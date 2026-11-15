@@ -13,12 +13,7 @@ import {
   waitForRecordStatusCommand,
 } from "./resume-e2e-runtime.mjs"
 import { taskSendRevived } from "./task-resume-e2e.mjs"
-import {
-  CONTINUATION_MARKER,
-  MIDTURN_CONTINUED_TOKEN,
-  PING_TOKEN,
-  PONG_TOKEN,
-} from "./task-resume-e2e-scenarios.mjs"
+import { CONTINUATION_MARKER, MIDTURN_CONTINUED_TOKEN, PING_TOKEN, PONG_TOKEN } from "./task-resume-e2e-scenarios.mjs"
 import {
   CONTINUATION_MARKER as PROVIDER_CONTINUATION_MARKER,
   MIDTURN_CONTINUED_TOKEN as PROVIDER_MIDTURN_CONTINUED_TOKEN,
@@ -100,14 +95,20 @@ describe("revivedAfterSuspend", () => {
   })
 
   test("#given no suspension #when scanning #then no revival", () => {
-    const log = JSON.stringify({ type: "transition_applied", payload: { status: "running", residency_state: "resident" } })
+    const log = JSON.stringify({
+      type: "transition_applied",
+      payload: { status: "running", residency_state: "resident" },
+    })
     expect(revivedAfterSuspend(log)).toBe(false)
   })
 
   test("#given only non-resident transitions after the suspend #when scanning #then no revival", () => {
     const log = [
       JSON.stringify({ type: "suspended", payload: { reason: "quit" } }),
-      JSON.stringify({ type: "transition_applied", payload: { status: "completed", residency_state: "persisted_only" } }),
+      JSON.stringify({
+        type: "transition_applied",
+        payload: { status: "completed", residency_state: "persisted_only" },
+      }),
     ].join("\n")
     expect(revivedAfterSuspend(log)).toBe(false)
   })
@@ -116,7 +117,10 @@ describe("revivedAfterSuspend", () => {
     // The reconcile claim is a store.mutate CAS (no transition_applied line); the reattach event is
     // the durable revival signal for terminal witnesses that never run another turn.
     const log = [
-      JSON.stringify({ type: "transition_applied", payload: { status: "completed", residency_state: "persisted_only" } }),
+      JSON.stringify({
+        type: "transition_applied",
+        payload: { status: "completed", residency_state: "persisted_only" },
+      }),
       JSON.stringify({ type: "suspended", payload: { reason: "quit" } }),
       JSON.stringify({ type: "reconcile_reattached", payload: {} }),
     ].join("\n")
@@ -127,14 +131,22 @@ describe("revivedAfterSuspend", () => {
 describe("taskSendRevived", () => {
   test("#given a task_send result reviving the finished child #when searching #then it matches", () => {
     const events = [
-      { type: "tool_execution_end", toolName: "task_send", result: { details: { kind: "revived", task_id: "st_fin", run_epoch: 1 } } },
+      {
+        type: "tool_execution_end",
+        toolName: "task_send",
+        result: { details: { kind: "revived", task_id: "st_fin", run_epoch: 1 } },
+      },
     ]
     expect(taskSendRevived(events, "st_fin")).toBe(true)
   })
 
   test("#given a revived result for a different task #when searching #then no match", () => {
     const events = [
-      { type: "tool_execution_end", toolName: "task_send", result: { details: { kind: "revived", task_id: "st_other", run_epoch: 1 } } },
+      {
+        type: "tool_execution_end",
+        toolName: "task_send",
+        result: { details: { kind: "revived", task_id: "st_other", run_epoch: 1 } },
+      },
     ]
     expect(taskSendRevived(events, "st_fin")).toBe(false)
   })
@@ -169,8 +181,14 @@ describe("store readers", () => {
       const tasksDir = join(taskStateDir(sandbox), "tasks")
       expect(tasksDir.startsWith(join(root, "agent", "projects"))).toBe(true)
       mkdirSync(tasksDir, { recursive: true })
-      writeFileSync(join(tasksDir, "st_one.json"), `${JSON.stringify({ task_id: "st_one", name: "midchild", status: "running", residency_state: "persisted_only" })}\n`)
-      writeFileSync(join(tasksDir, "st_two.json"), `${JSON.stringify({ task_id: "st_two", name: "finchild", status: "completed", residency_state: "resident" })}\n`)
+      writeFileSync(
+        join(tasksDir, "st_one.json"),
+        `${JSON.stringify({ task_id: "st_one", name: "midchild", status: "running", residency_state: "persisted_only" })}\n`,
+      )
+      writeFileSync(
+        join(tasksDir, "st_two.json"),
+        `${JSON.stringify({ task_id: "st_two", name: "finchild", status: "completed", residency_state: "resident" })}\n`,
+      )
       expect(readTaskRecords(sandbox)).toHaveLength(2)
       expect(findTaskByName(sandbox, "midchild")?.task_id).toBe("st_one")
       expect(findTaskByName(sandbox, "missing")).toBeUndefined()

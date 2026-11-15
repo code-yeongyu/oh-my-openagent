@@ -1,5 +1,5 @@
-import { existsSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { existsSync } from "node:fs"
+import { fileURLToPath } from "node:url"
 
 // Bundlers inline this module, so import.meta.url points at the consuming bundle, and the
 // distance to the skills directory depends on where that bundle landed:
@@ -13,11 +13,9 @@ import { fileURLToPath } from "node:url";
 //                                                       `plugins/omo/dist/cli`)
 // Probes run nearest-first so a closer skills directory always wins, and the sibling path is
 // returned unchanged when nothing matches, keeping the previous not-found behavior.
-const SKILLS_PROBE_SPECIFIERS = ["./skills/", "../skills/", "../../skills/"];
+const SKILLS_PROBE_SPECIFIERS = ["./skills/", "../skills/", "../../skills/"]
 
 export function sharedSkillsRootPath() {
-	const candidates = SKILLS_PROBE_SPECIFIERS.map((specifier) =>
-		fileURLToPath(new URL(specifier, import.meta.url)),
-	);
-	return candidates.find((candidate) => existsSync(candidate)) ?? candidates[0];
+  const candidates = SKILLS_PROBE_SPECIFIERS.map((specifier) => fileURLToPath(new URL(specifier, import.meta.url)))
+  return candidates.find((candidate) => existsSync(candidate)) ?? candidates[0]
 }

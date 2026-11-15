@@ -17,7 +17,10 @@ describe("/sleeptime", () => {
     tempDirs.push(root)
     const settings = memorySettings()
     const pi = new MemoryFakeExtensionAPI()
-    registerSleeptimeCommand(pi, fakeDeps(identity, { loadSettings: () => ({ settings, configPath: "/tmp/omo.jsonc" }) }))
+    registerSleeptimeCommand(
+      pi,
+      fakeDeps(identity, { loadSettings: () => ({ settings, configPath: "/tmp/omo.jsonc" }) }),
+    )
     const ctx = fakeCommandContext()
 
     // when
@@ -94,7 +97,10 @@ describe("/sleeptime", () => {
       },
     })
     const pi = new MemoryFakeExtensionAPI()
-    registerSleeptimeCommand(pi, fakeDeps(identity, { loadSettings: () => ({ settings, configPath: "/tmp/omo.jsonc" }) }))
+    registerSleeptimeCommand(
+      pi,
+      fakeDeps(identity, { loadSettings: () => ({ settings, configPath: "/tmp/omo.jsonc" }) }),
+    )
     const ctx = fakeCommandContext()
 
     // when

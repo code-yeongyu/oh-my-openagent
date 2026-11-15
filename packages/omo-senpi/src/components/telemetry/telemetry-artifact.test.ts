@@ -25,9 +25,13 @@ const SCHEMA: {
   }
   readonly properties: { readonly resource: { readonly required: readonly string[] } }
 } = JSON.parse(readFileSync(new URL("artifact.schema.json", REGISTRY), "utf8"))
-const PINS: { readonly files: Readonly<Record<string, string>> } = JSON.parse(readFileSync(new URL("PINS.json", REGISTRY), "utf8"))
+const PINS: { readonly files: Readonly<Record<string, string>> } = JSON.parse(
+  readFileSync(new URL("PINS.json", REGISTRY), "utf8"),
+)
 const KEY_PATTERN = new RegExp(SCHEMA.$defs.keyPattern.pattern, "u")
-const FORBIDDEN_PATTERNS = SCHEMA.$defs.wireKey.allOf.flatMap(({ not }) => (not?.pattern === undefined ? [] : [new RegExp(not.pattern, "u")]))
+const FORBIDDEN_PATTERNS = SCHEMA.$defs.wireKey.allOf.flatMap(({ not }) =>
+  not?.pattern === undefined ? [] : [new RegExp(not.pattern, "u")],
+)
 const isForbidden = (key: string): boolean =>
   SCHEMA.$defs.forbiddenKeys.enum.includes(key) || FORBIDDEN_PATTERNS.some((pattern) => pattern.test(key))
 
@@ -75,7 +79,11 @@ describe("telemetry schema artifacts", () => {
 
   test("#then the vendored registry files match the collector's pinned hashes and the artifacts record that pin", () => {
     for (const [file, pinned] of Object.entries(PINS.files)) {
-      expect(createHash("sha256").update(readFileSync(new URL(file, REGISTRY))).digest("hex")).toBe(pinned)
+      expect(
+        createHash("sha256")
+          .update(readFileSync(new URL(file, REGISTRY)))
+          .digest("hex"),
+      ).toBe(pinned)
     }
     const canonical = readFileSync(new URL("semconv-map.sha256", REGISTRY), "utf8").trim()
     for (const artifact of ARTIFACTS) expect(artifact.semconv_map_sha256).toBe(canonical)
@@ -103,8 +111,10 @@ describe("telemetry schema artifacts", () => {
     const violations: string[] = []
     for (const artifact of ARTIFACTS) {
       for (const [owner, key, spec] of attributesOf(artifact)) {
-        if (spec.type === "string" && spec.values === undefined && spec.pattern === undefined) violations.push(`${owner}.${key}`)
-        if (spec.type === "number" && (spec.min === undefined || spec.max === undefined)) violations.push(`${owner}.${key}`)
+        if (spec.type === "string" && spec.values === undefined && spec.pattern === undefined)
+          violations.push(`${owner}.${key}`)
+        if (spec.type === "number" && (spec.min === undefined || spec.max === undefined))
+          violations.push(`${owner}.${key}`)
       }
     }
     expect(violations).toEqual([])
@@ -134,14 +144,31 @@ describe("telemetry schema artifacts", () => {
 
   test("#then mapped fields use their semantic-convention keys and everything else is omo.<bare name>", () => {
     const turn = SENPI.events["omo.turn_completed"] ?? {}
-    expect(Object.keys(turn)).toEqual(expect.arrayContaining([
-      "log.record.uid", "session.id", "omo.session.role", "omo.provider", "gen_ai.provider.name", "omo.model_id",
-      "gen_ai.usage.input_tokens", "gen_ai.usage.cache_read.input_tokens", "gen_ai.usage.cache_creation.input_tokens",
-      "gen_ai.usage.output_tokens", "gen_ai.usage.reasoning.output_tokens", "omo.usage.total_tokens", "omo.cost.usd_1e4",
-      "omo.turn.index", "omo.sample_rate", "gen_ai.request.model", "gen_ai.response.model",
-    ]))
+    expect(Object.keys(turn)).toEqual(
+      expect.arrayContaining([
+        "log.record.uid",
+        "session.id",
+        "omo.session.role",
+        "omo.provider",
+        "gen_ai.provider.name",
+        "omo.model_id",
+        "gen_ai.usage.input_tokens",
+        "gen_ai.usage.cache_read.input_tokens",
+        "gen_ai.usage.cache_creation.input_tokens",
+        "gen_ai.usage.output_tokens",
+        "gen_ai.usage.reasoning.output_tokens",
+        "omo.usage.total_tokens",
+        "omo.cost.usd_1e4",
+        "omo.turn.index",
+        "omo.sample_rate",
+        "gen_ai.request.model",
+        "gen_ai.response.model",
+      ]),
+    )
     expect(turn).not.toHaveProperty(["omo.cost_usd"])
-    expect(SENPI.derived_properties["omo.turn_completed"]).toEqual({ cost_usd: { from: "omo.cost.usd_1e4", divide_by: 10_000 } })
+    expect(SENPI.derived_properties["omo.turn_completed"]).toEqual({
+      cost_usd: { from: "omo.cost.usd_1e4", divide_by: 10_000 },
+    })
     // Decoupled from the direct PostHog schema (#10934 option A): category models are the model enum, and properties
     // whose values fit no collector safe shape stay off the wire (the direct events keep them).
     expect(SENPI.events["omo.category_config"]?.["omo.cat_quick"]?.values).toContain("custom")
@@ -149,7 +176,11 @@ describe("telemetry schema artifacts", () => {
       expect(SENPI.events["omo.session_started"]).not.toHaveProperty([excluded])
     }
     expect(SENPI.events["omo.session_started"]).not.toHaveProperty(["omo.arch"])
-    expect(SENPI.resource_projections["omo.session_started"]).toEqual({ $os: "os.type", $os_version: "os.version", arch: "host.arch" })
+    expect(SENPI.resource_projections["omo.session_started"]).toEqual({
+      $os: "os.type",
+      $os_version: "os.version",
+      arch: "host.arch",
+    })
     expect(SENPI.events["omo.process_crashed"]).toHaveProperty(["process.exit.code"])
     expect(SENPI.events["omo.session_summary"]).toHaveProperty(["omo.input_tokens"])
     // The real-user flag keeps the collector's semconv wire key (its activity rollup reads it); only the PostHog name is
@@ -169,7 +200,10 @@ describe("telemetry schema artifacts", () => {
 
   test("#then turn_completed requires every attribute but the optional GenAI model ids, and session.id is required everywhere except sessionless events", () => {
     const turn = SENPI.events["omo.turn_completed"] ?? {}
-    const optional = Object.entries(turn).filter(([, spec]) => !spec.required).map(([key]) => key).sort()
+    const optional = Object.entries(turn)
+      .filter(([, spec]) => !spec.required)
+      .map(([key]) => key)
+      .sort()
     expect(optional).toEqual(["gen_ai.request.model", "gen_ai.response.model", "omo.session.role"])
     for (const [event, attributes] of Object.entries(SENPI.events)) {
       expect(attributes["log.record.uid"]?.required).toBe(true)
@@ -211,24 +245,55 @@ describe("telemetry schema artifacts", () => {
   })
 
   test("#then every version slot is the collector semver shape, and a hostname, build suffix or unbounded number is rejected", () => {
-    const accepted = ["1.2.3", "5.1.33", "1.2.3-beta.1", "1.2.3-rc.2", "1.2.3-alpha.10", "0.0.34-nightly.20261001.679", "0.0.43-preview.20260928.2413", "0.0.34-dfa.39", "5.1.34-2", "0.0.34-12"]
-    const rejected = ["1.2.3-yeongyu-macbook-pro.local", "1.2.3+build.host", "1.2.3-next.1", "1.2.3-beta", "1.2.3-beta.1.2", "1.2", "123456789012345678901234567890123456789012345678901234567890.2.3", "1234567.2.3", "1.2.3-beta.1234567", "1.2.3-nightly.2026100.1", "1.2.3-preview.20260928", "1.2.3-dfa.39.1", "5.1.34-abc", "5.1.34-1234567", "5.1.34-"]
+    const accepted = [
+      "1.2.3",
+      "5.1.33",
+      "1.2.3-beta.1",
+      "1.2.3-rc.2",
+      "1.2.3-alpha.10",
+      "0.0.34-nightly.20261001.679",
+      "0.0.43-preview.20260928.2413",
+      "0.0.34-dfa.39",
+      "5.1.34-2",
+      "0.0.34-12",
+    ]
+    const rejected = [
+      "1.2.3-yeongyu-macbook-pro.local",
+      "1.2.3+build.host",
+      "1.2.3-next.1",
+      "1.2.3-beta",
+      "1.2.3-beta.1.2",
+      "1.2",
+      "123456789012345678901234567890123456789012345678901234567890.2.3",
+      "1234567.2.3",
+      "1.2.3-beta.1234567",
+      "1.2.3-nightly.2026100.1",
+      "1.2.3-preview.20260928",
+      "1.2.3-dfa.39.1",
+      "5.1.34-abc",
+      "5.1.34-1234567",
+      "5.1.34-",
+    ]
     for (const artifact of ARTIFACTS) {
       const slots: [string, string][] = [["scope.version", artifact.scope.version]]
       for (const [owner, key, spec] of attributesOf(artifact)) {
-        if (/(?:^|[._])(?:service|sdk|crashed_[a-z]+)[._]version$/u.test(key) && spec.pattern !== undefined) slots.push([`${owner}.${key}`, spec.pattern])
+        if (/(?:^|[._])(?:service|sdk|crashed_[a-z]+)[._]version$/u.test(key) && spec.pattern !== undefined)
+          slots.push([`${owner}.${key}`, spec.pattern])
       }
       expect(slots.length).toBeGreaterThan(1)
       for (const [slot, pattern] of slots) {
         expect(`${slot} ${pattern === VERSION_PATTERN}`).toBe(`${slot} true`)
-        for (const value of accepted) expect(`${slot} ${value} ${matches(pattern, value)}`).toBe(`${slot} ${value} true`)
-        for (const value of rejected) expect(`${slot} ${value} ${matches(pattern, value)}`).toBe(`${slot} ${value} false`)
+        for (const value of accepted)
+          expect(`${slot} ${value} ${matches(pattern, value)}`).toBe(`${slot} ${value} true`)
+        for (const value of rejected)
+          expect(`${slot} ${value} ${matches(pattern, value)}`).toBe(`${slot} ${value} false`)
       }
     }
   })
 
   test("#then os.version accepts only a bare dotted release; a kernel or build suffix and a path do not match", () => {
-    for (const value of ["25.3.0", "26.4.1", "6.8.0", "10.0.22631"]) expect(`${value} ${matches(OS_VERSION_PATTERN, value)}`).toBe(`${value} true`)
+    for (const value of ["25.3.0", "26.4.1", "6.8.0", "10.0.22631"])
+      expect(`${value} ${matches(OS_VERSION_PATTERN, value)}`).toBe(`${value} true`)
     for (const value of ["6.8.0-45-generic", "26.4.1 (25E253)", "1234567.0", "6", "/srv/customer/alice/report.txt"]) {
       expect(`${value} ${matches(OS_VERSION_PATTERN, value)}`).toBe(`${value} false`)
     }
@@ -249,12 +314,20 @@ describe("telemetry schema artifacts", () => {
   })
 
   test("#given a string property without values or pattern #when generating #then the generator refuses", () => {
-    expect(() => buildTelemetryArtifacts({ ...OMO_NATIVE_EVENT_SCHEMAS, scratch_event: { $session_id: { type: "string" }, free_text_note: { type: "string" } } }))
-      .toThrow("scratch_event.free_text_note: string property without values or pattern")
+    expect(() =>
+      buildTelemetryArtifacts({
+        ...OMO_NATIVE_EVENT_SCHEMAS,
+        scratch_event: { $session_id: { type: "string" }, free_text_note: { type: "string" } },
+      }),
+    ).toThrow("scratch_event.free_text_note: string property without values or pattern")
   })
 
   test("#given a property that has a semantic convention but no map entry #when generating #then the generator refuses", () => {
-    expect(() => buildTelemetryArtifacts({ ...OMO_NATIVE_EVENT_SCHEMAS, scratch_event: { $session_id: { type: "string" }, http_method: { type: "string", values: ["x"] } } }))
-      .toThrow("scratch_event.http_method has a semantic convention but no entry in semconv-map.json")
+    expect(() =>
+      buildTelemetryArtifacts({
+        ...OMO_NATIVE_EVENT_SCHEMAS,
+        scratch_event: { $session_id: { type: "string" }, http_method: { type: "string", values: ["x"] } },
+      }),
+    ).toThrow("scratch_event.http_method has a semantic convention but no entry in semconv-map.json")
   })
 })

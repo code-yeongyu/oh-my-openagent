@@ -40,7 +40,10 @@ export class FakeItemStore implements ItemStore {
   async load(): Promise<void> {
     const saved = await readJson<Persisted>(this.file, { items: {}, materialized: {} })
     this.items = new Map(
-      Object.entries(saved.items).map(([k, v]) => [k, { adds: new Map(Object.entries(v.adds)), killed: new Set(v.killed) }]),
+      Object.entries(saved.items).map(([k, v]) => [
+        k,
+        { adds: new Map(Object.entries(v.adds)), killed: new Set(v.killed) },
+      ]),
     )
     this.materialized = new Map(Object.entries(saved.materialized))
   }
@@ -97,6 +100,49 @@ export class FakeItemStore implements ItemStore {
     this.materialized.set(key, text)
   }
 
+  /** Undoes the ops' adds and kills; the item's render becomes its baseline, as the Loro store's rewind does. */
+  async rewind(key: string, ops: readonly Uint8Array[]): Promise<"rewound" | "kept"> {
+    const item = this.items.get(key)
+    for (const op of ops) {
+      let parsed: ItemOps
+      try {
+        parsed = JSON.parse(decoder.decode(op)) as ItemOps
+      } catch {
+        return "kept"
+      }
+      for (const id of Object.keys(parsed.adds)) item?.adds.delete(id)
+      for (const id of parsed.kills) item?.killed.delete(id)
+    }
+    if (item !== undefined && item.adds.size === 0) this.items.delete(key)
+    this.materialized.set(key, this.render(key, null))
+    return "rewound"
+  }
+
+  /** The Loro store's adoptJournaled twin: the baseline becomes the captured lines (old lines minus kills plus adds). */
+  async adoptJournaled(key: string, ops: Uint8Array): Promise<"held" | "imported" | "refused"> {
+    let parsed: ItemOps
+    try {
+      parsed = JSON.parse(decoder.decode(ops)) as ItemOps
+    } catch {
+      return "refused"
+    }
+    const item = this.items.get(key)
+    if (
+      item !== undefined &&
+      Object.keys(parsed.adds).every((id) => item.adds.has(id)) &&
+      parsed.kills.every((id) => item.killed.has(id))
+    )
+      return "held"
+    const killed = new Set(parsed.kills.map((id) => item?.adds.get(id)).filter((line) => line !== undefined))
+    await this.apply(key, ops)
+    const lines = [
+      ...linesOf(this.materialized.get(key) ?? null).filter((line) => !killed.has(line)),
+      ...Object.values(parsed.adds),
+    ]
+    this.materialized.set(key, lines.length === 0 ? null : `${lines.join("\n")}\n`)
+    return "imported"
+  }
+
   async applySnapshot(payload: BatchPayload): Promise<void> {
     for (const item of payload.items) await this.apply(item.key, item.ops)
   }
@@ -112,7 +158,9 @@ export class FakeItemStore implements ItemStore {
     return {
       items: [...this.items].map(([key, v]) => ({
         key,
-        ops: encoder.encode(JSON.stringify({ adds: Object.fromEntries(v.adds), kills: [...v.killed] } satisfies ItemOps)),
+        ops: encoder.encode(
+          JSON.stringify({ adds: Object.fromEntries(v.adds), kills: [...v.killed] } satisfies ItemOps),
+        ),
       })),
     }
   }

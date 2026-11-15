@@ -19,14 +19,18 @@ export type RenameContentionDeps = {
 
 const sleepFor = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
-export async function renameWithContentionRetry(from: PathLike, to: PathLike, deps: RenameContentionDeps): Promise<void> {
+export async function renameWithContentionRetry(
+  from: PathLike,
+  to: PathLike,
+  deps: RenameContentionDeps,
+): Promise<void> {
   const delays = deps.platform === "win32" ? (deps.delaysMs ?? CONTENTION_DELAYS_MS) : []
   const sleep = deps.sleep ?? sleepFor
   for (let attempt = 0; ; attempt += 1) {
     try {
-      await retryOnEintr(() => deps.admit === undefined
-        ? deps.rename(from, to)
-        : deps.admit(() => deps.rename(from, to)))
+      await retryOnEintr(() =>
+        deps.admit === undefined ? deps.rename(from, to) : deps.admit(() => deps.rename(from, to)),
+      )
       return
     } catch (error) {
       const delay = delays[attempt]

@@ -2,9 +2,7 @@ import type { SisyphusAgentConfig } from "../../config/schema"
 import { stripInvisibleAgentCharacters } from "../../shared/agent-display-names"
 import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
 import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
-import {
-  promptWithModelSuggestionRetry,
-} from "../../shared/model-suggestion-retry"
+import { promptWithModelSuggestionRetry } from "../../shared/model-suggestion-retry"
 import { migrateToolsToPermission } from "../../shared/permission-compat"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { routePromptRetry } from "../../shared/session-route"
@@ -82,23 +80,21 @@ export async function sendSyncPrompt(
     taskId: string | undefined
     sisyphusAgentConfig?: SisyphusAgentConfig
   },
-  deps: SendSyncPromptDeps = sendSyncPromptDeps
+  deps: SendSyncPromptDeps = sendSyncPromptDeps,
 ): Promise<string | null> {
   const tddEnabled = input.sisyphusAgentConfig?.tdd
   const effectivePrompt = buildTaskPrompt(input.args.prompt, input.agentToUse, tddEnabled)
-  const userPermission = input.categoryModel?.tools
-    ? migrateToolsToPermission(input.categoryModel.tools)
-    : undefined
+  const userPermission = input.categoryModel?.tools ? migrateToolsToPermission(input.categoryModel.tools) : undefined
   const tools = buildSyncPromptTools(input.agentToUse, userPermission)
   setSessionTools(input.sessionID, tools)
 
   const loweredReasoning = applySessionPromptParams(input.sessionID, input.categoryModel)
-  const promptModel = input.categoryModel?.reasoning !== undefined
-    ? { ...input.categoryModel, reasoningEffort: loweredReasoning.reasoningEffort }
-    : input.categoryModel
-  const promptVariant = input.categoryModel?.reasoning !== undefined
-    ? loweredReasoning.variant
-    : input.categoryModel?.variant
+  const promptModel =
+    input.categoryModel?.reasoning !== undefined
+      ? { ...input.categoryModel, reasoningEffort: loweredReasoning.reasoningEffort }
+      : input.categoryModel
+  const promptVariant =
+    input.categoryModel?.reasoning !== undefined ? loweredReasoning.variant : input.categoryModel?.variant
 
   const promptArgs = {
     path: { id: input.sessionID },
@@ -136,13 +132,18 @@ export async function sendSyncPrompt(
     }
     const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
     if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
-      return formatDetailedError(new Error(`Agent "${input.agentToUse}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`), {
-        operation: "Send prompt to agent",
-        args: input.args,
-        sessionID: input.sessionID,
-        agent: input.agentToUse,
-        category: input.args.category,
-      })
+      return formatDetailedError(
+        new Error(
+          `Agent "${input.agentToUse}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`,
+        ),
+        {
+          operation: "Send prompt to agent",
+          args: input.args,
+          sessionID: input.sessionID,
+          agent: input.agentToUse,
+          category: input.args.category,
+        },
+      )
     }
     return formatDetailedError(promptError, {
       operation: "Send prompt",

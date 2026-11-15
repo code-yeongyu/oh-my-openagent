@@ -45,7 +45,10 @@ export class FakeCache {
     return this.entries.get(request.url)?.clone()
   }
   async put(request: Request, response: Response): Promise<void> {
-    this.entries.set(request.url, new Response(await response.arrayBuffer(), { status: response.status, headers: response.headers }))
+    this.entries.set(
+      request.url,
+      new Response(await response.arrayBuffer(), { status: response.status, headers: response.headers }),
+    )
   }
 }
 

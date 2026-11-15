@@ -35,10 +35,7 @@ function formatOutputLines(batch: OutputBatch): string[] {
   )
 }
 
-function formatStatus(
-  record: { status: string; exitCode?: number; signal?: string },
-  batch: OutputBatch,
-): string {
+function formatStatus(record: { status: string; exitCode?: number; signal?: string }, batch: OutputBatch): string {
   if (batch.stillRunning) {
     return "Status: running"
   }

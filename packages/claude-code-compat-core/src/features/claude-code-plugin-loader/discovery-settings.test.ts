@@ -52,11 +52,7 @@ describe("discoverInstalledPlugins settings", () => {
     const installPath = createTemporaryDirectory("omo-settings-disabled-install-")
     const settingsPath = join(createTemporaryDirectory("omo-claude-settings-"), "settings.json")
     process.env.CLAUDE_SETTINGS_PATH = settingsPath
-    writeFileSync(
-      settingsPath,
-      JSON.stringify({ enabledPlugins: { "settings-plugin@market": false } }),
-      "utf-8",
-    )
+    writeFileSync(settingsPath, JSON.stringify({ enabledPlugins: { "settings-plugin@market": false } }), "utf-8")
     writeDatabase(pluginsHome, {
       version: 2,
       plugins: {
@@ -90,11 +86,7 @@ describe("discoverInstalledPlugins settings", () => {
     const installPath = createTemporaryDirectory("omo-settings-malformed-install-")
     const settingsPath = join(createTemporaryDirectory("omo-claude-settings-"), "settings.json")
     process.env.CLAUDE_SETTINGS_PATH = settingsPath
-    writeFileSync(
-      settingsPath,
-      JSON.stringify({ enabledPlugins: "not-an-object" }),
-      "utf-8",
-    )
+    writeFileSync(settingsPath, JSON.stringify({ enabledPlugins: "not-an-object" }), "utf-8")
     writeDatabase(pluginsHome, {
       version: 2,
       plugins: {

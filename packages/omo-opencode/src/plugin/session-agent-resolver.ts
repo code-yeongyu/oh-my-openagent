@@ -14,10 +14,7 @@ type SessionClient = {
   }
 }
 
-export async function resolveSessionAgent(
-  client: SessionClient,
-  sessionId: string,
-): Promise<string | undefined> {
+export async function resolveSessionAgent(client: SessionClient, sessionId: string): Promise<string | undefined> {
   try {
     const messagesResp = await client.session.messages({ path: { id: sessionId } })
     const messages = normalizeSDKResponse(messagesResp, [] as SessionMessage[])

@@ -9,6 +9,7 @@ export type { HostLivenessStatus } from "../../state/host-liveness"
 
 export const HOST_UNRESPONSIVE_DEADLINE_MS = 120_000
 const MAX_BACKOFF_MS = 30_000
+const STOPPED = Symbol("host heartbeat stopped")
 
 export interface HostHeartbeatInput {
   readonly taskId: string
@@ -37,8 +38,11 @@ export function startHostHeartbeat(input: HostHeartbeatInput) {
     status = next
     input.onStatus(next)
     for (const listener of listeners) {
-      try { listener(next) }
-      catch (error) { log("senpi-task liveness observer failed", { taskId: input.taskId, error: String(error) }) }
+      try {
+        listener(next)
+      } catch (error) {
+        log("senpi-task liveness observer failed", { taskId: input.taskId, error: String(error) })
+      }
     }
   }
   const stop = (): void => {
@@ -83,10 +87,15 @@ export function startHostHeartbeat(input: HostHeartbeatInput) {
     // Old probes cannot undo this stop intent or authorize its completion.
     closeTimer = setTimeout(close, MAX_BACKOFF_MS)
     closeTimer.unref?.()
-    void Promise.resolve().then(input.close).then(() => gone(true), error => {
-      if (!active()) return
-      log("senpi-task unresponsive session close pending", { taskId: input.taskId, error: String(error) })
-    })
+    void Promise.resolve()
+      .then(input.close)
+      .then(
+        () => gone(true),
+        (error) => {
+          if (!active()) return
+          log("senpi-task unresponsive session close pending", { taskId: input.taskId, error: String(error) })
+        },
+      )
   }
   const tick = (): void => {
     if (!active() || status.state === "terminal-pending") return
@@ -98,16 +107,25 @@ export function startHostHeartbeat(input: HostHeartbeatInput) {
     probePending = true
     probeMissed = false
     schedule(HEARTBEAT_DEADLINE_MS)
-    void Promise.resolve().then(input.probe).then(state => {
-      if (!active() || status.state === "terminal-pending") return
-      failures = 0
-      clearTimeout(deadline)
-      if (status.state !== "running") publish({ state: "running" })
-      input.onState(state)
-      schedule(input.intervalMs)
-    }, error => {
-      if (isHostSessionMissing(error) || !probeMissed) failed(error)
-    }).finally(() => { probePending = false })
+    // A stop that settles before this launch (a teardown continuation queued ahead of it) sends no probe (#11673).
+    void Promise.resolve()
+      .then<HostSessionLiveness | typeof STOPPED>(() => (stopped ? STOPPED : input.probe()))
+      .then(
+        (state) => {
+          if (state === STOPPED || !active() || status.state === "terminal-pending") return
+          failures = 0
+          clearTimeout(deadline)
+          if (status.state !== "running") publish({ state: "running" })
+          input.onState(state)
+          schedule(input.intervalMs)
+        },
+        (error) => {
+          if (isHostSessionMissing(error) || !probeMissed) failed(error)
+        },
+      )
+      .finally(() => {
+        probePending = false
+      })
   }
   schedule(input.intervalMs)
   return {
@@ -125,7 +143,9 @@ export function startHostHeartbeat(input: HostHeartbeatInput) {
     subscribe: (listener: (status: HostLivenessStatus) => void) => {
       listeners.add(listener)
       if (status.state !== "running") listener(status)
-      return () => { listeners.delete(listener) }
+      return () => {
+        listeners.delete(listener)
+      }
     },
   }
 }

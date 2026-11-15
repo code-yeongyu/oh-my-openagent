@@ -2,17 +2,9 @@ import { existsSync, realpathSync } from "node:fs"
 import { homedir } from "node:os"
 import { join, posix, resolve, win32 } from "node:path"
 
-import type {
-  OpenCodeBinaryType,
-  OpenCodeConfigDirOptions,
-  OpenCodeConfigPaths,
-} from "./opencode-config-dir-types"
+import type { OpenCodeBinaryType, OpenCodeConfigDirOptions, OpenCodeConfigPaths } from "./opencode-config-dir-types"
 
-export type {
-  OpenCodeBinaryType,
-  OpenCodeConfigDirOptions,
-  OpenCodeConfigPaths,
-} from "./opencode-config-dir-types"
+export type { OpenCodeBinaryType, OpenCodeConfigDirOptions, OpenCodeConfigPaths } from "./opencode-config-dir-types"
 
 export const TAURI_APP_IDENTIFIER = "ai.opencode.desktop"
 export const TAURI_APP_IDENTIFIER_DEV = "ai.opencode.desktop.dev"
@@ -61,8 +53,10 @@ function resolveConfigPath(pathValue: string): string {
 }
 
 function isWslEnvironment(): boolean {
-  return process.platform === "linux" &&
+  return (
+    process.platform === "linux" &&
     (Boolean(process.env.WSL_DISTRO_NAME?.trim()) || Boolean(process.env.WSL_INTEROP?.trim()))
+  )
 }
 
 function isWindowsUserConfigRoot(pathValue: string): boolean {
@@ -82,7 +76,9 @@ function getWslLinuxHomeDir(windowsConfigRoot?: string): string | null {
     return envHome
   }
 
-  const user = process.env.USER?.trim() || process.env.LOGNAME?.trim() ||
+  const user =
+    process.env.USER?.trim() ||
+    process.env.LOGNAME?.trim() ||
     process.env.SUDO_USER?.trim() ||
     (windowsConfigRoot ? getWindowsUserFromConfigRoot(windowsConfigRoot) : undefined)
   return user ? posix.join("/home", user) : null
@@ -90,8 +86,8 @@ function getWslLinuxHomeDir(windowsConfigRoot?: string): string | null {
 
 function getCliDefaultConfigDir(): string {
   const envXdgConfig = process.env.XDG_CONFIG_HOME?.trim()
-  const shouldIgnoreWindowsXdg = envXdgConfig !== undefined && envXdgConfig.length > 0 &&
-    isWslEnvironment() && isWindowsUserConfigRoot(envXdgConfig)
+  const shouldIgnoreWindowsXdg =
+    envXdgConfig !== undefined && envXdgConfig.length > 0 && isWslEnvironment() && isWindowsUserConfigRoot(envXdgConfig)
   const xdgConfig = shouldIgnoreWindowsXdg
     ? posix.join(getWslLinuxHomeDir(envXdgConfig) ?? "/home", ".config")
     : envXdgConfig || join(homedir(), ".config")
@@ -119,12 +115,7 @@ export function getOpenCodeConfigDirs(options: OpenCodeConfigDirOptions): string
 
   const customConfigDir = getCliCustomConfigDir()
 
-  return Array.from(
-    new Set([
-      ...(customConfigDir ? [customConfigDir] : []),
-      getCliDefaultConfigDir(),
-    ]),
-  )
+  return Array.from(new Set([...(customConfigDir ? [customConfigDir] : []), getCliDefaultConfigDir()]))
 }
 
 export function getOpenCodeConfigDir(options: OpenCodeConfigDirOptions): string {
@@ -136,9 +127,12 @@ export function getOpenCodeConfigDir(options: OpenCodeConfigDirOptions): string 
 
   const identifier = isDevBuild(version) ? TAURI_APP_IDENTIFIER_DEV : TAURI_APP_IDENTIFIER
   const tauriDirBase = getTauriConfigDir(identifier)
-  const tauriDir = process.platform === "win32"
-    ? (win32.isAbsolute(tauriDirBase) ? win32.normalize(tauriDirBase) : win32.resolve(tauriDirBase))
-    : resolveConfigPath(tauriDirBase)
+  const tauriDir =
+    process.platform === "win32"
+      ? win32.isAbsolute(tauriDirBase)
+        ? win32.normalize(tauriDirBase)
+        : win32.resolve(tauriDirBase)
+      : resolveConfigPath(tauriDirBase)
 
   if (checkExisting) {
     const legacyDir = getCliConfigDir()

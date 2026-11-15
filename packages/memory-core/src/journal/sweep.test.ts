@@ -16,14 +16,18 @@ afterEach(async () => {
 
 const NOW = Date.parse("2026-10-08T12:00:00.000Z")
 const OLD = new Date(NOW - 60 * 60 * 1000)
-const EMPTY_STATE = `${JSON.stringify({
-  unreflected_bytes: 0,
-  schema_version: "v3_assistant_steps",
-  total_completed_steps: 0,
-  reflected_completed_steps: 0,
-  steps_since_last_successful_reflection: 0,
-  reflected_through_byte_offset: 0,
-}, null, 2)}\n`
+const EMPTY_STATE = `${JSON.stringify(
+  {
+    unreflected_bytes: 0,
+    schema_version: "v3_assistant_steps",
+    total_completed_steps: 0,
+    reflected_completed_steps: 0,
+    steps_since_last_successful_reflection: 0,
+    reflected_through_byte_offset: 0,
+  },
+  null,
+  2,
+)}\n`
 
 async function transcriptsDir(): Promise<string> {
   const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-journal-sweep-")))
@@ -75,14 +79,25 @@ describe("empty transcript journal sweep (#9737)", () => {
       }),
       await journal(root, "with-reflection", {
         "transcript.jsonl": "",
-        "state.json": JSON.stringify({ schema_version: "v3_assistant_steps", last_reflection_started_at: "2026-10-01T00:00:00.000Z" }),
+        "state.json": JSON.stringify({
+          schema_version: "v3_assistant_steps",
+          last_reflection_started_at: "2026-10-01T00:00:00.000Z",
+        }),
       }),
       await journal(root, "with-unreadable-state", { "transcript.jsonl": "", "state.json": "{not json" }),
-      await journal(root, "with-other-file", { "transcript.jsonl": "", "state.json": EMPTY_STATE, "notes.txt": "keep" }),
+      await journal(root, "with-other-file", {
+        "transcript.jsonl": "",
+        "state.json": EMPTY_STATE,
+        "notes.txt": "keep",
+      }),
       await journal(root, "locked", { "transcript.jsonl": "", "state.json": EMPTY_STATE, "state.lock": "123\n" }),
       await journal(root, "recent", { "transcript.jsonl": "", "state.json": EMPTY_STATE }, new Date(NOW - 60 * 1000)),
       await journal(root, "live-session", { "transcript.jsonl": "", "state.json": EMPTY_STATE }),
-      await journal(root, "with-subdirectory", { "transcript.jsonl": "", "state.json": EMPTY_STATE, "nested/file": "" }),
+      await journal(root, "with-subdirectory", {
+        "transcript.jsonl": "",
+        "state.json": EMPTY_STATE,
+        "nested/file": "",
+      }),
       await journal(root, "with-large-transcript", { "transcript.jsonl": " ".repeat(5000), "state.json": EMPTY_STATE }),
     ]
 
@@ -126,7 +141,10 @@ describe("empty transcript journal sweep (#9737)", () => {
 
     // when
     const missing = await sweepEmptyTranscriptJournals({ transcriptsDir: join(parent, "missing"), now: () => NOW })
-    const underFile = await sweepEmptyTranscriptJournals({ transcriptsDir: join(parent, "memory", "agents", "a", "runtime", "transcripts"), now: () => NOW })
+    const underFile = await sweepEmptyTranscriptJournals({
+      transcriptsDir: join(parent, "memory", "agents", "a", "runtime", "transcripts"),
+      now: () => NOW,
+    })
 
     // then
     expect(missing).toEqual({ removed: [], kept: {} })

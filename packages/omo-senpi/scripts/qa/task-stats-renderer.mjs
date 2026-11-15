@@ -68,16 +68,19 @@ const RUN_STATS = {
 }
 
 function foregroundLines() {
-  return renderTaskResultComponent({
-    task_id: "st_foreground",
-    status: "completed",
-    mode: "spawn",
-    category: "quick",
-    execution_mode: "in-process",
-    model: "apitopia/z-ai/glm-5.2-ultrafast-unlocked",
-    run_in_background: false,
-    run_stats: { ...RUN_STATS, runtime_ms: 125_000, tool_calls: 7, tokens_per_second: 64 },
-  }, THEME).render(WIDTH)
+  return renderTaskResultComponent(
+    {
+      task_id: "st_foreground",
+      status: "completed",
+      mode: "spawn",
+      category: "quick",
+      execution_mode: "in-process",
+      model: "apitopia/z-ai/glm-5.2-ultrafast-unlocked",
+      run_in_background: false,
+      run_stats: { ...RUN_STATS, runtime_ms: 125_000, tool_calls: 7, tokens_per_second: 64 },
+    },
+    THEME,
+  ).render(WIDTH)
 }
 
 function backgroundLines() {
@@ -101,20 +104,24 @@ function backgroundLines() {
     () => RUN_STATS,
     WIDTH,
   )
-  const completed = renderTaskOutputResult({
-    content: [{ type: "text", text: "background complete" }],
-    details: {
-      kind: "status",
-      snapshot: {
-        ...record,
-        status: "completed",
-        parent_session_id: "session-parent",
-        root_session_id: "session-root",
-        age_ms: 65_000,
-        run_stats: RUN_STATS,
+  const completed = renderTaskOutputResult(
+    {
+      content: [{ type: "text", text: "background complete" }],
+      details: {
+        kind: "status",
+        snapshot: {
+          ...record,
+          status: "completed",
+          parent_session_id: "session-parent",
+          root_session_id: "session-root",
+          age_ms: 65_000,
+          run_stats: RUN_STATS,
+        },
       },
     },
-  }, { expanded: false, isPartial: false }, THEME).render(WIDTH)
+    { expanded: false, isPartial: false },
+    THEME,
+  ).render(WIDTH)
   return [...live, ...completed]
 }
 
@@ -149,23 +156,29 @@ function failedLines() {
 }
 
 function teamLines() {
-  return renderTaskCompletion({
-    role: "custom",
-    customType: "senpi-task.completion",
-    content: "",
-    display: true,
-    details: [{
-      task_id: "st_team_member",
-      name: "stats-member",
-      status: "completed",
-      category: "quick",
-      model: "apitopia/z-ai/glm-5.2-ultrafast-unlocked",
-      duration_ms: 65_000,
-      run_stats: { ...RUN_STATS, tool_calls: 4, tokens_per_second: 250 },
-      final_response: "team statistics member complete",
-      continuation_hint: 'Use task_send({ to: "stats-member", message: "..." }) to continue.',
-    }],
-  }, { expanded: false }, THEME).render(WIDTH)
+  return renderTaskCompletion(
+    {
+      role: "custom",
+      customType: "senpi-task.completion",
+      content: "",
+      display: true,
+      details: [
+        {
+          task_id: "st_team_member",
+          name: "stats-member",
+          status: "completed",
+          category: "quick",
+          model: "apitopia/z-ai/glm-5.2-ultrafast-unlocked",
+          duration_ms: 65_000,
+          run_stats: { ...RUN_STATS, tool_calls: 4, tokens_per_second: 250 },
+          final_response: "team statistics member complete",
+          continuation_hint: 'Use task_send({ to: "stats-member", message: "..." }) to continue.',
+        },
+      ],
+    },
+    { expanded: false },
+    THEME,
+  ).render(WIDTH)
 }
 
 function scenario(name) {
@@ -196,12 +209,12 @@ function scenario(name) {
       runningForbidden: ["turn ", "$"],
     }
   }
-  throw new Error("usage: bun packages/omo-senpi/scripts/qa/task-stats-renderer.mjs <foreground|background|team|failed>")
+  throw new Error(
+    "usage: bun packages/omo-senpi/scripts/qa/task-stats-renderer.mjs <foreground|background|team|failed>",
+  )
 }
 
-const names = process.argv[2] === undefined
-  ? ["foreground", "background", "team", "failed"]
-  : [process.argv[2]]
+const names = process.argv[2] === undefined ? ["foreground", "background", "team", "failed"] : [process.argv[2]]
 const blocks = []
 for (const name of names) {
   const selected = scenario(name)

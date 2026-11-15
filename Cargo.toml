@@ -12,6 +12,17 @@ members = [
     "crates/senpi-desktop-engine",
     "crates/senpi-desktop-xpc",
     "crates/omo-engine-trust-helper",
+    "crates/omo-git-job-helper",
+    "crates/omo-computer-core",
+    "crates/omo-computer-safety",
+    "crates/omo-computer-session",
+    "crates/omo-computer-backend-fake",
+    "crates/omo-computer-backend-atspi",
+    "crates/omo-computer-backend-macos",
+    "crates/omo-computer-backend-x11",
+    "crates/omo-computer-backend-wayland",
+    "crates/omo-computer-backend-win32",
+    "crates/omo-computer-engine",
 ]
 resolver = "2"
 

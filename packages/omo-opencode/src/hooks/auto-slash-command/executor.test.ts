@@ -18,12 +18,7 @@ import type {
   CommandExecuteBeforeOutput,
 } from "./types"
 
-const ENV_KEYS = [
-  "CLAUDE_CONFIG_DIR",
-  "CLAUDE_PLUGINS_HOME",
-  "CLAUDE_SETTINGS_PATH",
-  "OPENCODE_CONFIG_DIR",
-] as const
+const ENV_KEYS = ["CLAUDE_CONFIG_DIR", "CLAUDE_PLUGINS_HOME", "CLAUDE_SETTINGS_PATH", "OPENCODE_CONFIG_DIR"] as const
 
 type EnvKey = (typeof ENV_KEYS)[number]
 type EnvSnapshot = Record<EnvKey, string | undefined>
@@ -38,14 +33,16 @@ function joinTextParts(parts: readonly TextPart[]): string {
 function createComposedHooks(directory: string) {
   return {
     autoSlashCommand: createAutoSlashCommandHook({ skills: [], directory }),
-    ulwExecute: createUlwExecuteHook(unsafeTestValue<Parameters<typeof createUlwExecuteHook>[0]>({
-      directory,
-      client: {
-        session: {
-          messages: async () => ({ data: [] }),
+    ulwExecute: createUlwExecuteHook(
+      unsafeTestValue<Parameters<typeof createUlwExecuteHook>[0]>({
+        directory,
+        client: {
+          session: {
+            messages: async () => ({ data: [] }),
+          },
         },
-      },
-    })),
+      }),
+    ),
   }
 }
 
@@ -537,10 +534,12 @@ describe("auto-slash-command runtime substitution", () => {
         )
         expect(rendered.success).toBe(true)
         const rawTemplate = loadBuiltinCommands()["ulw-execute"]?.template ?? ""
-        const hook = createUlwExecuteHook(unsafeTestValue<Parameters<typeof createUlwExecuteHook>[0]>({
-          directory: testDir,
-          client: { session: { messages: async () => ({ data: [] }) } },
-        }))
+        const hook = createUlwExecuteHook(
+          unsafeTestValue<Parameters<typeof createUlwExecuteHook>[0]>({
+            directory: testDir,
+            client: { session: { messages: async () => ({ data: [] }) } },
+          }),
+        )
         const output = {
           parts: [
             { type: "text", text: rendered.replacementText ?? "" },
@@ -551,11 +550,14 @@ describe("auto-slash-command runtime substitution", () => {
         if (surface.name === "chat.message") {
           await hook["chat.message"]({ sessionID: retrySessionID }, output)
         } else {
-          await hook["command.execute.before"]({
-            command: "ulw-execute",
-            sessionID: retrySessionID,
-            arguments: userInput,
-          }, output)
+          await hook["command.execute.before"](
+            {
+              command: "ulw-execute",
+              sessionID: retrySessionID,
+              arguments: userInput,
+            },
+            output,
+          )
         }
 
         expect(output.parts[0].text).toContain(`<user-request>\n${userInput}\n</user-request>`)
@@ -568,10 +570,12 @@ describe("auto-slash-command runtime substitution", () => {
   }
 
   it("substitutes one framework session context split across text parts", async () => {
-    const hook = createUlwExecuteHook(unsafeTestValue<Parameters<typeof createUlwExecuteHook>[0]>({
-      directory: testDir,
-      client: { session: { messages: async () => ({ data: [] }) } },
-    }))
+    const hook = createUlwExecuteHook(
+      unsafeTestValue<Parameters<typeof createUlwExecuteHook>[0]>({
+        directory: testDir,
+        client: { session: { messages: async () => ({ data: [] }) } },
+      }),
+    )
     const prompt = loadBuiltinCommands()["ulw-execute"]?.template ?? ""
     const splitAt = prompt.indexOf("\nTimestamp:")
     const output = {

@@ -10,8 +10,8 @@ import { runTmuxCommand } from "./runner"
  * the behavioural suite here only duplicated the host-shell seam of #11259 in a second file.
  */
 describe("shared/tmux/runner", () => {
-	test("#given the shared tmux runner module #when runTmuxCommand is imported #then it is tmux-core's implementation", () => {
-		// then
-		expect(runTmuxCommand).toBe(runTmuxCommandFromCore)
-	})
+  test("#given the shared tmux runner module #when runTmuxCommand is imported #then it is tmux-core's implementation", () => {
+    // then
+    expect(runTmuxCommand).toBe(runTmuxCommandFromCore)
+  })
 })

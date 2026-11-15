@@ -22,7 +22,10 @@ const PLAIN_THEME = {
 }
 
 function recordingTheme(): {
-  readonly theme: { fg: (color: ThemeColor, text: string) => string; bg: (color: "customMessageBg", text: string) => string }
+  readonly theme: {
+    fg: (color: ThemeColor, text: string) => string
+    bg: (color: "customMessageBg", text: string) => string
+  }
   readonly colors: ThemeColor[]
 } {
   const colors: ThemeColor[] = []
@@ -48,7 +51,10 @@ function renderSoul(
     (options.theme ?? PLAIN_THEME) as never,
   )
   expect(component).toBeDefined()
-  return component!.render(120).slice(1, -1).map((line) => line.slice(1).trimEnd())
+  return component!
+    .render(120)
+    .slice(1, -1)
+    .map((line) => line.slice(1).trimEnd())
 }
 
 describe("renderSoulUpdatedEntry house notice contract", () => {
@@ -131,8 +137,6 @@ describe("renderSoulUpdatedEntry house notice contract", () => {
   })
 
   test("#given no record #when it renders #then it returns undefined", () => {
-    expect(
-      renderSoulUpdatedEntry({} as never, { expanded: false }, PLAIN_THEME as never),
-    ).toBeUndefined()
+    expect(renderSoulUpdatedEntry({} as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
   })
 })

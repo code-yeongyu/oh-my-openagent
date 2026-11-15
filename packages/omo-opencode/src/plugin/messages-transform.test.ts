@@ -37,10 +37,7 @@ type TestMessage = {
   parts: TestPart[]
 }
 
-type TransformHook = (
-  input: Record<string, never>,
-  output: { messages: TestMessage[] },
-) => Promise<void>
+type TransformHook = (input: Record<string, never>, output: { messages: TestMessage[] }) => Promise<void>
 
 function makeHook(handler: TransformHook): NonNullable<CreatedHooks["toolPairValidator"]> {
   return {
@@ -68,10 +65,7 @@ function makeHooks(overrides: {
   } as CreatedHooks
 }
 
-async function runHandler(
-  hooks: CreatedHooks,
-  messages: TestMessage[],
-): Promise<void> {
+async function runHandler(hooks: CreatedHooks, messages: TestMessage[]): Promise<void> {
   const handler = createMessagesTransformHandler({ hooks })
   await handler({} as never, { messages: messages as never })
 }
@@ -120,9 +114,7 @@ describe("createMessagesTransformHandler", () => {
 
   it("#given category-skill-reminder is disabled #when messages transform runs #then the user message is unchanged", async () => {
     //#given
-    const messages: TestMessage[] = [
-      { info: { role: "user" }, parts: [{ type: "text", text: "unchanged" }] },
-    ]
+    const messages: TestMessage[] = [{ info: { role: "user" }, parts: [{ type: "text", text: "unchanged" }] }]
     const hooks = {
       ...makeHooks({}),
       categorySkillReminder: null,
@@ -132,9 +124,7 @@ describe("createMessagesTransformHandler", () => {
     await runHandler(hooks, messages)
 
     //#then
-    expect(messages).toEqual([
-      { info: { role: "user" }, parts: [{ type: "text", text: "unchanged" }] },
-    ])
+    expect(messages).toEqual([{ info: { role: "user" }, parts: [{ type: "text", text: "unchanged" }] }])
   })
 
   it("#given a legacy thinking-block-validator hook #when messages transform runs #then it is not invoked", async () => {
@@ -189,9 +179,7 @@ describe("createMessagesTransformHandler", () => {
     const transform = runHandler(hooks, [])
 
     //#then
-    await expect(transform).rejects.toThrow(
-      "Unable to classify session for BTW isolation.",
-    )
+    await expect(transform).rejects.toThrow("Unable to classify session for BTW isolation.")
   })
 
   it("runs tool-pair-validator even when thinking-block-validator throws", async () => {
@@ -404,6 +392,45 @@ describe("createMessagesTransformHandler", () => {
     })
   })
 
+  it("#given an Anthropic Fable history ends with an ordinary assistant tail #when messages transform runs #then it appends the same synthetic user recovery turn as Mythos", async () => {
+    // Fable and Mythos ship as one release pair; both reject assistant prefill.
+    const models = [
+      { providerID: "anthropic", modelID: "claude-mythos-5" },
+      { providerID: "anthropic", modelID: "claude-fable-5" },
+      { providerID: "anthropic", modelID: "claude-fable-5-1" },
+      { providerID: "anthropic", modelID: "claude-fable-5-2" },
+      { providerID: "aws-bedrock-anthropic", modelID: "us.anthropic.claude-fable-5-2" },
+      { providerID: "openrouter", modelID: "anthropic/claude-fable-5.2" },
+    ]
+
+    for (const model of models) {
+      //#given
+      const label = `${model.providerID}/${model.modelID}`
+      const messages: TestMessage[] = [
+        {
+          info: { id: "msg_user_fable", role: "user", sessionID: "ses_fable_prefill", model },
+          parts: [{ type: "text", text: "finish the debugging report" }],
+        },
+        {
+          info: { id: "msg_assistant_fable", role: "assistant", sessionID: "ses_fable_prefill" },
+          parts: [{ type: "text", text: "done" }],
+        },
+      ]
+
+      //#when
+      await runHandler(makeHooks({}), messages)
+
+      //#then
+      expect(messages, label).toHaveLength(3)
+      expect(messages.at(-1)?.info, label).toMatchObject({ role: "user", sessionID: "ses_fable_prefill", model })
+      expect(messages.at(-1)?.parts[0], label).toMatchObject({
+        type: "text",
+        text: "[internal] Continue from the previous assistant state.",
+        synthetic: true,
+      })
+    }
+  })
+
   it("#given rejecting model metadata is only on the assistant tail #when messages transform runs #then it appends a synthetic user recovery turn", async () => {
     //#given
     const messages: TestMessage[] = [
@@ -513,12 +540,14 @@ describe("createMessagesTransformHandler", () => {
     const messages: TestMessage[] = [
       {
         info: { role: "user" },
-        parts: [{
-          type: "text",
-          text: `[session recovered - continuing previous task]\n${OMO_INTERNAL_INITIATOR_MARKER}`,
-          synthetic: true,
-          metadata: { compaction_continue: true },
-        }],
+        parts: [
+          {
+            type: "text",
+            text: `[session recovered - continuing previous task]\n${OMO_INTERNAL_INITIATOR_MARKER}`,
+            synthetic: true,
+            metadata: { compaction_continue: true },
+          },
+        ],
       },
       { info: { role: "user" }, parts: [{ type: "text", text: "ordinary follow-up" }] },
       { info: { role: "assistant" }, parts: [{ type: "text", text: "completed assistant answer" }] },
@@ -754,12 +783,14 @@ describe("createMessagesTransformHandler", () => {
       { info: { role: "user" }, parts: [{ type: "text", text: "work on this" }] },
       {
         info: { role: "user" },
-        parts: [{
-          type: "text",
-          text: `[session recovered - continuing previous task]\n${OMO_INTERNAL_INITIATOR_MARKER}`,
-          synthetic: true,
-          metadata: { compaction_continue: true },
-        }],
+        parts: [
+          {
+            type: "text",
+            text: `[session recovered - continuing previous task]\n${OMO_INTERNAL_INITIATOR_MARKER}`,
+            synthetic: true,
+            metadata: { compaction_continue: true },
+          },
+        ],
       },
       { info: { role: "assistant" }, parts: [{ type: "text", text: "partial assistant tail" }] },
     ]
@@ -784,12 +815,14 @@ describe("createMessagesTransformHandler", () => {
           role: "user",
           model: { providerID: "openai", modelID: "gpt-5.4" },
         },
-        parts: [{
-          type: "text",
-          text: `[session recovered - continuing previous task]\n${OMO_INTERNAL_INITIATOR_MARKER}`,
-          synthetic: true,
-          metadata: { compaction_continue: true },
-        }],
+        parts: [
+          {
+            type: "text",
+            text: `[session recovered - continuing previous task]\n${OMO_INTERNAL_INITIATOR_MARKER}`,
+            synthetic: true,
+            metadata: { compaction_continue: true },
+          },
+        ],
       },
       { info: { role: "assistant" }, parts: [{ type: "text", text: "partial assistant tail" }] },
     ]

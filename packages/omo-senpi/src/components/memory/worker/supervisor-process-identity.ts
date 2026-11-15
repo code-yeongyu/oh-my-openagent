@@ -183,10 +183,7 @@ export function recordSupervisorGracefulDeadline(pid: number | undefined): void 
   if (pid !== undefined) recordTestTermination("win32-graceful", pid)
 }
 
-export function terminateSupervisorChildGracefully(
-  platform: SupervisorRuntimePlatform,
-  wrapper: ChildProcess,
-): void {
+export function terminateSupervisorChildGracefully(platform: SupervisorRuntimePlatform, wrapper: ChildProcess): void {
   if (platform === "win32") {
     recordSupervisorGracefulDeadline(wrapper.pid)
     wrapper.kill()

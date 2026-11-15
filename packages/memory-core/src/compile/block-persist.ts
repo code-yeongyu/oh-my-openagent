@@ -42,7 +42,9 @@ function isMissing(error: unknown): boolean {
 function decode(text: string, key: string): string | undefined {
   try {
     const entry = JSON.parse(text) as Partial<StoredEntry>
-    return entry.version === FORMAT_VERSION && entry.key === key && typeof entry.value === "string" ? entry.value : undefined
+    return entry.version === FORMAT_VERSION && entry.key === key && typeof entry.value === "string"
+      ? entry.value
+      : undefined
   } catch {
     return undefined
   }

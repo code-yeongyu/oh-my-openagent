@@ -43,9 +43,7 @@ async function main() {
   }
 
   const beforeCredential = credentialDigest(realSenpiAgentDir)
-  const realInstallIdBefore = existsSync(realOmoInstallIdPath)
-    ? readFileSync(realOmoInstallIdPath, "utf8")
-    : null
+  const realInstallIdBefore = existsSync(realOmoInstallIdPath) ? readFileSync(realOmoInstallIdPath, "utf8") : null
 
   const desktopLane = await runLane({
     senpiBin,
@@ -58,9 +56,7 @@ async function main() {
   const cliLane = await runLane({ senpiBin, laneName: "cli", extraEnv: {} })
 
   const afterCredential = credentialDigest(realSenpiAgentDir)
-  const realInstallIdAfter = existsSync(realOmoInstallIdPath)
-    ? readFileSync(realOmoInstallIdPath, "utf8")
-    : null
+  const realInstallIdAfter = existsSync(realOmoInstallIdPath) ? readFileSync(realOmoInstallIdPath, "utf8") : null
 
   const desktopEvents = nativeEvents(desktopLane.requests)
   const cliEvents = nativeEvents(cliLane.requests)
@@ -71,25 +67,29 @@ async function main() {
     cliSawNativeEvents: cliEvents.length > 0,
     desktopEveryEventSchemaV4: desktopEvents.every((event) => event.properties?.schema_version === 4),
     cliEveryEventSchemaV4: cliEvents.every((event) => event.properties?.schema_version === 4),
-    desktopEveryEventSurfaceDesktop: desktopEvents.every(
-      (event) => event.properties?.surface === "desktop",
-    ),
+    desktopEveryEventSurfaceDesktop: desktopEvents.every((event) => event.properties?.surface === "desktop"),
     cliEveryEventSurfaceCli: cliEvents.every((event) => event.properties?.surface === "cli"),
     desktopEnvPinWinsOverFile: desktopEvents.every(
-      (event) => event.distinct_id === sha256(PINNED_DESKTOP_INSTALL_ID)
-        && event.properties?.install_hash === event.distinct_id,
+      (event) =>
+        event.distinct_id === sha256(PINNED_DESKTOP_INSTALL_ID) && event.properties?.install_hash === event.distinct_id,
     ),
     cliInstallHashIsHex64: cliEvents.every((event) => HEX64.test(String(event.properties?.install_hash))),
     cliDistinctIdIsSha256OfSandboxFile:
       cliLane.persistedInstallId !== null &&
-      cliEvents.every((event) => event.distinct_id === sha256(cliLane.persistedInstallId)
-        && event.properties?.install_hash === event.distinct_id),
-    noRawInstallIdShipped: [...desktopEvents, ...cliEvents].every((event) => !("install_id" in (event.properties ?? {}))),
-    noMachineHashShipped: [...desktopEvents, ...cliEvents].every((event) => !("machine_hash" in (event.properties ?? {}))),
+      cliEvents.every(
+        (event) =>
+          event.distinct_id === sha256(cliLane.persistedInstallId) &&
+          event.properties?.install_hash === event.distinct_id,
+      ),
+    noRawInstallIdShipped: [...desktopEvents, ...cliEvents].every(
+      (event) => !("install_id" in (event.properties ?? {})),
+    ),
+    noMachineHashShipped: [...desktopEvents, ...cliEvents].every(
+      (event) => !("machine_hash" in (event.properties ?? {})),
+    ),
     credentialIsolationClean: beforeCredential === afterCredential,
     realHomeInstallIdUntouched:
-      (realInstallIdBefore === null) === (realInstallIdAfter === null) &&
-      realInstallIdBefore === realInstallIdAfter,
+      (realInstallIdBefore === null) === (realInstallIdAfter === null) && realInstallIdBefore === realInstallIdAfter,
     leakedPidsZero: desktopLane.leakedPids === 0 && cliLane.leakedPids === 0,
     sandboxesRemoved: desktopLane.sandboxRemoved && cliLane.sandboxRemoved,
   }
@@ -102,10 +102,7 @@ async function main() {
     join(evidenceDir, "attribution-sink-events.json"),
     `${JSON.stringify({ desktop: sanitize(desktopLane.requests), cli: sanitize(cliLane.requests) }, null, 2)}\n`,
   )
-  writeFileSync(
-    join(evidenceDir, "attribution-verdict.json"),
-    `${JSON.stringify({ ...result, checks }, null, 2)}\n`,
-  )
+  writeFileSync(join(evidenceDir, "attribution-verdict.json"), `${JSON.stringify({ ...result, checks }, null, 2)}\n`)
   console.log(JSON.stringify({ ...result, checks }))
   if (result.result !== "PASS") process.exitCode = 1
 }
@@ -260,7 +257,9 @@ async function selfTest() {
   const host = await sink.ready
   const waited = sink.waitForEvent("session_started", 5_000, "self-test")
   const body = JSON.stringify({
-    batch: [{ event: "session_started", properties: { schema_version: 4, surface: "cli", install_hash: "a".repeat(64) } }],
+    batch: [
+      { event: "session_started", properties: { schema_version: 4, surface: "cli", install_hash: "a".repeat(64) } },
+    ],
   })
   await fetch(`${host}/batch/`, {
     method: "POST",

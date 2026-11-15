@@ -1,10 +1,12 @@
 import type { JSX, ReactNode } from "react"
-import { GeistSans } from "geist/font/sans"
-import { GeistMono } from "geist/font/mono"
 import Script from "next/script"
 import { gaMeasurementId, gaTrackedDomain, jsonLd } from "@/app/_components/site-metadata"
+import { jetBrainsMono, timelessSans } from "@/components/home/fonts"
+import { themeInitScript } from "@/components/home/theme-init"
 import { installDetectScript } from "@/lib/install-targets"
 import "../globals.css"
+// The nav and footer every omo.dev page shares with the home page (doriterm-family chrome).
+import "@/components/home/styles/chrome.css"
 
 /**
  * The one `<html>`/`<body>` of every root layout. `lang` is the route's BCP 47 tag, so the
@@ -20,11 +22,12 @@ export function DocumentShell({
   return (
     <html
       lang={lang}
-      className={`dark ${GeistSans.variable} ${GeistMono.variable}`}
+      className={`${timelessSans.variable} ${jetBrainsMono.variable}`}
       data-omo-build={process.env.OMO_WEB_BUILD_ID || undefined}
       suppressHydrationWarning
     >
       <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         <script dangerouslySetInnerHTML={{ __html: installDetectScript }} />
         <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="anonymous" />
         <link

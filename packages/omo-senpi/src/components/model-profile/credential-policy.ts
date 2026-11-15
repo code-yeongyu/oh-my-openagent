@@ -31,7 +31,10 @@ function rotationDisabledProviders(agentDir: string | undefined): ReadonlySet<st
   return disabled
 }
 
-export function credentialRotationPolicy(registry: AuthStatusSource, agentDir: string | undefined): CredentialRotationPolicy {
+export function credentialRotationPolicy(
+  registry: AuthStatusSource,
+  agentDir: string | undefined,
+): CredentialRotationPolicy {
   const disabled = rotationDisabledProviders(agentDir)
   return (provider) => {
     if (disabled.has(provider)) return false

@@ -21,7 +21,12 @@ export interface MemoryFactsApplyRequest {
 }
 
 export type MemoryFactsApplyResponse =
-  | { readonly outcome: "committed"; readonly sha: string; readonly affectedPaths: readonly string[]; readonly batchId: string }
+  | {
+      readonly outcome: "committed"
+      readonly sha: string
+      readonly affectedPaths: readonly string[]
+      readonly batchId: string
+    }
   | { readonly outcome: "no_facts"; readonly affectedPaths: readonly [] }
   | { readonly outcome: "parent_dirty"; readonly batchId: string; readonly detail?: string }
   | { readonly kind: "unavailable"; readonly reason: string }

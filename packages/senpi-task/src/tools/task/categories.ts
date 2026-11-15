@@ -39,5 +39,7 @@ export function listTaskAgents(agents: Readonly<Record<string, AgentDefinition>>
     .sort()
     .map((name) => ownValue(agents, name))
     .filter((agent): agent is AgentDefinition => agent !== undefined && agent.disable !== true)
-    .map((agent) => (agent.description !== undefined ? { name: agent.name, description: agent.description } : { name: agent.name }))
+    .map((agent) =>
+      agent.description !== undefined ? { name: agent.name, description: agent.description } : { name: agent.name },
+    )
 }

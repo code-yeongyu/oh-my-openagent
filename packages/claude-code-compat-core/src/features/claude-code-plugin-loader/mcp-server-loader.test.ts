@@ -63,7 +63,7 @@ describe("loadPluginMcpServers", () => {
               projectPath: join(projectSubdirectory, "nested-project"),
             },
           },
-        })
+        }),
       )
 
       const plugin: LoadedPlugin = {

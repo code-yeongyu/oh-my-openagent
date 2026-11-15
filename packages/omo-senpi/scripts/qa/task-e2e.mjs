@@ -39,7 +39,11 @@ import { isolatedChildEnv, sandboxStateDir } from "./sandbox-child-env.mjs"
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const mockProviderEntry = join(scriptDir, "task-e2e-mock-provider.ts")
 const realSenpiAgentDir = join(homedir(), ".senpi", "agent")
-const OMO_CONFIG = { categories: { mockcat: { description: "Local mock category pinned to the mock provider.", model: "omo-mock/mock-1" } } }
+const OMO_CONFIG = {
+  categories: {
+    mockcat: { description: "Local mock category pinned to the mock provider.", model: "omo-mock/mock-1" },
+  },
+}
 
 function findOnPath(bin) {
   if (bin.includes("/")) return existsSync(bin) ? bin : null
@@ -64,7 +68,10 @@ function seedScenario(script, { withMarker } = {}) {
     markerLog = join(sandbox.root, "marker-invocations.log")
     const extDir = join(sandbox.agentDir, "extensions")
     mkdirSync(extDir, { recursive: true })
-    writeFileSync(join(extDir, "marker.js"), `import { appendFileSync } from "node:fs"\nexport default function () { appendFileSync(${JSON.stringify(markerLog)}, "x\\n") }\n`)
+    writeFileSync(
+      join(extDir, "marker.js"),
+      `import { appendFileSync } from "node:fs"\nexport default function () { appendFileSync(${JSON.stringify(markerLog)}, "x\\n") }\n`,
+    )
   }
   return { sandbox, sessionDir, markerLog, stateDir: sandboxStateDir(sandbox) }
 }
@@ -73,16 +80,29 @@ function driveSenpi(senpiBin, scenario, prompt, pids, sessionId) {
   const run = spawnSync(
     senpiBin,
     [
-      "-e", mockProviderEntry,
-      "-p", "--mode", "json",
-      "--provider", "omo-mock", "--model", "mock-1",
-      "--session-dir", scenario.sessionDir,
+      "-e",
+      mockProviderEntry,
+      "-p",
+      "--mode",
+      "json",
+      "--provider",
+      "omo-mock",
+      "--model",
+      "mock-1",
+      "--session-dir",
+      scenario.sessionDir,
       ...(sessionId === undefined ? [] : ["--session-id", sessionId]),
       prompt,
     ],
     {
       cwd: scenario.sandbox.cwd,
-      env: { ...isolatedChildEnv(process.env, scenario.sandbox.agentDir), SENPI_CODING_AGENT_DIR: scenario.sandbox.agentDir, XDG_CONFIG_HOME: scenario.sandbox.xdgConfigHome, SENPI_CODING_AGENT_SESSION_DIR: scenario.sessionDir, OMO_SENPI_QA: "1" },
+      env: {
+        ...isolatedChildEnv(process.env, scenario.sandbox.agentDir),
+        SENPI_CODING_AGENT_DIR: scenario.sandbox.agentDir,
+        XDG_CONFIG_HOME: scenario.sandbox.xdgConfigHome,
+        SENPI_CODING_AGENT_SESSION_DIR: scenario.sessionDir,
+        OMO_SENPI_QA: "1",
+      },
       encoding: "utf8",
       timeout: 120_000,
       maxBuffer: 64 * 1024 * 1024,
@@ -107,7 +127,10 @@ function readStoreJsonl(stateDir, taskId) {
 
 function markerCount(markerLog) {
   if (markerLog === undefined || !existsSync(markerLog)) return 0
-  return readFileSync(markerLog, "utf8").trim().split(/\r?\n/).filter((line) => line.length > 0).length
+  return readFileSync(markerLog, "utf8")
+    .trim()
+    .split(/\r?\n/)
+    .filter((line) => line.length > 0).length
 }
 
 function runMainFlow(senpiBin, checks, capture, pids) {
@@ -116,7 +139,13 @@ function runMainFlow(senpiBin, checks, capture, pids) {
   const taskId = readStoreTaskIds(scenario.stateDir)[0]
   const sessionId = sessionIdFromEvents(first.events)
   writeFileSync(join(scenario.sandbox.cwd, "mock-script.json"), `${JSON.stringify(MAIN_FOLLOWUP_SCRIPT, null, 2)}\n`)
-  const second = driveSenpi(senpiBin, scenario, "follow up with the completed child and read its output", pids, sessionId)
+  const second = driveSenpi(
+    senpiBin,
+    scenario,
+    "follow up with the completed child and read its output",
+    pids,
+    sessionId,
+  )
   const jsonl = taskId === undefined ? "" : readStoreJsonl(scenario.stateDir, taskId)
   const events = [...first.events, ...second.events]
   capture.main = {
@@ -133,10 +162,17 @@ function runMainFlow(senpiBin, checks, capture, pids) {
   const wake = findWakeNotification(first.events, taskId)
   const signatures = jsonlSignatures(jsonl)
   capture.mainEventSummary = summarizeEvents(second.events)
-  checks.spawn_background = first.run.status === 0 && typeof taskId === "string" && existsSync(join(scenario.stateDir, "tasks", `${taskId}.json`)) ? "PASS" : "FAIL"
+  checks.spawn_background =
+    first.run.status === 0 &&
+    typeof taskId === "string" &&
+    existsSync(join(scenario.stateDir, "tasks", `${taskId}.json`))
+      ? "PASS"
+      : "FAIL"
   checks.unconditional_wake = wake.ok ? "PASS" : "FAIL"
   checks.task_output_polling_guard = hasSuccessfulNoProgressFollowup(second.run.status, second.events) ? "PASS" : "FAIL"
-  checks.jsonl_sequence = matchesOrderedSubsequence(signatures, MAIN_FLOW_EXPECTED_SEQUENCE.slice(0, 3)) ? "PASS" : "FAIL"
+  checks.jsonl_sequence = matchesOrderedSubsequence(signatures, MAIN_FLOW_EXPECTED_SEQUENCE.slice(0, 3))
+    ? "PASS"
+    : "FAIL"
   checks.extension_suppression = markerCount(scenario.markerLog) === 2 ? "PASS" : "FAIL"
   capture.markerCount = markerCount(scenario.markerLog)
   capture.mainSignatures = signatures
@@ -150,7 +186,8 @@ function runBatchFlow(senpiBin, checks, capture, pids) {
   const items = findBatchFanout(events, 2)
   capture.batchStdout = run.stdout ?? ""
   capture.batchTaskIds = taskIds
-  checks.batch_fanout_two_children = run.status === 0 && taskIds.length >= 2 && batchChildrenCompleted(events, items) ? "PASS" : "FAIL"
+  checks.batch_fanout_two_children =
+    run.status === 0 && taskIds.length >= 2 && batchChildrenCompleted(events, items) ? "PASS" : "FAIL"
   return scenario.sandbox
 }
 
@@ -197,7 +234,7 @@ async function main() {
       // Plan todo 22: quit->resume revival scenarios live in their own module (this driver is oversize).
       // Their raw session streams can contain machine-local or unrelated prompt data; publish only
       // the driver's sanitized aggregate receipt.
-      sandboxes.push(...await runTaskResumeScenarios({ senpiBin, checks, capture, pids, outDir: undefined }))
+      sandboxes.push(...(await runTaskResumeScenarios({ senpiBin, checks, capture, pids, outDir: undefined })))
     }
   } finally {
     for (const pid of pids) if (isAlive(pid)) killTree(pid)
@@ -294,17 +331,15 @@ function summarizeEvents(events) {
     .filter((event) => event?.type === "tool_execution_start" || event?.type === "tool_execution_end")
     .slice(0, 32)
     .map((event) => {
-      const toolName = typeof event?.toolName === "string"
-        ? event.toolName
-        : typeof event?.name === "string"
-          ? event.name
-          : undefined
+      const toolName =
+        typeof event?.toolName === "string" ? event.toolName : typeof event?.name === "string" ? event.name : undefined
       const details = event?.result?.details
-      const state = typeof details?.kind === "string"
-        ? details.kind
-        : typeof details?.status === "string"
-          ? details.status
-          : undefined
+      const state =
+        typeof details?.kind === "string"
+          ? details.kind
+          : typeof details?.status === "string"
+            ? details.status
+            : undefined
       return [typeof event?.type === "string" ? event.type : "unknown", toolName, state].filter(Boolean).join(":")
     })
 }
@@ -316,110 +351,188 @@ function batchChildrenCompleted(events, items) {
 }
 
 function runSelfTest() {
-  const wakeEvents = parseJsonEvents(`banner\n${JSON.stringify({
-    type: "custom",
-    content: "task completion name:e2echild id:st_abc status:completed duration:3ms\nresult:\"done\"\nnext:Use task_send({ to: \"st_abc\", message: \"...\" }) to continue.",
-  })}`)
+  const wakeEvents = parseJsonEvents(
+    `banner\n${JSON.stringify({
+      type: "custom",
+      content:
+        'task completion name:e2echild id:st_abc status:completed duration:3ms\nresult:"done"\nnext:Use task_send({ to: "st_abc", message: "..." }) to continue.',
+    })}`,
+  )
   if (!findWakeNotification(wakeEvents, "st_abc").ok) throw new Error("self-test: wake notification must be detected")
-  if (findWakeNotification(wakeEvents, "st_missing").ok) throw new Error("self-test: wake must not match a foreign task id")
-  if (sessionIdFromEvents([{ type: "session", id: "ses_e2e" }]) !== "ses_e2e") throw new Error("self-test: session id must be recovered for the follow-up turn")
-  if (!findRevived(parseJsonEvents(JSON.stringify({ type: "toolResult", details: { kind: "revived", task_id: "st_abc", run_epoch: 1 } })))) throw new Error("self-test: revived must be detected")
-  if (!findTranscript(parseJsonEvents(JSON.stringify({ type: "toolResult", content: `st_abc [completed] transcript via jsonl:\n${CHILD_FIRST}` })), CHILD_FIRST)) throw new Error("self-test: transcript must be detected")
-  if (!findPeekTaskOutput(parseJsonEvents(JSON.stringify({ name: "task_output", arguments: { mode: "tail" } })))) throw new Error("self-test: non-blocking output peek must be detected")
-  if (!findPeekTaskOutput(parseJsonEvents(JSON.stringify({ toolName: "task_output", arguments: { mode: "tail" } })))) throw new Error("self-test: toolName output peek must be detected")
-  if (findPeekTaskOutput(parseJsonEvents(JSON.stringify({ name: "task_output", arguments: { block: true } })))) throw new Error("self-test: legacy blocking output call must not count as a peek")
-  const pollingEvents = parseJsonEvents([
-    JSON.stringify({ type: "tool_execution_end", toolName: "task_output", result: { details: { kind: "status" } } }),
-    JSON.stringify({ type: "tool_execution_end", toolName: "task_output", result: { details: { kind: "no_progress" } } }),
-  ].join("\n"))
-  if (!hasNoProgressAfterStatus(pollingEvents)) throw new Error("self-test: second unchanged task-output status read must be no_progress")
-  if (hasNoProgressAfterStatus(pollingEvents.slice(0, 1))) throw new Error("self-test: one status read must not pass the polling guard")
-  if (!hasSuccessfulNoProgressFollowup(0, pollingEvents)) throw new Error("self-test: successful follow-up with no_progress must pass")
-  if (hasSuccessfulNoProgressFollowup(1, pollingEvents)) throw new Error("self-test: failed follow-up must not pass the polling guard")
-  const taskOutputIndex = MAIN_FOLLOWUP_SCRIPT.parentSteps.findIndex((step) => step.type === "tool_call" && step.name === "task_output")
+  if (findWakeNotification(wakeEvents, "st_missing").ok)
+    throw new Error("self-test: wake must not match a foreign task id")
+  if (sessionIdFromEvents([{ type: "session", id: "ses_e2e" }]) !== "ses_e2e")
+    throw new Error("self-test: session id must be recovered for the follow-up turn")
+  if (
+    !findRevived(
+      parseJsonEvents(
+        JSON.stringify({ type: "toolResult", details: { kind: "revived", task_id: "st_abc", run_epoch: 1 } }),
+      ),
+    )
+  )
+    throw new Error("self-test: revived must be detected")
+  if (
+    !findTranscript(
+      parseJsonEvents(
+        JSON.stringify({ type: "toolResult", content: `st_abc [completed] transcript via jsonl:\n${CHILD_FIRST}` }),
+      ),
+      CHILD_FIRST,
+    )
+  )
+    throw new Error("self-test: transcript must be detected")
+  if (!findPeekTaskOutput(parseJsonEvents(JSON.stringify({ name: "task_output", arguments: { mode: "tail" } }))))
+    throw new Error("self-test: non-blocking output peek must be detected")
+  if (!findPeekTaskOutput(parseJsonEvents(JSON.stringify({ toolName: "task_output", arguments: { mode: "tail" } }))))
+    throw new Error("self-test: toolName output peek must be detected")
+  if (findPeekTaskOutput(parseJsonEvents(JSON.stringify({ name: "task_output", arguments: { block: true } }))))
+    throw new Error("self-test: legacy blocking output call must not count as a peek")
+  const pollingEvents = parseJsonEvents(
+    [
+      JSON.stringify({ type: "tool_execution_end", toolName: "task_output", result: { details: { kind: "status" } } }),
+      JSON.stringify({
+        type: "tool_execution_end",
+        toolName: "task_output",
+        result: { details: { kind: "no_progress" } },
+      }),
+    ].join("\n"),
+  )
+  if (!hasNoProgressAfterStatus(pollingEvents))
+    throw new Error("self-test: second unchanged task-output status read must be no_progress")
+  if (hasNoProgressAfterStatus(pollingEvents.slice(0, 1)))
+    throw new Error("self-test: one status read must not pass the polling guard")
+  if (!hasSuccessfulNoProgressFollowup(0, pollingEvents))
+    throw new Error("self-test: successful follow-up with no_progress must pass")
+  if (hasSuccessfulNoProgressFollowup(1, pollingEvents))
+    throw new Error("self-test: failed follow-up must not pass the polling guard")
+  const taskOutputIndex = MAIN_FOLLOWUP_SCRIPT.parentSteps.findIndex(
+    (step) => step.type === "tool_call" && step.name === "task_output",
+  )
   if (taskOutputIndex !== 0) {
     throw new Error("self-test: scoped follow-up must begin with task_output")
   }
   if (MAIN_FOLLOWUP_SCRIPT.parentSteps.some((step) => step.type === "tool_call" && step.name === "task_send")) {
     throw new Error("self-test: scoped output follow-up must not depend on task revival")
   }
-  if (!findInlineFinal(parseJsonEvents(JSON.stringify({ type: "text", text: SYNC_FINAL })), SYNC_FINAL)) throw new Error("self-test: inline final must be detected")
-  if (!findCategoryListingError(parseJsonEvents(JSON.stringify({ type: "toolResult", content: "Unknown category. Available categories: quick, deep." })))) throw new Error("self-test: category listing error must be detected")
-  const batchItems = findBatchFanout(parseJsonEvents(JSON.stringify({
-    type: "tool_execution_end",
-    toolName: "task",
-    result: { details: { items: [{ task_id: "st_1" }, { task_id: "st_2" }] } },
-  })), 2)
+  if (!findInlineFinal(parseJsonEvents(JSON.stringify({ type: "text", text: SYNC_FINAL })), SYNC_FINAL))
+    throw new Error("self-test: inline final must be detected")
+  if (
+    !findCategoryListingError(
+      parseJsonEvents(
+        JSON.stringify({ type: "toolResult", content: "Unknown category. Available categories: quick, deep." }),
+      ),
+    )
+  )
+    throw new Error("self-test: category listing error must be detected")
+  const batchItems = findBatchFanout(
+    parseJsonEvents(
+      JSON.stringify({
+        type: "tool_execution_end",
+        toolName: "task",
+        result: { details: { items: [{ task_id: "st_1" }, { task_id: "st_2" }] } },
+      }),
+    ),
+    2,
+  )
   if (batchItems.length !== 2) throw new Error("self-test: two-child batch fanout must be detected")
-  const completedBatchEvents = parseJsonEvents(JSON.stringify({
-    type: "tool_execution_end",
-    toolName: "task",
-    result: {
-      content: [{ type: "text", text: `${BATCH_FINAL} one\n${BATCH_FINAL} two` }],
-      details: {
-        status: "completed",
-        items: [
-          { task_id: "st_1", status: "completed" },
-          { task_id: "st_2", status: "completed" },
-        ],
+  const completedBatchEvents = parseJsonEvents(
+    JSON.stringify({
+      type: "tool_execution_end",
+      toolName: "task",
+      result: {
+        content: [{ type: "text", text: `${BATCH_FINAL} one\n${BATCH_FINAL} two` }],
+        details: {
+          status: "completed",
+          items: [
+            { task_id: "st_1", status: "completed" },
+            { task_id: "st_2", status: "completed" },
+          ],
+        },
       },
-    },
-  }))
+    }),
+  )
   const completedItems = findBatchFanout(completedBatchEvents, 2)
   if (!batchChildrenCompleted(completedBatchEvents, completedItems)) {
     throw new Error("self-test: completed batch children with both outputs must pass")
   }
-  const pendingBatchEvents = parseJsonEvents(JSON.stringify({
-    type: "tool_execution_end",
-    toolName: "task",
-    result: {
-      content: [{ type: "text", text: `${BATCH_FINAL} one\n${BATCH_FINAL} two` }],
-      details: {
-        status: "completed",
-        items: [
-          { task_id: "st_1", status: "completed" },
-          { task_id: "st_2", status: "running" },
-        ],
+  const pendingBatchEvents = parseJsonEvents(
+    JSON.stringify({
+      type: "tool_execution_end",
+      toolName: "task",
+      result: {
+        content: [{ type: "text", text: `${BATCH_FINAL} one\n${BATCH_FINAL} two` }],
+        details: {
+          status: "completed",
+          items: [
+            { task_id: "st_1", status: "completed" },
+            { task_id: "st_2", status: "running" },
+          ],
+        },
       },
-    },
-  }))
+    }),
+  )
   if (batchChildrenCompleted(pendingBatchEvents, findBatchFanout(pendingBatchEvents, 2))) {
     throw new Error("self-test: a pending batch child must fail")
   }
-  const incompleteOutputBatchEvents = parseJsonEvents(JSON.stringify({
-    type: "tool_execution_end",
-    toolName: "task",
-    result: {
-      content: [{ type: "text", text: `${BATCH_FINAL} one` }],
-      details: {
-        status: "completed",
-        items: [
-          { task_id: "st_1", status: "completed" },
-          { task_id: "st_2", status: "completed" },
-        ],
+  const incompleteOutputBatchEvents = parseJsonEvents(
+    JSON.stringify({
+      type: "tool_execution_end",
+      toolName: "task",
+      result: {
+        content: [{ type: "text", text: `${BATCH_FINAL} one` }],
+        details: {
+          status: "completed",
+          items: [
+            { task_id: "st_1", status: "completed" },
+            { task_id: "st_2", status: "completed" },
+          ],
+        },
       },
-    },
-  }))
+    }),
+  )
   if (batchChildrenCompleted(incompleteOutputBatchEvents, findBatchFanout(incompleteOutputBatchEvents, 2))) {
     throw new Error("self-test: a missing batch output must fail")
   }
-  const signatures = jsonlSignatures([
-    JSON.stringify({ type: "transition_applied", payload: { type: "transition_applied", status: "running", residency_state: "resident" } }),
-    JSON.stringify({ type: "assistant_message", payload: { text: CHILD_FIRST } }),
-    JSON.stringify({ type: "transition_applied", payload: { type: "transition_applied", status: "completed", residency_state: "resident" } }),
-    JSON.stringify({ type: "revived", payload: { run_epoch: 1 } }),
-    JSON.stringify({ type: "assistant_message", payload: { text: CHILD_SECOND } }),
-    JSON.stringify({ type: "transition_applied", payload: { type: "transition_applied", status: "completed", residency_state: "resident" } }),
-    JSON.stringify({ type: "destroyed", payload: { cause: "shutdown" } }),
-  ].join("\n"))
-  if (!matchesOrderedSubsequence(signatures, MAIN_FLOW_EXPECTED_SEQUENCE)) throw new Error("self-test: expected transition sequence must match")
-  if (matchesOrderedSubsequence(["running/resident"], MAIN_FLOW_EXPECTED_SEQUENCE)) throw new Error("self-test: a partial sequence must not match")
-  const logOnlyDelta = changedRealPaths(new Map([[SHARED_SENPI_LOG, "a"], ["settings.json", "x"]]), new Map([[SHARED_SENPI_LOG, "b"], ["settings.json", "x"]]))
+  const signatures = jsonlSignatures(
+    [
+      JSON.stringify({
+        type: "transition_applied",
+        payload: { type: "transition_applied", status: "running", residency_state: "resident" },
+      }),
+      JSON.stringify({ type: "assistant_message", payload: { text: CHILD_FIRST } }),
+      JSON.stringify({
+        type: "transition_applied",
+        payload: { type: "transition_applied", status: "completed", residency_state: "resident" },
+      }),
+      JSON.stringify({ type: "revived", payload: { run_epoch: 1 } }),
+      JSON.stringify({ type: "assistant_message", payload: { text: CHILD_SECOND } }),
+      JSON.stringify({
+        type: "transition_applied",
+        payload: { type: "transition_applied", status: "completed", residency_state: "resident" },
+      }),
+      JSON.stringify({ type: "destroyed", payload: { cause: "shutdown" } }),
+    ].join("\n"),
+  )
+  if (!matchesOrderedSubsequence(signatures, MAIN_FLOW_EXPECTED_SEQUENCE))
+    throw new Error("self-test: expected transition sequence must match")
+  if (matchesOrderedSubsequence(["running/resident"], MAIN_FLOW_EXPECTED_SEQUENCE))
+    throw new Error("self-test: a partial sequence must not match")
+  const logOnlyDelta = changedRealPaths(
+    new Map([
+      [SHARED_SENPI_LOG, "a"],
+      ["settings.json", "x"],
+    ]),
+    new Map([
+      [SHARED_SENPI_LOG, "b"],
+      ["settings.json", "x"],
+    ]),
+  )
   if (logOnlyDelta.length !== 0) throw new Error("self-test: a shared-log-only delta must not count as pollution")
   const configDelta = changedRealPaths(new Map([["settings.json", "x"]]), new Map([["settings.json", "y"]]))
-  if (configDelta.length !== 1 || configDelta[0] !== "settings.json") throw new Error("self-test: a real config change must be reported")
+  if (configDelta.length !== 1 || configDelta[0] !== "settings.json")
+    throw new Error("self-test: a real config change must be reported")
   const removalDelta = changedRealPaths(new Map([["auth.json", "x"]]), new Map())
-  if (removalDelta.length !== 1 || removalDelta[0] !== "auth.json") throw new Error("self-test: a real config removal must be reported")
+  if (removalDelta.length !== 1 || removalDelta[0] !== "auth.json")
+    throw new Error("self-test: a real config removal must be reported")
   const receipt = evidenceReceipt({
     result: "PASS",
     checks: { task_output_peek: "PASS" },
@@ -441,14 +554,18 @@ function runSelfTest() {
     mainExit: 0,
     batchTaskIds: ["st_batch"],
   })
-  if (JSON.stringify(receipt).includes("12345") || JSON.stringify(receipt).includes("/private/var") || JSON.stringify(receipt).includes("st_opaque")) {
+  if (
+    JSON.stringify(receipt).includes("12345") ||
+    JSON.stringify(receipt).includes("/private/var") ||
+    JSON.stringify(receipt).includes("st_opaque")
+  ) {
     throw new Error("self-test: evidence receipt must exclude host identifiers")
   }
   if (
-    receipt.sandboxCount !== 1
-    || receipt.batchTaskCount !== 1
-    || receipt.checks.task_output_peek !== "PASS"
-    || receipt.mainEventSummary[0] !== "task_output:completed"
+    receipt.sandboxCount !== 1 ||
+    receipt.batchTaskCount !== 1 ||
+    receipt.checks.task_output_peek !== "PASS" ||
+    receipt.mainEventSummary[0] !== "task_output:completed"
   ) {
     throw new Error("self-test: evidence receipt must retain safe QA summary fields")
   }

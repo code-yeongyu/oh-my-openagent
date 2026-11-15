@@ -22,9 +22,7 @@ export async function checkTeamModeDependencies(
   const tmuxAvailable = Boolean(tmuxEnv) || (await probeBinary("tmux", ["-V"], spawnImpl))
   const gitAvailable = await probeBinary("git", ["--version"], spawnImpl)
   if (config.tmux_visualization && !tmuxAvailable) {
-    console.warn(
-      "[team-mode] tmux_visualization=true but tmux not available; layout will be skipped at runtime",
-    )
+    console.warn("[team-mode] tmux_visualization=true but tmux not available; layout will be skipped at runtime")
   }
   return { tmuxAvailable, gitAvailable }
 }

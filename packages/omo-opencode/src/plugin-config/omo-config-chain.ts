@@ -57,7 +57,8 @@ function appendViews(
 ): void {
   for (const layer of layers) {
     const config = select(layer.config)
-    if (Object.keys(config).length > 0) views.push({ config, keyPrefix, path: layer.source.path, scope: layer.source.scope })
+    if (Object.keys(config).length > 0)
+      views.push({ config, keyPrefix, path: layer.source.path, scope: layer.source.scope })
   }
 }
 
@@ -72,16 +73,49 @@ function recordFields(value: unknown, fields: readonly string[]): Record<string,
 
 function modelInput(view: Readonly<Record<string, unknown>>): Record<string, unknown> {
   const agents = isPlainRecord(view.agents)
-    ? Object.fromEntries(Object.entries(view.agents).flatMap(([name, definition]) => {
-      const fields = recordFields(definition, ["description", "prompt", "model", "models", "models_distribution", "variant", "reasoningEffort", "tools", "temperature", "disable"])
-      return fields === undefined ? [] : [[name, fields]]
-    }))
+    ? Object.fromEntries(
+        Object.entries(view.agents).flatMap(([name, definition]) => {
+          const fields = recordFields(definition, [
+            "description",
+            "prompt",
+            "model",
+            "models",
+            "models_distribution",
+            "variant",
+            "reasoningEffort",
+            "tools",
+            "temperature",
+            "disable",
+          ])
+          return fields === undefined ? [] : [[name, fields]]
+        }),
+      )
     : undefined
   const categories = isPlainRecord(view.categories)
-    ? Object.fromEntries(Object.entries(view.categories).flatMap(([name, definition]) => {
-      const fields = recordFields(definition, ["description", "model", "models", "models_distribution", "fallback_models", "variant", "temperature", "top_p", "maxTokens", "thinking", "reasoningEffort", "textVerbosity", "tools", "prompt_append", "max_prompt_tokens", "is_unstable_agent", "disable"])
-      return fields === undefined ? [] : [[name, fields]]
-    }))
+    ? Object.fromEntries(
+        Object.entries(view.categories).flatMap(([name, definition]) => {
+          const fields = recordFields(definition, [
+            "description",
+            "model",
+            "models",
+            "models_distribution",
+            "fallback_models",
+            "variant",
+            "temperature",
+            "top_p",
+            "maxTokens",
+            "thinking",
+            "reasoningEffort",
+            "textVerbosity",
+            "tools",
+            "prompt_append",
+            "max_prompt_tokens",
+            "is_unstable_agent",
+            "disable",
+          ])
+          return fields === undefined ? [] : [[name, fields]]
+        }),
+      )
     : undefined
 
   return {
@@ -100,14 +134,14 @@ function modelView(view: Readonly<Record<string, unknown>>): {
   const modelConfig = parsed.success
     ? parsed.data
     : (() => {
-      const pruned = pruneInvalidConfigPaths(input, parsed.error.issues, (record) => {
-        const validation = OmoConfigSchema.safeParse(record)
-        return validation.success ? { success: true } : { success: false, issues: validation.error.issues }
-      })
-      if (!pruned.ok) return undefined
-      const validation = OmoConfigSchema.safeParse(pruned.config)
-      return validation.success ? validation.data : undefined
-    })()
+        const pruned = pruneInvalidConfigPaths(input, parsed.error.issues, (record) => {
+          const validation = OmoConfigSchema.safeParse(record)
+          return validation.success ? { success: true } : { success: false, issues: validation.error.issues }
+        })
+        if (!pruned.ok) return undefined
+        const validation = OmoConfigSchema.safeParse(pruned.config)
+        return validation.success ? validation.data : undefined
+      })()
   if (modelConfig === undefined) return { config: {}, diagnostics: [] }
 
   const resolved = resolveModelReferences(modelConfig)
@@ -160,10 +194,7 @@ export function loadOmoOpenCodeConfigChain(
   }
 
   return {
-    diagnostics: [
-      ...loaded.diagnostics,
-      ...resolvedModels.diagnostics,
-    ],
+    diagnostics: [...loaded.diagnostics, ...resolvedModels.diagnostics],
     protectedUserView,
     views,
   }

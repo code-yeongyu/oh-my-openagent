@@ -4,6 +4,12 @@
 // FAKE_ENGINE_ABI overrides the advertised ABI.
 // FAKE_ENGINE_DESKTOP=1 answers desktop methods without `params.fake` from test/fake-desktop.mjs;
 // FAKE_ENGINE_STALL=<method> then treats that method as "cancellable".
+// FAKE_ENGINE_FEATURES is the JSON `features` value of the hello reply (unset omits the key, like a
+// pre-features engine); a session opened with `reportMode: "object"` then answers a `null` desktop exec reply
+// with an ActionReport, and FAKE_ENGINE_EXEC_REPLY (JSON) replaces every such reply.
+// FAKE_ENGINE_TCC_FILE names a file holding "granted" or "denied"; it is read once at startup and that
+// answer is kept for the process's life, the way macOS caches a TCC answer per process.
+// FAKE_ENGINE_SPAWN_LOG names a file each fake engine appends its pid to at startup.
 // Every received line is echoed first as an `engine.log` notification ("recv <line>") so tests observe the wire.
 // Any other method is steered by `params.fake`:
 //   "hold"        - reply only after a "release" request arrives (after the release reply)
@@ -15,166 +21,213 @@
 //   "notify"      - emit one audit and one stopPath.changed notification, then reply
 //   "exit"        - exit with code 7 without replying
 //   otherwise     - reply { method, params, pid }
-import { createInterface } from "node:readline";
-import { createDesktop } from "./fake-desktop.mjs";
+import { appendFileSync, readFileSync } from "node:fs"
+import { createInterface } from "node:readline"
+import { createDesktop } from "./fake-desktop.mjs"
 
-const mode = process.env.FAKE_ENGINE_MODE ?? "normal";
-const abi = process.env.FAKE_ENGINE_ABI ?? "senpi-desktop/1";
-const resumeToken = `token-${process.pid}`;
-const desktop = process.env.FAKE_ENGINE_DESKTOP === "1" ? createDesktop() : undefined;
-const stalled = process.env.FAKE_ENGINE_STALL;
+const mode = process.env.FAKE_ENGINE_MODE ?? "normal"
+const abi = process.env.FAKE_ENGINE_ABI ?? "senpi-desktop/1"
+const resumeToken = `token-${process.pid}`
+const desktop = process.env.FAKE_ENGINE_DESKTOP === "1" ? createDesktop() : undefined
+const stalled = process.env.FAKE_ENGINE_STALL
+const helloFeatures =
+  process.env.FAKE_ENGINE_FEATURES === undefined ? {} : { features: JSON.parse(process.env.FAKE_ENGINE_FEATURES) }
+const execReply =
+  process.env.FAKE_ENGINE_EXEC_REPLY === undefined ? undefined : JSON.parse(process.env.FAKE_ENGINE_EXEC_REPLY)
+let reportMode = "null"
+// The exec methods whose reply is `null | ActionReport` (core `Response::Action`).
+const EXEC_METHODS = new Set([
+  "click",
+  "moveMouse",
+  "drag",
+  "scroll",
+  "typeText",
+  "keyChord",
+  "holdKeys",
+  "holdMouse",
+  "raiseWindow",
+  "menus.select",
+  "clipboard.write",
+  "ax.perform",
+  "ax.setValue",
+  "ax.focus",
+  "ax.click",
+])
+const actionReport = (method) => ({
+  disposition: { delivery: "delivered_unverified", retry: "unsafe" },
+  effect: "unverifiable",
+  focusRestoration: "not_needed",
+  auditIds: [`audit-${method}`],
+})
 
 if (!process.argv.includes("--stdio")) {
-	process.stderr.write("fake-engine: expected --stdio\n");
-	process.exit(2);
+  process.stderr.write("fake-engine: expected --stdio\n")
+  process.exit(2)
 }
 
+if (process.env.FAKE_ENGINE_SPAWN_LOG !== undefined)
+  appendFileSync(process.env.FAKE_ENGINE_SPAWN_LOG, `${process.pid}\n`)
+const tccFile = process.env.FAKE_ENGINE_TCC_FILE
+const tcc = tccFile === undefined ? "granted" : readFileSync(tccFile, "utf8").trim()
+const trusted = tcc === "granted"
+
 const capabilities = {
-	backend: "fake",
-	displayServer: null,
-	capture: true,
-	input: true,
-	ax: true,
-	backgroundWindowInput: true,
-	...(process.env.FAKE_ENGINE_CURSOR_OMITTED === "1" ? {} : { cursorOverlay: false }),
-	deliveryModes: ["background", "foreground"],
-	capturePermission: "granted",
-	inputPermission: "granted",
-	axPermission: "granted",
-	displayCount: 1,
-	focusGuard: true,
-	stopPath: "global",
-	stopReason: null,
-	integrityLevel: null,
-	screenLocked: false,
-};
-let suspended = false;
+  backend: "fake",
+  displayServer: null,
+  capture: trusted,
+  input: trusted,
+  ax: trusted,
+  backgroundWindowInput: trusted,
+  ...(process.env.FAKE_ENGINE_CURSOR_OMITTED === "1" ? {} : { cursorOverlay: false }),
+  deliveryModes: ["background", "foreground"],
+  capturePermission: tcc,
+  inputPermission: tcc,
+  axPermission: tcc,
+  displayCount: trusted ? 1 : 0,
+  focusGuard: true,
+  stopPath: "global",
+  stopReason: null,
+  integrityLevel: null,
+  screenLocked: false,
+}
+let suspended = false
 // The foreground control grant this fake holds (B5); FAKE_ENGINE_CONTROL_BUSY=1 refuses grants InputBusy.
 // A stop drops it, as the engine's stop epoch does. FAKE_ENGINE_GLOBAL_INPUT_GATE=1 refuses input on the
 // desktop or a display target without it, ControlRequired before any input (#10788).
-let control = { active: false };
-const GLOBAL_INPUT = new Set(["click", "moveMouse", "drag", "scroll", "typeText", "keyChord", "holdKeys", "holdMouse"]);
+let control = { active: false }
+const GLOBAL_INPUT = new Set(["click", "moveMouse", "drag", "scroll", "typeText", "keyChord", "holdKeys", "holdMouse"])
 const refusesGlobalInput = (method, params) =>
-	process.env.FAKE_ENGINE_GLOBAL_INPUT_GATE === "1" &&
-	GLOBAL_INPUT.has(method) &&
-	(params?.target === "desktop" || String(params?.target).startsWith("display:")) &&
-	!control.active;
-const CONTROL_GRANTED_AT = "2026-10-11T00:00:00.000Z";
+  process.env.FAKE_ENGINE_GLOBAL_INPUT_GATE === "1" &&
+  GLOBAL_INPUT.has(method) &&
+  (params?.target === "desktop" || String(params?.target).startsWith("display:")) &&
+  !control.active
+const CONTROL_GRANTED_AT = "2026-10-11T00:00:00.000Z"
 const status = () => ({
-	suspended,
-	globalLive: true,
-	hostRelayLive: true,
-	heartbeatFresh: true,
-	stopPath: "global",
-	reason: null,
-});
+  suspended,
+  globalLive: true,
+  hostRelayLive: true,
+  heartbeatFresh: true,
+  stopPath: "global",
+  reason: null,
+})
 
-const send = (message) => process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", ...message })}\n`);
-const reply = (id, result) => send({ id, result });
+const send = (message) => process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", ...message })}\n`)
+const reply = (id, result) => send({ id, result })
 const fail = (id, code, message, rpcCode = -32000) =>
-	send({ id, error: { code: rpcCode, message, data: { code, hint: null } } });
-const held = [];
-const cancellable = new Set();
-const releaseFails = new Set();
+  send({ id, error: { code: rpcCode, message, data: { code, hint: null } } })
+const held = []
+const cancellable = new Set()
+const releaseFails = new Set()
 
 function handle(request) {
-	const { id, method, params } = request;
-	switch (method) {
-		case "engine.hello":
-			return reply(id, { protocolVersion: "1", engineVersion: "0.0.0-fake", buildSha: "fake", abi });
-		case "session.open":
-			return reply(id, { capabilities, resumeToken });
-		case "session.close":
-		case "stopPath.heartbeat":
-			return reply(id, null);
-		case "capabilities":
-			return reply(id, capabilities);
-		case "stopPath.start":
-		case "stopPath.status":
-			return reply(id, status());
-		case "stopPath.stop":
-			suspended = true;
-			control = { active: false };
-			send({ method: "stopPath.changed", params: status() });
-			return reply(id, status());
-		case "stopPath.resume":
-			if (params?.token !== resumeToken) return fail(id, "InvalidTarget", "wrong resume token");
-			suspended = false;
-			send({ method: "stopPath.changed", params: status() });
-			return reply(id, status());
-		case "control.state":
-			return reply(id, control);
-		case "control.grant":
-			if (process.env.FAKE_ENGINE_CONTROL_BUSY === "1") {
-				return fail(id, "InputBusy", "another session holds the foreground control grant", -32021);
-			}
-			if (suspended && process.env.FAKE_ENGINE_GLOBAL_INPUT_GATE === "1") {
-				return fail(id, "Suspended", "a grant is refused while the stop is latched", -32015);
-			}
-			if (process.env.FAKE_ENGINE_GRANT_ERROR !== undefined) {
-				return fail(id, process.env.FAKE_ENGINE_GRANT_ERROR, `grant refused: ${process.env.FAKE_ENGINE_GRANT_ERROR}`);
-			}
-			control = { active: true, reason: params?.reason ?? null, grantedAt: CONTROL_GRANTED_AT };
-			return reply(id, control);
-		case "control.revoke":
-			if (process.env.FAKE_ENGINE_REVOKE_ERROR !== undefined) {
-				return fail(id, process.env.FAKE_ENGINE_REVOKE_ERROR, `revoke failed: ${process.env.FAKE_ENGINE_REVOKE_ERROR}`);
-			}
-			control = { active: false };
-			return reply(id, null);
-		case "$/cancel":
-			if (cancellable.delete(params.id)) fail(params.id, "Cancelled", "request was cancelled by $/cancel");
-			if (releaseFails.delete(params.id)) {
-				fail(params.id, "Cancelled", "the hold request was cancelled; input release also failed: key up for shift failed");
-			}
-			return;
-	}
-	if (desktop !== undefined && params?.fake === undefined) {
-		if (method === stalled) return cancellable.add(id);
-		const refused = (code, message, rpcCode) => {
-			send({ method: "audit", params: { action: method, target: params?.target, delivery: "background", code, durationMs: 1 } });
-			return fail(id, code, message, rpcCode);
-		};
-		if (suspended && GLOBAL_INPUT.has(method) && process.env.FAKE_ENGINE_GLOBAL_INPUT_GATE === "1") {
-			return refused("Suspended", "input is suspended", -32015);
-		}
-		if (refusesGlobalInput(method, params)) {
-			return refused("ControlRequired", "desktop input needs the control grant", -32022);
-		}
-		const outcome = desktop(method, params);
-		if (outcome !== undefined) {
-			const { notifications = [], ...reply } = outcome;
-			for (const notification of notifications) send(notification);
-			return send({ id, ...reply });
-		}
-	}
-	switch (params?.fake) {
-		case "hold":
-			return held.push(id);
-		case "release":
-			reply(id, { method, params, pid: process.pid });
-			for (const heldId of held.splice(0)) reply(heldId, { method: "held", pid: process.pid });
-			return;
-		case "hang":
-			return;
-		case "cancellable":
-			return cancellable.add(id);
-		case "release-fails":
-			return releaseFails.add(id);
-		case "notify":
-			send({ method: "audit", params: { action: method, target: "screen", delivery: "background", durationMs: 3 } });
-			send({ method: "stopPath.changed", params: status() });
-			return reply(id, { method, params, pid: process.pid });
-		case "exit":
-			return process.exit(7);
-		default:
-			return reply(id, { method, params, pid: process.pid });
-	}
+  const { id, method, params } = request
+  switch (method) {
+    case "engine.hello":
+      return reply(id, { protocolVersion: "1", engineVersion: "0.0.0-fake", buildSha: "fake", abi, ...helloFeatures })
+    case "session.open":
+      reportMode = params?.reportMode ?? "null"
+      return reply(id, { capabilities, resumeToken })
+    case "session.close":
+    case "stopPath.heartbeat":
+      return reply(id, null)
+    case "capabilities":
+      return reply(id, capabilities)
+    case "stopPath.start":
+    case "stopPath.status":
+      return reply(id, status())
+    case "stopPath.stop":
+      suspended = true
+      control = { active: false }
+      send({ method: "stopPath.changed", params: status() })
+      return reply(id, status())
+    case "stopPath.resume":
+      if (params?.token !== resumeToken) return fail(id, "InvalidTarget", "wrong resume token")
+      suspended = false
+      send({ method: "stopPath.changed", params: status() })
+      return reply(id, status())
+    case "control.state":
+      return reply(id, control)
+    case "control.grant":
+      if (process.env.FAKE_ENGINE_CONTROL_BUSY === "1") {
+        return fail(id, "InputBusy", "another session holds the foreground control grant", -32021)
+      }
+      if (suspended && process.env.FAKE_ENGINE_GLOBAL_INPUT_GATE === "1") {
+        return fail(id, "Suspended", "a grant is refused while the stop is latched", -32015)
+      }
+      if (process.env.FAKE_ENGINE_GRANT_ERROR !== undefined) {
+        return fail(id, process.env.FAKE_ENGINE_GRANT_ERROR, `grant refused: ${process.env.FAKE_ENGINE_GRANT_ERROR}`)
+      }
+      control = { active: true, reason: params?.reason ?? null, grantedAt: CONTROL_GRANTED_AT }
+      return reply(id, control)
+    case "control.revoke":
+      if (process.env.FAKE_ENGINE_REVOKE_ERROR !== undefined) {
+        return fail(id, process.env.FAKE_ENGINE_REVOKE_ERROR, `revoke failed: ${process.env.FAKE_ENGINE_REVOKE_ERROR}`)
+      }
+      control = { active: false }
+      return reply(id, null)
+    case "$/cancel":
+      if (cancellable.delete(params.id)) fail(params.id, "Cancelled", "request was cancelled by $/cancel")
+      if (releaseFails.delete(params.id)) {
+        fail(
+          params.id,
+          "Cancelled",
+          "the hold request was cancelled; input release also failed: key up for shift failed",
+        )
+      }
+      return
+  }
+  if (desktop !== undefined && params?.fake === undefined) {
+    if (method === stalled) return cancellable.add(id)
+    const refused = (code, message, rpcCode) => {
+      send({
+        method: "audit",
+        params: { action: method, target: params?.target, delivery: "background", code, durationMs: 1 },
+      })
+      return fail(id, code, message, rpcCode)
+    }
+    if (suspended && GLOBAL_INPUT.has(method) && process.env.FAKE_ENGINE_GLOBAL_INPUT_GATE === "1") {
+      return refused("Suspended", "input is suspended", -32015)
+    }
+    if (refusesGlobalInput(method, params)) {
+      return refused("ControlRequired", "desktop input needs the control grant", -32022)
+    }
+    const outcome = desktop(method, params)
+    if (outcome !== undefined) {
+      const { notifications = [], ...reply } = outcome
+      for (const notification of notifications) send(notification)
+      const exec = reply.result === null && EXEC_METHODS.has(method)
+      if (exec && execReply !== undefined) return send({ id, result: execReply })
+      if (exec && reportMode === "object") return send({ id, result: actionReport(method) })
+      return send({ id, ...reply })
+    }
+  }
+  switch (params?.fake) {
+    case "hold":
+      return held.push(id)
+    case "release":
+      reply(id, { method, params, pid: process.pid })
+      for (const heldId of held.splice(0)) reply(heldId, { method: "held", pid: process.pid })
+      return
+    case "hang":
+      return
+    case "cancellable":
+      return cancellable.add(id)
+    case "release-fails":
+      return releaseFails.add(id)
+    case "notify":
+      send({ method: "audit", params: { action: method, target: "screen", delivery: "background", durationMs: 3 } })
+      send({ method: "stopPath.changed", params: status() })
+      return reply(id, { method, params, pid: process.pid })
+    case "exit":
+      return process.exit(7)
+    default:
+      return reply(id, { method, params, pid: process.pid })
+  }
 }
 
 createInterface({ input: process.stdin })
-	.on("line", (line) => {
-		send({ method: "engine.log", params: { level: "debug", message: `recv ${line}` } });
-		if (mode !== "silent") handle(JSON.parse(line));
-	})
-	.on("close", () => process.exit(0));
+  .on("line", (line) => {
+    send({ method: "engine.log", params: { level: "debug", message: `recv ${line}` } })
+    if (mode !== "silent") handle(JSON.parse(line))
+  })
+  .on("close", () => process.exit(0))

@@ -29,23 +29,11 @@ describe("mergeSkills", () => {
       },
     ]
 
-    const configSourceSkills: LoadedSkill[] = [
-      createLoadedSkill("config", "priority-skill", "config source"),
-    ]
-    const userSkills: LoadedSkill[] = [
-      createLoadedSkill("user", "priority-skill", "user skill"),
-    ]
+    const configSourceSkills: LoadedSkill[] = [createLoadedSkill("config", "priority-skill", "config source")]
+    const userSkills: LoadedSkill[] = [createLoadedSkill("user", "priority-skill", "user skill")]
 
     // when
-    const merged = mergeSkills(
-      builtinSkills,
-      undefined,
-      configSourceSkills,
-      userSkills,
-      [],
-      [],
-      [],
-    )
+    const merged = mergeSkills(builtinSkills, undefined, configSourceSkills, userSkills, [], [], [])
 
     // then
     expect(merged).toHaveLength(1)

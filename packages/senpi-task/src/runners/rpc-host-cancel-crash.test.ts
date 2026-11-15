@@ -44,7 +44,9 @@ describe("a cancel the host crash interrupts", () => {
     expect(cancelled.details).toMatchObject({ kind: "cancelled", task_id: child.task_id })
     expect(parent.store.load(child.task_id)?.status).toBe("cancelled")
     expect(hostHolds(world, child)).toBe(false)
-    expect(String((await bounded(nextPrompt, "the next child's prompt")).payload.message)).toBe("host child parent-a #1")
+    expect(String((await bounded(nextPrompt, "the next child's prompt")).payload.message)).toBe(
+      "host child parent-a #1",
+    )
     expect(world.host.commands.slice(mark).filter((command) => command.type === "prompt")).toHaveLength(1)
     expect(recordAt(parent, 1).status).toBe("running")
     expect(concurrencyOf(parent).getCount(HOST_CHILD_MODEL)).toBe(1)

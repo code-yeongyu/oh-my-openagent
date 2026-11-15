@@ -64,7 +64,9 @@ describe("TaskManager child model tracking (F12)", () => {
       return record
     }
     const output = async () =>
-      firstText(await runTaskOutput({ manager, stateDir: project }, { task_id: started.task_id, mode: "status" }, "parent-1"))
+      firstText(
+        await runTaskOutput({ manager, stateDir: project }, { task_id: started.task_id, mode: "status" }, "parent-1"),
+      )
 
     // when: an operator switches the child's model from another client
     fake.emit(OPERATOR_SET)
@@ -125,9 +127,20 @@ describe("TaskManager child model tracking (F12)", () => {
     if (current === null || current === undefined) throw new Error("record missing")
     store.replace({
       ...current,
-      effective_model: { provider: "anthropic", model_id: "claude-opus-5-5", display: "anthropic/claude-opus-5-5", reasoning: "high", source: "set", switched_by_operator: true },
+      effective_model: {
+        provider: "anthropic",
+        model_id: "claude-opus-5-5",
+        display: "anthropic/claude-opus-5-5",
+        reasoning: "high",
+        source: "set",
+        switched_by_operator: true,
+      },
     })
-    const result = await runTaskOutput({ manager, stateDir: project }, { task_id: started.task_id, mode: "status" }, "parent-1")
+    const result = await runTaskOutput(
+      { manager, stateDir: project },
+      { task_id: started.task_id, mode: "status" },
+      "parent-1",
+    )
     expect(result.details).toMatchObject({
       kind: "status",
       snapshot: {

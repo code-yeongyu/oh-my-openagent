@@ -519,5 +519,190 @@
     "title": "找不到此页面。",
     "body": "链接可能已过期，或页面已移动。",
     "home": "返回首页"
+  },
+  "home": {
+    "metaTitle": "OmO: Your tool for real work. But it's an agent.",
+    "nav": {
+      "primary": "主菜单",
+      "skip": "跳到正文",
+      "ultrawork": "Ultrawork",
+      "massUlw": "Mass ulw",
+      "models": "模型",
+      "skills": "技能",
+      "docs": "文档",
+      "install": "安装",
+      "stars": "GitHub {count} 星标",
+      "theme": "主题",
+      "system": "使用系统主题",
+      "light": "使用浅色主题",
+      "dark": "使用深色主题",
+      "manifesto": "宣言",
+      "openMenu": "打开菜单",
+      "closeMenu": "关闭菜单"
+    },
+    "hero": {
+      "title": "Your tool for real work.",
+      "accent": "But it's an agent.",
+      "sub": "把你的 token 变成真正有价值的成果：上万个来源的研究、一看就懂的演示、后端、前端和代码。",
+      "start": "开始使用",
+      "beta": "下载桌面应用测试版",
+      "download": "下载桌面应用",
+      "makers": "来自 <team>Sisyphus Labs</team>，<dori>Dori</dori> 和 <term>doriterm</term> 的开发团队。"
+    },
+    "stats": {
+      "label": "实时数据",
+      "stars": "GitHub 星标",
+      "total": "总下载量",
+      "monthly": "近一个月下载量"
+    },
+    "index": {
+      "label": "本页内容",
+      "ultrawork": "难题只需一个词",
+      "massUlw": "一张代理图",
+      "models": "按模型调优的提示词",
+      "kibitzer": "代理旁的记忆",
+      "skills": "任务需要时才加载",
+      "crafted": "你看不见的部分"
+    },
+    "ultrawork": {
+      "eyebrow": "Ultrawork",
+      "title": "给难题加上一个词。",
+      "soft": "剩下的交给代理。",
+      "body": "不必学习下面的内容。觉得任务很难，就在提示词里加上 ultrawork。代理会自行判断怎么做，并推进到最好的结果。",
+      "prompt": "把季度报告改成真正读得下去的版本",
+      "keyword": "ultrawork",
+      "step1": "动一行代码之前先读完整个代码库",
+      "step2": "先规划，每一步先证明再前进",
+      "step3": "在真实界面上验证结果，然后才停下",
+      "frame": "omo · ~/reports"
+    },
+    "massUlw": {
+      "eyebrow": "Mass ulw",
+      "title": "一个关键词，数百个代理。",
+      "soft": "每个部分都由最合适的模型完成。",
+      "body": "输入 mass ulw，整件工作就变成一张代理图：横跨数千来源的深度研究、一整套机器学习流水线、没人想做的迁移。每个部分由最合适的模型并行完成，说完成之前先经过检查。"
+    },
+    "models": {
+      "eyebrow": "模型",
+      "title": "前沿模型与便宜模型，一起用。",
+      "soft": "每个模型都自带调好的提示词。",
+      "body": "把你喜爱的前沿模型和便宜的模型混着用。登录即可。每个模型都自带为它调好的系统提示词，你永远不会选错。",
+      "caption": "OmO 内置的调优配置"
+    },
+    "kibitzer": {
+      "eyebrow": "Kibitzer",
+      "title": "你的代理记得你的工作。",
+      "soft": "由一个小模型保管记忆。",
+      "body": "一个小而便宜的模型坐在昂贵的主代理旁边，从记忆里查看你做过的事，在主代理重蹈覆辙之前轻轻提醒。昂贵的模型保持敏锐，你也不必反复解释自己。",
+      "sidecar": "Kibitzer · 小模型",
+      "main": "主代理 · 前沿模型",
+      "cheapLoop": "小而便宜的模型 · 独立循环",
+      "expensiveLoop": "昂贵的前沿模型 · 主循环",
+      "watch": "观察",
+      "read": "读取记忆",
+      "judge": "判断",
+      "memory": "记忆",
+      "memoryNote": "上次迁移：跳过测试后，生产环境发生故障。",
+      "nudge": "提醒",
+      "plan": "规划 · schema 变更",
+      "act": "执行 · 编写迁移",
+      "testFirst": "验证 · 先运行迁移测试",
+      "ship": "发布已验证的变更",
+      "reason": "上次这导致了生产环境故障。请先运行迁移测试。",
+      "figure": "小而便宜的Kibitzer与昂贵的主代理独立循环运行，不断观察和读取记忆，并将先运行迁移测试的提醒插入主循环，避免发布时重蹈覆辙。"
+    },
+    "skills": {
+      "eyebrow": "技能",
+      "title": "现实世界的经验，做成技能。",
+      "soft": "只在任务需要时加载。",
+      "body": "你的模型很聪明，但解决现实问题时仍有很多不知道的事。OmO 把缺失的知识做成技能，只加载当前任务需要的部分。",
+      "more": "在文档中查看全部技能"
+    },
+    "crafted": {
+      "eyebrow": "精心打造",
+      "title": "其余一切都经过精心打造。",
+      "soft": "大多数你看不见。",
+      "body": "这正是意图。以下每一项都在每个会话中运行。",
+      "docs": "细节见文档",
+      "item1Name": "代码模式工具调用",
+      "item1Desc": "彼此独立的工具调用放进一个小程序里一次执行，而不是一次次缓慢往返。",
+      "item2Name": "工具调用吸收",
+      "item2Desc": "几十个读取、搜索、查询调用折叠成一步。更少的轮次，更少的等待，更少的 token。",
+      "item3Name": "工具调用修正",
+      "item3Desc": "格式错误的参数在执行前被修好，一个手滑不会浪费一轮。",
+      "item4Name": "团队模式",
+      "item4Desc": "当任务大到值得拆分时，主代理会并行运营一支专家团队。",
+      "item5Name": "监听而非轮询",
+      "item5Desc": "等待构建、部署或文件是一种订阅。代理继续工作，到达时自动唤醒。",
+      "item6Name": "能存活的目标",
+      "item6Desc": "长任务带着证据设检查点，会话重启后从停下的地方继续。",
+      "item7Name": "一切热重载",
+      "item7Desc": "配置、技能、提示词实时重新加载。试一个改动不需要重启。",
+      "item8Name": "电脑操作",
+      "item8Desc": "在 macOS、Linux 和 Windows 的原生应用里读取屏幕和无障碍树，然后在后台点击和输入。你的焦点和光标不受影响。停止快捷键随时中止，只有你能恢复。"
+    },
+    "everywhere": {
+      "eyebrow": "运行环境",
+      "title": "今天在你的终端里。",
+      "soft": "接下来在你的聊天应用里。",
+      "terminalTitle": "在终端里",
+      "terminalBody": "一条命令安装 OmO。然后在任意项目中运行 omo。",
+      "terminalMeta": "macOS、Linux、WSL 和 Windows",
+      "desktopTitle": "在桌面应用里",
+      "desktopBody": "适用于 Mac、Windows 电脑和 Linux 的 OmO 桌面应用。",
+      "desktopMeta": "测试版",
+      "chatTitle": "在你的聊天应用里",
+      "chatBody": "在你已经在的地方和代理对话。它以你的身份而不是机器人发消息，覆盖你使用的每一个平台。",
+      "chatMeta": "即将支持。各消息平台正在逐一接入中。"
+    },
+    "voices": {
+      "eyebrow": "来自用户",
+      "title": "用户怎么说。",
+      "q1": "It made me cancel my Cursor subscription. Unbelievable things are happening in the open source community.",
+      "a1": "Arthur Guiot",
+      "q2": "If Claude Code does in 7 days what a human does in 3 months, OmO does it in 1 hour.",
+      "a2": "B, Quant Researcher",
+      "q3": "You guys should pull this into core and recruit him. Seriously. It's really, really, really good.",
+      "a3": "Henning Kilset"
+    },
+    "makers": {
+      "title": "由 Sisyphus Labs 打造。",
+      "soft": "Dori 和 doriterm 的开发团队。",
+      "dori": "住在你聊天里的工程师。在 Slack、Discord 或 Telegram 里告诉他做什么；他为每项工作开一个独立的编程代理会话，合并后向你汇报。",
+      "doriterm": "你的每一台机器，通过端到端加密网络连接，汇聚在一个终端里。在家里的 mac mini 上启动 OmO，用手机回复它。"
+    },
+    "closing": {
+      "title": "一条命令。",
+      "soft": "然后回到你的工作。",
+      "body": "安装 OmO，打开项目，说出要做的事。设置就这么多。",
+      "docs": "阅读文档",
+      "manifesto": "阅读宣言"
+    },
+    "install": {
+      "label": "适用于你的系统的安装命令",
+      "unix": "macOS, Linux, WSL",
+      "powershell": "PowerShell",
+      "cmd": "CMD",
+      "next": "然后打开一个新终端，运行 omo。",
+      "copy": "复制",
+      "copied": "已复制",
+      "copyAria": "复制安装命令",
+      "copiedStatus": "已复制安装命令",
+      "windows": "Windows",
+      "onComputer": "请在 Mac、Linux 或 Windows 电脑上运行。"
+    },
+    "footer": {
+      "copyright": "© {year} Sisyphus Labs · 依据 SUL-1.0 源码可用",
+      "docs": "文档",
+      "manifesto": "宣言",
+      "releases": "发布",
+      "github": "GitHub",
+      "discord": "Discord",
+      "x": "X @justsisyphus",
+      "privacy": "隐私政策",
+      "terms": "服务条款",
+      "language": "语言",
+      "label": "页脚"
+    }
   }
 }

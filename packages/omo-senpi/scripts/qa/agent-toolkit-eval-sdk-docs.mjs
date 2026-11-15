@@ -69,5 +69,7 @@ checkFiles(GENERATED, "generated")
 checkDriverLifecycle()
 checkSourcesMatchGenerated()
 if (process.exitCode === undefined || process.exitCode === 0) {
-  console.log(`agent-toolkit-eval-sdk-docs: Native guidance teaches the eval SDK import (${GENERATED.length + SOURCES.length} files checked, repo ${repoRoot})`)
+  console.log(
+    `agent-toolkit-eval-sdk-docs: Native guidance teaches the eval SDK import (${GENERATED.length + SOURCES.length} files checked, repo ${repoRoot})`,
+  )
 }

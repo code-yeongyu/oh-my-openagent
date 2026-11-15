@@ -5,9 +5,7 @@ import { fileURLToPath } from "node:url"
 import { createRpcModelAdmission } from "../model-admission"
 import type { ProbeMode } from "./windows-console-probe-state"
 
-const FAKE_MODEL_CATALOG_PATH = fileURLToPath(
-  new URL("./fake-model-catalog.mjs", import.meta.url),
-)
+const FAKE_MODEL_CATALOG_PATH = fileURLToPath(new URL("./fake-model-catalog.mjs", import.meta.url))
 
 type WindowsModelAdmissionProbeOptions = {
   readonly mode: ProbeMode

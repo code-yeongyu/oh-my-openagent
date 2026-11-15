@@ -2,9 +2,16 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { chmodSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { connectDeviceService, deviceServiceStateDir, type DeviceService, LocalApiError, type RemoteAttachEvent } from "../src/index.ts"
-import { writeToken } from "../src/local-api/access.ts"
+import {
+  connectDeviceService,
+  deviceServiceStateDir,
+  type DeviceService,
+  LocalApiError,
+  type RemoteAttachEvent,
+} from "../src/index.ts"
+import { mintNonce, writeToken } from "../src/local-api/access.ts"
 import { connectLocalApi } from "../src/local-api/client.ts"
+import { validateWelcome } from "../src/local-api/validate.ts"
 import { startFakeOwner, type FakeOwner } from "./local-api/conformance/fake-owner.ts"
 import { defaultWorld, OFFLINE_PEER, PEER, SESSION_ID, type World } from "./local-api/conformance/world.ts"
 import { testSecure } from "./local-api/support.ts"
@@ -51,11 +58,15 @@ async function serviceFor(world: World = defaultWorld()): Promise<{ owner: FakeO
 describe("deviceServiceStateDir", () => {
   test("uses ~/.omo/device-service on POSIX and LOCALAPPDATA on Windows", () => {
     expect(deviceServiceStateDir("darwin", {}, "/Users/a")).toBe(join("/Users/a", ".omo", "device-service"))
-    expect(deviceServiceStateDir("linux", { LOCALAPPDATA: "/ignored" }, "/home/a")).toBe(join("/home/a", ".omo", "device-service"))
+    expect(deviceServiceStateDir("linux", { LOCALAPPDATA: "/ignored" }, "/home/a")).toBe(
+      join("/home/a", ".omo", "device-service"),
+    )
     expect(deviceServiceStateDir("win32", { LOCALAPPDATA: "C:\\Users\\a\\AppData\\Local" }, "C:\\Users\\a")).toBe(
       join("C:\\Users\\a\\AppData\\Local", "OmO", "device-service"),
     )
-    expect(deviceServiceStateDir("win32", {}, "C:\\Users\\a")).toBe(join("C:\\Users\\a", "AppData", "Local", "OmO", "device-service"))
+    expect(deviceServiceStateDir("win32", {}, "C:\\Users\\a")).toBe(
+      join("C:\\Users\\a", "AppData", "Local", "OmO", "device-service"),
+    )
   })
 })
 
@@ -91,8 +102,8 @@ describe("DeviceService", () => {
   test("watchStatus replays the current status and follows the switch", async () => {
     const { service } = await serviceFor()
     const seen: string[] = []
-    const changed = new Promise<void>(resolve => {
-      void service.watchStatus(status => {
+    const changed = new Promise<void>((resolve) => {
+      void service.watchStatus((status) => {
         seen.push(`${status.state}:${status.enabled}`)
         if (!status.enabled) resolve()
       })
@@ -106,7 +117,7 @@ describe("DeviceService", () => {
   test("devices lists every device of the account with its presence", async () => {
     const { service } = await serviceFor()
     const devices = await service.devices()
-    expect(devices.map(device => [device.device, device.label, device.online])).toEqual([
+    expect(devices.map((device) => [device.device, device.label, device.online])).toEqual([
       [PEER, "Studio", true],
       [OFFLINE_PEER, "Laptop", false],
     ])
@@ -115,9 +126,17 @@ describe("DeviceService", () => {
   test("sessions settles on the round's last revision and reports each revision whole", async () => {
     const { service } = await serviceFor()
     const revisions: number[][] = []
-    const result = await service.sessions(undefined, revision => revisions.push([revision.revision, revision.rows.length]))
-    expect(revisions).toEqual([[1, 1], [2, 2]])
-    expect(result.rows.map(row => [row.device, row.source])).toEqual([[OFFLINE_PEER, "cache"], [PEER, "live"]])
+    const result = await service.sessions(undefined, (revision) =>
+      revisions.push([revision.revision, revision.rows.length]),
+    )
+    expect(revisions).toEqual([
+      [1, 1],
+      [2, 2],
+    ])
+    expect(result.rows.map((row) => [row.device, row.source])).toEqual([
+      [OFFLINE_PEER, "cache"],
+      [PEER, "live"],
+    ])
     expect(result.incomplete).toEqual([])
     expect(result.devices).toEqual({ [PEER]: "answered", [OFFLINE_PEER]: "undelivered" })
   })
@@ -125,7 +144,7 @@ describe("DeviceService", () => {
   test("a device filter narrows only this query's rows", async () => {
     const { service } = await serviceFor()
     const result = await service.sessions({ device: PEER })
-    expect(result.rows.map(row => row.device)).toEqual([PEER])
+    expect(result.rows.map((row) => row.device)).toEqual([PEER])
   })
 
   test("attach delivers the snapshot, then records, reads history pages and detaches", async () => {
@@ -133,8 +152,8 @@ describe("DeviceService", () => {
     const attach = await service.attach(PEER, SESSION_ID)
     expect(await attach.snapshot).toEqual(firstSession(defaultWorld()).snapshot)
     const events: RemoteAttachEvent["kind"][] = []
-    const recordsSeen = new Promise<void>(resolve => {
-      attach.onEvent(event => {
+    const recordsSeen = new Promise<void>((resolve) => {
+      attach.onEvent((event) => {
         events.push(event.kind)
         if (event.kind === "records") resolve()
       })
@@ -157,11 +176,11 @@ describe("DeviceService", () => {
     const service = await connectDeviceService({
       version: "5.1.52",
       stateDir: owner.stateDir,
-      connect: async options => {
+      connect: async (options) => {
         const client = await connectLocalApi(options)
         return {
           ...client,
-          onEvent: listener => {
+          onEvent: (listener) => {
             live++
             const stop = client.onEvent(listener)
             let stopped = false
@@ -200,5 +219,77 @@ describe("DeviceService", () => {
     const error = await service.attach(PEER, "bm8tc3VjaC1zZXNzaW9u").catch((e: unknown) => e)
     expect(error).toBeInstanceOf(LocalApiError)
     expect((error as LocalApiError).code).toBe("session_not_found")
+  })
+})
+
+describe("DeviceService.endpointCommand (relay daemon #393's attach-less session.command)", () => {
+  const ENDPOINT = "ZW5kcG9pbnQta2V5LTAwMD"
+  const endpointWorld = (): World => ({
+    ...defaultWorld(),
+    endpoints: { [PEER]: [ENDPOINT] },
+    endpointCommand: {
+      data: { sessionId: "bmV3LXNlc3Npb24tMDAwMQ" },
+      outcome: [
+        { state: "queued", retryable: false },
+        { state: "engine_applied", retryable: false },
+      ],
+    },
+  })
+
+  test("#given the peer lists an engine endpoint #when a session-less record is sent to it #then it travels as session.command {device, endpoint, rpc} with no attach and settles with the engine's reply", async () => {
+    const { owner, service } = await serviceFor(endpointWorld())
+    const result = await within(
+      service.endpointCommand(PEER, { type: "open_session", cwd: "/p" }),
+      "the endpoint command",
+    )
+    expect(result.outcome.state).toBe("engine_applied")
+    expect(result.response).toEqual({
+      type: "response",
+      id: null,
+      command: "open_session",
+      success: true,
+      data: { sessionId: "bmV3LXNlc3Npb24tMDAwMQ" },
+    })
+    expect(owner.state.commands).toEqual([{ type: "open_session", cwd: "/p" }])
+  })
+
+  test("#given the peer lists no engine endpoint #when a session-less record is sent to it #then it is refused before any command goes out", async () => {
+    const { owner, service } = await serviceFor({ ...endpointWorld(), endpoints: { [PEER]: [] } })
+    const error = await service.endpointCommand(PEER, { type: "open_session" }).catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(LocalApiError)
+    expect((error as LocalApiError).code).toBe("unsupported")
+    expect((error as LocalApiError).command_id).toBeUndefined()
+    expect(owner.state.commands).toEqual([])
+  })
+})
+
+// D1 (#12051): the host attach setting is the per-device remote-control opt-out; a service advertises it as `control`.
+describe("the host attach control", () => {
+  test("a fresh service reads attached, and a set is stored and read back with its time", async () => {
+    const { service } = await serviceFor()
+    expect(service.capabilities).toContain("control")
+    expect(await service.attachControl()).toEqual({ attached: true, changedAt: "" })
+    const detached = await service.setAttachControl(false)
+    expect(detached.attached).toBe(false)
+    expect(Number.isNaN(Date.parse(detached.changedAt))).toBe(false)
+    expect(await service.attachControl()).toEqual(detached)
+  })
+
+  test("a welcome that also lists the optional machine capability is accepted; an unknown one is not", () => {
+    const welcome = {
+      type: "welcome",
+      v: 1,
+      service_version: "0.1.0",
+      owner: "service",
+      server_proof: mintNonce(),
+      server_nonce: mintNonce(),
+      state: defaultWorld().status,
+    }
+    expect(validateWelcome({ ...welcome, capabilities: ["sessions", "control", "machine"] })).toMatchObject({
+      capabilities: ["sessions", "control", "machine"],
+    })
+    expect(() => validateWelcome({ ...welcome, capabilities: ["sessions", "telepathy"] })).toThrow(
+      "protocol_violation: capability",
+    )
   })
 })

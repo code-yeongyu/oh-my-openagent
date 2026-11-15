@@ -51,7 +51,11 @@ export function createFinalWaveMockPluginInput(options: {
     }
   })
 
-  Reflect.set(client.session, "messages", mock(async () => ({ data: [] })))
+  Reflect.set(
+    client.session,
+    "messages",
+    mock(async () => ({ data: [] })),
+  )
   Reflect.set(client.session, "get", async ({ path }: { path: { id: string } }) => ({
     data: {
       id: path.id,
@@ -83,9 +87,9 @@ export function createFinalWaveMockPluginInput(options: {
  * cleanup) and exposes the current directory. `resetAgentRegistration` also resets
  * the shared claude-code session-state registry between tests.
  */
-export function registerFinalWaveTestEnvironment(options?: {
-  resetAgentRegistration?: boolean
-}): { readonly directory: string } {
+export function registerFinalWaveTestEnvironment(options?: { resetAgentRegistration?: boolean }): {
+  readonly directory: string
+} {
   let testDirectory = ""
 
   beforeEach(() => {

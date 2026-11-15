@@ -14,8 +14,8 @@ export { churnRatio, TICKER } from "./polish-rules.mjs"
 
 /** The DEFECT_CODES entry of a polish code; refuses a code the registry does not define. */
 function registryEntry(code) {
-	if (!Object.hasOwn(DEFECT_CODES, code)) throw new Error(`polish code ${code} is not in DEFECT_CODES`)
-	return DEFECT_CODES[code]
+  if (!Object.hasOwn(DEFECT_CODES, code)) throw new Error(`polish code ${code} is not in DEFECT_CODES`)
+  return DEFECT_CODES[code]
 }
 
 /**
@@ -25,7 +25,12 @@ function registryEntry(code) {
  * @returns {{ code: string, severity: string, message: string }[]} at most one defect per code
  */
 export function diffPolish(beforeHtml, afterHtml, ledger) {
-	const found = new Map()
-	for (const { code, message } of polishDefects(beforeHtml, afterHtml, ledger)) found.set(code, [...(found.get(code) ?? []), message])
-	return POLISH_CODES.filter((code) => found.has(code)).map((code) => ({ code, severity: registryEntry(code).severity, message: found.get(code).join("; ") }))
+  const found = new Map()
+  for (const { code, message } of polishDefects(beforeHtml, afterHtml, ledger))
+    found.set(code, [...(found.get(code) ?? []), message])
+  return POLISH_CODES.filter((code) => found.has(code)).map((code) => ({
+    code,
+    severity: registryEntry(code).severity,
+    message: found.get(code).join("; "),
+  }))
 }

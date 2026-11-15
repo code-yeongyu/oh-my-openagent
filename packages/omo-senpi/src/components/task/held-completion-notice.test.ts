@@ -6,24 +6,53 @@ import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createParentNotifier } from "./parent-notifier"
 
 const completion = (taskId: string, runId: string) => ({
-  customType: "senpi-task.completion" as const, content: `task ${taskId} completed`, display: true,
-  details: [{
-    task_id: taskId, name: taskId, status: "completed" as const, model: "m", duration_ms: 1,
-    final_response: "done", continuation_hint: "", runRef: { kind: "dag", id: runId } as RunRef,
-  }],
+  customType: "senpi-task.completion" as const,
+  content: `task ${taskId} completed`,
+  display: true,
+  details: [
+    {
+      task_id: taskId,
+      name: taskId,
+      status: "completed" as const,
+      model: "m",
+      duration_ms: 1,
+      final_response: "done",
+      continuation_hint: "",
+      runRef: { kind: "dag", id: runId } as RunRef,
+    },
+  ],
 })
 
 test("design 25: a run-tagged completion held as a notice while paused is engine custody, never a failed or repeated delivery", async () => {
   const stoppedRuns = new Set(["run-1"])
   const sends: { readonly runRefs: readonly (RunRef | undefined)[] }[] = []
   const failures: string[] = []
-  const coordinator = new IdleInjectionCoordinator((message, options) => deliverItems((_native, delivery) => {
-    sends.push({ runRefs: delivery.items.map(item => item.runRef) })
-    return delivery.items.map(item => item.runRef !== undefined && stoppedRuns.has(item.runRef.id)
-      ? { itemId: item.itemId, entryId: "held-batch", noticeId: `notice:${item.itemId}`, disposition: "notice_persisted" as const }
-      : { itemId: item.itemId, entryId: `entry:${item.itemId}`, disposition: "message_persisted" as const })
-  }, { ...options, message }))
-  const notifier = createParentNotifier(new FakeExtensionAPI(), coordinator, () => false, taskIds => { failures.push(...taskIds) })
+  const coordinator = new IdleInjectionCoordinator((message, options) =>
+    deliverItems(
+      (_native, delivery) => {
+        sends.push({ runRefs: delivery.items.map((item) => item.runRef) })
+        return delivery.items.map((item) =>
+          item.runRef !== undefined && stoppedRuns.has(item.runRef.id)
+            ? {
+                itemId: item.itemId,
+                entryId: "held-batch",
+                noticeId: `notice:${item.itemId}`,
+                disposition: "notice_persisted" as const,
+              }
+            : { itemId: item.itemId, entryId: `entry:${item.itemId}`, disposition: "message_persisted" as const },
+        )
+      },
+      { ...options, message },
+    ),
+  )
+  const notifier = createParentNotifier(
+    new FakeExtensionAPI(),
+    coordinator,
+    () => false,
+    (taskIds) => {
+      failures.push(...taskIds)
+    },
+  )
 
   notifier.enqueue(completion("st_1", "run-1"))
   await Promise.resolve()

@@ -2,7 +2,12 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { copyFileSync, mkdirSync, mkdtempSync, realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
-import { handOffToProvisionedRuntime, planProvisionedLaunch, PROVISIONED_HANDOFF_ENV } from "../provisioned-handoff"
+import {
+  handOffToProvisionedRuntime,
+  planProvisionedLaunch,
+  PROVISIONED_HANDOFF_ENV,
+  PROVISIONED_LAUNCHER_ENV,
+} from "../provisioned-handoff"
 import { removeTree } from "../../../test-support/remove-tree"
 
 const exe = process.platform === "win32" ? ".exe" : ""
@@ -15,19 +20,30 @@ const provisioned = join(home, ".omo", "binary-runtime", "handoff-fixture", `omo
 const canonical = (path: string) => realpathSync.native(path)
 
 type Run = { code: number; stdout: string; stderr: string }
-type Report = { version: string; execPath: string; args: string[]; launch: { provision: boolean; handOff: boolean } }
+type Report = {
+  version: string
+  execPath: string
+  args: string[]
+  launch: { provision: boolean; handOff: boolean; launcher?: string }
+}
 
 async function run(command: string[]): Promise<Run> {
   const env: Record<string, string | undefined> = { ...process.env, HOME: home, USERPROFILE: home }
   delete env.OMO_PROVISIONED_HANDOFF
+  delete env.OMO_PROVISIONED_LAUNCHER
   const child = Bun.spawn(command, { cwd: root, env, stdout: "pipe", stderr: "pipe" })
-  const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+  const [stdout, stderr, code] = await Promise.all([
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+    child.exited,
+  ])
   return { code, stdout, stderr }
 }
 
 function report(result: Run): Report {
   const line = result.stdout.trim().split(/\r?\n/).at(-1) ?? ""
-  if (!line.startsWith("{")) throw new Error(`fixture printed no report (exit ${result.code}):\n${result.stdout}\n${result.stderr}`)
+  if (!line.startsWith("{"))
+    throw new Error(`fixture printed no report (exit ${result.code}):\n${result.stdout}\n${result.stderr}`)
   return JSON.parse(line) as Report
 }
 
@@ -63,6 +79,56 @@ describe("provisioned launch plan", () => {
     expect(env[PROVISIONED_HANDOFF_ENV]).toBeUndefined()
   })
 
+  test("#given a raw download #when it plans its launch #then the download is the launcher an update replaces", () => {
+    const download = join(root, "Downloads", `omo${exe}`)
+    expect(planProvisionedLaunch(download, expected, { env: {} }).launcher).toBe(download)
+  })
+
+  test("#given the child a launch handed off to #when the parent named its launcher #then the child keeps it and drops both markers", () => {
+    // given
+    const launcher = join(root, "bin", `omo${exe}`)
+    const env: NodeJS.ProcessEnv = { [PROVISIONED_HANDOFF_ENV]: expected, [PROVISIONED_LAUNCHER_ENV]: launcher }
+    // when
+    const launch = planProvisionedLaunch(expected, expected, { env })
+    // then
+    expect(launch.launcher).toBe(launcher)
+    expect(env[PROVISIONED_HANDOFF_ENV]).toBeUndefined()
+    expect(env[PROVISIONED_LAUNCHER_ENV]).toBeUndefined()
+  })
+
+  for (const [name, launcher] of [
+    ["the runtime copy itself", expected],
+    ["a relative path", `bin/omo${exe}`],
+  ] as const) {
+    test(`#given a handed-off child #when the launcher marker names ${name} #then no launcher is trusted`, () => {
+      const env: NodeJS.ProcessEnv = { [PROVISIONED_HANDOFF_ENV]: expected, [PROVISIONED_LAUNCHER_ENV]: launcher }
+      expect(planProvisionedLaunch(expected, expected, { env }).launcher).toBeUndefined()
+    })
+  }
+
+  test("#given the runtime copy run directly #when it plans its launch #then a stray launcher marker is dropped and none is reported", () => {
+    const env: NodeJS.ProcessEnv = { [PROVISIONED_LAUNCHER_ENV]: join(root, "bin", `omo${exe}`) }
+    expect(planProvisionedLaunch(expected, expected, { env }).launcher).toBeUndefined()
+    expect(env[PROVISIONED_LAUNCHER_ENV]).toBeUndefined()
+  })
+
+  test("#given a handoff without a launcher #when the environment inherited a launcher marker #then the child does not receive it", async () => {
+    // given
+    let childEnv: NodeJS.ProcessEnv | undefined
+    // when
+    await handOffToProvisionedRuntime(expected, {
+      env: { [PROVISIONED_LAUNCHER_ENV]: join(root, "stale", `omo${exe}`) },
+      platform: "win32",
+      run: async (_file, _argv, options) => {
+        childEnv = (options as { env?: NodeJS.ProcessEnv } | undefined)?.env
+        return { status: 0, signal: null }
+      },
+      propagate: () => {},
+    })
+    // then
+    expect(childEnv).toEqual({ [PROVISIONED_HANDOFF_ENV]: expected })
+  })
+
   test("#given a marker naming another runtime #when a download plans its launch #then the marker is dropped and the download still hands off", () => {
     const env: NodeJS.ProcessEnv = { [PROVISIONED_HANDOFF_ENV]: join(root, "other-version", `omo${exe}`) }
     expect(planProvisionedLaunch(join(root, "Downloads", `omo${exe}`), expected, { env }).handOff).toBe(true)
@@ -76,13 +142,17 @@ describe("provisioned launch plan", () => {
     const propagated: unknown[] = []
     // when
     await handOffToProvisionedRuntime(expected, {
-      argv: ["-p", "hi"], env: { KEEP: "1" }, platform: "win32",
+      argv: ["-p", "hi"],
+      env: { KEEP: "1" },
+      platform: "win32",
       run: async (_file, _argv, options) => {
         seen.env = (options as { env?: NodeJS.ProcessEnv } | undefined)?.env
         seen.sigintListeners = process.listenerCount("SIGINT")
         return { status: 5, signal: null }
       },
-      propagate: (result: unknown) => { propagated.push(result) },
+      propagate: (result: unknown) => {
+        propagated.push(result)
+      },
     })
     // then
     expect(seen.env).toEqual({ KEEP: "1", [PROVISIONED_HANDOFF_ENV]: expected })
@@ -100,6 +170,8 @@ describe("a compiled omo launched from an empty download directory (#7485)", () 
     const firstBody = report(first)
     expect(firstBody.version).toBe("0.0.0-handoff-fixture")
     expect(canonical(dirname(firstBody.execPath))).toBe(canonical(dirname(provisioned)))
+    // the handed-off runtime still knows which binary the user launched (the one `omo update` replaces)
+    expect(canonical(firstBody.launch.launcher ?? "")).toBe(canonical(download))
     expect(firstBody.args).toEqual(["7", "two words"])
     expect(first.code).toBe(7)
 
@@ -114,6 +186,7 @@ describe("a compiled omo launched from an empty download directory (#7485)", () 
     const direct = await run([provisioned, "0"])
     // then: it runs in place, with nothing to provision or hand off
     expect(report(direct).launch).toEqual(expect.objectContaining({ provision: false, handOff: false }))
+    expect(report(direct).launch.launcher).toBeUndefined()
     expect(canonical(dirname(report(direct).execPath))).toBe(canonical(dirname(provisioned)))
     expect(direct.code).toBe(0)
   }, 180_000)

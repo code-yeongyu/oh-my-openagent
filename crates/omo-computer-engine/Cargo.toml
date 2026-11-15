@@ -1,0 +1,18 @@
+[package]
+name = "omo-computer-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "omo-computer-engine"
+path = "src/main.rs"
+
+[dependencies]
+omo-computer-session = { path = "../omo-computer-session" }
+omo-computer-backend-fake = { path = "../omo-computer-backend-fake" }
+omo-computer-backend-atspi = { path = "../omo-computer-backend-atspi" }
+omo-computer-backend-macos = { path = "../omo-computer-backend-macos" }
+omo-computer-backend-x11 = { path = "../omo-computer-backend-x11" }
+omo-computer-backend-wayland = { path = "../omo-computer-backend-wayland" }
+omo-computer-backend-win32 = { path = "../omo-computer-backend-win32" }

@@ -1,6 +1,12 @@
 import { randomUUID } from "node:crypto"
 
-import { MemorySecretError, parseFactsExtractionRecord, sanitizeToSlug, type FactsExtractionRecord, type FactsPeopleRouting } from "@oh-my-opencode/memory-core"
+import {
+  MemorySecretError,
+  parseFactsExtractionRecord,
+  sanitizeToSlug,
+  type FactsExtractionRecord,
+  type FactsPeopleRouting,
+} from "@oh-my-opencode/memory-core"
 
 import type { ComponentLogger } from "../../extension/types"
 import type { MemoryIdentityContext } from "./context"
@@ -33,11 +39,14 @@ export async function applyMemoryFacts(input: {
   if (records.length === 0) return { outcome: "no_facts", affectedPaths: [] }
   const batchId = clientBatchId ?? (input.newBatchId ?? randomUUID)()
   const context = input.context
-  const apply = input.apply ?? ((call: FactsApplyCall) => applyFactsWithRetriesUnderLock({
-    identity: { id: context.identity, safeSlug: sanitizeToSlug(context.identity), paths: context.identityPaths },
-    ...call,
-    ...(input.logger === undefined ? {} : { logger: input.logger }),
-  }))
+  const apply =
+    input.apply ??
+    ((call: FactsApplyCall) =>
+      applyFactsWithRetriesUnderLock({
+        identity: { id: context.identity, safeSlug: sanitizeToSlug(context.identity), paths: context.identityPaths },
+        ...call,
+        ...(input.logger === undefined ? {} : { logger: input.logger }),
+      }))
   let applied: Applied | undefined
   try {
     applied = await apply({ batchId, records, people: input.people })

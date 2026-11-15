@@ -4,14 +4,13 @@ import { join } from "node:path"
 
 import { reconcileReflectionRuns } from "./run-reconciliation"
 import { writeRunJsonAtomic } from "./run-artifacts"
-import {
-  cleanupReconciliationFixtures,
-  reconciliationFixture as fixture,
-} from "./run-reconciliation.test-support"
+import { cleanupReconciliationFixtures, reconciliationFixture as fixture } from "./run-reconciliation.test-support"
 
 afterEach(cleanupReconciliationFixtures)
 
-async function completionRecord(item: Awaited<ReturnType<typeof fixture>>): Promise<{ reason?: string; detail?: string }> {
+async function completionRecord(
+  item: Awaited<ReturnType<typeof fixture>>,
+): Promise<{ reason?: string; detail?: string }> {
   return JSON.parse(await readFile(join(item.identity.paths.reflection, "completions", "run-orphan.json"), "utf8"))
 }
 
@@ -20,7 +19,11 @@ describe("failure detail of a run reconciled after its supervisor died", () => {
     // given
     const item = await fixture()
     await writeRunJsonAtomic(join(item.runDir, "ledger.json"), {
-      ...item.ledger, pid: 222, processStart: "supervisor-start", childPid: 333, childProcessStart: "child-start",
+      ...item.ledger,
+      pid: 222,
+      processStart: "supervisor-start",
+      childPid: 333,
+      childProcessStart: "child-start",
     })
     await writeFile(join(item.runDir, "child-stderr.log"), "OpenAI API error (429): usage_limit_reached\n")
 
@@ -42,7 +45,11 @@ describe("failure detail of a run reconciled after its supervisor died", () => {
     // given
     const item = await fixture()
     await writeRunJsonAtomic(join(item.runDir, "ledger.json"), {
-      ...item.ledger, pid: 222, processStart: "supervisor-start", childPid: 333, childProcessStart: "child-start",
+      ...item.ledger,
+      pid: 222,
+      processStart: "supervisor-start",
+      childPid: 333,
+      childProcessStart: "child-start",
     })
 
     // when

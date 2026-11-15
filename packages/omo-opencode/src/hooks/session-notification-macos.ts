@@ -2,18 +2,9 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { escapeAppleScriptText } from "./session-notification-formatting"
 import { logCommandFailure } from "./session-notification-log"
 import { runNotificationCommand } from "./session-notification-runner"
-import {
-  getAfplayPath,
-  getCmuxPath,
-  getOsascriptPath,
-  getTerminalNotifierPath,
-} from "./session-notification-utils"
+import { getAfplayPath, getCmuxPath, getOsascriptPath, getTerminalNotifierPath } from "./session-notification-utils"
 
-export async function sendMacosSessionNotification(
-  ctx: PluginInput,
-  title: string,
-  message: string
-): Promise<void> {
+export async function sendMacosSessionNotification(ctx: PluginInput, title: string, message: string): Promise<void> {
   const cmuxPath = await getCmuxPath()
   if (cmuxPath) {
     try {
@@ -22,7 +13,7 @@ export async function sendMacosSessionNotification(
         cmuxPath,
         ["notify", "--title", title, "--body", message],
         (shell) => shell`${cmuxPath} notify --title ${title} --body ${message}`,
-        "throw"
+        "throw",
       )
       return
     } catch (error) {
@@ -45,10 +36,11 @@ export async function sendMacosSessionNotification(
         ctx,
         terminalNotifierPath,
         args,
-        (shell) => bundleId
-          ? shell`${terminalNotifierPath} -title ${title} -message ${message} -activate ${bundleId}`
-          : shell`${terminalNotifierPath} -title ${title} -message ${message}`,
-        "throw"
+        (shell) =>
+          bundleId
+            ? shell`${terminalNotifierPath} -title ${title} -message ${message} -activate ${bundleId}`
+            : shell`${terminalNotifierPath} -title ${title} -message ${message}`,
+        "throw",
       )
       return
     } catch (error) {
@@ -65,22 +57,17 @@ export async function sendMacosSessionNotification(
 
   const escapedTitle = escapeAppleScriptText(title)
   const escapedMessage = escapeAppleScriptText(message)
-  const appleScript = "display notification \"" + escapedMessage + "\" with title \"" + escapedTitle + "\""
+  const appleScript = 'display notification "' + escapedMessage + '" with title "' + escapedTitle + '"'
   await runNotificationCommand(
     ctx,
     osascriptPath,
     ["-e", appleScript],
-    (shell) => shell`${osascriptPath} -e ${appleScript}`
+    (shell) => shell`${osascriptPath} -e ${appleScript}`,
   )
 }
 
 export async function playMacosSessionNotificationSound(ctx: PluginInput, soundPath: string): Promise<void> {
   const afplayPath = await getAfplayPath()
   if (!afplayPath) return
-  await runNotificationCommand(
-    ctx,
-    afplayPath,
-    [soundPath],
-    (shell) => shell`${afplayPath} ${soundPath}`
-  )
+  await runNotificationCommand(ctx, afplayPath, [soundPath], (shell) => shell`${afplayPath} ${soundPath}`)
 }

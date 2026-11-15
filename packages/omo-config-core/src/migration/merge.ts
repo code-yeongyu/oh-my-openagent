@@ -54,7 +54,9 @@ function mergeInto(
       continue
     }
 
-    diagnostics.push(`skipped: ${displayPath(nextPath)} legacy=${displayValue(legacyValue)} kept=${displayValue(keptValue)}`)
+    diagnostics.push(
+      `skipped: ${displayPath(nextPath)} legacy=${displayValue(legacyValue)} kept=${displayValue(keptValue)}`,
+    )
   }
 
   return additions
@@ -70,9 +72,7 @@ function applyAdditions(
   for (const [key, value] of Object.entries(additions)) {
     if (isUnsafeObjectKey(key)) continue
     const current = result[key]
-    result[key] = isPlainObject(current) && isPlainObject(value)
-      ? applyAdditions(current, value)
-      : cloneValue(value)
+    result[key] = isPlainObject(current) && isPlainObject(value) ? applyAdditions(current, value) : cloneValue(value)
   }
   return result
 }

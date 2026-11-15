@@ -35,7 +35,9 @@ export function stripInvisibleAgentCharacters(agentName: string): string {
 }
 
 export function stripAgentListSortPrefix(agentName: string): string {
-  return stripInvisibleAgentCharacters(agentName).replace(VISIBLE_AGENT_LIST_SORT_PREFIX_REGEX, "").replace(AGENT_WRAPPER_CHARS_REGEX, "")
+  return stripInvisibleAgentCharacters(agentName)
+    .replace(VISIBLE_AGENT_LIST_SORT_PREFIX_REGEX, "")
+    .replace(AGENT_WRAPPER_CHARS_REGEX, "")
 }
 
 /**
@@ -53,8 +55,8 @@ export function getAgentDisplayName(
 ): string {
   // Check per-agent displayName override first (i18n support)
   if (overrides) {
-    const override = overrides[configKey]
-      ?? Object.entries(overrides).find(([k]) => k.toLowerCase() === configKey.toLowerCase())?.[1]
+    const override =
+      overrides[configKey] ?? Object.entries(overrides).find(([k]) => k.toLowerCase() === configKey.toLowerCase())?.[1]
     if (override?.displayName) return override.displayName
   }
 

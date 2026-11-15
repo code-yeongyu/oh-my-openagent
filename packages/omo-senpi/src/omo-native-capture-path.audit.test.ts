@@ -30,13 +30,18 @@ async function nativeModuleSources(): Promise<readonly SourceFile[]> {
   const names = (await readdir(TELEMETRY_DIR))
     .filter((name) => /^omo-native-.*\.ts$/u.test(name) && !name.includes(".test."))
     .sort()
-  return Promise.all(names.map(async (name) => ({
-    name,
-    source: await readFile(join(TELEMETRY_DIR, name), "utf8"),
-  })))
+  return Promise.all(
+    names.map(async (name) => ({
+      name,
+      source: await readFile(join(TELEMETRY_DIR, name), "utf8"),
+    })),
+  )
 }
 
-function functionRange(source: string, signature: string): { readonly start: number; readonly end: number } | undefined {
+function functionRange(
+  source: string,
+  signature: string,
+): { readonly start: number; readonly end: number } | undefined {
   const start = source.indexOf(signature)
   if (start < 0) return undefined
   const end = source.indexOf("\n}", start)
@@ -50,9 +55,14 @@ describe("OmO Native telemetry capture path", () => {
 
   test("#given a new direct transport capture outside the boundary #when the audit scans it #then the bypass is rejected", async () => {
     const files = await nativeModuleSources()
-    const mutated = files.map((file) => file.name === SANCTIONED_FILE
-      ? { ...file, source: `${file.source}\nfunction privacyBypass(transport: { capture(message: unknown): void }, message: unknown): void {\n  transport.capture(message)\n}\n` }
-      : file)
+    const mutated = files.map((file) =>
+      file.name === SANCTIONED_FILE
+        ? {
+            ...file,
+            source: `${file.source}\nfunction privacyBypass(transport: { capture(message: unknown): void }, message: unknown): void {\n  transport.capture(message)\n}\n`,
+          }
+        : file,
+    )
 
     expect(findDirectNativeCaptureViolations(mutated)).toEqual([
       expect.stringMatching(/^omo-native-component\.ts:\d+:transport\.capture\($/u),

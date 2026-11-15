@@ -134,11 +134,7 @@ export async function fixEmptyMessagesWithSDK(
   const fixedMessageIds: string[] = []
 
   if (params.messageIndex !== undefined) {
-    const targetMessageId = await findEmptyMessageByIndexFromSDK(
-      params.client,
-      params.sessionID,
-      params.messageIndex,
-    )
+    const targetMessageId = await findEmptyMessageByIndexFromSDK(params.client, params.sessionID, params.messageIndex)
 
     if (targetMessageId) {
       const replaced = await storage.replaceEmptyTextPartsAsync(

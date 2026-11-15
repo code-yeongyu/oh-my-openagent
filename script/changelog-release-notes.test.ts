@@ -1,10 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import {
-  assertUtcDate,
-  composeReleaseBody,
-  extractReleaseNotes,
-  stampUnreleased,
-} from "./changelog-release-notes"
+import { assertUtcDate, composeReleaseBody, extractReleaseNotes, stampUnreleased } from "./changelog-release-notes"
 
 const CHANGELOG = [
   "# Changelog",
@@ -70,7 +65,11 @@ describe("extractReleaseNotes", () => {
 
 describe("composeReleaseBody", () => {
   test("#given notes, contributors and a footer #when composed #then order is notes, contributors, footer", () => {
-    const body = composeReleaseBody("### Added\n\n- thing", "**Thanks:**\n- @someone", "\`\`\`bash\nnpm i -g omo-ai@beta\n\`\`\`")
+    const body = composeReleaseBody(
+      "### Added\n\n- thing",
+      "**Thanks:**\n- @someone",
+      "\`\`\`bash\nnpm i -g omo-ai@beta\n\`\`\`",
+    )
     expect(body.indexOf("- thing")).toBeLessThan(body.indexOf("@someone"))
     expect(body.indexOf("@someone")).toBeLessThan(body.indexOf("npm i -g"))
     expect(body.endsWith("\n")).toBe(true)

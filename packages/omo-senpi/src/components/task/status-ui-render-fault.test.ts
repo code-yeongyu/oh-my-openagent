@@ -1,12 +1,7 @@
 import { describe, expect, it } from "bun:test"
 
 import type { CapturedUi } from "./runtime-context"
-import {
-  createTaskStatusUi,
-  type StatusUiLogger,
-  type StatusUiRuntime,
-  type StatusUiTimers,
-} from "./status-ui"
+import { createTaskStatusUi, type StatusUiLogger, type StatusUiRuntime, type StatusUiTimers } from "./status-ui"
 
 // The render path runs from bare timer callbacks, so faults must be contained here rather than
 // escaping as uncaught exceptions (the beta.20 pi-tui incident killed the host process).

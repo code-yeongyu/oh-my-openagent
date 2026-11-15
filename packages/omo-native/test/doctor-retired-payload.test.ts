@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import {
-  classifyRetiredPayloadEngines,
-  formatRetiredPayloadLines,
-  parseElapsedSeconds,
-} from "../bin/lib/doctor.js"
+import { classifyRetiredPayloadEngines, formatRetiredPayloadLines, parseElapsedSeconds } from "../bin/lib/doctor.js"
 
 type Entry = {
   pid: number

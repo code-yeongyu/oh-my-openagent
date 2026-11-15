@@ -12,7 +12,9 @@ export function parseNpmPackPaths(raw) {
   const results = Array.isArray(parsed) ? parsed : Object.values(parsed ?? {})
   const [result] = results
   if (result === null || typeof result !== "object" || !Array.isArray(result.files)) {
-    throw new Error("npm pack --json returned no packed file list; expected an array of results or an object keyed by package name")
+    throw new Error(
+      "npm pack --json returned no packed file list; expected an array of results or an object keyed by package name",
+    )
   }
   return result.files.map((file) => {
     if (file === null || typeof file !== "object" || typeof file.path !== "string") {

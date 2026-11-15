@@ -71,14 +71,19 @@ describe("dead-owner lock reclaim", () => {
     try {
       const contenders = await Promise.allSettled(
         Array.from({ length: 6 }, async (_, index) =>
-          acquireLock(lockPath, await createLockRecord("memory-write", { runId: `c${index}` }), { waitTimeoutMs: 300, retryDelayMs: 10 }),
+          acquireLock(lockPath, await createLockRecord("memory-write", { runId: `c${index}` }), {
+            waitTimeoutMs: 300,
+            retryDelayMs: 10,
+          }),
         ),
       )
 
       // #then
       // Every tick used to run create+write+fsync+link+unlink on the recovery path while a live
       // owner visibly held it: about 40 publishes per second per waiter.
-      expect(contenders.every((result) => result.status === "rejected" && result.reason instanceof LockContentionError)).toBe(true)
+      expect(
+        contenders.every((result) => result.status === "rejected" && result.reason instanceof LockContentionError),
+      ).toBe(true)
       expect(publishes.names()).toEqual([])
     } finally {
       publishes.restore()
@@ -97,7 +102,7 @@ describe("dead-owner lock reclaim", () => {
     await writeRecord(`${crashedWithRecovery}.recovery`, await deadOwnerRecord("notice:recovery"))
     const liveOwner = await createLockRecord("memory-write")
     await writeRecord(live, liveOwner)
-    await writeFile(unparsable, "{\"pid\":", { mode: 0o600 })
+    await writeFile(unparsable, '{"pid":', { mode: 0o600 })
 
     // #when
     const reclaimed = await sweepDeadOwnerLocks(locksDirectory)
@@ -155,7 +160,8 @@ describe("dead-owner lock reclaim", () => {
     await writeRecord(crashed, await deadOwnerRecord("crashed"))
     const realReadFile = resilientFs.readFile
     const readFailure = spyOn(resilientFs, "readFile").mockImplementation(((filePath: string, ...rest: unknown[]) => {
-      if (String(filePath) === unreadable) return Promise.reject(Object.assign(new Error("permission denied"), { code: "EACCES" }))
+      if (String(filePath) === unreadable)
+        return Promise.reject(Object.assign(new Error("permission denied"), { code: "EACCES" }))
       return (realReadFile as (...args: unknown[]) => unknown)(filePath, ...rest)
     }) as typeof resilientFs.readFile)
     const failures: string[] = []
@@ -163,7 +169,9 @@ describe("dead-owner lock reclaim", () => {
     // #when
     let reclaimed: number
     try {
-      reclaimed = await sweepDeadOwnerLocks(locksDirectory, { onFailure: (lockPath) => failures.push(path.basename(lockPath)) })
+      reclaimed = await sweepDeadOwnerLocks(locksDirectory, {
+        onFailure: (lockPath) => failures.push(path.basename(lockPath)),
+      })
     } finally {
       readFailure.mockRestore()
     }

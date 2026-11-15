@@ -22,8 +22,10 @@ async function drain(state: ChaosState): Promise<void> {
   for (let round = 0; round < cap; round += 1) {
     const before = state.harness.runner.handles.size
     for (const engine of state.harness.engines) {
-      for (const handle of engine.inProcessRunner.allHandles) handle.settle({ status: "completed", finalResponse: "drain" })
-      for (const handle of engine.processRunner.allHandles) handle.settle({ status: "completed", finalResponse: "drain" })
+      for (const handle of engine.inProcessRunner.allHandles)
+        handle.settle({ status: "completed", finalResponse: "drain" })
+      for (const handle of engine.processRunner.allHandles)
+        handle.settle({ status: "completed", finalResponse: "drain" })
     }
     state.harness.waiters.advance()
     for (const engine of state.harness.engines) {
@@ -40,8 +42,8 @@ async function drain(state: ChaosState): Promise<void> {
     const allTerminal = records.every((record) => isTerminalStatus(record.status))
     const anyPending = records.some((record) => record.status === "pending")
     const grew = state.harness.runner.handles.size > before
-    const notificationsSettled = state.harness.retryScheduler.pendingCount === 0
-      && state.harness.notifier.bufferedCount(CHAOS_SESSION) === 0
+    const notificationsSettled =
+      state.harness.retryScheduler.pendingCount === 0 && state.harness.notifier.bufferedCount(CHAOS_SESSION) === 0
     if (allTerminal && !anyPending && !grew && notificationsSettled) break
   }
   state.harness.waiters.abortAll()
@@ -175,8 +177,13 @@ export async function runLifecycleMutationProbe(mutation: LifecycleMutation): Pr
       const record = state.harness.store.load(started)
       if (record === null) throw new Error("mutation record missing")
       const handle = await second.inProcessRunner.start({
-        taskId: started, cwd: state.harness.store.stateDir, stateDir: state.harness.store.stateDir,
-        prompt: "double claim", depth: 1, parentSessionId: CHAOS_SESSION, rootSessionId: CHAOS_SESSION,
+        taskId: started,
+        cwd: state.harness.store.stateDir,
+        stateDir: state.harness.store.stateDir,
+        prompt: "double claim",
+        depth: 1,
+        parentSessionId: CHAOS_SESSION,
+        rootSessionId: CHAOS_SESSION,
       })
       await second.manager.reattach(record, handle)
       state.harness.observeLiveHandles()
@@ -187,13 +194,23 @@ export async function runLifecycleMutationProbe(mutation: LifecycleMutation): Pr
     } else if (mutation === "suspension_bumps_epoch") {
       seedMutationRecord(state, taskId, { residency_state: "resident" })
       const record = state.harness.store.load(taskId)
-      if (record !== null) state.harness.store.replace({ ...record, residency_state: "persisted_only", notification: { ...record.notification, run_epoch: 5 } })
+      if (record !== null)
+        state.harness.store.replace({
+          ...record,
+          residency_state: "persisted_only",
+          notification: { ...record.notification, run_epoch: 5 },
+        })
     } else if (mutation === "spawn_before_orphan_kill") {
       const pid = state.harness.processes.spawn()
       seedMutationRecord(state, taskId, { execution_mode: "process", residency_state: "resident", pid })
       await state.harness.engines[0]?.processRunner.start({
-        taskId, cwd: state.harness.store.stateDir, stateDir: state.harness.store.stateDir,
-        prompt: "mutant", depth: 1, parentSessionId: CHAOS_SESSION, rootSessionId: CHAOS_SESSION,
+        taskId,
+        cwd: state.harness.store.stateDir,
+        stateDir: state.harness.store.stateDir,
+        prompt: "mutant",
+        depth: 1,
+        parentSessionId: CHAOS_SESSION,
+        rootSessionId: CHAOS_SESSION,
       })
     } else if (mutation === "revive_forbidden") {
       seedMutationRecord(state, taskId, { status: "cancelled", residency_state: "disposed" })
@@ -214,8 +231,13 @@ export async function runLifecycleMutationProbe(mutation: LifecycleMutation): Pr
     } else {
       seedMutationRecord(state, taskId, { status: "completed", final_response: "done" })
       await state.harness.engines[0]?.inProcessRunner.start({
-        taskId, cwd: state.harness.store.stateDir, stateDir: state.harness.store.stateDir,
-        prompt: "mutant", depth: 1, parentSessionId: CHAOS_SESSION, rootSessionId: CHAOS_SESSION,
+        taskId,
+        cwd: state.harness.store.stateDir,
+        stateDir: state.harness.store.stateDir,
+        prompt: "mutant",
+        depth: 1,
+        parentSessionId: CHAOS_SESSION,
+        rootSessionId: CHAOS_SESSION,
       })
     }
     return {

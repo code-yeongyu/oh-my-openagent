@@ -35,7 +35,7 @@ beforeAll(() => {
 })
 afterAll(() => Object.assign(process.env, savedEnv))
 
-function sandbox(auth?: Record<string, unknown>): { home: string, agentDir: string } {
+function sandbox(auth?: Record<string, unknown>): { home: string; agentDir: string } {
   const home = mkdtempSync(join(tmpdir(), "omo-category-coverage-"))
   roots.push(home)
   const agentDir = join(home, ".omo", "agent")
@@ -54,7 +54,10 @@ async function coverageFor(provider: string) {
 async function captureStdout(run: () => Promise<void>): Promise<string> {
   const chunks: string[] = []
   const original = process.stdout.write
-  process.stdout.write = ((chunk: string | Uint8Array) => { chunks.push(String(chunk)); return true }) as typeof process.stdout.write
+  process.stdout.write = ((chunk: string | Uint8Array) => {
+    chunks.push(String(chunk))
+    return true
+  }) as typeof process.stdout.write
   try {
     await run()
   } finally {
@@ -63,7 +66,7 @@ async function captureStdout(run: () => Promise<void>): Promise<string> {
   return chunks.join("")
 }
 
-function setupPlans(input: { additions: { provider: string, key: string }[], added: unknown[], pinned: string[] }) {
+function setupPlans(input: { additions: { provider: string; key: string }[]; added: unknown[]; pinned: string[] }) {
   return {
     credentials: { current: { entries: {} }, result: { additions: input.additions } },
     providers: { models: { document: { providers: {} } }, result: { added: input.added, keys: [] } },
@@ -79,7 +82,13 @@ describe("category coverage from the engine's model list", () => {
       expect([...new Set(models.map((model) => model.provider))]).toEqual(["zai"])
       expect(coverage.usable).toEqual(["quick", "unspecified-high", "unspecified-low"])
       expect(coverage.unusable.map((gap) => gap.name)).toEqual([
-        "architect", "artistry", "deep-high", "deep-low", "ultrabrain", "visual-engineering", "writing",
+        "architect",
+        "artistry",
+        "deep-high",
+        "deep-low",
+        "ultrabrain",
+        "visual-engineering",
+        "writing",
       ])
       expect(readdirSync(agentDir)).toEqual(["auth.json"])
     })
@@ -89,7 +98,15 @@ describe("category coverage from the engine's model list", () => {
     test("#when coverage is computed #then seven categories are usable and the GPT lanes name the GPT providers", async () => {
       const { coverage } = await coverageFor("anthropic")
 
-      expect(coverage.usable).toEqual(["architect", "artistry", "quick", "unspecified-high", "unspecified-low", "visual-engineering", "writing"])
+      expect(coverage.usable).toEqual([
+        "architect",
+        "artistry",
+        "quick",
+        "unspecified-high",
+        "unspecified-low",
+        "visual-engineering",
+        "writing",
+      ])
       expect(coverage.unusable.map((gap) => gap.name)).toEqual(["deep-high", "deep-low", "ultrabrain"])
       expect(coverage.unusable.every((gap) => gap.providers.includes("openai"))).toBe(true)
     })
@@ -123,7 +140,15 @@ describe("category coverage from the engine's model list", () => {
   describe("#given a setup plan that imports a zai key, a custom provider and a category pin", () => {
     test("#when setup coverage is computed #then the planned credential and pin count, the unlisted custom provider is only an opt-in, and nothing is written", async () => {
       const { home, agentDir } = sandbox()
-      const acme = { id: "acme", config: { baseUrl: "https://api.acme.example/v1", api: "openai-completions", apiKey: "acme-key", models: [{ id: "claude-fable-5-1" }] } }
+      const acme = {
+        id: "acme",
+        config: {
+          baseUrl: "https://api.acme.example/v1",
+          api: "openai-completions",
+          apiKey: "acme-key",
+          models: [{ id: "claude-fable-5-1" }],
+        },
+      }
 
       const coverage = await setupCoverage({
         agentDir,
@@ -136,7 +161,9 @@ describe("category coverage from the engine's model list", () => {
 
       // acme serves claude-fable-5-1 but no builtin chain lists it, so it opens nothing on its own (#9146)
       expect(coverage?.usable).toEqual(["quick", "unspecified-high", "unspecified-low"])
-      expect(coverage?.unusable.find((gap) => gap.name === "architect")?.unlistedProviderModel).toBe("acme/claude-fable-5-1")
+      expect(coverage?.unusable.find((gap) => gap.name === "architect")?.unlistedProviderModel).toBe(
+        "acme/claude-fable-5-1",
+      )
       expect(readdirSync(agentDir)).toEqual([])
     })
   })
@@ -149,7 +176,9 @@ describe("category coverage reaches the commands", () => {
       const output: string[] = []
       const originalLog = console.log
       const originalExitCode = process.exitCode
-      console.log = (value?: unknown) => { output.push(String(value)) }
+      console.log = (value?: unknown) => {
+        output.push(String(value))
+      }
       try {
         runDoctor({ harnesses: [] }, [], {
           list: () => [],
@@ -169,11 +198,19 @@ describe("category coverage reaches the commands", () => {
     test("#when omo setup --dry-run runs #then its summary carries the categories row and nothing is written", async () => {
       const { home, agentDir } = sandbox()
       mkdirSync(join(home, ".local", "share", "opencode"), { recursive: true })
-      writeFileSync(join(home, ".local", "share", "opencode", "auth.json"), JSON.stringify({ "zai-coding-plan": { type: "api", key: "dummy" } }))
+      writeFileSync(
+        join(home, ".local", "share", "opencode", "auth.json"),
+        JSON.stringify({ "zai-coding-plan": { type: "api", key: "dummy" } }),
+      )
 
-      const stdout = await captureStdout(() => runSetup(["--dry-run"], { home, env: { HOME: home }, loadCoverageRuntime: loadRuntime }))
+      const stdout = await captureStdout(() =>
+        runSetup(["--dry-run"], { home, env: { HOME: home }, loadCoverageRuntime: loadRuntime }),
+      )
 
-      const rows = stdout.split("\n").filter((line) => /^ {2}\S/.test(line)).map((line) => line.slice(2, 16).trim())
+      const rows = stdout
+        .split("\n")
+        .filter((line) => /^ {2}\S/.test(line))
+        .map((line) => line.slice(2, 16).trim())
       expect(rows).toContain("categories")
       expect(readdirSync(agentDir)).toEqual([])
     })
@@ -183,7 +220,10 @@ describe("category coverage reaches the commands", () => {
 describe("category coverage fails open", () => {
   describe("#given an engine that cannot be loaded", () => {
     test("#when doctor asks for coverage lines #then it gets none", async () => {
-      const lines = await doctorCoverageLines({ agentDir: sandbox().agentDir, loadEngine: () => Promise.reject(new Error("engine missing")) })
+      const lines = await doctorCoverageLines({
+        agentDir: sandbox().agentDir,
+        loadEngine: () => Promise.reject(new Error("engine missing")),
+      })
       expect(lines).toEqual([])
     })
   })
@@ -192,7 +232,10 @@ describe("category coverage fails open", () => {
     test("#when setup asks for coverage #then it gets undefined and the summary has no categories row", async () => {
       const { home, agentDir } = sandbox()
       const coverage = await setupCoverage({
-        agentDir, home, env: {}, cwd: home,
+        agentDir,
+        home,
+        env: {},
+        cwd: home,
         plans: setupPlans({ additions: [], added: [], pinned: [] }),
         loadRuntime: () => Promise.reject(new Error("runtime missing")),
       })
@@ -207,17 +250,30 @@ function summaryRowLabels(categories: unknown): string[] {
     home: "/h",
     agentDir: "/h/.omo/agent",
     inventory: { harnesses: [] },
-    credentials: { notices: [], result: { additions: [], skippedExisting: [] }, guidance: { logins: [], unmapped: [] } },
+    credentials: {
+      notices: [],
+      result: { additions: [], skippedExisting: [] },
+      guidance: { logins: [], unmapped: [] },
+    },
     assets: {
-      notices: [], present: false, refusedServers: [], skippedSkills: [],
-      result: { servers: { added: [], skippedExisting: [], blocked: [] }, skills: { added: [], skippedExisting: [], skippedBundled: [] } },
+      notices: [],
+      present: false,
+      refusedServers: [],
+      skippedSkills: [],
+      result: {
+        servers: { added: [], skippedExisting: [], blocked: [] },
+        skills: { added: [], skippedExisting: [], skippedBundled: [] },
+      },
     },
     providers: { notices: [], present: false, skipped: [], result: { added: [], skippedExisting: [], blocked: [] } },
     modelChoices: { notices: [], present: false, items: [], dropped: [] },
     categories,
   })
   // A row's first line carries its label in the first 14 columns after the indent.
-  return summary.split("\n").filter((line) => /^ {2}\S/.test(line)).map((line) => line.slice(2, 16).trim())
+  return summary
+    .split("\n")
+    .filter((line) => /^ {2}\S/.test(line))
+    .map((line) => line.slice(2, 16).trim())
 }
 
 describe("coverage rendering shape", () => {
@@ -231,7 +287,13 @@ describe("coverage rendering shape", () => {
 
   describe("#given two unusable categories", () => {
     test("#when rendered #then there is one line per gap after the usable set, and setup gets a categories row", () => {
-      const coverage = { usable: ["quick"], unusable: [{ name: "writing", providers: ["anthropic"] }, { name: "deep-high", providers: [] }] }
+      const coverage = {
+        usable: ["quick"],
+        unusable: [
+          { name: "writing", providers: ["anthropic"] },
+          { name: "deep-high", providers: [] },
+        ],
+      }
       expect(formatDoctorCoverageLines(coverage)).toHaveLength(3)
       expect(coverageSummaryParts(coverage)).toHaveLength(3)
       expect(summaryRowLabels(coverage)).toContain("categories")
@@ -242,9 +304,13 @@ describe("coverage rendering shape", () => {
     test("#when rendered for doctor #then its gap line names the exact opt-in pin", () => {
       const coverage = {
         usable: [],
-        unusable: [{ name: "writing", providers: ["anthropic"], unlistedProviderModel: "openrouter/anthropic/claude-opus-5.5" }],
+        unusable: [
+          { name: "writing", providers: ["anthropic"], unlistedProviderModel: "openrouter/anthropic/claude-opus-5.5" },
+        ],
       }
-      expect(formatDoctorCoverageLines(coverage)[1]).toContain('categories.writing.model = "openrouter/anthropic/claude-opus-5.5"')
+      expect(formatDoctorCoverageLines(coverage)[1]).toContain(
+        'categories.writing.model = "openrouter/anthropic/claude-opus-5.5"',
+      )
     })
   })
 })

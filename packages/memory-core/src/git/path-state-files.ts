@@ -1,5 +1,17 @@
 import { randomUUID } from "node:crypto"
-import { chmod, link, lstat, mkdir, open, readFile, rename, rm, rmdir, writeFile, writeHandleAll } from "../fs/resilient"
+import {
+  chmod,
+  link,
+  lstat,
+  mkdir,
+  open,
+  readFile,
+  rename,
+  rm,
+  rmdir,
+  writeFile,
+  writeHandleAll,
+} from "../fs/resilient"
 import { basename, dirname, join } from "node:path"
 import { GitPathStateError } from "./path-state"
 
@@ -108,7 +120,7 @@ export async function reserveMovedWorktreeDeletion(
       }
       if (!current.isDirectory() || current.dev !== reserved.dev || current.ino !== reserved.ino) return undefined
       try {
-        if (await readFile(join(target, ".omo-reservation"), "utf8") !== marker) return undefined
+        if ((await readFile(join(target, ".omo-reservation"), "utf8")) !== marker) return undefined
       } catch (error) {
         if (errorCode(error) === "ENOENT") return undefined
         throw error
@@ -131,7 +143,12 @@ export async function reserveMovedWorktreeDeletion(
               if (errorCode(error) !== "ENOENT") throw error
             }
           }
-          if (!owned.isDirectory() || owned.dev !== reserved.dev || owned.ino !== reserved.ino || ownedMarker !== marker) {
+          if (
+            !owned.isDirectory() ||
+            owned.dev !== reserved.dev ||
+            owned.ino !== reserved.ino ||
+            ownedMarker !== marker
+          ) {
             const restored = await restoreClaimed(claimed)
             return restored === true ? false : restored
           }
@@ -151,11 +168,7 @@ export async function reserveMovedWorktreeDeletion(
   }
 }
 
-export async function restoreClaimedWorktreeFile(
-  root: string,
-  path: string,
-  claimed: string,
-): Promise<true | string> {
+export async function restoreClaimedWorktreeFile(root: string, path: string, claimed: string): Promise<true | string> {
   const stat = await lstat(claimed)
   if (!stat.isFile()) return claimed
   try {
@@ -228,6 +241,7 @@ async function syncDirectory(path: string): Promise<void> {
       await directory.close()
     }
   } catch (error) {
-    if (process.platform !== "win32" || !["EISDIR", "EPERM", "EACCES", "EINVAL"].includes(errorCode(error) ?? "")) throw error
+    if (process.platform !== "win32" || !["EISDIR", "EPERM", "EACCES", "EINVAL"].includes(errorCode(error) ?? ""))
+      throw error
   }
 }

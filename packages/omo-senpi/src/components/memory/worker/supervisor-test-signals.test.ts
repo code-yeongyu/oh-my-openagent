@@ -6,7 +6,14 @@ test("#given subscription fails #then the waiter rejects without leaving a timeo
   const timer = jest.spyOn(globalThis, "setTimeout")
   try {
     const failure = new Error("subscription failed")
-    const waiting = waitForTestState(() => { throw failure }, () => undefined, 1_000, "state")
+    const waiting = waitForTestState(
+      () => {
+        throw failure
+      },
+      () => undefined,
+      1_000,
+      "state",
+    )
     await expect(waiting).rejects.toBe(failure)
     expect(timer).not.toHaveBeenCalled()
   } finally {

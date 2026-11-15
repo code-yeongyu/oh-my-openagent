@@ -5,9 +5,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import {
-  createModelCapabilitiesCacheStore,
-} from "./model-capabilities-cache"
+import { createModelCapabilitiesCacheStore } from "./model-capabilities-cache"
 
 let fakeUserCacheRoot = ""
 let testCacheDir = ""
@@ -34,21 +32,24 @@ describe("model-capabilities-cache", () => {
     writeFileSync(sentinelPath, JSON.stringify({ keep: true }))
 
     const fetchImpl = async () =>
-      new Response(JSON.stringify({
-        openai: {
-          models: {
-            "gpt-5.4": {
-              id: "gpt-5.4",
-              family: "gpt",
-              reasoning: true,
-              limit: { output: 128_000 },
+      new Response(
+        JSON.stringify({
+          openai: {
+            models: {
+              "gpt-5.4": {
+                id: "gpt-5.4",
+                family: "gpt",
+                reasoning: true,
+                limit: { output: 128_000 },
+              },
             },
           },
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
         },
-      }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      })
+      )
 
     //#when
     const snapshot = await store.refreshModelCapabilitiesCache({ fetchImpl })

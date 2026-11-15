@@ -2,7 +2,12 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import { createTaskLifecycle } from "./create"
 import { cancelHarness, eventsOf } from "./__fixtures__/host-session-cancel-harness"
-import { hostLifecycleDeps, hostSession, hostSessionHandle, hostSessionRecordInput } from "./__fixtures__/host-session-fakes"
+import {
+  hostLifecycleDeps,
+  hostSession,
+  hostSessionHandle,
+  hostSessionRecordInput,
+} from "./__fixtures__/host-session-fakes"
 import { cleanupProjects, seedRecord, tempStore, type CallLog } from "./__fixtures__/lifecycle-fakes"
 
 afterEach(cleanupProjects)
@@ -22,7 +27,9 @@ describe("endHostSessionChild confirms an end once and the cancel reuses it", ()
 
     // then
     expect(outcome.kind).toBe("cancelled")
-    expect(eventsOf(harness, "host_session_closed").map((event) => (event.payload as { via: string }).via)).toEqual(["generation_exited"])
+    expect(eventsOf(harness, "host_session_closed").map((event) => (event.payload as { via: string }).via)).toEqual([
+      "generation_exited",
+    ])
     expect(eventsOf(harness, "destroyed")).toHaveLength(1)
     expect(harness.fixture.daemon.listCalls).toBe(2)
     expect(harness.view.presentCalls).toBe(1)
@@ -40,7 +47,9 @@ describe("endHostSessionChild confirms an end once and the cancel reuses it", ()
     // then
     expect(outcome.kind).toBe("cancelled")
     expect(harness.fixture.daemon.closed).toEqual([harness.record.host_session?.session_path ?? "missing session path"])
-    expect(eventsOf(harness, "host_session_closed").map((event) => (event.payload as { via: string }).via)).toEqual(["close_session"])
+    expect(eventsOf(harness, "host_session_closed").map((event) => (event.payload as { via: string }).via)).toEqual([
+      "close_session",
+    ])
     expect(harness.view.presentCalls).toBe(0)
   })
 
@@ -115,13 +124,21 @@ describe("endHostSessionChild confirms an end once and the cancel reuses it", ()
     expect(harness.stopSettlements).toEqual(["st_0c000007"])
   })
 
-  for (const [answered, listings] of [[true, 0], [false, 1]] as const) {
+  for (const [answered, listings] of [
+    [true, 0],
+    [false, 1],
+  ] as const) {
     test(`#given a resident child whose host ${answered ? "answered" : "did not answer"} its close #when the destruction port cancels it #then the daemon is listed ${listings} time(s)`, async () => {
       // given
       const store = tempStore()
       const order: CallLog = []
       const fixture = hostLifecycleDeps({ store, hostPid: 4_242 })
-      seedRecord(store, { ...hostSessionRecordInput("st_0c000005", hostSession("st_0c000005")), status: "running", residency_state: "resident", host_pid: 4_242 })
+      seedRecord(store, {
+        ...hostSessionRecordInput("st_0c000005", hostSession("st_0c000005")),
+        status: "running",
+        residency_state: "resident",
+        host_pid: 4_242,
+      })
       fixture.registry.add({ ...hostSessionHandle("st_0c000005", order), hostEndAnswered: () => answered })
       const lifecycle = createTaskLifecycle(fixture.deps)
 

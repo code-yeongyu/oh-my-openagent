@@ -52,7 +52,7 @@ Skill body.
 
       try {
         const skills = await discoverProjectAgentsSkills()
-        const skill = skills.find(s => s.name === "agent-project-skill")
+        const skill = skills.find((s) => s.name === "agent-project-skill")
 
         //#then
         expect(skill).toBeDefined()
@@ -79,7 +79,7 @@ Skill body.
       //#when
       const { discoverProjectAgentsSkills } = await import("./loader")
       const skills = await discoverProjectAgentsSkills(TEST_DIR)
-      const skill = skills.find(s => s.name === "agent-dir-skill")
+      const skill = skills.find((s) => s.name === "agent-dir-skill")
 
       //#then
       expect(skill).toBeDefined()
@@ -147,12 +147,7 @@ description: A skill from .opencode/skill directory
 ---
 Skill body.
 `
-      const singularSkillDir = join(
-        TEST_DIR,
-        ".opencode",
-        "skill",
-        "singular-opencode-skill",
-      )
+      const singularSkillDir = join(TEST_DIR, ".opencode", "skill", "singular-opencode-skill")
       mkdirSync(singularSkillDir, { recursive: true })
       writeFileSync(join(singularSkillDir, "SKILL.md"), skillContent)
 

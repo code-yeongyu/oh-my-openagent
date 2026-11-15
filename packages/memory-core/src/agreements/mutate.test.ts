@@ -7,7 +7,17 @@ import type { AgreementItem, AgreementsPolicy } from "./types"
 const POLICY: AgreementsPolicy = { needsHumanThreshold: 3, maxItems: 64 }
 
 function item(text: string, overrides: Partial<AgreementItem> = {}): AgreementItem {
-  return { id: agreementId(text), scope: "global", by: "agent", text, n: 1, since: "2026-10-01", last: "2026-10-01", status: "active", ...overrides }
+  return {
+    id: agreementId(text),
+    scope: "global",
+    by: "agent",
+    text,
+    n: 1,
+    since: "2026-10-01",
+    last: "2026-10-01",
+    status: "active",
+    ...overrides,
+  }
 }
 
 describe("applyAgreementRecords: counting and the needs-human threshold", () => {
@@ -17,7 +27,11 @@ describe("applyAgreementRecords: counting and the needs-human threshold", () => 
 
     // when
     const third = applyAgreementRecords([monitor], [{ action: "reaffirm", id: monitor.id, date: "2026-10-21" }], POLICY)
-    const fourth = applyAgreementRecords(third.items, [{ action: "reaffirm", id: monitor.id, date: "2026-10-22" }], POLICY)
+    const fourth = applyAgreementRecords(
+      third.items,
+      [{ action: "reaffirm", id: monitor.id, date: "2026-10-22" }],
+      POLICY,
+    )
 
     // then
     expect(third.items).toEqual([{ ...monitor, n: 3, last: "2026-10-21", status: "needs-human" }])
@@ -49,12 +63,23 @@ describe("applyAgreementRecords: counting and the needs-human threshold", () => 
     // when
     const result = applyAgreementRecords(
       [tests],
-      [{ action: "reaffirm", id: tests.id, date: "2026-10-21", text: "Always run the full test suite before claiming done" }],
+      [
+        {
+          action: "reaffirm",
+          id: tests.id,
+          date: "2026-10-21",
+          text: "Always run the full test suite before claiming done",
+        },
+      ],
       POLICY,
     )
 
     // then
-    expect(result.items[0]).toMatchObject({ id: tests.id, n: 2, text: "Always run the full test suite before claiming done" })
+    expect(result.items[0]).toMatchObject({
+      id: tests.id,
+      n: 2,
+      text: "Always run the full test suite before claiming done",
+    })
   })
 })
 
@@ -99,10 +124,15 @@ describe("applyAgreementRecords: the cap", () => {
     )
 
     // then
-    expect(result.items.map((entry) => entry.text).sort()).toEqual(
-      ["Answer in Korean in the chat room", "Keep run roots out of tmp", "Never push to dev", "Never push to main"],
-    )
-    expect(result.events).toEqual([{ kind: "evicted", date: "2026-10-21", item: oldest, forText: "Keep run roots out of tmp" }])
+    expect(result.items.map((entry) => entry.text).sort()).toEqual([
+      "Answer in Korean in the chat room",
+      "Keep run roots out of tmp",
+      "Never push to dev",
+      "Never push to main",
+    ])
+    expect(result.events).toEqual([
+      { kind: "evicted", date: "2026-10-21", item: oldest, forText: "Keep run roots out of tmp" },
+    ])
   })
 
   test("#given a full ledger with nothing evictable (human, reaffirmed, flagged) #when a new agreement arrives #then it is refused as a recorded event and the ledger is unchanged", () => {
@@ -121,7 +151,9 @@ describe("applyAgreementRecords: the cap", () => {
     )
 
     // then
-    expect([...result.items].sort((a, b) => a.id.localeCompare(b.id))).toEqual([...full].sort((a, b) => a.id.localeCompare(b.id)))
+    expect([...result.items].sort((a, b) => a.id.localeCompare(b.id))).toEqual(
+      [...full].sort((a, b) => a.id.localeCompare(b.id)),
+    )
     expect(result.events).toEqual([{ kind: "refused", date: "2026-10-21", text: "Keep run roots out of tmp" }])
     expect(result.newlyFlagged).toEqual([])
   })
@@ -143,7 +175,10 @@ describe("applyAgreementRecords: the cap within one batch", () => {
     )
 
     // then
-    expect(result.items.map((entry) => entry.text).sort()).toEqual(["Answer in Korean in the chat room", "Keep run roots out of tmp"])
+    expect(result.items.map((entry) => entry.text).sort()).toEqual([
+      "Answer in Korean in the chat room",
+      "Keep run roots out of tmp",
+    ])
     expect(result.events).toEqual([{ kind: "refused", date: "2026-10-21", text: "Quote remote commands" }])
   })
 })

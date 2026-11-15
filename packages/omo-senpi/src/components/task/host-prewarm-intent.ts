@@ -25,7 +25,12 @@ export function startsDelegation(payload: unknown): boolean {
   const index = event["contentIndex"]
   if (!isRecord(partial) || !Array.isArray(partial["content"]) || typeof index !== "number") return false
   const block: unknown = partial["content"][index]
-  return isRecord(block) && block["type"] === "toolCall" && typeof block["name"] === "string" && DELEGATION_TOOLS.has(block["name"])
+  return (
+    isRecord(block) &&
+    block["type"] === "toolCall" &&
+    typeof block["name"] === "string" &&
+    DELEGATION_TOOLS.has(block["name"])
+  )
 }
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {

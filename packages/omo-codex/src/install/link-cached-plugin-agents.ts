@@ -57,14 +57,24 @@ export async function linkCachedPluginAgents(input: {
     const linkPath = join(agentsDir, agentFileName)
     receipts.set(
       agentName,
-      await syncAgentFile({ ...input, agentName, agentPath, linkPath, previousReceipt: previousReceipts.get(agentName) }),
+      await syncAgentFile({
+        ...input,
+        agentName,
+        agentPath,
+        linkPath,
+        previousReceipt: previousReceipts.get(agentName),
+      }),
     )
     linked.push({ name: agentFileName, path: linkPath, target: agentPath })
   }
   await writeAgentModelReceipts(input.codexHome, receipts)
   const worker = linked.find((entry) => entry.name === "lazycodex-worker-medium.toml")
   if (worker !== undefined) {
-    const fallback = await installDefaultAgentRole({ codexHome: input.codexHome, worker, enabled: input.defaultRoleEnabled !== false })
+    const fallback = await installDefaultAgentRole({
+      codexHome: input.codexHome,
+      worker,
+      enabled: input.defaultRoleEnabled !== false,
+    })
     if (fallback !== null) linked.push(fallback)
   }
   await writeManifest(
@@ -89,7 +99,10 @@ async function syncAgentFile(input: {
   const preservedReasoning = input.preservedReasoning?.get(input.agentName)
   const override = input.agentOverrides?.get(input.agentName)
   await replaceWithCopy(input.linkPath, input.agentPath)
-  await restorePreservedModel({ linkPath: input.linkPath, value: handEditedAgentModel(installedModel, input.previousReceipt) })
+  await restorePreservedModel({
+    linkPath: input.linkPath,
+    value: handEditedAgentModel(installedModel, input.previousReceipt),
+  })
   await restorePreservedReasoning({
     agentName: input.agentName,
     linkPath: input.linkPath,

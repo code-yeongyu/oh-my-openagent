@@ -151,7 +151,12 @@ export function isUnservedDevinSWE2Selector(selector: string): boolean {
   const separator = selector.indexOf("/")
   if (separator <= 0 || selector.slice(0, separator).toLowerCase() !== "devin") return false
   // A reasoning suffix (`:high`, ` (high)`) rides on the selector, never on the uid Cascade sees.
-  const modelId = selector.slice(separator + 1).trim().toLowerCase().split(/[:\s(]/u)[0] ?? ""
+  const modelId =
+    selector
+      .slice(separator + 1)
+      .trim()
+      .toLowerCase()
+      .split(/[:\s(]/u)[0] ?? ""
   if (!isSWE2Model(modelId)) return false
   return !(DEVIN_SWE2_SERVED_LANES as readonly string[]).includes(modelId)
 }
@@ -190,11 +195,7 @@ const GEMINI_PROVIDERS = ["google/", "google-vertex/"] as const
 export function isGeminiModel(model: string): boolean {
   if (GEMINI_PROVIDERS.some((prefix) => model.startsWith(prefix))) return true
 
-  if (
-    model.startsWith("github-copilot/") &&
-    extractModelName(model).toLowerCase().startsWith("gemini")
-  )
-    return true
+  if (model.startsWith("github-copilot/") && extractModelName(model).toLowerCase().startsWith("gemini")) return true
 
   const modelName = extractModelName(model).toLowerCase()
   return modelName.startsWith("gemini-")

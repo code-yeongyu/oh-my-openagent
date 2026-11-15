@@ -38,7 +38,11 @@ const NOOP_APPEND: AppendResult = { appended: 0, skipped: 0 }
 
 // Memory-owned hidden custom-message channels (kibitzer recall hints, memory notices). Any other
 // custom message belongs to a foreign extension and is admitted like any other entry.
-const EXCLUDED_CUSTOM_TYPES: ReadonlySet<string> = new Set([RECALL_CUSTOM_TYPE, "omo-memorian:recall", MEMORY_NOTICE_CUSTOM_TYPE])
+const EXCLUDED_CUSTOM_TYPES: ReadonlySet<string> = new Set([
+  RECALL_CUSTOM_TYPE,
+  "omo-memorian:recall",
+  MEMORY_NOTICE_CUSTOM_TYPE,
+])
 
 function isJournalLockFailure(error: unknown): boolean {
   if (error instanceof JournalLockTimeoutError) return true
@@ -48,7 +52,12 @@ function isJournalLockFailure(error: unknown): boolean {
 
 export function createMemoryJournalWiring(options: MemoryJournalWiringOptions): MemoryJournalWiring {
   const createJournal =
-    options.createJournal ?? ((journalDir: string) => new TranscriptJournal({ journalDir }))
+    options.createJournal ??
+    ((journalDir: string) =>
+      new TranscriptJournal({
+        journalDir,
+        warn: (message, fields) => options.logger?.warn(message, { ...fields }),
+      }))
   const journals = new Map<string, TranscriptJournal>()
 
   function journalFor(sessionId: string): TranscriptJournal {
@@ -170,9 +179,8 @@ function assistantProjection(
   toolResults: ReadonlyMap<string, { readonly resultText: string; readonly resultOk: boolean }>,
 ): TranscriptProjection {
   const content = body.content
-  const textBlocks: string[] = typeof content === "string" && content.trim().length > 0
-    ? [content]
-    : textBlocksOf(content)
+  const textBlocks: string[] =
+    typeof content === "string" && content.trim().length > 0 ? [content] : textBlocksOf(content)
   const reasoningBlocks: ProjectedReasoning[] = []
   const toolCalls: ProjectedToolCall[] = []
   if (Array.isArray(content)) {
@@ -197,9 +205,7 @@ function assistantProjection(
         callId,
         ...(name === undefined ? {} : { name }),
         ...(argsText === undefined ? {} : { argsText }),
-        ...(result === undefined
-          ? {}
-          : { resultText: result.resultText, resultOk: result.resultOk }),
+        ...(result === undefined ? {} : { resultText: result.resultText, resultOk: result.resultOk }),
       })
     }
   }

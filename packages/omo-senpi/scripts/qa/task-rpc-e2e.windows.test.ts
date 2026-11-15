@@ -40,7 +40,10 @@ type DriverPayload = {
   readonly wiringFixed: boolean
 }
 
-function createDeadline(timeoutMs: number, label: string): {
+function createDeadline(
+  timeoutMs: number,
+  label: string,
+): {
   readonly promise: Promise<never>
   readonly cancel: () => void
 } {
@@ -63,7 +66,7 @@ async function waitForClose(child: ChildProcess): Promise<DriverExit> {
   const [code, signal] = await once(child, "close")
   return {
     code: typeof code === "number" ? code : null,
-    signal: typeof signal === "string" ? signal as NodeJS.Signals : null,
+    signal: typeof signal === "string" ? (signal as NodeJS.Signals) : null,
   }
 }
 
@@ -93,7 +96,9 @@ function check(payload: DriverPayload, name: string): DriverCheck | undefined {
 function assertDriverChecks(payload: DriverPayload): void {
   const failed = payload.checks.filter((candidate) => candidate.verdict !== "PASS")
   if (payload.result !== "PASS" || failed.length > 0) {
-    throw new Error(`WINDOWS_TASK_RPC_E2E result=${payload.result}; failing checks: ${failed.map((candidate) => candidate.check).join(", ") || "none reported"}`)
+    throw new Error(
+      `WINDOWS_TASK_RPC_E2E result=${payload.result}; failing checks: ${failed.map((candidate) => candidate.check).join(", ") || "none reported"}`,
+    )
   }
 }
 

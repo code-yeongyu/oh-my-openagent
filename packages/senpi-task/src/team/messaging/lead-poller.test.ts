@@ -57,7 +57,7 @@ function poller(harness: Harness): LeadPoller {
     coordinator: { enqueue: (injection) => harness.injections.push(injection) },
     deliveryJournal: createLeadDeliveryJournal(),
     appendEvent: () => undefined,
-    eventTaskId: (value) => value.from === "alpha" ? "st_00000001" : undefined,
+    eventTaskId: (value) => (value.from === "alpha" ? "st_00000001" : undefined),
     leadSessionFile: () => harness.sessionFilePath,
   })
 }

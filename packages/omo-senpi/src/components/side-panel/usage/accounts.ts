@@ -157,7 +157,3 @@ function collectSlots(slots: Record<PropertyKey, unknown>, parsed: Record<string
 function usableToken(value: unknown): boolean {
   return typeof value === "string" && value.length >= MIN_ACCESS_TOKEN_LENGTH
 }
-
-
-
-

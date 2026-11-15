@@ -41,7 +41,10 @@ export function getPluginInputNativeSkills(ctx: PluginContext): NativeSkills | u
   return isNativeSkills(value) ? value : undefined
 }
 
-export function createNativeSkills(input: { readonly client: PluginContext["client"]; readonly directory: string }): NativeSkills {
+export function createNativeSkills(input: {
+  readonly client: PluginContext["client"]
+  readonly directory: string
+}): NativeSkills {
   const load = async () => {
     const generatedClient = getGeneratedClientFromPluginClient(input.client)
     if (!isV2GeneratedClient(generatedClient)) {

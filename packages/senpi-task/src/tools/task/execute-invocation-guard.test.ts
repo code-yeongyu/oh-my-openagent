@@ -80,7 +80,9 @@ describe("buildTaskExecute plan-gated agents", () => {
     // given
     const calls = { count: 0 }
     const execute = buildTaskExecute(
-      makeDeps(startedManager(calls), { resolveSkillInvocations: resolverFor({ invoked: ["ulw-plan"], artifact: true }) }),
+      makeDeps(startedManager(calls), {
+        resolveSkillInvocations: resolverFor({ invoked: ["ulw-plan"], artifact: true }),
+      }),
     )
 
     // when
@@ -95,11 +97,19 @@ describe("buildTaskExecute plan-gated agents", () => {
     // given
     const calls = { count: 0 }
     const execute = buildTaskExecute(
-      makeDeps(startedManager(calls), { resolveSkillInvocations: resolverFor({ requested: ["ulw-plan"], artifact: true }) }),
+      makeDeps(startedManager(calls), {
+        resolveSkillInvocations: resolverFor({ requested: ["ulw-plan"], artifact: true }),
+      }),
     )
 
     // when
-    const result = await execute("c", { prompt: "p", subagent_type: "plan-reviewer", run_in_background: true }, undefined, undefined, CTX)
+    const result = await execute(
+      "c",
+      { prompt: "p", subagent_type: "plan-reviewer", run_in_background: true },
+      undefined,
+      undefined,
+      CTX,
+    )
 
     // then
     expect(calls.count).toBe(1)
@@ -127,7 +137,9 @@ describe("buildTaskExecute plan-gated agents", () => {
   test("#given a session that invoked only ulw-execute #when spawning plan-reviewer #then the forbidden denial takes precedence", async () => {
     // given
     const calls = { count: 0 }
-    const execute = buildTaskExecute(makeDeps(startedManager(calls), { resolveSkillInvocations: resolverFor({ invoked: ["ulw-execute"] }) }))
+    const execute = buildTaskExecute(
+      makeDeps(startedManager(calls), { resolveSkillInvocations: resolverFor({ invoked: ["ulw-execute"] }) }),
+    )
 
     // when
     const result = await execute("c", { prompt: "p", subagent_type: "plan-reviewer" }, undefined, undefined, CTX)
@@ -144,7 +156,13 @@ describe("buildTaskExecute plan-gated agents", () => {
     const execute = buildTaskExecute(makeDeps(startedManager(calls), { resolveSkillInvocations: resolverFor({}) }))
 
     // when
-    const result = await execute("c", { prompt: "p", subagent_type: "explore", run_in_background: true }, undefined, undefined, CTX)
+    const result = await execute(
+      "c",
+      { prompt: "p", subagent_type: "explore", run_in_background: true },
+      undefined,
+      undefined,
+      CTX,
+    )
 
     // then
     expect(calls.count).toBe(1)
@@ -157,7 +175,13 @@ describe("buildTaskExecute plan-gated agents", () => {
     const execute = buildTaskExecute(makeDeps(startedManager(calls), { resolveSkillInvocations: resolverFor({}) }))
 
     // when
-    const result = await execute("c", { prompt: "p", category: "quick", run_in_background: true }, undefined, undefined, CTX)
+    const result = await execute(
+      "c",
+      { prompt: "p", category: "quick", run_in_background: true },
+      undefined,
+      undefined,
+      CTX,
+    )
 
     // then
     expect(calls.count).toBe(1)
@@ -172,7 +196,13 @@ describe("buildTaskExecute plan-gated agents", () => {
     // when
     const result = await execute(
       "c",
-      { tasks: [{ prompt: "review the plan", subagent_type: "plan-reviewer" }, { prompt: "scan", subagent_type: "explore" }], run_in_background: true },
+      {
+        tasks: [
+          { prompt: "review the plan", subagent_type: "plan-reviewer" },
+          { prompt: "scan", subagent_type: "explore" },
+        ],
+        run_in_background: true,
+      },
       undefined,
       undefined,
       CTX,
@@ -201,7 +231,13 @@ describe("buildTaskExecute plan-gated agents", () => {
       undefined,
       CTX,
     )
-    const canonical = await execute("c-canonical", { prompt: "p", subagent_type: "plan-reviewer" }, undefined, undefined, CTX)
+    const canonical = await execute(
+      "c-canonical",
+      { prompt: "p", subagent_type: "plan-reviewer" },
+      undefined,
+      undefined,
+      CTX,
+    )
 
     // then: the retired id carries no plan gate of its own, so it reaches the manager
     expect(retired.details.status).not.toBe("denied")
