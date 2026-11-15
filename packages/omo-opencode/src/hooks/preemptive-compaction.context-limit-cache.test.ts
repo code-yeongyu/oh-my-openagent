@@ -9,7 +9,9 @@ mock.module("../shared/logger", () => ({
   log: logMock,
 }))
 
-afterAll(() => { mock.restore() })
+afterAll(() => {
+  mock.restore()
+})
 
 const { createPreemptiveCompactionHook } = await import("./preemptive-compaction")
 

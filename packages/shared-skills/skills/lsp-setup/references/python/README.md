@@ -21,13 +21,13 @@ command -v basedpyright-langserver
 
 ## Configure
 
-Builtin — usually NO config needed (auto-resolved by extension). Configure only to set priority, init options, override extensions, or disable. Same JSON shape in `.codex/lsp-client.json` (Codex) AND `.opencode/lsp.json` (OpenCode/omo):
+Builtin — usually NO config needed (auto-resolved by extension). Configure only to set priority, init options, override extensions, or disable. Same JSON shape in every harness's project config (per-harness paths: the Configure step in `SKILL.md`):
 
 ```json
 { "lsp": { "basedpyright": { "priority": 100 } } }
 ```
 
-For builtin ids in a PROJECT config, `command` is supplied automatically — only set `priority`/`initialization`/`extensions`/`disabled`/`env`. A fully custom (non-builtin) server with its own `command` must go in the USER config (`~/.codex/lsp-client.json`).
+For builtin ids in a PROJECT config, `command` is supplied automatically — only set `priority`/`initialization`/`extensions`/`disabled` (a project entry drops `env`). `env`, and a fully custom (non-builtin) server with its own `command`, must go in your harness's USER config (see the Configure step in `SKILL.md`).
 
 ### Initialization options (only if commonly needed)
 
@@ -36,27 +36,28 @@ or `[tool.basedpyright]` in `pyproject.toml`, not the LSP config.
 
 ## Choosing a server
 
-All four are builtin. Type checkers and the linter serve different roles — run a
-type server, and optionally `ruff` ALONGSIDE it (not instead).
+All four are builtin. The engine starts ONE server per extension: the first
+installed candidate after ordering by config source (project > user > builtin)
+and then `priority`. So `ruff` cannot run alongside a type server for `.py` —
+choosing it replaces type checking with lint/format diagnostics.
 
 | id            | command                       | install                | role                                    |
 | ------------- | ----------------------------- | ---------------------- | --------------------------------------- |
 | `basedpyright`| `basedpyright-langserver --stdio` | `pip install basedpyright` | strictest types, **default**       |
 | `pyright`     | `pyright-langserver --stdio`  | `pip install pyright`  | upstream Microsoft type checker         |
 | `ty`          | `ty server`                   | `pip install ty`       | Astral, very fast, pre-1.0/experimental |
-| `ruff`        | `ruff server`                 | `pip install ruff`     | lint + format only, complements a type server |
+| `ruff`        | `ruff server`                 | `pip install ruff`     | lint + format only, no type checking    |
 
-Recommended priority: **basedpyright** (default) > pyright > ty (experimental).
-`ruff` complements via priority — it does not type-check, so keep a type server
-enabled.
+Recommended: **basedpyright** (default) > pyright > ty (experimental). Keep a
+type server as the `.py` server; run `ruff` from the shell or a pre-commit hook
+for lint/format.
 
-Enable ruff alongside basedpyright, disabling pyright:
+Switch this project to pyright:
 
 ```json
 { "lsp": {
-  "basedpyright": { "priority": 100 },
-  "ruff": { "priority": 90 },
-  "pyright": { "disabled": true }
+  "pyright": { "priority": 100 },
+  "basedpyright": { "disabled": true }
 } }
 ```
 

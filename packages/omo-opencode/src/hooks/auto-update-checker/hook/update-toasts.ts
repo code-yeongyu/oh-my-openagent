@@ -5,7 +5,7 @@ import { ignoreToastError } from "./ignore-toast-error"
 export async function showUpdateAvailableToast(
   ctx: PluginInput,
   latestVersion: string,
-  getToastMessage: (isUpdate: boolean, latestVersion?: string) => string
+  getToastMessage: (isUpdate: boolean, latestVersion?: string) => string,
 ): Promise<void> {
   await ctx.client.tui
     .showToast({

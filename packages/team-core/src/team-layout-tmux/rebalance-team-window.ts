@@ -25,13 +25,7 @@ export async function rebalanceTeamWindowWith(
     return true
   }
 
-  const setMainPaneWidth = await deps.runTmux([
-    "set-window-option",
-    "-t",
-    windowId,
-    "main-pane-width",
-    "60%",
-  ])
+  const setMainPaneWidth = await deps.runTmux(["set-window-option", "-t", windowId, "main-pane-width", "60%"])
   if (!setMainPaneWidth.success) {
     deps.log("[rebalanceTeamWindow] FAILED", { windowId, layout, step: "set-window-option" })
     return false
@@ -47,14 +41,8 @@ export async function rebalanceTeamWindowWith(
   return true
 }
 
-export async function rebalanceTeamWindow(
-  windowId: string,
-  layout: RebalanceLayout,
-): Promise<boolean> {
-  const [{ log }, { runTmuxCommand }] = await Promise.all([
-    import("../logger"),
-    import("@oh-my-opencode/tmux-core"),
-  ])
+export async function rebalanceTeamWindow(windowId: string, layout: RebalanceLayout): Promise<boolean> {
+  const [{ log }, { runTmuxCommand }] = await Promise.all([import("../logger"), import("@oh-my-opencode/tmux-core")])
   const tmuxPath = "tmux"
 
   return rebalanceTeamWindowWith(windowId, layout, {

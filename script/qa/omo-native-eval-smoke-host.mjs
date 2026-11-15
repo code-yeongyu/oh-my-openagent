@@ -8,20 +8,31 @@ const exec = promisify(execFile)
 
 export async function ownedProcesses(root) {
   if (process.platform === "win32") {
-    const { stdout } = await exec("powershell.exe", ["-NoProfile", "-Command",
-      "Get-CimInstance Win32_Process | Select-Object ProcessId,CommandLine | ConvertTo-Json -Compress"],
-    { timeout: 30_000, maxBuffer: 16 * 1024 * 1024 })
-    return JSON.parse(stdout).filter((entry) =>
-      entry.ProcessId !== process.pid && entry.CommandLine?.includes(root))
+    const { stdout } = await exec(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-Command",
+        "Get-CimInstance Win32_Process | Select-Object ProcessId,CommandLine | ConvertTo-Json -Compress",
+      ],
+      { timeout: 30_000, maxBuffer: 16 * 1024 * 1024 },
+    )
+    return JSON.parse(stdout)
+      .filter((entry) => entry.ProcessId !== process.pid && entry.CommandLine?.includes(root))
       .map((entry) => ({ pid: entry.ProcessId, command: entry.CommandLine }))
   }
   const { stdout } = await exec("ps", ["-axo", "pid=,args="], {
-    timeout: 30_000, maxBuffer: 16 * 1024 * 1024,
+    timeout: 30_000,
+    maxBuffer: 16 * 1024 * 1024,
   })
-  return stdout.split("\n").filter((line) => line.includes(root)).map((line) => {
-    const [pid, ...args] = line.trim().split(/\s+/)
-    return { pid: Number(pid), command: args.join(" ") }
-  }).filter((entry) => entry.pid !== process.pid)
+  return stdout
+    .split("\n")
+    .filter((line) => line.includes(root))
+    .map((line) => {
+      const [pid, ...args] = line.trim().split(/\s+/)
+      return { pid: Number(pid), command: args.join(" ") }
+    })
+    .filter((entry) => entry.pid !== process.pid)
 }
 
 const RENAME_RETRY_CODES = new Set(["EBUSY", "EPERM", "EACCES"])
@@ -43,7 +54,9 @@ async function treeHolders(tree) {
     "} | ConvertTo-Json -Compress",
   ].join("\n")
   const { stdout } = await exec("powershell.exe", ["-NoProfile", "-Command", script], {
-    timeout: 60_000, maxBuffer: 16 * 1024 * 1024, env: { ...process.env, OMO_SMOKE_TREE: tree },
+    timeout: 60_000,
+    maxBuffer: 16 * 1024 * 1024,
+    env: { ...process.env, OMO_SMOKE_TREE: tree },
   })
   const parsed = stdout.trim() === "" ? [] : JSON.parse(stdout)
   return (Array.isArray(parsed) ? parsed : [parsed]).filter((entry) => entry.pid !== process.pid)
@@ -65,9 +78,10 @@ export async function renameAside(tree, hidden) {
       if (!retryable) throw error
       if (attempt >= RENAME_RETRY_DELAYS_MS.length) {
         const holders = await treeHolders(tree).catch((query) => [{ query: String(query) }])
-        const named = holders.length > 0
-          ? `by: ${JSON.stringify(holders)}`
-          : "by no process whose image, module or command line is under it (a file scanner or indexer holding a handle)"
+        const named =
+          holders.length > 0
+            ? `by: ${JSON.stringify(holders)}`
+            : "by no process whose image, module or command line is under it (a file scanner or indexer holding a handle)"
         throw new Error(`${error.message}\nstill held after ${attempt + 1} attempts ${named}`)
       }
       await new Promise((settle) => setTimeout(settle, RENAME_RETRY_DELAYS_MS[attempt]))

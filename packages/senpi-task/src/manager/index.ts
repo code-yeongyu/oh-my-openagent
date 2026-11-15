@@ -5,7 +5,12 @@ export { decideDepthPolicy } from "./depth-policy"
 export type { DepthDecision, DepthPolicyInput } from "./depth-policy"
 export { NameRegistry } from "./names"
 export type { NameRegistration } from "./names"
-export { AUTO_HOST_CAPABILITIES, createExecutionModeGate, resolveAutoExecutionMode, resolveExecutionMode } from "./execution-mode"
+export {
+  AUTO_HOST_CAPABILITIES,
+  createExecutionModeGate,
+  resolveAutoExecutionMode,
+  resolveExecutionMode,
+} from "./execution-mode"
 export type {
   AutoExecutionModeInput,
   ConfiguredExecutionMode,

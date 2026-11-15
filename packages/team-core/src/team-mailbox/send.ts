@@ -58,10 +58,7 @@ export class TeamDeletingError extends Error {
 }
 
 function isMissingPathError(error: unknown): boolean {
-  return typeof error === "object"
-    && error !== null
-    && "code" in error
-    && error.code === "ENOENT"
+  return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT"
 }
 
 async function assertTeamAcceptsMessages(teamRunId: string, config: TeamModeConfig): Promise<void> {
@@ -104,10 +101,12 @@ async function getUnreadSizeBytes(inboxDir: string): Promise<number> {
       return !entry.name.startsWith(".")
     })
 
-    const sizes = await Promise.all(unreadEntries.map(async (entry) => {
-      const fileStats = await stat(path.join(inboxDir, entry.name))
-      return fileStats.size
-    }))
+    const sizes = await Promise.all(
+      unreadEntries.map(async (entry) => {
+        const fileStats = await stat(path.join(inboxDir, entry.name))
+        return fileStats.size
+      }),
+    )
 
     return sizes.reduce((totalBytes, fileSize) => totalBytes + fileSize, 0)
   } catch (error) {
@@ -159,25 +158,28 @@ export async function sendMessage(
     const inboxDir = getInboxDir(baseDir, teamRunId, recipient)
     await mkdir(inboxDir, { recursive: true, mode: 0o700 })
 
-    await withLock(`${inboxDir}.lock`, async () => {
-      const unreadSizeBytes = await getUnreadSizeBytes(inboxDir)
-      const nextUnreadSizeBytes = unreadSizeBytes + serializedMessageBytes
-      if (nextUnreadSizeBytes > config.recipient_unread_max_bytes) {
-        throw new RecipientBackpressureError()
-      }
+    await withLock(
+      `${inboxDir}.lock`,
+      async () => {
+        const unreadSizeBytes = await getUnreadSizeBytes(inboxDir)
+        const nextUnreadSizeBytes = unreadSizeBytes + serializedMessageBytes
+        if (nextUnreadSizeBytes > config.recipient_unread_max_bytes) {
+          throw new RecipientBackpressureError()
+        }
 
-      const unreservedPath = path.join(inboxDir, `${message.messageId}.json`)
-      const reservedPath = path.join(inboxDir, `.delivering-${message.messageId}.json`)
-      if (await fileExists(unreservedPath) || await fileExists(reservedPath)) {
-        throw new DuplicateMessageIdError()
-      }
+        const unreservedPath = path.join(inboxDir, `${message.messageId}.json`)
+        const reservedPath = path.join(inboxDir, `.delivering-${message.messageId}.json`)
+        if ((await fileExists(unreservedPath)) || (await fileExists(reservedPath))) {
+          throw new DuplicateMessageIdError()
+        }
 
-      const targetPath = recipient !== context.leadRecipient && reservedRecipients.has(recipient)
-        ? reservedPath
-        : unreservedPath
-      await atomicWrite(targetPath, serializedMessage)
-      deliveredTo.push(recipient)
-    }, { ownerTag: `team-mailbox:${recipient}` })
+        const targetPath =
+          recipient !== context.leadRecipient && reservedRecipients.has(recipient) ? reservedPath : unreservedPath
+        await atomicWrite(targetPath, serializedMessage)
+        deliveredTo.push(recipient)
+      },
+      { ownerTag: `team-mailbox:${recipient}` },
+    )
   }
 
   return { messageId: message.messageId, deliveredTo }

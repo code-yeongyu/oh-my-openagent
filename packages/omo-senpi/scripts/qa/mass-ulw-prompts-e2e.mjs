@@ -26,7 +26,9 @@ function readSandboxText(root) {
   const files = []
   collectFiles(root, files)
   return files
-    .filter((file) => file.endsWith(".json") || file.endsWith(".jsonl") || file.endsWith(".log") || file.endsWith(".md"))
+    .filter(
+      (file) => file.endsWith(".json") || file.endsWith(".jsonl") || file.endsWith(".log") || file.endsWith(".md"),
+    )
     .map((file) => readFileSync(file, "utf8"))
     .join("\n")
 }
@@ -137,10 +139,24 @@ function main() {
     )
     const run = spawnSync(
       resolvedSenpi,
-      ["-e", mockProviderEntry, "-p", "--provider", "omo-mock", "--model", "mock-1", "run mass ulw on the docs refresh"],
+      [
+        "-e",
+        mockProviderEntry,
+        "-p",
+        "--provider",
+        "omo-mock",
+        "--model",
+        "mock-1",
+        "run mass ulw on the docs refresh",
+      ],
       {
         cwd: sandbox.cwd,
-        env: { ...isolatedChildEnv(process.env, sandbox.agentDir), SENPI_CODING_AGENT_DIR: sandbox.agentDir, XDG_CONFIG_HOME: sandbox.xdgConfigHome, OMO_SENPI_QA: "1" },
+        env: {
+          ...isolatedChildEnv(process.env, sandbox.agentDir),
+          SENPI_CODING_AGENT_DIR: sandbox.agentDir,
+          XDG_CONFIG_HOME: sandbox.xdgConfigHome,
+          OMO_SENPI_QA: "1",
+        },
         encoding: "utf8",
         timeout: 60_000,
       },
@@ -150,7 +166,8 @@ function main() {
     const missingMarkers = REQUIRED_POINTER_MARKERS.filter((marker) => !transcript.includes(marker))
     const session = inspectSession(sandbox.agentDir)
     const pointerInjected = run.status === 0 && missingMarkers.length === 0
-    const userTextClean = session.userTexts.length > 0 && session.userTexts.every((text) => !text.includes("<omo-mass-ulw-mode>"))
+    const userTextClean =
+      session.userTexts.length > 0 && session.userTexts.every((text) => !text.includes("<omo-mass-ulw-mode>"))
     const hiddenInjectionOk =
       session.hiddenPointers.length === 1 &&
       session.visiblePointers.length === 0 &&

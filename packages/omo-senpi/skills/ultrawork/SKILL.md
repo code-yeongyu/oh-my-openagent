@@ -130,11 +130,16 @@ At task end, after owned processes exit, remove only owned directories, includin
 
 When a ulw-loop pointer or the ulw-execute skill accompanies this
 directive, that contract supersedes bootstrap sections 1-3: its state
-owns the goal and is the notepad (the loop CLI's goals and ledger, or
+owns the goal and is the notepad (the loop's goals and ledger, or
 Boulder plus `.omo/ulw-execute/ledger.jsonl`), and its checklist is
-the plan.
+the plan. Its own final gate replaces the Verification gate below, and
+under ulw-execute its orchestrator rule also governs the Execution
+loop: dispatched workers do the CHANGE and RUN steps (QA included),
+and you verify the evidence they capture.
 
 ## 0. Survey the skills, gather context, then size the work
+This section records into the notepad, so run section 2's `NOTE=`
+command first; section 2 then initialises that same file.
 <!-- omo-ultrawork-astra:skill-survey:start -->
 First, survey the loaded skill list and read the description of each
 loosely relevant skill. Decide explicitly which skills this task will
@@ -464,23 +469,27 @@ children remain open.
 # Verification gate (TRIGGERED, NOT OPTIONAL)
 
 Reviewers cost a full extra agent run, so they are earned by a written
-plan, never by ambition. Trigger ONLY when a `ulw-plan` run produced a
-plan file for THIS work and ANY apply:
-- Tier is HEAVY.
-- User demanded strict, rigorous, or proper review.
-No plan file means no reviewer: a bare `ulw` run — however heavy —
-records a self-review in the notepad instead. Same for LIGHT tier.
+plan or an explicit request, never by ambition. Trigger ONLY when ANY
+apply:
+- A `ulw-plan` run produced a plan file for THIS work and the tier is
+  HEAVY.
+- The user demanded strict, rigorous, or proper review of this work;
+  a `review-work` pass run on it is this gate (its one gate reviewer
+  is the reviewer below).
+Otherwise no reviewer: a bare `ulw` run — however heavy — records a
+self-review in the notepad instead. Same for LIGHT tier.
 Self-review is: re-read the diff, run diagnostics, confirm each
 criterion's evidence, and state in one line why the tier held.
 `plan-reviewer` and `plan-consultant` are plan-gated reviewers, not general helpers —
 never summon either to sanity-check work that no plan file covers.
 
 Procedure (NON-NEGOTIABLE):
-1. Spawn a reviewer child via `task` with a self-contained reviewer
-   assignment in `prompt` — `subagent_type: "plan-reviewer"` for read-only
-   review, or a reviewer-shaped `category` when the review must run
-   code. Pass: goal, success-criteria, scenario evidence, full diff,
-   notepad path.
+1. Spawn a reviewer child via `task` with
+   `subagent_type: "omo-native-gate-reviewer"` (the builtin gate
+   reviewer: it reads, runs commands, and writes its report) and a
+   self-contained reviewer assignment in `prompt`; never `plan-reviewer`,
+   which only reviews a plan file. Pass: goal, success-criteria,
+   scenario evidence, full diff, notepad path.
 2. Verify each reviewer concern yourself. A concern blocks only when
    it names a success criterion the evidence fails; record concerns
    that cite no criterion as notes with a one-line reason — fixed or

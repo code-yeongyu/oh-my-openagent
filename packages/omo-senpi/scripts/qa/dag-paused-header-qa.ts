@@ -60,7 +60,9 @@ function seedRunningRun(store: ReturnType<typeof createDagFileStore>): void {
     generation: 1,
     createdAt,
     updatedAt: createdAt,
-    nodes: compiled.nodes.map((entry) => (entry.id === "alpha" ? { ...entry, state: "running", startedAt: createdAt } : entry)),
+    nodes: compiled.nodes.map((entry) =>
+      entry.id === "alpha" ? { ...entry, state: "running", startedAt: createdAt } : entry,
+    ),
     edges: compiled.edges,
     waves: compiled.waves,
     criticalPath: compiled.criticalPath,
@@ -78,11 +80,12 @@ function widgetRows(store: ReturnType<typeof createDagFileStore>): readonly stri
       snapshot: (runId, sessionId) => manager.snapshot(runId as DagRunId, sessionId),
     },
     runtime: {
-      ui: () => ({
-        setWidget: (key: string, rows: readonly string[] | undefined) => {
-          if (key === DAG_STATUS_UI_KEY && rows !== undefined) captured = rows
-        },
-      }) as never,
+      ui: () =>
+        ({
+          setWidget: (key: string, rows: readonly string[] | undefined) => {
+            if (key === DAG_STATUS_UI_KEY && rows !== undefined) captured = rows
+          },
+        }) as never,
       sessionId: () => PARENT_SESSION,
       mode: () => "tui",
     },
@@ -124,20 +127,30 @@ try {
   check("live lease reads resuming", resumingRows[0]?.includes("resuming") === true, resumingRows[0])
   check("live lease drops the pause glyph", resumingRows[0]?.includes("⏸") === false, resumingRows[0])
   check("live lease uses the neutral run icon", resumingRows[0]?.startsWith("· ") === true, resumingRows[0])
-  check("running lane keeps its own icon", resumingRows.slice(1).some((row) => row.includes("▶")), resumingRows.slice(1))
+  check(
+    "running lane keeps its own icon",
+    resumingRows.slice(1).some((row) => row.includes("▶")),
+    resumingRows.slice(1),
+  )
 
   // Case B: same paused run, lease holder now DEAD -> header must read suspended with the count.
   liveChild.kill("SIGKILL")
   await new Promise((resolve) => liveChild.once("exit", resolve))
   const deadRows = widgetRows(store)
   report.suspended_header = deadRows[0]
-  check("dead lease over a running node reads suspended", deadRows[0]?.includes("suspended · 1 active") === true, deadRows[0])
+  check(
+    "dead lease over a running node reads suspended",
+    deadRows[0]?.includes("suspended · 1 active") === true,
+    deadRows[0],
+  )
   check("suspended header drops the pause glyph", deadRows[0]?.includes("⏸") === false, deadRows[0])
 
   // Case C: no running node left -> header falls back to plain paused under the neutral icon.
   store.withRunLock(RUN_ID, () => {
     const fresh = store.readCheckpoint<{ readonly nodes: readonly { readonly state: string }[] }>(RUN_ID)
-    const parked = (fresh?.nodes ?? []).map((entry) => (entry.state === "running" ? { ...entry, state: "pending" } : entry))
+    const parked = (fresh?.nodes ?? []).map((entry) =>
+      entry.state === "running" ? { ...entry, state: "pending" } : entry,
+    )
     store.writeCheckpoint(RUN_ID, { ...fresh, nodes: parked })
   })
   const pausedRows = widgetRows(store)

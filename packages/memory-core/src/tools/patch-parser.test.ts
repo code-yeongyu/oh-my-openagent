@@ -24,14 +24,10 @@ describe("memory patch parser", () => {
 
   it("#given CRLF and a terminal newline #when parsed #then the envelope is normalized", () => {
     // #given / #when
-    const operations = parseMemoryPatch(
-      "*** Begin Patch\r\n*** Add File: system/a.md\r\n+body\r\n*** End Patch\r\n",
-    )
+    const operations = parseMemoryPatch("*** Begin Patch\r\n*** Add File: system/a.md\r\n+body\r\n*** End Patch\r\n")
 
     // #then
-    expect(operations).toEqual([
-      { kind: "add", targetPath: "system/a.md", contentLines: ["body"] },
-    ])
+    expect(operations).toEqual([{ kind: "add", targetPath: "system/a.md", contentLines: ["body"] }])
   })
 
   it("#given add update move and delete directives #when parsed #then paths and hunks preserve patch text", () => {
@@ -69,13 +65,9 @@ describe("memory patch parser", () => {
 
   it("#given an update without an @@ marker #when parsed #then it forms one implicit hunk", () => {
     // #given / #when
-    const operations = parseMemoryPatch([
-      "*** Begin Patch",
-      "*** Update File: a.md",
-      "-old",
-      "+new",
-      "*** End Patch",
-    ].join("\n"))
+    const operations = parseMemoryPatch(
+      ["*** Begin Patch", "*** Update File: a.md", "-old", "+new", "*** End Patch"].join("\n"),
+    )
 
     // #then
     expect(operations[0]).toEqual({

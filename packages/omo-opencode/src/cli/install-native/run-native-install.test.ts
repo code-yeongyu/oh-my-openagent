@@ -173,7 +173,11 @@ describe("runNativeInstall legacy omo bin", () => {
 
   test("#given a legacy npm omo and no bun #when the native edition is installed #then the note says a later npm uninstall takes omo with it and how to restore it", async () => {
     // given omo-ai lands in the same npm bin dir the legacy package's omo was removed from
-    const legacy = writeGlobalPackageBin({ root: root("wire-npm-trap"), packageName: "oh-my-openagent", version: "4.19.4" })
+    const legacy = writeGlobalPackageBin({
+      root: root("wire-npm-trap"),
+      packageName: "oh-my-openagent",
+      version: "4.19.4",
+    })
     const { spawn } = recordingSpawn({ exitCode: 0 }, () => {
       writeGlobalPackageBin({ root: legacy.root, packageName: "omo-ai", version: "5.0.0-0.beta.89" })
     })
@@ -195,7 +199,11 @@ describe("runNativeInstall legacy omo bin", () => {
 
   test("#given a legacy omo and bun #when the native edition is installed #then no npm uninstall note is printed", async () => {
     // given
-    const legacy = writeGlobalPackageBin({ root: root("wire-bun-no-trap"), packageName: "oh-my-openagent", version: "4.19.4" })
+    const legacy = writeGlobalPackageBin({
+      root: root("wire-bun-no-trap"),
+      packageName: "oh-my-openagent",
+      version: "4.19.4",
+    })
     const { spawn } = recordingSpawn({ exitCode: 0 })
 
     // when

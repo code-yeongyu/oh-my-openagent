@@ -26,9 +26,7 @@ function asHarnessContext(ctx: unknown): HarnessContext {
   return unsafeTestValue<HarnessContext>(ctx)
 }
 
-function createEventHandlerManagers(
-  overrides: Record<string, unknown> = {},
-): EventHandlerArgs["managers"] {
+function createEventHandlerManagers(overrides: Record<string, unknown> = {}): EventHandlerArgs["managers"] {
   return unsafeTestValue<EventHandlerArgs["managers"]>({
     ...({} as EventHandlerArgs["managers"]),
     tmuxSessionManager: {
@@ -39,18 +37,14 @@ function createEventHandlerManagers(
   })
 }
 
-function createEventHandlerHooks(
-  overrides: Record<string, unknown>,
-): EventHandlerArgs["hooks"] {
+function createEventHandlerHooks(overrides: Record<string, unknown>): EventHandlerArgs["hooks"] {
   return unsafeTestValue<EventHandlerArgs["hooks"]>({
     ...({} as EventHandlerArgs["hooks"]),
     ...overrides,
   })
 }
 
-function createChatMessageHandlerHooks(
-  overrides: Record<string, unknown>,
-): ChatMessageHandlerArgs["hooks"] {
+function createChatMessageHandlerHooks(overrides: Record<string, unknown>): ChatMessageHandlerArgs["hooks"] {
   return unsafeTestValue<ChatMessageHandlerArgs["hooks"]>({
     ...({} as ChatMessageHandlerArgs["hooks"]),
     ...overrides,
@@ -69,11 +63,7 @@ const FIRST_FALLBACK_MODEL = {
   modelID: "claude-sonnet-4-6",
 }
 
-const CLIPROXYAPI_FALLBACKS = [
-  `${PROVIDER_ID}/claude-sonnet-4-6`,
-  `${PROVIDER_ID}/gpt-5.4`,
-  `${PROVIDER_ID}/kimi-k2.5`,
-]
+const CLIPROXYAPI_FALLBACKS = [`${PROVIDER_ID}/claude-sonnet-4-6`, `${PROVIDER_ID}/gpt-5.4`, `${PROVIDER_ID}/kimi-k2.5`]
 
 type HarnessMode = "none" | "model" | "runtime" | "both"
 
@@ -139,13 +129,10 @@ function createHarness(args: {
           ? {
               promptAsync: async (raw: unknown) => {
                 const call = {
-                  sessionID:
-                    (raw as { path?: { id?: string } })?.path?.id ?? "unknown-session",
+                  sessionID: (raw as { path?: { id?: string } })?.path?.id ?? "unknown-session",
                   agent: (raw as { body?: { agent?: string } })?.body?.agent,
-                  model: (raw as { body?: { model?: { providerID?: string; modelID?: string } } })?.body
-                    ?.model,
-                  parts: (raw as { body?: { parts?: Array<{ type?: string; text?: string }> } })?.body
-                    ?.parts,
+                  model: (raw as { body?: { model?: { providerID?: string; modelID?: string } } })?.body?.model,
+                  parts: (raw as { body?: { parts?: Array<{ type?: string; text?: string }> } })?.body?.parts,
                 }
                 promptAsyncCalls.push(call)
 
@@ -227,40 +214,41 @@ function createHarness(args: {
   }
 }
 
-async function primeMainSession(
-  eventHandler: ReturnType<typeof createHarness>["eventHandler"],
-  sessionID: string,
-) {
-  await eventHandler(asHarnessEventInput({
-    event: {
-      type: "session.created",
-      properties: {
-        info: {
-          id: sessionID,
-          model: PRIMARY_MODEL_STRING,
+async function primeMainSession(eventHandler: ReturnType<typeof createHarness>["eventHandler"], sessionID: string) {
+  await eventHandler(
+    asHarnessEventInput({
+      event: {
+        type: "session.created",
+        properties: {
+          info: {
+            id: sessionID,
+            model: PRIMARY_MODEL_STRING,
+          },
         },
       },
-    },
-  }))
+    }),
+  )
 
-  await eventHandler(asHarnessEventInput({
-    event: {
-      type: "message.updated",
-      properties: {
-        info: {
-          id: `user-${sessionID}`,
-          sessionID,
-          role: "user",
-          time: { created: 1 },
-          content: [],
-          modelID: PRIMARY_MODEL.modelID,
-          providerID: PRIMARY_MODEL.providerID,
-          agent: "Sisyphus - Ultraworker",
-          path: { cwd: "/tmp", root: "/tmp" },
+  await eventHandler(
+    asHarnessEventInput({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: `user-${sessionID}`,
+            sessionID,
+            role: "user",
+            time: { created: 1 },
+            content: [],
+            modelID: PRIMARY_MODEL.modelID,
+            providerID: PRIMARY_MODEL.providerID,
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
         },
       },
-    },
-  }))
+    }),
+  )
 }
 
 async function sendNextMessage(
@@ -276,77 +264,79 @@ async function sendNextMessage(
   return output
 }
 
-async function triggerSessionError(
-  eventHandler: ReturnType<typeof createHarness>["eventHandler"],
-  sessionID: string,
-) {
-  await eventHandler(asHarnessEventInput({
-    event: {
-      type: "session.error",
-      properties: {
-        sessionID,
-        agent: "sisyphus",
-        providerID: PRIMARY_MODEL.providerID,
-        modelID: PRIMARY_MODEL.modelID,
-        model: PRIMARY_MODEL_STRING,
-        error: {
-          statusCode: 529,
-          message: `Overloaded upstream for ${PRIMARY_MODEL_STRING}`,
-        },
-      },
-    },
-  }))
-}
-
-async function triggerSessionStatusRetry(
-  eventHandler: ReturnType<typeof createHarness>["eventHandler"],
-  sessionID: string,
-) {
-  await eventHandler(asHarnessEventInput({
-    event: {
-      type: "session.status",
-      properties: {
-        sessionID,
-        agent: "sisyphus",
-        model: PRIMARY_MODEL_STRING,
-        status: {
-          type: "retry",
-          attempt: 1,
-          message:
-            "All credentials for model claude-opus-4-7 are cooling down [retrying in 7m 56s attempt #1]",
-          next: 476,
-        },
-      },
-    },
-  }))
-}
-
-async function triggerAssistantMessageError(
-  eventHandler: ReturnType<typeof createHarness>["eventHandler"],
-  sessionID: string,
-) {
-  await eventHandler(asHarnessEventInput({
-    event: {
-      type: "message.updated",
-      properties: {
-        info: {
-          id: `assistant-error-${sessionID}`,
+async function triggerSessionError(eventHandler: ReturnType<typeof createHarness>["eventHandler"], sessionID: string) {
+  await eventHandler(
+    asHarnessEventInput({
+      event: {
+        type: "session.error",
+        properties: {
           sessionID,
-          role: "assistant",
-          time: { created: 1, completed: 2 },
-          model: PRIMARY_MODEL_STRING,
-          modelID: PRIMARY_MODEL.modelID,
+          agent: "sisyphus",
           providerID: PRIMARY_MODEL.providerID,
-          agent: "Sisyphus - Ultraworker",
-          path: { cwd: "/tmp", root: "/tmp" },
+          modelID: PRIMARY_MODEL.modelID,
+          model: PRIMARY_MODEL_STRING,
           error: {
             statusCode: 529,
             message: `Overloaded upstream for ${PRIMARY_MODEL_STRING}`,
           },
         },
       },
-    },
-  }))
+    }),
+  )
+}
+
+async function triggerSessionStatusRetry(
+  eventHandler: ReturnType<typeof createHarness>["eventHandler"],
+  sessionID: string,
+) {
+  await eventHandler(
+    asHarnessEventInput({
+      event: {
+        type: "session.status",
+        properties: {
+          sessionID,
+          agent: "sisyphus",
+          model: PRIMARY_MODEL_STRING,
+          status: {
+            type: "retry",
+            attempt: 1,
+            message: "All credentials for model claude-opus-4-7 are cooling down [retrying in 7m 56s attempt #1]",
+            next: 476,
+          },
+        },
+      },
+    }),
+  )
+}
+
+async function triggerAssistantMessageError(
+  eventHandler: ReturnType<typeof createHarness>["eventHandler"],
+  sessionID: string,
+) {
+  await eventHandler(
+    asHarnessEventInput({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: `assistant-error-${sessionID}`,
+            sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            model: PRIMARY_MODEL_STRING,
+            modelID: PRIMARY_MODEL.modelID,
+            providerID: PRIMARY_MODEL.providerID,
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+            error: {
+              statusCode: 529,
+              message: `Overloaded upstream for ${PRIMARY_MODEL_STRING}`,
+            },
+          },
+        },
+      },
+    }),
+  )
 }
 
 afterEach(() => {

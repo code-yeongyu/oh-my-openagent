@@ -71,12 +71,7 @@ describe("createAnthropicContextWindowLimitRecoveryHook regressions", () => {
 
   test("fully clears recovery state when contentful summary already succeeded", async () => {
     //#given
-    const {
-      restore,
-      createUntrackedTimeout,
-      getClearTimeoutCalls,
-      getScheduledTimeouts,
-    } = setupDelayedTimeoutMocks()
+    const { restore, createUntrackedTimeout, getClearTimeoutCalls, getScheduledTimeouts } = setupDelayedTimeoutMocks()
     const sessionID = "session-summary-success"
     let retryTimerHandle: ReturnType<typeof setTimeout> | undefined
     let capturedAutoCompactState: AutoCompactState | undefined
@@ -115,10 +110,7 @@ describe("createAnthropicContextWindowLimitRecoveryHook regressions", () => {
         truncateAttempt: 2,
       })
       capturedAutoCompactState?.emptyContentAttemptBySession.set(sessionID, 3)
-      capturedAutoCompactState?.retryTimerBySession.set(
-        sessionID,
-        (retryTimerHandle = createUntrackedTimeout()),
-      )
+      capturedAutoCompactState?.retryTimerBySession.set(sessionID, (retryTimerHandle = createUntrackedTimeout()))
 
       getLastAssistantMock.mockResolvedValueOnce({
         info: {
@@ -161,11 +153,7 @@ describe("createAnthropicContextWindowLimitRecoveryHook regressions", () => {
       }
 
       //#then
-      expect(getClearTimeoutCalls()).toEqual([
-        firstScheduledTimeout,
-        secondScheduledTimeout,
-        retryTimerHandle,
-      ])
+      expect(getClearTimeoutCalls()).toEqual([firstScheduledTimeout, secondScheduledTimeout, retryTimerHandle])
       expect(capturedAutoCompactState?.pendingCompact.has(sessionID)).toBe(false)
       expect(capturedAutoCompactState?.errorDataBySession.has(sessionID)).toBe(false)
       expect(capturedAutoCompactState?.retryStateBySession.has(sessionID)).toBe(false)

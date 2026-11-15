@@ -62,7 +62,18 @@ function parsePaneLine(line: string): ParsedPaneLine | null {
   const mandatoryFields = getMandatoryPaneFields(fields)
   if (!mandatoryFields) return null
 
-  const [paneId, widthString, heightString, leftString, topString, activeString, windowWidthString, windowHeightString, windowActiveString, sessionAttachedString] = mandatoryFields
+  const [
+    paneId,
+    widthString,
+    heightString,
+    leftString,
+    topString,
+    activeString,
+    windowWidthString,
+    windowHeightString,
+    windowActiveString,
+    sessionAttachedString,
+  ] = mandatoryFields
 
   const width = parseInteger(widthString)
   const height = parseInteger(heightString)
@@ -108,7 +119,18 @@ function parsePaneLine(line: string): ParsedPaneLine | null {
 function getMandatoryPaneFields(fields: string[]): MandatoryPaneFields | null {
   if (fields.length < MANDATORY_PANE_FIELD_COUNT) return null
 
-  const [paneId, widthString, heightString, leftString, topString, activeString, windowWidthString, windowHeightString, windowActiveString, sessionAttachedString] = fields
+  const [
+    paneId,
+    widthString,
+    heightString,
+    leftString,
+    topString,
+    activeString,
+    windowWidthString,
+    windowHeightString,
+    windowActiveString,
+    sessionAttachedString,
+  ] = fields
 
   if (
     paneId === undefined ||

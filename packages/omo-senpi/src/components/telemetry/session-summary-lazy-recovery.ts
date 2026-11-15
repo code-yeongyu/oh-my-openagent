@@ -7,8 +7,11 @@ import type { RecoveryRuntime } from "./session-summary-recovery"
 import type { ConsentScope, SummaryStorage } from "./session-summary-storage"
 
 /** What the recorder takes from the `extensions/omo-telemetry-recovery.js` sidecar. */
-export type SummarySidecar = Pick<typeof import("./session-summary-recovery"), "createRecoveryRuntime" | "sendSummaryRecord" | "purgeOptedOutStorage">
-  & Partial<Pick<typeof import("./session-summary-recovery"), "purgeSenpiOtlpSpoolOnOptOut">>
+export type SummarySidecar = Pick<
+  typeof import("./session-summary-recovery"),
+  "createRecoveryRuntime" | "sendSummaryRecord" | "purgeOptedOutStorage"
+> &
+  Partial<Pick<typeof import("./session-summary-recovery"), "purgeSenpiOtlpSpoolOnOptOut">>
 
 export type LoadSummaryRecovery = () => Promise<SummarySidecar>
 
@@ -22,10 +25,11 @@ export type LazySummaryRecovery = {
 /** One load at a time; a failed load is forgotten, so the next caller tries again. */
 export function memoizeLoad<T>(load: () => Promise<T>): () => Promise<T> {
   let loading: Promise<T> | undefined
-  return () => (loading ??= load().catch((error: unknown) => {
-    loading = undefined
-    throw error
-  }))
+  return () =>
+    (loading ??= load().catch((error: unknown) => {
+      loading = undefined
+      throw error
+    }))
 }
 
 // The sweep ships in the sidecar: a directory holding only this process's own windows and in-flight events

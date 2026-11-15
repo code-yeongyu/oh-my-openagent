@@ -1,7 +1,12 @@
 import { loadTrustAnchor, rootChangedSinceRetired, TrustPinError } from "../crypto/trust-pin.ts"
 import { creatorAnchor } from "../crypto/anchor.ts"
 import type { DeviceKeyring } from "../keyring-port.ts"
-import { checkSyncOperation, admitSyncOperation, syncOperationSignal, type SyncOperationOptions } from "../operation-authority.ts"
+import {
+  checkSyncOperation,
+  admitSyncOperation,
+  syncOperationSignal,
+  type SyncOperationOptions,
+} from "../operation-authority.ts"
 import { type GenesisBridge, GenesisEnableError } from "../genesis/bridge.ts"
 import { buildGenesis } from "../genesis/build.ts"
 import { completeAccountChain, completeGenesis } from "../genesis/complete.ts"
@@ -43,16 +48,19 @@ export async function enableSync(input: EnableSyncInput): Promise<EnableOutcome>
     const keys = await chain.listKeys()
     if (keys === null) throw new GenesisEnableError("malformed_reply")
     if (pin.ok && keys.length === 0) throw new GenesisEnableError("incomplete_chain")
-    if (pin.ok && intent !== null && pin.anchor.genesisDigest !== intent.genesisDigest) throw new TrustPinError("pin_conflict")
+    if (pin.ok && intent !== null && pin.anchor.genesisDigest !== intent.genesisDigest)
+      throw new TrustPinError("pin_conflict")
     const member = pin.ok ? (await completeAccountChain(captured, pin.anchor)).isMember() : false
     if (!pin.ok && intent !== null && keys.length > 0 && keys[0]?.digest === intent.genesisDigest) {
       const resumed = await completeAccountChain(captured, creatorAnchor(input.account, input.keyring))
-      if (resumed.state().genesisDigest !== intent.genesisDigest || !resumed.isMember()) throw new GenesisEnableError("intent_mismatch")
+      if (resumed.state().genesisDigest !== intent.genesisDigest || !resumed.isMember())
+        throw new GenesisEnableError("intent_mismatch")
     }
     if (keys.length === 0 && intent === null && !input.genesis?.prfSupported) return { kind: "needs_first_device" }
     const creating = intent === null && !pin.ok && keys.length === 0
     const { genesis, serviceOrigin, rpId, userName } = input
-    if (creating && (!genesis?.prfSupported || !serviceOrigin || !rpId || !userName)) throw new GenesisEnableError("missing_configuration")
+    if (creating && (!genesis?.prfSupported || !serviceOrigin || !rpId || !userName))
+      throw new GenesisEnableError("missing_configuration")
 
     // Bootstrap readability is not consent. Joining, resuming and creating all turn both switches on here, before any key
     // or root is written; needs_first_device and a refused configuration return above with both switches untouched.
@@ -61,28 +69,45 @@ export async function enableSync(input: EnableSyncInput): Promise<EnableOutcome>
     checkSyncOperation(input)
     if (intent === null && (pin.ok || keys.length > 0)) return { kind: member ? "joined" : "join_required" }
     if (intent === null) {
-      if (!genesis?.prfSupported || !serviceOrigin || !rpId || !userName) throw new GenesisEnableError("missing_configuration")
+      if (!genesis?.prfSupported || !serviceOrigin || !rpId || !userName)
+        throw new GenesisEnableError("missing_configuration")
       const operation = {
         signal: syncOperationSignal(input) ?? new AbortController().signal,
         admit: <T>(begin: () => T): T => admitSyncOperation(input, begin),
       }
-      const result = await admitSyncOperation(input, () => genesis.createGenesis({
-        account: input.account, rpId, userName, roaming: input.roaming ?? false, firstDevice: principalOf(input.keyring),
-      }, { operation }))
+      const result = await admitSyncOperation(input, () =>
+        genesis.createGenesis(
+          {
+            account: input.account,
+            rpId,
+            userName,
+            roaming: input.roaming ?? false,
+            firstDevice: principalOf(input.keyring),
+          },
+          { operation },
+        ),
+      )
       checkSyncOperation(input)
       if (!result.ok) throw new GenesisEnableError("bridge_refused", { cause: result.reason })
       if (result.prepared.body.bootstrap.recovery_key.rp_id !== rpId) throw new GenesisEnableError("intent_mismatch")
       const built = await buildGenesis(input.account, input.keyring, result.prepared, input)
       await verifyGenesisRequest(input.account, input.keyring, built.request)
       intent = {
-        version: 1, account: input.account, serviceOrigin, serviceDeviceId: input.serviceDeviceId,
-        syncPrincipal: principalOf(input.keyring), genesisDigest: built.digest, request: built.request,
+        version: 1,
+        account: input.account,
+        serviceOrigin,
+        serviceDeviceId: input.serviceDeviceId,
+        syncPrincipal: principalOf(input.keyring),
+        genesisDigest: built.digest,
+        request: built.request,
       }
       await storeGenesisIntent(captured, intent)
     }
     const result = await completeGenesis(captured, intent)
     checkSyncOperation(input)
     if (result !== "created") return { kind: "join_required" }
-    return (await rootChangedSinceRetired(input.pinDir, input.account, intent.genesisDigest)) ? { kind: "joined", created: true, rootChanged: true } : { kind: "joined", created: true }
+    return (await rootChangedSinceRetired(input.pinDir, input.account, intent.genesisDigest))
+      ? { kind: "joined", created: true, rootChanged: true }
+      : { kind: "joined", created: true }
   })
 }

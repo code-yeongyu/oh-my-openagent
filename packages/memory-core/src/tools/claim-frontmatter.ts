@@ -27,8 +27,11 @@ export function stampReceipt(
 ): MemoryFrontmatter {
   const prior = previous === undefined ? undefined : liveHeader(readHeader(previous.frontmatter))
   const reRender = previous !== undefined && previous.body === body && sameFields(previous.frontmatter, next)
-  const header = claim === undefined ? (reRender ? prior : editHeader(prior)) : claimHeader(prior, renderClaimReceipt(claim))
-  const rest = Object.fromEntries(Object.entries(next.extra ?? {}).filter(([key]) => normalizedFrontmatterKey(key) !== PROVENANCE_FRONTMATTER_KEY))
+  const header =
+    claim === undefined ? (reRender ? prior : editHeader(prior)) : claimHeader(prior, renderClaimReceipt(claim))
+  const rest = Object.fromEntries(
+    Object.entries(next.extra ?? {}).filter(([key]) => normalizedFrontmatterKey(key) !== PROVENANCE_FRONTMATTER_KEY),
+  )
   const extra = header === undefined ? rest : { ...rest, [PROVENANCE_FRONTMATTER_KEY]: JSON.stringify(header) }
   const { extra: _extra, ...base } = next
   return Object.keys(extra).length === 0 ? base : { ...base, extra }
@@ -36,11 +39,17 @@ export function stampReceipt(
 
 export function restampContent(previous: string | undefined, next: string, claim: ClaimReceipt | undefined): string {
   const parsed = parseMemoryFile(next)
-  const stamped = stampReceipt(previous === undefined ? undefined : parseMemoryFile(previous), parsed.frontmatter, parsed.body, claim)
+  const stamped = stampReceipt(
+    previous === undefined ? undefined : parseMemoryFile(previous),
+    parsed.frontmatter,
+    parsed.body,
+    claim,
+  )
   // The parser drops keys it does not accept (a Unicode look-alike such as `\u0440rovenance`), so a raw look-alike line
   // can survive an unchanged parse; re-render whenever the raw text carries one, so the memory tool never writes it.
   const rawLookAlike = lookAlikeFrontmatterKeys(next, PROVENANCE_FRONTMATTER_KEY).length > 0
-  const unchanged = !rawLookAlike && JSON.stringify(stamped.extra ?? {}) === JSON.stringify(parsed.frontmatter.extra ?? {})
+  const unchanged =
+    !rawLookAlike && JSON.stringify(stamped.extra ?? {}) === JSON.stringify(parsed.frontmatter.extra ?? {})
   return unchanged ? next : renderMemoryFile(stamped, parsed.body)
 }
 
@@ -74,8 +83,16 @@ function headerOf(content: string | undefined): string | undefined {
 
 function sameFields(a: MemoryFrontmatter, b: MemoryFrontmatter): boolean {
   const fields = (fm: MemoryFrontmatter): string => {
-    const extra = Object.entries(fm.extra ?? {}).filter(([key]) => normalizedFrontmatterKey(key) !== PROVENANCE_FRONTMATTER_KEY)
-    return JSON.stringify([fm.description, fm.read_only, fm.kind, fm.aliases, extra.map(([key, value]) => [key, value]).sort()])
+    const extra = Object.entries(fm.extra ?? {}).filter(
+      ([key]) => normalizedFrontmatterKey(key) !== PROVENANCE_FRONTMATTER_KEY,
+    )
+    return JSON.stringify([
+      fm.description,
+      fm.read_only,
+      fm.kind,
+      fm.aliases,
+      extra.map(([key, value]) => [key, value]).sort(),
+    ])
   }
   return fields(a) === fields(b)
 }

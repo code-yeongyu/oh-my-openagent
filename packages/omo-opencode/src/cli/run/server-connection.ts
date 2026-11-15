@@ -24,14 +24,15 @@ type OpencodeServer<TClient> = {
 }
 
 export type ServerConnectionDeps<TClient> = {
-  createOpencode: (options: { signal: AbortSignal, port: number, hostname: string }) => Promise<OpencodeServer<TClient>>
+  createOpencode: (options: { signal: AbortSignal; port: number; hostname: string }) => Promise<OpencodeServer<TClient>>
   createOpencodeClient: (options: { baseUrl: string }) => TClient
   injectServerAuthIntoClient: (client: TClient) => void
   isPortAvailable: (port: number, hostname?: string) => Promise<boolean>
-  getAvailableServerPort: (preferredPort?: number, hostname?: string) => Promise<{ port: number, wasAutoSelected: boolean }>
-  withWorkingOpencodePath: (
-    startServer: () => Promise<OpencodeServer<TClient>>,
-  ) => Promise<OpencodeServer<TClient>>
+  getAvailableServerPort: (
+    preferredPort?: number,
+    hostname?: string,
+  ) => Promise<{ port: number; wasAutoSelected: boolean }>
+  withWorkingOpencodePath: (startServer: () => Promise<OpencodeServer<TClient>>) => Promise<OpencodeServer<TClient>>
 }
 
 const defaultDeps: ServerConnectionDeps<ServerConnection["client"]> = {
@@ -72,9 +73,9 @@ function isPortRangeExhausted(error: unknown): boolean {
 }
 
 async function startServer<TClient>(
-  options: { signal: AbortSignal, port: number },
+  options: { signal: AbortSignal; port: number },
   deps: ServerConnectionDeps<TClient>,
-): Promise<{ client: TClient, cleanup: () => void }> {
+): Promise<{ client: TClient; cleanup: () => void }> {
   const { signal, port } = options
   // Without a password the spawned server accepts any local caller, including a web page on another
   // localhost port or a DNS-rebound name (its origin check allows both). A per-run random password,
@@ -95,9 +96,7 @@ async function startServer<TClient>(
   let cleanupAuthDirectory: (() => void) | undefined
   try {
     cleanupAuthDirectory = createPaneAuthDirectory()
-    started = await deps.withWorkingOpencodePath(() =>
-      deps.createOpencode({ signal, port, hostname: "127.0.0.1" }),
-    )
+    started = await deps.withWorkingOpencodePath(() => deps.createOpencode({ signal, port, hostname: "127.0.0.1" }))
   } catch (error) {
     try {
       cleanupAuthDirectory?.()
@@ -147,7 +146,7 @@ async function startServer<TClient>(
 export async function createServerConnectionWithDeps<TClient>(
   options: ServerConnectionOptions,
   deps: ServerConnectionDeps<TClient>,
-): Promise<{ client: TClient, cleanup: () => void }> {
+): Promise<{ client: TClient; cleanup: () => void }> {
   const { port, attach, signal } = options
 
   if (attach !== undefined) {
@@ -209,7 +208,10 @@ export async function createServerConnectionWithDeps<TClient>(
       throw error
     }
 
-    console.log(pc.dim("Port range exhausted, attaching to existing server on"), pc.cyan(DEFAULT_SERVER_PORT.toString()))
+    console.log(
+      pc.dim("Port range exhausted, attaching to existing server on"),
+      pc.cyan(DEFAULT_SERVER_PORT.toString()),
+    )
     const client = deps.createOpencodeClient({ baseUrl: `http://127.0.0.1:${DEFAULT_SERVER_PORT}` })
     deps.injectServerAuthIntoClient(client)
     return { client, cleanup: () => {} }

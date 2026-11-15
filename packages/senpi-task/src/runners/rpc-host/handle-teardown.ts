@@ -59,9 +59,13 @@ export function createHandleTeardown(host: HandleTeardownHost): HandleTeardown {
   let markedTerminal = host.openedAttached
   let lastStatus: TaskStatus | undefined
   const sendNow = (status: TaskStatus): void => {
-    const failed = (error: unknown): void => log("senpi-task host task_status publish failed", { taskId: host.taskId, status, error: String(error) })
+    const failed = (error: unknown): void =>
+      log("senpi-task host task_status publish failed", { taskId: host.taskId, status, error: String(error) })
     try {
-      void host.port().send({ type: "set_session_context", patch: { task_status: status } }).catch(failed)
+      void host
+        .port()
+        .send({ type: "set_session_context", patch: { task_status: status } })
+        .catch(failed)
     } catch (error) {
       failed(error)
     }
@@ -119,11 +123,18 @@ export async function endSessionOnHost(input: HostTeardownInput, next: "closed" 
       log("senpi-task host session teardown step failed", { taskId: input.taskId, step, error: String(error) })
     }
   }
-  if (next === "terminated") await settleWithin(bestEffort(() => input.port().send({ type: "abort" }), "abort"), ABORT_GRACE_MS)
+  if (next === "terminated")
+    await settleWithin(
+      bestEffort(() => input.port().send({ type: "abort" }), "abort"),
+      ABORT_GRACE_MS,
+    )
   let answered = false
-  await settleWithin(bestEffort(async () => {
-    answered = await input.port().close()
-  }, "close_session"), input.closeGraceMs)
+  await settleWithin(
+    bestEffort(async () => {
+      answered = await input.port().close()
+    }, "close_session"),
+    input.closeGraceMs,
+  )
   return answered
 }
 

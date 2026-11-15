@@ -26,6 +26,9 @@
     "./personas": {
       "import": "./src/personas/manifest.ts"
     },
+    "./hardware-id": {
+      "import": "./src/sync/item/machine-id.ts"
+    },
     "./process-identity": {
       "import": "./src/locks/process-identity.ts"
     },
@@ -40,10 +43,14 @@
     },
     "./external-projection": {
       "import": "./src/compile/external-projection.ts"
+    },
+    "./completion-links": {
+      "import": "./src/reflection/completion-links.ts"
     }
   },
   "imports": {
-    "#memory-external-projection": "./src/compile/external-projection.ts"
+    "#memory-external-projection": "./src/compile/external-projection.ts",
+    "#memory-completion-links": "./src/reflection/completion-links.ts"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit -p tsconfig.json",
@@ -52,6 +59,6 @@
   "dependencies": {
     "loro-crdt": "1.16.4",
     "yaml": "2.9.1",
-    "zod": "^4.6.5"
+    "zod": "^4.6.6"
   }
 }

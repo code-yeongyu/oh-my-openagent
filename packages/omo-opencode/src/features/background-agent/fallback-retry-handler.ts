@@ -69,7 +69,17 @@ export async function tryFallbackRetry(args: {
   }) => void
   deps?: Partial<FallbackRetryHandlerDeps>
 }): Promise<boolean> {
-  const { task, errorInfo, source, concurrencyManager, client, idleDeferralTimers, queuesByKey, processKey, onRetrying } = args
+  const {
+    task,
+    errorInfo,
+    source,
+    concurrencyManager,
+    client,
+    idleDeferralTimers,
+    queuesByKey,
+    processKey,
+    onRetrying,
+  } = args
   const deps = { ...defaultFallbackRetryHandlerDeps, ...args.deps }
   const fallbackChain = task.fallbackChain
   const canUseProviderExhaustionFallback = deps.isProviderExhaustionFallbackEligible(errorInfo)
@@ -84,7 +94,7 @@ export async function tryFallbackRetry(args: {
   const attemptCount = task.attemptCount ?? 0
   const providerModelsCache = deps.readProviderModelsCache()
   const connectedProviders = providerModelsCache?.connected ?? deps.readConnectedProvidersCache()
-  const connectedSet = connectedProviders ? new Set(connectedProviders.map(p => p.toLowerCase())) : null
+  const connectedSet = connectedProviders ? new Set(connectedProviders.map((p) => p.toLowerCase())) : null
 
   const isReachable = (entry: FallbackEntry): boolean => {
     if (!connectedSet) return true
@@ -123,10 +133,7 @@ export async function tryFallbackRetry(args: {
       })
       continue
     }
-    const candidateProviderID = deps.selectFallbackProvider(
-      servingProviders,
-      task.model?.providerID,
-    )
+    const candidateProviderID = deps.selectFallbackProvider(servingProviders, task.model?.providerID)
     const candidateModelID = deps.transformModelForProvider(candidateProviderID, candidate.model)
     const isNoOpFallback =
       !!task.model &&
@@ -147,10 +154,7 @@ export async function tryFallbackRetry(args: {
   }
   if (!nextFallback) return false
 
-  const providerID = nextProviderID ?? deps.selectFallbackProvider(
-    nextFallback.providers,
-    task.model?.providerID,
-  )
+  const providerID = nextProviderID ?? deps.selectFallbackProvider(nextFallback.providers, task.model?.providerID)
 
   deps.log("[background-agent] Retryable error, attempting fallback:", {
     taskId: task.id,
@@ -213,10 +217,13 @@ export async function tryFallbackRetry(args: {
   // every subsequent team tool call would throw "not in team". Fail with a bounded
   // structured error instead of silently entering that confusing runtime state.
   if (task.teamRunId && !task.onSessionCreated) {
-    deps.log("[background-agent] team-mode fallback denied: task has teamRunId but no onSessionCreated; cannot preserve team membership", {
-      taskId: task.id,
-      teamRunId: task.teamRunId,
-    })
+    deps.log(
+      "[background-agent] team-mode fallback denied: task has teamRunId but no onSessionCreated; cannot preserve team membership",
+      {
+        taskId: task.id,
+        teamRunId: task.teamRunId,
+      },
+    )
     throw new TeamModeFallbackError(
       `team-mode fallback denied: cannot preserve team context for task ${task.id} (teamRunId=${task.teamRunId})`,
     )

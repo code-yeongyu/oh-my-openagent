@@ -32,10 +32,5 @@ export function writeBackgroundTaskMarker(input: BackgroundTaskMarkerInput): voi
     return
   }
 
-  setContinuationMarkerSource(
-    input.directory,
-    input.parentSessionID,
-    "background-task",
-    "idle",
-  )
+  setContinuationMarkerSource(input.directory, input.parentSessionID, "background-task", "idle")
 }

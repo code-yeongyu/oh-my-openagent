@@ -25,10 +25,7 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-export async function withSerializedGitConfigMutation(
-  dir: string,
-  mutate: () => Promise<void>,
-): Promise<void> {
+export async function withSerializedGitConfigMutation(dir: string, mutate: () => Promise<void>): Promise<void> {
   const key = resolve(dir)
   const previous = mutationQueues.get(key) ?? Promise.resolve()
   const task = previous.catch(() => undefined).then(() => retryConfigMutation(mutate))

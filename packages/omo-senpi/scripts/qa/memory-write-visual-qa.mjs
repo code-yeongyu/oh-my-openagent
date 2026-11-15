@@ -74,38 +74,68 @@ try {
     const outDir = join(evidenceDir, label)
     const args = [
       qaScript,
-      "--title", `memory-write-notice-${label}`,
-      "--command", senpiCmd,
-      "--cwd", sandbox.cwd,
-      "--cols", "110", "--rows", "30",
-      "--dwell-ms", "15000",
-      "--key-delay-ms", "6000",
-      "--evidence-dir", outDir,
-      "--source-label", "senpi interactive mock-provider memory write",
+      "--title",
+      `memory-write-notice-${label}`,
+      "--command",
+      senpiCmd,
+      "--cwd",
+      sandbox.cwd,
+      "--cols",
+      "110",
+      "--rows",
+      "30",
+      "--dwell-ms",
+      "15000",
+      "--key-delay-ms",
+      "6000",
+      "--evidence-dir",
+      outDir,
+      "--source-label",
+      "senpi interactive mock-provider memory write",
     ]
     for (const input of inputs) args.push("--input", input)
-    const run = spawnSync(process.execPath, args, { encoding: "utf8", env: withTelemetryOptOut(process.env), timeout: 180_000 })
+    const run = spawnSync(process.execPath, args, {
+      encoding: "utf8",
+      env: withTelemetryOptOut(process.env),
+      timeout: 180_000,
+    })
     if (run.status !== 0) {
       record(`${label} capture`, false, (run.stderr ?? run.stdout ?? "").split("\n").slice(-3).join(" | "))
       return { transcript: "", ansi: "" }
     }
-    const transcript = existsSync(join(outDir, "terminal.txt")) ? readFileSync(join(outDir, "terminal.txt"), "utf8") : ""
-    const ansi = existsSync(join(outDir, "terminal-ansi.txt")) ? readFileSync(join(outDir, "terminal-ansi.txt"), "utf8") : ""
+    const transcript = existsSync(join(outDir, "terminal.txt"))
+      ? readFileSync(join(outDir, "terminal.txt"), "utf8")
+      : ""
+    const ansi = existsSync(join(outDir, "terminal-ansi.txt"))
+      ? readFileSync(join(outDir, "terminal-ansi.txt"), "utf8")
+      : ""
     return { transcript, ansi }
   }
 
   // Collapsed row: typed prompt -> mock emits the memory tool call -> real tool executes.
   const collapsed = capture("collapsed", ["remember the deploy runbook location", "{Enter}"])
   record("collapsed: notice title rendered", /Remembered/.test(collapsed.transcript), "expects 'Remembered' in row")
-  record("collapsed: old line gone", !/committed locally/.test(collapsed.transcript), "'committed locally' must not appear")
-  record("collapsed: command name gone", !/create committed|Memory create/.test(collapsed.transcript), "command name must not appear")
+  record(
+    "collapsed: old line gone",
+    !/committed locally/.test(collapsed.transcript),
+    "'committed locally' must not appear",
+  )
+  record(
+    "collapsed: command name gone",
+    !/create committed|Memory create/.test(collapsed.transcript),
+    "command name must not appear",
+  )
   record("collapsed: why line names path", /knowledge\/deploy\.md/.test(collapsed.transcript), "affected path visible")
   record("collapsed: bold title styling", /\[1m.*Remembered/s.test(collapsed.ansi), "SGR bold around title")
 
   // Expanded row: same flow, then {Ctrl+o} toggles tool output to reveal the detail line.
   const expanded = capture("expanded", ["remember the deploy runbook location", "{Enter}", "{Ctrl+o}"])
   record("expanded: sha in detail", /[0-9a-f]{7} · /.test(expanded.transcript), "sha7 + separator in expanded detail")
-  record("expanded: subject in detail", /Track the deploy runbook/.test(expanded.transcript), "commit subject in expanded detail")
+  record(
+    "expanded: subject in detail",
+    /Track the deploy runbook/.test(expanded.transcript),
+    "commit subject in expanded detail",
+  )
 
   console.log(`evidence: ${evidenceDir}`)
 } finally {

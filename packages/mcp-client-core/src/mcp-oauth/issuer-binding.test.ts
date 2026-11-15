@@ -88,7 +88,8 @@ describe("OAuth credential issuer stamps", () => {
   it("keeps legacy logins usable and stamps them at the next discovery without registering", async () => {
     // given
     saveToken(resource, resource, {
-      accessToken: "legacy-access", refreshToken: "legacy-refresh",
+      accessToken: "legacy-access",
+      refreshToken: "legacy-refresh",
       clientInfo: { clientId: "legacy-client" },
     })
     const provider = new RedirectProvider({ serverUrl: resource })
@@ -131,8 +132,10 @@ describe("OAuth credential issuer stamps", () => {
     requests = []
     // when
     const retried = await handlePostRequestAuthError({
-      error: new Error("HTTP 401"), config: { url: resource, oauth: {} },
-      authProviders: new Map(), createOAuthProvider: () => provider,
+      error: new Error("HTTP 401"),
+      config: { url: resource, oauth: {} },
+      authProviders: new Map(),
+      createOAuthProvider: () => provider,
     })
     // then
     expect(retried).toBe(true)
@@ -144,7 +147,8 @@ describe("OAuth credential issuer stamps", () => {
   it("does not reuse a separately stamped client registration from another issuer", async () => {
     // given
     saveToken(resource, resource, {
-      accessToken: "legacy", clientInfo: { clientId: "foreign-client", issuer: "https://other.example.com" },
+      accessToken: "legacy",
+      clientInfo: { clientId: "foreign-client", issuer: "https://other.example.com" },
     })
     const provider = new RedirectProvider({ serverUrl: resource })
     // when
@@ -154,7 +158,11 @@ describe("OAuth credential issuer stamps", () => {
     expect(provider.clientInformation()?.clientId).toBe("registered-1")
   })
 
-  for (const nextIssuer of ["https://auth.example.com:9443/tenant", "https://auth.example.com:8443/other", "https://other.example.com"]) {
+  for (const nextIssuer of [
+    "https://auth.example.com:9443/tenant",
+    "https://auth.example.com:8443/other",
+    "https://other.example.com",
+  ]) {
     it(`re-registers on refresh after the issuer changes to ${nextIssuer}`, async () => {
       // given
       const provider = new RedirectProvider({ serverUrl: resource })
@@ -176,7 +184,12 @@ describe("OAuth credential issuer stamps", () => {
 
   it("discards both token and registration when re-login fails, including duplicate legacy storage", async () => {
     // given
-    const old = { accessToken: "old", refreshToken: "old-refresh", issuer: firstIssuer, clientInfo: { clientId: "old-client", issuer: firstIssuer } }
+    const old = {
+      accessToken: "old",
+      refreshToken: "old-refresh",
+      issuer: firstIssuer,
+      clientInfo: { clientId: "old-client", issuer: firstIssuer },
+    }
     saveToken(resource, resource, old)
     writeFileSync(join(directory, "mcp-oauth.json"), JSON.stringify({ [`resource.example.com/${resource}`]: old }))
     selectedIssuer = "https://new.example.com"
@@ -194,7 +207,8 @@ describe("OAuth credential issuer stamps", () => {
   it("uses configured client IDs consistently across two provider instances after issuer changes", async () => {
     // given
     saveToken(resource, resource, {
-      accessToken: "old", issuer: firstIssuer,
+      accessToken: "old",
+      issuer: firstIssuer,
       clientInfo: { clientId: "old-registration", clientSecret: "old-secret", issuer: firstIssuer },
     })
     selectedIssuer = "https://new.example.com"

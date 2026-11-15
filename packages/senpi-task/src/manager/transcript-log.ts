@@ -28,7 +28,11 @@ export function logTranscriptEvent(store: TranscriptLogStore, taskId: string, ev
 
 // Subscribe a running child's events into the store transcript log. Returns the unsubscribe so the
 // manager can detach on dispose. READ path only feeds OUR log; it never mutates child state.
-export function subscribeTranscriptLog(handle: ManagedChildHandle, store: TranscriptLogStore, taskId: string): () => void {
+export function subscribeTranscriptLog(
+  handle: ManagedChildHandle,
+  store: TranscriptLogStore,
+  taskId: string,
+): () => void {
   return handle.subscribe((event) => logTranscriptEvent(store, taskId, event))
 }
 
@@ -73,9 +77,10 @@ function readEventString(event: ManagedChildEvent, key: string): string | undefi
 function assistantFailure(message: unknown): { readonly message: string; readonly stop_reason: string } | undefined {
   if (!isRecord(message) || message.role !== "assistant") return undefined
   if (message.stopReason !== "error") return undefined
-  const diagnostic = typeof message.errorMessage === "string" && message.errorMessage.length > 0
-    ? message.errorMessage
-    : "child turn failed without a diagnostic message"
+  const diagnostic =
+    typeof message.errorMessage === "string" && message.errorMessage.length > 0
+      ? message.errorMessage
+      : "child turn failed without a diagnostic message"
   return { message: diagnostic, stop_reason: "error" }
 }
 

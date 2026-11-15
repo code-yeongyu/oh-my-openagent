@@ -20,7 +20,12 @@ export interface Received {
 
 const sha256Hex = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex")
 
-async function takeSnapshot(deps: EngineDeps, journal: SyncJournal, entry: PulledEntry, s: SnapshotRef): Promise<RefusalCode | null> {
+async function takeSnapshot(
+  deps: EngineDeps,
+  journal: SyncJournal,
+  entry: PulledEntry,
+  s: SnapshotRef,
+): Promise<RefusalCode | null> {
   const chunks: Uint8Array[] = []
   for (const id of s.objectIds) chunks.push(await deps.transport.download(id))
   const only = chunks.length === 1 ? chunks[0] : undefined
@@ -29,7 +34,10 @@ async function takeSnapshot(deps: EngineDeps, journal: SyncJournal, entry: Pulle
   deps.fault?.("downloaded")
   const verdict = await deps.verifier.verifySnapshot(s, chunks)
   if (!verdict.ok) return verdict.code
-  const items = (await acceptedItems(deps, journal, "receive", verdict.payload.items)).map((i) => ({ key: i.key, ops: toBase64(i.ops) }))
+  const items = (await acceptedItems(deps, journal, "receive", verdict.payload.items)).map((i) => ({
+    key: i.key,
+    ops: toBase64(i.ops),
+  }))
   await journal.putIncoming({ entry, stage: "verified", items, snapshot: true })
   deps.fault?.("verified")
   return null
@@ -48,7 +56,10 @@ export async function receive(deps: EngineDeps, journal: SyncJournal): Promise<R
     await journal.updateState({ refused: (await journal.state()).refused + 1, paused: { seq: entry.seq, code } })
     return { refused: 1, snapshot }
   }
-  const take = async (entry: PulledEntry, verify: (bytes: Uint8Array) => Promise<Verdict>): Promise<RefusalCode | null> => {
+  const take = async (
+    entry: PulledEntry,
+    verify: (bytes: Uint8Array) => Promise<Verdict>,
+  ): Promise<RefusalCode | null> => {
     const bytes = entry.kind === "keyring" ? new Uint8Array() : await deps.transport.download(entry.objectId)
     if (entry.kind === "batch" && sha256Hex(bytes) !== entry.digest) return "content_hash"
     await journal.putIncoming({ entry, stage: "downloaded", items: [], snapshot: false })
@@ -61,7 +72,10 @@ export async function receive(deps: EngineDeps, journal: SyncJournal): Promise<R
     if (elsewhere !== undefined && elsewhere.seq !== entry.seq) return "replayed_content"
     // A verified batch may still carry keys this device must never write: those items are dropped
     // here, before the incoming record exists, and the rest of the batch applies (#12147).
-    const items = (await acceptedItems(deps, journal, "receive", verdict.payload.items)).map((i) => ({ key: i.key, ops: toBase64(i.ops) }))
+    const items = (await acceptedItems(deps, journal, "receive", verdict.payload.items)).map((i) => ({
+      key: i.key,
+      ops: toBase64(i.ops),
+    }))
     const named = { ...entry, batchId: verdict.batchId }
     await journal.putIncoming({ entry: named, stage: "verified", items, snapshot: false } satisfies IncomingRecord)
     deps.fault?.("verified")
@@ -71,7 +85,14 @@ export async function receive(deps: EngineDeps, journal: SyncJournal): Promise<R
     const page = await deps.transport.pull(after, PAGE)
     if (page.snapshot !== null && page.snapshot.coversSeq >= expected) {
       const s = page.snapshot
-      const entry: PulledEntry = { seq: s.coversSeq, kind: "batch", batchId: `snapshot:${s.coversSeq}`, digest: s.digest ?? "", objectId: s.objectIds.join(","), author: "snapshot" }
+      const entry: PulledEntry = {
+        seq: s.coversSeq,
+        kind: "batch",
+        batchId: `snapshot:${s.coversSeq}`,
+        digest: s.digest ?? "",
+        objectId: s.objectIds.join(","),
+        author: "snapshot",
+      }
       if (held.get(s.coversSeq)?.stage !== "verified") {
         const problem = await takeSnapshot(deps, journal, entry, s)
         if (problem !== null) return refusal(entry, problem)

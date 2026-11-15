@@ -83,7 +83,9 @@ export function createDagRpcBridge(pi: SenpiExtensionAPI, deps: DagRpcBridgeDeps
       const message = error instanceof Error ? error.message : String(error)
       if (!reportedReadFaults.has(message)) {
         reportedReadFaults.add(message)
-        deps.logger?.warn(`omo-dag ${surface} read failed; nothing published until the store reads again`, { error: message })
+        deps.logger?.warn(`omo-dag ${surface} read failed; nothing published until the store reads again`, {
+          error: message,
+        })
       }
       return undefined
     }
@@ -100,8 +102,7 @@ export function createDagRpcBridge(pi: SenpiExtensionAPI, deps: DagRpcBridgeDeps
     emit(DAG_EVENT_CHANNEL, event)
   }
 
-  const liveRuns = (): readonly DagBridgeRun[] =>
-    ownedRuns().filter((run) => !TERMINAL_RUN_STATUSES.has(run.status))
+  const liveRuns = (): readonly DagBridgeRun[] => ownedRuns().filter((run) => !TERMINAL_RUN_STATUSES.has(run.status))
 
   const stopHeartbeat = (): void => {
     if (heartbeat === undefined) return

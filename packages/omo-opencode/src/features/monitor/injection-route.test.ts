@@ -2,7 +2,12 @@ import { describe, expect, test } from "bun:test"
 
 import { MonitorOutputInjector } from "./output-injector"
 import type { MonitorCounters, MonitorRecord, OutputBatch } from "./types"
-import type { InternalPromptDispatchArgs, InternalPromptDispatchResult, PromptAsyncInput, PromptDispatchClient } from "@oh-my-opencode/utils/prompt-async-gate/types"
+import type {
+  InternalPromptDispatchArgs,
+  InternalPromptDispatchResult,
+  PromptAsyncInput,
+  PromptDispatchClient,
+} from "@oh-my-opencode/utils/prompt-async-gate/types"
 
 type DispatchCall = {
   source: string
@@ -75,18 +80,20 @@ function createRecentUserMessage(createdAt: number): FakeMessage {
   }
 }
 
-function createHarness(opts: {
-  active?: boolean
-  messages?: FakeMessage[]
-  now?: number
-  dispatchResults?: InternalPromptDispatchResult[]
-  dispatchFn?: (args: InternalPromptDispatchArgs<PromptAsyncInput>) => Promise<InternalPromptDispatchResult>
-} = {}): Harness {
+function createHarness(
+  opts: {
+    active?: boolean
+    messages?: FakeMessage[]
+    now?: number
+    dispatchResults?: InternalPromptDispatchResult[]
+    dispatchFn?: (args: InternalPromptDispatchArgs<PromptAsyncInput>) => Promise<InternalPromptDispatchResult>
+  } = {},
+): Harness {
   let active = opts.active ?? false
   let messages = opts.messages ?? []
   const calls: DispatchCall[] = []
   const scheduledFlushes: ScheduledFlush[] = []
-  const dispatchResults = [...opts.dispatchResults ?? []]
+  const dispatchResults = [...(opts.dispatchResults ?? [])]
   const client = {
     session: {
       status: async () => ({ data: { "parent-route": { type: active ? "busy" : "idle" } } }),

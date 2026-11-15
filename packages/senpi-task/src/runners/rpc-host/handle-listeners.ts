@@ -104,7 +104,9 @@ export function createHandleListeners(options: HandleListenersOptions = {}): Han
       resumedListeners.add(listener)
       if (earlyResume) {
         queueMicrotask(listener)
-        queueMicrotask(() => { earlyResume = false })
+        queueMicrotask(() => {
+          earlyResume = false
+        })
       }
       return () => resumedListeners.delete(listener)
     },

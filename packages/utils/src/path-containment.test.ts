@@ -26,13 +26,19 @@ describe("Windows path containment", () => {
     test(`#given Windows paths #when comparing ${child} to ${parent} #then containment is ${expected}`, () => {
       const result = isPathInside(child, parent, { platform: "win32", realpath })
 
-      expect(result, `canonical child=${win32.join(realpath(win32.dirname(child)), win32.basename(child))}; parent=${realpath(parent)}`).toBe(expected)
+      expect(
+        result,
+        `canonical child=${win32.join(realpath(win32.dirname(child)), win32.basename(child))}; parent=${realpath(parent)}`,
+      ).toBe(expected)
     })
   }
 })
 
 test("#given POSIX paths #when case differs #then they remain distinct", () => {
-  const result = isPathInside("/memory/PROJECT/notes.md", "/memory/project", { platform: "linux", realpath: (path) => path })
+  const result = isPathInside("/memory/PROJECT/notes.md", "/memory/project", {
+    platform: "linux",
+    realpath: (path) => path,
+  })
 
   expect(result).toBe(false)
 })
@@ -78,7 +84,9 @@ test("#given a link whose target contains dot-dot #when native containment runs 
 test("#given a Node-style lexical realpath fake #when default containment runs #then it still uses the native lookup", () => {
   const { inside, child } = symlinkFixture()
   const native = fs.realpathSync.native
-  const legacy = spyOn(fs, "realpathSync").mockImplementation((input) => input === child ? join(inside, "workspace") : native(input))
+  const legacy = spyOn(fs, "realpathSync").mockImplementation((input) =>
+    input === child ? join(inside, "workspace") : native(input),
+  )
   Object.assign(legacy, { native })
   try {
     expect(fs.realpathSync(child)).toBe(join(inside, "workspace"))
@@ -116,17 +124,20 @@ test("#given dot-dot after a link in the parent #when containment runs #then the
   expect(isPathInside(join(inside, "workspace"), parent)).toBe(process.platform === "win32")
 })
 
-test.if(process.platform === "darwin")("#given a case alias of the same directory #when native containment runs #then it is accepted", () => {
-  const { inside } = symlinkFixture()
-  const alias = inside.replace(/inside$/, "INSIDE")
-  // Case-sensitive macOS volumes have distinct directory names, not an alias.
-  if (!fs.existsSync(alias)) {
-    expect(() => containedRelativePath(alias, inside)).toThrow()
-    return
-  }
+test.if(process.platform === "darwin")(
+  "#given a case alias of the same directory #when native containment runs #then it is accepted",
+  () => {
+    const { inside } = symlinkFixture()
+    const alias = inside.replace(/inside$/, "INSIDE")
+    // Case-sensitive macOS volumes have distinct directory names, not an alias.
+    if (!fs.existsSync(alias)) {
+      expect(() => containedRelativePath(alias, inside)).toThrow()
+      return
+    }
 
-  expect(containedRelativePath(alias, inside)).toBe("")
-})
+    expect(containedRelativePath(alias, inside)).toBe("")
+  },
+)
 
 test("#given an absent target #when strict containment runs #then it throws instead of granting an ancestor", () => {
   const { inside } = symlinkFixture()
@@ -136,7 +147,9 @@ test("#given an absent target #when strict containment runs #then it throws inst
 
 describe("isDarwinAutomountTriggerPath (#11545)", () => {
   const darwin = { platform: "darwin" as const, homeDir: "/Users/someone" }
-  const cases: ReadonlyArray<readonly [string, typeof darwin | { platform: NodeJS.Platform; homeDir: string }, boolean]> = [
+  const cases: ReadonlyArray<
+    readonly [string, typeof darwin | { platform: NodeJS.Platform; homeDir: string }, boolean]
+  > = [
     ["/home", darwin, true],
     ["/home/", darwin, true],
     ["/home/other/work/run.sh", darwin, true],

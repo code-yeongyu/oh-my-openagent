@@ -26,7 +26,10 @@ function recordPath(): string {
 }
 
 function liveBody(token: string): string {
-  const child = Bun.spawn([process.execPath, "-e", "setInterval(() => {}, 1000)"], { stdout: "ignore", stderr: "ignore" })
+  const child = Bun.spawn([process.execPath, "-e", "setInterval(() => {}, 1000)"], {
+    stdout: "ignore",
+    stderr: "ignore",
+  })
   children.push(child)
   return `${child.pid}\n${Date.now()}\n${token}\n${readProcessStartIdentity(child.pid)}\n${hostname()}\n`
 }
@@ -43,11 +46,13 @@ async function writeDeadLock(path: string): Promise<string> {
 
 function stepReaperOnce(stage: RecordLockReapStage, step: () => void): void {
   let stepped = false
-  restores.push(setRecordLockReapHookForTests((reached) => {
-    if (reached !== stage || stepped) return
-    stepped = true
-    step()
-  }))
+  restores.push(
+    setRecordLockReapHookForTests((reached) => {
+      if (reached !== stage || stepped) return
+      stepped = true
+      step()
+    }),
+  )
 }
 
 function lockTaken(path: string): unknown {

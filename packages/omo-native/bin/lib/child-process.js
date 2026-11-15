@@ -128,7 +128,8 @@ export function runChild(command, args, options = {}) {
     child.on("error", (error) => settle(() => reject(error)))
     // A child that died of the forwarded signal needs no special case: `propagateResult` turns a
     // signaled result into this process dying by the same signal, which is exactly right.
-    const finish = (status, signal) => settle(() => resolve(captureStderr ? { status, signal, stderr } : { status, signal }))
+    const finish = (status, signal) =>
+      settle(() => resolve(captureStderr ? { status, signal, stderr } : { status, signal }))
     child.on("exit", (status, signal) => {
       if (!captureStderr || child.stderr.readableEnded) {
         finish(status, signal)

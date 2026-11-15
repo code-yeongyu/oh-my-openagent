@@ -2,11 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
-import {
-  classifyEngineProcesses,
-  formatStaleEngineLines,
-  reapStaleEngines,
-} from "../bin/lib/doctor.js"
+import { classifyEngineProcesses, formatStaleEngineLines, reapStaleEngines } from "../bin/lib/doctor.js"
 
 const LAUNCHER = join(resolve(fileURLToPath(new URL("..", import.meta.url))), "bin", "omo.js")
 
@@ -55,7 +51,12 @@ describe("omo doctor stale engine detection", () => {
         // whole report blind to the sessions it is supposed to find.
         const bundled = `${ENGINE.slice(0, -"cli.js".length)}bundle/cli.js`
         const orphan = entry({ pid: 75190, command: `bun ${bundled} --extension ${PLUGIN}` })
-        const attached = entry({ pid: 12820, ppid: 12806, tty: "ttys002", command: `bun ${bundled} --extension ${PLUGIN}` })
+        const attached = entry({
+          pid: 12820,
+          ppid: 12806,
+          tty: "ttys002",
+          command: `bun ${bundled} --extension ${PLUGIN}`,
+        })
         const rpc = entry({ pid: 4250, command: `bun ${bundled} --mode rpc` })
 
         const result = classifyEngineProcesses([orphan, attached, rpc])
@@ -233,7 +234,12 @@ describe("standalone binary engines", () => {
 
   test("#given an orphaned binary engine #when reaped by pid #then it is signalled", () => {
     const signalled: number[] = []
-    const result = reapStaleEngines(["75183"], { list: () => [binary(runtime)], kill: (pid: number) => { signalled.push(pid) } })
+    const result = reapStaleEngines(["75183"], {
+      list: () => [binary(runtime)],
+      kill: (pid: number) => {
+        signalled.push(pid)
+      },
+    })
     expect(signalled).toEqual([75183])
     expect(result.failed).toBe(false)
   })
@@ -260,14 +266,21 @@ describe("app-server daemons left over from an older version (#10033)", () => {
   })
 
   test("#given an ordinary orphaned session whose prompt mentions app-server #when reported #then it keeps the orphaned-session line", () => {
-    const { stale } = classifyEngineProcesses([entry({ command: `bun ${ENGINE} --extension ${PLUGIN} explain app-server` })])
+    const { stale } = classifyEngineProcesses([
+      entry({ command: `bun ${ENGINE} --extension ${PLUGIN} explain app-server` }),
+    ])
     expect(formatStaleEngineLines(stale)[0]).toContain("orphaned by a signaled launcher")
   })
 
   test("#given an orphaned app-server daemon #when reaped by pid #then it is signalled like any stale engine", () => {
     const signalled: number[] = []
     const daemon = entry({ command: `${runtime} app-server` })
-    const result = reapStaleEngines(["75183"], { list: () => [daemon], kill: (pid: number) => { signalled.push(pid) } })
+    const result = reapStaleEngines(["75183"], {
+      list: () => [daemon],
+      kill: (pid: number) => {
+        signalled.push(pid)
+      },
+    })
     expect(signalled).toEqual([75183])
     expect(result.failed).toBe(false)
   })

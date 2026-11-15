@@ -8,7 +8,9 @@ import { MemoryFakeExtensionAPI } from "../memory.test-support"
 describe("Kibitzer session compatibility (#7993)", () => {
   test("emits the Kibitzer channels while registering both generations for replay", () => {
     // Given a drain whose data dependencies must not run during registration.
-    const unused = (): never => { throw new Error("registration must not read recall state") }
+    const unused = (): never => {
+      throw new Error("registration must not read recall state")
+    }
     const drain = createRecallDrain({
       resolveContext: unused,
       resolveSettings: unused,
@@ -23,7 +25,9 @@ describe("Kibitzer session compatibility (#7993)", () => {
 
     // Then new records use the new identity and old records remain renderable.
     expect([NUDGED_ENTRY_TYPE, GATE_ENTRY_TYPE, RECALL_CUSTOM_TYPE]).toEqual([
-      "omo-kibitzer:nudged", "omo-kibitzer:gate", "omo-kibitzer:recall",
+      "omo-kibitzer:nudged",
+      "omo-kibitzer:gate",
+      "omo-kibitzer:recall",
     ])
     for (const kind of ["nudged", "gate", "recall"]) {
       const current = api.entryRenderers.find((entry) => entry.customType === `omo-kibitzer:${kind}`)?.renderer

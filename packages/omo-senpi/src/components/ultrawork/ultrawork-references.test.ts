@@ -4,7 +4,12 @@ import { describe, expect, it } from "bun:test"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { classifyUltraworkInput } from "./index"
-import { dispatchInput, expectHiddenInjection, expectNoInjection, registerIsolatedUltrawork } from "./ultrawork.test-support"
+import {
+  dispatchInput,
+  expectHiddenInjection,
+  expectNoInjection,
+  registerIsolatedUltrawork,
+} from "./ultrawork.test-support"
 
 const fresh = { wasArmed: false, compactRearmPending: false } as const
 const classify = (text: string) => classifyUltraworkInput({ text, source: "interactive" }, fresh)
@@ -92,6 +97,9 @@ describe("omo-senpi ultrawork references do not arm", () => {
   it("#given only references #when dispatched through the input handler #then nothing is injected", async () => {
     const pi = new FakeExtensionAPI()
     await registerIsolatedUltrawork(pi)
-    expectNoInjection(pi, await dispatchInput(pi, "Do not load mass-ulw or ulw-research. Results go to .omo/ulw/x.md", "interactive"))
+    expectNoInjection(
+      pi,
+      await dispatchInput(pi, "Do not load mass-ulw or ulw-research. Results go to .omo/ulw/x.md", "interactive"),
+    )
   })
 })

@@ -2,7 +2,8 @@ import type { Hooks } from "@opencode-ai/plugin"
 
 import { log } from "../shared"
 
-const WARNING_MESSAGE = "Prefer the Read tool over `cat`/`head`/`tail` for reading file contents. The Read tool provides line numbers and hash anchors for precise editing."
+const WARNING_MESSAGE =
+  "Prefer the Read tool over `cat`/`head`/`tail` for reading file contents. The Read tool provides line numbers and hash anchors for precise editing."
 
 const FILE_READ_PATTERNS = [
   /^\s*cat\s+(?!-)[^\s|&;]+\s*$/,

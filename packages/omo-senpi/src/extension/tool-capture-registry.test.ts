@@ -30,7 +30,12 @@ describe("tool capture registry", () => {
     pi.registerTool(fakeTool("task_send"))
 
     const captured = registry.getCapturedTools()
-    expect(captured.map((tool) => tool.name).sort()).toEqual(["lsp_diagnostics", "lsp_find_references", "task", "task_send"])
+    expect(captured.map((tool) => tool.name).sort()).toEqual([
+      "lsp_diagnostics",
+      "lsp_find_references",
+      "task",
+      "task_send",
+    ])
     expect(captured.every((tool) => typeof tool.execute === "function")).toBe(true)
     expect(pi.tools).toHaveLength(4)
   })

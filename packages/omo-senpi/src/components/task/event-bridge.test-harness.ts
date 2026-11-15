@@ -138,8 +138,7 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
       },
       cancelTask: async (idOrName: string, reason?: string) => {
         cancelCalls.push({ idOrName, ...(reason === undefined ? {} : { reason }) })
-        const record =
-          records[idOrName] ?? Object.values(records).find((candidate) => candidate.name === idOrName)
+        const record = records[idOrName] ?? Object.values(records).find((candidate) => candidate.name === idOrName)
         return {
           kind: "cancelled" as const,
           task_id: record?.task_id ?? idOrName,

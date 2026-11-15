@@ -1,6 +1,10 @@
 import { readCodexAgentConfig, unmanagedAgentOverrideWarnings } from "./codex-agent-config"
 import { writeInstalledMarketplaceSnapshot, type MarketplaceSnapshotPluginSource } from "./codex-marketplace-snapshot"
-import { capturePreservedAgentReasoning, capturePreservedAgentServiceTier, linkCachedPluginAgents } from "./link-cached-plugin-agents"
+import {
+  capturePreservedAgentReasoning,
+  capturePreservedAgentServiceTier,
+  linkCachedPluginAgents,
+} from "./link-cached-plugin-agents"
 import type { CodexAgentConfig, InstalledPlugin, MarketplaceManifest } from "./types"
 
 export async function linkInstalledPluginAgents(input: {

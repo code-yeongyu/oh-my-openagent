@@ -1,6 +1,12 @@
 import { afterEach, expect, test } from "bun:test"
 import { adaptRpcHandle } from "../../manager/child-handle"
-import { baseSpec, categoryPlanner, cleanupProjects, settings, tempProject } from "../../manager/__fixtures__/manager-fakes"
+import {
+  baseSpec,
+  categoryPlanner,
+  cleanupProjects,
+  settings,
+  tempProject,
+} from "../../manager/__fixtures__/manager-fakes"
 import { createTaskManager } from "../../manager/manager"
 import { createTaskRecordStore } from "../../store"
 import { fakeClock } from "../rpc/__fixtures__/clock"
@@ -27,17 +33,24 @@ async function closureFixture(hostState: "answers" | "stalled" | "gone", acked: 
   const events = new Set<(record: unknown) => void>()
   const listings: boolean[] = []
   let onClose = () => {}
-  const unexpected = (): never => { throw new Error("unexpected RPC command") }
+  const unexpected = (): never => {
+    throw new Error("unexpected RPC command")
+  }
   const rpc: HostRpcClient = {
     start: async () => {},
     stop: async () => {},
-    onEvent: listener => { events.add(listener); return () => { events.delete(listener) } },
+    onEvent: (listener) => {
+      events.add(listener)
+      return () => {
+        events.delete(listener)
+      }
+    },
     openSession: async () => ({ sessionId: route, attached: true }),
     closeSession: async () => {
       onClose()
       if (!acked) throw new Error("close refused")
     },
-    listSessions: async options => {
+    listSessions: async (options) => {
       listings.push(options.include_workers)
       if (hostState === "gone") throw new Error("host unreachable")
       if (hostState === "stalled") return hanging.promise
@@ -46,17 +59,24 @@ async function closureFixture(hostState: "answers" | "stalled" | "gone", acked: 
     getState: () => hanging.promise,
     abort: async () => {},
     setSessionContext: async () => {},
-    prompt: unexpected, steer: unexpected, followUp: unexpected,
-    sendExtensionUIResponse: unexpected, getAvailableModels: unexpected,
-    getEntries: unexpected, switchSession: unexpected,
+    prompt: unexpected,
+    steer: unexpected,
+    followUp: unexpected,
+    sendExtensionUIResponse: unexpected,
+    getAvailableModels: unexpected,
+    getEntries: unexpected,
+    switchSession: unexpected,
   }
   clock = fakeClock()
   const client = new HostSessionClient({
     socketPath: "/tmp/confirmed-close/rpc.sock",
     ports: {
       probeProtocolInfo: async () => ({
-        protocolVersion: 1, instanceId: "close-proof", generation: 1,
-        engineVersion: "2026.9.18", engineOrdinal: [2026, 9, 18, 0, 0],
+        protocolVersion: 1,
+        instanceId: "close-proof",
+        generation: 1,
+        engineVersion: "2026.9.18",
+        engineOrdinal: [2026, 9, 18, 0, 0],
         capabilities: [...FAKE_HOST_CAPABILITIES],
       }),
       createClient: async () => rpc,
@@ -66,25 +86,45 @@ async function closureFixture(hostState: "answers" | "stalled" | "gone", acked: 
   const path = "/tmp/sessions/close-proof.jsonl"
   const opened = await client.open(childOpenInput(path))
   const handle = createHostSessionHandle({
-    client, session: { routingId: opened.sessionId, sessionPath: path, instanceId: opened.instanceId },
-    taskId: "st_close_proof", heartbeatIntervalMs: 10_000, now: clock.now,
-    closeGraceMs: 100, openDisposition: "attached",
+    client,
+    session: { routingId: opened.sessionId, sessionPath: path, instanceId: opened.instanceId },
+    taskId: "st_close_proof",
+    heartbeatIntervalMs: 10_000,
+    now: clock.now,
+    closeGraceMs: 100,
+    openDisposition: "attached",
   })
   const notices: string[] = []
   const project = tempProject()
   const runner = { start: async (spec: { taskId: string }) => ({ ...adaptRpcHandle(handle), task_id: spec.taskId }) }
   const manager = createTaskManager({
     store: createTaskRecordStore({ project_dir: project }),
-    runners: { "in-process": runner, process: runner }, planner: categoryPlanner(),
-    config: settings(), cwd: project,
-    onChildLiveness: (_record, status) => { notices.push(status.state) },
+    runners: { "in-process": runner, process: runner },
+    planner: categoryPlanner(),
+    config: settings(),
+    cwd: project,
+    onChildLiveness: (_record, status) => {
+      notices.push(status.state)
+    },
   })
   const started = await manager.start(baseSpec({ execution_mode: "process", run_in_background: true }))
   if (started.kind !== "started") throw new Error("expected started")
   return {
-    handle, manager, notices, listings, taskId: started.task_id, clock,
-    closeFrame: (reason: string) => { onClose = () => { for (const listener of events) listener({ type: "session_closed", sessionId: route, reason }) } },
-    dispose: async () => { manager.forget(started.task_id, { path: "park" }); await handle.dispose() },
+    handle,
+    manager,
+    notices,
+    listings,
+    taskId: started.task_id,
+    clock,
+    closeFrame: (reason: string) => {
+      onClose = () => {
+        for (const listener of events) listener({ type: "session_closed", sessionId: route, reason })
+      }
+    },
+    dispose: async () => {
+      manager.forget(started.task_id, { path: "park" })
+      await handle.dispose()
+    },
   }
 }
 
@@ -105,10 +145,13 @@ for (const host of ["answers", "stalled", "gone"] as const) {
             expect(fixture.manager.get(fixture.taskId)?.status).toBe("running")
             expect(fixture.manager.get(fixture.taskId)?.host_liveness?.state).toBe("terminal-pending")
           } else {
-            expect(await fixture.handle.waitForOutcome()).toMatchObject({ status: "error", failure: { kind: "child-unresponsive" } })
+            expect(await fixture.handle.waitForOutcome()).toMatchObject({
+              status: "error",
+              failure: { kind: "child-unresponsive" },
+            })
           }
           expect(fixture.listings.length).toBeGreaterThan(0)
-          expect(fixture.listings.every(includeWorkers => includeWorkers)).toBe(true)
+          expect(fixture.listings.every((includeWorkers) => includeWorkers)).toBe(true)
         } finally {
           await fixture.dispose()
         }
@@ -142,7 +185,10 @@ test("a transport cut swallowed by the engine close never proves a retained sess
   await client.open(childOpenInput("/tmp/sessions/close-cut.jsonl"))
   host.withholdReply("close_session")
   const received = host.waitForCommand("close_session")
-  const closing = client.closeConfirmed().then(() => "confirmed", () => "unconfirmed")
+  const closing = client.closeConfirmed().then(
+    () => "confirmed",
+    () => "unconfirmed",
+  )
   await received
   // When the connection disappears mid-close, the engine may swallow that transport error.
   host.cutConnections()
@@ -164,6 +210,6 @@ test("a refused confirmed close keeps the same session route available for retry
   host.failReply("close_session", undefined)
   await client.closeConfirmed()
   expect(host.sessions()).toHaveLength(0)
-  expect(host.commands.filter(command => command.type === "open_session")).toHaveLength(1)
-  expect(host.commands.filter(command => command.type === "close_session")).toHaveLength(2)
+  expect(host.commands.filter((command) => command.type === "open_session")).toHaveLength(1)
+  expect(host.commands.filter((command) => command.type === "close_session")).toHaveLength(2)
 })

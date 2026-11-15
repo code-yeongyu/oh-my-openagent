@@ -52,6 +52,7 @@ fn classify(file: Vec<u8>) -> Option<RemoteScreen> {
 
 fn window() -> DesktopWindow {
     DesktopWindow {
+        identity: None,
         id: "101".to_owned(),
         title: "Office Mac".to_owned(),
         app: "Screen Sharing".to_owned(),

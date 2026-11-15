@@ -22,7 +22,13 @@ describe("buildTaskExecute spawn-only", () => {
     const execute = buildTaskExecute(makeDeps(manager))
 
     // when
-    const result = await execute("c", { prompt: "new work", category: "quick", run_in_background: true }, undefined, undefined, CTX)
+    const result = await execute(
+      "c",
+      { prompt: "new work", category: "quick", run_in_background: true },
+      undefined,
+      undefined,
+      CTX,
+    )
 
     // then
     expect(sendToTaskCalls).toBe(0)

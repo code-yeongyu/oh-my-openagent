@@ -2,6 +2,8 @@
 //! `reis::eis` and a fake xdg-desktop-portal on a private D-Bus bus.
 
 pub mod fake_eis;
+pub mod fake_gnome;
+pub mod fake_kwin;
 pub mod fake_portal;
 mod portal_ifaces;
 pub mod screenshot_iface;

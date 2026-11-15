@@ -11,7 +11,9 @@ export type FeedbackRuntimeLoader = () => Promise<FeedbackRuntimeModule>
 export const FEEDBACK_RUNTIME_ARTIFACT = "extensions/omo-feedback.js"
 
 /** One shared import per process; a failed import is not cached, so the next report retries. */
-export function createFeedbackRuntimeLoader(importRuntime: () => Promise<FeedbackRuntimeModule>): FeedbackRuntimeLoader {
+export function createFeedbackRuntimeLoader(
+  importRuntime: () => Promise<FeedbackRuntimeModule>,
+): FeedbackRuntimeLoader {
   let pending: Promise<FeedbackRuntimeModule> | undefined
   return () => {
     pending ??= importRuntime().catch((error: unknown) => {
@@ -22,7 +24,9 @@ export function createFeedbackRuntimeLoader(importRuntime: () => Promise<Feedbac
   }
 }
 
-export const loadFeedbackRuntime: FeedbackRuntimeLoader = createFeedbackRuntimeLoader(() => import("#omo-feedback-runtime"))
+export const loadFeedbackRuntime: FeedbackRuntimeLoader = createFeedbackRuntimeLoader(
+  () => import("#omo-feedback-runtime"),
+)
 
 export function feedbackRuntimeLoadFailure(error: unknown): string {
   const cause = error instanceof Error ? error.message : String(error)

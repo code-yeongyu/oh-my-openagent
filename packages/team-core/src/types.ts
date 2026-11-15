@@ -23,16 +23,21 @@ export const RUNTIME_STATUSES = [
   "orphaned",
 ] as const
 
-const MemberBaseSchema = z.object({
-  name: z.string().min(1).regex(/^[a-z0-9-]+$/),
-  cwd: z.string().optional(),
-  worktreePath: z.string().optional(),
-  task_summary: z.string().max(80).optional(),
-  subscriptions: z.array(z.string()).optional(),
-  backendType: z.enum(["in-process", "tmux"]).default("in-process"),
-  color: z.string().optional(),
-  isActive: z.boolean().default(true),
-}).strict()
+const MemberBaseSchema = z
+  .object({
+    name: z
+      .string()
+      .min(1)
+      .regex(/^[a-z0-9-]+$/),
+    cwd: z.string().optional(),
+    worktreePath: z.string().optional(),
+    task_summary: z.string().max(80).optional(),
+    subscriptions: z.array(z.string()).optional(),
+    backendType: z.enum(["in-process", "tmux"]).default("in-process"),
+    color: z.string().optional(),
+    isActive: z.boolean().default(true),
+  })
+  .strict()
 
 export const CategoryMemberSchema = MemberBaseSchema.extend({
   kind: z.literal("category"),
@@ -48,45 +53,58 @@ export const SubagentMemberSchema = MemberBaseSchema.extend({
 
 export const MemberSchema = z.discriminatedUnion("kind", [CategoryMemberSchema, SubagentMemberSchema])
 
-const TeamReferenceSchema = z.object({
-  path: z.string(),
-  description: z.string().optional(),
-}).strict()
+const TeamReferenceSchema = z
+  .object({
+    path: z.string(),
+    description: z.string().optional(),
+  })
+  .strict()
 
-const MISSING_TEAM_LEAD_MESSAGE = "leadAgentId required (or write a `lead: {...}` field, or mark one member with `isLead: true`)"
+const MISSING_TEAM_LEAD_MESSAGE =
+  "leadAgentId required (or write a `lead: {...}` field, or mark one member with `isLead: true`)"
 
-export const TeamSpecSchema = z.object({
-  version: z.literal(1).default(1),
-  name: z.string().min(1).regex(/^[a-z0-9-]+$/),
-  description: z.string().optional(),
-  createdAt: z.number().int().positive().default(() => Date.now()),
-  leadAgentId: z.string().optional(),
-  teamAllowedPaths: z.array(z.string()).optional(),
-  sessionPermission: z.string().optional(),
-  members: z.array(MemberSchema).min(1).max(8),
-}).superRefine((teamSpec, ctx) => {
-  if (teamSpec.leadAgentId === undefined && teamSpec.members.length > 1) {
-    ctx.addIssue({
-      code: "custom",
-      message: MISSING_TEAM_LEAD_MESSAGE,
-      path: ["leadAgentId"],
-    })
-  }
-}).transform((teamSpec) => {
-  if (teamSpec.leadAgentId !== undefined) {
-    return teamSpec
-  }
+export const TeamSpecSchema = z
+  .object({
+    version: z.literal(1).default(1),
+    name: z
+      .string()
+      .min(1)
+      .regex(/^[a-z0-9-]+$/),
+    description: z.string().optional(),
+    createdAt: z
+      .number()
+      .int()
+      .positive()
+      .default(() => Date.now()),
+    leadAgentId: z.string().optional(),
+    teamAllowedPaths: z.array(z.string()).optional(),
+    sessionPermission: z.string().optional(),
+    members: z.array(MemberSchema).min(1).max(8),
+  })
+  .superRefine((teamSpec, ctx) => {
+    if (teamSpec.leadAgentId === undefined && teamSpec.members.length > 1) {
+      ctx.addIssue({
+        code: "custom",
+        message: MISSING_TEAM_LEAD_MESSAGE,
+        path: ["leadAgentId"],
+      })
+    }
+  })
+  .transform((teamSpec) => {
+    if (teamSpec.leadAgentId !== undefined) {
+      return teamSpec
+    }
 
-  const firstMember = teamSpec.members[0]
-  if (!firstMember) {
-    throw new Error(MISSING_TEAM_LEAD_MESSAGE)
-  }
+    const firstMember = teamSpec.members[0]
+    if (!firstMember) {
+      throw new Error(MISSING_TEAM_LEAD_MESSAGE)
+    }
 
-  return {
-    ...teamSpec,
-    leadAgentId: firstMember.name,
-  }
-})
+    return {
+      ...teamSpec,
+      leadAgentId: firstMember.name,
+    }
+  })
 
 export const MessageSchema = z.object({
   version: z.literal(1),
@@ -118,60 +136,72 @@ export const TaskSchema = z.object({
   claimedAt: z.number().int().positive().optional(),
 })
 
-const RuntimeStateMemberModelSchema = z.object({
-  providerID: z.string(),
-  modelID: z.string(),
-  variant: z.string().optional(),
-  reasoningEffort: z.string().optional(),
-  temperature: z.number().optional(),
-  top_p: z.number().optional(),
-  maxTokens: z.number().optional(),
-  thinking: z.object({
-    type: z.enum(["enabled", "disabled"]),
-    budgetTokens: z.number().int().positive().optional(),
-  }).optional(),
-}).strict()
+const RuntimeStateMemberModelSchema = z
+  .object({
+    providerID: z.string(),
+    modelID: z.string(),
+    variant: z.string().optional(),
+    reasoningEffort: z.string().optional(),
+    temperature: z.number().optional(),
+    top_p: z.number().optional(),
+    maxTokens: z.number().optional(),
+    thinking: z
+      .object({
+        type: z.enum(["enabled", "disabled"]),
+        budgetTokens: z.number().int().positive().optional(),
+      })
+      .optional(),
+  })
+  .strict()
 
-const RuntimeStateMemberSchema = z.object({
-  name: z.string(),
-  sessionId: z.string().optional(),
-  tmuxPaneId: z.string().optional(),
-  tmuxGridPaneId: z.string().optional(),
-  agentType: z.enum(["leader", "general-purpose"]),
-  subagent_type: z.string().optional(),
-  category: z.string().optional(),
-  model: RuntimeStateMemberModelSchema.optional(),
-  status: z.enum(["pending", "running", "idle", "errored", "completed", "shutdown_approved"]),
-  color: z.string().optional(),
-  worktreePath: z.string().optional(),
-  lastInjectedTurnMarker: z.string().optional(),
-  pendingInjectedMessageIds: z.array(z.string()).default([]),
-}).strict()
+const RuntimeStateMemberSchema = z
+  .object({
+    name: z.string(),
+    sessionId: z.string().optional(),
+    tmuxPaneId: z.string().optional(),
+    tmuxGridPaneId: z.string().optional(),
+    agentType: z.enum(["leader", "general-purpose"]),
+    subagent_type: z.string().optional(),
+    category: z.string().optional(),
+    model: RuntimeStateMemberModelSchema.optional(),
+    status: z.enum(["pending", "running", "idle", "errored", "completed", "shutdown_approved"]),
+    color: z.string().optional(),
+    worktreePath: z.string().optional(),
+    lastInjectedTurnMarker: z.string().optional(),
+    pendingInjectedMessageIds: z.array(z.string()).default([]),
+  })
+  .strict()
 
-const RuntimeBoundsSchema = z.object({
-  maxMembers: z.number().int().default(8),
-  maxParallelMembers: z.number().int().default(4),
-  maxMessagesPerRun: z.number().int().default(10000),
-  maxWallClockMinutes: z.number().int().default(120),
-  maxMemberTurns: z.number().int().default(500),
-}).strict()
+const RuntimeBoundsSchema = z
+  .object({
+    maxMembers: z.number().int().default(8),
+    maxParallelMembers: z.number().int().default(4),
+    maxMessagesPerRun: z.number().int().default(10000),
+    maxWallClockMinutes: z.number().int().default(120),
+    maxMemberTurns: z.number().int().default(500),
+  })
+  .strict()
 
-const ShutdownRequestSchema = z.object({
-  memberId: z.string(),
-  requesterName: z.string(),
-  requestedAt: z.number().int().positive(),
-  approvedAt: z.number().int().positive().optional(),
-  rejectedReason: z.string().optional(),
-  rejectedAt: z.number().int().positive().optional(),
-}).strict()
+const ShutdownRequestSchema = z
+  .object({
+    memberId: z.string(),
+    requesterName: z.string(),
+    requestedAt: z.number().int().positive(),
+    approvedAt: z.number().int().positive().optional(),
+    rejectedReason: z.string().optional(),
+    rejectedAt: z.number().int().positive().optional(),
+  })
+  .strict()
 
-const RuntimeStateTmuxLayoutSchema = z.object({
-  ownedSession: z.boolean(),
-  targetSessionId: z.string(),
-  focusWindowId: z.string().optional(),
-  gridWindowId: z.string().optional(),
-  paneIds: z.array(z.string()).optional(),
-}).strict()
+const RuntimeStateTmuxLayoutSchema = z
+  .object({
+    ownedSession: z.boolean(),
+    targetSessionId: z.string(),
+    focusWindowId: z.string().optional(),
+    gridWindowId: z.string().optional(),
+    paneIds: z.array(z.string()).optional(),
+  })
+  .strict()
 
 export const RuntimeStateSchema = z.object({
   version: z.literal(1),
@@ -187,15 +217,20 @@ export const RuntimeStateSchema = z.object({
   bounds: RuntimeBoundsSchema,
 })
 
-export const AGENT_ELIGIBILITY_REGISTRY: Readonly<Record<string, {
-  verdict: "eligible" | "conditional" | "hard-reject"
-  rejectionMessage?: string
-}>> = {
+export const AGENT_ELIGIBILITY_REGISTRY: Readonly<
+  Record<
+    string,
+    {
+      verdict: "eligible" | "conditional" | "hard-reject"
+      rejectionMessage?: string
+    }
+  >
+> = {
   sisyphus: { verdict: "eligible" },
   hephaestus: {
     verdict: "conditional",
     rejectionMessage:
-      "Agent 'hephaestus' lacks teammate permission. Either apply D-36 (add teammate: \"allow\" in tool-config-handler.ts) or use subagent_type: \"sisyphus\" instead.",
+      'Agent \'hephaestus\' lacks teammate permission. Either apply D-36 (add teammate: "allow" in tool-config-handler.ts) or use subagent_type: "sisyphus" instead.',
   },
   oracle: {
     verdict: "hard-reject",

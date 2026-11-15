@@ -51,7 +51,12 @@ describe("createTurnWakeSources (senpi#3262)", () => {
     const tracker = createTurnWakeSources()
 
     // when - a permission prompt and an unrelated record
-    tracker.observe(extensionEvent("computer.permission_required", { type: "computer.permission_required", permission: "screen_recording" }))
+    tracker.observe(
+      extensionEvent("computer.permission_required", {
+        type: "computer.permission_required",
+        permission: "screen_recording",
+      }),
+    )
     tracker.observe({ type: "agent_end", willRetry: false })
 
     // then
@@ -61,7 +66,9 @@ describe("createTurnWakeSources (senpi#3262)", () => {
   test("#given a providerRetry goal timer (senpi#3319) #when armed then disarmed by kind #then only its own kind clears", () => {
     // given - a goal waiting out a provider outage on its retry backoff timer
     const tracker = createTurnWakeSources()
-    tracker.observe(extensionEvent("goal_continuation_timer_state", { armed: true, kind: "providerRetry", dueAtMs: 9_000 }))
+    tracker.observe(
+      extensionEvent("goal_continuation_timer_state", { armed: true, kind: "providerRetry", dueAtMs: 9_000 }),
+    )
     tracker.observe(extensionEvent("goal_continuation_timer_state", { armed: true, kind: "monitor" }))
     expect(tracker.hasLiveWakeSources()).toBe(true)
 

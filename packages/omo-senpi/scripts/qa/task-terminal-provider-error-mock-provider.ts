@@ -66,8 +66,7 @@ interface SimpleStreamOptions {
 }
 
 type AssistantContent =
-  | { type: "text"; text: string }
-  | { type: "toolCall"; id: string; name: string; arguments: Record<string, unknown> }
+  { type: "text"; text: string } | { type: "toolCall"; id: string; name: string; arguments: Record<string, unknown> }
 
 interface AssistantMessage {
   role: "assistant"
@@ -95,7 +94,11 @@ interface MockProvider {
     contextWindow: number
     maxTokens: number
   }>
-  streamSimple(model: Model<Api>, context: Context, options?: SimpleStreamOptions): AsyncIterable<unknown> & {
+  streamSimple(
+    model: Model<Api>,
+    context: Context,
+    options?: SimpleStreamOptions,
+  ): AsyncIterable<unknown> & {
     result(): Promise<AssistantMessage>
   }
 }

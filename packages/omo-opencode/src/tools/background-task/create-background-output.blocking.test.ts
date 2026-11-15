@@ -121,7 +121,7 @@ describe("createBackgroundOutput block=true polling", () => {
         timeout: 3000,
         full_session: false,
       },
-      mockContext
+      mockContext,
     )
 
     // #then
@@ -151,7 +151,7 @@ describe("createBackgroundOutput block=true polling", () => {
         block: true,
         timeout: 10,
       },
-      mockContext
+      mockContext,
     )
 
     // #then

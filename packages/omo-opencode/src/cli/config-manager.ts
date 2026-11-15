@@ -1,9 +1,5 @@
 export type { ConfigContext } from "./config-manager/config-context"
-export {
-  initConfigContext,
-  getConfigContext,
-  resetConfigContext,
-} from "./config-manager/config-context"
+export { initConfigContext, getConfigContext, resetConfigContext } from "./config-manager/config-context"
 
 export { fetchNpmDistTags } from "./config-manager/npm-dist-tags"
 export { getPluginNameWithVersion } from "./config-manager/plugin-name-with-version"
@@ -20,10 +16,7 @@ export type { BunInstallResult } from "./config-manager/bun-install"
 export { runBunInstall, runBunInstallWithDetails } from "./config-manager/bun-install"
 
 export type { VersionCompatibility } from "./config-manager/version-compatibility"
-export {
-  checkVersionCompatibility,
-  extractVersionFromPluginEntry,
-} from "./config-manager/version-compatibility"
+export { checkVersionCompatibility, extractVersionFromPluginEntry } from "./config-manager/version-compatibility"
 
 export type { BackupResult } from "./config-manager/backup-config"
 export { backupConfigFile } from "./config-manager/backup-config"

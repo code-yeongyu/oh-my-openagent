@@ -6,8 +6,7 @@ import { describeFrontmatterViolation } from "../memfs/frontmatter-validation"
 import { isMemoryContentPath } from "../memfs/paths"
 
 export type MemoryAuditCode =
-  | "link_dangling" | "frontmatter_invalid" | "content_duplicate"
-  | "path_orphan" | "file_unreadable" | "system_pressure"
+  "link_dangling" | "frontmatter_invalid" | "content_duplicate" | "path_orphan" | "file_unreadable" | "system_pressure"
 
 export interface MemoryAuditIssue {
   readonly code: MemoryAuditCode
@@ -34,10 +33,7 @@ const LEGACY_PREFIX = "memory/"
 const ROOT_FILES = new Set(["ARCHIVE.md", "README.md"])
 
 /** Read the working corpus, including a maintenance worktree, without following symlinks. */
-export async function auditMemoryRepo(
-  repoDir: string,
-  options: MemoryAuditOptions = {},
-): Promise<MemoryAuditReport> {
+export async function auditMemoryRepo(repoDir: string, options: MemoryAuditOptions = {}): Promise<MemoryAuditReport> {
   const files = await listFiles(repoDir)
   const existing = new Set(files)
   const issues: MemoryAuditIssue[] = []
@@ -53,7 +49,11 @@ export async function auditMemoryRepo(
       if (!(error instanceof Error)) throw error
       if (!(error instanceof TypeError) && !("code" in error)) throw error
       if (orphan) issues.push({ code: "path_orphan", path, detail: "outside memory homes" })
-      issues.push({ code: "file_unreadable", path, detail: error instanceof TypeError ? "invalid UTF-8" : "cannot read file" })
+      issues.push({
+        code: "file_unreadable",
+        path,
+        detail: error instanceof TypeError ? "invalid UTF-8" : "cannot read file",
+      })
       continue
     }
     if (orphan) {
@@ -91,8 +91,12 @@ export async function auditMemoryRepo(
     issues.push({ code: "system_pressure", path: "system/", detail: `${tokens} tokens of ${budget} budget` })
   }
   const counts: Record<MemoryAuditCode, number> = {
-    link_dangling: 0, frontmatter_invalid: 0, content_duplicate: 0,
-    path_orphan: 0, file_unreadable: 0, system_pressure: 0,
+    link_dangling: 0,
+    frontmatter_invalid: 0,
+    content_duplicate: 0,
+    path_orphan: 0,
+    file_unreadable: 0,
+    system_pressure: 0,
   }
   for (const issue of issues) counts[issue.code]++
   return { version: 1, generatedAt: new Date().toISOString(), issues, counts }
@@ -101,11 +105,11 @@ export async function auditMemoryRepo(
 async function listFiles(root: string, dir = ""): Promise<string[]> {
   const files: string[] = []
   const entries = await readdir(join(root, dir), { withFileTypes: true })
-  entries.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)
+  entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
   for (const entry of entries) {
     if (entry.name === ".git" || entry.name === ".tmp" || entry.isSymbolicLink()) continue
     const path = dir ? `${dir}/${entry.name}` : entry.name
-    if (entry.isDirectory()) files.push(...await listFiles(root, path))
+    if (entry.isDirectory()) files.push(...(await listFiles(root, path)))
     else if (entry.isFile()) files.push(path)
   }
   return files.sort()
@@ -116,14 +120,21 @@ function danglingLinks(path: string, body: string, existing: ReadonlySet<string>
   const text = withoutFences(body)
   const targets = [
     ...[...text.matchAll(/\[\[([^\]\n]+)\]\]/g)].map((match) => ({ raw: match[1] ?? "", wiki: true })),
-    ...[...text.matchAll(/(?<!!)\[[^\]\n]*\]\((<?[^)\n]+>?)\)/g)].map((match) => ({ raw: match[1] ?? "", wiki: false })),
+    ...[...text.matchAll(/(?<!!)\[[^\]\n]*\]\((<?[^)\n]+>?)\)/g)].map((match) => ({
+      raw: match[1] ?? "",
+      wiki: false,
+    })),
   ]
   for (const { raw, wiki } of targets) {
-    const target = (wiki ? raw.split("|")[0] ?? "" : markdownDestination(raw)).split("#")[0]?.trim() ?? ""
+    const target = (wiki ? (raw.split("|")[0] ?? "") : markdownDestination(raw)).split("#")[0]?.trim() ?? ""
     if (!target || /^(?:https?:|mailto:)/i.test(target)) continue
     const resolved = posix.normalize(wiki ? target : posix.join(posix.dirname(path), target))
     const escapes = posix.isAbsolute(target) || resolved === ".." || resolved.startsWith("../")
-    if (!escapes && (existing.has(resolved) || (wiki && existing.has(`${resolved}.md`)) || isDirectory(resolved, existing))) continue
+    if (
+      !escapes &&
+      (existing.has(resolved) || (wiki && existing.has(`${resolved}.md`)) || isDirectory(resolved, existing))
+    )
+      continue
     issues.push({ code: "link_dangling", path, detail: escapes ? `${target} (escapes repository)` : target })
   }
   return issues
@@ -144,17 +155,20 @@ function isDirectory(resolved: string, existing: ReadonlySet<string>): boolean {
 
 function withoutFences(body: string): string {
   let fence: { readonly char: string; readonly length: number } | undefined
-  return body.split("\n").map((line) => {
-    const marker = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line)
-    if (fence) {
-      if (marker?.[1]?.[0] === fence.char && marker[1].length >= fence.length && !marker[2]?.trim()) fence = undefined
-      return ""
-    }
-    if (marker?.[1]) {
-      fence = { char: marker[1][0] ?? "", length: marker[1].length }
-      return ""
-    }
-    // inline code spans quote link syntax as an example, not a reference
-    return line.replace(/(`+)[^`]*?\1/g, "")
-  }).join("\n")
+  return body
+    .split("\n")
+    .map((line) => {
+      const marker = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line)
+      if (fence) {
+        if (marker?.[1]?.[0] === fence.char && marker[1].length >= fence.length && !marker[2]?.trim()) fence = undefined
+        return ""
+      }
+      if (marker?.[1]) {
+        fence = { char: marker[1][0] ?? "", length: marker[1].length }
+        return ""
+      }
+      // inline code spans quote link syntax as an example, not a reference
+      return line.replace(/(`+)[^`]*?\1/g, "")
+    })
+    .join("\n")
 }

@@ -33,10 +33,12 @@ function fixture(identityDirs: (layout: { workspace: string; child: string; sibl
 
 function countingFs(): { readonly fs: ProjectScopeFs; readonly calls: () => number } {
   let calls = 0
-  const counted = <A extends unknown[], R>(call: (...args: A) => Promise<R>) => (...args: A): Promise<R> => {
-    calls += 1
-    return call(...args)
-  }
+  const counted =
+    <A extends unknown[], R>(call: (...args: A) => Promise<R>) =>
+    (...args: A): Promise<R> => {
+      calls += 1
+      return call(...args)
+    }
   return {
     fs: {
       realpath: counted((path: string) => realpath(path)),
@@ -101,7 +103,9 @@ describe("createProjectIdentityResolver", () => {
 
     // when / then
     expect((await resolver.forPath(join(child, "src", "index.ts")))?.projectDir).toBe(child)
-    expect((await resolver.forPath(join(workspace, "projects", "other.md")))?.projectDir).toBe(join(workspace, "projects"))
+    expect((await resolver.forPath(join(workspace, "projects", "other.md")))?.projectDir).toBe(
+      join(workspace, "projects"),
+    )
   })
 
   it("#given a directory was already resolved #when another file under it is touched #then the filesystem is not touched again", async () => {
@@ -130,7 +134,9 @@ describe("createProjectIdentityResolver", () => {
     // given - every sync entry point the identity code can fall back to is watched.
     const { workspace, child, sibling, env } = fixture(({ child, sibling }) => [child, sibling])
     symlinkSync(sibling, join(workspace, "linked"))
-    const spies = (["existsSync", "statSync", "lstatSync", "readFileSync", "readdirSync", "realpathSync"] as const).map((name) => spyOn(resilientFs, name))
+    const spies = (["existsSync", "statSync", "lstatSync", "readFileSync", "readdirSync", "realpathSync"] as const).map(
+      (name) => spyOn(resilientFs, name),
+    )
     const resolver = createProjectIdentityResolver({ sessionCwd: workspace, env, autoIdentity: "git" })
 
     try {
@@ -193,8 +199,12 @@ describe("createProjectIdentityResolver", () => {
     symlinkSync(sibling, join(workspace, "shared"))
 
     // when
-    const passed = await createProjectIdentityResolver({ sessionCwd: workspace, env, memoryRoot }).forPath(join(workspace, "shared", "neighbour", "a.ts"))
-    const fromEnv = await createProjectIdentityResolver({ sessionCwd: workspace, env }).forPath(join(workspace, "shared", "neighbour", "a.ts"))
+    const passed = await createProjectIdentityResolver({ sessionCwd: workspace, env, memoryRoot }).forPath(
+      join(workspace, "shared", "neighbour", "a.ts"),
+    )
+    const fromEnv = await createProjectIdentityResolver({ sessionCwd: workspace, env }).forPath(
+      join(workspace, "shared", "neighbour", "a.ts"),
+    )
 
     // then
     expect(passed).toBeUndefined()
@@ -218,7 +228,9 @@ describe("createProjectIdentityResolver", () => {
     const { workspace, child } = fixture(() => [])
     const env = { [MEMORY_ROOT_ENV_VAR]: "mem" }
     const memoryRoot = join(workspace, "mem")
-    mkdirSync(resolveMemoryIdentity("auto", child, { [MEMORY_ROOT_ENV_VAR]: memoryRoot }).paths.repo, { recursive: true })
+    mkdirSync(resolveMemoryIdentity("auto", child, { [MEMORY_ROOT_ENV_VAR]: memoryRoot }).paths.repo, {
+      recursive: true,
+    })
     const resolver = createProjectIdentityResolver({ sessionCwd: workspace, env, memoryRoot })
 
     // when
@@ -243,11 +255,16 @@ describe("createProjectIdentityResolver", () => {
     symlinkSync(worktree, join(workspace, "projects", "main-wt"))
     const mainId = resolveAutoIdentity(main, env, "git").id
     const worktreeOwnId = resolveAutoIdentity(worktree, env, "path").id
-    for (const id of [mainId, worktreeOwnId]) mkdirSync(join(env[MEMORY_ROOT_ENV_VAR], "agents", id, "repo"), { recursive: true })
+    for (const id of [mainId, worktreeOwnId])
+      mkdirSync(join(env[MEMORY_ROOT_ENV_VAR], "agents", id, "repo"), { recursive: true })
 
     // when
-    const gitMode = await createProjectIdentityResolver({ sessionCwd: workspace, env, autoIdentity: "git" }).forPath(join(worktree, "a.ts"))
-    const pathMode = await createProjectIdentityResolver({ sessionCwd: workspace, env, autoIdentity: "path" }).forPath(join(worktree, "a.ts"))
+    const gitMode = await createProjectIdentityResolver({ sessionCwd: workspace, env, autoIdentity: "git" }).forPath(
+      join(worktree, "a.ts"),
+    )
+    const pathMode = await createProjectIdentityResolver({ sessionCwd: workspace, env, autoIdentity: "path" }).forPath(
+      join(worktree, "a.ts"),
+    )
 
     // then
     expect(gitMode?.identity.id).toBe(mainId)

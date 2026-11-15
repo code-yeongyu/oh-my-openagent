@@ -10,7 +10,8 @@ const LOST_EXPLANATION =
 
 const AWAITING_INPUT_CAUSES: Readonly<Record<AwaitingInputReason, string>> = {
   resumed_turn_aborted: "its resumed session's last turn ended on an abort",
-  resumed_turn_unfinished: "its resumed session's last turn stopped before finishing (an error, a pending tool call, or an unanswered prompt)",
+  resumed_turn_unfinished:
+    "its resumed session's last turn stopped before finishing (an error, a pending tool call, or an unanswered prompt)",
 }
 
 // The user-facing flag text (senpi#3266): why the child cannot continue on its own, and the two

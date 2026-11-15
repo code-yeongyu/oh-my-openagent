@@ -1,19 +1,19 @@
 export interface TruncationResult {
-  readonly result: string;
-  readonly truncated: boolean;
+  readonly result: string
+  readonly truncated: boolean
 }
 
 export interface AgentsMdTruncator {
-  truncate(sessionID: string, content: string): Promise<TruncationResult>;
+  truncate(sessionID: string, content: string): Promise<TruncationResult>
 }
 
 export interface AgentsMdContextOutput {
-  readonly title: string;
-  output: string;
-  readonly metadata: unknown;
+  readonly title: string
+  output: string
+  readonly metadata: unknown
 }
 
 export interface AgentsMdInjectedPathsStorage {
-  loadInjectedPaths(sessionID: string): Set<string>;
-  saveInjectedPaths(sessionID: string, paths: Set<string>): void;
+  loadInjectedPaths(sessionID: string): Set<string>
+  saveInjectedPaths(sessionID: string, paths: Set<string>): void
 }

@@ -1,8 +1,6 @@
 import type { BtwSideMetadata } from "./metadata"
 
-type CachedAdoption =
-  | { hydrated: false }
-  | { hydrated: true; metadata?: BtwSideMetadata }
+type CachedAdoption = { hydrated: false } | { hydrated: true; metadata?: BtwSideMetadata }
 
 export function createBtwAdoptionCache() {
   const entries = new Map<string, BtwSideMetadata | null>()
@@ -15,10 +13,7 @@ export function createBtwAdoptionCache() {
         metadata: entries.get(sessionID) ?? undefined,
       }
     },
-    write: (
-      sessionID: string,
-      metadata: BtwSideMetadata | undefined,
-    ): void => {
+    write: (sessionID: string, metadata: BtwSideMetadata | undefined): void => {
       entries.set(sessionID, metadata ?? null)
     },
     removeForDeletion: (sessionID: string): void => {

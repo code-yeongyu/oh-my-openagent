@@ -46,7 +46,12 @@ export class HeldSecondStart implements ManagedRunner {
 }
 
 /** Tears a registered child down and forgets it, as the lifecycle's destruction port does. */
-export function managerOver(store: TaskRecordStore, runner: ManagedRunner, project: string, destroy?: (taskId: string, cause: string) => Promise<void>) {
+export function managerOver(
+  store: TaskRecordStore,
+  runner: ManagedRunner,
+  project: string,
+  destroy?: (taskId: string, cause: string) => Promise<void>,
+) {
   let manager: TaskManager | undefined
   const built = createTaskManager({
     store,
@@ -55,11 +60,13 @@ export function managerOver(store: TaskRecordStore, runner: ManagedRunner, proje
     config: settings({ default_concurrency: 2, max_depth: 1 }),
     cwd: project,
     destruction: {
-      destroyResidentTask: destroy ?? (async (taskId) => {
-        const handle = manager?.getResidentHandle(taskId)
-        manager?.forget(taskId, { path: "park" })
-        await handle?.dispose()
-      }),
+      destroyResidentTask:
+        destroy ??
+        (async (taskId) => {
+          const handle = manager?.getResidentHandle(taskId)
+          manager?.forget(taskId, { path: "park" })
+          await handle?.dispose()
+        }),
     },
   })
   manager = built
@@ -69,7 +76,13 @@ export function managerOver(store: TaskRecordStore, runner: ManagedRunner, proje
 export const HOST_PID = 21_001
 
 /** A manager over the REAL destruction port, so a child whose cleanup failed must reach the orphan path. */
-export function managerWithLifecycle(store: TaskRecordStore, runner: ManagedRunner, project: string, alive: Set<number>, now: () => number = Date.now) {
+export function managerWithLifecycle(
+  store: TaskRecordStore,
+  runner: ManagedRunner,
+  project: string,
+  alive: Set<number>,
+  now: () => number = Date.now,
+) {
   const terminated = Promise.withResolvers<number>()
   const orphaned = Promise.withResolvers<void>()
   const signals: string[] = []
@@ -121,7 +134,9 @@ export function stubbornChild(taskId: string, pid: number, disposed?: () => void
   return {
     ...handle,
     kind: "rpc",
-    terminate: async () => { throw new Error("terminate rejected") },
+    terminate: async () => {
+      throw new Error("terminate rejected")
+    },
     dispose: async () => {
       disposed?.()
       throw new Error("dispose rejected")
@@ -130,11 +145,16 @@ export function stubbornChild(taskId: string, pid: number, disposed?: () => void
 }
 
 /** An in-process child whose teardown rejects until `closable` is set: it has no pid and no session. */
-export function inProcessChild(taskId: string, state: { closable: boolean; disposals: number }): ReturnType<typeof makeHandle> {
+export function inProcessChild(
+  taskId: string,
+  state: { closable: boolean; disposals: number },
+): ReturnType<typeof makeHandle> {
   const fake = makeHandle(taskId)
   Object.assign(fake.handle, {
     kind: "in-process" as const,
-    abort: async () => { if (!state.closable) throw new Error("abort rejected") },
+    abort: async () => {
+      if (!state.closable) throw new Error("abort rejected")
+    },
     dispose: async () => {
       state.disposals += 1
       if (!state.closable) throw new Error("dispose rejected")

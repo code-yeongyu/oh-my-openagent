@@ -1,8 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import {
-  isAgentRegistered,
-  resolveRegisteredAgentName,
-} from "../../features/claude-code-session-state"
+import { isAgentRegistered, resolveRegisteredAgentName } from "../../features/claude-code-session-state"
 import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
 import { createInternalAgentContinuationTextPart, resolveInheritedPromptTools } from "../../shared"
@@ -16,11 +13,7 @@ import { resolveRecentPromptContextForSession } from "./recent-model-resolver"
 import type { BackgroundTaskStatusProvider, SessionState } from "./types"
 
 export type BoulderContinuationResult =
-  | "injected"
-  | "skipped_active_session"
-  | "skipped_background_tasks"
-  | "skipped_agent_unavailable"
-  | "failed"
+  "injected" | "skipped_active_session" | "skipped_background_tasks" | "skipped_agent_unavailable" | "failed"
 
 const ACTIVE_BACKGROUND_TASK_STATUSES = new Set(["pending", "running"])
 
@@ -54,7 +47,9 @@ export async function injectBoulderContinuation(input: {
   } = input
 
   const hasRunningBgTasks = backgroundManager
-    ? backgroundManager.getTasksByParentSession(sessionID).some((t: { status: string }) => ACTIVE_BACKGROUND_TASK_STATUSES.has(t.status))
+    ? backgroundManager
+        .getTasksByParentSession(sessionID)
+        .some((t: { status: string }) => ACTIVE_BACKGROUND_TASK_STATUSES.has(t.status))
     : false
 
   if (hasRunningBgTasks) {
@@ -66,21 +61,23 @@ export async function injectBoulderContinuation(input: {
   const preferredSessionContext = preferredTaskSessionId
     ? `\n\n[Preferred reuse session for current top-level plan task${preferredTaskTitle ? `: ${preferredTaskTitle}` : ""}: ${preferredTaskSessionId}]`
     : ""
-	const prompt =
-		BOULDER_CONTINUATION_PROMPT.replace(/{PLAN_NAME}/g, planName) +
-		`\n\n[Status: ${total - remaining}/${total} completed, ${remaining} remaining]` +
-		preferredSessionContext +
-		worktreeContext
-	const resolvedContinuationAgent = resolveRegisteredAgentName(
-		agent ?? (isAgentRegistered("atlas") ? "atlas" : undefined),
-	)
-	const continuationAgent = resolvedContinuationAgent ? stripAgentListSortPrefix(resolvedContinuationAgent) : resolvedContinuationAgent
+  const prompt =
+    BOULDER_CONTINUATION_PROMPT.replace(/{PLAN_NAME}/g, planName) +
+    `\n\n[Status: ${total - remaining}/${total} completed, ${remaining} remaining]` +
+    preferredSessionContext +
+    worktreeContext
+  const resolvedContinuationAgent = resolveRegisteredAgentName(
+    agent ?? (isAgentRegistered("atlas") ? "atlas" : undefined),
+  )
+  const continuationAgent = resolvedContinuationAgent
+    ? stripAgentListSortPrefix(resolvedContinuationAgent)
+    : resolvedContinuationAgent
 
-	if (!continuationAgent || !isAgentRegistered(continuationAgent)) {
-		log(`[${HOOK_NAME}] Skipped injection: continuation agent unavailable`, {
-			sessionID,
-			agent: continuationAgent ?? agent ?? "unknown",
-		})
+  if (!continuationAgent || !isAgentRegistered(continuationAgent)) {
+    log(`[${HOOK_NAME}] Skipped injection: continuation agent unavailable`, {
+      sessionID,
+      agent: continuationAgent ?? agent ?? "unknown",
+    })
     return "skipped_agent_unavailable"
   }
 

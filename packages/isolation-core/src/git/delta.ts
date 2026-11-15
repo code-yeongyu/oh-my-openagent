@@ -9,19 +9,31 @@ export interface DeltaPatchResult {
   nestedPatches: { relativePath: string; patch: string }[]
 }
 async function diffTrees(repoRoot: string, base: string, head: string): Promise<string> {
-  return (await runGit(["diff-tree", "--no-commit-id", "-r", "-p", "--binary", "--no-ext-diff", "--no-textconv", base, head], { cwd: repoRoot })).stdout.toString()
+  return (
+    await runGit(
+      ["diff-tree", "--no-commit-id", "-r", "-p", "--binary", "--no-ext-diff", "--no-textconv", base, head],
+      { cwd: repoRoot },
+    )
+  ).stdout.toString()
 }
 async function captureRepoDeltaPatch(repoDir: string, baseline: RepoBaseline): Promise<string> {
   const current = await captureRepoBaseline(repoDir)
   let committedPatch = ""
   if (current.headCommit && current.headCommit !== baseline.headCommit) {
-    const base = baseline.headCommit || await writeSyntheticTree(repoDir, "", [])
+    const base = baseline.headCommit || (await writeSyntheticTree(repoDir, "", []))
     committedPatch = await diffTrees(repoDir, base, current.headCommit)
   }
   // Render in the source object database: a copied child's new commits need not exist there.
-  const baselineTree = await writeSyntheticTree(baseline.repoRoot, baseline.headCommit, [baseline.staged, baseline.unstaged, baseline.untrackedPatch])
+  const baselineTree = await writeSyntheticTree(baseline.repoRoot, baseline.headCommit, [
+    baseline.staged,
+    baseline.unstaged,
+    baseline.untrackedPatch,
+  ])
   const currentTree = await writeSyntheticTree(baseline.repoRoot, baseline.headCommit, [
-    committedPatch, current.staged, current.unstaged, current.untrackedPatch,
+    committedPatch,
+    current.staged,
+    current.unstaged,
+    current.untrackedPatch,
   ])
   return diffTrees(baseline.repoRoot, baselineTree, currentTree)
 }

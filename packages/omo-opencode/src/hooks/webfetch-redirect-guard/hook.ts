@@ -5,10 +5,7 @@ import {
   WEBFETCH_REDIRECT_ERROR_PATTERNS,
   WEBFETCH_REDIRECT_GUARD_STALE_TIMEOUT_MS,
 } from "./constants"
-import {
-  resolveWebFetchRedirects,
-  type WebFetchFormat,
-} from "./redirect-resolution"
+import { resolveWebFetchRedirects, type WebFetchFormat } from "./redirect-resolution"
 
 type ToolExecuteInput = { tool: string; sessionID: string; callID: string }
 type ToolExecuteBeforeOutput = { args: Record<string, unknown> }

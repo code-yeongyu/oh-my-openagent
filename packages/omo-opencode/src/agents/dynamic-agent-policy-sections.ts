@@ -1,8 +1,4 @@
-import type {
-  AvailableAgent,
-  AvailableCategory,
-  AvailableSkill,
-} from "./dynamic-agent-prompt-types"
+import type { AvailableAgent, AvailableCategory, AvailableSkill } from "./dynamic-agent-prompt-types"
 
 export function buildHardBlocksSection(): string {
   const blocks = [
@@ -112,11 +108,8 @@ export function buildUltraworkSection(
     lines.push("**Agents** (for specialized consultation/exploration):")
     for (const agent of sortedAgents) {
       const shortDescription =
-        agent.description.length > 120
-          ? `${agent.description.slice(0, 120)}...`
-          : agent.description
-      const suffix =
-        agent.name === "explore" || agent.name === "librarian" ? " (multiple)" : ""
+        agent.description.length > 120 ? `${agent.description.slice(0, 120)}...` : agent.description
+      const suffix = agent.name === "explore" || agent.name === "librarian" ? " (multiple)" : ""
       lines.push(`- \`${agent.name}${suffix}\`: ${shortDescription}`)
     }
   }

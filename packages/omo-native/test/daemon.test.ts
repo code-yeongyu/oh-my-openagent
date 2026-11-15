@@ -46,13 +46,35 @@ function capture() {
   return { chunks, write: (text: string) => void chunks.push(text), text: () => chunks.join("") }
 }
 
+type WarmAnswer =
+  { kind: "warm"; state: "warmed" | "already_warm" } | { kind: "unsupported" } | { kind: "refused"; code: string }
+
+/** The thread SDK `omo daemon run` warms the daemon through after its ensure: records each warm and each dispose. */
+function warmingSdk(answer: WarmAnswer = { kind: "warm", state: "warmed" }) {
+  const events: string[] = []
+  return {
+    events,
+    threadSdk: async () => ({
+      sdk: {
+        warmDaemon: async () => {
+          events.push("warm")
+          return answer
+        },
+        dispose: async () => {
+          events.push("dispose")
+        },
+      },
+    }),
+  }
+}
+
 describe("omo daemon", () => {
-  test("run delegates to the engine with the launch spec and the resolved policy", () => {
+  test("run delegates to the engine with the launch spec and the resolved policy", async () => {
     const { pluginRoot, agentDir } = workspace()
     const engine = fakeEngine({ exitCode: 0, stdout: JSON.stringify({ action: "start", pid: 4242 }) })
     const stdout = capture()
 
-    const exitCode = runDaemonCommand(["run"], {
+    const exitCode = await runDaemonCommand(["run"], {
       engine,
       pluginRoot,
       agentDir,
@@ -60,6 +82,7 @@ describe("omo daemon", () => {
       stdout,
       stderr: capture(),
       platform: "darwin",
+      threadSdk: warmingSdk().threadSdk,
     })
 
     expect(exitCode).toBe(0)
@@ -83,7 +106,14 @@ describe("omo daemon", () => {
     const stdout = capture()
 
     runDaemonCommand(["run", "--json"], {
-      engine, pluginRoot, agentDir, env: {}, stdout, stderr: capture(), platform: "darwin",
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout,
+      stderr: capture(),
+      platform: "darwin",
+      threadSdk: warmingSdk().threadSdk,
     })
 
     expect(stdout.text().trim()).toBe(line)
@@ -94,7 +124,14 @@ describe("omo daemon", () => {
     const engine = fakeEngine({ exitCode: 0, stdout: JSON.stringify({ action: "reuse", pid: 1 }) })
 
     runDaemonCommand(["run", "--no-upgrade"], {
-      engine, pluginRoot, agentDir, env: {}, stdout: capture(), stderr: capture(), platform: "darwin",
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout: capture(),
+      stderr: capture(),
+      platform: "darwin",
+      threadSdk: warmingSdk().threadSdk,
     })
 
     expect(engine.calls[0]?.args).toContain("never")
@@ -105,7 +142,14 @@ describe("omo daemon", () => {
     const engine = fakeEngine({ exitCode: 0, stdout: JSON.stringify({ action: "start", pid: 9 }) })
 
     runDaemonCommand(["run"], {
-      engine, pluginRoot, agentDir, env: {}, stdout: capture(), stderr: capture(), platform: "darwin",
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout: capture(),
+      stderr: capture(),
+      platform: "darwin",
+      threadSdk: warmingSdk().threadSdk,
     })
 
     expect(engine.calls[0]?.args).toContain("fallback")
@@ -116,23 +160,104 @@ describe("omo daemon", () => {
     const engine = fakeEngine({ exitCode: 0, stdout: JSON.stringify({ action: "start", pid: 9 }) })
 
     runDaemonCommand(["run"], {
-      engine, pluginRoot, agentDir, env: {}, stdout: capture(), stderr: capture(), platform: "darwin",
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout: capture(),
+      stderr: capture(),
+      platform: "darwin",
+      threadSdk: warmingSdk().threadSdk,
     })
 
     expect(engine.calls[0]?.args).not.toContain("--idle-exit-ms")
     expect(engine.calls[0]?.env.SENPI_RPC_HOST_IDLE_EXIT_MS).toBe("900000")
   })
 
-  test("--persistent stays an accepted wrapper-only no-op for the adopted engine", () => {
+  test("--persistent stays an accepted wrapper-only no-op for the adopted engine", async () => {
     const { pluginRoot, agentDir } = workspace()
     const engine = fakeEngine({ exitCode: 0, stdout: JSON.stringify({ action: "start", pid: 9 }) })
 
-    const exitCode = runDaemonCommand(["run", "--persistent"], {
-      engine, pluginRoot, agentDir, env: {}, stdout: capture(), stderr: capture(), platform: "darwin",
+    const exitCode = await runDaemonCommand(["run", "--persistent"], {
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout: capture(),
+      stderr: capture(),
+      platform: "darwin",
+      threadSdk: warmingSdk().threadSdk,
     })
 
     expect(exitCode).toBe(0)
     expect(engine.calls[0]?.args).not.toContain("--persistent")
+  })
+
+  // #13037 cold wake: a multi-session host loads omo only for an open or a warm, so `run` warms the daemon it ensured
+  // and the daemon declares the delivery consumer with no session running.
+  test("run warms the daemon it ensured through the thread SDK, then closes the SDK", async () => {
+    const { pluginRoot, agentDir } = workspace()
+    const engine = fakeEngine({ exitCode: 0, stdout: JSON.stringify({ action: "start", pid: 9 }) })
+    const stderr = capture()
+    const warm = warmingSdk()
+
+    const exitCode = await runDaemonCommand(["run"], {
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout: capture(),
+      stderr,
+      platform: "darwin",
+      threadSdk: warm.threadSdk,
+    })
+
+    expect(exitCode).toBe(0)
+    expect(warm.events).toEqual(["warm", "dispose"])
+    expect(stderr.text()).toBe("")
+  })
+
+  test.each([
+    ["refuses the warm", { kind: "refused", code: "host_draining" } as const, "host_draining"],
+    ["has no warm", { kind: "unsupported" } as const, "the engine has no warm"],
+  ])("a daemon that %s is reported and the run still exits 0", async (_what, answer, reason) => {
+    const { pluginRoot, agentDir } = workspace()
+    const engine = fakeEngine({ exitCode: 0, stdout: JSON.stringify({ action: "reuse", pid: 9 }) })
+    const stderr = capture()
+
+    const exitCode = await runDaemonCommand(["run"], {
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout: capture(),
+      stderr,
+      platform: "darwin",
+      threadSdk: warmingSdk(answer).threadSdk,
+    })
+
+    expect(exitCode).toBe(0)
+    expect(stderr.text()).toContain(reason)
+  })
+
+  test("a run whose ensure the engine refused warms nothing", async () => {
+    const { pluginRoot, agentDir } = workspace()
+    const engine = fakeEngine({ exitCode: 3, stdout: JSON.stringify({ action: "refuse" }) })
+    const warm = warmingSdk()
+
+    const exitCode = await runDaemonCommand(["run"], {
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout: capture(),
+      stderr: capture(),
+      platform: "darwin",
+      threadSdk: warm.threadSdk,
+    })
+
+    expect(exitCode).toBe(3)
+    expect(warm.events).toEqual([])
   })
 
   test("--foreground fails clearly because the adopted engine always detaches", () => {
@@ -141,7 +266,13 @@ describe("omo daemon", () => {
     const stderr = capture()
 
     const exitCode = runDaemonCommand(["run", "--foreground"], {
-      engine, pluginRoot, agentDir, env: {}, stdout: capture(), stderr, platform: "darwin",
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout: capture(),
+      stderr,
+      platform: "darwin",
     })
 
     expect(exitCode).toBe(2)
@@ -156,7 +287,13 @@ describe("omo daemon", () => {
     const stderr = capture()
 
     const exitCode = runDaemonCommand(["attach", "--model", "x"], {
-      engine, pluginRoot, agentDir, env: {}, stdout, stderr, platform: "darwin",
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout,
+      stderr,
+      platform: "darwin",
     })
 
     expect(exitCode).toBe(2)
@@ -173,7 +310,13 @@ describe("omo daemon", () => {
     const stdout = capture()
 
     const exitCode = runDaemonCommand(["status"], {
-      engine, pluginRoot, agentDir, env: {}, stdout, stderr: capture(), platform: "darwin",
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout,
+      stderr: capture(),
+      platform: "darwin",
     })
 
     expect(exitCode).toBe(3)
@@ -186,7 +329,13 @@ describe("omo daemon", () => {
     const stderr = capture()
 
     const exitCode = runDaemonCommand(["run"], {
-      engine, pluginRoot, agentDir, env: {}, stdout: capture(), stderr, platform: "win32",
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout: capture(),
+      stderr,
+      platform: "win32",
     })
 
     expect(exitCode).toBe(4)
@@ -215,7 +364,13 @@ describe("omo daemon", () => {
     const stderr = capture()
 
     const exitCode = runDaemonCommand(["frobnicate"], {
-      engine, pluginRoot, agentDir, env: {}, stdout: capture(), stderr, platform: "darwin",
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout: capture(),
+      stderr,
+      platform: "darwin",
     })
 
     expect(exitCode).toBe(2)
@@ -225,10 +380,19 @@ describe("omo daemon", () => {
 
   test("stop and handoff reach the engine as their own subcommands", () => {
     const { pluginRoot, agentDir } = workspace()
-    for (const [command, expected] of [["stop", "stop"], ["handoff", "handoff"]] as const) {
+    for (const [command, expected] of [
+      ["stop", "stop"],
+      ["handoff", "handoff"],
+    ] as const) {
       const engine = fakeEngine({ exitCode: 0, stdout: JSON.stringify({ action: expected }) })
       runDaemonCommand([command], {
-        engine, pluginRoot, agentDir, env: {}, stdout: capture(), stderr: capture(), platform: "darwin",
+        engine,
+        pluginRoot,
+        agentDir,
+        env: {},
+        stdout: capture(),
+        stderr: capture(),
+        platform: "darwin",
       })
       expect(engine.calls.at(-1)?.args.slice(0, 2)).toEqual(["host", expected])
     }
@@ -240,12 +404,17 @@ describe("omo daemon", () => {
     const stdout = capture()
 
     const exitCode = runDaemonCommand(["--help"], {
-      engine, pluginRoot, agentDir, env: {}, stdout, stderr: capture(), platform: "darwin",
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout,
+      stderr: capture(),
+      platform: "darwin",
     })
 
     expect(exitCode).toBe(0)
     expect(engine.calls).toHaveLength(0)
     expect(stdout.text()).toContain("usage: omo daemon")
   })
-
 })

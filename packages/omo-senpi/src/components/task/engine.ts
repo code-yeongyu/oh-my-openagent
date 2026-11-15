@@ -110,6 +110,9 @@ export interface ComposeTaskEngineDeps {
   readonly childCreationPort?: ChildCreationPort
   readonly pi: SenpiExtensionAPI
   readonly omoConfig: OmoConfig
+  // Live user-config source for the planner seam. Defaults to the composition-time snapshot;
+  // the task component passes a re-loader so mid-session omo.json(c) edits apply to new plans.
+  readonly getOmoConfig?: () => OmoConfig
   readonly cwd: string
   readonly sharedParentTools: () => readonly ToolDefinition[]
   readonly coordinator?: IdleInjectionCoordinator
@@ -215,16 +218,23 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
   // with it, and the lifecycle salvages and sweeps a crashed host's clones through the same object.
   // Without it every `isolated: true` spawn is refused as `isolation_unavailable`.
   const isolation = createIsolationRuntime()
+  const getOmoConfig = deps.getOmoConfig ?? (() => deps.omoConfig)
   const { host, lifecycle, resolveInheritedExtensions, runnerContext } = composeEngineHostWiring({
     pi: deps.pi,
-    omoConfig: deps.omoConfig,
+    getOmoConfig,
     settings,
     runtime,
     sharedParentTools: deps.sharedParentTools,
     ...(deps.host === undefined ? {} : { host: deps.host }),
     baseStore,
     generations: categoryConfigGenerations,
-    lifecycle: { store: storeChain.store, registry, kernelToolBindings, isolation, onStoreMutation: storeChain.onMutation },
+    lifecycle: {
+      store: storeChain.store,
+      registry,
+      kernelToolBindings,
+      isolation,
+      onStoreMutation: storeChain.onMutation,
+    },
   })
 
   const factories = deps.runnerFactories ?? DEFAULT_RUNNER_FACTORIES
@@ -233,10 +243,19 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
   // the caller sees the substitution the failure prevented. Read lazily per plan: a mid-session
   // default change reaches the next spawn's message.
   const resolveDefaultRoute = () =>
-    readSettingsDefaultRoute({ cwd: runtime.cwd(), agentDir: host.agentDir ?? resolveAgentHome({ env: deps.env ?? process.env }) })
+    readSettingsDefaultRoute({
+      cwd: runtime.cwd(),
+      agentDir: host.agentDir ?? resolveAgentHome({ env: deps.env ?? process.env }),
+    })
   const basePlanner = createGenerationObservingPlanner({
-    planner: createTaskChildPlanner(deps.omoConfig, agents, resolveRegistry, () => runtime.parentServiceTier(), resolveDefaultRoute),
-    omoConfig: deps.omoConfig,
+    planner: createTaskChildPlanner(
+      getOmoConfig,
+      agents,
+      resolveRegistry,
+      () => runtime.parentServiceTier(),
+      resolveDefaultRoute,
+    ),
+    omoConfig: getOmoConfig,
     resolveRegistry,
     generations: categoryConfigGenerations,
   })
@@ -245,20 +264,25 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     pi: deps.pi,
     runtime,
     omoConfig: deps.omoConfig,
+    getOmoConfig,
     settings,
   })
   const manager = createTaskManager({
     onChildLiveness: (record, status) => {
-      if (record.parent_session_id === runtime.sessionId()) notifyHostLiveness(deps.pi, deps.coordinator, record, status, () => runtime.parentState().kind === "streaming")
+      if (record.parent_session_id === runtime.sessionId())
+        notifyHostLiveness(deps.pi, deps.coordinator, record, status, () => runtime.parentState().kind === "streaming")
     },
     onPausedChild: (record, owner, childSeq) => runPause.notePausedChild(record, owner, childSeq),
     admissionBarrier,
     childPausePort: deps.childPausePort ?? nativeChildPausePort,
     ...(deps.childCreationPort === undefined ? {} : { childCreationPort: deps.childCreationPort }),
     // An in-process child's task tool shares this manager; its owner connection is still ours.
-    onChildExtensionEvent: (event, owner) => deps.pi.events?.emit(TASK_CHILD_EXTENSION_EVENT, {
-      parent_session_id: runtime.sessionId(), root_session_id: owner.root_session_id, event,
-    }),
+    onChildExtensionEvent: (event, owner) =>
+      deps.pi.events?.emit(TASK_CHILD_EXTENSION_EVENT, {
+        parent_session_id: runtime.sessionId(),
+        root_session_id: owner.root_session_id,
+        event,
+      }),
     store: storeChain.store,
     isolation,
     runners: { "in-process": factories.inProcess(runnerContext), process: factories.process(runnerContext) },
@@ -273,8 +297,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     traceparentFor: readTurnTraceparent,
     cwd: deps.cwd,
     destruction: {
-      destroyResidentTask: (taskId, cause) =>
-        lifecycle.destroyResidentTask(taskId, cause),
+      destroyResidentTask: (taskId, cause) => lifecycle.destroyResidentTask(taskId, cause),
       parkTerminalResident: (taskId) => lifecycle.parkTerminalResident(taskId),
       ...(lifecycle.hostSessionCancel === undefined ? {} : { hostSessionCancel: lifecycle.hostSessionCancel }),
     },
@@ -301,7 +324,9 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     if (caller?.execution_mode === "in-process") {
       return { depth: caller.depth, rootSessionId: caller.root_session_id }
     }
-    return ancestry === undefined ? undefined : { depth: ancestry.depth, rootSessionId: ancestry.rootSessionId ?? sessionId }
+    return ancestry === undefined
+      ? undefined
+      : { depth: ancestry.depth, rootSessionId: ancestry.rootSessionId ?? sessionId }
   }
 
   return {

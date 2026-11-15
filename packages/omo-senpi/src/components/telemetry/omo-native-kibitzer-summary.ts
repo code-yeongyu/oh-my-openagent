@@ -74,17 +74,38 @@ type Accumulator = {
 
 function emptyAccumulator(): Accumulator {
   return {
-    wakes: 0, wakesWithNudge: 0, wakesFailed: 0, wakesDeadline: 0, wakesToolBudget: 0,
-    offers: 0, bufferedCooldown: 0, bufferedNoNewCandidate: 0,
-    nudges: 0, firstNudgeWake: 0, lastNudgeAtMs: undefined, nudgeGapsMs: [],
-    firstWakeAtMs: undefined, lastWakeAtMs: 0,
-    durationMsTotal: 0, slotWaitMsTotal: 0, toolCalls: 0, candidates: 0,
-    inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0,
-    generations: 0, modelCounts: new Map(),
+    wakes: 0,
+    wakesWithNudge: 0,
+    wakesFailed: 0,
+    wakesDeadline: 0,
+    wakesToolBudget: 0,
+    offers: 0,
+    bufferedCooldown: 0,
+    bufferedNoNewCandidate: 0,
+    nudges: 0,
+    firstNudgeWake: 0,
+    lastNudgeAtMs: undefined,
+    nudgeGapsMs: [],
+    firstWakeAtMs: undefined,
+    lastWakeAtMs: 0,
+    durationMsTotal: 0,
+    slotWaitMsTotal: 0,
+    toolCalls: 0,
+    candidates: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    generations: 0,
+    modelCounts: new Map(),
   }
 }
 
-function recordWake(entry: Accumulator, signal: Extract<KibitzerTelemetrySignal, { kind: "wake" }>, atMs: number): void {
+function recordWake(
+  entry: Accumulator,
+  signal: Extract<KibitzerTelemetrySignal, { kind: "wake" }>,
+  atMs: number,
+): void {
   entry.wakes += 1
   if (signal.status === "failed") entry.wakesFailed += 1
   if (signal.status === "deadline") entry.wakesDeadline += 1
@@ -222,7 +243,10 @@ export function buildKibitzerSummary(
   }
 }
 
-export function registerOmoNativeKibitzerSummary(pi: SenpiExtensionAPI, options: OmoNativeKibitzerSummaryOptions): () => void {
+export function registerOmoNativeKibitzerSummary(
+  pi: SenpiExtensionAPI,
+  options: OmoNativeKibitzerSummaryOptions,
+): () => void {
   const registry = options.registry ?? createKibitzerTelemetryRegistry()
   const now = options.now ?? Date.now
   const subscribe = options.subscribe ?? sharedKibitzerTelemetryObservers().subscribe

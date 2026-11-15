@@ -10,30 +10,32 @@ import {
   KeychainLockedError,
   SecretServiceUnavailableError,
 } from "../omo-opencode/src/cli/service-auth/keystore"
-import { type Credentials, credentialSchema, serviceOrigin, SignInError } from "../omo-opencode/src/cli/service-auth/protocol"
-import { type BeforeKeysDiscarded, createSession, discardedOf, type Session, SessionEnded } from "../omo-opencode/src/cli/service-auth/session"
+import {
+  type Credentials,
+  credentialSchema,
+  serviceOrigin,
+  SignInError,
+} from "../omo-opencode/src/cli/service-auth/protocol"
+import { registerHelperCandidates } from "../omo-opencode/src/cli/service-auth/keychain-helper/darwin-backend"
+import {
+  type BeforeKeysDiscarded,
+  createSession,
+  type DeviceServiceHandoff,
+  discardedOf,
+  type Session,
+  SessionEnded,
+} from "../omo-opencode/src/cli/service-auth/session"
 import { retireSyncPinOnDiscard } from "../omo-opencode/src/cli/service-auth/sync-pin-retire"
 import { retireSyncDevice } from "../memory-core/src/sync/device-retire"
 import { RecoveryExhausted, RecoveryPending } from "../omo-opencode/src/cli/service-auth/owned-refresh"
+import { ACCOUNT_EXIT, accountStoreFailure, showAccount } from "./account-show"
+import { cliDeviceServiceHandoff } from "./device-service-handoff"
+
+export { ACCOUNT_EXIT }
 
 // `omo account` lets the desktop share this machine's one OS-keychain credential with `omo login`
 // (one sync device per machine). It is a machine interface: one JSON line on stdout, secrets only on
-// stdin and stdout, and the exit code carries the outcome.
-// Exit 9 reports native storage failures/timeouts as {"error":"store-unavailable"} without another read.
-// Exit 10 is exit 4 after an explicit `omo logout` (its marker, #11434): 4 alone may be a store that read empty.
-export const ACCOUNT_EXIT = {
-  ok: 0,
-  failed: 1,
-  invalid: 2,
-  conflict: 3,
-  signedOut: 4,
-  ended: 5,
-  uncertain: 6,
-  keychainLocked: 7,
-  keychainUnavailable: 8,
-  storeUnavailable: 9,
-  loggedOut: 10,
-} as const
+// stdin and stdout, and the exit code carries the outcome (codes in account-show.ts).
 
 export interface AccountCommandDependencies {
   readonly api: string
@@ -42,6 +44,8 @@ export interface AccountCommandDependencies {
   readonly pinDir: () => string
   /** Retires the memory-sync pin of a principal whose keys this command discards (#12280); absent, none is retired. */
   readonly beforeKeysDiscarded?: BeforeKeysDiscarded
+  /** This machine's device service: adopt hands it the adopted keys, every forget and ended session forgets the device. */
+  readonly deviceService?: DeviceServiceHandoff
   readonly readStdin: () => Promise<string>
   readonly output: (line: string) => void
   readonly error: (line: string) => void
@@ -59,8 +63,11 @@ const retireHook = (dependencies: AccountCommandDependencies): BeforeKeysDiscard
 
 const sessionOf = (dependencies: AccountCommandDependencies): Session =>
   createSession({
-    api: dependencies.api, store: dependencies.store, beforeKeysDiscarded: retireHook(dependencies),
+    api: dependencies.api,
+    store: dependencies.store,
+    beforeKeysDiscarded: retireHook(dependencies),
     ...(dependencies.home === undefined ? {} : { home: dependencies.home }),
+    ...(dependencies.deviceService === undefined ? {} : { deviceService: dependencies.deviceService }),
   })
 
 async function signedOut(dependencies: AccountCommandDependencies, session: Session): Promise<number> {
@@ -90,20 +97,29 @@ async function adopt(dependencies: AccountCommandDependencies, replace: boolean)
     return ACCOUNT_EXIT.invalid
   }
   const session = sessionOf(dependencies)
-  return session.update(async current => {
-    if (current !== null && current.device.id !== incoming.device.id && !replace) {
-      return reply(dependencies, { conflict: { device: deviceOf(current) } }, ACCOUNT_EXIT.conflict)
-    }
-    const keepCurrent =
-      current !== null &&
-      current.device.id === incoming.device.id &&
-      current.refreshState !== "uncertain" &&
-      Date.parse(current.accessTokenExpiresAt) > Date.parse(incoming.accessTokenExpiresAt)
-    if (current !== null && current.device.id !== incoming.device.id) await retireHook(dependencies)(discardedOf(current, "replaced"))
-    if (!keepCurrent) await dependencies.store.write(incoming)
-    await session.clearSignedOutMarker()
-    return reply(dependencies, { adopted: true, device: deviceOf(incoming) })
-  }, { replaceInvalid: replace })
+  let adopted: Credentials | undefined
+  const code = await session.update(
+    async (current) => {
+      if (current !== null && current.device.id !== incoming.device.id && !replace) {
+        return reply(dependencies, { conflict: { device: deviceOf(current) } }, ACCOUNT_EXIT.conflict)
+      }
+      const keepCurrent =
+        current !== null &&
+        current.device.id === incoming.device.id &&
+        current.refreshState !== "uncertain" &&
+        Date.parse(current.accessTokenExpiresAt) > Date.parse(incoming.accessTokenExpiresAt)
+      if (current !== null && current.device.id !== incoming.device.id)
+        await retireHook(dependencies)(discardedOf(current, "replaced"))
+      if (!keepCurrent) await dependencies.store.write(incoming)
+      await session.clearSignedOutMarker()
+      adopted = keepCurrent ? current : incoming
+      return reply(dependencies, { adopted: true, device: deviceOf(incoming) })
+    },
+    { replaceInvalid: replace },
+  )
+  // A fresh sign-in handed over by the desktop: the marker is gone, so the keys go to the device service from memory.
+  if (adopted !== undefined) await dependencies.deviceService?.adopt(adopted)
+  return code
 }
 
 async function token(dependencies: AccountCommandDependencies): Promise<number> {
@@ -112,50 +128,38 @@ async function token(dependencies: AccountCommandDependencies): Promise<number> 
     const current = await session.accessSnapshot()
     if (current === null) return signedOut(dependencies, session)
     return reply(dependencies, {
-      accessToken: current.accessToken, accessTokenExpiresAt: current.accessTokenExpiresAt,
-      device: deviceOf(current), ...(current.owner === undefined ? {} : { owner: current.owner }),
+      accessToken: current.accessToken,
+      accessTokenExpiresAt: current.accessTokenExpiresAt,
+      device: deviceOf(current),
+      ...(current.owner === undefined ? {} : { owner: current.owner }),
     })
   } catch (error) {
     // Storage failures keep their own outcome; another native read can repeat the same timeout.
     if (error instanceof CredentialStoreError) throw error
-    if (error instanceof SessionEnded || error instanceof RecoveryExhausted) return reply(dependencies, { ended: { code: error.code } }, ACCOUNT_EXIT.ended)
-    if (error instanceof RecoveryPending) return reply(dependencies, { uncertain: { deadline: new Date(error.deadline).toISOString() } }, ACCOUNT_EXIT.uncertain)
+    if (error instanceof SessionEnded || error instanceof RecoveryExhausted)
+      return reply(dependencies, { ended: { code: error.code } }, ACCOUNT_EXIT.ended)
+    if (error instanceof RecoveryPending)
+      return reply(
+        dependencies,
+        { uncertain: { deadline: new Date(error.deadline).toISOString() } },
+        ACCOUNT_EXIT.uncertain,
+      )
     const after = await dependencies.store.read()
     dependencies.error(error instanceof Error ? error.message : "omo account token: the refresh failed")
     // The refusal code tells the desktop why the sign-in ended (desktop#3522); the message never leaves stderr.
     // Any other error with the item gone means another process signed out (forget/logout) meanwhile.
     if (after === null) return signedOut(dependencies, session)
-    if (after.refreshState === "uncertain") return reply(dependencies, { ended: { code: "refresh_recovery_expired" } }, ACCOUNT_EXIT.ended)
+    if (after.refreshState === "uncertain")
+      return reply(dependencies, { ended: { code: "refresh_recovery_expired" } }, ACCOUNT_EXIT.ended)
     return ACCOUNT_EXIT.failed
   }
-}
-
-// A trust pin is written only after the device verified its membership, so a pin means this device
-// joined memory sync for that account.
-async function syncStateOf(pinDir: string, account: string): Promise<"joined" | "not_joined" | "corrupt_pin"> {
-  const pin = await loadTrustAnchor(pinDir, account)
-  if (pin.ok) return "joined"
-  return pin.reason === "corrupt_pin" ? "corrupt_pin" : "not_joined"
 }
 
 async function runVerb(dependencies: AccountCommandDependencies, args: readonly string[]): Promise<number> {
   const [verb, ...flags] = args
   switch (verb) {
-    case "show": {
-      const current = await dependencies.store.read()
-      const accountAt = flags.indexOf("--account")
-      const account = accountAt === -1 ? undefined : flags[accountAt + 1]
-      if (accountAt !== -1 && (account === undefined || account === "")) {
-        dependencies.error("omo account show: --account needs an account id")
-        return ACCOUNT_EXIT.invalid
-      }
-      const sync = account === undefined ? {} : { sync: await syncStateOf(dependencies.pinDir(), account) }
-      const marker = current === null ? await sessionOf(dependencies).signedOutMarker() : null
-      return reply(
-        dependencies,
-        current === null ? { signedIn: false, ...(marker === null ? {} : { signedOut: marker }), ...sync } : { signedIn: true, device: deviceOf(current), refreshState: current.refreshState ?? "ok", ...sync },
-      )
-    }
+    case "show":
+      return showAccount(dependencies, flags)
     case "adopt":
       return adopt(dependencies, flags.includes("--replace"))
     case "token":
@@ -168,19 +172,29 @@ async function runVerb(dependencies: AccountCommandDependencies, args: readonly 
       const session = sessionOf(dependencies)
       if (flags.length > 0) {
         const device = flags[1]
-        if (flags.length !== 2 || flags[0] !== "--device" || device === undefined || device === "" || device.startsWith("--")) {
+        if (
+          flags.length !== 2 ||
+          flags[0] !== "--device" ||
+          device === undefined ||
+          device === "" ||
+          device.startsWith("--")
+        ) {
           dependencies.error("omo account forget: use forget or forget --device <id>")
           return ACCOUNT_EXIT.invalid
         }
         try {
-          return await session.update(async current => {
+          let forgotten = false
+          const code = await session.update(async (current) => {
             if (current !== null && current.device.id !== device) {
               return reply(dependencies, { forgotten: false, device: deviceOf(current) }, ACCOUNT_EXIT.conflict)
             }
             if (current !== null) await retireHook(dependencies)(discardedOf(current, "forget"))
             await dependencies.store.clear()
+            forgotten = true
             return reply(dependencies, { forgotten: true })
           })
+          if (forgotten) await dependencies.deviceService?.forget()
+          return code
         } catch (error) {
           if (!(error instanceof InvalidCredentialState)) throw error
           dependencies.error(error.message)
@@ -201,33 +215,29 @@ async function runVerb(dependencies: AccountCommandDependencies, args: readonly 
       return reply(dependencies, { retired: true })
     }
     default:
-      dependencies.error("usage: omo account show [--account <id>]|adopt [--replace]|token|export|forget [--device <id>]|retire-sync --account <id>")
+      dependencies.error(
+        "usage: omo account show [--account <id>]|adopt [--replace]|token|export|forget [--device <id>]|retire-sync --account <id>",
+      )
       return ACCOUNT_EXIT.invalid
   }
 }
 
-export async function runAccountVerb(dependencies: AccountCommandDependencies, args: readonly string[]): Promise<number> {
+export async function runAccountVerb(
+  dependencies: AccountCommandDependencies,
+  args: readonly string[],
+): Promise<number> {
   try {
     return await runVerb(dependencies, args)
   } catch (error) {
-    if (error instanceof KeychainLockedError) {
-      dependencies.error(error.message)
-      return reply(dependencies, { keychain: "locked" }, ACCOUNT_EXIT.keychainLocked)
-    }
-    if (error instanceof SecretServiceUnavailableError) {
-      dependencies.error(error.message)
-      return reply(dependencies, { keychain: "unavailable" }, ACCOUNT_EXIT.keychainUnavailable)
-    }
-    if (error instanceof CredentialStoreError) {
-      dependencies.error(error.message)
-      return reply(dependencies, { error: "store-unavailable" }, ACCOUNT_EXIT.storeUnavailable)
-    }
-    dependencies.error(error instanceof SignInError || error instanceof Error ? error.message : "omo account: the operation failed")
-    return ACCOUNT_EXIT.failed
+    return accountStoreFailure(dependencies, error)
   }
 }
 
-export async function runAccountCommand(args: readonly string[]): Promise<void> {
+export async function runAccountCommand(
+  args: readonly string[],
+  options: { readonly helperCandidates?: readonly string[] } = {},
+): Promise<void> {
+  registerHelperCandidates(options.helperCandidates ?? [])
   const api = serviceOrigin(process.env.OMO_SERVICE_API_URL ?? "https://api.omo.dev")
   // One store per command: its keyring check and fallback notice are per store (#10658 review).
   let store: CredentialStore | undefined
@@ -241,11 +251,12 @@ export async function runAccountCommand(args: readonly string[]): Promise<void> 
       pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())),
       beforeKeysDiscarded: retireSyncPinOnDiscard({
         pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())),
-        log: line => process.stderr.write(`${line}\n`),
+        log: (line) => process.stderr.write(`${line}\n`),
       }),
+      deviceService: cliDeviceServiceHandoff({ api, log: (line) => process.stderr.write(`${line}\n`) }),
       readStdin: () => new Response(Bun.stdin.stream()).text(),
-      output: line => process.stdout.write(`${line}\n`),
-      error: line => process.stderr.write(`${line}\n`),
+      output: (line) => process.stdout.write(`${line}\n`),
+      error: (line) => process.stderr.write(`${line}\n`),
     },
     args.slice(1),
   )

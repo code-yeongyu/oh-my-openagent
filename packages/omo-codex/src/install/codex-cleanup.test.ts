@@ -75,15 +75,9 @@ describe("codex cleanup", () => {
     )
     await writeFile(
       projectConfigPath,
-      [
-        "[features.multi_agent_v2]",
-        "enabled = true",
-        "",
-        "[agents]",
-        "max_threads = 8",
-        "max_depth = 3",
-        "",
-      ].join("\n"),
+      ["[features.multi_agent_v2]", "enabled = true", "", "[agents]", "max_threads = 8", "max_depth = 3", ""].join(
+        "\n",
+      ),
     )
 
     // when
@@ -108,16 +102,18 @@ describe("codex cleanup", () => {
     const config = await readFile(configPath, "utf8")
     expect(config).toContain("[features]")
     expect(config).not.toContain("[marketplaces.sisyphuslabs]")
-    expect(config).not.toContain('omo@sisyphuslabs')
+    expect(config).not.toContain("omo@sisyphuslabs")
     expect(config).not.toContain("[marketplaces.lazycodex]")
-    expect(config).not.toContain('omo@lazycodex')
+    expect(config).not.toContain("omo@lazycodex")
     expect(config).not.toContain("[agents.explorer]")
     expect(config).toContain("[agents.custom]")
     expect(await readFile(result.configBackupPath ?? "", "utf8")).toContain("[marketplaces.sisyphuslabs]")
 
     const projectConfig = await readFile(projectConfigPath, "utf8")
     expect(result.projectCleanup.changed).toBe(true)
-    expect(result.projectCleanup.artifacts.map((artifact) => artifact.relativePath).sort()).toEqual([".codex/hooks.json"])
+    expect(result.projectCleanup.artifacts.map((artifact) => artifact.relativePath).sort()).toEqual([
+      ".codex/hooks.json",
+    ])
     expect(projectConfig).not.toMatch(/^max_threads\s*=/m)
     expect(projectConfig).toContain("max_depth = 3")
     expect(await pathExists(join(projectRoot, ".codex", "hooks.json"))).toBe(true)
@@ -153,7 +149,7 @@ describe("codex cleanup", () => {
     expect(result.projectCleanup.configs).toEqual([])
     const config = await readFile(configPath, "utf8")
     expect(config).not.toContain("[marketplaces.sisyphuslabs]")
-    expect(config).not.toContain('omo@sisyphuslabs')
+    expect(config).not.toContain("omo@sisyphuslabs")
   })
 
   test("#given managed config and missing install manifests #when cleanup runs #then removes orphaned managed agent links", async () => {
@@ -224,7 +220,7 @@ describe("codex cleanup", () => {
     expect(result.projectCleanup.configs).toEqual([])
     const config = await readFile(configPath, "utf8")
     expect(config).not.toContain("[marketplaces.sisyphuslabs]")
-    expect(config).not.toContain('omo@sisyphuslabs')
+    expect(config).not.toContain("omo@sisyphuslabs")
   })
   test("#given provisioned runtime binaries and bootstrap plugin data #when cleanup runs #then removes only the managed subtrees", async () => {
     // given
@@ -234,7 +230,14 @@ describe("codex cleanup", () => {
     const foreignRuntimeFile = join(codexHome, "runtime", "other-owner", "keep.bin")
     const bootstrapDataDir = join(codexHome, "plugins", "data", "omo-sisyphuslabs", "bootstrap")
     const autoUpdateStatePath = join(codexHome, "plugins", "data", "omo-sisyphuslabs", "auto-update.json")
-    const foreignBootstrapStatePath = join(codexHome, "plugins", "data", "widget-sisyphuslabs", "bootstrap", "state.json")
+    const foreignBootstrapStatePath = join(
+      codexHome,
+      "plugins",
+      "data",
+      "widget-sisyphuslabs",
+      "bootstrap",
+      "state.json",
+    )
     const driftedBootstrapDataDir = join(codexHome, "plugins", "legacy", "omo-next-sisyphuslabs", "bootstrap")
     const cacheRoot = join(codexHome, "plugins", "cache", "sisyphuslabs")
     const snapshotRoot = join(codexHome, ".tmp", "marketplaces", "sisyphuslabs")
@@ -246,7 +249,10 @@ describe("codex cleanup", () => {
     await writeFixtureFile(join(bootstrapDataDir, "state.json.lock"), "1\n")
     await writeFixtureFile(join(bootstrapDataDir, "bootstrap.log"), "log\n")
     await writeFixtureFile(join(bootstrapDataDir, "ps-bootstrap.log"), "ps log\n")
-    await writeFixtureFile(join(bootstrapDataDir, "agents-stage", ".installed-agents.json"), JSON.stringify({ agents: [] }))
+    await writeFixtureFile(
+      join(bootstrapDataDir, "agents-stage", ".installed-agents.json"),
+      JSON.stringify({ agents: [] }),
+    )
     await writeFixtureFile(autoUpdateStatePath, "{}\n")
     await writeFixtureFile(foreignBootstrapStatePath, "{}\n")
     await writeFixtureFile(join(driftedBootstrapDataDir, "state.json"), "{}\n")
@@ -339,9 +345,17 @@ describe("codex cleanup", () => {
     await writeFixtureFile(statePath, "{}\n")
 
     // when
-    const firstRun = await cleanupCodexLight({ codexHome, projectDirectory: codexHome, now: () => new Date("2026-06-01T00:00:00Z") })
+    const firstRun = await cleanupCodexLight({
+      codexHome,
+      projectDirectory: codexHome,
+      now: () => new Date("2026-06-01T00:00:00Z"),
+    })
     await writeFixtureFile(statePath, "{}\n")
-    const secondRun = await cleanupCodexLight({ codexHome, projectDirectory: codexHome, now: () => new Date("2026-06-01T00:00:00Z") })
+    const secondRun = await cleanupCodexLight({
+      codexHome,
+      projectDirectory: codexHome,
+      now: () => new Date("2026-06-01T00:00:00Z"),
+    })
 
     // then
     expect(firstRun.removedPaths).toContain(bootstrapDataDir)

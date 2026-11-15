@@ -60,9 +60,14 @@ export function configureRuntimeCommands(program: Command): void {
         throw new InvalidArgumentError(error instanceof Error ? error.message : String(error))
       }
     })
-    .option("--repo <path>", "Repository to sweep (repeatable)", (value: string, previous: string[] = []) => [...previous, value])
+    .option("--repo <path>", "Repository to sweep (repeatable)", (value: string, previous: string[] = []) => [
+      ...previous,
+      value,
+    ])
     .option("--json", "Output structured JSON result")
-    .addHelpText("after", `
+    .addHelpText(
+      "after",
+      `
 Examples:
   $ omo-agent-toolkit worktree-sweep
   $ omo-agent-toolkit worktree-sweep --older-than=14
@@ -72,16 +77,24 @@ Lines: SWEEP <path> <ref> | KEEP(<reason>) <path> <ref> | PRUNE <path> <ref>
 KEEP reasons: locked, current, external, unmerged, dirty. Dry-run is the
 default; --apply removes with 'git worktree remove' (never --force) and then
 prunes.
-`)
-    .action(async (options: { readonly apply?: boolean; readonly olderThan?: number; readonly repo?: string[]; readonly json?: boolean }) => {
-      const exitCode = await worktreeSweep({
-        apply: options.apply === true,
-        olderThanDays: options.olderThan ?? 0,
-        repos: options.repo,
-        json: options.json ?? false,
-      })
-      process.exit(exitCode)
-    })
+`,
+    )
+    .action(
+      async (options: {
+        readonly apply?: boolean
+        readonly olderThan?: number
+        readonly repo?: string[]
+        readonly json?: boolean
+      }) => {
+        const exitCode = await worktreeSweep({
+          apply: options.apply === true,
+          olderThanDays: options.olderThan ?? 0,
+          repos: options.repo,
+          json: options.json ?? false,
+        })
+        process.exit(exitCode)
+      },
+    )
 
   program
     .command("ulw-loop [args...]")

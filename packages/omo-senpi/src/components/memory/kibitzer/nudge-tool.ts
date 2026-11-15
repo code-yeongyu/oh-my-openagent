@@ -8,10 +8,16 @@ export const KIBITZER_NUDGE_TOOL_NAME = "nudge"
 const KIBITZER_NUDGE_DESCRIPTION =
   "Surface one stored memory to the primary agent as a read-only hint. Call it only when the memory would change what the agent does next."
 
-export const KibitzerNudgeParams = Type.Object({
-  path: Type.String({ description: "Memory path copied exactly from the candidates input." }),
-  hint: Type.String({ description: "One factual sentence stating what the stored note records ('the note records that ...'), at most 200 characters, on a single line. It is reference the agent reads, so never address it or tell it what to do: no second person, no imperative, no judgment about whether to nudge, and never filler such as 'placeholder'." }),
-}, { additionalProperties: false })
+export const KibitzerNudgeParams = Type.Object(
+  {
+    path: Type.String({ description: "Memory path copied exactly from the candidates input." }),
+    hint: Type.String({
+      description:
+        "One factual sentence stating what the stored note records ('the note records that ...'), at most 200 characters, on a single line. It is reference the agent reads, so never address it or tell it what to do: no second person, no imperative, no judgment about whether to nudge, and never filler such as 'placeholder'.",
+    }),
+  },
+  { additionalProperties: false },
+)
 
 export interface KibitzerNudgeToolInput {
   /** Paths offered this launch; anything else is fabricated. */
@@ -33,10 +39,7 @@ export type KibitzerNudgeTool = Omit<
   ToolDefinition<typeof KibitzerNudgeParams, undefined>,
   "execute" | "renderCall" | "renderResult"
 > & {
-  readonly execute: (
-    toolCallId: string,
-    params: Static<typeof KibitzerNudgeParams>,
-  ) => Promise<KibitzerNudgeToolResult>
+  readonly execute: (toolCallId: string, params: Static<typeof KibitzerNudgeParams>) => Promise<KibitzerNudgeToolResult>
 }
 
 /**
@@ -72,9 +75,15 @@ export function createKibitzerNudgeTool(input: KibitzerNudgeToolInput): Kibitzer
       input.accepted.push({ path: params.path, hint: params.hint })
       const capped = capReached(input)
       return {
-        content: [{ type: "text", text: capped.terminate === true
-          ? `Nudge recorded for ${params.path}. The maxItems limit (${input.maxItems}) is reached; the run ends here.`
-          : `Nudge recorded for ${params.path}.` }],
+        content: [
+          {
+            type: "text",
+            text:
+              capped.terminate === true
+                ? `Nudge recorded for ${params.path}. The maxItems limit (${input.maxItems}) is reached; the run ends here.`
+                : `Nudge recorded for ${params.path}.`,
+          },
+        ],
         details: undefined,
         ...capped,
       }

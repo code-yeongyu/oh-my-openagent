@@ -1,17 +1,23 @@
 import { describe, expect, mock, onTestFinished, spyOn, test } from "bun:test"
 import * as credentialLock from "./credential-lock"
-import { createCredentialStore, CredentialIdentityChanged, type CredentialStore, InvalidCredentialState } from "./keystore"
+import {
+  createCredentialStore,
+  CredentialIdentityChanged,
+  type CredentialStore,
+  InvalidCredentialState,
+} from "./keystore"
 import type { Credentials } from "./protocol"
 import { createSession, SessionEnded } from "./session"
 import { fakeApi, grant, memorySecrets, privateKeys, refusal, temporaryHome } from "./test-support"
 
 const NOW = Date.parse("2030-01-01T00:00:00Z")
 const captured: Credentials = { ...grant, ...privateKeys, accountId: "account-a", credentialGeneration: "generation-a" }
-const sameIdentity = (current: Credentials) => current.accountId === captured.accountId
-  && current.credentialGeneration === captured.credentialGeneration
-  && current.device.id === captured.device.id
-  && current.signingPrivateKey === captured.signingPrivateKey
-  && current.sealingPrivateKey === captured.sealingPrivateKey
+const sameIdentity = (current: Credentials) =>
+  current.accountId === captured.accountId &&
+  current.credentialGeneration === captured.credentialGeneration &&
+  current.device.id === captured.device.id &&
+  current.signingPrivateKey === captured.signingPrivateKey &&
+  current.sealingPrivateKey === captured.sealingPrivateKey
 
 async function tokenHarness(snapshot: Credentials, authoritative = snapshot) {
   let current: Credentials | null = authoritative
@@ -24,12 +30,22 @@ async function tokenHarness(snapshot: Credentials, authoritative = snapshot) {
   const store = {
     read: mock(async () => snapshot),
     readAuthoritative: mock(async () => current),
-    write: mock(async (value: Credentials) => { current = value }),
-    clear: mock(async () => { current = null }),
+    write: mock(async (value: Credentials) => {
+      current = value
+    }),
+    clear: mock(async () => {
+      current = null
+    }),
   } satisfies CredentialStore
   const lock = spyOn(credentialLock, "withCredentialLock")
   onTestFinished(() => lock.mockRestore())
-  const session = createSession({ beforeKeysDiscarded: async () => undefined, api, store, home: await temporaryHome(), now: () => NOW })
+  const session = createSession({
+    beforeKeysDiscarded: async () => undefined,
+    api,
+    store,
+    home: await temporaryHome(),
+    now: () => NOW,
+  })
   return { session, store, lock, refresh, bodies }
 }
 
@@ -76,17 +92,31 @@ describe("access token identity and refresh paths", () => {
 
 describe("credential lifecycle", () => {
   test("accessToken surfaces corrupt-credential recovery without locking or changing storage", async () => {
-    const store = createCredentialStore("https://api.omo.dev", { platform: "darwin", secrets: {
-      get: async () => "{",
-      set: async () => { throw new Error("unexpected write") },
-      delete: async () => { throw new Error("unexpected delete") },
-    } })
+    const store = createCredentialStore("https://api.omo.dev", {
+      platform: "darwin",
+      secrets: {
+        get: async () => "{",
+        set: async () => {
+          throw new Error("unexpected write")
+        },
+        delete: async () => {
+          throw new Error("unexpected delete")
+        },
+      },
+    })
     const lock = spyOn(credentialLock, "withCredentialLock")
     onTestFinished(() => lock.mockRestore())
-    const session = createSession({ beforeKeysDiscarded: async () => undefined, api: "https://api.omo.dev", store, home: await temporaryHome() })
-    const error = await session.accessToken(sameIdentity).catch(error => error)
+    const session = createSession({
+      beforeKeysDiscarded: async () => undefined,
+      api: "https://api.omo.dev",
+      store,
+      home: await temporaryHome(),
+    })
+    const error = await session.accessToken(sameIdentity).catch((error) => error)
     expect(error).toBeInstanceOf(InvalidCredentialState)
-    expect(error.message).toBe("The OmO sign-in saved on this computer can't be read. Run omo account forget to remove it, then sign in again in the desktop app.")
+    expect(error.message).toBe(
+      "The OmO sign-in saved on this computer can't be read. Run omo account forget to remove it, then sign in again from the OmO desktop app on this computer, or with omo login in a terminal.",
+    )
     expect(lock).not.toHaveBeenCalled()
   })
 
@@ -98,17 +128,25 @@ describe("credential lifecycle", () => {
     await store.write(captured)
     await other.write({ ...captured, device: { ...captured.device, id: "other-device" } })
     const otherBefore = await other.read()
-    const slot = [...secrets.values.keys()].find(key => JSON.parse(secrets.values.get(key) ?? "{}").device?.id === captured.device.id)
+    const slot = [...secrets.values.keys()].find(
+      (key) => JSON.parse(secrets.values.get(key) ?? "{}").device?.id === captured.device.id,
+    )
     if (slot === undefined) throw new Error("the captured account was not stored")
     secrets.values.set(slot, "{")
-    const session = createSession({ beforeKeysDiscarded: async () => undefined, api, store, home: await temporaryHome() })
-    let actions = 0
-    const forgetCaptured = () => session.update(async current => {
-      actions++
-      if (current?.device.id !== captured.device.id) return false
-      await store.clear()
-      return true
+    const session = createSession({
+      beforeKeysDiscarded: async () => undefined,
+      api,
+      store,
+      home: await temporaryHome(),
     })
+    let actions = 0
+    const forgetCaptured = () =>
+      session.update(async (current) => {
+        actions++
+        if (current?.device.id !== captured.device.id) return false
+        await store.clear()
+        return true
+      })
     await expect(forgetCaptured()).rejects.toBeInstanceOf(InvalidCredentialState)
     expect(actions).toBe(0)
     expect(secrets.values.get(slot)).toBe("{")
@@ -123,7 +161,7 @@ describe("credential lifecycle", () => {
     const stored = Promise.withResolvers<void>()
     const permit = Promise.withResolvers<void>()
     let refreshes = 0
-    const api = fakeApi(async request => {
+    const api = fakeApi(async (request) => {
       expect(new URL(request.url).pathname).toBe("/v1/session/refresh")
       expect(await request.json()).toEqual({ refreshToken: grant.refreshToken })
       refreshes++
@@ -143,7 +181,10 @@ describe("credential lifecycle", () => {
     const first = createSession({ beforeKeysDiscarded: async () => undefined, api, store, home })
     const second = createSession({ beforeKeysDiscarded: async () => undefined, api, store, home })
     let delivered = false
-    const a = first.accessToken().then(value => { delivered = true; return value })
+    const a = first.accessToken().then((value) => {
+      delivered = true
+      return value
+    })
     await stored.promise
     const b = second.accessToken()
     expect(delivered).toBe(false)
@@ -160,8 +201,13 @@ describe("credential lifecycle", () => {
       const api = fakeApi(() => refusal(code, undefined, code === "account_deleted" ? 410 : 401))
       const store = secrets.store(api)
       await store.write({ ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00:00:00Z" })
-      const session = createSession({ beforeKeysDiscarded: async () => undefined, api, store, home: await temporaryHome() })
-      const error = await session.accessToken().catch(error => error)
+      const session = createSession({
+        beforeKeysDiscarded: async () => undefined,
+        api,
+        store,
+        home: await temporaryHome(),
+      })
+      const error = await session.accessToken().catch((error) => error)
       expect(error).toBeInstanceOf(SessionEnded)
       expect(error).toMatchObject({ code, deviceRevoked: code !== "unauthorized" })
       expect(await store.read()).toBeNull()
@@ -173,7 +219,12 @@ describe("credential lifecycle", () => {
     const api = fakeApi(() => new Response(null, { status: 204 }))
     const store = secrets.store(api)
     await store.write({ ...grant, ...privateKeys })
-    await createSession({ beforeKeysDiscarded: async () => undefined, api, store, home: await temporaryHome() }).logout()
+    await createSession({
+      beforeKeysDiscarded: async () => undefined,
+      api,
+      store,
+      home: await temporaryHome(),
+    }).logout()
     expect(secrets.values.size).toBe(0)
   })
 
@@ -183,9 +234,16 @@ describe("credential lifecycle", () => {
     const store = secrets.store(api)
     await store.write({ ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00:00:00Z" })
     const persisted = await store.read()
-    const session = createSession({ beforeKeysDiscarded: async () => undefined,
-      api, home: await temporaryHome(),
-      store: { ...store, write: async () => { throw new Error("store unavailable") } },
+    const session = createSession({
+      beforeKeysDiscarded: async () => undefined,
+      api,
+      home: await temporaryHome(),
+      store: {
+        ...store,
+        write: async () => {
+          throw new Error("store unavailable")
+        },
+      },
     })
     await expect(session.accessToken()).rejects.toThrow()
     expect(await store.read()).toEqual(persisted)

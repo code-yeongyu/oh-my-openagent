@@ -48,17 +48,27 @@ export function parseRollupRows(payload: unknown): RollupRow[] {
     }
     if (typeof day !== "string" || !DAY.test(day)) throw new RollupError("Analytics Engine row has no day")
     if (!Number.isFinite(count) || count < 0) throw new RollupError("Analytics Engine row has no count")
-    return { day, kind: text("kind"), source: text("source"), version: text("version"), asset: text("asset"), count: Math.round(count) }
+    return {
+      day,
+      kind: text("kind"),
+      source: text("source"),
+      version: text("version"),
+      asset: text("asset"),
+      count: Math.round(count),
+    }
   })
 }
 
 export async function queryAnalytics(env: Env, fetcher: typeof fetch = fetch): Promise<RollupRow[]> {
   if (!env.ANALYTICS_TOKEN) throw new RollupError("ANALYTICS_TOKEN is not configured")
-  const response = await fetcher(`https://api.cloudflare.com/client/v4/accounts/${env.ACCOUNT_ID}/analytics_engine/sql`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${env.ANALYTICS_TOKEN}` },
-    body: rollupQuery(env.ANALYTICS_DATASET),
-  })
+  const response = await fetcher(
+    `https://api.cloudflare.com/client/v4/accounts/${env.ACCOUNT_ID}/analytics_engine/sql`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${env.ANALYTICS_TOKEN}` },
+      body: rollupQuery(env.ANALYTICS_DATASET),
+    },
+  )
   if (!response.ok) throw new RollupError(`Analytics Engine SQL returned ${response.status}`, response.status)
   return parseRollupRows(await response.json())
 }

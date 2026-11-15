@@ -61,7 +61,14 @@ describe("acquireSessionAdmissionLease", () => {
     // given: a normal link publication, then the empty durable state a power loss can leave
     const stateDir = tempStateDir()
     let now = Date.now()
-    const timing = { renewMs: 60_000, staleMs: 1_000, incompleteGraceMs: 100, acquireTimeoutMs: 0, retryMs: 10, now: () => now }
+    const timing = {
+      renewMs: 60_000,
+      staleMs: 1_000,
+      incompleteGraceMs: 100,
+      acquireTimeoutMs: 0,
+      retryMs: 10,
+      now: () => now,
+    }
     const original = acquired(await acquireSessionAdmissionLease(stateDir, "parent-1", timing))
     writeFileSync(original.path, "")
     now = statSync(original.path).mtimeMs
@@ -94,7 +101,13 @@ describe("acquireSessionAdmissionLease", () => {
   test("#given link EACCES #when two contenders race the exclusive-create fallback #then exactly one wins", async () => {
     // given
     const stateDir = tempStateDir()
-    restoreLeaseFs.push(setAdmissionLeaseFsForTests({ linkSync: () => { throw codedError("EACCES") } }))
+    restoreLeaseFs.push(
+      setAdmissionLeaseFsForTests({
+        linkSync: () => {
+          throw codedError("EACCES")
+        },
+      }),
+    )
     const timing = { renewMs: 60_000, acquireTimeoutMs: 0, retryMs: 10 }
 
     // when
@@ -116,7 +129,13 @@ describe("acquireSessionAdmissionLease", () => {
   for (const code of ["EPERM", "ENOTSUP"]) {
     test(`#given link ${code} #when a lease is published #then the exclusive-create fallback succeeds`, async () => {
       const stateDir = tempStateDir()
-      restoreLeaseFs.push(setAdmissionLeaseFsForTests({ linkSync: () => { throw codedError(code) } }))
+      restoreLeaseFs.push(
+        setAdmissionLeaseFsForTests({
+          linkSync: () => {
+            throw codedError(code)
+          },
+        }),
+      )
 
       const lease = acquired(await acquireSessionAdmissionLease(stateDir, "parent-1", { renewMs: 60_000 }))
 
@@ -129,16 +148,35 @@ describe("acquireSessionAdmissionLease", () => {
     // given
     const stateDir = tempStateDir()
     let now = Date.now()
-    const timing = { renewMs: 60_000, staleMs: 1_000, incompleteGraceMs: 100, acquireTimeoutMs: 0, retryMs: 10, now: () => now }
-    restoreLeaseFs.push(setAdmissionLeaseFsForTests({
-      linkSync: () => { throw codedError("EACCES") },
-      writeFallback: () => { throw new Error("simulated writer crash") },
-    }))
+    const timing = {
+      renewMs: 60_000,
+      staleMs: 1_000,
+      incompleteGraceMs: 100,
+      acquireTimeoutMs: 0,
+      retryMs: 10,
+      now: () => now,
+    }
+    restoreLeaseFs.push(
+      setAdmissionLeaseFsForTests({
+        linkSync: () => {
+          throw codedError("EACCES")
+        },
+        writeFallback: () => {
+          throw new Error("simulated writer crash")
+        },
+      }),
+    )
     await expect(acquireSessionAdmissionLease(stateDir, "parent-1", timing)).rejects.toThrow("simulated writer crash")
     const path = admissionLeasePath(stateDir, "parent-1")
     expect(readFileSync(path, "utf8")).toBe("")
     restoreLeaseFs.pop()?.()
-    restoreLeaseFs.push(setAdmissionLeaseFsForTests({ linkSync: () => { throw codedError("EACCES") } }))
+    restoreLeaseFs.push(
+      setAdmissionLeaseFsForTests({
+        linkSync: () => {
+          throw codedError("EACCES")
+        },
+      }),
+    )
     now = statSync(path).mtimeMs
 
     // when / then: held during grace
@@ -153,9 +191,17 @@ describe("acquireSessionAdmissionLease", () => {
 
   test("#given a non-fallback link error #when a lease is published #then the original error is thrown", async () => {
     const stateDir = tempStateDir()
-    restoreLeaseFs.push(setAdmissionLeaseFsForTests({ linkSync: () => { throw codedError("EIO") } }))
+    restoreLeaseFs.push(
+      setAdmissionLeaseFsForTests({
+        linkSync: () => {
+          throw codedError("EIO")
+        },
+      }),
+    )
 
-    await expect(acquireSessionAdmissionLease(stateDir, "parent-1", { renewMs: 60_000 })).rejects.toMatchObject({ code: "EIO" })
+    await expect(acquireSessionAdmissionLease(stateDir, "parent-1", { renewMs: 60_000 })).rejects.toMatchObject({
+      code: "EIO",
+    })
   })
 
   test("#given a holder renewing on virtual time #when several stale windows pass before a waiter contends #then the holder is NOT reclaimed and the waiter yields contended", async () => {
@@ -183,12 +229,22 @@ describe("acquireSessionAdmissionLease", () => {
     // given: a holder that never renews (renewMs far beyond the test) simulates a crashed process
     const stateDir = tempStateDir()
     const crashed = acquired(
-      await acquireSessionAdmissionLease(stateDir, "parent-1", { renewMs: 60_000, staleMs: 120, acquireTimeoutMs: 300, retryMs: 10 }),
+      await acquireSessionAdmissionLease(stateDir, "parent-1", {
+        renewMs: 60_000,
+        staleMs: 120,
+        acquireTimeoutMs: 300,
+        retryMs: 10,
+      }),
     )
 
     // when: a waiter observes the stale lease and wins the takeover CAS
     const successor = acquired(
-      await acquireSessionAdmissionLease(stateDir, "parent-1", { renewMs: 40, staleMs: 120, acquireTimeoutMs: 2_000, retryMs: 10 }),
+      await acquireSessionAdmissionLease(stateDir, "parent-1", {
+        renewMs: 40,
+        staleMs: 120,
+        acquireTimeoutMs: 2_000,
+        retryMs: 10,
+      }),
     )
 
     // then: the successor fenced the crashed holder out
@@ -209,7 +265,12 @@ describe("acquireSessionAdmissionLease", () => {
       // given: a stale lease left by a crashed holder, aged past its stale window on virtual time
       const stateDir = tempStateDir()
       const crashed = acquired(
-        await acquireSessionAdmissionLease(stateDir, "parent-1", { renewMs: 60_000, staleMs: 150, acquireTimeoutMs: 300, retryMs: 10 }),
+        await acquireSessionAdmissionLease(stateDir, "parent-1", {
+          renewMs: 60_000,
+          staleMs: 150,
+          acquireTimeoutMs: 300,
+          retryMs: 10,
+        }),
       )
       jest.advanceTimersByTime(200)
 
