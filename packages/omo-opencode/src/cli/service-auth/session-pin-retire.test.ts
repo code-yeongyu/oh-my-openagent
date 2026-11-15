@@ -151,4 +151,49 @@ describe("the credential write seam retires the sync pin (#12280)", () => {
     expect(await h.pins()).toEqual({ live: 0, retired: 1 })
     expect(h.logs).toEqual([])
   })
+
+  // #12383: the refused-refresh discard reads the account of a legacy sign-in the same way logout does.
+  test("#given a legacy sign-in with no account and a live pin #when its refresh is refused device_revoked #then the account is read from the service and its pin is retired", async () => {
+    const h = await pinnedHome()
+    const calls: string[] = []
+    const api = fakeApi((request) => {
+      const path = new URL(request.url).pathname
+      calls.push(`${request.method} ${path}`)
+      return path === "/v1/me"
+        ? Response.json({ user: { id: "user-1" }, account: { id: ACCOUNT } })
+        : refusal("device_revoked", undefined, 401)
+    })
+    const s = memoryStore({ ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00:00:00Z" })
+    const error = await createSession({ api, store: s.store, home: h.home, beforeKeysDiscarded: h.hook })
+      .accessToken()
+      .catch((e: unknown) => e)
+    expect(error).toMatchObject({ code: "device_revoked" })
+    expect(s.current()).toBeNull()
+    expect(calls).toEqual(["POST /v1/session/refresh", "GET /v1/me"])
+    expect(await h.pins()).toEqual({ live: 0, retired: 1 })
+  })
+
+  // #12308: plain forget reads the account of a legacy sign-in the same way; `omo account forget` owns the stamped case.
+  test("#given a legacy sign-in with no account and a live pin #when it is forgotten #then the account is read from the service and its pin is retired", async () => {
+    const h = await pinnedHome()
+    const calls: string[] = []
+    const api = fakeApi((request) => {
+      calls.push(`${request.method} ${new URL(request.url).pathname}`)
+      return Response.json({ user: { id: "user-1" }, account: { id: ACCOUNT } })
+    })
+    const s = memoryStore({ ...grant, ...privateKeys })
+    await createSession({ api, store: s.store, home: h.home, beforeKeysDiscarded: h.hook }).forget()
+    expect(s.current()).toBeNull()
+    expect(calls).toEqual(["GET /v1/me"])
+    expect(await h.pins()).toEqual({ live: 0, retired: 1 })
+  })
+
+  test("#given an unreadable stored item #when it is forgotten #then it is still deleted, its pin is kept, and one line is logged", async () => {
+    const h = await pinnedHome()
+    const s = memoryStore(stored, true)
+    await createSession({ api: "https://api.omo.dev", store: s.store, home: h.home, beforeKeysDiscarded: h.hook }).forget()
+    expect(s.current()).toBeNull()
+    expect(await h.pins()).toEqual({ live: 1, retired: 0 })
+    expect(h.logs).toHaveLength(1)
+  })
 })

@@ -777,6 +777,8 @@ describe("discarding keys retires the account's sync pin (#12280)", () => {
 
   for (const [name, args, stdin] of [
     ["forget --device", ["forget", "--device", "dev-1"], undefined],
+    // #12308: the desktop signs a CLI-item session out with plain forget.
+    ["plain forget", ["forget"], undefined],
     ["adopt --replace with another device", ["adopt", "--replace"], JSON.stringify(credential("dev-2", 3_600_000))],
   ] as const) {
     test(`#given a joined device #when ${name} discards its keys #then its account's pin is retired, another account's is kept, and show reports not_joined`, async () => {
@@ -797,6 +799,19 @@ describe("discarding keys retires the account's sync pin (#12280)", () => {
       expect(await shown(s.store, pinDir, "acct-other")).toBe("joined")
     })
   }
+
+  // #12384: after a sign-out without --device, status agrees with the sign-out instead of still answering joined.
+  test("#given a joined device #when it signs out without --device #then show --account reports it signed out and not joined", async () => {
+    const home = mkdtempSync(join(tmpdir(), "omo-account-retire-"))
+    homes.push(home)
+    const pinDir = join(home, "sync-device")
+    await writePin(pinDir, "acct-1")
+    const s = memoryStore(withAccount("dev-1", "acct-1"))
+    expect((await run(s.store, ["forget"], { pinDir, ...retiring(pinDir) })).out).toEqual([{ forgotten: true }])
+    expect((await run(s.store, ["show", "--account", "acct-1"], { pinDir })).out).toEqual([
+      { signedIn: false, sync: "not_joined" },
+    ])
+  })
 
   test("#given a desktop-owned session's account #when retire-sync runs #then that pin is retired, idempotently", async () => {
     const home = mkdtempSync(join(tmpdir(), "omo-account-retire-"))
