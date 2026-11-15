@@ -83,7 +83,6 @@ describe("cold wake on Linux", () => {
     const { host, home, runs } = fakeSystemd()
     expect(await installColdWake(host, LAUNCH)).toEqual({ kind: "installed", serviceRestarted: true })
     expect(readFileSync(join(UNIT_DIR(home), "omo-session-host.service"), "utf8")).toContain('ExecStart="/opt/omo"')
-    expect(statSync(join(UNIT_DIR(home), "omo-session-host.service")).mode & 0o777).toBe(0o644)
     expect(readFileSync(DROP_IN(home), "utf8")).toBe(
       '[Service]\nEnvironment="OMO_RELAYD_SERVICES={\\"omo\\":{\\"systemd_user\\":\\"omo-session-host.service\\",\\"senders\\":[]}}"\n',
     )
@@ -93,6 +92,13 @@ describe("cold wake on Linux", () => {
       "systemctl --user enable omo-session-host.service",
       "systemctl --user restart omo-session-host.service",
     ])
+  })
+
+  // systemd refuses a group- or world-writable unit; Windows has no POSIX modes (and no session host unit).
+  test.skipIf(process.platform === "win32")("writes the unit 0644", async () => {
+    const { host, home } = fakeSystemd()
+    await installColdWake(host, LAUNCH)
+    expect(statSync(join(UNIT_DIR(home), "omo-session-host.service")).mode & 0o777).toBe(0o644)
   })
 
   test("starts a unit that is not running without rewriting anything else", async () => {
