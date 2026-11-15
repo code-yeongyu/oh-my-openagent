@@ -105,10 +105,11 @@ describe("selectedDeviceAccountSource", () => {
     expect(loads).toBe(2)
   })
 
+  type Loader = typeof import("./account-runtime-loader")
+  // A hot reload loads omo.js as a new module instance in the same process; senpi's worker-data registry survives it.
+  const generation = (name: string): Promise<Loader> => import(`./account-runtime-loader?generation=${name}`)
+
   test("#given omo.js re-evaluated by an extension hot reload #when the fresh module instance selects the account source #then it reuses the process's memory-sync provider instead of providing the name again", async () => {
-    type Loader = typeof import("./account-runtime-loader")
-    // A hot reload loads omo.js as a new module instance in the same process; senpi's worker-data registry survives it.
-    const generation = (name: string): Promise<Loader> => import(`./account-runtime-loader?generation=${name}`)
     const before = await generation("before-reload")
     const after = await generation("after-reload")
     const runtime = async (): Promise<DeviceAccountRuntimeModule> => cliRuntime(() => async () => account("acct_3"))
@@ -122,12 +123,12 @@ describe("selectedDeviceAccountSource", () => {
     const guard = Symbol.for("omo.memory-sync.worker-data-provided.v1")
     const provided = globalThis as typeof globalThis & { [key: symbol]: unknown }
     // An earlier build provided the name but never set the guard: the registry holds the name, the guard is absent.
-    const fresh = await import("./account-runtime-loader?generation=older-build-registered")
+    const fresh = await generation("older-build-registered")
     fresh.selectedDeviceAccountSource({ env: {} }, async () => cliRuntime(() => async () => account("acct_4")))
     const kept = provided[guard]
     delete provided[guard]
     try {
-      const current = await import("./account-runtime-loader?generation=after-older-build")
+      const current = await generation("after-older-build")
       expect(() =>
         current.selectedDeviceAccountSource({ env: {} }, async () => cliRuntime(() => async () => account("acct_4"))),
       ).toThrow(/already provided.*restart the session/s)

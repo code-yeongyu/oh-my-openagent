@@ -32,10 +32,6 @@ const PROVIDED_HOST_KEY = Symbol.for("omo.memory-sync.worker-data-provided.v1")
 type ProvidedHostGlobal = typeof globalThis & { [PROVIDED_HOST_KEY]?: HostMemorySync }
 
 /**
- * The thread's one account source: on the main thread it selects once per process and provides the Worker port; in a
- * session Worker it reads the port the host issued. The CLI credential source is built only for a CLI selection.
- */
-/**
  * The name is omo's own, so a provider registered before this module's guard existed is most often an earlier omo build
  * in this same process (an in-place update hot-reloaded omo.js) and only a restart replaces it. It stays a bootstrap
  * failure either way: the message names the likely cause and the remedy, and keeps the original text (#13101 review).
@@ -48,6 +44,10 @@ function providerConflict(error: unknown): unknown {
   )
 }
 
+/**
+ * The thread's one account source: on the main thread it selects once per process and provides the Worker port; in a
+ * session Worker it reads the port the host issued. The CLI credential source is built only for a CLI selection.
+ */
 export function selectedDeviceAccountSource(
   options: Parameters<DeviceAccountRuntimeModule["selectedAccountSource"]>[1],
   importRuntime: () => Promise<DeviceAccountRuntimeModule> = importDeviceAccountRuntime,
