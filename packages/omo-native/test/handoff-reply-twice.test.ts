@@ -4,7 +4,11 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import type { JsonObject, RemoteThreadSurface } from "../../omo-senpi/src/components/thread/remote/ports"
-import { createRemoteThreadFixture, ENGINE } from "../../omo-senpi/src/components/thread/thread-remote-fixture"
+import {
+  createRemoteThreadFixture,
+  ENGINE,
+  stampPromptRecord,
+} from "../../omo-senpi/src/components/thread/thread-remote-fixture"
 import type { RemoteCommandDependencies } from "../remote-cli"
 import { runSession } from "../remote-session-verbs"
 
@@ -77,8 +81,10 @@ async function send(script: Script) {
   const account = fixture.account(script.queued === true ? { engine: { ...ENGINE, streaming: true, pending: 1 } } : {})
   const base = account.remote.sessions
   let listener: ((record: JsonObject) => void) | undefined
+  // The run's prompt message streams stamped with the client message id this send's prompt named, as senpi streams it.
+  let promptClientMessageId: unknown
   const emit = (records: readonly JsonObject[] = []) => {
-    for (const record of records) listener?.(record)
+    for (const record of records) listener?.(stampPromptRecord(record, promptClientMessageId))
   }
   let reads = 0
   const remote: RemoteThreadSurface = {
@@ -103,7 +109,10 @@ async function send(script: Script) {
       },
       sessionCommand: async (device, session, rpc, options) => {
         const outcome = await base.sessionCommand(device, session, rpc, options)
-        if (rpc["type"] === "prompt") emit(script.beforeReply)
+        if (rpc["type"] === "prompt") {
+          promptClientMessageId = rpc["clientMessageId"]
+          emit(script.beforeReply)
+        }
         return outcome
       },
       read: async () => {

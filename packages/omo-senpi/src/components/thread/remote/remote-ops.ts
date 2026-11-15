@@ -401,14 +401,15 @@ export async function followRemote(
     onText(delta)
   }
   // Whether a buffered stream record is this send's own prompt: senpi streams the prompt's user message as the run
-  // starts, and stores its entry at that message's end. A message stamped with a client message id is this send's only
-  // when it carries the send's own id; an unstamped one is matched by its text, as the transcript readers match an
-  // engine that keeps no id (#13481 review M1).
+  // starts, and stores its entry at that message's end. A send with a client message id owns only the message carrying
+  // that id: an earlier identical prompt with no id (a send without --wait, text typed in the TUI) is not its own. Only
+  // a send with no id of its own matches by text, as the transcript readers match an engine that keeps no id (#13481
+  // review M1).
   const isOwnPrompt = (record: JsonObject): boolean => {
     const text = options?.text
     if (text === undefined || record["type"] !== "message_end" || !isUserEntry(record)) return false
-    const stamped = entryClientMessageIdOf(record)
-    if (stamped !== undefined) return stamped === options?.clientMessageId
+    const clientMessageId = options?.clientMessageId
+    if (clientMessageId !== undefined) return entryClientMessageIdOf(record) === clientMessageId
     return entryTextOf(record)?.includes(text) === true
   }
   /**
@@ -461,8 +462,12 @@ export async function followRemote(
     const interrupted = stopReason === "aborted"
     if (!(superseded || (settleSignal && (answerAtTail || interrupted)))) return
     if (answer.length === 0 && !interrupted) return
-    // An interrupted turn whose partial text the stream already printed ends without printing it again (#13481 review L3).
-    if (interrupted && streamed !== "") return end("interrupted")
+    const stored = answer.join("\n")
+    // An interrupted turn whose partial text the stream already printed ends without printing it again; deltas that
+    // are not this turn's text (a later message's turn) never drop its partial answer, which prints below (#13481
+    // review L3).
+    if (interrupted && streamed !== "" && (stored.startsWith(streamed) || streamed.startsWith(stored)))
+      return end("interrupted")
     if (streamed === "")
       for (const [index, entryText] of answer.entries()) {
         if (index > 0) onText("\n")
@@ -472,7 +477,6 @@ export async function followRemote(
       // The stream printed from the aim on: of this turn's stored answer only what it has not printed yet is written,
       // so the answer prints once (#13481). Deltas that are not this answer (a later message's turn streaming after
       // the aim of a superseded send) never drop it: it prints after them (#13481 review L3).
-      const stored = answer.join("\n")
       if (stored.startsWith(streamed)) {
         if (stored.length > streamed.length) onText(stored.slice(streamed.length))
       } else if (!streamed.startsWith(stored)) {
