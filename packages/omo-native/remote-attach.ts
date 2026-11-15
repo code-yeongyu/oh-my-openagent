@@ -12,6 +12,7 @@ import type {
   SnapshotBody,
 } from "../device-service-core/src/index.ts"
 import { outcomeFailure, outcomeOf } from "../omo-senpi/src/components/thread/remote/outcome"
+import { MirroredDialogs } from "./remote-attach-dialogs"
 
 // `omo remote attach` serves one remote session to the engine's unchanged attach TUI (`--attach <socket> --session
 // <ref>`): a private endpoint that speaks the RPC subset the TUI uses, answered from the device service's attach.
@@ -64,6 +65,7 @@ class Presentation {
   private snapshot: SnapshotBody | undefined
   private streaming = false
   private stopStream: (() => void) | undefined
+  private readonly dialogs = new MirroredDialogs()
   private readonly attach: RemoteAttach
   private readonly label: string
   private readonly socket: Socket
@@ -107,7 +109,10 @@ class Presentation {
         this.snapshot = event.snapshot
         return
       case "records":
-        for (const record of event.records) this.send({ ...record, sessionId: LOCAL_SESSION_ID })
+        for (const record of event.records) {
+          const dialog = this.dialogs.present(record, LOCAL_SESSION_ID)
+          if (dialog !== null) this.send(dialog ?? { ...record, sessionId: LOCAL_SESSION_ID })
+        }
         return
       case "pending":
         this.notify("Waiting for the remote device to share this session", "info")
@@ -186,7 +191,8 @@ class Presentation {
    * sessionId, or naming another one, goes as it is for the host to decide.
    */
   private async forward(request: JsonObject, type: string): Promise<void> {
-    const rpc = request.sessionId === LOCAL_SESSION_ID ? { ...request, sessionId: this.attach.sessionId } : request
+    const named = this.dialogs.answer(request)
+    const rpc = named.sessionId === LOCAL_SESSION_ID ? { ...named, sessionId: this.attach.sessionId } : named
     const { outcome, response } = await this.attach.command(rpc)
     if (response !== undefined) {
       this.send({ ...response, id: request.id })
