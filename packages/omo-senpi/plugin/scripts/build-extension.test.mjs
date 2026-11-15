@@ -379,6 +379,24 @@ describe("checkExtensionCurrent", () => {
     expect(threadClientInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(true)
   })
 
+  test("#given cross-device reply routing #when bundle inputs are inspected #then it loads only from the thread client sidecar", async () => {
+    const { mainInputs, threadClientInputs } = await sharedOutputs()
+    for (const suffix of [
+      // The reply routing and the account-wide id lookup of #13037 (keeps omo.js inside its byte budget).
+      "packages/omo-senpi/src/components/thread/tools/reply-target.ts",
+      "packages/omo-senpi/src/components/thread/tools/remote-lookup.ts",
+    ]) {
+      expect(
+        mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(false)
+      expect(
+        threadClientInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(true)
+    }
+  })
+
   test("#given lazy session-summary recovery #when bundle inputs are inspected #then the recovery sweep is confined to its sidecar", async () => {
     const { mainInputs, telemetryRecoveryInputs } = await sharedOutputs()
     const suffix = "/components/telemetry/session-summary-recovery.ts"

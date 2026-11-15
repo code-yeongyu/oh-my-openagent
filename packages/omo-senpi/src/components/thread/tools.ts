@@ -1,9 +1,8 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
-import { threadToolFailure } from "./errors"
 import type { ThreadErrorCode, ThreadToolFailure } from "./errors"
 import { type Static } from "typebox"
 import { toThreadAddressEntries } from "./address-book"
-import { checkNameConflict, normalizeThreadName, type ThreadResolveResult } from "./addressing"
+import { checkNameConflict, normalizeThreadName, type ThreadAddressEntry, type ThreadResolveResult } from "./addressing"
 import { createLocalSessionHost } from "./control/local-session-host"
 import { checkInitialSkills } from "./initial-skills"
 import {
@@ -35,8 +34,7 @@ import { createGatewayServices } from "./tools/gateway-services"
 import { listThreads, readThread } from "./tools/read-ops"
 import { createRelayTools } from "./tools/relay-tools"
 import { consumedSendersOf, threadSendPermission } from "./tools/reply-permission"
-import { otherDevice, replyTargetMismatch } from "./tools/reply-target"
-import { claimCreatedAlias, listAcross, planCreate, renameAlias, withAlias } from "./remote/lazy-ops"
+import { claimCreatedAlias, listAcross, planCreate, renameAlias, threadRouting, withAlias } from "./remote/lazy-ops"
 import { locateControl } from "./control/locate"
 import { closeThread, interruptThread, setModelOn, setThinkingLevelOn } from "./control/operations"
 import { controlIdentity, controlRefusalOf } from "./control/port"
@@ -66,7 +64,6 @@ import {
   targetSession,
   type AnyTool,
   type ToolOutput,
-  replyOnDevice,
   resolveAcross,
 } from "./tools/internals"
 
@@ -299,7 +296,9 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
       const current =
         sendTo !== "" && sendTo !== "self" && (await store.sessionOwner(sendTo)) !== null
           ? PUBLISHED_SEND_VIEW
-          : sendTo !== "" && (await replyLeavesThisDevice(options, sendTo))
+          : sendTo !== "" &&
+              consumedSendersOf(options, sendTo).some((sender) => sender.device !== undefined) &&
+              (await (await threadRouting()).replyLeavesThisDevice(options, sendTo))
             ? NO_LOCAL_VIEW
             : await view(receipted ? undefined : { offline: true })
       result = await sideEffect(current, value, scope.idempotency_key, callerId)
@@ -348,23 +347,11 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
             const found = await resolveAcross(options, entries, address, callerId, true)
             if (found.kind === "error")
               return { kind: "error", result: { kind: "error", error: found } as ThreadToolResult }
-            // A session found only by a probe (no file path: its device holds it but runs it nowhere) is no existing thread to
-            // open (omo#13037 A4.4): today's answer for a holder that cannot be reached, and no open is sent. A listed ended
-            // thread still opens from its file, as before.
-            if (
-              found.entry.transport?.kind === "relay" &&
-              found.entry.transport.row.state === "ended" &&
-              found.entry.transport.row.path === ""
-            )
-              return {
-                kind: "error",
-                result: failure(
-                  "not_found",
-                  `Thread ${found.entry.thread_id} on device ${found.entry.transport.row.device} is not running there.`,
-                  "Call thread_list with all_scope to find the live thread.",
-                  { device: found.entry.transport.row.device, thread_id: found.entry.thread_id },
-                ),
-              }
+            if (found.entry.transport?.kind === "relay") {
+              const refusal = (await threadRouting()).probedOnlyRefusal(found.entry)
+              if (refusal !== undefined)
+                return { kind: "error", result: { kind: "error", error: refusal } as ThreadToolResult }
+            }
             return found.entry.transport?.kind === "relay"
               ? { kind: "remote", row: found.entry.transport.row }
               : { kind: "local", address: found.entry.thread_id, accountWide: true }
@@ -640,34 +627,33 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
     })
     // Amendment A4.3.1 of #13037: a send approved as a reply resolves on the device the consumed delivery came from, before
     // this device's own entries and before any other listing match, whether the sender is named by id or by stated name.
-    const senders = match === "exact" ? consumedSendersOf(options, address) : []
-    const here = await thisDeviceOf(options, senders)
+    // The routing loads from the thread client sidecar only for a send approved as a reply.
+    const approved = consumedSendersOf(options, address)
+    const senders = match === "exact" ? approved : []
+    const routing = approved.length === 0 ? undefined : await threadRouting()
+    const here = senders.length === 0 ? undefined : await routing?.thisDeviceOf(options, senders)
     if (typeof here === "object") return refuse(here)
-    const replyTo = replySender(address, senders, here)
+    const replyTo = senders.length === 0 ? undefined : routing?.replySender(address, senders, here)
+    const mismatchOf = (entry: ThreadAddressEntry) => routing?.replyTargetMismatch(options, address, entry, here)
     if (replyTo !== undefined && "code" in replyTo) return refuse(replyTo)
-    if (replyTo?.device !== undefined) {
-      const resolved = await replyOnDevice(options, { session_id: replyTo.session_id, device: replyTo.device })
+    if (routing !== undefined && replyTo?.device !== undefined) {
+      const resolved = await routing.replyOnDevice(options, { session_id: replyTo.session_id, device: replyTo.device })
       if (resolved.kind === "error")
         return { kind: "error", result: { kind: "error", error: resolved } as ThreadToolResult }
-      const mismatch = replyTargetMismatch(options, address, resolved.entry, here)
+      const mismatch = mismatchOf(resolved.entry)
       if (mismatch !== undefined) return refuse(mismatch)
       if (resolved.entry.transport?.kind === "relay") return { kind: "remote", row: resolved.entry.transport.row }
     }
     if (current === PUBLISHED_SEND_VIEW) {
       // A reply approved by the sender's stated name must still land on that sender, not on a published thread that happens to carry the same spelling as its id.
-      const mismatch = replyTargetMismatch(
-        options,
-        address,
-        {
-          thread_id: address,
-          name: address,
-          status: "live",
-          cwd: "",
-          created_at: "",
-          updated_at: null,
-        },
-        here,
-      )
+      const mismatch = mismatchOf({
+        thread_id: address,
+        name: address,
+        status: "live",
+        cwd: "",
+        created_at: "",
+        updated_at: null,
+      })
       if (mismatch !== undefined)
         return { kind: "error", result: { kind: "error", error: mismatch } as ThreadToolResult }
       return { kind: "local", thread_id: address, all_scope: scope }
@@ -688,7 +674,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
     // The allowance approved this send as a reply to a consumed delivery's sender (by id or stated name): deliver only when
     // the address resolves to that sender on that sender's device, else refuse by name without sending (decision 0027
     // section 6, A4.3.1).
-    const mismatch = replyTargetMismatch(options, address, resolved.entry, here)
+    const mismatch = mismatchOf(resolved.entry)
     if (mismatch !== undefined) return { kind: "error", result: { kind: "error", error: mismatch } as ThreadToolResult }
     if (resolved.entry.transport?.kind === "relay") return { kind: "remote", row: resolved.entry.transport.row }
     return { kind: "local", thread_id: resolved.entry.thread_id, all_scope: resolved.all_scope ?? scope }
@@ -843,69 +829,4 @@ export function registerThreadTools(
   if (pi.on !== undefined)
     registerExtensionTools(pi as ExtensionToolHost & Required<Pick<ExtensionToolHost, "on">>, options, log)
   return { dispose: built.dispose }
-}
-
-type ConsumedSender = { readonly session_id: string; readonly device?: string }
-
-/**
- * This device's own id, read only when a consumed sender names a device: a sender naming it is a sender on this device.
- * A failed read is a typed host_unavailable, never undefined: without the id a sender on this device cannot be told from
- * one on another device, and guessing "another device" would route a local reply through the relay (#13218 review).
- */
-async function thisDeviceOf(
-  options: ThreadToolSurfaceOptions,
-  senders: readonly ConsumedSender[],
-): Promise<string | undefined | ThreadToolFailure> {
-  if (options.remote === undefined || !senders.some((sender) => sender.device !== undefined)) return undefined
-  try {
-    return (await options.remote.sessions.thisDevice()) ?? undefined
-  } catch (error) {
-    const devices = [...new Set(senders.flatMap((sender) => (sender.device === undefined ? [] : [sender.device])))]
-    return threadToolFailure(
-      "host_unavailable",
-      "This device's id could not be read, so a reply to a sender named by its device cannot be routed; nothing was sent.",
-      "Retry when the device service is reachable.",
-      { devices, reason: error instanceof Error ? error.message : String(error) },
-    )
-  }
-}
-
-/** True when `address` is an approved reply to a consumed sender on another device, or names such senders ambiguously. */
-async function replyLeavesThisDevice(options: ThreadToolSurfaceOptions, address: string): Promise<boolean> {
-  const senders = consumedSendersOf(options, address)
-  if (!senders.some((sender) => sender.device !== undefined)) return false
-  const here = await thisDeviceOf(options, senders)
-  // An unreadable device id takes no local listing either: the send answers that failure (sendTarget) before any route.
-  if (typeof here === "object") return true
-  const replyTo = replySender(address, senders, here)
-  return replyTo !== undefined && ("code" in replyTo || replyTo.device !== undefined)
-}
-
-/**
- * The one consumed sender a reply addresses, its device absent for this device; undefined when the send is no reply. One
- * session id stated from two devices, or one name stated by two senders, is ambiguous_target: none is picked.
- */
-function replySender(
-  address: string,
-  senders: readonly ConsumedSender[],
-  here: string | undefined,
-): { readonly session_id: string; readonly device: string | undefined } | ThreadToolFailure | undefined {
-  const distinct = new Map<string, { readonly session_id: string; readonly device: string | undefined }>()
-  for (const sender of senders) {
-    const device = otherDevice(sender.device, here)
-    distinct.set(JSON.stringify([sender.session_id, device ?? null]), { session_id: sender.session_id, device })
-  }
-  const found = [...distinct.values()]
-  if (found.length <= 1) return found[0]
-  return threadToolFailure(
-    "ambiguous_target",
-    `"${address}" names more than one sender of this run's deliveries; none was picked.`,
-    "Send to the intended thread as a normal send, by its id.",
-    {
-      candidates: found.map((sender) => ({
-        id: sender.session_id,
-        ...(sender.device === undefined ? {} : { device: sender.device }),
-      })),
-    },
-  )
 }

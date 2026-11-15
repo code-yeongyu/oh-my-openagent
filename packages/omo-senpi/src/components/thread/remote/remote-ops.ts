@@ -1,9 +1,8 @@
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import type { CommandResult } from "@oh-my-opencode/device-service-core"
 import { outcomeFailure, READ_UNCERTAIN } from "./outcome"
+import { threadRouting } from "./lazy-ops"
 import {
-  endedRow,
-  probeMayBuildEndedRow,
   type AliasError,
   type AliasHolder,
   type JsonObject,
@@ -112,8 +111,12 @@ export async function holderTarget(
   if (row !== undefined) return { where: "remote", row }
   // omo#13037 A4.3.2: the holder's device answered the probe for a session no engine lists: an ended row from that answer,
   // only while this device's service can carry the wake (else today's not_found below).
-  if (located.kind === "ok" && (await probeMayBuildEndedRow(remote.sessions)))
-    return { where: "remote", row: endedRow(holder.device, located.sessionId, holder.session_id) }
+  if (located.kind === "ok") {
+    const ended = await (
+      await threadRouting()
+    ).holderEndedRow(remote.sessions, holder.device, located.sessionId, holder.session_id)
+    if (ended !== undefined) return { where: "remote", row: ended }
+  }
   return fail(
     "not_found",
     `The alias names thread ${holder.session_id} on device ${holder.device}, which that device does not list.`,
