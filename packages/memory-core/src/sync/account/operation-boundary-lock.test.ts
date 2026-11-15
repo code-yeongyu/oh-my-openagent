@@ -13,8 +13,10 @@ import { walk } from "../genesis/vector.test-support.ts"
 import {
   cleanupStack,
   closedAfterPublications,
+  REAP_BOUND_MS,
   reap,
   resolvable,
+  SETTLE_BOUND_MS,
   StepStalled,
   stepsWithin,
   writerState,
@@ -40,7 +42,7 @@ const TEST_TIMEOUT_MS = 20_000
 const STEP_BUDGET_MS = 16_000
 // Cleanup waits at most once for a reap and once for a publication to settle. The hook's own timeout is
 // stated above their sum: without `--timeout 20000` the runner would give it 5 s, less than those bounds.
-const CLEANUP_TIMEOUT_MS = 10_000
+const CLEANUP_TIMEOUT_MS = REAP_BOUND_MS + SETTLE_BOUND_MS + 3_000
 
 afterEach(cleanup.closeAll, CLEANUP_TIMEOUT_MS)
 
@@ -187,6 +189,8 @@ test(
     expect(stalled).toBeInstanceOf(StepStalled)
     expect(stalled).toMatchObject({ step: "writer wrote" })
     expect(writer.exitCode).toBeNull()
+    expect(writer.signalCode).toBeNull()
+    expect(pidAlive(writer.pid)).toBe(true)
     await reap(writer)
     expect(pidAlive(writer.pid)).toBe(false)
   },

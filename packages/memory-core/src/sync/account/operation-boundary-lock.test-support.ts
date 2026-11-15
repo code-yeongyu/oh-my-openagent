@@ -5,8 +5,8 @@ import type { Subprocess } from "bun"
 import { settlesWithin } from "../../git/settles-within.test-support.ts"
 import { pidAlive } from "../../locks/process-liveness.test-support.ts"
 
-const REAP_BOUND_MS = 2_000
-const SETTLE_BOUND_MS = 5_000
+export const REAP_BOUND_MS = 2_000
+export const SETTLE_BOUND_MS = 5_000
 
 type Closer = () => void | Promise<void>
 
