@@ -8,7 +8,13 @@ export {
   openDeviceSync,
   resolveSpace,
 } from "@oh-my-opencode/memory-core/sync-engine"
-export { enableSync, joinAccount, approveDevice } from "@oh-my-opencode/memory-core/sync-engine"
+export {
+  acknowledgePhraseVoid,
+  enableSync,
+  joinAccount,
+  approveDevice,
+  phraseNoticeStatus,
+} from "@oh-my-opencode/memory-core/sync-engine"
 // A freeze status exists only while the engine runs, so its words ship with the engine, not the eager bundle.
 export { failureRpcSync, freezeFailure } from "./sync-status-copy"
 
