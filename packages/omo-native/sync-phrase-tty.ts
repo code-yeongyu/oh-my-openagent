@@ -5,6 +5,13 @@ import { ReadStream, WriteStream } from "node:tty"
 import type { PhraseSurface } from "../memory-core/src/sync/genesis/phrase-bridge.ts"
 import type { PhraseEntrySurface } from "../memory-core/src/sync/recovery/bridge-recover-phrase.ts"
 import { TypedPhrase } from "../memory-core/src/sync/recovery/phrase.ts"
+import {
+  ALT_SCREEN_OFF,
+  ALT_SCREEN_ON,
+  alternateScreenTracker,
+  restoreOnSignal,
+  writeAll,
+} from "./sync-phrase-tty-restore.ts"
 
 /**
  * The CLI's only phrase surface (A3 contract sec 7, review F5): the controlling terminal, opened directly. Words
@@ -37,6 +44,35 @@ export function controllingTerminalAvailable(): boolean {
   }
 }
 
+/**
+ * A controlling terminal that is put back on every exit (#13337 review L2): normal mode and the main screen are
+ * restored by `close()` and also when a signal ends the process mid-ceremony, where no `finally` runs. Release
+ * runs once and removes the signal listeners; a write after it (a `finally` that runs because another listener
+ * kept the process alive) is dropped instead of hitting the closed descriptor.
+ */
+function restoringTerminal(
+  input: NodeJS.ReadableStream,
+  write: (text: string) => void,
+  release: () => void,
+): PhraseTerminal {
+  let released = false
+  const screen = alternateScreenTracker((text) => {
+    if (!released) write(text)
+  })
+  let stop = () => undefined as void
+  const terminal = terminalFromStreams(input, { write: screen.write }, () => {
+    if (released) return
+    released = true
+    stop()
+    release()
+  })
+  stop = restoreOnSignal(() => {
+    screen.leave()
+    terminal.close()
+  })
+  return terminal
+}
+
 export function openControllingTerminal(): PhraseTerminal | null {
   // Checker LOW (#13337 @ e6ac0bca): each stream owns its own descriptor, so release closes each exactly once
   // (one shared fd was closed by both streams, and the second close could hit a reused fd number).
@@ -48,11 +84,15 @@ export function openControllingTerminal(): PhraseTerminal | null {
       const input = new ReadStream(opened[0] ?? -1)
       const output = new WriteStream(opened[1] ?? -1)
       input.setRawMode(true)
-      return terminalFromStreams(input, output, () => {
-        input.setRawMode(false)
-        input.destroy()
-        output.end()
-      })
+      return restoringTerminal(
+        input,
+        (text) => void output.write(text),
+        () => {
+          input.setRawMode(false)
+          input.destroy()
+          output.end()
+        },
+      )
     }
     // #13696: Bun's tty.ReadStream leaves a blocking read in flight on /dev/tty after destroy(), so the command
     // never exits until another key arrives. Words are read through a non-blocking descriptor whose reader is
@@ -65,14 +105,20 @@ export function openControllingTerminal(): PhraseTerminal | null {
     const input = Readable.fromWeb(Bun.file(readFd).stream())
     // Bun.file does not own the descriptor; it is closed once the cancelled reader has let go of it.
     input.once("close", () => closeSync(readFd))
-    const output = new WriteStream(opened[2] ?? -1)
+    // #13337 review L1: the words go out through plain synchronous writes on this descriptor, closed exactly once
+    // on release (a tty.WriteStream over it closed only its own duplicate and left this one open).
+    const writeFd = opened[2] ?? -1
     mode.setRawMode(true)
-    return terminalFromStreams(input, output, () => {
-      mode.setRawMode(false)
-      mode.destroy()
-      input.destroy()
-      output.end()
-    })
+    return restoringTerminal(
+      input,
+      (text) => writeAll(writeFd, text),
+      () => {
+        mode.setRawMode(false)
+        mode.destroy()
+        input.destroy()
+        closeSync(writeFd)
+      },
+    )
   } catch {
     for (const fd of opened) closeSync(fd)
     return null
@@ -138,9 +184,6 @@ export function terminalFromStreams(
     },
   }
 }
-
-const ALT_SCREEN_ON = "\u001b[?1049h\u001b[H\u001b[2J"
-const ALT_SCREEN_OFF = "\u001b[2J\u001b[H\u001b[?1049l"
 
 /**
  * The genesis/enrollment surface (show + 3-word check) and the recovery surface (enter), all on the terminal's
