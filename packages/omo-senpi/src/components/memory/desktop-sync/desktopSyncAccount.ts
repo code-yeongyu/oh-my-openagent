@@ -68,19 +68,40 @@ const sameDescriptor = (a: DesktopSyncDescriptor, b: DesktopSyncDescriptor) =>
 
 /** Install this source in the engine's composition root, never the CLI credential source. */
 export async function openDesktopSyncAccount(wire: DesktopSyncEngineWire, home?: string): Promise<DesktopSyncAccount> {
+  // The account ends with the channel or at main's `retired` event, which leaves the channel open (#13325). Listening
+  // before the descriptor request also ends an account whose describe raced its own retirement.
+  const retired = new AbortController()
+  const stopListening = wire.onEvent((event) => {
+    if (event.event === "retired") retired.abort()
+  })
+  const signal = AbortSignal.any([wire.signal, retired.signal])
+  signal.addEventListener("abort", stopListening, { once: true })
+  try {
+    return await openAccount(wire, signal, home)
+  } catch (error) {
+    retired.abort()
+    throw error
+  }
+}
+
+async function openAccount(
+  wire: DesktopSyncEngineWire,
+  signal: AbortSignal,
+  home: string | undefined,
+): Promise<DesktopSyncAccount> {
   const descriptor: DesktopSyncDescriptor = SyncDescriptor.parse(await wire.request({ op: "descriptor" }))
-  const boundary = desktopSyncBoundary(descriptor, wire.signal, home)
+  const boundary = desktopSyncBoundary(descriptor, signal, home)
   const accountAuthority: SyncOperationAuthority = {
-    signal: wire.signal,
+    signal,
     admit(effect) {
-      if (wire.signal.aborted) throw new DesktopSyncRefused()
+      if (signal.aborted) throw new DesktopSyncRefused()
       return effect()
     },
     boundary,
   }
   const open = async (authority: SyncOperationAuthority) => {
     const operation = await openDesktopSyncOperation(wire, {
-      signal: AbortSignal.any([wire.signal, authority.signal]),
+      signal: AbortSignal.any([signal, authority.signal]),
       admit: (effect) => accountAuthority.admit(() => authority.admit(effect)),
     })
     const call = (data: Readonly<Record<string, unknown>>) => operation.request({ op: "service", data })
@@ -128,7 +149,7 @@ export async function openDesktopSyncAccount(wire: DesktopSyncEngineWire, home?:
     let active = true
     let subscription: Awaited<ReturnType<typeof open>> | undefined
     const remove = wire.onEvent((event) => {
-      if (!active || wire.signal.aborted || event.event === "retired" || event.handle !== subscription?.handle) return
+      if (!active || signal.aborted || event.event === "retired" || event.handle !== subscription?.handle) return
       if (event.event === "advanced") handlers.onAdvanced(event.head)
       else handlers.onConnected(event.connected)
     })
@@ -139,13 +160,13 @@ export async function openDesktopSyncAccount(wire: DesktopSyncEngineWire, home?:
         await operation.call({ op: "subscribe" })
       })
       .catch(() => {
-        if (active && !wire.signal.aborted) handlers.onConnected(false)
+        if (active && !signal.aborted) handlers.onConnected(false)
       })
     return () => {
       if (!active) return
       active = false
       remove()
-      if (subscription !== undefined && !wire.signal.aborted) void subscription.close().catch(() => undefined)
+      if (subscription !== undefined && !signal.aborted) void subscription.close().catch(() => undefined)
     }
   })
   const forOperation = async (authority: SyncOperationAuthority): Promise<DesktopSyncOperation> => {
@@ -177,7 +198,7 @@ export async function openDesktopSyncAccount(wire: DesktopSyncEngineWire, home?:
   return {
     kind: "desktop",
     descriptor,
-    signal: wire.signal,
+    signal,
     keyring: background.keyring,
     chain: background.chain,
     pairing: background.pairing,
@@ -187,9 +208,9 @@ export async function openDesktopSyncAccount(wire: DesktopSyncEngineWire, home?:
     boundary,
     forOperation,
     async isCurrent() {
-      if (wire.signal.aborted) return false
+      if (signal.aborted) return false
       const current = SyncDescriptor.parse(await wire.request({ op: "descriptor" }))
-      if (wire.signal.aborted || !sameDescriptor(current, descriptor)) return false
+      if (signal.aborted || !sameDescriptor(current, descriptor)) return false
       return boundary(() => true).then(
         () => true,
         () => false,
