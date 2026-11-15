@@ -8,6 +8,7 @@ import {
   installDeviceService,
 } from "../device-service-core/src/index.ts"
 import packageJson from "./package.json" with { type: "json" }
+import { applyColdWake, type ColdWake } from "./remote-cold-wake"
 import { statusLines } from "./remote-render"
 
 // `omo remote bootstrap`: the device service bootstrap every interactive omo start runs in the background (the
@@ -68,6 +69,7 @@ export function omoBinaryPath(env: Readonly<Record<string, string | undefined>> 
 export async function runBootstrapVerb(
   io: BootstrapIo,
   setup: BootstrapSetup,
+  coldWake: ColdWake,
   json: boolean,
 ): Promise<"connected" | "stopped"> {
   const outcome = await bootstrapDeviceService({
@@ -87,5 +89,7 @@ export async function runBootstrapVerb(
   } finally {
     outcome.service.close()
   }
+  // After the connection is closed: a changed table restarts the device service, which would cut it.
+  await applyColdWake(coldWake, outcome.status.state !== "disabled", io.error)
   return "connected"
 }

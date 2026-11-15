@@ -14,6 +14,7 @@ import {
 import type { RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
 import { serveRemoteAttach } from "./remote-attach"
 import { type BootstrapSetup, runBootstrapVerb } from "./remote-bootstrap"
+import { applyColdWake, type ColdWake } from "./remote-cold-wake"
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
 import { controlLines, deviceLines, sessionLines, statusLines } from "./remote-render"
 import { isSessionVerb, parseSession, SESSION_VERBS, type SessionArgs } from "./remote-session-args"
@@ -49,6 +50,8 @@ export interface RemoteCommandDependencies {
 /** `omo remote` verbs; `bootstrap` also needs the pinned install, the stored keys and this omo binary. */
 export interface RemoteVerbDependencies extends RemoteCommandDependencies {
   readonly bootstrap: BootstrapSetup
+  /** The cold-wake unit `bootstrap` and `enable` install and `disable` removes (omo#13594). */
+  readonly coldWake: ColdWake
 }
 
 const VERBS = ["status", "devices", "sessions", "enable", "disable", "control", "bootstrap", ...SESSION_VERBS] as const
@@ -182,7 +185,8 @@ export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: 
     return REMOTE_EXIT.usage
   }
   if (parsed.command === "bootstrap")
-    return (await runBootstrapVerb(dependencies, dependencies.bootstrap, parsed.json)) === "connected"
+    return (await runBootstrapVerb(dependencies, dependencies.bootstrap, dependencies.coldWake, parsed.json)) ===
+      "connected"
       ? REMOTE_EXIT.ok
       : REMOTE_EXIT.unavailable
   const signedOut = await accountNotice(dependencies)
@@ -205,13 +209,18 @@ export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: 
     }
     return reportFailure(dependencies, error)
   }
+  let code: number
   try {
-    return await runOn(service, parsed, dependencies)
+    code = await runOn(service, parsed, dependencies)
   } catch (error) {
     return reportFailure(dependencies, error)
   } finally {
     service.close()
   }
+  // After the connection is closed: a changed table restarts the device service, which would cut it.
+  if (code === REMOTE_EXIT.ok && (parsed.command === "enable" || parsed.command === "disable"))
+    await applyColdWake(dependencies.coldWake, parsed.command === "enable", dependencies.error)
+  return code
 }
 
 async function accountNotice(dependencies: RemoteCommandDependencies): Promise<number | undefined> {

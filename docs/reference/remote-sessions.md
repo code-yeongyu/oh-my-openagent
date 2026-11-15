@@ -130,6 +130,33 @@ release moved into place as a whole under `<state dir>/bin/<version>/`. A downlo
 fails verification is not installed and the command says so. The state dir is `~/.omo/device-service`
 (macOS and Linux) or `%LOCALAPPDATA%\OmO\device-service` (Windows).
 
+## Cold wake
+
+A message another device sends to a session that is not running is delivered by an omo process on this
+device. So that one can start when none runs, `omo remote bootstrap` and `omo remote enable` install one
+fixed per-user unit that runs the omo session host, and record it in the device service's service table as the
+only unit it may start for a cold wake (`packages/device-service-core/src/cold-wake/`):
+
+| | Linux | macOS |
+| --- | --- | --- |
+| Unit | systemd user unit `~/.config/systemd/user/omo-session-host.service` | LaunchAgent `ai.omo.session-host`, `~/Library/LaunchAgents/ai.omo.session-host.plist` |
+| Runs | `<omo> daemon run` (an npm launcher script under the runtime that ran it), with `OMO_CODING_AGENT_DIR` set to the agent dir the bootstrap registers and `PATH` as it was at install | same |
+| Shape | `Type=oneshot`, `KillMode=process`: each start runs the ensure again, and the host it starts keeps running | loaded but idle: no `RunAtLoad`, no `KeepAlive`, `AbandonProcessGroup` |
+| Table entry | `OMO_RELAYD_SERVICES` entry `"omo": {"systemd_user": "omo-session-host.service", "senders": []}` in the drop-in `~/.config/systemd/user/omo-relay-daemon.service.d/50-omo-cold-wake.conf` | entry `"omo": {"launchd": "ai.omo.session-host", "senders": []}` in the device service's plist `EnvironmentVariables` |
+
+The device service reads its table once, at start, so a changed table restarts it (Linux: `systemctl --user
+restart omo-relay-daemon.service`; macOS: `launchctl bootout`, then `bootstrap` of `ai.omo.relay-daemon`).
+Nothing is written and nothing restarts when the unit and the entry are already in place. Other entries of the
+table are kept; a table that does not parse is left as it is, and the command prints a notice instead. Nothing
+runs as root, and neither the unit's name nor its command can be configured.
+
+The device service's installer rewrites its macOS plist on every install and update, which drops the entry;
+the next `omo remote bootstrap` (every omo start) writes it back. The Linux drop-in survives an install.
+
+`omo remote disable` removes the unit and the entry, and while remote sessions are off,
+`omo remote bootstrap` removes them again instead of installing them. A cold wake that cannot be set up
+prints one notice on stderr and never changes the command's exit code or output. Windows has no cold wake.
+
 ## Windows notes
 
 - The device service listens on a loopback TCP port that it publishes in `endpoint.json` in the state

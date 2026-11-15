@@ -17,6 +17,7 @@ import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import packageJson from "./package.json" with { type: "json" }
 import { deviceServiceBootstrapSetup, omoBinaryPath } from "./remote-bootstrap"
 import { prepareRemoteAttach, type RemoteVerbDependencies, runRemoteVerb } from "./remote-cli"
+import { coldWakeSetup } from "./remote-cold-wake"
 
 // The launchers' `omo remote` entries: the verbs in remote-cli.ts over this device's real service, sign-in and binary.
 
@@ -49,6 +50,8 @@ async function inProcessAccountShow(): Promise<AccountShowResult> {
 
 function remoteDependencies(packageRoot?: string): RemoteVerbDependencies {
   const stateDir = deviceServiceStateDir()
+  const binaryPath = omoBinaryPath()
+  const agentDir = canonicalAgentDir()
   return {
     accountShow: inProcessAccountShow,
     stateDir,
@@ -58,11 +61,8 @@ function remoteDependencies(packageRoot?: string): RemoteVerbDependencies {
     output: (line) => process.stdout.write(`${line}\n`),
     write: (text) => process.stdout.write(text),
     error: (line) => process.stderr.write(`${line}\n`),
-    bootstrap: deviceServiceBootstrapSetup({
-      stateDir,
-      binaryPath: omoBinaryPath(),
-      agentDir: canonicalAgentDir(),
-    }),
+    bootstrap: deviceServiceBootstrapSetup({ stateDir, binaryPath, agentDir }),
+    coldWake: coldWakeSetup({ binaryPath, agentDir }),
   }
 }
 

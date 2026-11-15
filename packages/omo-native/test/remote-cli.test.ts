@@ -25,6 +25,7 @@ import { createRemoteThreadFixture, ENGINE } from "../../omo-senpi/src/component
 import { runAccountVerb } from "../account-cli"
 import { type BootstrapSetup, deviceServiceBootstrapSetup } from "../remote-bootstrap"
 import { prepareRemoteAttach, REMOTE_EXIT, runRemoteVerb } from "../remote-cli"
+import type { ColdWake } from "../remote-cold-wake"
 import { gatewayWorkerAnchor } from "../remote-session-verbs"
 import { ago } from "../remote-render"
 
@@ -67,7 +68,7 @@ async function run(
   account = SIGNED_IN,
   bootstrap = testBootstrap(),
   remote?: RemoteThreadSurface,
-  extra: { readonly packageRoot?: string } = {},
+  extra: { readonly packageRoot?: string; readonly coldWake?: ColdWake } = {},
 ) {
   let dir = stateDir
   if (dir === undefined) {
@@ -78,6 +79,7 @@ async function run(
   const out: string[] = []
   const err: string[] = []
   const written: string[] = []
+  const coldWake: string[] = []
   const target = dir
   const code = await runRemoteVerb(
     {
@@ -89,12 +91,16 @@ async function run(
       write: (text) => written.push(text),
       error: (line) => err.push(line),
       bootstrap,
+      coldWake: {
+        install: async () => (coldWake.push("install"), { kind: "installed", serviceRestarted: false }),
+        uninstall: async () => (coldWake.push("uninstall"), { kind: "removed", serviceRestarted: false }),
+      },
       ...(remote === undefined ? {} : { remote: () => remote }),
       ...extra,
     },
     args,
   )
-  return { code, out, err, written }
+  return { code, out, err, written, coldWake }
 }
 
 describe("omo remote", () => {
@@ -302,6 +308,46 @@ describe("omo remote bootstrap", () => {
     expect(code).toBe(REMOTE_EXIT.unavailable)
     expect(JSON.parse(out.join(""))).toMatchObject({ state: "store_unavailable" })
     expect(owner.state.log).toEqual([])
+  })
+})
+
+// omo#13594: the cold-wake unit follows the device's remote-sessions switch. It is installed or removed only after the
+// verb succeeded and its connection is closed, and a cold wake that fails is a notice, never the verb's outcome.
+describe("omo remote and the cold-wake unit", () => {
+  test("bootstrap installs it on a device with remote sessions on, after reporting connected", async () => {
+    const { code, out, coldWake } = await run(["bootstrap", "--json"])
+    expect(code).toBe(REMOTE_EXIT.ok)
+    expect(JSON.parse(out.join(""))).toMatchObject({ state: "connected" })
+    expect(coldWake).toEqual(["install"])
+  })
+
+  test("bootstrap removes it on a device with remote sessions off, so it does not come back", async () => {
+    const owner = await startFakeOwner({ stateDir: privateDir(), world: defaultWorld() })
+    owners.push(owner)
+    expect((await run(["disable"], owner.stateDir)).coldWake).toEqual(["uninstall"])
+    expect((await run(["bootstrap", "--json"], owner.stateDir)).coldWake).toEqual(["uninstall"])
+    expect((await run(["enable"], owner.stateDir)).coldWake).toEqual(["install"])
+  })
+
+  test("a stopped bootstrap or a verb that failed touches nothing", async () => {
+    const signedOut = await run(["bootstrap", "--json"], undefined, { exitCode: 4, stdout: '{"signedIn":false}' })
+    expect([signedOut.code, signedOut.coldWake]).toEqual([REMOTE_EXIT.unavailable, []])
+    const stopped = await run(["enable"], privateDir())
+    expect([stopped.code, stopped.coldWake]).toEqual([REMOTE_EXIT.unavailable, []])
+    expect((await run(["status"])).coldWake).toEqual([])
+  })
+
+  test("a cold wake that fails prints one notice and keeps the verb's exit code and output", async () => {
+    const failing: ColdWake = {
+      install: async () => ({ kind: "failed", step: "service_restart", detail: "Failed to restart" }),
+      uninstall: async () => ({ kind: "removed", serviceRestarted: false }),
+    }
+    const { code, out, err } = await run(["enable", "--json"], undefined, SIGNED_IN, testBootstrap(), undefined, {
+      coldWake: failing,
+    })
+    expect(code).toBe(REMOTE_EXIT.ok)
+    expect(JSON.parse(out.join(""))).toEqual({ enabled: true })
+    expect(err).toHaveLength(1)
   })
 })
 
