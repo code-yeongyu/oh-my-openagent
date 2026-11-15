@@ -28,9 +28,6 @@ export type FakeDevice = Readonly<{
   describeRefusal?: Readonly<{ code: string; reason: string }>
 }>
 
-// This device itself, as the service lists it since relay-daemon#1134 (the id status.get reports).
-export const FAKE_SELF_DEVICE: FakeDevice = { device: "fake-dev-self", label: "self", os: "linux", tags: [] }
-
 // A command the fake terminal runs: its output in the chunks it arrives in, then its exit code.
 // hang: the command keeps running (empty polls) until it is killed.
 export type FakeCommand = Readonly<{ chunks: readonly string[]; exitCode: number; hang?: boolean }>

@@ -2,12 +2,13 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import {
   FAKE_DEVICES,
-  FAKE_SELF_DEVICE,
   startFakeDeviceService,
   type FakeCommand,
   type FakeDeviceService,
 } from "../../../scripts/qa/bunshin-ts-fake-service"
-import { DeviceUnavailableError, execOnDevice, localDeviceRunner } from "./device-machine"
+import { DeviceUnavailableError, execOnDevice, relayDeviceRunner, sessionDevice } from "./device-machine"
+
+const TARGET = FAKE_DEVICES[0]!.device
 
 const services: FakeDeviceService[] = []
 afterEach(async () => {
@@ -15,7 +16,7 @@ afterEach(async () => {
 })
 
 const start = async (options: { commands?: Record<string, FakeCommand>; killFails?: boolean; stateDir?: string } = {}) => {
-  const service = await startFakeDeviceService({ devices: [...FAKE_DEVICES, FAKE_SELF_DEVICE], ...options })
+  const service = await startFakeDeviceService({ devices: FAKE_DEVICES, ...options })
   services.push(service)
   return service
 }
@@ -35,24 +36,24 @@ const ops = (service: FakeDeviceService, name: string) =>
 const HANG: Record<string, FakeCommand> = { "sleep forever": { chunks: ["started\n"], exitCode: 0, hang: true } }
 const live = () => new AbortController().signal
 
-describe("#given this device's service on its local API socket", () => {
-  test("#when bash runs a command #then exactly one exec_command goes to this device, output streams, the exit code returns", async () => {
+describe("#given the session's working device reached through the device service and the relay", () => {
+  test("#when bash runs a command #then exactly one exec_command goes to the working device, output streams, the exit code returns", async () => {
     const service = await start({ commands: { "echo hello": { chunks: ["hel", "lo\n"], exitCode: 3 } } })
     const chunks: string[] = []
     const result = await execOnDevice(
-      localDeviceRunner({ OMO_DEVICE_SERVICE_STATE_DIR: service.stateDir }),
+      relayDeviceRunner(TARGET, { OMO_DEVICE_SERVICE_STATE_DIR: service.stateDir }),
       { command: "echo hello", onOutput: (chunk) => chunks.push(chunk.toString()) },
       live(),
     )
     expect(chunks.join("")).toBe("hello\n")
     expect(result.exitCode).toBe(3)
-    expect(ops(service, "exec_command")).toEqual([{ device: FAKE_SELF_DEVICE.device, op: "exec_command" }])
+    expect(ops(service, "exec_command")).toEqual([{ device: TARGET, op: "exec_command" }])
   })
 
   test("#when the service restarts #then the call in between is a typed DeviceUnavailableError and the next call reconnects", async () => {
     const first = await start()
     const stateDir = first.stateDir
-    const source = localDeviceRunner({ OMO_DEVICE_SERVICE_STATE_DIR: stateDir })
+    const source = relayDeviceRunner(TARGET, { OMO_DEVICE_SERVICE_STATE_DIR: stateDir })
     expect((await execOnDevice(source, { command: "echo one" }, live())).exitCode).toBe(0)
     await first.stop()
     services.splice(services.indexOf(first), 1)
@@ -72,7 +73,7 @@ describe("#given this device's service on its local API socket", () => {
     const service = await start()
     const controller = new AbortController()
     controller.abort()
-    const result = await execOnDevice(localDeviceRunner({ OMO_DEVICE_SERVICE_STATE_DIR: service.stateDir }), { command: "echo x" }, controller.signal)
+    const result = await execOnDevice(relayDeviceRunner(TARGET, { OMO_DEVICE_SERVICE_STATE_DIR: service.stateDir }), { command: "echo x" }, controller.signal)
     expect(result.aborted).toBe(true)
     expect(ops(service, "exec_command")).toHaveLength(0)
   })
@@ -83,19 +84,19 @@ describe("#given a running device command", () => {
     const service = await start({ commands: HANG })
     const controller = new AbortController()
     const result = await execOnDevice(
-      localDeviceRunner({ OMO_DEVICE_SERVICE_STATE_DIR: service.stateDir }),
+      relayDeviceRunner(TARGET, { OMO_DEVICE_SERVICE_STATE_DIR: service.stateDir }),
       { command: "sleep forever", onOutput: () => controller.abort() },
       controller.signal,
     )
     expect(result.aborted).toBe(true)
     expect(result.exitCode).toBeNull()
-    expect(ops(service, "kill_terminal")).toEqual([{ device: FAKE_SELF_DEVICE.device, op: "kill_terminal" }])
+    expect(ops(service, "kill_terminal")).toEqual([{ device: TARGET, op: "kill_terminal" }])
   })
 
   test("#when its timeout passes #then one kill_terminal reaches the device and the result says timedOut", async () => {
     const service = await start({ commands: HANG })
     const result = await execOnDevice(
-      localDeviceRunner({ OMO_DEVICE_SERVICE_STATE_DIR: service.stateDir }),
+      relayDeviceRunner(TARGET, { OMO_DEVICE_SERVICE_STATE_DIR: service.stateDir }),
       { command: "sleep forever", timeoutMs: 50 },
       live(),
     )
@@ -106,7 +107,7 @@ describe("#given a running device command", () => {
   test("#when the kill is refused #then the run ends with a typed DeviceUnavailableError instead of polling on", async () => {
     const service = await start({ commands: HANG, killFails: true })
     const error = await execOnDevice(
-      localDeviceRunner({ OMO_DEVICE_SERVICE_STATE_DIR: service.stateDir }),
+      relayDeviceRunner(TARGET, { OMO_DEVICE_SERVICE_STATE_DIR: service.stateDir }),
       { command: "sleep forever", timeoutMs: 50 },
       live(),
     ).then(
@@ -120,7 +121,7 @@ describe("#given a running device command", () => {
   test("#when the output consumer throws #then the device command is killed once and the consumer's error surfaces", async () => {
     const service = await start({ commands: HANG })
     const error = await execOnDevice(
-      localDeviceRunner({ OMO_DEVICE_SERVICE_STATE_DIR: service.stateDir }),
+      relayDeviceRunner(TARGET, { OMO_DEVICE_SERVICE_STATE_DIR: service.stateDir }),
       {
         command: "sleep forever",
         onOutput: () => {
@@ -134,5 +135,23 @@ describe("#given a running device command", () => {
     )
     expect((error as Error).message).toBe("consumer boom")
     expect(ops(service, "kill_terminal")).toHaveLength(1)
+  })
+})
+
+describe("#given the working device switch", () => {
+  test("#when OMO_SESSION_DEVICE names a device #then that is the working device; unset or blank means none", () => {
+    expect(sessionDevice({ OMO_SESSION_DEVICE: " fake-dev-builder " })).toBe("fake-dev-builder")
+    expect(sessionDevice({ OMO_SESSION_DEVICE: "  " })).toBeUndefined()
+    expect(sessionDevice({})).toBeUndefined()
+  })
+
+  test("#when the named device is not on the account #then a typed DeviceUnavailableError and nothing runs", async () => {
+    const service = await start()
+    const error = await execOnDevice(relayDeviceRunner("no-such-device", { OMO_DEVICE_SERVICE_STATE_DIR: service.stateDir }), { command: "echo x" }, live()).then(
+      () => undefined,
+      (caught: unknown) => caught,
+    )
+    expect(error).toBeInstanceOf(DeviceUnavailableError)
+    expect(ops(service, "exec_command")).toHaveLength(0)
   })
 })

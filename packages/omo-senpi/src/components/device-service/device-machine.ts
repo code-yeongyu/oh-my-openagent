@@ -1,9 +1,10 @@
 import { connect, type BunshinClient, type CommandHandle } from "../../../vendor/bunshin-ts/index.js"
-import { createRelayTransport, relayStatus } from "../../../vendor/bunshin-ts-relay/index.js"
+import { createRelayTransport } from "../../../vendor/bunshin-ts-relay/index.js"
 
-// Tools through this device's own hands daemon (Q's order; design note tools-via-hands-daemon.md). A command runs as
-// one exec_command on THIS device through the device service's local API (service.sock): the service runs a machine
-// batch toward its own device in process (relay-daemon#1134), so no relay hop is involved.
+// Tools on another device through its hands daemon (Q's daemon mode: the target runs the relayd device service,
+// headless and relay-connected; design note tools-via-hands-daemon.md). A command runs as one exec_command on the
+// session's working device, reached through this machine's device service and the relay. An omo started locally
+// keeps running its tools in-process; this path is only for a session whose working device is another machine.
 
 /** The device a routed tool should run on cannot be reached; the tool fails instead of running on this process. */
 export class DeviceUnavailableError extends Error {
@@ -155,11 +156,20 @@ export async function execOnDevice(
   }
 }
 
+/** The session's working device when it is another machine: OMO_SESSION_DEVICE (a device id or alias). */
+export function sessionDevice(env: Readonly<Record<string, string | undefined>> = process.env): string | undefined {
+  return env["OMO_SESSION_DEVICE"]?.trim() || undefined
+}
+
 /**
- * This device's command runner through its device service's local API. Connected once and reused; dropped (and the
- * connection closed) when a call proves it dead, so the next call reconnects once the service is back.
+ * The command runner of `target` (a device id or alias) through this machine's device service and the relay.
+ * Connected once and reused; dropped (and the connection closed) when a call proves it dead, so the next call
+ * reconnects once the service or the device is back.
  */
-export function localDeviceRunner(env: Readonly<Record<string, string | undefined>> = process.env): DeviceRunnerSource {
+export function relayDeviceRunner(
+  target: string,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): DeviceRunnerSource {
   let pending: Promise<{ client: BunshinClient; machine: DeviceCommandRunner }> | undefined
   const nonEmpty = (value: string | undefined): string | undefined => value?.trim() || undefined
   const drop = (): void => {
@@ -171,16 +181,18 @@ export function localDeviceRunner(env: Readonly<Record<string, string | undefine
   const connectOnce = async () => {
     const stateDir = nonEmpty(env["OMO_DEVICE_SERVICE_STATE_DIR"])
     const sessionRef = nonEmpty(env["PI_SESSION_ID"])
-    const status = await relayStatus(stateDir === undefined ? {} : { stateDir })
-    const self = status.device?.id
-    if (self === undefined) throw new Error(`the device service reports no device (state ${String(status.state)})`)
     const client = await connect({
       transport: createRelayTransport({
         ...(stateDir === undefined ? {} : { stateDir }),
         ...(sessionRef === undefined ? {} : { sessionRef }),
       }),
     })
-    return { client, machine: await client.getMachine(self) }
+    try {
+      return { client, machine: await client.getMachine(target) }
+    } catch (error) {
+      await client.close()
+      throw error
+    }
   }
   return {
     runner: async () => {
