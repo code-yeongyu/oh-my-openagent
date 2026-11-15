@@ -47,9 +47,7 @@ function convertSDKMessageToStoredMessage(msg: SDKMessage): StoredMessage | null
 
   return {
     agent: info.agent,
-    model: providerID && modelID
-      ? { providerID, modelID, ...(variant ? { variant } : {}) }
-      : undefined,
+    model: providerID && modelID ? { providerID, modelID, ...(variant ? { variant } : {}) } : undefined,
     tools: info.tools,
   }
 }
@@ -118,7 +116,7 @@ export function findFirstMessageWithAgentFromMessages(messages: readonly SDKMess
 
 export async function findNearestMessageWithFieldsFromSDK(
   client: OpencodeClient,
-  sessionID: string
+  sessionID: string,
 ): Promise<StoredMessage | null> {
   const messages = await fetchSDKMessages(client, sessionID)
   return messages ? findNearestMessageWithFieldsFromMessages(messages) : null
@@ -126,7 +124,7 @@ export async function findNearestMessageWithFieldsFromSDK(
 
 export async function findFirstMessageWithAgentFromSDK(
   client: OpencodeClient,
-  sessionID: string
+  sessionID: string,
 ): Promise<string | null> {
   const messages = await fetchSDKMessages(client, sessionID)
   return messages ? findFirstMessageWithAgentFromMessages(messages) : null

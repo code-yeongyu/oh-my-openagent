@@ -125,7 +125,11 @@ try {
         info.data.capabilities.includes("extension_events"),
       `serverVersion=${info.data?.serverVersion} capabilities=${JSON.stringify(info.data?.capabilities)}`,
     )
-    report.assert("engine-reported-host-pid", typeof managedHost.pid() === "number", `pid=${managedHost.pid()} socket=${socketPath}`)
+    report.assert(
+      "engine-reported-host-pid",
+      typeof managedHost.pid() === "number",
+      `pid=${managedHost.pid()} socket=${socketPath}`,
+    )
 
     const messages = (routingId) =>
       shared
@@ -155,28 +159,24 @@ try {
     // Delivery port over the DESKTOP transport: snapshot/steer/start all go through
     // makeOmoSharedProcess, and the settle is awaited on its record stream.
     const desktopPort = {
-              snapshot: () =>
-                Effect.runPromise(
-                  shared.request({ type: "get_state", sessionId: routingId }).pipe(
-                    Effect.map((response) => ({ active: response.data?.isStreaming === true })),
-                  ),
-                ),
-              steer: (message) =>
-                Effect.runPromise(shared.request({ type: "steer", sessionId: routingId, message })),
-              start: (message) =>
-                Effect.runPromise(
-                  Effect.gen(function* () {
-                    const waiter = yield* Effect.forkChild(
-                      awaitRecords(
-                        shared,
-                        (record) => record.type === "agent_settled" && record.sessionId === routingId,
-                      ),
-                    )
-                    yield* shared.request({ type: "prompt", sessionId: routingId, message })
-                    yield* Fiber.join(waiter)
-                    return { turn_id: `${routingId}-turn` }
-                  }),
-                ),
+      snapshot: () =>
+        Effect.runPromise(
+          shared
+            .request({ type: "get_state", sessionId: routingId })
+            .pipe(Effect.map((response) => ({ active: response.data?.isStreaming === true }))),
+        ),
+      steer: (message) => Effect.runPromise(shared.request({ type: "steer", sessionId: routingId, message })),
+      start: (message) =>
+        Effect.runPromise(
+          Effect.gen(function* () {
+            const waiter = yield* Effect.forkChild(
+              awaitRecords(shared, (record) => record.type === "agent_settled" && record.sessionId === routingId),
+            )
+            yield* shared.request({ type: "prompt", sessionId: routingId, message })
+            yield* Fiber.join(waiter)
+            return { turn_id: `${routingId}-turn` }
+          }),
+        ),
     }
 
     yield* promptAndSettle(routingId, CREATE_NEEDLE)

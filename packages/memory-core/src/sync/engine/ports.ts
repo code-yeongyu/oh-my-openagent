@@ -163,7 +163,13 @@ export interface Sealer {
    * batch a previous principal of this machine sealed (its keys were discarded, then a new principal
    * re-joined, #12280): that batch is re-sealed, never sent.
    */
-  sealedBySelf?(sealed: { readonly baseSeq: number; readonly digest: string; readonly epoch: number; readonly link: string; readonly recordSig: string }): Promise<boolean>
+  sealedBySelf?(sealed: {
+    readonly baseSeq: number
+    readonly digest: string
+    readonly epoch: number
+    readonly link: string
+    readonly recordSig: string
+  }): Promise<boolean>
 }
 
 /** The item model (#10203 device API) as the engine uses it. */

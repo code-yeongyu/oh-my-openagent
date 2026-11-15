@@ -6,7 +6,12 @@ import { loadAvailableModelsFromCache } from "./model-resolution-cache"
 import { loadOmoConfig } from "./model-resolution-config"
 import { buildModelResolutionDetails } from "./model-resolution-details"
 import { buildEffectiveResolution, getEffectiveModel } from "./model-resolution-effective-model"
-import type { AgentResolutionInfo, CategoryResolutionInfo, ModelResolutionInfo, OmoConfig } from "./model-resolution-types"
+import type {
+  AgentResolutionInfo,
+  CategoryResolutionInfo,
+  ModelResolutionInfo,
+  OmoConfig,
+} from "./model-resolution-types"
 
 export function parseProviderModel(value: string): { providerID: string; modelID: string } | null {
   const slashIndex = value.indexOf("/")
@@ -42,17 +47,16 @@ export function getModelResolutionInfo(): ModelResolutionInfo {
       requirement,
       effectiveModel: getEffectiveModel(requirement),
       effectiveResolution: buildEffectiveResolution(requirement),
-    })
+    }),
   )
 
-  const categories: CategoryResolutionInfo[] = Object.entries(CATEGORY_MODEL_REQUIREMENTS).map(
-    ([name, requirement]) =>
-      attachCapabilityDiagnostics({
-        name,
-        requirement,
-        effectiveModel: getEffectiveModel(requirement),
-        effectiveResolution: buildEffectiveResolution(requirement),
-      })
+  const categories: CategoryResolutionInfo[] = Object.entries(CATEGORY_MODEL_REQUIREMENTS).map(([name, requirement]) =>
+    attachCapabilityDiagnostics({
+      name,
+      requirement,
+      effectiveModel: getEffectiveModel(requirement),
+      effectiveResolution: buildEffectiveResolution(requirement),
+    }),
   )
 
   return { agents, categories }
@@ -84,7 +88,7 @@ export function getModelResolutionInfoWithOverrides(config: OmoConfig): ModelRes
         effectiveModel: getEffectiveModel(requirement, userOverride),
         effectiveResolution: buildEffectiveResolution(requirement, userOverride),
       })
-    }
+    },
   )
 
   return { agents, categories }
@@ -103,7 +107,9 @@ export function collectCapabilityResolutionIssues(info: ModelResolutionInfo): Do
   }
 
   const summary = fallbackEntries
-    .map((entry) => `${entry.name}=${entry.effectiveModel} (${entry.capabilityDiagnostics?.resolutionMode ?? "unknown"})`)
+    .map(
+      (entry) => `${entry.name}=${entry.effectiveModel} (${entry.capabilityDiagnostics?.resolutionMode ?? "unknown"})`,
+    )
     .join(", ")
 
   issues.push({

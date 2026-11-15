@@ -68,8 +68,6 @@ describe("executeUnstableAgentTask session permission", () => {
 
     // then
     expect(launchCalls).toHaveLength(1)
-    expect(launchCalls[0]?.sessionPermission).toEqual([
-      { permission: "question", action: "deny", pattern: "*" },
-    ])
+    expect(launchCalls[0]?.sessionPermission).toEqual([{ permission: "question", action: "deny", pattern: "*" }])
   })
 })

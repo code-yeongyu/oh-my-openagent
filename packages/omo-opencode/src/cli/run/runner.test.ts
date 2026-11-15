@@ -24,11 +24,7 @@ describe("resolveRunAgent", () => {
     const env = { OPENCODE_DEFAULT_AGENT: "Atlas" }
 
     // when
-    const agent = resolveRunAgent(
-      { message: "test", agent: "Hephaestus" },
-      config,
-      env
-    )
+    const agent = resolveRunAgent({ message: "test", agent: "Hephaestus" }, config, env)
 
     // then
     expect(agent).toBe("hephaestus")

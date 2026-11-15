@@ -1,6 +1,13 @@
 declare const require: NodeJS.Require
 const { describe, test, expect, beforeEach, afterEach, spyOn, mock } = require("bun:test")
-import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS, isPlanAgent, PLAN_AGENT_NAMES, isPlanFamily, PLAN_FAMILY_NAMES } from "./constants"
+import {
+  DEFAULT_CATEGORIES,
+  CATEGORY_DESCRIPTIONS,
+  isPlanAgent,
+  PLAN_AGENT_NAMES,
+  isPlanFamily,
+  PLAN_FAMILY_NAMES,
+} from "./constants"
 import { getAgentDisplayName, getAgentListDisplayName } from "../../shared/agent-display-names"
 import type { CategoryConfig } from "../../config/schema"
 import type { DelegateTaskArgs } from "./types"
@@ -10,7 +17,6 @@ import { __setTimingConfig, __resetTimingConfig } from "./timing"
 import * as connectedProvidersCache from "../../shared/connected-providers-cache"
 import * as executor from "./executor"
 import { releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
-import { FABLE_55_RELEASED } from "@oh-my-opencode/model-core"
 
 const runtimeRequire = require as NodeJS.Require & { cache?: Record<string, unknown> }
 
@@ -21,7 +27,9 @@ function clearRequireCache(modulePath: string): void {
   }
 }
 
-function resolveCategoryConfig(...args: Parameters<typeof import("./tools").resolveCategoryConfig>): ReturnType<typeof import("./tools").resolveCategoryConfig> {
+function resolveCategoryConfig(
+  ...args: Parameters<typeof import("./tools").resolveCategoryConfig>
+): ReturnType<typeof import("./tools").resolveCategoryConfig> {
   clearRequireCache("./tools")
   return require("./tools").resolveCategoryConfig(...args)
 }
@@ -138,11 +146,17 @@ describe("sisyphus-task", () => {
       MAX_POLL_TIME_MS: 50,
       SESSION_CONTINUATION_STABILITY_MS: 50,
     })
-    cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic", "google", "openai", "kimi-for-coding"])
+    cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue([
+      "anthropic",
+      "google",
+      "openai",
+      "kimi-for-coding",
+    ])
     providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
       models: {
         anthropic: ["claude-opus-4-7", "claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"],
-        google: ["gemini-3.1-pro", "gemini-3-flash"], "kimi-for-coding": ["k3.1-pro", "kimi-for-coding-highspeed"],
+        google: ["gemini-3.1-pro", "gemini-3-flash"],
+        "kimi-for-coding": ["k3.1-pro", "kimi-for-coding-highspeed"],
         openai: ["gpt-5.6-sol", "gpt-5.5", "gpt-6-luna-fast", "gpt-5.5"],
       },
       connected: ["anthropic", "google", "openai", "kimi-for-coding"],
@@ -388,361 +402,391 @@ describe("sisyphus-task", () => {
   })
 
   describe("load_skills parsing", () => {
-    test("parses valid JSON string into array before validation", async () => {
-      //#given
-      const { createDelegateTask } = require("./tools")
+    test(
+      "parses valid JSON string into array before validation",
+      async () => {
+        //#given
+        const { createDelegateTask } = require("./tools")
 
-      const mockManager = {
-        launch: async () => ({
-          id: "task-123",
-          status: "pending",
-          description: "Parse test",
-          agent: "sisyphus-junior",
-          sessionID: "test-session",
-        }),
-      }
+        const mockManager = {
+          launch: async () => ({
+            id: "task-123",
+            status: "pending",
+            description: "Parse test",
+            agent: "sisyphus-junior",
+            sessionID: "test-session",
+          }),
+        }
 
-      const mockClient = {
-        app: { agents: async () => ({ data: [] }) },
-        config: { get: async () => ({}) },
-        provider: { list: async () => ({ data: { connected: ["openai"] } }) },
-        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.5" }] }) },
-        session: {
-          create: async () => ({ data: { id: "test-session" } }),
-          prompt: async () => ({ data: {} }),
-          promptAsync: async () => ({ data: {} }),
-          messages: async () => ({ data: [] }),
-          status: async () => ({ data: {} }),
-        },
-      }
-      const resolutionEvents: string[] = []
-      const getLoadedSkills = async () => []
-      const nativeSkills = {
-        all: mock(async () => {
-          resolutionEvents.push("native")
-          return []
-        }),
-        get: async () => undefined,
-        dirs: async () => [],
-      }
+        const mockClient = {
+          app: { agents: async () => ({ data: [] }) },
+          config: { get: async () => ({}) },
+          provider: { list: async () => ({ data: { connected: ["openai"] } }) },
+          model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.5" }] }) },
+          session: {
+            create: async () => ({ data: { id: "test-session" } }),
+            prompt: async () => ({ data: {} }),
+            promptAsync: async () => ({ data: {} }),
+            messages: async () => ({ data: [] }),
+            status: async () => ({ data: {} }),
+          },
+        }
+        const resolutionEvents: string[] = []
+        const getLoadedSkills = async () => []
+        const nativeSkills = {
+          all: mock(async () => {
+            resolutionEvents.push("native")
+            return []
+          }),
+          get: async () => undefined,
+          dirs: async () => [],
+        }
 
-      const tool = createDelegateTask({
-        manager: mockManager,
-        client: mockClient,
-        connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
-        availableModelsOverride: createTestAvailableModels(),
-        nativeSkills,
-        getLoadedSkills,
-      })
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+          connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+          availableModelsOverride: createTestAvailableModels(),
+          nativeSkills,
+          getLoadedSkills,
+        })
 
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
 
-      const resolveSkillContentSpy = spyOn(executor, "resolveSkillContent").mockImplementation(async (_skills, options) => {
-        resolutionEvents.push("resolve")
-        expect(options.getLoadedSkills).toBe(getLoadedSkills)
-        expect(resolutionEvents).toEqual(["resolve"])
-        return {
+        const resolveSkillContentSpy = spyOn(executor, "resolveSkillContent").mockImplementation(
+          async (_skills, options) => {
+            resolutionEvents.push("resolve")
+            expect(options.getLoadedSkills).toBe(getLoadedSkills)
+            expect(resolutionEvents).toEqual(["resolve"])
+            return {
+              content: "resolved skill content",
+              error: null,
+            }
+          },
+        )
+
+        const args: DelegateTaskArgsWithSerializedSkills = {
+          description: "Parse valid string",
+          prompt: "Load skill parsing test",
+          category: "quick",
+          run_in_background: true,
+          load_skills: '["playwright", "git-master"]',
+        }
+
+        //#when
+        await tool.execute(args, toolContext)
+
+        //#then
+        expect(resolveSkillContentSpy).toHaveBeenCalledWith(["playwright", "git-master"], expect.any(Object))
+        expect(resolutionEvents).toEqual(["resolve", "native"])
+      },
+      { timeout: 10000 },
+    )
+
+    test(
+      "defaults to [] when load_skills is malformed JSON",
+      async () => {
+        //#given
+        const { createDelegateTask } = require("./tools")
+
+        const mockManager = {
+          launch: async () => ({
+            id: "task-456",
+            status: "pending",
+            description: "Parse test",
+            agent: "sisyphus-junior",
+            sessionID: "test-session",
+          }),
+        }
+
+        const mockClient = {
+          app: { agents: async () => ({ data: [] }) },
+          config: { get: async () => ({}) },
+          provider: { list: async () => ({ data: { connected: ["openai"] } }) },
+          model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.5" }] }) },
+          session: {
+            create: async () => ({ data: { id: "test-session" } }),
+            prompt: async () => ({ data: {} }),
+            promptAsync: async () => ({ data: {} }),
+            messages: async () => ({ data: [] }),
+            status: async () => ({ data: {} }),
+          },
+        }
+
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+          connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+          availableModelsOverride: createTestAvailableModels(),
+        })
+
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
+
+        const resolveSkillContentSpy = spyOn(executor, "resolveSkillContent").mockResolvedValue({
           content: "resolved skill content",
           error: null,
+        })
+
+        const args: DelegateTaskArgsWithSerializedSkills = {
+          description: "Parse malformed string",
+          prompt: "Load skill parsing test",
+          category: "quick",
+          run_in_background: true,
+          load_skills: '["playwright", "git-master"',
         }
-      })
 
-      const args: DelegateTaskArgsWithSerializedSkills = {
-        description: "Parse valid string",
-        prompt: "Load skill parsing test",
-        category: "quick",
-        run_in_background: true,
-        load_skills: '["playwright", "git-master"]',
-      }
+        //#when
+        await tool.execute(args, toolContext)
 
-      //#when
-      await tool.execute(args, toolContext)
-
-      //#then
-      expect(resolveSkillContentSpy).toHaveBeenCalledWith(["playwright", "git-master"], expect.any(Object))
-      expect(resolutionEvents).toEqual(["resolve", "native"])
-    }, { timeout: 10000 })
-
-    test("defaults to [] when load_skills is malformed JSON", async () => {
-      //#given
-      const { createDelegateTask } = require("./tools")
-
-      const mockManager = {
-        launch: async () => ({
-          id: "task-456",
-          status: "pending",
-          description: "Parse test",
-          agent: "sisyphus-junior",
-          sessionID: "test-session",
-        }),
-      }
-
-      const mockClient = {
-        app: { agents: async () => ({ data: [] }) },
-        config: { get: async () => ({}) },
-        provider: { list: async () => ({ data: { connected: ["openai"] } }) },
-        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.5" }] }) },
-        session: {
-          create: async () => ({ data: { id: "test-session" } }),
-          prompt: async () => ({ data: {} }),
-          promptAsync: async () => ({ data: {} }),
-          messages: async () => ({ data: [] }),
-          status: async () => ({ data: {} }),
-        },
-      }
-
-      const tool = createDelegateTask({
-        manager: mockManager,
-        client: mockClient,
-        connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
-        availableModelsOverride: createTestAvailableModels(),
-      })
-
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
-
-      const resolveSkillContentSpy = spyOn(executor, "resolveSkillContent").mockResolvedValue({
-        content: "resolved skill content",
-        error: null,
-      })
-
-      const args: DelegateTaskArgsWithSerializedSkills = {
-        description: "Parse malformed string",
-        prompt: "Load skill parsing test",
-        category: "quick",
-        run_in_background: true,
-        load_skills: '["playwright", "git-master"',
-      }
-
-      //#when
-      await tool.execute(args, toolContext)
-
-      //#then
-      expect(resolveSkillContentSpy).toHaveBeenCalledWith([], expect.any(Object))
-    }, { timeout: 10000 })
+        //#then
+        expect(resolveSkillContentSpy).toHaveBeenCalledWith([], expect.any(Object))
+      },
+      { timeout: 10000 },
+    )
   })
 
   describe("category delegation config validation", () => {
-    test("fills subagent_type as sisyphus-junior when category is provided without subagent_type", async () => {
-      // given
-      const { createDelegateTask } = require("./tools")
+    test(
+      "fills subagent_type as sisyphus-junior when category is provided without subagent_type",
+      async () => {
+        // given
+        const { createDelegateTask } = require("./tools")
 
-      let launchInput: CapturedLaunchInput | undefined
-      const mockManager = {
-        launch: async (input: CapturedLaunchInput) => {
-          launchInput = input
-          return {
+        let launchInput: CapturedLaunchInput | undefined
+        const mockManager = {
+          launch: async (input: CapturedLaunchInput) => {
+            launchInput = input
+            return {
+              id: "task-123",
+              status: "pending",
+              description: "Test task",
+              agent: "sisyphus-junior",
+              sessionID: "test-session",
+            }
+          },
+        }
+        const mockClient = {
+          app: { agents: async () => ({ data: [] }) },
+          config: { get: async () => ({}) },
+          provider: { list: async () => ({ data: { connected: ["openai"] } }) },
+          model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.5" }] }) },
+          session: {
+            create: async () => ({ data: { id: "test-session" } }),
+            prompt: async () => ({ data: {} }),
+            promptAsync: async () => ({ data: {} }),
+            messages: async () => ({ data: [] }),
+            status: async () => ({ data: {} }),
+          },
+        }
+
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+          connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+          availableModelsOverride: createTestAvailableModels(),
+        })
+
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
+
+        const args: {
+          description: string
+          prompt: string
+          category: string
+          run_in_background: boolean
+          load_skills: string[]
+          subagent_type?: string
+        } = {
+          description: "Quick category test",
+          prompt: "Do something",
+          category: "quick",
+          run_in_background: true,
+          load_skills: [],
+        }
+
+        // when
+        await tool.execute(args, toolContext)
+
+        // then
+        expect(requireCapturedLaunchInput(launchInput).agent).toBe("Sisyphus-Junior")
+      },
+      { timeout: 10000 },
+    )
+
+    test(
+      "prefers category over subagent_type when both are provided",
+      async () => {
+        //#given
+        const { createDelegateTask } = require("./tools")
+
+        let launchInput: CapturedLaunchInput | undefined
+        const mockManager = {
+          launch: async (input: CapturedLaunchInput) => {
+            launchInput = input
+            return {
+              id: "task-override",
+              status: "pending",
+              description: "Override test",
+              agent: "sisyphus-junior",
+              sessionID: "test-session",
+            }
+          },
+        }
+
+        const mockClient = {
+          app: { agents: async () => ({ data: [] }) },
+          config: { get: async () => ({}) },
+          provider: { list: async () => ({ data: { connected: ["openai"] } }) },
+          model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.5" }] }) },
+          session: {
+            create: async () => ({ data: { id: "test-session" } }),
+            prompt: async () => ({ data: {} }),
+            promptAsync: async () => ({ data: {} }),
+            messages: async () => ({ data: [] }),
+            status: async () => ({ data: {} }),
+          },
+        }
+
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+          connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+          availableModelsOverride: createTestAvailableModels(),
+        })
+
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
+
+        const args = {
+          description: "Override test",
+          prompt: "Do something",
+          category: "quick",
+          subagent_type: "oracle",
+          run_in_background: true,
+          load_skills: [],
+        }
+
+        //#when
+        await tool.execute(args, toolContext)
+
+        //#then - category takes precedence, subagent_type is overridden to sisyphus-junior
+        expect(requireCapturedLaunchInput(launchInput).agent).toBe("Sisyphus-Junior")
+      },
+      { timeout: 10000 },
+    )
+
+    test(
+      "proceeds without error when systemDefaultModel is undefined",
+      async () => {
+        // given a mock client with no model in config
+        const { createDelegateTask } = require("./tools")
+
+        const mockManager = {
+          launch: async () => ({
             id: "task-123",
             status: "pending",
             description: "Test task",
             agent: "sisyphus-junior",
-            sessionID: "test-session",
-          }
-        },
-      }
-      const mockClient = {
-        app: { agents: async () => ({ data: [] }) },
-        config: { get: async () => ({}) },
-        provider: { list: async () => ({ data: { connected: ["openai"] } }) },
-        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.5" }] }) },
-        session: {
-          create: async () => ({ data: { id: "test-session" } }),
-          prompt: async () => ({ data: {} }),
-          promptAsync: async () => ({ data: {} }),
-          messages: async () => ({ data: [] }),
-          status: async () => ({ data: {} }),
-        },
-      }
+            sessionId: "test-session",
+          }),
+        }
+        const mockClient = {
+          app: { agents: async () => ({ data: [] }) },
+          config: { get: async () => ({}) }, // No model configured
+          provider: { list: async () => ({ data: { connected: ["openai"] } }) },
+          model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.5" }] }) },
+          session: {
+            create: async () => ({ data: { id: "test-session" } }),
+            prompt: async () => ({ data: {} }),
+            promptAsync: async () => ({ data: {} }),
+            messages: async () => ({ data: [] }),
+            status: async () => ({ data: {} }),
+          },
+        }
 
-      const tool = createDelegateTask({
-        manager: mockManager,
-        client: mockClient,
-        connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
-        availableModelsOverride: createTestAvailableModels(),
-      })
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+          connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+          availableModelsOverride: createTestAvailableModels(),
+        })
 
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
 
-      const args: {
-        description: string
-        prompt: string
-        category: string
-        run_in_background: boolean
-        load_skills: string[]
-        subagent_type?: string
-      } = {
-        description: "Quick category test",
-        prompt: "Do something",
-        category: "quick",
-        run_in_background: true,
-        load_skills: [],
-      }
+        // when delegating with a category
+        const result = await tool.execute(
+          {
+            description: "Test task",
+            prompt: "Do something",
+            category: "ultrabrain",
+            run_in_background: true,
+            load_skills: [],
+          },
+          toolContext,
+        )
 
-      // when
-      await tool.execute(args, toolContext)
-
-      // then
-      expect(requireCapturedLaunchInput(launchInput).agent).toBe("Sisyphus-Junior")
-    }, { timeout: 10000 })
-
-    test("prefers category over subagent_type when both are provided", async () => {
-      //#given
-      const { createDelegateTask } = require("./tools")
-
-      let launchInput: CapturedLaunchInput | undefined
-      const mockManager = {
-        launch: async (input: CapturedLaunchInput) => {
-          launchInput = input
-          return {
-            id: "task-override",
-            status: "pending",
-            description: "Override test",
-            agent: "sisyphus-junior",
-            sessionID: "test-session",
-          }
-        },
-      }
-
-      const mockClient = {
-        app: { agents: async () => ({ data: [] }) },
-        config: { get: async () => ({}) },
-        provider: { list: async () => ({ data: { connected: ["openai"] } }) },
-        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.5" }] }) },
-        session: {
-          create: async () => ({ data: { id: "test-session" } }),
-          prompt: async () => ({ data: {} }),
-          promptAsync: async () => ({ data: {} }),
-          messages: async () => ({ data: [] }),
-          status: async () => ({ data: {} }),
-        },
-      }
-
-      const tool = createDelegateTask({
-        manager: mockManager,
-        client: mockClient,
-        connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
-        availableModelsOverride: createTestAvailableModels(),
-      })
-
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
-
-      const args = {
-        description: "Override test",
-        prompt: "Do something",
-        category: "quick",
-        subagent_type: "oracle",
-        run_in_background: true,
-        load_skills: [],
-      }
-
-      //#when
-      await tool.execute(args, toolContext)
-
-      //#then - category takes precedence, subagent_type is overridden to sisyphus-junior
-      expect(requireCapturedLaunchInput(launchInput).agent).toBe("Sisyphus-Junior")
-    }, { timeout: 10000 })
-
-    test("proceeds without error when systemDefaultModel is undefined", async () => {
-      // given a mock client with no model in config
-      const { createDelegateTask } = require("./tools")
-      
-       const mockManager = { launch: async () => ({ id: "task-123", status: "pending", description: "Test task", agent: "sisyphus-junior", sessionId: "test-session" }) }
-       const mockClient = {
-         app: { agents: async () => ({ data: [] }) },
-         config: { get: async () => ({}) }, // No model configured
-         provider: { list: async () => ({ data: { connected: ["openai"] } }) },
-         model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.5" }] }) },
-         session: {
-           create: async () => ({ data: { id: "test-session" } }),
-           prompt: async () => ({ data: {} }),
-           promptAsync: async () => ({ data: {} }),
-           messages: async () => ({ data: [] }),
-           status: async () => ({ data: {} }),
-         },
-       }
-       
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-         connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
-         availableModelsOverride: createTestAvailableModels(),
-       })
-       
-       const toolContext = {
-         sessionID: "parent-session",
-         messageID: "parent-message",
-         agent: "sisyphus",
-         abort: new AbortController().signal,
-       }
-       
-       // when delegating with a category
-       const result = await tool.execute(
-         {
-           description: "Test task",
-           prompt: "Do something",
-           category: "ultrabrain",
-           run_in_background: true,
-           load_skills: [],
-         },
-         toolContext
-       )
-       
-       // then proceeds without error - uses fallback chain
-       expect(result).not.toContain("[ERROR]")
-    }, { timeout: 10000 })
+        // then proceeds without error - uses fallback chain
+        expect(result).not.toContain("[ERROR]")
+      },
+      { timeout: 10000 },
+    )
 
     test("returns clear error when no model can be resolved", async () => {
       // given - custom category with no model, no systemDefaultModel, no available models
       const { createDelegateTask } = require("./tools")
-      
-       const mockManager = { launch: async () => ({ id: "task-123" }) }
-       const mockClient = {
-         app: { agents: async () => ({ data: [] }) },
-         config: { get: async () => ({}) }, // No model configured
-         model: { list: async () => [] }, // No available models
-         session: {
-           create: async () => ({ data: { id: "test-session" } }),
-           prompt: async () => ({ data: {} }),
-           promptAsync: async () => ({ data: {} }),
-           messages: async () => ({ data: [] }),
-         },
-       }
-       
-       // Custom category with no model defined
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-         userCategories: {
-           "custom-no-model": { temperature: 0.5 }, // No model field
-         },
-       })
-      
+
+      const mockManager = { launch: async () => ({ id: "task-123" }) }
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({}) }, // No model configured
+        model: { list: async () => [] }, // No available models
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
+
+      // Custom category with no model defined
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        userCategories: {
+          "custom-no-model": { temperature: 0.5 }, // No model field
+        },
+      })
+
       const toolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
         agent: "sisyphus",
         abort: new AbortController().signal,
       }
-      
+
       // when delegating with a custom category that has no model
       const result = await tool.execute(
         {
@@ -752,9 +796,9 @@ describe("sisyphus-task", () => {
           run_in_background: true,
           load_skills: [],
         },
-        toolContext
+        toolContext,
       )
-      
+
       // then returns clear error message with configuration guidance
       expect(result).toContain("Model not configured")
       expect(result).toContain("custom-no-model")
@@ -767,7 +811,10 @@ describe("sisyphus-task", () => {
       //#given - manager.launch returns before sessionID is available
       const { createDelegateTask } = require("./tools")
 
-      const tasks = new Map<string, { id: string; sessionID?: string; status: string; description: string; agent: string }>()
+      const tasks = new Map<
+        string,
+        { id: string; sessionID?: string; status: string; description: string; agent: string }
+      >()
       const mockManager = {
         getTask: (id: string) => tasks.get(id),
         launch: async () => {
@@ -780,31 +827,31 @@ describe("sisyphus-task", () => {
         },
       }
 
-       const mockClient = {
-         app: { agents: async () => ({ data: [{ name: "explore", mode: "subagent" }] }) },
-         config: { get: async () => ({}) },
-         provider: { list: async () => ({ data: { connected: ["openai"] } }) },
-         model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.5" }] }) },
-         session: {
-           create: async () => ({ data: { id: "test-session" } }),
-           prompt: async () => ({ data: {} }),
-           promptAsync: async () => ({ data: {} }),
-           messages: async () => ({ data: [] }),
-           status: async () => ({ data: {} }),
-         },
-       }
+      const mockClient = {
+        app: { agents: async () => ({ data: [{ name: "explore", mode: "subagent" }] }) },
+        config: { get: async () => ({}) },
+        provider: { list: async () => ({ data: { connected: ["openai"] } }) },
+        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.5" }] }) },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
+        },
+      }
 
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-         connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
-         availableModelsOverride: createTestAvailableModels(),
-       })
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+        availableModelsOverride: createTestAvailableModels(),
+      })
 
-       const metadataCalls: Array<{ title?: string; metadata?: Record<string, unknown> }> = []
-       const toolContext = {
-         sessionID: "parent-session",
-         messageID: "parent-message",
+      const metadataCalls: Array<{ title?: string; metadata?: Record<string, unknown> }> = []
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
         agent: "sisyphus",
         abort: new AbortController().signal,
         metadata: (input: { title?: string; metadata?: Record<string, unknown> }) => {
@@ -855,7 +902,7 @@ describe("sisyphus-task", () => {
 
       // then
       expect(result).not.toBeNull()
-      expect(result?.model).toBe(FABLE_55_RELEASED ? "anthropic/claude-fable-5-5" : "anthropic/claude-fable-5-1")
+      expect(result?.model).toBe("anthropic/claude-fable-5-2")
     })
 
     test("allows artistry when availability is empty", () => {
@@ -871,7 +918,7 @@ describe("sisyphus-task", () => {
 
       // then
       expect(result).not.toBeNull()
-      expect(result?.model).toBe(FABLE_55_RELEASED ? "anthropic/claude-fable-5-5" : "anthropic/claude-fable-5-1")
+      expect(result?.model).toBe("anthropic/claude-fable-5-2")
     })
 
     test("returns null for deep-high when neither gpt-6-astra nor gpt-5.6-sol is available and no user config overrides it", () => {
@@ -909,7 +956,9 @@ describe("sisyphus-task", () => {
       const resolved = expectResolvedCategoryConfig(result)
       expect(resolved.config.model).toBe("openai/gpt-6.1-sol")
       expect(resolved.config.variant).toBe("medium")
-      expect(resolveCategoryConfig("deep-high", { systemDefaultModel: SYSTEM_DEFAULT_MODEL, availableModels })).toBeNull()
+      expect(
+        resolveCategoryConfig("deep-high", { systemDefaultModel: SYSTEM_DEFAULT_MODEL, availableModels }),
+      ).toBeNull()
     })
 
     test("gates deep-low closed when the registry only carries GPT-6 Sol", () => {
@@ -1088,7 +1137,11 @@ describe("sisyphus-task", () => {
       const inheritedModel = "cliproxy/claude-opus-4-7"
 
       // when
-      const result = resolveCategoryConfig(categoryName, { userCategories, inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
+      const result = resolveCategoryConfig(categoryName, {
+        userCategories,
+        inheritedModel,
+        systemDefaultModel: SYSTEM_DEFAULT_MODEL,
+      })
 
       // then - systemDefaultModel is used since custom category has no built-in model
       const resolved = expectResolvedCategoryConfig(result)
@@ -1104,7 +1157,11 @@ describe("sisyphus-task", () => {
       const inheritedModel = "cliproxy/claude-opus-4-7"
 
       // when
-      const result = resolveCategoryConfig(categoryName, { userCategories, inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
+      const result = resolveCategoryConfig(categoryName, {
+        userCategories,
+        inheritedModel,
+        systemDefaultModel: SYSTEM_DEFAULT_MODEL,
+      })
 
       // then
       const resolved = expectResolvedCategoryConfig(result)
@@ -1143,26 +1200,26 @@ describe("sisyphus-task", () => {
         },
       }
 
-       const mockClient = {
-         app: { agents: async () => ({ data: [] }) },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         session: {
-           create: async () => ({ data: { id: "test-session" } }),
-           prompt: async () => ({ data: {} }),
-           promptAsync: async () => ({ data: {} }),
-           messages: async () => ({ data: [] }),
-         },
-       }
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
 
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-         userCategories: {
-           ultrabrain: { model: "openai/gpt-5.5", variant: "xhigh" },
-         },
-         connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
-         availableModelsOverride: createTestAvailableModels(),
-       })
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        userCategories: {
+          ultrabrain: { model: "openai/gpt-5.5", variant: "xhigh" },
+        },
+        connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+        availableModelsOverride: createTestAvailableModels(),
+      })
 
       const toolContext = {
         sessionID: "parent-session",
@@ -1180,7 +1237,7 @@ describe("sisyphus-task", () => {
           run_in_background: true,
           load_skills: ["git-master"],
         },
-        toolContext
+        toolContext,
       )
 
       // then
@@ -1191,187 +1248,199 @@ describe("sisyphus-task", () => {
       })
     })
 
-    test("DEFAULT_CATEGORIES explicit high model passes to background WITHOUT userCategories", async () => {
-      // given - NO userCategories, testing DEFAULT_CATEGORIES only
-      const { createDelegateTask } = require("./tools")
-      let launchInput: CapturedLaunchInput = {}
+    test(
+      "DEFAULT_CATEGORIES explicit high model passes to background WITHOUT userCategories",
+      async () => {
+        // given - NO userCategories, testing DEFAULT_CATEGORIES only
+        const { createDelegateTask } = require("./tools")
+        let launchInput: CapturedLaunchInput = {}
 
-      const mockManager = {
-        launch: async (input: CapturedLaunchInput) => {
-          launchInput = input
-          return {
-            id: "task-default-variant",
-            sessionID: "session-default-variant",
-            description: "Default variant task",
-            agent: "sisyphus-junior",
-            status: "running",
-          }
-        },
-      }
+        const mockManager = {
+          launch: async (input: CapturedLaunchInput) => {
+            launchInput = input
+            return {
+              id: "task-default-variant",
+              sessionID: "session-default-variant",
+              description: "Default variant task",
+              agent: "sisyphus-junior",
+              status: "running",
+            }
+          },
+        }
 
-       const mockClient = {
-         app: { agents: async () => ({ data: [] }) },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         model: { list: async () => [{ provider: "anthropic", id: "claude-opus-4-8" }] },
-         session: {
-           create: async () => ({ data: { id: "test-session" } }),
-           prompt: async () => ({ data: {} }),
-           promptAsync: async () => ({ data: {} }),
-           messages: async () => ({ data: [] }),
-         },
-       }
+        const mockClient = {
+          app: { agents: async () => ({ data: [] }) },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          model: { list: async () => [{ provider: "anthropic", id: "claude-opus-4-8" }] },
+          session: {
+            create: async () => ({ data: { id: "test-session" } }),
+            prompt: async () => ({ data: {} }),
+            promptAsync: async () => ({ data: {} }),
+            messages: async () => ({ data: [] }),
+          },
+        }
 
-       // NO userCategories - must use DEFAULT_CATEGORIES
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-         connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
-         availableModelsOverride: createTestAvailableModels(),
-       })
+        // NO userCategories - must use DEFAULT_CATEGORIES
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+          connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+          availableModelsOverride: createTestAvailableModels(),
+        })
 
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
 
-      // when - unspecified-high uses claude-opus-4-8 max in DEFAULT_CATEGORIES
-      await tool.execute(
-        {
-          description: "Test unspecified-high default variant",
-          prompt: "Do something",
-          category: "unspecified-high",
-          run_in_background: true,
-          load_skills: ["git-master"],
-        },
-        toolContext
-      )
+        // when - unspecified-high uses claude-opus-4-8 max in DEFAULT_CATEGORIES
+        await tool.execute(
+          {
+            description: "Test unspecified-high default variant",
+            prompt: "Do something",
+            category: "unspecified-high",
+            run_in_background: true,
+            load_skills: ["git-master"],
+          },
+          toolContext,
+        )
 
-      // then - Kimi K3.1 Pro should be passed with max variant
-      expect(launchInput.model).toEqual({
-        providerID: "kimi-for-coding",
-        modelID: "k3.1-pro",
-        variant: "max",
-      })
-    }, { timeout: 20000 })
+        // then - Kimi K3.1 Pro should be passed with max variant
+        expect(launchInput.model).toEqual({
+          providerID: "kimi-for-coding",
+          modelID: "k3.1-pro",
+          variant: "max",
+        })
+      },
+      { timeout: 20000 },
+    )
 
-     test("DEFAULT_CATEGORIES explicit high model passes to sync prompt request WITHOUT userCategories", async () => {
-       // given - NO userCategories, testing DEFAULT_CATEGORIES for sync mode
-       const { createDelegateTask } = require("./tools")
-       let promptBody: CapturedPromptBody = {}
+    test(
+      "DEFAULT_CATEGORIES explicit high model passes to sync prompt request WITHOUT userCategories",
+      async () => {
+        // given - NO userCategories, testing DEFAULT_CATEGORIES for sync mode
+        const { createDelegateTask } = require("./tools")
+        let promptBody: CapturedPromptBody = {}
 
-       const mockManager = { launch: async () => ({}) }
+        const mockManager = { launch: async () => ({}) }
 
-       const promptMock = async (input: CapturedPromptInput) => {
-         promptBody = input.body
-         return { data: {} }
-       }
+        const promptMock = async (input: CapturedPromptInput) => {
+          promptBody = input.body
+          return { data: {} }
+        }
 
-       const mockClient = {
-         app: { agents: async () => ({ data: [] }) },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         model: { list: async () => [{ provider: "anthropic", id: "claude-opus-4-8" }] },
-         session: {
-           get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_sync_default_variant" } }),
-           prompt: promptMock,
-           promptAsync: promptMock,
-           messages: async () => ({
-             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "done" }] }]
-           }),
-           status: async () => ({ data: { "ses_sync_default_variant": { type: "idle" } } }),
-         },
-       }
+        const mockClient = {
+          app: { agents: async () => ({ data: [] }) },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          model: { list: async () => [{ provider: "anthropic", id: "claude-opus-4-8" }] },
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "ses_sync_default_variant" } }),
+            prompt: promptMock,
+            promptAsync: promptMock,
+            messages: async () => ({
+              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "done" }] }],
+            }),
+            status: async () => ({ data: { ses_sync_default_variant: { type: "idle" } } }),
+          },
+        }
 
-      // NO userCategories - must use DEFAULT_CATEGORIES
-      const tool = createDelegateTask({
-        manager: mockManager,
-        client: mockClient,
-      })
+        // NO userCategories - must use DEFAULT_CATEGORIES
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+        })
 
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
 
-      // when - unspecified-high uses claude-opus-4-8 max in DEFAULT_CATEGORIES
-      await tool.execute(
-        {
-          description: "Test unspecified-high sync variant",
-          prompt: "Do something",
-          category: "unspecified-high",
-          run_in_background: false,
-          load_skills: ["git-master"],
-        },
-        toolContext
-      )
+        // when - unspecified-high uses claude-opus-4-8 max in DEFAULT_CATEGORIES
+        await tool.execute(
+          {
+            description: "Test unspecified-high sync variant",
+            prompt: "Do something",
+            category: "unspecified-high",
+            run_in_background: false,
+            load_skills: ["git-master"],
+          },
+          toolContext,
+        )
 
-      // then - Kimi K3.1 Pro should be passed with max variant
-      expect(promptBody.model).toEqual({
-        providerID: "kimi-for-coding",
-        modelID: "k3.1-pro",
-      })
-      expect(promptBody.variant).toBe("max")
-    }, { timeout: 20000 })
+        // then - Kimi K3.1 Pro should be passed with max variant
+        expect(promptBody.model).toEqual({
+          providerID: "kimi-for-coding",
+          modelID: "k3.1-pro",
+        })
+        expect(promptBody.variant).toBe("max")
+      },
+      { timeout: 20000 },
+    )
   })
 
   describe("skills parameter", () => {
-    test("#given load_skills omitted #when executing #then defaults to [] and proceeds (fixes #4119)", async () => {
-      // given
-      const { createDelegateTask } = require("./tools")
-      let promptBody: CapturedPromptBody = {}
+    test(
+      "#given load_skills omitted #when executing #then defaults to [] and proceeds (fixes #4119)",
+      async () => {
+        // given
+        const { createDelegateTask } = require("./tools")
+        let promptBody: CapturedPromptBody = {}
 
-      const mockManager = { launch: async () => ({}) }
+        const mockManager = { launch: async () => ({}) }
 
-      const promptMock = async (input: CapturedPromptInput) => {
-        promptBody = input.body
-        return { data: {} }
-      }
+        const promptMock = async (input: CapturedPromptInput) => {
+          promptBody = input.body
+          return { data: {} }
+        }
 
-      const mockClient = {
-        app: { agents: async () => ({ data: [] }) },
-        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        session: {
-          get: async () => ({ data: { directory: "/project" } }),
-          create: async () => ({ data: { id: "test-session" } }),
-          prompt: promptMock,
-          promptAsync: promptMock,
-          messages: async () => ({
-            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
-          }),
-          status: async () => ({ data: {} }),
-        },
-      }
+        const mockClient = {
+          app: { agents: async () => ({ data: [] }) },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "test-session" } }),
+            prompt: promptMock,
+            promptAsync: promptMock,
+            messages: async () => ({
+              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }],
+            }),
+            status: async () => ({ data: {} }),
+          },
+        }
 
-      const tool = createDelegateTask({
-        manager: mockManager,
-        client: mockClient,
-      })
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+        })
 
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
 
-      // when - skills not provided (undefined); previously threw a hard error.
-      // then - should default to [] and proceed normally.
-      await tool.execute(
-        {
-          description: "Test task",
-          prompt: "Do something",
-          category: "ultrabrain",
-          run_in_background: false,
-        },
-        toolContext
-      )
+        // when - skills not provided (undefined); previously threw a hard error.
+        // then - should default to [] and proceed normally.
+        await tool.execute(
+          {
+            description: "Test task",
+            prompt: "Do something",
+            category: "ultrabrain",
+            run_in_background: false,
+          },
+          toolContext,
+        )
 
-      expect(promptBody).toBeDefined()
-    }, { timeout: 20000 })
+        expect(promptBody).toBeDefined()
+      },
+      { timeout: 20000 },
+    )
 
     test("#given load_skills=null #when executing #then throws (explicit invalid stays rejected, fixes #4119 review)", async () => {
       // given - maintainer's Oracle review on PR #4121 (blocker 1) required us
@@ -1400,216 +1469,254 @@ describe("sisyphus-task", () => {
 
       // when - load_skills explicitly set to null
       // then - hard reject with clear error
-      await expect(tool.execute(
-        {
-          description: "Test task",
-          prompt: "Do something",
-          category: "ultrabrain",
-          run_in_background: false,
-          load_skills: null,
-        },
-        toolContext,
-      )).rejects.toThrow("Invalid arguments: load_skills=null is not allowed")
+      await expect(
+        tool.execute(
+          {
+            description: "Test task",
+            prompt: "Do something",
+            category: "ultrabrain",
+            run_in_background: false,
+            load_skills: null,
+          },
+          toolContext,
+        ),
+      ).rejects.toThrow("Invalid arguments: load_skills=null is not allowed")
     })
 
-     test("empty array [] is allowed and proceeds without skill content", async () => {
-       // given
-       const { createDelegateTask } = require("./tools")
-       let promptBody: CapturedPromptBody = {}
-       
-       const mockManager = { launch: async () => ({}) }
-       
-       const promptMock = async (input: CapturedPromptInput) => {
-         promptBody = input.body
-         return { data: {} }
-       }
-       
-       const mockClient = {
-         app: { agents: async () => ({ data: [] }) },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         session: {
-           get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "test-session" } }),
-           prompt: promptMock,
-           promptAsync: promptMock,
-           messages: async () => ({
-             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
-           }),
-           status: async () => ({ data: {} }),
-         },
-       }
-      
-      const tool = createDelegateTask({
-        manager: mockManager,
-        client: mockClient,
-      })
-      
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
-      
-      // when - empty array passed
-      await tool.execute(
-        {
-          description: "Test task",
-          prompt: "Do something",
-          category: "ultrabrain",
-          run_in_background: false,
-          load_skills: [],
-        },
-        toolContext
-      )
-      
-      // then - should proceed without system content from skills
-      expect(promptBody).toBeDefined()
-    }, { timeout: 20000 })
+    test(
+      "empty array [] is allowed and proceeds without skill content",
+      async () => {
+        // given
+        const { createDelegateTask } = require("./tools")
+        let promptBody: CapturedPromptBody = {}
+
+        const mockManager = { launch: async () => ({}) }
+
+        const promptMock = async (input: CapturedPromptInput) => {
+          promptBody = input.body
+          return { data: {} }
+        }
+
+        const mockClient = {
+          app: { agents: async () => ({ data: [] }) },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "test-session" } }),
+            prompt: promptMock,
+            promptAsync: promptMock,
+            messages: async () => ({
+              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }],
+            }),
+            status: async () => ({ data: {} }),
+          },
+        }
+
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+        })
+
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
+
+        // when - empty array passed
+        await tool.execute(
+          {
+            description: "Test task",
+            prompt: "Do something",
+            category: "ultrabrain",
+            run_in_background: false,
+            load_skills: [],
+          },
+          toolContext,
+        )
+
+        // then - should proceed without system content from skills
+        expect(promptBody).toBeDefined()
+      },
+      { timeout: 20000 },
+    )
   })
 
   describe("run_in_background parameter", () => {
-    test("#given category without run_in_background #when executing #then defaults to sync and proceeds (fixes #4119)", async () => {
-      // given
-      const { createDelegateTask } = require("./tools")
-      let promptBody: CapturedPromptBody = {}
-      const promptMock = async (input: CapturedPromptInput) => {
-        promptBody = input.body
-        return { data: {} }
-      }
-      const mockManager = { launch: async () => ({}) }
-      const mockClient = {
-        app: { agents: async () => ({ data: [] }) },
-        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        session: {
-          get: async () => ({ data: { directory: "/project" } }),
-          create: async () => ({ data: { id: "test-session" } }),
-          prompt: promptMock,
-          promptAsync: promptMock,
-          messages: async () => ({
-            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
-          }),
-          status: async () => ({ data: {} }),
-        },
-      }
-      const tool = createDelegateTask({ manager: mockManager, client: mockClient })
-
-      // when - run_in_background omitted (previously a hard throw)
-      await tool.execute(
-        {
-          description: "Category without run flag",
-          prompt: "Do something",
-          category: "quick",
-          load_skills: [],
-        },
-        { sessionID: "parent-session", messageID: "parent-message", agent: "sisyphus", abort: new AbortController().signal }
-      )
-
-      // then - sync path should run and the session prompt should be sent
-      expect(promptBody).toBeDefined()
-    }, { timeout: 20000 })
-
-    test("#given subagent_type without run_in_background #when executing #then defaults to sync and proceeds (fixes #4119)", async () => {
-      // given
-      const { createDelegateTask } = require("./tools")
-      let promptBody: CapturedPromptBody = {}
-      const promptMock = async (input: CapturedPromptInput) => {
-        promptBody = input.body
-        return { data: {} }
-      }
-      const mockManager = { launch: async () => ({}) }
-      const mockClient = {
-        app: { agents: async () => ({ data: [{ name: "explore", mode: "subagent" }] }) },
-        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        session: {
-          get: async () => ({ data: { directory: "/project" } }),
-          create: async () => ({ data: { id: "test-session" } }),
-          prompt: promptMock,
-          promptAsync: promptMock,
-          messages: async () => ({
-            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
-          }),
-          status: async () => ({ data: {} }),
-        },
-      }
-      const tool = createDelegateTask({ manager: mockManager, client: mockClient })
-
-      // when
-      await tool.execute(
-        {
-          description: "Subagent without run flag",
-          prompt: "Find patterns",
-          subagent_type: "explore",
-          load_skills: [],
-        },
-        { sessionID: "parent-session", messageID: "parent-message", agent: "sisyphus", abort: new AbortController().signal }
-      )
-
-      // then
-      expect(promptBody).toBeDefined()
-    }, { timeout: 20000 })
-
-    test("#given task_id without run_in_background #when executing #then defaults to sync continuation (fixes #4119)", async () => {
-      // given - mock manager.resume to return a running task, and capture
-      // which session-prompt method gets called. The previous PR removed the
-      // 'task_id without run_in_background throws' assertion; the maintainer's
-      // Oracle review on PR #4121 asked us to rewrite it (not delete it) so
-      // the new contract "default false routes to sync continuation" is
-      // pinned by a regression test rather than implicit behavior.
-      const { createDelegateTask } = require("./tools")
-      const managerCalls: string[] = []
-      const mockManager = {
-        resume: async () => {
-          managerCalls.push("resume")
-          return { id: "task-1", sessionId: "ses_continue_test", status: "running" }
-        },
-        launch: async () => {
-          managerCalls.push("launch")
-          return { id: "task-1" }
-        },
-      }
-      const continuationMessagesCalls: string[] = []
-      const mockClient = {
-        app: { agents: async () => ({ data: [] }) },
-        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        session: {
-          get: async () => ({ data: { directory: "/project" } }),
-          create: async () => ({ data: { id: "ses_continue_test" } }),
-          prompt: async () => ({ data: {} }),
-          promptAsync: async () => ({ data: {} }),
-          messages: async (input: { path: { id: string } }) => {
-            continuationMessagesCalls.push(input.path.id)
-            return {
-              data: [{ info: { id: "msg_1", role: "assistant", time: { created: Date.now() }, finish: "end_turn" }, parts: [{ type: "text", text: "sync-continuation-result-sentinel" }] }],
-            }
+    test(
+      "#given category without run_in_background #when executing #then defaults to sync and proceeds (fixes #4119)",
+      async () => {
+        // given
+        const { createDelegateTask } = require("./tools")
+        let promptBody: CapturedPromptBody = {}
+        const promptMock = async (input: CapturedPromptInput) => {
+          promptBody = input.body
+          return { data: {} }
+        }
+        const mockManager = { launch: async () => ({}) }
+        const mockClient = {
+          app: { agents: async () => ({ data: [] }) },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "test-session" } }),
+            prompt: promptMock,
+            promptAsync: promptMock,
+            messages: async () => ({
+              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }],
+            }),
+            status: async () => ({ data: {} }),
           },
-          status: async () => ({ data: { "ses_continue_test": { type: "idle" } } }),
-          abort: async () => ({ data: {} }),
-        },
-      }
-      const tool = createDelegateTask({ manager: mockManager, client: mockClient })
+        }
+        const tool = createDelegateTask({ manager: mockManager, client: mockClient })
 
-      // when - omit run_in_background; task_id + default false must route to
-      // executeSyncContinuation (tools.ts:75). Previously this threw the
-      // 'run_in_background REQUIRED' error, which #4119 reported as the cause
-      // of Sisyphus's retry storms.
-      const result = await tool.execute(
-        {
-          description: "Continue without run flag",
-          prompt: "Continue",
-          task_id: "ses_continue_test",
-          load_skills: [],
-        },
-        { sessionID: "parent-session", messageID: "parent-message", agent: "sisyphus", abort: new AbortController().signal },
-      )
+        // when - run_in_background omitted (previously a hard throw)
+        await tool.execute(
+          {
+            description: "Category without run flag",
+            prompt: "Do something",
+            category: "quick",
+            load_skills: [],
+          },
+          {
+            sessionID: "parent-session",
+            messageID: "parent-message",
+            agent: "sisyphus",
+            abort: new AbortController().signal,
+          },
+        )
 
-      // then - no throw, returned content is a string, and routing stayed on
-      // the sync-continuation branch: the continuation session was read and
-      // neither background path (launch/resume) was entered.
-      expect(typeof result).toBe("string")
-      expect(continuationMessagesCalls).toContain("ses_continue_test")
-      expect(managerCalls).toHaveLength(0)
-    }, { timeout: 20000 })
+        // then - sync path should run and the session prompt should be sent
+        expect(promptBody).toBeDefined()
+      },
+      { timeout: 20000 },
+    )
+
+    test(
+      "#given subagent_type without run_in_background #when executing #then defaults to sync and proceeds (fixes #4119)",
+      async () => {
+        // given
+        const { createDelegateTask } = require("./tools")
+        let promptBody: CapturedPromptBody = {}
+        const promptMock = async (input: CapturedPromptInput) => {
+          promptBody = input.body
+          return { data: {} }
+        }
+        const mockManager = { launch: async () => ({}) }
+        const mockClient = {
+          app: { agents: async () => ({ data: [{ name: "explore", mode: "subagent" }] }) },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "test-session" } }),
+            prompt: promptMock,
+            promptAsync: promptMock,
+            messages: async () => ({
+              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }],
+            }),
+            status: async () => ({ data: {} }),
+          },
+        }
+        const tool = createDelegateTask({ manager: mockManager, client: mockClient })
+
+        // when
+        await tool.execute(
+          {
+            description: "Subagent without run flag",
+            prompt: "Find patterns",
+            subagent_type: "explore",
+            load_skills: [],
+          },
+          {
+            sessionID: "parent-session",
+            messageID: "parent-message",
+            agent: "sisyphus",
+            abort: new AbortController().signal,
+          },
+        )
+
+        // then
+        expect(promptBody).toBeDefined()
+      },
+      { timeout: 20000 },
+    )
+
+    test(
+      "#given task_id without run_in_background #when executing #then defaults to sync continuation (fixes #4119)",
+      async () => {
+        // given - mock manager.resume to return a running task, and capture
+        // which session-prompt method gets called. The previous PR removed the
+        // 'task_id without run_in_background throws' assertion; the maintainer's
+        // Oracle review on PR #4121 asked us to rewrite it (not delete it) so
+        // the new contract "default false routes to sync continuation" is
+        // pinned by a regression test rather than implicit behavior.
+        const { createDelegateTask } = require("./tools")
+        const managerCalls: string[] = []
+        const mockManager = {
+          resume: async () => {
+            managerCalls.push("resume")
+            return { id: "task-1", sessionId: "ses_continue_test", status: "running" }
+          },
+          launch: async () => {
+            managerCalls.push("launch")
+            return { id: "task-1" }
+          },
+        }
+        const continuationMessagesCalls: string[] = []
+        const mockClient = {
+          app: { agents: async () => ({ data: [] }) },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "ses_continue_test" } }),
+            prompt: async () => ({ data: {} }),
+            promptAsync: async () => ({ data: {} }),
+            messages: async (input: { path: { id: string } }) => {
+              continuationMessagesCalls.push(input.path.id)
+              return {
+                data: [
+                  {
+                    info: { id: "msg_1", role: "assistant", time: { created: Date.now() }, finish: "end_turn" },
+                    parts: [{ type: "text", text: "sync-continuation-result-sentinel" }],
+                  },
+                ],
+              }
+            },
+            status: async () => ({ data: { ses_continue_test: { type: "idle" } } }),
+            abort: async () => ({ data: {} }),
+          },
+        }
+        const tool = createDelegateTask({ manager: mockManager, client: mockClient })
+
+        // when - omit run_in_background; task_id + default false must route to
+        // executeSyncContinuation (tools.ts:75). Previously this threw the
+        // 'run_in_background REQUIRED' error, which #4119 reported as the cause
+        // of Sisyphus's retry storms.
+        const result = await tool.execute(
+          {
+            description: "Continue without run flag",
+            prompt: "Continue",
+            task_id: "ses_continue_test",
+            load_skills: [],
+          },
+          {
+            sessionID: "parent-session",
+            messageID: "parent-message",
+            agent: "sisyphus",
+            abort: new AbortController().signal,
+          },
+        )
+
+        // then - no throw, returned content is a string, and routing stayed on
+        // the sync-continuation branch: the continuation session was read and
+        // neither background path (launch/resume) was entered.
+        expect(typeof result).toBe("string")
+        expect(continuationMessagesCalls).toContain("ses_continue_test")
+        expect(managerCalls).toHaveLength(0)
+      },
+      { timeout: 20000 },
+    )
 
     test("#given no category no subagent_type and no run_in_background #when executing #then still returns the (different) missing-target error (fixes #4119)", async () => {
       // given
@@ -1634,7 +1741,12 @@ describe("sisyphus-task", () => {
           prompt: "Do something",
           load_skills: [],
         },
-        { sessionID: "parent-session", messageID: "parent-message", agent: "sisyphus", abort: new AbortController().signal }
+        {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        },
       )
 
       // then - the missing-target error remains intact; only the run_in_background gate was removed.
@@ -1672,8 +1784,10 @@ describe("sisyphus-task", () => {
             messageID: "parent-message",
             agent: "sisyphus",
             abort: new AbortController().signal,
-            metadata: async (meta: { title?: string }) => { capturedTitle = meta.title },
-          }
+            metadata: async (meta: { title?: string }) => {
+              capturedTitle = meta.title
+            },
+          },
         )
       } catch (error) {
         if (!(error instanceof Error)) {
@@ -1718,8 +1832,10 @@ describe("sisyphus-task", () => {
             messageID: "parent-message",
             agent: "sisyphus",
             abort: new AbortController().signal,
-            metadata: async (meta: { title?: string }) => { capturedTitle = meta.title },
-          }
+            metadata: async (meta: { title?: string }) => {
+              capturedTitle = meta.title
+            },
+          },
         )
       } catch (error) {
         if (!(error instanceof Error)) {
@@ -1764,8 +1880,10 @@ describe("sisyphus-task", () => {
             messageID: "parent-message",
             agent: "sisyphus",
             abort: new AbortController().signal,
-            metadata: async (meta: { title?: string }) => { capturedTitle = meta.title },
-          }
+            metadata: async (meta: { title?: string }) => {
+              capturedTitle = meta.title
+            },
+          },
         )
       } catch (error) {
         if (!(error instanceof Error)) {
@@ -1778,477 +1896,533 @@ describe("sisyphus-task", () => {
       expect(capturedTitle).toBe("my-custom-task-name-sentinel")
     })
 
-    test("#given explicit run_in_background=false #when executing #then sync execution succeeds", async () => {
-      // given
-      const { createDelegateTask } = require("./tools")
-      let promptCalled = false
-      const mockManager = { launch: async () => ({}) }
-      const mockClient = {
-        app: { agents: async () => ({ data: [{ name: "oracle", mode: "subagent", model: { providerID: "anthropic", modelID: "claude-opus-4-7" } }] }) },
-        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        session: {
-          get: async () => ({ data: { directory: "/project" } }),
-          create: async () => ({ data: { id: "ses_explicit_false" } }),
-          prompt: async () => {
-            promptCalled = true
-            return { data: {} }
+    test(
+      "#given explicit run_in_background=false #when executing #then sync execution succeeds",
+      async () => {
+        // given
+        const { createDelegateTask } = require("./tools")
+        let promptCalled = false
+        const mockManager = { launch: async () => ({}) }
+        const mockClient = {
+          app: {
+            agents: async () => ({
+              data: [
+                { name: "oracle", mode: "subagent", model: { providerID: "anthropic", modelID: "claude-opus-4-7" } },
+              ],
+            }),
           },
-          promptAsync: async () => {
-            promptCalled = true
-            return { data: {} }
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "ses_explicit_false" } }),
+            prompt: async () => {
+              promptCalled = true
+              return { data: {} }
+            },
+            promptAsync: async () => {
+              promptCalled = true
+              return { data: {} }
+            },
+            messages: async () => ({
+              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }],
+            }),
+            status: async () => ({ data: { ses_explicit_false: { type: "idle" } } }),
           },
-          messages: async () => ({ data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }] }),
-          status: async () => ({ data: { ses_explicit_false: { type: "idle" } } }),
-        },
-      }
-      const tool = createDelegateTask({ manager: mockManager, client: mockClient })
+        }
+        const tool = createDelegateTask({ manager: mockManager, client: mockClient })
 
-      // when
-      const result = await tool.execute(
-        {
-          description: "Explicit false",
-          prompt: "Run sync",
-          subagent_type: "oracle",
-          run_in_background: false,
-          load_skills: [],
-        },
-        { sessionID: "parent-session", messageID: "parent-message", agent: "sisyphus", abort: new AbortController().signal }
-      )
+        // when
+        const result = await tool.execute(
+          {
+            description: "Explicit false",
+            prompt: "Run sync",
+            subagent_type: "oracle",
+            run_in_background: false,
+            load_skills: [],
+          },
+          {
+            sessionID: "parent-session",
+            messageID: "parent-message",
+            agent: "sisyphus",
+            abort: new AbortController().signal,
+          },
+        )
 
-      // then
-      expect(promptCalled).toBe(true)
-      expect(result).toContain("Done")
-    }, { timeout: 10000 })
+        // then
+        expect(promptCalled).toBe(true)
+        expect(result).toContain("Done")
+      },
+      { timeout: 10000 },
+    )
 
-    test("#given explicit run_in_background=true #when executing #then background execution succeeds", async () => {
-      // given
-      const { createDelegateTask } = require("./tools")
-      let launchCalled = false
-      const mockManager = {
-        launch: async () => {
-          launchCalled = true
-          return {
-            id: "bg_explicit_true",
-            sessionId: "ses_bg_explicit_true",
+    test(
+      "#given explicit run_in_background=true #when executing #then background execution succeeds",
+      async () => {
+        // given
+        const { createDelegateTask } = require("./tools")
+        let launchCalled = false
+        const mockManager = {
+          launch: async () => {
+            launchCalled = true
+            return {
+              id: "bg_explicit_true",
+              sessionId: "ses_bg_explicit_true",
+              description: "Explicit true",
+              agent: "Sisyphus-Junior",
+              status: "running",
+            }
+          },
+        }
+        const mockClient = {
+          app: { agents: async () => ({ data: [] }) },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          model: { list: async () => [] },
+          session: {
+            create: async () => ({ data: { id: "ses_bg_explicit_true" } }),
+            prompt: async () => ({ data: {} }),
+            promptAsync: async () => ({ data: {} }),
+            messages: async () => ({ data: [] }),
+          },
+        }
+        const tool = createDelegateTask({ manager: mockManager, client: mockClient })
+
+        // when
+        const result = await tool.execute(
+          {
             description: "Explicit true",
-            agent: "Sisyphus-Junior",
-            status: "running",
-          }
-        },
-      }
-      const mockClient = {
-        app: { agents: async () => ({ data: [] }) },
-        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        model: { list: async () => [] },
-        session: {
-          create: async () => ({ data: { id: "ses_bg_explicit_true" } }),
-          prompt: async () => ({ data: {} }),
-          promptAsync: async () => ({ data: {} }),
-          messages: async () => ({ data: [] }),
-        },
-      }
-      const tool = createDelegateTask({ manager: mockManager, client: mockClient })
-
-      // when
-      const result = await tool.execute(
-        {
-          description: "Explicit true",
-          prompt: "Run background",
-          category: "quick",
-          run_in_background: true,
-          load_skills: [],
-        },
-        { sessionID: "parent-session", messageID: "parent-message", agent: "sisyphus", abort: new AbortController().signal }
-      )
-
-      // then
-      expect(launchCalled).toBe(true)
-      expect(result).toContain("Background task launched")
-    }, { timeout: 10000 })
-
-    test("#given concurrent background launches from the same parent #when one parent call aborts during session wait #then sibling launch is not interrupted", async () => {
-      // given
-      const { createDelegateTask } = require("./tools")
-      const firstAbortController = new AbortController()
-      const secondAbortController = new AbortController()
-      const taskStates = new Map([
-        ["bg_tool_first", { reads: 0, abortOnFirstRead: true, sessionId: "ses_tool_first" }],
-        ["bg_tool_second", { reads: 0, abortOnFirstRead: false, sessionId: "ses_tool_second" }],
-      ])
-      let launchCount = 0
-      const mockManager = {
-        launch: async () => {
-          launchCount += 1
-          return launchCount === 1
-            ? {
-                id: "bg_tool_first",
-                sessionId: undefined,
-                description: "Tool first",
-                agent: "Sisyphus-Junior",
-                status: "running",
-              }
-            : {
-                id: "bg_tool_second",
-                sessionId: undefined,
-                description: "Tool second",
-                agent: "Sisyphus-Junior",
-                status: "running",
-              }
-        },
-        getTask: (taskID: string) => {
-          const state = taskStates.get(taskID)
-          if (!state) return undefined
-          state.reads += 1
-          if (state.abortOnFirstRead && state.reads === 1) {
-            firstAbortController.abort()
-          }
-          return state.reads >= 2
-            ? { sessionId: state.sessionId, status: "running" }
-            : { sessionId: undefined, status: "pending" }
-        },
-      }
-      const mockClient = {
-        app: { agents: async () => ({ data: [] }) },
-        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        model: { list: async () => [] },
-        session: {
-          create: async () => ({ data: { id: "ses_bg_explicit_true" } }),
-          prompt: async () => ({ data: {} }),
-          promptAsync: async () => ({ data: {} }),
-          messages: async () => ({ data: [] }),
-        },
-      }
-      const tool = createDelegateTask({ manager: mockManager, client: mockClient })
-
-      // when
-      const [firstResult, secondResult] = await Promise.all([
-        tool.execute(
-          {
-            description: "Tool first",
             prompt: "Run background",
             category: "quick",
             run_in_background: true,
             load_skills: [],
           },
-          { sessionID: "parent-session", messageID: "parent-message-1", agent: "sisyphus", abort: firstAbortController.signal }
-        ),
-        tool.execute(
           {
-            description: "Tool second",
-            prompt: "Run background",
-            category: "quick",
-            run_in_background: true,
-            load_skills: [],
+            sessionID: "parent-session",
+            messageID: "parent-message",
+            agent: "sisyphus",
+            abort: new AbortController().signal,
           },
-          { sessionID: "parent-session", messageID: "parent-message-2", agent: "sisyphus", abort: secondAbortController.signal }
-        ),
-      ])
+        )
 
-      // then
-      expect(firstResult).toContain("Background task launched")
-      expect(secondResult).toContain("Background task launched")
-      expect(secondResult).toContain("session_id: ses_tool_second")
-      expect(secondResult).not.toContain("interrupt")
-    }, { timeout: 10000 })
+        // then
+        expect(launchCalled).toBe(true)
+        expect(result).toContain("Background task launched")
+      },
+      { timeout: 10000 },
+    )
+
+    test(
+      "#given concurrent background launches from the same parent #when one parent call aborts during session wait #then sibling launch is not interrupted",
+      async () => {
+        // given
+        const { createDelegateTask } = require("./tools")
+        const firstAbortController = new AbortController()
+        const secondAbortController = new AbortController()
+        const taskStates = new Map([
+          ["bg_tool_first", { reads: 0, abortOnFirstRead: true, sessionId: "ses_tool_first" }],
+          ["bg_tool_second", { reads: 0, abortOnFirstRead: false, sessionId: "ses_tool_second" }],
+        ])
+        let launchCount = 0
+        const mockManager = {
+          launch: async () => {
+            launchCount += 1
+            return launchCount === 1
+              ? {
+                  id: "bg_tool_first",
+                  sessionId: undefined,
+                  description: "Tool first",
+                  agent: "Sisyphus-Junior",
+                  status: "running",
+                }
+              : {
+                  id: "bg_tool_second",
+                  sessionId: undefined,
+                  description: "Tool second",
+                  agent: "Sisyphus-Junior",
+                  status: "running",
+                }
+          },
+          getTask: (taskID: string) => {
+            const state = taskStates.get(taskID)
+            if (!state) return undefined
+            state.reads += 1
+            if (state.abortOnFirstRead && state.reads === 1) {
+              firstAbortController.abort()
+            }
+            return state.reads >= 2
+              ? { sessionId: state.sessionId, status: "running" }
+              : { sessionId: undefined, status: "pending" }
+          },
+        }
+        const mockClient = {
+          app: { agents: async () => ({ data: [] }) },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          model: { list: async () => [] },
+          session: {
+            create: async () => ({ data: { id: "ses_bg_explicit_true" } }),
+            prompt: async () => ({ data: {} }),
+            promptAsync: async () => ({ data: {} }),
+            messages: async () => ({ data: [] }),
+          },
+        }
+        const tool = createDelegateTask({ manager: mockManager, client: mockClient })
+
+        // when
+        const [firstResult, secondResult] = await Promise.all([
+          tool.execute(
+            {
+              description: "Tool first",
+              prompt: "Run background",
+              category: "quick",
+              run_in_background: true,
+              load_skills: [],
+            },
+            {
+              sessionID: "parent-session",
+              messageID: "parent-message-1",
+              agent: "sisyphus",
+              abort: firstAbortController.signal,
+            },
+          ),
+          tool.execute(
+            {
+              description: "Tool second",
+              prompt: "Run background",
+              category: "quick",
+              run_in_background: true,
+              load_skills: [],
+            },
+            {
+              sessionID: "parent-session",
+              messageID: "parent-message-2",
+              agent: "sisyphus",
+              abort: secondAbortController.signal,
+            },
+          ),
+        ])
+
+        // then
+        expect(firstResult).toContain("Background task launched")
+        expect(secondResult).toContain("Background task launched")
+        expect(secondResult).toContain("session_id: ses_tool_second")
+        expect(secondResult).not.toContain("interrupt")
+      },
+      { timeout: 10000 },
+    )
   })
 
   describe("task_id with background parameter", () => {
-  test("task_id with background=false should wait for result and return content", async () => {
-    // Note: This test needs extended timeout because the implementation has MIN_STABILITY_TIME_MS = 5000
-    // given
-    const { createDelegateTask } = require("./tools")
-    
-    const mockTask = {
-      id: "task-123",
-      sessionId: "ses_continue_test",
-      description: "Continued task",
-      agent: "explore",
-      status: "running",
-    }
-    
-    const mockManager = {
-      resume: async () => mockTask,
-      launch: async () => mockTask,
-    }
-    
-      let messagesCallCount = 0
+    test(
+      "task_id with background=false should wait for result and return content",
+      async () => {
+        // Note: This test needs extended timeout because the implementation has MIN_STABILITY_TIME_MS = 5000
+        // given
+        const { createDelegateTask } = require("./tools")
 
-      const mockClient = {
-         session: {
-           prompt: async () => ({ data: {} }),
-           promptAsync: async () => ({ data: {} }),
-           messages: async (args?: { path?: { id?: string } }) => {
-             const sessionID = args?.path?.id
-             // Only track calls for the target session (ses_continue_test),
-             // not for parent-session calls from resolveParentContext
-             if (sessionID !== "ses_continue_test") {
-               return { data: [] }
-             }
-             messagesCallCount++
-             const now = Date.now()
+        const mockTask = {
+          id: "task-123",
+          sessionId: "ses_continue_test",
+          description: "Continued task",
+          agent: "explore",
+          status: "running",
+        }
 
-             const beforeContinuation = [
-               {
-                 info: { id: "msg_001", role: "user", time: { created: now } },
-                 parts: [{ type: "text", text: "Previous context" }],
-               },
-               {
-                 info: { id: "msg_002", role: "assistant", time: { created: now + 1 }, finish: "end_turn" },
-                 parts: [{ type: "text", text: "Previous result" }],
-               },
-             ]
+        const mockManager = {
+          resume: async () => mockTask,
+          launch: async () => mockTask,
+        }
 
-             if (messagesCallCount === 1) {
-               return { data: beforeContinuation }
-             }
+        let messagesCallCount = 0
 
-             return {
-               data: [
-                 ...beforeContinuation,
-                 {
-                   info: { id: "msg_003", role: "user", time: { created: now + 2 } },
-                   parts: [{ type: "text", text: "Continue the task" }],
-                 },
-                 {
-                   info: { id: "msg_004", role: "assistant", time: { created: now + 3 }, finish: "end_turn" },
-                   parts: [{ type: "text", text: "continued-task-result-sentinel" }],
-                 },
-               ],
-             }
-           },
-           status: async () => ({ data: { "ses_continue_test": { type: "idle" } } }),
-         },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         app: {
-           agents: async () => ({ data: [] }),
-        },
-      }
-     
-     const tool = createDelegateTask({
-       manager: mockManager,
-       client: mockClient,
-     })
-     
-     const toolContext = {
-       sessionID: "parent-session",
-       messageID: "parent-message",
-       agent: "sisyphus",
-       abort: new AbortController().signal,
-     }
-     
-     // when
-     const result = await tool.execute(
-       {
-         description: "Continue test",
-         prompt: "Continue the task",
-         task_id: "ses_continue_test",
-         run_in_background: false,
-         load_skills: ["git-master"],
-       },
-       toolContext
-     )
-    
-    // then - should contain the actual continued session result
-    expect(result).toContain("continued-task-result-sentinel")
-  }, { timeout: 10000 })
+        const mockClient = {
+          session: {
+            prompt: async () => ({ data: {} }),
+            promptAsync: async () => ({ data: {} }),
+            messages: async (args?: { path?: { id?: string } }) => {
+              const sessionID = args?.path?.id
+              // Only track calls for the target session (ses_continue_test),
+              // not for parent-session calls from resolveParentContext
+              if (sessionID !== "ses_continue_test") {
+                return { data: [] }
+              }
+              messagesCallCount++
+              const now = Date.now()
 
-  test("sync continuation preserves variant from previous session message", async () => {
-    //#given a session with a previous message that has variant "max"
-    const { createDelegateTask } = require("./tools")
+              const beforeContinuation = [
+                {
+                  info: { id: "msg_001", role: "user", time: { created: now } },
+                  parts: [{ type: "text", text: "Previous context" }],
+                },
+                {
+                  info: { id: "msg_002", role: "assistant", time: { created: now + 1 }, finish: "end_turn" },
+                  parts: [{ type: "text", text: "Previous result" }],
+                },
+              ]
 
-    const promptMock = mock(async () => {
-      return { data: {} }
-    })
+              if (messagesCallCount === 1) {
+                return { data: beforeContinuation }
+              }
 
-    const baseTime = Date.now()
-    const initialMessages = [
-      {
-        info: {
-          id: "msg_001",
-          role: "user",
-          agent: "sisyphus-junior",
-          model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
-          variant: "max",
-          time: { created: baseTime },
-        },
-        parts: [{ type: "text", text: "previous message" }],
+              return {
+                data: [
+                  ...beforeContinuation,
+                  {
+                    info: { id: "msg_003", role: "user", time: { created: now + 2 } },
+                    parts: [{ type: "text", text: "Continue the task" }],
+                  },
+                  {
+                    info: { id: "msg_004", role: "assistant", time: { created: now + 3 }, finish: "end_turn" },
+                    parts: [{ type: "text", text: "continued-task-result-sentinel" }],
+                  },
+                ],
+              }
+            },
+            status: async () => ({ data: { ses_continue_test: { type: "idle" } } }),
+          },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          app: {
+            agents: async () => ({ data: [] }),
+          },
+        }
+
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+        })
+
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
+
+        // when
+        const result = await tool.execute(
+          {
+            description: "Continue test",
+            prompt: "Continue the task",
+            task_id: "ses_continue_test",
+            run_in_background: false,
+            load_skills: ["git-master"],
+          },
+          toolContext,
+        )
+
+        // then - should contain the actual continued session result
+        expect(result).toContain("continued-task-result-sentinel")
       },
-      {
-        info: { id: "msg_002", role: "assistant", time: { created: baseTime + 1 }, finish: "end_turn" },
-        parts: [{ type: "text", text: "Completed." }],
-      },
-    ]
-
-    const messagesCallCounts: Record<string, number> = {}
-
-    const mockClient = {
-      session: {
-        prompt: promptMock,
-        promptAsync: promptMock,
-        messages: async (input: CapturedSessionMessagesInput) => {
-          const sessionID = input?.path?.id
-          if (typeof sessionID !== "string") {
-            return { data: [] }
-          }
-
-          const callCount = (messagesCallCounts[sessionID] ?? 0) + 1
-          messagesCallCounts[sessionID] = callCount
-
-          if (sessionID !== "ses_var_test") {
-            return { data: [] }
-          }
-
-          if (callCount === 1) {
-            return { data: initialMessages }
-          }
-
-          return {
-            data: [
-              ...initialMessages,
-              {
-                info: { id: "msg_003", role: "assistant", time: { created: baseTime + 2 }, finish: "end_turn" },
-                parts: [{ type: "text", text: "Continued." }],
-              },
-            ],
-          }
-        },
-        status: async () => ({ data: { "ses_var_test": { type: "idle" } } }),
-      },
-      config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-      app: {
-        agents: async () => ({ data: [] }),
-      },
-    }
-
-    const tool = createDelegateTask({
-      manager: { resume: async () => ({ id: "task-var", sessionId: "ses_var_test", description: "Variant test", agent: "sisyphus-junior", status: "running" }) },
-      client: mockClient,
-    })
-
-    const toolContext = {
-      sessionID: "parent-session",
-      messageID: "parent-message",
-      agent: "sisyphus",
-      abort: new AbortController().signal,
-    }
-
-    //#when continuing the session
-    await tool.execute(
-      {
-        description: "Continue with variant",
-        prompt: "Continue the task",
-        task_id: "ses_var_test",
-        run_in_background: false,
-        load_skills: [],
-      },
-      toolContext
+      { timeout: 10000 },
     )
 
-    //#then prompt should include variant from previous message
-    expect(promptMock).toHaveBeenCalled()
-    const callArgs = promptMock.mock.calls[0][0]
-    expect(callArgs.body.variant).toBe("max")
-    expect(callArgs.body.agent).toBe("sisyphus-junior")
-    expect(callArgs.body.model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
-  }, { timeout: 10000 })
+    test(
+      "sync continuation preserves variant from previous session message",
+      async () => {
+        //#given a session with a previous message that has variant "max"
+        const { createDelegateTask } = require("./tools")
 
-  test("task_id with background=true should return immediately without waiting", async () => {
-    // given
-    const { createDelegateTask } = require("./tools")
-    
-    const mockTask = {
-      id: "task-456",
-      sessionId: "ses_bg_continue",
-      description: "Background continued task",
-      agent: "explore",
-      status: "running",
-    }
-    
-    const mockManager = {
-      resume: async () => mockTask,
-    }
-    
-     const mockClient = {
-       session: {
-         prompt: async () => ({ data: {} }),
-         promptAsync: async () => ({ data: {} }),
-         messages: async () => ({
-           data: [],
-         }),
-       },
-       config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-     }
-     
-     const tool = createDelegateTask({
-       manager: mockManager,
-       client: mockClient,
-     })
-     
-     const toolContext = {
-       sessionID: "parent-session",
-       messageID: "parent-message",
-       agent: "sisyphus",
-       abort: new AbortController().signal,
-     }
-     
-     // when
-     const result = await tool.execute(
-       {
-         description: "Continue bg test",
-         prompt: "Continue in background",
-         task_id: "ses_bg_continue",
-         run_in_background: true,
-         load_skills: ["git-master"],
-       },
-       toolContext
-     )
-    
-    // then - should return background message
-    expect(result).toContain("Background task continued")
-    expect(result).toContain("task-456")
-  })
-})
+        const promptMock = mock(async () => {
+          return { data: {} }
+        })
 
-  describe("sync mode new task (run_in_background=false)", () => {
-    test("sync mode prompt error returns error message immediately", async () => {
+        const baseTime = Date.now()
+        const initialMessages = [
+          {
+            info: {
+              id: "msg_001",
+              role: "user",
+              agent: "sisyphus-junior",
+              model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+              variant: "max",
+              time: { created: baseTime },
+            },
+            parts: [{ type: "text", text: "previous message" }],
+          },
+          {
+            info: { id: "msg_002", role: "assistant", time: { created: baseTime + 1 }, finish: "end_turn" },
+            parts: [{ type: "text", text: "Completed." }],
+          },
+        ]
+
+        const messagesCallCounts: Record<string, number> = {}
+
+        const mockClient = {
+          session: {
+            prompt: promptMock,
+            promptAsync: promptMock,
+            messages: async (input: CapturedSessionMessagesInput) => {
+              const sessionID = input?.path?.id
+              if (typeof sessionID !== "string") {
+                return { data: [] }
+              }
+
+              const callCount = (messagesCallCounts[sessionID] ?? 0) + 1
+              messagesCallCounts[sessionID] = callCount
+
+              if (sessionID !== "ses_var_test") {
+                return { data: [] }
+              }
+
+              if (callCount === 1) {
+                return { data: initialMessages }
+              }
+
+              return {
+                data: [
+                  ...initialMessages,
+                  {
+                    info: { id: "msg_003", role: "assistant", time: { created: baseTime + 2 }, finish: "end_turn" },
+                    parts: [{ type: "text", text: "Continued." }],
+                  },
+                ],
+              }
+            },
+            status: async () => ({ data: { ses_var_test: { type: "idle" } } }),
+          },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          app: {
+            agents: async () => ({ data: [] }),
+          },
+        }
+
+        const tool = createDelegateTask({
+          manager: {
+            resume: async () => ({
+              id: "task-var",
+              sessionId: "ses_var_test",
+              description: "Variant test",
+              agent: "sisyphus-junior",
+              status: "running",
+            }),
+          },
+          client: mockClient,
+        })
+
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
+
+        //#when continuing the session
+        await tool.execute(
+          {
+            description: "Continue with variant",
+            prompt: "Continue the task",
+            task_id: "ses_var_test",
+            run_in_background: false,
+            load_skills: [],
+          },
+          toolContext,
+        )
+
+        //#then prompt should include variant from previous message
+        expect(promptMock).toHaveBeenCalled()
+        const callArgs = promptMock.mock.calls[0][0]
+        expect(callArgs.body.variant).toBe("max")
+        expect(callArgs.body.agent).toBe("sisyphus-junior")
+        expect(callArgs.body.model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
+      },
+      { timeout: 10000 },
+    )
+
+    test("task_id with background=true should return immediately without waiting", async () => {
       // given
       const { createDelegateTask } = require("./tools")
-      
-      const mockManager = {
-        launch: async () => ({}),
-      }
-      
-       const promptMock = async () => {
-         throw new Error("synthetic-prompt-transport-failure-sentinel")
-       }
 
-       const mockClient = {
-         session: {
-           get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_sync_error_test" } }),
-           prompt: promptMock,
-           promptAsync: promptMock,
-           messages: async () => ({ data: [] }),
-           status: async () => ({ data: {} }),
-         },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         app: {
-           agents: async () => ({ data: [{ name: "ultrabrain", mode: "subagent" }] }),
-         },
-       }
-       
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-       })
-      
+      const mockTask = {
+        id: "task-456",
+        sessionId: "ses_bg_continue",
+        description: "Background continued task",
+        agent: "explore",
+        status: "running",
+      }
+
+      const mockManager = {
+        resume: async () => mockTask,
+      }
+
+      const mockClient = {
+        session: {
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({
+            data: [],
+          }),
+        },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
       const toolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
         agent: "sisyphus",
         abort: new AbortController().signal,
       }
-      
+
+      // when
+      const result = await tool.execute(
+        {
+          description: "Continue bg test",
+          prompt: "Continue in background",
+          task_id: "ses_bg_continue",
+          run_in_background: true,
+          load_skills: ["git-master"],
+        },
+        toolContext,
+      )
+
+      // then - should return background message
+      expect(result).toContain("Background task continued")
+      expect(result).toContain("task-456")
+    })
+  })
+
+  describe("sync mode new task (run_in_background=false)", () => {
+    test("sync mode prompt error returns error message immediately", async () => {
+      // given
+      const { createDelegateTask } = require("./tools")
+
+      const mockManager = {
+        launch: async () => ({}),
+      }
+
+      const promptMock = async () => {
+        throw new Error("synthetic-prompt-transport-failure-sentinel")
+      }
+
+      const mockClient = {
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_sync_error_test" } }),
+          prompt: promptMock,
+          promptAsync: promptMock,
+          messages: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
+        },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        app: {
+          agents: async () => ({ data: [{ name: "ultrabrain", mode: "subagent" }] }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
       // when
       const result = await tool.execute(
         {
@@ -2258,9 +2432,9 @@ describe("sisyphus-task", () => {
           run_in_background: false,
           load_skills: ["git-master"],
         },
-        toolContext
+        toolContext,
       )
-      
+
       // then - should return detailed error message with args and stack trace
       expect(result).toContain("Send prompt failed")
       expect(result).toContain("synthetic-prompt-transport-failure-sentinel")
@@ -2268,179 +2442,187 @@ describe("sisyphus-task", () => {
       expect(result).toContain("**Stack Trace**:")
     })
 
-    test("#given sync prompt returns ambiguous EOF #when sync task runs #then it waits for the accepted session result", async () => {
-      // given
-      const { createDelegateTask } = require("./tools")
-      let promptCalls = 0
+    test(
+      "#given sync prompt returns ambiguous EOF #when sync task runs #then it waits for the accepted session result",
+      async () => {
+        // given
+        const { createDelegateTask } = require("./tools")
+        let promptCalls = 0
 
-      const mockManager = {
-        launch: async () => ({}),
-      }
+        const mockManager = {
+          launch: async () => ({}),
+        }
 
-       const promptMock = async () => {
-         promptCalls += 1
-         throw new Error("JSON Parse error: Unexpected EOF")
-       }
+        const promptMock = async () => {
+          promptCalls += 1
+          throw new Error("JSON Parse error: Unexpected EOF")
+        }
 
-       const mockClient = {
-         session: {
-           get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_sync_ambiguous_eof" } }),
-           prompt: promptMock,
-           promptAsync: promptMock,
-           messages: async () => ({
-             data: [
-               {
-                 info: { id: "msg_001", role: "user", time: { created: Date.now() } },
-                 parts: [{ type: "text", text: "Do something" }],
-               },
-               {
-                 info: { id: "msg_002", role: "assistant", time: { created: Date.now() + 1 }, finish: "end_turn" },
-                 parts: [{ type: "text", text: "accepted-despite-eof-sentinel" }],
-               },
-             ],
-           }),
-           status: async () => ({ data: { ses_sync_ambiguous_eof: { type: "idle" } } }),
-           abort: async () => ({}),
-         },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         app: {
-           agents: async () => ({ data: [{ name: "ultrabrain", mode: "subagent" }] }),
-         },
-       }
+        const mockClient = {
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "ses_sync_ambiguous_eof" } }),
+            prompt: promptMock,
+            promptAsync: promptMock,
+            messages: async () => ({
+              data: [
+                {
+                  info: { id: "msg_001", role: "user", time: { created: Date.now() } },
+                  parts: [{ type: "text", text: "Do something" }],
+                },
+                {
+                  info: { id: "msg_002", role: "assistant", time: { created: Date.now() + 1 }, finish: "end_turn" },
+                  parts: [{ type: "text", text: "accepted-despite-eof-sentinel" }],
+                },
+              ],
+            }),
+            status: async () => ({ data: { ses_sync_ambiguous_eof: { type: "idle" } } }),
+            abort: async () => ({}),
+          },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          app: {
+            agents: async () => ({ data: [{ name: "ultrabrain", mode: "subagent" }] }),
+          },
+        }
 
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-       })
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+        })
 
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
 
-      // when
-      const result = await tool.execute(
-        {
-          description: "Sync accepted EOF test",
-          prompt: "Do something",
-          category: "ultrabrain",
-          run_in_background: false,
-          load_skills: ["git-master"],
-        },
-        toolContext
-      )
+        // when
+        const result = await tool.execute(
+          {
+            description: "Sync accepted EOF test",
+            prompt: "Do something",
+            category: "ultrabrain",
+            run_in_background: false,
+            load_skills: ["git-master"],
+          },
+          toolContext,
+        )
 
-      // then
-      expect(result).toContain("accepted-despite-eof-sentinel")
-      expect(result).toContain("Task completed")
-      expect(promptCalls).toBe(1)
-    }, { timeout: 20000 })
+        // then
+        expect(result).toContain("accepted-despite-eof-sentinel")
+        expect(result).toContain("Task completed")
+        expect(promptCalls).toBe(1)
+      },
+      { timeout: 20000 },
+    )
 
-    test("sync mode success returns task result with content", async () => {
-      // given
-      const { createDelegateTask } = require("./tools")
-      
-      const mockManager = {
-        launch: async () => ({}),
-      }
-      
-       const mockClient = {
-         session: {
-           get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_sync_success" } }),
-           prompt: async () => ({ data: {} }),
-           promptAsync: async () => ({ data: {} }),
-           messages: async () => ({
-             data: [
-               {
-                 info: { id: "msg_001", role: "user", time: { created: Date.now() } },
-                 parts: [{ type: "text", text: "Do something" }],
-               },
-               {
-                 info: { id: "msg_002", role: "assistant", time: { created: Date.now() + 1 }, finish: "end_turn" },
-                 parts: [{ type: "text", text: "sync-task-result-sentinel" }],
-               },
-             ],
-           }),
-           status: async () => ({ data: { "ses_sync_success": { type: "idle" } } }),
-         },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         app: {
-           agents: async () => ({ data: [{ name: "ultrabrain", mode: "subagent" }] }),
-         },
-       }
-       
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-       })
-      
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
-      
-      // when
-      const result = await tool.execute(
-        {
-          description: "Sync success test",
-          prompt: "Do something",
-          category: "ultrabrain",
-          run_in_background: false,
-          load_skills: ["git-master"],
-        },
-        toolContext
-      )
-      
-      // then - should return the task result content
-      expect(result).toContain("sync-task-result-sentinel")
-      expect(result).toContain("Task completed")
-    }, { timeout: 20000 })
+    test(
+      "sync mode success returns task result with content",
+      async () => {
+        // given
+        const { createDelegateTask } = require("./tools")
+
+        const mockManager = {
+          launch: async () => ({}),
+        }
+
+        const mockClient = {
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "ses_sync_success" } }),
+            prompt: async () => ({ data: {} }),
+            promptAsync: async () => ({ data: {} }),
+            messages: async () => ({
+              data: [
+                {
+                  info: { id: "msg_001", role: "user", time: { created: Date.now() } },
+                  parts: [{ type: "text", text: "Do something" }],
+                },
+                {
+                  info: { id: "msg_002", role: "assistant", time: { created: Date.now() + 1 }, finish: "end_turn" },
+                  parts: [{ type: "text", text: "sync-task-result-sentinel" }],
+                },
+              ],
+            }),
+            status: async () => ({ data: { ses_sync_success: { type: "idle" } } }),
+          },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          app: {
+            agents: async () => ({ data: [{ name: "ultrabrain", mode: "subagent" }] }),
+          },
+        }
+
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+        })
+
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
+
+        // when
+        const result = await tool.execute(
+          {
+            description: "Sync success test",
+            prompt: "Do something",
+            category: "ultrabrain",
+            run_in_background: false,
+            load_skills: ["git-master"],
+          },
+          toolContext,
+        )
+
+        // then - should return the task result content
+        expect(result).toContain("sync-task-result-sentinel")
+        expect(result).toContain("Task completed")
+      },
+      { timeout: 20000 },
+    )
 
     test("sync mode agent not found returns helpful error", async () => {
       // given
       const { createDelegateTask } = require("./tools")
-      
+
       const mockManager = {
         launch: async () => ({}),
       }
-      
-       const promptMock = async () => {
-         throw new Error("Cannot read property 'name' of undefined agent.name")
-       }
 
-       const mockClient = {
-         session: {
-           get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_agent_notfound" } }),
-           prompt: promptMock,
-           promptAsync: promptMock,
-           messages: async () => ({ data: [] }),
-           status: async () => ({ data: {} }),
-         },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         app: {
-           agents: async () => ({ data: [{ name: "ultrabrain", mode: "subagent" }] }),
-         },
-       }
-       
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-       })
-      
+      const promptMock = async () => {
+        throw new Error("Cannot read property 'name' of undefined agent.name")
+      }
+
+      const mockClient = {
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_agent_notfound" } }),
+          prompt: promptMock,
+          promptAsync: promptMock,
+          messages: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
+        },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        app: {
+          agents: async () => ({ data: [{ name: "ultrabrain", mode: "subagent" }] }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
       const toolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
         agent: "sisyphus",
         abort: new AbortController().signal,
       }
-      
+
       // when
       const result = await tool.execute(
         {
@@ -2450,150 +2632,164 @@ describe("sisyphus-task", () => {
           run_in_background: false,
           load_skills: ["git-master"],
         },
-        toolContext
+        toolContext,
       )
-      
+
       // then - should return agent not found error
       expect(result).toContain("not found")
       expect(result).toContain("registered")
     })
 
-     test("sync mode passes category model to prompt", async () => {
-       // given
-       const { createDelegateTask } = require("./tools")
-       let promptBody: CapturedPromptBody = {}
+    test(
+      "sync mode passes category model to prompt",
+      async () => {
+        // given
+        const { createDelegateTask } = require("./tools")
+        let promptBody: CapturedPromptBody = {}
 
-       const mockManager = { launch: async () => ({}) }
-       
-       const promptMock = async (input: CapturedPromptInput) => {
-         promptBody = input.body
-         return { data: {} }
-       }
-       
-       const mockClient = {
-         session: {
-           get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_sync_model" } }),
-           prompt: promptMock,
-           promptAsync: promptMock,
-           messages: async () => ({
-             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
-           }),
-           status: async () => ({ data: {} }),
-         },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         app: { agents: async () => ({ data: [] }) },
-       }
+        const mockManager = { launch: async () => ({}) }
 
-      const tool = createDelegateTask({
-        manager: mockManager,
-        client: mockClient,
-        userCategories: {
-          "custom-cat": { model: "provider/custom-model" }
+        const promptMock = async (input: CapturedPromptInput) => {
+          promptBody = input.body
+          return { data: {} }
         }
-      })
 
-      const toolContext = {
-        sessionID: "parent",
-        messageID: "msg",
-        agent: "sisyphus",
-        abort: new AbortController().signal
-      }
+        const mockClient = {
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "ses_sync_model" } }),
+            prompt: promptMock,
+            promptAsync: promptMock,
+            messages: async () => ({
+              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }],
+            }),
+            status: async () => ({ data: {} }),
+          },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          app: { agents: async () => ({ data: [] }) },
+        }
 
-      // when
-      await tool.execute({
-        description: "Sync model test",
-        prompt: "test",
-        category: "custom-cat",
-        run_in_background: false,
-        load_skills: ["git-master"]
-      }, toolContext)
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+          userCategories: {
+            "custom-cat": { model: "provider/custom-model" },
+          },
+        })
 
-      // then
-      expect(promptBody.model).toEqual({
-        providerID: "provider",
-        modelID: "custom-model"
-      })
-    }, { timeout: 20000 })
+        const toolContext = {
+          sessionID: "parent",
+          messageID: "msg",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
+
+        // when
+        await tool.execute(
+          {
+            description: "Sync model test",
+            prompt: "test",
+            category: "custom-cat",
+            run_in_background: false,
+            load_skills: ["git-master"],
+          },
+          toolContext,
+        )
+
+        // then
+        expect(promptBody.model).toEqual({
+          providerID: "provider",
+          modelID: "custom-model",
+        })
+      },
+      { timeout: 20000 },
+    )
   })
 
   describe("unstable agent forced background mode", () => {
-    test("gemini model with run_in_background=false should force background but wait for result", async () => {
-      // given - category using gemini model with run_in_background=false
-      const { createDelegateTask } = require("./tools")
-      let launchCalled = false
-      
-      const launchedTask = {
-        id: "task-unstable",
-        sessionId: "ses_unstable_gemini",
-        description: "Unstable gemini task",
-        agent: "sisyphus-junior",
-        status: "running",
-      }
-      const mockManager = {
-        launch: async () => {
-          launchCalled = true
-          return launchedTask
-        },
-        getTask: () => launchedTask,
-      }
-      
-       const mockClient = {
-         app: { agents: async () => ({ data: [] }) },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         model: { list: async () => [{ provider: "google", id: "gemini-3.1-pro" }] },
-         session: {
-           get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_unstable_gemini" } }),
-           prompt: async () => ({ data: {} }),
-           promptAsync: async () => ({ data: {} }),
-           messages: async () => ({
-             data: [
-               { info: { role: "assistant", time: { created: Date.now() } }, parts: [{ type: "text", text: "gemini-forced-bg-result-sentinel" }] }
-             ]
-           }),
-           status: async () => ({ data: { "ses_unstable_gemini": { type: "idle" } } }),
-         },
-       }
-       
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-         userCategories: {
-           "gemini-canvas": { model: "google/gemini-3.1-pro", variant: "high" },
-         },
-       })
-      
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
-      
-      // when - using a user-defined gemini category with run_in_background=false
-      const result = await tool.execute(
-        {
-          description: "Test gemini forced background",
-          prompt: "Do something creative",
-          category: "gemini-canvas",
-          run_in_background: false,
-          load_skills: ["git-master"],
-        },
-        toolContext
-      )
-      
-      // then - should launch as background BUT wait for and return actual result
-      expect(launchCalled).toBe(true)
-      expect(result).toContain("SUPERVISED TASK COMPLETED")
-      expect(result).toContain("gemini-forced-bg-result-sentinel")
-    }, { timeout: 20000 })
+    test(
+      "gemini model with run_in_background=false should force background but wait for result",
+      async () => {
+        // given - category using gemini model with run_in_background=false
+        const { createDelegateTask } = require("./tools")
+        let launchCalled = false
+
+        const launchedTask = {
+          id: "task-unstable",
+          sessionId: "ses_unstable_gemini",
+          description: "Unstable gemini task",
+          agent: "sisyphus-junior",
+          status: "running",
+        }
+        const mockManager = {
+          launch: async () => {
+            launchCalled = true
+            return launchedTask
+          },
+          getTask: () => launchedTask,
+        }
+
+        const mockClient = {
+          app: { agents: async () => ({ data: [] }) },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          model: { list: async () => [{ provider: "google", id: "gemini-3.1-pro" }] },
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "ses_unstable_gemini" } }),
+            prompt: async () => ({ data: {} }),
+            promptAsync: async () => ({ data: {} }),
+            messages: async () => ({
+              data: [
+                {
+                  info: { role: "assistant", time: { created: Date.now() } },
+                  parts: [{ type: "text", text: "gemini-forced-bg-result-sentinel" }],
+                },
+              ],
+            }),
+            status: async () => ({ data: { ses_unstable_gemini: { type: "idle" } } }),
+          },
+        }
+
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+          userCategories: {
+            "gemini-canvas": { model: "google/gemini-3.1-pro", variant: "high" },
+          },
+        })
+
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
+
+        // when - using a user-defined gemini category with run_in_background=false
+        const result = await tool.execute(
+          {
+            description: "Test gemini forced background",
+            prompt: "Do something creative",
+            category: "gemini-canvas",
+            run_in_background: false,
+            load_skills: ["git-master"],
+          },
+          toolContext,
+        )
+
+        // then - should launch as background BUT wait for and return actual result
+        expect(launchCalled).toBe(true)
+        expect(result).toContain("SUPERVISED TASK COMPLETED")
+        expect(result).toContain("gemini-forced-bg-result-sentinel")
+      },
+      { timeout: 20000 },
+    )
 
     test("gemini model with run_in_background=true should not show unstable message (normal background)", async () => {
       // given - category using gemini model with run_in_background=true (normal background flow)
       const { createDelegateTask } = require("./tools")
       let launchCalled = false
-      
+
       const mockManager = {
         launch: async () => {
           launchCalled = true
@@ -2606,403 +2802,432 @@ describe("sisyphus-task", () => {
           }
         },
       }
-      
-       const mockClient = {
-         app: { agents: async () => ({ data: [] }) },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         session: {
-           create: async () => ({ data: { id: "test-session" } }),
-           prompt: async () => ({ data: {} }),
-           promptAsync: async () => ({ data: {} }),
-           messages: async () => ({ data: [] }),
-         },
-       }
-       
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-       })
-       
-       const toolContext = {
-         sessionID: "parent-session",
-         messageID: "parent-message",
-         agent: "sisyphus",
-         abort: new AbortController().signal,
-       }
-       
-       // when - using visual-engineering with run_in_background=true (normal background)
-       const result = await tool.execute(
-         {
-           description: "Test normal background",
-           prompt: "Do something visual",
-           category: "visual-engineering",
-           run_in_background: true,  // User explicitly says true - normal background
-           load_skills: ["git-master"],
-         },
-         toolContext
-       )
-      
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // when - using visual-engineering with run_in_background=true (normal background)
+      const result = await tool.execute(
+        {
+          description: "Test normal background",
+          prompt: "Do something visual",
+          category: "visual-engineering",
+          run_in_background: true, // User explicitly says true - normal background
+          load_skills: ["git-master"],
+        },
+        toolContext,
+      )
+
       // then - should NOT show unstable message (it's normal background flow)
       expect(launchCalled).toBe(true)
       expect(result).not.toContain("UNSTABLE AGENT MODE")
       expect(result).toContain("task-normal-bg")
     })
 
-    test("minimax model with run_in_background=false should force background but wait for result", async () => {
-      // given - custom category using minimax model with run_in_background=false
-      const { createDelegateTask } = require("./tools")
-      let launchCalled = false
+    test(
+      "minimax model with run_in_background=false should force background but wait for result",
+      async () => {
+        // given - custom category using minimax model with run_in_background=false
+        const { createDelegateTask } = require("./tools")
+        let launchCalled = false
 
-      const launchedTask = {
-        id: "task-unstable-minimax",
-        sessionId: "ses_unstable_minimax",
-        description: "Unstable minimax task",
-        agent: "sisyphus-junior",
-        status: "running",
-      }
-      const mockManager = {
-        launch: async () => {
-          launchCalled = true
-          return launchedTask
-        },
-        getTask: () => launchedTask,
-      }
-
-       const mockClient = {
-         app: { agents: async () => ({ data: [] }) },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         session: {
-           get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_unstable_minimax" } }),
-           prompt: async () => ({ data: {} }),
-           promptAsync: async () => ({ data: {} }),
-           messages: async () => ({
-             data: [
-               { info: { role: "assistant", time: { created: Date.now() } }, parts: [{ type: "text", text: "minimax-forced-bg-result-sentinel" }] }
-             ]
-           }),
-           status: async () => ({ data: { "ses_unstable_minimax": { type: "idle" } } }),
-         },
-       }
-
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-         userCategories: {
-           "minimax-cat": {
-             model: "minimax/abab-5",
-           },
-         },
-       })
-
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
-
-      // when - using minimax category with run_in_background=false
-      const result = await tool.execute(
-        {
-          description: "Test minimax forced background",
-          prompt: "Do something with minimax",
-          category: "minimax-cat",
-          run_in_background: false,
-          load_skills: ["git-master"],
-        },
-        toolContext
-      )
-
-      // then - should launch as background BUT wait for and return actual result
-      expect(launchCalled).toBe(true)
-      expect(result).toContain("SUPERVISED TASK COMPLETED")
-      expect(result).toContain("minimax-forced-bg-result-sentinel")
-    }, { timeout: 20000 })
-
-    test("non-gemini model with run_in_background=false should run sync (not forced to background)", async () => {
-      // given - category using non-gemini model with run_in_background=false
-      const { createDelegateTask } = require("./tools")
-      let launchCalled = false
-      let promptCalled = false
-      
-      const mockManager = {
-        launch: async () => {
-          launchCalled = true
-          return { id: "should-not-be-called", sessionId: "x", description: "x", agent: "x", status: "running" }
-        },
-      }
-      
-       const promptMock = async () => {
-         promptCalled = true
-         return { data: {} }
-       }
-
-       const mockClient = {
-         app: { agents: async () => ({ data: [] }) },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         session: {
-           get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_sync_non_gemini" } }),
-           prompt: promptMock,
-           promptAsync: promptMock,
-           messages: async () => ({
-             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done sync" }] }]
-           }),
-           status: async () => ({ data: { "ses_sync_non_gemini": { type: "idle" } } }),
-         },
-       }
-       
-       // Use ultrabrain which uses gpt-5.5 (non-gemini)
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-       })
-      
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
-      
-      // when - using ultrabrain (gpt model) with run_in_background=false
-      const result = await tool.execute(
-        {
-          description: "Test non-gemini sync",
-          prompt: "Do something smart",
-          category: "ultrabrain",
-          run_in_background: false,
-          load_skills: ["git-master"],
-        },
-        toolContext
-      )
-      
-      // then - should run sync, NOT forced to background
-      expect(launchCalled).toBe(false)  // manager.launch should NOT be called
-      expect(promptCalled).toBe(true)
-      expect(result).not.toContain("UNSTABLE AGENT MODE")
-    }, { timeout: 20000 })
-
-    test("user gemini category with run_in_background=false should force background but wait for result", async () => {
-      // given - a user-defined category pinned to a gemini model
-      const { createDelegateTask } = require("./tools")
-      let launchCalled = false
-      
-      const launchedTask = {
-        id: "task-artistry",
-        sessionId: "ses_artistry_gemini",
-        description: "Artistry gemini task",
-        agent: "sisyphus-junior",
-        status: "running",
-      }
-      const mockManager = {
-        launch: async () => {
-          launchCalled = true
-          return launchedTask
-        },
-        getTask: () => launchedTask,
-      }
-      
-       const mockClient = {
-         app: { agents: async () => ({ data: [] }) },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         model: { list: async () => [{ provider: "google", id: "gemini-3.1-pro" }] },
-         session: {
-           get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_artistry_gemini" } }),
-           prompt: async () => ({ data: {} }),
-           promptAsync: async () => ({ data: {} }),
-           messages: async () => ({
-             data: [
-               { info: { role: "assistant", time: { created: Date.now() } }, parts: [{ type: "text", text: "artistry-forced-bg-result-sentinel" }] }
-             ]
-           }),
-           status: async () => ({ data: { "ses_artistry_gemini": { type: "idle" } } }),
-         },
-       }
-       
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-         userCategories: {
-           "gemini-canvas": { model: "google/gemini-3.1-pro", variant: "high" },
-         },
-       })
-      
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
-      
-      // when - user gemini category (gemini-3.1-pro with high variant)
-      const result = await tool.execute(
-        {
-          description: "Test artistry forced background",
-          prompt: "Do something artistic",
-          category: "gemini-canvas",
-          run_in_background: false,
-          load_skills: ["git-master"],
-        },
-        toolContext
-      )
-      
-      // then - should launch as background BUT wait for and return actual result
-      expect(launchCalled).toBe(true)
-      expect(result).toContain("SUPERVISED TASK COMPLETED")
-      expect(result).toContain("artistry-forced-bg-result-sentinel")
-    }, { timeout: 20000 })
-
-    test("writing category (kimi) with run_in_background=false should run sync when kimi provider is available", async () => {
-      // given - writing uses kimi model which is no longer considered unstable
-      // Override provider cache to include kimi-for-coding provider
-      providerModelsSpy.mockReturnValue({
-        models: {
-          anthropic: ["claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5"],
-          google: ["gemini-3.1-pro", "gemini-3-flash"],
-        openai: ["gpt-5.5", "gpt-5.5", "gpt-5.5"],
-          "kimi-for-coding": ["k3"],
-        },
-        connected: ["anthropic", "google", "openai", "kimi-for-coding"],
-        updatedAt: "2026-01-01T00:00:00.000Z",
-      })
-      cacheSpy.mockReturnValue(["anthropic", "google", "openai", "kimi-for-coding"])
-
-      const { createDelegateTask } = require("./tools")
-      let launchCalled = false
-      let promptCalled = false
-
-      const mockManager = {
-        launch: async () => {
-          launchCalled = true
-          return { id: "should-not-be-called", sessionId: "x", description: "x", agent: "x", status: "running" }
-        },
-      }
-
-       const promptMock = async () => {
-         promptCalled = true
-         return { data: {} }
-       }
-
-       const mockClient = {
-         app: { agents: async () => ({ data: [] }) },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         session: {
-           get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_writing_kimi" } }),
-           prompt: promptMock,
-           promptAsync: promptMock,
-           messages: async () => ({
-             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Writing result here" }] }]
-           }),
-           status: async () => ({ data: { "ses_writing_kimi": { type: "idle" } } }),
-         },
-       }
-
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-       })
-
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
-
-      // when - writing category (kimi) with run_in_background=false
-      const result = await tool.execute(
-        {
-          description: "Test writing sync",
-          prompt: "Write something",
-          category: "writing",
-          run_in_background: false,
-          load_skills: ["git-master"],
-        },
-        toolContext
-      )
-
-      // then - should run sync, NOT forced to background (kimi is not unstable)
-      expect(launchCalled).toBe(false)
-      expect(promptCalled).toBe(true)
-      expect(result).not.toContain("SUPERVISED TASK COMPLETED")
-    }, { timeout: 20000 })
-
-    test("is_unstable_agent=true should force background but wait for result", async () => {
-      // given - custom category with is_unstable_agent=true but non-gemini model
-      const { createDelegateTask } = require("./tools")
-      let launchCalled = false
-      
-      const launchedTask = {
-        id: "task-custom-unstable",
-        sessionId: "ses_custom_unstable",
-        description: "Custom unstable task",
-        agent: "sisyphus-junior",
-        status: "running",
-      }
-      const mockManager = {
-        launch: async () => {
-          launchCalled = true
-          return launchedTask
-        },
-        getTask: () => launchedTask,
-      }
-      
-      const mockClient = {
-        app: { agents: async () => ({ data: [] }) },
-        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        session: {
-          get: async () => ({ data: { directory: "/project" } }),
-          create: async () => ({ data: { id: "ses_custom_unstable" } }),
-          prompt: async () => ({ data: {} }),
-          promptAsync: async () => ({ data: {} }),
-          messages: async () => ({
-            data: [
-              { info: { role: "assistant", time: { created: Date.now() } }, parts: [{ type: "text", text: "custom-unstable-result-sentinel" }] }
-            ]
-          }),
-          status: async () => ({ data: { "ses_custom_unstable": { type: "idle" } } }),
-        },
-      }
-      
-      const tool = createDelegateTask({
-        manager: mockManager,
-        client: mockClient,
-        userCategories: {
-          "my-unstable-cat": {
-            model: "openai/gpt-5.5",
-            is_unstable_agent: true,
+        const launchedTask = {
+          id: "task-unstable-minimax",
+          sessionId: "ses_unstable_minimax",
+          description: "Unstable minimax task",
+          agent: "sisyphus-junior",
+          status: "running",
+        }
+        const mockManager = {
+          launch: async () => {
+            launchCalled = true
+            return launchedTask
           },
-        },
-      })
-      
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
-      
-      // when - using custom unstable category with run_in_background=false
-      const result = await tool.execute(
-        {
-          description: "Test custom unstable",
-          prompt: "Do something",
-          category: "my-unstable-cat",
-          run_in_background: false,
-          load_skills: ["git-master"],
-        },
-        toolContext
-      )
-      
-      // then - should launch as background BUT wait for and return actual result
-      expect(launchCalled).toBe(true)
-      expect(result).toContain("SUPERVISED TASK COMPLETED")
-      expect(result).toContain("custom-unstable-result-sentinel")
-    }, { timeout: 20000 })
+          getTask: () => launchedTask,
+        }
+
+        const mockClient = {
+          app: { agents: async () => ({ data: [] }) },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "ses_unstable_minimax" } }),
+            prompt: async () => ({ data: {} }),
+            promptAsync: async () => ({ data: {} }),
+            messages: async () => ({
+              data: [
+                {
+                  info: { role: "assistant", time: { created: Date.now() } },
+                  parts: [{ type: "text", text: "minimax-forced-bg-result-sentinel" }],
+                },
+              ],
+            }),
+            status: async () => ({ data: { ses_unstable_minimax: { type: "idle" } } }),
+          },
+        }
+
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+          userCategories: {
+            "minimax-cat": {
+              model: "minimax/abab-5",
+            },
+          },
+        })
+
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
+
+        // when - using minimax category with run_in_background=false
+        const result = await tool.execute(
+          {
+            description: "Test minimax forced background",
+            prompt: "Do something with minimax",
+            category: "minimax-cat",
+            run_in_background: false,
+            load_skills: ["git-master"],
+          },
+          toolContext,
+        )
+
+        // then - should launch as background BUT wait for and return actual result
+        expect(launchCalled).toBe(true)
+        expect(result).toContain("SUPERVISED TASK COMPLETED")
+        expect(result).toContain("minimax-forced-bg-result-sentinel")
+      },
+      { timeout: 20000 },
+    )
+
+    test(
+      "non-gemini model with run_in_background=false should run sync (not forced to background)",
+      async () => {
+        // given - category using non-gemini model with run_in_background=false
+        const { createDelegateTask } = require("./tools")
+        let launchCalled = false
+        let promptCalled = false
+
+        const mockManager = {
+          launch: async () => {
+            launchCalled = true
+            return { id: "should-not-be-called", sessionId: "x", description: "x", agent: "x", status: "running" }
+          },
+        }
+
+        const promptMock = async () => {
+          promptCalled = true
+          return { data: {} }
+        }
+
+        const mockClient = {
+          app: { agents: async () => ({ data: [] }) },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "ses_sync_non_gemini" } }),
+            prompt: promptMock,
+            promptAsync: promptMock,
+            messages: async () => ({
+              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done sync" }] }],
+            }),
+            status: async () => ({ data: { ses_sync_non_gemini: { type: "idle" } } }),
+          },
+        }
+
+        // Use ultrabrain which uses gpt-5.5 (non-gemini)
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+        })
+
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
+
+        // when - using ultrabrain (gpt model) with run_in_background=false
+        const result = await tool.execute(
+          {
+            description: "Test non-gemini sync",
+            prompt: "Do something smart",
+            category: "ultrabrain",
+            run_in_background: false,
+            load_skills: ["git-master"],
+          },
+          toolContext,
+        )
+
+        // then - should run sync, NOT forced to background
+        expect(launchCalled).toBe(false) // manager.launch should NOT be called
+        expect(promptCalled).toBe(true)
+        expect(result).not.toContain("UNSTABLE AGENT MODE")
+      },
+      { timeout: 20000 },
+    )
+
+    test(
+      "user gemini category with run_in_background=false should force background but wait for result",
+      async () => {
+        // given - a user-defined category pinned to a gemini model
+        const { createDelegateTask } = require("./tools")
+        let launchCalled = false
+
+        const launchedTask = {
+          id: "task-artistry",
+          sessionId: "ses_artistry_gemini",
+          description: "Artistry gemini task",
+          agent: "sisyphus-junior",
+          status: "running",
+        }
+        const mockManager = {
+          launch: async () => {
+            launchCalled = true
+            return launchedTask
+          },
+          getTask: () => launchedTask,
+        }
+
+        const mockClient = {
+          app: { agents: async () => ({ data: [] }) },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          model: { list: async () => [{ provider: "google", id: "gemini-3.1-pro" }] },
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "ses_artistry_gemini" } }),
+            prompt: async () => ({ data: {} }),
+            promptAsync: async () => ({ data: {} }),
+            messages: async () => ({
+              data: [
+                {
+                  info: { role: "assistant", time: { created: Date.now() } },
+                  parts: [{ type: "text", text: "artistry-forced-bg-result-sentinel" }],
+                },
+              ],
+            }),
+            status: async () => ({ data: { ses_artistry_gemini: { type: "idle" } } }),
+          },
+        }
+
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+          userCategories: {
+            "gemini-canvas": { model: "google/gemini-3.1-pro", variant: "high" },
+          },
+        })
+
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
+
+        // when - user gemini category (gemini-3.1-pro with high variant)
+        const result = await tool.execute(
+          {
+            description: "Test artistry forced background",
+            prompt: "Do something artistic",
+            category: "gemini-canvas",
+            run_in_background: false,
+            load_skills: ["git-master"],
+          },
+          toolContext,
+        )
+
+        // then - should launch as background BUT wait for and return actual result
+        expect(launchCalled).toBe(true)
+        expect(result).toContain("SUPERVISED TASK COMPLETED")
+        expect(result).toContain("artistry-forced-bg-result-sentinel")
+      },
+      { timeout: 20000 },
+    )
+
+    test(
+      "writing category (kimi) with run_in_background=false should run sync when kimi provider is available",
+      async () => {
+        // given - writing uses kimi model which is no longer considered unstable
+        // Override provider cache to include kimi-for-coding provider
+        providerModelsSpy.mockReturnValue({
+          models: {
+            anthropic: ["claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5"],
+            google: ["gemini-3.1-pro", "gemini-3-flash"],
+            openai: ["gpt-5.5", "gpt-5.5", "gpt-5.5"],
+            "kimi-for-coding": ["k3"],
+          },
+          connected: ["anthropic", "google", "openai", "kimi-for-coding"],
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        })
+        cacheSpy.mockReturnValue(["anthropic", "google", "openai", "kimi-for-coding"])
+
+        const { createDelegateTask } = require("./tools")
+        let launchCalled = false
+        let promptCalled = false
+
+        const mockManager = {
+          launch: async () => {
+            launchCalled = true
+            return { id: "should-not-be-called", sessionId: "x", description: "x", agent: "x", status: "running" }
+          },
+        }
+
+        const promptMock = async () => {
+          promptCalled = true
+          return { data: {} }
+        }
+
+        const mockClient = {
+          app: { agents: async () => ({ data: [] }) },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "ses_writing_kimi" } }),
+            prompt: promptMock,
+            promptAsync: promptMock,
+            messages: async () => ({
+              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Writing result here" }] }],
+            }),
+            status: async () => ({ data: { ses_writing_kimi: { type: "idle" } } }),
+          },
+        }
+
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+        })
+
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
+
+        // when - writing category (kimi) with run_in_background=false
+        const result = await tool.execute(
+          {
+            description: "Test writing sync",
+            prompt: "Write something",
+            category: "writing",
+            run_in_background: false,
+            load_skills: ["git-master"],
+          },
+          toolContext,
+        )
+
+        // then - should run sync, NOT forced to background (kimi is not unstable)
+        expect(launchCalled).toBe(false)
+        expect(promptCalled).toBe(true)
+        expect(result).not.toContain("SUPERVISED TASK COMPLETED")
+      },
+      { timeout: 20000 },
+    )
+
+    test(
+      "is_unstable_agent=true should force background but wait for result",
+      async () => {
+        // given - custom category with is_unstable_agent=true but non-gemini model
+        const { createDelegateTask } = require("./tools")
+        let launchCalled = false
+
+        const launchedTask = {
+          id: "task-custom-unstable",
+          sessionId: "ses_custom_unstable",
+          description: "Custom unstable task",
+          agent: "sisyphus-junior",
+          status: "running",
+        }
+        const mockManager = {
+          launch: async () => {
+            launchCalled = true
+            return launchedTask
+          },
+          getTask: () => launchedTask,
+        }
+
+        const mockClient = {
+          app: { agents: async () => ({ data: [] }) },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "ses_custom_unstable" } }),
+            prompt: async () => ({ data: {} }),
+            promptAsync: async () => ({ data: {} }),
+            messages: async () => ({
+              data: [
+                {
+                  info: { role: "assistant", time: { created: Date.now() } },
+                  parts: [{ type: "text", text: "custom-unstable-result-sentinel" }],
+                },
+              ],
+            }),
+            status: async () => ({ data: { ses_custom_unstable: { type: "idle" } } }),
+          },
+        }
+
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+          userCategories: {
+            "my-unstable-cat": {
+              model: "openai/gpt-5.5",
+              is_unstable_agent: true,
+            },
+          },
+        })
+
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
+
+        // when - using custom unstable category with run_in_background=false
+        const result = await tool.execute(
+          {
+            description: "Test custom unstable",
+            prompt: "Do something",
+            category: "my-unstable-cat",
+            run_in_background: false,
+            load_skills: ["git-master"],
+          },
+          toolContext,
+        )
+
+        // then - should launch as background BUT wait for and return actual result
+        expect(launchCalled).toBe(true)
+        expect(result).toContain("SUPERVISED TASK COMPLETED")
+        expect(result).toContain("custom-unstable-result-sentinel")
+      },
+      { timeout: 20000 },
+    )
   })
 
   describe("category model resolution fallback", () => {
@@ -3064,7 +3289,7 @@ describe("sisyphus-task", () => {
           run_in_background: true,
           load_skills: [],
         },
-        toolContext
+        toolContext,
       )
 
       // then - model should be openai/gpt-6-luna-fast from DEFAULT_CATEGORIES
@@ -3091,27 +3316,27 @@ describe("sisyphus-task", () => {
         },
       }
 
-       const mockClient = {
-         app: { agents: async () => ({ data: [] }) },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         model: { list: async () => [] },
-         session: {
-           create: async () => ({ data: { id: "test-session" } }),
-           prompt: async () => ({ data: {} }),
-           promptAsync: async () => ({ data: {} }),
-           messages: async () => ({ data: [] }),
-         },
-       }
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        model: { list: async () => [] },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
 
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-         userCategories: {
-           "fallback-test": { model: "anthropic/claude-opus-4-7" },
-         },
-         connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
-         availableModelsOverride: createTestAvailableModels(),
-       })
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        userCategories: {
+          "fallback-test": { model: "anthropic/claude-opus-4-7" },
+        },
+        connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+        availableModelsOverride: createTestAvailableModels(),
+      })
 
       const toolContext = {
         sessionID: "parent-session",
@@ -3129,7 +3354,7 @@ describe("sisyphus-task", () => {
           run_in_background: true,
           load_skills: [],
         },
-        toolContext
+        toolContext,
       )
 
       // then - category model must win (not Kimi)
@@ -3190,7 +3415,7 @@ describe("sisyphus-task", () => {
           run_in_background: true,
           load_skills: [],
         },
-        toolContext
+        toolContext,
       )
 
       // then - override model should be used instead of category model
@@ -3216,28 +3441,28 @@ describe("sisyphus-task", () => {
         },
       }
 
-       const mockClient = {
-         app: { agents: async () => ({ data: [] }) },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         model: { list: async () => [] },
-         session: {
-           create: async () => ({ data: { id: "test-session" } }),
-           prompt: async () => ({ data: {} }),
-           promptAsync: async () => ({ data: {} }),
-           messages: async () => ({ data: [] }),
-         },
-       }
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        model: { list: async () => [] },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
 
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-         sisyphusJuniorModel: "anthropic/claude-sonnet-4-6",
-         userCategories: {
-           ultrabrain: { model: "openai/gpt-5.5" },
-         },
-         connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
-         availableModelsOverride: createTestAvailableModels(),
-       })
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        sisyphusJuniorModel: "anthropic/claude-sonnet-4-6",
+        userCategories: {
+          ultrabrain: { model: "openai/gpt-5.5" },
+        },
+        connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+        availableModelsOverride: createTestAvailableModels(),
+      })
 
       const toolContext = {
         sessionID: "parent-session",
@@ -3255,7 +3480,7 @@ describe("sisyphus-task", () => {
           run_in_background: true,
           load_skills: [],
         },
-        toolContext
+        toolContext,
       )
 
       // then - explicit category model should win
@@ -3316,7 +3541,7 @@ describe("sisyphus-task", () => {
           run_in_background: true,
           load_skills: [],
         },
-        toolContext
+        toolContext,
       )
 
       // then - sisyphus-junior override model should be used, not category default
@@ -3379,7 +3604,7 @@ describe("sisyphus-task", () => {
           run_in_background: true,
           load_skills: [],
         },
-        toolContext
+        toolContext,
       )
 
       // then - sisyphus-junior override model should be used as fallback
@@ -3389,76 +3614,82 @@ describe("sisyphus-task", () => {
   })
 
   describe("browserProvider propagation", () => {
-    test("should resolve dev-browser skill when browserProvider is passed", async () => {
-      // given - task configured with an alternate browser provider
-      const { createDelegateTask } = require("./tools")
-      let promptBody: CapturedPromptBody = {}
+    test(
+      "should resolve dev-browser skill when browserProvider is passed",
+      async () => {
+        // given - task configured with an alternate browser provider
+        const { createDelegateTask } = require("./tools")
+        let promptBody: CapturedPromptBody = {}
 
-       const mockManager = { launch: async () => ({}) }
-       
-       const promptMock = async (input: CapturedPromptInput) => {
-         promptBody = input.body
-         return { data: {} }
-       }
-       
-       const mockClient = {
-         app: { agents: async () => ({ data: [] }) },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         session: {
-           get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_browser_provider" } }),
-           prompt: promptMock,
-           promptAsync: promptMock,
-           messages: async () => ({
-             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
-           }),
-           status: async () => ({ data: {} }),
-         },
-       }
+        const mockManager = { launch: async () => ({}) }
 
-       // Pass browserProvider to createDelegateTask
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-         browserProvider: "dev-browser",
-       })
+        const promptMock = async (input: CapturedPromptInput) => {
+          promptBody = input.body
+          return { data: {} }
+        }
 
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
+        const mockClient = {
+          app: { agents: async () => ({ data: [] }) },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "ses_browser_provider" } }),
+            prompt: promptMock,
+            promptAsync: promptMock,
+            messages: async () => ({
+              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }],
+            }),
+            status: async () => ({ data: {} }),
+          },
+        }
 
-      // when - request dev-browser skill
-      await tool.execute(
-        {
-          description: "Test browserProvider propagation",
-          prompt: "Do something",
-          category: "ultrabrain",
-          run_in_background: false,
-          load_skills: ["dev-browser"],
-        },
-        toolContext
-      )
+        // Pass browserProvider to createDelegateTask
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+          browserProvider: "dev-browser",
+        })
 
-      // then - dev-browser skill should be resolved
-      expect(promptBody).toBeDefined()
-      expect(promptBody.system).toBeDefined()
-      expect(promptBody.system).toContain("<Category_Context>")
-      expect(String(promptBody.system).startsWith("<Category_Context>")).toBe(false)
-    }, { timeout: 20000 })
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
+
+        // when - request dev-browser skill
+        await tool.execute(
+          {
+            description: "Test browserProvider propagation",
+            prompt: "Do something",
+            category: "ultrabrain",
+            run_in_background: false,
+            load_skills: ["dev-browser"],
+          },
+          toolContext,
+        )
+
+        // then - dev-browser skill should be resolved
+        expect(promptBody).toBeDefined()
+        expect(promptBody.system).toBeDefined()
+        expect(promptBody.system).toContain("<Category_Context>")
+        expect(String(promptBody.system).startsWith("<Category_Context>")).toBe(false)
+      },
+      { timeout: 20000 },
+    )
 
     test("should resolve a configured custom browser skill when browserProvider is not set", async () => {
       // given - delegate_task without browserProvider
       const { createDelegateTask } = require("./tools")
       const nativeSkills = {
-        all: async () => [{
-          name: "custom-browser",
-          description: "Browser automation skill",
-          location: "/native/custom-browser/SKILL.md",
-          content: "Custom browser instructions",
-        }],
+        all: async () => [
+          {
+            name: "custom-browser",
+            description: "Browser automation skill",
+            location: "/native/custom-browser/SKILL.md",
+            content: "Custom browser instructions",
+          },
+        ],
         get: async () => undefined,
       }
       const mockManager = { launch: async () => ({}) }
@@ -3473,18 +3704,18 @@ describe("sisyphus-task", () => {
           },
           promptAsync: async () => ({ data: {} }),
           messages: async () => ({
-            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
+            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }],
           }),
           status: async () => ({ data: {} }),
         },
       }
 
-       // No browserProvider passed
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-         nativeSkills,
-       })
+      // No browserProvider passed
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        nativeSkills,
+      })
 
       const toolContext = {
         sessionID: "parent-session",
@@ -3502,7 +3733,7 @@ describe("sisyphus-task", () => {
           run_in_background: false,
           load_skills: ["custom-browser"],
         },
-        toolContext
+        toolContext,
       )
 
       expect(result).toContain("Task completed")
@@ -3510,100 +3741,100 @@ describe("sisyphus-task", () => {
     })
   })
 
-	describe("delegate task with short skill name", () => {
-		let envCleanup: Record<string, string | undefined>
+  describe("delegate task with short skill name", () => {
+    let envCleanup: Record<string, string | undefined>
 
-		beforeEach(() => {
-			envCleanup = {
-				CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
-				OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
-			}
-		})
+    beforeEach(() => {
+      envCleanup = {
+        CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
+        OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
+      }
+    })
 
-		afterEach(() => {
-			for (const [key, value] of Object.entries(envCleanup)) {
-				if (value !== undefined) {
-					process.env[key] = value
-				} else {
-					delete process.env[key]
-				}
-			}
-		})
+    afterEach(() => {
+      for (const [key, value] of Object.entries(envCleanup)) {
+        if (value !== undefined) {
+          process.env[key] = value
+        } else {
+          delete process.env[key]
+        }
+      }
+    })
 
-		test("resolves short named discovered skill and flows content into prompt", async () => {
-			// given: a nested discovered skill under a temp config dir
-			// (intentionally verifies the full integration path: delegate-task -> skill-resolver ->
-			//  resolveMultipleSkillsAsync -> matchSkillByName, not just unit-testing the resolver)
-			const { join } = require("node:path")
-			const { tmpdir } = require("node:os")
-			const { mkdirSync, writeFileSync } = require("node:fs")
-			const unique = `delegate-shortname-${Date.now()}-${Math.random().toString(16).slice(2)}`
-			const testConfigDir = join(tmpdir(), unique)
-			process.env.CLAUDE_CONFIG_DIR = testConfigDir
-			process.env.OPENCODE_CONFIG_DIR = testConfigDir
-			const skillDir = join(testConfigDir, "skills", "toolkit", "systematic-debugging")
-			mkdirSync(skillDir, { recursive: true })
-			writeFileSync(
-				join(skillDir, "SKILL.md"),
-				"---\nname: systematic-debugging\ndescription: Nested debug skill\n---\ndebug-skill-content-sentinel"
-			)
-			clearSkillCache()
+    test("resolves short named discovered skill and flows content into prompt", async () => {
+      // given: a nested discovered skill under a temp config dir
+      // (intentionally verifies the full integration path: delegate-task -> skill-resolver ->
+      //  resolveMultipleSkillsAsync -> matchSkillByName, not just unit-testing the resolver)
+      const { join } = require("node:path")
+      const { tmpdir } = require("node:os")
+      const { mkdirSync, writeFileSync } = require("node:fs")
+      const unique = `delegate-shortname-${Date.now()}-${Math.random().toString(16).slice(2)}`
+      const testConfigDir = join(tmpdir(), unique)
+      process.env.CLAUDE_CONFIG_DIR = testConfigDir
+      process.env.OPENCODE_CONFIG_DIR = testConfigDir
+      const skillDir = join(testConfigDir, "skills", "toolkit", "systematic-debugging")
+      mkdirSync(skillDir, { recursive: true })
+      writeFileSync(
+        join(skillDir, "SKILL.md"),
+        "---\nname: systematic-debugging\ndescription: Nested debug skill\n---\ndebug-skill-content-sentinel",
+      )
+      clearSkillCache()
 
-			const { createDelegateTask } = require("./tools")
-			const mockManager = { launch: async () => ({}) }
+      const { createDelegateTask } = require("./tools")
+      const mockManager = { launch: async () => ({}) }
 
-			let promptBody: CapturedPromptBody = {}
-			const promptMock = async (input: CapturedPromptInput) => {
-				promptBody = input.body
-				return { data: {} }
-			}
+      let promptBody: CapturedPromptBody = {}
+      const promptMock = async (input: CapturedPromptInput) => {
+        promptBody = input.body
+        return { data: {} }
+      }
 
-			const mockClient = {
-				app: { agents: async () => ({ data: [] }) },
-				config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-				session: {
-					get: async () => ({ data: { directory: "/project" } }),
-					create: async () => ({ data: { id: "ses_shortname_test" } }),
-					prompt: promptMock,
-					promptAsync: promptMock,
-					messages: async () => ({
-						data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }],
-					}),
-					status: async () => ({ data: {} }),
-				},
-			}
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_shortname_test" } }),
+          prompt: promptMock,
+          promptAsync: promptMock,
+          messages: async () => ({
+            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }],
+          }),
+          status: async () => ({ data: {} }),
+        },
+      }
 
-			const tool = createDelegateTask({
-				manager: mockManager,
-				client: mockClient,
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // when: using short name in load_skills
+      const result = await tool.execute(
+        {
+          description: "Test short name resolution",
+          prompt: "Do something",
+          category: "ultrabrain",
+          run_in_background: false,
+          load_skills: ["systematic-debugging"],
+        },
+        toolContext,
+      )
+
+      // then: the resolved skill content must have been injected into the prompt body
+      expect(promptBody).toBeDefined()
+      expect(promptBody.system).toContain("debug-skill-content-sentinel")
+    })
   })
 
-			const toolContext = {
-				sessionID: "parent-session",
-				messageID: "parent-message",
-				agent: "sisyphus",
-				abort: new AbortController().signal,
-			}
-
-			// when: using short name in load_skills
-			const result = await tool.execute(
-				{
-					description: "Test short name resolution",
-					prompt: "Do something",
-					category: "ultrabrain",
-					run_in_background: false,
-					load_skills: ["systematic-debugging"],
-				},
-				toolContext
-			)
-
-			// then: the resolved skill content must have been injected into the prompt body
-			expect(promptBody).toBeDefined()
-			expect(promptBody.system).toContain("debug-skill-content-sentinel")
-		})
-	})
-
-	describe("buildSystemContent", () => {
+  describe("buildSystemContent", () => {
     test("returns undefined when no skills and no category promptAppend", () => {
       // given
       const { buildSystemContent } = require("./tools")
@@ -3843,10 +4074,10 @@ describe("sisyphus-task", () => {
     test("catalog model is used for category with catalog entry", () => {
       // given - ultrabrain has catalog entry
       const categoryName = "ultrabrain"
-      
+
       // when
       const resolved = resolveCategoryConfig(categoryName, { systemDefaultModel: SYSTEM_DEFAULT_MODEL })
-      
+
       // then - catalog model is used
       const category = expectResolvedCategoryConfig(resolved)
       expect(category.config.model).toBe("openai/gpt-6-astra")
@@ -3856,10 +4087,10 @@ describe("sisyphus-task", () => {
     test("default model is used for category with default entry", () => {
       // given - unspecified-low has default model
       const categoryName = "unspecified-low"
-      
+
       // when
       const resolved = resolveCategoryConfig(categoryName, { systemDefaultModel: SYSTEM_DEFAULT_MODEL })
-      
+
       // then - default model from DEFAULT_CATEGORIES is used
       const category = expectResolvedCategoryConfig(resolved)
       expect(category.config.model).toBe("anthropic/claude-sonnet-5-5")
@@ -3870,10 +4101,10 @@ describe("sisyphus-task", () => {
       // given - builtin ultrabrain category with its own model, inherited model also provided
       const categoryName = "ultrabrain"
       const inheritedModel = "cliproxy/claude-opus-4-7"
-      
+
       // when
       const resolved = resolveCategoryConfig(categoryName, { inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
-      
+
       // then - category's built-in model wins (ultrabrain uses gpt-6-astra)
       const category = expectResolvedCategoryConfig(resolved)
       const actualModel = category.config.model
@@ -3883,12 +4114,16 @@ describe("sisyphus-task", () => {
     test("when user defines model - modelInfo should report user-defined regardless of inheritedModel", () => {
       // given
       const categoryName = "ultrabrain"
-      const userCategories = { "ultrabrain": { model: "my-provider/custom-model" } }
+      const userCategories = { ultrabrain: { model: "my-provider/custom-model" } }
       const inheritedModel = "cliproxy/claude-opus-4-7"
-      
+
       // when
-      const resolved = resolveCategoryConfig(categoryName, { userCategories, inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
-      
+      const resolved = resolveCategoryConfig(categoryName, {
+        userCategories,
+        inheritedModel,
+        systemDefaultModel: SYSTEM_DEFAULT_MODEL,
+      })
+
       // then - actualModel should be userModel, type should be "user-defined"
       const category = expectResolvedCategoryConfig(resolved)
       const actualModel = category.config.model
@@ -3902,23 +4137,28 @@ describe("sisyphus-task", () => {
       // The bug was: checking `if (inheritedModel)` instead of `if (actualModel === inheritedModel)`
       const categoryName = "ultrabrain"
       const inheritedModel = "cliproxy/claude-opus-4-7"
-      const userCategories = { "ultrabrain": { model: "user/model" } }
-      
+      const userCategories = { ultrabrain: { model: "user/model" } }
+
       // when - user model wins
-      const resolved = resolveCategoryConfig(categoryName, { userCategories, inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
+      const resolved = resolveCategoryConfig(categoryName, {
+        userCategories,
+        inheritedModel,
+        systemDefaultModel: SYSTEM_DEFAULT_MODEL,
+      })
       const category = requireResolvedCategoryConfig(resolved)
       const actualModel = category.config.model
       const userDefinedModel = userCategories[categoryName]?.model
-      
+
       // then - detection should compare against actual resolved model
-      const detectedType = actualModel === userDefinedModel 
-        ? "user-defined" 
-        : actualModel === inheritedModel 
-        ? "inherited" 
-        : actualModel === SYSTEM_DEFAULT_MODEL 
-        ? "system-default" 
-        : undefined
-      
+      const detectedType =
+        actualModel === userDefinedModel
+          ? "user-defined"
+          : actualModel === inheritedModel
+            ? "inherited"
+            : actualModel === SYSTEM_DEFAULT_MODEL
+              ? "system-default"
+              : undefined
+
       expect(detectedType).toBe("user-defined")
       expect(actualModel).not.toBe(inheritedModel)
     })
@@ -3930,10 +4170,10 @@ describe("sisyphus-task", () => {
       // The CORRECT chain: userConfig?.model ?? categoryBuiltIn ?? systemDefaultModel
       const categoryName = "ultrabrain"
       const inheritedModel = "anthropic/claude-opus-4-7"
-      
+
       // when category has a built-in model (gpt-6-astra for ultrabrain)
       const resolved = resolveCategoryConfig(categoryName, { inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
-      
+
       // then category's built-in model should be used, NOT inheritedModel
       const category = expectResolvedCategoryConfig(resolved)
       expect(category.model).toBe("openai/gpt-6-astra")
@@ -3944,13 +4184,13 @@ describe("sisyphus-task", () => {
       const categoryName = "custom-no-default"
       const userCategories: Record<string, CategoryConfig> = { "custom-no-default": { temperature: 0.5 } }
       const systemDefaultModel = "anthropic/claude-sonnet-4-6"
-      
+
       // when no inheritedModel is provided, only systemDefaultModel
-      const resolved = resolveCategoryConfig(categoryName, { 
-        userCategories, 
-        systemDefaultModel 
+      const resolved = resolveCategoryConfig(categoryName, {
+        userCategories,
+        systemDefaultModel,
       })
-      
+
       // then systemDefaultModel should be returned
       const category = expectResolvedCategoryConfig(resolved)
       expect(category.model).toBe("anthropic/claude-sonnet-4-6")
@@ -3959,17 +4199,17 @@ describe("sisyphus-task", () => {
     test("FIXED: userConfig.model always takes priority over everything", () => {
       // given userConfig.model is explicitly set
       const categoryName = "ultrabrain"
-      const userCategories = { "ultrabrain": { model: "custom/user-model" } }
+      const userCategories = { ultrabrain: { model: "custom/user-model" } }
       const inheritedModel = "anthropic/claude-opus-4-7"
       const systemDefaultModel = "anthropic/claude-sonnet-4-6"
-      
+
       // when resolveCategoryConfig is called with all sources
-      const resolved = resolveCategoryConfig(categoryName, { 
-        userCategories, 
-        inheritedModel, 
-        systemDefaultModel 
+      const resolved = resolveCategoryConfig(categoryName, {
+        userCategories,
+        inheritedModel,
+        systemDefaultModel,
       })
-      
+
       // then userConfig.model should win
       const category = expectResolvedCategoryConfig(resolved)
       expect(category.model).toBe("custom/user-model")
@@ -3980,10 +4220,14 @@ describe("sisyphus-task", () => {
       const categoryName = "custom-empty-model"
       const userCategories = { "custom-empty-model": { model: "", temperature: 0.3 } }
       const inheritedModel = "anthropic/claude-opus-4-7"
-      
+
       // when resolveCategoryConfig is called
-      const resolved = resolveCategoryConfig(categoryName, { userCategories, inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
-      
+      const resolved = resolveCategoryConfig(categoryName, {
+        userCategories,
+        inheritedModel,
+        systemDefaultModel: SYSTEM_DEFAULT_MODEL,
+      })
+
       // then should fall back to systemDefaultModel since custom category has no built-in model
       const category = expectResolvedCategoryConfig(resolved)
       expect(category.model).toBe(SYSTEM_DEFAULT_MODEL)
@@ -3994,10 +4238,14 @@ describe("sisyphus-task", () => {
       const categoryName = "visual-engineering"
       const userCategories: Record<string, CategoryConfig> = { "visual-engineering": { temperature: 0.2 } }
       const inheritedModel = "anthropic/claude-opus-4-7"
-      
+
       // when resolveCategoryConfig is called
-      const resolved = resolveCategoryConfig(categoryName, { userCategories, inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
-      
+      const resolved = resolveCategoryConfig(categoryName, {
+        userCategories,
+        inheritedModel,
+        systemDefaultModel: SYSTEM_DEFAULT_MODEL,
+      })
+
       // then should use category's built-in model (Opus 5 high for visual-engineering)
       const category = expectResolvedCategoryConfig(resolved)
       expect(category.model).toBe("google/gemini-4-argon")
@@ -4008,10 +4256,10 @@ describe("sisyphus-task", () => {
       const categoryName = "my-custom"
       const userCategories: Record<string, CategoryConfig> = { "my-custom": { temperature: 0.5 } }
       const systemDefaultModel = "anthropic/claude-sonnet-4-6"
-      
+
       // when
       const resolved = resolveCategoryConfig(categoryName, { userCategories, systemDefaultModel })
-      
+
       // then - actualModel should be systemDefaultModel
       const category = expectResolvedCategoryConfig(resolved)
       expect(category.model).toBe(systemDefaultModel)
@@ -4023,18 +4271,31 @@ describe("sisyphus-task", () => {
       //#given
       const { createDelegateTask } = require("./tools")
       const mockClient = {
-         app: { agents: async () => ({ data: [{ name: "plan", mode: "subagent" }] }) },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         session: { get: async () => ({ data: { directory: "/project" } }), create: async () => ({ data: { id: "s" } }), prompt: async () => ({ data: {} }), promptAsync: async () => ({ data: {} }), messages: async () => ({ data: [] }), status: async () => ({ data: {} }) },
-       }
-       const tool = createDelegateTask({ manager: { launch: async () => ({}) }, client: mockClient })
-      
+        app: { agents: async () => ({ data: [{ name: "plan", mode: "subagent" }] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "s" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
+        },
+      }
+      const tool = createDelegateTask({ manager: { launch: async () => ({}) }, client: mockClient })
+
       //#when
       const result = await tool.execute(
-        { description: "test", prompt: "Create a plan", subagent_type: "plan", run_in_background: false, load_skills: [] },
-        { sessionID: "p", messageID: "m", agent: "plan", abort: new AbortController().signal }
+        {
+          description: "test",
+          prompt: "Create a plan",
+          subagent_type: "plan",
+          run_in_background: false,
+          load_skills: [],
+        },
+        { sessionID: "p", messageID: "m", agent: "plan", abort: new AbortController().signal },
       )
-      
+
       //#then
       expect(result).toContain("plan-family")
       expect(result).toContain("directly")
@@ -4044,18 +4305,31 @@ describe("sisyphus-task", () => {
       //#given
       const { createDelegateTask } = require("./tools")
       const mockClient = {
-         app: { agents: async () => ({ data: [{ name: "plan", mode: "subagent" }] }) },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         session: { get: async () => ({ data: { directory: "/project" } }), create: async () => ({ data: { id: "s" } }), prompt: async () => ({ data: {} }), promptAsync: async () => ({ data: {} }), messages: async () => ({ data: [] }), status: async () => ({ data: {} }) },
-       }
-       const tool = createDelegateTask({ manager: { launch: async () => ({}) }, client: mockClient })
-      
+        app: { agents: async () => ({ data: [{ name: "plan", mode: "subagent" }] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "s" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
+        },
+      }
+      const tool = createDelegateTask({ manager: { launch: async () => ({}) }, client: mockClient })
+
       //#when
       const result = await tool.execute(
-        { description: "test", prompt: "Create a plan", subagent_type: "plan", run_in_background: false, load_skills: [] },
-        { sessionID: "p", messageID: "m", agent: "prometheus", abort: new AbortController().signal }
+        {
+          description: "test",
+          prompt: "Create a plan",
+          subagent_type: "plan",
+          run_in_background: false,
+          load_skills: [],
+        },
+        { sessionID: "p", messageID: "m", agent: "prometheus", abort: new AbortController().signal },
       )
-      
+
       //#then
       expect(result).toContain("plan-family")
     })
@@ -4064,16 +4338,34 @@ describe("sisyphus-task", () => {
       //#given
       const { createDelegateTask } = require("./tools")
       const mockClient = {
-         app: { agents: async () => ({ data: [{ name: "plan", mode: "subagent" }] }) },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         session: { get: async () => ({ data: { directory: "/project" } }), create: async () => ({ data: { id: "s" } }), prompt: async () => ({ data: {} }), promptAsync: async () => ({ data: {} }), messages: async () => ({ data: [] }), status: async () => ({ data: {} }) },
-       }
-       const tool = createDelegateTask({ manager: { launch: async () => ({}) }, client: mockClient })
+        app: { agents: async () => ({ data: [{ name: "plan", mode: "subagent" }] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "s" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
+        },
+      }
+      const tool = createDelegateTask({ manager: { launch: async () => ({}) }, client: mockClient })
 
       //#when
       const result = await tool.execute(
-        { description: "test", prompt: "Create a plan", subagent_type: "plan", run_in_background: false, load_skills: [] },
-        { sessionID: "p", messageID: "m", agent: getAgentDisplayName("prometheus"), abort: new AbortController().signal }
+        {
+          description: "test",
+          prompt: "Create a plan",
+          subagent_type: "plan",
+          run_in_background: false,
+          load_skills: [],
+        },
+        {
+          sessionID: "p",
+          messageID: "m",
+          agent: getAgentDisplayName("prometheus"),
+          abort: new AbortController().signal,
+        },
       )
 
       //#then
@@ -4084,49 +4376,74 @@ describe("sisyphus-task", () => {
       //#given
       const { createDelegateTask } = require("./tools")
       const mockClient = {
-         app: { agents: async () => ({ data: [{ name: "prometheus", mode: "primary" }] }) },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         session: { get: async () => ({ data: { directory: "/project" } }), create: async () => ({ data: { id: "s" } }), prompt: async () => ({ data: {} }), promptAsync: async () => ({ data: {} }), messages: async () => ({ data: [] }), status: async () => ({ data: {} }) },
-       }
-       const tool = createDelegateTask({ manager: { launch: async () => ({}) }, client: mockClient })
-      
+        app: { agents: async () => ({ data: [{ name: "prometheus", mode: "primary" }] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "s" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
+        },
+      }
+      const tool = createDelegateTask({ manager: { launch: async () => ({}) }, client: mockClient })
+
       //#when
       const result = await tool.execute(
-        { description: "test", prompt: "Execute", subagent_type: "prometheus", run_in_background: false, load_skills: [] },
-        { sessionID: "p", messageID: "m", agent: "plan", abort: new AbortController().signal }
+        {
+          description: "test",
+          prompt: "Execute",
+          subagent_type: "prometheus",
+          run_in_background: false,
+          load_skills: [],
+        },
+        { sessionID: "p", messageID: "m", agent: "plan", abort: new AbortController().signal },
       )
-      
+
       //#then
       expect(result).toContain("plan-family")
     })
 
-    test("sisyphus CAN delegate to plan (not in plan family)", async () => {
-      //#given
-      const { createDelegateTask } = require("./tools")
-      const mockClient = {
-         app: { agents: async () => ({ data: [{ name: "plan", mode: "subagent" }] }) },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         session: {
-           get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_ok" } }),
-           prompt: async () => ({ data: {} }),
-           promptAsync: async () => ({ data: {} }),
-           messages: async () => ({ data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "plan-created-sentinel" }] }] }),
-           status: async () => ({ data: { "ses_ok": { type: "idle" } } }),
-         },
-       }
-       const tool = createDelegateTask({ manager: { launch: async () => ({}) }, client: mockClient })
-      
-      //#when
-      const result = await tool.execute(
-        { description: "test", prompt: "Create a plan", subagent_type: "plan", run_in_background: false, load_skills: [] },
-        { sessionID: "p", messageID: "m", agent: "sisyphus", abort: new AbortController().signal }
-      )
-      
-      //#then
-      expect(result).not.toContain("plan-family")
-      expect(result).toContain("plan-created-sentinel")
-    }, { timeout: 20000 })
+    test(
+      "sisyphus CAN delegate to plan (not in plan family)",
+      async () => {
+        //#given
+        const { createDelegateTask } = require("./tools")
+        const mockClient = {
+          app: { agents: async () => ({ data: [{ name: "plan", mode: "subagent" }] }) },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "ses_ok" } }),
+            prompt: async () => ({ data: {} }),
+            promptAsync: async () => ({ data: {} }),
+            messages: async () => ({
+              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "plan-created-sentinel" }] }],
+            }),
+            status: async () => ({ data: { ses_ok: { type: "idle" } } }),
+          },
+        }
+        const tool = createDelegateTask({ manager: { launch: async () => ({}) }, client: mockClient })
+
+        //#when
+        const result = await tool.execute(
+          {
+            description: "test",
+            prompt: "Create a plan",
+            subagent_type: "plan",
+            run_in_background: false,
+            load_skills: [],
+          },
+          { sessionID: "p", messageID: "m", agent: "sisyphus", abort: new AbortController().signal },
+        )
+
+        //#then
+        expect(result).not.toContain("plan-family")
+        expect(result).toContain("plan-created-sentinel")
+      },
+      { timeout: 20000 },
+    )
   })
 
   describe("subagent_type model extraction (issue #1225)", () => {
@@ -4148,27 +4465,27 @@ describe("sisyphus-task", () => {
         },
       }
 
-       const mockClient = {
-         app: {
-           agents: async () => ({
-             data: [
-               { name: "explore", mode: "subagent", model: { providerID: "anthropic", modelID: "claude-haiku-4-5" } },
-             ],
-           }),
-         },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         session: {
-           create: async () => ({ data: { id: "ses_explore_model" } }),
-           prompt: async () => ({ data: {} }),
-           promptAsync: async () => ({ data: {} }),
-           messages: async () => ({ data: [] }),
-         },
-       }
+      const mockClient = {
+        app: {
+          agents: async () => ({
+            data: [
+              { name: "explore", mode: "subagent", model: { providerID: "anthropic", modelID: "claude-haiku-4-5" } },
+            ],
+          }),
+        },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          create: async () => ({ data: { id: "ses_explore_model" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
 
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-       })
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
 
       const toolContext = {
         sessionID: "parent-session",
@@ -4186,7 +4503,7 @@ describe("sisyphus-task", () => {
           run_in_background: true,
           load_skills: [],
         },
-        toolContext
+        toolContext,
       )
 
       // then - matched agent's model should be passed to manager.launch
@@ -4196,632 +4513,678 @@ describe("sisyphus-task", () => {
       })
     })
 
-    test("sync mode passes matched agent model to prompt request", async () => {
-      // given - agent with model registered, using subagent_type with run_in_background=false
-      const { createDelegateTask } = require("./tools")
-      let promptBody: CapturedPromptBody = {}
+    test(
+      "sync mode passes matched agent model to prompt request",
+      async () => {
+        // given - agent with model registered, using subagent_type with run_in_background=false
+        const { createDelegateTask } = require("./tools")
+        let promptBody: CapturedPromptBody = {}
 
-      const mockManager = { launch: async () => ({}) }
+        const mockManager = { launch: async () => ({}) }
 
-       const promptMock = async (input: CapturedPromptInput) => {
-         promptBody = input.body
-         return { data: {} }
-       }
+        const promptMock = async (input: CapturedPromptInput) => {
+          promptBody = input.body
+          return { data: {} }
+        }
 
-       const mockClient = {
-         app: {
-           agents: async () => ({
-             data: [
-               { name: "oracle", mode: "subagent", model: { providerID: "anthropic", modelID: "claude-opus-4-7" } },
-             ],
-           }),
-         },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         session: {
-           get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_oracle_model" } }),
-           prompt: promptMock,
-           promptAsync: promptMock,
-           messages: async () => ({
-             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Consultation done" }] }],
-           }),
-           status: async () => ({ data: { "ses_oracle_model": { type: "idle" } } }),
-         },
-       }
+        const mockClient = {
+          app: {
+            agents: async () => ({
+              data: [
+                { name: "oracle", mode: "subagent", model: { providerID: "anthropic", modelID: "claude-opus-4-7" } },
+              ],
+            }),
+          },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "ses_oracle_model" } }),
+            prompt: promptMock,
+            promptAsync: promptMock,
+            messages: async () => ({
+              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Consultation done" }] }],
+            }),
+            status: async () => ({ data: { ses_oracle_model: { type: "idle" } } }),
+          },
+        }
 
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-       })
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+        })
 
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
 
-      // when - delegating to oracle agent via subagent_type in sync mode
-      await tool.execute(
-        {
-          description: "Consult oracle",
-          prompt: "Review architecture",
-          subagent_type: "oracle",
-          run_in_background: false,
-          load_skills: [],
-        },
-        toolContext
-      )
+        // when - delegating to oracle agent via subagent_type in sync mode
+        await tool.execute(
+          {
+            description: "Consult oracle",
+            prompt: "Review architecture",
+            subagent_type: "oracle",
+            run_in_background: false,
+            load_skills: [],
+          },
+          toolContext,
+        )
 
-      expect(promptBody.model).toEqual({
-        providerID: "anthropic",
-        modelID: "claude-opus-4-7",
-      })
-    }, { timeout: 20000 })
+        expect(promptBody.model).toEqual({
+          providerID: "anthropic",
+          modelID: "claude-opus-4-7",
+        })
+      },
+      { timeout: 20000 },
+    )
 
-    test("agent without model resolves via fallback chain", async () => {
-      // given - agent registered without model field, fallback chain should resolve
-      const { createDelegateTask } = require("./tools")
-      let promptBody: CapturedPromptBody = {}
+    test(
+      "agent without model resolves via fallback chain",
+      async () => {
+        // given - agent registered without model field, fallback chain should resolve
+        const { createDelegateTask } = require("./tools")
+        let promptBody: CapturedPromptBody = {}
 
-      const mockManager = { launch: async () => ({}) }
+        const mockManager = { launch: async () => ({}) }
 
-       const promptMock = async (input: CapturedPromptInput) => {
-         promptBody = input.body
-         return { data: {} }
-       }
+        const promptMock = async (input: CapturedPromptInput) => {
+          promptBody = input.body
+          return { data: {} }
+        }
 
-       const mockClient = {
-         app: {
-           agents: async () => ({
-             data: [
-               { name: "explore", mode: "subagent" },
-             ],
-           }),
-         },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         session: {
-           get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_no_model_agent" } }),
-           prompt: promptMock,
-           promptAsync: promptMock,
-           messages: async () => ({
-             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }],
-           }),
-           status: async () => ({ data: { "ses_no_model_agent": { type: "idle" } } }),
-         },
-       }
+        const mockClient = {
+          app: {
+            agents: async () => ({
+              data: [{ name: "explore", mode: "subagent" }],
+            }),
+          },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "ses_no_model_agent" } }),
+            prompt: promptMock,
+            promptAsync: promptMock,
+            messages: async () => ({
+              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }],
+            }),
+            status: async () => ({ data: { ses_no_model_agent: { type: "idle" } } }),
+          },
+        }
 
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-       })
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+        })
 
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
 
-      // when - delegating to agent without model
-      await tool.execute(
-        {
-          description: "Explore without model",
-          prompt: "Find something",
-          subagent_type: "explore",
-          run_in_background: false,
-          load_skills: [],
-        },
-        toolContext
-      )
+        // when - delegating to agent without model
+        await tool.execute(
+          {
+            description: "Explore without model",
+            prompt: "Find something",
+            subagent_type: "explore",
+            run_in_background: false,
+            load_skills: [],
+          },
+          toolContext,
+        )
 
-      // then - model should be resolved via AGENT_MODEL_REQUIREMENTS fallback chain
-      expect(promptBody.model).toBeDefined()
-    }, { timeout: 20000 })
+        // then - model should be resolved via AGENT_MODEL_REQUIREMENTS fallback chain
+        expect(promptBody.model).toBeDefined()
+      },
+      { timeout: 20000 },
+    )
 
-    test("agentOverrides model takes priority over matchedAgent.model (#1357)", async () => {
-      // given - user configured oracle to use a specific model in omo.json
-      const { createDelegateTask } = require("./tools")
-      let promptBody: CapturedPromptBody = {}
+    test(
+      "agentOverrides model takes priority over matchedAgent.model (#1357)",
+      async () => {
+        // given - user configured oracle to use a specific model in omo.json
+        const { createDelegateTask } = require("./tools")
+        let promptBody: CapturedPromptBody = {}
 
-      const mockManager = { launch: async () => ({}) }
+        const mockManager = { launch: async () => ({}) }
 
-       const promptMock = async (input: CapturedPromptInput) => {
-         promptBody = input.body
-         return { data: {} }
-       }
+        const promptMock = async (input: CapturedPromptInput) => {
+          promptBody = input.body
+          return { data: {} }
+        }
 
-       const mockClient = {
-         app: {
-           agents: async () => ({
-             data: [
-               { name: "oracle", mode: "subagent", model: { providerID: "openai", modelID: "gpt-5.5" } },
-             ],
-           }),
-         },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         session: {
-           get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_override_model" } }),
-           prompt: promptMock,
-           promptAsync: promptMock,
-           messages: async () => ({
-             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }],
-           }),
-           status: async () => ({ data: { "ses_override_model": { type: "idle" } } }),
-         },
-       }
+        const mockClient = {
+          app: {
+            agents: async () => ({
+              data: [{ name: "oracle", mode: "subagent", model: { providerID: "openai", modelID: "gpt-5.5" } }],
+            }),
+          },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "ses_override_model" } }),
+            prompt: promptMock,
+            promptAsync: promptMock,
+            messages: async () => ({
+              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }],
+            }),
+            status: async () => ({ data: { ses_override_model: { type: "idle" } } }),
+          },
+        }
 
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-         agentOverrides: {
-           oracle: { model: "anthropic/claude-opus-4-7" },
-         },
-       })
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+          agentOverrides: {
+            oracle: { model: "anthropic/claude-opus-4-7" },
+          },
+        })
 
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
 
-      // when - delegating to oracle via subagent_type with user override
-      await tool.execute(
-        {
-          description: "Consult oracle with override",
-          prompt: "Review architecture",
-          subagent_type: "oracle",
-          run_in_background: false,
-          load_skills: [],
-        },
-        toolContext
-      )
+        // when - delegating to oracle via subagent_type with user override
+        await tool.execute(
+          {
+            description: "Consult oracle with override",
+            prompt: "Review architecture",
+            subagent_type: "oracle",
+            run_in_background: false,
+            load_skills: [],
+          },
+          toolContext,
+        )
 
-      // then - user-configured model should take priority over matchedAgent.model
-      expect(promptBody.model).toEqual({
-        providerID: "anthropic",
-        modelID: "claude-opus-4-7",
-      })
-    }, { timeout: 20000 })
+        // then - user-configured model should take priority over matchedAgent.model
+        expect(promptBody.model).toEqual({
+          providerID: "anthropic",
+          modelID: "claude-opus-4-7",
+        })
+      },
+      { timeout: 20000 },
+    )
 
-    test("agentOverrides variant is applied when model is overridden (#1357)", async () => {
-      // given - user configured oracle with model and variant
-      const { createDelegateTask } = require("./tools")
-      let promptBody: CapturedPromptBody = {}
+    test(
+      "agentOverrides variant is applied when model is overridden (#1357)",
+      async () => {
+        // given - user configured oracle with model and variant
+        const { createDelegateTask } = require("./tools")
+        let promptBody: CapturedPromptBody = {}
 
-      const mockManager = { launch: async () => ({}) }
+        const mockManager = { launch: async () => ({}) }
 
-       const promptMock = async (input: CapturedPromptInput) => {
-         promptBody = input.body
-         return { data: {} }
-       }
+        const promptMock = async (input: CapturedPromptInput) => {
+          promptBody = input.body
+          return { data: {} }
+        }
 
-       const mockClient = {
-         app: {
-           agents: async () => ({
-             data: [
-               { name: "oracle", mode: "subagent", model: { providerID: "openai", modelID: "gpt-5.5" } },
-             ],
-           }),
-         },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         session: {
-           get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_variant_test" } }),
-           prompt: promptMock,
-           promptAsync: promptMock,
-           messages: async () => ({
-             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }],
-           }),
-           status: async () => ({ data: { "ses_variant_test": { type: "idle" } } }),
-         },
-       }
+        const mockClient = {
+          app: {
+            agents: async () => ({
+              data: [{ name: "oracle", mode: "subagent", model: { providerID: "openai", modelID: "gpt-5.5" } }],
+            }),
+          },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "ses_variant_test" } }),
+            prompt: promptMock,
+            promptAsync: promptMock,
+            messages: async () => ({
+              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }],
+            }),
+            status: async () => ({ data: { ses_variant_test: { type: "idle" } } }),
+          },
+        }
 
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-         agentOverrides: {
-           oracle: { model: "anthropic/claude-opus-4-7", variant: "max" },
-         },
-       })
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+          agentOverrides: {
+            oracle: { model: "anthropic/claude-opus-4-7", variant: "max" },
+          },
+        })
 
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
 
-      // when - delegating to oracle via subagent_type with variant override
-      await tool.execute(
-        {
-          description: "Consult oracle with variant",
-          prompt: "Review architecture",
-          subagent_type: "oracle",
-          run_in_background: false,
-          load_skills: [],
-        },
-        toolContext
-      )
+        // when - delegating to oracle via subagent_type with variant override
+        await tool.execute(
+          {
+            description: "Consult oracle with variant",
+            prompt: "Review architecture",
+            subagent_type: "oracle",
+            run_in_background: false,
+            load_skills: [],
+          },
+          toolContext,
+        )
 
-      // then - user-configured variant should be applied
-      expect(promptBody.variant).toBe("max")
-    }, { timeout: 20000 })
+        // then - user-configured variant should be applied
+        expect(promptBody.variant).toBe("max")
+      },
+      { timeout: 20000 },
+    )
 
-    test("fallback chain resolves model when no override and no matchedAgent.model (#1357)", async () => {
-      // given - agent registered without model, no override, but AGENT_MODEL_REQUIREMENTS has fallback
-      const { createDelegateTask } = require("./tools")
-      let promptBody: CapturedPromptBody = {}
+    test(
+      "fallback chain resolves model when no override and no matchedAgent.model (#1357)",
+      async () => {
+        // given - agent registered without model, no override, but AGENT_MODEL_REQUIREMENTS has fallback
+        const { createDelegateTask } = require("./tools")
+        let promptBody: CapturedPromptBody = {}
 
-      const mockManager = { launch: async () => ({}) }
+        const mockManager = { launch: async () => ({}) }
 
-       const promptMock = async (input: CapturedPromptInput) => {
-         promptBody = input.body
-         return { data: {} }
-       }
+        const promptMock = async (input: CapturedPromptInput) => {
+          promptBody = input.body
+          return { data: {} }
+        }
 
-       const mockClient = {
-         app: {
-           agents: async () => ({
-             data: [
-               { name: "oracle", mode: "subagent" }, // no model field
-             ],
-           }),
-         },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         session: {
-           get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_fallback_test" } }),
-           prompt: promptMock,
-           promptAsync: promptMock,
-           messages: async () => ({
-             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }],
-           }),
-           status: async () => ({ data: { "ses_fallback_test": { type: "idle" } } }),
-         },
-       }
+        const mockClient = {
+          app: {
+            agents: async () => ({
+              data: [
+                { name: "oracle", mode: "subagent" }, // no model field
+              ],
+            }),
+          },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "ses_fallback_test" } }),
+            prompt: promptMock,
+            promptAsync: promptMock,
+            messages: async () => ({
+              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }],
+            }),
+            status: async () => ({ data: { ses_fallback_test: { type: "idle" } } }),
+          },
+        }
 
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-         // no agentOverrides
-         connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
-         availableModelsOverride: createTestAvailableModels(),
-       })
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+          // no agentOverrides
+          connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+          availableModelsOverride: createTestAvailableModels(),
+        })
 
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
 
-      // when - delegating to oracle with no override and no matchedAgent model
-      await tool.execute(
-        {
-          description: "Consult oracle with fallback",
-          prompt: "Review architecture",
-          subagent_type: "oracle",
-          run_in_background: false,
-          load_skills: [],
-        },
-        toolContext
-      )
+        // when - delegating to oracle with no override and no matchedAgent model
+        await tool.execute(
+          {
+            description: "Consult oracle with fallback",
+            prompt: "Review architecture",
+            subagent_type: "oracle",
+            run_in_background: false,
+            load_skills: [],
+          },
+          toolContext,
+        )
 
-      // then - should resolve via AGENT_MODEL_REQUIREMENTS fallback chain for oracle
-      // oracle fallback chain: gpt-5.6-sol (openai) > gemini-3.1-pro (google) > claude-opus-4-8 (anthropic)
-      // Since openai is in connectedProviders, should resolve to openai/gpt-5.6-sol at xhigh
-      expect(promptBody.model).toBeDefined()
-      expect(promptBody.model.providerID).toBe("openai")
-      expect(promptBody.model.modelID).toBe("gpt-5.6-sol")
-      expect(promptBody.variant).toBe("xhigh")
-    }, { timeout: 20000 })
+        // then - should resolve via AGENT_MODEL_REQUIREMENTS fallback chain for oracle
+        // oracle fallback chain: gpt-5.6-sol (openai) > gemini-3.1-pro (google) > claude-opus-4-8 (anthropic)
+        // Since openai is in connectedProviders, should resolve to openai/gpt-5.6-sol at xhigh
+        expect(promptBody.model).toBeDefined()
+        expect(promptBody.model.providerID).toBe("openai")
+        expect(promptBody.model.modelID).toBe("gpt-5.6-sol")
+        expect(promptBody.variant).toBe("xhigh")
+      },
+      { timeout: 20000 },
+    )
   })
 
   describe("subagent task permission", () => {
-    test("plan subagent should have task permission enabled", async () => {
-      //#given - sisyphus delegates to plan agent
-      const { createDelegateTask } = require("./tools")
-      let promptBody: CapturedPromptBody = {}
-      
-       const mockManager = { launch: async () => ({}) }
-       
-       const promptMock = async (input: CapturedPromptInput) => {
-         promptBody = input.body
-         return { data: {} }
-       }
-       
-       const mockClient = {
-         app: { agents: async () => ({ data: [{ name: "plan", mode: "subagent" }] }) },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         session: {
-           get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_plan_delegate" } }),
-           prompt: promptMock,
-           promptAsync: promptMock,
-           messages: async () => ({
-             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Plan created" }] }]
-           }),
-           status: async () => ({ data: { "ses_plan_delegate": { type: "idle" } } }),
-         },
-       }
-       
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-       })
-      
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
-      
-      //#when - sisyphus delegates to plan
-      await tool.execute(
-        {
-          description: "Test plan task permission",
-          prompt: "Create a plan",
-          subagent_type: "plan",
-          run_in_background: false,
-          load_skills: [],
-        },
-        toolContext
-      )
-      
-      //#then - plan agent should have task permission
-      expect(promptBody.tools.task).toBe(true)
-    }, { timeout: 20000 })
+    test(
+      "plan subagent should have task permission enabled",
+      async () => {
+        //#given - sisyphus delegates to plan agent
+        const { createDelegateTask } = require("./tools")
+        let promptBody: CapturedPromptBody = {}
 
-    test("prometheus primary agent should not be callable via task", async () => {
-      //#given
-      const { createDelegateTask } = require("./tools")
-       const mockClient = {
-         app: { agents: async () => ({ data: [{ name: "prometheus", mode: "primary" }] }) },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         session: {
-           get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_prometheus_task" } }),
-           prompt: async () => ({ data: {} }),
-           promptAsync: async () => ({ data: {} }),
-           messages: async () => ({ data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Plan created" }] }] }),
-           status: async () => ({ data: { "ses_prometheus_task": { type: "idle" } } }),
-         },
-       }
-       const tool = createDelegateTask({ manager: { launch: async () => ({}) }, client: mockClient })
-      
-      //#when
-      const result = await tool.execute(
-        { description: "Test prometheus task permission", prompt: "Create a plan", subagent_type: "prometheus", run_in_background: false, load_skills: [] },
-        { sessionID: "p", messageID: "m", agent: "sisyphus", abort: new AbortController().signal }
-      )
-      
-      //#then — coordinator guard fires before primary-agent check; message names the agent and explains the conflict
-      expect(result).toContain('Cannot delegate to coordinator agent "prometheus" via task()')
-    }, { timeout: 20000 })
+        const mockManager = { launch: async () => ({}) }
 
-    test("non-plan subagent should NOT have task permission", async () => {
-      //#given - sisyphus delegates to oracle (non-plan)
-      const { createDelegateTask } = require("./tools")
-      let promptBody: CapturedPromptBody = {}
-      
-      const mockManager = { launch: async () => ({}) }
-      const mockClient = {
-        app: { agents: async () => ({ data: [{ name: "oracle", mode: "subagent" }] }) },
-        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        session: {
-          get: async () => ({ data: { directory: "/project" } }),
-          create: async () => ({ data: { id: "ses_oracle_no_delegate" } }),
-          prompt: async (input: CapturedPromptInput) => {
-            promptBody = input.body
-            return { data: {} }
+        const promptMock = async (input: CapturedPromptInput) => {
+          promptBody = input.body
+          return { data: {} }
+        }
+
+        const mockClient = {
+          app: { agents: async () => ({ data: [{ name: "plan", mode: "subagent" }] }) },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "ses_plan_delegate" } }),
+            prompt: promptMock,
+            promptAsync: promptMock,
+            messages: async () => ({
+              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Plan created" }] }],
+            }),
+            status: async () => ({ data: { ses_plan_delegate: { type: "idle" } } }),
           },
-          promptAsync: async (input: CapturedPromptInput) => {
-            promptBody = input.body
-            return { data: {} }
+        }
+
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+        })
+
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
+
+        //#when - sisyphus delegates to plan
+        await tool.execute(
+          {
+            description: "Test plan task permission",
+            prompt: "Create a plan",
+            subagent_type: "plan",
+            run_in_background: false,
+            load_skills: [],
           },
-          messages: async () => ({
-            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Consultation done" }] }]
-          }),
-          status: async () => ({ data: { "ses_oracle_no_delegate": { type: "idle" } } }),
-        },
-      }
-      
-      const tool = createDelegateTask({
-        manager: mockManager,
-        client: mockClient,
-      })
-      
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
-      
-      // when - sisyphus delegates to oracle
-      await tool.execute(
-        {
-          description: "Test oracle no task permission",
-          prompt: "Consult on architecture",
-          subagent_type: "oracle",
-          run_in_background: false,
-          load_skills: [],
-        },
-        toolContext
-      )
-      
-      // then - oracle should NOT have task permission
-      expect(promptBody.tools.task).toBe(false)
-    }, { timeout: 20000 })
+          toolContext,
+        )
+
+        //#then - plan agent should have task permission
+        expect(promptBody.tools.task).toBe(true)
+      },
+      { timeout: 20000 },
+    )
+
+    test(
+      "prometheus primary agent should not be callable via task",
+      async () => {
+        //#given
+        const { createDelegateTask } = require("./tools")
+        const mockClient = {
+          app: { agents: async () => ({ data: [{ name: "prometheus", mode: "primary" }] }) },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "ses_prometheus_task" } }),
+            prompt: async () => ({ data: {} }),
+            promptAsync: async () => ({ data: {} }),
+            messages: async () => ({
+              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Plan created" }] }],
+            }),
+            status: async () => ({ data: { ses_prometheus_task: { type: "idle" } } }),
+          },
+        }
+        const tool = createDelegateTask({ manager: { launch: async () => ({}) }, client: mockClient })
+
+        //#when
+        const result = await tool.execute(
+          {
+            description: "Test prometheus task permission",
+            prompt: "Create a plan",
+            subagent_type: "prometheus",
+            run_in_background: false,
+            load_skills: [],
+          },
+          { sessionID: "p", messageID: "m", agent: "sisyphus", abort: new AbortController().signal },
+        )
+
+        //#then — coordinator guard fires before primary-agent check; message names the agent and explains the conflict
+        expect(result).toContain('Cannot delegate to coordinator agent "prometheus" via task()')
+      },
+      { timeout: 20000 },
+    )
+
+    test(
+      "non-plan subagent should NOT have task permission",
+      async () => {
+        //#given - sisyphus delegates to oracle (non-plan)
+        const { createDelegateTask } = require("./tools")
+        let promptBody: CapturedPromptBody = {}
+
+        const mockManager = { launch: async () => ({}) }
+        const mockClient = {
+          app: { agents: async () => ({ data: [{ name: "oracle", mode: "subagent" }] }) },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "ses_oracle_no_delegate" } }),
+            prompt: async (input: CapturedPromptInput) => {
+              promptBody = input.body
+              return { data: {} }
+            },
+            promptAsync: async (input: CapturedPromptInput) => {
+              promptBody = input.body
+              return { data: {} }
+            },
+            messages: async () => ({
+              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Consultation done" }] }],
+            }),
+            status: async () => ({ data: { ses_oracle_no_delegate: { type: "idle" } } }),
+          },
+        }
+
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+        })
+
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
+
+        // when - sisyphus delegates to oracle
+        await tool.execute(
+          {
+            description: "Test oracle no task permission",
+            prompt: "Consult on architecture",
+            subagent_type: "oracle",
+            run_in_background: false,
+            load_skills: [],
+          },
+          toolContext,
+        )
+
+        // then - oracle should NOT have task permission
+        expect(promptBody.tools.task).toBe(false)
+      },
+      { timeout: 20000 },
+    )
   })
 
   describe("session title and metadata format (OpenCode compatibility)", () => {
-    test("categorized sync session persists an OpenCode-compatible category-prefixed child title", async () => {
-      // given
-      const { createDelegateTask } = require("./tools")
-      let createBody: CapturedSessionCreateBody = {}
+    test(
+      "categorized sync session persists an OpenCode-compatible category-prefixed child title",
+      async () => {
+        // given
+        const { createDelegateTask } = require("./tools")
+        let createBody: CapturedSessionCreateBody = {}
 
-      const mockManager = { launch: async () => ({}) }
-      const mockClient = {
-        app: { agents: async () => ({ data: [] }) },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         model: { list: async () => [{ id: SYSTEM_DEFAULT_MODEL }] },
-         session: {
-           get: async () => ({ data: { directory: "/project" } }),
-           create: async (input: CapturedSessionCreateInput) => {
-             createBody = input.body
-             return { data: { id: "ses_title_test" } }
-           },
-           prompt: async () => ({ data: {} }),
-           promptAsync: async () => ({ data: {} }),
-           messages: async () => ({
-             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "done" }] }]
-           }),
-           status: async () => ({ data: { "ses_title_test": { type: "idle" } } }),
-         },
-       }
+        const mockManager = { launch: async () => ({}) }
+        const mockClient = {
+          app: { agents: async () => ({ data: [] }) },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          model: { list: async () => [{ id: SYSTEM_DEFAULT_MODEL }] },
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async (input: CapturedSessionCreateInput) => {
+              createBody = input.body
+              return { data: { id: "ses_title_test" } }
+            },
+            prompt: async () => ({ data: {} }),
+            promptAsync: async () => ({ data: {} }),
+            messages: async () => ({
+              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "done" }] }],
+            }),
+            status: async () => ({ data: { ses_title_test: { type: "idle" } } }),
+          },
+        }
 
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-       })
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+        })
 
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
 
-      // when - sync task with category
-      await tool.execute(
-        {
-          description: "Implement feature X",
-          prompt: "Build the feature",
-          category: "quick",
-          run_in_background: false,
-          load_skills: [],
-        },
-        toolContext
-      )
+        // when - sync task with category
+        await tool.execute(
+          {
+            description: "Implement feature X",
+            prompt: "Build the feature",
+            category: "quick",
+            run_in_background: false,
+            load_skills: [],
+          },
+          toolContext,
+        )
 
-      // then - title should prefix the category while preserving the OpenCode agent suffix
-      expect(createBody.title).toBe("[quick] Implement feature X (@Sisyphus-Junior subagent)")
-    }, { timeout: 10000 })
+        // then - title should prefix the category while preserving the OpenCode agent suffix
+        expect(createBody.title).toBe("[quick] Implement feature X (@Sisyphus-Junior subagent)")
+      },
+      { timeout: 10000 },
+    )
 
-    test("sync task output includes <task_metadata> block with session_id", async () => {
-      // given
-      const { createDelegateTask } = require("./tools")
+    test(
+      "sync task output includes <task_metadata> block with session_id",
+      async () => {
+        // given
+        const { createDelegateTask } = require("./tools")
 
-       const mockManager = { launch: async () => ({}) }
-       const mockClient = {
-         app: { agents: async () => ({ data: [] }) },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         model: { list: async () => [{ id: SYSTEM_DEFAULT_MODEL }] },
-         session: {
-           get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_metadata_test" } }),
-           prompt: async () => ({ data: {} }),
-           promptAsync: async () => ({ data: {} }),
-           messages: async () => ({
-             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Task completed" }] }]
-           }),
-           status: async () => ({ data: { "ses_metadata_test": { type: "idle" } } }),
-         },
-       }
+        const mockManager = { launch: async () => ({}) }
+        const mockClient = {
+          app: { agents: async () => ({ data: [] }) },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          model: { list: async () => [{ id: SYSTEM_DEFAULT_MODEL }] },
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "ses_metadata_test" } }),
+            prompt: async () => ({ data: {} }),
+            promptAsync: async () => ({ data: {} }),
+            messages: async () => ({
+              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Task completed" }] }],
+            }),
+            status: async () => ({ data: { ses_metadata_test: { type: "idle" } } }),
+          },
+        }
 
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-       })
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+        })
 
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
 
-      // when
-      const result = await tool.execute(
-        {
-          description: "Test metadata format",
-          prompt: "Do something",
-          category: "quick",
-          run_in_background: false,
-          load_skills: [],
-        },
-        toolContext
-      )
+        // when
+        const result = await tool.execute(
+          {
+            description: "Test metadata format",
+            prompt: "Do something",
+            category: "quick",
+            run_in_background: false,
+            load_skills: [],
+          },
+          toolContext,
+        )
 
-      // then - output should contain <task_metadata> block
-      expect(result).toContain("<task_metadata>")
-      expect(result).toContain("session_id: ses_metadata_test")
-      expect(result).toContain("</task_metadata>")
-    }, { timeout: 10000 })
+        // then - output should contain <task_metadata> block
+        expect(result).toContain("<task_metadata>")
+        expect(result).toContain("session_id: ses_metadata_test")
+        expect(result).toContain("</task_metadata>")
+      },
+      { timeout: 10000 },
+    )
 
-    test("background task output includes <task_metadata> block with session_id", async () => {
-      // given
-      const { createDelegateTask } = require("./tools")
+    test(
+      "background task output includes <task_metadata> block with session_id",
+      async () => {
+        // given
+        const { createDelegateTask } = require("./tools")
 
-      const mockManager = {
-        launch: async () => ({
-          id: "bg_meta_test",
-          sessionId: "ses_bg_metadata",
-          description: "Background metadata test",
-          agent: "sisyphus-junior",
-          status: "running",
-        }),
-      }
-       const mockClient = {
-         app: { agents: async () => ({ data: [] }) },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         model: { list: async () => [] },
-         session: {
-           create: async () => ({ data: { id: "test-session" } }),
-           prompt: async () => ({ data: {} }),
-           promptAsync: async () => ({ data: {} }),
-           messages: async () => ({ data: [] }),
-         },
-       }
+        const mockManager = {
+          launch: async () => ({
+            id: "bg_meta_test",
+            sessionId: "ses_bg_metadata",
+            description: "Background metadata test",
+            agent: "sisyphus-junior",
+            status: "running",
+          }),
+        }
+        const mockClient = {
+          app: { agents: async () => ({ data: [] }) },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          model: { list: async () => [] },
+          session: {
+            create: async () => ({ data: { id: "test-session" } }),
+            prompt: async () => ({ data: {} }),
+            promptAsync: async () => ({ data: {} }),
+            messages: async () => ({ data: [] }),
+          },
+        }
 
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-         userCategories: {
-           "sisyphus-junior": { model: "anthropic/claude-sonnet-4-6" },
-         },
-       })
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+          userCategories: {
+            "sisyphus-junior": { model: "anthropic/claude-sonnet-4-6" },
+          },
+        })
 
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
 
-      // when
-      const result = await tool.execute(
-        {
-          description: "Background metadata test",
-          prompt: "Do something",
-          category: "quick",
-          run_in_background: true,
-          load_skills: [],
-        },
-        toolContext
-      )
+        // when
+        const result = await tool.execute(
+          {
+            description: "Background metadata test",
+            prompt: "Do something",
+            category: "quick",
+            run_in_background: true,
+            load_skills: [],
+          },
+          toolContext,
+        )
 
-      // then - output should contain <task_metadata> block
-      expect(result).toContain("<task_metadata>")
-      expect(result).toContain("session_id: ses_bg_metadata")
-      expect(result).toContain("</task_metadata>")
-    }, { timeout: 10000 })
+        // then - output should contain <task_metadata> block
+        expect(result).toContain("<task_metadata>")
+        expect(result).toContain("session_id: ses_bg_metadata")
+        expect(result).toContain("</task_metadata>")
+      },
+      { timeout: 10000 },
+    )
   })
 })
 
@@ -4867,28 +5230,32 @@ describe("buildSyncPromptTools (issue #5182)", () => {
     }
 
     // #when sendSyncPrompt is called with categoryModel.tools
-    await sendSyncPrompt(mockClient, {
-      sessionID,
-      agentToUse: "sisyphus-junior",
-      args: {
-        description: "test",
-        prompt: "test",
-        category: "quick",
-        subagent_type: "",
-        requested_subagent_type: "",
-        run_in_background: false,
-        task_id: "",
-        command: "",
-        load_skills: [],
+    await sendSyncPrompt(
+      mockClient,
+      {
+        sessionID,
+        agentToUse: "sisyphus-junior",
+        args: {
+          description: "test",
+          prompt: "test",
+          category: "quick",
+          subagent_type: "",
+          requested_subagent_type: "",
+          run_in_background: false,
+          task_id: "",
+          command: "",
+          load_skills: [],
+        },
+        systemContent: undefined,
+        categoryModel,
+        directory: "/tmp",
+        toastManager: null,
+        taskId: undefined,
       },
-      systemContent: undefined,
-      categoryModel,
-      directory: "/tmp",
-      toastManager: null,
-      taskId: undefined,
-    }, {
-      promptSyncWithModelSuggestionRetry: mockPromptResolve,
-    })
+      {
+        promptSyncWithModelSuggestionRetry: mockPromptResolve,
+      },
+    )
 
     // #then session tools include user's grep:false and glob:false denials
     const storedTools = getSessionTools(sessionID)

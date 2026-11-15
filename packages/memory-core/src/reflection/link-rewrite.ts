@@ -4,7 +4,8 @@ import { FRONTMATTER_RE } from "../memfs/frontmatter-scalar"
 export const ARCHIVE_PATH = "ARCHIVE.md"
 
 /** Where a link to a path the run removed points now: the rename destination, the root archive, or nowhere. */
-export type Successor = { readonly kind: "moved"; readonly path: string } | { readonly kind: "archived" } | { readonly kind: "removed" }
+export type Successor =
+  { readonly kind: "moved"; readonly path: string } | { readonly kind: "archived" } | { readonly kind: "removed" }
 
 export interface LinkTargets {
   readonly live: ReadonlySet<string>
@@ -20,24 +21,28 @@ export function repointLinks(path: string, content: string, targets: LinkTargets
   const match = FRONTMATTER_RE.exec(content)
   const bodyStart = match === null ? 0 : content.length - (match[2] ?? "").length
   let fence: { readonly char: string; readonly length: number } | undefined
-  const body = content.slice(bodyStart).split("\n").map((line) => {
-    const marker = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line)
-    if (fence !== undefined) {
-      if (marker?.[1]?.[0] === fence.char && marker[1].length >= fence.length && !marker[2]?.trim()) fence = undefined
-      return line
-    }
-    if (marker?.[1] !== undefined) {
-      fence = { char: marker[1][0] ?? "", length: marker[1].length }
-      return line
-    }
-    let out = ""
-    let last = 0
-    for (const span of line.matchAll(/(`+)[^`]*?\1/g)) {
-      out += repointSegment(path, line.slice(last, span.index), targets, movedFrom) + span[0]
-      last = span.index + span[0].length
-    }
-    return out + repointSegment(path, line.slice(last), targets, movedFrom)
-  }).join("\n")
+  const body = content
+    .slice(bodyStart)
+    .split("\n")
+    .map((line) => {
+      const marker = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line)
+      if (fence !== undefined) {
+        if (marker?.[1]?.[0] === fence.char && marker[1].length >= fence.length && !marker[2]?.trim()) fence = undefined
+        return line
+      }
+      if (marker?.[1] !== undefined) {
+        fence = { char: marker[1][0] ?? "", length: marker[1].length }
+        return line
+      }
+      let out = ""
+      let last = 0
+      for (const span of line.matchAll(/(`+)[^`]*?\1/g)) {
+        out += repointSegment(path, line.slice(last, span.index), targets, movedFrom) + span[0]
+        last = span.index + span[0].length
+      }
+      return out + repointSegment(path, line.slice(last), targets, movedFrom)
+    })
+    .join("\n")
   return content.slice(0, bodyStart) + body
 }
 
@@ -56,9 +61,12 @@ function repointSegment(path: string, text: string, targets: LinkTargets, movedF
     if (successor === undefined) return whole
     const suffix = alias === undefined ? "" : `|${alias}`
     switch (successor.kind) {
-      case "moved": return `[[${exact === undefined ? successor.path.replace(/\.md$/, "") : successor.path}${anchor}${suffix}]]`
-      case "archived": return `[[${ARCHIVE_PATH}|${alias ?? target} (archived)]]`
-      case "removed": return alias ?? target
+      case "moved":
+        return `[[${exact === undefined ? successor.path.replace(/\.md$/, "") : successor.path}${anchor}${suffix}]]`
+      case "archived":
+        return `[[${ARCHIVE_PATH}|${alias ?? target} (archived)]]`
+      case "removed":
+        return alias ?? target
     }
   })
   return wiki.replace(/(?<!!)\[([^\]\n]*)\]\((<?[^)\n]+>?)\)/g, (whole, label: string, raw: string) => {
@@ -71,10 +79,16 @@ function repointSegment(path: string, text: string, targets: LinkTargets, movedF
     if (escapes(original)) return whole
     const successor = targets.removed.get(original)
     if (successor?.kind === "removed") return label
-    const nextTarget = successor === undefined
-      ? (resolves(original, targets.live, false) ? original : undefined)
-      : successor.kind === "moved" ? successor.path : ARCHIVE_PATH
-    if (nextTarget === undefined || nextTarget === posix.normalize(posix.join(posix.dirname(path), destinationPath))) return whole
+    const nextTarget =
+      successor === undefined
+        ? resolves(original, targets.live, false)
+          ? original
+          : undefined
+        : successor.kind === "moved"
+          ? successor.path
+          : ARCHIVE_PATH
+    if (nextTarget === undefined || nextTarget === posix.normalize(posix.join(posix.dirname(path), destinationPath)))
+      return whole
     const next = `${posix.relative(posix.dirname(path), nextTarget)}${successor?.kind === "archived" ? "" : anchor}`
     const replaced = /\s/.test(next) && !raw.trim().startsWith("<") ? `<${next}>` : next
     return `[${label}](${raw.replace(destination, replaced)})`

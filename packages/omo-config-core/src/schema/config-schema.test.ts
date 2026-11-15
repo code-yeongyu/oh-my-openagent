@@ -21,11 +21,18 @@ function makeConfigFixture(): { readonly cwd: string; readonly homeDir: string; 
 
 describe("omo config schema", () => {
   test("#given an empty formatOnMutation config #when parsed #then formatter defaults are available", () => {
-    expect(OmoConfigSchema.parse({ formatOnMutation: {} }).formatOnMutation).toEqual({ mode: "best-effort", maxFileBytes: 1048576, timeoutMs: 3000 })
+    expect(OmoConfigSchema.parse({ formatOnMutation: {} }).formatOnMutation).toEqual({
+      mode: "best-effort",
+      maxFileBytes: 1048576,
+      timeoutMs: 3000,
+    })
   })
 
   test("#given formatOnMutation overrides #when parsed #then mode limits and language map survive", () => {
-    expect(OmoConfigSchema.parse({ formatOnMutation: { mode: "required", languages: { python: false }, timeoutMs: 1000 } }).formatOnMutation).toEqual({ mode: "required", languages: { python: false }, maxFileBytes: 1048576, timeoutMs: 1000 })
+    expect(
+      OmoConfigSchema.parse({ formatOnMutation: { mode: "required", languages: { python: false }, timeoutMs: 1000 } })
+        .formatOnMutation,
+    ).toEqual({ mode: "required", languages: { python: false }, maxFileBytes: 1048576, timeoutMs: 1000 })
   })
   test("#given a full omo config #when parsed #then task defaults and deprecated category keys normalize", () => {
     // given
@@ -201,7 +208,12 @@ describe("omo config schema", () => {
 
     try {
       // when
-      const result = loadOmoConfig({ cwd: fixture.cwd, env: { HOME: fixture.homeDir }, harness: "senpi", platform: "linux" })
+      const result = loadOmoConfig({
+        cwd: fixture.cwd,
+        env: { HOME: fixture.homeDir },
+        harness: "senpi",
+        platform: "linux",
+      })
 
       // then
       expect(result.diagnostics).toEqual([])
@@ -223,7 +235,12 @@ describe("omo config schema", () => {
 
     try {
       // when
-      const result = loadOmoConfig({ cwd: fixture.cwd, env: { HOME: fixture.homeDir }, harness: "senpi", platform: "linux" })
+      const result = loadOmoConfig({
+        cwd: fixture.cwd,
+        env: { HOME: fixture.homeDir },
+        harness: "senpi",
+        platform: "linux",
+      })
 
       // then
       expect(result.diagnostics).toEqual([])

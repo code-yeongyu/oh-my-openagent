@@ -37,7 +37,9 @@ describe("runtime-fallback recovery claims", () => {
 
     // when
     const pending = awaitRuntimeFallbackRecoveryDecision(event)
-    pending?.then((decision) => { resolved = decision })
+    pending?.then((decision) => {
+      resolved = decision
+    })
     await Promise.resolve()
     const resolvedBeforeSettle = resolved
     settleRuntimeFallbackRecoveryClaim(event, "retry-owned")
@@ -149,7 +151,9 @@ describe("runtime-fallback recovery claims", () => {
     const event = { type: "session.error" }
     openRuntimeFallbackRecoveryClaim(event, "ses_1")
     let settled: string | undefined
-    awaitLateRuntimeFallbackRecoveryDecision(event)?.then((decision) => { settled = decision })
+    awaitLateRuntimeFallbackRecoveryDecision(event)?.then((decision) => {
+      settled = decision
+    })
 
     // when
     release()

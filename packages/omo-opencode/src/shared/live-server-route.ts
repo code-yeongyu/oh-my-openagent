@@ -104,15 +104,12 @@ async function probe(registration: RouteRegistration): Promise<boolean> {
   try {
     const controller = new AbortController()
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("probe timeout")), PROBE_ABORT_MS)
+      setTimeout(() => reject(new Error("probe timeout")), PROBE_ABORT_MS),
     )
     const timeoutId = setTimeout(() => controller.abort(), PROBE_ABORT_MS)
     let response: Response
     try {
-      response = await Promise.race([
-        getFetch()(probeUrl, { headers, signal: controller.signal }),
-        timeoutPromise,
-      ])
+      response = await Promise.race([getFetch()(probeUrl, { headers, signal: controller.signal }), timeoutPromise])
     } finally {
       clearTimeout(timeoutId)
     }
@@ -196,7 +193,10 @@ function getFreshSessionAffinity(registration: RouteRegistration, sessionID: str
   return entry.owned
 }
 
-async function resolveSessionAffinity(registration: RouteRegistration, sessionID: string): Promise<boolean | undefined> {
+async function resolveSessionAffinity(
+  registration: RouteRegistration,
+  sessionID: string,
+): Promise<boolean | undefined> {
   const cached = getFreshSessionAffinity(registration, sessionID)
   if (cached !== undefined) {
     return cached

@@ -11,10 +11,38 @@ const T0 = "2026-08-27T09:00:00.000Z"
 
 const startupRecordLines = (cwd: string, id: string): Array<string> => [
   JSON.stringify({ type: "session", version: 3, id, timestamp: T0, cwd }),
-  JSON.stringify({ type: "model_change", id: "p0000001", parentId: null, timestamp: T0, provider: "openai", modelId: "gpt-6.1-sol" }),
-  JSON.stringify({ type: "thinking_level_change", id: "p0000002", parentId: "p0000001", timestamp: T0, thinkingLevel: "high" }),
-  JSON.stringify({ type: "custom", customType: "pi-rules.scan", id: "p0000003", parentId: "p0000002", timestamp: T0, data: { cwd, reason: "startup" } }),
-  JSON.stringify({ type: "custom_message", customType: "omo-model-profile:unavailable", id: "p0000004", parentId: "p0000003", timestamp: T0, content: "no model", display: true }),
+  JSON.stringify({
+    type: "model_change",
+    id: "p0000001",
+    parentId: null,
+    timestamp: T0,
+    provider: "openai",
+    modelId: "gpt-6.1-sol",
+  }),
+  JSON.stringify({
+    type: "thinking_level_change",
+    id: "p0000002",
+    parentId: "p0000001",
+    timestamp: T0,
+    thinkingLevel: "high",
+  }),
+  JSON.stringify({
+    type: "custom",
+    customType: "pi-rules.scan",
+    id: "p0000003",
+    parentId: "p0000002",
+    timestamp: T0,
+    data: { cwd, reason: "startup" },
+  }),
+  JSON.stringify({
+    type: "custom_message",
+    customType: "omo-model-profile:unavailable",
+    id: "p0000004",
+    parentId: "p0000003",
+    timestamp: T0,
+    content: "no model",
+    display: true,
+  }),
 ]
 
 const startupOnlySession = (cwd: string, id: string) => `${startupRecordLines(cwd, id).join("\n")}\n`
@@ -22,7 +50,11 @@ const startupThenOneMessageSession = (cwd: string, id: string) =>
   `${[...startupRecordLines(cwd, id), JSON.stringify({ type: "message", id: "p0000007", parentId: "p0000004", timestamp: T0, message: { role: "user", content: [{ type: "text", text: "hello" }] } })].join("\n")}\n`
 
 async function scanWithOmoSessions(root: string, sessions: string) {
-  return runScan({ claudeHomePath: join(root, "claude"), codexHomePath: join(root, "codex"), omoSessionsRoots: [sessions] })
+  return runScan({
+    claudeHomePath: join(root, "claude"),
+    codexHomePath: join(root, "codex"),
+    omoSessionsRoots: [sessions],
+  })
 }
 
 describe("session-history scanProjects omo CLI sessions (parity with desktop AgentSessionScanner.omo.test)", () => {
@@ -32,7 +64,15 @@ describe("session-history scanProjects omo CLI sessions (parity with desktop Age
     const sessions = join(root, "agent", "sessions")
     await mkdir(sessions, { recursive: true })
     await writeFile(join(sessions, "broken.jsonl"), "{broken")
-    await writeFile(join(sessions, "deleted.jsonl"), JSON.stringify({ type: "session", version: 3, id: "deleted-project-session", cwd: join(root, "deleted-project") }))
+    await writeFile(
+      join(sessions, "deleted.jsonl"),
+      JSON.stringify({
+        type: "session",
+        version: 3,
+        id: "deleted-project-session",
+        cwd: join(root, "deleted-project"),
+      }),
+    )
 
     // when
     const result = await scanWithOmoSessions(root, sessions)
@@ -49,10 +89,22 @@ describe("session-history scanProjects omo CLI sessions (parity with desktop Age
     const encoded = join(sessions, "--existing-project--")
     await mkdir(project)
     await mkdir(encoded, { recursive: true })
-    await writeFile(join(encoded, "finished.jsonl"), [
-      JSON.stringify({ type: "session", version: 3, id: "finished-cli-session", cwd: project, timestamp: "2026-01-01T00:00:00.000Z" }),
-      JSON.stringify({ type: "message", message: { role: "user", content: [{ type: "text", text: "Work on this project." }] } }),
-    ].join("\n"))
+    await writeFile(
+      join(encoded, "finished.jsonl"),
+      [
+        JSON.stringify({
+          type: "session",
+          version: 3,
+          id: "finished-cli-session",
+          cwd: project,
+          timestamp: "2026-01-01T00:00:00.000Z",
+        }),
+        JSON.stringify({
+          type: "message",
+          message: { role: "user", content: [{ type: "text", text: "Work on this project." }] },
+        }),
+      ].join("\n"),
+    )
 
     // when
     const result = await scanWithOmoSessions(root, sessions)
@@ -75,9 +127,15 @@ describe("session-history scanProjects omo CLI sessions (parity with desktop Age
     await mkdir(probeSessions, { recursive: true })
     await mkdir(projectSessions, { recursive: true })
     for (const index of [1, 2, 3]) {
-      await writeFile(join(probeSessions, `probe-${index}.jsonl`), startupOnlySession(serverFolder, `0199d0c0-3333-7000-8000-00000000000${index}`))
+      await writeFile(
+        join(probeSessions, `probe-${index}.jsonl`),
+        startupOnlySession(serverFolder, `0199d0c0-3333-7000-8000-00000000000${index}`),
+      )
     }
-    await writeFile(join(projectSessions, "talked.jsonl"), startupThenOneMessageSession(project, "0199d0c0-3333-7000-8000-000000000009"))
+    await writeFile(
+      join(projectSessions, "talked.jsonl"),
+      startupThenOneMessageSession(project, "0199d0c0-3333-7000-8000-000000000009"),
+    )
 
     // when
     const result = await scanWithOmoSessions(root, sessions)

@@ -20,7 +20,11 @@ export interface PushPlan<T extends SizedItem> {
  * still batched, so one oversized item never stops the rest of the device's changes. `withheld` keys
  * (ops this device must not send) are held the same way, from their first op on.
  */
-export function planBatches<T extends SizedItem>(items: readonly T[], limit = MAX_BATCH_BYTES, withheld: ReadonlySet<string> = new Set()): PushPlan<T> {
+export function planBatches<T extends SizedItem>(
+  items: readonly T[],
+  limit = MAX_BATCH_BYTES,
+  withheld: ReadonlySet<string> = new Set(),
+): PushPlan<T> {
   const batches: T[][] = []
   const held: T[] = []
   const heldKeys = new Set<string>(withheld)

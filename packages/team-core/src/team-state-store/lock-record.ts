@@ -1,9 +1,18 @@
 import { randomUUID } from "node:crypto"
 import { readFile, stat } from "node:fs/promises"
-import { getPidLiveness, getProcessStartIdentity, startIdentitiesConflict } from "@oh-my-opencode/memory-core/process-identity"
+import {
+  getPidLiveness,
+  getProcessStartIdentity,
+  startIdentitiesConflict,
+} from "@oh-my-opencode/memory-core/process-identity"
 
 import { isWorkerLockReleased, lockOwnerInstanceId, registerLockWorker } from "./lock-worker-lifetime"
-export { lockOwnerInstanceId, markLockRecordHeld, markLockRecordReleased, forgetLockRecord } from "./lock-worker-lifetime"
+export {
+  lockOwnerInstanceId,
+  markLockRecordHeld,
+  markLockRecordReleased,
+  forgetLockRecord,
+} from "./lock-worker-lifetime"
 
 export type ObservedLockRecord = {
   readonly content: string

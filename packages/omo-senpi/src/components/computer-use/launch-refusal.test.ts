@@ -13,8 +13,9 @@ import { createComputerUseComponent } from "./index"
 
 for (const reason of ["self-responsible", "unresolved"]) {
   test(`doctor reports actual ${reason} refusal`, async () => {
-    const result = await probeComputerUseEngine("/fixture", {}, 5_000,
-      () => refusalChild({ stderr: refusalRecord(reason) }))
+    const result = await probeComputerUseEngine("/fixture", {}, 5_000, () =>
+      refusalChild({ stderr: refusalRecord(reason) }),
+    )
     expect(result).toMatchObject({ ok: false, code: "launch-context-unavailable", reason })
   }, 10_000)
 }
@@ -24,7 +25,7 @@ test("status stays passive, records failed restart, and emits no permission even
   const permissions: unknown[] = []
   let launches = 0
   const service = new TrackedDesktopService({
-    createChild: () => ++launches === 1 ? live.spawn() : refusalChild(),
+    createChild: () => (++launches === 1 ? live.spawn() : refusalChild()),
     onPermissionRequired: (permission) => permissions.push(permission),
   })
   expect(service.engineState).toBe("not started")
@@ -46,7 +47,8 @@ test("status stays passive, records failed restart, and emits no permission even
 test("initial tracked activation preserves the typed reason", async () => {
   const service = new TrackedDesktopService({ createChild: () => refusalChild() })
   expect(await rejectionOf(service.open({}))).toMatchObject({
-    code: "launch-context-unavailable", reason: "self-responsible",
+    code: "launch-context-unavailable",
+    reason: "self-responsible",
   })
   expect(service.engineState).toBe("launch-context-unavailable")
   await service.close()
@@ -55,10 +57,20 @@ test("initial tracked activation preserves the typed reason", async () => {
 test("the registered /computer on command reports recovery without a permission event or automatic retry", async () => {
   class Host extends FakeExtensionAPI {
     active = ["read"]
-    rpc = { emit: (name: string, data: unknown) => { this.rpcEvents.push({ name, data }) } }
-    getActiveTools() { return this.active }
-    setActiveTools(names: string[]) { this.active = names }
-    async executeTool() { throw new Error("no external action is allowed") }
+    rpc = {
+      emit: (name: string, data: unknown) => {
+        this.rpcEvents.push({ name, data })
+      },
+    }
+    getActiveTools() {
+      return this.active
+    }
+    setActiveTools(names: string[]) {
+      this.active = names
+    }
+    async executeTool() {
+      throw new Error("no external action is allowed")
+    }
   }
   const home = mkdtempSync(join(tmpdir(), "launch-command-"))
   const pi = new Host()
@@ -66,14 +78,20 @@ test("the registered /computer on command reports recovery without a permission 
   const messages: { text: string; level: string }[] = []
   try {
     createComputerUseComponent({
-      platform: "darwin", env: { HOME: home },
-      engineChild: () => () => { launches++; return refusalChild() },
+      platform: "darwin",
+      env: { HOME: home },
+      engineChild: () => () => {
+        launches++
+        return refusalChild()
+      },
       loadSettings: () => resolveComputerSettings({ auditLog: { enabled: false } }, "darwin"),
     }).register(pi, { logger: { info() {}, warn() {}, error() {} }, config: { getFlag: () => undefined } })
     const handler = pi.commands.find((entry) => entry.name === "computer")?.options.handler
     if (typeof handler !== "function") throw new Error("missing registered command")
     const context = {
-      cwd: home, model: undefined, hasUI: true,
+      cwd: home,
+      model: undefined,
+      hasUI: true,
       sessionManager: { getSessionId: () => "launch-command", getSessionDir: () => home },
       ui: { notify: (text: string, level: string) => messages.push({ text, level }) },
     }

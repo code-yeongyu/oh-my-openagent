@@ -10,21 +10,35 @@ import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs"
 export function isolatedEnvironment(sandbox, packageRoot) {
   const env = { ...process.env }
   for (const key of Object.keys(env)) {
-    if (/^(OMO_|SENPI_|PI_)/.test(key) || /(_PACKAGE_DIR|API_KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)$/.test(key)) delete env[key]
+    if (/^(OMO_|SENPI_|PI_)/.test(key) || /(_PACKAGE_DIR|API_KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)$/.test(key))
+      delete env[key]
   }
   const nativeRoot = join(packageRoot, "../omo-native")
   const manifest = JSON.parse(readFileSync(join(nativeRoot, "package.json"), "utf8"))
   const changelogPath = join(nativeRoot, "plugin/CHANGELOG.md")
   const brand = {
-    name: "OmO", logo: OMO_BRAND_LOGO, command: "omo", displayVersion: manifest.version, configDir: ".omo", flatLayout: false,
-    envPrefix: "OMO", userAgent: "omo", originator: "omo",
-    update: { packageName: "omo-ai", distTag: "beta", command: "npm i -g omo-ai@beta", changelogUrl: "https://github.com/code-yeongyu/oh-my-openagent/releases" },
+    name: "OmO",
+    logo: OMO_BRAND_LOGO,
+    command: "omo",
+    displayVersion: manifest.version,
+    configDir: ".omo",
+    flatLayout: false,
+    envPrefix: "OMO",
+    userAgent: "omo",
+    originator: "omo",
+    update: {
+      packageName: "omo-ai",
+      distTag: "beta",
+      command: "npm i -g omo-ai@beta",
+      changelogUrl: "https://github.com/code-yeongyu/oh-my-openagent/releases",
+    },
   }
   if (existsSync(changelogPath)) {
     const { version } = JSON.parse(readFileSync(join(nativeRoot, "plugin/package.json"), "utf8"))
     brand.changelog = { path: changelogPath, version }
   }
-  for (const key of ["HOME", "USERPROFILE", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"]) env[key] = join(sandbox, "home")
+  for (const key of ["HOME", "USERPROFILE", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"])
+    env[key] = join(sandbox, "home")
   env.OMO_CODING_AGENT_DIR = join(sandbox, "agent")
   env.SENPI_CODING_AGENT_DIR = env.OMO_CODING_AGENT_DIR
   env.OMO_NATIVE = "1"
@@ -38,5 +52,7 @@ export function isolatedEnvironment(sandbox, packageRoot) {
 
 export function processGroupMembers(groupId) {
   return execFileSync("ps", ["-axo", "pid=,ppid=,pgid=,command="], { encoding: "utf8" })
-    .trim().split("\n").filter(line => Number(line.trim().split(/\s+/)[2]) === groupId)
+    .trim()
+    .split("\n")
+    .filter((line) => Number(line.trim().split(/\s+/)[2]) === groupId)
 }

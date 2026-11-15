@@ -40,7 +40,12 @@ describe("the start-up notice of a stopped bootstrap", () => {
     const { bootstrapAtStart } = await loadInstance(`notice-${report.state}`)
     const notices: [string, string | undefined][] = []
     const debug: unknown[][] = []
-    const eventCtx = { mode: "tui", hasUI: true, cwd: "/work/project", ui: { notify: (message: string, type?: string) => notices.push([message, type]) } }
+    const eventCtx = {
+      mode: "tui",
+      hasUI: true,
+      cwd: "/work/project",
+      ui: { notify: (message: string, type?: string) => notices.push([message, type]) },
+    }
     const logger = { info() {}, warn() {}, error() {}, debug: (...args: unknown[]) => debug.push(args) }
     await bootstrapAtStart(eventCtx, logger, {
       env: { OMO_BIN: "/opt/omo/launcher" },
@@ -52,7 +57,8 @@ describe("the start-up notice of a stopped bootstrap", () => {
   }
 
   test("not_published shows no warning and leaves one debug line", async () => {
-    const notice = "Remote devices are not available in this omo build yet: OmO device service 0.1.0 has not been published."
+    const notice =
+      "Remote devices are not available in this omo build yet: OmO device service 0.1.0 has not been published."
     const { notices, debug } = await startWith({ state: "not_published", notice })
     expect(notices).toEqual([])
     expect(debug).toEqual([["device service release is not published", { notice }]])

@@ -49,7 +49,7 @@ describe("loadPrompt", () => {
 
   test("#given missing file #then error mentions prompt name and variant", async () => {
     const error = await captureError(() =>
-      loadPrompt({ source: fixtureSource, name: "test-prompt", variant: "missing" })
+      loadPrompt({ source: fixtureSource, name: "test-prompt", variant: "missing" }),
     )
 
     expect(error).toBeInstanceOf(PromptFileNotFoundError)
@@ -58,7 +58,7 @@ describe("loadPrompt", () => {
 
   test("#given prompt name escapes source directory #then rejects path traversal", async () => {
     const error = await captureError(() =>
-      loadPrompt({ source: fixtureSource, name: "../test-prompt", variant: "default" })
+      loadPrompt({ source: fixtureSource, name: "../test-prompt", variant: "default" }),
     )
 
     expect(error).toBeInstanceOf(PromptPathTraversalError)
@@ -66,7 +66,7 @@ describe("loadPrompt", () => {
 
   test("#given variant escapes source directory #then rejects path traversal", async () => {
     const error = await captureError(() =>
-      loadPrompt({ source: fixtureSource, name: "test-prompt", variant: "../../outside" })
+      loadPrompt({ source: fixtureSource, name: "test-prompt", variant: "../../outside" }),
     )
 
     expect(error).toBeInstanceOf(PromptPathTraversalError)
@@ -140,7 +140,7 @@ describe("loadPrompt", () => {
             },
           },
         ],
-      })
+      }),
     )
 
     expect(error).toBeInstanceOf(ResolverFailureError)

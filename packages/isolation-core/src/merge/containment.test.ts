@@ -38,5 +38,15 @@ test("nested merge refuses a nested repository path replaced by an external syml
   // After baseline capture, the source's nested repository is replaced by a symlink out.
   await rm(join(f.repoRoot, "inner"), { recursive: true, force: true })
   await symlink(f.root, join(f.repoRoot, "inner"))
-  await expect(mergeIsolatedChanges({ ...f, baseline, isolationDir, id: "escape", artifactsDir: join(f.root, "artifacts"), apply: true, mode: "patch" as const })).rejects.toThrow(/escape|Invalid|symlink/)
+  await expect(
+    mergeIsolatedChanges({
+      ...f,
+      baseline,
+      isolationDir,
+      id: "escape",
+      artifactsDir: join(f.root, "artifacts"),
+      apply: true,
+      mode: "patch" as const,
+    }),
+  ).rejects.toThrow(/escape|Invalid|symlink/)
 })

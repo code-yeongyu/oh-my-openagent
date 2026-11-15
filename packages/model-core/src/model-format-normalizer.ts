@@ -1,5 +1,5 @@
 export function normalizeModelFormat(
-  model: string | { providerID: string; modelID: string } | null | undefined
+  model: string | { providerID: string; modelID: string } | null | undefined,
 ): { providerID: string; modelID: string } | undefined {
   if (!model) {
     return undefined

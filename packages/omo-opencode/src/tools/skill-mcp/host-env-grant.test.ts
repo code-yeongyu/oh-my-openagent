@@ -28,7 +28,9 @@ test("host config reference grant survives manager restart and revoke restores t
   const host = join(root, "opaque-host", "fixture")
   mkdirSync(join(project, ".git"), { recursive: true })
   mkdirSync(host, { recursive: true })
-  writeFileSync(join(host, "SKILL.md"), `---
+  writeFileSync(
+    join(host, "SKILL.md"),
+    `---
 name: fixture
 description: synthetic
 mcp:
@@ -38,7 +40,8 @@ mcp:
       AUTH_HEADER: "\${GITHUB_TOKEN}"
 ---
 Synthetic host skill.
-`)
+`,
+  )
   const oldToken = process.env.GITHUB_TOKEN
   process.env.GITHUB_TOKEN = "synthetic-not-a-real-token"
   const transports: StdioServerParameters[] = []
@@ -48,10 +51,14 @@ Synthetic host skill.
       return { start: async () => {}, send: async () => {}, close: async () => {} }
     },
     createClient: () => ({
-      connect: async () => {}, close: async () => {},
-      listTools: async () => ({ tools: [] }), listResources: async () => ({ resources: [] }),
-      listPrompts: async () => ({ prompts: [] }), callTool: async () => ({ content: [] }),
-      readResource: async () => ({ contents: [] }), getPrompt: async () => ({ messages: [] }),
+      connect: async () => {},
+      close: async () => {},
+      listTools: async () => ({ tools: [] }),
+      listResources: async () => ({ resources: [] }),
+      listPrompts: async () => ({ prompts: [] }),
+      callTool: async () => ({ content: [] }),
+      readResource: async () => ({ contents: [] }),
+      getPrompt: async () => ({ messages: [] }),
     }),
   })
   const grants: Record<string, EnvGrant> = {}
@@ -71,31 +78,49 @@ Synthetic host skill.
     },
     list: async () => ({ ...grants }),
     digest: async () => String(generation),
-    watch: (listener) => { listeners.add(listener); return () => { listeners.delete(listener) } },
+    watch: (listener) => {
+      listeners.add(listener)
+      return () => {
+        listeners.delete(listener)
+      }
+    },
   }
   const notices: string[] = []
   const manager = new SkillMcpManager({ grantStore: store, onEnvironmentNotice: (message) => notices.push(message) })
   managers.push(manager)
   try {
     const context = await createSkillContext({
-      directory: project, pluginConfig: OhMyOpenCodeConfigSchema.parse({}),
+      directory: project,
+      pluginConfig: OhMyOpenCodeConfigSchema.parse({}),
       hostSkills: { paths: [join(root, "opaque-host")] },
     })
     const toolContext = unsafeTestValue({
-      sessionID: "synthetic", directory: project, ask: async () => {},
+      sessionID: "synthetic",
+      directory: project,
+      ask: async () => {},
     })
     const tool = createSkillMcpTool({ manager, getLoadedSkills: () => context.mergedSkills })
     const first = await tool.execute({ mcp_name: "synthetic", tool_name: "test" }, toolContext)
     const id = first.match(/\/omo-mcp-env-grant ([a-zA-Z0-9_-]+)/)?.[1]
     if (!id) throw new Error("No exact grant command in tool output")
     expect(transports.at(-1)?.env?.AUTH_HEADER).toBe("${GITHUB_TOKEN}")
-    const handler = createCommandExecuteBeforeHandler(unsafeTestValue({
-      directory: project, hooks: {}, mcpManager: manager,
-    }))
+    const handler = createCommandExecuteBeforeHandler(
+      unsafeTestValue({
+        directory: project,
+        hooks: {},
+        mcpManager: manager,
+      }),
+    )
     // when
-    await handler({ command: "omo-mcp-env-grant", arguments: `${id} GITHUB_TOKEN`, sessionID: "synthetic" }, { parts: [] })
+    await handler(
+      { command: "omo-mcp-env-grant", arguments: `${id} GITHUB_TOKEN`, sessionID: "synthetic" },
+      { parts: [] },
+    )
     await manager.disconnectAll()
-    const restarted = new SkillMcpManager({ grantStore: store, onEnvironmentNotice: (message) => notices.push(message) })
+    const restarted = new SkillMcpManager({
+      grantStore: store,
+      onEnvironmentNotice: (message) => notices.push(message),
+    })
     managers.push(restarted)
     const secondTool = createSkillMcpTool({ manager: restarted, getLoadedSkills: () => context.mergedSkills })
     await secondTool.execute({ mcp_name: "synthetic", tool_name: "test" }, toolContext)
@@ -114,65 +139,91 @@ Synthetic host skill.
   }
 })
 
-test.each(["global-config", "unattributable", "url-cache"])("native host fallback applies the right environment to %s content", async (kind) => {
-  // given
-  const root = mkdtempSync(join(tmpdir(), "native-host-authority-"))
-  roots.push(root)
-  const project = join(root, "project")
-  const global = join(root, "global-config")
-  const cache = join(root, "cache")
-  const source = kind === "global-config" ? join(global, "skills", "fixture") :
-    kind === "url-cache" ? join(cache, "opencode", "skills", "fixture") : join(root, "opaque-host", "fixture")
-  mkdirSync(join(project, ".git"), { recursive: true })
-  mkdirSync(global)
-  mkdirSync(source, { recursive: true })
-  const path = join(source, "SKILL.md")
-  writeFileSync(path, "---\nname: fixture\ndescription: synthetic\nmcp:\n  fixture:\n    command: synthetic-command\n---\nActual host body\n")
-  const old = {
-    OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR, XDG_CACHE_HOME: process.env.XDG_CACHE_HOME,
-    NODE_ENV: process.env.NODE_ENV, JAVA_HOME: process.env.JAVA_HOME,
-  }
-  process.env.OPENCODE_CONFIG_DIR = global
-  process.env.XDG_CACHE_HOME = cache
-  process.env.NODE_ENV = "synthetic-node-env"
-  process.env.JAVA_HOME = "synthetic-java-home"
-  const transports: StdioServerParameters[] = []
-  const notices: string[] = []
-  setStdioClientDependenciesForTesting({
-    createTransport: (options) => {
-      transports.push(options)
-      return { start: async () => {}, send: async () => {}, close: async () => {} }
-    },
-    createClient: () => ({
-      connect: async () => {}, close: async () => {},
-      listTools: async () => ({ tools: [] }), listResources: async () => ({ resources: [] }),
-      listPrompts: async () => ({ prompts: [] }), callTool: async () => ({ content: [] }),
-      readResource: async () => ({ contents: [] }), getPrompt: async () => ({ messages: [] }),
-    }),
-  })
-  const manager = new SkillMcpManager(Object.assign({}, { onEnvironmentNotice: (message: string) => notices.push(message) }))
-  managers.push(manager)
-  const native = { name: "fixture", description: "synthetic", location: path, content: "Cached host body" }
-  const tool = createSkillTool({
-    directory: project, skills: [], commands: [], mcpManager: manager,
-    nativeSkills: { all: () => [native], get: () => native, dirs: () => [source] },
-  })
-  try {
-    // when
-    const output = await tool.execute({ name: "fixture" }, unsafeTestValue({
-      sessionID: "synthetic-host", directory: project, ask: async () => {},
-    }))
-    // then
-    expect(output).toContain("Cached host body")
-    expect(transports).toHaveLength(1)
-    expect(transports[0]?.env?.NODE_ENV).toBe(kind === "global-config" ? "synthetic-node-env" : undefined)
-    expect(transports[0]?.env?.JAVA_HOME).toBe(kind === "global-config" ? "synthetic-java-home" : undefined)
-    expect(notices).toHaveLength(kind === "global-config" ? 0 : 1)
-    if (kind !== "global-config") expect(output).toMatch(/\/omo-mcp-env-grant [a-zA-Z0-9_-]+/)
-  } finally {
-    for (const [name, value] of Object.entries(old)) {
-      if (value === undefined) delete process.env[name]
-      else process.env[name] = value
+test.each(["global-config", "unattributable", "url-cache"])(
+  "native host fallback applies the right environment to %s content",
+  async (kind) => {
+    // given
+    const root = mkdtempSync(join(tmpdir(), "native-host-authority-"))
+    roots.push(root)
+    const project = join(root, "project")
+    const global = join(root, "global-config")
+    const cache = join(root, "cache")
+    const source =
+      kind === "global-config"
+        ? join(global, "skills", "fixture")
+        : kind === "url-cache"
+          ? join(cache, "opencode", "skills", "fixture")
+          : join(root, "opaque-host", "fixture")
+    mkdirSync(join(project, ".git"), { recursive: true })
+    mkdirSync(global)
+    mkdirSync(source, { recursive: true })
+    const path = join(source, "SKILL.md")
+    writeFileSync(
+      path,
+      "---\nname: fixture\ndescription: synthetic\nmcp:\n  fixture:\n    command: synthetic-command\n---\nActual host body\n",
+    )
+    const old = {
+      OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
+      XDG_CACHE_HOME: process.env.XDG_CACHE_HOME,
+      NODE_ENV: process.env.NODE_ENV,
+      JAVA_HOME: process.env.JAVA_HOME,
     }
-  }
-})
+    process.env.OPENCODE_CONFIG_DIR = global
+    process.env.XDG_CACHE_HOME = cache
+    process.env.NODE_ENV = "synthetic-node-env"
+    process.env.JAVA_HOME = "synthetic-java-home"
+    const transports: StdioServerParameters[] = []
+    const notices: string[] = []
+    setStdioClientDependenciesForTesting({
+      createTransport: (options) => {
+        transports.push(options)
+        return { start: async () => {}, send: async () => {}, close: async () => {} }
+      },
+      createClient: () => ({
+        connect: async () => {},
+        close: async () => {},
+        listTools: async () => ({ tools: [] }),
+        listResources: async () => ({ resources: [] }),
+        listPrompts: async () => ({ prompts: [] }),
+        callTool: async () => ({ content: [] }),
+        readResource: async () => ({ contents: [] }),
+        getPrompt: async () => ({ messages: [] }),
+      }),
+    })
+    const manager = new SkillMcpManager(
+      Object.assign({}, { onEnvironmentNotice: (message: string) => notices.push(message) }),
+    )
+    managers.push(manager)
+    const native = { name: "fixture", description: "synthetic", location: path, content: "Cached host body" }
+    const tool = createSkillTool({
+      directory: project,
+      skills: [],
+      commands: [],
+      mcpManager: manager,
+      nativeSkills: { all: () => [native], get: () => native, dirs: () => [source] },
+    })
+    try {
+      // when
+      const output = await tool.execute(
+        { name: "fixture" },
+        unsafeTestValue({
+          sessionID: "synthetic-host",
+          directory: project,
+          ask: async () => {},
+        }),
+      )
+      // then
+      expect(output).toContain("Cached host body")
+      expect(transports).toHaveLength(1)
+      expect(transports[0]?.env?.NODE_ENV).toBe(kind === "global-config" ? "synthetic-node-env" : undefined)
+      expect(transports[0]?.env?.JAVA_HOME).toBe(kind === "global-config" ? "synthetic-java-home" : undefined)
+      expect(notices).toHaveLength(kind === "global-config" ? 0 : 1)
+      if (kind !== "global-config") expect(output).toMatch(/\/omo-mcp-env-grant [a-zA-Z0-9_-]+/)
+    } finally {
+      for (const [name, value] of Object.entries(old)) {
+        if (value === undefined) delete process.env[name]
+        else process.env[name] = value
+      }
+    }
+  },
+)

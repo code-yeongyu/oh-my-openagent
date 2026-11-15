@@ -41,8 +41,12 @@ function createFakeSession(sessionId = "resume-session-1"): FakeSessionControls 
         settle = resolve
       })
     },
-    async steer() { return "handled" },
-    async followUp() { return "handled" },
+    async steer() {
+      return "handled"
+    },
+    async followUp() {
+      return "handled"
+    },
     async abort() {},
     subscribe(_listener: ChildSessionListener) {
       return () => {}

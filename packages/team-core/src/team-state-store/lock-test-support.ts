@@ -50,7 +50,11 @@ async function writeScript(workDirectory: string, name: string, source: string):
   return scriptPath
 }
 
-export async function startLockHolder(workDirectory: string, lockPath: string, staleAfterMs = 300_000): Promise<LockHolder> {
+export async function startLockHolder(
+  workDirectory: string,
+  lockPath: string,
+  staleAfterMs = 300_000,
+): Promise<LockHolder> {
   const scriptPath = await writeScript(workDirectory, "holder", HOLDER_SCRIPT)
   const child = spawn(process.execPath, [scriptPath], {
     stdio: ["pipe", "pipe", "pipe"],
@@ -87,9 +91,11 @@ export async function runLockContenders(
   rounds: number,
 ): Promise<(number | null)[]> {
   const scriptPath = await writeScript(workDirectory, "contender", CONTENDER_SCRIPT)
-  const children = Array.from({ length: processes }, () => spawn(process.execPath, [scriptPath], {
-    stdio: ["ignore", "ignore", "inherit"],
-    env: { ...process.env, LOCKS_MODULE, HOLD_PATH: lockPath, LOG_PATH: logPath, ROUNDS: String(rounds) },
-  }))
+  const children = Array.from({ length: processes }, () =>
+    spawn(process.execPath, [scriptPath], {
+      stdio: ["ignore", "ignore", "inherit"],
+      env: { ...process.env, LOCKS_MODULE, HOLD_PATH: lockPath, LOG_PATH: logPath, ROUNDS: String(rounds) },
+    }),
+  )
   return await Promise.all(children.map(exitCodeOf))
 }

@@ -44,14 +44,27 @@ async function view(omoJson: Record<string, unknown>) {
 describe("omo doctor --models", () => {
   test("#given an Anthropic login and an artistry override plus an exclude list #when --json is asked #then the chain, sources and exclusion come from the resolver", async () => {
     // when
-    const report = await view({ categories: { artistry: { model: "anthropic/claude-opus-5-5" } }, exclude_models: ["claude-fable-*"] })
+    const report = await view({
+      categories: { artistry: { model: "anthropic/claude-opus-5-5" } },
+      exclude_models: ["claude-fable-*"],
+    })
     const artistry = report.categories.find((entry: { name: string }) => entry.name === "artistry")
 
     // then
     expect(report.excludeModels).toEqual(["claude-fable-*"])
     expect(artistry.primary).toBe("anthropic/claude-opus-5-5")
     expect(artistry.rungs[0]).toEqual({ model: "anthropic/claude-opus-5-5", source: "omo.json", state: "primary" })
-    expect(artistry.rungs[1]).toMatchObject({ model: "anthropic/claude-fable-5-1", state: "excluded", excludedBy: "claude-fable-*" })
+    expect(artistry.rungs[1]).toMatchObject({
+      model: "anthropic/claude-fable-5-2",
+      source: "built-in",
+      state: "excluded",
+      excludedBy: "claude-fable-*",
+    })
+    expect(artistry.rungs[2]).toMatchObject({
+      model: "anthropic/claude-fable-5-1",
+      state: "excluded",
+      excludedBy: "claude-fable-*",
+    })
     expect(report.modelProfile.selection).toBe("default")
     expect(report.modelProfile.applied).toBe("anthropic/claude-opus-5-5")
   })
@@ -66,12 +79,20 @@ describe("omo doctor --models", () => {
     // then
     const lines = result.output.split("\n")
     expect(lines).toContain("exclude_models: claude-fable-*")
-    expect(lines.some((line) => /anthropic\/claude-fable-5-1\s+built-in\s+excluded by exclude_models "claude-fable-\*"/.test(line))).toBe(true)
+    expect(
+      lines.some((line) =>
+        /anthropic\/claude-fable-5-1\s+built-in\s+excluded by exclude_models "claude-fable-\*"/.test(line),
+      ),
+    ).toBe(true)
   })
 
   test("#given a runtime that cannot load #when asked #then the command fails instead of printing nothing", async () => {
     // when
-    const result = await doctorModelChains({ agentDir: "/nonexistent", json: false, loadRuntime: () => Promise.reject(new Error("runtime missing")) })
+    const result = await doctorModelChains({
+      agentDir: "/nonexistent",
+      json: false,
+      loadRuntime: () => Promise.reject(new Error("runtime missing")),
+    })
 
     // then
     expect(result).toEqual({ output: "FAIL models: runtime missing", failed: true })
@@ -79,7 +100,10 @@ describe("omo doctor --models", () => {
 
   test("#given an unknown option #when run #then it exits 2 without resolving anything", async () => {
     // when
-    const code = await runDoctorModels(["--yaml"], { agentDir: "/nonexistent", loadRuntime: () => Promise.reject(new Error("must not load")) })
+    const code = await runDoctorModels(["--yaml"], {
+      agentDir: "/nonexistent",
+      loadRuntime: () => Promise.reject(new Error("must not load")),
+    })
 
     // then
     expect(code).toBe(2)

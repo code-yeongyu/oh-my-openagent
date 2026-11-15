@@ -43,7 +43,10 @@ async function writeMarketplaceFixture(sourceRoot: string, includeRootCli: boole
       ],
     },
   })
-  await writeRuntimeFile(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "bootstrap", "dist", "cli.js"), "bootstrap")
+  await writeRuntimeFile(
+    join(sourceRoot, "packages", "omo-codex", "plugin", "components", "bootstrap", "dist", "cli.js"),
+    "bootstrap",
+  )
   await writeRuntimeFile(join(sourceRoot, "packages", "git-bash-mcp", "dist", "cli.js"), "git-bash")
   await writeRuntimeFile(join(sourceRoot, "packages", "lsp-tools-mcp", "dist", "cli.js"), "lsp-tools")
   await writeRuntimeFile(join(sourceRoot, "packages", "lsp-daemon", "dist", "cli.js"), "lsp-daemon")

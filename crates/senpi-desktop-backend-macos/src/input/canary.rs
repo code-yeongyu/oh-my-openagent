@@ -8,6 +8,9 @@
 //! live for both the HID tap and the stamped SkyLight post), so the OK button
 //! is dismissed through AX after the keystroke receipt proves delivery.
 
+mod verdict;
+
+use std::os::unix::process::CommandExt;
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -31,6 +34,18 @@ const DIALOG_GIVES_UP: &str = "5";
 const DIALOG_DEADLINE: Duration = Duration::from_secs(4);
 const RECEIPT_DEADLINE: Duration = Duration::from_secs(2);
 const OK: &str = "OK";
+/// `osascript` is a system binary with no parent watch of its own (G16), so
+/// it runs under a shell whose watcher ends it within 0.2 s of the engine's
+/// death. The shell reaps it, so the watcher never signals a reused pid, and
+/// `$PPID` stays the engine's pid in the watcher's subshell.
+const CONTAINED_OSASCRIPT: &str = r#"/usr/bin/osascript -e "$1" &
+dialog=$!
+( while kill -0 "$PPID" 2>/dev/null; do sleep 0.2; done; kill "$dialog" 2>/dev/null ) >/dev/null 2>&1 &
+watcher=$!
+wait "$dialog"
+status=$?
+kill "$watcher" 2>/dev/null
+exit "$status""#;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CanaryMode {
@@ -84,33 +99,38 @@ struct Dialog {
 pub(super) fn run(input: &mut MacInput) -> CoreResult<CanaryResult> {
     skylight::require_spi()?;
     let front = focus::front_window()?;
-    let child = Command::new("/usr/bin/osascript")
-        .args([
-            "-e",
-            &format!(
-                "display dialog \"{DIALOG_MARKER}\" default answer \"\" buttons {{\"OK\"}} \
-                 default button 1 giving up after {DIALOG_GIVES_UP}"
-            ),
-        ])
+    let dialog = format!(
+        "display dialog \"{DIALOG_MARKER}\" default answer \"\" buttons {{\"OK\"}} \
+         default button 1 giving up after {DIALOG_GIVES_UP}"
+    );
+    let child = contained_osascript(&dialog)
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .spawn()
         .map_err(|error| DesktopError::input_failed(format!("spawning the canary dialog failed: {error}")))?;
     let delivered = deliver_and_confirm(input, child);
     let focus_restored = restore(input, front.as_ref());
-    let passed = delivered.is_ok() && focus_restored;
-    input.settle_canary(passed);
-    if passed {
-        Ok(CanaryResult { focus_restored: true })
-    } else {
-        let detail = match delivered {
-            Err(error) => format!(" {error}"),
-            Ok(()) => String::new(),
-        };
-        Err(DesktopError::background_unavailable(format!(
-            "{CANARY_STOP_REASON}: the background SPI path did not produce a dialog receipt or \
-             could not restore focus;{detail} retry with delivery:\"foreground\" or use ax actions",
-        )))
+    let (settle, reply) = verdict::verdict(delivered, focus_restored);
+    if let Some(passed) = settle {
+        input.settle_canary(passed);
+    }
+    reply
+}
+
+/// Runs `script` in `osascript` contained to this engine's lifetime, in a
+/// process group of its own led by the shell (see [`CONTAINED_OSASCRIPT`]).
+pub(super) fn contained_osascript(script: &str) -> Command {
+    let mut command = Command::new("/bin/sh");
+    command.args(["-c", CONTAINED_OSASCRIPT, "sh", script]).process_group(0);
+    command
+}
+
+/// Ends the contained dialog, its shell and its watcher together.
+fn kill_group(child: &std::process::Child) {
+    if let Ok(group) = libc::pid_t::try_from(child.id()) {
+        // SAFETY: [FFI] the shell is this process's unreaped child and leads
+        // its own group, so the group id cannot have been reused.
+        unsafe { libc::killpg(group, libc::SIGKILL) };
     }
 }
 
@@ -158,7 +178,7 @@ fn deliver_and_confirm(input: &mut MacInput, mut child: std::process::Child) -> 
                 thread::sleep(Duration::from_millis(10));
             }
             Ok(None) => {
-                let _ = child.kill();
+                kill_group(&child);
                 return Err(DesktopError::input_failed(
                     "the canary dialog did not dismiss within the receipt deadline",
                 ));
@@ -280,3 +300,7 @@ fn process_name(pid: libc::pid_t) -> String {
     }
     String::from_utf8_lossy(&buffer[..len as usize]).into_owned()
 }
+
+#[cfg(test)]
+#[path = "canary_containment_tests.rs"]
+mod containment_tests;

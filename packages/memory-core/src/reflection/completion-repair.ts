@@ -19,7 +19,9 @@ export const DROPPED_TRAILER = "Omo-Completion-Dropped"
 
 /** One line a finalizer can put in the run's detail; every path and reason is redacted here, never printed raw. */
 export function describeDroppedEntries(dropped: readonly DroppedEntry[]): string {
-  const items = dropped.map((entry) => `${redactSecretLikeMaterial(entry.path)} (${redactSecretLikeMaterial(entry.reason)})`)
+  const items = dropped.map(
+    (entry) => `${redactSecretLikeMaterial(entry.path)} (${redactSecretLikeMaterial(entry.reason)})`,
+  )
   return `Dropped ${dropped.length} invalid memory entr${dropped.length === 1 ? "y" : "ies"}: ${items.join("; ")}`
 }
 
@@ -42,7 +44,12 @@ function parseTrailerValue(value: string): DroppedEntry | undefined {
  * The dropped entries a previous squash recorded on `tipSha`, when the branch is exactly that one commit on
  * the base; empty otherwise. Lets a second validation of an already-repaired tip report what was dropped.
  */
-export async function readDroppedTrailers(exec: GitExec, dir: string, baseSha: string, tipSha: string): Promise<DroppedEntry[]> {
+export async function readDroppedTrailers(
+  exec: GitExec,
+  dir: string,
+  baseSha: string,
+  tipSha: string,
+): Promise<DroppedEntry[]> {
   const run = literalPathspecRunner(exec, dir)
   const parent = await run(["rev-parse", "--verify", `${tipSha}^`])
   if (parent.code !== 0 || parent.stdout.trim() !== baseSha) return []
@@ -56,7 +63,10 @@ export async function readDroppedTrailers(exec: GitExec, dir: string, baseSha: s
   return entries
 }
 
-export type Run = (argv: readonly string[], env?: Readonly<Record<string, string>>) => Promise<{ code: number; stdout: string; stderr: string; stdoutBytes?: Buffer }>
+export type Run = (
+  argv: readonly string[],
+  env?: Readonly<Record<string, string>>,
+) => Promise<{ code: number; stdout: string; stderr: string; stdoutBytes?: Buffer }>
 
 /**
  * Every git call here that names a note passes the agent-chosen path as a pathspec. GIT_LITERAL_PATHSPECS makes each
@@ -69,7 +79,15 @@ export function literalPathspecRunner(exec: GitExec, dir: string): Run {
       cwd: dir,
       timeoutMs: GIT_TIMEOUT_MS,
       // git refuses literal pathspecs combined with glob/icase ones, so a user's own setting must not fail every drop.
-      env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_LITERAL_PATHSPECS: "1", GIT_GLOB_PATHSPECS: "0", GIT_ICASE_PATHSPECS: "0", GIT_NOGLOB_PATHSPECS: "0", ...env },
+      env: {
+        ...process.env,
+        GIT_TERMINAL_PROMPT: "0",
+        GIT_LITERAL_PATHSPECS: "1",
+        GIT_GLOB_PATHSPECS: "0",
+        GIT_ICASE_PATHSPECS: "0",
+        GIT_NOGLOB_PATHSPECS: "0",
+        ...env,
+      },
     })
 }
 
@@ -84,7 +102,7 @@ async function renameSources(run: Run, baseSha: string, tipSha: string): Promise
   const out = await must(run, ["diff", "--name-status", "-M", "-z", `${baseSha}..${tipSha}`, "--"])
   const parts = out.split("\0")
   const sources = new Map<string, string>()
-  for (let index = 0; index < parts.length; ) {
+  for (let index = 0; index < parts.length;) {
     const status = parts[index] ?? ""
     if (status === "") break
     if (status.startsWith("R") || status.startsWith("C")) {
@@ -137,10 +155,19 @@ export async function squashWithoutPaths(
   if ((await run(["diff", "--cached", "--quiet", baseSha, "--"])).code !== 0) {
     const [name = "reflection", email = "reflection@omo.local", subject = "reflection"] = identity
     // The agent's subject is copied forward, so it gets the same redaction as every other recorded text.
-    const message = [`${redactSecretLikeMaterial(subject)} (kept valid entries)`, "", ...record.map(trailerLine)].join("\n")
+    const message = [`${redactSecretLikeMaterial(subject)} (kept valid entries)`, "", ...record.map(trailerLine)].join(
+      "\n",
+    )
     await must(run, [
-      "-c", `user.name=${name}`, "-c", `user.email=${email}`,
-      "commit", "-q", "--no-verify", "-m", message,
+      "-c",
+      `user.name=${name}`,
+      "-c",
+      `user.email=${email}`,
+      "commit",
+      "-q",
+      "--no-verify",
+      "-m",
+      message,
     ])
   }
   return (await must(run, ["rev-parse", "--verify", "HEAD"])).trim()

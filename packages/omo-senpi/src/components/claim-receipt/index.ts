@@ -1,8 +1,19 @@
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { readAgentEndOutcome } from "../ulw-execute-continuation/agent-end-eligibility"
 import type { ClaimVerdict } from "./match"
-import { type ClaimReceiptRuntimeLoader, claimReceiptRuntimeLoadFailure, loadClaimReceiptRuntime } from "./runtime-loader"
-import { GATE_FLAGS_TAG, gateFlagsBlock, NUDGE_MESSAGE_TYPE, nudgeText, VERDICT_ENTRY_TYPE, type VerdictRecord } from "./verdict"
+import {
+  type ClaimReceiptRuntimeLoader,
+  claimReceiptRuntimeLoadFailure,
+  loadClaimReceiptRuntime,
+} from "./runtime-loader"
+import {
+  GATE_FLAGS_TAG,
+  gateFlagsBlock,
+  NUDGE_MESSAGE_TYPE,
+  nudgeText,
+  VERDICT_ENTRY_TYPE,
+  type VerdictRecord,
+} from "./verdict"
 
 export const CLAIM_RECEIPT_NUDGE_FLAG = "omo-senpi-claim-receipt-nudge"
 
@@ -33,7 +44,13 @@ function callManager(eventCtx: unknown, method: "getSessionId" | "getBranch"): u
 function lastAssistantIndex(branch: readonly unknown[]): number {
   for (let index = branch.length - 1; index >= 0; index -= 1) {
     const entry = branch[index]
-    if (isRecord(entry) && entry["type"] === "message" && isRecord(entry["message"]) && entry["message"]["role"] === "assistant") return index
+    if (
+      isRecord(entry) &&
+      entry["type"] === "message" &&
+      isRecord(entry["message"]) &&
+      entry["message"]["role"] === "assistant"
+    )
+      return index
   }
   return -1
 }
@@ -55,7 +72,8 @@ export function createClaimReceiptComponent(
       pi.registerFlag(CLAIM_RECEIPT_NUDGE_FLAG, {
         type: "boolean",
         default: false,
-        description: "Show the unsupported-claim nudge and pass flagged claims to gate reviewers. Off by default: verdicts are only recorded.",
+        description:
+          "Show the unsupported-claim nudge and pass flagged claims to gate reviewers. Off by default: verdicts are only recorded.",
       })
       const surfaced = (): boolean => ctx.config.getFlag(CLAIM_RECEIPT_NUDGE_FLAG) === true
       let loadFailureReported = false
@@ -98,7 +116,8 @@ export function createClaimReceiptComponent(
         const answerEntry: unknown = branch[answerAt]
         if (!isRecord(answerEntry) || !isRecord(answerEntry["message"])) return undefined
         const content = answerEntry["message"]["content"]
-        if (Array.isArray(content) && content.some((part) => isRecord(part) && part["type"] === "toolCall")) return undefined
+        if (Array.isArray(content) && content.some((part) => isRecord(part) && part["type"] === "toolCall"))
+          return undefined
         // The first sidecar import is a real await: a user message can arrive during it. This answer belongs to the
         // epoch it ended in, so a newer message must neither inherit its flags nor lose its own nudge.
         const epoch = state.epoch
@@ -119,16 +138,32 @@ export function createClaimReceiptComponent(
         if (nudged) state.nudgedEpoch = epoch
         if (current) state.flagged = [...state.flagged, ...flagged].slice(-MAX_GATE_FLAGS)
         const answerEntryId = typeof answerEntry["id"] === "string" ? answerEntry["id"] : ""
-        const record: VerdictRecord = { version: 1, answerEntryId, epoch, flagged: flagged.length > 0, nudged, verdicts }
+        const record: VerdictRecord = {
+          version: 1,
+          answerEntryId,
+          epoch,
+          flagged: flagged.length > 0,
+          nudged,
+          verdicts,
+        }
         const drafts: Rec[] = [{ type: "custom", customType: VERDICT_ENTRY_TYPE, data: record }]
-        if (nudged) drafts.push({ type: "custom_message", customType: NUDGE_MESSAGE_TYPE, content: nudgeText(flagged), display: true, details: { answerEntryId, flagged } })
-        if (flagged.length > 0) ctx.logger.info("omo-senpi claim-receipt flagged unsupported claims", { count: flagged.length, nudged })
+        if (nudged)
+          drafts.push({
+            type: "custom_message",
+            customType: NUDGE_MESSAGE_TYPE,
+            content: nudgeText(flagged),
+            display: true,
+            details: { answerEntryId, flagged },
+          })
+        if (flagged.length > 0)
+          ctx.logger.info("omo-senpi claim-receipt flagged unsupported claims", { count: flagged.length, nudged })
         const existing = Array.isArray(payload["entries"]) ? payload["entries"] : []
         return { entries: [...existing, ...drafts] }
       })
 
       pi.on("tool_call", (payload: unknown, eventCtx: unknown): undefined => {
-        if (!surfaced() || !isRecord(payload) || payload["toolName"] !== "task" || !isRecord(payload["input"])) return undefined
+        if (!surfaced() || !isRecord(payload) || payload["toolName"] !== "task" || !isRecord(payload["input"]))
+          return undefined
         const flagged = sessions.get(keyOf(eventCtx))?.flagged ?? []
         if (flagged.length === 0) return undefined
         const input = payload["input"]

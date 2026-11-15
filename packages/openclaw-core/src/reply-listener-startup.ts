@@ -34,11 +34,7 @@ function isReadyState(
   startupToken: string,
 ): state is ReplyListenerDaemonState {
   return Boolean(
-    state
-      && state.isRunning
-      && state.pid === pid
-      && state.startupToken === startupToken
-      && state.lastPollAt !== null,
+    state && state.isRunning && state.pid === pid && state.startupToken === startupToken && state.lastPollAt !== null,
   )
 }
 

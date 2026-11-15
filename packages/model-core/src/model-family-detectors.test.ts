@@ -141,20 +141,48 @@ describe("model family detectors", () => {
   })
 
   test("#given Kimi K3.1 model ids #then detects K3.1 and leaves K3 alone", () => {
-    for (const id of ["kimi-coding/k3.1-pro", "kimi-for-coding/k3.1-pro-highspeed", "moonshotai/kimi-k3.1-pro", "openrouter/moonshotai/kimi-k3.1-pro-highspeed", "venice/kimi-k3-1-pro", "kimi-for-coding/k3p1", "Kimi K3.1 Pro"]) {
+    for (const id of [
+      "kimi-coding/k3.1-pro",
+      "kimi-for-coding/k3.1-pro-highspeed",
+      "moonshotai/kimi-k3.1-pro",
+      "openrouter/moonshotai/kimi-k3.1-pro-highspeed",
+      "venice/kimi-k3-1-pro",
+      "kimi-for-coding/k3p1",
+      "Kimi K3.1 Pro",
+    ]) {
       expect({ id, k31: isKimiK31Model(id) }).toEqual({ id, k31: true })
     }
-    for (const id of ["opencode-go/kimi-k3", "kimi-coding/k3", "kimi-coding/k3-256k", "moonshotai/kimi-k3-202607", "moonshotai/kimi-k3-128k", "opencode-go/kimi-k2.7"]) {
+    for (const id of [
+      "opencode-go/kimi-k3",
+      "kimi-coding/k3",
+      "kimi-coding/k3-256k",
+      "moonshotai/kimi-k3-202607",
+      "moonshotai/kimi-k3-128k",
+      "opencode-go/kimi-k2.7",
+    ]) {
       expect({ id, k31: isKimiK31Model(id) }).toEqual({ id, k31: false })
     }
   })
 
   test("#given Devin selectors #then only an explicit devin SWE-2 id outside the served lanes is unserved", () => {
     expect(DEVIN_SWE2_SERVED_LANES).toEqual(["swe-2-medium", "swe-2-high", "swe-2-max"])
-    for (const served of ["devin/swe-2-medium", "devin/swe-2-high", "devin/swe-2-max", "Devin/SWE-2-High", "devin/swe-2-high:max", "devin/swe-2-medium (high)"]) {
+    for (const served of [
+      "devin/swe-2-medium",
+      "devin/swe-2-high",
+      "devin/swe-2-max",
+      "Devin/SWE-2-High",
+      "devin/swe-2-high:max",
+      "devin/swe-2-medium (high)",
+    ]) {
       expect(isUnservedDevinSWE2Selector(served)).toBe(false)
     }
-    for (const unserved of ["devin/swe-2", "devin/swe-2-low", "devin/swe-2-high-lite", "devin/swe-2.0", "devin/swe-2-low:high"]) {
+    for (const unserved of [
+      "devin/swe-2",
+      "devin/swe-2-low",
+      "devin/swe-2-high-lite",
+      "devin/swe-2.0",
+      "devin/swe-2-low:high",
+    ]) {
       expect(isUnservedDevinSWE2Selector(unserved)).toBe(true)
     }
     for (const other of ["swe-2-low", "gateway/swe-2-low", "devin/swe-1-6", "devin/swe-20", "devin/adaptive"]) {

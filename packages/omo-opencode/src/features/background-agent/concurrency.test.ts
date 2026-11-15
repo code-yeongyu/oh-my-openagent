@@ -6,7 +6,7 @@ describe("ConcurrencyManager.getConcurrencyLimit", () => {
   test("should return model-specific limit when modelConcurrency is set", () => {
     // given
     const config: BackgroundTaskConfig = {
-      modelConcurrency: { "anthropic/claude-sonnet-4-6": 5 }
+      modelConcurrency: { "anthropic/claude-sonnet-4-6": 5 },
     }
     const manager = new ConcurrencyManager(config)
 
@@ -20,7 +20,7 @@ describe("ConcurrencyManager.getConcurrencyLimit", () => {
   test("should return provider limit when providerConcurrency is set for model provider", () => {
     // given
     const config: BackgroundTaskConfig = {
-      providerConcurrency: { anthropic: 3 }
+      providerConcurrency: { anthropic: 3 },
     }
     const manager = new ConcurrencyManager(config)
 
@@ -35,7 +35,7 @@ describe("ConcurrencyManager.getConcurrencyLimit", () => {
     // given
     const config: BackgroundTaskConfig = {
       modelConcurrency: { "google/gemini-3.1-pro": 5 },
-      providerConcurrency: { anthropic: 3 }
+      providerConcurrency: { anthropic: 3 },
     }
     const manager = new ConcurrencyManager(config)
 
@@ -49,7 +49,7 @@ describe("ConcurrencyManager.getConcurrencyLimit", () => {
   test("should return default limit when defaultConcurrency is set", () => {
     // given
     const config: BackgroundTaskConfig = {
-      defaultConcurrency: 2
+      defaultConcurrency: 2,
     }
     const manager = new ConcurrencyManager(config)
 
@@ -88,7 +88,7 @@ describe("ConcurrencyManager.getConcurrencyLimit", () => {
     const config: BackgroundTaskConfig = {
       modelConcurrency: { "anthropic/claude-sonnet-4-6": 10 },
       providerConcurrency: { anthropic: 5 },
-      defaultConcurrency: 2
+      defaultConcurrency: 2,
     }
     const manager = new ConcurrencyManager(config)
 
@@ -106,7 +106,7 @@ describe("ConcurrencyManager.getConcurrencyLimit", () => {
   test("should handle models without provider part", () => {
     // given
     const config: BackgroundTaskConfig = {
-      providerConcurrency: { "custom-model": 4 }
+      providerConcurrency: { "custom-model": 4 },
     }
     const manager = new ConcurrencyManager(config)
 
@@ -132,7 +132,7 @@ describe("ConcurrencyManager.getConcurrencyLimit", () => {
   test("should return Infinity when providerConcurrency is 0", () => {
     // given
     const config: BackgroundTaskConfig = {
-      providerConcurrency: { anthropic: 0 }
+      providerConcurrency: { anthropic: 0 },
     }
     const manager = new ConcurrencyManager(config)
 
@@ -146,7 +146,7 @@ describe("ConcurrencyManager.getConcurrencyLimit", () => {
   test("should return Infinity when modelConcurrency is 0", () => {
     // given
     const config: BackgroundTaskConfig = {
-      modelConcurrency: { "anthropic/claude-sonnet-4-6": 0 }
+      modelConcurrency: { "anthropic/claude-sonnet-4-6": 0 },
     }
     const manager = new ConcurrencyManager(config)
 
@@ -162,7 +162,7 @@ describe("ConcurrencyManager.getConcurrencyKey", () => {
   test("should use provider key when provider concurrency is configured", () => {
     // given
     const config: BackgroundTaskConfig = {
-      providerConcurrency: { anthropic: 1 }
+      providerConcurrency: { anthropic: 1 },
     }
     const manager = new ConcurrencyManager(config)
 
@@ -179,7 +179,7 @@ describe("ConcurrencyManager.getConcurrencyKey", () => {
     // given
     const config: BackgroundTaskConfig = {
       modelConcurrency: { "anthropic/claude-sonnet-4-6": 1 },
-      providerConcurrency: { anthropic: 1 }
+      providerConcurrency: { anthropic: 1 },
     }
     const manager = new ConcurrencyManager(config)
 
@@ -247,7 +247,9 @@ describe("ConcurrencyManager.acquire/release", () => {
 
     // when
     let resolved = false
-    const waitPromise = manager.acquire("model-a").then(() => { resolved = true })
+    const waitPromise = manager.acquire("model-a").then(() => {
+      resolved = true
+    })
 
     // Give microtask queue a chance to run
     await Promise.resolve()
@@ -271,9 +273,15 @@ describe("ConcurrencyManager.acquire/release", () => {
 
     // when
     const order: string[] = []
-    const task1 = manager.acquire("model-a").then(() => { order.push("1") })
-    const task2 = manager.acquire("model-a").then(() => { order.push("2") })
-    const task3 = manager.acquire("model-a").then(() => { order.push("3") })
+    const task1 = manager.acquire("model-a").then(() => {
+      order.push("1")
+    })
+    const task2 = manager.acquire("model-a").then(() => {
+      order.push("2")
+    })
+    const task3 = manager.acquire("model-a").then(() => {
+      order.push("3")
+    })
 
     // Give microtask queue a chance to run
     await Promise.resolve()
@@ -304,7 +312,7 @@ describe("ConcurrencyManager.acquire/release", () => {
     // when - acquire different model
     const resolved = await Promise.race([
       manager.acquire("model-b").then(() => "resolved"),
-      Promise.resolve("timeout").then(() => "timeout")
+      Promise.resolve("timeout").then(() => "timeout"),
     ])
 
     // then - different model should resolve immediately
@@ -340,14 +348,14 @@ describe("ConcurrencyManager.acquire/release", () => {
   test("should handle release when no prior acquire", () => {
     // given - default config
 
-     // when - release without acquire
-     manager.release("model-a")
+    // when - release without acquire
+    manager.release("model-a")
 
-     // then - count should be 0 (no negative count)
-     expect(manager.getCount("model-a")).toBe(0)
-   })
+    // then - count should be 0 (no negative count)
+    expect(manager.getCount("model-a")).toBe(0)
+  })
 
-   test("should handle multiple acquires and releases correctly", async () => {
+  test("should handle multiple acquires and releases correctly", async () => {
     // given
     const config: BackgroundTaskConfig = { defaultConcurrency: 3 }
     manager = new ConcurrencyManager(config)
@@ -362,18 +370,18 @@ describe("ConcurrencyManager.acquire/release", () => {
     manager.release("model-a")
     manager.release("model-a")
 
-     // Should be able to acquire again
-     await manager.acquire("model-a")
+    // Should be able to acquire again
+    await manager.acquire("model-a")
 
-     // then - count should be 1 after re-acquiring
-     expect(manager.getCount("model-a")).toBe(1)
+    // then - count should be 1 after re-acquiring
+    expect(manager.getCount("model-a")).toBe(1)
   })
 
   test("should use model-specific limit for acquire", async () => {
     // given
     const config: BackgroundTaskConfig = {
       modelConcurrency: { "anthropic/claude-sonnet-4-6": 2 },
-      defaultConcurrency: 5
+      defaultConcurrency: 5,
     }
     manager = new ConcurrencyManager(config)
     await manager.acquire("anthropic/claude-sonnet-4-6")
@@ -381,7 +389,9 @@ describe("ConcurrencyManager.acquire/release", () => {
 
     // when
     let resolved = false
-    const waitPromise = manager.acquire("anthropic/claude-sonnet-4-6").then(() => { resolved = true })
+    const waitPromise = manager.acquire("anthropic/claude-sonnet-4-6").then(() => {
+      resolved = true
+    })
 
     // Give microtask queue a chance to run
     await Promise.resolve()
@@ -393,7 +403,6 @@ describe("ConcurrencyManager.acquire/release", () => {
     manager.release("anthropic/claude-sonnet-4-6")
     await waitPromise
   })
-
 })
 
 describe("ConcurrencyManager.cleanup", () => {
@@ -463,8 +472,8 @@ describe("ConcurrencyManager.cleanup", () => {
 
     // Queue waiters
     const errors: Error[] = []
-    const p1 = manager.acquire("model-a").catch(e => errors.push(e))
-    const p2 = manager.acquire("model-a").catch(e => errors.push(e))
+    const p1 = manager.acquire("model-a").catch((e) => errors.push(e))
+    const p2 = manager.acquire("model-a").catch((e) => errors.push(e))
 
     // when
     manager.cancelWaiters("model-a")
@@ -483,8 +492,8 @@ describe("ConcurrencyManager.cleanup", () => {
     await manager.acquire("model-b")
 
     const errors: Error[] = []
-    const p1 = manager.acquire("model-a").catch(e => errors.push(e))
-    const p2 = manager.acquire("model-b").catch(e => errors.push(e))
+    const p1 = manager.acquire("model-a").catch((e) => errors.push(e))
+    const p2 = manager.acquire("model-b").catch((e) => errors.push(e))
 
     // when
     manager.clear()

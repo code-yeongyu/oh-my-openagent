@@ -16,13 +16,17 @@ test("#given a held lock #when it is handed to a live child and restored #then t
   const child = spawnChild()
 
   // when
-  const observed = await withLock(lockPath, async (lease) => {
-    const original = await readFile(lockPath, "utf8")
-    await lease.handOver(child.pid)
-    const handed = await readFile(lockPath, "utf8")
-    await lease.restore()
-    return { original, handed, restored: await readFile(lockPath, "utf8") }
-  }, { staleAfterMs: Number.POSITIVE_INFINITY })
+  const observed = await withLock(
+    lockPath,
+    async (lease) => {
+      const original = await readFile(lockPath, "utf8")
+      await lease.handOver(child.pid)
+      const handed = await readFile(lockPath, "utf8")
+      await lease.restore()
+      return { original, handed, restored: await readFile(lockPath, "utf8") }
+    },
+    { staleAfterMs: Number.POSITIVE_INFINITY },
+  )
 
   // then
   const lines = observed.handed.split("\n").filter((line) => line.length > 0)
@@ -43,10 +47,14 @@ test("#given a lock handed to a live child #when the child's pid is reused by an
   const child = spawnChild()
 
   try {
-    const handed = await withLock(lockPath, async (lease) => {
-      await lease.handOver(child.pid)
-      return await readFile(lockPath, "utf8")
-    }, { staleAfterMs: Number.POSITIVE_INFINITY })
+    const handed = await withLock(
+      lockPath,
+      async (lease) => {
+        await lease.handOver(child.pid)
+        return await readFile(lockPath, "utf8")
+      },
+      { staleAfterMs: Number.POSITIVE_INFINITY },
+    )
     const lines = handed.split("\n").filter((line) => line.length > 0)
     const liveStart = await getProcessStartIdentity(child.pid)
     expect(liveStart).not.toBeNull()
@@ -77,19 +85,26 @@ test("#given a lock handed to a live child #when anyone tries to take or reap it
   let contenders: Promise<number[]> = Promise.resolve([])
 
   // when
-  const during = await withLock(lockPath, async (lease) => {
-    contenders = runLockContenders(root, lockPath, logPath, 2, 3).then((codes) => codes.map((code) => code ?? -1))
-    await lease.handOver(child.pid)
-    await appendFile(logPath, "handover\n")
-    const checks = {
-      stale: await detectStaleLock(lockPath, 0),
-      reaped: await reapStaleLock(lockPath, 0),
-      published: await publishLockRecord(lockPath, `contender ${crypto.randomUUID()}\n${process.pid}\n${Date.now()}\nx\n`),
-    }
-    await lease.restore()
-    await appendFile(logPath, "release\n")
-    return checks
-  }, { staleAfterMs: Number.POSITIVE_INFINITY })
+  const during = await withLock(
+    lockPath,
+    async (lease) => {
+      contenders = runLockContenders(root, lockPath, logPath, 2, 3).then((codes) => codes.map((code) => code ?? -1))
+      await lease.handOver(child.pid)
+      await appendFile(logPath, "handover\n")
+      const checks = {
+        stale: await detectStaleLock(lockPath, 0),
+        reaped: await reapStaleLock(lockPath, 0),
+        published: await publishLockRecord(
+          lockPath,
+          `contender ${crypto.randomUUID()}\n${process.pid}\n${Date.now()}\nx\n`,
+        ),
+      }
+      await lease.restore()
+      await appendFile(logPath, "release\n")
+      return checks
+    },
+    { staleAfterMs: Number.POSITIVE_INFINITY },
+  )
 
   // then
   expect(during).toEqual({ stale: false, reaped: "changed", published: false })
@@ -111,11 +126,15 @@ test("#given a lock handed to a child #when the record changes before restore #t
   const foreign = `other ${crypto.randomUUID()}\n${child.pid}\n${Date.now()}\n${crypto.randomUUID()}\n`
 
   // when
-  const outcome = withLock(lockPath, async (lease) => {
-    await lease.handOver(child.pid)
-    await writeFile(lockPath, foreign)
-    await lease.restore()
-  }, { staleAfterMs: Number.POSITIVE_INFINITY })
+  const outcome = withLock(
+    lockPath,
+    async (lease) => {
+      await lease.handOver(child.pid)
+      await writeFile(lockPath, foreign)
+      await lease.restore()
+    },
+    { staleAfterMs: Number.POSITIVE_INFINITY },
+  )
 
   // then
   await expect(outcome).rejects.toBeInstanceOf(LockLeaseLostError)
@@ -132,9 +151,13 @@ test("#given a client that never restores #when its child is still alive and the
   const child = spawnChild()
 
   // when
-  await withLock(lockPath, async (lease) => {
-    await lease.handOver(child.pid)
-  }, { staleAfterMs: Number.POSITIVE_INFINITY })
+  await withLock(
+    lockPath,
+    async (lease) => {
+      await lease.handOver(child.pid)
+    },
+    { staleAfterMs: Number.POSITIVE_INFINITY },
+  )
   const whileAlive = await detectStaleLock(lockPath, Number.POSITIVE_INFINITY)
   child.stdin.end()
   await child.exited

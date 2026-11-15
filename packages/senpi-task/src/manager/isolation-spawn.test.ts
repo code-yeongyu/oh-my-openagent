@@ -61,7 +61,9 @@ describe("isolated child spawn", () => {
     expect(details.isolation?.changes_applied).toBe(true)
     expect(details.isolation?.backend.length).toBeGreaterThan(0)
     expect((details.isolation?.summary_path ?? "").length).toBeGreaterThan(0)
-    expect(completionMessageLines([details]).join("\n")).toContain(`isolation: applied via ${details.isolation?.backend}`)
+    expect(completionMessageLines([details]).join("\n")).toContain(
+      `isolation: applied via ${details.isolation?.backend}`,
+    )
 
     const toolDetails = recordDetails(record, "spawn")
     expect(toolDetails.isolation?.kind).toBe("applied")
@@ -133,7 +135,13 @@ describe("isolated child spawn", () => {
     expect(inherited.kind).toBe("started")
     expect(runner.startedSpecs[0]?.cwd).not.toBe(fixture.repoRoot)
 
-    const overridden = await manager.start({ prompt: "p", parent_session_id: "parent-1", depth: 1, category: "quick", isolated: false })
+    const overridden = await manager.start({
+      prompt: "p",
+      parent_session_id: "parent-1",
+      depth: 1,
+      category: "quick",
+      isolated: false,
+    })
     expect(overridden.kind).toBe("started")
     expect(runner.startedSpecs[1]?.cwd).toBe(fixture.repoRoot)
     if (overridden.kind === "started") expect(manager.get(overridden.task_id)?.isolation).toBeUndefined()

@@ -28,8 +28,13 @@ const isFactElement = (name, attrs) => FACT_TAGS.has(name) && (attrs["data-fact"
 
 /** Each fact span of the markup as {id, start, end, html}, in order; an unclosed one runs to the end. */
 export function factSpans(markup) {
-	const src = String(markup)
-	return elementSpans(src, isFactElement).map(({ start, end, tag }) => ({ id: tag.attrs["data-fact"], start, end, html: src.slice(start, end) }))
+  const src = String(markup)
+  return elementSpans(src, isFactElement).map(({ start, end, tag }) => ({
+    id: tag.attrs["data-fact"],
+    start,
+    end,
+    html: src.slice(start, end),
+  }))
 }
 
 /**
@@ -38,57 +43,62 @@ export function factSpans(markup) {
  * with the markup rules; no second tag-stripping regex.
  */
 export function textOf(html) {
-	return decodeEntities(markupParts(html).text.join(" ")).replace(/\s+/g, " ")
+  return decodeEntities(markupParts(html).text.join(" ")).replace(/\s+/g, " ")
 }
 
 /** The protected projection of (already visible) markup; see the header. */
 export function project(markup) {
-	const facts = []
-	let visible = ""
-	let masked = ""
-	let at = 0
-	for (const span of factSpans(markup)) {
-		const outside = textOf(markup.slice(at, span.start))
-		facts.push({ id: span.id, html: span.html.replace(/\s+/g, " ") })
-		visible += `${outside}${textOf(span.html)}`
-		masked += `${outside} ${SLOT} `
-		at = span.end
-	}
-	const rest = textOf(markup.slice(at))
-	const links = tagAttributes(markup).flatMap(({ attrs }) =>
-		POLISH_LINK_ATTRIBUTES.filter((name) => Object.hasOwn(attrs, name)).map((name) => `${name}=${attrs[name]}`),
-	)
-	return { facts, visible: (visible + rest).replace(/\s+/g, " ").trim(), masked: (masked + rest).replace(/\s+/g, " ").trim(), links }
+  const facts = []
+  let visible = ""
+  let masked = ""
+  let at = 0
+  for (const span of factSpans(markup)) {
+    const outside = textOf(markup.slice(at, span.start))
+    facts.push({ id: span.id, html: span.html.replace(/\s+/g, " ") })
+    visible += `${outside}${textOf(span.html)}`
+    masked += `${outside} ${SLOT} `
+    at = span.end
+  }
+  const rest = textOf(markup.slice(at))
+  const links = tagAttributes(markup).flatMap(({ attrs }) =>
+    POLISH_LINK_ATTRIBUTES.filter((name) => Object.hasOwn(attrs, name)).map((name) => `${name}=${attrs[name]}`),
+  )
+  return {
+    facts,
+    visible: (visible + rest).replace(/\s+/g, " ").trim(),
+    masked: (masked + rest).replace(/\s+/g, " ").trim(),
+    links,
+  }
 }
 
 const unitKey = (raw) => (raw === null ? "" : (normalizeUnit(raw) ?? raw.toLowerCase()))
 
 /** Ordered numeral keys: a parsed quantity as "value unit" (once), any other digit run as written. */
 export function numeralKeys(text) {
-	const quantities = []
-	for (let found = parseNumeral(text); found !== null; found = parseNumeral(text, found.span[1])) quantities.push(found)
-	const keys = []
-	let k = 0
-	for (const match of text.matchAll(POLISH_DIGITS)) {
-		while (k < quantities.length && quantities[k].span[1] <= match.index) k++
-		const quantity = quantities[k]
-		if (!quantity || quantity.span[0] > match.index) keys.push(match[0])
-		else if (!quantity.counted) {
-			quantity.counted = true
-			keys.push(`${quantity.value}${quantity.range ? `~${quantity.valueEnd}` : ""} ${unitKey(quantity.unitRaw)}`.trim())
-		}
-	}
-	return keys
+  const quantities = []
+  for (let found = parseNumeral(text); found !== null; found = parseNumeral(text, found.span[1])) quantities.push(found)
+  const keys = []
+  let k = 0
+  for (const match of text.matchAll(POLISH_DIGITS)) {
+    while (k < quantities.length && quantities[k].span[1] <= match.index) k++
+    const quantity = quantities[k]
+    if (!quantity || quantity.span[0] > match.index) keys.push(match[0])
+    else if (!quantity.counted) {
+      quantity.counted = true
+      keys.push(`${quantity.value}${quantity.range ? `~${quantity.valueEnd}` : ""} ${unitKey(quantity.unitRaw)}`.trim())
+    }
+  }
+  return keys
 }
 
 /** term -> occurrence count of each listed term in the text (guard mode of the lexical engine). */
 export function termCounts(text, terms = guardedTerms()) {
-	const counts = new Map()
-	for (const term of terms) {
-		const n = [...text.matchAll(lexicalPattern(term, "guard"))].length
-		if (n > 0) counts.set(term, n)
-	}
-	return counts
+  const counts = new Map()
+  for (const term of terms) {
+    const n = [...text.matchAll(lexicalPattern(term, "guard"))].length
+    if (n > 0) counts.set(term, n)
+  }
+  return counts
 }
 
 const add = (into, term, n) => into.set(term, (into.get(term) ?? 0) + n)
@@ -100,26 +110,26 @@ const add = (into, term, n) => into.set(term, (into.get(term) ?? 0) + n)
  * qualifier forms name. A ledger term the sentence never held is never required.
  */
 export function requiredTerms(projection, rows) {
-	const required = new Map()
-	let cursor = 0
-	for (const { text } of splitSentences(projection.masked)) {
-		const slots = text.split(SLOT).length - 1
-		const facts = projection.facts.slice(cursor, cursor + slots)
-		cursor += slots
-		const present = termCounts(text)
-		const sourced = new Set()
-		for (const { id } of facts) {
-			const row = rows.get(id)
-			for (const term of termCounts(row?.quote ?? "", HEDGES).keys()) sourced.add(term)
-			for (const form of QUALIFIER_FORMS[row?.qualifier] ?? []) sourced.add(form)
-		}
-		for (const [term, n] of present) if (slots === 0 || sourced.has(term)) add(required, term, n)
-	}
-	return required
+  const required = new Map()
+  let cursor = 0
+  for (const { text } of splitSentences(projection.masked)) {
+    const slots = text.split(SLOT).length - 1
+    const facts = projection.facts.slice(cursor, cursor + slots)
+    cursor += slots
+    const present = termCounts(text)
+    const sourced = new Set()
+    for (const { id } of facts) {
+      const row = rows.get(id)
+      for (const term of termCounts(row?.quote ?? "", HEDGES).keys()) sourced.add(term)
+      for (const form of QUALIFIER_FORMS[row?.qualifier] ?? []) sourced.add(form)
+    }
+    for (const [term, n] of present) if (slots === 0 || sourced.has(term)) add(required, term, n)
+  }
+  return required
 }
 
 /** Required terms the text no longer holds as many times, as "term" names. */
 export function missingTerms(required, text) {
-	const have = termCounts(text, [...required.keys()])
-	return [...required].filter(([term, n]) => (have.get(term) ?? 0) < n).map(([term]) => term)
+  const have = termCounts(text, [...required.keys()])
+  return [...required].filter(([term, n]) => (have.get(term) ?? 0) < n).map(([term]) => term)
 }

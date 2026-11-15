@@ -1,0 +1,338 @@
+{
+  "description": "the --mcp stdio server over the same daemon (no session flags): initialize, then tools/call results; null inputs are a text block 'null', objects add structuredContent, an engine error is isError with the engine error object as text, host-only tools do not exist.",
+  "transport": "mcp",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
+  "env": {
+    "OMO_COMPUTER_FAKE_STOP_PATH": "live"
+  },
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "method": "initialize",
+        "params": {
+          "protocolVersion": "2025-06-18",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "v1-consumer",
+            "version": "0"
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 0,
+            "result": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {
+                "tools": {
+                  "listChanged": false
+                }
+              },
+              "serverInfo": {
+                "name": "omo-computer-engine",
+                "version": "0.0.0"
+              }
+            }
+          },
+          "variable": [
+            "/result/serverInfo/version"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "expect": []
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {
+          "name": "desktop_capture",
+          "arguments": {
+            "target": "101",
+            "caps": {
+              "maxWidth": 64
+            }
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "content": [
+                {
+                  "type": "image",
+                  "data": "png-bytes",
+                  "mimeType": "image/png"
+                },
+                {
+                  "type": "text",
+                  "text": "{\"mode\":\"inline-png\",\"mimeType\":\"image/png\",\"artifactPath\":null,\"width\":64,\"height\":48,\"sourceWidth\":800,\"sourceHeight\":600,\"coordinateWidth\":64,\"coordinateHeight\":48,\"region\":null,\"scale\":0.08,\"target\":\"101\",\"frameId\":\"frame-1\",\"note\":null}"
+                }
+              ],
+              "structuredContent": {
+                "mode": "inline-png",
+                "mimeType": "image/png",
+                "artifactPath": null,
+                "width": 64,
+                "height": 48,
+                "sourceWidth": 800,
+                "sourceHeight": 600,
+                "coordinateWidth": 64,
+                "coordinateHeight": 48,
+                "region": null,
+                "scale": 0.08,
+                "target": "101",
+                "frameId": "frame-1",
+                "note": null
+              }
+            }
+          },
+          "variable": [
+            "/result/content/0/data"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/call",
+        "params": {
+          "name": "desktop_click",
+          "arguments": {
+            "target": "101",
+            "x": 10,
+            "y": 10
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "null"
+                }
+              ]
+            }
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "tools/call",
+        "params": {
+          "name": "desktop_typeText",
+          "arguments": {
+            "target": "101",
+            "text": "hello"
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "null"
+                }
+              ]
+            }
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "tools/call",
+        "params": {
+          "name": "desktop_keyChord",
+          "arguments": {
+            "target": "101",
+            "keys": [
+              "cmd",
+              "q"
+            ]
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "null"
+                }
+              ]
+            }
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "tools/call",
+        "params": {
+          "name": "desktop_ax_snapshot",
+          "arguments": {
+            "target": "101"
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"text\":\"- window \\\"Untitled - Notes\\\" [ref=e1] app=Notes (focused)\\n  - textarea [ref=e2] (focused)\\n  - button \\\"Save\\\" [ref=e3]\",\"nodeCount\":3,\"truncated\":false}"
+                }
+              ],
+              "structuredContent": {
+                "text": "- window \"Untitled - Notes\" [ref=e1] app=Notes (focused)\n  - textarea [ref=e2] (focused)\n  - button \"Save\" [ref=e3]",
+                "nodeCount": 3,
+                "truncated": false
+              }
+            }
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "method": "tools/call",
+        "params": {
+          "name": "desktop_ax_node",
+          "arguments": {
+            "ref": "e9999"
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"code\":-32008,\"message\":\"e9999 expired; re-run ax()/find()\",\"data\":{\"code\":\"StaleRef\",\"hint\":null}}"
+                }
+              ],
+              "isError": true
+            }
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "method": "tools/call",
+        "params": {
+          "name": "desktop_session_open",
+          "arguments": {}
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 7,
+            "error": {
+              "code": -32602,
+              "message": "unknown tool: desktop_session_open"
+            }
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 8,
+        "method": "tools/call",
+        "params": {
+          "name": "desktop_stop",
+          "arguments": {}
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 8,
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"suspended\":true,\"globalLive\":true,\"hostRelayLive\":true,\"heartbeatFresh\":true,\"stopPath\":\"global\",\"reason\":null}"
+                }
+              ],
+              "structuredContent": {
+                "suspended": true,
+                "globalLive": true,
+                "hostRelayLive": true,
+                "heartbeatFresh": true,
+                "stopPath": "global",
+                "reason": null
+              }
+            }
+          },
+          "variable": [
+            "/result/content/0/text",
+            "/result/structuredContent/heartbeatFresh",
+            "/result/structuredContent/reason"
+          ]
+        }
+      ]
+    }
+  ]
+}

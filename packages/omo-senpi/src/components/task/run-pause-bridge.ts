@@ -76,7 +76,8 @@ export class EngineRunPauseBridge {
     const inFlight = this.#resumes.get(parentSessionId)
     if (inFlight?.seq === record.pauseSeq && !inFlight.settled) return Promise.resolve()
     const state = this.native.getPauseState()
-    if (state === undefined || state.pauseSeq < record.pauseSeq || readEngineRunHold(state).stopped) return Promise.resolve()
+    if (state === undefined || state.pauseSeq < record.pauseSeq || readEngineRunHold(state).stopped)
+      return Promise.resolve()
     return this.#resume(parentSessionId, record.pauseSeq)
   }
 
@@ -86,7 +87,9 @@ export class EngineRunPauseBridge {
     const pending = this.controller.pause(parentSessionId, pauseSeq)
     const entry = { seq: pauseSeq, pending }
     this.#pauses.set(parentSessionId, entry)
-    void pending.catch(() => { if (this.#pauses.get(parentSessionId) === entry) this.#pauses.delete(parentSessionId) })
+    void pending.catch(() => {
+      if (this.#pauses.get(parentSessionId) === entry) this.#pauses.delete(parentSessionId)
+    })
     // Keep the fulfilled propagation promise until the next Stop so a Resume racing
     // the final acknowledgement observes the same completed transaction.
     return pending
@@ -99,10 +102,15 @@ export class EngineRunPauseBridge {
     const pending = this.#resumeAfterPropagation(parentSessionId, pauseSeq)
     const entry = { seq: pauseSeq, pending, settled: false }
     this.#resumes.set(parentSessionId, entry)
-    void pending.then(() => { entry.settled = true }, () => {
-      entry.settled = true
-      if (this.#resumes.get(parentSessionId) === entry) this.#resumes.delete(parentSessionId)
-    })
+    void pending.then(
+      () => {
+        entry.settled = true
+      },
+      () => {
+        entry.settled = true
+        if (this.#resumes.get(parentSessionId) === entry) this.#resumes.delete(parentSessionId)
+      },
+    )
     return pending
   }
 
@@ -121,17 +129,27 @@ export class EngineRunPauseBridge {
     const resumeId = record.resume?.resumeId ?? `parent-resume:${pauseSeq}`
     const installed = await this.controller.resume(parentSessionId, pauseSeq, resumeId)
     if (installed.failures !== undefined) {
-      log("[omo-senpi] run resume left participants outside the run", { parentSessionId, pauseSeq, failures: installed.failures })
+      log("[omo-senpi] run resume left participants outside the run", {
+        parentSessionId,
+        pauseSeq,
+        failures: installed.failures,
+      })
     }
     if (installed.kind === "installed" && this.controller.released(parentSessionId, pauseSeq, resumeId)) {
       await this.afterReleased?.(parentSessionId)
       // Backgrounded: the hold-change handler must not wait out the retry schedule.
       if (this.lostRecovery !== undefined && this.controller.hasLost(parentSessionId, pauseSeq)) {
         const recovery = this.#recoverLost(parentSessionId, pauseSeq, this.lostRecovery).catch((error: unknown) => {
-          log("[omo-senpi] run resume lost-participant recovery failed", { parentSessionId, pauseSeq, error: String(error) })
+          log("[omo-senpi] run resume lost-participant recovery failed", {
+            parentSessionId,
+            pauseSeq,
+            error: String(error),
+          })
         })
         this.#recoveries.set(parentSessionId, recovery)
-        void recovery.then(() => { if (this.#recoveries.get(parentSessionId) === recovery) this.#recoveries.delete(parentSessionId) })
+        void recovery.then(() => {
+          if (this.#recoveries.get(parentSessionId) === recovery) this.#recoveries.delete(parentSessionId)
+        })
       }
     }
   }
@@ -145,7 +163,8 @@ export class EngineRunPauseBridge {
     }
     await this.#serialized(parentSessionId, async () => {
       const failures = await this.controller.endLost(parentSessionId, pauseSeq)
-      if (failures.length > 0) log("[omo-senpi] run resume could not end lost participants", { parentSessionId, pauseSeq, failures })
+      if (failures.length > 0)
+        log("[omo-senpi] run resume could not end lost participants", { parentSessionId, pauseSeq, failures })
     })
   }
 
@@ -157,7 +176,8 @@ export class EngineRunPauseBridge {
   #retryLost(parentSessionId: string, pauseSeq: number): Promise<void> {
     return this.#serialized(parentSessionId, async () => {
       const failures = await this.controller.retryLost(parentSessionId, pauseSeq)
-      if (failures.length > 0) log("[omo-senpi] run resume retry left participants outside the run", { parentSessionId, pauseSeq, failures })
+      if (failures.length > 0)
+        log("[omo-senpi] run resume retry left participants outside the run", { parentSessionId, pauseSeq, failures })
     })
   }
 
@@ -167,16 +187,34 @@ export class EngineRunPauseBridge {
     const next = previous.then(work)
     const settled = next.catch(() => undefined)
     this.#retries.set(parentSessionId, settled)
-    void settled.then(() => { if (this.#retries.get(parentSessionId) === settled) this.#retries.delete(parentSessionId) })
+    void settled.then(() => {
+      if (this.#retries.get(parentSessionId) === settled) this.#retries.delete(parentSessionId)
+    })
     return next
   }
 }
 
 export function isRunHoldChange(value: unknown): value is RunHoldChange {
   if (typeof value !== "object" || value === null) return false
-  if (!("pauseSeq" in value) || !Number.isSafeInteger(value.pauseSeq) || typeof value.pauseSeq !== "number" || value.pauseSeq < 1) return false
+  if (
+    !("pauseSeq" in value) ||
+    !Number.isSafeInteger(value.pauseSeq) ||
+    typeof value.pauseSeq !== "number" ||
+    value.pauseSeq < 1
+  )
+    return false
   if (!("change" in value) || (value.change !== "paused" && value.change !== "resumed")) return false
-  return "holds" in value && Array.isArray(value.holds) && value.holds.every(hold =>
-    typeof hold === "object" && hold !== null && "kind" in hold && typeof hold.kind === "string"
-    && "key" in hold && typeof hold.key === "string")
+  return (
+    "holds" in value &&
+    Array.isArray(value.holds) &&
+    value.holds.every(
+      (hold) =>
+        typeof hold === "object" &&
+        hold !== null &&
+        "kind" in hold &&
+        typeof hold.kind === "string" &&
+        "key" in hold &&
+        typeof hold.key === "string",
+    )
+  )
 }

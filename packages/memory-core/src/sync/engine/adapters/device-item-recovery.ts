@@ -154,7 +154,9 @@ export function createItemRecovery(state: ItemStoreState) {
     // The receipt of the capture that produced these ops, found by its span (a revive's sits at the dead
     // doc's frontier, not the baseline's); receiptLanded checks its capture id on the change at that start.
     const receipts = await readReceipts(device().stateDir, key)
-    const receipt = receipts.find((r) => r.span !== null && r.span.peer === peer && r.span.start === start && receiptLanded(doc, r))
+    const receipt = receipts.find(
+      (r) => r.span !== null && r.span.peer === peer && r.span.start === start && receiptLanded(doc, r),
+    )
     if (receipt !== undefined) await materialize(key, receipt.text)
     else if (revivedText !== undefined) await materialize(key, revivedText)
     else state.log?.(`sync.item.adopted-unreceipted len=${keyLength(key)}`)

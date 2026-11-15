@@ -47,9 +47,7 @@ const defaultPluginComponentLoadDeps: PluginComponentLoadDeps = {
   loadPluginHooksConfigs,
 }
 
-function clonePluginComponentsResult(
-  result: PluginComponentsResult,
-): PluginComponentsResult {
+function clonePluginComponentsResult(result: PluginComponentsResult): PluginComponentsResult {
   return structuredClone(result)
 }
 
@@ -60,8 +58,9 @@ function isClaudeCodePluginsDisabled(): boolean {
 }
 
 function getPluginComponentsCacheKey(options?: PluginLoaderOptions): string {
-  const overrideEntries = Object.entries(options?.enabledPluginsOverride ?? {})
-    .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+  const overrideEntries = Object.entries(options?.enabledPluginsOverride ?? {}).sort(([leftKey], [rightKey]) =>
+    leftKey.localeCompare(rightKey),
+  )
 
   return JSON.stringify({
     enabledPluginsOverride: overrideEntries,
@@ -106,7 +105,9 @@ async function loadAllPluginComponentsInternal(
     Promise.resolve(deps.loadPluginHooksConfigs(plugins)),
   ])
 
-  log(`Loaded ${plugins.length} plugins with ${Object.keys(commands).length} commands, ${Object.keys(skills).length} skills, ${Object.keys(agents).length} agents, ${Object.keys(mcpServers).length} MCP servers`)
+  log(
+    `Loaded ${plugins.length} plugins with ${Object.keys(commands).length} commands, ${Object.keys(skills).length} skills, ${Object.keys(agents).length} agents, ${Object.keys(mcpServers).length} MCP servers`,
+  )
 
   const result = {
     commands,

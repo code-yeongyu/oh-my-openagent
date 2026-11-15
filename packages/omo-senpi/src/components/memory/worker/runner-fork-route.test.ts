@@ -3,9 +3,9 @@ import { describe, expect, test } from "bun:test"
 import { chooseMemoryLaunchRoute, MEMORY_WORKLOAD_PROFILES } from "./fork-cost"
 import { memoryLaunchRouteInput, reflectionPayloadTokens } from "./runner-launch-route"
 
-const KIMI = { input: 0.60, cacheRead: 0.15, output: 2.50 }
-const LUNA = { input: 0.25, cacheRead: 0.025, output: 2.00 }
-const OPUS = { input: 5.00, cacheRead: 0.50, output: 25.0 }
+const KIMI = { input: 0.6, cacheRead: 0.15, output: 2.5 }
+const LUNA = { input: 0.25, cacheRead: 0.025, output: 2.0 }
+const OPUS = { input: 5.0, cacheRead: 0.5, output: 25.0 }
 const PARENT_P50 = 156_872
 
 describe("reflection launch route", () => {
@@ -91,9 +91,9 @@ describe("reflectionPayloadTokens", () => {
     const bytes = Buffer.byteLength(JSON.stringify(entries), "utf8")
 
     // when / then
-    expect(reflectionPayloadTokens([
-      { conversationId: "conversation-a", snapshot: { entries } },
-    ])).toBe(Math.ceil(bytes / 4))
+    expect(reflectionPayloadTokens([{ conversationId: "conversation-a", snapshot: { entries } }])).toBe(
+      Math.ceil(bytes / 4),
+    )
     expect(reflectionPayloadTokens([])).toBe(0)
   })
 })

@@ -10,11 +10,13 @@ export function createPressureDreamAdmission(options: {
 }) {
   const deferred = new Set<string>()
   const request = (sessionId: string): void => {
-    void options.work.track(() => options.request(sessionId)).catch((error: unknown) => {
-      options.logger?.warn("omo-senpi memory pressure dream trigger failed", {
-        error: error instanceof Error ? error.message : String(error),
+    void options.work
+      .track(() => options.request(sessionId))
+      .catch((error: unknown) => {
+        options.logger?.warn("omo-senpi memory pressure dream trigger failed", {
+          error: error instanceof Error ? error.message : String(error),
+        })
       })
-    })
   }
   return {
     reset(sessionId: string): void {

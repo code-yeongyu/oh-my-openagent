@@ -1,0 +1,7274 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "omo-computer engine protocol",
+  "protocolVersion": "1",
+  "abi": "omo-computer/1",
+  "oneshot": {
+    "prefix": "desktop.",
+    "aliases": {
+      "desktop.stop": "stopPath.stop"
+    }
+  },
+  "methods": {
+    "engine.hello": {
+      "effect": "read",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/EmptyParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Hello"
+      }
+    },
+    "session.open": {
+      "effect": "read",
+      "exposure": "hostOnly(session)",
+      "params": {
+        "$ref": "#/$defs/SessionOpenParams"
+      },
+      "result": {
+        "$ref": "#/$defs/SessionOpened"
+      }
+    },
+    "session.close": {
+      "effect": "read",
+      "exposure": "hostOnly(session)",
+      "params": {
+        "$ref": "#/$defs/EmptyParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "capabilities": {
+      "effect": "read",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/EmptyParams"
+      },
+      "result": {
+        "$ref": "#/$defs/CapabilitiesReply"
+      }
+    },
+    "displays": {
+      "effect": "read",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/EmptyParams"
+      },
+      "result": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/DisplayInfo"
+        }
+      }
+    },
+    "windows": {
+      "effect": "read",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/WindowsParams"
+      },
+      "result": {
+        "$ref": "#/$defs/WindowsReply"
+      }
+    },
+    "apps.list": {
+      "effect": "read",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/EmptyParams"
+      },
+      "result": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/AppInfo"
+        }
+      }
+    },
+    "pointer": {
+      "effect": "read",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/EmptyParams"
+      },
+      "result": {
+        "$ref": "#/$defs/PointerPosition"
+      }
+    },
+    "diagnose": {
+      "effect": "read",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/EmptyParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Diagnosis"
+      }
+    },
+    "capture": {
+      "effect": "read",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/CaptureParams"
+      },
+      "result": {
+        "$ref": "#/$defs/CaptureReply"
+      }
+    },
+    "zoom": {
+      "effect": "read",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/ZoomParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Frame"
+      }
+    },
+    "observe": {
+      "effect": "read",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/ObserveParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ObserveReply"
+      }
+    },
+    "ax.snapshot": {
+      "effect": "read",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/AxTargetParams"
+      },
+      "result": {
+        "$ref": "#/$defs/AxSnapshotText"
+      }
+    },
+    "ax.drill": {
+      "effect": "read",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/DrillParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Observation"
+      }
+    },
+    "ax.node": {
+      "effect": "read",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/AxRefParams"
+      },
+      "result": {
+        "$ref": "#/$defs/AxNode"
+      }
+    },
+    "ax.children": {
+      "effect": "read",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/AxRefParams"
+      },
+      "result": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/AxNode"
+        }
+      }
+    },
+    "ax.focused": {
+      "effect": "read",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/EmptyParams"
+      },
+      "result": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/AxNode"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "elementAt": {
+      "effect": "read",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/ElementAtParams"
+      },
+      "result": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/ElementInfo"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "waitFor": {
+      "effect": "read",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/WaitForParams"
+      },
+      "result": {
+        "$ref": "#/$defs/WaitResult"
+      }
+    },
+    "clipboard.read": {
+      "effect": "read",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/EmptyParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ClipboardContent"
+      }
+    },
+    "menu.items": {
+      "effect": "read",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/MenuItemsParams"
+      },
+      "result": {
+        "$ref": "#/$defs/MenuItems"
+      }
+    },
+    "surface": {
+      "effect": "read",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/SurfaceParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Surface"
+      }
+    },
+    "click": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/ClickParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "move": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/MoveParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "mouse.down": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/MouseDownParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "mouse.up": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/MouseUpParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "key.down": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/KeyDownParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "key.up": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/KeyUpParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "drag": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/DragParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "type": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/TypeParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "press": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/PressParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "paste": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/PasteParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "scroll": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/ScrollParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "typeText": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/TypeTextParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "keyChord": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/KeyChordParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "holdKeys": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/HoldKeysParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "holdMouse": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/HoldMouseParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "raiseWindow": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/RaiseWindowParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "ax.setValue": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/AxSetValueParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "ax.perform": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/AxPerformParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "ax.focus": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/AxRefParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "ax.typeText": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/AxTypeTextParams"
+      },
+      "result": {
+        "$ref": "#/$defs/AxTypeTextReply"
+      }
+    },
+    "ax.selectText": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/SelectTextParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "menu.select": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/MenuSelectParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "apps.open": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/AppsOpenParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "apps.quit": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/AppsQuitParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "window.raise": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/WindowParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "window.activate": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/WindowParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "window.setFrame": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/WindowFrameParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "window.minimize": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/WindowParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "window.restore": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/WindowParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "clipboard.write": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/ClipboardWriteParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "openSystemSurface": {
+      "effect": "exec",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/OpenSystemSurfaceParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ExecReply"
+      }
+    },
+    "control.grant": {
+      "effect": "exec",
+      "exposure": "hostOnly(authority)",
+      "params": {
+        "$ref": "#/$defs/ControlGrantParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ControlState"
+      }
+    },
+    "control.revoke": {
+      "effect": "exec",
+      "exposure": "hostOnly(authority)",
+      "params": {
+        "$ref": "#/$defs/EmptyParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "control.acquire": {
+      "effect": "exec",
+      "exposure": "hostOnly(authority)",
+      "params": {
+        "$ref": "#/$defs/EmptyParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ControlState"
+      }
+    },
+    "control.release": {
+      "effect": "read",
+      "exposure": "hostOnly(session)",
+      "params": {
+        "$ref": "#/$defs/EmptyParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "display.release": {
+      "effect": "exec",
+      "exposure": "hostOnly(session)",
+      "params": {
+        "$ref": "#/$defs/EmptyParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "display.resume": {
+      "effect": "exec",
+      "exposure": "hostOnly(session)",
+      "params": {
+        "$ref": "#/$defs/EmptyParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "preview.subscribe": {
+      "effect": "read",
+      "exposure": "hostOnly(session)",
+      "params": {
+        "$ref": "#/$defs/EmptyParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "stopPath.start": {
+      "effect": "exec",
+      "exposure": "hostOnly(authority)",
+      "params": {
+        "$ref": "#/$defs/StopPathStartParams"
+      },
+      "result": {
+        "$ref": "#/$defs/StopPathStatus"
+      }
+    },
+    "stopPath.status": {
+      "effect": "read",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/EmptyParams"
+      },
+      "result": {
+        "$ref": "#/$defs/StopPathStatus"
+      }
+    },
+    "stopPath.heartbeat": {
+      "effect": "read",
+      "exposure": "hostOnly(session)",
+      "params": {
+        "$ref": "#/$defs/EmptyParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "stopPath.stop": {
+      "effect": "read",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/StopPathStopParams"
+      },
+      "result": {
+        "$ref": "#/$defs/StopPathStatus"
+      }
+    },
+    "stopPath.resume": {
+      "effect": "exec",
+      "exposure": "hostOnly(authority)",
+      "params": {
+        "$ref": "#/$defs/StopPathResumeParams"
+      },
+      "result": {
+        "$ref": "#/$defs/StopPathStatus"
+      }
+    },
+    "desktop.shutdown": {
+      "effect": "exec",
+      "exposure": "hostOnly(authority)",
+      "params": {
+        "$ref": "#/$defs/EmptyParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "$/cancel": {
+      "effect": "read",
+      "exposure": "public",
+      "params": {
+        "$ref": "#/$defs/CancelParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "$/test.advanceClock": {
+      "effect": "exec",
+      "exposure": "testOnly",
+      "params": {
+        "$ref": "#/$defs/AdvanceClockParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    }
+  },
+  "notifications": {
+    "audit": {
+      "params": {
+        "$ref": "#/$defs/AuditLine"
+      }
+    },
+    "stopPath.changed": {
+      "params": {
+        "$ref": "#/$defs/StopPathStatus"
+      }
+    },
+    "epoch.changed": {
+      "params": {
+        "$ref": "#/$defs/EpochChanged"
+      }
+    },
+    "control.changed": {
+      "params": {
+        "$ref": "#/$defs/ControlState"
+      }
+    },
+    "preview.frame": {
+      "params": {
+        "$ref": "#/$defs/Frame"
+      }
+    },
+    "hand.status": {
+      "params": {
+        "$ref": "#/$defs/HandStatus"
+      }
+    }
+  },
+  "settings": {
+    "$ref": "#/$defs/Settings"
+  },
+  "settingsTable": [
+    {
+      "key": "enabled",
+      "status": "keep",
+      "reader": "tool registration",
+      "admissionKey": false
+    },
+    {
+      "key": "display",
+      "status": "keep",
+      "reader": "session.open: display selector",
+      "admissionKey": false
+    },
+    {
+      "key": "stop_hotkey",
+      "status": "keep",
+      "reader": "session.open: stop listener chord",
+      "admissionKey": true
+    },
+    {
+      "key": "allow_host_relay_only_stop",
+      "status": "keep",
+      "reader": "session.open: StopPolicy.allowHostRelayOnly",
+      "admissionKey": true
+    },
+    {
+      "key": "audit_log",
+      "status": "keep",
+      "reader": "session audit writer",
+      "admissionKey": false
+    },
+    {
+      "key": "screenshot_gc",
+      "status": "keep",
+      "reader": "artifact GC",
+      "admissionKey": false
+    },
+    {
+      "key": "engine_path",
+      "status": "keep",
+      "reader": "engine locator (acquire source, identity-checked)",
+      "admissionKey": false
+    },
+    {
+      "key": "send_on_enter",
+      "status": "new",
+      "reader": "session.open: send-on-enter composer guard",
+      "admissionKey": true
+    },
+    {
+      "key": "url_policy",
+      "status": "new",
+      "reader": "session.open: Consequential gate URL read",
+      "admissionKey": true
+    },
+    {
+      "key": "run_limits",
+      "status": "new",
+      "reader": "QuickJS run cell ceilings",
+      "admissionKey": false
+    },
+    {
+      "key": "record",
+      "status": "new",
+      "reader": "per-run recording writer",
+      "admissionKey": true
+    },
+    {
+      "key": "pause_ceiling_ms",
+      "status": "new",
+      "reader": "mutate admission: deadline pause",
+      "admissionKey": false
+    },
+    {
+      "key": "display_awake_grace_ms",
+      "status": "new",
+      "reader": "session.open: display-awake hold",
+      "admissionKey": false
+    },
+    {
+      "key": "display_awake_session_cap_ms",
+      "status": "new",
+      "reader": "session.open: display-awake hold",
+      "admissionKey": false
+    },
+    {
+      "key": "x11_keymap_remap",
+      "status": "new",
+      "reader": "session.open: X11 backend keymap remap",
+      "admissionKey": true
+    },
+    {
+      "key": "background_indicator",
+      "status": "new",
+      "reader": "hand host presence surface",
+      "admissionKey": true
+    },
+    {
+      "key": "max_width",
+      "status": "keep",
+      "reader": "capture policy",
+      "admissionKey": false
+    },
+    {
+      "key": "max_height",
+      "status": "keep",
+      "reader": "capture policy",
+      "admissionKey": false
+    },
+    {
+      "key": "screenshot_max_bytes",
+      "status": "keep",
+      "reader": "capture policy",
+      "admissionKey": false
+    },
+    {
+      "key": "cua_adapter",
+      "status": "keep",
+      "reader": "tool registration: CUA adapter",
+      "admissionKey": false
+    },
+    {
+      "key": "default_hand",
+      "status": "new",
+      "reader": "tool dispatcher: hand selector",
+      "admissionKey": false
+    },
+    {
+      "key": "mcp.tier",
+      "status": "new",
+      "reader": "--mcp host adapter consent view",
+      "admissionKey": false
+    },
+    {
+      "key": "intervention",
+      "status": "keep",
+      "reader": "session.open: intervention policy",
+      "admissionKey": true
+    },
+    {
+      "key": "macos_key_priming",
+      "status": "keep",
+      "reader": "session.open: macOS key priming",
+      "admissionKey": false
+    },
+    {
+      "key": "trace",
+      "status": "keep",
+      "reader": "session.open: trace writer",
+      "admissionKey": false
+    },
+    {
+      "key": "remote_commands",
+      "status": "new",
+      "reader": "hand host admission",
+      "admissionKey": true
+    },
+    {
+      "key": "foreground_input_lock",
+      "status": "new",
+      "reader": "presence surface: input lock",
+      "admissionKey": true
+    },
+    {
+      "key": "x11_mpx",
+      "status": "new",
+      "reader": "session.open: X11 MPX route",
+      "admissionKey": true
+    },
+    {
+      "key": "wayland_persist_consent",
+      "status": "new",
+      "reader": "Wayland backend: portal token",
+      "admissionKey": false
+    },
+    {
+      "key": "capture_on_open",
+      "status": "new",
+      "reader": "session.open: Wayland capture open",
+      "admissionKey": false
+    },
+    {
+      "key": "ssh_hosts",
+      "status": "new",
+      "reader": "brain-side SDK: ssh pipe",
+      "admissionKey": false
+    },
+    {
+      "key": "fleet.maxInFlight",
+      "status": "new",
+      "reader": "brain-side SDK: fanout concurrency",
+      "admissionKey": false
+    },
+    {
+      "key": "fleet.frameBytesPerMin",
+      "status": "new",
+      "reader": "brain-side SDK: fanout frame budget",
+      "admissionKey": false
+    },
+    {
+      "key": "fleet.perHandFramesPerSec",
+      "status": "new",
+      "reader": "brain-side SDK: fanout frame rate",
+      "admissionKey": false
+    },
+    {
+      "key": "fleet.maxImagePartsPerResult",
+      "status": "new",
+      "reader": "brain-side SDK: fanout image parts",
+      "admissionKey": false
+    },
+    {
+      "key": "wayland_lease_end_chord",
+      "status": "new",
+      "reader": "session.open: Wayland lease-end chord",
+      "admissionKey": true
+    },
+    {
+      "key": "linux_display_server",
+      "status": "new",
+      "reader": "session.open: Linux backend selection",
+      "admissionKey": false
+    },
+    {
+      "key": "toolkit_routes",
+      "status": "new",
+      "reader": "session.open: route table loader",
+      "admissionKey": true
+    },
+    {
+      "key": "artifact_max_bytes",
+      "status": "new",
+      "reader": "session.open: artifact GC cap",
+      "admissionKey": false
+    },
+    {
+      "key": "artifact_max_files",
+      "status": "new",
+      "reader": "session.open: artifact GC cap",
+      "admissionKey": false
+    },
+    {
+      "key": "artifact_release_after_fetch",
+      "status": "new",
+      "reader": "brain-side SDK: artifact release",
+      "admissionKey": false
+    },
+    {
+      "key": "capture_policy",
+      "status": "new",
+      "reader": "SDK capture policy",
+      "admissionKey": false
+    },
+    {
+      "key": "app_scope",
+      "status": "new",
+      "reader": "session.open: per-app scope",
+      "admissionKey": true
+    },
+    {
+      "key": "preview",
+      "status": "new",
+      "reader": "host preview consumer",
+      "admissionKey": false
+    },
+    {
+      "key": "runtime",
+      "status": "migration-only",
+      "reader": "runtime loader (legacy | v3)",
+      "admissionKey": false
+    },
+    {
+      "key": "operation_timeout_ms",
+      "status": "moved-from-env",
+      "reader": "session.open: operation deadline",
+      "admissionKey": false
+    },
+    {
+      "key": "close_timeout_ms",
+      "status": "moved-from-env",
+      "reader": "session.open: close budget",
+      "admissionKey": false
+    },
+    {
+      "key": "capture_helper_signed",
+      "status": "moved-from-env",
+      "reader": "session.open: macOS capture helper trust",
+      "admissionKey": false
+    }
+  ],
+  "envSeams": [
+    {
+      "name": "OMO_COMPUTER_BACKEND",
+      "phase": "launch",
+      "fakeOnly": false,
+      "purpose": "selects the backend; `fake` admits the fake-only seams"
+    },
+    {
+      "name": "OMO_COMPUTER_FAKE_CLOCK",
+      "phase": "launch",
+      "fakeOnly": true,
+      "purpose": "installs the fake clock"
+    },
+    {
+      "name": "OMO_COMPUTER_FAKE_STOP_PATH",
+      "phase": "launch",
+      "fakeOnly": true,
+      "purpose": "scripts the fake stop listener"
+    },
+    {
+      "name": "OMO_COMPUTER_FAKE_SCENARIO",
+      "phase": "launch",
+      "fakeOnly": true,
+      "purpose": "selects the fake backend's scenario file"
+    },
+    {
+      "name": "OMO_COMPUTER_RUNTIME_DIR",
+      "phase": "launch",
+      "fakeOnly": true,
+      "purpose": "moves the marker and stop files into a test directory"
+    },
+    {
+      "name": "OMO_COMPUTER_DISABLE_SKYLIGHT",
+      "phase": "launch",
+      "fakeOnly": false,
+      "purpose": "turns the macOS SkyLight capture route off"
+    },
+    {
+      "name": "OMO_COMPUTER_UPDATE_SCHEMA",
+      "phase": "test",
+      "fakeOnly": false,
+      "purpose": "rewrites the generated schema and protocol doc"
+    },
+    {
+      "name": "OMO_COMPUTER_CONFORMANCE_DIR",
+      "phase": "test",
+      "fakeOnly": false,
+      "purpose": "points the conformance replay at a fixture directory"
+    },
+    {
+      "name": "OMO_COMPUTER_BUILD_SHA",
+      "phase": "build-time",
+      "fakeOnly": false,
+      "purpose": "the commit the engine was built from"
+    }
+  ],
+  "$defs": {
+    "ActionReport": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "disposition": {
+          "$ref": "#/$defs/Disposition"
+        },
+        "delivered": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Delivered"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "effect": {
+          "$ref": "#/$defs/Effect"
+        },
+        "route": {
+          "$ref": "#/$defs/Route"
+        },
+        "hit": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Hit"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "focusRestoration": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FocusRestoration"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "openedSurfaces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Surface"
+          },
+          "default": []
+        },
+        "nextCall": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "warning": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "auditIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "timings": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Timings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          }
+        },
+        "observation": {
+          "$ref": "#/$defs/UntrustedText",
+          "description": "Required on the wire: a report without `{untrustedText: true}` does not parse."
+        }
+      },
+      "required": [
+        "disposition",
+        "effect",
+        "route",
+        "evidence",
+        "observation"
+      ],
+      "description": "Everything a report says, before validation."
+    },
+    "AdvanceClockParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "ms"
+      ]
+    },
+    "AppInfo": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "appKey": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "pid": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "running": {
+          "type": "boolean"
+        },
+        "source": {
+          "$ref": "#/$defs/AppSource"
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "identity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CodeIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "observation": {
+          "$ref": "#/$defs/UntrustedText"
+        }
+      },
+      "required": [
+        "appKey",
+        "name",
+        "running",
+        "source",
+        "observation"
+      ],
+      "description": "One `apps.list()` record."
+    },
+    "AppScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/AppScopeMode"
+        },
+        "allow": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "denied": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "mode",
+        "allow",
+        "denied"
+      ]
+    },
+    "AppScopeMode": {
+      "type": "string",
+      "enum": [
+        "list",
+        "off"
+      ]
+    },
+    "AppSource": {
+      "type": "string",
+      "enum": [
+        "running",
+        "xdg_entry",
+        "app_paths",
+        "start_menu",
+        "apps_folder",
+        "launch_services"
+      ],
+      "description": "Where an `apps.list()` entry came from on this OS."
+    },
+    "AppsOpenParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "activate": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "reveal": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "observe": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveRequest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target"
+      ]
+    },
+    "AppsQuitParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "force": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target"
+      ]
+    },
+    "AttachVia": {
+      "type": "string",
+      "enum": [
+        "direct",
+        "launcher_proxy"
+      ]
+    },
+    "AuditLine": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "action": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        },
+        "delivery": {
+          "type": "string"
+        },
+        "frameId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "durationMs": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "focusRestored": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "textLength": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "textSha256": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "keys": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "textDelivered": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "action",
+        "target",
+        "delivery",
+        "durationMs"
+      ],
+      "description": "One `audit` line as v1 hosts read it. Text is recorded by length and digest only."
+    },
+    "AuditLog": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
+    },
+    "AuthMessage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "offset": {
+          "type": "integer",
+          "format": "uint8",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "sentinelAt": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "offset",
+        "sentinelAt"
+      ]
+    },
+    "AuthMessageProbe": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hits": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8",
+            "minimum": 0,
+            "maximum": 255
+          }
+        }
+      },
+      "required": [
+        "hits"
+      ]
+    },
+    "Availability": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "available": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "available"
+      ],
+      "description": "`{available, reason?}`."
+    },
+    "AxNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "nativeRole": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "focused": {
+          "type": "boolean"
+        },
+        "x": {
+          "type": "number",
+          "format": "double"
+        },
+        "y": {
+          "type": "number",
+          "format": "double"
+        },
+        "width": {
+          "type": "number",
+          "format": "double"
+        },
+        "height": {
+          "type": "number",
+          "format": "double"
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "childCount": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "ref",
+        "role",
+        "enabled",
+        "focused",
+        "x",
+        "y",
+        "width",
+        "height",
+        "actions",
+        "childCount"
+      ],
+      "description": "One v1 accessibility node."
+    },
+    "AxPerformParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref",
+        "action"
+      ]
+    },
+    "AxRefParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ref": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref"
+      ]
+    },
+    "AxSetValueParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "ref",
+        "value"
+      ]
+    },
+    "AxSnapshotText": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "nodeCount": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "text",
+        "nodeCount",
+        "truncated"
+      ],
+      "description": "The v1 accessibility snapshot: the rendered tree text."
+    },
+    "AxTargetParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "target"
+      ]
+    },
+    "AxTypeTextParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref",
+        "text"
+      ]
+    },
+    "AxTypeTextReply": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "$ref": "#/$defs/TypeTextMethod"
+        }
+      },
+      "required": [
+        "method"
+      ],
+      "description": "`ax.typeText`: how the text went in."
+    },
+    "BackgroundBasis": {
+      "type": "string",
+      "enum": [
+        "receipt",
+        "cross_process_verified",
+        "route_available",
+        "unverified",
+        "none"
+      ]
+    },
+    "BackgroundReach": {
+      "type": "string",
+      "enum": [
+        "full",
+        "pointer_only",
+        "core_toolkits_only",
+        "win32_classic_only",
+        "ax_only"
+      ]
+    },
+    "BusyIndicator": {
+      "type": "string",
+      "enum": [
+        "ax_busy",
+        "progress",
+        "spinner",
+        "frame_changing"
+      ]
+    },
+    "Button": {
+      "type": "string",
+      "enum": [
+        "left",
+        "right",
+        "middle"
+      ]
+    },
+    "CancelParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "Capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "backend": {
+          "type": "string"
+        },
+        "displayCount": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "deliveryModes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DeliveryMode"
+          }
+        },
+        "capture": {
+          "$ref": "#/$defs/CaptureCapability"
+        },
+        "windowCapture": {
+          "$ref": "#/$defs/Availability"
+        },
+        "windowInput": {
+          "$ref": "#/$defs/Availability"
+        },
+        "observe": {
+          "type": "boolean"
+        },
+        "settle": {
+          "type": "boolean"
+        },
+        "ocr": {
+          "type": "boolean"
+        },
+        "background_window_input": {
+          "type": "boolean"
+        },
+        "background_window_input_basis": {
+          "$ref": "#/$defs/BackgroundBasis"
+        },
+        "inputModes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/InputMode"
+          }
+        },
+        "backgroundReach": {
+          "$ref": "#/$defs/BackgroundReach"
+        },
+        "toolkitRoutes": {
+          "$ref": "#/$defs/ToolkitRoutes"
+        },
+        "session": {
+          "$ref": "#/$defs/SessionState"
+        },
+        "sessionProbes": {
+          "$ref": "#/$defs/SessionProbes"
+        },
+        "displayAwake": {
+          "$ref": "#/$defs/DisplayAwake"
+        },
+        "releaseHelper": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReleaseHelper"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "surfaces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SurfaceKind"
+          }
+        },
+        "routeLadder": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RouteRung"
+          }
+        },
+        "sendOnEnter": {
+          "$ref": "#/$defs/SendOnEnterKeys"
+        },
+        "stopPath": {
+          "$ref": "#/$defs/StopPathCapability"
+        },
+        "compositor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Compositor"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Linux only."
+        }
+      },
+      "required": [
+        "backend",
+        "displayCount",
+        "deliveryModes",
+        "capture",
+        "windowCapture",
+        "windowInput",
+        "observe",
+        "settle",
+        "ocr",
+        "background_window_input",
+        "background_window_input_basis",
+        "inputModes",
+        "backgroundReach",
+        "toolkitRoutes",
+        "session",
+        "sessionProbes",
+        "displayAwake",
+        "surfaces",
+        "routeLadder",
+        "sendOnEnter",
+        "stopPath"
+      ],
+      "description": "`capabilities` in an object-mode session."
+    },
+    "CapabilitiesReply": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LegacyCapabilities"
+        },
+        {
+          "$ref": "#/$defs/Capabilities"
+        }
+      ],
+      "description": "`capabilities`: the v1 record in null mode, the object-mode record otherwise."
+    },
+    "CaptureCapability": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "available": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "route": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CaptureRoute"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "available"
+      ]
+    },
+    "CaptureCaps": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxWidth": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "maxHeight": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "maxBytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "description": "v1 capture caps: the frame is scaled to fit."
+    },
+    "CaptureMode": {
+      "type": "string",
+      "enum": [
+        "inline-png",
+        "artifact-only"
+      ]
+    },
+    "CaptureParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "caps": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CaptureCaps"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "excludeWindowTitles": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "crosshair": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Point"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Draws a crosshair at this point in the space `click` consumes (acceptance 90)."
+        },
+        "cursor": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "`false` asks for a pointer-free frame (`Frame.cursor:\"none\"`)."
+        }
+      },
+      "required": [
+        "target"
+      ]
+    },
+    "CapturePolicyRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pattern": {
+          "type": "string"
+        },
+        "maxLongEdgePx": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "maxImageTokens": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "supportsImageDetailOriginal": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "pattern",
+        "maxLongEdgePx",
+        "maxImageTokens",
+        "supportsImageDetailOriginal"
+      ]
+    },
+    "CaptureReply": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LegacyFrame"
+        },
+        {
+          "$ref": "#/$defs/Frame"
+        }
+      ],
+      "description": "`capture` / `zoom`: the v1 frame in null mode, a `Frame` in object mode."
+    },
+    "CaptureRoute": {
+      "type": "string",
+      "enum": [
+        "composite",
+        "root_crop",
+        "screencast",
+        "screencast_crop",
+        "screenshot_portal"
+      ],
+      "description": "How a frame was produced."
+    },
+    "ChainLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "$ref": "#/$defs/ChainRole"
+        },
+        "pid": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "path": {
+          "type": "string"
+        },
+        "cdhash": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sessionContext": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "role",
+        "pid",
+        "path",
+        "sessionContext"
+      ],
+      "description": "One process of the spawn chain with its session context."
+    },
+    "ChainRole": {
+      "type": "string",
+      "enum": [
+        "host",
+        "launcher",
+        "engine",
+        "helper"
+      ]
+    },
+    "ClickParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "x": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "y": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "frameId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "button": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Button"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint8",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "modifiers": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "delivery": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Delivery"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "consume": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "force": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "description": "`click`: a point (v1) or a ref; `consume` asks for a consumption receipt."
+    },
+    "ClipboardContent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "formats": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "secure": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "const": true
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConcealedReason"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "observation": {
+          "$ref": "#/$defs/UntrustedText"
+        }
+      },
+      "required": [
+        "formats",
+        "observation"
+      ],
+      "description": "`clipboard.read`: a concealed clipboard answers `{secure:true, text:null, reason:\"concealed\"}`."
+    },
+    "ClipboardWriteParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "format": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PasteFormat"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "text"
+      ]
+    },
+    "CodeIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "teamId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cdhash": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "signer": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "hash": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "description": "The code identity consent is bound to (principle 6)."
+    },
+    "Compositor": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/CompositorName"
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "nested": {
+          "type": "boolean"
+        },
+        "virtualServer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VirtualServer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sessionLockProtocol": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "nested",
+        "sessionLockProtocol"
+      ],
+      "description": "The Linux compositor, declared once. `sessionLockProtocol` says the compositor\nadvertises `ext-session-lock-v1`; the lock datum itself is `session.screenLocked`."
+    },
+    "CompositorName": {
+      "type": "string",
+      "enum": [
+        "mutter",
+        "kwin",
+        "sway",
+        "hyprland",
+        "river",
+        "labwc",
+        "weston",
+        "xfwm4",
+        "openbox",
+        "i3",
+        "unknown"
+      ]
+    },
+    "ConcealedReason": {
+      "type": "string",
+      "enum": [
+        "concealed"
+      ]
+    },
+    "ConsentAuthority": {
+      "type": "string",
+      "enum": [
+        "host",
+        "file_only"
+      ]
+    },
+    "ControlGrantParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "type": "string"
+        },
+        "confirmationId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "reason"
+      ]
+    },
+    "ControlState": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "active": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "grantedAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "active"
+      ],
+      "description": "The foreground-control grant (`control.grant`, `control.acquire`, `control.changed`)."
+    },
+    "CuaAdapter": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CuaAdapterMode"
+        },
+        {
+          "type": "boolean"
+        }
+      ],
+      "description": "`cua_adapter`: the tri-state, plus the old boolean read as `on` / `off` for two minor releases."
+    },
+    "CuaAdapterMode": {
+      "type": "string",
+      "enum": [
+        "auto",
+        "on",
+        "off"
+      ]
+    },
+    "CursorMode": {
+      "type": "string",
+      "enum": [
+        "os",
+        "engine",
+        "none"
+      ],
+      "description": "Whose pointer the pixels carry: the OS one, one the engine composited, or none."
+    },
+    "Cut": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "childCount": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "ref",
+        "childCount"
+      ],
+      "description": "A cut container the skeleton did not open; `drill(ref)` opens it."
+    },
+    "DeafReason": {
+      "type": "string",
+      "enum": [
+        "secure-input-active",
+        "portal-unavailable",
+        "xi2-raw-unavailable",
+        "hook-install-failed",
+        "listener-parked"
+      ]
+    },
+    "DefaultDelivery": {
+      "type": "string",
+      "enum": [
+        "foreground_lease_first"
+      ]
+    },
+    "Delivered": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "count": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "of": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "count",
+        "of"
+      ],
+      "description": "How many units of an interrupted send went out."
+    },
+    "Delivery": {
+      "type": "string",
+      "enum": [
+        "background",
+        "foreground"
+      ],
+      "description": "The delivery route the model asked for; omitted lets the engine pick."
+    },
+    "DeliveryMode": {
+      "type": "string",
+      "enum": [
+        "background",
+        "foreground"
+      ]
+    },
+    "Diagnosis": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "description": "No probe failed."
+        },
+        "chain": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ChainLink"
+          }
+        },
+        "responsibleProcess": {
+          "type": "string"
+        },
+        "attachVia": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AttachVia"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "permissions": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/PermissionReport"
+          }
+        },
+        "identity": {
+          "$ref": "#/$defs/IdentityReport"
+        },
+        "consentAuthority": {
+          "$ref": "#/$defs/ConsentAuthority"
+        },
+        "session": {
+          "$ref": "#/$defs/SessionState"
+        },
+        "lockPolicy": {
+          "type": "string"
+        },
+        "stopPath": {
+          "$ref": "#/$defs/StopPathCapability"
+        },
+        "releaseHelper": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReleaseHelper"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "observation": {
+          "$ref": "#/$defs/UntrustedText"
+        }
+      },
+      "required": [
+        "ok",
+        "chain",
+        "responsibleProcess",
+        "permissions",
+        "identity",
+        "consentAuthority",
+        "session",
+        "lockPolicy",
+        "stopPath",
+        "observation"
+      ]
+    },
+    "DisplayAwake": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/DisplayAwakeState"
+        },
+        "graceMs": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "capMs": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "heldSinceMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "mechanism": {
+          "$ref": "#/$defs/DisplayAwakeMechanism"
+        }
+      },
+      "required": [
+        "state",
+        "graceMs",
+        "capMs",
+        "mechanism"
+      ]
+    },
+    "DisplayAwakeMechanism": {
+      "type": "string",
+      "enum": [
+        "IOPMAssertion",
+        "PowerRequest",
+        "XResetScreenSaver",
+        "idle-inhibit",
+        "ScreenSaver.Inhibit",
+        "unavailable"
+      ]
+    },
+    "DisplayAwakeState": {
+      "type": "string",
+      "enum": [
+        "idle",
+        "held",
+        "released",
+        "capped"
+      ]
+    },
+    "DisplayInfo": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "bounds": {
+          "$ref": "#/$defs/Rect"
+        },
+        "scale": {
+          "type": "number",
+          "format": "double"
+        },
+        "primary": {
+          "type": "boolean"
+        },
+        "truncated": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "A display was dropped from the composite."
+        }
+      },
+      "required": [
+        "id",
+        "bounds",
+        "scale",
+        "primary"
+      ]
+    },
+    "Disposition": {
+      "description": "Whether input reached the target and whether the same request may be sent again: exactly one of the seven valid (delivery, retry) pairs.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "delivery": {
+              "const": "not_delivered"
+            },
+            "retry": {
+              "const": "safe"
+            }
+          },
+          "required": [
+            "delivery",
+            "retry"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "delivery": {
+              "const": "not_delivered"
+            },
+            "retry": {
+              "const": "after_user"
+            }
+          },
+          "required": [
+            "delivery",
+            "retry"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "delivery": {
+              "const": "delivery_uncertain"
+            },
+            "retry": {
+              "const": "unsafe"
+            }
+          },
+          "required": [
+            "delivery",
+            "retry"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "delivery": {
+              "const": "delivery_uncertain"
+            },
+            "retry": {
+              "const": "unknown"
+            }
+          },
+          "required": [
+            "delivery",
+            "retry"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "delivery": {
+              "const": "delivered_unverified"
+            },
+            "retry": {
+              "const": "unsafe"
+            }
+          },
+          "required": [
+            "delivery",
+            "retry"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "delivery": {
+              "const": "delivered_verified"
+            },
+            "retry": {
+              "const": "unsafe"
+            }
+          },
+          "required": [
+            "delivery",
+            "retry"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "delivery": {
+              "const": "unknown"
+            },
+            "retry": {
+              "const": "unknown"
+            }
+          },
+          "required": [
+            "delivery",
+            "retry"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "DragParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "from": {
+          "$ref": "#/$defs/Point"
+        },
+        "to": {
+          "$ref": "#/$defs/Point"
+        },
+        "button": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Button"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "modifiers": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "frameId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "path": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Point"
+          }
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target",
+        "from",
+        "to"
+      ]
+    },
+    "DrillParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "depth": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "ref"
+      ]
+    },
+    "Effect": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "confirmed",
+          "description": "A receipt for this verb proves the requested effect."
+        },
+        {
+          "type": "string",
+          "const": "observed",
+          "description": "The engine read the target after the send; the read is not proof the input caused it."
+        },
+        {
+          "type": "string",
+          "const": "partial",
+          "description": "Part of the request landed; `delivered` carries the counts."
+        },
+        {
+          "type": "string",
+          "const": "unverifiable",
+          "description": "Nothing proves or reads the effect."
+        },
+        {
+          "type": "string",
+          "const": "suspected_noop",
+          "description": "Sent exactly once into a childless hit in a suspect viewport, and nothing changed."
+        },
+        {
+          "type": "string",
+          "const": "no_change",
+          "description": "Kept in the union so older shapes still parse; the engine never produces it."
+        },
+        {
+          "type": "string",
+          "const": "refused",
+          "description": "Nothing was sent."
+        }
+      ],
+      "description": "What the engine can say the action did."
+    },
+    "ElementAtParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "x": {
+          "type": "number",
+          "format": "double"
+        },
+        "y": {
+          "type": "number",
+          "format": "double"
+        },
+        "frameId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "target",
+        "x",
+        "y"
+      ]
+    },
+    "ElementInfo": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "nativeRole": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "enabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "focused": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "childCount": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "bounds": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Rect"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "actions": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "window": {
+          "type": "string"
+        },
+        "generation": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observation": {
+          "$ref": "#/$defs/UntrustedText"
+        }
+      },
+      "required": [
+        "ref",
+        "role",
+        "window",
+        "generation",
+        "observation"
+      ],
+      "description": "One accessibility element as a tree, `find()`, `elementAt()` or a menu shows it."
+    },
+    "ElementState": {
+      "type": "string",
+      "enum": [
+        "enabled",
+        "visible",
+        "gone"
+      ]
+    },
+    "EmptyParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "No params: `{}`."
+    },
+    "EpochChanged": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason"
+      ],
+      "description": "`epoch.changed`: the frames and refs of an older epoch are stale."
+    },
+    "EventKind": {
+      "type": "string",
+      "enum": [
+        "focus",
+        "structure",
+        "property",
+        "window_opened",
+        "window_closed"
+      ]
+    },
+    "EventPredicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/EventKind"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "Evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/EvidenceKind"
+        },
+        "class": {
+          "$ref": "#/$defs/EvidenceClass"
+        },
+        "intended": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "baseline": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "event": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "kind",
+        "class"
+      ]
+    },
+    "EvidenceClass": {
+      "type": "string",
+      "enum": [
+        "receipt",
+        "observation"
+      ],
+      "description": "Receipt or observation."
+    },
+    "EvidenceKind": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "barrier_consumed",
+          "description": "Windows hook-free barrier: the target dequeued the input."
+        },
+        {
+          "type": "string",
+          "const": "xi2_raw_confirm",
+          "description": "X11 MPX raw XI2 event: the server consumed and re-emitted the input."
+        },
+        {
+          "type": "string",
+          "const": "value_readback",
+          "description": "The target's value read back after the send."
+        },
+        {
+          "type": "string",
+          "const": "focus_readback",
+          "description": "The focused element read back after the send."
+        },
+        {
+          "type": "string",
+          "const": "menu_readback",
+          "description": "The menu state read back after the send."
+        },
+        {
+          "type": "string",
+          "const": "ax_notification",
+          "description": "An event from an observer registered on the target window before the send."
+        },
+        {
+          "type": "string",
+          "const": "settle_frame_diff",
+          "description": "Pixels changed in the hit region or the window during the settle window."
+        },
+        {
+          "type": "string",
+          "const": "ax_change",
+          "description": "A window-wide accessibility change during the settle window."
+        }
+      ],
+      "description": "What an evidence entry read."
+    },
+    "ExecReply": {
+      "description": "null in a null-mode session; the ActionReport in an object-mode session.",
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/ActionReport"
+        }
+      ]
+    },
+    "FleetSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxInFlight": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "frameBytesPerMin": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "perHandFramesPerSec": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "maxImagePartsPerResult": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "description": "`fleet`: the brain-side fanout budgets. `maxInFlight` is the fanout concurrency."
+    },
+    "FocusRestoration": {
+      "type": "string",
+      "enum": [
+        "untouched",
+        "restored",
+        "user_moved_on",
+        "failed"
+      ],
+      "description": "Where focus ended after the action. A background action touches no focus: `untouched`."
+    },
+    "ForegroundConsent": {
+      "type": "string",
+      "enum": [
+        "never",
+        "policy",
+        "granted"
+      ]
+    },
+    "Frame": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "frameId": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        },
+        "width": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "height": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "coordinateWidth": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "coordinateHeight": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "scale": {
+          "type": "number",
+          "format": "double"
+        },
+        "cursor": {
+          "$ref": "#/$defs/CursorMode"
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "artifact": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FrameArtifact"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "session": {
+          "$ref": "#/$defs/SessionState"
+        },
+        "observation": {
+          "$ref": "#/$defs/UntrustedText"
+        }
+      },
+      "required": [
+        "frameId",
+        "target",
+        "width",
+        "height",
+        "coordinateWidth",
+        "coordinateHeight",
+        "scale",
+        "cursor",
+        "session",
+        "observation"
+      ]
+    },
+    "FrameArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "type": "string"
+        },
+        "size": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "mime": {
+          "$ref": "#/$defs/ImageMime"
+        },
+        "ttlMs": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "digest",
+        "size",
+        "mime",
+        "ttlMs"
+      ],
+      "description": "Present only when the bytes did not ride inline (size above `limits.maxResponseBytes`)."
+    },
+    "FullLiteral": {
+      "type": "string",
+      "enum": [
+        "full"
+      ],
+      "description": "The literal `\"full\"`."
+    },
+    "HandConsent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "computerUse": {
+          "type": "boolean"
+        },
+        "remoteCommands": {
+          "type": "boolean"
+        },
+        "foreground": {
+          "$ref": "#/$defs/ForegroundConsent"
+        },
+        "appScope": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "tampered": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "computerUse",
+        "remoteCommands",
+        "foreground"
+      ]
+    },
+    "HandSelector": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "handId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "handId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ]
+        }
+      ],
+      "description": "`default_hand`: `\"local\"`, `\"relay:<id>\"`, `\"bunshin:<id>\"`, `\"ssh:<alias>\"`, `{handId}` or `{name}`."
+    },
+    "HandStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "online": {
+          "type": "boolean"
+        },
+        "generation": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "stopped": {
+          "type": "boolean"
+        },
+        "consent": {
+          "$ref": "#/$defs/HandConsent"
+        }
+      },
+      "required": [
+        "online",
+        "generation",
+        "stopped",
+        "consent"
+      ],
+      "description": "`hand.status`: liveness of the hand the host serves."
+    },
+    "Hello": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocolVersion": {
+          "type": "string"
+        },
+        "engineVersion": {
+          "type": "string"
+        },
+        "buildSha": {
+          "type": "string"
+        },
+        "abi": {
+          "type": "string"
+        },
+        "features": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "generation": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "description": "Incremented on every engine restart; a reply from another generation is quarantined."
+        },
+        "limits": {
+          "$ref": "#/$defs/Limits"
+        },
+        "machineId": {
+          "type": "string",
+          "description": "sha256-16 of the lock-file identity and the uid: one id per user and machine."
+        }
+      },
+      "required": [
+        "protocolVersion",
+        "engineVersion",
+        "buildSha",
+        "abi",
+        "features",
+        "generation",
+        "limits",
+        "machineId"
+      ],
+      "description": "The `engine.hello` reply."
+    },
+    "Hit": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "type": "string"
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "role"
+      ],
+      "description": "The element read under the point before the send."
+    },
+    "HoldKeysParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "keys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "duration": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "target",
+        "keys",
+        "duration"
+      ]
+    },
+    "HoldMouseParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "x": {
+          "type": "number",
+          "format": "double"
+        },
+        "y": {
+          "type": "number",
+          "format": "double"
+        },
+        "duration": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "target",
+        "x",
+        "y",
+        "duration"
+      ]
+    },
+    "IdentityMatch": {
+      "type": "string",
+      "enum": [
+        "match",
+        "mismatch",
+        "unknown"
+      ]
+    },
+    "IdentityReport": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "match": {
+          "$ref": "#/$defs/IdentityMatch"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SpawnPath"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "match"
+      ]
+    },
+    "ImageMime": {
+      "type": "string",
+      "enum": [
+        "image/png",
+        "image/jpeg"
+      ]
+    },
+    "InputMode": {
+      "type": "string",
+      "enum": [
+        "pointer",
+        "keyboard",
+        "ax"
+      ]
+    },
+    "Intervention": {
+      "type": "string",
+      "enum": [
+        "continue",
+        "pause"
+      ]
+    },
+    "KeyChordParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "keys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "target",
+        "keys"
+      ]
+    },
+    "KeyDownParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "chord": {
+          "type": "string"
+        },
+        "frameId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "force": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target",
+        "chord"
+      ]
+    },
+    "KeyUpParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "chord": {
+          "type": "string"
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target",
+        "chord"
+      ]
+    },
+    "LearnedRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/LearnedSource"
+        },
+        "defaultDelivery": {
+          "$ref": "#/$defs/DefaultDelivery"
+        }
+      },
+      "required": [
+        "key",
+        "source",
+        "defaultDelivery"
+      ]
+    },
+    "LearnedSource": {
+      "type": "string",
+      "enum": [
+        "learned"
+      ]
+    },
+    "LegacyCapabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "backend": {
+          "type": "string"
+        },
+        "displayServer": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "capture": {
+          "type": "boolean"
+        },
+        "input": {
+          "type": "boolean"
+        },
+        "ax": {
+          "type": "boolean"
+        },
+        "backgroundWindowInput": {
+          "type": "boolean"
+        },
+        "cursorOverlay": {
+          "type": "boolean"
+        },
+        "deliveryModes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DeliveryMode"
+          }
+        },
+        "capturePermission": {
+          "type": "string"
+        },
+        "inputPermission": {
+          "type": "string"
+        },
+        "axPermission": {
+          "type": "string"
+        },
+        "displayCount": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "focusGuard": {
+          "type": "boolean"
+        },
+        "stopPath": {
+          "type": "string"
+        },
+        "stopReason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "integrityLevel": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "screenLocked": {
+          "type": "boolean"
+        },
+        "displayAsleep": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "backend",
+        "capture",
+        "input",
+        "ax",
+        "backgroundWindowInput",
+        "cursorOverlay",
+        "deliveryModes",
+        "capturePermission",
+        "inputPermission",
+        "axPermission",
+        "displayCount",
+        "focusGuard",
+        "stopPath",
+        "screenLocked"
+      ],
+      "description": "`capabilities` (and `session.open`'s `capabilities` member) in null mode."
+    },
+    "LegacyFrame": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/CaptureMode"
+        },
+        "data": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mimeType": {
+          "type": "string"
+        },
+        "artifactPath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "width": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "height": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "sourceWidth": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "sourceHeight": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "coordinateWidth": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "coordinateHeight": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "region": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Rect"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "scale": {
+          "type": "number",
+          "format": "double"
+        },
+        "target": {
+          "type": "string"
+        },
+        "frameId": {
+          "type": "string"
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "legacyCapture": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "mode",
+        "mimeType",
+        "width",
+        "height",
+        "sourceWidth",
+        "sourceHeight",
+        "coordinateWidth",
+        "coordinateHeight",
+        "scale",
+        "target",
+        "frameId"
+      ],
+      "description": "The v1 frame reply of `capture`."
+    },
+    "LegacyObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/CaptureMode"
+        },
+        "data": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mimeType": {
+          "type": "string"
+        },
+        "artifactPath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "width": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "height": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "sourceWidth": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "sourceHeight": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "coordinateWidth": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "coordinateHeight": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "region": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Rect"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "scale": {
+          "type": "number",
+          "format": "double"
+        },
+        "target": {
+          "type": "string"
+        },
+        "frameId": {
+          "type": "string"
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ax": {
+          "type": "string"
+        },
+        "nodeCount": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "mode",
+        "mimeType",
+        "width",
+        "height",
+        "sourceWidth",
+        "sourceHeight",
+        "coordinateWidth",
+        "coordinateHeight",
+        "scale",
+        "target",
+        "frameId",
+        "ax",
+        "nodeCount",
+        "truncated"
+      ],
+      "description": "The v1 `observe` reply: a frame plus the accessibility summary."
+    },
+    "LegacyWindow": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "app": {
+          "type": "string"
+        },
+        "pid": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "x": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "y": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "width": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "height": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "focused": {
+          "type": "boolean"
+        },
+        "elevated": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "app",
+        "pid",
+        "x",
+        "y",
+        "width",
+        "height",
+        "focused"
+      ],
+      "description": "One v1 `windows` record."
+    },
+    "Limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxRequestBytes": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "maxResponseBytes": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "maxFrameBytes": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "maxRequestBytes",
+        "maxResponseBytes",
+        "maxFrameBytes"
+      ],
+      "description": "The size ceilings a host must respect on this connection."
+    },
+    "LinuxDisplayServer": {
+      "type": "string",
+      "enum": [
+        "auto",
+        "x11",
+        "wayland"
+      ]
+    },
+    "McpSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tier": {
+          "$ref": "#/$defs/Tier"
+        }
+      },
+      "required": [
+        "tier"
+      ],
+      "description": "`mcp`: the `--mcp` shim's consent view."
+    },
+    "MenuItems": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ElementInfo"
+          }
+        },
+        "truncated": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "observation": {
+          "$ref": "#/$defs/UntrustedText"
+        }
+      },
+      "required": [
+        "items",
+        "observation"
+      ],
+      "description": "`menu.items`: the menu tree, listed without opening, moving or focusing anything."
+    },
+    "MenuItemsParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "path": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "target"
+      ]
+    },
+    "MenuSelectParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "path": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "delivery": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Delivery"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target",
+        "path"
+      ]
+    },
+    "MouseDownParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "button": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Button"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "x": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "y": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "frameId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target"
+      ]
+    },
+    "MouseUpParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "button": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Button"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target"
+      ]
+    },
+    "MoveParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "x": {
+          "type": "number",
+          "format": "double"
+        },
+        "y": {
+          "type": "number",
+          "format": "double"
+        },
+        "frameId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target",
+        "x",
+        "y"
+      ]
+    },
+    "NotificationPredicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "app": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "Observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "frame": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Frame"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tree": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "diff": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "focused": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ElementInfo"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "selectedText": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "complete": {
+          "type": "boolean"
+        },
+        "nodesObserved": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "cuts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Cut"
+          }
+        },
+        "generation": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "session": {
+          "$ref": "#/$defs/SessionState"
+        },
+        "observation": {
+          "$ref": "#/$defs/UntrustedText"
+        },
+        "secure": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "settle": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObservationSettle"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ocr": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Ocr"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "complete",
+        "nodesObserved",
+        "cuts",
+        "generation",
+        "session",
+        "observation"
+      ]
+    },
+    "ObservationSettle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "outcome": {
+          "$ref": "#/$defs/SettleOutcome"
+        },
+        "indicator": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BusyIndicator"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "quietMs": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "waitedMs": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "outcome",
+        "quietMs",
+        "waitedMs"
+      ]
+    },
+    "ObserveAx": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "maxNodes": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "maxNodes"
+          ]
+        }
+      ],
+      "description": "v1 `observe.ax`: a node budget; the object mode's `ax` flag is the boolean."
+    },
+    "ObserveOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "screenshot": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "ax": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "query": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "since": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "depth": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "skeleton": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "actions": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "settle": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SettleOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ocr": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OcrMode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "description": "The one observe option set (`observeAfter` and `apps.open{observe}` carry it too)."
+    },
+    "ObserveParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "caps": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CaptureCaps"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ax": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveAx"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "screenshot": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "query": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "since": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "depth": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "skeleton": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "actions": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "settle": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SettleOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ocr": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OcrMode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target"
+      ]
+    },
+    "ObserveReply": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LegacyObservation"
+        },
+        {
+          "$ref": "#/$defs/Observation"
+        }
+      ],
+      "description": "`observe`: the v1 frame-plus-summary in null mode, an `Observation` in object mode."
+    },
+    "ObserveRequest": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "$ref": "#/$defs/ObserveOptions"
+        }
+      ],
+      "description": "`observe` on `apps.open`: an option set or `true` for the defaults."
+    },
+    "Ocr": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "engine": {
+          "type": "string"
+        },
+        "languages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "lines": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/OcrLine"
+          }
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "frameId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "engine",
+        "languages",
+        "lines",
+        "truncated",
+        "frameId"
+      ]
+    },
+    "OcrLine": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "box": {
+          "$ref": "#/$defs/Rect"
+        },
+        "confidence": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        }
+      },
+      "required": [
+        "text",
+        "box"
+      ]
+    },
+    "OcrMode": {
+      "type": "string",
+      "enum": [
+        "auto",
+        "always",
+        "never"
+      ]
+    },
+    "OnOff": {
+      "type": "string",
+      "enum": [
+        "on",
+        "off"
+      ]
+    },
+    "OpenSystemSurfaceParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/SurfaceKind"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "PasteFormat": {
+      "type": "string",
+      "enum": [
+        "text",
+        "markdown",
+        "html"
+      ]
+    },
+    "PasteParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "format": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PasteFormat"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "force": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target",
+        "text"
+      ]
+    },
+    "PermissionReport": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/PermissionState"
+        },
+        "settingsUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "relaunchRequired": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "state"
+      ]
+    },
+    "PermissionState": {
+      "type": "string",
+      "enum": [
+        "Granted",
+        "Denied",
+        "Unknown"
+      ]
+    },
+    "Point": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "type": "number",
+          "format": "double"
+        },
+        "y": {
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "required": [
+        "x",
+        "y"
+      ],
+      "description": "A point in the coordinate space of the frame the call names (or the latest one)."
+    },
+    "PointerPosition": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "type": "number",
+          "format": "double"
+        },
+        "y": {
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "required": [
+        "x",
+        "y"
+      ],
+      "description": "`pointer`: the pointer position in desktop coordinates."
+    },
+    "PressParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "chord": {
+          "type": "string"
+        },
+        "target": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "repeat": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "force": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "delivery": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Delivery"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "chord"
+      ]
+    },
+    "RaiseWindowParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "windowId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "windowId"
+      ]
+    },
+    "Rect": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "type": "number",
+          "format": "double"
+        },
+        "y": {
+          "type": "number",
+          "format": "double"
+        },
+        "width": {
+          "type": "number",
+          "format": "double"
+        },
+        "height": {
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "description": "A rectangle in the coordinate space of the reply that carries it."
+    },
+    "ReleaseHelper": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "available": {
+          "type": "boolean"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReleaseHelperReason"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "available"
+      ]
+    },
+    "ReleaseHelperReason": {
+      "type": "string",
+      "enum": [
+        "enclosing_job_no_breakaway",
+        "wayland_release_unproven"
+      ]
+    },
+    "ReportMode": {
+      "type": "string",
+      "enum": [
+        "null",
+        "object"
+      ],
+      "description": "`reportMode`: `\"null\"` keeps every v1 reply byte-identical; `\"object\"` opts into reports."
+    },
+    "RequestId": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "format": "int64"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "description": "A JSON-RPC request id: a number or a string, echoed verbatim."
+    },
+    "Route": {
+      "type": "string",
+      "enum": [
+        "ax",
+        "background_window",
+        "background_pid",
+        "foreground_hid"
+      ],
+      "description": "The delivery route the input took."
+    },
+    "RouteRung": {
+      "type": "string",
+      "enum": [
+        "physical",
+        "semantic"
+      ]
+    },
+    "RunLimits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "default": 65536
+        },
+        "wallMs": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "default": 30000
+        },
+        "heapBytes": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "default": 16777216
+        },
+        "stackBytes": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "default": 1048576
+        },
+        "calls": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "default": 64
+        },
+        "pending": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "default": 4
+        },
+        "argBytes": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "default": 65536
+        },
+        "returnBytes": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "default": 65536
+        },
+        "treeBytes": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "default": 131072
+        },
+        "imageBytes": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "default": 2097152
+        },
+        "journal": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "default": 64
+        },
+        "children": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "default": 4
+        },
+        "batchCalls": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "default": 16
+        }
+      },
+      "description": "`run_limits`: the QuickJS cell's ceilings. Every member is overridable per hand; an\nomitted member keeps its default."
+    },
+    "Runtime": {
+      "type": "string",
+      "enum": [
+        "legacy",
+        "v3"
+      ],
+      "description": "`computer.runtime` (amendment A10): which implementation serves the tool until cutover."
+    },
+    "ScreenshotGc": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "stale_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "scan_interval_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        }
+      }
+    },
+    "ScrollDirection": {
+      "type": "string",
+      "enum": [
+        "up",
+        "down",
+        "left",
+        "right"
+      ]
+    },
+    "ScrollParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "x": {
+          "type": "number",
+          "format": "double"
+        },
+        "y": {
+          "type": "number",
+          "format": "double"
+        },
+        "dx": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "dy": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "clicks": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "direction": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScrollDirection"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "delivery": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Delivery"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target",
+        "x",
+        "y"
+      ]
+    },
+    "SeededRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "class": {
+          "$ref": "#/$defs/ToolkitClass"
+        }
+      },
+      "required": [
+        "key",
+        "class"
+      ]
+    },
+    "SelectTextParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "range": {
+          "$ref": "#/$defs/TextRange"
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "ref",
+        "range"
+      ]
+    },
+    "SendOnEnterKeys": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "keys": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "keys"
+      ]
+    },
+    "SendOnEnterRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "chords": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "chords"
+      ]
+    },
+    "SessionOpenParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reportMode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReportMode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "intervention": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Intervention"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "macosKeyPriming": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OnOff"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "trace": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Trace"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "showCursor": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "allowHostRelayOnlyStop": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "settings": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Settings"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "description": "`session.open`: the v1 session keys plus the `computer.*` settings table."
+    },
+    "SessionOpened": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "capabilities": {
+          "$ref": "#/$defs/CapabilitiesReply"
+        },
+        "resumeToken": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "capabilities",
+        "resumeToken"
+      ]
+    },
+    "SessionPauseReason": {
+      "type": "string",
+      "enum": [
+        "screen_locked",
+        "screensaver_active",
+        "session_deactivated",
+        "system_suspended"
+      ],
+      "description": "The four reasons a session reports; `screen_locked` and `system_suspended` pause."
+    },
+    "SessionPredicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "screenLocked": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "displayAsleep": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sessionActive": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "secureInputActive": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "userActive": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
+    },
+    "SessionProbes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "screenLocked": {
+          "type": "string"
+        },
+        "displayAsleep": {
+          "type": "string"
+        },
+        "userActive": {
+          "type": "string"
+        },
+        "secureInputActive": {
+          "type": "string"
+        },
+        "sessionActive": {
+          "type": "string"
+        },
+        "screensaverActive": {
+          "type": "string"
+        },
+        "sessionActiveDeliveryVerified": {
+          "type": "boolean"
+        },
+        "authMessage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AuthMessage"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "macOS only: absent elsewhere, `null` when no candidate accepted."
+        },
+        "authMessageProbe": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AuthMessageProbe"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "screenLocked",
+        "displayAsleep",
+        "userActive",
+        "secureInputActive",
+        "sessionActive",
+        "screensaverActive",
+        "sessionActiveDeliveryVerified"
+      ],
+      "description": "The OS symbol or protocol behind each `SessionState` field (`\"none\"` where there is none)."
+    },
+    "SessionState": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "screenLocked": {
+          "$ref": "#/$defs/Tristate"
+        },
+        "displayAsleep": {
+          "$ref": "#/$defs/Tristate"
+        },
+        "userActive": {
+          "$ref": "#/$defs/UserActive"
+        },
+        "secureInputActive": {
+          "$ref": "#/$defs/Tristate"
+        },
+        "sessionActive": {
+          "$ref": "#/$defs/Tristate"
+        },
+        "screensaverActive": {
+          "$ref": "#/$defs/Tristate"
+        },
+        "pauseReasons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SessionPauseReason"
+          }
+        },
+        "sampledAt": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "screenLocked",
+        "displayAsleep",
+        "userActive",
+        "secureInputActive",
+        "sessionActive",
+        "screensaverActive",
+        "pauseReasons",
+        "sampledAt"
+      ]
+    },
+    "Settings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "display": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "stop_hotkey": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "allow_host_relay_only_stop": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "audit_log": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AuditLog"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "screenshot_gc": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScreenshotGc"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "engine_path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "send_on_enter": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/SendOnEnterRule"
+          }
+        },
+        "url_policy": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "run_limits": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RunLimits"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "record": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "pause_ceiling_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "display_awake_grace_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "display_awake_session_cap_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "x11_keymap_remap": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "background_indicator": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "max_width": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "max_height": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "screenshot_max_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "cua_adapter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CuaAdapter"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "default_hand": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HandSelector"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mcp": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/McpSettings"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "intervention": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Intervention"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "macos_key_priming": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "trace": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Trace"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "remote_commands": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "foreground_input_lock": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "x11_mpx": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "wayland_persist_consent": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "capture_on_open": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "ssh_hosts": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/SshHost"
+          }
+        },
+        "fleet": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FleetSettings"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "wayland_lease_end_chord": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "linux_display_server": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LinuxDisplayServer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "toolkit_routes": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/ToolkitClass"
+          }
+        },
+        "artifact_max_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "artifact_max_files": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "artifact_release_after_fetch": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "capture_policy": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/CapturePolicyRow"
+          }
+        },
+        "app_scope": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AppScope"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "preview": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "runtime": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Runtime"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "operation_timeout_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "close_timeout_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "capture_helper_signed": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "description": "The one documented `computer.*` table; [`super::SETTINGS_TABLE`] names each key's reader."
+    },
+    "SettleOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "quietMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "timeoutMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        }
+      }
+    },
+    "SettleOutcome": {
+      "type": "string",
+      "enum": [
+        "settled",
+        "pending",
+        "unsupported",
+        "timeout"
+      ]
+    },
+    "SpawnPath": {
+      "type": "string",
+      "enum": [
+        "open_a",
+        "disclaim"
+      ]
+    },
+    "SshHost": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "host": {
+          "type": "string"
+        },
+        "user": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "port": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint16",
+          "minimum": 0,
+          "maximum": 65535
+        }
+      },
+      "required": [
+        "host"
+      ]
+    },
+    "StopPathCapability": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/StopPathKind"
+        },
+        "hostRelayLive": {
+          "type": "boolean"
+        },
+        "allowHostRelayOnly": {
+          "type": "boolean"
+        },
+        "listener": {
+          "type": "string"
+        },
+        "deaf": {
+          "type": "boolean"
+        },
+        "stale": {
+          "type": "boolean"
+        },
+        "deafReason": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DeafReason"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "hostRelayLive",
+        "allowHostRelayOnly",
+        "listener",
+        "deaf",
+        "stale"
+      ]
+    },
+    "StopPathKind": {
+      "type": "string",
+      "enum": [
+        "global",
+        "host-relay",
+        "none"
+      ]
+    },
+    "StopPathResumeParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "token": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "token"
+      ]
+    },
+    "StopPathStartParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "chord": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "StopPathStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "suspended": {
+          "type": "boolean"
+        },
+        "globalLive": {
+          "type": "boolean"
+        },
+        "hostRelayLive": {
+          "type": "boolean"
+        },
+        "heartbeatFresh": {
+          "type": "boolean"
+        },
+        "stopPath": {
+          "type": "string"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "suspended",
+        "globalLive",
+        "hostRelayLive",
+        "heartbeatFresh",
+        "stopPath"
+      ],
+      "description": "The stop path's state (`stopPath.*` replies and the `stopPath.changed` notification)."
+    },
+    "StopPathStopParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "Surface": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/SurfaceKind"
+        },
+        "id": {
+          "type": "string"
+        },
+        "pid": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "bounds": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Rect"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "observation": {
+          "$ref": "#/$defs/UntrustedText"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "observation"
+      ],
+      "description": "One system or app surface."
+    },
+    "SurfaceKind": {
+      "type": "string",
+      "enum": [
+        "window",
+        "focused",
+        "menu",
+        "menubar",
+        "sheet",
+        "popover",
+        "alert",
+        "desktop",
+        "taskbar",
+        "system_tray",
+        "quick_settings",
+        "notification_center",
+        "toolbar",
+        "dock",
+        "spotlight",
+        "menubar_extras",
+        "system_tray_overflow",
+        "start_menu",
+        "action_center"
+      ],
+      "description": "The nineteen system surface kinds; `capabilities().surfaces` lists this OS's subset."
+    },
+    "SurfaceParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/SurfaceKind"
+        },
+        "index": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "SurfacePredicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/SurfaceKind"
+        },
+        "state": {
+          "$ref": "#/$defs/SurfaceState"
+        }
+      },
+      "required": [
+        "kind",
+        "state"
+      ]
+    },
+    "SurfaceState": {
+      "type": "string",
+      "enum": [
+        "appeared",
+        "gone"
+      ]
+    },
+    "TextRange": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "start": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "end": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "start",
+            "end"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ]
+        }
+      ],
+      "description": "`selectText`: an index range or the text to select."
+    },
+    "Tier": {
+      "type": "string",
+      "enum": [
+        "read",
+        "exec"
+      ],
+      "description": "The tool tier the `--mcp` shim grants."
+    },
+    "Timings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "axResolve": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "capture": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "prime": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "dispatch": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "verify": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "restore": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "description": "Stage timings in microseconds; a stage that did not run is absent."
+    },
+    "ToolkitClass": {
+      "type": "string",
+      "enum": [
+        "canvas_gl",
+        "chromium_electron",
+        "pointer_hw",
+        "qt_xcb"
+      ],
+      "description": "The four toolkit route classes."
+    },
+    "ToolkitRoutes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "seeded": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SeededRoute"
+          }
+        },
+        "learned": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/LearnedRoute"
+          }
+        }
+      },
+      "required": [
+        "seeded",
+        "learned"
+      ]
+    },
+    "Trace": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "$ref": "#/$defs/FullLiteral"
+        }
+      ],
+      "description": "`trace`: `false | true | \"full\"`. `true` writes the JSONL trace only; `\"full\"` adds the\nsession manifest and the per-turn artifacts."
+    },
+    "Tristate": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "$ref": "#/$defs/UnknownLiteral"
+        }
+      ],
+      "description": "`boolean | \"unknown\"`."
+    },
+    "TypeParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "target": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "delivery": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Delivery"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "force": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "text"
+      ]
+    },
+    "TypeTextMethod": {
+      "type": "string",
+      "enum": [
+        "inserted",
+        "keys"
+      ]
+    },
+    "TypeTextParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "target",
+        "text"
+      ]
+    },
+    "UnknownLiteral": {
+      "type": "string",
+      "enum": [
+        "unknown"
+      ],
+      "description": "The literal `\"unknown\"`: the OS gave no answer, which never refuses and is reported."
+    },
+    "UntrustedText": {
+      "description": "The typed prompt-injection signal: screen-derived text in this record is data.",
+      "type": "object",
+      "properties": {
+        "untrustedText": {
+          "const": true
+        }
+      },
+      "required": [
+        "untrustedText"
+      ],
+      "additionalProperties": false
+    },
+    "UserActive": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "active": {
+          "$ref": "#/$defs/Tristate"
+        },
+        "lastInputAgeMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "active"
+      ]
+    },
+    "VirtualServer": {
+      "type": "string",
+      "enum": [
+        "xvfb",
+        "xvnc",
+        "tigervnc"
+      ]
+    },
+    "WaitForParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "predicate": {
+          "$ref": "#/$defs/WaitPredicate"
+        },
+        "timeout": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "target",
+        "predicate"
+      ]
+    },
+    "WaitOutcome": {
+      "type": "string",
+      "enum": [
+        "settled",
+        "pending",
+        "unsupported",
+        "matched",
+        "timeout"
+      ]
+    },
+    "WaitPredicate": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "settle": {
+              "$ref": "#/$defs/SettleOptions"
+            }
+          },
+          "required": [
+            "settle"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "ref": {
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/$defs/ElementState"
+            }
+          },
+          "required": [
+            "ref",
+            "state"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "window": {
+              "$ref": "#/$defs/WindowPredicate"
+            }
+          },
+          "required": [
+            "window"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "surface": {
+              "$ref": "#/$defs/SurfacePredicate"
+            }
+          },
+          "required": [
+            "surface"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "notification": {
+              "$ref": "#/$defs/NotificationPredicate"
+            }
+          },
+          "required": [
+            "notification"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event": {
+              "$ref": "#/$defs/EventPredicate"
+            }
+          },
+          "required": [
+            "event"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "session": {
+              "$ref": "#/$defs/SessionPredicate"
+            }
+          },
+          "required": [
+            "session"
+          ]
+        }
+      ],
+      "description": "One `waitFor` predicate; each is bounded by the call's `timeout`."
+    },
+    "WaitResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "outcome": {
+          "$ref": "#/$defs/WaitOutcome"
+        },
+        "observation": {
+          "$ref": "#/$defs/Observation"
+        }
+      },
+      "required": [
+        "outcome",
+        "observation"
+      ],
+      "description": "`waitFor`: the outcome and the observation it ended on."
+    },
+    "WindowFrameParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "x": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "y": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "width": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "height": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target"
+      ]
+    },
+    "WindowIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "windowNumber": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "hwnd": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "xid": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "pid": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "processStart": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "pid",
+        "processStart"
+      ],
+      "description": "A window's identity: the OS handle plus the process generation."
+    },
+    "WindowInfo": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "identity": {
+          "$ref": "#/$defs/WindowIdentity"
+        },
+        "app": {
+          "type": "string"
+        },
+        "appKey": {
+          "type": "string",
+          "description": "Bundle id, AUMID, `WM_CLASS` or `app_id`."
+        },
+        "title": {
+          "type": "string"
+        },
+        "bounds": {
+          "$ref": "#/$defs/Rect"
+        },
+        "display": {
+          "type": "string"
+        },
+        "focused": {
+          "type": "boolean"
+        },
+        "isOnScreen": {
+          "type": "boolean"
+        },
+        "space": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "minimized": {
+          "type": "boolean"
+        },
+        "elevated": {
+          "type": "boolean"
+        },
+        "z": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "description": "Front-to-back index of the listing order."
+        },
+        "observation": {
+          "$ref": "#/$defs/UntrustedText"
+        }
+      },
+      "required": [
+        "id",
+        "identity",
+        "app",
+        "appKey",
+        "title",
+        "bounds",
+        "display",
+        "focused",
+        "isOnScreen",
+        "minimized",
+        "elevated",
+        "z",
+        "observation"
+      ],
+      "description": "One `windows()` record: minimized windows are listed, never filtered."
+    },
+    "WindowParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target"
+      ]
+    },
+    "WindowPredicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/WindowState"
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "app": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "state"
+      ]
+    },
+    "WindowState": {
+      "type": "string",
+      "enum": [
+        "appeared",
+        "gone",
+        "focused"
+      ]
+    },
+    "WindowsParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "app": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pid": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "description": "`windows`: an optional filter; `{}` lists every window."
+    },
+    "WindowsReply": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/LegacyWindow"
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/WindowInfo"
+          }
+        }
+      ],
+      "description": "`windows`: the v1 records in null mode, `WindowInfo` records in object mode."
+    },
+    "ZoomParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "region": {
+          "$ref": "#/$defs/Rect"
+        }
+      },
+      "required": [
+        "target",
+        "region"
+      ]
+    }
+  }
+}

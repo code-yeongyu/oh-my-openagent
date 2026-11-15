@@ -11,12 +11,18 @@ describe("tracked desktop service error coverage", () => {
   for (const failure of [
     new DesktopEngineAbiMismatchError("/fixture", { abi: "wrong", protocolVersion: "wrong" }),
     new DesktopEngineUnavailableError({
-      code: "native-unavailable", host: "darwin-arm64", attemptedPaths: ["/fixture"],
-      message: "missing engine", cause: "fixture",
+      code: "native-unavailable",
+      host: "darwin-arm64",
+      attemptedPaths: ["/fixture"],
+      message: "missing engine",
+      cause: "fixture",
     }),
     new DesktopEngineUnavailableError({
-      code: "quarantined", host: "darwin-arm64", attemptedPaths: ["/fixture"],
-      message: "quarantined engine", cause: "fixture",
+      code: "quarantined",
+      host: "darwin-arm64",
+      attemptedPaths: ["/fixture"],
+      message: "quarantined engine",
+      cause: "fixture",
     }),
   ]) {
     test(`#given activation succeeded #when ${failure.name} is reported #then later replies keep the hard diagnostic`, async () => {

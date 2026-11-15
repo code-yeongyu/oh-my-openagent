@@ -248,10 +248,7 @@ describe("deprecated reasoning keys check", () => {
         `${configPath}: categories.deep.variant`,
         `${configPath}: categories.deep.thinking`,
       ])
-      expect(result.issues.map((issue) => issue.title)).toEqual([
-        "Deprecated config key",
-        "Deprecated config key",
-      ])
+      expect(result.issues.map((issue) => issue.title)).toEqual(["Deprecated config key", "Deprecated config key"])
       expect(result.issues.map((issue) => issue.fix)).toEqual([
         "Replace variant with reasoning, or run: oh-my-openagent config migrate",
         'Replace thinking with reasoning: "off" or provider_options.thinking, or run: oh-my-openagent config migrate',

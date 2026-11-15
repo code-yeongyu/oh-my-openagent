@@ -17,10 +17,7 @@ export async function ackMessages(
 
   for (const messageId of messageIds) {
     const messageFileName = `${messageId}.json`
-    const sourcePaths = [
-      path.join(inboxDir, messageFileName),
-      path.join(inboxDir, `.delivering-${messageFileName}`),
-    ]
+    const sourcePaths = [path.join(inboxDir, messageFileName), path.join(inboxDir, `.delivering-${messageFileName}`)]
     const targetPath = path.join(processedDir, messageFileName)
 
     for (const sourcePath of sourcePaths) {

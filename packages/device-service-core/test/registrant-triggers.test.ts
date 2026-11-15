@@ -1,11 +1,23 @@
 import { describe, expect, test } from "bun:test"
 import { spawn } from "node:child_process"
 import { mkdirSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
-import { deviceServiceEndpointPath } from "../src/device-service.ts"
+import { dirname, join } from "node:path"
+import { deviceServiceEndpointPath, deviceServiceStateDir } from "../src/device-service.ts"
 import type { RegistrantSchedule } from "../src/registrant.ts"
 import type { FakeOwner } from "./local-api/conformance/fake-owner.ts"
-import { AGENT_DIR, ownerAt, recorder, registeredFor, registers, root, SELF, start, stopOwner, useRegistrantWorld, within } from "./registrant-support.ts"
+import {
+  AGENT_DIR,
+  ownerAt,
+  recorder,
+  registeredFor,
+  registers,
+  root,
+  SELF,
+  start,
+  stopOwner,
+  useRegistrantWorld,
+  within,
+} from "./registrant-support.ts"
 
 // #12379: the registrant registers on every proven connection to a service that starts,
 // restarts or reappears, through a watcher armed before the existence check and the connection's own close, and it
@@ -23,10 +35,34 @@ describe("agent dir registrant: service starts (#12379)", () => {
 
     await registered
     expect([...owner.state.endpoints]).toEqual([AGENT_DIR])
-    expect(seen.events.filter(event => event.kind === "registered").map(event => event.deviceId)).toEqual([null, SELF])
+    expect(seen.events.filter((event) => event.kind === "registered").map((event) => event.deviceId)).toEqual([
+      null,
+      SELF,
+    ])
     expect(registers(owner)).toBe(2)
   })
 
+  // #13597: a service run with --state-dir elsewhere is found through the env var or the discovery file.
+  test.each(["the env var", "the discovery file"])(
+    "registers on a service in a non-default state dir named by %s",
+    async (via) => {
+      const home = root()
+      const altDir = join(root(), "ds-alt")
+      const owner = await ownerAt(altDir)
+      const env = via === "the env var" ? { OMO_DEVICE_SERVICE_STATE_DIR: altDir } : {}
+      if (via === "the discovery file") {
+        const besideDefault = dirname(deviceServiceStateDir(process.platform, {}, home))
+        mkdirSync(besideDefault, { recursive: true })
+        writeFileSync(join(besideDefault, "device-service.location.json"), JSON.stringify({ v: 1, state_dir: altDir }))
+      }
+      const seen = recorder()
+      const registered = seen.next(registeredFor(SELF), "the register for the adopted device")
+      start({ stateDir: deviceServiceStateDir(process.platform, env, home), onEvent: seen.onEvent })
+
+      await registered
+      expect([...owner.state.endpoints]).toEqual([AGENT_DIR])
+    },
+  )
 
   test("a fresh service on the same state dir (a relayd restart) gets the register again on its new connection", async () => {
     const stateDir = join(root(), "device-service")
@@ -36,7 +72,7 @@ describe("agent dir registrant: service starts (#12379)", () => {
     start({ stateDir, onEvent: seen.onEvent })
     await firstRegister
 
-    const disconnected = seen.next(event => event.kind === "disconnected", "the connection closing")
+    const disconnected = seen.next((event) => event.kind === "disconnected", "the connection closing")
     await stopOwner(first)
     await disconnected
     const again = seen.next(registeredFor(SELF), "the register after the restart")
@@ -46,7 +82,6 @@ describe("agent dir registrant: service starts (#12379)", () => {
     expect([...second.state.endpoints]).toEqual([AGENT_DIR])
     expect(registers(second)).toBe(2)
   })
-
 
   test("a back-to-back stop and start is caught by the connection's close even when no file event arrives", async () => {
     const stateDir = join(root(), "device-service")
@@ -65,7 +100,6 @@ describe("agent dir registrant: service starts (#12379)", () => {
     expect([...second.state.endpoints]).toEqual([AGENT_DIR])
   })
 
-
   test("a state dir that does not exist yet (relayd installed after the engine started) is watched from its nearest ancestor", async () => {
     const stateDir = join(root(), "home", ".omo", "device-service")
     const seen = recorder()
@@ -77,7 +111,6 @@ describe("agent dir registrant: service starts (#12379)", () => {
     await registered
     expect([...owner.state.endpoints]).toEqual([AGENT_DIR])
   })
-
 
   test("a service that starts between arming the watcher and the existence check is not missed", async () => {
     const stateDir = join(root(), "device-service")
@@ -101,7 +134,6 @@ describe("agent dir registrant: service starts (#12379)", () => {
     expect(owner === undefined ? [] : [...owner.state.endpoints]).toEqual([AGENT_DIR])
   })
 
-
   test("schedules nothing without a trigger, and only the 250 ms / 1 s / 4 s connect retries for a dead endpoint", async () => {
     const stateDir = join(root(), "device-service")
     mkdirSync(stateDir, { mode: 0o700 })
@@ -111,14 +143,14 @@ describe("agent dir registrant: service starts (#12379)", () => {
     const scheduled: number[] = []
     let onScheduled: ((run: () => void) => void) | undefined
     const nextScheduled = (what: string): Promise<() => void> =>
-      within(new Promise<() => void>(resolve => (onScheduled = resolve)), what)
+      within(new Promise<() => void>((resolve) => (onScheduled = resolve)), what)
     const schedule: RegistrantSchedule = (run, ms) => {
       scheduled.push(ms)
       onScheduled?.(run)
       return () => {}
     }
     const seen = recorder()
-    const gaveUp = seen.next(event => event.kind === "gave_up", "the registrant giving up until the next trigger")
+    const gaveUp = seen.next((event) => event.kind === "gave_up", "the registrant giving up until the next trigger")
     let retry = nextScheduled("retry 1 being scheduled")
     start({ stateDir, onEvent: seen.onEvent, schedule })
 
@@ -130,9 +162,8 @@ describe("agent dir registrant: service starts (#12379)", () => {
 
     await gaveUp
     expect(scheduled).toEqual([250, 1_000, 4_000])
-    expect(seen.events.filter(event => event.kind === "connect_failed")).toHaveLength(4)
+    expect(seen.events.filter((event) => event.kind === "connect_failed")).toHaveLength(4)
   })
-
 
   test("stop closes the connection and the watcher: a later service start registers nothing", async () => {
     const stateDir = join(root(), "device-service")
@@ -151,9 +182,8 @@ describe("agent dir registrant: service starts (#12379)", () => {
     await freshRegistered
 
     expect(registers(second)).toBe(2)
-    expect(seen.events.filter(event => event.kind === "registered")).toHaveLength(2)
+    expect(seen.events.filter((event) => event.kind === "registered")).toHaveLength(2)
   })
-
 
   test("never holds the engine process open", async () => {
     const stateDir = join(root(), "device-service")
@@ -173,11 +203,13 @@ describe("agent dir registrant: service starts (#12379)", () => {
     child.stdout.setEncoding("utf8").on("data", (chunk: string) => {
       stdout += chunk
     })
-    const exitCode = await within(new Promise<number | null>(resolve => child.once("close", resolve)), "the engine stand-in to exit on its own")
+    const exitCode = await within(
+      new Promise<number | null>((resolve) => child.once("close", resolve)),
+      "the engine stand-in to exit on its own",
+    )
 
     expect(exitCode).toBe(0)
     expect(stdout.trim()).toBe("REGISTERED")
     expect([...owner.state.endpoints]).toEqual([AGENT_DIR])
   })
-
 })

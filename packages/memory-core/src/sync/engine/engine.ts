@@ -94,7 +94,8 @@ export class SyncEngine {
     const s = await this.journal.state()
     const held = s.held === null ? null : heldShown(s.held, batchBound(this.deps))
     // A refused entry is never hidden behind a held item (#12284 review L3); the pause carries the hold along.
-    if (s.paused !== null) return { kind: "paused", seq: s.paused.seq, code: s.paused.code, ...(held === null ? {} : { held }) }
+    if (s.paused !== null)
+      return { kind: "paused", seq: s.paused.seq, code: s.paused.code, ...(held === null ? {} : { held }) }
     if (held !== null) return { kind: "failing", ...held }
     if (s.lastSyncedAt === null) return { kind: "never_synced" }
     return { kind: "synced", at: s.lastSyncedAt, updatedWhileOffline: s.updatedWhileOffline }
@@ -145,10 +146,12 @@ export class SyncEngine {
   runCycle(): Promise<CycleReport> {
     const previous = this.running ?? Promise.resolve(null)
     let keyAtStart: string | null = null
-    const run = previous.catch(() => null).then(() => {
-      keyAtStart = this.statusKey()
-      return this.cycle()
-    })
+    const run = previous
+      .catch(() => null)
+      .then(() => {
+        keyAtStart = this.statusKey()
+        return this.cycle()
+      })
     this.running = run
     const waiters = this.waiters.splice(0)
     void run.then(
@@ -189,7 +192,9 @@ export class SyncEngine {
     try {
       this.deps.onStatusChange?.()
     } catch (error) {
-      this.deps.log?.(`sync status listener failed: ${error instanceof Error ? error.message : "a non-Error value was thrown"}`)
+      this.deps.log?.(
+        `sync status listener failed: ${error instanceof Error ? error.message : "a non-Error value was thrown"}`,
+      )
     }
   }
 
@@ -272,7 +277,13 @@ export class SyncEngine {
     const settleFirst = this.settleNext
     this.settleNext = false
     const pushedCycle = await pushCycle({
-      deps, journal, inbound, sleep: (ms) => this.sleep(ms), settleFirst, frozen: this.tracker.frozen, withheld: () => holds.withheld,
+      deps,
+      journal,
+      inbound,
+      sleep: (ms) => this.sleep(ms),
+      settleFirst,
+      frozen: this.tracker.frozen,
+      withheld: () => holds.withheld,
     })
     this.tracker.frozen = pushedCycle.frozen
     const pushed = pushedCycle.pushed

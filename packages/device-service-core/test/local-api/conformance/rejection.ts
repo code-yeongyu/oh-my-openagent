@@ -4,7 +4,7 @@
 export const rejectionOf = (promise: Promise<unknown>): Promise<unknown> =>
   promise.then(
     () => {
-      throw new Error("expected the promise to reject, but it fulfilled");
+      throw new Error("expected the promise to reject, but it fulfilled")
     },
     (error: unknown) => error,
-  );
+  )

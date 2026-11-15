@@ -9,14 +9,16 @@ const ENDPOINT = "ZW5kcG9pbnQta2V5LTAwMD"
 function client(lookup: () => Promise<unknown>) {
   const calls = { endpointCommand: 0 }
   const fake = {
-    welcome: { service_version: "t", capabilities: [], state: "connected" },
+    welcome: { service_version: "0.1.0", capabilities: [], state: "connected" },
     request: async (type: string) => {
       if (type === "session.endpoints") return await lookup()
       throw new Error(`unexpected request ${type}`)
     },
     endpointCommand: async (_device: string, _endpoint: string, _rpc: unknown, commandId: string) => {
       calls.endpointCommand += 1
-      throw new LocalApiError("request_timeout", `command ${commandId} may have been dispatched`, { command_id: commandId })
+      throw new LocalApiError("request_timeout", `command ${commandId} may have been dispatched`, {
+        command_id: commandId,
+      })
     },
     onEvent: () => () => {},
     close: () => {},
@@ -34,7 +36,9 @@ const failure = async (lookup: () => Promise<unknown>) => {
 
 describe("DeviceService.endpointCommand: a failed endpoint lookup is not_sent", () => {
   test("#given session.endpoints times out #when an endpoint command is sent #then it fails not_sent with the lookup's code and no command goes out", async () => {
-    const { error, calls } = await failure(async () => { throw new LocalApiError("request_timeout", "no answer") })
+    const { error, calls } = await failure(async () => {
+      throw new LocalApiError("request_timeout", "no answer")
+    })
     expect(error).toBeInstanceOf(LocalApiError)
     expect(error.code).toBe("request_timeout")
     expect(error.not_sent).toBe(true)
@@ -43,7 +47,9 @@ describe("DeviceService.endpointCommand: a failed endpoint lookup is not_sent", 
   })
 
   test("#given the connection closes during session.endpoints #when an endpoint command is sent #then it fails not_sent with closed", async () => {
-    const { error, calls } = await failure(async () => { throw new LocalApiError("closed", "the connection closed") })
+    const { error, calls } = await failure(async () => {
+      throw new LocalApiError("closed", "the connection closed")
+    })
     expect(error.code).toBe("closed")
     expect(error.not_sent).toBe(true)
     expect(calls.endpointCommand).toBe(0)

@@ -29,19 +29,26 @@ describe.skipIf(process.platform === "win32")("short engine socket dir (#12557)"
     ["a base whose socket path is exactly at the limit", () => base("a".repeat(atLimitPad)), "base"],
     ["a base one byte over the limit", () => base("b".repeat(atLimitPad + 1)), "/tmp"],
     ["an over-long base", () => base("r".repeat(120)), "/tmp"],
-    ["an over-long base nested under the root suite's run root", () => base("r".repeat(60), "omo-test-run-XXXXXX", "deeper"), "/tmp"],
-  ] as const)("#given %s #when a socket dir is made #then the socket fits the limit under a short hashed leaf", (_name, makeBase, parent) => {
-    const runnerTmp = makeBase()
-    const { dir, socket } = shortSocketDir(LABEL, NAME, runnerTmp)
-    try {
-      expect(dirname(dir)).toBe(parent === "base" ? runnerTmp : "/tmp")
-      expect(basename(dir)).toMatch(/^s[0-9a-f]{4}-.{6}$/)
-      expect(socket).toBe(join(dir, NAME))
-      expect(Buffer.byteLength(socket)).toBeLessThanOrEqual(MAX_SHARD_BIND_PATH)
-    } finally {
-      rmSync(dir, { recursive: true, force: true })
-    }
-  })
+    [
+      "an over-long base nested under the root suite's run root",
+      () => base("r".repeat(60), "omo-test-run-XXXXXX", "deeper"),
+      "/tmp",
+    ],
+  ] as const)(
+    "#given %s #when a socket dir is made #then the socket fits the limit under a short hashed leaf",
+    (_name, makeBase, parent) => {
+      const runnerTmp = makeBase()
+      const { dir, socket } = shortSocketDir(LABEL, NAME, runnerTmp)
+      try {
+        expect(dirname(dir)).toBe(parent === "base" ? runnerTmp : "/tmp")
+        expect(basename(dir)).toMatch(/^s[0-9a-f]{4}-.{6}$/)
+        expect(socket).toBe(join(dir, NAME))
+        expect(Buffer.byteLength(socket)).toBeLessThanOrEqual(MAX_SHARD_BIND_PATH)
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
+    },
+  )
 
   test("#given two tests under one over-long TMPDIR #when each makes its socket dir #then the dirs differ", () => {
     const runnerTmp = base("u".repeat(120))
@@ -55,6 +62,8 @@ describe.skipIf(process.platform === "win32")("short engine socket dir (#12557)"
   })
 
   test("#given a socket name too long even under /tmp #when a socket dir is requested #then it fails naming the limit", () => {
-    expect(() => shortSocketDir(LABEL, `${"x".repeat(100)}.sock`, base("short"))).toThrow(`over the ${MAX_SHARD_BIND_PATH}-byte engine limit`)
+    expect(() => shortSocketDir(LABEL, `${"x".repeat(100)}.sock`, base("short"))).toThrow(
+      `over the ${MAX_SHARD_BIND_PATH}-byte engine limit`,
+    )
   })
 })

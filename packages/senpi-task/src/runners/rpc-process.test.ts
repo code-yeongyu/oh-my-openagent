@@ -215,11 +215,13 @@ describe("RpcProcessRunner", () => {
         terminated = true
       },
     })
-    const start = runner.start(makeSpec({ resumeSessionPath: join(tmpdir(), "held-resume.jsonl") })).catch((error: unknown) => {
-      rejected = true
-      expect(terminated).toBe(true)
-      return error
-    })
+    const start = runner
+      .start(makeSpec({ resumeSessionPath: join(tmpdir(), "held-resume.jsonl") }))
+      .catch((error: unknown) => {
+        rejected = true
+        expect(terminated).toBe(true)
+        return error
+      })
     try {
       await terminating.promise
       expect(rejected).toBe(false)

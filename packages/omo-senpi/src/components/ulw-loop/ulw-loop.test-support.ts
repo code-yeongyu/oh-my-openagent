@@ -115,7 +115,10 @@ export async function withEnvAsync<T>(patch: Record<string, string | undefined>,
   return withEnv(patch, run)
 }
 
-export async function registerWithRunner(outputs: string[], logger = createLogger()): Promise<{
+export async function registerWithRunner(
+  outputs: string[],
+  logger = createLogger(),
+): Promise<{
   readonly pi: FakeExtensionAPI
   readonly logger: ComponentLogger & { entries: RecordedLog[] }
   readonly calls: StatusCall[]

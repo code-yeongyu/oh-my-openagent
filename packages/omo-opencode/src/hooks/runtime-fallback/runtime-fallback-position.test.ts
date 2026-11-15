@@ -11,10 +11,7 @@ type RecordedPrompt = {
   partTexts: string[]
 }
 
-function createContext(recorded: {
-  prompts: RecordedPrompt[]
-  aborts: string[]
-}): RuntimeFallbackPluginInput {
+function createContext(recorded: { prompts: RecordedPrompt[]; aborts: string[] }): RuntimeFallbackPluginInput {
   return {
     client: {
       session: {
@@ -121,10 +118,7 @@ describe("runtime fallback position monotonicity (#6751)", () => {
     })
 
     // second hop dispatched forward
-    expect(recorded.prompts.map((prompt) => prompt.model)).toEqual([
-      "go/fallback-a",
-      "zen/fallback-b",
-    ])
+    expect(recorded.prompts.map((prompt) => prompt.model)).toEqual(["go/fallback-a", "zen/fallback-b"])
 
     // opencode echoes our abort back as stop + idle + abort-classified error
     await hook.event({ event: { type: "session.stop", properties: { sessionID } } })
@@ -150,10 +144,7 @@ describe("runtime fallback position monotonicity (#6751)", () => {
     })
 
     // then
-    expect(recorded.prompts.map((prompt) => prompt.model)).toEqual([
-      "go/fallback-a",
-      "zen/fallback-b",
-    ])
+    expect(recorded.prompts.map((prompt) => prompt.model)).toEqual(["go/fallback-a", "zen/fallback-b"])
     for (const prompt of recorded.prompts) {
       expect(prompt.partTexts).toContain("run the failing task")
     }
@@ -219,10 +210,7 @@ describe("runtime fallback position monotonicity (#6751)", () => {
         },
       },
     })
-    expect(recorded.prompts.map((prompt) => prompt.model)).toEqual([
-      "go/fallback-a",
-      "go/fallback-a",
-    ])
+    expect(recorded.prompts.map((prompt) => prompt.model)).toEqual(["go/fallback-a", "go/fallback-a"])
     hook.dispose?.()
   })
 })

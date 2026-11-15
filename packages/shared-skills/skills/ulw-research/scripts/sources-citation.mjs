@@ -26,40 +26,54 @@ const BREAK = new Set(["br", "p", "li", "div", "tr", "dd", "dt"])
 const NOT_END = /(?:\b(?:pp?|vol|vols|no|nos|ed|eds|al|ch|sec|fig|vs|e\.g|i\.e|[A-Z])\.)$/i
 const FACT = "\u0000"
 const LINK = "\u0002"
-const [CITE_OPEN, CITE_CLOSE, EM_OPEN, EM_CLOSE, A_OPEN, A_CLOSE] = ["\u0003", "\u0004", "\u0005", "\u0006", "\u0007", "\u0008"]
-const MONTH = "(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\b\\.?"
+const [CITE_OPEN, CITE_CLOSE, EM_OPEN, EM_CLOSE, A_OPEN, A_CLOSE] = [
+  "\u0003",
+  "\u0004",
+  "\u0005",
+  "\u0006",
+  "\u0007",
+  "\u0008",
+]
+const MONTH =
+  "(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\b\\.?"
 const YEAR = "(?:19|20)\\d{2}"
 const URL = `(?:https?://|www\\.)[^\\s<>"${LINK}${A_CLOSE}]+?(?=[.,;:)\\]]?(?:\\s|$))`
 /** A date at the start of a string: ISO/dotted/slashed, month-name, or Korean nyeon-wol-il. */
-const DATE_AHEAD = new RegExp(`^(?:${YEAR}[-./]\\d{1,2}(?:[-./]\\d{1,2})?|\\d{1,2}[-./]\\d{1,2}[-./]${YEAR}|${MONTH}\\s+\\d{1,2},?\\s+${YEAR}|\\d{1,2}\\s+${MONTH}\\s+${YEAR}|${MONTH}\\s+${YEAR}|${YEAR}\\s*\\uB144|${YEAR}\\b)`, "i")
+const DATE_AHEAD = new RegExp(
+  `^(?:${YEAR}[-./]\\d{1,2}(?:[-./]\\d{1,2})?|\\d{1,2}[-./]\\d{1,2}[-./]${YEAR}|${MONTH}\\s+\\d{1,2},?\\s+${YEAR}|\\d{1,2}\\s+${MONTH}\\s+${YEAR}|${MONTH}\\s+${YEAR}|${YEAR}\\s*\\uB144|${YEAR}\\b)`,
+  "i",
+)
 /** Citation fields a number can sit INSIDE (a checked sentence is traced without them, so a title is never a quotation). */
 const CONTAINERS = [
-	new RegExp(URL, "gi"),
-	/\b(?:doi:\s*)?10\.\d{4,9}\/[^\s<>"]+/gi,
-	/\b(?:arXiv:\s*)?\d{4}\.\d{4,5}(?:v\d+)?\b/gi,
-	/\bIS[BS]N(?:-1[03])?:?\s*[\dXx][\dXx\s-]{6,16}[\dXx]/g,
-	/\[(?:S|Source\s*)?\^?\d+\]/gi,
-	/"[^"]*"|\u201C[^\u201D]*\u201D|\u300C[^\u300D]*\u300D|\u300E[^\u300F]*\u300F/g,
-	new RegExp(`${CITE_OPEN}[^${CITE_CLOSE}]*${CITE_CLOSE}`, "g"),
-	new RegExp(`${A_OPEN}[^${A_CLOSE}]*${A_CLOSE}`, "g"),
+  new RegExp(URL, "gi"),
+  /\b(?:doi:\s*)?10\.\d{4,9}\/[^\s<>"]+/gi,
+  /\b(?:arXiv:\s*)?\d{4}\.\d{4,5}(?:v\d+)?\b/gi,
+  /\bIS[BS]N(?:-1[03])?:?\s*[\dXx][\dXx\s-]{6,16}[\dXx]/g,
+  /\[(?:S|Source\s*)?\^?\d+\]/gi,
+  /"[^"]*"|\u201C[^\u201D]*\u201D|\u300C[^\u300D]*\u300D|\u300E[^\u300F]*\u300F/g,
+  new RegExp(`${CITE_OPEN}[^${CITE_CLOSE}]*${CITE_CLOSE}`, "g"),
+  new RegExp(`${A_OPEN}[^${A_CLOSE}]*${A_CLOSE}`, "g"),
 ]
 /** Date fields: full dates, month/day, a Korean quarter, dotted dates (with spaces, or DD.MM.YY), years and year ranges. */
 const DATES = [
-	new RegExp(`${YEAR}[-./]\\d{1,2}(?:[-./]\\d{1,2})?|\\d{1,2}[-./]\\d{1,2}[-./]${YEAR}`, "g"),
-	new RegExp(`\\b${MONTH}\\s+\\d{1,2}(?:st|nd|rd|th)?\\b(?:,?\\s+${YEAR})?|\\b\\d{1,2}(?:st|nd|rd|th)?\\s+${MONTH}`, "gi"),
-	/\d{1,2}\s*\uC6D4(?:\s*\d{1,2}\s*\uC77C)?|(?<!\d)[1-4]\s*\uBD84\uAE30/g,
-	new RegExp(`${YEAR}\\.\\s+\\d{1,2}\\.\\s+\\d{1,2}\\.?`, "g"),
-	/(?<![\d/.,])(?:1[0-2]|0?[1-9])\/(?:3[01]|[12]\d|0?[1-9])(?![\d/]|[.,]\d)/g,
-	/(?<![\d.])\d{2}\.\d{2}\.\d{2}(?!\d|\.\d)/g,
-	new RegExp(`(?<![\\d.,])${YEAR}(?:\\s*[-\\u2013~]\\s*${YEAR})?(?![\\d]|[.,]\\d)`, "g"),
+  new RegExp(`${YEAR}[-./]\\d{1,2}(?:[-./]\\d{1,2})?|\\d{1,2}[-./]\\d{1,2}[-./]${YEAR}`, "g"),
+  new RegExp(
+    `\\b${MONTH}\\s+\\d{1,2}(?:st|nd|rd|th)?\\b(?:,?\\s+${YEAR})?|\\b\\d{1,2}(?:st|nd|rd|th)?\\s+${MONTH}`,
+    "gi",
+  ),
+  /\d{1,2}\s*\uC6D4(?:\s*\d{1,2}\s*\uC77C)?|(?<!\d)[1-4]\s*\uBD84\uAE30/g,
+  new RegExp(`${YEAR}\\.\\s+\\d{1,2}\\.\\s+\\d{1,2}\\.?`, "g"),
+  /(?<![\d/.,])(?:1[0-2]|0?[1-9])\/(?:3[01]|[12]\d|0?[1-9])(?![\d/]|[.,]\d)/g,
+  /(?<![\d.])\d{2}\.\d{2}\.\d{2}(?!\d|\.\d)/g,
+  new RegExp(`(?<![\\d.,])${YEAR}(?:\\s*[-\\u2013~]\\s*${YEAR})?(?![\\d]|[.,]\\d)`, "g"),
 ]
 /** Marker fields: page, volume, issue, number, and edition markers. */
 const MARKERS = [
-	/\b(?:pp?|pg|pages?)\.?\s*\d+(?:\s*[-\u2013]\s*\d+)?/gi,
-	/\b(?:vols?|nos?|iss|ed)\.\s*\d+(?:\s*[-\u2013/]\s*\d+)*/gi,
-	/\b(?:Vol|Volume|No|Issue|Number|volume|issue)\s+\d+(?:\s*[-\u2013/]\s*\d+)*/g,
-	/\b\d+(?:st|nd|rd|th)\s+(?:ed\.|edition)|\bedition\s+\d+/gi,
-	/\uC81C?\s*\d+(?:\s*[-\u2013~]\s*\d+)?\s*(?:\uCABD|\uBA74|\uAD8C|\uD638|\uD310)/g,
+  /\b(?:pp?|pg|pages?)\.?\s*\d+(?:\s*[-\u2013]\s*\d+)?/gi,
+  /\b(?:vols?|nos?|iss|ed)\.\s*\d+(?:\s*[-\u2013/]\s*\d+)*/gi,
+  /\b(?:Vol|Volume|No|Issue|Number|volume|issue)\s+\d+(?:\s*[-\u2013/]\s*\d+)*/g,
+  /\b\d+(?:st|nd|rd|th)\s+(?:ed\.|edition)|\bedition\s+\d+/gi,
+  /\uC81C?\s*\d+(?:\s*[-\u2013~]\s*\d+)?\s*(?:\uCABD|\uBA74|\uAD8C|\uD638|\uD310)/g,
 ]
 const TYPED = [...DATES, ...MARKERS]
 const NUMERAL = /\d+(?:[.,]\d+)*/g
@@ -75,13 +89,15 @@ const GROUPED = new RegExp(`^${DOT_GROUPED}$`)
 
 /** Letters that make a glued digit run a quantity; a Korean run may carry a particle after its unit. */
 function isUnit(letters) {
-	if (!/^[\uAC00-\uD7A3]/.test(letters)) return UNIT_WORD.test(letters) || normalizeUnit(letters) !== null || normalizeUnit(letters.toLowerCase()) !== null
-	if (UNIT_LEAD.test(letters)) return true
-	for (let size = letters.length; size > 0; size--) if (normalizeUnit(letters.slice(0, size))) return true
-	return false
+  if (!/^[\uAC00-\uD7A3]/.test(letters))
+    return UNIT_WORD.test(letters) || normalizeUnit(letters) !== null || normalizeUnit(letters.toLowerCase()) !== null
+  if (UNIT_LEAD.test(letters)) return true
+  for (let size = letters.length; size > 0; size--) if (normalizeUnit(letters.slice(0, size))) return true
+  return false
 }
 /** A multiplier written before its number ("x3", "x1.5"): a standalone x, never a label ("w1:x02") or a leading zero. */
-const isMultiplierBefore = (before, left, run) => dimensionOf(left) === "multiple" && /(?:^|[\s(])\p{L}+$/u.test(before) && !/^0\d/.test(run)
+const isMultiplierBefore = (before, left, run) =>
+  dimensionOf(left) === "multiple" && /(?:^|[\s(])\p{L}+$/u.test(before) && !/^0\d/.test(run)
 const isCurrency = (letters) => /^currency:/.test(dimensionOf(letters) ?? dimensionOf(letters.toUpperCase()) ?? "")
 
 /**
@@ -94,57 +110,70 @@ const isCurrency = (letters) => /^currency:/.test(dimensionOf(letters) ?? dimens
  * sides, which is an identifier ("W3C", "eb2b").
  */
 function isName(text, start, end) {
-	const run = text.slice(start, end)
-	if (/^\d+(?:\.\d+){2,}$/.test(run) && !GROUPED.test(run)) return true
-	const before = text.slice(0, start)
-	const rest = text.slice(end)
-	if (KO_ORDINAL_BEFORE.test(before) || KO_ORDINAL_AFTER.test(rest)) return true
-	const left = /(?<![A-Za-z])[A-Za-z]+$/.exec(before)?.[0] ?? /\p{L}+$/u.exec(before)?.[0]
-	const right = LETTERS_AFTER.exec(rest)?.[0]
-	const measure = right ? !/^\d/.test(rest.slice(right.length)) && isUnit(right) : SYMBOL_AFTER.test(rest)
-	if (measure && !(right && /^[A-Za-z]/.test(right) && /[A-Za-z]$/.test(before))) return false
-	if (left) return !isCurrency(left) && !(!right && isMultiplierBefore(before, left, run))
-	if (right) return true
-	if (before.endsWith("#") || /\p{L}/u.test(/([\p{L}\p{N}]+)[-._/]$/u.exec(before)?.[1] ?? "")) return true
-	const joined = /^-(\p{L}[\p{L}\p{N}]*)/u.exec(rest)?.[1]
-	return joined !== undefined && !isUnit(joined)
+  const run = text.slice(start, end)
+  if (/^\d+(?:\.\d+){2,}$/.test(run) && !GROUPED.test(run)) return true
+  const before = text.slice(0, start)
+  const rest = text.slice(end)
+  if (KO_ORDINAL_BEFORE.test(before) || KO_ORDINAL_AFTER.test(rest)) return true
+  const left = /(?<![A-Za-z])[A-Za-z]+$/.exec(before)?.[0] ?? /\p{L}+$/u.exec(before)?.[0]
+  const right = LETTERS_AFTER.exec(rest)?.[0]
+  const measure = right ? !/^\d/.test(rest.slice(right.length)) && isUnit(right) : SYMBOL_AFTER.test(rest)
+  if (measure && !(right && /^[A-Za-z]/.test(right) && /[A-Za-z]$/.test(before))) return false
+  if (left) return !isCurrency(left) && !(!right && isMultiplierBefore(before, left, run))
+  if (right) return true
+  if (before.endsWith("#") || /\p{L}/u.test(/([\p{L}\p{N}]+)[-._/]$/u.exec(before)?.[1] ?? "")) return true
+  const joined = /^-(\p{L}[\p{L}\p{N}]*)/u.exec(rest)?.[1]
+  return joined !== undefined && !isUnit(joined)
 }
 
 /** A fact element is bound by its ledger row, not traced here; it reads as one opaque token. */
-const isFact = (node) => node.attrs?.["data-fact"] !== undefined || node.attrs?.["data-translates"] !== undefined || node.tag === "q" || node.tag === "blockquote"
+const isFact = (node) =>
+  node.attrs?.["data-fact"] !== undefined ||
+  node.attrs?.["data-translates"] !== undefined ||
+  node.tag === "q" ||
+  node.tag === "blockquote"
 
 function lines(node, out = [""]) {
-	for (const child of node.children ?? []) {
-		if (child.tag === "#text") out[out.length - 1] += child.text
-		else if (SKIP.has(child.tag)) continue
-		else if (isFact(child)) out[out.length - 1] += ` ${FACT} `
-		else if (child.tag === "cite" || child.tag === "i" || child.tag === "em" || child.tag === "a") {
-			const [open, close] = child.tag === "cite" ? [CITE_OPEN, CITE_CLOSE] : child.tag === "a" ? [A_OPEN, A_CLOSE] : [EM_OPEN, EM_CLOSE]
-			out[out.length - 1] += open
-			lines(child, out)
-			out[out.length - 1] += close
-			if (child.tag === "a" && /^https?:\/\//i.test(child.attrs?.href ?? "")) out[out.length - 1] += ` ${LINK} `
-		} else {
-			if (BREAK.has(child.tag)) out.push("")
-			lines(child, out)
-			if (BREAK.has(child.tag)) out.push("")
-		}
-	}
-	return out
+  for (const child of node.children ?? []) {
+    if (child.tag === "#text") out[out.length - 1] += child.text
+    else if (SKIP.has(child.tag)) continue
+    else if (isFact(child)) out[out.length - 1] += ` ${FACT} `
+    else if (child.tag === "cite" || child.tag === "i" || child.tag === "em" || child.tag === "a") {
+      const [open, close] =
+        child.tag === "cite" ? [CITE_OPEN, CITE_CLOSE] : child.tag === "a" ? [A_OPEN, A_CLOSE] : [EM_OPEN, EM_CLOSE]
+      out[out.length - 1] += open
+      lines(child, out)
+      out[out.length - 1] += close
+      if (child.tag === "a" && /^https?:\/\//i.test(child.attrs?.href ?? "")) out[out.length - 1] += ` ${LINK} `
+    } else {
+      if (BREAK.has(child.tag)) out.push("")
+      lines(child, out)
+      if (BREAK.has(child.tag)) out.push("")
+    }
+  }
+  return out
 }
 
 /** Spans [start, end) of the citation fields in `text`; an <i>/<em> run is a title only right before a URL, a link, or a date. */
 function containerSpans(text) {
-	const spans = []
-	for (const re of CONTAINERS) for (const match of text.matchAll(re)) spans.push([match.index, match.index + match[0].length])
-	for (const match of text.matchAll(new RegExp(`${EM_OPEN}[^${EM_CLOSE}]*${EM_CLOSE}`, "g"))) {
-		const after = text.slice(match.index + match[0].length).replace(/^[\s,.:;()\u2013-]*/, "")
-		if (after.startsWith(LINK) || after.startsWith(A_OPEN) || /^(?:https?:\/\/|www\.)/i.test(after) || DATE_AHEAD.test(after)) spans.push([match.index, match.index + match[0].length])
-	}
-	return spans
+  const spans = []
+  for (const re of CONTAINERS)
+    for (const match of text.matchAll(re)) spans.push([match.index, match.index + match[0].length])
+  for (const match of text.matchAll(new RegExp(`${EM_OPEN}[^${EM_CLOSE}]*${EM_CLOSE}`, "g"))) {
+    const after = text.slice(match.index + match[0].length).replace(/^[\s,.:;()\u2013-]*/, "")
+    if (
+      after.startsWith(LINK) ||
+      after.startsWith(A_OPEN) ||
+      /^(?:https?:\/\/|www\.)/i.test(after) ||
+      DATE_AHEAD.test(after)
+    )
+      spans.push([match.index, match.index + match[0].length])
+  }
+  return spans
 }
 
-const typedSpans = (text, list) => list.flatMap((re) => [...text.matchAll(re)].map((match) => [match.index, match.index + match[0].length]))
+const typedSpans = (text, list) =>
+  list.flatMap((re) => [...text.matchAll(re)].map((match) => [match.index, match.index + match[0].length]))
 
 const fieldSpans = (text) => [...containerSpans(text), ...typedSpans(text, TYPED)]
 
@@ -152,27 +181,34 @@ const inside = (spans, start, end) => spans.some(([s, e]) => start >= s && end <
 
 /** Sentences of one line; a period after an abbreviation, an initial, or inside a field never ends one. */
 function sentences(line) {
-	const spans = fieldSpans(line)
-	const out = []
-	let start = 0
-	for (const match of line.matchAll(/[.!?](?=\s+\S|$)/g)) {
-		const end = match.index + 1
-		if (NOT_END.test(line.slice(start, end)) || inside(spans, match.index, end)) continue
-		out.push(line.slice(start, end))
-		start = end
-	}
-	out.push(line.slice(start))
-	return out.map((text) => text.replace(/\s+/g, " ").trim()).filter(Boolean)
+  const spans = fieldSpans(line)
+  const out = []
+  let start = 0
+  for (const match of line.matchAll(/[.!?](?=\s+\S|$)/g)) {
+    const end = match.index + 1
+    if (NOT_END.test(line.slice(start, end)) || inside(spans, match.index, end)) continue
+    out.push(line.slice(start, end))
+    start = end
+  }
+  out.push(line.slice(start))
+  return out.map((text) => text.replace(/\s+/g, " ").trim()).filter(Boolean)
 }
 
 /** Each digit run of `text` with its class: "citation-field" (a container or a marker), "date", "name", or "numeral". */
 export function numeralKinds(text) {
-	const [containers, markers, dates] = [containerSpans(text), typedSpans(text, MARKERS), typedSpans(text, DATES)]
-	return [...text.matchAll(NUMERAL)].map((match) => {
-		const [start, end] = [match.index, match.index + match[0].length]
-		const kind = inside(containers, start, end) || inside(markers, start, end) ? "citation-field" : inside(dates, start, end) ? "date" : isName(text, start, end) ? "name" : "numeral"
-		return { text: match[0], kind }
-	})
+  const [containers, markers, dates] = [containerSpans(text), typedSpans(text, MARKERS), typedSpans(text, DATES)]
+  return [...text.matchAll(NUMERAL)].map((match) => {
+    const [start, end] = [match.index, match.index + match[0].length]
+    const kind =
+      inside(containers, start, end) || inside(markers, start, end)
+        ? "citation-field"
+        : inside(dates, start, end)
+          ? "date"
+          : isName(text, start, end)
+            ? "name"
+            : "numeral"
+    return { text: match[0], kind }
+  })
 }
 
 /** The sentence holds a numeral that is not a citation-field number, so the gates check it. */
@@ -180,24 +216,27 @@ export const isClaimSegment = (text) => numeralKinds(text).some(({ kind }) => ki
 
 /** A checked sentence as the gates read it: container fields (URL, DOI, title, tag) removed, every other number kept. */
 function plain(text) {
-	let out = ""
-	let at = 0
-	for (const [start, end] of containerSpans(text).sort((a, b) => a[0] - b[0])) {
-		if (end <= at) continue
-		out += `${text.slice(at, Math.max(at, start))} `
-		at = end
-	}
-	return `${out}${text.slice(at)}`.replace(/[\u0002-\u0008]/g, " ").replace(/\s+/g, " ").trim()
+  let out = ""
+  let at = 0
+  for (const [start, end] of containerSpans(text).sort((a, b) => a[0] - b[0])) {
+    if (end <= at) continue
+    out += `${text.slice(at, Math.max(at, start))} `
+    at = end
+  }
+  return `${out}${text.slice(at)}`
+    .replace(/[\u0002-\u0008]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
 }
 const lineClaims = (line) => sentences(line).filter(isClaimSegment).map(plain)
 
 /** The checked sentences of an element under Sources ([] when every numeral is a citation field). */
 export function sourcesClaims(node) {
-	if (/^h[1-6]$/.test(node.tag)) return []
-	return lines(node).flatMap(lineClaims)
+  if (/^h[1-6]$/.test(node.tag)) return []
+  return lines(node).flatMap(lineClaims)
 }
 
 /** The checked sentences of loose text (a text node owned by a container element rather than a prose element). */
 export function textClaims(text) {
-	return lines({ children: [{ tag: "#text", text }] }).flatMap(lineClaims)
+  return lines({ children: [{ tag: "#text", text }] }).flatMap(lineClaims)
 }

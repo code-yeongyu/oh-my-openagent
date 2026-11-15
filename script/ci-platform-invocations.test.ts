@@ -26,22 +26,26 @@ function jobOses(job: Record<string, unknown>): string[] {
   const matrix = isRecord(strategy) ? strategy["matrix"] : undefined
   if (!isRecord(matrix)) return []
   const listed = Array.isArray(matrix["os"]) ? matrix["os"] : []
-  const included = Array.isArray(matrix["include"]) ? matrix["include"].map((entry) => (isRecord(entry) ? entry["os"] : undefined)) : []
+  const included = Array.isArray(matrix["include"])
+    ? matrix["include"].map((entry) => (isRecord(entry) ? entry["os"] : undefined))
+    : []
   return [...listed, ...included].filter((os): os is string => typeof os === "string")
 }
 
 function pathsNamedByPlatformOnlySteps(): string[] {
   const workflow: unknown = load(ciWorkflow)
   if (!isRecord(workflow) || !isRecord(workflow["jobs"])) throw new Error("ci.yml must define jobs")
-  const named = Object.values(workflow["jobs"]).filter(isRecord).flatMap((job) => {
-    const oses = jobOses(job)
-    const literalRunner = typeof job["runs-on"] === "string" && /^(?:macos|windows)/.test(job["runs-on"])
-    const jobIsPlatformOnly = literalRunner || (oses.length > 0 && oses.every((os) => /macos|windows/.test(os)))
-    const steps = Array.isArray(job["steps"]) ? job["steps"].filter(isRecord) : []
-    return steps
-      .filter((step) => jobIsPlatformOnly || platformOnlyCondition.test(String(step["if"] ?? "")))
-      .flatMap((step) => JSON.stringify([step["run"], step["with"], step["env"]]).match(namedPath) ?? [])
-  })
+  const named = Object.values(workflow["jobs"])
+    .filter(isRecord)
+    .flatMap((job) => {
+      const oses = jobOses(job)
+      const literalRunner = typeof job["runs-on"] === "string" && /^(?:macos|windows)/.test(job["runs-on"])
+      const jobIsPlatformOnly = literalRunner || (oses.length > 0 && oses.every((os) => /macos|windows/.test(os)))
+      const steps = Array.isArray(job["steps"]) ? job["steps"].filter(isRecord) : []
+      return steps
+        .filter((step) => jobIsPlatformOnly || platformOnlyCondition.test(String(step["if"] ?? "")))
+        .flatMap((step) => JSON.stringify([step["run"], step["with"], step["env"]]).match(namedPath) ?? [])
+    })
   const fromScripts = named
     .filter((path) => /^\.github\/scripts\/[\w.-]+\.sh$/.test(path))
     .flatMap((script) => readFileSync(`${repoRoot}${script}`, "utf8").match(namedPath) ?? [])
@@ -142,7 +146,9 @@ describe("#given a workflow that adds a new macOS/Windows invocation", () => {
   })
 
   test("#then a script's shebang interpreter path is not mistaken for a repository path", () => {
-    const shebang = platformInvocationCoverage(workflow, (path) => (path === ".github/scripts/win-pipes.sh" ? "#!/usr/bin/env bash\n" : ""))
+    const shebang = platformInvocationCoverage(workflow, (path) =>
+      path === ".github/scripts/win-pipes.sh" ? "#!/usr/bin/env bash\n" : "",
+    )
     expect(shebang.some((entry) => entry.value.startsWith("bin/env"))).toBe(false)
   })
 

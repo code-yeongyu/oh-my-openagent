@@ -1,4 +1,10 @@
-import { canonicalPath, hostPathOperations, isWindowsPathOperations, pathKey, usesWindowsPathSemantics } from "./discovery-paths"
+import {
+  canonicalPath,
+  hostPathOperations,
+  isWindowsPathOperations,
+  pathKey,
+  usesWindowsPathSemantics,
+} from "./discovery-paths"
 import type { ConfigMigrationDiscoveryOptions } from "./types"
 
 const TAURI_IDENTIFIERS = ["ai.opencode.desktop", "ai.opencode.desktop.dev"] as const
@@ -19,9 +25,10 @@ function isWindowsPath(path: string): boolean {
 }
 
 function isWsl(options: ConfigMigrationDiscoveryOptions): boolean {
-  return options.platform === "linux" && (
-    environmentValue(options, "WSL_DISTRO_NAME") !== undefined
-    || environmentValue(options, "WSL_INTEROP") !== undefined
+  return (
+    options.platform === "linux" &&
+    (environmentValue(options, "WSL_DISTRO_NAME") !== undefined ||
+      environmentValue(options, "WSL_INTEROP") !== undefined)
   )
 }
 
@@ -48,8 +55,7 @@ function defaultTauriRoots(options: ConfigMigrationDiscoveryOptions): readonly s
 function windowsRoots(options: ConfigMigrationDiscoveryOptions): readonly string[] {
   if (!usesWindowsPathSemantics(options)) return []
   const pathOperations = hostPathOperations(options)
-  const appData = environmentValue(options, "APPDATA")
-    ?? pathOperations.join(options.homeDir, "AppData", "Roaming")
+  const appData = environmentValue(options, "APPDATA") ?? pathOperations.join(options.homeDir, "AppData", "Roaming")
   return [
     pathOperations.join(appData, "opencode"),
     ...TAURI_IDENTIFIERS.map((identifier) => pathOperations.join(appData, identifier)),

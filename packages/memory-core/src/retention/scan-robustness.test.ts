@@ -6,11 +6,26 @@ import { join } from "node:path"
 import type { MemoryIdentityPaths } from "../identity/layout"
 import { withLocalJournalLock, type JournalLock } from "../journal/lock"
 import { readReflectionRetentionGuard } from "./guard"
-import { measureRuntimeCapEvictableBytes, runRuntimeSizeCap, type RuntimeCapCursor, type RuntimeSizeCapOptions } from "./cap"
+import {
+  measureRuntimeCapEvictableBytes,
+  runRuntimeSizeCap,
+  type RuntimeCapCursor,
+  type RuntimeSizeCapOptions,
+} from "./cap"
 import { countRuntimePastRetention, measureUnreflectedJournalBytes } from "./past-retention"
 import { runRuntimeRetention } from "./pass"
 import { DEFAULT_RUNTIME_RETENTION } from "./policy"
-import { ageTree, cleanupRoots, daysAgo, identity, journal, now, reflectionRun, runsDir, writeJson } from "./retention.test-support"
+import {
+  ageTree,
+  cleanupRoots,
+  daysAgo,
+  identity,
+  journal,
+  now,
+  reflectionRun,
+  runsDir,
+  writeJson,
+} from "./retention.test-support"
 import { measureRuntimeSize } from "./size"
 
 afterEach(cleanupRoots)
@@ -76,8 +91,12 @@ describe("the doctors' journal measures run under the measurement deadline (#125
     await foldedRuns(paths, 2, 1024)
     await journal(paths, "j-never", "never", daysAgo(60))
 
-    await expect(measureUnreflectedJournalBytes({ paths, policy: UNREFLECTED_ON, signal: AbortSignal.abort() })).rejects.toMatchObject({ name: "AbortError" })
-    await expect(measureRuntimeCapEvictableBytes({ paths, policy: UNREFLECTED_ON, now, signal: AbortSignal.abort() })).rejects.toMatchObject({ name: "AbortError" })
+    await expect(
+      measureUnreflectedJournalBytes({ paths, policy: UNREFLECTED_ON, signal: AbortSignal.abort() }),
+    ).rejects.toMatchObject({ name: "AbortError" })
+    await expect(
+      measureRuntimeCapEvictableBytes({ paths, policy: UNREFLECTED_ON, now, signal: AbortSignal.abort() }),
+    ).rejects.toMatchObject({ name: "AbortError" })
   })
 })
 
@@ -105,7 +124,7 @@ describe("a resumed cap pass that walks no new item keeps its cursor (#12538 rev
     const paths = await identity()
     await foldedRuns(paths, 4, 1024)
     let reads = 0
-    const report = await cap(paths, 1, { resume, budgetMs: 500, clock: () => (reads++) * 1000 })
+    const report = await cap(paths, 1, { resume, budgetMs: 500, clock: () => reads++ * 1000 })
 
     expect(report.skipped).toContain("measure-over-budget")
     expect(report.cursor).toEqual(resume)
@@ -126,7 +145,9 @@ describe("a resumed cap pass that walks no new item keeps its cursor (#12538 rev
 
 const cursorFile = (paths: MemoryIdentityPaths): string => join(paths.runtime, "retention.json")
 
-async function persistedCursors(paths: MemoryIdentityPaths): Promise<{ readonly cursor?: unknown; readonly cap?: unknown } | undefined> {
+async function persistedCursors(
+  paths: MemoryIdentityPaths,
+): Promise<{ readonly cursor?: unknown; readonly cap?: unknown } | undefined> {
   if (!existsSync(cursorFile(paths))) return undefined
   return JSON.parse(await readFile(cursorFile(paths), "utf8")) as { readonly cursor?: unknown; readonly cap?: unknown }
 }
@@ -141,7 +162,11 @@ async function unfoldedRuns(paths: MemoryIdentityPaths): Promise<{ readonly runs
   const at: number[] = []
   for (let index = 1; index <= 13; index += 1) {
     const finishedAt = daysAgo(61 - index)
-    runs.push(await reflectionRun(paths, `reflection-run-${index}`, { outcome: "failed", finishedAt }).then(() => `reflection-run-${index}`))
+    runs.push(
+      await reflectionRun(paths, `reflection-run-${index}`, { outcome: "failed", finishedAt }).then(
+        () => `reflection-run-${index}`,
+      ),
+    )
     at.push(finishedAt)
   }
   return { runs, at }
@@ -154,7 +179,8 @@ describe("a saved cap resume point never stops retention (#12538 review r4 M)", 
 
   test("#given an identity over its cap with a stored cap resume point and a size walk that overruns the budget #when passes repeat #then retention still removes the runs and the journal past their windows and the cap keeps its resume point", async () => {
     const paths = await identity()
-    for (let index = 1; index <= 4; index += 1) await reflectionRun(paths, `reflection-run-${index}`, { finishedAt: daysAgo(60 - index) })
+    for (let index = 1; index <= 4; index += 1)
+      await reflectionRun(paths, `reflection-run-${index}`, { finishedAt: daysAgo(60 - index) })
     const stale = await journal(paths, "j-fully", "fully", daysAgo(60))
     const resume: RuntimeCapCursor = { store: "cap", tier: "folded-run", clock: 0, lastName: "reflection-run-0" }
     // The shape a pass of #12538@237e8d01d1 persisted: the cap's resume point as the pass's only cursor.
@@ -177,7 +203,8 @@ describe("a saved cap resume point never stops retention (#12538 review r4 M)", 
     const { runs, at } = await unfoldedRuns(paths)
     const [at0, at1] = at
     const [run0] = runs
-    if (at0 === undefined || at1 === undefined || run0 === undefined) throw new Error("expected at least two unfolded runs")
+    if (at0 === undefined || at1 === undefined || run0 === undefined)
+      throw new Error("expected at least two unfolded runs")
     const resume: RuntimeCapCursor = { store: "cap", tier: "unfolded-run", clock: (at0 + at1) / 2, lastName: run0 }
     await writeJson(cursorFile(paths), { version: 1, cursor: { store: "journals", lastName: "s-05" }, cap: resume })
 
@@ -193,7 +220,8 @@ describe("a saved cap resume point never stops retention (#12538 review r4 M)", 
     const { runs, at } = await unfoldedRuns(paths)
     const [at0, at1] = at
     const [run0] = runs
-    if (at0 === undefined || at1 === undefined || run0 === undefined) throw new Error("expected at least two unfolded runs")
+    if (at0 === undefined || at1 === undefined || run0 === undefined)
+      throw new Error("expected at least two unfolded runs")
     const resume: RuntimeCapCursor = { store: "cap", tier: "unfolded-run", clock: (at0 + at1) / 2, lastName: run0 }
     await writeJson(cursorFile(paths), { version: 1, cap: resume })
 
@@ -253,7 +281,9 @@ describe("a journal that turns unreadable before the cap's locked eviction (#125
     }
 
     // A cap that kept the aborted journal as state-unreadable would resolve, and its pass could stamp itself complete.
-    await expect(cap(paths, 1, { journalLock, signal: controller.signal })).rejects.toMatchObject({ name: "AbortError" })
+    await expect(cap(paths, 1, { journalLock, signal: controller.signal })).rejects.toMatchObject({
+      name: "AbortError",
+    })
 
     expect(locked).toEqual([join(first, "state.lock"), join(last, "state.lock")])
     expect(existsSync(join(first, "transcript.jsonl"))).toBe(false)

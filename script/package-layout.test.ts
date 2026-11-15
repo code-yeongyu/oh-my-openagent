@@ -41,7 +41,10 @@ const packDryRunTimeoutMs = 15_000
 setDefaultTimeout(packageLayoutTestTimeoutMs)
 
 class PackDryRunError extends Error {
-  constructor(readonly exitCode: number, readonly stderr: string) {
+  constructor(
+    readonly exitCode: number,
+    readonly stderr: string,
+  ) {
     super(`bun pm pack --dry-run --ignore-scripts failed with exit code ${exitCode}: ${stderr}`)
     this.name = "PackDryRunError"
   }
@@ -108,10 +111,7 @@ function collectSkillAssetPaths(rootRelativePath: string): string[] {
 }
 
 function collectExpectedAssetPaths(): string[] {
-  return [
-    ...commandRoots.flatMap(collectCommandAssetPaths),
-    ...skillRoots.flatMap(collectSkillAssetPaths),
-  ].sort()
+  return [...commandRoots.flatMap(collectCommandAssetPaths), ...skillRoots.flatMap(collectSkillAssetPaths)].sort()
 }
 
 function parsePackedPaths(output: string): Set<string> {
@@ -172,7 +172,8 @@ describe("published package layout", () => {
       cwd: repositoryRoot,
       encoding: "utf8",
     }).trim()
-    const gitmodules = trackedGitmodulesPath && existsSync(gitmodulesPath) ? Bun.file(gitmodulesPath).text() : Promise.resolve("")
+    const gitmodules =
+      trackedGitmodulesPath && existsSync(gitmodulesPath) ? Bun.file(gitmodulesPath).text() : Promise.resolve("")
 
     // then
     expect(trackedEntries).not.toContain("160000")
@@ -180,66 +181,86 @@ describe("published package layout", () => {
     return expect(gitmodules).resolves.not.toContain("packages/lsp-tools-mcp")
   })
 
-  test("#given Codex LSP file dependency #when packing package #then lsp-tools-mcp package metadata ships", async () => {
-    // given
-    const expectedPackageRootManifest = "packages/lsp-tools-mcp/package.json"
+  test(
+    "#given Codex LSP file dependency #when packing package #then lsp-tools-mcp package metadata ships",
+    async () => {
+      // given
+      const expectedPackageRootManifest = "packages/lsp-tools-mcp/package.json"
 
-    // when
-    const packedPaths = await packDryRunPaths()
+      // when
+      const packedPaths = await packDryRunPaths()
 
-    // then
-    expect(packedPaths.has(expectedPackageRootManifest)).toBe(true)
-  }, packDryRunTimeoutMs)
+      // then
+      expect(packedPaths.has(expectedPackageRootManifest)).toBe(true)
+    },
+    packDryRunTimeoutMs,
+  )
 
-  test("#given generated Codex installer bundle #when packing package #then generated output ships and stale forks do not", async () => {
-    // given
-    const expectedGeneratedInstaller = "packages/omo-codex/scripts/install-dist/install-local.mjs"
-    const obsoleteForkPrefix = "packages/omo-codex/scripts/install/"
+  test(
+    "#given generated Codex installer bundle #when packing package #then generated output ships and stale forks do not",
+    async () => {
+      // given
+      const expectedGeneratedInstaller = "packages/omo-codex/scripts/install-dist/install-local.mjs"
+      const obsoleteForkPrefix = "packages/omo-codex/scripts/install/"
 
-    // when
-    const packedPaths = await packDryRunPaths()
-    const packedObsoleteForks = [...packedPaths].filter((packagePath) => packagePath.startsWith(obsoleteForkPrefix))
+      // when
+      const packedPaths = await packDryRunPaths()
+      const packedObsoleteForks = [...packedPaths].filter((packagePath) => packagePath.startsWith(obsoleteForkPrefix))
 
-    // then
-    expect(packedPaths.has(expectedGeneratedInstaller)).toBe(true)
-    expect(packedObsoleteForks).toEqual([])
-  }, packDryRunTimeoutMs)
+      // then
+      expect(packedPaths.has(expectedGeneratedInstaller)).toBe(true)
+      expect(packedObsoleteForks).toEqual([])
+    },
+    packDryRunTimeoutMs,
+  )
 
-  test("#given Codex materialized runtime payloads #when packing package #then every current payload target ships", async () => {
-    // given
-    const expectedRuntimePaths = codexMaterializedRuntimePayloadPaths
+  test(
+    "#given Codex materialized runtime payloads #when packing package #then every current payload target ships",
+    async () => {
+      // given
+      const expectedRuntimePaths = codexMaterializedRuntimePayloadPaths
 
-    // when
-    const packedPaths = await packDryRunPaths()
-    const missingRuntimePaths = expectedRuntimePaths.filter((expectedPath) => !packedPaths.has(expectedPath))
+      // when
+      const packedPaths = await packDryRunPaths()
+      const missingRuntimePaths = expectedRuntimePaths.filter((expectedPath) => !packedPaths.has(expectedPath))
 
-    // then
-    expect(missingRuntimePaths).toEqual([])
-  }, packDryRunTimeoutMs)
+      // then
+      expect(missingRuntimePaths).toEqual([])
+    },
+    packDryRunTimeoutMs,
+  )
 
-  test("#given shipped QA skills reference web terminal helpers #when packing package #then helper runtime ships", async () => {
-    // given
-    const expectedRuntimePaths = webTerminalVisualQaRuntimePaths
+  test(
+    "#given shipped QA skills reference web terminal helpers #when packing package #then helper runtime ships",
+    async () => {
+      // given
+      const expectedRuntimePaths = webTerminalVisualQaRuntimePaths
 
-    // when
-    const packedPaths = await packDryRunPaths()
-    const missingRuntimePaths = expectedRuntimePaths.filter((expectedPath) => !packedPaths.has(expectedPath))
+      // when
+      const packedPaths = await packDryRunPaths()
+      const missingRuntimePaths = expectedRuntimePaths.filter((expectedPath) => !packedPaths.has(expectedPath))
 
-    // then
-    expect(missingRuntimePaths).toEqual([])
-  }, packDryRunTimeoutMs)
+      // then
+      expect(missingRuntimePaths).toEqual([])
+    },
+    packDryRunTimeoutMs,
+  )
 
-  test("#given shipped QA skills reference guidance docs #when packing package #then referenced docs ship", async () => {
-    // given
-    const expectedDocPaths = packageGuidanceDocPaths
+  test(
+    "#given shipped QA skills reference guidance docs #when packing package #then referenced docs ship",
+    async () => {
+      // given
+      const expectedDocPaths = packageGuidanceDocPaths
 
-    // when
-    const packedPaths = await packDryRunPaths()
-    const missingDocPaths = expectedDocPaths.filter((expectedPath) => !packedPaths.has(expectedPath))
+      // when
+      const packedPaths = await packDryRunPaths()
+      const missingDocPaths = expectedDocPaths.filter((expectedPath) => !packedPaths.has(expectedPath))
 
-    // then
-    expect(missingDocPaths).toEqual([])
-  }, packDryRunTimeoutMs)
+      // then
+      expect(missingDocPaths).toEqual([])
+    },
+    packDryRunTimeoutMs,
+  )
 
   test("#given Codex installer source tree #when checking obsolete forks #then hand-written install mjs files are absent", () => {
     // given
@@ -254,20 +275,24 @@ describe("published package layout", () => {
     expect(obsoleteForks).toEqual([])
   })
 
-  test("#given dot-directory command and skill assets #when packing package #then slash-command discovery assets ship", async () => {
-    // given
-    const expectedAssetPaths = collectExpectedAssetPaths()
-    expect(expectedAssetPaths).toContain(".opencode/command/security-research.md")
-    expect(expectedAssetPaths).toContain(".agents/command/security-research.md")
-    expect(expectedAssetPaths).toContain(".agents/skills/security-research/SKILL.md")
-    expect(expectedAssetPaths).not.toContain(".opencode/command/security-review.md")
-    expect(expectedAssetPaths).not.toContain(".agents/command/security-review.md")
+  test(
+    "#given dot-directory command and skill assets #when packing package #then slash-command discovery assets ship",
+    async () => {
+      // given
+      const expectedAssetPaths = collectExpectedAssetPaths()
+      expect(expectedAssetPaths).toContain(".opencode/command/security-research.md")
+      expect(expectedAssetPaths).toContain(".agents/command/security-research.md")
+      expect(expectedAssetPaths).toContain(".agents/skills/security-research/SKILL.md")
+      expect(expectedAssetPaths).not.toContain(".opencode/command/security-review.md")
+      expect(expectedAssetPaths).not.toContain(".agents/command/security-review.md")
 
-    // when
-    const packedPaths = await packDryRunPaths()
+      // when
+      const packedPaths = await packDryRunPaths()
 
-    // then
-    const missingPaths = expectedAssetPaths.filter((expectedPath) => !packedPaths.has(expectedPath))
-    expect(missingPaths).toEqual([])
-  }, packDryRunTimeoutMs)
+      // then
+      const missingPaths = expectedAssetPaths.filter((expectedPath) => !packedPaths.has(expectedPath))
+      expect(missingPaths).toEqual([])
+    },
+    packDryRunTimeoutMs,
+  )
 })

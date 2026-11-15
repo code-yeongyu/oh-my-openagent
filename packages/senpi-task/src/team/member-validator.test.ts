@@ -13,7 +13,10 @@ const allowAll: SenpiTeamMemberPorts = {
 describe("validateSenpiTeamMembers vocabulary hints", () => {
   test("#given an unknown category with named ports #when validated #then the error lists the available categories", () => {
     // given
-    const spec = normalizeSenpiTeamSpec({ members: [{ kind: "category", category: "quikc", prompt: "work" }] }, "typo-team")
+    const spec = normalizeSenpiTeamSpec(
+      { members: [{ kind: "category", category: "quikc", prompt: "work" }] },
+      "typo-team",
+    )
     const ports: SenpiTeamMemberPorts = {
       isCategoryResolvable: (category) => category === "quick" || category === "deep",
       isKnownAgent: () => true,
@@ -37,7 +40,10 @@ describe("validateSenpiTeamMembers vocabulary hints", () => {
 
   test("#given an unknown subagent_type with named ports #when validated #then the error lists the available agents", () => {
     // given
-    const spec = normalizeSenpiTeamSpec({ members: [{ kind: "subagent_type", subagent_type: "orakel", prompt: "work" }] }, "typo-team")
+    const spec = normalizeSenpiTeamSpec(
+      { members: [{ kind: "subagent_type", subagent_type: "orakel", prompt: "work" }] },
+      "typo-team",
+    )
     const ports: SenpiTeamMemberPorts = {
       isCategoryResolvable: () => true,
       isKnownAgent: (agent) => agent === "sisyphus",
@@ -82,10 +88,7 @@ describe("validateSenpiTeamMembers", () => {
 
   test("#given an unresolvable category #when validated #then it throws naming the allowed kinds", () => {
     // given
-    const spec = normalizeSenpiTeamSpec(
-      { members: [{ kind: "unresolvable-kind", name: "x" }] },
-      "bad-category-team",
-    )
+    const spec = normalizeSenpiTeamSpec({ members: [{ kind: "unresolvable-kind", name: "x" }] }, "bad-category-team")
     const ports: SenpiTeamMemberPorts = {
       isCategoryResolvable: () => false,
       isKnownAgent: () => true,
@@ -111,10 +114,7 @@ describe("validateSenpiTeamMembers", () => {
 
   test("#given an unknown subagent_type #when validated #then it throws a typed diagnostic", () => {
     // given
-    const spec = normalizeSenpiTeamSpec(
-      { members: [{ kind: "agent", subagent_type: "not-loaded" }] },
-      "bad-agent-team",
-    )
+    const spec = normalizeSenpiTeamSpec({ members: [{ kind: "agent", subagent_type: "not-loaded" }] }, "bad-agent-team")
     const ports: SenpiTeamMemberPorts = {
       isCategoryResolvable: () => true,
       isKnownAgent: () => false,
@@ -162,10 +162,7 @@ describe("validateSenpiTeamMembers", () => {
 
   test("#given a member naming a retired curated id #when validated #then it is an ordinary unknown subagent_type, named verbatim", () => {
     // given
-    const spec = normalizeSenpiTeamSpec(
-      { members: [{ kind: "agent", subagent_type: "momus" }] },
-      "retired-agent-team",
-    )
+    const spec = normalizeSenpiTeamSpec({ members: [{ kind: "agent", subagent_type: "momus" }] }, "retired-agent-team")
     const ports: SenpiTeamMemberPorts = {
       isCategoryResolvable: () => true,
       isKnownAgent: () => false,

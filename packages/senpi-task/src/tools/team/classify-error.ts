@@ -2,11 +2,7 @@
 // mailbox errors carry a stable `.name` but are not all re-exported, so the tool layer keys on the
 // name rather than importing every class (keeps the tools free of a direct team-mailbox dependency).
 export type MailboxErrorKind =
-  | "recipient_backpressure"
-  | "invalid_recipient"
-  | "payload_too_large"
-  | "broadcast_denied"
-  | "team_deleting"
+  "recipient_backpressure" | "invalid_recipient" | "payload_too_large" | "broadcast_denied" | "team_deleting"
 
 const MAILBOX_ERROR_NAMES: Readonly<Record<string, MailboxErrorKind>> = {
   RecipientBackpressureError: "recipient_backpressure",

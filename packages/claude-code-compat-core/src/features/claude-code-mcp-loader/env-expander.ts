@@ -1,9 +1,6 @@
 import { expandEnvReferences, expandEnvReferencesInObject } from "@oh-my-opencode/utils"
 import { log } from "../../shared/logger"
-import {
-  isAllowedMcpEnvVar,
-  isSensitiveMcpEnvVar,
-} from "./configure-allowed-env-vars"
+import { isAllowedMcpEnvVar, isSensitiveMcpEnvVar } from "./configure-allowed-env-vars"
 
 export interface ExpandEnvVarsOptions {
   trusted?: boolean

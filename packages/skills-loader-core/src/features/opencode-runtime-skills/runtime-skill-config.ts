@@ -16,8 +16,6 @@ export type OpenCodeSkillHostConfig = Record<string, unknown> & {
   skills?: OpenCodeSkillsHostConfig
 }
 
-
-
 function toStringList(value: unknown): string[] {
   if (!Array.isArray(value)) return []
   return value.filter((item): item is string => typeof item === "string")
@@ -28,9 +26,7 @@ function appendUnique(values: readonly string[], next: string): string[] {
   return [...values, next]
 }
 
-export function selectRuntimeSecuritySkills(
-  pluginConfig: RuntimeSkillConfig = {},
-): RuntimeSkillSourceEntry[] {
+export function selectRuntimeSecuritySkills(pluginConfig: RuntimeSkillConfig = {}): RuntimeSkillSourceEntry[] {
   const disabledSkills = collectDisabledSkillAliases(pluginConfig)
   const includeResearch = !disabledSkills.has("security-research")
   const includeReview = !disabledSkills.has("security-review")

@@ -9,7 +9,8 @@ export type MigrationNames = {
 
 /** `<A>.old` is slot 0; retired copies rotate through `<A>.old.1` ... `<A>.old.7` (RULING-73). */
 export const OLD_SLOT_COUNT = 8
-export const oldSlotName = (account: string, slot: number): string => (slot === 0 ? `${account}.old` : `${account}.old.${slot}`)
+export const oldSlotName = (account: string, slot: number): string =>
+  slot === 0 ? `${account}.old` : `${account}.old.${slot}`
 
 export type RecoveryStep = "promote" | "remove-staging" | "delete-old"
 
@@ -33,7 +34,12 @@ export function oldSlotsOf(reply: HelperReply): readonly number[] {
 /** The names present, from one `read` reply (its `present` field comes from silent attribute reads). */
 export function namesFromRead(reply: HelperReply): MigrationNames {
   const original = reply.owned === false || (reply.owned === true && reply.recover !== true)
-  return { original, staging: reply.present?.staging === true, old: reply.present?.old === true, oldSlots: oldSlotsOf(reply) }
+  return {
+    original,
+    staging: reply.present?.staging === true,
+    old: reply.present?.old === true,
+    oldSlots: oldSlotsOf(reply),
+  }
 }
 
 export type HelperCaller = (call: HelperCall) => Promise<HelperReply>
@@ -43,7 +49,11 @@ export type HelperCaller = (call: HelperCall) => Promise<HelperReply>
  * identity (a decrypt-list member deletes silently, m9). A copy neither can delete is left; it holds a single-use token
  * that the next refresh retires, and it occupies one rotation slot.
  */
-export async function deleteOld(name: string, helper: HelperCaller, deleteOwn: (name: string) => Promise<boolean>): Promise<boolean> {
+export async function deleteOld(
+  name: string,
+  helper: HelperCaller,
+  deleteOwn: (name: string) => Promise<boolean>,
+): Promise<boolean> {
   const removed = await helper({ verb: "remove", account: name }).catch(() => null)
   if (removed?.ok === true) return true
   return deleteOwn(name).catch(() => false)

@@ -29,13 +29,20 @@ export function manifestKind(path) {
 /** `entry -> value` for one file, or `undefined` for an opaque kind. Throws when the text is unreadable. */
 export function entriesOf(kind, text) {
   switch (kind) {
-    case "package.json": return packageJsonEntries(JSON.parse(text))
-    case "bun.lock": return bunLockEntries(JSON.parse(stripJsonc(text)))
-    case "npm-lock": return npmLockEntries(JSON.parse(text))
-    case "yarn.lock": return yarnLockEntries(text)
-    case "pnpm-lock": return pnpmLockEntries(text)
-    case "opaque": return undefined
-    default: throw new Error(`unknown manifest kind ${kind}`)
+    case "package.json":
+      return packageJsonEntries(JSON.parse(text))
+    case "bun.lock":
+      return bunLockEntries(JSON.parse(stripJsonc(text)))
+    case "npm-lock":
+      return npmLockEntries(JSON.parse(text))
+    case "yarn.lock":
+      return yarnLockEntries(text)
+    case "pnpm-lock":
+      return pnpmLockEntries(text)
+    case "opaque":
+      return undefined
+    default:
+      throw new Error(`unknown manifest kind ${kind}`)
   }
 }
 
@@ -43,7 +50,8 @@ export function packageJsonEntries(json) {
   const entries = new Map()
   addSections(entries, json, PACKAGE_JSON_SECTIONS, "")
   const bundled = json.bundledDependencies ?? json.bundleDependencies
-  if (Array.isArray(bundled)) for (const name of bundled) if (typeof name === "string") entries.set(`bundledDependencies:${name}`, "*")
+  if (Array.isArray(bundled))
+    for (const name of bundled) if (typeof name === "string") entries.set(`bundledDependencies:${name}`, "*")
   return entries
 }
 
@@ -52,7 +60,8 @@ function addSections(entries, json, sections, prefix) {
   for (const section of sections) {
     const block = json[section]
     if (!isRecord(block)) continue
-    for (const [name, spec] of Object.entries(block)) entries.set(`${prefix}${section}:${name}`, typeof spec === "string" ? spec : JSON.stringify(spec))
+    for (const [name, spec] of Object.entries(block))
+      entries.set(`${prefix}${section}:${name}`, typeof spec === "string" ? spec : JSON.stringify(spec))
   }
 }
 
@@ -60,16 +69,21 @@ function addSections(entries, json, sections, prefix) {
 export function bunLockEntries(json) {
   const entries = new Map()
   if (isRecord(json.workspaces)) {
-    for (const [path, workspace] of Object.entries(json.workspaces)) addSections(entries, workspace, MANIFEST_SECTIONS, `workspaces:${path}:`)
+    for (const [path, workspace] of Object.entries(json.workspaces))
+      addSections(entries, workspace, MANIFEST_SECTIONS, `workspaces:${path}:`)
   }
   if (isRecord(json.packages)) {
     for (const [key, tuple] of Object.entries(json.packages)) {
-      entries.set(`packages:${key}`, Array.isArray(tuple) && typeof tuple[0] === "string" ? tuple[0] : JSON.stringify(tuple))
+      entries.set(
+        `packages:${key}`,
+        Array.isArray(tuple) && typeof tuple[0] === "string" ? tuple[0] : JSON.stringify(tuple),
+      )
     }
   }
   for (const section of ["overrides", "patchedDependencies", "catalog"]) {
     if (!isRecord(json[section])) continue
-    for (const [name, spec] of Object.entries(json[section])) entries.set(`${section}:${name}`, typeof spec === "string" ? spec : JSON.stringify(spec))
+    for (const [name, spec] of Object.entries(json[section]))
+      entries.set(`${section}:${name}`, typeof spec === "string" ? spec : JSON.stringify(spec))
   }
   return entries
 }
@@ -90,7 +104,8 @@ export function npmLockEntries(json) {
 function walkNpmV1(entries, block, prefix) {
   for (const [name, meta] of Object.entries(block)) {
     entries.set(`${prefix}:${name}`, isRecord(meta) ? String(meta.version ?? "") : "")
-    if (isRecord(meta) && isRecord(meta.dependencies)) walkNpmV1(entries, meta.dependencies, `${prefix}:${name}/node_modules`)
+    if (isRecord(meta) && isRecord(meta.dependencies))
+      walkNpmV1(entries, meta.dependencies, `${prefix}:${name}/node_modules`)
   }
 }
 
@@ -102,7 +117,10 @@ export function yarnLockEntries(text) {
     if (raw.length === 0 || raw.startsWith("#")) continue
     if (!/^\s/u.test(raw)) {
       const header = raw.replace(/:\s*$/u, "")
-      names = header.split(/,\s*/u).map((selector) => nameOfSelector(unquote(selector.trim()))).filter((name) => name.length > 0 && name !== "__metadata")
+      names = header
+        .split(/,\s*/u)
+        .map((selector) => nameOfSelector(unquote(selector.trim())))
+        .filter((name) => name.length > 0 && name !== "__metadata")
       for (const name of names) if (!versions.has(name)) versions.set(name, new Set())
       continue
     }
@@ -119,8 +137,14 @@ export function pnpmLockEntries(text) {
   for (const raw of text.split(/\r?\n/u)) {
     if (raw.length === 0 || raw.startsWith("#")) continue
     const top = /^([A-Za-z][\w-]*):\s*$/u.exec(raw)
-    if (top !== null) { section = top[1]; continue }
-    if (!/^\s/u.test(raw)) { section = undefined; continue }
+    if (top !== null) {
+      section = top[1]
+      continue
+    }
+    if (!/^\s/u.test(raw)) {
+      section = undefined
+      continue
+    }
     if ((section !== "packages" && section !== "snapshots") || !/^ {2}\S/u.test(raw)) continue
     const { name, version } = splitPackageKey(unquote(raw.trim().replace(/:\s*$/u, "")).replace(/^\//u, ""))
     const bucket = versions.get(`${section}/${name}`) ?? new Set()
@@ -132,7 +156,8 @@ export function pnpmLockEntries(text) {
 
 function byName(versions, prefix) {
   const entries = new Map()
-  for (const [name, set] of versions) entries.set(prefix.length === 0 ? name : `${prefix}:${name}`, [...set].sort().join(","))
+  for (const [name, set] of versions)
+    entries.set(prefix.length === 0 ? name : `${prefix}:${name}`, [...set].sort().join(","))
   return entries
 }
 
@@ -162,13 +187,26 @@ export function stripJsonc(text) {
     const char = text[index]
     if (inString) {
       out += char
-      if (char === "\\") { out += text[index + 1] ?? ""; index += 1 }
-      else if (char === '"') inString = false
+      if (char === "\\") {
+        out += text[index + 1] ?? ""
+        index += 1
+      } else if (char === '"') inString = false
       continue
     }
-    if (char === '"') { inString = true; out += char; continue }
-    if (char === "/" && text[index + 1] === "/") { index = text.indexOf("\n", index) === -1 ? text.length : text.indexOf("\n", index) - 1; continue }
-    if (char === "/" && text[index + 1] === "*") { const end = text.indexOf("*/", index + 2); index = end === -1 ? text.length : end + 1; continue }
+    if (char === '"') {
+      inString = true
+      out += char
+      continue
+    }
+    if (char === "/" && text[index + 1] === "/") {
+      index = text.indexOf("\n", index) === -1 ? text.length : text.indexOf("\n", index) - 1
+      continue
+    }
+    if (char === "/" && text[index + 1] === "*") {
+      const end = text.indexOf("*/", index + 2)
+      index = end === -1 ? text.length : end + 1
+      continue
+    }
     if (char === ",") {
       let ahead = index + 1
       while (ahead < text.length && /\s/u.test(text[ahead])) ahead += 1

@@ -15,7 +15,15 @@ import { ownMaterial, rotationAppend } from "../recovery/keyring-append.ts"
 import type { EpochMaterial } from "../recovery/key-material.ts"
 import { committedWrap, expectedHistory } from "../recovery/served-chain.ts"
 import type { AccountChain } from "./account-chain.ts"
-import { atServedHead, chainGate, revokedGrew, rotationMembers, type SettleMemory, unchangedSince, viewGate } from "./freeze-eligibility.ts"
+import {
+  atServedHead,
+  chainGate,
+  revokedGrew,
+  rotationMembers,
+  type SettleMemory,
+  unchangedSince,
+  viewGate,
+} from "./freeze-eligibility.ts"
 import type { AccountHttp } from "./http.ts"
 import type { RevocationView } from "./revocation-view.ts"
 
@@ -54,7 +62,9 @@ const zero = (material: EpochMaterial): void => {
 }
 
 const sameMembers = (state: ChainState, ids: ReadonlySet<string>): boolean =>
-  state.authority !== null && state.authority.members.size === ids.size && [...ids].every((id) => state.authority?.members.has(id) === true)
+  state.authority !== null &&
+  state.authority.members.size === ids.size &&
+  [...ids].every((id) => state.authority?.members.has(id) === true)
 
 export function createFreezeSettler(input: FreezeSettlerInput): FreezeSettler {
   const { chain, http, keyring, scope } = input
@@ -63,7 +73,12 @@ export function createFreezeSettler(input: FreezeSettlerInput): FreezeSettler {
   const self = { id: keyring.principal().id, signing: keyring.publicKeys().signing }
 
   // One attempt at the served head: rotate with the material this device opened from its own wrap.
-  const attempt = async (served: Head, material: EpochMaterial, view: RevocationView & { readonly kind: "usable" }, state: ChainState): Promise<FreezeOutcome | "stale" | "reread"> => {
+  const attempt = async (
+    served: Head,
+    material: EpochMaterial,
+    view: RevocationView & { readonly kind: "usable" },
+    state: ChainState,
+  ): Promise<FreezeOutcome | "stale" | "reread"> => {
     const authority = state.authority
     const head = state.head
     if (authority === null || head === null) return frozen("unverified")
@@ -71,13 +86,17 @@ export function createFreezeSettler(input: FreezeSettlerInput): FreezeSettler {
     if (unchangedSince(refused.get(scope), served.keyring_link, view.revoked)) return frozen("refused")
     const { members, unlisted } = rotationMembers(authority, view)
     for (let i = 0; i < unlisted; i += 1) input.onEvent?.("sync.keyring.member_unlisted")
-    const request = await rotationAppend(keyring, head, chain.account, authority, material, members, [...authority.registry.values()])
+    const request = await rotationAppend(keyring, head, chain.account, authority, material, members, [
+      ...authority.registry.values(),
+    ])
     await fault("before-append")
     const result = await http.appendKeys(request)
     if (result.ok) {
       await chain.reach(result.seq)
       const after = chain.state()
-      const verified = after.authority?.epoch === authority.epoch + 1 && sameMembers(after, new Set(members.map((m) => m.id))) &&
+      const verified =
+        after.authority?.epoch === authority.epoch + 1 &&
+        sameMembers(after, new Set(members.map((m) => m.id))) &&
         (await chain.epochKey(authority.epoch + 1)) !== null
       if (!verified || after.head === null) {
         input.onEvent?.("sync.keyring.unverified")
@@ -115,13 +134,17 @@ export function createFreezeSettler(input: FreezeSettlerInput): FreezeSettler {
       const gate = chainGate(state, self)
       if (gate.kind !== "ok") return gate
       const wrap = committedWrap(state, state.authority.epoch, `device:${self.id}`)
-      const material = wrap === null ? null : await ownMaterial(keyring, chain.account, wrap, expectedHistory(state.authority, state.authority.epoch))
+      const material =
+        wrap === null
+          ? null
+          : await ownMaterial(keyring, chain.account, wrap, expectedHistory(state.authority, state.authority.epoch))
       if (material === null) return frozen("no_epoch_key")
       try {
         const view = await input.revocationView()
         await fault("after-devices-read")
         const usable = viewGate(view, self.id)
-        if (usable.kind !== "ok" || view.kind !== "usable") return usable.kind === "ok" ? frozen("device_list_unusable") : usable
+        if (usable.kind !== "ok" || view.kind !== "usable")
+          return usable.kind === "ok" ? frozen("device_list_unusable") : usable
         const outcome = await attempt(served.head, material, view, state)
         if (outcome === "stale") {
           lostRace = true

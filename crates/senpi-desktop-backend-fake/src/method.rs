@@ -41,6 +41,7 @@ pub enum FakeMethod {
     AxTypeText,
     AxElementAt,
     AxFocusedElement,
+    AxAppFocusedElement,
     AxAttributes,
     AxOwner,
     MenuItems,

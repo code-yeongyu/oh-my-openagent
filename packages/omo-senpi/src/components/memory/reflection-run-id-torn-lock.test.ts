@@ -20,30 +20,49 @@ function identity() {
   return paths
 }
 
-const probe = { hostname: () => "this-host", now: () => Date.parse("2026-11-05T06:00:00.000Z"), getPidLiveness: () => "dead" as const }
+const probe = {
+  hostname: () => "this-host",
+  now: () => Date.parse("2026-11-05T06:00:00.000Z"),
+  getPidLiveness: () => "dead" as const,
+}
 
 describe("run-id high water across a torn active.lock (#11976 C17)", () => {
   test("#given a torn active.lock naming reflection-run-66 and reflection-run-60 as the highest other trace #when the reaper moves it aside #then run-id.json records 66 and the next mint is reflection-run-67", async () => {
     // given
     const paths = identity()
     mkdirSync(join(paths.reflection, "runs", "reflection-run-60"), { recursive: true })
-    utimesSync(join(paths.reflection, "runs", "reflection-run-60"), new Date("2026-11-05T04:00:00.000Z"), new Date("2026-11-05T04:00:00.000Z"))
-    writeFileSync(join(paths.reflection, "active.lock"), "{\"runId\":\"reflection-run-66\",\"request\":{\"trig")
-    utimesSync(join(paths.reflection, "active.lock"), new Date("2026-11-05T04:00:00.000Z"), new Date("2026-11-05T04:00:00.000Z"))
+    utimesSync(
+      join(paths.reflection, "runs", "reflection-run-60"),
+      new Date("2026-11-05T04:00:00.000Z"),
+      new Date("2026-11-05T04:00:00.000Z"),
+    )
+    writeFileSync(join(paths.reflection, "active.lock"), '{"runId":"reflection-run-66","request":{"trig')
+    utimesSync(
+      join(paths.reflection, "active.lock"),
+      new Date("2026-11-05T04:00:00.000Z"),
+      new Date("2026-11-05T04:00:00.000Z"),
+    )
 
     // when
     await runStaleLockReaper({ runtimeDir: paths.runtime, probe })
 
     // then
-    expect(JSON.parse(readFileSync(join(paths.reflection, "run-id.json"), "utf8"))).toMatchObject({ version: 1, highWater: 66 })
+    expect(JSON.parse(readFileSync(join(paths.reflection, "run-id.json"), "utf8"))).toMatchObject({
+      version: 1,
+      highWater: 66,
+    })
     expect(await createReflectionRunIdFactory({ identityPaths: paths })()).toBe("reflection-run-67")
   })
 
   test("#given a torn active.lock whose run id is cut mid-digit and no other trace #when the reaper moves it aside #then the truncated digits are not trusted and the next mint is reflection-run-1", async () => {
     // given
     const paths = identity()
-    writeFileSync(join(paths.reflection, "active.lock"), "{\"runId\":\"reflection-run-6")
-    utimesSync(join(paths.reflection, "active.lock"), new Date("2026-11-05T04:00:00.000Z"), new Date("2026-11-05T04:00:00.000Z"))
+    writeFileSync(join(paths.reflection, "active.lock"), '{"runId":"reflection-run-6')
+    utimesSync(
+      join(paths.reflection, "active.lock"),
+      new Date("2026-11-05T04:00:00.000Z"),
+      new Date("2026-11-05T04:00:00.000Z"),
+    )
 
     // when
     await runStaleLockReaper({ runtimeDir: paths.runtime, probe })

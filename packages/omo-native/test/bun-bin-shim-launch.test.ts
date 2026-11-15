@@ -1,9 +1,30 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  readlinkSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { join } from "node:path"
 import { ensureBunBinShim } from "../bin/lib/bun-bin-shim.js"
 import { legacyShim, nodeModulesBinPath, stockLinkTarget } from "./bun-bin-shim.test-support"
-import { capture, createFixture, fixtureEnv, launchEntry, launchShim, launchViaNode, NODE, POSIX_ONLY, removeFixtureRoots } from "./bun-bin-shim.fixture"
+import {
+  capture,
+  createFixture,
+  fixtureEnv,
+  launchEntry,
+  launchShim,
+  launchViaNode,
+  NODE,
+  POSIX_ONLY,
+  removeFixtureRoots,
+} from "./bun-bin-shim.fixture"
 
 afterEach(removeFixtureRoots)
 

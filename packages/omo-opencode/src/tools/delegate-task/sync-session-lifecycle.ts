@@ -1,4 +1,9 @@
-import { handedBackSyncSessions, setSessionAgent, subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
+import {
+  handedBackSyncSessions,
+  setSessionAgent,
+  subagentSessions,
+  syncSubagentSessions,
+} from "../../features/claude-code-session-state"
 import {
   clearDelegatedChildSessionBootstrap,
   registerDelegatedChildSessionBootstrap,
@@ -25,9 +30,7 @@ export async function registerSyncSessionSideEffects(input: {
   syncSubagentSessions.add(input.sessionID)
   handedBackSyncSessions.delete(input.sessionID)
   setSessionAgent(input.sessionID, input.agentToUse)
-  const userPermission = input.categoryModel?.tools
-    ? migrateToolsToPermission(input.categoryModel.tools)
-    : undefined
+  const userPermission = input.categoryModel?.tools ? migrateToolsToPermission(input.categoryModel.tools) : undefined
   registerDelegatedChildSessionBootstrap({
     sessionID: input.sessionID,
     promptText: buildTaskPrompt(input.args.prompt, input.agentToUse, input.executorCtx.sisyphusAgentConfig?.tdd),
@@ -43,20 +46,22 @@ export async function registerSyncSessionSideEffects(input: {
       sessionID: input.sessionID,
       parentID: input.parentContext.sessionID,
     })
-    void input.executorCtx.onSyncSessionCreated({
-      sessionID: input.sessionID,
-      parentID: input.parentContext.sessionID,
-      title: input.args.description,
-    }).catch((error: unknown) => {
-      const message = error instanceof Error ? String(error) : String(error)
-      log("[task] onSyncSessionCreated callback failed", { error: message })
-    })
+    void input.executorCtx
+      .onSyncSessionCreated({
+        sessionID: input.sessionID,
+        parentID: input.parentContext.sessionID,
+        title: input.args.description,
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? String(error) : String(error)
+        log("[task] onSyncSessionCreated callback failed", { error: message })
+      })
   }
 }
 
 export function cleanupSyncSessionSideEffects(
   sessionID: string,
-  executorCtx: Pick<ExecutorContext, "modelFallbackControllerAccessor">
+  executorCtx: Pick<ExecutorContext, "modelFallbackControllerAccessor">,
 ): void {
   subagentSessions.delete(sessionID)
   syncSubagentSessions.delete(sessionID)

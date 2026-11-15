@@ -20,18 +20,35 @@ export const parseLockedReply = (stdout: string): SecretServiceLockState | null 
 
 export const probeSecretServiceLock: SecretServiceLockProbe = () =>
   new Promise((resolve) => {
-    const child = spawn("gdbus", [
-      "call", "--session",
-      "--dest", "org.freedesktop.secrets",
-      "--object-path", DEFAULT_COLLECTION,
-      "--method", "org.freedesktop.DBus.Properties.Get",
-      "org.freedesktop.Secret.Collection", "Locked",
-    ], { stdio: ["ignore", "pipe", "ignore"] })
+    const child = spawn(
+      "gdbus",
+      [
+        "call",
+        "--session",
+        "--dest",
+        "org.freedesktop.secrets",
+        "--object-path",
+        DEFAULT_COLLECTION,
+        "--method",
+        "org.freedesktop.DBus.Properties.Get",
+        "org.freedesktop.Secret.Collection",
+        "Locked",
+      ],
+      { stdio: ["ignore", "pipe", "ignore"] },
+    )
     let stdout = ""
-    const timer = setTimeout(() => { child.kill(); resolve("unknown") }, PROBE_TIMEOUT_MS)
-    child.stdout.on("data", (chunk: Buffer) => { stdout += chunk.toString() })
+    const timer = setTimeout(() => {
+      child.kill()
+      resolve("unknown")
+    }, PROBE_TIMEOUT_MS)
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString()
+    })
     // A missing gdbus (minimal installs ship libglib without libglib2.0-bin) says nothing about the keyring.
-    child.on("error", () => { clearTimeout(timer); resolve("unknown") })
+    child.on("error", () => {
+      clearTimeout(timer)
+      resolve("unknown")
+    })
     child.on("close", (code) => {
       clearTimeout(timer)
       resolve(code === 0 ? (parseLockedReply(stdout) ?? "absent") : "absent")

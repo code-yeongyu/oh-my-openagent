@@ -97,7 +97,9 @@ describe("job widget author on the quick category", () => {
 
     // then
     expect(host.installs).toBe(1)
-    expect(host.current()?.({ cwd: "/project-b", modelRegistry: registry([sessionModel, quickModel]) })).toBe(quickModel)
+    expect(host.current()?.({ cwd: "/project-b", modelRegistry: registry([sessionModel, quickModel]) })).toBe(
+      quickModel,
+    )
     expect(host.current()?.({ cwd: "/project-a", modelRegistry: registry([sessionModel, quickModel]) })).toBeUndefined()
     release()
     expect(host.current()).toBeUndefined()

@@ -105,7 +105,9 @@ A request is `{"id": "<1-64 printable ASCII>", "type": "<request type>", ...fiel
 request gets exactly one `{"id", "type": "response", "ok": true, "data": {...}}` or
 `{"id", "type": "response", "ok": false, "error": {"code", "reason", "action"}}`. A request type this version does
 not define is answered `unknown_type`; a malformed request `invalid_request` (its `reason` names the field, never its
-value). Requests are answered in any order; clients correlate by `id`.
+value). Requests are answered in any order; clients correlate by `id`. A client ignores a field it does not define in
+anything it reads (`welcome`, `refused`, a response, an event, a blob payload), so a newer service may add one; a
+missing required field, or a field one variant of a message defines carried by another, is still a protocol violation.
 
 | Request                      | Fields                                                                   | Response `data`                                                      | Notes                                                                 |
 | ---------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------- | --------------------------------------------------------------------- |
@@ -120,7 +122,7 @@ value). Requests are answered in any order; clients correlate by `id`.
 | `endpoints.register`         | `agent_dir` (absolute)                                                   | `{}`                                                                 |                                                                       |
 | `endpoints.unregister`       | `agent_dir` (absolute)                                                   | `{}`                                                                 |                                                                       |
 | `devices.list`               |                                                                          | `{devices: [{device, label, kind, platform, last_seen_ms, online}]}` |                                                                       |
-| `sessions.list`              | `filter?` (`device`, `project`, `state`), `rows?` (`2`)                  | `{query_id}`                                                         | then the round and listing events                                     |
+| `sessions.list`              | `filter?` (`device`, `project`, `state`), `rows?` (`2`, `3`)             | `{query_id}`                                                         | then the round and listing events                                     |
 | `session.attach`             | `device`, `session_id`                                                   | `{attach}`                                                           | then the attach stream                                                |
 | `session.detach`             | `attach`                                                                 | `{}`                                                                 | closing a connection detaches its attaches                            |
 | `session.command`            | `attach`, `command_id?`, `rpc` or `upload_id`, `delegated?`, `endpoint?` | `{command_id}`                                                       | then `session.command_state`; delegated: see below                    |
@@ -242,7 +244,10 @@ with `rows: 2` (#316) gets rows that may also carry `kind`, `parent` and `parent
 carries them. `kind` is the session kind as its host reports it (`interactive`, `worker`, or a kind the client does
 not know, kept as reported); absent means unknown, not interactive. `parent` is the `session_id` of the session it
 was started from, on the same `device`, and `parent_listed` says whether that row is in this listing (false: show the
-link unresolved). A service before `rows` answers it `invalid_request`. `detached` reasons:
+link unresolved). `rows: 3` (#12996) gets the `rows: 2` fields and may also carry `durable_id`, the durable engine
+session id of the listed session (1-128 characters, as `session.locate`'s `engine_id`); a row without it comes from a
+host that does not report it. Below `rows: 3` a row never carries `durable_id`. A service before `rows` answers it
+`invalid_request`, and a service before `rows: 3` answers `rows: 3` the same way. `detached` reasons:
 `authorization_expired`, `activation_pending`, `service_disabled`, `owner_transfer`, `peer_revoked`,
 `stream_key_pending`, `peer_detached`, `blob_failed`, `session_closed`, `session_replaced`. `session_closed` and
 `session_replaced` (decision 0013 amendment 2026-11-03) mean the host's engine closed the attached session, or now

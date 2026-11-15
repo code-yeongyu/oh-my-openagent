@@ -9,7 +9,14 @@ import { join } from "node:path"
 import { memoryWriterLockPath } from "@oh-my-opencode/memory-core"
 
 import { MemoryFakeExtensionAPI } from "../memory.test-support"
-import { fakeCommandContext, fakeDeps, invoke, seededRepo, tempIdentity, type FakeCommandContext } from "./commands.test-support"
+import {
+  fakeCommandContext,
+  fakeDeps,
+  invoke,
+  seededRepo,
+  tempIdentity,
+  type FakeCommandContext,
+} from "./commands.test-support"
 import { registerMemoryCommand } from "./memory"
 import { removeTree } from "../../../../../../test-support/remove-tree"
 
@@ -46,21 +53,31 @@ async function harness(options: { readonly hasUI: boolean }): Promise<Harness> {
   await mkdir(identity.identityPaths.locks, { recursive: true })
   const pi = new MemoryFakeExtensionAPI()
   registerMemoryCommand(pi, fakeDeps(identity))
-  return { pi, ctx: fakeCommandContext({ hasUI: options.hasUI }), indexLock, refLock, locksDir: identity.identityPaths.locks }
+  return {
+    pi,
+    ctx: fakeCommandContext({ hasUI: options.hasUI }),
+    indexLock,
+    refLock,
+    locksDir: identity.identityPaths.locks,
+  }
 }
 
 async function recordLiveWriter(locksDir: string): Promise<void> {
   const writer = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" })
   children.push(writer)
   if (writer.pid === undefined) throw new Error("writer has no pid")
-  await writeFile(memoryWriterLockPath(locksDir), JSON.stringify({
-    pid: writer.pid,
-    process_start: "unavailable",
-    hostname: hostname(),
-    nonce: randomUUID(),
-    created_at: new Date().toISOString(),
-    purpose: "memory-write",
-  }), "utf8")
+  await writeFile(
+    memoryWriterLockPath(locksDir),
+    JSON.stringify({
+      pid: writer.pid,
+      process_start: "unavailable",
+      hostname: hostname(),
+      nonce: randomUUID(),
+      created_at: new Date().toISOString(),
+      purpose: "memory-write",
+    }),
+    "utf8",
+  )
 }
 
 describe("/memory unlock (omo #10199)", () => {

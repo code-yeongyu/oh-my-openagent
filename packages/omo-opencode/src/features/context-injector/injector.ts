@@ -17,7 +17,7 @@ interface InjectionResult {
 export function injectPendingContext(
   collector: ContextCollector,
   sessionID: string,
-  parts: OutputPart[]
+  parts: OutputPart[],
 ): InjectionResult {
   if (!collector.hasPending(sessionID)) {
     return { injected: false, contextLength: 0 }
@@ -52,10 +52,7 @@ interface ChatMessageOutput {
 
 export function createContextInjectorHook(collector: ContextCollector) {
   return {
-    "chat.message": async (
-      input: ChatMessageInput,
-      output: ChatMessageOutput
-    ): Promise<void> => {
+    "chat.message": async (input: ChatMessageInput, output: ChatMessageOutput): Promise<void> => {
       const result = injectPendingContext(collector, input.sessionID, output.parts)
       if (result.injected) {
         log("[context-injector] Injected pending context via chat.message", {
@@ -75,7 +72,7 @@ interface MessageWithParts {
 type MessagesTransformHook = {
   "experimental.chat.messages.transform"?: (
     input: Record<string, never>,
-    output: { messages: MessageWithParts[] }
+    output: { messages: MessageWithParts[] },
   ) => Promise<void>
 }
 
@@ -87,9 +84,7 @@ function hasText(part: Part): boolean {
   return "text" in part && typeof part.text === "string" && part.text.length > 0
 }
 
-export function createContextInjectorMessagesTransformHook(
-  collector: ContextCollector
-): MessagesTransformHook {
+export function createContextInjectorMessagesTransformHook(collector: ContextCollector): MessagesTransformHook {
   return {
     "experimental.chat.messages.transform": async (_input, output) => {
       const { messages } = output
@@ -131,9 +126,7 @@ export function createContextInjectorMessagesTransformHook(
         return
       }
 
-      const textPartIndex = lastUserMessage.parts.findIndex(
-        (p) => isRealUserTextPart(p) && hasText(p)
-      )
+      const textPartIndex = lastUserMessage.parts.findIndex((p) => isRealUserTextPart(p) && hasText(p))
 
       if (textPartIndex === -1) {
         log("[context-injector] No text part found in last user message, skipping injection", {

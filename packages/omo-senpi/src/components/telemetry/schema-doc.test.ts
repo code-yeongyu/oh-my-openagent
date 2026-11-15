@@ -42,11 +42,13 @@ describe("OmO Native telemetry schema documentation", () => {
     const actual = extractGeneratedBlock(await readFile(DOC_PATH, "utf8"))
 
     if (actual !== expected) {
-      throw new Error([
-        "Telemetry schema documentation drifted.",
-        "Paste this exact generated block into docs/reference/senpi-telemetry.md:",
-        expected,
-      ].join("\n\n"))
+      throw new Error(
+        [
+          "Telemetry schema documentation drifted.",
+          "Paste this exact generated block into docs/reference/senpi-telemetry.md:",
+          expected,
+        ].join("\n\n"),
+      )
     }
   })
 

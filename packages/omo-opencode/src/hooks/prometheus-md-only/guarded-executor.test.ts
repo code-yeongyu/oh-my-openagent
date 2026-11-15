@@ -1,7 +1,17 @@
 /// <reference types="bun-types" />
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join, relative } from "node:path"
 
@@ -16,13 +26,24 @@ describe("real guarded hashline execution", () => {
   afterEach(() => rmSync(root, { recursive: true, force: true }))
 
   async function execute(filePath: string, rename?: string, frozen = false, deleteMode = false) {
-    const child = Bun.spawn([
-      process.execPath, "run", join(import.meta.dir, "fixtures/guarded-hashline.ts"),
-      JSON.stringify({ filePath, rename, ...(deleteMode ? { delete: true, edits: [] } : { edits: [{ op: "append", lines: ["probe"] }] }) }),
-      ...(frozen ? ["frozen"] : []),
-    ], { cwd: root, stdout: "pipe", stderr: "pipe" })
+    const child = Bun.spawn(
+      [
+        process.execPath,
+        "run",
+        join(import.meta.dir, "fixtures/guarded-hashline.ts"),
+        JSON.stringify({
+          filePath,
+          rename,
+          ...(deleteMode ? { delete: true, edits: [] } : { edits: [{ op: "append", lines: ["probe"] }] }),
+        }),
+        ...(frozen ? ["frozen"] : []),
+      ],
+      { cwd: root, stdout: "pipe", stderr: "pipe" },
+    )
     const [stdout, stderr, code] = await Promise.all([
-      new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
     ])
     expect(code, stderr).toBe(0)
     return JSON.parse(stdout) as { blocked: boolean; result?: string; filePath?: string; rename?: string }

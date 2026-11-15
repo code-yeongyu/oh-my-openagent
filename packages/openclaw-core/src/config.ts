@@ -1,8 +1,4 @@
-import type {
-  OpenClawConfig,
-  OpenClawGateway,
-  OpenClawReplyListenerConfig,
-} from "./types"
+import type { OpenClawConfig, OpenClawGateway, OpenClawReplyListenerConfig } from "./types"
 export { validateGatewayUrl } from "./gateway-url-validation"
 
 const DEFAULT_REPLY_POLL_INTERVAL_MS = 3000
@@ -14,12 +10,7 @@ const DEFAULT_REPLY_MAX_MESSAGE_LENGTH = 500
 const MIN_REPLY_MAX_MESSAGE_LENGTH = 1
 const MAX_REPLY_MAX_MESSAGE_LENGTH = 4000
 
-function normalizeInteger(
-  value: unknown,
-  fallback: number,
-  min: number,
-  max?: number,
-): number {
+function normalizeInteger(value: unknown, fallback: number, min: number, max?: number): number {
   const numeric =
     typeof value === "number"
       ? Math.trunc(value)
@@ -62,9 +53,7 @@ export function normalizeReplyListenerConfig(config: OpenClawConfig): OpenClawCo
     ),
     includePrefix: replyListener.includePrefix !== false,
     authorizedDiscordUserIds: Array.isArray(replyListener.authorizedDiscordUserIds)
-      ? replyListener.authorizedDiscordUserIds.filter(
-          (id) => typeof id === "string" && id.trim() !== "",
-        )
+      ? replyListener.authorizedDiscordUserIds.filter((id) => typeof id === "string" && id.trim() !== "")
       : [],
   }
 

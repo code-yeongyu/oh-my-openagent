@@ -4,7 +4,7 @@ import { withLock } from "./locks"
 const step = process.env.STEP
 await withLock(
   process.env.LOCK_PATH ?? "",
-  async lease => {
+  async (lease) => {
     await lease.handOver(Number(process.env.HELPER_PID))
     if (step === "handed") process.stdout.write("at handed\n")
     if (step === "restored") {

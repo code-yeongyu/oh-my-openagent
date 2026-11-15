@@ -56,10 +56,7 @@ describe("auto-update checker catch fallbacks", () => {
     mkdirSync(packageDirectory, { recursive: true })
     mkdirSync(configDirectory, { recursive: true })
     writeFileSync(join(packageDirectory, "package.json"), "{not-valid-json")
-    writeFileSync(
-      join(configDirectory, "opencode.json"),
-      JSON.stringify({ plugin: [`file://${packageDirectory}`] }),
-    )
+    writeFileSync(join(configDirectory, "opencode.json"), JSON.stringify({ plugin: [`file://${packageDirectory}`] }))
 
     // when
     const version = getLocalDevVersion(directory)
@@ -77,21 +74,16 @@ describe("auto-update checker catch fallbacks", () => {
     mkdirSync(packageDirectory, { recursive: true })
     mkdirSync(configDirectory, { recursive: true })
     writeFileSync(join(packageDirectory, "package.json"), JSON.stringify({ name: PACKAGE_NAME, version: "4.7.5" }))
-    writeFileSync(
-      join(configDirectory, "opencode.json"),
-      JSON.stringify({ plugin: [`file://${packageDirectory}`] }),
-    )
+    writeFileSync(join(configDirectory, "opencode.json"), JSON.stringify({ plugin: [`file://${packageDirectory}`] }))
 
     const nonError = Symbol("read failure")
     const originalParse = JSON.parse
     let parseCount = 0
-    const parseSpy = spyOn(JSON, "parse").mockImplementation(
-      (text: string) => {
-        parseCount += 1
-        if (parseCount === 1) return originalParse(text)
-        throw nonError
-      },
-    )
+    const parseSpy = spyOn(JSON, "parse").mockImplementation((text: string) => {
+      parseCount += 1
+      if (parseCount === 1) return originalParse(text)
+      throw nonError
+    })
 
     try {
       // when

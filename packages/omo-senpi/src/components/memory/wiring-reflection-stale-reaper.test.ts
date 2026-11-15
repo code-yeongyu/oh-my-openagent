@@ -7,7 +7,13 @@ import { join } from "node:path"
 import { createReflectionWorktree, getPidLiveness } from "@oh-my-opencode/memory-core"
 
 import { writeRunJsonAtomic } from "./worker/run-artifacts"
-import { activeRunId, cleanupStaleLockFixtures, deadPid, settleTurn, staleLockFixture } from "./wiring-reflection-stale-lock.test-support"
+import {
+  activeRunId,
+  cleanupStaleLockFixtures,
+  deadPid,
+  settleTurn,
+  staleLockFixture,
+} from "./wiring-reflection-stale-lock.test-support"
 
 afterEach(cleanupStaleLockFixtures)
 
@@ -16,7 +22,11 @@ type Fixture = Awaited<ReturnType<typeof staleLockFixture>>
 async function reserve(item: Fixture): Promise<string> {
   const snapshot = await item.journal.captureReflectionSnapshot()
   if (snapshot === null) throw new Error("expected a snapshot")
-  const reserved = await item.store.tryReserve({ trigger: "manual", conversationIds: ["session-1"], snapshots: [{ conversationId: "session-1", snapshot }] })
+  const reserved = await item.store.tryReserve({
+    trigger: "manual",
+    conversationIds: ["session-1"],
+    snapshots: [{ conversationId: "session-1", snapshot }],
+  })
   if (reserved.status !== "active") throw new Error(`expected an active reservation, got ${reserved.status}`)
   return reserved.run.runId
 }
@@ -24,7 +34,17 @@ async function reserve(item: Fixture): Promise<string> {
 async function launcherDied(item: Fixture, pid: number): Promise<void> {
   const activePath = join(item.paths.reflection, "active.lock")
   const active = JSON.parse(await readFile(activePath, "utf8")) as Record<string, unknown>
-  await writeFile(activePath, JSON.stringify({ ...active, launcherPid: pid, launcherHostname: hostname(), launcherProcessStart: null, reservedAt: new Date(Date.now() - 10 * 60_000).toISOString() }), { mode: 0o600 })
+  await writeFile(
+    activePath,
+    JSON.stringify({
+      ...active,
+      launcherPid: pid,
+      launcherHostname: hostname(),
+      launcherProcessStart: null,
+      reservedAt: new Date(Date.now() - 10 * 60_000).toISOString(),
+    }),
+    { mode: 0o600 },
+  )
 }
 
 async function launchInterrupted(item: Fixture): Promise<string> {
@@ -39,13 +59,37 @@ async function processesDied(item: Fixture): Promise<string> {
   const worktree = await createReflectionWorktree(item.repo, runId, item.paths.worktrees)
   const runDir = join(item.paths.reflection, "runs", runId)
   await mkdir(runDir, { recursive: true, mode: 0o700 })
-  await writeRunJsonAtomic(join(runDir, "prelaunch.json"), { version: 1, runId, worktreeDir: worktree.dir, worktreeBranch: worktree.branch })
+  await writeRunJsonAtomic(join(runDir, "prelaunch.json"), {
+    version: 1,
+    runId,
+    worktreeDir: worktree.dir,
+    worktreeBranch: worktree.branch,
+  })
   const hardDeadlineAt = Date.now() + 600_000
   await writeRunJsonAtomic(join(runDir, "ledger.json"), {
-    version: 1, runId, attempt: 1, category: "quick", conversationIds: ["session-1"], kind: "reflection", trigger: "manual",
-    startedAt: new Date().toISOString(), hardDeadlineAt, terminationGraceMs: 100, deadlineAt: hardDeadlineAt + 100, mergePolicy: "auto",
-    pid, processStart: null, childPid: pid, childProcessStart: null, worktreeDir: worktree.dir, worktreeBranch: worktree.branch, baseSha: worktree.baseSha,
-    gitFilePath: worktree.gitFilePath, gitFileSnapshot: worktree.gitFileSnapshot, commonConfigPath: worktree.commonConfigPath, commonConfigSnapshot: worktree.commonConfigSnapshot,
+    version: 1,
+    runId,
+    attempt: 1,
+    category: "quick",
+    conversationIds: ["session-1"],
+    kind: "reflection",
+    trigger: "manual",
+    startedAt: new Date().toISOString(),
+    hardDeadlineAt,
+    terminationGraceMs: 100,
+    deadlineAt: hardDeadlineAt + 100,
+    mergePolicy: "auto",
+    pid,
+    processStart: null,
+    childPid: pid,
+    childProcessStart: null,
+    worktreeDir: worktree.dir,
+    worktreeBranch: worktree.branch,
+    baseSha: worktree.baseSha,
+    gitFilePath: worktree.gitFilePath,
+    gitFileSnapshot: worktree.gitFileSnapshot,
+    commonConfigPath: worktree.commonConfigPath,
+    commonConfigSnapshot: worktree.commonConfigSnapshot,
   })
   await launcherDied(item, pid)
   return runId
@@ -65,10 +109,25 @@ async function liveSibling(item: Fixture, pid: number): Promise<string> {
   const runDir = join(item.paths.reflection, "runs", runId)
   await mkdir(runDir, { recursive: true, mode: 0o700 })
   await writeRunJsonAtomic(join(runDir, "ledger.json"), {
-    version: 1, runId, attempt: 1, kind: "reflection", trigger: "manual", startedAt: new Date().toISOString(),
-    hardDeadlineAt, terminationGraceMs: 100, deadlineAt: hardDeadlineAt + 100, mergePolicy: "auto",
-    pid, processStart: null, worktreeDir: "/nonexistent/worktree", worktreeBranch: `reflection/${runId}`, baseSha: "0".repeat(40),
-    gitFilePath: "/nonexistent/worktree/.git", gitFileSnapshot: "gitdir: /nonexistent", commonConfigPath: "/nonexistent/config", commonConfigSnapshot: null,
+    version: 1,
+    runId,
+    attempt: 1,
+    kind: "reflection",
+    trigger: "manual",
+    startedAt: new Date().toISOString(),
+    hardDeadlineAt,
+    terminationGraceMs: 100,
+    deadlineAt: hardDeadlineAt + 100,
+    mergePolicy: "auto",
+    pid,
+    processStart: null,
+    worktreeDir: "/nonexistent/worktree",
+    worktreeBranch: `reflection/${runId}`,
+    baseSha: "0".repeat(40),
+    gitFilePath: "/nonexistent/worktree/.git",
+    gitFileSnapshot: "gitdir: /nonexistent",
+    commonConfigPath: "/nonexistent/config",
+    commonConfigSnapshot: null,
   })
   return runId
 }
@@ -88,7 +147,9 @@ describe("the stale reflection-lock reaper in a session (#11976)", () => {
 
     // then
     expect(await activeRunId(item)).not.toBe(runId)
-    expect(JSON.parse(await readFile(join(item.paths.reflection, "runs", runId, "abandoned.json"), "utf8"))).toMatchObject({ reason: "launch_interrupted" })
+    expect(
+      JSON.parse(await readFile(join(item.paths.reflection, "runs", runId, "abandoned.json"), "utf8")),
+    ).toMatchObject({ reason: "launch_interrupted" })
   }, 30_000)
 
   test("#given case A after the session already reconciled #when the next turn settles #then it is reaped once, without a stale-lock notice", async () => {
@@ -105,7 +166,9 @@ describe("the stale reflection-lock reaper in a session (#11976)", () => {
     // then
     expect(item.reconciles.count).toBe(before + 1)
     expect(await activeRunId(item)).not.toBe(runId)
-    expect(JSON.parse(await readFile(join(item.paths.reflection, "runs", runId, "abandoned.json"), "utf8"))).toMatchObject({ reason: "launch_interrupted" })
+    expect(
+      JSON.parse(await readFile(join(item.paths.reflection, "runs", runId, "abandoned.json"), "utf8")),
+    ).toMatchObject({ reason: "launch_interrupted" })
     expect(staleNotices(item)).toEqual([])
   }, 30_000)
 
@@ -120,7 +183,9 @@ describe("the stale reflection-lock reaper in a session (#11976)", () => {
 
     // then
     expect(await activeRunId(item)).not.toBe(runId)
-    expect(JSON.parse(await readFile(join(item.paths.reflection, "runs", runId, "final.json"), "utf8"))).toMatchObject({ outcome: "failed" })
+    expect(JSON.parse(await readFile(join(item.paths.reflection, "runs", runId, "final.json"), "utf8"))).toMatchObject({
+      outcome: "failed",
+    })
     expect(staleNotices(item)).toEqual([])
   }, 30_000)
 
@@ -129,7 +194,7 @@ describe("the stale reflection-lock reaper in a session (#11976)", () => {
     const item = await staleLockFixture()
     await settleTurn(item)
     await mkdir(item.paths.reflection, { recursive: true })
-    await writeFile(join(item.paths.reflection, "active.lock"), "{\"runId\":\"reflection-run-64\",\"req", { mode: 0o600 })
+    await writeFile(join(item.paths.reflection, "active.lock"), '{"runId":"reflection-run-64","req', { mode: 0o600 })
     const old = new Date(Date.now() - 2 * 60 * 60_000)
     await utimes(join(item.paths.reflection, "active.lock"), old, old)
 
@@ -149,7 +214,7 @@ describe("the stale reflection-lock reaper in a session (#11976)", () => {
     const waits: string[] = []
     const item = await staleLockFixture(undefined, {
       reconcileSeams: {
-        getPidLiveness: (pid) => pid === SIBLING_SUPERVISOR ? "alive" : getPidLiveness(pid),
+        getPidLiveness: (pid) => (pid === SIBLING_SUPERVISOR ? "alive" : getPidLiveness(pid)),
         waitForOutcome: async (path) => {
           waits.push(path)
           return "timeout"

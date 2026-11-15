@@ -61,7 +61,11 @@ async function foldedRuns(paths: MemoryIdentityPaths, count: number, bytes = 64 
   for (let index = 1; index <= count; index += 1) {
     const runId = `reflection-run-${index}`
     const finishedAt = daysAgo(count - index + 1) + index
-    await padded(await reflectionRun(paths, runId, { outcome: index % 2 === 0 ? "no_changes" : "merged", finishedAt }), bytes, finishedAt)
+    await padded(
+      await reflectionRun(paths, runId, { outcome: index % 2 === 0 ? "no_changes" : "merged", finishedAt }),
+      bytes,
+      finishedAt,
+    )
     ids.push(runId)
   }
   return ids
@@ -81,7 +85,9 @@ describe("runtime size cap: eviction order", () => {
   test("#given folded runs, sidecars and journals over the cap #when the cap runs #then folded runs go oldest-first until it fits and nothing else is touched (B01)", async () => {
     const paths = await identity()
     const runs = await foldedRuns(paths, 10)
-    const sidecars = await Promise.all([1, 2, 3, 4, 5].map(async (n) => padded(await sidecar(paths, `s-${n}`, daysAgo(1)), 32 * 1024, daysAgo(1))))
+    const sidecars = await Promise.all(
+      [1, 2, 3, 4, 5].map(async (n) => padded(await sidecar(paths, `s-${n}`, daysAgo(1)), 32 * 1024, daysAgo(1))),
+    )
     const journals = await Promise.all([1, 2, 3, 4, 5].map((n) => journal(paths, `j-${n}`, "never", daysAgo(3))))
     await settleGuard(paths)
     const before = (await measureRuntimeSize(paths.runtime)).bytes
@@ -89,7 +95,9 @@ describe("runtime size cap: eviction order", () => {
 
     const report = await cap(paths, maxBytes)
 
-    expect(report.evicted.map((entry) => [entry.tier, entry.name])).toEqual(runs.slice(0, 3).map((runId) => ["folded-run", runId]))
+    expect(report.evicted.map((entry) => [entry.tier, entry.name])).toEqual(
+      runs.slice(0, 3).map((runId) => ["folded-run", runId]),
+    )
     expect(await liveNames(runsDir(paths))).toEqual(runs.slice(3).sort())
     for (const dir of [...sidecars, ...journals]) expect(existsSync(dir)).toBe(true)
     expect(report.afterBytes).toBeLessThanOrEqual(maxBytes)
@@ -100,7 +108,8 @@ describe("runtime size cap: eviction order", () => {
     const paths = await identity()
     await foldedRuns(paths, 3, 1024)
     const oldSidecars = [5, 4, 3, 2].map((hours) => `side-${hours}h`)
-    for (const [index, name] of oldSidecars.entries()) await padded(await sidecar(paths, name, hoursAgo(5 - index)), 8 * 1024, hoursAgo(5 - index))
+    for (const [index, name] of oldSidecars.entries())
+      await padded(await sidecar(paths, name, hoursAgo(5 - index)), 8 * 1024, hoursAgo(5 - index))
     const hotSidecar = await sidecar(paths, "side-hot", NOW - 30 * 60 * 1000)
     const oldJournal = await journal(paths, "j-old", "never", daysAgo(3))
     const hotJournal = await journal(paths, "j-hot", "never", hoursAgo(1))
@@ -112,7 +121,9 @@ describe("runtime size cap: eviction order", () => {
     expect(report.evicted.filter((entry) => entry.tier === "sidecar").map((entry) => entry.name)).toEqual(
       oldSidecars.map((name) => Buffer.from(name, "utf8").toString("base64url")),
     )
-    expect(report.evicted.filter((entry) => entry.tier === "never-reflected-journal").map((entry) => entry.name)).toEqual(["j-old"])
+    expect(
+      report.evicted.filter((entry) => entry.tier === "never-reflected-journal").map((entry) => entry.name),
+    ).toEqual(["j-old"])
     expect(existsSync(oldJournal)).toBe(false)
     expect(existsSync(hotJournal)).toBe(true)
     expect(existsSync(hotSidecar)).toBe(true)
@@ -127,7 +138,12 @@ describe("runtime size cap: eviction order", () => {
 
     const report = await cap(paths, 1, { policy: UNREFLECTED_ON })
 
-    expect(report.evicted.map((entry) => entry.tier)).toEqual(["folded-run", "folded-run", "never-reflected-journal", "partly-reflected-transcript"])
+    expect(report.evicted.map((entry) => entry.tier)).toEqual([
+      "folded-run",
+      "folded-run",
+      "never-reflected-journal",
+      "partly-reflected-transcript",
+    ])
     expect(existsSync(oldJournal)).toBe(false)
     expect(existsSync(join(partly, "transcript.jsonl"))).toBe(false)
   })
@@ -150,13 +166,20 @@ describe("runtime size cap: eviction order", () => {
 
   test("#given only in-flight runs, a live journal and an owned sidecar over the cap #when the cap runs #then only the idle sibling is evicted and the excess is reported (B03)", async () => {
     const paths = await identity()
-    const inFlight = await padded(await reflectionRun(paths, "reflection-run-4", { sentinel: "none", finishedAt: daysAgo(20) }), 64 * 1024, daysAgo(20))
+    const inFlight = await padded(
+      await reflectionRun(paths, "reflection-run-4", { sentinel: "none", finishedAt: daysAgo(20) }),
+      64 * 1024,
+      daysAgo(20),
+    )
     const live = await journal(paths, "j-live", "never", daysAgo(5))
     const owned = await sidecar(paths, "owned", daysAgo(5))
     const ownedName = Buffer.from("owned", "utf8").toString("base64url")
     const control = await journal(paths, "j-idle", "never", daysAgo(5))
 
-    const report = await cap(paths, 1, { isLiveSession: (sessionId) => sessionId === "j-live", ownedSidecars: new Set([ownedName]) })
+    const report = await cap(paths, 1, {
+      isLiveSession: (sessionId) => sessionId === "j-live",
+      ownedSidecars: new Set([ownedName]),
+    })
 
     expect(report.evicted.map((entry) => entry.name)).toEqual(["j-idle"])
     expect(existsSync(control)).toBe(false)
@@ -177,7 +200,9 @@ describe("runtime size cap: eviction order", () => {
 
     const report = await cap(paths, 1)
 
-    expect(report.evicted.filter((entry) => entry.tier === "unfolded-run").map((entry) => entry.name)).toEqual(ids.slice(0, 5))
+    expect(report.evicted.filter((entry) => entry.tier === "unfolded-run").map((entry) => entry.name)).toEqual(
+      ids.slice(0, 5),
+    )
     expect(await liveNames(runsDir(paths))).toEqual(ids.slice(5).sort())
     for (const runId of ids.slice(5)) expect(existsSync(join(runsDir(paths), runId, "child-1.log"))).toBe(true)
   })
@@ -185,7 +210,10 @@ describe("runtime size cap: eviction order", () => {
   test("#given unfolded runs beyond the newest 10 that are younger than retention #when the cap reaches tier 6 #then they are kept as recent (B04)", async () => {
     const paths = await identity()
     for (let index = 1; index <= 12; index += 1) {
-      await reflectionRun(paths, `reflection-run-${index}`, { outcome: "failed", finishedAt: daysAgo(6) + index * HOUR_MS })
+      await reflectionRun(paths, `reflection-run-${index}`, {
+        outcome: "failed",
+        finishedAt: daysAgo(6) + index * HOUR_MS,
+      })
     }
 
     const report = await cap(paths, 1)
@@ -202,7 +230,11 @@ describe("runtime size cap: eviction order", () => {
 
     const report = await cap(paths, 1)
 
-    expect(report.evicted.map((entry) => entry.name)).toEqual(["reflection-run-1", "reflection-run-2", "reflection-run-3"])
+    expect(report.evicted.map((entry) => entry.name)).toEqual([
+      "reflection-run-1",
+      "reflection-run-2",
+      "reflection-run-3",
+    ])
     expect(report.kept["reflection-run-50"]).toBe("high-water")
     expect(report.kept["reflection-run-4"]).toBe("newest")
     expect(await liveNames(runsDir(paths))).toEqual(["reflection-run-4", "reflection-run-50"])
@@ -229,7 +261,10 @@ describe("runtime size cap: crash windows and claims", () => {
     const tombstone = join(runsDir(paths), ".prune-reflection-run-0-4b0f")
     await mkdir(tombstone, { recursive: true })
     await writeFile(join(tombstone, "child-1.log"), "left by an interrupted pass\n")
-    const maxBytes = (await measureRuntimeSize(paths.runtime)).bytes - (await measureTreeBytes(tombstone)) - (await bytesOf(paths, runs.slice(0, 1)))
+    const maxBytes =
+      (await measureRuntimeSize(paths.runtime)).bytes -
+      (await measureTreeBytes(tombstone)) -
+      (await bytesOf(paths, runs.slice(0, 1)))
 
     const report = await cap(paths, maxBytes)
 
@@ -251,7 +286,11 @@ describe("runtime size cap: crash windows and claims", () => {
     const paths = await identity()
     await reflectionRun(paths, "reflection-run-1", { outcome: "merged", finishedAt: daysAgo(3), readOnlyPayload: true })
     await reflectionRun(paths, "reflection-run-2", { outcome: "merged", finishedAt: daysAgo(2), readOnlyPayload: true })
-    await reflectionRun(paths, "reflection-run-3", { outcome: "failed", finishedAt: daysAgo(40), readOnlyPayload: true })
+    await reflectionRun(paths, "reflection-run-3", {
+      outcome: "failed",
+      finishedAt: daysAgo(40),
+      readOnlyPayload: true,
+    })
     for (let index = 4; index <= 13; index += 1) {
       await reflectionRun(paths, `reflection-run-${index}`, { outcome: "failed", finishedAt: daysAgo(30) + index })
     }
@@ -259,8 +298,13 @@ describe("runtime size cap: crash windows and claims", () => {
 
     const report = await cap(paths, 1)
 
-    expect(report.evicted.map((entry) => entry.name)).toEqual(["reflection-run-1", "reflection-run-2", "reflection-run-3"])
-    for (const runId of ["reflection-run-1", "reflection-run-2", "reflection-run-3"]) expect(existsSync(join(runsDir(paths), runId))).toBe(false)
+    expect(report.evicted.map((entry) => entry.name)).toEqual([
+      "reflection-run-1",
+      "reflection-run-2",
+      "reflection-run-3",
+    ])
+    for (const runId of ["reflection-run-1", "reflection-run-2", "reflection-run-3"])
+      expect(existsSync(join(runsDir(paths), runId))).toBe(false)
     expect((await readdir(runsDir(paths))).filter((name) => name.startsWith(".prune-"))).toEqual([])
     expect(report.afterBytes).toBe((await measureRuntimeSize(paths.runtime)).bytes)
     expect(report.afterBytes).toBeLessThan(report.beforeBytes)
@@ -305,9 +349,21 @@ describe("runtime size cap: journal floor for callers without session liveness (
 })
 
 describe("runtime size cap: journals named by a reservation (B15, J0)", () => {
-  async function reserve(paths: MemoryIdentityPaths, file: "active.lock" | "pending.json", runId: string, conversationIds: readonly string[]) {
+  async function reserve(
+    paths: MemoryIdentityPaths,
+    file: "active.lock" | "pending.json",
+    runId: string,
+    conversationIds: readonly string[],
+  ) {
     await mkdir(paths.reflection, { recursive: true })
-    await writeFile(join(paths.reflection, file), JSON.stringify({ runId, reservedAt: new Date(daysAgo(1)).toISOString(), request: { trigger: "manual", conversationIds } }))
+    await writeFile(
+      join(paths.reflection, file),
+      JSON.stringify({
+        runId,
+        reservedAt: new Date(daysAgo(1)).toISOString(),
+        request: { trigger: "manual", conversationIds },
+      }),
+    )
   }
 
   test("#given active and pending reservations naming one fully- and one never-reflected journal #when the cap forces tiers 2, 4 and 5 #then those are kept as reserved and their siblings evicted", async () => {
@@ -352,11 +408,25 @@ describe("runtime size cap: journals named by a reservation (B15, J0)", () => {
 })
 
 describe("runtime size cap: health gate on unfolded journals (B17, M6)", () => {
-  async function completionOf(paths: MemoryIdentityPaths, runId: string, outcome: string, finishedAt: number): Promise<void> {
+  async function completionOf(
+    paths: MemoryIdentityPaths,
+    runId: string,
+    outcome: string,
+    finishedAt: number,
+  ): Promise<void> {
     await writeJson(join(paths.reflection, "completions", `${runId}.json`), {
-      schemaVersion: 1, runId, identity: "agent-test", category: "quick", conversationIds: [], trigger: "step-count", outcome,
-      startedAt: new Date(finishedAt - 60_000).toISOString(), finishedAt: new Date(finishedAt).toISOString(), durationMs: 60_000,
-      consecutiveFailures: outcome === "failed" ? 1 : 0, delivery: { status: "consumed" },
+      schemaVersion: 1,
+      runId,
+      identity: "agent-test",
+      category: "quick",
+      conversationIds: [],
+      trigger: "step-count",
+      outcome,
+      startedAt: new Date(finishedAt - 60_000).toISOString(),
+      finishedAt: new Date(finishedAt).toISOString(),
+      durationMs: 60_000,
+      consecutiveFailures: outcome === "failed" ? 1 : 0,
+      delivery: { status: "consumed" },
     })
   }
 
@@ -440,7 +510,7 @@ describe("runtime size cap: pass budget and cursor (B16, H4; r3 N8, N3)", () => 
   // A stepping timer: every read advances 10 ms, so the budget is spent by reads, not by wall time.
   function steppingClock(stepMs: number): () => number {
     let reads = 0
-    return () => (reads++) * stepMs
+    return () => reads++ * stepMs
   }
 
   test("#given 40 evictions needed and a budget that allows 15 #when the cap runs twice #then the first stops with a tier cursor and the resumed walk finishes", async () => {
@@ -497,7 +567,9 @@ describe("runtime size cap: pass budget and cursor (B16, H4; r3 N8, N3)", () => 
       return 0
     }
 
-    await expect(cap(paths, 1, { signal: caller.signal, measureSignal: caller.signal, budgetMs: 60_000, clock })).rejects.toMatchObject({ name: "AbortError" })
+    await expect(
+      cap(paths, 1, { signal: caller.signal, measureSignal: caller.signal, budgetMs: 60_000, clock }),
+    ).rejects.toMatchObject({ name: "AbortError" })
     expect(await liveNames(runsDir(paths))).toEqual(runs.toSorted())
   })
 
@@ -538,7 +610,10 @@ describe("runtime size cap: what the next pass could evict, for the doctors (#12
 describe("runtime retention then cap in one pass (B12 on)", () => {
   test("#given a scaled busiest-identity shape #when the pass runs with a cap #then retention frees the old data first and the cap evicts only tier 1", async () => {
     const paths = await identity()
-    for (const [runId, days] of [["reflection-run-1", 12], ["reflection-run-2", 9]] as const) {
+    for (const [runId, days] of [
+      ["reflection-run-1", 12],
+      ["reflection-run-2", 9],
+    ] as const) {
       await padded(await reflectionRun(paths, runId, { finishedAt: daysAgo(days) }), 64 * 1024, daysAgo(days))
     }
     const young: string[] = []
@@ -552,10 +627,11 @@ describe("runtime retention then cap in one pass (B12 on)", () => {
     await journal(paths, "j-partly", "partly", daysAgo(15))
     const freshJournal = await journal(paths, "j-fresh", "never", daysAgo(3))
     const freshSidecar = await sidecar(paths, "fresh", daysAgo(1))
-    const afterRetention = (await measureRuntimeSize(paths.runtime)).bytes
-      - (await bytesOf(paths, ["reflection-run-1", "reflection-run-2"]))
-      - (await measureTreeBytes(join(paths.transcripts, "j-abandoned")))
-      - (await measureTreeBytes(join(paths.transcripts, "j-partly", "transcript.jsonl")))
+    const afterRetention =
+      (await measureRuntimeSize(paths.runtime)).bytes -
+      (await bytesOf(paths, ["reflection-run-1", "reflection-run-2"])) -
+      (await measureTreeBytes(join(paths.transcripts, "j-abandoned"))) -
+      (await measureTreeBytes(join(paths.transcripts, "j-partly", "transcript.jsonl")))
     const margin = Math.floor((await bytesOf(paths, young.slice(2, 3))) / 2)
     const maxBytes = afterRetention - (await bytesOf(paths, young.slice(0, 2))) + margin
 
@@ -563,7 +639,9 @@ describe("runtime retention then cap in one pass (B12 on)", () => {
 
     expect(report.runs.removed).toEqual(["reflection-run-1", "reflection-run-2"])
     expect([...report.journals.removed].sort()).toEqual(["j-abandoned", "j-partly"])
-    expect(report.cap?.evicted.map((entry) => [entry.tier, entry.name])).toEqual(young.slice(0, 2).map((runId) => ["folded-run", runId]))
+    expect(report.cap?.evicted.map((entry) => [entry.tier, entry.name])).toEqual(
+      young.slice(0, 2).map((runId) => ["folded-run", runId]),
+    )
     expect(report.cap?.afterBytes).toBeLessThanOrEqual(maxBytes)
     expect(existsSync(freshJournal)).toBe(true)
     expect(existsSync(freshSidecar)).toBe(true)
@@ -578,7 +656,6 @@ const TIER_ORDER = [
   "partly-reflected-transcript",
   "unfolded-run",
 ] as const
-
 
 describe("runtime retention then cap with the default switch (B12 default, off)", () => {
   test("#given discard_unreflected_journals off #when retention and the cap run #then unreflected journals are kept and the cap evicts folded runs only", async () => {

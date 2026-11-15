@@ -46,130 +46,160 @@ async function pair() {
   return { a, b }
 }
 
-test("a revert to the exact pre-edit text after a crash between journaling and importing the edit reaches the peer", async () => {
-  const { a, b } = await pair()
-  await a.write("n.md", note("first\n"))
-  await a.engine.runCycle()
-  await b.engine.runCycle()
-  await a.write("n.md", note("first\nedit\n"))
-  await a.restart(crashAtCaptured)
-  await expect(a.engine.runCycle()).rejects.toBeInstanceOf(CrashInjected)
-  await a.restart()
-  await a.write("n.md", note("first\n"))
-  await a.engine.runCycle()
-  expect(await a.engine.status()).toMatchObject({ kind: "synced" })
-  await b.engine.runCycle()
-  expect(await b.read("n.md")).toBe(note("first\n"))
-  expect(await a.read("n.md")).toBe(note("first\n"))
-}, TIMEOUT)
+test(
+  "a revert to the exact pre-edit text after a crash between journaling and importing the edit reaches the peer",
+  async () => {
+    const { a, b } = await pair()
+    await a.write("n.md", note("first\n"))
+    await a.engine.runCycle()
+    await b.engine.runCycle()
+    await a.write("n.md", note("first\nedit\n"))
+    await a.restart(crashAtCaptured)
+    await expect(a.engine.runCycle()).rejects.toBeInstanceOf(CrashInjected)
+    await a.restart()
+    await a.write("n.md", note("first\n"))
+    await a.engine.runCycle()
+    expect(await a.engine.status()).toMatchObject({ kind: "synced" })
+    await b.engine.runCycle()
+    expect(await b.read("n.md")).toBe(note("first\n"))
+    expect(await a.read("n.md")).toBe(note("first\n"))
+  },
+  TIMEOUT,
+)
 
-test("deleting a new file whose creation crashed between journaling and importing reaches the peer as a delete", async () => {
-  const { a, b } = await pair()
-  await a.engine.runCycle()
-  await b.engine.runCycle()
-  await a.write("new.md", note("brand new\n"))
-  await a.restart(crashAtCaptured)
-  await expect(a.engine.runCycle()).rejects.toBeInstanceOf(CrashInjected)
-  await a.restart()
-  await a.write("new.md", null)
-  await a.engine.runCycle()
-  expect(await a.engine.status()).toMatchObject({ kind: "synced" })
-  await b.engine.runCycle()
-  expect(await b.read("new.md")).toBeNull()
-}, TIMEOUT)
+test(
+  "deleting a new file whose creation crashed between journaling and importing reaches the peer as a delete",
+  async () => {
+    const { a, b } = await pair()
+    await a.engine.runCycle()
+    await b.engine.runCycle()
+    await a.write("new.md", note("brand new\n"))
+    await a.restart(crashAtCaptured)
+    await expect(a.engine.runCycle()).rejects.toBeInstanceOf(CrashInjected)
+    await a.restart()
+    await a.write("new.md", null)
+    await a.engine.runCycle()
+    expect(await a.engine.status()).toMatchObject({ kind: "synced" })
+    await b.engine.runCycle()
+    expect(await b.read("new.md")).toBeNull()
+  },
+  TIMEOUT,
+)
 
-test("a journaled op under a foreign peer that the doc lacks stays queued, is never imported or sent, and the cycle does not fail", async () => {
-  const { a, b } = await pair()
-  await a.write("x.md", note("mine\n"))
-  await a.engine.runCycle()
-  await b.engine.runCycle()
-  const { LoroDoc } = await loadLoroRuntime()
-  const foreign = new LoroDoc()
-  foreign.setPeerId("4242")
-  foreign.getText("body").insert(0, "not this device's op")
-  foreign.commit()
-  const item = { key: "x.md", ops: toBase64(foreign.export({ mode: "update" })) }
-  foreign.free()
-  const versionBefore = await a.store.version("x.md")
-  await writeInlinePending(a, [item])
-  expect(await a.engine.runCycle()).toMatchObject({ held: ["x.md"] })
-  expect(await a.store.version("x.md")).toBe(versionBefore)
-  await expectOnlyPending(a, item)
-  expect(await a.engine.status()).toMatchObject({ kind: "failing", failure: { kind: "oversized_item", stuck: ["x.md"] } })
-  await b.engine.runCycle()
-  expect(await b.read("x.md")).toBe(note("mine\n"))
-}, TIMEOUT)
+test(
+  "a journaled op under a foreign peer that the doc lacks stays queued, is never imported or sent, and the cycle does not fail",
+  async () => {
+    const { a, b } = await pair()
+    await a.write("x.md", note("mine\n"))
+    await a.engine.runCycle()
+    await b.engine.runCycle()
+    const { LoroDoc } = await loadLoroRuntime()
+    const foreign = new LoroDoc()
+    foreign.setPeerId("4242")
+    foreign.getText("body").insert(0, "not this device's op")
+    foreign.commit()
+    const item = { key: "x.md", ops: toBase64(foreign.export({ mode: "update" })) }
+    foreign.free()
+    const versionBefore = await a.store.version("x.md")
+    await writeInlinePending(a, [item])
+    expect(await a.engine.runCycle()).toMatchObject({ held: ["x.md"] })
+    expect(await a.store.version("x.md")).toBe(versionBefore)
+    await expectOnlyPending(a, item)
+    expect(await a.engine.status()).toMatchObject({
+      kind: "failing",
+      failure: { kind: "oversized_item", stuck: ["x.md"] },
+    })
+    await b.engine.runCycle()
+    expect(await b.read("x.md")).toBe(note("mine\n"))
+  },
+  TIMEOUT,
+)
 
-test("a journaled op under this device's peer whose earlier ops the doc lacks is refused unimported, never sent, and named stuck", async () => {
-  const { a, b } = await pair()
-  await a.engine.runCycle()
-  await b.engine.runCycle()
-  const { LoroDoc } = await loadLoroRuntime()
-  const source = new LoroDoc()
-  source.setPeerId(a.store.peer() as `${number}`)
-  source.getText("body").insert(0, "earlier ")
-  source.commit()
-  const mid = source.oplogVersion()
-  source.getText("body").insert(8, "later")
-  source.commit()
-  const item = { key: "dep.md", ops: toBase64(source.export({ mode: "update", from: mid })) }
-  source.free()
-  const versionBefore = await a.store.version("dep.md")
-  await writeInlinePending(a, [item])
-  expect(await a.engine.runCycle()).toMatchObject({ held: ["dep.md"] })
-  expect(await a.store.version("dep.md")).toBe(versionBefore)
-  await expectOnlyPending(a, item)
-  expect(await a.engine.status()).toMatchObject({ kind: "failing", failure: { kind: "oversized_item", stuck: ["dep.md"] } })
-  await b.engine.runCycle()
-  expect(await b.read("dep.md")).toBeNull()
-}, TIMEOUT)
+test(
+  "a journaled op under this device's peer whose earlier ops the doc lacks is refused unimported, never sent, and named stuck",
+  async () => {
+    const { a, b } = await pair()
+    await a.engine.runCycle()
+    await b.engine.runCycle()
+    const { LoroDoc } = await loadLoroRuntime()
+    const source = new LoroDoc()
+    source.setPeerId(a.store.peer() as `${number}`)
+    source.getText("body").insert(0, "earlier ")
+    source.commit()
+    const mid = source.oplogVersion()
+    source.getText("body").insert(8, "later")
+    source.commit()
+    const item = { key: "dep.md", ops: toBase64(source.export({ mode: "update", from: mid })) }
+    source.free()
+    const versionBefore = await a.store.version("dep.md")
+    await writeInlinePending(a, [item])
+    expect(await a.engine.runCycle()).toMatchObject({ held: ["dep.md"] })
+    expect(await a.store.version("dep.md")).toBe(versionBefore)
+    await expectOnlyPending(a, item)
+    expect(await a.engine.status()).toMatchObject({
+      kind: "failing",
+      failure: { kind: "oversized_item", stuck: ["dep.md"] },
+    })
+    await b.engine.runCycle()
+    expect(await b.read("dep.md")).toBeNull()
+  },
+  TIMEOUT,
+)
 
-test("deleting a re-created file whose revival crashed between journaling and importing reaches the peer as a delete", async () => {
-  const { a, b } = await pair()
-  await a.write("r.md", note("same text\n"))
-  await a.engine.runCycle()
-  await b.engine.runCycle()
-  await a.write("r.md", null)
-  await a.engine.runCycle()
-  await b.engine.runCycle()
-  expect(await b.read("r.md")).toBeNull()
-  await a.write("r.md", note("same text\n"))
-  await a.restart(crashAtCaptured)
-  await expect(a.engine.runCycle()).rejects.toBeInstanceOf(CrashInjected)
-  await a.restart()
-  await a.write("r.md", null)
-  await a.engine.runCycle()
-  expect(await a.engine.status()).toMatchObject({ kind: "synced" })
-  await b.engine.runCycle()
-  expect(await b.read("r.md")).toBeNull()
-  expect(await a.read("r.md")).toBeNull()
-}, TIMEOUT)
+test(
+  "deleting a re-created file whose revival crashed between journaling and importing reaches the peer as a delete",
+  async () => {
+    const { a, b } = await pair()
+    await a.write("r.md", note("same text\n"))
+    await a.engine.runCycle()
+    await b.engine.runCycle()
+    await a.write("r.md", null)
+    await a.engine.runCycle()
+    await b.engine.runCycle()
+    expect(await b.read("r.md")).toBeNull()
+    await a.write("r.md", note("same text\n"))
+    await a.restart(crashAtCaptured)
+    await expect(a.engine.runCycle()).rejects.toBeInstanceOf(CrashInjected)
+    await a.restart()
+    await a.write("r.md", null)
+    await a.engine.runCycle()
+    expect(await a.engine.status()).toMatchObject({ kind: "synced" })
+    await b.engine.runCycle()
+    expect(await b.read("r.md")).toBeNull()
+    expect(await a.read("r.md")).toBeNull()
+  },
+  TIMEOUT,
+)
 
-test("a revive of a held file a peer deleted, crashed between journaling and importing, then edited again, ends identical on both devices", async () => {
-  const bound = 4096
-  const server = new FakeSyncServer()
-  const a = await makeDevice(server, "a", undefined, { realStore: true, batchBytes: bound })
-  const b = await makeDevice(server, "b", undefined, { realStore: true, batchBytes: bound })
-  devices.push(a, b)
-  await a.write("shared.md", note("first\n"))
-  await a.engine.runCycle()
-  await b.engine.runCycle()
-  await a.write("shared.md", note(`first\n${"y".repeat(bound * 2)}\n`))
-  await a.engine.runCycle()
-  await b.write("shared.md", null)
-  await b.engine.runCycle()
-  expect(await a.engine.runCycle()).toMatchObject({ held: ["shared.md"] })
-  await a.write("shared.md", note("first\nfrom a\n"))
-  await a.restart(crashAtCaptured)
-  await expect(a.engine.runCycle()).rejects.toBeInstanceOf(CrashInjected)
-  await a.restart()
-  await a.write("shared.md", note("first\nfrom a\nmore\n"))
-  await a.engine.runCycle()
-  await b.engine.runCycle()
-  expect(await a.read("shared.md")).toBe(note("first\nfrom a\nmore\n"))
-  expect(await b.read("shared.md")).toBe(note("first\nfrom a\nmore\n"))
-  expect(await a.engine.status()).toMatchObject({ kind: "synced" })
-}, TIMEOUT)
+test(
+  "a revive of a held file a peer deleted, crashed between journaling and importing, then edited again, ends identical on both devices",
+  async () => {
+    const bound = 4096
+    const server = new FakeSyncServer()
+    const a = await makeDevice(server, "a", undefined, { realStore: true, batchBytes: bound })
+    const b = await makeDevice(server, "b", undefined, { realStore: true, batchBytes: bound })
+    devices.push(a, b)
+    await a.write("shared.md", note("first\n"))
+    await a.engine.runCycle()
+    await b.engine.runCycle()
+    await a.write("shared.md", note(`first\n${"y".repeat(bound * 2)}\n`))
+    await a.engine.runCycle()
+    await b.write("shared.md", null)
+    await b.engine.runCycle()
+    expect(await a.engine.runCycle()).toMatchObject({ held: ["shared.md"] })
+    await a.write("shared.md", note("first\nfrom a\n"))
+    await a.restart(crashAtCaptured)
+    await expect(a.engine.runCycle()).rejects.toBeInstanceOf(CrashInjected)
+    await a.restart()
+    await a.write("shared.md", note("first\nfrom a\nmore\n"))
+    await a.engine.runCycle()
+    await b.engine.runCycle()
+    expect(await a.read("shared.md")).toBe(note("first\nfrom a\nmore\n"))
+    expect(await b.read("shared.md")).toBe(note("first\nfrom a\nmore\n"))
+    expect(await a.engine.status()).toMatchObject({ kind: "synced" })
+  },
+  TIMEOUT,
+)
 
 /** A device whose next capture crashes once after the doc is persisted: its op stays pending, marked imported. */
 async function crashedAfterPersist(name: string) {
@@ -191,47 +221,59 @@ async function crashedAfterPersist(name: string) {
   return { device, entry }
 }
 
-test("capture recovery never re-reads an op the doc already holds", async () => {
-  const { device } = await crashedAfterPersist("a")
-  const adopt = spyOn(device.store, "adoptJournaled")
-  expect(await device.engine.runCycle()).toMatchObject({ pushed: true })
-  expect(adopt).not.toHaveBeenCalled()
-}, TIMEOUT)
+test(
+  "capture recovery never re-reads an op the doc already holds",
+  async () => {
+    const { device } = await crashedAfterPersist("a")
+    const adopt = spyOn(device.store, "adoptJournaled")
+    expect(await device.engine.runCycle()).toMatchObject({ pushed: true })
+    expect(adopt).not.toHaveBeenCalled()
+  },
+  TIMEOUT,
+)
 
-test("an entry whose imported mark was lost is checked once against the doc, never imported twice", async () => {
-  // A crash between persisting the doc and writing the mark, or an older build dropping the field.
-  const { device, entry } = await crashedAfterPersist("b")
-  const { imported: _lost, ...unmarked } = entry
-  await device.engine.journal.setPending({ items: [unmarked], outgoing: null })
-  const adopt = spyOn(device.store, "adoptJournaled")
-  const versionBefore = await device.store.version("kept.md")
-  expect(await device.engine.runCycle()).toMatchObject({ pushed: true })
-  expect(adopt).toHaveBeenCalledTimes(1)
-  expect(await adopt.mock.results[0]?.value).toBe("held")
-  expect(await device.store.version("kept.md")).toBe(versionBefore)
-}, TIMEOUT)
+test(
+  "an entry whose imported mark was lost is checked once against the doc, never imported twice",
+  async () => {
+    // A crash between persisting the doc and writing the mark, or an older build dropping the field.
+    const { device, entry } = await crashedAfterPersist("b")
+    const { imported: _lost, ...unmarked } = entry
+    await device.engine.journal.setPending({ items: [unmarked], outgoing: null })
+    const adopt = spyOn(device.store, "adoptJournaled")
+    const versionBefore = await device.store.version("kept.md")
+    expect(await device.engine.runCycle()).toMatchObject({ pushed: true })
+    expect(adopt).toHaveBeenCalledTimes(1)
+    expect(await adopt.mock.results[0]?.value).toBe("held")
+    expect(await device.store.version("kept.md")).toBe(versionBefore)
+  },
+  TIMEOUT,
+)
 
-test("an entry whose capture never reached disk is marked imported only once the doc holding it is persisted", async () => {
-  // Review of #12597 at 4647e55a6e: the store's persist fails after a capture applied the op in memory,
-  // the next cycle finds the op "held" by that in-memory doc, and a restart before any later persist
-  // must still re-import it rather than skip it as already imported.
-  const server = new FakeSyncServer()
-  const a = await makeDevice(server, "a", undefined, { realStore: true })
-  const b = await makeDevice(server, "b", undefined, { realStore: true })
-  devices.push(a, b)
-  await a.write("kept.md", note("one\ntwo\nthree\n"))
-  await a.engine.runCycle()
-  await b.engine.runCycle()
-  await a.write("kept.md", note("ONE\ntwo\nthree\n"))
-  const persist = spyOn(a.store, "persist").mockImplementationOnce(() => Promise.reject(new Error("ENOSPC")))
-  await expect(a.engine.runCycle()).rejects.toThrow()
-  persist.mockRestore()
-  server.beforeNextAppend = () => Promise.reject(new Error("offline"))
-  await expect(a.engine.runCycle()).rejects.toThrow()
-  await a.restart()
-  await a.write("kept.md", note("ONE\ntwo\nTHREE\n"))
-  await a.engine.runCycle()
-  await b.engine.runCycle()
-  expect(await b.read("kept.md")).toBe(note("ONE\ntwo\nTHREE\n"))
-  expect(await a.read("kept.md")).toBe(note("ONE\ntwo\nTHREE\n"))
-}, TIMEOUT)
+test(
+  "an entry whose capture never reached disk is marked imported only once the doc holding it is persisted",
+  async () => {
+    // Review of #12597 at 4647e55a6e: the store's persist fails after a capture applied the op in memory,
+    // the next cycle finds the op "held" by that in-memory doc, and a restart before any later persist
+    // must still re-import it rather than skip it as already imported.
+    const server = new FakeSyncServer()
+    const a = await makeDevice(server, "a", undefined, { realStore: true })
+    const b = await makeDevice(server, "b", undefined, { realStore: true })
+    devices.push(a, b)
+    await a.write("kept.md", note("one\ntwo\nthree\n"))
+    await a.engine.runCycle()
+    await b.engine.runCycle()
+    await a.write("kept.md", note("ONE\ntwo\nthree\n"))
+    const persist = spyOn(a.store, "persist").mockImplementationOnce(() => Promise.reject(new Error("ENOSPC")))
+    await expect(a.engine.runCycle()).rejects.toThrow()
+    persist.mockRestore()
+    server.beforeNextAppend = () => Promise.reject(new Error("offline"))
+    await expect(a.engine.runCycle()).rejects.toThrow()
+    await a.restart()
+    await a.write("kept.md", note("ONE\ntwo\nTHREE\n"))
+    await a.engine.runCycle()
+    await b.engine.runCycle()
+    expect(await b.read("kept.md")).toBe(note("ONE\ntwo\nTHREE\n"))
+    expect(await a.read("kept.md")).toBe(note("ONE\ntwo\nTHREE\n"))
+  },
+  TIMEOUT,
+)

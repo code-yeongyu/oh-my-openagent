@@ -10,9 +10,23 @@ import { execFileSync } from "node:child_process"
 
 import { generationHostPid } from "./task-host-e2e-daemon-state.mjs"
 import { observeState, stopParent } from "./task-host-e2e-events.mjs"
-import { cleanupScenario, daemonStatus, pidAlive, readTaskRecords, spawnParent, waitFor } from "./task-host-e2e-process.mjs"
+import {
+  cleanupScenario,
+  daemonStatus,
+  pidAlive,
+  readTaskRecords,
+  spawnParent,
+  waitFor,
+} from "./task-host-e2e-process.mjs"
 import { createScenarioSandbox } from "./task-host-e2e-sandbox.mjs"
-import { CHILD_BUSY, childStartDiagnosis, childrenSettled, hostConfig, holdParent, spawnScript } from "./task-host-e2e-support.mjs"
+import {
+  CHILD_BUSY,
+  childStartDiagnosis,
+  childrenSettled,
+  hostConfig,
+  holdParent,
+  spawnScript,
+} from "./task-host-e2e-support.mjs"
 
 const CHILDREN = 16
 /** Threads the host may keep above its pre-fan-out count once every child is gone (GC/JIT helpers settle slowly). */
@@ -24,7 +38,9 @@ const RSS_TOLERANCE_MB = 512
 export function threadCount(pid) {
   try {
     if (process.platform === "darwin") {
-      const rows = execFileSync("ps", ["-M", "-p", String(pid)], { encoding: "utf8" }).trim().split("\n")
+      const rows = execFileSync("ps", ["-M", "-p", String(pid)], { encoding: "utf8" })
+        .trim()
+        .split("\n")
       return Math.max(0, rows.length - 1)
     }
     return Number(execFileSync("ps", ["-o", "nlwp=", "-p", String(pid)], { encoding: "utf8" }).trim())
@@ -56,11 +72,16 @@ export async function scenarioK(run) {
       const records = readTaskRecords(sandbox)
       if (baseline === undefined && records.length > 0) {
         const pid = generationHostPid(sandbox.agentDir)
-        if (pid !== undefined) baseline = { pid, threads: threadCount(pid), rssMb: rssMb(pid), atChildren: records.length }
+        if (pid !== undefined)
+          baseline = { pid, threads: threadCount(pid), rssMb: rssMb(pid), atChildren: records.length }
       }
       return childrenSettled(records, CHILDREN) ? records : undefined
     },
-    { trigger: () => { parent = spawnParent(sandbox, run.mockEntry, "run sixteen children to completion", { capture: true }) } },
+    {
+      trigger: () => {
+        parent = spawnParent(sandbox, run.mockEntry, "run sixteen children to completion", { capture: true })
+      },
+    },
   )
   const records = started ?? readTaskRecords(sandbox)
   const hostPid = generationHostPid(sandbox.agentDir)
@@ -91,7 +112,8 @@ export async function scenarioK(run) {
     peak: peak ?? null,
     after: after ?? null,
     threadsReturnedToBaseline: settled !== undefined,
-    threadDelta: after?.threads !== undefined && baseline?.threads !== undefined ? after.threads - baseline.threads : null,
+    threadDelta:
+      after?.threads !== undefined && baseline?.threads !== undefined ? after.threads - baseline.threads : null,
     rssDeltaMb: after?.rssMb !== undefined && baseline?.rssMb !== undefined ? after.rssMb - baseline.rssMb : null,
     sessionsRemaining: status.json?.sessions?.total ?? null,
     childStart: childStartDiagnosis(sandbox, records),
