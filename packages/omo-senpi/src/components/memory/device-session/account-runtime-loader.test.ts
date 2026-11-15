@@ -1,9 +1,14 @@
 import { describe, expect, test } from "bun:test"
+import { spawn } from "node:child_process"
+import { once } from "node:events"
+import { join } from "node:path"
+import { Duplex } from "node:stream"
 
 import type { CliDeviceAccount, DeviceAccount, DeviceAccountSource } from "./account-source"
 import { SyncSidecarUnavailableError } from "../sync-runner"
 import { type DeviceAccountRuntimeModule, selectedDeviceAccountSource } from "./account-runtime-loader"
 import type { MemorySyncSelection } from "../desktop-sync/hostSelection"
+import { readFrames, writeFrame } from "../desktop-sync/framing"
 
 const account = (accountId: string): CliDeviceAccount => ({
   kind: "cli",
@@ -104,4 +109,63 @@ describe("selectedDeviceAccountSource", () => {
     expect(accountIdOf(second)).toBe("acct_2")
     expect(loads).toBe(2)
   })
+})
+
+// #12057, POSIX only (one inherited socket at fd 5). Security contract: a fallback-path launch (no host CLI captured the
+// private-descriptor table) must not leave the declaration in process.env past registration, where any child another
+// extension spawns before the sidecar's claim would inherit it; the claim itself still selects the desktop channel.
+describe.skipIf(process.platform === "win32")("the fallback path's private-descriptor declaration", () => {
+  test("#given a launch whose table no host CLI captured #when the memory component registers #then the declaration leaves process.env before registration returns and the sidecar's claim still attaches", async () => {
+    const env: Record<string, string | undefined> = {
+      ...process.env,
+      SENPI_PRIVATE_FDS: '{"memory-sync":5}',
+      SENPI_PRIVATE_FDS_FINAL: "1",
+    }
+    const child = spawn(process.execPath, [join(import.meta.dirname, "account-runtime-loader.fixture.ts")], {
+      env,
+      stdio: ["ignore", "pipe", "pipe", "ignore", "ignore", "pipe"],
+      windowsHide: true,
+    })
+    const closed = once(child, "close", { signal: AbortSignal.timeout(60_000) })
+    let report = ""
+    let errors = ""
+    child.stdout?.on("data", (chunk: Buffer) => {
+      report += chunk.toString()
+    })
+    child.stderr?.on("data", (chunk: Buffer) => {
+      errors += chunk.toString()
+    })
+    const socket: unknown = Reflect.get(child.stdio, 5)
+    if (!(socket instanceof Duplex)) throw new Error("missing the memory-sync socket")
+    const frames: unknown[] = []
+    readFrames(
+      socket,
+      (packet) => {
+        frames.push(packet)
+        if (typeof packet !== "object" || packet === null || !("id" in packet) || !("op" in packet)) return
+        writeFrame(socket, {
+          id: packet.id,
+          ok: true,
+          value: packet.op === "bootstrap" ? { child: "fallback-child" } : { descriptor: "ok" },
+        })
+      },
+      () => {},
+    )
+    try {
+      const [code] = await closed
+      expect(code, errors).toBe(0)
+    } finally {
+      socket.destroy()
+    }
+    expect(JSON.parse(report)).toEqual({
+      atRegistration: { table: null, final: null },
+      afterClaim: { table: null, final: null },
+      selection: "desktop",
+      reply: { descriptor: "ok" },
+    })
+    expect(frames).toEqual([
+      { id: 1, op: "bootstrap" },
+      { id: 2, op: "request", capability: "fallback-child", request: { op: "descriptor" } },
+    ])
+  }, 90_000)
 })
