@@ -10,6 +10,7 @@ import { createThreadSdk, type ThreadSdk } from "./sdk"
 import { createRemoteThreadFixture } from "./thread-remote-fixture"
 import type { ThreadHost, ThreadHostSession } from "./tools"
 import type { ThreadHostViewRequest } from "./tools/ports"
+import { startFakeEngineHost } from "./wake/testing/fake-engine-host"
 import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
 
 const TUI_SOCKET = "/tmp/t-0123456789abcdef.sock"
@@ -674,5 +675,33 @@ describe("thread SDK: takeover", () => {
     const located = await sdk.locate({ thread: "dur-host" })
     if (located.kind !== "ok") throw new Error("located")
     expect(await sdk.release(located.thread, {})).toMatchObject({ success: false, error: "host_unavailable" })
+  })
+})
+
+// #13037 cold wake: `omo daemon run` has the operator daemon load omo with no session open, so its thread component
+// declares the delivery consumer before any session runs. The SDK asks the host thread_create opens sessions on.
+describe("thread SDK: the operator daemon's warm", () => {
+  test.each([
+    ["warms its default profile", undefined, { kind: "warm", state: "warmed" }],
+    ["is draining", { success: false, error: "host_draining" }, { kind: "refused", code: "host_draining" }],
+    ["predates warm", { success: false, error: "unknown_command" }, { kind: "unsupported" }],
+  ] as const)("#given an operator daemon that %s #when the SDK warms it #then one session-less warm reaches that host and its answer is classified", async (_what, reply, expected) => {
+    const host = await startFakeEngineHost(reply === undefined ? {} : { warm: () => reply })
+    try {
+      const warmSdk = createThreadSdk({
+        agentDir: mkdtempSync(join(tmpdir(), "thread-sdk-warm-")),
+        cwd: process.cwd(),
+        uid: 501,
+        user: "tester",
+        env: { OMO_RPC_SOCKET_PATH: host.socketPath },
+      })
+      sdks.push(warmSdk)
+      expect(await warmSdk.warmDaemon()).toEqual(expected)
+      expect(host.frames.filter((frame) => frame.type === "warm")).toEqual([
+        { id: expect.any(String), type: "warm" },
+      ])
+    } finally {
+      await host.close()
+    }
   })
 })

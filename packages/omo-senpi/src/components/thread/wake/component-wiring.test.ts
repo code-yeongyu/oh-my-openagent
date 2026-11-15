@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { mkdtempSync } from "node:fs"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 
 import { FakeExtensionAPI } from "../../../../test-support/fake-extension-api"
 import { createThreadComponent } from "../component"
@@ -63,6 +63,8 @@ type Wired = {
   readonly store: GatewayStore
   readonly path: string
   readonly latch: ThreadWakeLatch
+  /** The wake options every component this harness registers is given. */
+  readonly options: ThreadWakeOptions
   /** Every delay the carrier asked its schedule seam to arm. */
   readonly scheduled: readonly number[]
   /** Resolves with the carrier's outcome for the target's next wake; armed before the trigger, fails after 5 s. */
@@ -77,7 +79,15 @@ const ENGINE_AT_MINIMUM: Pick<ThreadWakeOptions, "engineVersion" | "minimumEngin
   minimumEngine: "2026.12.1",
 }
 
-async function wire(wake: Partial<ThreadWakeOptions> = {}, targetCwd: string = process.cwd()): Promise<Wired> {
+/**
+ * `sessionStores`: each registered component opens and disposes its own gateway store, as production does, and the
+ * wake gets none from the test; otherwise one test store is shared by every component and the wake.
+ */
+async function wire(
+  wake: Partial<ThreadWakeOptions> = {},
+  targetCwd: string = process.cwd(),
+  { sessionStores = false }: { readonly sessionStores?: boolean } = {},
+): Promise<Wired> {
   const h = (harness = createGatewayHarness())
   const fake = (host = await startFakeEngineHost())
   const store = h.store()
@@ -100,7 +110,7 @@ async function wire(wake: Partial<ThreadWakeOptions> = {}, targetCwd: string = p
   const options: ThreadWakeOptions = {
     env: {},
     latch,
-    store,
+    ...(sessionStores ? {} : { store }),
     connect: () => connectCarrierHost({ socket: fake.socketPath, keyRoot: () => h.agentDir }),
     ensureHost: async () => undefined,
     schedule: (_run, ms) => {
@@ -122,7 +132,7 @@ async function wire(wake: Partial<ThreadWakeOptions> = {}, targetCwd: string = p
       host: offlineHost(),
       stateDirectory: join(h.agentDir, "state"),
       agentDir: () => h.agentDir,
-      store,
+      ...(sessionStores ? {} : { store }),
       callerSessionId: () => "dur-sender",
       wake: options,
     }).register(pi as never, context() as never)
@@ -140,7 +150,7 @@ async function wire(wake: Partial<ThreadWakeOptions> = {}, targetCwd: string = p
     if (tool === undefined) throw new Error("thread_send is not registered")
     return (await tool.execute("call-1", { thread: TARGET, message: text }, undefined, undefined, {})).details.result
   }
-  return { h, fake, store, path, latch, scheduled, woken, start, send }
+  return { h, fake, store, path, latch, options, scheduled, woken, start, send }
 }
 
 async function drainWoken(
@@ -239,6 +249,69 @@ describe("the same-device wake through the registered thread component", () => {
     await w.send(second, "from the second session")
     expect(await woken).toMatchObject({ kind: "open" })
     expect(opens(w.fake)).toHaveLength(1)
+  })
+
+  // A host the device service cold-starts has no session yet: it loads omo through a `warm` (`omo daemon run` sends
+  // one after its ensure), with no session_start. The operator daemon declares its delivery consumer right then; any
+  // other host still waits for a session.
+  test.each([
+    ["the operator daemon", true],
+    ["another host", false],
+  ])(
+    "#given %s loads the thread component with no session open #when the component registers #then the delivery consumer is declared only on the operator daemon",
+    async (_what, operatorDaemon) => {
+      const service = createFakeDeliveryService({ admitted: true })
+      const daemonSocket = join(mkdtempSync("/tmp/omo-wake-daemon-"), "rpc.sock")
+      const w = await wire({
+        ...ENGINE_AT_MINIMUM,
+        env: { OMO_RPC_SOCKET_PATH: daemonSocket },
+        deliveries: async () => service.port,
+      })
+      const pi = new FakeExtensionAPI()
+      pi.cwd = process.cwd()
+      Object.assign(pi, {
+        sessionContext: {
+          host_socket: operatorDaemon ? daemonSocket : join(dirname(daemonSocket), "i-0123456789abcdef.sock"),
+          host_instance: "generation-1",
+        },
+      })
+      createThreadComponent({
+        host: offlineHost(),
+        stateDirectory: join(w.h.agentDir, "state"),
+        agentDir: () => w.h.agentDir,
+        store: w.store,
+        callerSessionId: () => "dur-sender",
+        wake: { ...w.options },
+      }).register(pi as never, context() as never)
+      await import("#omo-wake-runtime")
+      await w.latch.running?.get(w.h.agentDir)?.ready
+      expect(w.latch.running?.has(w.h.agentDir) ?? false).toBe(operatorDaemon)
+      expect(service.calls.filter((call) => call.type === "deliveries.serve")).toEqual(
+        operatorDaemon ? [expect.objectContaining({ agent_dir: w.h.agentDir })] : [],
+      )
+    },
+  )
+
+  // The carrier is the process's, latched per agent directory; the component of the session that started it opens a
+  // store of its own and disposes it at that session's shutdown. A carrier that borrowed that store would answer every
+  // later wake with "the gateway store is disposed" for the rest of the process - a session host's whole life.
+  test("#given the session that started the process's carrier has ended #when a later session of the same process names a session that is not running #then the carrier still opens it", async () => {
+    const w = await wire(
+      { ...ENGINE_AT_MINIMUM, loadConfig: () => ({ config: { session_wake: { same_device: true } } }) },
+      process.cwd(),
+      { sessionStores: true },
+    )
+    const first = await w.start()
+    await first.dispatch("session_shutdown", { type: "session_shutdown" }, { mode: "tui", agentDir: w.h.agentDir })
+    const second = await w.start()
+    expect(w.latch.running?.size).toBe(1)
+    const woken = w.woken()
+    expect(await w.send(second, "after the first session ended")).toMatchObject({
+      kind: "ok",
+      delivery: { kind: "queued", waiting_on: { kind: "wake" } },
+    })
+    expect(await woken).toMatchObject({ kind: "open" })
+    expect(opens(w.fake)).toEqual([expect.objectContaining({ sessionPath: w.path })])
   })
 
   test.each([

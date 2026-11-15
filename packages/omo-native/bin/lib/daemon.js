@@ -248,5 +248,34 @@ export function runDaemonCommand(args, options) {
 
   if (args.includes("--json") && result.stdout) stdout.write(result.stdout.trim() + "\n")
   else stdout.write(`${summarize(subcommand, parsed, result.exitCode)}\n`)
+  if (subcommand === "run" && result.exitCode === DAEMON_EXIT.ok) return warmAfterRun(options)
   return result.exitCode
+}
+
+/**
+ * `omo daemon run` ends with senpi's `warm` on the daemon it ensured. A multi-session host loads omo only for an open
+ * or a warm, and once it has loaded omo the operator daemon declares the delivery consumer, so a daemon the device
+ * service cold-starts can be handed deliveries before any session runs (#13037 cold wake). A warm that fails is
+ * reported and changes nothing about the run's answer: the consumer then starts with the daemon's first session.
+ */
+async function warmAfterRun(options) {
+  const report = (reason) =>
+    options.stderr.write(
+      `omo daemon: the daemon did not load omo (${reason}); its delivery consumer starts with its first session\n`,
+    )
+  const loaded = await (options.threadSdk ?? loadThreadSdk)({ ...options, cwd: options.cwd ?? process.cwd() })
+  if (loaded.error !== undefined) {
+    report(loaded.error)
+    return DAEMON_EXIT.ok
+  }
+  try {
+    const answer = await loaded.sdk.warmDaemon()
+    if (answer.kind === "refused") report(answer.code)
+    else if (answer.kind === "unsupported") report("the engine has no warm")
+  } catch (error) {
+    report(error instanceof Error ? error.message : String(error))
+  } finally {
+    await loaded.sdk.dispose().catch((error) => report(`closing the gateway store failed: ${error instanceof Error ? error.message : String(error)}`))
+  }
+  return DAEMON_EXIT.ok
 }

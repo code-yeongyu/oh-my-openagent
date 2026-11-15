@@ -64,7 +64,7 @@ const WARM_REFUSALS = [
   "invalid_path",
 ] as const
 
-type WarmAnswer =
+export type WarmAnswer =
   | { readonly kind: "warm"; readonly state: "warmed" | "already_warm" }
   | { readonly kind: "unsupported" }
   | { readonly kind: "refused"; readonly code: string }
@@ -98,7 +98,8 @@ export async function warmTaskHost(input: WarmHostSessionInput): Promise<TaskHos
   }
 }
 
-function classifyWarmReply(reply: HostReply | undefined): WarmAnswer {
+/** A `warm` reply as the caller acts on it; also `omo daemon run`'s warm of the operator daemon (omo-senpi thread SDK). */
+export function classifyWarmReply(reply: HostReply | undefined): WarmAnswer {
   if (reply === undefined) return { kind: "refused", code: "no_answer" }
   if (reply.success === true) {
     const state = isRecord(reply.data) ? reply.data.state : undefined

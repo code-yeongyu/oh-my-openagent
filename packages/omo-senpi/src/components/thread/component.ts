@@ -14,6 +14,7 @@ import {
   controlSessionOf,
   createControlEndpointRegistrant,
   hostInstanceOf,
+  hostSocketOf,
   sessionControlOf,
   type ControlEndpointRegistrantOptions,
   type SessionControlActionsPort,
@@ -24,7 +25,7 @@ import { registerThreadTools, UNKNOWN_CALLER, type ThreadToolSurfaceOptions } fr
 import { createLazyLiveThreadSurface } from "./lazy-live-surface"
 import { createDefaultRemoteSurface } from "./remote/default-remote"
 import { createOmoNativeProductConfig } from "../telemetry/product-identity"
-import { defaultThreadStateDirectory } from "./live-surface-paths"
+import { defaultThreadStateDirectory, isThreadSocket } from "./live-surface-paths"
 import { stampThisDevice } from "./remote/this-device"
 import type { IntakeAdmission } from "./gateway/intake-admission"
 import type { SameDeviceWake } from "./gateway/same-device-wake"
@@ -426,9 +427,11 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         },
       )
       const sessionsDirectory = options.sessionsDirectory ?? (() => join(agentDir(), "sessions"))
-      // The carrier and the consumer share the component's own store: a running wake never opens a second gateway
-      // store of this agent directory, whose worker the sweep would keep from retiring (#13455, design A3.1.4).
-      const wakeOptions: ThreadWakeOptions = { store, ...options.wake }
+      // The running wake is the process's (one per agent directory, latched), so it opens its own store and never
+      // borrows this component's: this session's shutdown disposes that one, and every later wake would fail on it.
+      // Its worker still retires when idle, since the carrier arms its sweep only while the wake table holds a row
+      // (design A3.1.4).
+      const wakeOptions: ThreadWakeOptions = { ...options.wake }
       const warn = (line: string) => ctx.logger.warn(line)
       // The wake's runtime (the carrier and its host connection, the delivery consumer and its device-service client)
       // lives in its own sidecar (#omo-wake-runtime -> extensions/omo-wake.js): the main bundle carries only the lazy
@@ -564,7 +567,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
           )
         }
       }
-      pi.on("session_start", (_event, eventCtx) => {
+      const startWake = (eventCtx: unknown): void => {
         void wakeRuntime()
           .then((module) =>
             module.startWakeAtSession(eventCtx, {
@@ -583,6 +586,14 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
               `thread gateway: the session wake runtime could not be loaded: ${error instanceof Error ? error.message : String(error)}`,
             ),
           )
+      }
+      // The operator daemon is the device's session host: it starts the wake, and with it the delivery consumer, as
+      // soon as it loads omo - a `warm` (`omo daemon run` sends one after its ensure) or its first open - so a host the
+      // device service cold-starts declares its consumer with no session running (#13037 cold wake).
+      const hostSocket = hostSocketOf(pi)
+      if (hostSocket !== undefined && isThreadSocket(hostSocket, wakeOptions.env ?? process.env)) startWake({ mode: "rpc" })
+      pi.on("session_start", (_event, eventCtx) => {
+        startWake(eventCtx)
         void importLegacyMailbox()
         const durableId = durableIdOf(eventCtx)
         if (durableId !== undefined) void pickUpArms(durableId)
