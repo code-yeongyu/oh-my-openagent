@@ -31,7 +31,7 @@ Codex team-mode component. Two deliverables in one dir:
 | team.json shape | `team-state.mjs` (single source of the shape; `validateTeam` migrates schemaVersion 2 to 3 and rejects anything else) |
 | Transport rules | `team-transport.mjs` (`parseTeamTransport`, `parseTaskName`, `assertTransport`) + `plugin/test/teammode-transport.test.mjs` |
 | Branch naming, worktree paths, merge | `team-worktree.mjs` (`team/<sessionId>/<memberId>` branches, worktrees confined to `<team dir>/worktrees/<memberId>`) |
-| Hook wiring | `hooks/hooks.json` (component) + `plugin/hooks/post-tool-use-checking-thread-title-hygiene.json` (aggregate; adds `commandWindows` powershell node-dispatch) |
+| Hook wiring | `hooks/hooks.json` (component) + `plugin/hooks/post-tool-use-checking-thread-title-hygiene.json` (aggregate; adds `commandWindows` cmd node-dispatch) |
 
 ## NOTES
 

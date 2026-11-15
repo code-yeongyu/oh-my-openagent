@@ -132,7 +132,7 @@ export async function createRepoWithGitBashHooksFixture(sourceRepoRoot: string):
     const relativeHookPath = hook.startsWith("./") ? hook.slice(2) : hook
     await copyFile(join(sourcePluginRoot, relativeHookPath), join(fixturePluginRoot, relativeHookPath))
   }
-  const bootstrapScriptPath = join("components", "bootstrap", "scripts", "node-dispatch.ps1")
+  const bootstrapScriptPath = join("components", "bootstrap", "scripts", "node-dispatch.cmd")
   await mkdir(join(fixturePluginRoot, "components", "bootstrap", "scripts"), { recursive: true })
   await copyFile(join(sourcePluginRoot, bootstrapScriptPath), join(fixturePluginRoot, bootstrapScriptPath))
   return repoRoot
