@@ -107,16 +107,28 @@ class Presentation {
     switch (event.kind) {
       case "snapshot": {
         this.snapshot = event.snapshot
-        // A dialog already pending when this attach starts (or after a re-attach) is shown from the snapshot's
-        // engine state, not only from records that arrive later (#13482).
-        const pending = event.snapshot.state["pendingDialogs"]
-        if (Array.isArray(pending))
+        // The engine keeps a dialog or a question raised before this attach (or during a relay gap) in its state as a
+        // RAW request frame. Present each as the mirror record the TUI reads, so the raiser-only filter applies and an
+        // answer carries its uiRequestId (#13482 review).
+        for (const field of ["pendingDialogs", "pendingQuestions"] as const) {
+          const pending = event.snapshot.state[field]
+          if (!Array.isArray(pending)) continue
           for (const entry of pending) {
             if (typeof entry !== "object" || entry === null) continue
-            const record = entry as JsonObject
-            const dialog = this.dialogs.present(record, LOCAL_SESSION_ID)
-            if (dialog !== null) this.send(dialog ?? { ...record, sessionId: LOCAL_SESSION_ID })
+            const request = entry as JsonObject
+            const id = request["id"]
+            if (typeof id !== "string" || id === "") continue
+            const mirror: JsonObject = {
+              type: "ui_request_pending",
+              uiRequestId: id,
+              method: String(request["method"] ?? ""),
+              request,
+              sessionId: LOCAL_SESSION_ID,
+            }
+            const dialog = this.dialogs.present(mirror, LOCAL_SESSION_ID)
+            if (dialog !== null) this.send(dialog ?? { ...mirror, sessionId: LOCAL_SESSION_ID })
           }
+        }
         return
       }
       case "records":
