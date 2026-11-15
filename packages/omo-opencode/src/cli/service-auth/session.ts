@@ -152,9 +152,15 @@ export function createSession(options: {
     (await beforeKeysDiscarded.wantsAccount?.()) === true
       ? accountOf(access)
       : undefined
-  /** Runs the hook for a principal whose keys are about to be discarded, naming its account when the service can. */
+  /**
+   * Runs the hook for a principal whose keys are about to be discarded, naming its account when the service can. An
+   * expired access token is never sent (the service refuses it, and the call would hold the credential lock): its pin stays.
+   */
   async function discard(current: Credentials, cause: "refused" | "forget" | "replaced"): Promise<void> {
-    const account = await unstampedAccount(current, current.accessToken)
+    const account =
+      Date.parse(current.accessTokenExpiresAt) > now()
+        ? await unstampedAccount(current, current.accessToken)
+        : undefined
     await beforeKeysDiscarded(discardedOf(account === undefined ? current : { ...current, accountId: account }, cause))
   }
   async function refreshed(current: Credentials): Promise<Credentials> {
@@ -300,7 +306,8 @@ export function createSession(options: {
     discard,
     /**
      * Every sign-out retires the pin of the account it signs out of (#12308): the item is read first to name it. An item
-     * that cannot be read (corrupt, or a store that fails the read) is still deleted, and its pin is left with one line.
+     * that cannot be read (corrupt, or a store that fails the read) is still deleted, and once it is gone its pin is
+     * reported left with one line; a delete that fails too (a locked store) discarded nothing and reports only its error.
      */
     async forget(): Promise<void> {
       await locked(async () => {
@@ -309,8 +316,9 @@ export function createSession(options: {
           current = await store.readAuthoritative()
         } catch (error) {
           if (!(error instanceof InvalidCredentialState || error instanceof CredentialStoreError)) throw error
+          await store.clear()
           await beforeKeysDiscarded({ kind: "unreadable" })
-          current = null
+          return
         }
         if (current !== null) await discard(current, "forget")
         await store.clear()
