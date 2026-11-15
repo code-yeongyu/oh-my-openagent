@@ -19,6 +19,8 @@
         "src/sync/account/testing/credential-writer.test-support.ts",
         "src/sync/keyring-port.ts",
         "src/sync/space/test-support.ts",
+        // run by path by src/sync/account/phrase-notice.test.ts (Bun.spawn) to crash a phrase genesis mid-way (A3 #13335)
+        "src/sync/account/testing/phrase-crash.fixture.ts",
       ],
       "ignoreFiles": [
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
@@ -166,11 +168,11 @@
     // pre-existing at origin dev 4686e425b5: unused export(s) POLL_MS
     "packages/memory-core/src/sync/engine/engine.ts": ["POLL_MS"],
     // pre-existing at origin dev 4686e425b5: unused export(s) createHttpTransport, SyncHttpError, SyncEngine
-    "packages/memory-core/src/sync/engine/index.ts": ["createHttpTransport", "SyncHttpError", "SyncEngine"],
+    "packages/memory-core/src/sync/engine/index.ts": ["createHttpTransport", "SyncHttpError", "SyncEngine", "readServiceFloor", "SYNC_CAPABILITIES", "SYNC_CONTRACT_VERSION"],
     // pre-existing at origin dev 4686e425b5: unused export(s) MAX_RECEIPTS
     "packages/memory-core/src/sync/item/capture-receipts.ts": ["MAX_RECEIPTS"],
     // pre-existing at origin dev 4686e425b5: unused export(s) VETO_WINDOW_MS
-    "packages/memory-core/src/sync/recovery/index.ts": ["VETO_WINDOW_MS"],
+    "packages/memory-core/src/sync/recovery/index.ts": ["VETO_WINDOW_MS", "enrollPhraseRecoveryKey", "PhraseAcknowledgeUnverifiedError", "rotateRecoveryPhrase"],
     // pre-existing at origin dev 4686e425b5: unused export(s) VETO_WINDOW_MS
     "packages/memory-core/src/sync/recovery/join-notice.ts": ["VETO_WINDOW_MS"],
     // pre-existing at origin dev 4686e425b5: unused export(s) envelopeBytes
@@ -184,6 +186,14 @@
     // pre-existing at origin dev 4686e425b5: unused export(s) toLf, linesOf
     "packages/memory-core/src/sync/space/read-back.ts": ["toLf", "linesOf"],
     // pre-existing at origin dev 4686e425b5: unused export(s) MemoryApplyPatchError
+    // A3 recovery-phrase stack (#13330-#13336): exported for the engine and desktop phrase flows, not consumed inside the repo yet
+    "packages/memory-core/src/sync/account/enable-phrase.ts": ["isPhraseIntent"],
+    // A3 recovery-phrase stack: the contract version is re-exported by engine/index.ts for hosts; the only in-repo use is the header builder
+    "packages/memory-core/src/sync/contract-version.ts": ["SYNC_CONTRACT_VERSION"],
+    // A3 recovery-phrase stack: the vendored sync-format barrel is now imported (no longer an unused file), so its unused re-exports are listed by name
+    "packages/memory-core/src/sync/crypto/vendor/sync-format/index.ts": ["asciiCompare", "assertCanonicalOrder", "compareMembers", "compareRecoveryKeys", "compareWrapEntries", "entryAuthorKey", "recordPreimage", "verifyEntrySignature", "compareRecordRef", "forkSetMatchesEvidence", "asciiBytes", "b64urlDecode", "b64urlEncode", "concatBytes", "jcsBytes", "jcsCanonical", "SyncFormatError", "sha256", "sha256B64", "deriveDeviceId", "ed25519PublicKey", "framedPreimage", "hkdfSha256", "signFramed", "verifyFramed", "decodeObject", "OBJECT_MAGIC", "verifyObject", "createKeyringReceiver", "importSnapshot", "snapshotPreimage", "verifySnapshot"],
+    // A3 recovery-phrase stack: enrollment helpers exported for the recovery barrel and its tests
+    "packages/memory-core/src/sync/recovery/enroll-phrase.ts": ["chainFactsOf", "PhraseAcknowledgeUnverifiedError"],
     "packages/memory-core/src/tools/memory-apply-patch.ts": ["MemoryApplyPatchError"]
   }
 }
