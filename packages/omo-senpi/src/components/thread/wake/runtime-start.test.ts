@@ -11,34 +11,37 @@ import { startThreadWakeAtSession, wakeHostIdleExitMs, type ThreadWakeLatch, typ
 // delivery consumer beside it is started again after it dies (#13457's MEDIUM), and the ensured host's idle-exit
 // setting is read with a warning when the configuration cannot be (#13456's delta review).
 
+/** A scope that runs its callback in the caller's context: these tests start the wake outside any session callback. */
+const directScope = { runInAsyncScope: <T>(fn: () => T): T => fn() }
+
 const latches: ThreadWakeLatch[] = []
 afterEach(() => {
   latches.splice(0)
 })
 
-function start(
-  agentDir: string,
-  options: Partial<ThreadWakeOptions>,
-  warn: (line: string) => void = () => undefined,
-) {
+function start(agentDir: string, options: Partial<ThreadWakeOptions>, warn: (line: string) => void = () => undefined) {
   const latch: ThreadWakeLatch = {}
   latches.push(latch)
-  startThreadWakeAtSession({ mode: "tui" }, {
-    options: {
-      env: { HOME: agentDir },
-      latch,
+  startThreadWakeAtSession(
+    { mode: "tui" },
+    {
+      options: {
+        env: { HOME: agentDir },
+        latch,
+        engineVersion: "2026.12.1",
+        minimumEngine: "2026.12.1",
+        connect: () => Promise.reject(new Error("no carrier may open a session")),
+        ...options,
+      },
+      agentDir: () => agentDir,
+      sessionsDirectory: () => join(agentDir, "sessions"),
+      settings: () => ({ sameDevice: true, wakeLimit: 0 }),
       engineVersion: "2026.12.1",
-      minimumEngine: "2026.12.1",
-      connect: () => Promise.reject(new Error("no carrier may open a session")),
-      ...options,
+      ensureHost: undefined,
+      warn,
+      scope: directScope,
     },
-    agentDir: () => agentDir,
-    sessionsDirectory: () => join(agentDir, "sessions"),
-    settings: () => ({ sameDevice: true, wakeLimit: 0 }),
-    engineVersion: "2026.12.1",
-    ensureHost: undefined,
-    warn,
-  })
+  )
   return latch.running?.get(agentDir)
 }
 
@@ -333,7 +336,10 @@ describe("the consumer's connect-failure and rejected-start deaths", () => {
     let firstServe: () => void = () => undefined
     const first = new Promise<void>((resolve, reject) => {
       firstServe = resolve
-      setTimeout(() => reject(new Error("waited 5s for the consumer to serve after the rejected start")), 5_000).unref?.()
+      setTimeout(
+        () => reject(new Error("waited 5s for the consumer to serve after the rejected start")),
+        5_000,
+      ).unref?.()
     })
     const timers: (() => void)[] = []
     const running = start(agentDir, {
@@ -401,9 +407,7 @@ describe("a delivery consumer that dies", () => {
     expect(timers.length).toBe(armed + 1)
     timers.at(-1)?.()
     await second
-    expect(
-      service.calls.filter((call) => call.type === "deliveries.serve"),
-    ).toHaveLength(2)
+    expect(service.calls.filter((call) => call.type === "deliveries.serve")).toHaveLength(2)
     await running?.stop()
   })
 
@@ -416,7 +420,10 @@ describe("a delivery consumer that dies", () => {
     let secondServe: () => void = () => undefined
     const second = new Promise<void>((resolve, reject) => {
       secondServe = resolve
-      setTimeout(() => reject(new Error("waited 5s for the consumer to declare itself after the refusal")), 5_000).unref?.()
+      setTimeout(
+        () => reject(new Error("waited 5s for the consumer to declare itself after the refusal")),
+        5_000,
+      ).unref?.()
     })
     const running = start(agentDir, {
       deliveries: async () => ({
@@ -469,16 +476,19 @@ describe("the wake's process scope", () => {
       connect: () => Promise.reject(new Error("no carrier may open a session")),
       schedule: () => () => undefined,
     }
-    startThreadWakeAtSession({ mode: "tui" }, {
-      options,
-      agentDir: () => agentDir,
-      sessionsDirectory: () => join(agentDir, "sessions"),
-      settings: () => ({ sameDevice: true, wakeLimit: 0 }),
-      engineVersion: "2026.12.1",
-      ensureHost: undefined,
-      warn: () => undefined,
-      scope,
-    })
+    startThreadWakeAtSession(
+      { mode: "tui" },
+      {
+        options,
+        agentDir: () => agentDir,
+        sessionsDirectory: () => join(agentDir, "sessions"),
+        settings: () => ({ sameDevice: true, wakeLimit: 0 }),
+        engineVersion: "2026.12.1",
+        ensureHost: undefined,
+        warn: () => undefined,
+        scope,
+      },
+    )
     const running = latch.running?.get(agentDir)
     expect(running).toBeDefined()
     expect(runs.length).toBe(1)
@@ -508,16 +518,19 @@ describe("the wake's process scope", () => {
         return () => undefined
       },
     }
-    startThreadWakeAtSession({ mode: "tui" }, {
-      options,
-      agentDir: () => agentDir,
-      sessionsDirectory: () => join(agentDir, "sessions"),
-      settings: () => ({ sameDevice: true, wakeLimit: 0 }),
-      engineVersion: "2026.12.1",
-      ensureHost: undefined,
-      warn: () => undefined,
-      scope: { runInAsyncScope: (fn) => resource.runInAsyncScope(fn) },
-    })
+    startThreadWakeAtSession(
+      { mode: "tui" },
+      {
+        options,
+        agentDir: () => agentDir,
+        sessionsDirectory: () => join(agentDir, "sessions"),
+        settings: () => ({ sameDevice: true, wakeLimit: 0 }),
+        engineVersion: "2026.12.1",
+        ensureHost: undefined,
+        warn: () => undefined,
+        scope: { runInAsyncScope: (fn) => resource.runInAsyncScope(fn) },
+      },
+    )
     const running = latch.running?.get(agentDir)
     expect(running).toBeDefined()
     await running?.ready

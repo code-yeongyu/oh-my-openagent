@@ -110,6 +110,15 @@ export function hostInstanceOf(pi: unknown): string | undefined {
   return typeof instance === "string" && instance.length > 0 ? instance : undefined
 }
 
+/** The public socket of the senpi host a session runs in (`pi.sessionContext.host_socket`); `undefined` in a terminal. */
+export function hostSocketOf(pi: unknown): string | undefined {
+  if (typeof pi !== "object" || pi === null) return undefined
+  const context = (pi as { readonly sessionContext?: unknown }).sessionContext
+  if (typeof context !== "object" || context === null) return undefined
+  const socket = (context as { readonly host_socket?: unknown }).host_socket
+  return typeof socket === "string" && socket.length > 0 ? socket : undefined
+}
+
 export type ControlEndpointRegistrantOptions = {
   readonly control: SessionControlActionsPort
   readonly agentDir: () => string

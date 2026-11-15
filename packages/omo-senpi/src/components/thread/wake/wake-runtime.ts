@@ -27,7 +27,7 @@ export type WakeAtSessionInput = {
   readonly ensureHost: (() => Promise<void>) | undefined
   readonly warn: (line: string) => void
   /** The extension's process-level scope, captured at omo.js's module top level (component.ts). */
-  readonly scope?: ProcessScope
+  readonly scope: ProcessScope
 }
 
 export function startWakeAtSession(eventCtx: unknown, input: WakeAtSessionInput): void {

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { mkdtempSync } from "node:fs"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 
 import { FakeExtensionAPI } from "../../../../test-support/fake-extension-api"
 import { createThreadComponent } from "../component"
@@ -63,6 +63,8 @@ type Wired = {
   readonly store: GatewayStore
   readonly path: string
   readonly latch: ThreadWakeLatch
+  /** The wake options every component this harness registers is given. */
+  readonly options: ThreadWakeOptions
   /** Every delay the carrier asked its schedule seam to arm. */
   readonly scheduled: readonly number[]
   /** Resolves with the carrier's outcome for the target's next wake; armed before the trigger, fails after 5 s. */
@@ -77,7 +79,15 @@ const ENGINE_AT_MINIMUM: Pick<ThreadWakeOptions, "engineVersion" | "minimumEngin
   minimumEngine: "2026.12.1",
 }
 
-async function wire(wake: Partial<ThreadWakeOptions> = {}, targetCwd: string = process.cwd()): Promise<Wired> {
+/**
+ * `sessionStores`: each registered component opens and disposes its own gateway store, as production does, and the
+ * wake gets none from the test; otherwise one test store is shared by every component and the wake.
+ */
+async function wire(
+  wake: Partial<ThreadWakeOptions> = {},
+  targetCwd: string = process.cwd(),
+  { sessionStores = false }: { readonly sessionStores?: boolean } = {},
+): Promise<Wired> {
   const h = (harness = createGatewayHarness())
   const fake = (host = await startFakeEngineHost())
   const store = h.store()
@@ -100,7 +110,7 @@ async function wire(wake: Partial<ThreadWakeOptions> = {}, targetCwd: string = p
   const options: ThreadWakeOptions = {
     env: {},
     latch,
-    store,
+    ...(sessionStores ? {} : { store }),
     connect: () => connectCarrierHost({ socket: fake.socketPath, keyRoot: () => h.agentDir }),
     ensureHost: async () => undefined,
     schedule: (_run, ms) => {
@@ -122,7 +132,7 @@ async function wire(wake: Partial<ThreadWakeOptions> = {}, targetCwd: string = p
       host: offlineHost(),
       stateDirectory: join(h.agentDir, "state"),
       agentDir: () => h.agentDir,
-      store,
+      ...(sessionStores ? {} : { store }),
       callerSessionId: () => "dur-sender",
       wake: options,
     }).register(pi as never, context() as never)
@@ -140,7 +150,7 @@ async function wire(wake: Partial<ThreadWakeOptions> = {}, targetCwd: string = p
     if (tool === undefined) throw new Error("thread_send is not registered")
     return (await tool.execute("call-1", { thread: TARGET, message: text }, undefined, undefined, {})).details.result
   }
-  return { h, fake, store, path, latch, scheduled, woken, start, send }
+  return { h, fake, store, path, latch, options, scheduled, woken, start, send }
 }
 
 async function drainWoken(
@@ -194,7 +204,10 @@ function inboundRecord(deliveryId: string): Record<string, unknown> {
 
 describe("the same-device wake through the registered thread component", () => {
   test("#given an engine process with the thread component and the same-device switch on #when its thread_send names a session that is not running #then the carrier opens that session by path on the operator host and its drain admits the delivery once", async () => {
-    const w = await wire({ ...ENGINE_AT_MINIMUM, loadConfig: () => ({ config: { session_wake: { same_device: true } } }) })
+    const w = await wire({
+      ...ENGINE_AT_MINIMUM,
+      loadConfig: () => ({ config: { session_wake: { same_device: true } } }),
+    })
     const pi = await w.start()
     const woken = w.woken()
     expect(await w.send(pi, "wake up and answer")).toMatchObject({
@@ -231,7 +244,10 @@ describe("the same-device wake through the registered thread component", () => {
   })
 
   test("#given two sessions of one engine process register the thread component #when both start #then one carrier serves the agent directory", async () => {
-    const w = await wire({ ...ENGINE_AT_MINIMUM, loadConfig: () => ({ config: { session_wake: { same_device: true } } }) })
+    const w = await wire({
+      ...ENGINE_AT_MINIMUM,
+      loadConfig: () => ({ config: { session_wake: { same_device: true } } }),
+    })
     await w.start()
     const second = await w.start()
     expect(w.latch.running?.size).toBe(1)
@@ -241,13 +257,80 @@ describe("the same-device wake through the registered thread component", () => {
     expect(opens(w.fake)).toHaveLength(1)
   })
 
+  // A host the device service cold-starts has no session yet: it loads omo through a `warm` (`omo daemon run` sends
+  // one after its ensure), with no session_start. The operator daemon declares its delivery consumer right then; any
+  // other host still waits for a session.
+  test.each([
+    ["the operator daemon", true],
+    ["another host", false],
+  ])(
+    "#given %s loads the thread component with no session open #when the component registers #then the delivery consumer is declared only on the operator daemon",
+    async (_what, operatorDaemon) => {
+      const service = createFakeDeliveryService({ admitted: true })
+      const daemonSocket = join(mkdtempSync("/tmp/omo-wake-daemon-"), "rpc.sock")
+      const w = await wire({
+        ...ENGINE_AT_MINIMUM,
+        env: { OMO_RPC_SOCKET_PATH: daemonSocket },
+        deliveries: async () => service.port,
+      })
+      const pi = new FakeExtensionAPI()
+      pi.cwd = process.cwd()
+      Object.assign(pi, {
+        sessionContext: {
+          host_socket: operatorDaemon ? daemonSocket : join(dirname(daemonSocket), "i-0123456789abcdef.sock"),
+          host_instance: "generation-1",
+        },
+      })
+      createThreadComponent({
+        host: offlineHost(),
+        stateDirectory: join(w.h.agentDir, "state"),
+        agentDir: () => w.h.agentDir,
+        store: w.store,
+        callerSessionId: () => "dur-sender",
+        wake: { ...w.options },
+      }).register(pi as never, context() as never)
+      await import("#omo-wake-runtime")
+      await w.latch.running?.get(w.h.agentDir)?.ready
+      expect(w.latch.running?.has(w.h.agentDir) ?? false).toBe(operatorDaemon)
+      expect(service.calls.filter((call) => call.type === "deliveries.serve")).toEqual(
+        operatorDaemon ? [expect.objectContaining({ agent_dir: w.h.agentDir })] : [],
+      )
+    },
+  )
+
+  // The carrier is the process's, latched per agent directory; the component of the session that started it opens a
+  // store of its own and disposes it at that session's shutdown. A carrier that borrowed that store would answer every
+  // later wake with "the gateway store is disposed" for the rest of the process - a session host's whole life.
+  test("#given the session that started the process's carrier has ended #when a later session of the same process names a session that is not running #then the carrier still opens it", async () => {
+    const w = await wire(
+      { ...ENGINE_AT_MINIMUM, loadConfig: () => ({ config: { session_wake: { same_device: true } } }) },
+      process.cwd(),
+      { sessionStores: true },
+    )
+    const first = await w.start()
+    await first.dispatch("session_shutdown", { type: "session_shutdown" }, { mode: "tui", agentDir: w.h.agentDir })
+    const second = await w.start()
+    expect(w.latch.running?.size).toBe(1)
+    const woken = w.woken()
+    expect(await w.send(second, "after the first session ended")).toMatchObject({
+      kind: "ok",
+      delivery: { kind: "queued", waiting_on: { kind: "wake" } },
+    })
+    expect(await woken).toMatchObject({ kind: "open" })
+    expect(opens(w.fake)).toEqual([expect.objectContaining({ sessionPath: w.path })])
+  })
+
   test.each([
     ["CI", { CI: "1" }],
     ["a task child", { OMO_SENPI_TASK_RPC_CHILD: "1" }],
   ])(
     "#given %s #when its thread_send names a session that is not running #then no carrier starts and the answer says the wake is unavailable",
     async (_what, env) => {
-      const w = await wire({ ...ENGINE_AT_MINIMUM, env, loadConfig: () => ({ config: { session_wake: { same_device: true } } }) })
+      const w = await wire({
+        ...ENGINE_AT_MINIMUM,
+        env,
+        loadConfig: () => ({ config: { session_wake: { same_device: true } } }),
+      })
       const pi = await w.start()
       expect(w.latch.running?.size ?? 0).toBe(0)
       expect(await w.send(pi, "nobody carries this")).toMatchObject({
@@ -331,7 +414,10 @@ describe("the same-device wake through the registered thread component", () => {
 })
 
 describe("the delivery consumer through the registered thread component", () => {
-  const consumerWake = (service: FakeDeliveryService, engine: { readonly version: string; readonly minimum: string | null }) => ({
+  const consumerWake = (
+    service: FakeDeliveryService,
+    engine: { readonly version: string; readonly minimum: string | null },
+  ) => ({
     deliveries: async () => service.port,
     engineVersion: engine.version,
     minimumEngine: engine.minimum,
@@ -415,15 +501,18 @@ describe("the delivery consumer through the registered thread component", () => 
     ["the shipped minimum (none released)", { version: "2099.1.1", minimum: undefined }],
     ["an engine below the minimum", { version: "2026.11.13", minimum: "2026.12.1" }],
     ["an engine that reports no version", { version: undefined, minimum: "2026.12.1" }],
-  ])("#given %s #when the component starts #then no carrier starts and no consumer declares itself", async (_what, engine) => {
-    const service = createFakeDeliveryService({ admitted: true })
-    const w = await wire({
-      deliveries: async () => service.port,
-      ...(engine.version === undefined ? {} : { engineVersion: engine.version }),
-      ...(engine.minimum === undefined ? {} : { minimumEngine: engine.minimum }),
-    })
-    await w.start()
-    expect(w.latch.running?.size ?? 0).toBe(0)
-    expect(service.calls).toEqual([])
-  })
+  ])(
+    "#given %s #when the component starts #then no carrier starts and no consumer declares itself",
+    async (_what, engine) => {
+      const service = createFakeDeliveryService({ admitted: true })
+      const w = await wire({
+        deliveries: async () => service.port,
+        ...(engine.version === undefined ? {} : { engineVersion: engine.version }),
+        ...(engine.minimum === undefined ? {} : { minimumEngine: engine.minimum }),
+      })
+      await w.start()
+      expect(w.latch.running?.size ?? 0).toBe(0)
+      expect(service.calls).toEqual([])
+    },
+  )
 })
