@@ -14,6 +14,7 @@ export {
   joinAccount,
   approveDevice,
   phraseNoticeStatus,
+  verifiedPhraseNoticeStatus,
 } from "@oh-my-opencode/memory-core/sync-engine"
 // A freeze status exists only while the engine runs, so its words ship with the engine, not the eager bundle.
 export { failureRpcSync, freezeFailure } from "./sync-status-copy"

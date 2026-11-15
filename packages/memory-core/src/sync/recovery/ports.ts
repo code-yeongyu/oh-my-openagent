@@ -1,6 +1,8 @@
 import type { KeyringBody, KeyringEntry, SyncAuthor, VerifiedWrap, WrapEntry } from "../crypto/entry.ts"
 import type { Principal, RecoveryKey } from "../crypto/parse.ts"
 import type { SyncOperationOptions } from "../operation-authority.ts"
+import type { PhraseEnrollBridgeRequest } from "./bridge-enroll-phrase.ts"
+import type { PhraseRecoverBeginRequest } from "./bridge-recover-phrase.ts"
 
 /**
  * The platform passkey API the native bridge drives (macOS AuthenticationServices, the Windows
@@ -184,6 +186,10 @@ export interface RecoveryBridge {
   recoverFinish(request: RecoverFinishRequest): Promise<RecoverBridgeResult>
   recoverAbort(handle: string): Promise<void>
   signalRemoved(rpId: string, credentialId: string): Promise<"signalled" | "unsupported">
+  /** Phrase recovery begin (contract 6): same result and handle as `recoverBegin`; absent where no phrase surface exists. */
+  recoverBeginWithPhrase?(request: PhraseRecoverBeginRequest): Promise<RecoverBeginResult>
+  /** Phrase enrollment with the engine-drawn credential id (M3); absent where no phrase surface exists. */
+  enrollPhrase?(request: PhraseEnrollBridgeRequest): Promise<EnrollBridgeResult>
 }
 
 /** A row of `GET /v1/sync/entries`: ciphertext-free chain metadata. */
