@@ -137,9 +137,13 @@ export function startAgentDirRegistrant(options: AgentDirRegistrantOptions): Age
         if (stopped) return
         emit({ kind: "connect_failed", reason: reasonOf(error) })
         const delay = REGISTRANT_RETRY_DELAYS_MS[retry]
-        const endpointGone = !existsSync(endpoint)
-        if (endpointGone) rearmWatch()
-        if (delay === undefined || endpointGone) {
+        if (!existsSync(endpoint)) {
+          emit({ kind: "gave_up" })
+          rearmWatch()
+          trigger()
+          return
+        }
+        if (delay === undefined) {
           emit({ kind: "gave_up" })
           return
         }
@@ -161,7 +165,7 @@ export function startAgentDirRegistrant(options: AgentDirRegistrantOptions): Age
   const watchEndpoint = options.watchEndpoint ?? watchEndpointFile
   let stopWatch = watchEndpoint(endpoint, trigger)
   // A watch that armed while the old endpoint existed does not settle on its replacement. The new watch is armed
-  // before the old one stops, so the endpoint is never unwatched in between.
+  // before the old one stops, so the endpoint is never unwatched in between; the caller checks existence right after.
   function rearmWatch(): void {
     const stopPrevious = stopWatch
     stopWatch = watchEndpoint(endpoint, trigger)

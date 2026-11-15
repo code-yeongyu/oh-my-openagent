@@ -5,6 +5,7 @@ import { deviceServiceEndpointPath } from "../src/device-service.ts"
 import {
   AGENT_DIR,
   deafWatch,
+  otherClient,
   ownerAt,
   recorder,
   registeredFor,
@@ -73,6 +74,41 @@ describe("agent dir registrant: a service that comes back while the watch stays 
     const registered = seen.next(registeredFor(SELF), "the register on the service that started later")
     const owner = await ownerAt(stateDir)
     watch.runSettles()
+
+    // then
+    await registered
+    expect([...owner.state.endpoints]).toEqual([AGENT_DIR])
+  })
+
+  test("an endpoint that appears between the failed connect's existence check and the re-arm is connected to", async () => {
+    // given
+    const stateDir = join(root(), "device-service")
+    mkdirSync(stateDir, { mode: 0o700 })
+    const endpoint = deviceServiceEndpointPath(stateDir)
+    writeFileSync(endpoint, "")
+    const owner = await ownerAt(join(root(), "device-service"))
+    const seen = recorder()
+    const registered = seen.next(registeredFor(SELF), "the register on the service whose endpoint appeared in the gap")
+    const watch = deafWatch()
+    let connects = 0
+    let arms = 0
+
+    // when
+    start({
+      stateDir,
+      // The first connect is refused; the next one reaches the service that came back.
+      connect: () => (connects++ === 0 ? Promise.reject(new Error("refused")) : otherClient(owner.stateDir)),
+      // The second arm is the re-arm: the returning service's endpoint is in place just before it, so that arm sees
+      // an endpoint, its settle stays silent, and only the existence check after the arm can find the service.
+      watchEndpoint: (path, onChange) => {
+        if (arms++ === 1) writeFileSync(endpoint, "")
+        return watch.watchEndpoint(path, onChange)
+      },
+      onEvent: (event) => {
+        if (event.kind === "connect_failed") rmSync(endpoint, { force: true })
+        seen.onEvent(event)
+      },
+    })
 
     // then
     await registered
