@@ -2,31 +2,25 @@ name: Desktop bench
 
 # Computer-use latency bench, base against head on one runner (docs/reference/computer-use-eval.md): the job builds the desktop
 # engine at both refs, runs head's cu-eval bench against each in alternating rounds, and fails when any op's
-# head wall p50 is more than 30% (and more than 0.5 ms) above the base's. Path-gated, so it never runs on an
-# unrelated PR; workflow_dispatch works once this file is on the default branch.
+# head wall p50 is more than 30% (and more than 0.5 ms) above the base's. Two engine builds and 10x30 bench rounds
+# are too heavy for every pull request, so it runs nightly on the default branch (against the newest v* release tag)
+# and on manual dispatch (against base_ref, or that tag when base_ref is empty).
 on:
+  schedule:
+    - cron: "17 18 * * *"
   workflow_dispatch:
     inputs:
       base_ref:
-        description: Branch, tag or SHA to compare the dispatched ref against
-        required: true
+        description: Branch, tag or SHA to compare the dispatched ref against (empty = newest v* release tag)
+        required: false
         default: dev
-  pull_request:
-    paths:
-      - ".github/workflows/desktop-bench.yml"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "rust-toolchain.toml"
-      - "crates/senpi-desktop-*/**"
-      - "packages/senpi-desktop-*/**"
-      - "packages/omo-senpi/scripts/qa/cu-eval/**"
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   desktop-bench:
@@ -34,6 +28,25 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 60
     steps:
+      - name: Resolve base ref
+        id: base
+        shell: bash
+        env:
+          BASE_REF_INPUT: ${{ inputs.base_ref }}
+        run: |
+          set -euo pipefail
+          ref="${BASE_REF_INPUT:-}"
+          if test -z "$ref"; then
+            ref=$(git ls-remote --tags --refs "https://github.com/${GITHUB_REPOSITORY}.git" 'refs/tags/v*' \
+              | awk '{print $2}' | sed 's#^refs/tags/##' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+          fi
+          if test -z "$ref"; then
+            echo "::error::no base_ref given and no v* release tag found"
+            exit 1
+          fi
+          echo "ref=$ref" >>"$GITHUB_OUTPUT"
+          echo "base ref: $ref"
+
       - name: Check out head
         uses: actions/checkout@v7
         with:
@@ -44,7 +57,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           path: base
-          ref: ${{ github.event.pull_request.base.sha || inputs.base_ref }}
+          ref: ${{ steps.base.outputs.ref }}
           persist-credentials: false
 
       - uses: oven-sh/setup-bun@v2
@@ -86,7 +99,7 @@ jobs:
       - name: Bench base and head, compare p50
         shell: bash
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || inputs.base_ref }}
+          BASE_SHA: ${{ steps.base.outputs.ref }}
           HEAD_SHA: ${{ github.sha }}
           BENCH_ROUNDS: "10"
           BENCH_RUNS: "30"
