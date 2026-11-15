@@ -26,7 +26,12 @@ describe("the remote sessions opt-out record", () => {
     const optOut = remoteOptOut(path)
     expect(optOut.read()).toBe(false)
     optOut.record()
-    expect([lstatSync(path).isFile(), lstatSync(path).mode & 0o777, optOut.read()]).toEqual([true, 0o600, true])
+    // Windows has no POSIX mode bits (lstat reports 0o666), so the 0600 check applies on POSIX only
+    expect([
+      lstatSync(path).isFile(),
+      process.platform === "win32" || (lstatSync(path).mode & 0o777) === 0o600,
+      optOut.read(),
+    ]).toEqual([true, true, true])
     expect(JSON.parse(readFileSync(path, "utf8")).remote_sessions).toBe("off")
     optOut.clear()
     expect(optOut.read()).toBe(false)

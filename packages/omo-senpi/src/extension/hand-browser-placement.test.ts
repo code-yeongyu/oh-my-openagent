@@ -61,18 +61,24 @@ function runFixture(
 }
 
 describe("browser work on a split session runs on the hand (Q 2026-11-04: browser = HAND)", () => {
-  test("#given a session linked to a hand #when the browser skill's shell command runs #then it executes on the hand, in the hand scope's root", async () => {
-    // given
-    const scratch = mkdtempSync(join(tmpdir(), "omo-hand-browser-"))
-    tempDirs.push(scratch)
-    const handRoot = join(scratch, "hand-root")
-    for (const dir of [handRoot, join(scratch, "agent"), join(scratch, "home")]) mkdirSync(dir, { recursive: true })
+  // the hand runs the skill through a POSIX shell, whose pwd on Windows is an MSYS path (/tmp/...), not the
+  // Windows path the test made; the placement itself is platform-neutral and covered on POSIX hosts
+  test.skipIf(process.platform === "win32")(
+    "#given a session linked to a hand #when the browser skill's shell command runs #then it executes on the hand, in the hand scope's root",
+    async () => {
+      // given
+      const scratch = mkdtempSync(join(tmpdir(), "omo-hand-browser-"))
+      tempDirs.push(scratch)
+      const handRoot = join(scratch, "hand-root")
+      for (const dir of [handRoot, join(scratch, "agent"), join(scratch, "home")]) mkdirSync(dir, { recursive: true })
 
-    // when
-    const run = await runFixture(scratch, handRoot)
+      // when
+      const run = await runFixture(scratch, handRoot)
 
-    // then
-    expect({ code: run.code, stderr: run.code === 0 ? "" : run.stderr.slice(-800) }).toEqual({ code: 0, stderr: "" })
-    expect(JSON.parse(run.stdout.trim().split("\n").at(-1) ?? "{}")).toEqual({ results: [handRoot] })
-  }, 90_000)
+      // then
+      expect({ code: run.code, stderr: run.code === 0 ? "" : run.stderr.slice(-800) }).toEqual({ code: 0, stderr: "" })
+      expect(JSON.parse(run.stdout.trim().split("\n").at(-1) ?? "{}")).toEqual({ results: [handRoot] })
+    },
+    90_000,
+  )
 })

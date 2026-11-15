@@ -152,6 +152,8 @@ describe("omo login sets remote sessions up", () => {
       delete process.env.OMO_SERVICE_API_URL
       await afterServiceAuth(["logout"], 0, setUp)
       await afterServiceAuth(["login"], 1, setUp)
+      // 5.1.73: Windows skips the post-login setup (it blocked login there); omo remote enable still turns remote on.
+      await afterServiceAuth(["login"], 0, setUp, "win32")
       await afterServiceAuth(["login", "--device"], 0, setUp)
       await afterServiceAuth(["login", "--api", "https://staging.example"], 0, setUp)
       expect(calls).toEqual(["default", "https://staging.example"])
