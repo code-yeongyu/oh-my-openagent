@@ -51,9 +51,19 @@ describe("audit records of a call's own requests", () => {
     expect(result.audit).toEqual([expect.objectContaining({ action: "click", toolCallId: "call-click" })])
   })
 
-  it.each(["abort", "deadline"] as const)("rejects at once on %s while the barrier never answers", async (end) => {
-    // Given: an engine that never answers the barrier
-    const service = { ...engineAuditingAfterReply(), auditBarrier: () => new Promise<void>(() => undefined) }
+  it.each(["abort", "deadline"] as const)("rejects on %s while the barrier never answers", async (end) => {
+    // Given: an engine that never answers the barrier, and a signal for the moment the call reaches it
+    let entered!: () => void
+    const barrierEntered = new Promise<void>((resolve) => {
+      entered = resolve
+    })
+    const service = {
+      ...engineAuditingAfterReply(),
+      auditBarrier: () => {
+        entered()
+        return new Promise<void>(() => undefined)
+      },
+    }
     const controller = new AbortController()
     const running = runComputerSteps(
       {
@@ -66,7 +76,8 @@ describe("audit records of a call's own requests", () => {
       ({ desktop }) => desktop.click(1, 1),
     )
 
-    // When
+    // When: the call is stopped only once it waits on the barrier
+    await barrierEntered
     if (end === "abort") controller.abort()
 
     // Then
