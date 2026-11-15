@@ -1,10 +1,10 @@
 /**
- * #13037 A8.1: the first engine release whose `release_session` drops a woken session's retained record (senpi#6449).
- * On an older engine a session the carrier handed back is reopened by the host's next restart, so the delivery consumer
- * makes no wake registration with the device service below this version. senpi#6449 is not released yet: null keeps the
- * consumer off on every engine until that release is cut and named here.
+ * #13037 A8.1: the first engine release whose `release_session` drops a woken session's retained record (senpi#6449,
+ * merged at 1ae8fa2863): senpi 2026.11.15-2. 2026.11.15 was cut before that merge. On an older engine a session the
+ * carrier handed back is reopened by the host's next restart, so below this version no carrier starts and the delivery
+ * consumer makes no wake registration with the device service; null would keep both off on every engine.
  */
-export const MIN_WAKE_ENGINE_VERSION: string | null = null
+export const MIN_WAKE_ENGINE_VERSION: string | null = "2026.11.15-2"
 
 // The engine's version scheme, YYYY.MM.DD-N with optional +build metadata; a release without `-N` orders before `-1`.
 const ENGINE_VERSION = /^(\d+)\.(\d+)\.(\d+)(?:-(\d+))?(?:\+.*)?$/

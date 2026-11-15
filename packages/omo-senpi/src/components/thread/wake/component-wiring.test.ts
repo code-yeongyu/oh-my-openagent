@@ -495,10 +495,9 @@ describe("the delivery consumer through the registered thread component", () => 
   })
 
   // A8.1: below the engine release that drops a released session's retained record (senpi#6449), the consumer makes no
-  // wake registration with the device service, and no carrier starts at all. The minimum is null until that release
-  // exists, so nothing registers.
+  // wake registration with the device service, and no carrier starts at all. The release cut just before it is below.
   test.each([
-    ["the shipped minimum (none released)", { version: "2099.1.1", minimum: undefined }],
+    ["the release before the shipped minimum", { version: "2026.11.15", minimum: undefined }],
     ["an engine below the minimum", { version: "2026.11.13", minimum: "2026.12.1" }],
     ["an engine that reports no version", { version: undefined, minimum: "2026.12.1" }],
   ])(
