@@ -34,14 +34,15 @@ type Row = { id: string; kind: string; platform: string; revokedAt: string | nul
 
 /**
  * A service holding each account's devices. A bearer names its device and account; `GET /v1/devices` lists the
- * caller's account, `DELETE /v1/devices/:id` revokes a device of that account (404 for any other), and `down`
- * makes every revoke answer 503. Each request is recorded as `METHOD path bearer`.
+ * caller's account in the service's shape (machine devices in `devices`, browser devices in `browsers`),
+ * `DELETE /v1/devices/:id` revokes a device of that account (404 for any other), and `refuse` makes every revoke
+ * answer that refusal. Each request is recorded as `METHOD path bearer`.
  */
 async function world() {
   const calls: string[] = []
   const accounts = new Map<string, Row[]>()
   const bearers = new Map<string, { account: string; device: string }>()
-  let down = false
+  let refused: { readonly code: string; readonly status: number } | null = null
   let onDelete: () => void = () => undefined
   const api = fakeApi((request) => {
     const path = new URL(request.url).pathname
@@ -49,10 +50,15 @@ async function world() {
     calls.push(`${request.method} ${path} ${bearer}`)
     const caller = bearers.get(bearer.replace(/^Bearer /, ""))
     const rows = accounts.get(caller?.account ?? "") ?? []
-    if (request.method === "GET" && path === "/v1/devices")
-      return Response.json({ devices: rows.map((row) => ({ ...row, current: row.id === caller?.device })) })
+    if (request.method === "GET" && path === "/v1/devices") {
+      const listed = rows.map((row) => ({ ...row, current: row.id === caller?.device }))
+      return Response.json({
+        devices: listed.filter((row) => row.kind !== "browser"),
+        browsers: listed.filter((row) => row.kind === "browser"),
+      })
+    }
     onDelete()
-    if (down) return refusal("unavailable", undefined, 503)
+    if (refused !== null) return refusal(refused.code, undefined, refused.status)
     const row = rows.find((candidate) => `/v1/devices/${candidate.id}` === path)
     if (row === undefined) return refusal("not_found", undefined, 404)
     row.revokedAt = new Date(0).toISOString()
@@ -83,7 +89,10 @@ async function world() {
     signIn,
     owedPath: owedRevokePath(home, credentialId(api)),
     setDown: (value: boolean) => {
-      down = value
+      refused = value ? { code: "unavailable", status: 503 } : null
+    },
+    refuse: (code: string, status: number) => {
+      refused = { code, status }
     },
     onDelete: (hook: () => void) => {
       onDelete = hook
@@ -214,9 +223,11 @@ describe("an unconfirmed sign-out owes its revoke to the next sign-in (#12281)",
     expect(w.logs).toHaveLength(1)
   })
 
-  // L2: an owe names only this computer's own machine device; one naming a browser or a device of another platform
-  // cannot come from this computer's logout, so it is never sent.
+  // L2 / delta L1: an owe only ever comes from an omo CLI logout, so it names only a live CLI device of this platform.
+  // One naming this computer's desktop-app device, a browser (listed apart, in `browsers`) or a device of another
+  // platform is dropped unsent.
   for (const row of [
+    { id: "desktop-1", kind: "desktop", platform: devicePlatform() },
     { id: "browser-1", kind: "browser", platform: "web" },
     { id: "elsewhere-1", kind: "cli", platform: devicePlatform() === "windows" ? "linux" : "windows" },
   ]) {
@@ -251,5 +262,36 @@ describe("an unconfirmed sign-out owes its revoke to the next sign-in (#12281)",
     w.calls.length = 0
     await w.session(s.store).save(w.signIn("device-2"))
     expect(w.calls).toEqual([list("access-device-2"), revoke("device-1", "access-device-2")])
+  })
+
+  // Delta L2: a refusal that will not change (401/403) is reported with its code and the owe is dropped, pointing at
+  // the Devices page; a transient one (429, 5xx, no network) keeps the owe for the next sign-in.
+  for (const lasting of [
+    { code: "forbidden", status: 403 },
+    { code: "unauthorized", status: 401 },
+  ]) {
+    test(`#given the owed revoke is refused ${lasting.code} #when this computer signs in #then the refusal is reported by its code and never re-sent`, async () => {
+      const { w, s } = await owedWorld()
+      w.refuse(lasting.code, lasting.status)
+      await w.session(s.store).save(w.signIn("device-2"))
+      expect(s.current()?.device.id).toBe("device-2")
+      expect(w.logs).toHaveLength(1)
+      expect(w.logs[0]).toContain(lasting.code)
+      w.setDown(false)
+      w.calls.length = 0
+      await w.session(s.store).save(w.signIn("device-3"))
+      expect(w.calls).toEqual([])
+    })
+  }
+
+  test("#given the owed revoke is rate limited #when this computer signs in #then the owe is kept and the next sign-in sends it", async () => {
+    const { w, s } = await owedWorld()
+    w.refuse("rate_limited", 429)
+    await w.session(s.store).save(w.signIn("device-2"))
+    expect(w.logs).toHaveLength(1)
+    w.setDown(false)
+    w.calls.length = 0
+    await w.session(s.store).save(w.signIn("device-3"))
+    expect(w.calls).toEqual([list("access-device-3"), revoke("device-1", "access-device-3")])
   })
 })
