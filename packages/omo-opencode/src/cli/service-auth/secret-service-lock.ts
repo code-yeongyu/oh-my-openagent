@@ -20,9 +20,12 @@ export const parseLockedReply = (stdout: string): SecretServiceLockState | null 
   return match[1] === "true" ? "locked" : "unlocked"
 }
 
-// gdbus prints "Error connecting:" when there is no session bus to reach, and these D-Bus errors when nothing owns
-// (or can be activated as) the Secret Service name. Every other failure leaves the question open.
-const NO_SECRET_SERVICE = /^Error connecting:|org\.freedesktop\.DBus\.Error\.(?:ServiceUnknown|NameHasNoOwner)\b/m
+// Only two gdbus answers prove there is no Secret Service: no session bus at all (no bus socket, and no way to start
+// one), or a bus on which nothing owns or can be activated as the Secret Service name. A bus that refuses this process
+// (another user's bus address under sudo -u), a refused connection, a timeout or any other failure leaves the question
+// open, so a running keyring is never bypassed for the file (#13640 review M1).
+const NO_SECRET_SERVICE =
+  /^Error connecting: (?:Could not connect: No such file or directory|Cannot autolaunch D-Bus without X11 \$DISPLAY|Failed to execute child process .dbus-launch. \(No such file or directory\))|org\.freedesktop\.DBus\.Error\.(?:ServiceUnknown|NameHasNoOwner)\b/m
 
 export const classifyProbeFailure = (stderr: string): SecretServiceLockState =>
   NO_SECRET_SERVICE.test(stderr) ? "absent" : "unknown"

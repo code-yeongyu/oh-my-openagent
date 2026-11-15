@@ -239,7 +239,14 @@ describe("Linux with no Secret Service keeps the shared sign-in in a private sta
     const home = await temporaryHome()
     await linuxStore(home, null, "absent").write(record)
     const written = await readFile(stateFile(home), "utf8")
-    const lossy: SecretApi = { get: async () => "{}", set: async () => {}, delete: async () => true }
+    let stored = false
+    const lossy: SecretApi = {
+      get: async () => (stored ? "{}" : null),
+      set: async () => {
+        stored = true
+      },
+      delete: async () => true,
+    }
     await expect(linuxStore(home, lossy, "unlocked").read()).rejects.toBeInstanceOf(CredentialStoreError)
     expect(await readFile(stateFile(home), "utf8")).toBe(written)
   })
@@ -268,5 +275,81 @@ describe("Linux with no Secret Service keeps the shared sign-in in a private sta
     await linuxStore(home, memory.api, "unlocked").clear()
     expect(await missing(stateFile(home))).toBe(true)
     expect(memory.values.size).toBe(0)
+  })
+
+  // #13640 review M1: a process that could not reach the keyring (cron, su, ssh with no session bus) may have written
+  // another sign-in to the file; moving it must never replace the sign-in the keyring already holds.
+  const otherRecord = {
+    ...record,
+    device: { id: "device-2", name: "Other CLI" },
+    signingPrivateKey: "synthetic-signing-private-2",
+    sealingPrivateKey: "synthetic-sealing-private-2",
+    refreshToken: "synthetic-refresh-token-2",
+  }
+  const keyringValue = (memory: ReturnType<typeof memorySecrets>) =>
+    JSON.parse([...memory.values.values()][0] ?? "null")
+
+  test("#given the keyring holds sign-in A and the file holds B #when the keyring answers #then A stays, the file is kept, one line says so", async () => {
+    const home = await temporaryHome()
+    await linuxStore(home, null, "absent").write(otherRecord)
+    const written = await readFile(stateFile(home), "utf8")
+    const memory = memorySecrets()
+    await linuxStore(await temporaryHome(), memory.api, "unlocked").write(record)
+    const notices: string[] = []
+    const store = linuxStore(home, memory.api, "unlocked", notices)
+    expect(await store.read()).toMatchObject(record)
+    expect(await store.read()).toMatchObject(record)
+    expect(store.storage?.()).toBe("keyring")
+    expect(keyringValue(memory)).toMatchObject({ device: record.device })
+    expect(await readFile(stateFile(home), "utf8")).toBe(written)
+    expect(notices).toHaveLength(1)
+    expect(notices.join("\n")).not.toContain(otherRecord.refreshToken)
+  })
+
+  test("#given the same sign-in in both #then only a file at least as fresh as the keyring moves over it", async () => {
+    for (const [keyringExpiry, moves] of [
+      ["2098-01-01T00:00:00.000Z", true],
+      ["2099-01-01T00:00:00.000Z", true],
+      ["2100-01-01T00:00:00.000Z", false],
+    ] as const) {
+      const home = await temporaryHome()
+      await linuxStore(home, null, "absent").write(record)
+      const written = await readFile(stateFile(home), "utf8")
+      const memory = memorySecrets()
+      const inKeyring = JSON.stringify({
+        ...JSON.parse(written),
+        accessTokenExpiresAt: keyringExpiry,
+        accessToken: "older",
+      })
+      await memory.api.set({ service: "omo-cli", name: credentialId(api), value: inKeyring })
+      await linuxStore(home, memory.api, "unlocked").read()
+      expect({
+        keyringExpiry,
+        keyring: [...memory.values.values()][0],
+        fileKept: !(await missing(stateFile(home))),
+      }).toEqual({
+        keyringExpiry,
+        keyring: moves ? written : inKeyring,
+        fileKept: !moves,
+      })
+    }
+  })
+
+  test("#given the keyring holds A and the file holds B #when signed out #then only the sign-in in use goes", async () => {
+    const home = await temporaryHome()
+    await linuxStore(home, null, "absent").write(otherRecord)
+    const memory = memorySecrets()
+    await linuxStore(await temporaryHome(), memory.api, "unlocked").write(record)
+    await linuxStore(home, memory.api, "unlocked").clear()
+    expect(memory.values.size).toBe(0)
+    expect(await missing(stateFile(home))).toBe(false)
+
+    const unanswered = await temporaryHome()
+    await linuxStore(unanswered, null, "absent").write(otherRecord)
+    const kept = memorySecrets()
+    await linuxStore(await temporaryHome(), kept.api, "unlocked").write(record)
+    await linuxStore(unanswered, kept.api, "unknown").clear()
+    expect(await missing(stateFile(unanswered))).toBe(true)
+    expect(keyringValue(kept)).toMatchObject({ device: record.device })
   })
 })

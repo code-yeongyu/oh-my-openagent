@@ -46,7 +46,7 @@ for (const code of ["device_revoked", "unknown_refusal"]) {
       expect(await store.read()).toBeNull()
       output.length = 0
       expect(await runAccountVerb(dependencies, ["show"])).toBe(ACCOUNT_EXIT.ok)
-      expect(output.map((line) => JSON.parse(line))).toEqual([{ signedIn: false }])
+      expect(output.map((line) => JSON.parse(line))).toEqual([{ signedIn: false, storage: "keyring" }])
     } else {
       expect(result).toBe(ACCOUNT_EXIT.ended)
       expect(output.map((line) => JSON.parse(line))).toEqual([{ ended: { code: "refresh_recovery_expired" } }])
@@ -62,6 +62,7 @@ for (const code of ["device_revoked", "unknown_refusal"]) {
           signedIn: true,
           device: grant.device,
           refreshState: "uncertain",
+          storage: "keyring",
         },
       ])
       expect(await runAccountVerb(dependencies, ["token"])).toBe(ACCOUNT_EXIT.ended)

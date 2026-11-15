@@ -70,6 +70,13 @@ describe("classifyProbeFailure", () => {
       ),
     ).toBe("unknown")
     expect(classifyProbeFailure("Error: Timeout was reached\n")).toBe("unknown")
+    // #13640 review M1: a bus that exists but refuses this process (sudo -u with another user's bus address) or stopped
+    // answering is no proof that the Secret Service is missing.
+    expect(classifyProbeFailure("Error connecting: Could not connect: Permission denied\n")).toBe("unknown")
+    expect(classifyProbeFailure("Error connecting: Could not connect: Connection refused\n")).toBe("unknown")
+    expect(classifyProbeFailure("Error connecting: Exhausted all available authentication mechanisms\n")).toBe(
+      "unknown",
+    )
     expect(classifyProbeFailure("")).toBe("unknown")
   })
 })

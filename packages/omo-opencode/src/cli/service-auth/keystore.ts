@@ -13,7 +13,7 @@ import { HelperOldSlotsFull, type WriteIntent } from "./keychain-helper/darwin-s
 import { bindKeychainHelper, type LockedStore, lockedStoreView } from "./keychain-helper/store-binding"
 import { probeSecretServiceLock, type SecretServiceLockProbe } from "./secret-service-lock"
 import { heldCredentialLease, withCredentialLock } from "./credential-lock"
-import { type OpenKeyringState, routeLinuxStore } from "./linux-store-route"
+import { type KeyringRelation, type OpenKeyringState, routeLinuxStore } from "./linux-store-route"
 import { createStateFileStore } from "./state-file-store"
 
 type SecretKey = { readonly service: string; readonly name: string }
@@ -99,6 +99,27 @@ const isLocked = (error: unknown): boolean =>
   error instanceof Error &&
   (LOCKED.test(error.message) || LOCKED.test(String((error as { code?: unknown }).code ?? "")))
 
+/** One device and key pair (and account, when both name one): the same sign-in, whatever its tokens. */
+const sameCredentialIdentity = (current: Credentials, value: Credentials): boolean =>
+  current.device.id === value.device.id &&
+  current.signingPrivateKey === value.signingPrivateKey &&
+  current.sealingPrivateKey === value.sealingPrivateKey &&
+  (value.accountId === undefined || current.accountId === undefined || current.accountId === value.accountId)
+
+/**
+ * How the keyring's sign-in relates to the one in Linux's state file (#13640 review M1): the file may move over it only
+ * when it is the same sign-in at the same generation with a token at least as fresh.
+ */
+const relateCredentials = (keyring: Credentials, file: Credentials): KeyringRelation =>
+  !sameCredentialIdentity(keyring, file) ||
+  (keyring.credentialGeneration !== undefined &&
+    file.credentialGeneration !== undefined &&
+    keyring.credentialGeneration !== file.credentialGeneration)
+    ? "other"
+    : Date.parse(keyring.accessTokenExpiresAt) <= Date.parse(file.accessTokenExpiresAt)
+      ? "older"
+      : "newer"
+
 export function credentialId(api: string): string {
   return createHash("sha256").update(serviceOrigin(api)).digest("hex")
 }
@@ -125,12 +146,7 @@ export function createCredentialStore(
     options.notice,
     options.wait,
     (current, value) => {
-      const sameIdentity =
-        current !== null &&
-        current.device.id === value.device.id &&
-        current.signingPrivateKey === value.signingPrivateKey &&
-        current.sealingPrivateKey === value.sealingPrivateKey &&
-        (value.accountId === undefined || current.accountId === undefined || current.accountId === value.accountId)
+      const sameIdentity = current !== null && sameCredentialIdentity(current, value)
       const accountId = value.accountId ?? (sameIdentity ? current?.accountId : undefined)
       // An incoming snapshot cannot restore its old generation after A -> B -> A or clear.
       return {
@@ -140,7 +156,7 @@ export function createCredentialStore(
       }
     },
     options.keychainHelper,
-    options.home,
+    { ...(options.home === undefined ? {} : { home: options.home }), relate: relateCredentials },
   )
   // One helper view per locked section, shared by every call in it and recovered once at its start (design 3.4, 3.6).
   const sections = new WeakMap<HelperLease, Promise<LockedStore<Credentials> | null>>()
@@ -207,8 +223,13 @@ export function createSealedStore<T>(
   wait: CredentialReadWait = SESSION_READ_WAIT,
   amendWrite?: (previous: T | null, next: T) => T,
   keychainHelper?: KeychainHelperOptions,
-  home?: string,
+  linux: {
+    readonly home?: string
+    /** Absent, only a byte-identical keyring item counts as the file's own sign-in. */
+    readonly relate?: (keyring: T, file: T) => KeyringRelation
+  } = {},
 ): SealedStore<T> {
+  const { home } = linux
   const parseStored = (value: string): T => {
     try {
       return schema.parse(JSON.parse(value))
@@ -414,6 +435,22 @@ export function createSealedStore<T>(
     probe: keyringState,
     notice,
     ...(home === undefined ? {} : { home }),
+    async relation(text) {
+      let stored: string | null
+      try {
+        stored = await answered(secrets, true)
+      } catch (error) {
+        throw error instanceof CredentialStoreError ? error : unavailable(error)
+      } finally {
+        forget(secrets)
+      }
+      if (stored === null) return "empty"
+      if (stored === text) return "older"
+      const inKeyring = previousOf(stored)
+      const inFile = previousOf(text)
+      if (inKeyring === null || inFile === null || linux.relate === undefined) return "other"
+      return linux.relate(inKeyring, inFile)
+    },
     // The keyring must hand back exactly the text it was given before the file may go.
     async moveToKeyring(text) {
       try {

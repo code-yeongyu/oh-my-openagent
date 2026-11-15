@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto"
 import { constants, type Stats } from "node:fs"
-import { lstat, mkdir, open, rename, rm } from "node:fs/promises"
+import { lstat, mkdir, open, readdir, rename, rm } from "node:fs/promises"
 import { join } from "node:path"
 import { accountHome } from "./account-home"
 import { withCredentialLock } from "./credential-lock"
@@ -87,6 +87,17 @@ export async function readStateFile(dir: string, name: string, uid: number): Pro
   }
 }
 
+// Under the credential lock no other write is running, so a temp file of this name is one a crash left before its
+// rename: it holds a credential and is removed, without following a symlink.
+async function removeTempLeftovers(dir: string, name: string): Promise<void> {
+  const entries = await readdir(dir).catch((error: unknown) => {
+    if (errnoCode(error) === "ENOENT") return []
+    throw error
+  })
+  for (const entry of entries)
+    if (entry.startsWith(`.${name}.`) && entry.endsWith(".tmp")) await rm(join(dir, entry), { force: true })
+}
+
 /**
  * Replaces the file atomically: a temp file created 0600 (never wider, whatever the umask) in the same private dir,
  * written and synced, then renamed over the old one, then the dir synced. A refused dir is never written to.
@@ -94,6 +105,7 @@ export async function readStateFile(dir: string, name: string, uid: number): Pro
 export async function writeStateFile(dir: string, name: string, contents: string, uid: number): Promise<void> {
   await mkdir(dir, { recursive: true, mode: 0o700 })
   await checkDir(dir, uid)
+  await removeTempLeftovers(dir, name)
   const temp = join(dir, `.${name}.${randomBytes(8).toString("hex")}.tmp`)
   try {
     const handle = await open(temp, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600)
@@ -118,7 +130,10 @@ export async function writeStateFile(dir: string, name: string, contents: string
 }
 
 /** A symlink in the file's place is unlinked itself, never followed to its target. */
-export const removeStateFile = (dir: string, name: string): Promise<void> => rm(join(dir, name), { force: true })
+export async function removeStateFile(dir: string, name: string): Promise<void> {
+  await removeTempLeftovers(dir, name)
+  await rm(join(dir, name), { force: true })
+}
 
 export type StateFileStore<T> = SealedStore<T> & {
   /** The stored text as written, or null when there is none or it was refused (one line, never its content). */

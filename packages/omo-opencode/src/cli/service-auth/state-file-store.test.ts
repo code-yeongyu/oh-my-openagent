@@ -144,4 +144,17 @@ describe.skipIf(process.platform === "win32")("the Linux sign-in state file (#71
     expect(await store.present()).toBe(false)
     expect(await store.read()).toBeNull()
   })
+
+  test("#given a temp file left by a crash before its rename #then the next write and a sign-out remove it", async () => {
+    const home = await temporaryHome()
+    const { store, dir } = await fileStore(home)
+    await store.write(secret)
+    const leftover = join(dir, ".omo-cli-test.json.0123456789abcdef.tmp")
+    await writeFile(leftover, JSON.stringify(secret), { mode: 0o600 })
+    await store.write({ token: "second" })
+    expect(await readdir(dir)).toEqual(["omo-cli-test.json"])
+    await writeFile(leftover, JSON.stringify(secret), { mode: 0o600 })
+    await store.clear()
+    expect(await readdir(dir)).toEqual([])
+  })
 })
