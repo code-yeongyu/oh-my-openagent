@@ -41,7 +41,12 @@ export const openBatch = async (
   }
   const signingKey = decodeB64(binding.signingPublicKey, 32)
   if (signingKey === null || !strictEd25519Key(signingKey)) return refuse("bad_key")
-  const ctx = { account: binding.account, epoch: binding.epoch, authorId: binding.authorId, authorSigningPublicKey: signingKey }
+  const ctx = {
+    account: binding.account,
+    epoch: binding.epoch,
+    authorId: binding.authorId,
+    authorSigningPublicKey: signingKey,
+  }
   const verified = await verifyObject(bytes, ctx)
   if (!verified.ok) return refuse(verified.reason)
   if (!strictEd25519Precheck(signingKey, bytes.subarray(bytes.length - 64)).ok) return refuse("bad_signature")

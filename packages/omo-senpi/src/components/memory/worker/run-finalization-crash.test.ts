@@ -25,25 +25,41 @@ describe("reflection finalization crash recovery", () => {
   test("#given a secret-bearing tip with an oversized description #when finalized #then the note is dropped, nothing lands, and no exception escapes", async () => {
     const item = await fixture(false)
     const warnings: Readonly<Record<string, unknown>>[] = []
-    await writeFile(join(item.worktree.dir, "system/learned.md"),
-      renderMemoryFile({ description: `${"summary ".repeat(139)}ending` }, "token=synthetic-fixture-value\n"))
+    await writeFile(
+      join(item.worktree.dir, "system/learned.md"),
+      renderMemoryFile({ description: `${"summary ".repeat(139)}ending` }, "token=synthetic-fixture-value\n"),
+    )
     // Maintenance children use normal git; the completion gate screens their full history.
     const exec = createNodeGitExec()
     for (const argv of [
       ["add", "--", "system/learned.md"],
-      ["-c", "user.name=Reflection Agent", "-c", "user.email=fixture@omo.local", "commit", "-m", "reflection expanded summary"],
+      [
+        "-c",
+        "user.name=Reflection Agent",
+        "-c",
+        "user.email=fixture@omo.local",
+        "commit",
+        "-m",
+        "reflection expanded summary",
+      ],
     ]) {
       const result = await exec.run(argv, { cwd: item.worktree.dir, timeoutMs: 30_000 })
       if (result.code !== 0) throw new Error(result.stderr)
     }
 
-    const result = await finalizeRecordedOutcome({
-      identity: item.identity,
-      reservation: item.store,
-      now: () => Date.parse("2026-08-11T10:01:00.000Z"),
-      withWriterLock: async (operation) => operation(),
-      warn: (_message, fields) => { warnings.push(fields) },
-    }, item.runDir, item.ledger)
+    const result = await finalizeRecordedOutcome(
+      {
+        identity: item.identity,
+        reservation: item.store,
+        now: () => Date.parse("2026-08-11T10:01:00.000Z"),
+        withWriterLock: async (operation) => operation(),
+        warn: (_message, fields) => {
+          warnings.push(fields)
+        },
+      },
+      item.runDir,
+      item.ledger,
+    )
 
     // The run's only entry is invalid, so the gate drops it and the run settles with nothing to merge (#10528).
     expect(result).toMatchObject({ outcome: "no_changes" })
@@ -54,7 +70,10 @@ describe("reflection finalization crash recovery", () => {
     expect(JSON.parse(await readFile(join(item.runDir, "final.json"), "utf8"))).toMatchObject({ outcome: "no_changes" })
     expect((await item.store.readState()).active).toBeUndefined()
     // git grep exits 1 for "not found"; any other code is a git error, not proof.
-    const landed = await createNodeGitExec().run(["grep", "-q", "synthetic-fixture-value", "HEAD"], { cwd: item.worktree.parent.dir, timeoutMs: 30_000 })
+    const landed = await createNodeGitExec().run(["grep", "-q", "synthetic-fixture-value", "HEAD"], {
+      cwd: item.worktree.parent.dir,
+      timeoutMs: 30_000,
+    })
     expect(landed.code).toBe(1)
     // The refused run still advances the cursor, so this conversation is not replayed into the same refusal.
     expect((await item.journal.getState()).reflected_completed_steps).toBe(1)
@@ -63,19 +82,26 @@ describe("reflection finalization crash recovery", () => {
   test("#given a committed oversized description #when the recorded outcome finalizes #then preflight runs before validation and the gate passes", async () => {
     const item = await fixture(false)
     const body = "learned\n"
-    await writeFile(join(item.worktree.dir, "system/learned.md"),
-      renderMemoryFile({ description: `${"summary ".repeat(139)}ending` }, body))
+    await writeFile(
+      join(item.worktree.dir, "system/learned.md"),
+      renderMemoryFile({ description: `${"summary ".repeat(139)}ending` }, body),
+    )
     await new GitMemoryRepo({ dir: item.worktree.dir, agentId: item.identity.id }).commitWrite(
-      ["system/learned.md"], "reflection expanded summary",
+      ["system/learned.md"],
+      "reflection expanded summary",
       { agentId: item.identity.id, authorName: "Reflection Agent" },
     )
 
-    const result = await finalizeRecordedOutcome({
-      identity: item.identity,
-      reservation: item.store,
-      now: () => Date.parse("2026-08-11T10:01:00.000Z"),
-      withWriterLock: async (operation) => operation(),
-    }, item.runDir, item.ledger)
+    const result = await finalizeRecordedOutcome(
+      {
+        identity: item.identity,
+        reservation: item.store,
+        now: () => Date.parse("2026-08-11T10:01:00.000Z"),
+        withWriterLock: async (operation) => operation(),
+      },
+      item.runDir,
+      item.ledger,
+    )
 
     expect(result?.outcome).toBe("merged")
     const parsed = parseMemoryFile(await readFile(join(item.repo.dir, "system/learned.md"), "utf8"))
@@ -89,12 +115,16 @@ describe("reflection finalization crash recovery", () => {
     const item = await fixture()
 
     // when
-    const result = await finalizeRecordedOutcome({
-      identity: item.identity,
-      reservation: item.store,
-      now: () => Date.parse("2026-08-11T10:01:00.000Z"),
-      withWriterLock: async (operation) => operation(),
-    }, item.runDir, item.ledger)
+    const result = await finalizeRecordedOutcome(
+      {
+        identity: item.identity,
+        reservation: item.store,
+        now: () => Date.parse("2026-08-11T10:01:00.000Z"),
+        withWriterLock: async (operation) => operation(),
+      },
+      item.runDir,
+      item.ledger,
+    )
 
     // then
     expect(result?.outcome).toBe("merged")
@@ -115,25 +145,31 @@ describe("reflection finalization crash recovery", () => {
     await item.store.complete(item.ledger.runId, "merged")
 
     // when
-    const result = await finalizeRecordedOutcome({
-      identity: item.identity,
-      reservation: item.store,
-      now: () => Date.parse("2026-08-11T10:01:00.000Z"),
-    }, item.runDir, item.ledger)
+    const result = await finalizeRecordedOutcome(
+      {
+        identity: item.identity,
+        reservation: item.store,
+        now: () => Date.parse("2026-08-11T10:01:00.000Z"),
+      },
+      item.runDir,
+      item.ledger,
+    )
 
     // then
     expect(result?.outcome).toBe("merged")
     expect(await receiptCount(item.repo.dir)).toBe(1)
     expect((await item.journal.getState()).reflected_completed_steps).toBe(1)
-    expect(JSON.parse(await readFile(
-      join(item.identity.paths.reflection, "completions", "run-1.json"),
-      "utf8",
-    ))).toMatchObject({ outcome: "merged" })
+    expect(
+      JSON.parse(await readFile(join(item.identity.paths.reflection, "completions", "run-1.json"), "utf8")),
+    ).toMatchObject({ outcome: "merged" })
   }, 30_000)
 
   test("#given a pressure dream merges above its token target #when finalization validates committed system memory #then the merge records a budget_not_met warning", async () => {
     const item = await fixture(false)
-    await writeFile(join(item.worktree.dir, "system", "learned.md"), `---\ndescription: Learned\n---\n${"L".repeat(400)}`)
+    await writeFile(
+      join(item.worktree.dir, "system", "learned.md"),
+      `---\ndescription: Learned\n---\n${"L".repeat(400)}`,
+    )
     const childRepo = new GitMemoryRepo({ dir: item.worktree.dir, agentId: item.identity.id })
     await childRepo.commitWrite(["system/learned.md"], "dream retained too much", {
       agentId: item.identity.id,
@@ -149,12 +185,16 @@ describe("reflection finalization crash recovery", () => {
     }
     await writeRunJsonAtomic(join(item.runDir, "ledger.json"), dreamLedger)
 
-    const result = await finalizeRecordedOutcome({
-      identity: item.identity,
-      reservation: item.store,
-      now: () => Date.parse("2026-08-11T10:01:00.000Z"),
-      withWriterLock: async (operation) => operation(),
-    }, item.runDir, dreamLedger)
+    const result = await finalizeRecordedOutcome(
+      {
+        identity: item.identity,
+        reservation: item.store,
+        now: () => Date.parse("2026-08-11T10:01:00.000Z"),
+        withWriterLock: async (operation) => operation(),
+      },
+      item.runDir,
+      dreamLedger,
+    )
 
     expect(result).toMatchObject({
       outcome: "merged",
@@ -180,11 +220,15 @@ describe("reflection finalization crash recovery", () => {
     await cleanupReflectionWorktree(item.worktree)
 
     // when
-    const result = await finalizeRecordedOutcome({
-      identity: item.identity,
-      reservation: item.store,
-      now: () => Date.parse("2026-08-11T10:01:00.000Z"),
-    }, item.runDir, item.ledger)
+    const result = await finalizeRecordedOutcome(
+      {
+        identity: item.identity,
+        reservation: item.store,
+        now: () => Date.parse("2026-08-11T10:01:00.000Z"),
+      },
+      item.runDir,
+      item.ledger,
+    )
 
     // then
     expect(result?.outcome).toBe("parent_dirty")

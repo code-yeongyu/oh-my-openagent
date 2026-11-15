@@ -1,14 +1,21 @@
 import type { ModelRefusal, ModelRefusalReason, TaskRecord, TaskRunStats } from "../state"
 import type { TaskRecordStore } from "../store"
 import type { ManagedChildEvent } from "./child-handle"
-import { isCredentialFailure, runtimeFallbackCandidates, terminalFailureMessage, usageLimitScope } from "./credential-failure"
+import {
+  isCredentialFailure,
+  runtimeFallbackCandidates,
+  terminalFailureMessage,
+  usageLimitScope,
+} from "./credential-failure"
 
 const DETAIL_MAX = 200
 const RESETS = /\bresets?\s+((?:at|in)\s+)?([^.\n;]+)/iu
 // The provider declined the request itself (a content or usage policy), not the account or its capacity.
-const POLICY_REFUSAL = /\bflagged\b|content[_ ]?(?:policy|filter|management)|usage[_ ]policy|safety (?:system|policy)|\brefus(?:ed|al)\b|\bviolat(?:es|ed|ion)\b/i
+const POLICY_REFUSAL =
+  /\bflagged\b|content[_ ]?(?:policy|filter|management)|usage[_ ]policy|safety (?:system|policy)|\brefus(?:ed|al)\b|\bviolat(?:es|ed|ion)\b/i
 // Capacity: an overload, an outage, a timeout, a 5xx, or a rate limit that is not a spent quota.
-const UNAVAILABLE = /overload|\b(?:500|502|503|504|529)\b|unavailable|capacity|timed? ?out|rate[_ ]limit|too many requests/i
+const UNAVAILABLE =
+  /overload|\b(?:500|502|503|504|529)\b|unavailable|capacity|timed? ?out|rate[_ ]limit|too many requests/i
 
 export const MODEL_CHAIN_EXHAUSTED = "model_chain_exhausted" as const
 
@@ -28,9 +35,11 @@ type Outcome = {
 
 /** The model itself failed the turn: not a kill, not a host or session failure. */
 export function isModelTurnFailure(outcome: Outcome): boolean {
-  return outcome.status === "error"
-    && outcome.killed !== true
-    && (outcome.failure?.kind === "child-turn-failed" || outcome.failure?.kind === "child-prompt-failed")
+  return (
+    outcome.status === "error" &&
+    outcome.killed !== true &&
+    (outcome.failure?.kind === "child-turn-failed" || outcome.failure?.kind === "child-prompt-failed")
+  )
 }
 
 /** A model turn failure the manager may walk past: no tool call ran, so the next designated model can take the same prompt. */
@@ -80,11 +89,23 @@ function buildModelRefusal(input: {
   }
 }
 
-export function refusalOf(record: Pick<TaskRecord, "model" | "resolved_model">, message: string, at: string): ModelRefusal {
-  return buildModelRefusal({ model: record.model, reason: reasonOfFailure(message, record.resolved_model?.model_id), message, at })
+export function refusalOf(
+  record: Pick<TaskRecord, "model" | "resolved_model">,
+  message: string,
+  at: string,
+): ModelRefusal {
+  return buildModelRefusal({
+    model: record.model,
+    reason: reasonOfFailure(message, record.resolved_model?.model_id),
+    message,
+    at,
+  })
 }
 
-export function withRefusal<Record extends Pick<TaskRecord, "model_refusals">>(record: Record, refusal: ModelRefusal): Record {
+export function withRefusal<Record extends Pick<TaskRecord, "model_refusals">>(
+  record: Record,
+  refusal: ModelRefusal,
+): Record {
   return { ...record, model_refusals: [...(record.model_refusals ?? []), refusal] }
 }
 
@@ -118,7 +139,10 @@ export function observeModelRefusals(input: {
   }
 }
 
-type TerminalFields = { readonly error_message: string; readonly failure_kind?: "child-unresponsive" | typeof MODEL_CHAIN_EXHAUSTED }
+type TerminalFields = {
+  readonly error_message: string
+  readonly failure_kind?: "child-unresponsive" | typeof MODEL_CHAIN_EXHAUSTED
+}
 
 /**
  * The terminal error of a failed run. When the designated chain is spent on a recognized refusal (a usage
@@ -132,18 +156,36 @@ export function terminalFailureFields(
 ): TerminalFields {
   const message = terminalFailureMessage(record, failure.message)
   const final = refusalOf(record, failure.message, record.updated_at)
-  if (!modelFailure || final.reason === "error" || runtimeFallbackCandidates(record, failure.message).remaining.length > 0) {
+  if (
+    !modelFailure ||
+    final.reason === "error" ||
+    runtimeFallbackCandidates(record, failure.message).remaining.length > 0
+  ) {
     return { error_message: message, ...(failure.kind === "child-unresponsive" ? { failure_kind: failure.kind } : {}) }
   }
-  return { error_message: `${message}\n${describeExhaustedChain(record, [...(record.model_refusals ?? []), final])}`, failure_kind: MODEL_CHAIN_EXHAUSTED }
+  return {
+    error_message: `${message}\n${describeExhaustedChain(record, [...(record.model_refusals ?? []), final])}`,
+    failure_kind: MODEL_CHAIN_EXHAUSTED,
+  }
 }
 
-export function describeExhaustedChain(record: Pick<TaskRecord, "category" | "agent_type">, refusals: readonly ModelRefusal[]): string {
-  const subject = record.category !== undefined
-    ? `category "${record.category}"`
-    : record.agent_type !== undefined ? `agent "${record.agent_type}"` : "this task"
-  const lines = refusals.map((refusal) => `- ${refusal.model}: ${REASON_LABELS[refusal.reason]}${refusalSuffix(refusal)}`)
-  return [`Every designated model for ${subject} was refused, and a child never runs on any other model:`, ...lines].join("\n")
+export function describeExhaustedChain(
+  record: Pick<TaskRecord, "category" | "agent_type">,
+  refusals: readonly ModelRefusal[],
+): string {
+  const subject =
+    record.category !== undefined
+      ? `category "${record.category}"`
+      : record.agent_type !== undefined
+        ? `agent "${record.agent_type}"`
+        : "this task"
+  const lines = refusals.map(
+    (refusal) => `- ${refusal.model}: ${REASON_LABELS[refusal.reason]}${refusalSuffix(refusal)}`,
+  )
+  return [
+    `Every designated model for ${subject} was refused, and a child never runs on any other model:`,
+    ...lines,
+  ].join("\n")
 }
 
 function refusalSuffix(refusal: ModelRefusal): string {
@@ -154,7 +196,8 @@ function refusalSuffix(refusal: ModelRefusal): string {
 
 function failedTurnMessage(message: Record<string, unknown>): string | undefined {
   if (message.stopReason !== "error" && message.stopReason !== "aborted") return undefined
-  const text = typeof message.errorMessage === "string" && message.errorMessage.length > 0 ? message.errorMessage : undefined
+  const text =
+    typeof message.errorMessage === "string" && message.errorMessage.length > 0 ? message.errorMessage : undefined
   return text ?? `stopped with ${String(message.stopReason)}`
 }
 
@@ -168,7 +211,10 @@ function readString(event: ManagedChildEvent, key: string): string | undefined {
 }
 
 function firstLine(message: string): string | undefined {
-  const line = message.split("\n").map((part) => part.trim()).find((part) => part.length > 0)
+  const line = message
+    .split("\n")
+    .map((part) => part.trim())
+    .find((part) => part.length > 0)
   if (line === undefined) return undefined
   return line.length > DETAIL_MAX ? `${line.slice(0, DETAIL_MAX - 1)}…` : line
 }

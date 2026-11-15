@@ -43,7 +43,13 @@ import {
   type KibitzerGateRecord,
   type KibitzerUnavailableRecord,
 } from "./notice"
-import { OWNER_LOCK_PURPOSE, encodeKibitzerSessionId, kibitzerSidecarSessionDir, kibitzerWakesFile, ownerLockPathFor } from "./observe-paths"
+import {
+  OWNER_LOCK_PURPOSE,
+  encodeKibitzerSessionId,
+  kibitzerSidecarSessionDir,
+  kibitzerWakesFile,
+  ownerLockPathFor,
+} from "./observe-paths"
 import { KIBITZER_SIDECAR_RETENTION_MS, pruneKibitzerSidecars } from "./observe-prune"
 import { WAKE_MODEL_MAX_CHARS, capped, kibitzerWakeRecord, redactKibitzerWakeReason } from "./observe-record"
 import type { KibitzerWakeOutcome } from "./sidecar-outcome"
@@ -57,8 +63,18 @@ export {
   kibitzerWakesFile,
 } from "./observe-paths"
 export { kibitzerSidecarsRoot } from "@oh-my-opencode/memory-core"
-export { KIBITZER_SIDECAR_RETENTION_MS, pruneKibitzerSidecars, type PruneKibitzerSidecarsOptions, type PruneKibitzerSidecarsResult } from "./observe-prune"
-export { KIBITZER_WAKE_RECORD_MAX_CHARS, kibitzerWakeRecord, redactKibitzerWakeReason, type KibitzerWakeRecord } from "./observe-record"
+export {
+  KIBITZER_SIDECAR_RETENTION_MS,
+  pruneKibitzerSidecars,
+  type PruneKibitzerSidecarsOptions,
+  type PruneKibitzerSidecarsResult,
+} from "./observe-prune"
+export {
+  KIBITZER_WAKE_RECORD_MAX_CHARS,
+  kibitzerWakeRecord,
+  redactKibitzerWakeReason,
+  type KibitzerWakeRecord,
+} from "./observe-record"
 
 /** Consecutive diagnostic failures of one main session before the single actionable notice. */
 export const KIBITZER_PERSISTENT_FAILURE_THRESHOLD = 3
@@ -136,7 +152,11 @@ export function createKibitzerObservability(options: KibitzerObservabilityOption
       await acquireLock(lockPath, record, { waitTimeoutMs: OWNER_LOCK_WAIT_MS })
       return record
     } catch (error) {
-      warn("omo-senpi kibitzer sidecar directory owner lock unavailable", { sessionId, lockPath, error: describe(error) })
+      warn("omo-senpi kibitzer sidecar directory owner lock unavailable", {
+        sessionId,
+        lockPath,
+        error: describe(error),
+      })
       return undefined
     }
   }
@@ -161,7 +181,11 @@ export function createKibitzerObservability(options: KibitzerObservabilityOption
     try {
       await releaseLock(ownership.lockPath, record)
     } catch (error) {
-      warn("omo-senpi kibitzer sidecar directory owner lock release failed", { sessionId, lockPath: ownership.lockPath, error: describe(error) })
+      warn("omo-senpi kibitzer sidecar directory owner lock release failed", {
+        sessionId,
+        lockPath: ownership.lockPath,
+        error: describe(error),
+      })
     }
   }
 
@@ -206,12 +230,19 @@ export function createKibitzerObservability(options: KibitzerObservabilityOption
       // A chain can list a dozen providers; the entry is stored bounded, exactly as the renderer draws it.
       ...(configuration.missingProviders === undefined
         ? {}
-        : { missingProviders: configuration.missingProviders.slice(0, UNAVAILABLE_PROVIDER_MAX_COUNT).map((provider) => capped(redactKibitzerEventText(provider), UNAVAILABLE_PROVIDER_MAX_CHARS)) }),
+        : {
+            missingProviders: configuration.missingProviders
+              .slice(0, UNAVAILABLE_PROVIDER_MAX_COUNT)
+              .map((provider) => capped(redactKibitzerEventText(provider), UNAVAILABLE_PROVIDER_MAX_CHARS)),
+          }),
     }
     try {
       options.appendEntry(UNAVAILABLE_ENTRY_TYPE, record)
     } catch (error) {
-      warn("omo-senpi kibitzer unavailable notice append failed", { sessionId: outcome.sessionId, error: describe(error) })
+      warn("omo-senpi kibitzer unavailable notice append failed", {
+        sessionId: outcome.sessionId,
+        error: describe(error),
+      })
     }
   }
 
@@ -232,8 +263,12 @@ export function createKibitzerObservability(options: KibitzerObservabilityOption
       version: 1,
       status: "failed",
       cause: outcome.cause ?? "child_failed",
-      ...(outcome.model === undefined ? {} : { model: capped(redactKibitzerEventText(outcome.model), WAKE_MODEL_MAX_CHARS) }),
-      ...(recall === undefined ? {} : { category: capped(redactKibitzerEventText(recall.category), WAKE_MODEL_MAX_CHARS) }),
+      ...(outcome.model === undefined
+        ? {}
+        : { model: capped(redactKibitzerEventText(outcome.model), WAKE_MODEL_MAX_CHARS) }),
+      ...(recall === undefined
+        ? {}
+        : { category: capped(redactKibitzerEventText(recall.category), WAKE_MODEL_MAX_CHARS) }),
       candidateCount: outcome.candidateCount,
       ...(reason === undefined ? {} : { reason }),
       consecutiveFailures: streak.count,
@@ -251,18 +286,25 @@ export function createKibitzerObservability(options: KibitzerObservabilityOption
   function sweep(context: MemoryIdentityContext): void {
     const recallDir = context.identityPaths.recall
     if (sweeping.has(recallDir)) return
-    const run = track(pruneKibitzerSidecars({
-      recallDir,
-      locksDir: context.identityPaths.locks,
-      now,
-      maxAgeMs: retentionMs,
-      owned: new Set([...owned.values()].map((ownership) => ownership.encoded)),
-      warn,
-    }).then(() => undefined, (error: unknown) => {
-      warn("omo-senpi kibitzer sidecar sweep failed", { recallDir, error: describe(error) })
-    }).finally(() => {
-      sweeping.delete(recallDir)
-    }))
+    const run = track(
+      pruneKibitzerSidecars({
+        recallDir,
+        locksDir: context.identityPaths.locks,
+        now,
+        maxAgeMs: retentionMs,
+        owned: new Set([...owned.values()].map((ownership) => ownership.encoded)),
+        warn,
+      })
+        .then(
+          () => undefined,
+          (error: unknown) => {
+            warn("omo-senpi kibitzer sidecar sweep failed", { recallDir, error: describe(error) })
+          },
+        )
+        .finally(() => {
+          sweeping.delete(recallDir)
+        }),
+    )
     sweeping.set(recallDir, run)
   }
 

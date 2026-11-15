@@ -17,7 +17,7 @@ export type ConsentGatedFetchInput = {
 // on the next flush: dropping IS the outcome, not a failure.
 const ACCEPTED: FetchResponse = {
   status: 200,
-  text: async () => "{\"status\":1}",
+  text: async () => '{"status":1}',
   json: async () => ({ status: 1 }),
 }
 
@@ -42,11 +42,15 @@ async function countBatchEvents(options: FetchOptions): Promise<number> {
   try {
     const body = options.body
     if (body === undefined) return 0
-    const bytes = typeof body === "string"
-      ? new TextEncoder().encode(body)
-      : body instanceof Blob ? new Uint8Array(await body.arrayBuffer()) : new Uint8Array(body)
-    const gzipped = Object.entries(options.headers)
-      .some(([name, value]) => name.toLowerCase() === "content-encoding" && value === "gzip")
+    const bytes =
+      typeof body === "string"
+        ? new TextEncoder().encode(body)
+        : body instanceof Blob
+          ? new Uint8Array(await body.arrayBuffer())
+          : new Uint8Array(body)
+    const gzipped = Object.entries(options.headers).some(
+      ([name, value]) => name.toLowerCase() === "content-encoding" && value === "gzip",
+    )
     const parsed: unknown = JSON.parse(new TextDecoder().decode(gzipped ? gunzipSync(bytes) : bytes))
     if (parsed !== null && typeof parsed === "object" && "batch" in parsed && Array.isArray(parsed.batch)) {
       return parsed.batch.length

@@ -52,7 +52,10 @@ type TeamBackgroundManager = BackgroundManager & {
   listTasksByParentSession?: (sessionID: string) => Array<unknown>
 }
 
-function getPrimaryModelKey(bgMgr: TeamBackgroundManager | undefined, leadSessionId: string | undefined): string | undefined {
+function getPrimaryModelKey(
+  bgMgr: TeamBackgroundManager | undefined,
+  leadSessionId: string | undefined,
+): string | undefined {
   if (!bgMgr || !leadSessionId) return undefined
 
   const tasksByParent = bgMgr.getTasksByParentSession(leadSessionId)
@@ -82,7 +85,10 @@ function countTasks(tasks: Task[]): TeamStatus["tasks"] {
   return counts
 }
 
-function resolveConcurrencyCounts(bgMgr: TeamBackgroundManager | undefined, leadSessionId: string | undefined): ConcurrencyCounts {
+function resolveConcurrencyCounts(
+  bgMgr: TeamBackgroundManager | undefined,
+  leadSessionId: string | undefined,
+): ConcurrencyCounts {
   if (!bgMgr || !leadSessionId) return { running: 0, queued: 0 }
 
   const modelKey = getPrimaryModelKey(bgMgr, leadSessionId)
@@ -114,7 +120,9 @@ export async function aggregateStatus(
   const tasks = await listTasks(teamRunId, config)
   const teamBackgroundManager: TeamBackgroundManager | undefined = bgMgr
   const concurrencyCounts = resolveConcurrencyCounts(teamBackgroundManager, runtimeState.leadSessionId)
-  const teamRunIdSpecific = teamBackgroundManager?.listTasksByParentSession?.(runtimeState.leadSessionId ?? teamRunId)?.length
+  const teamRunIdSpecific = teamBackgroundManager?.listTasksByParentSession?.(
+    runtimeState.leadSessionId ?? teamRunId,
+  )?.length
   const baseDir = resolveBaseDir(config)
   const claimsDir = path.join(getTasksDir(baseDir, teamRunId), "claims")
   const staleLockEntries = await readdir(claimsDir, { withFileTypes: true }).catch((error: unknown) => {

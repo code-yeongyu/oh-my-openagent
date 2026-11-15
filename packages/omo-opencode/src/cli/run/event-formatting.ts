@@ -62,9 +62,7 @@ function getSessionTag(ctx: RunContext, payload: EventPayload): string {
   const info = props?.info as Record<string, unknown> | undefined
   const part = props?.part as Record<string, unknown> | undefined
   const sessionID =
-    props?.sessionID ?? props?.sessionId ??
-    info?.sessionID ?? info?.sessionId ??
-    part?.sessionID ?? part?.sessionId
+    props?.sessionID ?? props?.sessionId ?? info?.sessionID ?? info?.sessionId ?? part?.sessionID ?? part?.sessionId
   const isMainSession = sessionID === ctx.sessionID
   if (isMainSession) return pc.green("[MAIN]")
   if (sessionID) return pc.yellow(`[${String(sessionID).slice(0, 8)}]`)
@@ -101,7 +99,9 @@ export function logEventVerbose(ctx: RunContext, payload: EventPayload): void {
       const field = deltaProps?.field ?? "unknown"
       const delta = deltaProps?.delta ?? ""
       const preview = delta.slice(0, 80).replace(/\n/g, "\\n")
-      console.error(pc.dim(`${sessionTag} message.part.delta (${field}): "${preview}${delta.length > 80 ? "..." : ""}"`))
+      console.error(
+        pc.dim(`${sessionTag} message.part.delta (${field}): "${preview}${delta.length > 80 ? "..." : ""}"`),
+      )
       break
     }
 

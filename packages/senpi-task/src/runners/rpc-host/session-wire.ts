@@ -61,17 +61,20 @@ export class HostSessionUnresponsiveError extends Error {
 
 /** The engine's typed response, including hosts that carry the code only in the error string. */
 export function isHostSessionMissing(error: unknown): boolean {
-  return error instanceof Error && (
-    ("errorCode" in error && error.errorCode === "unknown_session")
-    || (error.name === "RpcCommandError" && error.message === "unknown_session")
+  return (
+    error instanceof Error &&
+    (("errorCode" in error && error.errorCode === "unknown_session") ||
+      (error.name === "RpcCommandError" && error.message === "unknown_session"))
   )
 }
 
-const uiRequestSchema = z.object({
-  type: z.literal("extension_ui_request"),
-  id: z.string().min(1),
-  method: z.string().min(1),
-})
+const uiRequestSchema = z
+  .object({
+    type: z.literal("extension_ui_request"),
+    id: z.string().min(1),
+    method: z.string().min(1),
+  })
+  .passthrough()
 
 const parkedSchema = z.object({
   type: z.literal("session_parked"),
@@ -149,7 +152,8 @@ function readHold(error: Error): { readonly owner?: string; readonly retryAfterM
   const data = error.errorData
   if (typeof data !== "object" || data === null) return {}
   const owner = "owner" in data && typeof data.owner === "string" ? data.owner : undefined
-  const retryAfterMs = "retry_after_ms" in data && typeof data.retry_after_ms === "number" ? data.retry_after_ms : undefined
+  const retryAfterMs =
+    "retry_after_ms" in data && typeof data.retry_after_ms === "number" ? data.retry_after_ms : undefined
   return {
     ...(owner === undefined ? {} : { owner }),
     ...(retryAfterMs === undefined ? {} : { retryAfterMs }),

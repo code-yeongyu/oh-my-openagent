@@ -16,8 +16,12 @@ function normalizedCode(source: string, loader: "ts" | "js"): string {
 
 function pinnedStoreModule(): string | undefined {
   const manifest: unknown = JSON.parse(readFileSync(join(senpiPackageDir, "package.json"), "utf8"))
-  const exportsMap = typeof manifest === "object" && manifest !== null && "exports" in manifest ? manifest.exports : undefined
-  const entry = typeof exportsMap === "object" && exportsMap !== null && STORE_EXPORT in exportsMap ? exportsMap[STORE_EXPORT] : undefined
+  const exportsMap =
+    typeof manifest === "object" && manifest !== null && "exports" in manifest ? manifest.exports : undefined
+  const entry =
+    typeof exportsMap === "object" && exportsMap !== null && STORE_EXPORT in exportsMap
+      ? exportsMap[STORE_EXPORT]
+      : undefined
   if (entry === undefined) return undefined
   const target = typeof entry === "object" && entry !== null && "import" in entry ? entry.import : entry
   if (typeof target !== "string") throw new Error(`senpi's ${STORE_EXPORT} export has no import path`)

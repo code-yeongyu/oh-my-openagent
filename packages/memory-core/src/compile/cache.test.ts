@@ -7,14 +7,15 @@ import { GitMemoryRepo } from "../git"
 import { MemoryBlockCache, hashMemoryTemplate } from "./cache"
 import { removeTree } from "../../../../test-support/remove-tree"
 
-
 const tempDirs: string[] = []
 
 async function createRepo() {
   const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-cache-")))
   tempDirs.push(dir)
   const repo = new GitMemoryRepo({ dir, agentId: "cache-agent" })
-  await repo.init({ seedFiles: [{ relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\nfirst\n" }] })
+  await repo.init({
+    seedFiles: [{ relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\nfirst\n" }],
+  })
   return { dir, repo }
 }
 
@@ -99,7 +100,10 @@ describe("MemoryBlockCache", () => {
 
     // when
     await writeFile(join(dir, "system/persona.md"), "---\ndescription: Persona\n---\nsecond\n")
-    await repo.commitWrite(["system/persona.md"], "change persona", { agentId: "cache-agent", authorName: "Cache Agent" })
+    await repo.commitWrite(["system/persona.md"], "change persona", {
+      agentId: "cache-agent",
+      authorName: "Cache Agent",
+    })
     const stillPinned = await cache.compile(repo, "template", options, pinned)
     const atHead = await cache.compile(repo, "template", options)
 

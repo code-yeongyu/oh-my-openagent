@@ -12,7 +12,6 @@ const roots: string[] = []
 const AUTHOR = { agentId: "agent-one", authorName: "Reflection Agent" }
 const LEGACY = "---\ndescription: Run the chain by default: verify, merge\n---\n\nlegacy body\n"
 
-
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 })))
 })
@@ -44,14 +43,20 @@ describe("reflection completion frontmatter gate", () => {
   it("#given a reflection that writes a SKILL.md with an unquoted ': ' description #when validated #then the entry is dropped and named", async () => {
     // #given
     const { worktree } = await fixture()
-    await commit(worktree, "skills/deploy/SKILL.md", "---\nname: deploy\ndescription: Use by default: verify\n---\n\nsteps\n")
+    await commit(
+      worktree,
+      "skills/deploy/SKILL.md",
+      "---\nname: deploy\ndescription: Use by default: verify\n---\n\nsteps\n",
+    )
 
     // #when
     const result = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
 
     // #then
     expect(result.status).toBe("no_changes")
-    expect(droppedOf(result)).toEqual([{ path: "skills/deploy/SKILL.md", reason: expect.stringContaining("not a safe YAML plain scalar") }])
+    expect(droppedOf(result)).toEqual([
+      { path: "skills/deploy/SKILL.md", reason: expect.stringContaining("not a safe YAML plain scalar") },
+    ])
   })
 
   it("#given a reflection that writes a reference note without a description #when validated #then the entry is dropped", async () => {
@@ -95,7 +100,11 @@ describe("reflection completion frontmatter gate", () => {
   it("#given a reflection that writes strict frontmatter and deletes a file #when validated #then it is valid", async () => {
     // #given
     const { worktree } = await fixture({ "reference/old.md": LEGACY })
-    await commit(worktree, "skills/deploy/SKILL.md", '---\nname: deploy\ndescription: "Use by default: verify"\nversion: 0.1.0\n---\n\nsteps\n')
+    await commit(
+      worktree,
+      "skills/deploy/SKILL.md",
+      '---\nname: deploy\ndescription: "Use by default: verify"\nversion: 0.1.0\n---\n\nsteps\n',
+    )
     await rm(join(worktree.dir, "reference/old.md"))
     const child = new GitMemoryRepo({ dir: worktree.dir, agentId: AUTHOR.agentId })
     await child.commitWrite(["reference/old.md"], "forget", AUTHOR)
@@ -105,6 +114,9 @@ describe("reflection completion frontmatter gate", () => {
 
     // #then
     expect(result.status).toBe("valid")
-    expect(result.status === "valid" ? [...result.changedPaths].sort() : []).toEqual(["reference/old.md", "skills/deploy/SKILL.md"])
+    expect(result.status === "valid" ? [...result.changedPaths].sort() : []).toEqual([
+      "reference/old.md",
+      "skills/deploy/SKILL.md",
+    ])
   })
 })

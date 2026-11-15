@@ -1,7 +1,20 @@
 import type { Clock, FreezeSettler, ItemStore, Sealer, SyncRepo, Transport, Verifier, WriterLock } from "./ports"
 
 /** Where a crash can be injected: right after each journal marker, or between an effect and its marker. */
-export const INBOUND_POINTS = ["captured", "persisted", "downloaded", "verified", "merged", "staged", "render-intent", "render-key", "rendered", "git-commit", "committed", "checkpointed"] as const
+export const INBOUND_POINTS = [
+  "captured",
+  "persisted",
+  "downloaded",
+  "verified",
+  "merged",
+  "staged",
+  "render-intent",
+  "render-key",
+  "rendered",
+  "git-commit",
+  "committed",
+  "checkpointed",
+] as const
 export const OUTBOUND_POINTS = ["sealed", "reserved", "uploaded", "append-landed", "appended"] as const
 /** After an older build's queued oversized ops are wound back in the store, before the journal drops them. */
 const REWIND_POINT = "rewound"

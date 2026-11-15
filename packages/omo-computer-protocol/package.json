@@ -1,0 +1,23 @@
+{
+	"name": "@oh-my-opencode/omo-computer-protocol",
+	"version": "0.1.0",
+	"type": "module",
+	"private": true,
+	"description": "Generated wire types, call-chain classifier and schema-drift test of the computer-use v3 engine",
+	"exports": {
+		".": {
+			"types": "./src/index.ts",
+			"import": "./src/index.ts"
+		}
+	},
+	"types": "./src/index.ts",
+	"scripts": {
+		"typecheck": "tsgo --noEmit -p tsconfig.json",
+		"test": "vitest --run test",
+		"generate": "bun scripts/generate-protocol.ts"
+	},
+	"devDependencies": {
+		"@types/node": "26.6.2",
+		"vitest": "5.0.1"
+	}
+}

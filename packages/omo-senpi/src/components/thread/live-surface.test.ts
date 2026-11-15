@@ -8,6 +8,7 @@ import { TASK_HOST_SOCKET_ENV_NAMES } from "../../../../senpi-task/src/runners/r
 import { fakeHostTransport } from "../../../../senpi-task/src/runners/rpc-host/__fixtures__/fake-host-transport"
 import { createLiveThreadSurface, resolveThreadSocket, THREAD_SOCKET_ENV_NAMES } from "./live-surface"
 import type { ThreadHost } from "./tools"
+import { testBudgetSignal } from "../../../../../test-support/test-deadline"
 
 /** An engine that cannot enumerate endpoints: the surface reaches the legacy socket alone. */
 const NO_ENUMERATION = async () => undefined
@@ -28,28 +29,45 @@ async function withRpc(
   const frames: Array<Record<string, unknown>> = []
   const sockets = new Set<Socket>()
   const transport = fakeHostTransport(socketPath)
-  const server = createServer((socket) => transport.authenticate(socket, () => {
-    sockets.add(socket)
-    socket.once("close", () => sockets.delete(socket))
-    let buffer = ""
-    socket.on("data", (chunk) => {
-      buffer += chunk.toString("utf8")
-      const newline = buffer.indexOf("\n")
-      if (newline < 0) return
-      const frame = JSON.parse(buffer.slice(0, newline)) as Record<string, unknown>
-      buffer = buffer.slice(newline + 1)
-      if (frame.type === "get_protocol_info") { socket.write(`${JSON.stringify({ id: frame.id, type: "response", command: frame.type, success: true, data: {} })}\n`); return }
-      frames.push(frame)
-      const answer = typeof response === "function" ? response(frame) : response
-      const lines = [...preamble(String(frame.id)), { id: frame.id, type: "response", command: frame.type, ...answer }]
-      socket.write(lines.map((line) => `${JSON.stringify(line)}\n`).join(""))
-    })
-  }))
+  const server = createServer((socket) =>
+    transport.authenticate(socket, () => {
+      sockets.add(socket)
+      socket.once("close", () => sockets.delete(socket))
+      let buffer = ""
+      socket.on("data", (chunk) => {
+        buffer += chunk.toString("utf8")
+        const newline = buffer.indexOf("\n")
+        if (newline < 0) return
+        const frame = JSON.parse(buffer.slice(0, newline)) as Record<string, unknown>
+        buffer = buffer.slice(newline + 1)
+        if (frame.type === "get_protocol_info") {
+          socket.write(
+            `${JSON.stringify({ id: frame.id, type: "response", command: frame.type, success: true, data: {} })}\n`,
+          )
+          return
+        }
+        frames.push(frame)
+        const answer = typeof response === "function" ? response(frame) : response
+        const lines = [
+          ...preamble(String(frame.id)),
+          { id: frame.id, type: "response", command: frame.type, ...answer },
+        ]
+        socket.write(lines.map((line) => `${JSON.stringify(line)}\n`).join(""))
+      })
+    }),
+  )
   try {
-    const listening = once(server, "listening", { signal: AbortSignal.timeout(2000) })
+    const listening = once(server, "listening", { signal: testBudgetSignal("server to emit 'listening'") })
     server.listen(transport.listenAddress)
     await listening
-    await exercise(createLiveThreadSurface({} as never, { env: { SENPI_RPC_SOCKET: socketPath }, statusAll: NO_ENUMERATION, registry: NO_REGISTRY }), frames)
+    await exercise(
+      createLiveThreadSurface({} as never, {
+        env: { SENPI_RPC_SOCKET: socketPath },
+        statusAll: NO_ENUMERATION,
+        registry: NO_REGISTRY,
+      }),
+      frames,
+    )
   } finally {
     const closed = once(server, "close", { signal: AbortSignal.timeout(2000) })
     for (const socket of sockets) socket.destroy()
@@ -68,30 +86,63 @@ describe("live thread socket discovery", () => {
     expect(resolveThreadSocket({ SENPI_RPC_SOCKET: "/tmp/override.sock" })).toBe("/tmp/override.sock")
   })
   test("#given the desktop's OMO_RPC_SOCKET_PATH #when no engine RPC_SOCKET is set #then the desktop host socket is used", () => {
-    expect(resolveThreadSocket({ OMO_RPC_SOCKET_PATH: "/h/.omo/agent/rpc-desktop/rpc.sock", OMO_CODING_AGENT_DIR: "/h/.omo/agent" })).toBe("/h/.omo/agent/rpc-desktop/rpc.sock")
+    expect(
+      resolveThreadSocket({
+        OMO_RPC_SOCKET_PATH: "/h/.omo/agent/rpc-desktop/rpc.sock",
+        OMO_CODING_AGENT_DIR: "/h/.omo/agent",
+      }),
+    ).toBe("/h/.omo/agent/rpc-desktop/rpc.sock")
   })
   test("#given brand and legacy RPC_SOCKET names #when several are set #then the brand name wins and blanks are skipped", () => {
-    expect(resolveThreadSocket({ OMO_RPC_SOCKET: "/brand.sock", SENPI_RPC_SOCKET: "/legacy.sock", OMO_RPC_SOCKET_PATH: "/desktop.sock" })).toBe("/brand.sock")
-    expect(resolveThreadSocket({ OMO_RPC_SOCKET: "  ", PI_RPC_SOCKET: "/pi.sock", OMO_RPC_SOCKET_PATH: "/desktop.sock" })).toBe("/pi.sock")
-    expect(resolveThreadSocket({ OMO_CODING_AGENT_DIR: "/configured" })).toBe(join(resolve("/configured"), "rpc", "rpc.sock"))
+    expect(
+      resolveThreadSocket({
+        OMO_RPC_SOCKET: "/brand.sock",
+        SENPI_RPC_SOCKET: "/legacy.sock",
+        OMO_RPC_SOCKET_PATH: "/desktop.sock",
+      }),
+    ).toBe("/brand.sock")
+    expect(
+      resolveThreadSocket({ OMO_RPC_SOCKET: "  ", PI_RPC_SOCKET: "/pi.sock", OMO_RPC_SOCKET_PATH: "/desktop.sock" }),
+    ).toBe("/pi.sock")
+    expect(resolveThreadSocket({ OMO_CODING_AGENT_DIR: "/configured" })).toBe(
+      join(resolve("/configured"), "rpc", "rpc.sock"),
+    )
   })
   test("canonical and env branches resolve through resolveAgentHome", async () => {
     const { resolveAgentHome } = await import("../agent-home/resolve-agent-home")
     const canonical = join("/h", ".omo", "agent")
-    expect(resolveAgentHome({ env: {}, homeDir: "/h", exists: (path) => path === join(canonical, "settings.json") })).toBe(canonical)
-    expect(resolveAgentHome({ env: { OMO_CODING_AGENT_DIR: "/configured" }, homeDir: "/h", exists: () => false })).toBe(resolve("/configured"))
+    expect(
+      resolveAgentHome({ env: {}, homeDir: "/h", exists: (path) => path === join(canonical, "settings.json") }),
+    ).toBe(canonical)
+    expect(resolveAgentHome({ env: { OMO_CODING_AGENT_DIR: "/configured" }, homeDir: "/h", exists: () => false })).toBe(
+      resolve("/configured"),
+    )
   })
   test("resolveAgentHome supports flat and standalone fallback", async () => {
     const { resolveAgentHome } = await import("../agent-home/resolve-agent-home")
     const flat = join("/h", ".omo")
-    expect(resolveAgentHome({ env: {}, homeDir: "/h", exists: (path) => path === join(flat, "settings.json") })).toBe(flat)
+    expect(resolveAgentHome({ env: {}, homeDir: "/h", exists: (path) => path === join(flat, "settings.json") })).toBe(
+      flat,
+    )
     expect(resolveAgentHome({ env: {}, homeDir: "/h", exists: () => false })).toBe(join("/h", ".senpi", "agent"))
   })
   test("always constructs a surface when the socket is absent at registration", () => {
-    expect(createLiveThreadSurface({} as never, { env: { SENPI_RPC_SOCKET: "/missing.sock" }, exists: () => false, statusAll: NO_ENUMERATION, registry: NO_REGISTRY })).toBeDefined()
+    expect(
+      createLiveThreadSurface({} as never, {
+        env: { SENPI_RPC_SOCKET: "/missing.sock" },
+        exists: () => false,
+        statusAll: NO_ENUMERATION,
+        registry: NO_REGISTRY,
+      }),
+    ).toBeDefined()
   })
   test("returns typed host_unavailable when the socket is absent at call time", async () => {
-    const surface = createLiveThreadSurface({} as never, { env: { SENPI_RPC_SOCKET: "/missing.sock" }, exists: () => false, statusAll: NO_ENUMERATION, registry: NO_REGISTRY })
+    const surface = createLiveThreadSurface({} as never, {
+      env: { SENPI_RPC_SOCKET: "/missing.sock" },
+      exists: () => false,
+      statusAll: NO_ENUMERATION,
+      registry: NO_REGISTRY,
+    })
     await expect(surface.listSessions()).rejects.toThrow("host_unavailable:/missing.sock")
   })
 })
@@ -101,48 +152,91 @@ describe("live thread session-control RPCs", () => {
     await withRpc({ success: true }, async (surface, frames) => {
       expect(typeof surface.setSessionName).toBe("function")
       expect(await surface.setSessionName("route-peer", "New Name")).toBeUndefined()
-      expect(frames).toEqual([{ id: expect.any(String), type: "set_session_name", sessionId: "route-peer", name: "New Name" }])
+      expect(frames).toEqual([
+        { id: expect.any(String), type: "set_session_name", sessionId: "route-peer", name: "New Name" },
+      ])
     })
   })
 
   test("setModel writes provider and modelId and reads the full model response", async () => {
-    await withRpc({ success: true, data: { provider: "openai", id: "gpt-x", name: "GPT X", contextWindow: 1234 } }, async (surface, frames) => {
-      expect(typeof surface.setModel).toBe("function")
-      expect(await surface.setModel("route-peer", "openai", "gpt-x")).toMatchObject({ provider: "openai", id: "gpt-x", name: "GPT X" })
-      expect(frames).toEqual([{ id: expect.any(String), type: "set_model", sessionId: "route-peer", provider: "openai", modelId: "gpt-x" }])
-    })
+    await withRpc(
+      { success: true, data: { provider: "openai", id: "gpt-x", name: "GPT X", contextWindow: 1234 } },
+      async (surface, frames) => {
+        expect(typeof surface.setModel).toBe("function")
+        expect(await surface.setModel("route-peer", "openai", "gpt-x")).toMatchObject({
+          provider: "openai",
+          id: "gpt-x",
+          name: "GPT X",
+        })
+        expect(frames).toEqual([
+          { id: expect.any(String), type: "set_model", sessionId: "route-peer", provider: "openai", modelId: "gpt-x" },
+        ])
+      },
+    )
   })
 
   test("getAvailableModels writes get_available_models and projects the catalog", async () => {
-    await withRpc({ success: true, data: { models: [{ provider: "openai", id: "gpt-x", name: "GPT X", contextWindow: 1234 }, { provider: "other", id: "other-model", contextWindow: 4321 }] } }, async (surface, frames) => {
-      expect(typeof surface.getAvailableModels).toBe("function")
-      expect(await surface.getAvailableModels("route-peer")).toEqual([{ provider: "openai", id: "gpt-x", name: "GPT X" }, { provider: "other", id: "other-model" }])
-      expect(frames).toEqual([{ id: expect.any(String), type: "get_available_models", sessionId: "route-peer" }])
-    })
+    await withRpc(
+      {
+        success: true,
+        data: {
+          models: [
+            { provider: "openai", id: "gpt-x", name: "GPT X", contextWindow: 1234 },
+            { provider: "other", id: "other-model", contextWindow: 4321 },
+          ],
+        },
+      },
+      async (surface, frames) => {
+        expect(typeof surface.getAvailableModels).toBe("function")
+        expect(await surface.getAvailableModels("route-peer")).toEqual([
+          { provider: "openai", id: "gpt-x", name: "GPT X" },
+          { provider: "other", id: "other-model" },
+        ])
+        expect(frames).toEqual([{ id: expect.any(String), type: "get_available_models", sessionId: "route-peer" }])
+      },
+    )
   })
 
-  test.each([undefined, "session", "turn"] as const)("setThinkingLevel writes only wire-supported scope for %s", async (scope) => {
-    await withRpc({ success: true }, async (surface, frames) => {
-      expect(typeof surface.setThinkingLevel).toBe("function")
-      expect(await surface.setThinkingLevel("route-peer", "high", scope)).toBeUndefined()
-      expect(frames).toEqual([{ id: expect.any(String), type: "set_thinking_level", sessionId: "route-peer", level: "high", ...(scope === "turn" ? { scope: "turn" } : {}) }])
-    })
-  })
+  test.each([undefined, "session", "turn"] as const)(
+    "setThinkingLevel writes only wire-supported scope for %s",
+    async (scope) => {
+      await withRpc({ success: true }, async (surface, frames) => {
+        expect(typeof surface.setThinkingLevel).toBe("function")
+        expect(await surface.setThinkingLevel("route-peer", "high", scope)).toBeUndefined()
+        expect(frames).toEqual([
+          {
+            id: expect.any(String),
+            type: "set_thinking_level",
+            sessionId: "route-peer",
+            level: "high",
+            ...(scope === "turn" ? { scope: "turn" } : {}),
+          },
+        ])
+      })
+    },
+  )
 
   test("getAvailableThinkingLevels writes get_available_thinking_levels and unwraps levels", async () => {
     await withRpc({ success: true, data: { levels: ["off", "high"] } }, async (surface, frames) => {
       expect(typeof surface.getAvailableThinkingLevels).toBe("function")
       expect(await surface.getAvailableThinkingLevels("route-peer")).toEqual(["off", "high"])
-      expect(frames).toEqual([{ id: expect.any(String), type: "get_available_thinking_levels", sessionId: "route-peer" }])
+      expect(frames).toEqual([
+        { id: expect.any(String), type: "get_available_thinking_levels", sessionId: "route-peer" },
+      ])
     })
   })
 
   test("set_thinking_level unsupported failure frames become classified errors", async () => {
-    await withRpc({ success: false, error: "Thinking level low is not supported by the active model." }, async (surface, frames) => {
-      expect(typeof surface.setThinkingLevel).toBe("function")
-      await expect(surface.setThinkingLevel("route-peer", "low")).rejects.toThrow(/^thinking_level_unsupported:/)
-      expect(frames).toEqual([{ id: expect.any(String), type: "set_thinking_level", sessionId: "route-peer", level: "low" }])
-    })
+    await withRpc(
+      { success: false, error: "Thinking level low is not supported by the active model." },
+      async (surface, frames) => {
+        expect(typeof surface.setThinkingLevel).toBe("function")
+        await expect(surface.setThinkingLevel("route-peer", "low")).rejects.toThrow(/^thinking_level_unsupported:/)
+        expect(frames).toEqual([
+          { id: expect.any(String), type: "set_thinking_level", sessionId: "route-peer", level: "low" },
+        ])
+      },
+    )
   })
 
   test("unrelated set_thinking_level failures are not mislabeled as unsupported", async () => {
@@ -155,48 +249,76 @@ describe("live thread session-control RPCs", () => {
 
 describe("live thread frame decoding", () => {
   // win32 is simulated (process.platform), so the Windows transport path runs on every runner.
-  test.each([process.platform, "win32"] as const)("#given a reply whose non-ASCII text arrives one byte per read on %s #when it is decoded #then the text is identical to what the engine sent", async (platform) => {
-    // given
-    const name = "한국어 모델 🙂 ｍｏｄｅｌ"
-    const socket = new EventEmitter() as EventEmitter & { write: (data: string | Uint8Array) => boolean; destroy: () => void }
-    socket.destroy = () => {}
-    socket.write = (data) => {
-      const text = typeof data === "string" ? data : ""
-      if (!text.endsWith("\n")) return true
-      const frame = JSON.parse(text) as { id: string }
-      const reply = Buffer.from(`${JSON.stringify({ id: frame.id, type: "response", success: true, data: { models: [{ provider: "p", id: "m", name }] } })}\n`)
-      queueMicrotask(() => { for (const byte of reply) socket.emit("data", Buffer.from([byte])) })
-      return true
-    }
-    // A win32 host publishes <socket>.secret beside its logical path and listens on the pipe derived from both
-    // (senpi socket-transport.ts); the client resolves that transport before it dials, as it does for a real host.
-    const directory = mkdtempSync(join(tmpdir(), "byte-split-"))
-    const socketPath = join(directory, "rpc.sock")
-    writeFileSync(`${socketPath}.secret`, Buffer.alloc(32, 7))
-    const surface = createLiveThreadSurface({} as never, { env: { SENPI_RPC_SOCKET: socketPath }, exists: () => true, statusAll: NO_ENUMERATION, registry: NO_REGISTRY, connect: () => { queueMicrotask(() => socket.emit("connect")); return socket as never } })
+  test.each([process.platform, "win32"] as const)(
+    "#given a reply whose non-ASCII text arrives one byte per read on %s #when it is decoded #then the text is identical to what the engine sent",
+    async (platform) => {
+      // given
+      const name = "한국어 모델 🙂 ｍｏｄｅｌ"
+      const socket = new EventEmitter() as EventEmitter & {
+        write: (data: string | Uint8Array) => boolean
+        destroy: () => void
+      }
+      socket.destroy = () => {}
+      socket.write = (data) => {
+        const text = typeof data === "string" ? data : ""
+        if (!text.endsWith("\n")) return true
+        const frame = JSON.parse(text) as { id: string }
+        const reply = Buffer.from(
+          `${JSON.stringify({ id: frame.id, type: "response", success: true, data: { models: [{ provider: "p", id: "m", name }] } })}\n`,
+        )
+        queueMicrotask(() => {
+          for (const byte of reply) socket.emit("data", Buffer.from([byte]))
+        })
+        return true
+      }
+      // A win32 host publishes <socket>.secret beside its logical path and listens on the pipe derived from both
+      // (senpi socket-transport.ts); the client resolves that transport before it dials, as it does for a real host.
+      const directory = mkdtempSync(join(tmpdir(), "byte-split-"))
+      const socketPath = join(directory, "rpc.sock")
+      writeFileSync(`${socketPath}.secret`, Buffer.alloc(32, 7))
+      const surface = createLiveThreadSurface({} as never, {
+        env: { SENPI_RPC_SOCKET: socketPath },
+        exists: () => true,
+        statusAll: NO_ENUMERATION,
+        registry: NO_REGISTRY,
+        connect: () => {
+          queueMicrotask(() => socket.emit("connect"))
+          return socket as never
+        },
+      })
 
-    // when
-    const realPlatform = process.platform
-    Object.defineProperty(process, "platform", { value: platform, configurable: true })
-    let models: unknown
-    try { models = await surface.getAvailableModels?.("route-peer") } finally {
-      Object.defineProperty(process, "platform", { value: realPlatform, configurable: true })
-      rmSync(directory, { recursive: true, force: true })
-    }
+      // when
+      const realPlatform = process.platform
+      Object.defineProperty(process, "platform", { value: platform, configurable: true })
+      let models: unknown
+      try {
+        models = await surface.getAvailableModels?.("route-peer")
+      } finally {
+        Object.defineProperty(process, "platform", { value: realPlatform, configurable: true })
+        rmSync(directory, { recursive: true, force: true })
+      }
 
-    // then
-    expect(models).toEqual([{ provider: "p", id: "m", name }])
-  })
+      // then
+      expect(models).toEqual([{ provider: "p", id: "m", name }])
+    },
+  )
 })
 
 describe("live thread create with initial skills", () => {
   test("#given initial skills #when a session is opened #then they ride on the open_session context and never as a wire field", async () => {
     await withRpc(
-      (frame) => (frame.type === "open_session" ? { success: true, data: { sessionId: "rpc-new", state: { sessionId: "rpc-new", cwd: "/w" } } } : { success: true, data: { sessions: [] } }),
+      (frame) =>
+        frame.type === "open_session"
+          ? { success: true, data: { sessionId: "rpc-new", state: { sessionId: "rpc-new", cwd: "/w" } } }
+          : { success: true, data: { sessions: [] } },
       async (surface, frames) => {
         await surface.openSession({ cwd: "/w", initialSkills: ["gateway-lead"] })
         const open = frames.find((frame) => frame.type === "open_session")
-        expect(open).toMatchObject({ cwd: "/w", retain_on_disconnect: true, context: { initial_skills: JSON.stringify(["gateway-lead"]) } })
+        expect(open).toMatchObject({
+          cwd: "/w",
+          retain_on_disconnect: true,
+          context: { initial_skills: JSON.stringify(["gateway-lead"]) },
+        })
         expect(open).not.toHaveProperty("initialSkills")
       },
     )
@@ -211,7 +333,20 @@ describe("live thread request correlation", () => {
           ? { success: true, data: { sessionId: "route-new", state: { cwd: "/w" } } }
           : frame.type === "set_session_name"
             ? { success: true }
-            : { success: true, data: { sessions: [{ sessionId: "route-new", durableSessionId: "01a0-queued", cwd: "/w", name: "peer", status: "open" }] } },
+            : {
+                success: true,
+                data: {
+                  sessions: [
+                    {
+                      sessionId: "route-new",
+                      durableSessionId: "01a0-queued",
+                      cwd: "/w",
+                      name: "peer",
+                      status: "open",
+                    },
+                  ],
+                },
+              },
       async (surface) => {
         const opened = await surface.openSession({ cwd: "/w", name: "peer" })
         expect(opened.sessionId).toBe("route-new")
@@ -228,7 +363,15 @@ describe("live thread request correlation", () => {
       { success: true, data: { sessions: [{ sessionId: "route-a", cwd: "/w" }] } },
       async (surface) => {
         const sessions = await surface.listSessions()
-        expect(sessions).toEqual([{ sessionId: "route-a", cwd: "/w", socket: surface.socket, endpoint_kind: "rpc_host", controls: ["send", "read", "rename", "set_model", "set_reasoning", "interrupt"] }])
+        expect(sessions).toEqual([
+          {
+            sessionId: "route-a",
+            cwd: "/w",
+            socket: surface.socket,
+            endpoint_kind: "rpc_host",
+            controls: ["send", "read", "rename", "set_model", "set_reasoning", "interrupt"],
+          },
+        ])
       },
       () => [
         { type: "agent_start", sessionId: "route-other" },
@@ -243,7 +386,10 @@ describe("live thread request correlation", () => {
       (frame) =>
         frame.type === "open_session"
           ? { success: true, data: { sessionId: "rpc-1", state: { cwd: "/w" } } }
-          : { success: true, data: { sessions: [{ sessionId: "rpc-1", durableSessionId: "01a0-durable", cwd: "/w", status: "open" }] } },
+          : {
+              success: true,
+              data: { sessions: [{ sessionId: "rpc-1", durableSessionId: "01a0-durable", cwd: "/w", status: "open" }] },
+            },
       async (surface, frames) => {
         const opened = await surface.openSession({ cwd: "/w" })
         // The address book keys every entry by the durable id, so an address that is only the
@@ -266,7 +412,14 @@ describe("live thread request correlation", () => {
           ? { success: true, data: { sessionId: "rpc-2", state: { cwd: "/w" } } }
           : frame.type === "set_session_name"
             ? { success: true }
-            : { success: true, data: { sessions: [{ sessionId: "rpc-2", durableSessionId: "01a0-named", cwd: "/w", name: "peer-one", status: "open" }] } },
+            : {
+                success: true,
+                data: {
+                  sessions: [
+                    { sessionId: "rpc-2", durableSessionId: "01a0-named", cwd: "/w", name: "peer-one", status: "open" },
+                  ],
+                },
+              },
       async (surface, frames) => {
         const opened = await surface.openSession({ cwd: "/w", name: "peer-one" })
         expect(opened.name).toBe("peer-one")
@@ -283,7 +436,15 @@ describe("live thread request correlation", () => {
       async (surface) => {
         await expect(surface.setSessionName("route-peer", "renamed")).resolves.toBeUndefined()
       },
-      () => [{ id: "stale-request", type: "response", command: "set_session_name", success: false, error: "Session not found" }],
+      () => [
+        {
+          id: "stale-request",
+          type: "response",
+          command: "set_session_name",
+          success: false,
+          error: "Session not found",
+        },
+      ],
     )
   })
 })

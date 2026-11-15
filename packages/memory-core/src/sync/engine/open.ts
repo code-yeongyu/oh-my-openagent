@@ -70,7 +70,10 @@ export async function openDeviceSync(options: OpenDeviceSyncOptions): Promise<De
   try {
     await mkdir(options.locksDir, { recursive: true })
     const writer: WriterLock = {
-      withLock: async (fn) => withLock(memoryWriterLockPath(options.locksDir), await createLockRecord("memory sync apply"), fn, { waitTimeoutMs: WRITER_WAIT_MS }),
+      withLock: async (fn) =>
+        withLock(memoryWriterLockPath(options.locksDir), await createLockRecord("memory sync apply"), fn, {
+          waitTimeoutMs: WRITER_WAIT_MS,
+        }),
     }
     const store = createDeviceItemStore({
       stateDir: options.stateDir,

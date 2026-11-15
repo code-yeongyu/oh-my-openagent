@@ -2,9 +2,7 @@ import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
 
 const repositoryRoot = fileURLToPath(new URL("..", import.meta.url))
-const installerEntrypoint = fileURLToPath(
-  new URL("../packages/omo-codex/scripts/install-local.mjs", import.meta.url),
-)
+const installerEntrypoint = fileURLToPath(new URL("../packages/omo-codex/scripts/install-local.mjs", import.meta.url))
 
 const args = process.argv.slice(2)
 const devVersionArg = args.find((arg) => arg.startsWith("--version="))
@@ -42,4 +40,4 @@ if (installStatus !== 0) {
 }
 
 console.log(`[install-codex-dev] Done. Installed the dev build stamped as "${devVersion}".`)
-console.log('[install-codex-dev] Verify with: omo get-local-version')
+console.log("[install-codex-dev] Verify with: omo get-local-version")

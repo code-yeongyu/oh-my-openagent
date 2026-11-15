@@ -62,15 +62,7 @@ export function buildDelegatedOmoInvocation(parsed: LazyCodexDelegatedCommand): 
 
 function buildLazyCodexDoctorInvocation(doctorArgs: readonly string[]): DelegatedOmoInvocation {
   const doctorOptions = parseLazyCodexDoctorOptions(doctorArgs)
-  const codexArgs = [
-    "exec",
-    "--ephemeral",
-    "--sandbox",
-    "danger-full-access",
-    "--skip-git-repo-check",
-    "--cd",
-    ".",
-  ]
+  const codexArgs = ["exec", "--ephemeral", "--sandbox", "danger-full-access", "--skip-git-repo-check", "--cd", "."]
   if (doctorOptions.model !== undefined) codexArgs.push("--model", doctorOptions.model)
   codexArgs.push(buildLazyCodexDoctorPrompt(doctorOptions.args))
   return {

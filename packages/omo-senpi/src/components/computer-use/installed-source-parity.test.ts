@@ -41,8 +41,16 @@ createInterface({ input: process.stdin }).on("line", line => {
       sidecar: join(execDir, prebuild),
       "package-prebuild": join(packageDir, prebuild),
       "dev-build": join(root, "target", "release", "senpi-desktop-engine"),
-      cache: join(root, ".omo", "cache", "senpi-desktop-engine", version, host,
-        `${digest}-${randomUUID()}`, "senpi-desktop-engine-linux-x64"),
+      cache: join(
+        root,
+        ".omo",
+        "cache",
+        "senpi-desktop-engine",
+        version,
+        host,
+        `${digest}-${randomUUID()}`,
+        "senpi-desktop-engine-linux-x64",
+      ),
     }
     const engine = paths[source]
     mkdirSync(dirname(engine), { recursive: true })
@@ -51,29 +59,51 @@ createInterface({ input: process.stdin }).on("line", line => {
     mkdirSync(runtimeDir, { recursive: true })
     writeFileSync(join(runtimeDir, "package.json"), JSON.stringify({ name: "omo", version }))
     mkdirSync(join(root, ".omo"), { recursive: true })
-    writeFileSync(join(root, ".omo", "omo.jsonc"), JSON.stringify({
-      "[native]": { computer: { enabled: true, ...(source === "explicit" ? { engine_path: engine } : {}) } },
-    }))
+    writeFileSync(
+      join(root, ".omo", "omo.jsonc"),
+      JSON.stringify({
+        "[native]": { computer: { enabled: true, ...(source === "explicit" ? { engine_path: engine } : {}) } },
+      }),
+    )
     const env = { HOME: root, OMO_PACKAGE_DIR: runtimeDir }
-    const fetch = spyOn(globalThis, "fetch").mockImplementation(Object.assign(
-      () => { throw new Error("must not download") }, { preconnect: globalThis.fetch.preconnect },
-    ))
+    const fetch = spyOn(globalThis, "fetch").mockImplementation(
+      Object.assign(
+        () => {
+          throw new Error("must not download")
+        },
+        { preconnect: globalThis.fetch.preconnect },
+      ),
+    )
     try {
       // The executable's directory is a production source input. Keep this case's candidates isolated.
       process.execPath = join(execDir, "runtime")
       const report = await computerUseDoctorReport({
-        cwd: root, env, version, packageRoot, platform: "linux", arch: "x64",
-        launchEngine: (path, args, childEnv) => spawn(originalExec, [path, ...args], {
-          stdio: "pipe", detached: true, env: childEnv,
-        }),
+        cwd: root,
+        env,
+        version,
+        packageRoot,
+        platform: "linux",
+        arch: "x64",
+        launchEngine: (path, args, childEnv) =>
+          spawn(originalExec, [path, ...args], {
+            stdio: "pipe",
+            detached: true,
+            env: childEnv,
+          }),
       })
       expect(report.kind).toBe("ready")
       if (report.kind !== "ready") throw new Error("expected installed engine")
       expect(report.enginePath).toBe(engine)
       expect(report.engineSource).toBe(source)
-      expect(describeEngineSource(source === "explicit" ? engine : undefined, env, {
-        platform: "linux", arch: "x64", execDir, packageDir, repoRoot: root,
-      })).toBe(`found ${report.enginePath} (${source}${source === "cache" ? `, omo v${version}` : ""})`)
+      expect(
+        describeEngineSource(source === "explicit" ? engine : undefined, env, {
+          platform: "linux",
+          arch: "x64",
+          execDir,
+          packageDir,
+          repoRoot: root,
+        }),
+      ).toBe(`found ${report.enginePath} (${source}${source === "cache" ? `, omo v${version}` : ""})`)
       expect(fetch).not.toHaveBeenCalled()
       expect(readFileSync(engine, "utf8")).toBe(body)
     } finally {

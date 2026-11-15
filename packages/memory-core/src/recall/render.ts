@@ -19,11 +19,8 @@ export const RECALL_HINT_HEADER_KO =
  * detail the hint had to leave out.
  */
 export function renderNudgeBlock(nudge: RecallNudge): string {
-  const escapeMarkup = (value: string): string => value
-    .replaceAll("&", "&amp;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
+  const escapeMarkup = (value: string): string =>
+    value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
   const path = escapeMarkup(redactSecretLikeMaterial(nudge.source ?? nudge.path))
   const hint = escapeMarkup(redactSecretLikeMaterial(nudge.hint))
   return [

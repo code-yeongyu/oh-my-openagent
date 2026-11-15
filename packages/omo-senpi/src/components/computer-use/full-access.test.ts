@@ -14,7 +14,11 @@ describe("isFullAccess (#10022, #2465)", () => {
   test.each([
     ["the resolved preset is full-access from the session flag", source("full-access", "full-access"), true],
     ["the resolved preset is full-access with no session flag (settings or the default)", source("full-access"), true],
-    ["the resolved preset is another preset although the raw flag says full-access", source("ask", "full-access"), false],
+    [
+      "the resolved preset is another preset although the raw flag says full-access",
+      source("ask", "full-access"),
+      false,
+    ],
     ["the permission system is disabled or not bound yet", source(undefined, "full-access"), false],
   ])("#given %s #then it reports %p", (_name, preset, expected) => {
     expect(isFullAccess(preset)).toBe(expected)

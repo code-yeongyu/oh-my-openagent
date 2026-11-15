@@ -1,9 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  isAmbiguousPostDispatchPromptFailure,
-  isAmbiguousPromptDispatchFailure,
-} from "./prompt-failure-classifier"
+import { isAmbiguousPostDispatchPromptFailure, isAmbiguousPromptDispatchFailure } from "./prompt-failure-classifier"
 
 describe("prompt failure classifier", () => {
   test("#given prompt dispatch reports a generic JSON parse error #when classifying ambiguity #then it treats the dispatch as possibly accepted", () => {

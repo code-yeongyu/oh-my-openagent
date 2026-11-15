@@ -11,11 +11,7 @@ import type {
 
 import { getActivityStateDir } from "./data-path"
 
-export type {
-  TelemetryDiagnosticErrorKind,
-  TelemetryDiagnosticEvent,
-  TelemetryDiagnosticInput,
-}
+export type { TelemetryDiagnosticErrorKind, TelemetryDiagnosticEvent, TelemetryDiagnosticInput }
 
 export type TelemetryDiagnosticSource = "cli" | "install" | "plugin" | "shared"
 

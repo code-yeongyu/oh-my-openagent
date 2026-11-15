@@ -34,20 +34,22 @@ function createTask(overrides: Partial<BackgroundTask> & { id: string; sessionId
 }
 
 function createBackgroundManager(): BackgroundManager {
-  return new BackgroundManager({ pluginContext: {
-    client: {
-      session: {
-        abort: async () => ({}),
-        prompt: async () => ({}),
-        promptAsync: async () => ({}),
-      },
+  return new BackgroundManager({
+    pluginContext: {
+      client: {
+        session: {
+          abort: async () => ({}),
+          prompt: async () => ({}),
+          promptAsync: async () => ({}),
+        },
+      } as never,
+      project: {} as never,
+      directory: tmpdir(),
+      worktree: tmpdir(),
+      serverUrl: new URL("https://example.com"),
+      $: {} as never,
     } as never,
-    project: {} as never,
-    directory: tmpdir(),
-    worktree: tmpdir(),
-    serverUrl: new URL("https://example.com"),
-    $: {} as never,
-  } as never })
+  })
 }
 
 describe("BackgroundManager shutdown global cleanup", () => {

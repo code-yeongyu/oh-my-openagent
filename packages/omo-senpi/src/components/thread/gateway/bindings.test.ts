@@ -2,7 +2,13 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { existsSync, readdirSync } from "node:fs"
 
 import { parseThreadParams, threadToolParamSchemas } from "../contracts"
-import { BINDING_DEFAULT_TTL_SECONDS, type BindInput, normalizeBindInput, OUTBOX_RETENTION_MS, WHOLE_CHAT_THREAD_ID } from "./bindings"
+import {
+  BINDING_DEFAULT_TTL_SECONDS,
+  type BindInput,
+  normalizeBindInput,
+  OUTBOX_RETENTION_MS,
+  WHOLE_CHAT_THREAD_ID,
+} from "./bindings"
 import { gatewayInboxDirectory } from "./paths"
 import { createGatewayRelay, type GatewayRelay } from "./relay"
 import type { GatewayStore } from "./store"
@@ -21,7 +27,13 @@ function open(): GatewayHarness {
 }
 
 function relayOn(h: GatewayHarness, store: GatewayStore = h.store()): GatewayRelay {
-  return createGatewayRelay({ store, engine: h.engineFor(store), endpoints: { wake: async () => ({ admitted: [] }) }, locate: async () => null, now: () => h.clock.now })
+  return createGatewayRelay({
+    store,
+    engine: h.engineFor(store),
+    endpoints: { wake: async () => ({ admitted: [] }) },
+    locate: async () => null,
+    now: () => h.clock.now,
+  })
 }
 
 function thread(session: string, extra: Partial<BindInput> = {}): BindInput {
@@ -58,9 +70,19 @@ describe("binding_uniqueness_revision_expiry_and_replay", () => {
     const relay = relayOn(h)
     const first = ok(await relay.bind({ principal: "session:A", idempotency_key: "k-1", binding: thread("B") }))
     const replay = ok(await relay.bind({ principal: "session:A", idempotency_key: "k-1", binding: thread("B") }))
-    expect({ id: replay.binding.binding_id, deduplicated: replay.deduplicated, first: first.deduplicated }).toEqual({ id: first.binding.binding_id, deduplicated: true, first: false })
-    expect(code(await relay.bind({ principal: "session:A", idempotency_key: "k-1", binding: thread("B", { ttl_seconds: 60 }) }))).toBe("idempotency_conflict")
-    expect(code(await relay.bind({ principal: "session:Z", idempotency_key: "k-1", binding: thread("B") }))).toBe("binding_conflict")
+    expect({ id: replay.binding.binding_id, deduplicated: replay.deduplicated, first: first.deduplicated }).toEqual({
+      id: first.binding.binding_id,
+      deduplicated: true,
+      first: false,
+    })
+    expect(
+      code(
+        await relay.bind({ principal: "session:A", idempotency_key: "k-1", binding: thread("B", { ttl_seconds: 60 }) }),
+      ),
+    ).toBe("idempotency_conflict")
+    expect(code(await relay.bind({ principal: "session:Z", idempotency_key: "k-1", binding: thread("B") }))).toBe(
+      "binding_conflict",
+    )
     expect(ok(await relay.bindings({ filter: {} })).bindings).toHaveLength(1)
   })
 
@@ -71,24 +93,35 @@ describe("binding_uniqueness_revision_expiry_and_replay", () => {
     ok(await relay.bind({ principal: "session:A", binding: thread("C", { chat_id: "c2" }) }))
     ok(await relay.bind({ principal: "session:A", binding: thread("D", { account_id: "other" }) }))
     ok(await relay.bind({ principal: "session:A", binding: thread("E", { platform: "discord" }) }))
-    expect(ok(await relay.bindings({ filter: { thread_id: "t1", status: "active" } })).bindings.map((binding) => binding.session_durable_id).sort()).toEqual(["B", "C", "D", "E"])
+    expect(
+      ok(await relay.bindings({ filter: { thread_id: "t1", status: "active" } }))
+        .bindings.map((binding) => binding.session_durable_id)
+        .sort(),
+    ).toEqual(["B", "C", "D", "E"])
   })
 
   test("#given the Notion and Feishu connectors #when a thread is bound on each by its native platform name #then the tool schema takes the name and the store keeps it", async () => {
     const h = open()
     const relay = relayOn(h)
     for (const platform of ["notion", "feishu", "whatsapp"] as const) {
-      expect(parseThreadParams(threadToolParamSchemas.thread_bind, { platform, account_id: "qa", chat_id: "c1" }).kind).toBe("ok")
+      expect(
+        parseThreadParams(threadToolParamSchemas.thread_bind, { platform, account_id: "qa", chat_id: "c1" }).kind,
+      ).toBe("ok")
       ok(await relay.bind({ principal: "session:A", binding: thread(`S-${platform}`, { platform }) }))
     }
-    expect(ok(await relay.bindings({ filter: { status: "active" } })).bindings.map((binding) => binding.platform).sort()).toEqual(["feishu", "notion", "whatsapp"])
+    expect(
+      ok(await relay.bindings({ filter: { status: "active" } }))
+        .bindings.map((binding) => binding.platform)
+        .sort(),
+    ).toEqual(["feishu", "notion", "whatsapp"])
   })
 
   test("#given identifiers carrying a C1 control or a Unicode line separator #when a thread is bound with them #then the bind is invalid_arguments and nothing is stored", async () => {
     const h = open()
     const relay = relayOn(h)
     const refused = []
-    for (const account_id of ["bot\u0085acct", "bot\u009bacct", "bot\u2028acct", "bot\u2029acct"]) refused.push(code(await relay.bind({ principal: "session:A", binding: thread("B", { account_id }) })))
+    for (const account_id of ["bot\u0085acct", "bot\u009bacct", "bot\u2028acct", "bot\u2029acct"])
+      refused.push(code(await relay.bind({ principal: "session:A", binding: thread("B", { account_id }) })))
     expect(refused).toEqual(["invalid_arguments", "invalid_arguments", "invalid_arguments", "invalid_arguments"])
     expect(ok(await relay.bindings({ filter: {} })).bindings).toEqual([])
   })
@@ -99,7 +132,9 @@ describe("binding_uniqueness_revision_expiry_and_replay", () => {
     const relay = relayOn(h, store)
     const bindAt = async (chat: string) => {
       h.clock.now += 1_000
-      return ok(await relay.bind({ principal: "session:A", binding: thread("B", { chat_id: chat, ttl_seconds: null }) })).binding
+      return ok(
+        await relay.bind({ principal: "session:A", binding: thread("B", { chat_id: chat, ttl_seconds: null }) }),
+      ).binding
     }
     const kept = [(await bindAt("c-1")).binding_id, (await bindAt("c-2")).binding_id]
     const closed = await bindAt("c-3")
@@ -128,18 +163,42 @@ describe("binding_uniqueness_revision_expiry_and_replay", () => {
     const bound = ok(await relay.bind({ principal: "session:A", binding: thread("B") })).binding
     const inbound = await relay.inbound({ binding_id: bound.binding_id, event_id: "m-1", text: "hi" })
     expect(inbound).toMatchObject({ kind: "ok", delivery: { kind: "queued_offline" } })
-    expect(code(await relay.unbind({ principal: "session:A", binding_id: bound.binding_id, expected_revision: 2 }))).toBe("stale_revision")
-    expect(code(await relay.rebind({ principal: "session:A", binding_id: bound.binding_id, expected_revision: 2, session_durable_id: "C" }))).toBe("stale_revision")
-    const detached = ok(await relay.unbind({ principal: "session:A", binding_id: bound.binding_id, expected_revision: 1 }))
-    expect({ status: detached.binding.status, revision: detached.binding.revision, in_flight: detached.in_flight, already: detached.already_closed }).toEqual({
+    expect(
+      code(await relay.unbind({ principal: "session:A", binding_id: bound.binding_id, expected_revision: 2 })),
+    ).toBe("stale_revision")
+    expect(
+      code(
+        await relay.rebind({
+          principal: "session:A",
+          binding_id: bound.binding_id,
+          expected_revision: 2,
+          session_durable_id: "C",
+        }),
+      ),
+    ).toBe("stale_revision")
+    const detached = ok(
+      await relay.unbind({ principal: "session:A", binding_id: bound.binding_id, expected_revision: 1 }),
+    )
+    expect({
+      status: detached.binding.status,
+      revision: detached.binding.revision,
+      in_flight: detached.in_flight,
+      already: detached.already_closed,
+    }).toEqual({
       status: "detached",
       revision: 2,
       in_flight: [(inbound as { delivery_id: string }).delivery_id],
       already: false,
     })
     const again = ok(await relay.unbind({ principal: "session:A", binding_id: bound.binding_id, expected_revision: 1 }))
-    expect({ status: again.binding.status, revision: again.binding.revision, already: again.already_closed }).toEqual({ status: "detached", revision: 2, already: true })
-    expect(code(await relay.inbound({ binding_id: bound.binding_id, event_id: "m-2", text: "late" }))).toBe("binding_inactive")
+    expect({ status: again.binding.status, revision: again.binding.revision, already: again.already_closed }).toEqual({
+      status: "detached",
+      revision: 2,
+      already: true,
+    })
+    expect(code(await relay.inbound({ binding_id: bound.binding_id, event_id: "m-2", text: "late" }))).toBe(
+      "binding_inactive",
+    )
   })
 
   test("#given a connector event the session already received #when the connector retries it after the binding was unbound #then it gets the stored result back, while an edited or new event meets binding_inactive", async () => {
@@ -151,9 +210,16 @@ describe("binding_uniqueness_revision_expiry_and_replay", () => {
     ok(await relay.unbind({ principal: "session:A", binding_id: bound.binding_id, expected_revision: 1 }))
     await h.quiesce()
 
-    expect(await relay.inbound({ binding_id: bound.binding_id, event_id: "m-1", text: "hi" })).toEqual({ ...first, deduplicated: true })
-    expect(code(await relay.inbound({ binding_id: bound.binding_id, event_id: "m-1", text: "hi, edited" }))).toBe("binding_inactive")
-    expect(code(await relay.inbound({ binding_id: bound.binding_id, event_id: "m-2", text: "new" }))).toBe("binding_inactive")
+    expect(await relay.inbound({ binding_id: bound.binding_id, event_id: "m-1", text: "hi" })).toEqual({
+      ...first,
+      deduplicated: true,
+    })
+    expect(code(await relay.inbound({ binding_id: bound.binding_id, event_id: "m-1", text: "hi, edited" }))).toBe(
+      "binding_inactive",
+    )
+    expect(code(await relay.inbound({ binding_id: bound.binding_id, event_id: "m-2", text: "new" }))).toBe(
+      "binding_inactive",
+    )
     expect(b.runtime.enqueueCount(first.delivery_id)).toBe(1)
     expect(await b.store.list({ target_durable_id: "B" })).toHaveLength(1)
   })
@@ -162,13 +228,36 @@ describe("binding_uniqueness_revision_expiry_and_replay", () => {
     const h = open()
     const b = h.session("B")
     const store = h.store()
-    const lockWait = () => Object.assign(new Error("gateway store lock wait exceeded: complete_receipt waited 25000 ms for the write lock (limit 30000 ms); another process holds it"), { code: "gateway_lock_wait_exceeded" })
+    const lockWait = () =>
+      Object.assign(
+        new Error(
+          "gateway store lock wait exceeded: complete_receipt waited 25000 ms for the write lock (limit 30000 ms); another process holds it",
+        ),
+        { code: "gateway_lock_wait_exceeded" },
+      )
     // The delivery commits and the target applies it, but the receipt never records the outcome: it stays prepared.
-    const stuck: GatewayStore = { ...store, completeReceipt: async () => { throw lockWait() }, abandonReceipt: async () => { throw lockWait() } }
-    const relay = createGatewayRelay({ store, engine: h.engineFor(stuck), endpoints: { wake: async () => ({ admitted: [] }) }, locate: async () => null, now: () => h.clock.now })
+    const stuck: GatewayStore = {
+      ...store,
+      completeReceipt: async () => {
+        throw lockWait()
+      },
+      abandonReceipt: async () => {
+        throw lockWait()
+      },
+    }
+    const relay = createGatewayRelay({
+      store,
+      engine: h.engineFor(stuck),
+      endpoints: { wake: async () => ({ admitted: [] }) },
+      locate: async () => null,
+      now: () => h.clock.now,
+    })
     const bound = ok(await relay.bind({ principal: "session:A", binding: thread("B") })).binding
     // Awaited as a settled value: Bun 1.4.2's `expect(promise).rejects` misses a store worker's reply (oven-sh/bun#43819).
-    const lost = await relay.inbound({ binding_id: bound.binding_id, event_id: "m-1", text: "hi" }).then(() => null, (error: unknown) => error)
+    const lost = await relay.inbound({ binding_id: bound.binding_id, event_id: "m-1", text: "hi" }).then(
+      () => null,
+      (error: unknown) => error,
+    )
     expect(lost instanceof Error ? lost.message : lost).toContain("lock wait exceeded")
     await h.quiesce()
     const [row] = await b.store.list({ target_durable_id: "B" })
@@ -178,24 +267,56 @@ describe("binding_uniqueness_revision_expiry_and_replay", () => {
     const retried = await relay.inbound({ binding_id: bound.binding_id, event_id: "m-1", text: "hi" })
     expect(retried).toMatchObject({ kind: "ok", delivery_id: row?.delivery_id, deduplicated: true })
     expect(await relay.inbound({ binding_id: bound.binding_id, event_id: "m-1", text: "hi" })).toEqual(retried)
-    expect(code(await relay.inbound({ binding_id: bound.binding_id, event_id: "m-1", text: "hi, edited" }))).toBe("binding_inactive")
-    expect(code(await relay.inbound({ binding_id: bound.binding_id, event_id: "m-2", text: "new" }))).toBe("binding_inactive")
-    expect({ entries: b.runtime.enqueueCount(row?.delivery_id ?? ""), rows: (await b.store.list({ target_durable_id: "B" })).length }).toEqual({ entries: 1, rows: 1 })
+    expect(code(await relay.inbound({ binding_id: bound.binding_id, event_id: "m-1", text: "hi, edited" }))).toBe(
+      "binding_inactive",
+    )
+    expect(code(await relay.inbound({ binding_id: bound.binding_id, event_id: "m-2", text: "new" }))).toBe(
+      "binding_inactive",
+    )
+    expect({
+      entries: b.runtime.enqueueCount(row?.delivery_id ?? ""),
+      rows: (await b.store.list({ target_durable_id: "B" })).length,
+    }).toEqual({ entries: 1, rows: 1 })
   })
 
   test("#given a connector event still queued for an offline session while the relay's store gave up both receipt writes #when the connector retries it after the binding was unbound #then the retry is idempotency_in_progress, never a second delivery and never binding_inactive", async () => {
     const h = open()
     const b = h.session("B", { online: false })
     const store = h.store()
-    const lockWait = () => Object.assign(new Error("gateway store lock wait exceeded: complete_receipt waited 25000 ms for the write lock (limit 30000 ms); another process holds it"), { code: "gateway_lock_wait_exceeded" })
-    const stuck: GatewayStore = { ...store, completeReceipt: async () => { throw lockWait() }, abandonReceipt: async () => { throw lockWait() } }
-    const relay = createGatewayRelay({ store, engine: h.engineFor(stuck), endpoints: { wake: async () => ({ admitted: [] }) }, locate: async () => null, now: () => h.clock.now })
+    const lockWait = () =>
+      Object.assign(
+        new Error(
+          "gateway store lock wait exceeded: complete_receipt waited 25000 ms for the write lock (limit 30000 ms); another process holds it",
+        ),
+        { code: "gateway_lock_wait_exceeded" },
+      )
+    const stuck: GatewayStore = {
+      ...store,
+      completeReceipt: async () => {
+        throw lockWait()
+      },
+      abandonReceipt: async () => {
+        throw lockWait()
+      },
+    }
+    const relay = createGatewayRelay({
+      store,
+      engine: h.engineFor(stuck),
+      endpoints: { wake: async () => ({ admitted: [] }) },
+      locate: async () => null,
+      now: () => h.clock.now,
+    })
     const bound = ok(await relay.bind({ principal: "session:A", binding: thread("B") })).binding
-    const lost = await relay.inbound({ binding_id: bound.binding_id, event_id: "m-1", text: "hi" }).then(() => null, (error: unknown) => error)
+    const lost = await relay.inbound({ binding_id: bound.binding_id, event_id: "m-1", text: "hi" }).then(
+      () => null,
+      (error: unknown) => error,
+    )
     expect(lost instanceof Error ? lost.message : lost).toContain("lock wait exceeded")
     ok(await relay.unbind({ principal: "session:A", binding_id: bound.binding_id, expected_revision: 1 }))
 
-    expect(code(await relay.inbound({ binding_id: bound.binding_id, event_id: "m-1", text: "hi" }))).toBe("idempotency_in_progress")
+    expect(code(await relay.inbound({ binding_id: bound.binding_id, event_id: "m-1", text: "hi" }))).toBe(
+      "idempotency_in_progress",
+    )
     expect((await b.store.list({ target_durable_id: "B" })).map((row) => row.state)).toEqual(["queued"])
   })
 
@@ -207,14 +328,41 @@ describe("binding_uniqueness_revision_expiry_and_replay", () => {
     const bound = ok(await relay.bind({ principal: "session:A", binding: thread("B", { ttl_seconds: 60 }) })).binding
     expect(bound.expires_at).toBe(new Date(h.clock.now + 60_000).toISOString())
     h.clock.now += 30_000
-    const moved = ok(await relay.rebind({ principal: "session:A", binding_id: bound.binding_id, expected_revision: 1, session_durable_id: "C" })).binding
-    expect({ revision: moved.revision, expires_at: moved.expires_at, lease: moved.lease_started_at }).toEqual({ revision: 2, expires_at: bound.expires_at, lease: new Date(h.clock.now).toISOString() })
+    const moved = ok(
+      await relay.rebind({
+        principal: "session:A",
+        binding_id: bound.binding_id,
+        expected_revision: 1,
+        session_durable_id: "C",
+      }),
+    ).binding
+    expect({ revision: moved.revision, expires_at: moved.expires_at, lease: moved.lease_started_at }).toEqual({
+      revision: 2,
+      expires_at: bound.expires_at,
+      lease: new Date(h.clock.now).toISOString(),
+    })
     h.clock.now += 30_001
-    expect(ok(await relay.bindings({ filter: { chat_id: "c1" } })).bindings.map((binding) => binding.status)).toEqual(["expired"])
-    expect(code(await relay.inbound({ binding_id: bound.binding_id, event_id: "m-1", text: "too late" }))).toBe("binding_inactive")
-    expect(code(await relay.rebind({ principal: "session:A", binding_id: bound.binding_id, expected_revision: 2, session_durable_id: "B" }))).toBe("binding_inactive")
+    expect(ok(await relay.bindings({ filter: { chat_id: "c1" } })).bindings.map((binding) => binding.status)).toEqual([
+      "expired",
+    ])
+    expect(code(await relay.inbound({ binding_id: bound.binding_id, event_id: "m-1", text: "too late" }))).toBe(
+      "binding_inactive",
+    )
+    expect(
+      code(
+        await relay.rebind({
+          principal: "session:A",
+          binding_id: bound.binding_id,
+          expected_revision: 2,
+          session_durable_id: "B",
+        }),
+      ),
+    ).toBe("binding_inactive")
     const rebound = ok(await relay.bind({ principal: "session:A", binding: thread("B") })).binding
-    expect({ status: rebound.status, ttl: rebound.ttl_seconds }).toEqual({ status: "active", ttl: BINDING_DEFAULT_TTL_SECONDS })
+    expect({ status: rebound.status, ttl: rebound.ttl_seconds }).toEqual({
+      status: "active",
+      ttl: BINDING_DEFAULT_TTL_SECONDS,
+    })
   })
 
   test("#given work queued for B under revision 1 #when the binding is rebound to C #then the queued work is refused binding_closed and never reaches C, and B's inbox marker is gone", async () => {
@@ -225,10 +373,23 @@ describe("binding_uniqueness_revision_expiry_and_replay", () => {
     const bound = ok(await relay.bind({ principal: "session:A", binding: thread("B") })).binding
     const queued = await relay.inbound({ binding_id: bound.binding_id, event_id: "m-1", text: "for B" })
     const deliveryId = (queued as { delivery_id: string }).delivery_id
-    expect(existsSync(gatewayInboxDirectory(h.agentDir, "B")) && readdirSync(gatewayInboxDirectory(h.agentDir, "B"))).toEqual([deliveryId])
-    const moved = ok(await relay.rebind({ principal: "session:A", binding_id: bound.binding_id, expected_revision: 1, session_durable_id: "C" }))
+    expect(
+      existsSync(gatewayInboxDirectory(h.agentDir, "B")) && readdirSync(gatewayInboxDirectory(h.agentDir, "B")),
+    ).toEqual([deliveryId])
+    const moved = ok(
+      await relay.rebind({
+        principal: "session:A",
+        binding_id: bound.binding_id,
+        expected_revision: 1,
+        session_durable_id: "C",
+      }),
+    )
     expect(moved.closed).toEqual([deliveryId])
-    expect((await b.store.deliveryView(deliveryId))?.row).toMatchObject({ state: "refused", reason: "binding_closed", target_durable_id: "B" })
+    expect((await b.store.deliveryView(deliveryId))?.row).toMatchObject({
+      state: "refused",
+      reason: "binding_closed",
+      target_durable_id: "B",
+    })
     expect(readdirSync(gatewayInboxDirectory(h.agentDir, "B"))).toEqual([])
     b.online = true
     await b.drain.drain({ reason: "start" })
@@ -250,16 +411,37 @@ describe("binding_uniqueness_revision_expiry_and_replay", () => {
     expect(first.bindings.map((binding) => binding.chat_id)).toEqual(["c1", "c2"])
     ok(await relay.bind({ principal: "session:A", binding: thread("B", { chat_id: "c4" }) }))
     const second = ok(await relay.bindings({ filter: {}, limit: 2, cursor: first.next_cursor as string }))
-    expect({ chats: second.bindings.map((binding) => binding.chat_id), next: second.next_cursor }).toEqual({ chats: ["c3"], next: null })
+    expect({ chats: second.bindings.map((binding) => binding.chat_id), next: second.next_cursor }).toEqual({
+      chats: ["c3"],
+      next: null,
+    })
     expect(code(await relay.bindings({ filter: {}, cursor: "not-a-cursor" }))).toBe("cursor_invalid")
   })
 
   test("#given the closed binding schema #when a bind omits or breaks fields #then defaults apply and every broken field is invalid_arguments", () => {
     expect(normalizeBindInput({ platform: "slack", account_id: "a", chat_id: "c", session_durable_id: "B" })).toEqual({
-      platform: "slack", account_id: "a", chat_id: "c", thread_id: WHOLE_CHAT_THREAD_ID, root_message_id: null, progress_message_id: null, session_durable_id: "B",
-      direction: { inbound: true, outbound: true }, inbound_mode: "auto", outbound_events: ["milestone", "report", "question", "completion"], policy_id: "default", ttl_seconds: BINDING_DEFAULT_TTL_SECONDS,
+      platform: "slack",
+      account_id: "a",
+      chat_id: "c",
+      thread_id: WHOLE_CHAT_THREAD_ID,
+      root_message_id: null,
+      progress_message_id: null,
+      session_durable_id: "B",
+      direction: { inbound: true, outbound: true },
+      inbound_mode: "auto",
+      outbound_events: ["milestone", "report", "question", "completion"],
+      policy_id: "default",
+      ttl_seconds: BINDING_DEFAULT_TTL_SECONDS,
     })
-    expect(normalizeBindInput({ platform: "slack", account_id: "a", chat_id: "c", session_durable_id: "B", ttl_seconds: null })).toMatchObject({ ttl_seconds: null })
+    expect(
+      normalizeBindInput({
+        platform: "slack",
+        account_id: "a",
+        chat_id: "c",
+        session_durable_id: "B",
+        ttl_seconds: null,
+      }),
+    ).toMatchObject({ ttl_seconds: null })
     const broken: readonly Partial<BindInput>[] = [
       { platform: "irc" },
       { direction: { inbound: false, outbound: false } },
@@ -272,7 +454,10 @@ describe("binding_uniqueness_revision_expiry_and_replay", () => {
       { direction: { inbound: false, outbound: true }, outbound_events: [] },
     ]
     for (const change of broken) {
-      expect(normalizeBindInput({ platform: "slack", account_id: "a", chat_id: "c", session_durable_id: "B", ...change }), JSON.stringify(change)).toMatchObject({ kind: "refused", code: "invalid_arguments" })
+      expect(
+        normalizeBindInput({ platform: "slack", account_id: "a", chat_id: "c", session_durable_id: "B", ...change }),
+        JSON.stringify(change),
+      ).toMatchObject({ kind: "refused", code: "invalid_arguments" })
     }
   })
 })

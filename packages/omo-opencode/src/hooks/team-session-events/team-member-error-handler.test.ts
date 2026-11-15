@@ -10,10 +10,7 @@ import { TeamModeConfigSchema } from "../../config/schema/team-mode"
 import type { TeamModeConfig } from "../../config/schema/team-mode"
 import { sendMessage } from "../../features/team-mode/team-mailbox/send"
 import { getInboxDir, resolveBaseDir } from "../../features/team-mode/team-registry/paths"
-import {
-  clearTeamSessionRegistry,
-  registerTeamSession,
-} from "../../features/team-mode/team-session-registry"
+import { clearTeamSessionRegistry, registerTeamSession } from "../../features/team-mode/team-session-registry"
 import type { RuntimeState } from "../../features/team-mode/types"
 import {
   loadRuntimeState,
@@ -101,26 +98,33 @@ async function seedRuntimeState(runtimeState: RuntimeState, config: TeamModeConf
 }
 
 async function seedReservedMessage(teamRunId: string, config: TeamModeConfig, messageId: string): Promise<void> {
-  await sendMessage({
-    version: 1,
-    messageId,
-    from: "lead",
-    to: "worker",
-    kind: "message",
-    body: "pending live delivery",
-    timestamp: 1,
-  }, teamRunId, config, {
-    isLead: true,
-    activeMembers: ["worker"],
-    reservedRecipients: new Set(["worker"]),
-  })
+  await sendMessage(
+    {
+      version: 1,
+      messageId,
+      from: "lead",
+      to: "worker",
+      kind: "message",
+      body: "pending live delivery",
+      timestamp: 1,
+    },
+    teamRunId,
+    config,
+    {
+      isLead: true,
+      activeMembers: ["worker"],
+      reservedRecipients: new Set(["worker"]),
+    },
+  )
 }
 
 afterEach(async () => {
   clearTeamSessionRegistry()
-  await Promise.all(temporaryDirectories.splice(0).map(async (directoryPath) => {
-    await rm(directoryPath, { recursive: true, force: true })
-  }))
+  await Promise.all(
+    temporaryDirectories.splice(0).map(async (directoryPath) => {
+      await rm(directoryPath, { recursive: true, force: true })
+    }),
+  )
 })
 
 describe("createTeamMemberErrorHandler", () => {
@@ -158,14 +162,18 @@ describe("createTeamMemberErrorHandler", () => {
     const stubClient = {
       session: {
         status: async () => {
-          await transitionRuntimeState(teamRunId, (state) => ({
-            ...state,
-            members: state.members.map((member) => (
-              member.name === "worker"
-                ? { ...member, sessionId: "replacement-session", status: "running" as const }
-                : member
-            )),
-          }), config)
+          await transitionRuntimeState(
+            teamRunId,
+            (state) => ({
+              ...state,
+              members: state.members.map((member) =>
+                member.name === "worker"
+                  ? { ...member, sessionId: "replacement-session", status: "running" as const }
+                  : member,
+              ),
+            }),
+            config,
+          )
           return {}
         },
       },
@@ -200,17 +208,20 @@ describe("createTeamMemberErrorHandler", () => {
     const baseDir = await createTemporaryBaseDir()
     const config = createConfig(baseDir)
     const teamRunId = randomUUID()
-    await seedRuntimeState({
-      ...createRuntimeState(teamRunId),
-      members: [
-        {
-          name: "worker",
-          agentType: "general-purpose",
-          status: "running",
-          pendingInjectedMessageIds: [],
-        },
-      ],
-    }, config)
+    await seedRuntimeState(
+      {
+        ...createRuntimeState(teamRunId),
+        members: [
+          {
+            name: "worker",
+            agentType: "general-purpose",
+            status: "running",
+            pendingInjectedMessageIds: [],
+          },
+        ],
+      },
+      config,
+    )
     registerTeamSession("member-session", {
       teamRunId,
       memberName: "worker",
@@ -239,18 +250,21 @@ describe("createTeamMemberErrorHandler", () => {
     const correctTeamRunId = randomUUID()
     const wrongTeamRunId = randomUUID()
     await seedRuntimeState(createRuntimeState(correctTeamRunId), config)
-    await seedRuntimeState({
-      ...createRuntimeState(wrongTeamRunId),
-      members: [
-        {
-          name: "worker",
-          sessionId: "other-session",
-          agentType: "general-purpose",
-          status: "running",
-          pendingInjectedMessageIds: [],
-        },
-      ],
-    }, config)
+    await seedRuntimeState(
+      {
+        ...createRuntimeState(wrongTeamRunId),
+        members: [
+          {
+            name: "worker",
+            sessionId: "other-session",
+            agentType: "general-purpose",
+            status: "running",
+            pendingInjectedMessageIds: [],
+          },
+        ],
+      },
+      config,
+    )
     registerTeamSession("member-session", {
       teamRunId: wrongTeamRunId,
       memberName: "worker",

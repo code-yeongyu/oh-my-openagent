@@ -20,7 +20,10 @@ async function createLocksDirectory(): Promise<string> {
   return directory
 }
 
-function countCalls(name: "readFile" | "readdir", target: string): { readonly count: () => number; readonly restore: () => void } {
+function countCalls(
+  name: "readFile" | "readdir",
+  target: string,
+): { readonly count: () => number; readonly restore: () => void } {
   const spy = spyOn(resilientFs, name)
   return {
     count: () => spy.mock.calls.filter((call) => String(call[0]) === target).length,
@@ -38,7 +41,9 @@ describe("lock wait backoff", () => {
     const extremes = [() => 0, () => 0.5, () => 0.999]
 
     // #when
-    const schedules = extremes.map((random) => Array.from({ length: 40 }, (_, attempt) => lockRetryDelayMs(attempt, 5, random)))
+    const schedules = extremes.map((random) =>
+      Array.from({ length: 40 }, (_, attempt) => lockRetryDelayMs(attempt, 5, random)),
+    )
 
     // #then
     for (const delays of schedules) {
@@ -59,7 +64,9 @@ describe("lock wait backoff", () => {
 
     // #when
     try {
-      await expect(acquireLock(lockPath, await createLockRecord("memory-write"), { waitTimeoutMs: 1_000, retryDelayMs: 5 })).rejects.toBeInstanceOf(LockContentionError)
+      await expect(
+        acquireLock(lockPath, await createLockRecord("memory-write"), { waitTimeoutMs: 1_000, retryDelayMs: 5 }),
+      ).rejects.toBeInstanceOf(LockContentionError)
 
       // #then
       expect(reads.count()).toBeLessThanOrEqual(25)
@@ -77,7 +84,9 @@ describe("lock wait backoff", () => {
 
     // #when
     try {
-      await expect(acquireRecallWakeLease(locksDirectory, { maxConcurrent: 1, waitTimeoutMs: 1_000, retryDelayMs: 5 })).rejects.toBeInstanceOf(RecallWakeBusyError)
+      await expect(
+        acquireRecallWakeLease(locksDirectory, { maxConcurrent: 1, waitTimeoutMs: 1_000, retryDelayMs: 5 }),
+      ).rejects.toBeInstanceOf(RecallWakeBusyError)
 
       // #then
       expect(polls.count()).toBeLessThanOrEqual(25)

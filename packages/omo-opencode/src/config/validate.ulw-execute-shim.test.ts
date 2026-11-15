@@ -14,7 +14,8 @@ import {
 // `start_work` emits exactly one deprecation warning naming that layer, and the
 // merged config exposes the value under `ulw_execute` unless a real
 // `ulw_execute` key is also set (then the new key wins).
-const DEPRECATION_MESSAGE = 'config key "start_work" is deprecated, rename to "ulw_execute" - will be removed next release'
+const DEPRECATION_MESSAGE =
+  'config key "start_work" is deprecated, rename to "ulw_execute" - will be removed next release'
 
 type EnvSnapshot = {
   readonly HOME: string | undefined

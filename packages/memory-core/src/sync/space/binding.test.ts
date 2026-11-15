@@ -109,10 +109,12 @@ describe("spaceIdForBinding", () => {
 
 describe("repoBinding", () => {
   test("skips invalid origin URLs and uses another usable remote", () => {
-    expect(repoBinding([
-      { name: "origin", url: "https://[bad" },
-      { name: "upstream", url: "https://github.com/a/b.git" },
-    ])).toBe("repo:github.com/a/b")
+    expect(
+      repoBinding([
+        { name: "origin", url: "https://[bad" },
+        { name: "upstream", url: "https://github.com/a/b.git" },
+      ]),
+    ).toBe("repo:github.com/a/b")
   })
 
   test("all invalid URLs mean no repo binding", () => {

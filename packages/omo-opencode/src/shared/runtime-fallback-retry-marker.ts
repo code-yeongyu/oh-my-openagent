@@ -12,7 +12,8 @@ type RuntimeFallbackRetryTextPartLike = {
   text?: string
 }
 
-const MARKER_ONLY_LINE_PATTERN = /^\s*(?:<!--\s*OMO_RUNTIME_FALLBACK_RETRY\s*-->|<!--\s*OMO_INTERNAL_INITIATOR\s*-->|<!--|-->)\s*$/
+const MARKER_ONLY_LINE_PATTERN =
+  /^\s*(?:<!--\s*OMO_RUNTIME_FALLBACK_RETRY\s*-->|<!--\s*OMO_INTERNAL_INITIATOR\s*-->|<!--|-->)\s*$/
 const INTERNAL_MARKERS_PATTERN = /<!--\s*(?:OMO_RUNTIME_FALLBACK_RETRY|OMO_INTERNAL_INITIATOR)\s*-->/g
 
 export function hasRuntimeFallbackRetryMarker(text: string): boolean {
@@ -30,16 +31,16 @@ export function createRuntimeFallbackRetryTextPart(text: string) {
 export function isRuntimeFallbackRetryTextParts(
   parts: readonly RuntimeFallbackRetryTextPartLike[] | undefined,
 ): boolean {
-  return (parts ?? []).some((part) => (
-    part.type === "text"
-    && typeof part.text === "string"
-    && hasRuntimeFallbackRetryMarker(part.text)
-  ))
+  return (parts ?? []).some(
+    (part) => part.type === "text" && typeof part.text === "string" && hasRuntimeFallbackRetryMarker(part.text),
+  )
 }
 
 function isRuntimeFallbackContinuationText(text: string): boolean {
-  return hasRuntimeFallbackRetryMarker(text)
-    && text.replace(INTERNAL_MARKERS_PATTERN, "").trim() === RUNTIME_FALLBACK_RETRY_CONTINUATION_TEXT
+  return (
+    hasRuntimeFallbackRetryMarker(text) &&
+    text.replace(INTERNAL_MARKERS_PATTERN, "").trim() === RUNTIME_FALLBACK_RETRY_CONTINUATION_TEXT
+  )
 }
 
 export function hasSubstantivePromptText(parts: unknown): boolean {

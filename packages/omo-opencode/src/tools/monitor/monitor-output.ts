@@ -1,5 +1,10 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
-import type { MonitorCounters, MonitorManager, MonitorOutputArgs, MonitorOutputResult } from "../../features/monitor/types"
+import type {
+  MonitorCounters,
+  MonitorManager,
+  MonitorOutputArgs,
+  MonitorOutputResult,
+} from "../../features/monitor/types"
 
 type MonitorOutputToolContext = {
   sessionID: string

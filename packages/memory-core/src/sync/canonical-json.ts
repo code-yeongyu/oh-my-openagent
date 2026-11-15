@@ -50,7 +50,11 @@ class Parser {
     }
     if (char === '"') return this.parseString().value
     if (char === "-" || (char >= "0" && char <= "9")) return this.parseNumber()
-    for (const [word, literal] of [["null", null], ["true", true], ["false", false]] as const) {
+    for (const [word, literal] of [
+      ["null", null],
+      ["true", true],
+      ["false", false],
+    ] as const) {
       if (this.text.startsWith(word, this.position)) {
         this.position += word.length
         return literal
@@ -80,7 +84,12 @@ class Parser {
       if (this.text[this.position] !== ":") throw this.fail("json", "expected ':' after object key")
       this.position++
       // defineProperty, not assignment: a "__proto__" key must stay an own property.
-      Object.defineProperty(object, key.value, { value: this.parseValue(), enumerable: true, writable: true, configurable: true })
+      Object.defineProperty(object, key.value, {
+        value: this.parseValue(),
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      })
       this.skipInsignificant()
       const next = this.text[this.position]
       if (next === ",") {
@@ -95,7 +104,10 @@ class Parser {
     }
     for (let i = 1; i < keys.length; i++) {
       if (compareUtf16(keys[i - 1], keys[i]) >= 0) {
-        throw this.fail("order", `object properties out of order: ${JSON.stringify(keys[i - 1])} precedes ${JSON.stringify(keys[i])}`)
+        throw this.fail(
+          "order",
+          `object properties out of order: ${JSON.stringify(keys[i - 1])} precedes ${JSON.stringify(keys[i])}`,
+        )
       }
     }
     return object
@@ -143,7 +155,16 @@ class Parser {
       }
       if (char === "\\") {
         const escape = this.text[this.position + 1]
-        const simple: Record<string, string> = { '"': '"', "\\": "\\", "/": "/", b: "\b", f: "\f", n: "\n", r: "\r", t: "\t" }
+        const simple: Record<string, string> = {
+          '"': '"',
+          "\\": "\\",
+          "/": "/",
+          b: "\b",
+          f: "\f",
+          n: "\n",
+          r: "\r",
+          t: "\t",
+        }
         if (escape in simple) {
           value += simple[escape]
           this.position += 2

@@ -15,7 +15,10 @@ export type DeclaredRung = {
  * serves it through (the same provider walk the resolver makes), or the bare model with its
  * providers when none is logged in.
  */
-export function builtinRungs(chain: readonly DelegateFallbackEntry[] | undefined, available: ReadonlySet<string>): readonly DeclaredRung[] {
+export function builtinRungs(
+  chain: readonly DelegateFallbackEntry[] | undefined,
+  available: ReadonlySet<string>,
+): readonly DeclaredRung[] {
   return (chain ?? []).map((rung): DeclaredRung => {
     const concrete = availableChainCandidates([rung], available)[0]
     return concrete === undefined

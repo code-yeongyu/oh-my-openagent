@@ -7,7 +7,10 @@ import { join } from "node:path"
 import { connectDeviceService } from "@oh-my-opencode/device-service-core"
 import type { CredentialStore, Credentials } from "@oh-my-opencode/omo-opencode/service-auth"
 
-import { startFakeOwner, type FakeOwner } from "../../../../../device-service-core/test/local-api/conformance/fake-owner.ts"
+import {
+  startFakeOwner,
+  type FakeOwner,
+} from "../../../../../device-service-core/test/local-api/conformance/fake-owner.ts"
 import { defaultWorld } from "../../../../../device-service-core/test/local-api/conformance/world.ts"
 import { createCliAccountSource } from "./account-source"
 import { engineDeviceService } from "./account-runtime"
@@ -27,8 +30,12 @@ const stored: Credentials = {
   accessTokenExpiresAt: new Date(Date.now() + 3_600_000).toISOString(),
   refreshToken: "refresh-1",
   device: { id: "dev_service_row", name: "laptop" },
-  signingPrivateKey: generateKeyPairSync("ed25519").privateKey.export({ format: "der", type: "pkcs8" }).toString("base64"),
-  sealingPrivateKey: generateKeyPairSync("x25519").privateKey.export({ format: "der", type: "pkcs8" }).toString("base64"),
+  signingPrivateKey: generateKeyPairSync("ed25519")
+    .privateKey.export({ format: "der", type: "pkcs8" })
+    .toString("base64"),
+  sealingPrivateKey: generateKeyPairSync("x25519")
+    .privateKey.export({ format: "der", type: "pkcs8" })
+    .toString("base64"),
   accountId: "acct_42",
   credentialGeneration: "gen-a",
 }
@@ -40,11 +47,15 @@ const store: CredentialStore = {
   clear: async () => undefined,
 }
 
-const service: typeof fetch = Object.assign(async (input: Parameters<typeof fetch>[0]) => {
-  if (String(input).endsWith("/v1/devices")) return Response.json({ devices: [{ id: "dev_service_row", current: true, revokedAt: null }] })
-  if (String(input).endsWith("/v1/me")) return Response.json({ user: { id: "u" }, account: { id: "acct_42" } })
-  return new Response("{}", { status: 404 })
-}, { preconnect: fetch.preconnect })
+const service: typeof fetch = Object.assign(
+  async (input: Parameters<typeof fetch>[0]) => {
+    if (String(input).endsWith("/v1/devices"))
+      return Response.json({ devices: [{ id: "dev_service_row", current: true, revokedAt: null }] })
+    if (String(input).endsWith("/v1/me")) return Response.json({ user: { id: "u" }, account: { id: "acct_42" } })
+    return new Response("{}", { status: 404 })
+  },
+  { preconnect: fetch.preconnect },
+)
 
 test("no relayd at the first resolve: the next resolve after it starts re-adopts once", async () => {
   const dir = mkdtempSync(join(tmpdir(), "omo-late-relayd-"))
@@ -52,7 +63,13 @@ test("no relayd at the first resolve: the next resolve after it starts re-adopts
   dirs.push(dir)
   const stateDir = join(dir, "ds")
   const relay = engineDeviceService(stateDir, () => connectDeviceService({ version: "5.1.60", stateDir }))
-  const source = createCliAccountSource({ api: "http://127.0.0.1:9", store, fetch: service, relay, logger: { warn: () => undefined } })
+  const source = createCliAccountSource({
+    api: "http://127.0.0.1:9",
+    store,
+    fetch: service,
+    relay,
+    logger: { warn: () => undefined },
+  })
 
   expect((await source())?.accountId).toBe("acct_42")
 
@@ -66,7 +83,7 @@ test("no relayd at the first resolve: the next resolve after it starts re-adopts
 
   await source()
   expect(owner.state.log).toEqual(["status.get", "device.adopt"])
-  expect(owner.state.adoptRequests.map(request => request["account"])).toEqual(["acct_42"])
+  expect(owner.state.adoptRequests.map((request) => request["account"])).toEqual(["acct_42"])
 
   await source()
   expect(owner.state.log).toEqual(["status.get", "device.adopt"])

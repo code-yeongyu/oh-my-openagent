@@ -1,14 +1,9 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "fs";
-import { join } from "path";
-import { tmpdir } from "os";
+import { describe, test, expect, beforeEach, afterEach } from "bun:test"
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "fs"
+import { join } from "path"
+import { tmpdir } from "os"
 
-import {
-  loadUserAgents,
-  loadProjectAgents,
-  loadOpencodeGlobalAgents,
-  loadOpencodeProjectAgents,
-} from "./loader";
+import { loadUserAgents, loadProjectAgents, loadOpencodeGlobalAgents, loadOpencodeProjectAgents } from "./loader"
 
 /**
  * Creates a temporary directory tree for testing agent loading.
@@ -17,26 +12,26 @@ import {
  */
 function createProjectWithAgents(
   agents: {
-    claudeAgents?: Array<{ filename: string; content: string }>;
-    opencodeAgents?: Array<{ filename: string; content: string }>;
+    claudeAgents?: Array<{ filename: string; content: string }>
+    opencodeAgents?: Array<{ filename: string; content: string }>
   } = {},
 ): string {
-  const root = mkdtempSync(join(tmpdir(), "agent-loader-test-"));
+  const root = mkdtempSync(join(tmpdir(), "agent-loader-test-"))
   if (agents.claudeAgents) {
-    const dir = join(root, ".claude", "agents");
-    mkdirSync(dir, { recursive: true });
+    const dir = join(root, ".claude", "agents")
+    mkdirSync(dir, { recursive: true })
     for (const { filename, content } of agents.claudeAgents) {
-      writeFileSync(join(dir, filename), content, "utf-8");
+      writeFileSync(join(dir, filename), content, "utf-8")
     }
   }
   if (agents.opencodeAgents) {
-    const dir = join(root, ".opencode", "agents");
-    mkdirSync(dir, { recursive: true });
+    const dir = join(root, ".opencode", "agents")
+    mkdirSync(dir, { recursive: true })
     for (const { filename, content } of agents.opencodeAgents) {
-      writeFileSync(join(dir, filename), content, "utf-8");
+      writeFileSync(join(dir, filename), content, "utf-8")
     }
   }
-  return root;
+  return root
 }
 
 const BASIC_AGENT = `---
@@ -44,17 +39,17 @@ name: test-agent
 description: A test agent
 tools: Bash,Read
 ---
-You are a test agent.`;
+You are a test agent.`
 
 const MINIMAL_AGENT = `---
 description: Minimal agent
 ---
-Do minimal things.`;
+Do minimal things.`
 
-const NO_FRONTMATTER_AGENT = `Just a prompt with no frontmatter.`;
+const NO_FRONTMATTER_AGENT = `Just a prompt with no frontmatter.`
 
 describe("claude-code-agent-loader", () => {
-  const dirs: string[] = [];
+  const dirs: string[] = []
   const originalEnv = {
     CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
     OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
@@ -63,9 +58,9 @@ describe("claude-code-agent-loader", () => {
 
   afterEach(() => {
     for (const dir of dirs) {
-      rmSync(dir, { recursive: true, force: true });
+      rmSync(dir, { recursive: true, force: true })
     }
-    dirs.length = 0;
+    dirs.length = 0
     if (originalEnv.CLAUDE_CONFIG_DIR === undefined) {
       delete process.env.CLAUDE_CONFIG_DIR
     } else {
@@ -81,11 +76,11 @@ describe("claude-code-agent-loader", () => {
     } else {
       process.env.XDG_CONFIG_HOME = originalEnv.XDG_CONFIG_HOME
     }
-  });
+  })
 
   function trackDir(dir: string): string {
-    dirs.push(dir);
-    return dir;
+    dirs.push(dir)
+    return dir
   }
 
   describe("loadProjectAgents", () => {
@@ -94,54 +89,50 @@ describe("claude-code-agent-loader", () => {
         createProjectWithAgents({
           claudeAgents: [{ filename: "my-agent.md", content: BASIC_AGENT }],
         }),
-      );
+      )
 
-      const result = loadProjectAgents(root);
+      const result = loadProjectAgents(root)
 
-      expect(Object.keys(result)).toEqual(["test-agent"]);
-      expect(result["test-agent"].description).toBe("(project) A test agent");
-      expect(result["test-agent"].mode).toBe("subagent");
-      expect(result["test-agent"].prompt).toBe("You are a test agent.");
-      expect(result["test-agent"].tools).toEqual({ bash: true, read: true });
-    });
+      expect(Object.keys(result)).toEqual(["test-agent"])
+      expect(result["test-agent"].description).toBe("(project) A test agent")
+      expect(result["test-agent"].mode).toBe("subagent")
+      expect(result["test-agent"].prompt).toBe("You are a test agent.")
+      expect(result["test-agent"].tools).toEqual({ bash: true, read: true })
+    })
 
     test("uses filename as agent name when frontmatter name is absent", () => {
       const root = trackDir(
         createProjectWithAgents({
-          claudeAgents: [
-            { filename: "fallback-name.md", content: MINIMAL_AGENT },
-          ],
+          claudeAgents: [{ filename: "fallback-name.md", content: MINIMAL_AGENT }],
         }),
-      );
+      )
 
-      const result = loadProjectAgents(root);
+      const result = loadProjectAgents(root)
 
-      expect(Object.keys(result)).toEqual(["fallback-name"]);
-      expect(result["fallback-name"].description).toBe(
-        "(project) Minimal agent",
-      );
-    });
+      expect(Object.keys(result)).toEqual(["fallback-name"])
+      expect(result["fallback-name"].description).toBe("(project) Minimal agent")
+    })
 
     test("handles agent with no frontmatter", () => {
       const root = trackDir(
         createProjectWithAgents({
           claudeAgents: [{ filename: "raw.md", content: NO_FRONTMATTER_AGENT }],
         }),
-      );
+      )
 
-      const result = loadProjectAgents(root);
+      const result = loadProjectAgents(root)
 
-      expect(Object.keys(result)).toEqual(["raw"]);
-      expect(result["raw"].prompt).toBe("Just a prompt with no frontmatter.");
-    });
+      expect(Object.keys(result)).toEqual(["raw"])
+      expect(result["raw"].prompt).toBe("Just a prompt with no frontmatter.")
+    })
 
     test("returns empty object when project has no .claude/agents directory", () => {
-      const root = trackDir(mkdtempSync(join(tmpdir(), "agent-loader-test-")));
+      const root = trackDir(mkdtempSync(join(tmpdir(), "agent-loader-test-")))
 
-      const result = loadProjectAgents(root);
+      const result = loadProjectAgents(root)
 
-      expect(result).toEqual({});
-    });
+      expect(result).toEqual({})
+    })
 
     test("ignores non-markdown files", () => {
       const root = trackDir(
@@ -152,12 +143,12 @@ describe("claude-code-agent-loader", () => {
             { filename: "also-bad.json", content: "{}" },
           ],
         }),
-      );
+      )
 
-      const result = loadProjectAgents(root);
+      const result = loadProjectAgents(root)
 
-      expect(Object.keys(result)).toEqual(["test-agent"]);
-    });
+      expect(Object.keys(result)).toEqual(["test-agent"])
+    })
 
     test("loads multiple agents", () => {
       const root = trackDir(
@@ -170,16 +161,13 @@ describe("claude-code-agent-loader", () => {
             },
           ],
         }),
-      );
+      )
 
-      const result = loadProjectAgents(root);
+      const result = loadProjectAgents(root)
 
-      expect(Object.keys(result).sort()).toEqual([
-        "second-agent",
-        "test-agent",
-      ]);
-    });
-  });
+      expect(Object.keys(result).sort()).toEqual(["second-agent", "test-agent"])
+    })
+  })
 
   describe("loadOpencodeProjectAgents", () => {
     test("loads agents from <directory>/.opencode/agents", () => {
@@ -187,26 +175,24 @@ describe("claude-code-agent-loader", () => {
         createProjectWithAgents({
           opencodeAgents: [{ filename: "oc-agent.md", content: BASIC_AGENT }],
         }),
-      );
+      )
 
-      const result = loadOpencodeProjectAgents(root);
+      const result = loadOpencodeProjectAgents(root)
 
-      expect(Object.keys(result)).toEqual(["test-agent"]);
-      expect(result["test-agent"].description).toBe(
-        "(opencode-project) A test agent",
-      );
-      expect(result["test-agent"].mode).toBe("subagent");
-      expect(result["test-agent"].prompt).toBe("You are a test agent.");
-    });
+      expect(Object.keys(result)).toEqual(["test-agent"])
+      expect(result["test-agent"].description).toBe("(opencode-project) A test agent")
+      expect(result["test-agent"].mode).toBe("subagent")
+      expect(result["test-agent"].prompt).toBe("You are a test agent.")
+    })
 
     test("returns empty object when project has no .opencode/agents directory", () => {
-      const root = trackDir(mkdtempSync(join(tmpdir(), "agent-loader-test-")));
+      const root = trackDir(mkdtempSync(join(tmpdir(), "agent-loader-test-")))
 
-      const result = loadOpencodeProjectAgents(root);
+      const result = loadOpencodeProjectAgents(root)
 
-      expect(result).toEqual({});
-    });
-  });
+      expect(result).toEqual({})
+    })
+  })
 
   describe("loadUserAgents", () => {
     test("returns empty object when pointed at dir without agents/", () => {
@@ -251,35 +237,35 @@ describe("claude-code-agent-loader", () => {
 
   describe("tools parsing", () => {
     test("parses comma-separated tools into boolean record", () => {
-      const agentWithTools = `---\nname: tooled\ndescription: Has tools\ntools: Bash,Read,Edit\n---\nDo things.`;
+      const agentWithTools = `---\nname: tooled\ndescription: Has tools\ntools: Bash,Read,Edit\n---\nDo things.`
       const root = trackDir(
         createProjectWithAgents({
           claudeAgents: [{ filename: "tooled.md", content: agentWithTools }],
         }),
-      );
+      )
 
-      const result = loadProjectAgents(root);
+      const result = loadProjectAgents(root)
 
       expect(result["tooled"].tools).toEqual({
         bash: true,
         read: true,
         edit: true,
-      });
-    });
+      })
+    })
 
     test("omits tools when frontmatter tools field is absent", () => {
-      const agentNoTools = `---\nname: no-tools\ndescription: No tools\n---\nDo things.`;
+      const agentNoTools = `---\nname: no-tools\ndescription: No tools\n---\nDo things.`
       const root = trackDir(
         createProjectWithAgents({
           claudeAgents: [{ filename: "no-tools.md", content: agentNoTools }],
         }),
-      );
+      )
 
-      const result = loadProjectAgents(root);
+      const result = loadProjectAgents(root)
 
-      expect(result["no-tools"].tools).toBeUndefined();
-    });
-  });
+      expect(result["no-tools"].tools).toBeUndefined()
+    })
+  })
 
   describe("scope labeling", () => {
     test("project and opencode-project loaders apply correct scope prefixes", () => {
@@ -302,4 +288,4 @@ describe("claude-code-agent-loader", () => {
       expect(ocProject["scoped"].description).toBe("(opencode-project) Scoped agent")
     })
   })
-});
+})

@@ -18,11 +18,17 @@ async function spaceWith(text: string) {
   const doc = await newDoc("1")
   captureInto(doc, "", [], text)
   const base = renderDocContent(doc)
-  return { doc, base, state: { currentText: base, lastMaterialised: null, tombstoned: false, registers: activeRegisters(doc) } }
+  return {
+    doc,
+    base,
+    state: { currentText: base, lastMaterialised: null, tombstoned: false, registers: activeRegisters(doc) },
+  }
 }
 
 const activeValues = (doc: Parameters<typeof readKeyState>[0], key: string): string[] =>
-  activeReg(readKeyState(doc, key).reg).map((entry) => entry.value).sort()
+  activeReg(readKeyState(doc, key).reg)
+    .map((entry) => entry.value)
+    .sort()
 
 const hasMarker = (text: string): boolean => text.split("\n").some((line) => line.startsWith("<!-- memory-sync"))
 
@@ -61,12 +67,18 @@ describe("(a) a differing register value is one more entry superseding nothing",
     const doc = await newDoc("1")
     try {
       const main = `---\ntitle: Main\n---\nmain\n${t2Block("2026-10-15", "n.md", "---\ntitle: Other\n---\n")}`
-      const plan = planAdoption([{ path: "n.md", text: main }, { path: SIDE, text: "---\ntitle: Side\n---\nmain\n" }], {
-        currentText: null,
-        lastMaterialised: null,
-        tombstoned: false,
-        registers: soleRegisters(null)
-      })
+      const plan = planAdoption(
+        [
+          { path: "n.md", text: main },
+          { path: SIDE, text: "---\ntitle: Side\n---\nmain\n" },
+        ],
+        {
+          currentText: null,
+          lastMaterialised: null,
+          tombstoned: false,
+          registers: soleRegisters(null),
+        },
+      )
       applyPlan(doc, "", plan)
       expect(activeValues(doc, "title")).toEqual(["Main", "Other", "Side"])
       expect(renderDocContent(doc)).toBe('---\ntitle: "Main / Other / Side"\n---\nmain\n')
@@ -81,7 +93,12 @@ describe("(a) a differing register value is one more entry superseding nothing",
       const files = [{ path: SIDE, text: "---\ndescription: laptop view\n---\nbody\n" }]
       applyPlan(doc, base, planAdoption(files, state))
       const again = renderDocContent(doc)
-      const repeated = planAdoption(files, { currentText: again, lastMaterialised: null, tombstoned: false, registers: activeRegisters(doc) })
+      const repeated = planAdoption(files, {
+        currentText: again,
+        lastMaterialised: null,
+        tombstoned: false,
+        registers: activeRegisters(doc),
+      })
       expect(repeated.action).toBe("none")
     } finally {
       doc.free()
@@ -107,7 +124,12 @@ test("(c) the body keeps insert-only line adoption: nothing the space holds is d
   try {
     const plan = planAdoption([{ path: SIDE, text: "x\nz\n" }], state)
     applyPlan(doc, base, plan)
-    expect(splitItem(renderDocContent(doc)).body.split("\n").filter((line) => line !== "").sort()).toEqual(["x", "y", "z"])
+    expect(
+      splitItem(renderDocContent(doc))
+        .body.split("\n")
+        .filter((line) => line !== "")
+        .sort(),
+    ).toEqual(["x", "y", "z"])
   } finally {
     doc.free()
   }
@@ -125,6 +147,8 @@ describe("(d) the structure-free read-back accounts a register line only by an a
   })
 
   test("a value that is not an active entry keeps the source with the reason", () => {
-    expect(firstMissingFact("---\nk: v\n---\nx\n", "---\nk: w\n---\nx\n", new Map([["k", ["v"]]]))).toBe('missing line "k: w"')
+    expect(firstMissingFact("---\nk: v\n---\nx\n", "---\nk: w\n---\nx\n", new Map([["k", ["v"]]]))).toBe(
+      'missing line "k: w"',
+    )
   })
 })

@@ -60,7 +60,9 @@ function createManager(): {
         },
       ],
       status: async () => ({ data: { "main-session": { type: "idle" }, "subagent-session": { type: "idle" } } }),
-      get: async (input: { path: { id: string } }) => ({ data: input.path.id === "subagent-session" ? null : { id: input.path.id } }),
+      get: async (input: { path: { id: string } }) => ({
+        data: input.path.id === "subagent-session" ? null : { id: input.path.id },
+      }),
       prompt: async () => ({}),
       promptAsync: async (call: PromptAsyncCall) => {
         promptAsyncCalls.push(call)

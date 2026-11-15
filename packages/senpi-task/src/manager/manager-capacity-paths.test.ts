@@ -76,7 +76,10 @@ describe("TaskManager capacity paths", () => {
     const other = await manager.start(baseSpec({ name: "other", model: primary }))
     expect(other).toMatchObject({ kind: "started", status: "running" })
     await manager.cancelTask(holder.task_id)
-    expect(runner.startedSpecs.filter((spec) => spec.taskId === task.task_id).map((spec) => spec.model)).toEqual([primary, next])
+    expect(runner.startedSpecs.filter((spec) => spec.taskId === task.task_id).map((spec) => spec.model)).toEqual([
+      primary,
+      next,
+    ])
   })
 
   test("#given a runtime fallback waiter #when it is cancelled before capacity frees #then it never launches later", async () => {
@@ -117,7 +120,8 @@ describe("TaskManager capacity paths", () => {
     const primaryHolder = await manager.start(baseSpec({ name: "primary-holder", model: primary }))
     const fallbackHolder = await manager.start(baseSpec({ name: "fallback-holder", model: next }))
     const oldWaiter = await manager.start(baseSpec({ name: "old-waiter" }))
-    if (primaryHolder.kind !== "started" || fallbackHolder.kind !== "started" || oldWaiter.kind !== "started") throw new Error("expected tasks")
+    if (primaryHolder.kind !== "started" || fallbackHolder.kind !== "started" || oldWaiter.kind !== "started")
+      throw new Error("expected tasks")
     expect(oldWaiter.status).toBe("pending")
 
     await manager.cancelTask(fallbackHolder.task_id)

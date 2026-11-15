@@ -63,7 +63,12 @@ describe("teamModeSkill gating", () => {
     const globalQueryTools = ["team_list"]
 
     // then
-    for (const toolName of [...leadOnlyTools, ...leadOrTargetMemberShutdownTools, ...universalTools, ...globalQueryTools]) {
+    for (const toolName of [
+      ...leadOnlyTools,
+      ...leadOrTargetMemberShutdownTools,
+      ...universalTools,
+      ...globalQueryTools,
+    ]) {
       expect(body).toContain(toolName)
     }
   })

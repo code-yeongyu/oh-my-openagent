@@ -31,8 +31,7 @@ function expectedModels(env = process.env) {
     "both-lanes": env.OMO_OPENAI_LANE_EXPECT_BOTH?.trim() || `chatgpt-subscription/${laneModelId}`,
     "api-key-only": `openai/${laneModelId}`,
     "subscription-only": `chatgpt-subscription/${laneModelId}`,
-    "explore-kimi-fails-api-key-only":
-      env.OMO_OPENAI_LANE_EXPECT_EXPLORE_FALLBACK?.trim() || "openai/gpt-6-luna-fast",
+    "explore-kimi-fails-api-key-only": env.OMO_OPENAI_LANE_EXPECT_EXPLORE_FALLBACK?.trim() || "openai/gpt-6-luna-fast",
   }
 }
 
@@ -69,9 +68,7 @@ function spawnEnv(sandbox, sessionDir, homeDir, scenario) {
 
 function readTaskArtifacts(stateDir) {
   const tasksDir = join(stateDir, "tasks")
-  const names = existsSync(tasksDir)
-    ? readdirSync(tasksDir).filter((name) => name.endsWith(".json"))
-    : []
+  const names = existsSync(tasksDir) ? readdirSync(tasksDir).filter((name) => name.endsWith(".json")) : []
   const taskFile = names[0] === undefined ? undefined : join(tasksDir, names[0])
   const task = taskFile === undefined ? undefined : JSON.parse(readFileSync(taskFile, "utf8"))
   const logFile = task === undefined ? undefined : join(stateDir, "logs", `${task.task_id}.jsonl`)
@@ -95,7 +92,10 @@ function runScenario(scenario, outDir) {
     // No category overrides: the builtin chain and the resolver alone must pick the lane. Children run
     // in-process: a process-mode child never loads the `-e` mock provider, so it would fail to start
     // or be served by whatever real provider the child process can reach.
-    writeFileSync(join(omoDir, "omo.json"), `${JSON.stringify({ task: { default_execution_mode: "in-process" } }, null, 2)}\n`)
+    writeFileSync(
+      join(omoDir, "omo.json"),
+      `${JSON.stringify({ task: { default_execution_mode: "in-process" } }, null, 2)}\n`,
+    )
     const sessionDir = join(sandbox.root, "sessions")
     mkdirSync(sessionDir, { recursive: true })
     // HOME-based user config (~/.omo/config.jsonc) would otherwise leak the developer's real
@@ -165,7 +165,9 @@ function runScenario(scenario, outDir) {
 }
 
 function run() {
-  const outDir = resolve(process.env.TASK_OPENAI_LANE_OUT_DIR ?? join(process.cwd(), ".omo", "evidence", "task-openai-lane"))
+  const outDir = resolve(
+    process.env.TASK_OPENAI_LANE_OUT_DIR ?? join(process.cwd(), ".omo", "evidence", "task-openai-lane"),
+  )
   mkdirSync(outDir, { recursive: true })
   const verdicts = selectedScenarios().map((scenario) => runScenario(scenario, outDir))
   const result = verdicts.length > 0 && verdicts.every((verdict) => verdict.result === "PASS") ? "PASS" : "FAIL"
@@ -179,22 +181,31 @@ function selfTest() {
   const parsed = parseJsonEvents(`${JSON.stringify({ type: "text", text: finalText })}\n`)
   if (!JSON.stringify(parsed).includes(finalText)) throw new Error("event parser did not preserve final text")
   const expected = expectedModels({})
-  if (expected["both-lanes"] !== `chatgpt-subscription/${laneModelId}`) throw new Error("both-lanes must expect the subscription lane")
+  if (expected["both-lanes"] !== `chatgpt-subscription/${laneModelId}`)
+    throw new Error("both-lanes must expect the subscription lane")
   if (expected["api-key-only"] !== `openai/${laneModelId}`) throw new Error("api-key-only must expect the API lane")
-  if (expected["subscription-only"] !== `chatgpt-subscription/${laneModelId}`) throw new Error("subscription-only must expect the subscription lane")
-  if (expected["explore-kimi-fails-api-key-only"] !== "openai/gpt-6-luna-fast") throw new Error("explore fallback must expect the openai Luna rung")
+  if (expected["subscription-only"] !== `chatgpt-subscription/${laneModelId}`)
+    throw new Error("subscription-only must expect the subscription lane")
+  if (expected["explore-kimi-fails-api-key-only"] !== "openai/gpt-6-luna-fast")
+    throw new Error("explore fallback must expect the openai Luna rung")
   const overridden = expectedModels({ OMO_OPENAI_LANE_EXPECT_BOTH: `openai/${laneModelId}` })
   if (overridden["both-lanes"] !== `openai/${laneModelId}`) throw new Error("pre-fix RED expectation override ignored")
   const scenarios = selectedScenarios({})
   if (scenarios.length !== 4) throw new Error("default run must cover all four lane scenarios")
-  if (scenarios.some((scenario) => typeof scenario.expectedModel !== "string")) throw new Error("every scenario needs an expected model")
+  if (scenarios.some((scenario) => typeof scenario.expectedModel !== "string"))
+    throw new Error("every scenario needs an expected model")
   const narrowed = selectedScenarios({ OMO_OPENAI_LANE_SCENARIOS: "subscription-only, nope" })
   if (JSON.stringify(narrowed.map((scenario) => scenario.name)) !== JSON.stringify(["subscription-only"])) {
     throw new Error("scenario narrowing must keep known names only")
   }
   const env = spawnEnv({ agentDir: "/tmp/a", xdgConfigHome: "/tmp/x" }, "/tmp/s", "/tmp/h", { name: "both-lanes" })
-  if (INHERITED_RUNTIME_KEYS.some((key) => key in env)) throw new Error("inherited runtime locators must be scrubbed from the spawn env")
-  if (env.HOME !== "/tmp/h" || env.SENPI_CODING_AGENT_DIR !== "/tmp/a" || env.OMO_OPENAI_LANE_SCENARIO !== "both-lanes") {
+  if (INHERITED_RUNTIME_KEYS.some((key) => key in env))
+    throw new Error("inherited runtime locators must be scrubbed from the spawn env")
+  if (
+    env.HOME !== "/tmp/h" ||
+    env.SENPI_CODING_AGENT_DIR !== "/tmp/a" ||
+    env.OMO_OPENAI_LANE_SCENARIO !== "both-lanes"
+  ) {
     throw new Error("spawn env lost its sandbox isolation")
   }
   console.log("SELF-TEST OK")

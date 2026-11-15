@@ -14,14 +14,13 @@ import type { ChildFactory } from "@oh-my-opencode/senpi-desktop-service"
 import type { ComponentContext, ComponentLogger } from "../../extension/types"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { COMPUTER_UNAVAILABLE_MESSAGE, createComputerUseComponent } from "./index"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const FAKE_ENGINE = join(
   dirname(fileURLToPath(import.meta.url)),
   "../../../../senpi-desktop-service/test/fake-engine.mjs",
 )
 const RECEIVED = "recv "
-const HANG_GUARD_MS = 10_000
-
 class HostApi extends FakeExtensionAPI {
   active: string[] = ["read", "bash"]
   readonly executed: string[] = []
@@ -104,7 +103,10 @@ function fakeEngine(): EngineLog {
     nth: (method, n) =>
       new Promise((resolve, reject) => {
         if (methods.filter((seen) => seen === method).length >= n) return resolve()
-        const timer = setTimeout(() => reject(new Error(`waited ${HANG_GUARD_MS}ms for ${method} #${n}`)), HANG_GUARD_MS)
+        const timer = setTimeout(
+          () => reject(new Error(`waited out the test budget for ${method} #${n}`)),
+          remainingTestTime(),
+        )
         waiters.push({ method, n, resolve: () => (clearTimeout(timer), resolve()) })
       }),
   }
@@ -176,7 +178,9 @@ describe("computer-use component", () => {
     expect(computer?.exposure).toBe("search")
     expect(computer?.kernelPrelude).toBeDefined()
     const parse = computer?.permissionParser as Parser
-    expect(parse({ action: "call", chain: [{ method: "click", args: [1, 2] }] }, "/work")[0]?.patterns).toEqual(["exec"])
+    expect(parse({ action: "call", chain: [{ method: "click", args: [1, 2] }] }, "/work")[0]?.patterns).toEqual([
+      "exec",
+    ])
     expect(parse({ action: "call", chain: [{ method: "screenshot" }] }, "/work")[0]?.patterns).toEqual(["read"])
     expect(engine.methods).toEqual([])
   })
@@ -208,7 +212,10 @@ describe("computer-use component", () => {
     // then
     const parse = tool(withAdapter, "computer_actions")?.permissionParser as Parser | undefined
     expect(parse?.({ action: "screenshot" }, "/work")[0]?.patterns).toEqual(["read"])
-    expect(parse?.({ action: "batch", actions: [{ action: "screenshot" }, { action: "click", x: 1, y: 2 }] }, "/work")[0]?.patterns).toEqual(["exec"])
+    expect(
+      parse?.({ action: "batch", actions: [{ action: "screenshot" }, { action: "click", x: 1, y: 2 }] }, "/work")[0]
+        ?.patterns,
+    ).toEqual(["exec"])
     expect(tool(without, "computer_actions")).toBeUndefined()
   })
 
@@ -258,7 +265,9 @@ describe("computer-use component", () => {
 
     // then
     expect(engine.methods).toEqual([])
-    expect(await runCommand(pi, "status")).toEqual([expect.stringMatching(/engine: not started \([^\n]+\)\nprelude: inactive/)])
+    expect(await runCommand(pi, "status")).toEqual([
+      expect.stringMatching(/engine: not started \([^\n]+\)\nprelude: inactive/),
+    ])
   })
 
   test("#given an active session #when /computer off runs #then the engine session closes and the tool leaves the active set", async () => {
@@ -342,11 +351,24 @@ describe("computer-use component", () => {
     await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, hostContext())
     await pi.dispatch("resources_discover", {})
     await pi.dispatch("tool_activated", { type: "tool_activated", toolNames: ["x_search"] }, hostContext())
-    await pi.dispatch("tool_execution_start", { type: "tool_execution_start", toolCallId: "c1", toolName: "read", args: {} })
-    await pi.dispatch("tool_execution_end", { type: "tool_execution_end", toolCallId: "c1", toolName: "read", isError: false, result: {} })
+    await pi.dispatch("tool_execution_start", {
+      type: "tool_execution_start",
+      toolCallId: "c1",
+      toolName: "read",
+      args: {},
+    })
+    await pi.dispatch("tool_execution_end", {
+      type: "tool_execution_end",
+      toolCallId: "c1",
+      toolName: "read",
+      isError: false,
+      result: {},
+    })
     const beforeUse = loads
     const status = await runCommand(pi, "status")
-    const execute = tool(pi, "computer")?.execute as (...args: unknown[]) => Promise<{ content: Array<{ text?: string }> }>
+    const execute = tool(pi, "computer")?.execute as (
+      ...args: unknown[]
+    ) => Promise<{ content: Array<{ text?: string }> }>
     const closed = await execute("call-1", { action: "close" }, undefined, undefined, hostContext())
 
     // then
@@ -395,7 +417,11 @@ describe("computer-use component", () => {
     const { pi } = register({ pi: new UserSkillHost("/home/me/.omo/agent/skills/computer-use/SKILL.md") })
 
     // when
-    const results = await pi.dispatch("resources_discover", { type: "resources_discover", cwd: "/work", reason: "startup" })
+    const results = await pi.dispatch("resources_discover", {
+      type: "resources_discover",
+      cwd: "/work",
+      reason: "startup",
+    })
 
     // then
     expect(contributedSkillPaths(results)).toEqual([])
@@ -420,7 +446,11 @@ describe("computer-use component", () => {
     const { pi } = register({ omoConfig: { disabled_skills: ["computer-use"] } })
 
     // when
-    const results = await pi.dispatch("resources_discover", { type: "resources_discover", cwd: "/work", reason: "startup" })
+    const results = await pi.dispatch("resources_discover", {
+      type: "resources_discover",
+      cwd: "/work",
+      reason: "startup",
+    })
 
     // then
     expect(contributedSkillPaths(results)).toEqual([])

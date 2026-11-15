@@ -19,7 +19,13 @@ const pool = (slots: Record<string, unknown>): Record<string, unknown> => ({
 describe("resolveUsageCredential", () => {
   test("#given a healthy pinned account #when resolved #then its own token and name come back", () => {
     // given
-    const file = auth([{ name: "work", access: token("work") }, { name: "personal", access: token("personal") }], "work")
+    const file = auth(
+      [
+        { name: "work", access: token("work") },
+        { name: "personal", access: token("personal") },
+      ],
+      "work",
+    )
 
     // when
     const credential = resolveUsageCredential(file, undefined, PROVIDER, NOW)
@@ -30,7 +36,13 @@ describe("resolveUsageCredential", () => {
 
   test("#given the pinned account is on cooldown #when resolved #then the healthy one serves and is marked", () => {
     // given the pool put the pinned slot on cooldown, so it is not the slot doing the work
-    const file = auth([{ name: "work", access: token("work") }, { name: "personal", access: token("personal") }], "work")
+    const file = auth(
+      [
+        { name: "work", access: token("work") },
+        { name: "personal", access: token("personal") },
+      ],
+      "work",
+    )
     const slots = pool({ work: { blockedUntil: NOW + 60_000 } })
 
     // when

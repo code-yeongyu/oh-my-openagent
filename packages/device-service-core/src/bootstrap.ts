@@ -19,7 +19,12 @@ export type BootstrapStopState =
 
 export type BootstrapOutcome =
   | { readonly kind: "connected"; readonly status: Status; readonly service: DeviceService }
-  | { readonly kind: "stopped"; readonly state: BootstrapStopState; readonly notice: string; readonly exitCode: typeof BOOTSTRAP_STOPPED_EXIT }
+  | {
+      readonly kind: "stopped"
+      readonly state: BootstrapStopState
+      readonly notice: string
+      readonly exitCode: typeof BOOTSTRAP_STOPPED_EXIT
+    }
 
 export type BootstrapDependencies = {
   /** `omo account show`; nothing else runs unless it reports signed in. */
@@ -41,9 +46,15 @@ const ACCOUNT_STOP: Readonly<Record<Exclude<AccountState["kind"], "signed_in">, 
   account_unavailable: "account_unavailable",
 }
 
-const stopped = (state: BootstrapStopState, notice: string): BootstrapOutcome => ({ kind: "stopped", state, notice, exitCode: BOOTSTRAP_STOPPED_EXIT })
+const stopped = (state: BootstrapStopState, notice: string): BootstrapOutcome => ({
+  kind: "stopped",
+  state,
+  notice,
+  exitCode: BOOTSTRAP_STOPPED_EXIT,
+})
 
-const isHandshakeTimeout = (error: unknown): boolean => error instanceof LocalApiError && error.code === "handshake_timeout"
+const isHandshakeTimeout = (error: unknown): boolean =>
+  error instanceof LocalApiError && error.code === "handshake_timeout"
 
 /**
  * A service that is not running: its socket is gone (POSIX) or its loopback port refuses or never answers (Windows).
@@ -51,12 +62,15 @@ const isHandshakeTimeout = (error: unknown): boolean => error instanceof LocalAp
  * slow (for example busy right after a restart), and reinstalling it would restart a working service.
  */
 const isServiceStopped = (error: unknown, platform: NodeJS.Platform = process.platform): boolean =>
-  (error instanceof Error && "code" in error && ["ENOENT", "ECONNREFUSED", "ECONNRESET"].includes(String(error.code))) ||
+  (error instanceof Error &&
+    "code" in error &&
+    ["ENOENT", "ECONNREFUSED", "ECONNRESET"].includes(String(error.code))) ||
   (platform === "win32" && isHandshakeTimeout(error))
 
 const failureNotice = (error: unknown): string =>
   error instanceof LocalApiError
-    ? (error.action ?? `The OmO device service did not answer as expected (${error.reason}). Try again; if it keeps failing, report it with /bug.`)
+    ? (error.action ??
+      `The OmO device service did not answer as expected (${error.reason}). Try again; if it keeps failing, report it with /bug.`)
     : "The OmO device service could not be reached. Try again; if it keeps failing, report it with /bug."
 
 // A running service at the pin or newer, "absent" when none runs (or an older one does, which install replaces), or the

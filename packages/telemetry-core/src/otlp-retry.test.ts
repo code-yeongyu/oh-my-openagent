@@ -107,8 +107,9 @@ describe("OTLP retry policy", () => {
     // given
     const dir = root()
     let tracesUp = false
-    const { calls, fetch } = recordingFetch((url) =>
-      new Response(null, { status: url.endsWith("/v1/traces") && !tracesUp ? 503 : 200 }))
+    const { calls, fetch } = recordingFetch(
+      (url) => new Response(null, { status: url.endsWith("/v1/traces") && !tracesUp ? 503 : 200 }),
+    )
     const transport = makeTransport(dir, { fetch })
     capture(transport, "feature_used", { feature: "a" })
     transport.tracer.startSpan("omo.turn").end()

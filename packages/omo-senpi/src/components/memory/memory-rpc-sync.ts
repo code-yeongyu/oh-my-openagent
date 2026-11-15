@@ -27,7 +27,10 @@ export interface MemoryRpcSync {
   }
 }
 
-export async function readMemoryRpcSync(read: SyncStatusReader | undefined, repo: string): Promise<MemoryRpcSync | undefined> {
+export async function readMemoryRpcSync(
+  read: SyncStatusReader | undefined,
+  repo: string,
+): Promise<MemoryRpcSync | undefined> {
   if (read === undefined) return undefined
   const status = await read(repo).catch(() => null)
   if (status === null) return undefined
@@ -36,7 +39,9 @@ export async function readMemoryRpcSync(read: SyncStatusReader | undefined, repo
       return { state: status.kind }
     case "paused":
       // A pause that carries held files (#12284) exists only while the engine runs too, so its mapping ships with it.
-      return status.held === undefined ? { state: "paused" } : (await import("#omo-memory-sync-runtime")).failureRpcSync(status)
+      return status.held === undefined
+        ? { state: "paused" }
+        : (await import("#omo-memory-sync-runtime")).failureRpcSync(status)
     case "synced":
       return { state: "synced", lastSyncedAtISO: new Date(status.at).toISOString() }
     // Both exist only while the engine runs, so their mapping ships with it (sync-status-copy.ts).

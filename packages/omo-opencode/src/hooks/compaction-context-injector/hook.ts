@@ -7,7 +7,12 @@ import { resolveMessageEventSessionID } from "../../shared/event-session-id"
 import { log } from "../../shared/logger"
 import { COMPACTION_CONTEXT_PROMPT } from "./compaction-context-prompt"
 import { resolveSessionPromptConfig } from "./session-prompt-config-resolver"
-import { finalizeTrackedAssistantMessage, shouldTreatAssistantPartAsOutput, trackAssistantOutput, type TailMonitorState } from "./tail-monitor"
+import {
+  finalizeTrackedAssistantMessage,
+  shouldTreatAssistantPartAsOutput,
+  trackAssistantOutput,
+  type TailMonitorState,
+} from "./tail-monitor"
 import { resolveSessionID } from "./session-id"
 import type { CompactionContextClient, CompactionContextInjector } from "./types"
 import { createRecoveryLogic } from "./recovery"
@@ -116,11 +121,13 @@ export function createCompactionContextInjector(options?: {
     }
 
     if (event.type === "message.updated") {
-      const info = props?.info as {
-        id?: string
-        role?: string
-        sessionID?: string
-      } | undefined
+      const info = props?.info as
+        | {
+            id?: string
+            role?: string
+            sessionID?: string
+          }
+        | undefined
 
       const sessionID = resolveMessageEventSessionID(props)
       if (!sessionID || info?.role !== "assistant" || !info.id) {
@@ -155,12 +162,14 @@ export function createCompactionContextInjector(options?: {
     }
 
     if (event.type === "message.part.updated") {
-      const part = props?.part as {
-        messageID?: string
-        sessionID?: string
-        type?: string
-        text?: string
-      } | undefined
+      const part = props?.part as
+        | {
+            messageID?: string
+            sessionID?: string
+            type?: string
+            text?: string
+          }
+        | undefined
 
       if (!part?.sessionID || !shouldTreatAssistantPartAsOutput(part)) {
         return

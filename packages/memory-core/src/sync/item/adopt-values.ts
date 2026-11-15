@@ -25,7 +25,12 @@ export interface RegisterValue {
  *
  * @internal
  */
-export function withRegisterValues(doc: LoroDoc, captured: Uint8Array | null, values: readonly RegisterValue[], commitMessage?: string): Uint8Array | null {
+export function withRegisterValues(
+  doc: LoroDoc,
+  captured: Uint8Array | null,
+  values: readonly RegisterValue[],
+  commitMessage?: string,
+): Uint8Array | null {
   if (values.length === 0) return captured
   const target = doc.fork()
   try {

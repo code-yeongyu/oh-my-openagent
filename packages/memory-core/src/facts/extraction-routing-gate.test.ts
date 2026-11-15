@@ -8,11 +8,7 @@ import { createNodeGitExec, GitMemoryRepo, type GitExec } from "../git"
 import { parseMemoryFile, renderMemoryFile } from "../memfs"
 import { parsePeopleCard, type ObservationEntry } from "../people"
 import { buildDefaultSeedFiles } from "../seeds"
-import {
-  applyFactsBatch,
-  parseFactsExtractionJsonl,
-  type FactsExtractionRecord,
-} from "./extraction"
+import { applyFactsBatch, parseFactsExtractionJsonl, type FactsExtractionRecord } from "./extraction"
 import { removeTree } from "../../../../test-support/remove-tree"
 
 const AUTHOR = { agentId: "facts-agent", authorName: "Facts Extractor" }
@@ -70,12 +66,7 @@ async function commitPersonCard(
   await repo.commitWrite([`people/${slug}/card.md`], `test: seed ${slug} card`, AUTHOR)
 }
 
-async function commitObservations(
-  repo: GitMemoryRepo,
-  slug: string,
-  name: string,
-  body: string,
-): Promise<void> {
+async function commitObservations(repo: GitMemoryRepo, slug: string, name: string, body: string): Promise<void> {
   await mkdir(join(repo.dir, "people", slug), { recursive: true })
   await writeFile(
     join(repo.dir, "people", slug, "observations.md"),
@@ -98,10 +89,15 @@ describe("person routing gate and unresolved mentions", () => {
     const { dir, repo } = await fixture()
 
     // when
-    await applyFactsBatch(repo, {
-      batchId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
-      records: [person()],
-    }, AUTHOR, { people: { enabled: false, maxEntries: 40, maxEntryChars: 200 } })
+    await applyFactsBatch(
+      repo,
+      {
+        batchId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        records: [person()],
+      },
+      AUTHOR,
+      { people: { enabled: false, maxEntries: 40, maxEntryChars: 200 } },
+    )
 
     // then
     const memory = parseMemoryFile(await readFile(join(dir, "notes/facts/2026-08.md"), "utf8"))
@@ -114,14 +110,21 @@ describe("person routing gate and unresolved mentions", () => {
     const { dir, repo } = await fixture()
 
     // when
-    await applyFactsBatch(repo, {
-      batchId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
-      records: [{
-        scope: "project",
-        text: "person-unresolved: A teammate said the launch slips.",
-        date: "2026-08-10",
-      }],
-    }, AUTHOR, { people: PEOPLE })
+    await applyFactsBatch(
+      repo,
+      {
+        batchId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+        records: [
+          {
+            scope: "project",
+            text: "person-unresolved: A teammate said the launch slips.",
+            date: "2026-08-10",
+          },
+        ],
+      },
+      AUTHOR,
+      { people: PEOPLE },
+    )
 
     // then
     const memory = parseMemoryFile(await readFile(join(dir, "notes/facts/2026-08.md"), "utf8"))

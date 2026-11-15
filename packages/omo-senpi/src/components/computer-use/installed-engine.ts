@@ -26,21 +26,25 @@ export function explicitPathDiagnostic(
   const base = { host, attemptedPaths: [enginePath] }
   if (!existsSync(enginePath)) {
     return {
-      ...base, code: "native-unavailable",
+      ...base,
+      code: "native-unavailable",
       message: `No senpi-desktop-engine binary is available for ${host}.`,
       cause: `${enginePath}: missing`,
     }
   }
   if (isQuarantined(enginePath)) {
     return {
-      ...base, code: "quarantined",
+      ...base,
+      code: "quarantined",
       message: `The senpi-desktop-engine binary for ${host} is quarantined by macOS Gatekeeper: ${enginePath}.`,
       cause: `${enginePath}: blocked because com.apple.quarantine is present (macOS Gatekeeper)`,
     }
   }
   // Windows has no exec bit (X_OK only proves existence there); the engine must be a .exe.
   if (platform === "win32") {
-    return /\.exe$/i.test(enginePath) ? undefined : notExecutable(base, host, `${enginePath}: not executable (expected a .exe file)`)
+    return /\.exe$/i.test(enginePath)
+      ? undefined
+      : notExecutable(base, host, `${enginePath}: not executable (expected a .exe file)`)
   }
   try {
     accessSync(enginePath, constants.X_OK)
@@ -56,7 +60,12 @@ function notExecutable(
   host: string,
   cause: string,
 ): DesktopEngineLocateDiagnostic {
-  return { ...base, code: "native-unavailable", message: `No senpi-desktop-engine binary is available for ${host}.`, cause }
+  return {
+    ...base,
+    code: "native-unavailable",
+    message: `No senpi-desktop-engine binary is available for ${host}.`,
+    cause,
+  }
 }
 
 /** One installed-source decision for status and doctor; never acquires, copies or starts an engine. */
@@ -84,7 +93,9 @@ export function resolveInstalledEngine(
   if (located.diagnostic.code === "quarantined") return { diagnostic: located.diagnostic }
   if (version !== undefined) {
     const cached = findCachedDesktopEngine({
-      host, version, cacheDir: join(env.HOME ?? homedir(), ".omo", "cache", "senpi-desktop-engine"),
+      host,
+      version,
+      cacheDir: join(env.HOME ?? homedir(), ".omo", "cache", "senpi-desktop-engine"),
     })
     if (cached.path !== null) return { path: cached.path, source: "cache" }
   }

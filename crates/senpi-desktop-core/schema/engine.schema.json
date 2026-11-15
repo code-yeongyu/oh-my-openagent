@@ -855,7 +855,7 @@
         },
         "trace": {
           "type": "boolean",
-          "description": "Per-request timing traces; accepted and stored, not acted on yet.",
+          "description": "Per-stage `timings` in action reports, and with `auditPath` a\nredacted JSONL trace in its `trace/` directory.",
           "default": false
         }
       },
@@ -1967,6 +1967,17 @@
           ],
           "description": "Open token set, e.g. `secure_field`."
         },
+        "timings": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/StageTimings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Per-stage durations; only in a session opened with `trace: true`."
+        },
         "auditIds": {
           "type": "array",
           "items": {
@@ -2274,6 +2285,67 @@
         "$/test.advanceClock"
       ],
       "description": "Every engine method, by wire name."
+    },
+    "StageTimings": {
+      "type": "object",
+      "properties": {
+        "axResolve": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0,
+          "description": "Resolving an accessibility ref to its element."
+        },
+        "capture": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0,
+          "description": "Capturing the focus and cursor state the request restores."
+        },
+        "prime": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0,
+          "description": "Making the target window key before background keys."
+        },
+        "dispatch": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0,
+          "description": "Sending the input itself."
+        },
+        "verify": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0,
+          "description": "The checks after the input was sent."
+        },
+        "restore": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0,
+          "description": "Restoring focus and cursor."
+        }
+      },
+      "description": "How long each stage of one mutating request took, in microseconds. A\nstage the request did not run is absent.",
+      "additionalProperties": false
     },
     "DragParams": {
       "type": "object",
@@ -3638,7 +3710,7 @@
             "string",
             "null"
           ],
-          "description": "Machine-readable cause, an open token set per code (object mode),\ne.g. `InvalidCoordinateFrame`: `resized`, `consumed`, `zoom`,\n`wrong_target`, `out_of_bounds`; `WindowNotFound`: `identity_changed`;\n`InvalidTarget`: `ambiguous`; `BackgroundUnavailable`:\n`key_route_unproven`, `user_active_in_target`,\n`pointer_reading_toolkit`, `electron_select`,\n`wayland_window_targeting`; `InvalidKey`: `dangerous_chord`;\n`ControlRequired`: `headless_host`, `spawn_inside_session`,\n`lease_missing`; `Suspended`: `stop_marker`; `Internal`:\n`request_too_large`, `other`."
+          "description": "Machine-readable cause, an open token set per code (object mode),\ne.g. `InvalidCoordinateFrame`: `resized`, `consumed`, `zoom`,\n`wrong_target`, `out_of_bounds`; `WindowNotFound`: `identity_changed`;\n`InvalidTarget`: `ambiguous`; `BackgroundUnavailable`:\n`key_route_unproven`, `user_active_in_target`,\n`pointer_reading_toolkit`, `electron_select`,\n`wayland_window_targeting`; `InvalidKey`: `dangerous_chord`;\n`AxUnsupported`: `disabled`, `action_unsupported`, `not_visible`,\n`unstable`, `occluded` (the actionability battery);\n`ControlRequired`: `headless_host`, `spawn_inside_session`,\n`lease_missing`; `Suspended`: `stop_marker`; `Internal`:\n`request_too_large`, `other`."
         },
         "disposition": {
           "anyOf": [
@@ -3670,6 +3742,17 @@
               "type": "null"
             }
           ]
+        },
+        "nextCall": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/NextCall"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The next rung of the refusal ladder (element action, keyboard,\nforeground), object mode; never followed automatically."
         }
       },
       "required": [
@@ -3718,7 +3801,7 @@
       "required": [
         "reason"
       ],
-      "description": "Why a `CaptureUnavailable` capture was refused. `reason` is an open token\nset: B9 introduces `\"minimized\"` and later waves add more.",
+      "description": "Why a `CaptureUnavailable` capture was refused. `reason` is an open token\nset: B9 introduces `\"minimized\"`; P8 adds `\"off-space\"` and `\"off-screen\"`; later waves add more.",
       "additionalProperties": false
     },
     "MethodRejectionData": {

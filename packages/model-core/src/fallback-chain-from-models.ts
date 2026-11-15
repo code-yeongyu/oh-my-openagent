@@ -46,8 +46,7 @@ export function parseFallbackModelEntry(
   if (!trimmed) return undefined
 
   const parts = trimmed.split("/")
-  const providerID =
-    parts.length >= 2 ? parts[0].trim() : (contextProviderID?.trim() || defaultProviderID)
+  const providerID = parts.length >= 2 ? parts[0].trim() : contextProviderID?.trim() || defaultProviderID
   const rawModelID = parts.length >= 2 ? parts.slice(1).join("/").trim() : trimmed
   if (!providerID || !rawModelID) return undefined
 

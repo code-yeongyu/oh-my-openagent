@@ -26,19 +26,25 @@ function createFixture(): Fixture {
   const packageRoot = join(root, "app")
   mkdirSync(packageRoot, { recursive: true })
   cpSync(join(SOURCE_ROOT, "bin"), join(packageRoot, "bin"), { recursive: true })
-  writeFile(join(packageRoot, "package.json"), JSON.stringify({
-    name: "omo-ai",
-    version: "1.2.3-test.0",
-    type: "module",
-    dependencies: { "@code-yeongyu/senpi": "2026.8.9" },
-  }))
+  writeFile(
+    join(packageRoot, "package.json"),
+    JSON.stringify({
+      name: "omo-ai",
+      version: "1.2.3-test.0",
+      type: "module",
+      dependencies: { "@code-yeongyu/senpi": "2026.8.9" },
+    }),
+  )
   const senpiRoot = join(packageRoot, "node_modules", "@code-yeongyu", "senpi")
-  writeFile(join(senpiRoot, "package.json"), JSON.stringify({
-    name: "@code-yeongyu/senpi",
-    version: "2026.8.9",
-    type: "module",
-    exports: { ".": "./dist/index.js" },
-  }))
+  writeFile(
+    join(senpiRoot, "package.json"),
+    JSON.stringify({
+      name: "@code-yeongyu/senpi",
+      version: "2026.8.9",
+      type: "module",
+      exports: { ".": "./dist/index.js" },
+    }),
+  )
   writeFile(join(senpiRoot, "dist", "index.js"), "export const fixture = true\n")
   writeFile(join(senpiRoot, "dist", "cli.js"), "process.exit(0)\n")
   writeFile(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
@@ -117,12 +123,15 @@ describe("omo doctor", () => {
     test("#then the version check fails with both versions", () => {
       const fixture = createFixture()
       const manifestPath = join(fixture.packageRoot, "node_modules", "@code-yeongyu", "senpi", "package.json")
-      writeFile(manifestPath, JSON.stringify({
-        name: "@code-yeongyu/senpi",
-        version: "2026.8.8",
-        type: "module",
-        exports: { ".": "./dist/index.js" },
-      }))
+      writeFile(
+        manifestPath,
+        JSON.stringify({
+          name: "@code-yeongyu/senpi",
+          version: "2026.8.8",
+          type: "module",
+          exports: { ".": "./dist/index.js" },
+        }),
+      )
       const result = run(fixture)
       expect(result.status).toBe(1)
       expect(result.stdout).toContain("FAIL senpi version")
@@ -132,12 +141,15 @@ describe("omo doctor", () => {
     test("#then a zero-padded spelling of the pinned release still passes", () => {
       const fixture = createFixture()
       const manifestPath = join(fixture.packageRoot, "node_modules", "@code-yeongyu", "senpi", "package.json")
-      writeFile(manifestPath, JSON.stringify({
-        name: "@code-yeongyu/senpi",
-        version: "2026.08.09",
-        type: "module",
-        exports: { ".": "./dist/index.js" },
-      }))
+      writeFile(
+        manifestPath,
+        JSON.stringify({
+          name: "@code-yeongyu/senpi",
+          version: "2026.08.09",
+          type: "module",
+          exports: { ".": "./dist/index.js" },
+        }),
+      )
       const result = run(fixture)
       expect(result.stdout).toContain("PASS senpi version 2026.08.09")
       expect(result.stdout).not.toContain("FAIL senpi version")

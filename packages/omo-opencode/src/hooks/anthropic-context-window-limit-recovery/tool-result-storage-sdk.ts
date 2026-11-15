@@ -28,7 +28,7 @@ interface SDKMessage {
 
 export async function findToolResultsBySizeFromSDK(
   client: OpencodeClient,
-  sessionID: string
+  sessionID: string,
 ): Promise<ToolResultInfo[]> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
@@ -66,7 +66,7 @@ export async function truncateToolResultAsync(
   sessionID: string,
   messageID: string,
   partId: string,
-  part: SDKToolPart
+  part: SDKToolPart,
 ): Promise<{ success: boolean; toolName?: string; originalSize?: number }> {
   if (!part.state?.output) return { success: false }
 
@@ -96,10 +96,7 @@ export async function truncateToolResultAsync(
   }
 }
 
-export async function countTruncatedResultsFromSDK(
-  client: OpencodeClient,
-  sessionID: string
-): Promise<number> {
+export async function countTruncatedResultsFromSDK(client: OpencodeClient, sessionID: string): Promise<number> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
     const messages = normalizeSDKResponse(response, [] as SDKMessage[], { preferResponseOnMissingData: true })
@@ -121,10 +118,7 @@ export async function countTruncatedResultsFromSDK(
   }
 }
 
-export async function getTotalToolOutputSizeFromSDK(
-  client: OpencodeClient,
-  sessionID: string
-): Promise<number> {
+export async function getTotalToolOutputSizeFromSDK(client: OpencodeClient, sessionID: string): Promise<number> {
   const results = await findToolResultsBySizeFromSDK(client, sessionID)
   return results.reduce((sum, result) => sum + result.outputSize, 0)
 }

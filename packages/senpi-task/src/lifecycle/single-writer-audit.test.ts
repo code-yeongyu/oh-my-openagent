@@ -69,5 +69,4 @@ describe("single-writer destruction audit", () => {
     // then
     expect(violations).toEqual([])
   })
-
 })

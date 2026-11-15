@@ -7,12 +7,7 @@ import {
   isServerPluginEntry,
   tuiPluginSpecName,
 } from "../doctor/checks/tui-plugin-config"
-import {
-  LEGACY_PLUGIN_NAME,
-  PLUGIN_NAME,
-  getOpenCodeConfigDir,
-  parseJsonc,
-} from "../../shared"
+import { LEGACY_PLUGIN_NAME, PLUGIN_NAME, getOpenCodeConfigDir, parseJsonc } from "../../shared"
 import { writeFileAtomically } from "../../shared/write-file-atomically"
 
 type ConfigShape = {

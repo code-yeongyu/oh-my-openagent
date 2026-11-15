@@ -35,6 +35,7 @@ function readyLines(report) {
     `${permissionLevel} computer use permissions: capture=${capabilities.capturePermission} input=${capabilities.inputPermission} accessibility=${capabilities.axPermission}`,
     `${displayLevel} computer use display: count=${capabilities.displayCount} screenLocked=${capabilities.screenLocked} displayAsleep=${displayAsleep}`,
     stopLine,
+    "INFO computer use stop persistence: a stop survives an engine restart only on the macOS XPC agent; a --serve daemon (--oneshot, --mcp) starts unstopped",
   ]
 }
 

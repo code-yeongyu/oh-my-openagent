@@ -36,6 +36,8 @@ export type ContractHostOptions = {
   readonly rejectProof?: boolean
   /** A session with no file yet: unload_session refuses it `unsupported` (senpi session-unload.ts `loaded`). */
   readonly unwritten?: boolean
+  /** unload_session answers `{outcome: "refused", reason}` with this reason, as data, whatever else is set. */
+  readonly unloadRefusal?: string
 }
 export type ContractHost = {
   readonly socket: string
@@ -59,16 +61,47 @@ export type ContractHost = {
  * a connection that holds no attachment may still send these session commands.
  */
 export const ATTACH_GATE_EXEMPT: ReadonlySet<string> = new Set([
-  "get_protocol_info", "list_sessions", "subscribe_sessions", "unsubscribe_sessions", "get_subscription_limits", "warm",
-  "detach_connection", "open_session", "attach_session", "reclaim_session", "get_effect_status", "get_state", "get_messages",
-  "get_entries", "get_tree", "get_fork_messages", "get_last_assistant_text", "get_media", "get_commands", "get_loaded_surfaces",
-  "get_available_models", "get_available_thinking_levels", "get_fast_mode", "get_session_stats", "get_pending_inputs",
-  "get_steering_messages", "get_follow_up_messages", "get_auth_providers", "get_provider_accounts", "resolve_path",
-  "memory_report", "eval_cells.list", "eval_cells.peek", "check_reload_veto",
+  "get_protocol_info",
+  "list_sessions",
+  "subscribe_sessions",
+  "unsubscribe_sessions",
+  "get_subscription_limits",
+  "warm",
+  "detach_connection",
+  "open_session",
+  "attach_session",
+  "reclaim_session",
+  "get_effect_status",
+  "get_state",
+  "get_messages",
+  "get_entries",
+  "get_tree",
+  "get_fork_messages",
+  "get_last_assistant_text",
+  "get_media",
+  "get_commands",
+  "get_loaded_surfaces",
+  "get_available_models",
+  "get_available_thinking_levels",
+  "get_fast_mode",
+  "get_session_stats",
+  "get_pending_inputs",
+  "get_steering_messages",
+  "get_follow_up_messages",
+  "get_auth_providers",
+  "get_provider_accounts",
+  "resolve_path",
+  "memory_report",
+  "eval_cells.list",
+  "eval_cells.peek",
+  "check_reload_veto",
 ])
 
 /** Enforces the public v1.1 wire contract, including connection-local attachment ownership. */
-export async function withContractHost(options: ContractHostOptions, exercise: (host: ContractHost) => Promise<void>): Promise<void> {
+export async function withContractHost(
+  options: ContractHostOptions,
+  exercise: (host: ContractHost) => Promise<void>,
+): Promise<void> {
   const root = mkdtempSync(join(tmpdir(), "rpc-client-"))
   const socket = join(root, "rpc.sock")
   const transport = fakeHostTransport(socket)
@@ -78,10 +111,19 @@ export async function withContractHost(options: ContractHostOptions, exercise: (
   const recordPath = join(keyRoot, "rpc", "keys", launchId)
   mkdirSync(join(keyRoot, "rpc", "keys"), { recursive: true, mode: 0o700 })
   for (const directory of [keyRoot, join(keyRoot, "rpc")]) chmodSync(directory, 0o700)
-  writeFileSync(recordPath, JSON.stringify({
-    version: 1, launch_id: launchId, key: key.toString("hex"), pid: process.pid,
-    process_start: null, endpoint: socket, created_at: new Date().toISOString(),
-  }), { mode: 0o600 })
+  writeFileSync(
+    recordPath,
+    JSON.stringify({
+      version: 1,
+      launch_id: launchId,
+      key: key.toString("hex"),
+      pid: process.pid,
+      process_start: null,
+      endpoint: socket,
+      created_at: new Date().toISOString(),
+    }),
+    { mode: 0o600 },
+  )
   options.prepareRecord?.(recordPath, root)
   const frames: ContractHost["frames"] = []
   const mutations: Frame[] = []
@@ -96,154 +138,267 @@ export async function withContractHost(options: ContractHostOptions, exercise: (
   let draining = false
   // Ended by a close or an unload: gone for every connection and no longer listed.
   let ended = false
-  const server = createServer((client) => transport.authenticate(client, () => {
-    // A draining host disconnects a newly arriving client; only an admitted connection sees the attach refusal.
-    if (draining) { client.destroy(); return }
-    const connection = nextConnection++
-    sockets.add(client)
-    client.once("close", () => sockets.delete(client))
-    let buffer = ""
-    let authenticated = process.platform === "win32" || options.auth !== true
-    let attached = false
-    let expectedProof = ""
-    let released = false
-    const respond = (frame: Frame, data: unknown = {}, error?: string, errorData?: Frame) => client.write(`${options.strayLine ? "not json\n" : ""}${JSON.stringify({
-      id: frame.id, type: "response", command: frame.type, success: error === undefined,
-      ...(error === undefined ? { data } : { error, errorCode: error, ...(errorData === undefined ? {} : { errorData }) }),
-    })}\n`)
-    // Wire frames 4 and 5: an auth refusal is answered, then the host closes the connection.
-    const refuseAndClose = (frame: Frame, error: "auth_required" | "auth_failed") => { respond(frame, undefined, error); client.end() }
-    client.setEncoding("utf8")
-    client.on("data", (chunk: string) => {
-      buffer += chunk
-      for (let newline = buffer.indexOf("\n"); newline >= 0; newline = buffer.indexOf("\n")) {
-        const frame = JSON.parse(buffer.slice(0, newline)) as Frame
-        buffer = buffer.slice(newline + 1)
-        frames.push({ connection, frame })
-        if (options.silent?.includes(String(frame.type))) continue
-        if (frame.type === "get_protocol_info" && options.refuseProtocolInfo) { respond(frame, undefined, "unknown_command"); continue }
-        if (frame.type === "get_protocol_info") {
-          const capabilities = options.legacy ? [] : ["attach_session", "release_attachment", "release_caller_aware"]
-          if (options.auth && process.platform !== "win32") {
-            const clientNonce = (frame.auth as { client_nonce?: string } | undefined)?.client_nonce
-            if (typeof clientNonce !== "string" || !/^[0-9a-f]{64}$/.test(clientNonce)) {
-              refuseAndClose(frame, "auth_required")
+  const server = createServer((client) =>
+    transport.authenticate(client, () => {
+      // A draining host disconnects a newly arriving client; only an admitted connection sees the attach refusal.
+      if (draining) {
+        client.destroy()
+        return
+      }
+      const connection = nextConnection++
+      sockets.add(client)
+      client.once("close", () => sockets.delete(client))
+      let buffer = ""
+      let authenticated = process.platform === "win32" || options.auth !== true
+      let attached = false
+      let expectedProof = ""
+      let released = false
+      const respond = (frame: Frame, data: unknown = {}, error?: string, errorData?: Frame) =>
+        client.write(
+          `${options.strayLine ? "not json\n" : ""}${JSON.stringify({
+            id: frame.id,
+            type: "response",
+            command: frame.type,
+            success: error === undefined,
+            ...(error === undefined
+              ? { data }
+              : { error, errorCode: error, ...(errorData === undefined ? {} : { errorData }) }),
+          })}\n`,
+        )
+      // Wire frames 4 and 5: an auth refusal is answered, then the host closes the connection.
+      const refuseAndClose = (frame: Frame, error: "auth_required" | "auth_failed") => {
+        respond(frame, undefined, error)
+        client.end()
+      }
+      client.setEncoding("utf8")
+      client.on("data", (chunk: string) => {
+        buffer += chunk
+        for (let newline = buffer.indexOf("\n"); newline >= 0; newline = buffer.indexOf("\n")) {
+          const frame = JSON.parse(buffer.slice(0, newline)) as Frame
+          buffer = buffer.slice(newline + 1)
+          frames.push({ connection, frame })
+          if (options.silent?.includes(String(frame.type))) continue
+          if (frame.type === "get_protocol_info" && options.refuseProtocolInfo) {
+            respond(frame, undefined, "unknown_command")
+            continue
+          }
+          if (frame.type === "get_protocol_info") {
+            const capabilities = options.legacy ? [] : ["attach_session", "release_attachment", "release_caller_aware"]
+            if (options.auth && process.platform !== "win32") {
+              const clientNonce = (frame.auth as { client_nonce?: string } | undefined)?.client_nonce
+              if (typeof clientNonce !== "string" || !/^[0-9a-f]{64}$/.test(clientNonce)) {
+                refuseAndClose(frame, "auth_required")
+                continue
+              }
+              const serverNonce = randomBytes(32).toString("hex")
+              const proof = (label: string, first: string, second: string) =>
+                createHmac("sha256", key).update([label, launchId, first, second].join("\n"), "utf8").digest("hex")
+              expectedProof = proof("senpi-rpc-client", serverNonce, clientNonce)
+              const answer = {
+                capabilities: [...capabilities, "socket_auth"],
+                auth: {
+                  launch_id: launchId,
+                  server_nonce: serverNonce,
+                  server_proof: options.badProof ? "0".repeat(64) : proof("senpi-rpc-server", clientNonce, serverNonce),
+                },
+              }
+              if (options.protocolDelayMs === undefined) respond(frame, answer)
+              else setTimeout(() => respond(frame, answer), options.protocolDelayMs)
+            } else respond(frame, { capabilities })
+            continue
+          }
+          if (frame.type === "authenticate") {
+            authenticated = !options.rejectProof && frame.client_proof === expectedProof && expectedProof !== ""
+            if (authenticated) respond(frame, {})
+            else refuseAndClose(frame, "auth_failed")
+            continue
+          }
+          if (!authenticated) {
+            refuseAndClose(frame, "auth_required")
+            continue
+          }
+          if (frame.type === "attach_session") {
+            if (draining || options.attachRefusal === "host_draining")
+              respond(frame, undefined, "session_busy_lifecycle", { reason: "host_draining" })
+            else if (options.attachRefusal === "session_not_attached")
+              respond(frame, undefined, "session_not_attached", { reason: "no_connection" })
+            else if (gone) respond(frame, undefined, "unknown_session", {})
+            else if (frame.sessionId !== "rpc-1" || frame.durableSessionId !== durableId) {
+              respond(frame, undefined, "session_identity_mismatch", {})
+            } else {
+              attached = true
+              respond(frame, { sessionId: "rpc-1", attached: true })
+            }
+            continue
+          }
+          if (frame.type === "release_attachment") {
+            if (options.afterMutation === "connection_lost") {
+              client.destroy()
               continue
             }
-            const serverNonce = randomBytes(32).toString("hex")
-            const proof = (label: string, first: string, second: string) =>
-              createHmac("sha256", key).update([label, launchId, first, second].join("\n"), "utf8").digest("hex")
-            expectedProof = proof("senpi-rpc-client", serverNonce, clientNonce)
-            const answer = { capabilities: [...capabilities, "socket_auth"], auth: {
-              launch_id: launchId, server_nonce: serverNonce,
-              server_proof: options.badProof ? "0".repeat(64) : proof("senpi-rpc-server", clientNonce, serverNonce),
-            } }
-            if (options.protocolDelayMs === undefined) respond(frame, answer)
-            else setTimeout(() => respond(frame, answer), options.protocolDelayMs)
-          } else respond(frame, { capabilities })
-          continue
-        }
-        if (frame.type === "authenticate") {
-          authenticated = !options.rejectProof && frame.client_proof === expectedProof && expectedProof !== ""
-          if (authenticated) respond(frame, {})
-          else refuseAndClose(frame, "auth_failed")
-          continue
-        }
-        if (!authenticated) { refuseAndClose(frame, "auth_required"); continue }
-        if (frame.type === "attach_session") {
-          if (draining || options.attachRefusal === "host_draining") respond(frame, undefined, "session_busy_lifecycle", { reason: "host_draining" })
-          else if (options.attachRefusal === "session_not_attached") respond(frame, undefined, "session_not_attached", { reason: "no_connection" })
-          else if (gone) respond(frame, undefined, "unknown_session", {})
-          else if (frame.sessionId !== "rpc-1" || frame.durableSessionId !== durableId) {
-            respond(frame, undefined, "session_identity_mismatch", {})
-          } else { attached = true; respond(frame, { sessionId: "rpc-1", attached: true }) }
-          continue
-        }
-        if (frame.type === "release_attachment") {
-          if (options.afterMutation === "connection_lost") { client.destroy(); continue }
-          if (released && options.releasedAttachmentAnswer === "unknown_session") respond(frame, undefined, "unknown_session")
-          else if (attached && !released) respond(frame, { deferred: false })
-          else respond(frame, undefined, "session_not_attached", { reason: "not_attached" })
-          attached = false
-          continue
-        }
-        if (frame.type === "reclaim_session") {
-          if (draining || options.attachRefusal === "host_draining") respond(frame, undefined, "session_busy_lifecycle", { reason: "host_draining" })
-          else if (options.attachRefusal === "session_not_attached") respond(frame, undefined, "session_not_attached", { reason: "no_connection" })
-          else if (frame.durableSessionId !== durableId) respond(frame, undefined, "session_identity_mismatch", {})
-          else { attached = true; respond(frame, { reclaimed: true, sessionId: "rpc-1" }) }
-          continue
-        }
-        if (frame.type === "list_sessions") { respond(frame, { sessions: ended ? [] : [session()] }); continue }
-        if (frame.type === "warm") { respond(frame, { warmed: true }); continue }
-        if (frame.type === "open_session") {
-          attached = true
-          if (typeof frame.permissionPreset === "string") preset = frame.permissionPreset
-          respond(frame, { sessionId: "rpc-1", state: session() })
-          continue
-        }
-        // A multi-session host routes every other command by `sessionId` (senpi `session-router-routing.ts`):
-        // one that names no session is refused before it reaches any session, an older host included.
-        if (frame.sessionId === undefined || frame.sessionId === "") { respond(frame, undefined, "missing_session_id"); continue }
-        // Only session-scoped commands are gated, as the host's attachment gate reads `sessionId`; its exempt reads pass.
-        // close_session skips the gate, but close() refuses a connection that holds no attachment with unknown_session
-        // and releases nothing (senpi session-router-close.ts close(), senpi#1782). An attached close releases only the
-        // caller's hold (drainAttachments: false), so the session ends only when no other client holds it.
-        if (frame.type === "close_session") {
-          if (gone || (!options.legacy && !attached)) { respond(frame, undefined, "unknown_session", {}); continue }
-          attached = false
+            if (released && options.releasedAttachmentAnswer === "unknown_session")
+              respond(frame, undefined, "unknown_session")
+            else if (attached && !released) respond(frame, { deferred: false })
+            else respond(frame, undefined, "session_not_attached", { reason: "not_attached" })
+            attached = false
+            continue
+          }
+          if (frame.type === "reclaim_session") {
+            if (draining || options.attachRefusal === "host_draining")
+              respond(frame, undefined, "session_busy_lifecycle", { reason: "host_draining" })
+            else if (options.attachRefusal === "session_not_attached")
+              respond(frame, undefined, "session_not_attached", { reason: "no_connection" })
+            else if (frame.durableSessionId !== durableId) respond(frame, undefined, "session_identity_mismatch", {})
+            else {
+              attached = true
+              respond(frame, { reclaimed: true, sessionId: "rpc-1" })
+            }
+            continue
+          }
+          if (frame.type === "list_sessions") {
+            respond(frame, { sessions: ended ? [] : [session()] })
+            continue
+          }
+          if (frame.type === "warm") {
+            respond(frame, { warmed: true })
+            continue
+          }
+          if (frame.type === "open_session") {
+            attached = true
+            if (typeof frame.permissionPreset === "string") preset = frame.permissionPreset
+            respond(frame, { sessionId: "rpc-1", state: session() })
+            continue
+          }
+          // A multi-session host routes every other command by `sessionId` (senpi `session-router-routing.ts`):
+          // one that names no session is refused before it reaches any session, an older host included.
+          if (frame.sessionId === undefined || frame.sessionId === "") {
+            respond(frame, undefined, "missing_session_id")
+            continue
+          }
+          // Only session-scoped commands are gated, as the host's attachment gate reads `sessionId`; its exempt reads pass.
+          // close_session skips the gate, but close() refuses a connection that holds no attachment with unknown_session
+          // and releases nothing (senpi session-router-close.ts close(), senpi#1782). An attached close releases only the
+          // caller's hold (drainAttachments: false), so the session ends only when no other client holds it.
+          if (frame.type === "close_session") {
+            if (gone || (!options.legacy && !attached)) {
+              respond(frame, undefined, "unknown_session", {})
+              continue
+            }
+            attached = false
+            mutations.push(frame)
+            if (!options.otherAttachments) {
+              gone = true
+              ended = true
+            }
+            respond(frame, {})
+            continue
+          }
+          if (!options.legacy && !attached && !ATTACH_GATE_EXEMPT.has(String(frame.type))) {
+            respond(frame, undefined, "session_not_attached", {
+              reason: "this connection is not attached to that session",
+              action:
+                "attach first with attach_session { sessionId, durableSessionId } or open_session { sessionPath }",
+            })
+            continue
+          }
+          // unload_session answers its refusals as data (senpi session-unload.ts): a session with no file is unsupported,
+          // other holders refuse it unless force; otherwise every attachment is drained and the session ends for all.
+          if (frame.type === "unload_session") {
+            if (options.unloadRefusal !== undefined) {
+              respond(frame, {
+                outcome: "refused",
+                reason: options.unloadRefusal,
+                detail: `refused: ${options.unloadRefusal}`,
+              })
+              continue
+            }
+            if (options.unwritten) {
+              respond(frame, {
+                outcome: "refused",
+                reason: "unsupported",
+                detail: "the session has no file to reopen it by",
+              })
+              continue
+            }
+            if (options.otherAttachments && frame.force !== true) {
+              respond(frame, {
+                outcome: "refused",
+                reason: "attached",
+                detail: `${options.otherAttachments} other client(s) attached`,
+              })
+              continue
+            }
+            mutations.push(frame)
+            gone = true
+            ended = true
+            attached = false
+            respond(frame, { outcome: "unloaded", sessionPath })
+            continue
+          }
+          if (frame.type === "get_messages") {
+            respond(frame, { messages: [] })
+            continue
+          }
+          if (frame.type === "get_state") {
+            respond(frame, { isStreaming: false })
+            continue
+          }
+          if (frame.type === "get_available_models") {
+            respond(frame, { models: [{ provider: "p", id: "m" }] })
+            continue
+          }
+          if (frame.type === "get_available_thinking_levels") {
+            respond(frame, { levels: ["off", "high"] })
+            continue
+          }
+          if (frame.type === "release_session" && options.releaseFailsThenGone && !gone) {
+            gone = true
+            respond(frame, undefined, "release_failed", { detail: "the hand-over entry could not be written" })
+            continue
+          }
+          if (frame.type === "release_session" && options.otherAttachments && frame.force !== true) {
+            respond(frame, undefined, "attached")
+            continue
+          }
           mutations.push(frame)
-          if (!options.otherAttachments) { gone = true; ended = true }
-          respond(frame, {})
-          continue
+          if (options.afterMutation === "detached") attached = false
+          // A released session leaves the host, so a later release_attachment names a session it no longer knows.
+          if (frame.type === "release_session") released = true
+          respond(
+            frame,
+            frame.type === "set_model"
+              ? { provider: frame.provider, id: frame.modelId }
+              : frame.type === "release_session"
+                ? {
+                    released: true,
+                    session_path: sessionPath,
+                    attachments: 0,
+                    dropped: { deliveries: [], user_messages: [] },
+                  }
+                : frame.type === "interrupt"
+                  ? { interrupted: true }
+                  : {},
+          )
         }
-        if (!options.legacy && !attached && !ATTACH_GATE_EXEMPT.has(String(frame.type))) {
-          respond(frame, undefined, "session_not_attached", {
-            reason: "this connection is not attached to that session",
-            action: "attach first with attach_session { sessionId, durableSessionId } or open_session { sessionPath }",
-          })
-          continue
-        }
-        // unload_session answers its refusals as data (senpi session-unload.ts): a session with no file is unsupported,
-        // other holders refuse it unless force; otherwise every attachment is drained and the session ends for all.
-        if (frame.type === "unload_session") {
-          if (options.unwritten) { respond(frame, { outcome: "refused", reason: "unsupported", detail: "the session has no file to reopen it by" }); continue }
-          if (options.otherAttachments && frame.force !== true) { respond(frame, { outcome: "refused", reason: "attached", detail: `${options.otherAttachments} other client(s) attached` }); continue }
-          mutations.push(frame)
-          gone = true
-          ended = true
-          attached = false
-          respond(frame, { outcome: "unloaded", sessionPath })
-          continue
-        }
-        if (frame.type === "get_messages") { respond(frame, { messages: [] }); continue }
-        if (frame.type === "get_state") { respond(frame, { isStreaming: false }); continue }
-        if (frame.type === "get_available_models") { respond(frame, { models: [{ provider: "p", id: "m" }] }); continue }
-        if (frame.type === "get_available_thinking_levels") { respond(frame, { levels: ["off", "high"] }); continue }
-        if (frame.type === "release_session" && options.releaseFailsThenGone && !gone) {
-          gone = true
-          respond(frame, undefined, "release_failed", { detail: "the hand-over entry could not be written" })
-          continue
-        }
-        if (frame.type === "release_session" && options.otherAttachments && frame.force !== true) {
-          respond(frame, undefined, "attached")
-          continue
-        }
-        mutations.push(frame)
-        if (options.afterMutation === "detached") attached = false
-        // A released session leaves the host, so a later release_attachment names a session it no longer knows.
-        if (frame.type === "release_session") released = true
-        respond(frame, frame.type === "set_model" ? { provider: frame.provider, id: frame.modelId }
-          : frame.type === "release_session" ? { released: true, session_path: sessionPath, attachments: 0, dropped: { deliveries: [], user_messages: [] } }
-          : frame.type === "interrupt" ? { interrupted: true } : {})
-      }
-    })
-  }))
+      })
+    }),
+  )
   try {
     const listening = once(server, "listening", { signal: AbortSignal.timeout(2000) })
     server.listen(transport.listenAddress)
     await listening
-    await exercise({ socket, root, recordPath, frames, mutations, permissionPreset: () => preset, drain: () => { draining = true }, live: () => !ended })
+    await exercise({
+      socket,
+      root,
+      recordPath,
+      frames,
+      mutations,
+      permissionPreset: () => preset,
+      drain: () => {
+        draining = true
+      },
+      live: () => !ended,
+    })
   } finally {
     const closed = once(server, "close", { signal: AbortSignal.timeout(2000) })
     for (const client of sockets) client.destroy()

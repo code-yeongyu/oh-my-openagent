@@ -7,7 +7,13 @@ import { fileURLToPath } from "node:url"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { resolveBundledSkillsDir } from "../bundled-skills"
 import { runAdvisor } from "../init-deep-advisor/component"
-import { componentContext, createHarness, makeCoverageRepo, resetTestHome, setTestHome } from "../init-deep-advisor/component.test-support"
+import {
+  componentContext,
+  createHarness,
+  makeCoverageRepo,
+  resetTestHome,
+  setTestHome,
+} from "../init-deep-advisor/component.test-support"
 import { createOnboardingHarness } from "../onboarding/test-harness"
 import { ULW_PLAN_CUSTOM_TYPE } from "../skill-pointers"
 import { dispatchInput, injectedContent, registerSkillPointers } from "../skill-pointers/test-support"
@@ -56,7 +62,8 @@ function messageContents(results: readonly unknown[]): string[] {
   return results.flatMap((result) =>
     typeof result === "object" && result !== null && "message" in result
       ? [String((result as { message: { content: unknown } }).message.content)]
-      : [])
+      : [],
+  )
 }
 
 describe("getBuiltinSkillsRoot follows the bundled-skills resolver (#11626)", () => {
@@ -67,7 +74,11 @@ describe("getBuiltinSkillsRoot follows the bundled-skills resolver (#11626)", ()
       if (value !== undefined) process.env[variable] = value
       const expected = entry.honoured ? `${value}${sep}` : pluginRelativeRoot
       const errors: string[] = []
-      const logger = { error: (message: string) => { errors.push(message) } }
+      const logger = {
+        error: (message: string) => {
+          errors.push(message)
+        },
+      }
 
       // when
       const skillsRoot = getBuiltinSkillsRoot(process.env, logger)
@@ -100,17 +111,29 @@ describe("getBuiltinSkillsRoot follows the bundled-skills resolver (#11626)", ()
 
       // telemetry: the skill is recognised under the resolved root, and only its allowlisted name is exported
       const telemetryApi = new FakeExtensionAPI()
-      const events: Array<{ readonly name: OmoNativeEventName; readonly properties: Readonly<Record<string, unknown>> }> = []
+      const events: Array<{
+        readonly name: OmoNativeEventName
+        readonly properties: Readonly<Record<string, unknown>>
+      }> = []
       registerOmoNativeToolTelemetry(telemetryApi, {
         captureEvent: (name, properties) => events.push({ name, properties }),
         hashSessionId: (sessionId) => `hashed:${sessionId}`,
       })
       await telemetryApi.dispatch(
         "tool_result",
-        { type: "tool_result", toolCallId: "call-1", toolName: "read", input: { path: join(expected, "ulw-plan", "SKILL.md") }, content: [], isError: false },
+        {
+          type: "tool_result",
+          toolCallId: "call-1",
+          toolName: "read",
+          input: { path: join(expected, "ulw-plan", "SKILL.md") },
+          content: [],
+          isError: false,
+        },
         { sessionManager: { getSessionId: () => "session-a" } },
       )
-      expect(events).toEqual([{ name: "skill_loaded", properties: { $session_id: "hashed:session-a", skill_name: "ulw-plan" } }])
+      expect(events).toEqual([
+        { name: "skill_loaded", properties: { $session_id: "hashed:session-a", skill_name: "ulw-plan" } },
+      ])
       expect(JSON.stringify(events)).not.toContain(root)
 
       expect(errors).toHaveLength(value === undefined || entry.honoured ? 0 : 1)

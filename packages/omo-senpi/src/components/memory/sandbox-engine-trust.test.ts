@@ -9,6 +9,8 @@ import { buildSandboxTransform } from "./sandbox"
 import { probeBwrapUsability } from "./sandbox-bwrap-probe"
 import { rmSyncEfaultTolerant } from "./teardown.test-support"
 import type { ReflectionSpawnArgs } from "./worker/spawn"
+import { useTestTimeout } from "../../../../../test-support/test-deadline"
+import { spawnTimeout } from "../../../test-support/spawn-timeout"
 
 const bwrap = process.platform === "linux" ? Bun.which("bwrap") : null
 const bwrapUsable = bwrap !== null && (await probeBwrapUsability(bwrap)).usable
@@ -25,11 +27,19 @@ try {
 }
 `
 
-type Outcome = { ok: boolean; directory?: string; codes?: { code: string }[]; verified?: boolean; code?: string | null; message?: string }
+type Outcome = {
+  ok: boolean
+  directory?: string
+  codes?: { code: string }[]
+  verified?: boolean
+  code?: string | null
+  message?: string
+}
 
 const roots: string[] = []
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0))
+    rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 function fixture() {
@@ -68,17 +78,22 @@ function spawnArgs(setup: ReturnType<typeof fixture>, env: NodeJS.ProcessEnv, ar
   }
 }
 
-async function runInSandbox(mode: "prepare" | "adopt" | "unattested", options: {
-  readonly extraEnv?: (worktree: string) => Promise<Record<string, string>>
-  readonly home?: string
-  readonly extraMounts?: (root: string) => string[]
-} = {}) {
+async function runInSandbox(
+  mode: "prepare" | "adopt" | "unattested",
+  options: {
+    readonly extraEnv?: (worktree: string) => Promise<Record<string, string>>
+    readonly home?: string
+    readonly extraMounts?: (root: string) => string[]
+  } = {},
+) {
   const setup = fixture()
   const probe = join(setup.worktree, "engine-trust-probe.ts")
   writeFileSync(probe, probeSource)
   const env = {
-    PATH: process.env.PATH, HOME: options.home ?? process.env.HOME, TMPDIR: setup.hostTmp,
-    ...await (options.extraEnv ?? (async () => ({})))(setup.worktree),
+    PATH: process.env.PATH,
+    HOME: options.home ?? process.env.HOME,
+    TMPDIR: setup.hostTmp,
+    ...(await (options.extraEnv ?? (async () => ({})))(setup.worktree)),
   }
   const transform = buildSandboxTransform({
     policy: "required",
@@ -91,91 +106,138 @@ async function runInSandbox(mode: "prepare" | "adopt" | "unattested", options: {
   })
   const sandboxed = await transform(spawnArgs(setup, env, [probe, mode]))
   const separator = sandboxed.args.indexOf("--")
-  const args = [...sandboxed.args.slice(0, separator), ...(options.extraMounts?.(setup.root) ?? []), ...sandboxed.args.slice(separator)]
+  const args = [
+    ...sandboxed.args.slice(0, separator),
+    ...(options.extraMounts?.(setup.root) ?? []),
+    ...sandboxed.args.slice(separator),
+  ]
   const child = Bun.spawn([sandboxed.command, ...args], {
-    cwd: setup.worktree, env: sandboxed.env, stdout: "pipe", stderr: "pipe", timeout: 20_000,
+    cwd: setup.worktree,
+    env: sandboxed.env,
+    stdout: "pipe",
+    stderr: "pipe",
+    timeout: spawnTimeout(),
   })
-  const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+  const [code, stdout, stderr] = await Promise.all([
+    child.exited,
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+  ])
   return { code, stderr, outcome: JSON.parse(stdout) as Outcome }
 }
 
-test.skipIf(!bwrapUsable)("#given the real Linux reflection sandbox #when the child prepares its engine trust directory #then it gets a private directory instead of an unsafe-ancestor crash", async () => {
-  // given / when
-  const home = process.env.HOME ?? "/"
-  const { code, stderr, outcome } = await runInSandbox("prepare")
+test.skipIf(!bwrapUsable)(
+  "#given the real Linux reflection sandbox #when the child prepares its engine trust directory #then it gets a private directory instead of an unsafe-ancestor crash",
+  async () => {
+    useTestTimeout(60_000)
+    // given / when
+    const home = process.env.HOME ?? "/"
+    const { code, stderr, outcome } = await runInSandbox("prepare")
 
-  // then
-  expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
-  expect(outcome).toMatchObject({ ok: true })
-  // A HOME under /tmp lives on the sandbox's own writable tmpfs, so its trust directory is used as is;
-  // any other HOME is read-only inside the sandbox and falls back to mkdtemp under /tmp.
-  if (home.startsWith("/tmp/")) expect(outcome).toMatchObject({ directory: join(home, ".omo", "engine-trust"), codes: [] })
-  else expect(outcome.directory).toStartWith("/tmp/omo-engine-trust-")
-}, 60_000)
+    // then
+    expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
+    expect(outcome).toMatchObject({ ok: true })
+    // A HOME under /tmp lives on the sandbox's own writable tmpfs, so its trust directory is used as is;
+    // any other HOME is read-only inside the sandbox and falls back to mkdtemp under /tmp.
+    if (home.startsWith("/tmp/"))
+      expect(outcome).toMatchObject({ directory: join(home, ".omo", "engine-trust"), codes: [] })
+    else expect(outcome.directory).toStartWith("/tmp/omo-engine-trust-")
+  },
+  60_000,
+)
 
-test.skipIf(!bwrapUsable)("#given a parent trust generation outside the child's trust directory #when the sandboxed child adopts it #then the inherited marker's ancestors are attested and the generation verifies", async () => {
-  // given
-  const marker = async (worktree: string) => {
-    const { directory } = await prepareTrustDirectory(join(worktree, "parent-trust"), "linux")
-    roots.push(directory)
-    const generation = await writeTrustGeneration(directory, [], [], [])
-    return { SENPI_ENGINE_TRUST: JSON.stringify({ file: generation.file, sha256: generation.sha256, user: generation.user }) }
-  }
+test.skipIf(!bwrapUsable)(
+  "#given a parent trust generation outside the child's trust directory #when the sandboxed child adopts it #then the inherited marker's ancestors are attested and the generation verifies",
+  async () => {
+    useTestTimeout(60_000)
+    // given
+    const marker = async (worktree: string) => {
+      const { directory } = await prepareTrustDirectory(join(worktree, "parent-trust"), "linux")
+      roots.push(directory)
+      const generation = await writeTrustGeneration(directory, [], [], [])
+      return {
+        SENPI_ENGINE_TRUST: JSON.stringify({ file: generation.file, sha256: generation.sha256, user: generation.user }),
+      }
+    }
 
-  // when
-  const { code, stderr, outcome } = await runInSandbox("adopt", { extraEnv: marker })
+    // when
+    const { code, stderr, outcome } = await runInSandbox("adopt", { extraEnv: marker })
 
-  // then
-  expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
-  expect(outcome).toEqual({ ok: true, verified: true })
-}, 60_000)
+    // then
+    expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
+    expect(outcome).toEqual({ ok: true, verified: true })
+  },
+  60_000,
+)
 
-test.skipIf(!bwrapUsable)("#given a user namespace without the launcher's attestation #when the child prepares its trust directory #then it gets the named unattested refusal, not a crash", async () => {
-  // given / when
-  const { code, stderr, outcome } = await runInSandbox("unattested")
+test.skipIf(!bwrapUsable)(
+  "#given a user namespace without the launcher's attestation #when the child prepares its trust directory #then it gets the named unattested refusal, not a crash",
+  async () => {
+    useTestTimeout(60_000)
+    // given / when
+    const { code, stderr, outcome } = await runInSandbox("unattested")
 
-  // then
-  expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
-  expect(outcome).toMatchObject({ ok: false, code: "trust-userns-unattested" })
-}, 60_000)
+    // then
+    expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
+    expect(outcome).toMatchObject({ ok: false, code: "trust-userns-unattested" })
+  },
+  60_000,
+)
 
-test.skipIf(!bwrapUsable)("#given a user namespace whose overflow uid cannot be read #when the child prepares its trust directory #then it gets the named unattested refusal, not a crash", async () => {
-  // given / when
-  const { code, stderr, outcome } = await runInSandbox("prepare", {
-    extraMounts: () => ["--ro-bind", "/dev/null", "/proc/sys/kernel/overflowuid"],
-  })
+test.skipIf(!bwrapUsable)(
+  "#given a user namespace whose overflow uid cannot be read #when the child prepares its trust directory #then it gets the named unattested refusal, not a crash",
+  async () => {
+    useTestTimeout(60_000)
+    // given / when
+    const { code, stderr, outcome } = await runInSandbox("prepare", {
+      extraMounts: () => ["--ro-bind", "/dev/null", "/proc/sys/kernel/overflowuid"],
+    })
 
-  // then
-  expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
-  expect(outcome).toMatchObject({ ok: false, code: "trust-userns-unattested" })
-}, 60_000)
+    // then
+    expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
+    expect(outcome).toMatchObject({ ok: false, code: "trust-userns-unattested" })
+  },
+  60_000,
+)
 
-test.skipIf(!bwrapUsable)("#given an existing private trust directory on a read-only mount #when the sandboxed child prepares it #then it falls back to a private temp directory with trust-dir-readonly", async () => {
-  // given
-  const readOnlyHome = (root: string) => {
-    const home = join(root, "ro-home")
-    mkdirSync(join(home, ".omo", "engine-trust"), { recursive: true })
-    for (const dir of [home, join(home, ".omo"), join(home, ".omo", "engine-trust")]) chmodSync(dir, 0o700)
-    return ["--ro-bind", home, "/tmp/ro-home"]
-  }
+test.skipIf(!bwrapUsable)(
+  "#given an existing private trust directory on a read-only mount #when the sandboxed child prepares it #then it falls back to a private temp directory with trust-dir-readonly",
+  async () => {
+    useTestTimeout(60_000)
+    // given
+    const readOnlyHome = (root: string) => {
+      const home = join(root, "ro-home")
+      mkdirSync(join(home, ".omo", "engine-trust"), { recursive: true })
+      for (const dir of [home, join(home, ".omo"), join(home, ".omo", "engine-trust")]) chmodSync(dir, 0o700)
+      return ["--ro-bind", home, "/tmp/ro-home"]
+    }
 
-  // when
-  const { code, stderr, outcome } = await runInSandbox("prepare", { home: "/tmp/ro-home", extraMounts: readOnlyHome })
+    // when
+    const { code, stderr, outcome } = await runInSandbox("prepare", { home: "/tmp/ro-home", extraMounts: readOnlyHome })
 
-  // then
-  expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
-  expect(outcome.ok).toBe(true)
-  expect(outcome.directory).toStartWith("/tmp/omo-engine-trust-")
-  expect(outcome.codes).toEqual([{ code: "trust-dir-readonly" }])
-}, 60_000)
+    // then
+    expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
+    expect(outcome.ok).toBe(true)
+    expect(outcome.directory).toStartWith("/tmp/omo-engine-trust-")
+    expect(outcome.codes).toEqual([{ code: "trust-dir-readonly" }])
+  },
+  60_000,
+)
 
 test("#given a stale inherited attestation #when the Linux transform wraps the child #then TMPDIR is the sandbox tmpfs and the attestation is the launcher's own", async () => {
   // given
   const setup = fixture()
   const env = { PATH: process.env.PATH, HOME: setup.root, [USERNS_ROOTS_ENV]: "stale" }
   const transform = buildSandboxTransform({
-    policy: "required", worktreeDir: setup.worktree, gitCommonDir: setup.gitCommonDir, payloadPaths: [setup.payload],
-    command: "/bin/sh", env, platform: "linux", which: () => "/usr/bin/bwrap", probe: () => ({ usable: true }),
+    policy: "required",
+    worktreeDir: setup.worktree,
+    gitCommonDir: setup.gitCommonDir,
+    payloadPaths: [setup.payload],
+    command: "/bin/sh",
+    env,
+    platform: "linux",
+    which: () => "/usr/bin/bwrap",
+    probe: () => ({ usable: true }),
   })
 
   // when
@@ -203,8 +265,14 @@ test("#given the macOS sandbox #when it wraps the child #then it never writes th
   const setup = fixture()
   const env = { PATH: process.env.PATH, HOME: setup.root, [USERNS_ROOTS_ENV]: "inherited" }
   const transform = buildSandboxTransform({
-    policy: "required", worktreeDir: setup.worktree, gitCommonDir: setup.gitCommonDir, payloadPaths: [setup.payload],
-    command: "/bin/sh", env, platform: "darwin", which: () => "/usr/bin/sandbox-exec",
+    policy: "required",
+    worktreeDir: setup.worktree,
+    gitCommonDir: setup.gitCommonDir,
+    payloadPaths: [setup.payload],
+    command: "/bin/sh",
+    env,
+    platform: "darwin",
+    which: () => "/usr/bin/sandbox-exec",
   })
 
   // when

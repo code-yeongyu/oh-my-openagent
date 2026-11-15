@@ -2,11 +2,7 @@ import { getAgentListDisplayName } from "../shared/agent-display-names"
 
 type AgentOverridesMap = Record<string, { displayName?: string } | undefined>
 
-function rewriteAgentNameForListDisplay(
-  key: string,
-  value: unknown,
-  overrides?: AgentOverridesMap,
-): unknown {
+function rewriteAgentNameForListDisplay(key: string, value: unknown, overrides?: AgentOverridesMap): unknown {
   if (typeof value !== "object" || value === null) {
     return value
   }

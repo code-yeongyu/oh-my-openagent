@@ -10,9 +10,7 @@ import { createRpcModelAdmission } from "@oh-my-opencode/senpi-task/rpc-model-ad
 import { buildRpcModelCatalogSpawn, type RpcSpawnDescriptor } from "@oh-my-opencode/senpi-task/rpc-spawn"
 
 const agentDirs: string[] = []
-const mockProviderExtension = fileURLToPath(
-  new URL("../../../scripts/qa/mock-provider/index.ts", import.meta.url),
-)
+const mockProviderExtension = fileURLToPath(new URL("../../../scripts/qa/mock-provider/index.ts", import.meta.url))
 // Snapshot at module load, before any test in this process can mutate process.env:
 // other suites prepend fixture bin dirs to PATH, and a poisoned PATH changes
 // which Senpi launcher the probe resolves.
@@ -28,9 +26,11 @@ function buildPinnedCatalogSpawn(spec: RpcRunnerSpec, parentEnv: NodeJS.ProcessE
   })
 }
 
-function createAdmission(options: {
-  readonly onProbe?: (descriptor: RpcSpawnDescriptor) => void
-} = {}) {
+function createAdmission(
+  options: {
+    readonly onProbe?: (descriptor: RpcSpawnDescriptor) => void
+  } = {},
+) {
   const agentDir = mkdtempSync(join(tmpdir(), "omo-task-rpc-model-profile-"))
   agentDirs.push(agentDir)
   const parentEnv = {
@@ -98,7 +98,11 @@ describe("task RPC launch profile parity", () => {
   test("#given an explicit provider extension #when process model admission runs #then its model is visible without credentials", async () => {
     // given
     let observed: RpcSpawnDescriptor | undefined
-    const admit = createAdmission({ onProbe: (descriptor) => { observed = descriptor } })
+    const admit = createAdmission({
+      onProbe: (descriptor) => {
+        observed = descriptor
+      },
+    })
 
     // when
     const admission = admit(makeSpec([mockProviderExtension]))
@@ -120,7 +124,9 @@ describe("task RPC launch profile parity", () => {
 
     // then
     return admission.then(
-      () => { throw new Error("expected model admission to reject") },
+      () => {
+        throw new Error("expected model admission to reject")
+      },
       (error: unknown) => {
         expect(error).toMatchObject({
           failure: {

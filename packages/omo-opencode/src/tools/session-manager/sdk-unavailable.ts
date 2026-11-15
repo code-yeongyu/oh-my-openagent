@@ -35,9 +35,7 @@ function collectErrorTexts(value: unknown): string[] {
 }
 
 export function isSessionSdkUnavailableError(value: unknown): boolean {
-  const haystack = collectErrorTexts(value)
-    .join(" ")
-    .toLowerCase()
+  const haystack = collectErrorTexts(value).join(" ").toLowerCase()
 
   return SDK_UNAVAILABLE_PATTERNS.some((pattern) => haystack.includes(pattern))
 }

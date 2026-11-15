@@ -18,7 +18,7 @@ const fallback = {
 } as const
 
 function planner(plan: ResolvedChildPlan) {
-  return () => ({ kind: "resolved", plan } as const)
+  return () => ({ kind: "resolved", plan }) as const
 }
 
 function spillPlan(): ResolvedChildPlan {

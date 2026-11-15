@@ -158,7 +158,13 @@ function normalizeInlineMember(member: JsonRecord, options?: NormalizeTeamSpecIn
       normalizedMember.kind = "category"
     } else if (typeof normalizedMember.subagent_type === "string") {
       normalizedMember.kind = "subagent_type"
-    } else if (typeof rawKind === "string" && rawKind !== "agent" && rawKind !== "member" && rawKind !== "worker" && rawKind !== "analyst") {
+    } else if (
+      typeof rawKind === "string" &&
+      rawKind !== "agent" &&
+      rawKind !== "member" &&
+      rawKind !== "worker" &&
+      rawKind !== "analyst"
+    ) {
       normalizedMember.kind = "category"
       normalizedMember.category = rawKind
     } else if (options?.defaultCategoryName !== undefined) {
@@ -185,20 +191,19 @@ export function normalizeTeamSpecInput(raw: unknown, options?: NormalizeTeamSpec
   }
 
   const rawMembers = raw.members
-  const rawLead = isJsonRecord(raw.lead) && Object.keys(omitEmptyStringFields(raw.lead)).length > 0
-    ? raw.lead
-    : undefined
+  const rawLead =
+    isJsonRecord(raw.lead) && Object.keys(omitEmptyStringFields(raw.lead)).length > 0 ? raw.lead : undefined
   let leadAgentId = typeof normalizedSpec.leadAgentId === "string" ? normalizedSpec.leadAgentId : undefined
-  const hasExplicitLead = leadAgentId !== undefined
-    || rawLead !== undefined
-    || (Array.isArray(rawMembers) && hasMemberLeadFlag(rawMembers))
+  const hasExplicitLead =
+    leadAgentId !== undefined || rawLead !== undefined || (Array.isArray(rawMembers) && hasMemberLeadFlag(rawMembers))
 
   if (Array.isArray(rawMembers)) {
-    let normalizedMembers = rawMembers.map((member) => isJsonRecord(member) ? normalizeInlineMember(member, options) : member)
+    let normalizedMembers = rawMembers.map((member) =>
+      isJsonRecord(member) ? normalizeInlineMember(member, options) : member,
+    )
     const callerTeamLead = options?.callerTeamLead
-    const shouldUseFirstMemberAsLead = !hasExplicitLead
-      && normalizedMembers.length >= 8
-      && callerTeamLead?.isEligibleForTeamLead === true
+    const shouldUseFirstMemberAsLead =
+      !hasExplicitLead && normalizedMembers.length >= 8 && callerTeamLead?.isEligibleForTeamLead === true
 
     if (isJsonRecord(rawLead)) {
       const leadMember = normalizeInlineMember(rawLead, options)
@@ -207,7 +212,8 @@ export function normalizeTeamSpecInput(raw: unknown, options?: NormalizeTeamSpec
       }
 
       const leadName = getMemberName(leadMember)
-      const alreadyPresent = leadName !== undefined && normalizedMembers.some((member) => getMemberName(member) === leadName)
+      const alreadyPresent =
+        leadName !== undefined && normalizedMembers.some((member) => getMemberName(member) === leadName)
       if (!alreadyPresent) {
         normalizedMembers = [leadMember, ...normalizedMembers]
       }
@@ -224,7 +230,9 @@ export function normalizeTeamSpecInput(raw: unknown, options?: NormalizeTeamSpec
         normalizedMembers = [createCallerLeadMember(callerTeamLead.agentTypeId), ...normalizedMembers]
         leadAgentId = "lead"
       } else if (callerTeamLead?.displayName !== undefined) {
-        throw new Error(`Caller agent ${callerTeamLead.displayName} is not eligible as team lead; specify leadAgentId explicitly`)
+        throw new Error(
+          `Caller agent ${callerTeamLead.displayName} is not eligible as team lead; specify leadAgentId explicitly`,
+        )
       }
     }
 

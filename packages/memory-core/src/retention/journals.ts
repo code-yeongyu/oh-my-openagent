@@ -19,7 +19,15 @@ import { JournalLockTimeoutError, withLocalJournalLock, type JournalLock } from 
 import { TranscriptJournal } from "../journal/store"
 import type { LazyRetentionGuard } from "./guard"
 import type { UnreflectedRetentionGate } from "./reflection-health-signal"
-import { DAY_MS, StoreTally, errorCode, listNames, type RetentionContext, type RetentionKeepReason, type RetentionStoreResult } from "./policy"
+import {
+  DAY_MS,
+  StoreTally,
+  errorCode,
+  listNames,
+  type RetentionContext,
+  type RetentionKeepReason,
+  type RetentionStoreResult,
+} from "./policy"
 
 const TRANSCRIPT = "transcript.jsonl"
 const STATE = "state.json"
@@ -39,10 +47,12 @@ export async function pruneTranscriptJournals(
     if (context.budget?.skip("journals", sessionId) === true) continue
     if (context.budget?.admit("journals") === false) break
     // One journal that cannot be read is kept with its reason; it never stops the rest of the pass.
-    const outcome = await visitJournal(context, lazyGuard, gate, lock, sessionId).catch((error: unknown): RetentionKeepReason => {
-      if (context.signal?.aborted === true) throw error
-      return "state-unreadable"
-    })
+    const outcome = await visitJournal(context, lazyGuard, gate, lock, sessionId).catch(
+      (error: unknown): RetentionKeepReason => {
+        if (context.signal?.aborted === true) throw error
+        return "state-unreadable"
+      },
+    )
     if (outcome === "removed") tally.removed.push(sessionId)
     else if (outcome !== undefined) tally.keep(sessionId, outcome)
     context.budget?.done("journals", sessionId)
@@ -72,7 +82,12 @@ async function visitJournal(
   return removeUnderLock(context, dir, lock, gate)
 }
 
-async function judge(context: RetentionContext, dir: string, holdingLock: boolean, gate: UnreflectedRetentionGate | undefined): Promise<Verdict> {
+async function judge(
+  context: RetentionContext,
+  dir: string,
+  holdingLock: boolean,
+  gate: UnreflectedRetentionGate | undefined,
+): Promise<Verdict> {
   const state = await readState(join(dir, STATE))
   if (state === "unreadable") return "state-unreadable"
   const kind = classify(state)
@@ -84,7 +99,8 @@ async function judge(context: RetentionContext, dir: string, holdingLock: boolea
   const cutoff = context.now() - days * DAY_MS
   const newest = await newestFileMtime(dir, holdingLock)
   if (newest === undefined || newest > cutoff) return "recent"
-  const startedAt = typeof state?.last_reflection_started_at === "string" ? Date.parse(state.last_reflection_started_at) : Number.NaN
+  const startedAt =
+    typeof state?.last_reflection_started_at === "string" ? Date.parse(state.last_reflection_started_at) : Number.NaN
   if (!Number.isNaN(startedAt) && startedAt > cutoff) return "recent"
   if (state !== undefined && !(await transcriptMatchesState(dir, state))) return "state-behind-transcript"
   return kind
@@ -103,11 +119,14 @@ async function transcriptMatchesState(dir: string, state: Record<string, unknown
   const rowBytes = entries.reduce((total, entry) => total + Buffer.byteLength(`${JSON.stringify(entry)}\n`, "utf8"), 0)
   if (rowBytes !== size) return false
   const anchor = typeof state.reflected_through_message_id === "string" ? state.reflected_through_message_id : undefined
-  const derived = deriveState({
-    ...initialReflectionState(),
-    ...(anchor === undefined ? {} : { reflected_through_message_id: anchor }),
-    reflected_completed_steps: count(state.reflected_completed_steps) ?? 0,
-  }, entries)
+  const derived = deriveState(
+    {
+      ...initialReflectionState(),
+      ...(anchor === undefined ? {} : { reflected_through_message_id: anchor }),
+      reflected_completed_steps: count(state.reflected_completed_steps) ?? 0,
+    },
+    entries,
+  )
   if (derived.total_completed_steps !== count(state.total_completed_steps)) return false
   return state.unreflected_bytes === undefined || derived.unreflected_bytes === state.unreflected_bytes
 }
@@ -120,7 +139,8 @@ function classify(state: Record<string, unknown> | undefined): { readonly kind: 
   if (total === undefined || reflected === undefined || since === undefined) return "unclassified"
   const anchor = typeof state.reflected_through_message_id === "string" && state.reflected_through_message_id.length > 0
   if (reflected === 0 && !anchor) return { kind: "never" }
-  if (total > 0 && since === 0 && anchor) return state.pending_compaction === true ? "pending-compaction" : { kind: "fully" }
+  if (total > 0 && since === 0 && anchor)
+    return state.pending_compaction === true ? "pending-compaction" : { kind: "fully" }
   if (reflected > 0 && since > 0 && anchor) return { kind: "partly" }
   return "unclassified"
 }
@@ -141,7 +161,9 @@ async function readState(path: string): Promise<Record<string, unknown> | undefi
   }
   try {
     const parsed: unknown = JSON.parse(raw)
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : "unreadable"
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : "unreadable"
   } catch {
     return "unreadable"
   }
@@ -207,11 +229,16 @@ async function unlinkIfPresent(path: string): Promise<void> {
 
 async function stampPruned(statePath: string, now: number): Promise<void> {
   const state = await readState(statePath)
-  if (state === "unreadable" || state === undefined) throw new Error(`journal state vanished under its lock: ${statePath}`)
+  if (state === "unreadable" || state === undefined)
+    throw new Error(`journal state vanished under its lock: ${statePath}`)
   const temporary = `${statePath}.tmp-${randomUUID()}`
   try {
     const { reflected_through_byte_offset: _offset, ...kept } = state
-    await writeFile(temporary, `${JSON.stringify({ ...kept, transcript_pruned_at: new Date(now).toISOString() }, null, 2)}\n`, "utf8")
+    await writeFile(
+      temporary,
+      `${JSON.stringify({ ...kept, transcript_pruned_at: new Date(now).toISOString() }, null, 2)}\n`,
+      "utf8",
+    )
     await rename(temporary, statePath)
   } catch (error) {
     await rm(temporary, { force: true })

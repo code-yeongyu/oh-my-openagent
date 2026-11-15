@@ -1,4 +1,9 @@
-import { createModelDistributor, isExcludedModel, type ModelDistributor, type OmoConfig } from "@oh-my-opencode/omo-config-core"
+import {
+  createModelDistributor,
+  isExcludedModel,
+  type ModelDistributor,
+  type OmoConfig,
+} from "@oh-my-opencode/omo-config-core"
 
 import { inheritParentFastMode, type ResolveParentServiceTier } from "./fast-mode-inheritance"
 import { NO_REGISTRY_MESSAGE, resolveExplicitPin, type ResolveDefaultRoute } from "./planner-explicit-pin"
@@ -30,6 +35,10 @@ export type ResolveModelRegistry = () => TaskModelRegistry | undefined
 
 export type { ResolveDefaultRoute } from "./planner-explicit-pin"
 
+// A ChildPlanner that can be handed the config snapshot to plan against, so a caller that reads the
+// live config for the same plan (the generation observer) observes exactly what the planner used.
+export type ConfigScopedChildPlanner = (spec: Parameters<ChildPlanner>[0], omoConfig?: OmoConfig) => PlanResolution
+
 // The category-and-agent resolving ChildPlanner the manager consumes. Resolution order:
 // 1. a subagent_type naming a known agent wins: an explicit `model` pin is parsed ONCE with
 //    senpi's own resolver and must resolve against the live registry, or the spawn fails typed
@@ -42,22 +51,32 @@ export type { ResolveDefaultRoute } from "./planner-explicit-pin"
 // Whatever path resolved, the plan then inherits the parent's effective execution tier
 // (fast-mode-inheritance.ts) so a fast parent never delegates to a standard-tier child.
 export function createTaskChildPlanner(
-  omoConfig: OmoConfig,
+  omoConfig: OmoConfig | (() => OmoConfig),
   agents: Readonly<Record<string, AgentDefinition>>,
   resolveRegistry: ResolveModelRegistry,
   resolveParentServiceTier: ResolveParentServiceTier = () => undefined,
   resolveDefaultRoute?: ResolveDefaultRoute,
-): ChildPlanner {
+): ConfigScopedChildPlanner {
   const distributeModels = createModelDistributor()
   const availableAgents = listAvailableAgents(agents)
-  const planChild = (spec: Parameters<ChildPlanner>[0]): PlanResolution => {
+  const planChild = (spec: Parameters<ChildPlanner>[0], liveConfig: OmoConfig): PlanResolution => {
     if (spec.subagent_type !== undefined) {
-      const agentResolution = resolveAgentTarget(spec.subagent_type, spec.model, agents, resolveRegistry, omoConfig, distributeModels, resolveDefaultRoute)
-      return agentResolution ?? unresolvableAgentTarget(spec.subagent_type, availableAgents, resolveRegistry, omoConfig)
+      const agentResolution = resolveAgentTarget(
+        spec.subagent_type,
+        spec.model,
+        agents,
+        resolveRegistry,
+        liveConfig,
+        distributeModels,
+        resolveDefaultRoute,
+      )
+      return (
+        agentResolution ?? unresolvableAgentTarget(spec.subagent_type, availableAgents, resolveRegistry, liveConfig)
+      )
     }
 
     if (spec.model !== undefined && spec.model.length > 0) {
-      const pin = resolveExplicitPin(spec.model, resolveRegistry, resolveDefaultRoute, omoConfig.exclude_models)
+      const pin = resolveExplicitPin(spec.model, resolveRegistry, resolveDefaultRoute, liveConfig.exclude_models)
       if (pin.kind !== "resolved") return { kind: "error", error: pin.error }
       return {
         kind: "resolved",
@@ -71,7 +90,10 @@ export function createTaskChildPlanner(
 
     const categoryName = spec.category
     if (categoryName === undefined) {
-      return { kind: "error", error: { code: "invalid_target", message: "A task requires a category, subagent_type, or model." } }
+      return {
+        kind: "error",
+        error: { code: "invalid_target", message: "A task requires a category, subagent_type, or model." },
+      }
     }
 
     const registry = resolveRegistry()
@@ -82,26 +104,29 @@ export function createTaskChildPlanner(
       }
     }
 
-    const resolution = resolveCategory(categoryName, omoConfig, registry, { distributeModels })
+    const resolution = resolveCategory(categoryName, liveConfig, registry, { distributeModels })
     const plan = toPlanResolution(categoryName, resolution, availableAgents)
     // Q's standing model rule: a chain ends in a typed failure that names each model, so the parent
     // reads the whole chain and the fix instead of retrying a dead binding. No substitution happens.
     if (plan.kind === "error" && plan.error.code === "model_unavailable") {
       const message = categoryModelFailureText(
         plan.error,
-        omoConfig,
+        liveConfig,
         resolution.kind === "model_unavailable" ? resolution.category : undefined,
       )
       if (message !== undefined) return { kind: "error", error: { ...plan.error, message } }
     }
     return plan
   }
-  return (spec): PlanResolution => {
-    const resolution = planChild(spec)
+  return (spec, planConfig): PlanResolution => {
+    // Mid-session omo.json(c) edits must reach new plans: resolve the config per plan instead of
+    // closing over the composition-time snapshot (a stale object silently pins old category models).
+    const liveConfig = planConfig ?? (typeof omoConfig === "function" ? omoConfig() : omoConfig)
+    const resolution = planChild(spec, liveConfig)
     if (resolution.kind !== "resolved") return resolution
     const fast = inheritParentFastMode(resolution.plan, resolveRegistry(), resolveParentServiceTier())
     // The -fast sibling is a different model: exclude_models can keep it out while the planned one runs.
-    return { kind: "resolved", plan: isExcludedModel(fast.model, omoConfig.exclude_models) ? resolution.plan : fast }
+    return { kind: "resolved", plan: isExcludedModel(fast.model, liveConfig.exclude_models) ? resolution.plan : fast }
   }
 }
 
@@ -175,19 +200,19 @@ function unresolvableAgentTarget(
   }
 }
 
-function toAgentPlan(resolution: ResolvedAgentResult, explicitModel: ResolvedModelMetadata | undefined, canonicalModel?: string): ResolvedPlan {
+function toAgentPlan(
+  resolution: ResolvedAgentResult,
+  explicitModel: ResolvedModelMetadata | undefined,
+  canonicalModel?: string,
+): ResolvedPlan {
   const resolvedModel = resolution.resolved_model ?? explicitModel
   // Identical precedence to the category path below: reasoning outranks reasoningEffort outranks
   // variant, and whichever is chosen becomes the child's thinking level through asSenpiThinkingLevel.
   const appliedVariant = resolvedModel?.reasoning ?? resolvedModel?.reasoning_effort ?? resolvedModel?.variant
   return {
     model: canonicalModel ?? resolution.model,
-    ...(resolution.requested_model !== undefined
-      ? { requested_model: resolution.requested_model }
-      : {}),
-    ...(resolution.fallback_models !== undefined
-      ? { fallback_models: resolution.fallback_models }
-      : {}),
+    ...(resolution.requested_model !== undefined ? { requested_model: resolution.requested_model } : {}),
+    ...(resolution.fallback_models !== undefined ? { fallback_models: resolution.fallback_models } : {}),
     ...(resolvedModel !== undefined ? { resolved_model: resolvedModel } : {}),
     ...(appliedVariant !== undefined ? { variant: appliedVariant } : {}),
     agentType: resolution.agentType,
@@ -220,19 +245,17 @@ function toPlanResolution(
       kind: "resolved",
       plan: {
         model: `${resolution.spec.provider}/${resolution.spec.modelId}`,
-        ...(resolution.spec.requested_model !== undefined
-          ? { requested_model: resolution.spec.requested_model }
-          : {}),
-        ...(resolution.spec.fallback_models !== undefined
-          ? { fallback_models: resolution.spec.fallback_models }
-          : {}),
+        ...(resolution.spec.requested_model !== undefined ? { requested_model: resolution.spec.requested_model } : {}),
+        ...(resolution.spec.fallback_models !== undefined ? { fallback_models: resolution.spec.fallback_models } : {}),
         resolved_model: {
           source: "category",
           provider: resolution.spec.provider,
           model_id: resolution.spec.modelId,
           display: resolution.spec.displayName ?? `${resolution.spec.provider}/${resolution.spec.modelId}`,
           ...(resolution.spec.variant !== undefined ? { variant: resolution.spec.variant } : {}),
-          ...(resolution.spec.reasoningEffort !== undefined ? { reasoning_effort: resolution.spec.reasoningEffort } : {}),
+          ...(resolution.spec.reasoningEffort !== undefined
+            ? { reasoning_effort: resolution.spec.reasoningEffort }
+            : {}),
           ...(resolution.spec.reasoning !== undefined ? { reasoning: resolution.spec.reasoning } : {}),
         },
         ...(appliedVariant !== undefined ? { variant: appliedVariant } : {}),
@@ -244,7 +267,11 @@ function toPlanResolution(
   if (resolution.kind === "disabled") {
     return {
       kind: "error",
-      error: { code: "category_disabled", message: resolution.reason, availableCategories: resolution.availableCategories },
+      error: {
+        code: "category_disabled",
+        message: resolution.reason,
+        availableCategories: resolution.availableCategories,
+      },
     }
   }
   if (resolution.kind === "not_found") {
@@ -268,7 +295,9 @@ function toPlanResolution(
       category: categoryName,
       ...(resolution.attempted_chain !== undefined && { attempted_chain: resolution.attempted_chain }),
       ...(resolution.missing_providers !== undefined && { missing_providers: resolution.missing_providers }),
-      ...(resolution.unlisted_provider_model !== undefined && { unlisted_provider_model: resolution.unlisted_provider_model }),
+      ...(resolution.unlisted_provider_model !== undefined && {
+        unlisted_provider_model: resolution.unlisted_provider_model,
+      }),
     },
   }
 }

@@ -2,7 +2,12 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { connect } from "../../vendor/bunshin-ts/index.js"
 import { createRelayTransport, relayStatus } from "../../vendor/bunshin-ts-relay/index.js"
 
-import { FAKE_DEVICES, startFakeDeviceService, type FakeDevice, type FakeDeviceService } from "./bunshin-ts-fake-service"
+import {
+  FAKE_DEVICES,
+  startFakeDeviceService,
+  type FakeDevice,
+  type FakeDeviceService,
+} from "./bunshin-ts-fake-service"
 
 const services: FakeDeviceService[] = []
 afterEach(async () => {
@@ -26,7 +31,11 @@ async function started(devices: readonly FakeDevice[] = FAKE_DEVICES): Promise<F
 describe("bunshin-ts QA fake device service", () => {
   test("#given the fake #when the real relay client probes it #then the mutual proof verifies and the status answers connected", async () => {
     const service = await started()
-    expect(await relayStatus({ stateDir: service.stateDir })).toEqual({ state: "connected", device: { id: "fake-dev-self", name: "QA device" }, connected: true })
+    expect(await relayStatus({ stateDir: service.stateDir })).toEqual({
+      state: "connected",
+      device: { id: "fake-dev-self", name: "QA device" },
+      connected: true,
+    })
     expect(service.authenticated()).toBe(1)
   })
 
@@ -35,7 +44,10 @@ describe("bunshin-ts QA fake device service", () => {
     const client = await connect({ transport: createRelayTransport({ stateDir: service.stateDir }) })
     try {
       const machines = await client.listMachines()
-      expect(machines.map((machine) => [machine.alias, machine.transport])).toEqual([...FAKE_DEVICES.map((device) => [device.label, "relay"]), ["QA device", "relay"]])
+      expect(machines.map((machine) => [machine.alias, machine.transport])).toEqual([
+        ...FAKE_DEVICES.map((device) => [device.label, "relay"]),
+        ["QA device", "relay"],
+      ])
       const builder = await client.getMachine("builder")
       expect((await builder.shell("hostname")).stdout).toBe("builder: hostname")
     } finally {

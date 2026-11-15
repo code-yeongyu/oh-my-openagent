@@ -20,16 +20,22 @@ export type LeadPoller = {
 }
 
 export type LeadPollerDeps = {
-  readonly teamRunId: string; readonly config: TeamModeConfig
+  readonly teamRunId: string
+  readonly config: TeamModeConfig
   readonly coordinator: LeadInjectionSink
   readonly deliveryJournal?: LeadDeliveryJournal
   readonly appendEvent?: (taskId: string, event: PersistedTaskEvent) => void
-  readonly eventTaskId: (message: Message) => string | undefined; readonly leadSessionFile?: () => string | undefined
+  readonly eventTaskId: (message: Message) => string | undefined
+  readonly leadSessionFile?: () => string | undefined
 }
 
 export type PendingPhase = "awaiting_flush" | "awaiting_persistence" | "recovery"
 
-export type PendingDelivery = { readonly message: Message; readonly reservation: DeliveryReservation; phase: PendingPhase }
+export type PendingDelivery = {
+  readonly message: Message
+  readonly reservation: DeliveryReservation
+  phase: PendingPhase
+}
 
 export type LeadPollState = {
   readonly pending: Map<string, PendingDelivery>

@@ -16,10 +16,15 @@ beforeAll(async () => {
   // The stage relocates a directory reached through any link (macOS tmpdir() is under /var -> /private/var),
   // so the directories these tests name must be canonical.
   root = await mkdtemp(join(await realpath(tmpdir()), "omo-trust-ensure-"))
-  const certs = await issueCertificates(root, ["root", "extra", "user"].map((name) => ({
-    name, subject: `/CN=synthetic-ensure-${name}`, days: 2,
-    extensions: "basicConstraints=critical,CA:TRUE\nkeyUsage=critical,keyCertSign,cRLSign",
-  })))
+  const certs = await issueCertificates(
+    root,
+    ["root", "extra", "user"].map((name) => ({
+      name,
+      subject: `/CN=synthetic-ensure-${name}`,
+      days: 2,
+      extensions: "basicConstraints=critical,CA:TRUE\nkeyUsage=critical,keyCertSign,cRLSign",
+    })),
+  )
   ;[ca, extra, user] = ["root", "extra", "user"].map((name) => {
     const pem = certs.get(name)
     if (pem === undefined) throw new Error(`missing synthetic certificate ${name}`)
@@ -32,28 +37,51 @@ afterAll(async () => {
 
 const directory = () => mkdtemp(join(root, "ensure-"))
 const sha256 = (text: string) => createHash("sha256").update(text).digest("hex")
-type Ensured = { v: number; file: string; sha256: string; automatic: string; fallbackReason: string | null
-  user: string | null; defaults: { file: string; dir: string } | null; diagnostics: { code: string }[] }
+type Ensured = {
+  v: number
+  file: string
+  sha256: string
+  automatic: string
+  fallbackReason: string | null
+  user: string | null
+  defaults: { file: string; dir: string } | null
+  diagnostics: { code: string }[]
+}
 
 async function ensure(dir: string, args: string[], overrides: Partial<TrustStageOptions> = {}) {
   const out: string[] = []
   const err: string[] = []
   let budget = 0
   const result = await runTrustStage({
-    args: ["trust", "ensure", ...args], directory: dir, env: {}, loadedExtra: () => [],
-    acquire: async (options) => { budget = options.deadlineMs; return { certificates: [ca], fallbackReason: null, codes: [] } },
-    exec: async () => { throw new Error("trust ensure must never exec") },
-    stdout: (line) => out.push(line), stderr: (line) => err.push(line),
+    args: ["trust", "ensure", ...args],
+    directory: dir,
+    env: {},
+    loadedExtra: () => [],
+    acquire: async (options) => {
+      budget = options.deadlineMs
+      return { certificates: [ca], fallbackReason: null, codes: [] }
+    },
+    exec: async () => {
+      throw new Error("trust ensure must never exec")
+    },
+    stdout: (line) => out.push(line),
+    stderr: (line) => err.push(line),
     ...overrides,
   })
   return { result, out: out.join(""), err: err.join(""), budget }
 }
 const parsed = (out: string) => JSON.parse(out) as Ensured
 async function records(dir: string) {
-  return (await readFile(join(dir, "diagnostics.jsonl"), "utf8")).trim().split("\n").map((line) => JSON.parse(line))
+  return (await readFile(join(dir, "diagnostics.jsonl"), "utf8"))
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line))
 }
 async function exists(path: string) {
-  return stat(path).then(() => true, () => false)
+  return stat(path).then(
+    () => true,
+    () => false,
+  )
 }
 
 test.each([
@@ -65,8 +93,12 @@ test.each([
   expect(trustLaunchKind(args)).toBe(kind)
 })
 
-test.each([[[], 1500], [["--wait"], 20_000]] as const)(
-  "trust ensure %j imports with a %i ms budget, prints the 5.2 fields and never execs", async (args, expected) => {
+test.each([
+  [[], 1500],
+  [["--wait"], 20_000],
+] as const)(
+  "trust ensure %j imports with a %i ms budget, prints the 5.2 fields and never execs",
+  async (args, expected) => {
     const dir = await directory()
     const { result, out, budget } = await ensure(dir, ["--json", ...args], {
       env: { OMO_EXTRA_CA_CERTIFICATES: extra, SENPI_ENGINE_TRUST_HOP: "1" },
@@ -76,7 +108,16 @@ test.each([[[], 1500], [["--wait"], 20_000]] as const)(
     expect(out.endsWith("\n")).toBe(true)
     expect(out.trim().split("\n")).toHaveLength(1)
     const value = parsed(out)
-    expect(Object.keys(value)).toEqual(["v", "file", "sha256", "automatic", "fallbackReason", "user", "defaults", "diagnostics"])
+    expect(Object.keys(value)).toEqual([
+      "v",
+      "file",
+      "sha256",
+      "automatic",
+      "fallbackReason",
+      "user",
+      "defaults",
+      "diagnostics",
+    ])
     expect(value).toMatchObject({ v: 1, automatic: "os", fallbackReason: null, user: null, diagnostics: [] })
     const text = await readFile(value.file, "utf8")
     expect(basename(value.file)).toBe(`${value.sha256}.pem`)
@@ -91,7 +132,12 @@ test.each([[[], 1500], [["--wait"], 20_000]] as const)(
     expect(await readdir(defaults.dir)).toEqual([])
     const log = await records(dir)
     expect(log).toHaveLength(1)
-    expect(log[0]).toMatchObject({ action: "ensure", kind: expected === 1500 ? "short-host-cli" : "one-shot-network", generation: value.sha256, codes: [] })
+    expect(log[0]).toMatchObject({
+      action: "ensure",
+      kind: expected === 1500 ? "short-host-cli" : "one-shot-network",
+      generation: value.sha256,
+      codes: [],
+    })
     // No lease without --lease-pid: this process exits as soon as it prints.
     expect(await readdir(join(dir, "leases")).catch(() => [])).toEqual([])
   },
@@ -102,12 +148,17 @@ test("a fallback ensure is reported as a fallback, keeps the closure and holds o
   const userFile = join(dir, "user.pem")
   await writeFile(userFile, user)
   const { result, out } = await ensure(dir, ["--json"], {
-    env: { OMO_EXTRA_CA_CERTIFICATES: extra, NODE_EXTRA_CA_CERTS: userFile }, loadedExtra: () => [user],
+    env: { OMO_EXTRA_CA_CERTIFICATES: extra, NODE_EXTRA_CA_CERTS: userFile },
+    loadedExtra: () => [user],
     acquire: async () => ({ certificates: [ca], fallbackReason: "helper-timeout", codes: [] }),
   })
   expect(result).toEqual({ action: "ensure" })
   const value = parsed(out)
-  expect(value).toMatchObject({ automatic: "fallback", fallbackReason: "helper-timeout", diagnostics: [{ code: "helper-timeout" }] })
+  expect(value).toMatchObject({
+    automatic: "fallback",
+    fallbackReason: "helper-timeout",
+    diagnostics: [{ code: "helper-timeout" }],
+  })
   expect(value.defaults).not.toBeNull()
   const text = await readFile(value.file, "utf8")
   expect(text).not.toContain(ca.trim())
@@ -119,10 +170,18 @@ test("a fallback ensure is reported as a fallback, keeps the closure and holds o
 
 test("a dropped OpenSSL default file is reported in the ensure result as defaultFileDrop (design 4.4 item 6)", async () => {
   const dir = await directory()
-  const drop = { code: "openssl-default-file-malformed", file: "/etc/ssl/cert.pem", cause: "ordinary-block-unparseable", blockIndex: 3, narrowing: true } as const
+  const drop = {
+    code: "openssl-default-file-malformed",
+    file: "/etc/ssl/cert.pem",
+    cause: "ordinary-block-unparseable",
+    blockIndex: 3,
+    narrowing: true,
+  } as const
   const { out } = await ensure(dir, ["--json"], {
     acquire: async () => ({
-      certificates: [ca], fallbackReason: null, defaultFileDrop: drop,
+      certificates: [ca],
+      fallbackReason: null,
+      defaultFileDrop: drop,
       codes: [drop],
     }),
   })
@@ -159,9 +218,24 @@ test("--lease-pid writes { v, pid, bootAtMs } by rename, and a second lease by t
 
 test("a lease for another pid outlives the ensure process and pins its generation past 16 newer ones", async () => {
   const dir = await directory()
-  const probe = Bun.spawn([process.execPath, join(import.meta.dir, "fixtures/trust-ensure-probe.ts"), dir,
-    "trust", "ensure", "--json", "--lease-pid", String(process.pid)], { stdout: "pipe", stderr: "pipe", timeout: 20_000 })
-  const [code, stdout, stderr] = await Promise.all([probe.exited, new Response(probe.stdout).text(), new Response(probe.stderr).text()])
+  const probe = Bun.spawn(
+    [
+      process.execPath,
+      join(import.meta.dir, "fixtures/trust-ensure-probe.ts"),
+      dir,
+      "trust",
+      "ensure",
+      "--json",
+      "--lease-pid",
+      String(process.pid),
+    ],
+    { stdout: "pipe", stderr: "pipe", timeout: 20_000 },
+  )
+  const [code, stdout, stderr] = await Promise.all([
+    probe.exited,
+    new Response(probe.stdout).text(),
+    new Response(probe.stderr).text(),
+  ])
   expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
   const leased = parsed(stdout)
   const leaseFile = join(dir, "leases", `${leased.sha256}.${process.pid}`)
@@ -248,8 +322,11 @@ test("an unrecoverable U refuses with exit 78 semantics and prints no generation
   const generation = join(dir, `${"b".repeat(64)}.pem`)
   await writeFile(generation, `# omo-engine-trust-generation v1 user=${"c".repeat(64)}\n${ca}`, { mode: 0o600 })
   const { result, out, err } = await ensure(dir, ["--json"], {
-    env: { NODE_EXTRA_CA_CERTS: generation }, loadedExtra: () => [ca],
-    acquire: async () => { throw new Error("unrecoverable U acquired") },
+    env: { NODE_EXTRA_CA_CERTS: generation },
+    loadedExtra: () => [ca],
+    acquire: async () => {
+      throw new Error("unrecoverable U acquired")
+    },
   })
   expect(result).toMatchObject({ action: "refuse", code: "trust-user-extras-unrecoverable" })
   expect(out).toBe("")
@@ -257,20 +334,39 @@ test("an unrecoverable U refuses with exit 78 semantics and prints no generation
 })
 
 test.each([
-  [["trust"]], [["trust", "status"]], [["trust", "ensure"]], [["trust", "ensure", "--wait"]],
-  [["trust", "ensure", "--json", "--json"]], [["trust", "ensure", "--json", "--wait", "--wait"]],
-  [["trust", "ensure", "--json", "--lease-pid"]], [["trust", "ensure", "--json", "--lease-pid", "0"]],
-  [["trust", "ensure", "--json", "--lease-pid", "-5"]], [["trust", "ensure", "--json", "--lease-pid", "007"]],
-  [["trust", "ensure", "--json", "--lease-pid", "12x"]], [["trust", "ensure", "--json", "--lease-pid", "2147483648"]],
-  [["trust", "ensure", "--json", "--lease-pid", "1", "--lease-pid", "2"]], [["trust", "ensure", "--json", "--lease-pid=1"]],
-  [["trust", "ensure", "--json", "--force"]], [["trust", "ensure", "--json", "--", "x"]],
+  [["trust"]],
+  [["trust", "status"]],
+  [["trust", "ensure"]],
+  [["trust", "ensure", "--wait"]],
+  [["trust", "ensure", "--json", "--json"]],
+  [["trust", "ensure", "--json", "--wait", "--wait"]],
+  [["trust", "ensure", "--json", "--lease-pid"]],
+  [["trust", "ensure", "--json", "--lease-pid", "0"]],
+  [["trust", "ensure", "--json", "--lease-pid", "-5"]],
+  [["trust", "ensure", "--json", "--lease-pid", "007"]],
+  [["trust", "ensure", "--json", "--lease-pid", "12x"]],
+  [["trust", "ensure", "--json", "--lease-pid", "2147483648"]],
+  [["trust", "ensure", "--json", "--lease-pid", "1", "--lease-pid", "2"]],
+  [["trust", "ensure", "--json", "--lease-pid=1"]],
+  [["trust", "ensure", "--json", "--force"]],
+  [["trust", "ensure", "--json", "--", "x"]],
 ] as const)("%j is a usage error before any import or write", async (args) => {
   const dir = join(root, `usage-${Math.random().toString(16).slice(2)}`)
   const err: string[] = []
   const result = await runTrustStage({
-    args, directory: dir, env: {}, stderr: (line) => err.push(line), stdout: () => { throw new Error("usage printed output") },
-    acquire: async () => { throw new Error("usage acquired") },
-    exec: async () => { throw new Error("usage exec") },
+    args,
+    directory: dir,
+    env: {},
+    stderr: (line) => err.push(line),
+    stdout: () => {
+      throw new Error("usage printed output")
+    },
+    acquire: async () => {
+      throw new Error("usage acquired")
+    },
+    exec: async () => {
+      throw new Error("usage exec")
+    },
   })
   expect(result).toEqual({ action: "usage" })
   expect(err.join("")).not.toBe("")
@@ -278,12 +374,20 @@ test.each([
 })
 
 test.each([[["trust", "bogus"]], [["trust", "ensure", "--json", "--lease-pid", "0"]]])(
-  "compile-entry answers %j with exit 2 and never reaches the engine or the trust directory", async (args) => {
+  "compile-entry answers %j with exit 2 and never reaches the engine or the trust directory",
+  async (args) => {
     const home = await directory()
     const proc = Bun.spawn([process.execPath, join(import.meta.dir, "../compile-entry.ts"), ...args], {
-      env: { PATH: process.env.PATH, HOME: home }, stdout: "pipe", stderr: "pipe", timeout: 30_000,
+      env: { PATH: process.env.PATH, HOME: home },
+      stdout: "pipe",
+      stderr: "pipe",
+      timeout: 30_000,
     })
-    const [code, stdout, stderr] = await Promise.all([proc.exited, new Response(proc.stdout).text(), new Response(proc.stderr).text()])
+    const [code, stdout, stderr] = await Promise.all([
+      proc.exited,
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+    ])
     expect({ code, stdout }).toEqual({ code: 2, stdout: "" })
     expect(stderr).not.toBe("")
     expect(await exists(join(home, ".omo/engine-trust"))).toBe(false)

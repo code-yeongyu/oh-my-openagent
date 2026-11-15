@@ -24,12 +24,16 @@ const mockCreateMessageUpdateHandler = mock((_deps: HookDeps, _helpers: AutoRetr
 const mockCreateChatMessageHandler = mock((_deps: HookDeps) => async () => {})
 
 function createHookWithMocks() {
-  return createRuntimeFallbackHook(createMockContext(), { pluginConfig: {} }, {
-    createAutoRetryHelpers: mockCreateAutoRetryHelpers,
-    createEventHandler: mockCreateEventHandler,
-    createMessageUpdateHandler: mockCreateMessageUpdateHandler,
-    createChatMessageHandler: mockCreateChatMessageHandler,
-  })
+  return createRuntimeFallbackHook(
+    createMockContext(),
+    { pluginConfig: {} },
+    {
+      createAutoRetryHelpers: mockCreateAutoRetryHelpers,
+      createEventHandler: mockCreateEventHandler,
+      createMessageUpdateHandler: mockCreateMessageUpdateHandler,
+      createChatMessageHandler: mockCreateChatMessageHandler,
+    },
+  )
 }
 
 function createMockContext(): RuntimeFallbackPluginInput {

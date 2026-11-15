@@ -5,9 +5,7 @@ import {
   type TaskStartFailureReason,
 } from "../state"
 
-export function readOptionalTaskStartFailureKind(
-  record: Record<string, unknown>,
-): TaskStartFailureKind | undefined {
+export function readOptionalTaskStartFailureKind(record: Record<string, unknown>): TaskStartFailureKind | undefined {
   const value = record["failure_kind"]
   if (value === undefined) return undefined
   if (typeof value !== "string") throw new Error("failure_kind is not a string")

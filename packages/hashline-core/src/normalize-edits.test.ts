@@ -36,7 +36,10 @@ describe("normalizeHashlineEdits", () => {
     const result = normalizeHashlineEdits(input)
 
     //#then
-    expect(result).toEqual([{ op: "append", pos: "2#VK", lines: ["after"] }, { op: "prepend", pos: "4#MB", lines: ["before"] }])
+    expect(result).toEqual([
+      { op: "append", pos: "2#VK", lines: ["after"] },
+      { op: "prepend", pos: "4#MB", lines: ["before"] },
+    ])
   })
 
   it("prefers pos over end for prepend anchors", () => {
@@ -52,9 +55,9 @@ describe("normalizeHashlineEdits", () => {
 
   it("rejects legacy payload without op", () => {
     //#given
-    const input = unsafeTestValue<Parameters<
-      typeof normalizeHashlineEdits
-    >[0]>([{ type: "set_line", line: "2#VK", text: "updated" }])
+    const input = unsafeTestValue<Parameters<typeof normalizeHashlineEdits>[0]>([
+      { type: "set_line", line: "2#VK", text: "updated" },
+    ])
 
     //#when / #then
     expect(() => normalizeHashlineEdits(input)).toThrow(/legacy format was removed/i)

@@ -23,7 +23,12 @@ describe("installAstGrepForOpenCode", () => {
     })
 
     // then
-    expect(calls).toEqual([{ skillDir: join("/repo/packages/shared-skills/skills", "ast-grep"), targetDir: join("/home/test", ".omo", "runtime", "ast-grep", "linux-x64") }])
+    expect(calls).toEqual([
+      {
+        skillDir: join("/repo/packages/shared-skills/skills", "ast-grep"),
+        targetDir: join("/home/test", ".omo", "runtime", "ast-grep", "linux-x64"),
+      },
+    ])
   })
 
   test("#given vendored installer fails #when OpenCode installer calls it #then installation continues without throwing", async () => {
@@ -31,14 +36,16 @@ describe("installAstGrepForOpenCode", () => {
     const logs: string[] = []
 
     // when
-    await expect(installAstGrepForOpenCode({
-      homeDir: "/home/test",
-      installer: async () => ({ kind: "failed", reason: "exit 1" }),
-      log: (message) => logs.push(message),
-      arch: "x64",
-      platform: "linux",
-      sharedSkillsRoot: "/repo/packages/shared-skills/skills",
-    })).resolves.toBeUndefined()
+    await expect(
+      installAstGrepForOpenCode({
+        homeDir: "/home/test",
+        installer: async () => ({ kind: "failed", reason: "exit 1" }),
+        log: (message) => logs.push(message),
+        arch: "x64",
+        platform: "linux",
+        sharedSkillsRoot: "/repo/packages/shared-skills/skills",
+      }),
+    ).resolves.toBeUndefined()
 
     // then
     expect(logs.join("\n")).toContain("exit 1")

@@ -7,7 +7,6 @@ import { GitMemoryRepo } from "../git"
 import { RecallCorpusCache, loadRecallCorpus } from "./provider"
 import { removeTree } from "../../../../test-support/remove-tree"
 
-
 const tempDirs: string[] = []
 
 async function createRepo(): Promise<{ dir: string; repo: GitMemoryRepo }> {
@@ -41,9 +40,7 @@ async function createBareDir(): Promise<string> {
 }
 
 afterEach(async () => {
-  await Promise.all(
-    tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })),
-  )
+  await Promise.all(tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })))
 })
 
 describe("loadRecallCorpus", () => {
@@ -83,14 +80,14 @@ describe("loadRecallCorpus", () => {
     const repo = new GitMemoryRepo({ dir, agentId: "recall-agent" })
     await repo.init({
       seedFiles: [
-      {
-        relativePath: "reference/system/deploy.md",
-        content: "---\ndescription: Deployment notes under a system-named folder\n---\nRoll forward on failure.\n",
-      },
-      {
-        relativePath: "system/persona.md",
-        content: "---\ndescription: Persona\n---\nsystem body\n",
-      },
+        {
+          relativePath: "reference/system/deploy.md",
+          content: "---\ndescription: Deployment notes under a system-named folder\n---\nRoll forward on failure.\n",
+        },
+        {
+          relativePath: "system/persona.md",
+          content: "---\ndescription: Persona\n---\nsystem body\n",
+        },
       ],
     })
 
@@ -133,7 +130,10 @@ describe("loadRecallCorpus", () => {
     // given
     const { dir, repo } = await createRepo()
     const before = await loadRecallCorpus(repo)
-    await writeFile(join(dir, "notes/deploy.md"), "---\ndescription: Deployment runbook\n---\nRoll forward on failure.\n")
+    await writeFile(
+      join(dir, "notes/deploy.md"),
+      "---\ndescription: Deployment runbook\n---\nRoll forward on failure.\n",
+    )
     await repo.commitWrite(["notes/deploy.md"], "add deploy runbook", {
       agentId: "recall-agent",
       authorName: "Recall Agent",

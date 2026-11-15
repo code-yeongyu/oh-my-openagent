@@ -9,7 +9,9 @@ import type { SyncConfigInvalidStatus, SyncUnavailableStatus } from "./sync-runn
 
 // The runner also reports an invalid sync configuration (#10860); like "unavailable" it is not a failing cycle,
 // so the footer and the notice treat it the same way (the runner already logs why sync is off).
-export type SyncStatusReader = (repo: string) => Promise<EngineStatus | SyncUnavailableStatus | SyncConfigInvalidStatus | null>
+export type SyncStatusReader = (
+  repo: string,
+) => Promise<EngineStatus | SyncUnavailableStatus | SyncConfigInvalidStatus | null>
 
 export interface SyncNoticeUi {
   notify(message: string, level: "info" | "warning" | "error"): void
@@ -38,7 +40,10 @@ export function createSyncStatusNotifier(read: SyncStatusReader): SyncStatusNoti
       // A failed read says nothing about sync, so it changes no notice; the next change reads again.
       const status = await read(repo).catch(() => undefined)
       if (status === undefined) return
-      const failure = status?.kind === "frozen" ? (await import("#omo-memory-sync-runtime")).freezeFailure(status) : shownSyncFailure(status)
+      const failure =
+        status?.kind === "frozen"
+          ? (await import("#omo-memory-sync-runtime")).freezeFailure(status)
+          : shownSyncFailure(status)
       const previous = announced.get(repo)
       if (failure === undefined) {
         announced.delete(repo)

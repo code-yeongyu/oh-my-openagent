@@ -25,7 +25,11 @@ export function applyReasoningOverride(catalog: CodexModelCatalog, reasoning: st
 
 export function ensureCodexReasoningConfig(config: string, catalog: CodexModelCatalog): string {
   const current = readRootReasoningSettings(config)
-  if (Object.keys(current).length > 0 && !matchesProfile(current, catalog.current) && !catalog.managedProfiles.some((profile) => matchesProfile(current, profile))) {
+  if (
+    Object.keys(current).length > 0 &&
+    !matchesProfile(current, catalog.current) &&
+    !catalog.managedProfiles.some((profile) => matchesProfile(current, profile))
+  ) {
     return config
   }
   let next = replaceOrInsertRootSetting(config, "model", JSON.stringify(catalog.current.model))
@@ -35,7 +39,11 @@ export function ensureCodexReasoningConfig(config: string, catalog: CodexModelCa
     "model_reasoning_effort",
     JSON.stringify(catalog.current.modelReasoningEffort),
   )
-  next = replaceOrInsertRootSetting(next, "plan_mode_reasoning_effort", JSON.stringify(catalog.current.planModeReasoningEffort))
+  next = replaceOrInsertRootSetting(
+    next,
+    "plan_mode_reasoning_effort",
+    JSON.stringify(catalog.current.planModeReasoningEffort),
+  )
   return next
 }
 

@@ -1,5 +1,15 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, symlinkSync, writeFileSync } from "node:fs"
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pruneProvisionedRuntimes, removeReplacedLauncher } from "../runtime-prune"
@@ -62,7 +72,12 @@ describe("pruneProvisionedRuntimes", () => {
     const listings = [[] as string[], [`${join(root, "5.1.40", "omo")} --mode rpc`]]
     let calls = 0
     // when
-    const result = pruneProvisionedRuntimes({ root, current: "5.1.62", platform: "linux", listRunning: () => listings[calls++] })
+    const result = pruneProvisionedRuntimes({
+      root,
+      current: "5.1.62",
+      platform: "linux",
+      listRunning: () => listings[calls++],
+    })
     // then
     expect(calls).toBe(2)
     expect(result.removed).toEqual(["5.1.56"])
@@ -77,7 +92,12 @@ describe("pruneProvisionedRuntimes", () => {
     const listings = [[] as string[], undefined]
     let calls = 0
     // when
-    const result = pruneProvisionedRuntimes({ root, current: "5.1.62", platform: "linux", listRunning: () => listings[calls++] })
+    const result = pruneProvisionedRuntimes({
+      root,
+      current: "5.1.62",
+      platform: "linux",
+      listRunning: () => listings[calls++],
+    })
     // then
     expect(result.removed).toEqual([])
     for (const version of ["5.1.40", "5.1.56"]) expect(readFileSync(join(root, version, "omo"), "utf8")).toBe(version)
@@ -87,7 +107,12 @@ describe("pruneProvisionedRuntimes", () => {
     // given
     provision("5.1.40", "5.1.60", "5.1.61", "5.1.62")
     // when
-    const result = pruneProvisionedRuntimes({ root, current: "5.1.62", platform: "linux", listRunning: () => undefined })
+    const result = pruneProvisionedRuntimes({
+      root,
+      current: "5.1.62",
+      platform: "linux",
+      listRunning: () => undefined,
+    })
     // then
     expect(result.removed).toEqual([])
     expect(result.kept.toSorted()).toEqual(["5.1.40", "5.1.60", "5.1.61"])
@@ -99,7 +124,15 @@ describe("pruneProvisionedRuntimes", () => {
     provision("5.1.61", "5.1.62")
     let listed = 0
     // when
-    const result = pruneProvisionedRuntimes({ root, current: "5.1.62", platform: "linux", listRunning: () => { listed += 1; return [] } })
+    const result = pruneProvisionedRuntimes({
+      root,
+      current: "5.1.62",
+      platform: "linux",
+      listRunning: () => {
+        listed += 1
+        return []
+      },
+    })
     // then
     expect(result).toEqual({ removed: [], kept: ["5.1.61"], failed: [] })
     expect(listed).toBe(0)
@@ -120,7 +153,15 @@ describe("pruneProvisionedRuntimes", () => {
     provision("5.1.40", "5.1.61", "5.1.62")
     let listed = 0
     // when
-    const result = pruneProvisionedRuntimes({ root, current: "5.1.62", platform: "win32", listRunning: () => { listed += 1; return undefined } })
+    const result = pruneProvisionedRuntimes({
+      root,
+      current: "5.1.62",
+      platform: "win32",
+      listRunning: () => {
+        listed += 1
+        return undefined
+      },
+    })
     // then: nothing here holds 5.1.40 open, so the rename succeeds and it goes
     expect(listed).toBe(0)
     expect(result.removed).toEqual(["5.1.40"])
@@ -157,11 +198,26 @@ describe("pruneProvisionedRuntimes", () => {
   })
 
   test("#given no runtime root #when a fresh runtime prunes #then it reports nothing", () => {
-    expect(pruneProvisionedRuntimes({ root: join(root, "missing"), current: "5.1.62", platform: "linux" })).toEqual({ removed: [], kept: [], failed: [] })
+    expect(pruneProvisionedRuntimes({ root: join(root, "missing"), current: "5.1.62", platform: "linux" })).toEqual({
+      removed: [],
+      kept: [],
+      failed: [],
+    })
   })
 })
 
 describe("removeReplacedLauncher", () => {
+  test("#given unique rollback executables from completed Windows updates #then the next launch removes them while preserving unrelated files", () => {
+    const launcher = join(root, "omo.exe")
+    const rollback = `${launcher}.old-12345678-1234-1234-1234-123456789abc`
+    const unrelated = `${launcher}.old-user-backup`
+    writeFileSync(rollback, "released old image")
+    writeFileSync(unrelated, "user file")
+    removeReplacedLauncher(launcher, "win32")
+    expect(existsSync(rollback)).toBe(false)
+    expect(existsSync(unrelated)).toBe(true)
+  })
+
   test("#given the launcher a Windows replace command moved aside #when the new version first runs #then the .old file is removed", () => {
     // given
     const launcher = join(root, "omo.exe")

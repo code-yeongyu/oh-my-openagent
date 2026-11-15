@@ -46,8 +46,6 @@ function isThinkingBlockError(text: string): boolean {
 
 const MESSAGE_INDEX_PATTERN = /messages\.(\d+)/
 
-
-
 function readProperty(source: Record<string, unknown>, key: string): unknown | undefined {
   try {
     return source[key]
@@ -75,7 +73,9 @@ function isAnthropicErrorData(value: unknown): value is AnthropicErrorData {
   }
 
   const requestId = readProperty(value, "request_id")
-  return typeof readProperty(error, "message") === "string" && (requestId === undefined || typeof requestId === "string")
+  return (
+    typeof readProperty(error, "message") === "string" && (requestId === undefined || typeof requestId === "string")
+  )
 }
 
 function extractTokensFromMessage(message: string): { current: number; max: number } | null {

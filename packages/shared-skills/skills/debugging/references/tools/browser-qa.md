@@ -62,10 +62,11 @@ When the bug only happens signed in:
 
 ```js
 const session = await omowright.connectBrowserSkill({ name: "debug repro", focused: false })
+const sync = async () => (await session.cooperate("sync")).context_id   // BrowserSkill 0.4: one context per page action
 try {
-  await session.navigate(url)
-  const { tree, css } = await omowright.bskSnapshot(session, { interactive: true })
-  await session.click({ selector: css.e7 })
+  await session.navigate(url, { context: await sync() })
+  const { tree, css } = await omowright.bskSnapshot(session, { interactive: true, context: await sync() })
+  await session.click({ selector: css.e7 }, { context: await sync() })
   const errors = await session.console({ since: 0 })
   const shot = await session.screenshot()
 } finally {

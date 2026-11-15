@@ -4,10 +4,17 @@ import { readJobWidgetHost, type JobWidgetAuthorResolver, type JobWidgetSourceRe
 
 class FakeTap {
   readonly appended: string[] = []
-  constructor(readonly id: string, readonly label: string) {}
-  append(text: string): void { this.appended.push(text) }
+  constructor(
+    readonly id: string,
+    readonly label: string,
+  ) {}
+  append(text: string): void {
+    this.appended.push(text)
+  }
   close(): void {}
-  read(from: number) { return { start: from, end: from, text: "", open: true } }
+  read(from: number) {
+    return { start: from, end: from, text: "", open: true }
+  }
 }
 
 describe("senpi job widget API feature detection", () => {
@@ -22,7 +29,10 @@ describe("senpi job widget API feature detection", () => {
 
   it("#given registerJobWidgetSource without TextTap #when it is read #then task sources stay off because no tap can feed them", () => {
     // when
-    const host = readJobWidgetHost({ registerJobWidgetSource: () => undefined, setJobWidgetAuthorResolver: () => () => {} })
+    const host = readJobWidgetHost({
+      registerJobWidgetSource: () => undefined,
+      setJobWidgetAuthorResolver: () => () => {},
+    })
 
     // then
     expect(host.sources).toBeUndefined()
@@ -52,7 +62,10 @@ describe("senpi job widget API feature detection", () => {
     const tap = host.sources?.createTap("tools", "label")
     const route: JobWidgetAuthorResolver = () => undefined
     const returnedWithdraw = host.setAuthorResolver?.(route)
-    const returnedHandle = tap === undefined ? undefined : host.sources?.register({ sessionId: "s", id: "st_1", kind: "task", sources: [tap], brief: {} })
+    const returnedHandle =
+      tap === undefined
+        ? undefined
+        : host.sources?.register({ sessionId: "s", id: "st_1", kind: "task", sources: [tap], brief: {} })
 
     // then
     expect(tap).toBeInstanceOf(FakeTap)

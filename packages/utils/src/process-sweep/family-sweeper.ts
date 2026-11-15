@@ -51,7 +51,10 @@ export interface FamilySweepConfig<TTarget extends { readonly pid: number }, TSp
 const DEFAULT_GRACE_MS = 2_000
 const DEFAULT_THROTTLE_MS = 60 * 60 * 1_000
 
-export async function runProcessFamilySweep<TTarget extends { readonly pid: number }, TSpared extends TTarget = TTarget>(
+export async function runProcessFamilySweep<
+  TTarget extends { readonly pid: number },
+  TSpared extends TTarget = TTarget,
+>(
   config: FamilySweepConfig<TTarget, TSpared>,
   options: ProcessFamilySweepOptions,
 ): Promise<ProcessFamilySweepResult<TTarget, TSpared>> {
@@ -59,14 +62,20 @@ export async function runProcessFamilySweep<TTarget extends { readonly pid: numb
   const dryRun = options.dryRun === true
 
   if (options.force !== true && isSweepThrottled(config.stampFile, nowMs, options.throttleMs ?? DEFAULT_THROTTLE_MS)) {
-    return { action: "throttled", candidates: [], dryRun, failed: [], killed: [], spared: [], stampFile: config.stampFile }
+    return {
+      action: "throttled",
+      candidates: [],
+      dryRun,
+      failed: [],
+      killed: [],
+      spared: [],
+      stampFile: config.stampFile,
+    }
   }
 
   try {
     const plan = await config.collect()
-    const { failed, killed } = dryRun
-      ? { failed: [], killed: [] }
-      : await killTargets(plan.killList, options, config)
+    const { failed, killed } = dryRun ? { failed: [], killed: [] } : await killTargets(plan.killList, options, config)
     if (!dryRun) writeSweepStamp(config.stampFile, nowMs)
     return {
       action: "swept",

@@ -12,6 +12,7 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 const builtTaskExtensionPath = join(packageRoot, "plugin", "extensions", "omo-task.js")
 const builtMemoryDoctorExtensionPath = join(packageRoot, "plugin", "extensions", "omo-memory-doctor.js")
 const builtThreadClientExtensionPath = join(packageRoot, "plugin", "extensions", "omo-thread-client.js")
+const builtWakeExtensionPath = join(packageRoot, "plugin", "extensions", "omo-wake.js")
 const builtFeedbackExtensionPath = join(packageRoot, "plugin", "extensions", "omo-feedback.js")
 const builtDesktopToolkitExtensionPath = join(packageRoot, "plugin", "extensions", "omo-desktop-toolkit.js")
 const builtClaimReceiptExtensionPath = join(packageRoot, "plugin", "extensions", "omo-claim-receipt.js")
@@ -57,25 +58,41 @@ describe("omo-senpi bundle purity", () => {
       expect(existsSync(path), `missing built SDK at ${path}`).toBe(true)
       const imports = collectStaticImportSpecifiers(readFileSync(path, "utf8"))
       expect(imports.length).toBeGreaterThan(0)
-      expect(imports.filter(specifier => !specifier.startsWith("node:"))).toEqual([])
+      expect(imports.filter((specifier) => !specifier.startsWith("node:"))).toEqual([])
     }
     const root = await mkdtemp(join(tmpdir(), "sdk-inputs-"))
     try {
       const built = await buildExtension({ outputPath: join(root, "omo.js") })
       const { toolkitSdkInputs } = built
       expect(toolkitSdkInputs.length).toBeGreaterThan(0)
-      expect(toolkitSdkInputs.filter(input => input.replaceAll("\\\\", "/").includes("node_modules/"))).toEqual([])
+      expect(toolkitSdkInputs.filter((input) => input.replaceAll("\\\\", "/").includes("node_modules/"))).toEqual([])
       // The bunshin-ts SDK is its entry files, the two vendored packages and their one npm dependency; no senpi runtime.
-      const bunshinTsInputs = built.bunshinTsInputs.map(input => input.replaceAll("\\", "/"))
-      expect(bunshinTsInputs.filter(input => !/(src\/extension\/bunshin-ts-[a-z-]+\.ts|\/vendor\/bunshin-ts(-relay)?\/index\.js|\/node_modules\/@sinclair\/typebox\/.+)$/.test(input))).toEqual([])
-      expect(bunshinTsInputs.some(input => input.endsWith("/vendor/bunshin-ts/index.js"))).toBe(true)
-      expect(bunshinTsInputs.some(input => input.endsWith("/vendor/bunshin-ts-relay/index.js"))).toBe(true)
+      // Plus device-service-core's state-dir rule (#13597), a node-builtins-only file, so the transport pick never guesses.
+      const bunshinTsInputs = built.bunshinTsInputs.map((input) => input.replaceAll("\\", "/"))
+      expect(
+        bunshinTsInputs.filter(
+          (input) =>
+            !/(src\/extension\/bunshin-ts-[a-z-]+\.ts|\/vendor\/bunshin-ts(-relay)?\/index\.js|\/node_modules\/@sinclair\/typebox\/.+|(^|\/)packages\/device-service-core\/src\/state-dir\.ts)$/.test(
+              input,
+            ),
+        ),
+      ).toEqual([])
+      expect(bunshinTsInputs.some((input) => input.endsWith("/vendor/bunshin-ts/index.js"))).toBe(true)
+      expect(bunshinTsInputs.some((input) => input.endsWith("/vendor/bunshin-ts-relay/index.js"))).toBe(true)
       // The sidecar gets the PostHog class from the main bundle; its gzip/Sentry top-level code must not come along.
       const { telemetryRecoveryInputs } = built
       expect(telemetryRecoveryInputs.length).toBeGreaterThan(0)
-      expect(telemetryRecoveryInputs.filter(input => /posthog-node|telemetry-core\/src\/(index|posthog-client)\.ts$/.test(input.replaceAll("\\", "/")))).toEqual([])
-      expect(collectStaticImportSpecifiers(readFileSync(join(root, "omo-telemetry-recovery.js"), "utf8"))).not.toContain("node:zlib")
-    } finally { await rm(root, { recursive: true, force: true }) }
+      expect(
+        telemetryRecoveryInputs.filter((input) =>
+          /posthog-node|telemetry-core\/src\/(index|posthog-client)\.ts$/.test(input.replaceAll("\\", "/")),
+        ),
+      ).toEqual([])
+      expect(
+        collectStaticImportSpecifiers(readFileSync(join(root, "omo-telemetry-recovery.js"), "utf8")),
+      ).not.toContain("node:zlib")
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   }, 120_000)
 
   it("#given the senpi loader aliases #when tested #then the shared build constant pins all 19 peers", () => {
@@ -84,7 +101,27 @@ describe("omo-senpi bundle purity", () => {
 
   it("#given built extension artifacts #when static imports are inspected #then only senpi peers and node builtins remain external", () => {
     const allowed = new Set<string>(SENPI_LOADER_ALIASES)
-    for (const path of [builtExtensionPath, builtTaskExtensionPath, builtComputerUseExtensionPath, builtMemoryDoctorExtensionPath, builtMemoryMemfsExtensionPath, builtMemoryPalaceExtensionPath, builtMemoryCommandsExtensionPath, builtDeviceAccountExtensionPath, builtSessionHistoryExtensionPath, builtRecallStoreExtensionPath, builtDeviceServiceExtensionPath, builtTelemetryPosthogExtensionPath, builtTelemetryOtlpExtensionPath, builtThreadClientExtensionPath, builtTelemetryRecoveryExtensionPath, builtFeedbackExtensionPath, builtDesktopToolkitExtensionPath, builtClaimReceiptExtensionPath]) {
+    for (const path of [
+      builtExtensionPath,
+      builtTaskExtensionPath,
+      builtComputerUseExtensionPath,
+      builtMemoryDoctorExtensionPath,
+      builtMemoryMemfsExtensionPath,
+      builtMemoryPalaceExtensionPath,
+      builtMemoryCommandsExtensionPath,
+      builtDeviceAccountExtensionPath,
+      builtSessionHistoryExtensionPath,
+      builtRecallStoreExtensionPath,
+      builtDeviceServiceExtensionPath,
+      builtTelemetryPosthogExtensionPath,
+      builtTelemetryOtlpExtensionPath,
+      builtThreadClientExtensionPath,
+      builtWakeExtensionPath,
+      builtTelemetryRecoveryExtensionPath,
+      builtFeedbackExtensionPath,
+      builtDesktopToolkitExtensionPath,
+      builtClaimReceiptExtensionPath,
+    ]) {
       expect(existsSync(path), `missing built extension at ${path}`).toBe(true)
       const imports = collectStaticImportSpecifiers(readFileSync(path, "utf8"))
       const forbidden = imports.filter((specifier) => !specifier.startsWith("node:") && !allowed.has(specifier))

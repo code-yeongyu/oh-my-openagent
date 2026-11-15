@@ -1,13 +1,7 @@
 import type { GitMasterConfig, BrowserAutomationProvider } from "../../config/schema"
 import { discoverSkills } from "../../features/opencode-skill-loader"
-import {
-  getAllSkills,
-  isDisabledSkillAlias,
-} from "../../features/opencode-skill-loader/skill-discovery"
-import {
-  extractSkillTemplate,
-  injectGitMasterConfig,
-} from "../../features/opencode-skill-loader/skill-content"
+import { getAllSkills, isDisabledSkillAlias } from "../../features/opencode-skill-loader/skill-discovery"
+import { extractSkillTemplate, injectGitMasterConfig } from "../../features/opencode-skill-loader/skill-content"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"

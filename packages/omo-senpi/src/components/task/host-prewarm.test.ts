@@ -11,71 +11,83 @@ afterEach(removeWorldDirs)
 const posixPrewarmTest = test.skipIf(process.platform === "win32")
 
 describe("task.host_shard_prewarm warms the session's own host", () => {
-  posixPrewarmTest("#given session-start #when session_start fires #then the session's shard is ensured once, before any spawn", async () => {
-    // given
-    const w = world({ prewarm: "session-start" })
+  posixPrewarmTest(
+    "#given session-start #when session_start fires #then the session's shard is ensured once, before any spawn",
+    async () => {
+      // given
+      const w = world({ prewarm: "session-start" })
 
-    // when
-    await w.sessionStart("root-1")
-    await w.settled("root-1")
+      // when
+      await w.sessionStart("root-1")
+      await w.settled("root-1")
 
-    // then
-    expect(sockets(w.ensures)).toEqual([w.host.shardSocket()])
-    expect(w.ensures[0]?.owner?.ownerSessionId).toBe("root-1")
-    expect(await w.host.executionModeGate.ensure()).toBe("process")
-    expect(w.ensures).toHaveLength(1)
-  })
+      // then
+      expect(sockets(w.ensures)).toEqual([w.host.shardSocket()])
+      expect(w.ensures[0]?.owner?.ownerSessionId).toBe("root-1")
+      expect(await w.host.executionModeGate.ensure()).toBe("process")
+      expect(w.ensures).toHaveLength(1)
+    },
+  )
 
-  posixPrewarmTest("#given first-turn #when session_start then two prompts fire #then nothing at session_start and exactly one ensure on the first prompt", async () => {
-    // given
-    const w = world({ prewarm: "first-turn" })
+  posixPrewarmTest(
+    "#given first-turn #when session_start then two prompts fire #then nothing at session_start and exactly one ensure on the first prompt",
+    async () => {
+      // given
+      const w = world({ prewarm: "first-turn" })
 
-    // when
-    await w.sessionStart("root-1")
-    await w.settled("root-1")
-    const atSessionStart = w.ensures.length
-    await w.prompt("root-1")
-    await w.agentStart("root-1")
-    await w.settled("root-1")
-    const afterFirstTurn = w.ensures.length
-    await w.prompt("root-1")
-    await w.agentStart("root-1")
-    await w.settled("root-1")
+      // when
+      await w.sessionStart("root-1")
+      await w.settled("root-1")
+      const atSessionStart = w.ensures.length
+      await w.prompt("root-1")
+      await w.agentStart("root-1")
+      await w.settled("root-1")
+      const afterFirstTurn = w.ensures.length
+      await w.prompt("root-1")
+      await w.agentStart("root-1")
+      await w.settled("root-1")
 
-    // then
-    expect(atSessionStart).toBe(0)
-    expect(afterFirstTurn).toBe(1)
-    expect(sockets(w.ensures)).toEqual([w.host.shardSocket()])
-  })
+      // then
+      expect(atSessionStart).toBe(0)
+      expect(afterFirstTurn).toBe(1)
+      expect(sockets(w.ensures)).toEqual([w.host.shardSocket()])
+    },
+  )
 
-  posixPrewarmTest("#given the default settings #when a top-level session starts and then prompts #then its host warms on the first prompt, not at session_start", async () => {
-    // given
-    const w = world({ prewarm: "default" })
+  posixPrewarmTest(
+    "#given the default settings #when a top-level session starts and then prompts #then its host warms on the first prompt, not at session_start",
+    async () => {
+      // given
+      const w = world({ prewarm: "default" })
 
-    // when
-    await w.sessionStart("root-1")
-    await w.settled("root-1")
-    const atSessionStart = w.ensures.length
-    await w.prompt("root-1")
-    await w.settled("root-1")
+      // when
+      await w.sessionStart("root-1")
+      await w.settled("root-1")
+      const atSessionStart = w.ensures.length
+      await w.prompt("root-1")
+      await w.settled("root-1")
 
-    // then
-    expect(atSessionStart).toBe(0)
-    expect(sockets(w.ensures)).toEqual([w.host.shardSocket()])
-  })
+      // then
+      expect(atSessionStart).toBe(0)
+      expect(sockets(w.ensures)).toEqual([w.host.shardSocket()])
+    },
+  )
 
-  posixPrewarmTest("#given first-turn and a turn that skips input #when before_agent_start fires #then that turn warms the host", async () => {
-    // given
-    const w = world({ prewarm: "first-turn" })
-    await w.sessionStart("root-1")
+  posixPrewarmTest(
+    "#given first-turn and a turn that skips input #when before_agent_start fires #then that turn warms the host",
+    async () => {
+      // given
+      const w = world({ prewarm: "first-turn" })
+      await w.sessionStart("root-1")
 
-    // when
-    await w.agentStart("root-1")
-    await w.settled("root-1")
+      // when
+      await w.agentStart("root-1")
+      await w.settled("root-1")
 
-    // then
-    expect(w.ensures).toHaveLength(1)
-  })
+      // then
+      expect(w.ensures).toHaveLength(1)
+    },
+  )
 
   test("#given off and no suspended children #when session_start and a prompt fire #then no host is ensured", async () => {
     // given
@@ -180,47 +192,53 @@ describe("task.host_shard_prewarm warms the session's own host", () => {
     }
   })
 
-  posixPrewarmTest("#given an ensure that rejects #when session-start warms #then no unhandled rejection escapes, the warm adds no notice, and the spawn's own ensure reports it", async () => {
-    // given
-    const w = world({ prewarm: "session-start", ensure: "reject" })
-    const unhandled: unknown[] = []
-    const onUnhandled = (reason: unknown): void => {
-      unhandled.push(reason)
-    }
-    process.on("unhandledRejection", onUnhandled)
+  posixPrewarmTest(
+    "#given an ensure that rejects #when session-start warms #then no unhandled rejection escapes, the warm adds no notice, and the spawn's own ensure reports it",
+    async () => {
+      // given
+      const w = world({ prewarm: "session-start", ensure: "reject" })
+      const unhandled: unknown[] = []
+      const onUnhandled = (reason: unknown): void => {
+        unhandled.push(reason)
+      }
+      process.on("unhandledRejection", onUnhandled)
 
-    try {
-      // when
+      try {
+        // when
+        await w.sessionStart("root-1")
+        await w.settled("root-1")
+        const noticesAfterWarm = w.host.notices.list()
+        const mode = await w.host.executionModeGate.ensure()
+
+        // then
+        expect(noticesAfterWarm).toEqual([])
+        expect(mode).toBe("in-process")
+        expect(w.ensures).toHaveLength(2)
+        expect(unhandled).toEqual([])
+        expect(w.host.notices.list().some((notice) => notice.startsWith("host_unavailable:"))).toBe(true)
+      } finally {
+        process.off("unhandledRejection", onUnhandled)
+      }
+    },
+  )
+
+  posixPrewarmTest(
+    "#given a warm whose ensure fails once #when the first child's ensure runs #then it asks the host again and routes to process",
+    async () => {
+      // given
+      const w = world({ prewarm: "session-start", ensure: "reject-once" })
       await w.sessionStart("root-1")
       await w.settled("root-1")
-      const noticesAfterWarm = w.host.notices.list()
+
+      // when
       const mode = await w.host.executionModeGate.ensure()
 
       // then
-      expect(noticesAfterWarm).toEqual([])
-      expect(mode).toBe("in-process")
-      expect(w.ensures).toHaveLength(2)
-      expect(unhandled).toEqual([])
-      expect(w.host.notices.list().some((notice) => notice.startsWith("host_unavailable:"))).toBe(true)
-    } finally {
-      process.off("unhandledRejection", onUnhandled)
-    }
-  })
-
-  posixPrewarmTest("#given a warm whose ensure fails once #when the first child's ensure runs #then it asks the host again and routes to process", async () => {
-    // given
-    const w = world({ prewarm: "session-start", ensure: "reject-once" })
-    await w.sessionStart("root-1")
-    await w.settled("root-1")
-
-    // when
-    const mode = await w.host.executionModeGate.ensure()
-
-    // then
-    expect(mode).toBe("process")
-    expect(sockets(w.ensures)).toEqual([w.host.shardSocket(), w.host.shardSocket()])
-    expect(w.host.notices.list()).toEqual([])
-  })
+      expect(mode).toBe("process")
+      expect(sockets(w.ensures)).toEqual([w.host.shardSocket(), w.host.shardSocket()])
+      expect(w.host.notices.list()).toEqual([])
+    },
+  )
 
   test("#given an omo-spawned session (child or per-process child) #when every prewarm edge fires #then its own host is never warmed", async () => {
     for (const variant of [{ sessionRole: "child" }, { ownShard: "p-aaaaaaaaaaaaaaaa" }]) {
@@ -254,15 +272,18 @@ describe("task.host_shard_prewarm warms the session's own host", () => {
     }
   })
 
-  posixPrewarmTest("#given default_execution_mode process #when session-start warms #then the session's shard is ensured", async () => {
-    // given
-    const w = world({ prewarm: "session-start", defaultExecutionMode: "process" })
+  posixPrewarmTest(
+    "#given default_execution_mode process #when session-start warms #then the session's shard is ensured",
+    async () => {
+      // given
+      const w = world({ prewarm: "session-start", defaultExecutionMode: "process" })
 
-    // when
-    await w.sessionStart("root-1")
-    await w.settled("root-1")
+      // when
+      await w.sessionStart("root-1")
+      await w.settled("root-1")
 
-    // then
-    expect(sockets(w.ensures)).toEqual([w.host.shardSocket()])
-  })
+      // then
+      expect(sockets(w.ensures)).toEqual([w.host.shardSocket()])
+    },
+  )
 })

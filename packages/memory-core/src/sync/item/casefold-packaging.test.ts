@@ -9,10 +9,13 @@ test("a plain bun build bundle folds case from the filesystem root cwd", () => {
   const work = mkdtempSync(join(tmpdir(), "casefold-bundle-"))
   try {
     const entry = join(work, "entry.ts")
-    writeFileSync(entry, [
-      `import { caseFold } from ${JSON.stringify(join(import.meta.dir, "casefold.ts"))}`,
-      'console.log(caseFold("Straße") === "strasse" ? "casefold-ok" : "casefold-wrong")',
-    ].join("\n"))
+    writeFileSync(
+      entry,
+      [
+        `import { caseFold } from ${JSON.stringify(join(import.meta.dir, "casefold.ts"))}`,
+        'console.log(caseFold("Straße") === "strasse" ? "casefold-ok" : "casefold-wrong")',
+      ].join("\n"),
+    )
     const outdir = join(work, "out")
     const build = Bun.spawnSync([process.execPath, "build", "--target=node", entry, "--outdir", outdir], { cwd: work })
     expect(build.exitCode, build.stderr.toString()).toBe(0)

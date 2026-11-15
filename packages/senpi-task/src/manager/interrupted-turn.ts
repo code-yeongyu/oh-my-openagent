@@ -10,10 +10,7 @@ const BOOKKEEPING_CUSTOM_TYPES = new Set([
   "rpc_effect",
 ])
 
-export async function sessionTailNeedsContinuation(
-  sessionPath: string,
-  ignoredUserPrompt?: string,
-): Promise<boolean> {
+export async function sessionTailNeedsContinuation(sessionPath: string, ignoredUserPrompt?: string): Promise<boolean> {
   try {
     return tailNeedsContinuation(await readConversationTail(sessionPath), ignoredUserPrompt)
   } catch {
@@ -24,7 +21,9 @@ export async function sessionTailNeedsContinuation(
 // Why a re-joined IDLE session cannot continue on its own (senpi#3266): its last turn ENDED on an
 // abort, or it never answered at all. `undefined` means the transcript leaves nothing blocking - a
 // completed turn, or nothing readable enough to accuse (a torn or missing tail never flags).
-export async function sessionTailContinuationBlocker(sessionPath: string): Promise<"aborted" | "unfinished" | undefined> {
+export async function sessionTailContinuationBlocker(
+  sessionPath: string,
+): Promise<"aborted" | "unfinished" | undefined> {
   try {
     const tail = await readConversationTail(sessionPath)
     if (tail === undefined) return undefined
@@ -60,7 +59,10 @@ function tailFinishedText(tail: ConversationTail | undefined): string | undefine
   if (last === undefined || last.role !== "assistant" || last.stopReason !== "stop") return undefined
   if (messageNeedsContinuation(last) || !Array.isArray(last.content)) return undefined
   const text = last.content
-    .filter((part): part is { type: "text"; text: string } => isRecord(part) && part.type === "text" && typeof part.text === "string")
+    .filter(
+      (part): part is { type: "text"; text: string } =>
+        isRecord(part) && part.type === "text" && typeof part.text === "string",
+    )
     .map((part) => part.text)
     .join("")
   return text.length > 0 ? text : undefined
@@ -91,19 +93,29 @@ export type ConversationTail = {
 export async function sessionTailReconciliation(
   sessionPath: string,
   ignoredUserPrompts: readonly string[] = [],
-): Promise<(ConversationTail & { readonly finishedText?: string; readonly needsContinuation: boolean; readonly endsAtIgnoredUserPrompt: boolean }) | undefined> {
+): Promise<
+  | (ConversationTail & {
+      readonly finishedText?: string
+      readonly needsContinuation: boolean
+      readonly endsAtIgnoredUserPrompt: boolean
+    })
+  | undefined
+> {
   try {
     const tail = await readConversationTail(sessionPath)
     if (tail === undefined) return undefined
     return {
       ...tail,
       finishedText: tailFinishedText(tail),
-      needsContinuation: tailNeedsContinuation(tail) && ignoredUserPrompts.every(prompt => tailNeedsContinuation(tail, prompt)),
-      endsAtIgnoredUserPrompt: tail.lastMessage.role === "user" &&
-        ignoredUserPrompts.some(prompt => isIgnoredUserPrompt(tail.lastMessage, prompt)),
+      needsContinuation:
+        tailNeedsContinuation(tail) && ignoredUserPrompts.every((prompt) => tailNeedsContinuation(tail, prompt)),
+      endsAtIgnoredUserPrompt:
+        tail.lastMessage.role === "user" &&
+        ignoredUserPrompts.some((prompt) => isIgnoredUserPrompt(tail.lastMessage, prompt)),
     }
   } catch (error) {
-    if (error instanceof SyntaxError || (error instanceof Error && "code" in error && error.code === "ENOENT")) return undefined
+    if (error instanceof SyntaxError || (error instanceof Error && "code" in error && error.code === "ENOENT"))
+      return undefined
     throw error
   }
 }
@@ -168,10 +180,12 @@ async function readConversationTail(sessionPath: string): Promise<ConversationTa
 
 function classifyRecord(line: string): TailVerdict {
   const parsed: unknown = JSON.parse(line)
-  if (isSessionMessageEntry(parsed)) return {
-    kind: "message", message: parsed.message,
-    ...(typeof parsed.id === "string" ? { entryId: parsed.id } : {}),
-  }
+  if (isSessionMessageEntry(parsed))
+    return {
+      kind: "message",
+      message: parsed.message,
+      ...(typeof parsed.id === "string" ? { entryId: parsed.id } : {}),
+    }
   if (isRecord(parsed) && parsed.type === "agent_end") return { kind: "end", event: parsed }
   if (isRecord(parsed) && parsed.type === "custom" && isRecord(parsed.data) && parsed.data.type === "agent_end") {
     return { kind: "end", event: parsed.data }

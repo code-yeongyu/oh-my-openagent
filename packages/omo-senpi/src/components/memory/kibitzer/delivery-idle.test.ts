@@ -20,12 +20,24 @@ afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
 })
 
-async function fixture(): Promise<{ context: ReturnType<typeof createMemoryIdentityContext>; ledger: RecallLedger; pending: PendingNudges }> {
+async function fixture(): Promise<{
+  context: ReturnType<typeof createMemoryIdentityContext>
+  ledger: RecallLedger
+  pending: PendingNudges
+}> {
   const dir = join(tmpdir(), `kibitzer-idle-${crypto.randomUUID()}`)
   await mkdir(dir, { recursive: true })
   tempDirs.push(dir)
-  const context = createMemoryIdentityContext({ identity: "idle-agent", identityPaths: buildIdentityPaths(join(dir, "memory"), "idle-agent"), binding: createMemoryBinding({ identity: "idle-agent", repoPath: dir, boundAt: 0 }) })
-  return { context, ledger: new RecallLedger(context.identityPaths.recallLedger), pending: new PendingNudges(context.identityPaths.recallPending) }
+  const context = createMemoryIdentityContext({
+    identity: "idle-agent",
+    identityPaths: buildIdentityPaths(join(dir, "memory"), "idle-agent"),
+    binding: createMemoryBinding({ identity: "idle-agent", repoPath: dir, boundAt: 0 }),
+  })
+  return {
+    context,
+    ledger: new RecallLedger(context.identityPaths.recallLedger),
+    pending: new PendingNudges(context.identityPaths.recallPending),
+  }
 }
 
 /** Only the running/settled bookkeeping matters here: the sidecar sink is inert. */
@@ -33,13 +45,23 @@ function sessionHooks(delivery: KibitzerDelivery, context: ReturnType<typeof cre
   const pi = new FakeExtensionAPI()
   registerKibitzerHooks(pi, {
     sink: { onPrompt: () => {}, onToolCall: () => {}, onToolResult: () => {}, onSettled: () => {} },
-    delivery, resolveContext: () => context, resolveSessionId: () => SESSION_ID, env: {},
+    delivery,
+    resolveContext: () => context,
+    resolveSessionId: () => SESSION_ID,
+    env: {},
   })
   return pi
 }
 
 const TOOL_CALL = { type: "tool_call", toolName: "read", toolCallId: "call-1", input: { path: "README.md" } }
-const TOOL_RESULT = { type: "tool_result", toolName: "read", toolCallId: "call-1", input: { path: "README.md" }, content: [], isError: false }
+const TOOL_RESULT = {
+  type: "tool_result",
+  toolName: "read",
+  toolCallId: "call-1",
+  input: { path: "README.md" },
+  content: [],
+  isError: false,
+}
 
 describe("kibitzer accept-time delivery", () => {
   test("#given a tool in flight #when nudges are accepted #then one steer batches every nudge", async () => {
@@ -48,8 +70,10 @@ describe("kibitzer accept-time delivery", () => {
     const sends = new FakeExtensionAPI()
     const nudges = [NUDGE, { path: "notes/checklist.md", hint: "Check the rollout." }]
     const delivery = createKibitzerDelivery({
-      ledgerFor: () => f.ledger, pendingFor: () => f.pending,
-      sendMessage: (message, options) => sends.sendMessage(message, options), appendEntry: () => {},
+      ledgerFor: () => f.ledger,
+      pendingFor: () => f.pending,
+      sendMessage: (message, options) => sends.sendMessage(message, options),
+      appendEntry: () => {},
     })
     const pi = sessionHooks(delivery, f.context)
     const ctx = eventContext([], SESSION_ID)
@@ -59,37 +83,52 @@ describe("kibitzer accept-time delivery", () => {
     await delivery.accept(SESSION_ID, f.context, nudges)
     // then
     expect(sends.messages).toHaveLength(1)
-    expect(sends.messages[0]).toMatchObject({ message: { customType: "omo-kibitzer:recall", display: false }, options: { deliverAs: "steer" } })
+    expect(sends.messages[0]).toMatchObject({
+      message: { customType: "omo-kibitzer:recall", display: false },
+      options: { deliverAs: "steer" },
+    })
     for (const nudge of nudges) expect(sends.messages[0]?.message.content).toContain(nudge.path)
   })
 
-  test.each(["no tool call", "a finished tool call", "an ended tool turn"] as const)("#given a running session with %s #when a late verdict is accepted #then it is held for the next prompt instead of steering an extra turn", async (state) => {
-    // given
-    const f = await fixture()
-    let sends = 0
-    const delivery = createKibitzerDelivery({ ledgerFor: () => f.ledger, pendingFor: () => f.pending, sendMessage: () => { sends += 1 }, appendEntry: () => {} })
-    const pi = sessionHooks(delivery, f.context)
-    const ctx = eventContext([], SESSION_ID)
-    await pi.dispatch("before_agent_start", beforeAgentStart("rollout"), ctx)
-    switch (state) {
-      case "no tool call": break
-      case "a finished tool call":
-        await pi.dispatch("tool_call", TOOL_CALL, ctx)
-        await pi.dispatch("tool_result", TOOL_RESULT, ctx)
-        break
-      case "an ended tool turn":
-        await pi.dispatch("tool_call", TOOL_CALL, ctx)
-        await pi.dispatch("turn_end", { type: "turn_end", turnIndex: 0, message: {}, toolResults: [] }, ctx)
-        break
-      default: state satisfies never
-    }
-    // when
-    await delivery.accept(SESSION_ID, f.context, [NUDGE])
-    // then
-    expect(sends).toBe(0)
-    expect(delivery.drainForPrompt(SESSION_ID, f.context)).toEqual([NUDGE])
-    await expect(f.pending.take(SESSION_ID)).resolves.toEqual([NUDGE])
-  })
+  test.each(["no tool call", "a finished tool call", "an ended tool turn"] as const)(
+    "#given a running session with %s #when a late verdict is accepted #then it is held for the next prompt instead of steering an extra turn",
+    async (state) => {
+      // given
+      const f = await fixture()
+      let sends = 0
+      const delivery = createKibitzerDelivery({
+        ledgerFor: () => f.ledger,
+        pendingFor: () => f.pending,
+        sendMessage: () => {
+          sends += 1
+        },
+        appendEntry: () => {},
+      })
+      const pi = sessionHooks(delivery, f.context)
+      const ctx = eventContext([], SESSION_ID)
+      await pi.dispatch("before_agent_start", beforeAgentStart("rollout"), ctx)
+      switch (state) {
+        case "no tool call":
+          break
+        case "a finished tool call":
+          await pi.dispatch("tool_call", TOOL_CALL, ctx)
+          await pi.dispatch("tool_result", TOOL_RESULT, ctx)
+          break
+        case "an ended tool turn":
+          await pi.dispatch("tool_call", TOOL_CALL, ctx)
+          await pi.dispatch("turn_end", { type: "turn_end", turnIndex: 0, message: {}, toolResults: [] }, ctx)
+          break
+        default:
+          state satisfies never
+      }
+      // when
+      await delivery.accept(SESSION_ID, f.context, [NUDGE])
+      // then
+      expect(sends).toBe(0)
+      expect(delivery.drainForPrompt(SESSION_ID, f.context)).toEqual([NUDGE])
+      await expect(f.pending.take(SESSION_ID)).resolves.toEqual([NUDGE])
+    },
+  )
 
   test("#given a running session with a tool in flight and a rejecting sender #when nudges are accepted #then it warns and preserves every fallback", async () => {
     // given
@@ -98,9 +137,21 @@ describe("kibitzer accept-time delivery", () => {
     const coordinator = new IdleInjectionCoordinator(() => {})
     let sends = 0
     const delivery = createKibitzerDelivery({
-      ledgerFor: () => f.ledger, pendingFor: () => f.pending, coordinator, appendEntry: () => {},
-      sendMessage: async () => { sends += 1; throw new Error("sender unavailable") },
-      logger: { warn: (_message, details) => { warnings.push(details) }, info: () => {}, error: () => {} },
+      ledgerFor: () => f.ledger,
+      pendingFor: () => f.pending,
+      coordinator,
+      appendEntry: () => {},
+      sendMessage: async () => {
+        sends += 1
+        throw new Error("sender unavailable")
+      },
+      logger: {
+        warn: (_message, details) => {
+          warnings.push(details)
+        },
+        info: () => {},
+        error: () => {},
+      },
     })
     const pi = sessionHooks(delivery, f.context)
     const ctx = eventContext([], SESSION_ID)
@@ -120,7 +171,14 @@ describe("kibitzer accept-time delivery", () => {
     // given
     const f = await fixture()
     let sends = 0
-    const delivery = createKibitzerDelivery({ ledgerFor: () => f.ledger, pendingFor: () => f.pending, sendMessage: () => { sends += 1 }, appendEntry: () => {} })
+    const delivery = createKibitzerDelivery({
+      ledgerFor: () => f.ledger,
+      pendingFor: () => f.pending,
+      sendMessage: () => {
+        sends += 1
+      },
+      appendEntry: () => {},
+    })
     sessionHooks(delivery, f.context)
     // when
     await delivery.accept(SESSION_ID, f.context, [NUDGE])
@@ -137,8 +195,14 @@ describe("kibitzer accept-time delivery", () => {
     const release = Promise.withResolvers<void>()
     let sends = 0
     const delivery = createKibitzerDelivery({
-      ledgerFor: () => f.ledger, pendingFor: () => f.pending, appendEntry: () => {},
-      sendMessage: () => { sends += 1; sent.resolve(); return release.promise },
+      ledgerFor: () => f.ledger,
+      pendingFor: () => f.pending,
+      appendEntry: () => {},
+      sendMessage: () => {
+        sends += 1
+        sent.resolve()
+        return release.promise
+      },
     })
     const pi = sessionHooks(delivery, f.context)
     const ctx = eventContext([], SESSION_ID)
@@ -157,27 +221,44 @@ describe("kibitzer accept-time delivery", () => {
     }
   }, 5_000)
 
-  test.each(["settled", "compacted", "shutdown"] as const)("#given a %s session with a tool in flight #when a late verdict is accepted #then it stays queued", async (state) => {
-    // given
-    const f = await fixture()
-    let sends = 0
-    const delivery = createKibitzerDelivery({ ledgerFor: () => f.ledger, pendingFor: () => f.pending, sendMessage: () => { sends += 1 }, appendEntry: () => {} })
-    const pi = sessionHooks(delivery, f.context)
-    const ctx = eventContext([], SESSION_ID)
-    await pi.dispatch("before_agent_start", beforeAgentStart("rollout"), ctx)
-    await pi.dispatch("tool_call", TOOL_CALL, ctx)
-    switch (state) {
-      case "settled": await pi.dispatch("agent_settled", {}, ctx); break
-      case "compacted": await delivery.onCompactionAccepted(SESSION_ID, f.context); break
-      case "shutdown": delivery.onSessionShutdown(SESSION_ID); break
-      default: state satisfies never
-    }
-    // when
-    await delivery.accept(SESSION_ID, f.context, [NUDGE])
-    // then
-    expect(sends).toBe(0)
-    expect(delivery.drainForPrompt(SESSION_ID, f.context)).toEqual([NUDGE])
-  })
+  test.each(["settled", "compacted", "shutdown"] as const)(
+    "#given a %s session with a tool in flight #when a late verdict is accepted #then it stays queued",
+    async (state) => {
+      // given
+      const f = await fixture()
+      let sends = 0
+      const delivery = createKibitzerDelivery({
+        ledgerFor: () => f.ledger,
+        pendingFor: () => f.pending,
+        sendMessage: () => {
+          sends += 1
+        },
+        appendEntry: () => {},
+      })
+      const pi = sessionHooks(delivery, f.context)
+      const ctx = eventContext([], SESSION_ID)
+      await pi.dispatch("before_agent_start", beforeAgentStart("rollout"), ctx)
+      await pi.dispatch("tool_call", TOOL_CALL, ctx)
+      switch (state) {
+        case "settled":
+          await pi.dispatch("agent_settled", {}, ctx)
+          break
+        case "compacted":
+          await delivery.onCompactionAccepted(SESSION_ID, f.context)
+          break
+        case "shutdown":
+          delivery.onSessionShutdown(SESSION_ID)
+          break
+        default:
+          state satisfies never
+      }
+      // when
+      await delivery.accept(SESSION_ID, f.context, [NUDGE])
+      // then
+      expect(sends).toBe(0)
+      expect(delivery.drainForPrompt(SESSION_ID, f.context)).toEqual([NUDGE])
+    },
+  )
 })
 
 describe("kibitzer delivery idle lifecycle", () => {
@@ -186,9 +267,20 @@ describe("kibitzer delivery idle lifecycle", () => {
     const delivered: string[] = []
     let wakeEntry: unknown
     let wakeEntryReady: (() => void) | undefined
-    const wakeReady = new Promise<void>((resolve) => { wakeEntryReady = resolve })
+    const wakeReady = new Promise<void>((resolve) => {
+      wakeEntryReady = resolve
+    })
     const coordinator = new IdleInjectionCoordinator((message) => delivered.push(message.content))
-    const delivery = createKibitzerDelivery({ ledgerFor: () => f.ledger, pendingFor: () => f.pending, coordinator, sendMessage: () => undefined, appendEntry: (_customType, data) => { wakeEntry = data; wakeEntryReady?.() } })
+    const delivery = createKibitzerDelivery({
+      ledgerFor: () => f.ledger,
+      pendingFor: () => f.pending,
+      coordinator,
+      sendMessage: () => undefined,
+      appendEntry: (_customType, data) => {
+        wakeEntry = data
+        wakeEntryReady?.()
+      },
+    })
     await delivery.accept(SESSION_ID, f.context, [NUDGE])
     expect(coordinator.flushOnIdle()).toBe(0)
     expect(delivered).toEqual([])
@@ -207,7 +299,13 @@ describe("kibitzer delivery idle lifecycle", () => {
   test("#given accepted nudges #when compaction is accepted #then state, coordinator, and pending file are cleared", async () => {
     const f = await fixture()
     const coordinator = new IdleInjectionCoordinator(() => undefined)
-    const delivery = createKibitzerDelivery({ ledgerFor: () => f.ledger, pendingFor: () => f.pending, coordinator, sendMessage: () => undefined, appendEntry: () => undefined })
+    const delivery = createKibitzerDelivery({
+      ledgerFor: () => f.ledger,
+      pendingFor: () => f.pending,
+      coordinator,
+      sendMessage: () => undefined,
+      appendEntry: () => undefined,
+    })
     await delivery.accept(SESSION_ID, f.context, [NUDGE])
     await delivery.onCompactionAccepted(SESSION_ID, f.context)
     await delivery.onToolResult(SESSION_ID, f.context, { hasPendingMessages: () => false, isIdle: () => false })
@@ -218,7 +316,13 @@ describe("kibitzer delivery idle lifecycle", () => {
   test("#given accepted nudges #when session shuts down #then only in-memory wake state is cleared", async () => {
     const f = await fixture()
     const coordinator = new IdleInjectionCoordinator(() => undefined)
-    const delivery = createKibitzerDelivery({ ledgerFor: () => f.ledger, pendingFor: () => f.pending, coordinator, sendMessage: () => undefined, appendEntry: () => undefined })
+    const delivery = createKibitzerDelivery({
+      ledgerFor: () => f.ledger,
+      pendingFor: () => f.pending,
+      coordinator,
+      sendMessage: () => undefined,
+      appendEntry: () => undefined,
+    })
     await delivery.accept(SESSION_ID, f.context, [NUDGE])
     delivery.onSessionShutdown(SESSION_ID)
     await delivery.onToolResult(SESSION_ID, f.context, { hasPendingMessages: () => false, isIdle: () => false })

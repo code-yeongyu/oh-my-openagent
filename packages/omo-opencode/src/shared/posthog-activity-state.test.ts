@@ -157,9 +157,7 @@ describe("getPostHogActivityCaptureState", () => {
     getPostHogActivityCaptureState(new Date("2026-04-11T10:15:00.000Z"))
 
     // then
-    const persistedState = JSON.parse(
-      readFileSync(join(cachePath, "posthog-activity.json"), "utf-8"),
-    )
+    const persistedState = JSON.parse(readFileSync(join(cachePath, "posthog-activity.json"), "utf-8"))
     expect(persistedState).toEqual({
       lastActiveDayUTC: "2026-04-11",
       lastPluginLoadedDayUTC: "2026-04-11",

@@ -41,8 +41,10 @@ export interface ChainWireServer {
   stop(): Promise<void>
 }
 
-const isObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value)
-const signingOf = (principal: unknown): string[] => isObject(principal) && typeof principal["signing_public_key"] === "string" ? [principal["signing_public_key"]] : []
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+const signingOf = (principal: unknown): string[] =>
+  isObject(principal) && typeof principal["signing_public_key"] === "string" ? [principal["signing_public_key"]] : []
 
 /** The service's sync_members: the folded device membership, by signing key. */
 const memberKeys = (chain: ReadonlyArray<SyncEntry>): Set<string> => {
@@ -50,21 +52,48 @@ const memberKeys = (chain: ReadonlyArray<SyncEntry>): Set<string> => {
   for (const entry of chain) {
     if (entry.kind !== "keyring") continue
     const body: Record<string, unknown> = entry.body
-    if (body["kind"] === "genesis") members = new Set(signingOf(isObject(body["bootstrap"]) ? body["bootstrap"]["first_device"] : undefined))
+    if (body["kind"] === "genesis")
+      members = new Set(signingOf(isObject(body["bootstrap"]) ? body["bootstrap"]["first_device"] : undefined))
     if (body["kind"] === "approval") for (const key of signingOf(body["principal"])) members.add(key)
-    if (body["kind"] === "rotation" && Array.isArray(body["members"])) members = new Set(body["members"].flatMap(signingOf))
+    if (body["kind"] === "rotation" && Array.isArray(body["members"]))
+      members = new Set(body["members"].flatMap(signingOf))
     if (body["kind"] === "recovery-join") members = new Set(signingOf(body["principal"]))
   }
   return members
 }
 
-const refusal = (status: number, code: string): Response => Response.json({ error: { code, message: code } }, { status })
+const refusal = (status: number, code: string): Response =>
+  Response.json({ error: { code, message: code } }, { status })
 
-const chainRow = ({ seq, base_seq, kind, account, epoch, author, digest, link, keyring_link, record_sig }: SyncEntry) => ({
-  seq, base_seq, kind, account, epoch, author, digest, link, keyring_link, record_sig,
+const chainRow = ({
+  seq,
+  base_seq,
+  kind,
+  account,
+  epoch,
+  author,
+  digest,
+  link,
+  keyring_link,
+  record_sig,
+}: SyncEntry) => ({
+  seq,
+  base_seq,
+  kind,
+  account,
+  epoch,
+  author,
+  digest,
+  link,
+  keyring_link,
+  record_sig,
 })
 
-export function startChainWireServer(account: string, chain: SyncEntry[], options: { readonly requireConsent?: boolean; readonly stream?: boolean; readonly entriesBatchId?: boolean } = {}): ChainWireServer {
+export function startChainWireServer(
+  account: string,
+  chain: SyncEntry[],
+  options: { readonly requireConsent?: boolean; readonly stream?: boolean; readonly entriesBatchId?: boolean } = {},
+): ChainWireServer {
   const authors = new Map<string, SyncAuthor>()
   const devices = new Map<string, string>()
   const deviceConsent = new Map<string, boolean>()
@@ -74,7 +103,9 @@ export function startChainWireServer(account: string, chain: SyncEntry[], option
   const head = () => chain.at(-1)
   const pairings = new Map<string, Pending>()
   const switches: string[] = []
-  const hooks: { tamperReveal: ((reveal: Record<string, unknown>) => Record<string, unknown>) | null } = { tamperReveal: null }
+  const hooks: { tamperReveal: ((reveal: Record<string, unknown>) => Record<string, unknown>) | null } = {
+    tamperReveal: null,
+  }
   let onWrite: (() => void) | null = null
   const freeze = new FreezeModel((key) => memberKeys(chain).has(key))
   const streams = new Set<ReadableStreamDefaultController<Uint8Array>>()
@@ -84,7 +115,8 @@ export function startChainWireServer(account: string, chain: SyncEntry[], option
   }
   freeze.onStateChanged(() => announce({ type: "sync.state.changed" }))
   let keyAppends = 0
-  let hold: { readonly received: (request: KeyringAppendRequest) => void; readonly released: Promise<void> } | null = null
+  let hold: { readonly received: (request: KeyringAppendRequest) => void; readonly released: Promise<void> } | null =
+    null
   const server = Bun.serve({
     // Bound to the exact address the client dials: on a wildcard bind another process may bind
     // 127.0.0.1 on the same port and answer this fixture's requests.
@@ -101,8 +133,15 @@ export function startChainWireServer(account: string, chain: SyncEntry[], option
       if (freeze.isRevokedDevice(device)) return freeze.revokedRefusal()
       const routed = freeze.route(req.method, path, device)
       if (routed !== null) return routed
-      if (options.requireConsent && (path.includes("/batches") || path.includes("/uploads") || path.includes("/objects") || (path === "/v1/sync/keys" && req.method === "PUT")) &&
-          !(accountConsent && deviceConsent.get(device) === true)) return refusal(403, "sync_disabled")
+      if (
+        options.requireConsent &&
+        (path.includes("/batches") ||
+          path.includes("/uploads") ||
+          path.includes("/objects") ||
+          (path === "/v1/sync/keys" && req.method === "PUT")) &&
+        !(accountConsent && deviceConsent.get(device) === true)
+      )
+        return refusal(403, "sync_disabled")
       const after = Number(url.searchParams.get("after") ?? "0")
       if (req.method === "GET" && path === "/v1/sync/state") {
         const last = head()
@@ -118,15 +157,27 @@ export function startChainWireServer(account: string, chain: SyncEntry[], option
       }
       if (req.method === "GET" && path === "/v1/sync/entries") {
         const rows = chain.filter((e) => e.seq > after)
-        return Response.json({ entries: rows.map((e) => (options.entriesBatchId === false ? chainRow(e) : { ...chainRow(e), batch_id: servedBatchId(e) })) })
+        return Response.json({
+          entries: rows.map((e) =>
+            options.entriesBatchId === false ? chainRow(e) : { ...chainRow(e), batch_id: servedBatchId(e) },
+          ),
+        })
       }
-      if (req.method === "GET" && path === "/v1/sync/keys") return Response.json({ entries: chain.filter((e) => e.kind === "keyring") })
+      if (req.method === "GET" && path === "/v1/sync/keys")
+        return Response.json({ entries: chain.filter((e) => e.kind === "keyring") })
       if (req.method === "GET" && path === "/v1/sync/batches") {
         return Response.json({
-          entries: chain.filter((e) => e.seq > after).map((e) => {
-            const stored = objects.get(e.seq)
-            return { ...chainRow(e), object_id: stored?.id ?? null, bytes: stored?.bytes.byteLength ?? null, batch_id: stored?.batchId ?? null }
-          }),
+          entries: chain
+            .filter((e) => e.seq > after)
+            .map((e) => {
+              const stored = objects.get(e.seq)
+              return {
+                ...chainRow(e),
+                object_id: stored?.id ?? null,
+                bytes: stored?.bytes.byteLength ?? null,
+                batch_id: stored?.batchId ?? null,
+              }
+            }),
         })
       }
       if (req.method === "GET" && path.startsWith("/v1/sync/objects/")) {
@@ -158,23 +209,54 @@ export function startChainWireServer(account: string, chain: SyncEntry[], option
       if (req.method === "PUT" && path.startsWith("/v1/sync/uploads/")) {
         const up = uploads.get(path.slice("/v1/sync/uploads/".length))
         const data = new Uint8Array(await req.arrayBuffer())
-        if (up === undefined || data.byteLength !== up.size || createHash("sha256").update(data).digest("hex") !== up.sha256) return refusal(400, "invalid_request")
+        if (
+          up === undefined ||
+          data.byteLength !== up.size ||
+          createHash("sha256").update(data).digest("hex") !== up.sha256
+        )
+          return refusal(400, "invalid_request")
         up.data = data
         return new Response(null, { status: 204 })
       }
       if (req.method === "POST" && path === "/v1/sync/batches") {
-        const body = (await req.json()) as { upload_id: string; digest: string; base_seq: number; idempotency_key: string; epoch: number; link: string; record_sig: string }
+        const body = (await req.json()) as {
+          upload_id: string
+          digest: string
+          base_seq: number
+          idempotency_key: string
+          epoch: number
+          link: string
+          record_sig: string
+        }
         const up = uploads.get(body.upload_id)
         if (up === undefined || up.data === null) return refusal(404, "not_found")
         const replay = [...objects.entries()].find(([, o]) => o.batchId === body.idempotency_key)
         if (replay !== undefined) return Response.json({ seq: replay[0] })
-        const fields = { account, base_seq: body.base_seq, digest: body.digest, epoch: body.epoch, link: body.link, keyring_link: null, record_sig: body.record_sig }
-        if (author.kind === "device" && !(await verifyRecordSig(author.signing_public_key, fields))) return refusal(400, "invalid_request")
+        const fields = {
+          account,
+          base_seq: body.base_seq,
+          digest: body.digest,
+          epoch: body.epoch,
+          link: body.link,
+          keyring_link: null,
+          record_sig: body.record_sig,
+        }
+        if (author.kind === "device" && !(await verifyRecordSig(author.signing_public_key, fields)))
+          return refusal(400, "invalid_request")
         if (freeze.pending) return freeze.staleRefusal()
         if (body.base_seq !== chain.length) return refusal(409, "stale_base")
         const entry: StoredBatchRow = {
-          seq: chain.length + 1, base_seq: body.base_seq, kind: "batch", account, epoch: body.epoch, author,
-          digest: body.digest, link: body.link, keyring_link: null, record_sig: body.record_sig, batch_id: body.idempotency_key,
+          seq: chain.length + 1,
+          base_seq: body.base_seq,
+          kind: "batch",
+          account,
+          epoch: body.epoch,
+          author,
+          digest: body.digest,
+          link: body.link,
+          keyring_link: null,
+          record_sig: body.record_sig,
+          batch_id: body.idempotency_key,
         }
         chain.push(entry)
         objects.set(entry.seq, { id: body.upload_id, batchId: body.idempotency_key, bytes: up.data })
@@ -183,7 +265,14 @@ export function startChainWireServer(account: string, chain: SyncEntry[], option
       }
       if (req.method === "PUT" && path === "/v1/sync/pending") {
         const body = (await req.json()) as { account: string; commitment: string }
-        const row: Pending = { id: randomBytes(9).toString("base64url"), account: body.account, commitment: body.commitment, answer: null, reveal: null, expires_at: Date.now() + 600_000 }
+        const row: Pending = {
+          id: randomBytes(9).toString("base64url"),
+          account: body.account,
+          commitment: body.commitment,
+          answer: null,
+          reveal: null,
+          expires_at: Date.now() + 600_000,
+        }
         pairings.set(row.id, row)
         onWrite?.()
         return Response.json(row)
@@ -221,18 +310,34 @@ export function startChainWireServer(account: string, chain: SyncEntry[], option
         if (request.base_seq !== chain.length) return refusal(409, "stale_base")
         const kind = request.record["kind"]
         const members = request.record["members"]
-        if (kind === "rotation" && Array.isArray(members) && members.flatMap(signingOf).some((key) => freeze.isRevokedKey(key))) {
+        if (
+          kind === "rotation" &&
+          Array.isArray(members) &&
+          members.flatMap(signingOf).some((key) => freeze.isRevokedKey(key))
+        ) {
           return freeze.forbiddenRefusal()
         }
         const entry: KeyringEntry = {
-          seq: chain.length + 1, base_seq: request.base_seq, kind: "keyring", account, epoch: request.record.epoch, author,
-          body: request.record, digest, link: request.link,
-          keyring_link: request.keyring_link, record_sig: request.record_sig, wraps: request.wraps,
+          seq: chain.length + 1,
+          base_seq: request.base_seq,
+          kind: "keyring",
+          account,
+          epoch: request.record.epoch,
+          author,
+          body: request.record,
+          digest,
+          link: request.link,
+          keyring_link: request.keyring_link,
+          record_sig: request.record_sig,
+          wraps: request.wraps,
         }
         chain.push(entry)
         if (kind === "rotation") freeze.setPending(false)
         if (kind === "recovery-key-removed" || kind === "recovery-join") freeze.setPending(true)
-        announce({ type: "sync.keyring.changed", head: { seq: entry.seq, link: entry.link, keyring_link: entry.keyring_link } })
+        announce({
+          type: "sync.keyring.changed",
+          head: { seq: entry.seq, link: entry.link, keyring_link: entry.keyring_link },
+        })
         onWrite?.()
         return Response.json(entry)
       }
@@ -249,22 +354,29 @@ export function startChainWireServer(account: string, chain: SyncEntry[], option
       hooks.tamperReveal = fn
     },
     pending: () => [...pairings.values()],
-    get onWrite() { return onWrite },
-    set onWrite(fn) { onWrite = fn },
+    get onWrite() {
+      return onWrite
+    },
+    set onWrite(fn) {
+      onWrite = fn
+    },
     enabled: (deviceId) => accountConsent && deviceConsent.get(deviceId) === true,
     tokenFor(author, serviceDeviceId = author.kind === "device" ? author.id : author.credential_id) {
       const token = randomBytes(12).toString("base64url")
       authors.set(token, author)
       devices.set(token, serviceDeviceId)
       freeze.addDevice({
-        id: serviceDeviceId, kind: "cli",
+        id: serviceDeviceId,
+        kind: "cli",
         principal: author.kind === "device" ? author.id : null,
         signingKey: author.kind === "device" ? author.signing_public_key : null,
       })
       return token
     },
     freeze,
-    get keyAppendsReceived() { return keyAppends },
+    get keyAppendsReceived() {
+      return keyAppends
+    },
     holdKeysAppend() {
       const received = Promise.withResolvers<KeyringAppendRequest>()
       const released = Promise.withResolvers<void>()

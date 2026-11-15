@@ -16,22 +16,27 @@ import { defaultTranscriptReader } from "./transcript"
 import type { TaskOutputDeps, TaskOutputDetails, TaskOutputToolResult, TaskSnapshot, TranscriptReader } from "./types"
 
 export const TaskOutputParams = Type.Object({
-  task_id: Type.Optional(Type.String({ description: "Task id (st_...) of the child to read. Pass task_id or name; when both are given, task_id wins and name is ignored." })),
+  task_id: Type.Optional(
+    Type.String({
+      description:
+        "Task id (st_...) of the child to read. Pass task_id or name; when both are given, task_id wins and name is ignored.",
+    }),
+  ),
   name: Type.Optional(Type.String({ description: "Canonical task name; required if task_id is omitted." })),
   mode: Type.Optional(
     Type.Union([Type.Literal("status"), Type.Literal("tail"), Type.Literal("full")], {
-      description: "status (default) = record snapshot + final result; tail = last lines of the transcript; full = whole transcript.",
+      description:
+        "status (default) = record snapshot + final result; tail = last lines of the transcript; full = whole transcript.",
     }),
   ),
-  tail_lines: Type.Optional(
-    Type.Integer({ minimum: 1, description: "Lines to keep in tail mode. Defaults to 60." }),
-  ),
+  tail_lines: Type.Optional(Type.Integer({ minimum: 1, description: "Lines to keep in tail mode. Defaults to 60." })),
 })
 
 export type TaskOutputInput = Static<typeof TaskOutputParams>
 
 const DEFAULT_TAIL_LINES = 60
-const STOP_PENDING_EXPLANATION = "cancel requested, child unreachable: it is stopped on its host before it runs anything else"
+const STOP_PENDING_EXPLANATION =
+  "cancel requested, child unreachable: it is stopped on its host before it runs anything else"
 const MAX_STATUS_READS = 1024
 const BLOCKING_REMOVED_GUIDANCE = 'blocking removed - completion arrives as a notification; use mode:"tail" to peek.'
 
@@ -51,7 +56,8 @@ export function runTaskOutput(
   if (hasLegacyBlockingParam(params)) return Promise.resolve(invalidArguments(BLOCKING_REMOVED_GUIDANCE))
 
   const idOrName = params.task_id ?? params.name
-  if (idOrName === undefined) return Promise.resolve(invalidArguments("Provide task_id or name to identify the child task."))
+  if (idOrName === undefined)
+    return Promise.resolve(invalidArguments("Provide task_id or name to identify the child task."))
 
   const candidates = scopedCandidates(deps.manager.list.bind(deps.manager), callerSessionId)
   const record = resolveTarget(candidates, idOrName)
@@ -97,8 +103,13 @@ function outputForRecord(deps: TaskOutputDeps, record: TaskRecord, params: TaskO
   const now = (deps.now ?? Date.now)()
   const lease = deps.manager.concurrency?.leaseState(record.task_id, record.notification.run_epoch)
   // Only a still-running child can be waiting on its cancel; a cancelled record says so itself.
-  const stop = record.status === "running" && record.cancel_requested !== undefined ? { stop: STOP_PENDING_EXPLANATION } : {}
-  const snapshot = { ...buildTaskSnapshot(record, deps.stateDir, now), ...(lease === undefined ? {} : { lease }), ...stop }
+  const stop =
+    record.status === "running" && record.cancel_requested !== undefined ? { stop: STOP_PENDING_EXPLANATION } : {}
+  const snapshot = {
+    ...buildTaskSnapshot(record, deps.stateDir, now),
+    ...(lease === undefined ? {} : { lease }),
+    ...stop,
+  }
   const mode = params.mode ?? "status"
 
   if (mode === "status" || record.status === "lost") {
@@ -116,7 +127,11 @@ function transcriptResult(
   tailLines: number,
 ): TaskOutputToolResult {
   const reader: TranscriptReader = deps.transcriptReader ?? defaultTranscriptReader
-  const { entries, source, truncated: sourceTruncated } = reader({
+  const {
+    entries,
+    source,
+    truncated: sourceTruncated,
+  } = reader({
     taskId: record.task_id,
     stateDir: deps.stateDir,
   })
@@ -143,7 +158,9 @@ function scopedCandidates(
 }
 
 function resolveTarget(candidates: readonly TaskRecord[], idOrName: string): TaskRecord | undefined {
-  return candidates.find((record) => record.task_id === idOrName) ?? candidates.find((record) => record.name === idOrName)
+  return (
+    candidates.find((record) => record.task_id === idOrName) ?? candidates.find((record) => record.name === idOrName)
+  )
 }
 
 // Session-level runner notices ride the status view: one line each, after the record facts, so a
@@ -155,7 +172,8 @@ function withNotices(text: string, deps: TaskOutputDeps): string {
 
 function statusText(snapshot: TaskSnapshot): string {
   const parts = [`${snapshot.task_id} [${snapshot.status}] ${taskOutputModelText(snapshot)}`]
-  if (snapshot.host_liveness !== undefined && snapshot.host_liveness.state !== "running") parts.push(hostLivenessText(snapshot.host_liveness))
+  if (snapshot.host_liveness !== undefined && snapshot.host_liveness.state !== "running")
+    parts.push(hostLivenessText(snapshot.host_liveness))
   if (snapshot.lease !== undefined) parts.push(`lease: ${snapshot.lease}`)
   if (snapshot.suspended !== undefined) parts.push(snapshot.suspended.explanation)
   if (snapshot.awaiting_input !== undefined) parts.push(snapshot.awaiting_input.explanation)
@@ -171,7 +189,11 @@ function statusText(snapshot: TaskSnapshot): string {
 function notFound(candidates: readonly TaskRecord[], idOrName: string): TaskOutputToolResult {
   const known = candidates.map((record) => record.name ?? record.task_id)
   const listText = known.length > 0 ? ` Known tasks in this session: ${known.join(", ")}.` : ""
-  return toolResult(`No task '${idOrName}' in this session.${listText}`, { kind: "not_found", reason: `No task '${idOrName}' in this session.`, known_tasks: known })
+  return toolResult(`No task '${idOrName}' in this session.${listText}`, {
+    kind: "not_found",
+    reason: `No task '${idOrName}' in this session.`,
+    known_tasks: known,
+  })
 }
 
 function invalidArguments(reason: string): TaskOutputToolResult {
@@ -200,7 +222,9 @@ export type TaskOutputTool = ToolDefinition<typeof TaskOutputParams, TaskOutputD
 }
 
 function digestField(value: unknown): string {
-  return createHash("sha256").update(JSON.stringify(value ?? null)).digest("hex")
+  return createHash("sha256")
+    .update(JSON.stringify(value ?? null))
+    .digest("hex")
 }
 
 export function createTaskOutputTool(deps: TaskOutputDeps): TaskOutputTool {

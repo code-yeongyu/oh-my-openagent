@@ -48,19 +48,26 @@ export function createSettleObservers(pi: SenpiExtensionAPI, logger: ComponentLo
         signal.addEventListener("abort", onAbort, { once: true })
         const timer = setTimeout(() => {
           logger.warn("extension_handler_stalled", {
-            event: "extension_handler_stalled", extension: "omo.js",
-            component, hook, handlerEvent: "agent_settled", stage: "timeout",
-            durationMs: Date.now() - started, sessionId,
+            event: "extension_handler_stalled",
+            extension: "omo.js",
+            component,
+            hook,
+            handlerEvent: "agent_settled",
+            stage: "timeout",
+            durationMs: Date.now() - started,
+            sessionId,
           })
           const reason = new DOMException("Settle observer budget exhausted", "TimeoutError")
           cancellations.add(reason)
           controller.abort(reason)
         }, SETTLE_OBSERVER_BUDGET_MS)
         timer.unref()
-        const work = Promise.resolve().then(() => handler(payload, ctx, observer)).catch((error: unknown) => {
-          if (!signal.aborted && !(error instanceof DOMException && cancellations.has(error))) throw error
-          return undefined
-        })
+        const work = Promise.resolve()
+          .then(() => handler(payload, ctx, observer))
+          .catch((error: unknown) => {
+            if (!signal.aborted && !(error instanceof DOMException && cancellations.has(error))) throw error
+            return undefined
+          })
         try {
           return await Promise.race([work, released.promise])
         } finally {
