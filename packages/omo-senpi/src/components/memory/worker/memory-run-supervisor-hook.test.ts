@@ -7,7 +7,9 @@ test("#given hook mode #when unrelated supervisor modules cannot load #then the 
   const root = await mkdtemp(join(tmpdir(), "memory-hook-startup-"))
   onTestFinished(() => rm(root, { recursive: true, force: true }))
   const preload = join(root, "forbid-supervisor.ts")
-  await writeFile(preload, String.raw`
+  await writeFile(
+    preload,
+    String.raw`
 import { plugin } from "bun"
 plugin({
   name: "forbid-supervisor-startup",
@@ -17,12 +19,17 @@ plugin({
     }, () => { throw new Error("UNRELATED_SUPERVISOR_IMPORT") })
   },
 })
-`)
+`,
+  )
   const git = Bun.spawn(["git", "init", "--quiet", root], { stdout: "pipe", stderr: "pipe" })
   expect(await git.exited).toBe(0)
   const argv = [
-    process.execPath, "--preload", preload,
-    join(import.meta.dir, "memory-run-supervisor.ts"), "--memory-hook", "pre-commit",
+    process.execPath,
+    "--preload",
+    preload,
+    join(import.meta.dir, "memory-run-supervisor.ts"),
+    "--memory-hook",
+    "pre-commit",
   ]
   const child = Bun.spawn(argv, { cwd: root, stdout: "pipe", stderr: "pipe" })
   const [code, stdout, stderr] = await Promise.all([

@@ -25,6 +25,8 @@ export interface PushCycleInput {
   readonly sleep: (ms: number) => Promise<void>
   readonly settleFirst: boolean
   readonly frozen: Frozen | null
+  /** Keys whose queued ops this device must not send (#12284), read per attempt: an inbound recapture can change them. */
+  readonly withheld: () => ReadonlySet<string>
 }
 
 export interface PushCycleResult {
@@ -45,7 +47,7 @@ export async function pushCycle(input: PushCycleInput): Promise<PushCycleResult>
   }
   if (input.settleFirst && ended(await settle())) await input.inbound()
   for (let attempt = 0; attempt < PUSH_ATTEMPTS; attempt += 1) {
-    const outcome = await push(deps, journal, deps.batchBytes)
+    const outcome = await push(deps, journal, deps.batchBytes, input.withheld())
     if (outcome !== "stale") {
       if (outcome === "pushed") frozen = null
       return { pushed: outcome === "pushed", frozen }

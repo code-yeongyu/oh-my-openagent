@@ -19,7 +19,8 @@ test("#given a git command that exits before reading a large stdin #when it runs
   const root = realpathSync.native(await mkdtemp(join(tmpdir(), "git-stdin-epipe-")))
   roots.push(root)
   const exec = createNodeGitExec()
-  const git = (argv: readonly string[], stdin?: string) => exec.run(argv, { cwd: root, timeoutMs: 30_000, ...(stdin === undefined ? {} : { stdin }) })
+  const git = (argv: readonly string[], stdin?: string) =>
+    exec.run(argv, { cwd: root, timeoutMs: 30_000, ...(stdin === undefined ? {} : { stdin }) })
   expect((await git(["init", "-q"])).code).toBe(0)
   // update-index exits at the first path that does not exist, long before it has read 8 MiB of stdin.
   const paths = "note-with-a-long-enough-name.md\0".repeat(256 * 1024)
@@ -34,13 +35,21 @@ test("#given a stdin error other than EPIPE #when git still exits normally #then
   const root = realpathSync.native(await mkdtemp(join(tmpdir(), "git-stdin-eio-")))
   roots.push(root)
   const realSpawn = childProcess.spawn
-  const spawnSpy = spyOn(childProcess, "spawn").mockImplementation(((...args: Parameters<typeof childProcess.spawn>) => {
+  const spawnSpy = spyOn(childProcess, "spawn").mockImplementation(((
+    ...args: Parameters<typeof childProcess.spawn>
+  ) => {
     const child = Reflect.apply(realSpawn, childProcess, args)
-    queueMicrotask(() => child.stdin?.emit("error", Object.assign(new Error("injected stdin failure"), { code: "EIO" })))
+    queueMicrotask(() =>
+      child.stdin?.emit("error", Object.assign(new Error("injected stdin failure"), { code: "EIO" })),
+    )
     return child
   }) as typeof childProcess.spawn)
   try {
-    const result = await createNodeGitExec().run(["hash-object", "--stdin"], { cwd: root, timeoutMs: 30_000, stdin: "note\n" })
+    const result = await createNodeGitExec().run(["hash-object", "--stdin"], {
+      cwd: root,
+      timeoutMs: 30_000,
+      stdin: "note\n",
+    })
 
     expect(spawnSpy).toHaveBeenCalled()
     expect(result.stderr).toContain("git stdin was not fully delivered (EIO)")

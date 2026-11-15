@@ -3,26 +3,24 @@ import { describe, expect, test } from "bun:test"
 import { TaskConcurrency } from "./concurrency"
 
 describe("OpenGateway default concurrency", () => {
-  test.each([
-    {},
-    { default_concurrency: 1 },
-    { default_concurrency: 2, provider_concurrency: { openai: 1 } },
-  ])("admits OpenGateway tasks beyond the generic limit with %j", (config) => {
-    // given
-    const concurrency = new TaskConcurrency(config)
-    const model = "opengateway/openai/gpt"
+  test.each([{}, { default_concurrency: 1 }, { default_concurrency: 2, provider_concurrency: { openai: 1 } }])(
+    "admits OpenGateway tasks beyond the generic limit with %j",
+    (config) => {
+      // given
+      const concurrency = new TaskConcurrency(config)
+      const model = "opengateway/openai/gpt"
 
-    // when
-    const admitted = Array.from({ length: 32 }, (_, index) =>
-      concurrency.tryAcquire(model, `gateway-${index}`, 0))
+      // when
+      const admitted = Array.from({ length: 32 }, (_, index) => concurrency.tryAcquire(model, `gateway-${index}`, 0))
 
-    // then
-    expect(admitted.every(Boolean)).toBe(true)
-    for (let index = 0; index < admitted.length; index += 1) {
-      concurrency.releaseLease(`gateway-${index}`, 0)
-    }
-    expect(concurrency.getRetainedKeyCounts()).toEqual({ lanes: 0, queues: 0, leases: 0 })
-  })
+      // then
+      expect(admitted.every(Boolean)).toBe(true)
+      for (let index = 0; index < admitted.length; index += 1) {
+        concurrency.releaseLease(`gateway-${index}`, 0)
+      }
+      expect(concurrency.getRetainedKeyCounts()).toEqual({ lanes: 0, queues: 0, leases: 0 })
+    },
+  )
 
   test("honors an explicit provider cap across OpenGateway models", () => {
     // given
@@ -32,7 +30,9 @@ describe("OpenGateway default concurrency", () => {
 
     // when
     const admitted = concurrency.tryAcquire("opengateway/anthropic/claude", "second", 0)
-    concurrency.enqueue("opengateway/anthropic/claude", "second", 0, () => { granted = true })
+    concurrency.enqueue("opengateway/anthropic/claude", "second", 0, () => {
+      granted = true
+    })
 
     // then
     expect(admitted).toBe(false)
@@ -54,8 +54,7 @@ describe("OpenGateway default concurrency", () => {
 
     // when
     const sameModel = concurrency.tryAcquire(model, "second", 0)
-    const otherModels = ["third", "fourth"].map((id) =>
-      concurrency.tryAcquire("opengateway/anthropic/claude", id, 0))
+    const otherModels = ["third", "fourth"].map((id) => concurrency.tryAcquire("opengateway/anthropic/claude", id, 0))
 
     // then
     expect(sameModel).toBe(false)
@@ -86,7 +85,9 @@ describe("OpenGateway default concurrency", () => {
 
     // when
     const admitted = concurrency.tryAcquire(model, "third", 0)
-    concurrency.enqueue(model, "third", 0, () => { granted = true })
+    concurrency.enqueue(model, "third", 0, () => {
+      granted = true
+    })
 
     // then
     expect(admitted).toBe(false)

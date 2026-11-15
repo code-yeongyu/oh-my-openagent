@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs"
 import { type AccountShowResult, type AccountState, accountStateNotice, classifyAccountShow } from "./account-state.ts"
-import { type DeviceCredential, type DeviceService, deviceServiceEndpointPath, LocalApiError, type Status } from "./device-service.ts"
+import { type DeviceService, deviceServiceEndpointPath, LocalApiError, type Status } from "./device-service.ts"
+import { connectOrNotRunning } from "./hand-device-keys.ts"
 import type { InstallOutcome } from "./install.ts"
 import { compareVersions } from "./release/version.ts"
 
@@ -11,12 +12,19 @@ export type BootstrapStopState =
   | "keychain_locked"
   | "store_unavailable"
   | "service_degraded"
+  /** The pinned release is not on the release origin yet (#12656); nothing for the user to act on at start-up. */
+  | "not_published"
   | "account_unavailable"
   | "update_required"
 
 export type BootstrapOutcome =
   | { readonly kind: "connected"; readonly status: Status; readonly service: DeviceService }
-  | { readonly kind: "stopped"; readonly state: BootstrapStopState; readonly notice: string; readonly exitCode: typeof BOOTSTRAP_STOPPED_EXIT }
+  | {
+      readonly kind: "stopped"
+      readonly state: BootstrapStopState
+      readonly notice: string
+      readonly exitCode: typeof BOOTSTRAP_STOPPED_EXIT
+    }
 
 export type BootstrapDependencies = {
   /** `omo account show`; nothing else runs unless it reports signed in. */
@@ -26,8 +34,6 @@ export type BootstrapDependencies = {
   readonly pinVersion: string
   readonly install: () => Promise<InstallOutcome>
   readonly connect: () => Promise<DeviceService>
-  /** The stored sign-in's device and keys, read only after `omo account show` reported signed in. */
-  readonly credential: () => Promise<DeviceCredential | null>
   readonly refresher: { readonly binaryPath: string; readonly version: string }
   readonly agentDir: string
 }
@@ -40,9 +46,15 @@ const ACCOUNT_STOP: Readonly<Record<Exclude<AccountState["kind"], "signed_in">, 
   account_unavailable: "account_unavailable",
 }
 
-const stopped = (state: BootstrapStopState, notice: string): BootstrapOutcome => ({ kind: "stopped", state, notice, exitCode: BOOTSTRAP_STOPPED_EXIT })
+const stopped = (state: BootstrapStopState, notice: string): BootstrapOutcome => ({
+  kind: "stopped",
+  state,
+  notice,
+  exitCode: BOOTSTRAP_STOPPED_EXIT,
+})
 
-const isHandshakeTimeout = (error: unknown): boolean => error instanceof LocalApiError && error.code === "handshake_timeout"
+const isHandshakeTimeout = (error: unknown): boolean =>
+  error instanceof LocalApiError && error.code === "handshake_timeout"
 
 /**
  * A service that is not running: its socket is gone (POSIX) or its loopback port refuses or never answers (Windows).
@@ -50,12 +62,15 @@ const isHandshakeTimeout = (error: unknown): boolean => error instanceof LocalAp
  * slow (for example busy right after a restart), and reinstalling it would restart a working service.
  */
 const isServiceStopped = (error: unknown, platform: NodeJS.Platform = process.platform): boolean =>
-  (error instanceof Error && "code" in error && ["ENOENT", "ECONNREFUSED", "ECONNRESET"].includes(String(error.code))) ||
+  (error instanceof Error &&
+    "code" in error &&
+    ["ENOENT", "ECONNREFUSED", "ECONNRESET"].includes(String(error.code))) ||
   (platform === "win32" && isHandshakeTimeout(error))
 
 const failureNotice = (error: unknown): string =>
   error instanceof LocalApiError
-    ? (error.action ?? `The OmO device service did not answer as expected (${error.reason}). Try again; if it keeps failing, report it with /bug.`)
+    ? (error.action ??
+      `The OmO device service did not answer as expected (${error.reason}). Try again; if it keeps failing, report it with /bug.`)
     : "The OmO device service could not be reached. Try again; if it keeps failing, report it with /bug."
 
 // A running service at the pin or newer, "absent" when none runs (or an older one does, which install replaces), or the
@@ -95,20 +110,17 @@ const connectInstalled = async (deps: BootstrapDependencies): Promise<DeviceServ
 
 /**
  * The device service bootstrap of every omo start: `omo account show` first; only when signed in, ensure the pinned
- * service is installed, connect (mutual proof), register the refresher, adopt the device, register this agent dir, and
- * read the status.
+ * service is installed, connect (mutual proof), register the refresher, register this agent dir, and read the status.
+ * It reads no credential and adopts nothing (design D r9 section 3): device keys reach the service only from a
+ * credential a client already holds in memory for its own work (a fresh sign-in, or the memory device session).
  */
 export const bootstrapDeviceService = async (deps: BootstrapDependencies): Promise<BootstrapOutcome> => {
   const account = classifyAccountShow(await deps.accountShow())
   if (account.kind !== "signed_in") return stopped(ACCOUNT_STOP[account.kind], accountStateNotice(account) ?? "")
-  const credential = await deps.credential()
-  if (credential === null)
-    return stopped("account_unavailable", accountStateNotice({ kind: "account_unavailable", reason: "no device keys are stored" }) ?? "")
   const service = await connectInstalled(deps)
   if ("kind" in service) return service
   try {
     await service.registerRefresher(deps.refresher.binaryPath, deps.refresher.version)
-    await service.adopt(credential)
     await service.registerEndpoints(deps.agentDir)
     return { kind: "connected", status: await service.status(), service }
   } catch (error) {
@@ -117,19 +129,18 @@ export const bootstrapDeviceService = async (deps: BootstrapDependencies): Promi
   }
 }
 
-/** `omo logout`: a running service forgets this device. Without a running service there is nothing to tell. */
+/**
+ * Every local end of a sign-in: a running service forgets this device. With no service answering (none running, or a
+ * dead one that left its endpoint file) there is nothing to tell; that is logged, never thrown.
+ */
 export const forgetDeviceService = async (options: {
   readonly stateDir: string
   readonly connect: () => Promise<DeviceService>
+  readonly log?: (line: string) => void
 }): Promise<"forgotten" | "not_running"> => {
   if (!existsSync(deviceServiceEndpointPath(options.stateDir))) return "not_running"
-  let service: DeviceService
-  try {
-    service = await options.connect()
-  } catch (error) {
-    if (isServiceStopped(error)) return "not_running"
-    throw error
-  }
+  const service = await connectOrNotRunning(options.connect, options.log)
+  if (service === "not_running") return "not_running"
   try {
     await service.forget()
   } finally {

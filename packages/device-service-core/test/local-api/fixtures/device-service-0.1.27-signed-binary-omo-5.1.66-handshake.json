@@ -1,0 +1,69 @@
+{
+  "recorded_from": "the signed omo-device-service-linux-x64 0.1.27 from get.omo.dev/stable/device-service/0.1.27 (sha256 3f264827b8a3291a0879d8cf5ca6f29cbb0a0c176cae52991d422a496d544dd2, listed in checksums.txt sha256 4146820d8c021bb174e46272fbf5a4f2ec81441b6e29bc999dea43d4aa63bd7e whose checksums.txt.sig verifies under release-key.json), run as `run --state-dir <temp>` with a temp HOME and OMO_SERVICE_API_URL on a closed loopback port (never adopted, relay not_configured); frames read off the client's socket",
+  "client": {
+    "name": "omo",
+    "version": "5.1.66"
+  },
+  "client_frames": [
+    {
+      "type": "hello",
+      "v": 1,
+      "client": {
+        "name": "omo",
+        "version": "5.1.66"
+      },
+      "client_nonce": "NvLePbOjqCTKkThiG85BxDjYOUoyFGtS_IVPcgsryDI"
+    },
+    {
+      "id": "1",
+      "type": "authenticate",
+      "client_proof": "Yf7n3eoHZPeGipxELrUFfpd87Wxy7C9mhEBn1b89c1Q"
+    },
+    {
+      "id": "2",
+      "type": "session.endpoints",
+      "device": "dev-a"
+    }
+  ],
+  "service_frames": [
+    {
+      "type": "welcome",
+      "v": 1,
+      "service_version": "0.1.27",
+      "owner": "service",
+      "server_proof": "WhgXXVSWdaXgSDDApm0lPMqTr4HqFnAfiZWTi7hJFxM",
+      "server_nonce": "3ymlhQ23MDOqQlFCzpI301m7_mcTB3mkAlSlLdX7olw",
+      "capabilities": [
+        "sessions",
+        "devices",
+        "enforcement",
+        "upgrade",
+        "control",
+        "machine"
+      ],
+      "state": {
+        "state": "not_configured",
+        "since_ms": 1794352751723,
+        "device": null,
+        "origin_configured": false,
+        "enabled": true
+      }
+    },
+    {
+      "id": "1",
+      "type": "response",
+      "ok": true,
+      "data": {}
+    },
+    {
+      "id": "2",
+      "type": "response",
+      "ok": false,
+      "error": {
+        "code": "signed_out",
+        "reason": "no device adopted yet",
+        "action": null
+      }
+    }
+  ]
+}

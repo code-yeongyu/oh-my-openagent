@@ -8,7 +8,8 @@
 // warns and stops there, and ENOENT is success.
 
 import { existsSync } from "@oh-my-opencode/memory-core/fs"
-import { readdir, rm } from "@oh-my-opencode/memory-core/fs"
+import { readdir } from "@oh-my-opencode/memory-core/fs"
+import { removeTree } from "@oh-my-opencode/memory-core"
 import { join } from "node:path"
 
 import { describe } from "./facts-run-storage"
@@ -30,7 +31,7 @@ export interface FactsRunCleanupOptions {
 }
 
 export function removeRunArtifact(path: string): Promise<void> {
-  return rm(path, { recursive: true, force: true })
+  return removeTree(path)
 }
 
 /**

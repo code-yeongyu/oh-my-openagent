@@ -58,7 +58,9 @@ export async function fixture(personaBody = "first"): Promise<{ repo: CountingRe
   return { repo, context }
 }
 
-export async function fixtureAtSystemTokens(tokens: number): Promise<{ repo: CountingRepo; context: MemoryIdentityContext }> {
+export async function fixtureAtSystemTokens(
+  tokens: number,
+): Promise<{ repo: CountingRepo; context: MemoryIdentityContext }> {
   const header = "---\ndescription: Persona\n---\n"
   return fixture("A".repeat(tokens * 4 - Buffer.byteLength(header, "utf8") - 1))
 }

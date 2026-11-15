@@ -20,7 +20,7 @@ function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
     hasZaiCodingPlan: false,
     hasKimiForCoding: false,
     hasOpencodeGo: false,
-      hasBailianCodingPlan: false,
+    hasBailianCodingPlan: false,
     hasMinimaxCnCodingPlan: false,
     hasMinimaxCodingPlan: false,
     hasVercelAiGateway: false,
@@ -29,15 +29,13 @@ function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
 }
 
 function flattenConfiguredModels(result: ReturnType<typeof generateModelConfig>) {
-  return [
-    ...Object.values(result.agents ?? {}),
-    ...Object.values(result.categories ?? {}),
-  ].flatMap((entry) => [entry, ...(entry.fallback_models ?? [])])
+  return [...Object.values(result.agents ?? {}), ...Object.values(result.categories ?? {})].flatMap((entry) => [
+    entry,
+    ...(entry.fallback_models ?? []),
+  ])
 }
 describe("generateModelConfig", () => {
-
   describe("fallback providers", () => {
-
     test("downgrades unsupported GitHub Copilot GPT high-tier variants", () => {
       // #given only GitHub Copilot is available
       const config = createConfig({ hasCopilot: true })
@@ -48,8 +46,7 @@ describe("generateModelConfig", () => {
       // #then Copilot GPT routes should not receive variants that hang the provider
       const unsupportedEntries = flattenConfiguredModels(result).filter(
         (entry) =>
-          /^github-copilot\/gpt-[56][.-]/.test(entry.model) &&
-          (entry.variant === "max" || entry.variant === "xhigh")
+          /^github-copilot\/gpt-[56][.-]/.test(entry.model) && (entry.variant === "max" || entry.variant === "xhigh"),
       )
       expect(unsupportedEntries).toEqual([])
       expect(result.agents?.momus).toEqual({
@@ -113,7 +110,6 @@ describe("generateModelConfig", () => {
   })
 
   describe("mixed provider scenarios", () => {
-
     test("librarian skips deprecated OpenCode Zen models when OpenCode Zen and ZAI are both available", () => {
       // #given the Discord-reported non-TUI provider selection
       const config = createConfig({
@@ -130,7 +126,6 @@ describe("generateModelConfig", () => {
       expect(JSON.stringify(result)).not.toContain("opencode/claude-haiku-4-5")
       expect(JSON.stringify(result)).not.toContain("opencode/gpt-5.4-nano")
     })
-
   })
 
   describe("explore agent special cases", () => {
@@ -307,5 +302,4 @@ describe("generateModelConfig", () => {
       })
     })
   })
-
 })

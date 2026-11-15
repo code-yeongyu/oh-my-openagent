@@ -35,11 +35,12 @@ describe("createTaskChildPlanner runtime fallback", () => {
         },
       },
       {},
-      () => registry([
-        model("kimi-coding", "kimi-for-coding-highspeed-unlocked"),
-        model("chatgpt-subscription", "gpt-6-luna-fast"),
-        model("example-gateway", "z-ai/glm-5.2-ultrafast-unlocked"),
-      ]),
+      () =>
+        registry([
+          model("kimi-coding", "kimi-for-coding-highspeed-unlocked"),
+          model("chatgpt-subscription", "gpt-6-luna-fast"),
+          model("example-gateway", "z-ai/glm-5.2-ultrafast-unlocked"),
+        ]),
     )
 
     // when
@@ -77,13 +78,8 @@ describe("createTaskChildPlanner runtime fallback", () => {
 
   test("#given a builtin category whose chain head is unavailable #when planned #then the remaining chain rungs become fallback models", () => {
     // given
-    const planner = createTaskChildPlanner(
-      {},
-      {},
-      () => registry([
-        model("deepseek", "deepseek-flash"),
-        model("opencode-go", "minimax-m3"),
-      ]),
+    const planner = createTaskChildPlanner({}, {}, () =>
+      registry([model("deepseek", "deepseek-flash"), model("opencode-go", "minimax-m3")]),
     )
 
     // when
@@ -130,10 +126,7 @@ describe("createTaskChildPlanner runtime fallback", () => {
         },
       },
       {},
-      () => registry([
-        model("chatgpt-subscription", "gpt-6-luna-fast"),
-        model("opencode-go", "minimax-m3"),
-      ]),
+      () => registry([model("chatgpt-subscription", "gpt-6-luna-fast"), model("opencode-go", "minimax-m3")]),
     )
 
     // when

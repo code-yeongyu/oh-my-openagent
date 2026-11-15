@@ -38,10 +38,9 @@ export function createAtlasEventHandler(input: {
         await handleAtlasSessionIdle({ ctx, options, getState, sessionID })
         const state = sessions.get(sessionID)
         if (
-          state
-          &&
-          state.lastContinuationInjectedAt !== undefined
-          && state.lastContinuationInjectedAt !== previousInjectedAt
+          state &&
+          state.lastContinuationInjectedAt !== undefined &&
+          state.lastContinuationInjectedAt !== previousInjectedAt
         ) {
           state.skipNextIdleAfterRuntimeErrorRetry = true
         }

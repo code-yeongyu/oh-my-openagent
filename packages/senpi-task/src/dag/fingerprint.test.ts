@@ -169,16 +169,12 @@ describe("ownerFingerprintInput", () => {
 
   it("#given execAttempt is 0 #when fingerprinted #then matches the pinned legacy hash", () => {
     const input = ownerFingerprintInput({ ...ownerInput, execAttempt: 0 })
-    expect(dagFingerprint(input)).toBe(
-      "8abfeef1a4832e7dd31064a56f785ae0253851596b4a650d6ec8a849620e58dc",
-    )
+    expect(dagFingerprint(input)).toBe("8abfeef1a4832e7dd31064a56f785ae0253851596b4a650d6ec8a849620e58dc")
   })
 
   it("#given execAttempt is omitted #when fingerprinted #then matches the pinned legacy hash", () => {
     const input = ownerFingerprintInput(ownerInput)
-    expect(dagFingerprint(input)).toBe(
-      "8abfeef1a4832e7dd31064a56f785ae0253851596b4a650d6ec8a849620e58dc",
-    )
+    expect(dagFingerprint(input)).toBe("8abfeef1a4832e7dd31064a56f785ae0253851596b4a650d6ec8a849620e58dc")
   })
 
   it("#given execAttempt is 1 #when fingerprinted #then differs from the legacy hash", () => {

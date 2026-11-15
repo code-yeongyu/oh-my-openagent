@@ -58,10 +58,7 @@ function appendedTextOf(transform: ToolResultTransform): string {
   return typeof last?.text === "string" ? last.text : ""
 }
 
-async function registerWithSettings(
-  pi: FakeExtensionAPI,
-  settings: OmoGitMasterSettings,
-): Promise<void> {
+async function registerWithSettings(pi: FakeExtensionAPI, settings: OmoGitMasterSettings): Promise<void> {
   const component = createGitMasterAttributionComponent({ loadSettings: () => settings })
   await component.register(pi, createTestContext(pi))
 }
@@ -160,7 +157,7 @@ describe("omo-senpi git-master attribution component", () => {
     payload.content = [
       {
         type: "text",
-        text: "# Git Master\n\n```bash\ngit add -A .\ngit commit -m \"x\"\necho done\n```",
+        text: '# Git Master\n\n```bash\ngit add -A .\ngit commit -m "x"\necho done\n```',
       },
     ]
 
@@ -172,7 +169,7 @@ describe("omo-senpi git-master attribution component", () => {
     if (transform === undefined) return
     const text = transform.content[0]?.text ?? ""
     expect(text).toContain("GIT_MASTER=1 git add -A .")
-    expect(text).toContain("GIT_MASTER=1 git commit -m \"x\"")
+    expect(text).toContain('GIT_MASTER=1 git commit -m "x"')
     expect(text).toContain("\necho done")
   })
 
@@ -278,7 +275,9 @@ describe("omo-senpi git-master attribution component", () => {
     // then
     expect(transform?.content).toHaveLength(2)
     expect(transform?.content[0]?.text).toBe("# Git Master\n\nMode Gate...")
-    expect(transform === undefined ? "" : appendedTextOf(transform)).toContain(`git -c trailer.ifexists=addIfDifferent commit -m "{Commit Message}" --trailer "${TRAILER}"`)
+    expect(transform === undefined ? "" : appendedTextOf(transform)).toContain(
+      `git -c trailer.ifexists=addIfDifferent commit -m "{Commit Message}" --trailer "${TRAILER}"`,
+    )
   })
 
   it("#given a Windows-style skill path with the footer opted in #when the read result arrives #then the directive is still appended", async () => {

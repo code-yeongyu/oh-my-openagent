@@ -8,11 +8,7 @@ import { createNodeGitExec, GitMemoryRepo, type GitExec } from "../git"
 import { parseMemoryFile, renderMemoryFile } from "../memfs"
 import { parsePeopleCard, type ObservationEntry } from "../people"
 import { buildDefaultSeedFiles } from "../seeds"
-import {
-  applyFactsBatch,
-  parseFactsExtractionJsonl,
-  type FactsExtractionRecord,
-} from "./extraction"
+import { applyFactsBatch, parseFactsExtractionJsonl, type FactsExtractionRecord } from "./extraction"
 import { removeTree } from "../../../../test-support/remove-tree"
 
 const AUTHOR = { agentId: "facts-agent", authorName: "Facts Extractor" }
@@ -70,12 +66,7 @@ async function commitPersonCard(
   await repo.commitWrite([`people/${slug}/card.md`], `test: seed ${slug} card`, AUTHOR)
 }
 
-async function commitObservations(
-  repo: GitMemoryRepo,
-  slug: string,
-  name: string,
-  body: string,
-): Promise<void> {
+async function commitObservations(repo: GitMemoryRepo, slug: string, name: string, body: string): Promise<void> {
   await mkdir(join(repo.dir, "people", slug), { recursive: true })
   await writeFile(
     join(repo.dir, "people", slug, "observations.md"),
@@ -100,10 +91,15 @@ describe("person routing reinforcement", () => {
     await commitObservations(repo, "mina", "Mina", "## Explicit\n\n- [2026-08-01] Mina prefers concise reviews.\n")
 
     // when
-    await applyFactsBatch(repo, {
-      batchId: "88888888-8888-4888-8888-888888888888",
-      records: [personRecord("Mina", [], "mina   prefers concise  reviews")],
-    }, AUTHOR, { people: PEOPLE })
+    await applyFactsBatch(
+      repo,
+      {
+        batchId: "88888888-8888-4888-8888-888888888888",
+        records: [personRecord("Mina", [], "mina   prefers concise  reviews")],
+      },
+      AUTHOR,
+      { people: PEOPLE },
+    )
 
     // then
     const entries = await readExplicitEntries(dir, "mina")
@@ -111,10 +107,15 @@ describe("person routing reinforcement", () => {
     expect(entries[0]).toMatchObject({ date: "2026-08-10", content: "Mina prefers concise reviews.", n: 2 })
 
     // when an nfkc-folded repeat arrives
-    await applyFactsBatch(repo, {
-      batchId: "99999999-9999-4999-8999-999999999999",
-      records: [personRecord("Min", [], "Ｍｉｎａ prefers concise reviews", "2026-08-11")],
-    }, AUTHOR, { people: PEOPLE })
+    await applyFactsBatch(
+      repo,
+      {
+        batchId: "99999999-9999-4999-8999-999999999999",
+        records: [personRecord("Min", [], "Ｍｉｎａ prefers concise reviews", "2026-08-11")],
+      },
+      AUTHOR,
+      { people: PEOPLE },
+    )
 
     // then
     const reinforced = await readExplicitEntries(dir, "mina")
@@ -129,10 +130,15 @@ describe("person routing reinforcement", () => {
     await commitObservations(repo, "mina", "Mina", "## Explicit\n\n- [2026-08-01] Mina prefers concise reviews.\n")
 
     // when
-    await applyFactsBatch(repo, {
-      batchId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      records: [personRecord("Min", [], "Mina prefers dark themes.")],
-    }, AUTHOR, { people: PEOPLE })
+    await applyFactsBatch(
+      repo,
+      {
+        batchId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        records: [personRecord("Min", [], "Mina prefers dark themes.")],
+      },
+      AUTHOR,
+      { people: PEOPLE },
+    )
 
     // then
     const entries = await readExplicitEntries(dir, "mina")
@@ -148,10 +154,15 @@ describe("person routing new people", () => {
     const { dir, repo } = await fixture()
 
     // when
-    const result = await applyFactsBatch(repo, {
-      batchId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-      records: [personRecord("Yeongyu", ["YG"], "Yeongyu reviews on Tuesdays.")],
-    }, AUTHOR, { people: PEOPLE })
+    const result = await applyFactsBatch(
+      repo,
+      {
+        batchId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        records: [personRecord("Yeongyu", ["YG"], "Yeongyu reviews on Tuesdays.")],
+      },
+      AUTHOR,
+      { people: PEOPLE },
+    )
 
     // then
     expect(result.outcome).toBe("committed")
@@ -164,8 +175,9 @@ describe("person routing new people", () => {
       kind: "person",
       aliases: ["YG"],
     })
-    expect((await readExplicitEntries(dir, "yeongyu")).map((entry) => entry.content))
-      .toEqual(["Yeongyu reviews on Tuesdays."])
+    expect((await readExplicitEntries(dir, "yeongyu")).map((entry) => entry.content)).toEqual([
+      "Yeongyu reviews on Tuesdays.",
+    ])
   }, 30_000)
 
   test("#given a slug already taken by a different person #when a new person sanitizes to it #then a numeric suffix avoids the collision", async () => {
@@ -174,18 +186,25 @@ describe("person routing new people", () => {
     await commitPersonCard(repo, "yeongyu", "Yeongyu Kim", ["Yoshi"])
 
     // when
-    await applyFactsBatch(repo, {
-      batchId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-      records: [personRecord("Yeongyu", [], "Yeongyu joined the platform guild.")],
-    }, AUTHOR, { people: PEOPLE })
+    await applyFactsBatch(
+      repo,
+      {
+        batchId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        records: [personRecord("Yeongyu", [], "Yeongyu joined the platform guild.")],
+      },
+      AUTHOR,
+      { people: PEOPLE },
+    )
 
     // then
     const card = parseMemoryFile(await readFile(join(dir, "people", "yeongyu-2", "card.md"), "utf8"))
     expect(card.frontmatter).toMatchObject({ description: "Person - Yeongyu", kind: "person" })
-    expect((await readExplicitEntries(dir, "yeongyu-2")).map((entry) => entry.content))
-      .toEqual(["Yeongyu joined the platform guild."])
-    expect(await readFile(join(dir, "people", "yeongyu", "observations.md"), "utf8").catch(() => undefined))
-      .toBeUndefined()
+    expect((await readExplicitEntries(dir, "yeongyu-2")).map((entry) => entry.content)).toEqual([
+      "Yeongyu joined the platform guild.",
+    ])
+    expect(
+      await readFile(join(dir, "people", "yeongyu", "observations.md"), "utf8").catch(() => undefined),
+    ).toBeUndefined()
   }, 30_000)
 
   test("#given two facts about the same new person in one batch #when applied #then one card receives both entries", async () => {
@@ -193,17 +212,24 @@ describe("person routing new people", () => {
     const { dir, repo } = await fixture()
 
     // when
-    await applyFactsBatch(repo, {
-      batchId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
-      records: [
-        personRecord("Yeongyu", ["YG"], "Yeongyu reviews on Tuesdays."),
-        personRecord("YG", [], "YG drafted the alias table."),
-      ],
-    }, AUTHOR, { people: PEOPLE })
+    await applyFactsBatch(
+      repo,
+      {
+        batchId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        records: [
+          personRecord("Yeongyu", ["YG"], "Yeongyu reviews on Tuesdays."),
+          personRecord("YG", [], "YG drafted the alias table."),
+        ],
+      },
+      AUTHOR,
+      { people: PEOPLE },
+    )
 
     // then
     expect(await readdir(join(dir, "people"))).toEqual(["yeongyu"])
-    expect((await readExplicitEntries(dir, "yeongyu")).map((entry) => entry.content))
-      .toEqual(["Yeongyu reviews on Tuesdays.", "YG drafted the alias table."])
+    expect((await readExplicitEntries(dir, "yeongyu")).map((entry) => entry.content)).toEqual([
+      "Yeongyu reviews on Tuesdays.",
+      "YG drafted the alias table.",
+    ])
   }, 30_000)
 })

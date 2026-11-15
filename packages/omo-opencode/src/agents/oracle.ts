@@ -1,10 +1,10 @@
 import { buildNativeAgentPrompt } from "./native-model-prompt"
-import type { AgentConfig } from "@opencode-ai/sdk";
-import type { AgentMode, AgentPromptMetadata } from "./types";
-import { buildClaudeThinkingConfig, isGpt5_5Model, isGpt5_6Model, isGpt6Model, isGptModel } from "./types";
-import { createAgentToolRestrictions } from "../shared/permission-compat";
+import type { AgentConfig } from "@opencode-ai/sdk"
+import type { AgentMode, AgentPromptMetadata } from "./types"
+import { buildClaudeThinkingConfig, isGpt5_5Model, isGpt5_6Model, isGpt6Model, isGptModel } from "./types"
+import { createAgentToolRestrictions } from "../shared/permission-compat"
 
-const MODE: AgentMode = "subagent";
+const MODE: AgentMode = "subagent"
 
 export const ORACLE_PROMPT_METADATA: AgentPromptMetadata = {
   category: "advisor",
@@ -36,7 +36,7 @@ export const ORACLE_PROMPT_METADATA: AgentPromptMetadata = {
     "Trivial decisions (variable names, formatting)",
     "Things you can infer from existing code patterns",
   ],
-};
+}
 
 /**
  * Default Oracle prompt - used for Claude and other non-GPT models.
@@ -151,7 +151,7 @@ Before finalizing answers on architecture, security, or performance:
 
 <delivery>
 Your response goes directly to the user with no intermediate processing. Make your final message self-contained: a clear recommendation they can act on immediately, covering both what to do and why.
-</delivery>`;
+</delivery>`
 
 /**
  * GPT-5.4 Optimized Oracle System Prompt
@@ -241,7 +241,7 @@ Before finalizing answers on architecture, security, or performance: re-scan for
 
 <delivery>
 Your response goes directly to the user with no intermediate processing. Make your final message self-contained: a clear recommendation they can act on immediately, covering both what to do and why. Dense and useful beats long and thorough. Deliver actionable insight, not exhaustive analysis.
-</delivery>`;
+</delivery>`
 
 const ORACLE_GPT_5_5_PROMPT = `You are Oracle, a strategic technical advisor based on GPT-5.5. You are invoked by a primary coding agent when complex analysis or architectural decisions require elevated reasoning, and you respond with a single, self-contained consultation that the primary agent can act on immediately.
 
@@ -406,16 +406,10 @@ Your interaction surface is one consultation at a time, with optional follow-ups
 When the consulting agent continues the session with a follow-up question, answer efficiently. You still have the context from the original consultation; do not re-establish it, do not recap unless they ask. Answer the new question directly, adjusting the earlier recommendation only if the follow-up reveals new information that changes it.
 
 If the follow-up contradicts what you recommended and you still believe the original recommendation, say so clearly and explain the disagreement. Your job is not to agree; it is to give the best recommendation.
-`;
-
+`
 
 export function createOracleAgent(model: string): AgentConfig {
-  const restrictions = createAgentToolRestrictions([
-    "write",
-    "edit",
-    "apply_patch",
-    "task",
-  ]);
+  const restrictions = createAgentToolRestrictions(["write", "edit", "apply_patch", "task"])
 
   const base = {
     description:
@@ -425,7 +419,7 @@ export function createOracleAgent(model: string): AgentConfig {
     temperature: 0.1,
     ...restrictions,
     prompt: buildNativeAgentPrompt(model, ORACLE_DEFAULT_PROMPT),
-  } as AgentConfig;
+  } as AgentConfig
 
   if (isGpt5_6Model(model) || isGpt6Model(model)) {
     return {
@@ -433,7 +427,7 @@ export function createOracleAgent(model: string): AgentConfig {
       prompt: buildNativeAgentPrompt(model, ORACLE_GPT_5_5_PROMPT),
       reasoningEffort: "xhigh",
       textVerbosity: "high",
-    } as AgentConfig;
+    } as AgentConfig
   }
 
   if (isGpt5_5Model(model)) {
@@ -442,7 +436,7 @@ export function createOracleAgent(model: string): AgentConfig {
       prompt: buildNativeAgentPrompt(model, ORACLE_GPT_5_5_PROMPT),
       reasoningEffort: "medium",
       textVerbosity: "high",
-    } as AgentConfig;
+    } as AgentConfig
   }
 
   if (isGptModel(model)) {
@@ -451,12 +445,12 @@ export function createOracleAgent(model: string): AgentConfig {
       prompt: buildNativeAgentPrompt(model, ORACLE_GPT_PROMPT),
       reasoningEffort: "medium",
       textVerbosity: "high",
-    } as AgentConfig;
+    } as AgentConfig
   }
 
   return {
     ...base,
     ...buildClaudeThinkingConfig(model),
-  } as AgentConfig;
+  } as AgentConfig
 }
-createOracleAgent.mode = MODE;
+createOracleAgent.mode = MODE

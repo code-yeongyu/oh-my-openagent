@@ -6,10 +6,7 @@ import { join } from "node:path"
 import { classifyGhostActive } from "./run-ghost-active"
 import { writeRunJsonAtomic } from "./run-artifacts"
 import { reconcileReflectionRuns } from "./run-reconciliation"
-import {
-  cleanupReconciliationFixtures,
-  reconciliationFixture as fixture,
-} from "./run-reconciliation.test-support"
+import { cleanupReconciliationFixtures, reconciliationFixture as fixture } from "./run-reconciliation.test-support"
 
 afterEach(cleanupReconciliationFixtures)
 
@@ -27,12 +24,18 @@ function liveLauncher() {
   return {
     hostname: () => "fixture-host",
     now: () => Date.parse("2026-08-10T00:01:01.001Z"),
-    getPidLiveness: (pid: number) => pid === 111 || pid === 222 ? "alive" as const : "dead" as const,
-    getProcessStartIdentity: async (pid: number) => pid === 111 ? "launcher-start" : pid === 222 ? "supervisor-two" : null,
+    getPidLiveness: (pid: number) => (pid === 111 || pid === 222 ? ("alive" as const) : ("dead" as const)),
+    getProcessStartIdentity: async (pid: number) =>
+      pid === 111 ? "launcher-start" : pid === 222 ? "supervisor-two" : null,
   }
 }
 
-const LIVE_SUPERVISOR_LEDGER = { pid: 222, processStart: "supervisor-two", childPid: 333, childProcessStart: "child-two" } as const
+const LIVE_SUPERVISOR_LEDGER = {
+  pid: 222,
+  processStart: "supervisor-two",
+  childPid: 333,
+  childProcessStart: "child-two",
+} as const
 
 async function stripActiveFields(item: Awaited<ReturnType<typeof fixture>>, fields: readonly string[]) {
   const activePath = join(item.identity.paths.reflection, "active.lock")
@@ -42,10 +45,12 @@ async function stripActiveFields(item: Awaited<ReturnType<typeof fixture>>, fiel
 }
 
 function retiredArtifactsIntact(item: Awaited<ReturnType<typeof fixture>>): boolean {
-  return existsSync(join(item.runDir, "ledger.json"))
-    && existsSync(join(item.runDir, "prelaunch.json"))
-    && existsSync(item.worktree.dir)
-    && !existsSync(join(item.runDir, "final.json"))
+  return (
+    existsSync(join(item.runDir, "ledger.json")) &&
+    existsSync(join(item.runDir, "prelaunch.json")) &&
+    existsSync(item.worktree.dir) &&
+    !existsSync(join(item.runDir, "final.json"))
+  )
 }
 
 describe("ghost active reservation reconciliation", () => {
@@ -71,7 +76,11 @@ describe("ghost active reservation reconciliation", () => {
     await stripActiveFields(item, ["reservedAt"])
 
     // when
-    const results = await reconcileReflectionRuns({ identity: item.identity, reservation: item.store, ...liveLauncher() })
+    const results = await reconcileReflectionRuns({
+      identity: item.identity,
+      reservation: item.store,
+      ...liveLauncher(),
+    })
 
     // then
     expect(results).toEqual([])
@@ -85,7 +94,11 @@ describe("ghost active reservation reconciliation", () => {
     await stripActiveFields(item, ["reservedAt"])
 
     // when
-    const results = await reconcileReflectionRuns({ identity: item.identity, reservation: item.store, ...deadLauncher() })
+    const results = await reconcileReflectionRuns({
+      identity: item.identity,
+      reservation: item.store,
+      ...deadLauncher(),
+    })
 
     // then
     expect(results).toEqual([{ runId: "run-orphan", outcome: "failed" }])
@@ -98,7 +111,11 @@ describe("ghost active reservation reconciliation", () => {
     await writeRunJsonAtomic(join(item.runDir, "ledger.json"), { ...item.ledger, startedAt: OLDER_STARTED_AT })
 
     // when
-    const results = await reconcileReflectionRuns({ identity: item.identity, reservation: item.store, ...deadLauncher() })
+    const results = await reconcileReflectionRuns({
+      identity: item.identity,
+      reservation: item.store,
+      ...deadLauncher(),
+    })
 
     // then
     expect(results).toEqual([{ runId: "run-orphan", outcome: "failed" }])
@@ -117,7 +134,11 @@ describe("ghost active reservation reconciliation", () => {
     })
 
     // when
-    const results = await reconcileReflectionRuns({ identity: item.identity, reservation: item.store, ...liveLauncher() })
+    const results = await reconcileReflectionRuns({
+      identity: item.identity,
+      reservation: item.store,
+      ...liveLauncher(),
+    })
 
     // then
     expect(results).toEqual([])
@@ -128,10 +149,17 @@ describe("ghost active reservation reconciliation", () => {
   test("#given a ledger inside the generation slack #when the launcher is dead #then the reservation is not treated as a ghost", async () => {
     // given
     const item = await fixture()
-    await writeRunJsonAtomic(join(item.runDir, "ledger.json"), { ...item.ledger, startedAt: "2026-08-09T23:59:57.000Z" })
+    await writeRunJsonAtomic(join(item.runDir, "ledger.json"), {
+      ...item.ledger,
+      startedAt: "2026-08-09T23:59:57.000Z",
+    })
 
     // when
-    const results = await reconcileReflectionRuns({ identity: item.identity, reservation: item.store, ...deadLauncher() })
+    const results = await reconcileReflectionRuns({
+      identity: item.identity,
+      reservation: item.store,
+      ...deadLauncher(),
+    })
 
     // then
     expect(results).toEqual([{ runId: "run-orphan", outcome: "failed" }])
@@ -146,9 +174,15 @@ describe("ghost active reservation reconciliation", () => {
 
     // when / then
     expect(await classifyGhostActive({ identity: item.identity, active })).toEqual({ ghost: false })
-    expect(await classifyGhostActive({ identity: item.identity, active: { ...active, reservedAt: undefined } }))
-      .toEqual({ ghost: true, reason: "missing-identity" })
-    await writeRunJsonAtomic(join(item.runDir, "final.json"), { version: 1, runId: "run-orphan", outcome: "merged", finishedAt: "2026-08-09T23:59:55.000Z" })
+    expect(
+      await classifyGhostActive({ identity: item.identity, active: { ...active, reservedAt: undefined } }),
+    ).toEqual({ ghost: true, reason: "missing-identity" })
+    await writeRunJsonAtomic(join(item.runDir, "final.json"), {
+      version: 1,
+      runId: "run-orphan",
+      outcome: "merged",
+      finishedAt: "2026-08-09T23:59:55.000Z",
+    })
     await writeRunJsonAtomic(join(item.runDir, "ledger.json"), { ...item.ledger, startedAt: OLDER_STARTED_AT })
     expect(await classifyGhostActive({ identity: item.identity, active })).toEqual({ ghost: false })
   }, 30_000)

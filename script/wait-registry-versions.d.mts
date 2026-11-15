@@ -1,4 +1,7 @@
-export type RegistryFetch = (url: string, init?: { headers?: Record<string, string>; cache?: string; signal?: AbortSignal }) => Promise<Response>
+export type RegistryFetch = (
+  url: string,
+  init?: { headers?: Record<string, string>; cache?: string; signal?: AbortSignal },
+) => Promise<Response>
 export type PendingSpec = { spec: string; reason: string }
 
 export declare function parseSpec(spec: string): { name: string; version: string }

@@ -1,0 +1,9 @@
+design row	leg	recorded by row	owed to row	status
+C1	`trace_full_literal_accepted_true_is_jsonl_only` on the fake (needs the session trace writer)	12	20	owed
+C2	`hello_generation_quarantines_stale_reply` (restart-mid-call: 1 quarantined reply, `delivery_uncertain/unsafe`); AC-39 quarantine leg	12	17	owed
+C17	the `admissionKeys` set K8 fingerprints equals the rows the table marks (k-safety N5)	12	37	owed
+C3	the AC-75 `suspected_noop` fixtures of C19 run in this suite and assert membership in `ALL`	13	27	owed
+C3	a `confirmed` pointer / key report from the macOS, X11 or Wayland fake (the report produced by the fake's persona, not only built under that platform)	13	23	owed
+C4	`computer-error-table.test.ts`: every `(code, reason)` pair has a row, enumerated from `method_table!` + the gate table + the ref-resolution verdicts of `d-a11y-model.md` + the per-OS preflight refusals + the SDK's typed failures	13	31	owed
+C4	0 `COMPUTER_ERROR` fallthrough on tool	13	34	owed
+C4	0 `COMPUTER_ERROR` fallthrough on adapter	13	35	owed

@@ -1,7 +1,11 @@
 import type { BackgroundManager } from "../../features/background-agent"
 import { getMainSessionID, getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
-import { createInternalAgentTextPart, isAmbiguousPostDispatchPromptFailure, resolveInheritedPromptTools } from "../../shared"
+import {
+  createInternalAgentTextPart,
+  isAmbiguousPostDispatchPromptFailure,
+  resolveInheritedPromptTools,
+} from "../../shared"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { isAbortError } from "../../shared/is-abort-error"
 import {
@@ -51,11 +55,14 @@ type BabysitterOptions = {
   idleSettleMs?: number
 }
 
-
 async function resolveMainSessionTarget(
   ctx: BabysitterContext,
-  sessionID: string
-): Promise<{ agent?: string; model?: { providerID: string; modelID: string; variant?: string }; tools?: Record<string, boolean> }> {
+  sessionID: string,
+): Promise<{
+  agent?: string
+  model?: { providerID: string; modelID: string; variant?: string }
+  tools?: Record<string, boolean>
+}> {
   let agent = getSessionAgent(sessionID)
   let model: { providerID: string; modelID: string; variant?: string } | undefined
   let tools: Record<string, boolean> | undefined
@@ -121,7 +128,11 @@ async function getThinkingSummary(ctx: BabysitterContext, sessionID: string): Pr
   }
 }
 
-async function latestMainSessionUserMessageIsInProgress(ctx: BabysitterContext, sessionID: string, now: number): Promise<boolean> {
+async function latestMainSessionUserMessageIsInProgress(
+  ctx: BabysitterContext,
+  sessionID: string,
+  now: number,
+): Promise<boolean> {
   try {
     const messagesResp = await ctx.client.session.messages({
       path: { id: sessionID },
@@ -245,9 +256,7 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
       const { agent, model, tools } = await resolveMainSessionTarget(ctx, mainSessionID)
 
       try {
-        const launchModel = model
-          ? { providerID: model.providerID, modelID: model.modelID }
-          : undefined
+        const launchModel = model ? { providerID: model.providerID, modelID: model.modelID } : undefined
         const launchVariant = model?.variant
         const promptResult = await dispatchInternalPrompt({
           mode: "async",

@@ -30,10 +30,9 @@ describe("generateOmoConfig - model fallback system", () => {
     const result = generateOmoConfig(config)
 
     //#then
-    expect([
-      "github-copilot/claude-opus-5-5",
-      "github-copilot/claude-opus-5.5",
-    ]).toContain((result.agents as Record<string, { model: string }>).sisyphus.model)
+    expect(["github-copilot/claude-opus-5-5", "github-copilot/claude-opus-5.5"]).toContain(
+      (result.agents as Record<string, { model: string }>).sisyphus.model,
+    )
   })
 
   test("uses ultimate fallback when no providers configured", () => {
@@ -60,7 +59,9 @@ describe("generateOmoConfig - model fallback system", () => {
     const result = generateOmoConfig(config)
 
     //#then
-    expect(result.$schema).toBe("https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json")
+    expect(result.$schema).toBe(
+      "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
+    )
     expect((result.agents as Record<string, { model: string }>).sisyphus).toBeUndefined()
   })
 
@@ -154,16 +155,22 @@ describe("generateOmoConfig - model fallback system", () => {
 
     //#when
     const result = generateOmoConfig(config)
-    const agents = result.agents as Record<string, {
-      model: string
-      variant?: string
-      fallback_models?: Array<{ model: string; variant?: string }>
-    }>
-    const categories = result.categories as Record<string, {
-      model: string
-      variant?: string
-      fallback_models?: Array<{ model: string; variant?: string }>
-    }>
+    const agents = result.agents as Record<
+      string,
+      {
+        model: string
+        variant?: string
+        fallback_models?: Array<{ model: string; variant?: string }>
+      }
+    >
+    const categories = result.categories as Record<
+      string,
+      {
+        model: string
+        variant?: string
+        fallback_models?: Array<{ model: string; variant?: string }>
+      }
+    >
 
     //#then
     expect(agents.sisyphus.model).toBe("anthropic/claude-opus-5-5")

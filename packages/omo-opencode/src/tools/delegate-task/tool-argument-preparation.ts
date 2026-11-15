@@ -2,7 +2,10 @@ import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { log } from "../../shared/logger"
 
-export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx: ToolContextWithMetadata): Promise<DelegateTaskArgs> {
+export async function prepareDelegateTaskArgs(
+  args: Record<string, unknown>,
+  ctx: ToolContextWithMetadata,
+): Promise<DelegateTaskArgs> {
   const category = typeof args.category === "string" ? args.category : undefined
   const prompt = typeof args.prompt === "string" ? args.prompt : ""
   const originalSubagentType = typeof args.subagent_type === "string" ? args.subagent_type : undefined
@@ -83,7 +86,6 @@ export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx
 
   const taskID = typeof args.task_id === "string" ? args.task_id : undefined
   const command = typeof args.command === "string" ? args.command : undefined
-
 
   return {
     category,

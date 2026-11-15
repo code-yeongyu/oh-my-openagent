@@ -21,8 +21,9 @@ test("#given leaked timeout and interval #when checking pending timers #then the
 // clock is installed. Counting it made that test's `pending()` assertion depend on host load (#11446).
 test("#given work another test left running #when it arms a timer under this clock #then it keeps the real clock and is not counted", async () => {
   let resume!: () => void
-  const leftover = new Promise<void>((resolve) => { resume = resolve })
-    .then(() => new Promise<number>((resolve) => setTimeout(() => resolve(Date.now()), 1)))
+  const leftover = new Promise<void>((resolve) => {
+    resume = resolve
+  }).then(() => new Promise<number>((resolve) => setTimeout(() => resolve(Date.now()), 1)))
   clock = fakeClock()
   setTimeout(() => {}, 1)
   resume()

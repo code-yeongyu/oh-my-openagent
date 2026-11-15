@@ -70,7 +70,8 @@ export function migrateHostSessionSockets(
 ): HostSessionMigrationResult {
   const plan = planHostSessionSocketMigration(storeDir, options.to)
   for (const socket of plan.sockets) {
-    if (!options.deadEndpoints.has(socket)) throw new Error(`rollback migration refused live or unverified endpoint ${socket}`)
+    if (!options.deadEndpoints.has(socket))
+      throw new Error(`rollback migration refused live or unverified endpoint ${socket}`)
   }
   if (options.dryRun) return { ...plan, migrated: 0 }
   for (const warning of plan.warnings ?? []) {

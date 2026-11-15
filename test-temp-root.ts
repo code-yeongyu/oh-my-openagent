@@ -95,8 +95,13 @@ export function markTestInfrastructureDir(path: string): void {
 function leftoverEntries(): string[] {
   try {
     return readdirSync(runRoot)
-      .filter((entry) => !infrastructureEntries.has(entry) && !isOsCreatedTempEntry(entry)
-        && !skippedTestRoots.has(join(runRoot, entry)) && !isRootBeingRemoved(entry))
+      .filter(
+        (entry) =>
+          !infrastructureEntries.has(entry) &&
+          !isOsCreatedTempEntry(entry) &&
+          !skippedTestRoots.has(join(runRoot, entry)) &&
+          !isRootBeingRemoved(entry),
+      )
       .sort()
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") return []
@@ -185,8 +190,8 @@ export function runTestTempRootTeardown(): void {
   if (known.length > 0) reportKnownLeaks(known)
   if (unexpected.length === 0) return
   throw new Error(
-    `Tests left ${unexpected.length} temp entr${unexpected.length === 1 ? "y" : "ies"} behind (#9766). `
-      + "Remove every temp dir a test creates in afterEach/afterAll, onTestFinished, or a finally block:\n"
-      + unexpected.map((entry) => `  ${entry}`).join("\n"),
+    `Tests left ${unexpected.length} temp entr${unexpected.length === 1 ? "y" : "ies"} behind (#9766). ` +
+      "Remove every temp dir a test creates in afterEach/afterAll, onTestFinished, or a finally block:\n" +
+      unexpected.map((entry) => `  ${entry}`).join("\n"),
   )
 }

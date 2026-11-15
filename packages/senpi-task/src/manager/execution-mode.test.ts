@@ -10,7 +10,11 @@ import {
 describe("resolveExecutionMode", () => {
   test("#given a spec mode #when resolved #then the spec mode wins over every other source", () => {
     // given
-    const sources = { specMode: "process" as const, agentMode: "in-process" as const, configMode: "in-process" as const }
+    const sources = {
+      specMode: "process" as const,
+      agentMode: "in-process" as const,
+      configMode: "in-process" as const,
+    }
 
     // when
     const mode = resolveExecutionMode(sources)
@@ -70,7 +74,9 @@ describe("resolveExecutionMode with a configured auto mode", () => {
   test("#given config auto and an explicit spec or agent mode #when resolved #then the explicit mode still wins", () => {
     // given / when / then
     expect(resolveExecutionMode({ configMode: "auto", autoMode: "process", specMode: "in-process" })).toBe("in-process")
-    expect(resolveExecutionMode({ configMode: "auto", autoMode: "process", agentMode: "in-process" })).toBe("in-process")
+    expect(resolveExecutionMode({ configMode: "auto", autoMode: "process", agentMode: "in-process" })).toBe(
+      "in-process",
+    )
   })
 
   test("#given an explicit config mode and a resolved auto mode #when resolved #then the auto mode is ignored", () => {
@@ -84,12 +90,16 @@ describe("resolveAutoExecutionMode", () => {
 
   test("#given a posix host runner and a daemon advertising the session capabilities #when resolved #then children run as daemon sessions", () => {
     // given / when / then
-    expect(resolveAutoExecutionMode({ ...posixHost, capabilities: [...AUTO_HOST_CAPABILITIES, "multi_session"] })).toBe("process")
+    expect(resolveAutoExecutionMode({ ...posixHost, capabilities: [...AUTO_HOST_CAPABILITIES, "multi_session"] })).toBe(
+      "process",
+    )
   })
 
   test("#given a daemon without generation_handoff #when resolved #then children stay in-process", () => {
     // given / when / then
-    expect(resolveAutoExecutionMode({ ...posixHost, capabilities: ["session_context", "session_kind"] })).toBe("in-process")
+    expect(resolveAutoExecutionMode({ ...posixHost, capabilities: ["session_context", "session_kind"] })).toBe(
+      "in-process",
+    )
   })
 
   test("#given no daemon at all #when resolved #then children stay in-process", () => {
@@ -99,8 +109,16 @@ describe("resolveAutoExecutionMode", () => {
 
   test("#given win32 or the child-process runner #when resolved #then children stay in-process even with every capability", () => {
     // given / when / then
-    expect(resolveAutoExecutionMode({ platform: "win32", processRunner: "host", capabilities: AUTO_HOST_CAPABILITIES })).toBe("in-process")
-    expect(resolveAutoExecutionMode({ platform: "darwin", processRunner: "child-process", capabilities: AUTO_HOST_CAPABILITIES })).toBe("in-process")
+    expect(
+      resolveAutoExecutionMode({ platform: "win32", processRunner: "host", capabilities: AUTO_HOST_CAPABILITIES }),
+    ).toBe("in-process")
+    expect(
+      resolveAutoExecutionMode({
+        platform: "darwin",
+        processRunner: "child-process",
+        capabilities: AUTO_HOST_CAPABILITIES,
+      }),
+    ).toBe("in-process")
   })
 })
 
@@ -159,7 +177,9 @@ describe("createExecutionModeGate", () => {
   test("#given a resolution that throws #when ensure runs #then onEnsureFailure sees the error once", async () => {
     // given
     const failures: unknown[] = []
-    const gate = createExecutionModeGate(() => Promise.reject(new Error("boom")), { onEnsureFailure: (error) => failures.push(error) })
+    const gate = createExecutionModeGate(() => Promise.reject(new Error("boom")), {
+      onEnsureFailure: (error) => failures.push(error),
+    })
 
     // when
     await gate.ensure()
@@ -263,10 +283,13 @@ describe("execution-mode gate store admission", () => {
   test("#given a task store the index cannot take #when a spawn asks #then nothing is resolved and the spawn goes to the host runner", async () => {
     // given
     let resolves = 0
-    const gate = createExecutionModeGate(() => {
-      resolves += 1
-      return Promise.resolve("process")
-    }, { admit: () => Promise.resolve(false) })
+    const gate = createExecutionModeGate(
+      () => {
+        resolves += 1
+        return Promise.resolve("process")
+      },
+      { admit: () => Promise.resolve(false) },
+    )
 
     // when
     const mode = await gate.ensure()
@@ -281,15 +304,18 @@ describe("execution-mode gate store admission", () => {
     // given
     const answers = [false, true, true]
     const order: string[] = []
-    const gate = createExecutionModeGate(() => {
-      order.push("resolve")
-      return Promise.resolve("in-process")
-    }, {
-      admit: () => {
-        order.push("admit")
-        return Promise.resolve(answers.shift() ?? true)
+    const gate = createExecutionModeGate(
+      () => {
+        order.push("resolve")
+        return Promise.resolve("in-process")
       },
-    })
+      {
+        admit: () => {
+          order.push("admit")
+          return Promise.resolve(answers.shift() ?? true)
+        },
+      },
+    )
 
     // when
     const first = await gate.ensure()

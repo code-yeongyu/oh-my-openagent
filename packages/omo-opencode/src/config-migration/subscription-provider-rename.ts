@@ -66,9 +66,10 @@ export function hasLegacySubscriptionProviderIds(document: unknown): boolean {
 export function transformSubscriptionProviderRename(document: unknown): ConfigMigrationTransformResult {
   const rewrites: Rewrite[] = []
   const rewritten = rewriteValue(document, "$", rewrites)
-  const next = rewritten !== null && typeof rewritten === "object" && !Array.isArray(rewritten)
-    ? (rewritten as Record<string, unknown>)
-    : {}
+  const next =
+    rewritten !== null && typeof rewritten === "object" && !Array.isArray(rewritten)
+      ? (rewritten as Record<string, unknown>)
+      : {}
   return {
     diagnostics: rewrites.map((rewrite) => `${rewrite.path}: ${rewrite.from} renamed to ${rewrite.to}`),
     document: next,

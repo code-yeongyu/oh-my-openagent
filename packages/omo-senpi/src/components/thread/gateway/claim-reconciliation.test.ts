@@ -16,14 +16,22 @@ afterEach(async () => {
   harness = undefined
 })
 
-async function spawnHolder(runtimeInstance: string | null = null): Promise<{ readonly identity: ProcessIdentity; readonly stop: () => Promise<void> }> {
+async function spawnHolder(
+  runtimeInstance: string | null = null,
+): Promise<{ readonly identity: ProcessIdentity; readonly stop: () => Promise<void> }> {
   const child = Bun.spawn(["cat"], { stdin: "pipe", stdout: "ignore", stderr: "ignore" })
   const startTime = await processStartTime(child.pid)
   // win32 has no `ps`: the store records no start time there and judges a claimant by its pid alone (process-identity.ts)
-  if (startTime === null && process.platform !== "win32") throw new Error("could not read the start time of the holder process")
+  if (startTime === null && process.platform !== "win32")
+    throw new Error("could not read the start time of the holder process")
   let stopped: Promise<void> | undefined
   return {
-    identity: { pid: child.pid, process_start_time: startTime, instance_id: randomUUID(), runtime_instance: runtimeInstance },
+    identity: {
+      pid: child.pid,
+      process_start_time: startTime,
+      instance_id: randomUUID(),
+      runtime_instance: runtimeInstance,
+    },
     stop: () => {
       stopped ??= (async () => {
         child.stdin.end()
@@ -45,7 +53,12 @@ function okId(result: GatewayDeliveryResult): string {
   return result.delivery_id
 }
 
-async function crashingPass(h: GatewayHarness, runtime: FakeSessionRuntime, identity: ProcessIdentity, stage: "afterClaim" | "afterAdmit"): Promise<void> {
+async function crashingPass(
+  h: GatewayHarness,
+  runtime: FakeSessionRuntime,
+  identity: ProcessIdentity,
+  stage: "afterClaim" | "afterAdmit",
+): Promise<void> {
   const crash = (): never => {
     throw new Error(`simulated crash ${stage}`)
   }
@@ -55,7 +68,12 @@ async function crashingPass(h: GatewayHarness, runtime: FakeSessionRuntime, iden
     durableId: "B",
     sessionPath: () => runtime.sessionPath,
     now: () => h.clock.now,
-    _test: { identity, ...(stage === "afterClaim" ? { afterClaim: (_row: DeliveryRow) => crash() } : { afterAdmit: (_row: DeliveryRow, _kind: string) => crash() }) },
+    _test: {
+      identity,
+      ...(stage === "afterClaim"
+        ? { afterClaim: (_row: DeliveryRow) => crash() }
+        : { afterAdmit: (_row: DeliveryRow, _kind: string) => crash() }),
+    },
   })
   expect((await settled(drain.drain({ reason: "start" }))).error?.message).toContain(`simulated crash ${stage}`)
 }
@@ -64,7 +82,10 @@ async function crashingPass(h: GatewayHarness, runtime: FakeSessionRuntime, iden
  * The target B as a bare runtime: no drain is attached to its `emitted` edge, so after a simulated
  * crash nothing in this process can settle B's rows; only the fresh process's reconciliation does.
  */
-function crashedTarget(h: GatewayHarness): { readonly runtime: FakeSessionRuntime; readonly view: (id: string) => Promise<DeliveryRow | undefined> } {
+function crashedTarget(h: GatewayHarness): {
+  readonly runtime: FakeSessionRuntime
+  readonly view: (id: string) => Promise<DeliveryRow | undefined>
+} {
   h.phantom("B")
   const runtime = new FakeSessionRuntime(join(h.agentDir, "sessions", "B.jsonl"), "B", h.agentDir)
   const store = h.store()
@@ -75,14 +96,37 @@ async function sendToB(h: GatewayHarness, text: string): Promise<string> {
   return okId(await h.get("A").engine.deliver({ sender: { kind: "session", durable_id: "A" }, target: "B", text }))
 }
 
-function freshProcess(h: GatewayHarness, sessionPath: string): { readonly runtime: FakeSessionRuntime; readonly drain: ReturnType<typeof createInboxDrain>; readonly log: string[] } {
+function freshProcess(
+  h: GatewayHarness,
+  sessionPath: string,
+): {
+  readonly runtime: FakeSessionRuntime
+  readonly drain: ReturnType<typeof createInboxDrain>
+  readonly log: string[]
+} {
   const runtime = new FakeSessionRuntime(sessionPath, "B", h.agentDir, { reopen: true })
   const log: string[] = []
-  const drain = createInboxDrain({ store: h.store(), runtime, durableId: "B", sessionPath: () => sessionPath, now: () => h.clock.now, log: (line) => log.push(line) })
+  const drain = createInboxDrain({
+    store: h.store(),
+    runtime,
+    durableId: "B",
+    sessionPath: () => sessionPath,
+    now: () => h.clock.now,
+    log: (line) => log.push(line),
+  })
   return { runtime, drain, log }
 }
 
-async function claimedByLiveHolder(h: GatewayHarness, runtimeInstance: string, release: { readonly by: string; readonly beforeClaim: boolean }): Promise<{ readonly id: string; readonly state: string | undefined; readonly dual: readonly string[]; readonly stop: () => Promise<void> }> {
+async function claimedByLiveHolder(
+  h: GatewayHarness,
+  runtimeInstance: string,
+  release: { readonly by: string; readonly beforeClaim: boolean },
+): Promise<{
+  readonly id: string
+  readonly state: string | undefined
+  readonly dual: readonly string[]
+  readonly stop: () => Promise<void>
+}> {
   h.session("A")
   const b = crashedTarget(h)
   const id = await sendToB(h, "claimed by a live runtime")
@@ -98,7 +142,12 @@ async function claimedByLiveHolder(h: GatewayHarness, runtimeInstance: string, r
   }
   const next = freshProcess(h, b.runtime.sessionPath)
   await next.drain.drain({ reason: "start" })
-  return { id, state: (await b.view(id))?.state, dual: next.log.filter((line) => line.startsWith("dual_runtime")), stop: holder.stop }
+  return {
+    id,
+    state: (await b.view(id))?.state,
+    dual: next.log.filter((line) => line.startsWith("dual_runtime")),
+    stop: holder.stop,
+  }
 }
 
 describe("claim_reconciliation", () => {
@@ -122,10 +171,17 @@ describe("claim_reconciliation", () => {
     const b = crashedTarget(h)
     const id = await sendToB(h, "ii")
     await crashingPass(h, b.runtime, await deadIdentity(), "afterAdmit")
-    expect({ state: (await b.view(id))?.state, entries: b.runtime.transcriptEntries(id) }).toEqual({ state: "admitting", entries: 1 })
+    expect({ state: (await b.view(id))?.state, entries: b.runtime.transcriptEntries(id) }).toEqual({
+      state: "admitting",
+      entries: 1,
+    })
     const next = freshProcess(h, b.runtime.sessionPath)
     await next.drain.drain({ reason: "start" })
-    expect({ state: (await b.view(id))?.state, readmitted: next.runtime.enqueueCount(id), entries: next.runtime.transcriptEntries(id) }).toEqual({ state: "applied", readmitted: 0, entries: 1 })
+    expect({
+      state: (await b.view(id))?.state,
+      readmitted: next.runtime.enqueueCount(id),
+      entries: next.runtime.transcriptEntries(id),
+    }).toEqual({ state: "applied", readmitted: 0, entries: 1 })
   })
 
   test("#given a claimant died holding a mid-turn follow-up it never wrote #when a fresh process drains #then the row goes back to queued and is admitted once there", async () => {
@@ -135,11 +191,14 @@ describe("claim_reconciliation", () => {
     b.runtime.beginUserTurn()
     const id = await sendToB(h, "iv")
     await crashingPass(h, b.runtime, await deadIdentity(), "afterAdmit")
-    expect({ state: (await b.view(id))?.state, entries: b.runtime.transcriptEntries(id) }).toEqual({ state: "admitting", entries: 0 })
+    expect({ state: (await b.view(id))?.state, entries: b.runtime.transcriptEntries(id) }).toEqual({
+      state: "admitting",
+      entries: 0,
+    })
     const next = freshProcess(h, b.runtime.sessionPath)
     next.runtime.beginUserTurn()
     const result = await next.drain.drain({ reason: "start" })
-    expect(result.admitted).toEqual([{ delivery_id: id, kind: "queued" }])
+    expect(result.admitted).toEqual([{ delivery_id: id, kind: "steered" }])
     expect(next.runtime.enqueueCount(id)).toBe(1)
   })
 
@@ -147,14 +206,23 @@ describe("claim_reconciliation", () => {
     const h = (harness = createGatewayHarness())
     h.session("A")
     const b = crashedTarget(h)
-    const drain = createInboxDrain({ store: h.store(), runtime: b.runtime, durableId: "B", sessionPath: () => b.runtime.sessionPath })
+    const drain = createInboxDrain({
+      store: h.store(),
+      runtime: b.runtime,
+      durableId: "B",
+      sessionPath: () => b.runtime.sessionPath,
+    })
     b.runtime.beginUserTurn()
     const id = await sendToB(h, "dropped by the runtime")
-    expect((await drain.drain({ reason: "start" })).admitted).toEqual([{ delivery_id: id, kind: "queued" }])
+    expect((await drain.drain({ reason: "start" })).admitted).toEqual([{ delivery_id: id, kind: "steered" }])
     expect(b.runtime.dropQueues()).toEqual([id])
     expect(b.runtime.listAdmittedDeliveries()).toEqual({ pending: [], emitted: [] })
-    expect((await drain.drain({ reason: "command" })).admitted).toEqual([{ delivery_id: id, kind: "queued" }])
-    expect({ state: (await b.view(id))?.state, attempt: (await b.view(id))?.attempt, enqueued: b.runtime.enqueueCount(id) }).toEqual({ state: "admitted", attempt: 2, enqueued: 2 })
+    expect((await drain.drain({ reason: "command" })).admitted).toEqual([{ delivery_id: id, kind: "steered" }])
+    expect({
+      state: (await b.view(id))?.state,
+      attempt: (await b.view(id))?.attempt,
+      enqueued: b.runtime.enqueueCount(id),
+    }).toEqual({ state: "admitted", attempt: 2, enqueued: 2 })
     b.runtime.endTurn()
     expect(b.runtime.transcriptEntries(id)).toBe(1)
   })
@@ -163,13 +231,25 @@ describe("claim_reconciliation", () => {
     const h = (harness = createGatewayHarness())
     h.session("A")
     const b = crashedTarget(h)
-    const host = createInboxDrain({ store: h.store({ runtimeInstance: "host-1" }), runtime: b.runtime, durableId: "B", sessionPath: () => b.runtime.sessionPath, now: () => h.clock.now })
+    const host = createInboxDrain({
+      store: h.store({ runtimeInstance: "host-1" }),
+      runtime: b.runtime,
+      durableId: "B",
+      sessionPath: () => b.runtime.sessionPath,
+      now: () => h.clock.now,
+    })
     const written = await sendToB(h, "written before release")
     const unwritten = await sendToB(h, "queued behind the turn")
     const firstEmitted = new Promise<string>((resolve) => b.runtime.onEmitted(resolve))
-    expect((await host.drain({ reason: "start" })).admitted).toEqual([{ delivery_id: written, kind: "started" }, { delivery_id: unwritten, kind: "queued" }])
+    expect((await host.drain({ reason: "start" })).admitted).toEqual([
+      { delivery_id: written, kind: "started" },
+      { delivery_id: unwritten, kind: "steered" },
+    ])
     expect(await firstEmitted).toBe(written)
-    expect({ written: (await b.view(written))?.state, unwritten: (await b.view(unwritten))?.state }).toEqual({ written: "admitted", unwritten: "admitted" })
+    expect({ written: (await b.view(written))?.state, unwritten: (await b.view(unwritten))?.state }).toEqual({
+      written: "admitted",
+      unwritten: "admitted",
+    })
 
     h.clock.now += 1_000
     b.runtime.release(h.clock.now, "host-1")
@@ -181,7 +261,13 @@ describe("claim_reconciliation", () => {
       readmittedWritten: next.runtime.enqueueCount(written),
       entries: next.runtime.transcriptEntries(written),
       dual: next.log.filter((line) => line.startsWith("dual_runtime")),
-    }).toEqual({ admitted: [{ delivery_id: unwritten, kind: "started" }], written: "applied", readmittedWritten: 0, entries: 1, dual: [] })
+    }).toEqual({
+      admitted: [{ delivery_id: unwritten, kind: "started" }],
+      written: "applied",
+      readmittedWritten: 0,
+      entries: 1,
+      dual: [],
+    })
   })
 
   test("#given a live runtime that claimed a row AFTER the session_released entry #when the next owner drains #then that claim is not the released one and stays dual_runtime", async () => {
@@ -214,7 +300,11 @@ describe("claim_reconciliation", () => {
       await crashingPass(h, b.runtime, holder.identity, "afterClaim")
       const next = freshProcess(h, b.runtime.sessionPath)
       const untouched = await next.drain.drain({ reason: "start" })
-      expect({ admitted: untouched.admitted, state: (await b.view(id))?.state, logged: next.log.some((line) => line.startsWith(`dual_runtime: delivery ${id}`)) }).toEqual({ admitted: [], state: "admitting", logged: true })
+      expect({
+        admitted: untouched.admitted,
+        state: (await b.view(id))?.state,
+        logged: next.log.some((line) => line.startsWith(`dual_runtime: delivery ${id}`)),
+      }).toEqual({ admitted: [], state: "admitting", logged: true })
       await holder.stop()
       const after = await next.drain.drain({ reason: "start" })
       expect(after.admitted).toEqual([{ delivery_id: id, kind: "started" }])

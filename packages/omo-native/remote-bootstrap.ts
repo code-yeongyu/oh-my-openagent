@@ -4,17 +4,17 @@ import {
   type BootstrapDependencies,
   bootstrapDeviceService,
   DEVICE_SERVICE_VERSION,
-  type DeviceCredential,
   deviceServiceHost,
   installDeviceService,
 } from "../device-service-core/src/index.ts"
-import { createCredentialStore, SESSION_READ_WAIT } from "../omo-opencode/src/cli/service-auth/keystore"
 import packageJson from "./package.json" with { type: "json" }
+import { applyColdWake, type ColdWake } from "./remote-cold-wake"
+import { REMOTE_EXIT } from "./remote-exit"
 import { statusLines } from "./remote-render"
 
 // `omo remote bootstrap`: the device service bootstrap every interactive omo start runs in the background (the
 // omo-senpi device-service component starts it). One JSON line with --json: {state: "connected", status} or
-// {state, notice}; the component shows the notice for every stop but signed_out.
+// {state, notice}; the component shows the notice for every stop but signed_out, store_unavailable and not_published.
 
 /** Everything the bootstrap needs besides the account read, the state dir and the connection `omo remote` already has. */
 export type BootstrapSetup = Omit<BootstrapDependencies, "accountShow" | "stateDir" | "connect">
@@ -26,10 +26,9 @@ type BootstrapIo = Pick<BootstrapDependencies, "accountShow" | "stateDir" | "con
 
 const UNSUPPORTED_HOST = "The OmO device service does not run on this platform yet."
 
-/** This build's bootstrap inputs: the pinned release and its verified install, the stored sign-in, this omo binary. */
+/** This build's bootstrap inputs: the pinned release and its verified install and this omo binary; never a credential. */
 export function deviceServiceBootstrapSetup(options: {
   readonly stateDir: string
-  readonly credential: () => Promise<DeviceCredential | null>
   readonly binaryPath: string
   readonly agentDir: string
   readonly platform?: NodeJS.Platform
@@ -50,22 +49,8 @@ export function deviceServiceBootstrapSetup(options: {
             stateDir: options.stateDir,
             engineVersion: packageJson.dependencies["@code-yeongyu/senpi"],
           }),
-    credential: options.credential,
     refresher: { binaryPath: options.binaryPath, version: packageJson.version },
     agentDir: options.agentDir,
-  }
-}
-
-/** The stored sign-in's device and keys, read only after `omo account show` reported signed in. */
-export function storedDeviceCredential(api: string): () => Promise<DeviceCredential | null> {
-  return async () => {
-    const stored = await createCredentialStore(api, { wait: SESSION_READ_WAIT }).read()
-    if (stored === null) return null
-    return {
-      device: { id: stored.device.id, name: stored.device.name },
-      signingPrivateKey: stored.signingPrivateKey,
-      sealingPrivateKey: stored.sealingPrivateKey,
-    }
   }
 }
 
@@ -82,18 +67,74 @@ export function omoBinaryPath(env: Readonly<Record<string, string | undefined>> 
   return resolve(process.argv[1] ?? process.execPath)
 }
 
-export async function runBootstrapVerb(io: BootstrapIo, setup: BootstrapSetup, json: boolean): Promise<"connected" | "stopped"> {
-  const outcome = await bootstrapDeviceService({ accountShow: io.accountShow, stateDir: io.stateDir, connect: io.connect, ...setup })
+const bootstrap = async (io: BootstrapIo, setup: BootstrapSetup, json: boolean) => {
+  const outcome = await bootstrapDeviceService({
+    accountShow: io.accountShow,
+    stateDir: io.stateDir,
+    connect: io.connect,
+    ...setup,
+  })
   if (outcome.kind === "stopped") {
     if (json) io.output(JSON.stringify({ state: outcome.state, notice: outcome.notice }))
     else io.error(outcome.notice)
-    return "stopped"
   }
+  return outcome
+}
+
+/**
+ * Hands the signed-in session's device keys to the running service through the handoff a fresh `omo login` uses;
+ * "signed_out" when there is no signed-in session to hand over.
+ */
+export type DeviceLink = () => Promise<"linked" | "signed_out">
+
+const NOT_LINKED = "This device is not linked to the OmO device service yet. Run omo login to link it."
+
+/**
+ * `omo remote enable`, the one command after `omo login` (omo#13594): the bootstrap (install the pinned service when none
+ * runs, connect, register the refresher and this agent dir), then the switch on, then the always-on session host unit.
+ * Every step is idempotent, so running it again changes nothing that is already in place.
+ *
+ * Design D r9 section 3 exception (LEAD ruling on omo#13602): a sign-in made before the service was installed never
+ * reached it, and the background bootstrap must never read a credential. This explicit verb, and only while the service
+ * holds no device, hands the signed-in session's keys over through `linkDevice`, the same handoff a fresh login makes.
+ */
+export async function runEnableVerb(
+  io: BootstrapIo,
+  setup: BootstrapSetup,
+  coldWake: ColdWake,
+  linkDevice: DeviceLink,
+  json: boolean,
+): Promise<number> {
+  const outcome = await bootstrap(io, setup, json)
+  if (outcome.kind === "stopped") return REMOTE_EXIT.unavailable
+  let enabled: boolean
+  try {
+    enabled = await outcome.service.setEnabled(true)
+  } finally {
+    outcome.service.close()
+  }
+  if (json) io.output(JSON.stringify({ enabled }))
+  else io.output(`Remote sessions are ${enabled ? "on" : "off"} for this device.`)
+  if (outcome.status.device === null && (await linkDevice()) === "signed_out") io.error(NOT_LINKED)
+  await applyColdWake(coldWake, enabled, io.error)
+  return REMOTE_EXIT.ok
+}
+
+export async function runBootstrapVerb(
+  io: BootstrapIo,
+  setup: BootstrapSetup,
+  coldWake: ColdWake,
+  json: boolean,
+): Promise<"connected" | "stopped"> {
+  const outcome = await bootstrap(io, setup, json)
+  if (outcome.kind === "stopped") return "stopped"
   try {
     if (json) io.output(JSON.stringify({ state: "connected", status: outcome.status }))
     else for (const line of statusLines(outcome.status, outcome.service.serviceVersion)) io.output(line)
   } finally {
     outcome.service.close()
   }
+  // After the connection is closed: a changed table restarts the device service, which would cut it.
+  await applyColdWake(coldWake, outcome.status.state !== "disabled", io.error)
   return "connected"
 }

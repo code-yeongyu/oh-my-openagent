@@ -68,7 +68,8 @@ export function parseLockOwner(body: string): LockOwner | undefined {
   // A legacy body ends after the token; anything else must carry both owner fields.
   const legacy = lines.length === 4 && lines[3] === ""
   if (legacy) return { pid: Number(pidText), startIdentity: UNAVAILABLE, hostname: undefined, token }
-  if (startIdentity === undefined || startIdentity.length === 0 || host === undefined || host.length === 0) return undefined
+  if (startIdentity === undefined || startIdentity.length === 0 || host === undefined || host.length === 0)
+    return undefined
   return { pid: Number(pidText), startIdentity, hostname: host, token }
 }
 
@@ -92,17 +93,24 @@ function startIdentitiesConflict(recorded: string, actual: string): boolean {
 export function readProcessStartIdentity(pid: number): string | null {
   if (!Number.isSafeInteger(pid) || pid <= 0) return null
   switch (process.platform) {
-    case "linux": return readLinuxStartIdentity(pid)
-    case "darwin": return readDarwinStartIdentity(pid)
-    case "win32": return readWin32StartIdentity(pid)
-    default: return null
+    case "linux":
+      return readLinuxStartIdentity(pid)
+    case "darwin":
+      return readDarwinStartIdentity(pid)
+    case "win32":
+      return readWin32StartIdentity(pid)
+    default:
+      return null
   }
 }
 
 function readLinuxStartIdentity(pid: number): string | null {
   try {
     const stat = readFileSync(`/proc/${pid}/stat`, "utf8")
-    const fields = stat.slice(stat.lastIndexOf(")") + 2).trim().split(/\s+/)
+    const fields = stat
+      .slice(stat.lastIndexOf(")") + 2)
+      .trim()
+      .split(/\s+/)
     const startTicks = fields[19]
     return startTicks === undefined ? null : `linux-proc-start-ticks:${startTicks}`
   } catch {
@@ -137,9 +145,11 @@ function readDarwinStartIdentity(pid: number): string | null {
       const library = loaded?.dlopen("/usr/lib/libSystem.B.dylib", {
         proc_pidinfo: { args: ["i32", "i32", "u64", "ptr", "i32"], returns: "i32" },
       })
-      procPidInfo = library === undefined
-        ? null
-        : (target, buffer) => Number(library.symbols.proc_pidinfo(target, PROC_PIDTBSDINFO, 0n, buffer, PROC_BSDINFO_SIZE))
+      procPidInfo =
+        library === undefined
+          ? null
+          : (target, buffer) =>
+              Number(library.symbols.proc_pidinfo(target, PROC_PIDTBSDINFO, 0n, buffer, PROC_BSDINFO_SIZE))
     } catch {
       procPidInfo = null
     }
@@ -162,11 +172,12 @@ let kernel32: Kernel32 | null | undefined
 function readWin32StartIdentity(pid: number): string | null {
   if (kernel32 === undefined) {
     try {
-      kernel32 = (loadFfi()?.dlopen("kernel32.dll", {
-        OpenProcess: { args: ["u32", "i32", "u32"], returns: "ptr" },
-        GetProcessTimes: { args: ["ptr", "ptr", "ptr", "ptr", "ptr"], returns: "i32" },
-        CloseHandle: { args: ["ptr"], returns: "i32" },
-      }).symbols as Kernel32 | undefined) ?? null
+      kernel32 =
+        (loadFfi()?.dlopen("kernel32.dll", {
+          OpenProcess: { args: ["u32", "i32", "u32"], returns: "ptr" },
+          GetProcessTimes: { args: ["ptr", "ptr", "ptr", "ptr", "ptr"], returns: "i32" },
+          CloseHandle: { args: ["ptr"], returns: "i32" },
+        }).symbols as Kernel32 | undefined) ?? null
     } catch {
       kernel32 = null
     }
@@ -176,7 +187,13 @@ function readWin32StartIdentity(pid: number): string | null {
   if (handle === null || handle === 0 || handle === 0n) return null
   try {
     const creation = new BigUint64Array(1)
-    const ok = kernel32.GetProcessTimes(handle, creation, new BigUint64Array(1), new BigUint64Array(1), new BigUint64Array(1))
+    const ok = kernel32.GetProcessTimes(
+      handle,
+      creation,
+      new BigUint64Array(1),
+      new BigUint64Array(1),
+      new BigUint64Array(1),
+    )
     const filetime = creation[0] ?? 0n
     return ok === 0 || filetime === 0n ? null : `win32-creation-filetime:${filetime}`
   } finally {

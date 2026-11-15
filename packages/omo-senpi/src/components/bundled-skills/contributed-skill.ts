@@ -7,11 +7,13 @@ import type { SenpiExtensionAPI } from "../../extension/types"
 
 export function readDisabledSkills(cwd: string, env: Record<string, string | undefined>): ReadonlySet<string> {
   const loaded = loadOmoConfig({ cwd, env })
-  return new Set(collectDisabledSkills({
-    harness: "senpi",
-    layers: loaded.layers,
-    ...(loaded.profile === undefined ? {} : { profile: loaded.profile }),
-  }))
+  return new Set(
+    collectDisabledSkills({
+      harness: "senpi",
+      layers: loaded.layers,
+      ...(loaded.profile === undefined ? {} : { profile: loaded.profile }),
+    }),
+  )
 }
 
 export type ContributedSkill =
@@ -27,9 +29,7 @@ export interface ResolveContributedSkillOptions {
   readonly env: Record<string, string | undefined>
 }
 
-export type BundledSkillProvenance =
-  | { readonly shadowed: false }
-  | { readonly shadowed: true }
+export type BundledSkillProvenance = { readonly shadowed: false } | { readonly shadowed: true }
 
 /**
  * Which file the session's skills listing resolves for `name`, compared with the bundled copy at

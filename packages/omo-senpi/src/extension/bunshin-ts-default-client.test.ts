@@ -6,7 +6,9 @@ import { createLazyBunshinClient } from "./bunshin-ts-default-client"
 function fakeClient(closed: string[], name: string): BunshinClient {
   return {
     listMachines: async () => [{ id: name } as unknown as StandaloneMachine],
-    close: async () => { closed.push(name) },
+    close: async () => {
+      closed.push(name)
+    },
   } as unknown as BunshinClient
 }
 
@@ -39,20 +41,29 @@ describe("bunshin-ts lazy default client", () => {
 
   it("#given a connect that fails #when events are subscribed #then the failure goes to reportError and no rejection is left unhandled", async () => {
     const unhandled: unknown[] = []
-    const onUnhandled = (reason: unknown) => { unhandled.push(reason) }
+    const onUnhandled = (reason: unknown) => {
+      unhandled.push(reason)
+    }
     process.on("unhandledRejection", onUnhandled)
     try {
       const failure = new Error("service not connected")
       let settle: (outcome: string) => void = () => {}
-      const outcome = new Promise<string>((resolve) => { settle = resolve })
+      const outcome = new Promise<string>((resolve) => {
+        settle = resolve
+      })
       process.once("unhandledRejection", () => settle("unhandled"))
       const reported: unknown[] = []
-      const client = createLazyBunshinClient(async () => { throw failure }, {
-        reportError: (error) => {
-          reported.push(error)
-          settle("reported")
+      const client = createLazyBunshinClient(
+        async () => {
+          throw failure
         },
-      })
+        {
+          reportError: (error) => {
+            reported.push(error)
+            settle("reported")
+          },
+        },
+      )
       client.events({ topics: ["device"] }).subscribe(() => {})
       const timeout = setTimeout(() => settle("timeout"), 2_000)
       expect(await outcome).toBe("reported")

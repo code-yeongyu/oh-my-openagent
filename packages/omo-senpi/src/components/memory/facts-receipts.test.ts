@@ -32,8 +32,15 @@ async function factsRun(): Promise<{ paths: MemoryIdentityPaths; runDir: string;
   const runDir = join(paths.facts, "runs", "facts-abc-1")
   await mkdir(runDir, { recursive: true })
   await writeRunJsonAtomic(join(runDir, "ledger.json"), {
-    version: 1, runId: "facts-abc-1", kind: "facts", startedAt: NOW.toISOString(),
-    hardDeadlineAt: 1, terminationGraceMs: 1, deadlineAt: 2, batchId, queued: [],
+    version: 1,
+    runId: "facts-abc-1",
+    kind: "facts",
+    startedAt: NOW.toISOString(),
+    hardDeadlineAt: 1,
+    terminationGraceMs: 1,
+    deadlineAt: 2,
+    batchId,
+    queued: [],
   })
   return { paths, runDir, batchId }
 }
@@ -88,10 +95,20 @@ describe("facts receipts", () => {
     }
 
     // when
-    await writes(paths, port).fail({ runDir, runId: "facts-abc-1", batchId, targets: [target], reason: "secret_like_content", detail: "refused" })
+    await writes(paths, port).fail({
+      runDir,
+      runId: "facts-abc-1",
+      batchId,
+      targets: [target],
+      reason: "secret_like_content",
+      detail: "refused",
+    })
 
     // then
-    expect(order).toEqual([{ event: "failed", sentinel: true }, { event: "parked", sentinel: true }])
+    expect(order).toEqual([
+      { event: "failed", sentinel: true },
+      { event: "parked", sentinel: true },
+    ])
     expect(await read(paths)).toMatchObject([
       { batchId, event: "failed", reason: "secret_like_content" },
       { batchId, event: "parked", reason: "secret_like_content" },
@@ -103,7 +120,14 @@ describe("facts receipts", () => {
     const { paths, runDir, batchId } = await factsRun()
 
     // when
-    await writes(paths).fail({ runDir, runId: "facts-abc-1", batchId, targets: [target], reason: "child_exit", detail: "exit 1" })
+    await writes(paths).fail({
+      runDir,
+      runId: "facts-abc-1",
+      batchId,
+      targets: [target],
+      reason: "child_exit",
+      detail: "exit 1",
+    })
 
     // then
     expect((await read(paths)).map((receipt) => receipt.event)).toEqual(["failed"])
@@ -112,7 +136,17 @@ describe("facts receipts", () => {
   test("#given a run reconciliation cannot prove dead #when abandoned #then an abandoned receipt follows abandoned.json", async () => {
     // given
     const { paths, runDir, batchId } = await factsRun()
-    const ledger = { version: 1 as const, runId: "facts-abc-1", kind: "facts" as const, startedAt: NOW.toISOString(), hardDeadlineAt: 1, terminationGraceMs: 1, deadlineAt: 2, batchId, queued: [] }
+    const ledger = {
+      version: 1 as const,
+      runId: "facts-abc-1",
+      kind: "facts" as const,
+      startedAt: NOW.toISOString(),
+      hardDeadlineAt: 1,
+      terminationGraceMs: 1,
+      deadlineAt: 2,
+      batchId,
+      queued: [],
+    }
 
     // when
     await writes(paths).abandon(runDir, ledger, "unknown_liveness")
@@ -125,7 +159,11 @@ describe("facts receipts", () => {
   test("#given a receipt write that fails #when the batch succeeds #then the run still finishes and final.json lands", async () => {
     // given
     const { paths, runDir } = await factsRun()
-    const broken: MemoryReceiptsPort = { append: async () => { throw new Error("disk full") } }
+    const broken: MemoryReceiptsPort = {
+      append: async () => {
+        throw new Error("disk full")
+      },
+    }
 
     // when
     await writes(paths, broken).succeed(runDir, "facts-abc-1", "committed", { entries: [], targets: [] }, "f00d")
@@ -158,19 +196,30 @@ describe("facts receipts", () => {
 })
 
 describe("facts receipt recovery", () => {
-  const reconcile = (paths: MemoryIdentityPaths) => reconcileFactsRuns({
-    factsDir: paths.facts,
-    now: () => NOW,
-    finalize: async () => { throw new Error("a terminal run is never finalized again") },
-    fail: async () => { throw new Error("a terminal run is never failed again") },
-    abandon: async () => { throw new Error("a terminal run is never abandoned again") },
-    receiptsDir: paths.runtime,
-  })
+  const reconcile = (paths: MemoryIdentityPaths) =>
+    reconcileFactsRuns({
+      factsDir: paths.facts,
+      now: () => NOW,
+      finalize: async () => {
+        throw new Error("a terminal run is never finalized again")
+      },
+      fail: async () => {
+        throw new Error("a terminal run is never failed again")
+      },
+      abandon: async () => {
+        throw new Error("a terminal run is never abandoned again")
+      },
+      receiptsDir: paths.runtime,
+    })
 
   test("#given a committed run whose receipt write was lost #when facts reconcile twice #then exactly one committed receipt is rebuilt from final.json", async () => {
     // given
     const { paths, runDir, batchId } = await factsRun()
-    const lost: MemoryReceiptsPort = { append: async () => { throw new Error("receipt write lost") } }
+    const lost: MemoryReceiptsPort = {
+      append: async () => {
+        throw new Error("receipt write lost")
+      },
+    }
     await writes(paths, lost).succeed(runDir, "facts-abc-1", "committed", { entries: [], targets: [] }, "f00d")
     const afterLoss = await read(paths)
 
@@ -180,7 +229,13 @@ describe("facts receipt recovery", () => {
 
     // then
     expect(afterLoss).toEqual([])
-    expect((await read(paths)).map((receipt) => [receipt.kind === "facts" ? receipt.batchId : "", receipt.event, receipt.sha])).toEqual([[batchId, "committed", "f00d"]])
+    expect(
+      (await read(paths)).map((receipt) => [
+        receipt.kind === "facts" ? receipt.batchId : "",
+        receipt.event,
+        receipt.sha,
+      ]),
+    ).toEqual([[batchId, "committed", "f00d"]])
   })
 
   test("#given a terminal run whose receipt was already written #when facts reconcile #then no second receipt appears", async () => {
@@ -198,7 +253,11 @@ describe("facts receipt recovery", () => {
   test("#given a finished facts run whose ledger is gone #when facts reconcile #then no receipt is guessed and the skip is logged once", async () => {
     // given
     const { paths, runDir } = await factsRun()
-    await writes(paths, { append: async () => { throw new Error("receipt write lost") } }).succeed(runDir, "facts-abc-1", "no_facts", { entries: [], targets: [] })
+    await writes(paths, {
+      append: async () => {
+        throw new Error("receipt write lost")
+      },
+    }).succeed(runDir, "facts-abc-1", "no_facts", { entries: [], targets: [] })
     await rm(join(runDir, "ledger.json"))
     const warnings: string[] = []
 
@@ -206,9 +265,15 @@ describe("facts receipt recovery", () => {
     await reconcileFactsRuns({
       factsDir: paths.facts,
       now: () => NOW,
-      finalize: async () => { throw new Error("a terminal run is never finalized again") },
-      fail: async () => { throw new Error("a terminal run is never failed again") },
-      abandon: async () => { throw new Error("a terminal run is never abandoned again") },
+      finalize: async () => {
+        throw new Error("a terminal run is never finalized again")
+      },
+      fail: async () => {
+        throw new Error("a terminal run is never failed again")
+      },
+      abandon: async () => {
+        throw new Error("a terminal run is never abandoned again")
+      },
       receiptsDir: paths.runtime,
       warn: (message) => warnings.push(message),
     })
@@ -242,27 +307,35 @@ describe("facts receipt recovery", () => {
   test.each([
     ["is gone", "facts receipt skipped: ledger unreadable"],
     ["names another run", "facts receipt skipped: ledger does not name this run"],
-  ] as const)("#given a batch whose ledger %s #when it succeeds #then no receipt is guessed and the skip is logged", async (state, expected) => {
-    // given
-    const { paths, runDir } = await factsRun()
-    if (state === "is gone") await rm(join(runDir, "ledger.json"))
-    else await writeRunJsonAtomic(join(runDir, "ledger.json"), { version: 1, runId: "facts-other", batchId: "batch-0009" })
-    const warnings: string[] = []
-    const terminal = new FactsTerminalWrites({
-      failures: new FactsFailureStore({ identityPaths: paths, now: () => NOW }),
-      now: () => NOW,
-      markConsumed: async () => undefined,
-      receiptsDir: paths.runtime,
-      warn: (message) => warnings.push(message),
-    })
+  ] as const)(
+    "#given a batch whose ledger %s #when it succeeds #then no receipt is guessed and the skip is logged",
+    async (state, expected) => {
+      // given
+      const { paths, runDir } = await factsRun()
+      if (state === "is gone") await rm(join(runDir, "ledger.json"))
+      else
+        await writeRunJsonAtomic(join(runDir, "ledger.json"), {
+          version: 1,
+          runId: "facts-other",
+          batchId: "batch-0009",
+        })
+      const warnings: string[] = []
+      const terminal = new FactsTerminalWrites({
+        failures: new FactsFailureStore({ identityPaths: paths, now: () => NOW }),
+        now: () => NOW,
+        markConsumed: async () => undefined,
+        receiptsDir: paths.runtime,
+        warn: (message) => warnings.push(message),
+      })
 
-    // when
-    await terminal.succeed(runDir, "facts-abc-1", "no_facts", { entries: [], targets: [] })
+      // when
+      await terminal.succeed(runDir, "facts-abc-1", "no_facts", { entries: [], targets: [] })
 
-    // then
-    expect(await read(paths)).toEqual([])
-    expect(warnings).toEqual([expected])
-  })
+      // then
+      expect(await read(paths)).toEqual([])
+      expect(warnings).toEqual([expected])
+    },
+  )
 
   test("#given a launched receipt write that fails #when a facts run dir is reserved #then the failure is reported to warn and the run dir is still claimed", async () => {
     // given
@@ -279,7 +352,11 @@ describe("facts receipt recovery", () => {
       batchId: "batch-0002",
       launchedAt: NOW.getTime(),
       receiptsDir: paths.runtime,
-      receipts: { append: async () => { throw new Error("disk full") } },
+      receipts: {
+        append: async () => {
+          throw new Error("disk full")
+        },
+      },
       warn: (message) => warnings.push(message),
     })
 

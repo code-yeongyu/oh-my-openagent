@@ -226,3 +226,76 @@ fn bounded_button_hold_releases_on_success() {
         (DesktopPoint { x: 110.0, y: 140.0 }, false),
     ]);
 }
+
+fn object_mode() -> Harness {
+    use senpi_desktop_core::report::ReportMode;
+    use senpi_desktop_core::types::DesktopSessionOptions;
+    let mut harness = harness(&json!({}));
+    harness.worker.open(DesktopSessionOptions { report_mode: ReportMode::Object, ..DesktopSessionOptions::default() });
+    harness
+}
+
+fn assert_dangerous_hold_refused(error: &senpi_desktop_core::error::DesktopError) {
+    use senpi_desktop_core::report::Disposition;
+    assert_eq!(error.code, ErrorCode::InvalidKey);
+    let report = error.report.as_deref().expect("object-mode refusal carries a report");
+    assert_eq!(report.reason.as_deref(), Some("dangerous_chord"));
+    assert_eq!(report.disposition, Some(Disposition::NOT_DELIVERED_SAFE));
+    assert!(error.message.contains("keyChord"), "{}", error.message);
+    assert!(error.message.contains("force: true"), "{}", error.message);
+}
+
+#[test]
+fn an_object_mode_key_hold_of_a_dangerous_chord_is_refused_and_presses_nothing() {
+    for held in [vec!["cmd", "q"], vec!["alt+f4"], vec!["win", "l"]] {
+        // Given an object-mode session.
+        let mut harness = object_mode();
+        // When a hold asks for a chord that quits, closes or locks.
+        let error = harness
+            .process(Op::HoldKeys(HoldKeysParams {
+                target: "101".to_owned(),
+                keys: held.iter().map(|key| (*key).to_owned()).collect(),
+                duration: 0.0,
+                opts: None,
+            }))
+            .expect_err("a dangerous hold is refused");
+        // Then it is the keyChord refusal, pointing at keyChord with force, and no key went down.
+        assert_dangerous_hold_refused(&error);
+        assert!(transitions(&harness).is_empty(), "{held:?} pressed {:?}", transitions(&harness));
+    }
+}
+
+#[test]
+fn an_object_mode_mouse_hold_with_dangerous_held_keys_is_refused_and_presses_nothing() {
+    // Given an object-mode session with a full frame of the target.
+    let mut harness = object_mode();
+    let frame = harness.capture("101");
+    // When a mouse hold also holds cmd+q.
+    let error = harness
+        .process(Op::HoldMouse(HoldMouseParams {
+            target: "101".to_owned(), x: 10.0, y: 20.0, duration: 0.0, button: None,
+            keys: Some(vec!["cmd".to_owned(), "q".to_owned()]), frame_id: Some(frame), opts: None,
+        }))
+        .expect_err("a dangerous held-key set is refused");
+    // Then nothing was pressed: no key and no button.
+    assert_dangerous_hold_refused(&error);
+    assert!(transitions(&harness).is_empty());
+    assert!(!harness.sink.ops().iter().any(|op| matches!(op, SinkOp::HeldButton { .. })));
+}
+
+#[test]
+fn a_null_mode_key_hold_of_cmd_q_runs_as_protocol_1_did() {
+    // Given a null-mode session.
+    let mut harness = harness(&json!({}));
+    // When the same hold runs.
+    harness
+        .process(Op::HoldKeys(HoldKeysParams {
+            target: "101".to_owned(),
+            keys: vec!["cmd".to_owned(), "q".to_owned()],
+            duration: 0.0,
+            opts: None,
+        }))
+        .expect("null mode is unchanged");
+    // Then both keys go down and up.
+    assert_eq!(transitions(&harness).len(), 4);
+}

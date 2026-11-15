@@ -8,20 +8,14 @@ import { isRecord } from "../../../shared/record-type-guard"
 
 type OpencodeClient = PluginInput["client"]
 
-function normalizeSDKMessage(
-  sessionID: string,
-  value: unknown
-): StoredMessageMeta | null {
+function normalizeSDKMessage(sessionID: string, value: unknown): StoredMessageMeta | null {
   if (!isRecord(value)) return null
   if (typeof value.id !== "string") return null
 
   const roleValue = value.role
   const role: StoredMessageMeta["role"] = roleValue === "assistant" ? "assistant" : "user"
 
-  const created =
-    isRecord(value.time) && typeof value.time.created === "number"
-      ? value.time.created
-      : 0
+  const created = isRecord(value.time) && typeof value.time.created === "number" ? value.time.created : 0
 
   return {
     id: value.id,
@@ -59,10 +53,7 @@ export function readMessages(sessionID: string): StoredMessageMeta[] {
   })
 }
 
-export async function readMessagesFromSDK(
-  client: OpencodeClient,
-  sessionID: string
-): Promise<StoredMessageMeta[]> {
+export async function readMessagesFromSDK(client: OpencodeClient, sessionID: string): Promise<StoredMessageMeta[]> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
     const data = normalizeSDKResponse<unknown[]>(response, [], {

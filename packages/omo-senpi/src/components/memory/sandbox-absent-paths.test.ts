@@ -15,7 +15,8 @@ import { buildSandboxTransform, SandboxUnavailableError } from "./sandbox"
 
 const roots: string[] = []
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0))
+    rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 /**
@@ -29,7 +30,12 @@ function unwrapTransformResult(result: ReflectionSpawnArgs | Promise<ReflectionS
   return result
 }
 
-function fixture(): { readonly root: string; readonly worktree: string; readonly gitCommonDir: string; readonly payload: string } {
+function fixture(): {
+  readonly root: string
+  readonly worktree: string
+  readonly gitCommonDir: string
+  readonly payload: string
+} {
   const root = realpathSync.native(mkdtempSync(join(tmpdir(), "omo-sandbox-absent-")))
   roots.push(root)
   const worktree = join(root, "parent", "runtime", "worktree")
@@ -173,16 +179,17 @@ describe("reflection sandbox with not-yet-created paths", () => {
     const absentRuntimeWrite = join(setup.root, "runtime", "reflection")
 
     // when
-    const build = () => buildSandboxTransform({
-      policy: "required",
-      worktreeDir: setup.worktree,
-      gitCommonDir: setup.gitCommonDir,
-      payloadPaths: [setup.payload],
-      runtimeWrites: [absentRuntimeWrite],
-      command: "/bin/sh",
-      env: { PATH: process.env.PATH },
-      ...darwin,
-    })
+    const build = () =>
+      buildSandboxTransform({
+        policy: "required",
+        worktreeDir: setup.worktree,
+        gitCommonDir: setup.gitCommonDir,
+        payloadPaths: [setup.payload],
+        runtimeWrites: [absentRuntimeWrite],
+        command: "/bin/sh",
+        env: { PATH: process.env.PATH },
+        ...darwin,
+      })
 
     // then
     expect(build).not.toThrow()
@@ -190,37 +197,37 @@ describe("reflection sandbox with not-yet-created paths", () => {
     expect(build).not.toThrow(SandboxUnavailableError)
   }, 30_000)
 
-  test("#given a Linux runtime write dir that does not exist yet #when the bwrap transform is built #then the directory exists with private permissions and the exact path is bound",
-    async () => {
-      // given
-      const setup = fixture()
-      const absentRuntimeWrite = join(setup.root, "runtime", "reflection-sessions")
-      expect(existsSync(absentRuntimeWrite)).toBe(false)
+  test("#given a Linux runtime write dir that does not exist yet #when the bwrap transform is built #then the directory exists with private permissions and the exact path is bound", async () => {
+    // given
+    const setup = fixture()
+    const absentRuntimeWrite = join(setup.root, "runtime", "reflection-sessions")
+    expect(existsSync(absentRuntimeWrite)).toBe(false)
 
-      // when
-      const transform = buildSandboxTransform({
-        policy: "auto",
-        worktreeDir: setup.worktree,
-        gitCommonDir: setup.gitCommonDir,
-        payloadPaths: [setup.payload],
-        runtimeWrites: [absentRuntimeWrite],
-        command: "/bin/sh",
-        env: { PATH: process.env.PATH },
-        ...linuxAvailable,
-      })
-      const args = (await transform(spawnArgs(setup.worktree))).args
+    // when
+    const transform = buildSandboxTransform({
+      policy: "auto",
+      worktreeDir: setup.worktree,
+      gitCommonDir: setup.gitCommonDir,
+      payloadPaths: [setup.payload],
+      runtimeWrites: [absentRuntimeWrite],
+      command: "/bin/sh",
+      env: { PATH: process.env.PATH },
+      ...linuxAvailable,
+    })
+    const args = (await transform(spawnArgs(setup.worktree))).args
 
-      // then: bwrap --bind requires a real source; creating the declared path (0700) is the
-      // fix, not widening the grant to an existing ancestor or masking with --bind-try.
-      expect(transform.wasSandboxed).toBe(true)
-      assertPrivateDirectory(absentRuntimeWrite)
-      expect(hasExactBind(args, absentRuntimeWrite)).toBe(true)
-      expect(hasExactBind(args, setup.root)).toBe(false)
-      expect(hasExactBind(args, dirname(absentRuntimeWrite))).toBe(false)
-      expect(args).not.toContain("--bind-try")
-    }, 30_000)
+    // then: bwrap --bind requires a real source; creating the declared path (0700) is the
+    // fix, not widening the grant to an existing ancestor or masking with --bind-try.
+    expect(transform.wasSandboxed).toBe(true)
+    assertPrivateDirectory(absentRuntimeWrite)
+    expect(hasExactBind(args, absentRuntimeWrite)).toBe(true)
+    expect(hasExactBind(args, setup.root)).toBe(false)
+    expect(hasExactBind(args, dirname(absentRuntimeWrite))).toBe(false)
+    expect(args).not.toContain("--bind-try")
+  }, 30_000)
 
-  test.skipIf(process.platform === "win32")("#given a symlink planted on a missing writable path after the transform was planned #when the transform runs #then it refuses to bind instead of following the link",
+  test.skipIf(process.platform === "win32")(
+    "#given a symlink planted on a missing writable path after the transform was planned #when the transform runs #then it refuses to bind instead of following the link",
     async () => {
       // given
       const setup = fixture()
@@ -251,9 +258,12 @@ describe("reflection sandbox with not-yet-created paths", () => {
       // then
       expect(String(failure)).toContain("refused to bind")
       expect(String(failure)).toContain(elsewhere)
-    }, 30_000)
+    },
+    30_000,
+  )
 
-  test.skipIf(process.platform === "win32")("#given a symlink planted on a missing MIDDLE segment of a writable path #when the transform runs #then nothing is created through the link and the bind is refused",
+  test.skipIf(process.platform === "win32")(
+    "#given a symlink planted on a missing MIDDLE segment of a writable path #when the transform runs #then nothing is created through the link and the bind is refused",
     async () => {
       // given
       const setup = fixture()
@@ -284,109 +294,114 @@ describe("reflection sandbox with not-yet-created paths", () => {
       // then
       expect(String(failure)).toContain("refused to bind")
       expect(existsSync(join(elsewhere, "leaf"))).toBe(false)
-    }, 30_000)
+    },
+    30_000,
+  )
 
-  test("#given a nested Linux writable path whose ancestors are also missing #when the bwrap transform is built #then the full leaf exists privately and is the bind source",
-    async () => {
-      // given
-      const setup = fixture()
-      const absentNested = join(setup.root, "runtime", "reflection", "runs", "reflection-run-9")
-      expect(existsSync(dirname(dirname(absentNested)))).toBe(false)
+  test("#given a nested Linux writable path whose ancestors are also missing #when the bwrap transform is built #then the full leaf exists privately and is the bind source", async () => {
+    // given
+    const setup = fixture()
+    const absentNested = join(setup.root, "runtime", "reflection", "runs", "reflection-run-9")
+    expect(existsSync(dirname(dirname(absentNested)))).toBe(false)
 
-      // when
-      const transform = buildSandboxTransform({
-        policy: "required",
-        worktreeDir: setup.worktree,
-        gitCommonDir: setup.gitCommonDir,
-        payloadPaths: [setup.payload],
-        runtimeWrites: [absentNested],
-        command: "/bin/sh",
-        env: { PATH: process.env.PATH },
-        ...linuxAvailable,
-      })
-      const args = (await transform(spawnArgs(setup.worktree))).args
+    // when
+    const transform = buildSandboxTransform({
+      policy: "required",
+      worktreeDir: setup.worktree,
+      gitCommonDir: setup.gitCommonDir,
+      payloadPaths: [setup.payload],
+      runtimeWrites: [absentNested],
+      command: "/bin/sh",
+      env: { PATH: process.env.PATH },
+      ...linuxAvailable,
+    })
+    const args = (await transform(spawnArgs(setup.worktree))).args
 
-      // then
-      expect(transform.wasSandboxed).toBe(true)
-      assertPrivateDirectory(absentNested)
-      expect(hasExactBind(args, absentNested)).toBe(true)
-      expect(hasExactBind(args, dirname(absentNested))).toBe(false)
-      expect(hasExactBind(args, join(setup.root, "runtime"))).toBe(false)
-    }, 30_000)
+    // then
+    expect(transform.wasSandboxed).toBe(true)
+    assertPrivateDirectory(absentNested)
+    expect(hasExactBind(args, absentNested)).toBe(true)
+    expect(hasExactBind(args, dirname(absentNested))).toBe(false)
+    expect(hasExactBind(args, join(setup.root, "runtime"))).toBe(false)
+  }, 30_000)
 
-  test("#given an absent writable dir #when Linux policy is off or the sandbox is unavailable #then the path is not created",
-    () => {
-      // given
-      const setup = fixture()
-      const absentOff = join(setup.root, "runtime", "off-sessions")
-      const absentMissing = join(setup.root, "runtime", "missing-bwrap")
-      const absentUnusable = join(setup.root, "runtime", "unusable-bwrap")
+  test("#given an absent writable dir #when Linux policy is off or the sandbox is unavailable #then the path is not created", () => {
+    // given
+    const setup = fixture()
+    const absentOff = join(setup.root, "runtime", "off-sessions")
+    const absentMissing = join(setup.root, "runtime", "missing-bwrap")
+    const absentUnusable = join(setup.root, "runtime", "unusable-bwrap")
 
-      // when
-      buildSandboxTransform({
-        policy: "off",
-        worktreeDir: setup.worktree,
-        gitCommonDir: setup.gitCommonDir,
-        payloadPaths: [setup.payload],
-        runtimeWrites: [absentOff],
-        command: "/bin/sh",
-        env: { PATH: process.env.PATH },
-        platform: "linux",
-        which: () => { throw new Error("must not detect") },
-        probe: () => { throw new Error("must not probe") },
-      })
-      buildSandboxTransform({
-        policy: "auto",
-        worktreeDir: setup.worktree,
-        gitCommonDir: setup.gitCommonDir,
-        payloadPaths: [setup.payload],
-        runtimeWrites: [absentMissing],
-        command: "/bin/sh",
-        env: { PATH: process.env.PATH },
-        platform: "linux",
-        which: () => undefined,
-        probe: () => { throw new Error("must not probe an unresolved executable") },
-      })
-      buildSandboxTransform({
-        policy: "auto",
-        worktreeDir: setup.worktree,
-        gitCommonDir: setup.gitCommonDir,
-        payloadPaths: [setup.payload],
-        runtimeWrites: [absentUnusable],
-        command: "/bin/sh",
-        env: { PATH: process.env.PATH },
-        platform: "linux",
-        which: () => "/usr/bin/bwrap",
-        probe: () => ({ usable: false, reason: "smoke test exited 1: bwrap: setting up uid map: Permission denied" }),
-      })
+    // when
+    buildSandboxTransform({
+      policy: "off",
+      worktreeDir: setup.worktree,
+      gitCommonDir: setup.gitCommonDir,
+      payloadPaths: [setup.payload],
+      runtimeWrites: [absentOff],
+      command: "/bin/sh",
+      env: { PATH: process.env.PATH },
+      platform: "linux",
+      which: () => {
+        throw new Error("must not detect")
+      },
+      probe: () => {
+        throw new Error("must not probe")
+      },
+    })
+    buildSandboxTransform({
+      policy: "auto",
+      worktreeDir: setup.worktree,
+      gitCommonDir: setup.gitCommonDir,
+      payloadPaths: [setup.payload],
+      runtimeWrites: [absentMissing],
+      command: "/bin/sh",
+      env: { PATH: process.env.PATH },
+      platform: "linux",
+      which: () => undefined,
+      probe: () => {
+        throw new Error("must not probe an unresolved executable")
+      },
+    })
+    buildSandboxTransform({
+      policy: "auto",
+      worktreeDir: setup.worktree,
+      gitCommonDir: setup.gitCommonDir,
+      payloadPaths: [setup.payload],
+      runtimeWrites: [absentUnusable],
+      command: "/bin/sh",
+      env: { PATH: process.env.PATH },
+      platform: "linux",
+      which: () => "/usr/bin/bwrap",
+      probe: () => ({ usable: false, reason: "smoke test exited 1: bwrap: setting up uid map: Permission denied" }),
+    })
 
-      // then
-      expect(existsSync(absentOff)).toBe(false)
-      expect(existsSync(absentMissing)).toBe(false)
-      expect(existsSync(absentUnusable)).toBe(false)
-    }, 30_000)
+    // then
+    expect(existsSync(absentOff)).toBe(false)
+    expect(existsSync(absentMissing)).toBe(false)
+    expect(existsSync(absentUnusable)).toBe(false)
+  }, 30_000)
 
-  test("#given a Darwin sandbox with an absent runtime write dir #when the transform is built #then the path stays absent",
-    () => {
-      // given: seatbelt grants a subpath without needing the directory to exist; Linux mkdir
-      // must not leak onto this path.
-      const setup = fixture()
-      const absentRuntimeWrite = join(setup.root, "runtime", "reflection-sessions")
+  test("#given a Darwin sandbox with an absent runtime write dir #when the transform is built #then the path stays absent", () => {
+    // given: seatbelt grants a subpath without needing the directory to exist; Linux mkdir
+    // must not leak onto this path.
+    const setup = fixture()
+    const absentRuntimeWrite = join(setup.root, "runtime", "reflection-sessions")
 
-      // when
-      const transform = buildSandboxTransform({
-        policy: "auto",
-        worktreeDir: setup.worktree,
-        gitCommonDir: setup.gitCommonDir,
-        payloadPaths: [setup.payload],
-        runtimeWrites: [absentRuntimeWrite],
-        command: "/bin/sh",
-        env: { PATH: process.env.PATH },
-        ...darwin,
-      })
+    // when
+    const transform = buildSandboxTransform({
+      policy: "auto",
+      worktreeDir: setup.worktree,
+      gitCommonDir: setup.gitCommonDir,
+      payloadPaths: [setup.payload],
+      runtimeWrites: [absentRuntimeWrite],
+      command: "/bin/sh",
+      env: { PATH: process.env.PATH },
+      ...darwin,
+    })
 
-      // then
-      expect(transform.wasSandboxed).toBe(true)
-      expect(existsSync(absentRuntimeWrite)).toBe(false)
-    }, 30_000)
+    // then
+    expect(transform.wasSandboxed).toBe(true)
+    expect(existsSync(absentRuntimeWrite)).toBe(false)
+  }, 30_000)
 })

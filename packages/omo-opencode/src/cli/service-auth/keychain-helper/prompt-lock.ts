@@ -39,10 +39,10 @@ export function promptLockAt(path: string, hooks: PromptLockHooks = {}): () => P
           return async () => {
             markLockRecordReleased(record)
             try {
-              await (hooks.removeRecord ?? ((target, owned) => removeLockRecordIfUnchanged(target, owned, Number.POSITIVE_INFINITY)))(
-                path,
-                record,
-              )
+              await (
+                hooks.removeRecord ??
+                ((target, owned) => removeLockRecordIfUnchanged(target, owned, Number.POSITIVE_INFINITY))
+              )(path, record)
             } finally {
               held.delete(path)
             }

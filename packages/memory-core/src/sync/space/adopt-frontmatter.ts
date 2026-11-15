@@ -20,7 +20,11 @@ export type AdoptedFields = Map<string, AdoptedField>
  * Seed with the space's own keys. `registers` must hold every register key's exact components:
  * a rendered register is never read as one whole value (review r7 M1), so a missing key throws.
  */
-export function seedFields(fields: AdoptedFields, entries: readonly FmEntry[], registers: ReadonlyMap<string, readonly string[]>): void {
+export function seedFields(
+  fields: AdoptedFields,
+  entries: readonly FmEntry[],
+  registers: ReadonlyMap<string, readonly string[]>,
+): void {
   for (const { key, value } of entries) {
     switch (value.kind) {
       case "remove":
@@ -45,7 +49,12 @@ export function adoptFields(fields: AdoptedFields, entries: readonly FmEntry[]):
     if (value.kind === "remove") continue
     const current = fields.get(key)
     if (current === undefined) {
-      fields.set(key, value.kind === "set" ? { kind: "set", elements: [...value.elements] } : { kind: "reg", values: [value.value], inText: 1 })
+      fields.set(
+        key,
+        value.kind === "set"
+          ? { kind: "set", elements: [...value.elements] }
+          : { kind: "reg", values: [value.value], inText: 1 },
+      )
       continue
     }
     switch (current.kind) {

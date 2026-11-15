@@ -5,7 +5,13 @@ import { tolerantFsync } from "../tolerant-fsync"
 import { createLockLease, type LockLease } from "./lock-lease"
 import { publishLockRecord } from "./lock-publish"
 import { removeLockRecordIfUnchanged, type LockReclaimDeps, type LockReclaimOutcome } from "./lock-reclaim"
-import { buildLockRecord, forgetLockRecord, isLockRecordStale, markLockRecordReleased, readLockRecord } from "./lock-record"
+import {
+  buildLockRecord,
+  forgetLockRecord,
+  isLockRecordStale,
+  markLockRecordReleased,
+  readLockRecord,
+} from "./lock-record"
 
 export { type LockLease, LockLeaseLostError } from "./lock-lease"
 export { assertRetryableLockOpenError } from "./lock-publish"
@@ -71,7 +77,7 @@ export async function withLock<T>(
 
 export async function detectStaleLock(lockPath: string, staleAfterMs: number): Promise<boolean> {
   const observed = await readLockRecord(lockPath)
-  return observed !== null && await isLockRecordStale(observed, staleAfterMs)
+  return observed !== null && (await isLockRecordStale(observed, staleAfterMs))
 }
 
 export async function reapStaleLock(
@@ -81,7 +87,7 @@ export async function reapStaleLock(
 ): Promise<LockReclaimOutcome> {
   const observed = await readLockRecord(lockPath)
   if (observed === null) return "absent"
-  if (!await isLockRecordStale(observed, staleAfterMs)) return "changed"
+  if (!(await isLockRecordStale(observed, staleAfterMs))) return "changed"
   return await removeLockRecordIfUnchanged(lockPath, observed.content, staleAfterMs, deps)
 }
 

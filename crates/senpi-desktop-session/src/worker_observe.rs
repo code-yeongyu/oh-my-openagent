@@ -11,7 +11,7 @@ use crate::screen_notes::op_display;
 use crate::request::{Op, Response};
 use crate::session::guarded;
 use crate::worker::Worker;
-use crate::worker_capture::capture_response;
+use crate::worker_capture::{capture_response, with_identity};
 
 impl Worker {
     pub(crate) fn observe(
@@ -35,9 +35,11 @@ impl Worker {
         let snapshot = ax::snapshot(backend, &mut registry, &window, &options)?;
         check_cancel(cancelled)?;
         let legacy_capture = geometry.is_legacy_capture();
+        let identity = self.object_identity(&geometry);
         let mut frames = self.frames.clone();
         let frame_id = frames.record(&target, geometry);
-        let Response::Capture(capture) = capture_response(screenshot, &target, frame_id, None, window.is_on_screen, legacy_capture) else {
+        let captured = capture_response(screenshot, &target, frame_id, None, window.is_on_screen, legacy_capture);
+        let Response::Capture(capture) = with_identity(captured, identity) else {
             return Err(DesktopError::internal("capture response has no frame"));
         };
         self.refresh_capabilities();

@@ -8,9 +8,7 @@ type MockApi = {
   restore: () => unknown
 }
 
-type ModuleLoadResult =
-  | { ok: true; value: unknown }
-  | { ok: false; error: Error }
+type ModuleLoadResult = { ok: true; value: unknown } | { ok: false; error: Error }
 
 type ModuleSnapshot = {
   restoreSpecifier: string
@@ -145,9 +143,11 @@ export function installModuleMockLifecycle(
   const getCallerUrl = options.getCallerUrl ?? defaultGetCallerUrl
   const resolveSpecifier = options.resolveSpecifier ?? defaultResolveSpecifier
   const loadUnmockedModule = options.loadUnmockedModule ?? defaultLoadUnmockedModule
-  const shouldPreserveActiveMocksOnRestore = options.shouldPreserveActiveMocksOnRestore ?? (() => {
-    return new Error().stack?.includes("/test-setup.ts") ?? false
-  })
+  const shouldPreserveActiveMocksOnRestore =
+    options.shouldPreserveActiveMocksOnRestore ??
+    (() => {
+      return new Error().stack?.includes("/test-setup.ts") ?? false
+    })
   const preserveOwners = new Set<string>()
   let handledPreserveCleanup = false
 

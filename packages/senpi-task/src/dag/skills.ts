@@ -105,10 +105,12 @@ function materializeNode(
  */
 export function createDagSkillMaterializer(options: DagSkillMaterializerOptions): DagMaterializeSkills {
   const cwd = options.cwd
-  const loadSkills = options.loadSkills ?? createFsSkillLoader({
-    ...(options.homeDir === undefined ? {} : { homeDir: options.homeDir }),
-    ...(options.extraDirs === undefined ? {} : { extraDirs: options.extraDirs }),
-  })
+  const loadSkills =
+    options.loadSkills ??
+    createFsSkillLoader({
+      ...(options.homeDir === undefined ? {} : { homeDir: options.homeDir }),
+      ...(options.extraDirs === undefined ? {} : { extraDirs: options.extraDirs }),
+    })
   return ({ runId, definition, at }) => {
     const nodes: DagNodeSkillMaterialization[] = []
     const diagnostics: DagDiagnostic[] = []

@@ -41,7 +41,10 @@ describe("checkForLegacyPluginEntry", () => {
 
     try {
       // given
-      writeFileSync(join(testConfigDir, "opencode.json"), JSON.stringify({ plugin: ["oh-my-opencode@3.10.0"] }, null, 2))
+      writeFileSync(
+        join(testConfigDir, "opencode.json"),
+        JSON.stringify({ plugin: ["oh-my-opencode@3.10.0"] }, null, 2),
+      )
 
       // when
       const result = checkForLegacyPluginEntry(testConfigDir)

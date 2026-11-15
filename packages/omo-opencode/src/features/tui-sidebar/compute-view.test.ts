@@ -1,14 +1,7 @@
 import { describe, expect, it } from "bun:test"
 
 import { computeView, viewKey } from "./compute-view"
-import type {
-  AgentsState,
-  ConfigState,
-  JobBoardState,
-  LoopState,
-  RosterState,
-  SidebarView,
-} from "./state-types"
+import type { AgentsState, ConfigState, JobBoardState, LoopState, RosterState, SidebarView } from "./state-types"
 
 const validConfig: ConfigState = { kind: "valid" }
 const invalidConfig: ConfigState = {

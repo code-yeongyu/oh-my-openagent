@@ -224,11 +224,7 @@ describe("event-bridge session_shutdown", () => {
   it("#given a session_shutdown with a reason and a captured session id #when the event fires #then it suspends with parentSessionId and reason", async () => {
     const { pi, calls, order } = wireHarness("parent-session")
 
-    await pi.dispatch(
-      "session_shutdown",
-      { type: "session_shutdown", reason: "quit" } as SessionShutdownEvent,
-      {},
-    )
+    await pi.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" } as SessionShutdownEvent, {})
 
     expect(order).toEqual([
       "capture",
@@ -253,11 +249,7 @@ describe("event-bridge session_shutdown", () => {
       const { pi, calls } = wireHarness("child-session", { stateDir: "/stores/proj/senpi-task" })
       Object.assign(pi, { sessionContext: { role: "child", task_id: "st_0000c0de", state_dir: stateDir } })
 
-      await pi.dispatch(
-        "session_shutdown",
-        { type: "session_shutdown", reason: "quit" } as SessionShutdownEvent,
-        {},
-      )
+      await pi.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" } as SessionShutdownEvent, {})
 
       expect(calls).toEqual([{ parentSessionId: "child-session", reason: "quit", ...expected }])
     })
@@ -266,20 +258,9 @@ describe("event-bridge session_shutdown", () => {
   it("#given a session_shutdown with no captured session id and no live handles #when the event fires #then nothing is suspended and nothing is warned", async () => {
     const { pi, calls, order, warnings } = wireHarness(undefined)
 
-    await pi.dispatch(
-      "session_shutdown",
-      { type: "session_shutdown", reason: "reload" } as SessionShutdownEvent,
-      {},
-    )
+    await pi.dispatch("session_shutdown", { type: "session_shutdown", reason: "reload" } as SessionShutdownEvent, {})
 
-    expect(order).toEqual([
-      "capture",
-      "transition",
-      "clearUi",
-      "dispose",
-      "leadShutdown",
-      "resumptionShutdown:0",
-    ])
+    expect(order).toEqual(["capture", "transition", "clearUi", "dispose", "leadShutdown", "resumptionShutdown:0"])
     expect(calls).toHaveLength(0)
     expect(warnings).toHaveLength(0)
   })
@@ -293,11 +274,7 @@ describe("event-bridge session_shutdown", () => {
       resident: ["task-owned", "task-sibling"],
     })
 
-    await pi.dispatch(
-      "session_shutdown",
-      { type: "session_shutdown", reason: "reload" } as SessionShutdownEvent,
-      {},
-    )
+    await pi.dispatch("session_shutdown", { type: "session_shutdown", reason: "reload" } as SessionShutdownEvent, {})
 
     expect(order.at(-1)).toBe("suspend")
     expect(calls).toEqual([{ parentSessionId: "parent-a", reason: "reload" }])

@@ -175,19 +175,13 @@ describe("createSessionStateStore", () => {
     // given
     const sessionID = "ses-no-todo-change-stagnation"
     const state = sessionStateStore.getState(sessionID)
-    const todos = [
-      { id: "1", content: "Task 1", status: "pending", priority: "high" },
-    ]
+    const todos = [{ id: "1", content: "Task 1", status: "pending", priority: "high" }]
 
     sessionStateStore.trackContinuationProgress(sessionID, 1, todos)
     state.awaitingPostInjectionProgressCheck = true
 
     // when
-    const progressUpdate = sessionStateStore.trackContinuationProgress(
-      sessionID,
-      1,
-      todos,
-    )
+    const progressUpdate = sessionStateStore.trackContinuationProgress(sessionID, 1, todos)
 
     // then
     expect(progressUpdate.hasProgressed).toBe(false)
@@ -199,9 +193,7 @@ describe("createSessionStateStore", () => {
     // given
     const sessionID = "ses-directive-response-block"
     const state = sessionStateStore.getState(sessionID)
-    const todos = [
-      { id: "1", content: "Task 1", status: "pending", priority: "high" },
-    ]
+    const todos = [{ id: "1", content: "Task 1", status: "pending", priority: "high" }]
     sessionStateStore.trackContinuationProgress(sessionID, 1, todos)
     state.awaitingPostInjectionProgressCheck = true
     state.continuationResponseObserved = true
@@ -218,9 +210,7 @@ describe("createSessionStateStore", () => {
     // given
     const sessionID = "ses-user-interruption-priority"
     const state = sessionStateStore.getState(sessionID)
-    const todos = [
-      { id: "1", content: "Task 1", status: "pending", priority: "high" },
-    ]
+    const todos = [{ id: "1", content: "Task 1", status: "pending", priority: "high" }]
     sessionStateStore.trackContinuationProgress(sessionID, 1, todos)
     state.awaitingPostInjectionProgressCheck = true
     state.continuationResponseObserved = true

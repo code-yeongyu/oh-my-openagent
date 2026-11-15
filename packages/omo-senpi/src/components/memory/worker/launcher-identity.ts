@@ -11,8 +11,9 @@ export function describeReflectionLauncher(input: {
   readonly pid: number
   readonly sessionId?: string
 }): ReflectionLauncher {
-  const runtimeRoot = [input.env.OMO_PACKAGE_DIR, input.env.SENPI_PACKAGE_DIR, input.env.PI_PACKAGE_DIR]
-    .find((value) => value !== undefined && value.trim().length > 0)
+  const runtimeRoot = [input.env.OMO_PACKAGE_DIR, input.env.SENPI_PACKAGE_DIR, input.env.PI_PACKAGE_DIR].find(
+    (value) => value !== undefined && value.trim().length > 0,
+  )
   const brandedRuntime = readBrandedRuntime(input.env.SENPI_BRAND)
   const runtime = brandedRuntime ?? basename(runtimeRoot ?? input.execPath)
   return {

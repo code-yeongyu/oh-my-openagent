@@ -58,7 +58,11 @@ export const RELOAD_CLEANUP_HOOK_TIMEOUT_MS = DEFAULT_BUDGET_MS + 5_000
 // (`<root>/shards/p-<key>.sock` plus its bind siblings) still fits `sun_path` there. A longer parent, such as
 // darwin's ~48-byte /var/folders/.../T, falls back to /tmp so the host still binds inside the root (#10846).
 export function reloadRootParent(base: string = tmpdir()): string {
-  return shortSocketParent(shardSocketPathForKey(join("omo-ulw-reload-XXXXXX", "shards"), "p", "0".repeat(16)), base, validateBindPath)
+  return shortSocketParent(
+    shardSocketPathForKey(join("omo-ulw-reload-XXXXXX", "shards"), "p", "0".repeat(16)),
+    base,
+    validateBindPath,
+  )
 }
 
 export function ownsHostSocket(launchArgs: readonly string[] | undefined, root: string): boolean {
@@ -101,7 +105,9 @@ export async function cleanUpReloadRun(run: ReloadCleanup): Promise<void> {
     for (const shutdown of run.shutdowns) {
       const settled = shutdown().then(
         () => undefined,
-        (error: unknown) => { errors.push(error) },
+        (error: unknown) => {
+          errors.push(error)
+        },
       )
       if (!(await settlesBy(settled, shutdownsBy, clock))) {
         errors.push(new Error("packaged reload plugin shutdown did not settle in time"))

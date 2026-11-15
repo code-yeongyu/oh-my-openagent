@@ -13,7 +13,7 @@ export interface MenuItem {
 }
 
 /**
- * The phone header menu: a toggle that shows under 860 px, where the section links hide, and a sheet below the pill
+ * The phone header menu: a toggle that shows under 1000 px, where the section links hide, and a sheet below the pill
  * with every link plus Install. Escape closes it and returns focus to the toggle when focus was inside.
  */
 export function MobileMenu({

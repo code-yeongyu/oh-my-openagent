@@ -86,7 +86,6 @@ describe("evaluateInvocationGuard", () => {
     expect(verdict.kind).toBe("deny")
   })
 
-
   test("#given a user request without a plan artifact #when plan-reviewer is evaluated #then it denies naming the plan artifact", () => {
     // given / when
     const verdict = evaluateInvocationGuard("plan-reviewer", stateOf({ requested: ["ulw-plan"] }))
@@ -178,7 +177,10 @@ describe("evaluateInvocationGuard - denial names the real unlock path", () => {
 
   test("#given ulw-execute already invoked #when plan-reviewer is evaluated #then the terminal denial does not advertise an unlock", () => {
     // given / when
-    const verdict = evaluateInvocationGuard("plan-reviewer", stateOf({ invoked: ["ulw-execute"], requested: ["ulw-plan"], artifact: true }))
+    const verdict = evaluateInvocationGuard(
+      "plan-reviewer",
+      stateOf({ invoked: ["ulw-execute"], requested: ["ulw-plan"], artifact: true }),
+    )
 
     // then
     expect(verdict.kind).toBe("deny")

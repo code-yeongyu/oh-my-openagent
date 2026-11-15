@@ -8,7 +8,12 @@ import { existsSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { literalConfigValue } from "./auth-store.js"
-import { convertPlaceholders, opencodeConfigSources, readOpencodeSection, unconvertedPlaceholder } from "./setup-opencode-assets.js"
+import {
+  convertPlaceholders,
+  opencodeConfigSources,
+  readOpencodeSection,
+  unconvertedPlaceholder,
+} from "./setup-opencode-assets.js"
 import providerMap from "./provider-map.json" with { type: "json" }
 
 // The AI SDK package an OpenCode provider names decides its wire protocol; each engine api id here
@@ -78,13 +83,17 @@ function convertKey(id, entry, opencodeAuth, notices) {
   if (inline !== undefined) {
     const key = configValue(inline)
     if (key !== undefined) return { key, source: "opencode config apiKey" }
-    notices.push(`NOTICE opencode: ${kind} ${id} apiKey uses a {file:...} or {env:...} placeholder omo cannot express; its key was not imported - start omo and run /login ${id}`)
+    notices.push(
+      `NOTICE opencode: ${kind} ${id} apiKey uses a {file:...} or {env:...} placeholder omo cannot express; its key was not imported - start omo and run /login ${id}`,
+    )
     return undefined
   }
   const stored = opencodeAuth[id]
-  if (stored?.type === "api" && text(stored.key) !== undefined) return { key: literalConfigValue(stored.key), source: "opencode auth.json" }
+  if (stored?.type === "api" && text(stored.key) !== undefined)
+    return { key: literalConfigValue(stored.key), source: "opencode auth.json" }
   const names = Array.isArray(entry.env) ? entry.env : []
-  if (names.length === 1 && ENV_NAME.test(names[0])) return { key: `\${${names[0]}}`, source: `environment variable ${names[0]}` }
+  if (names.length === 1 && ENV_NAME.test(names[0]))
+    return { key: `\${${names[0]}}`, source: `environment variable ${names[0]}` }
   return undefined
 }
 
@@ -99,7 +108,9 @@ function convertModel(provider, id, entry, notices) {
   const npm = text(source.provider?.npm)
   const api = npm === undefined ? provider.api : API_BY_NPM[npm]
   if (api === undefined) {
-    notices.push(`NOTICE opencode: model ${provider.id}/${id} uses npm package ${npm}, which omo has no API adapter for; not imported`)
+    notices.push(
+      `NOTICE opencode: model ${provider.id}/${id} uses npm package ${npm}, which omo has no API adapter for; not imported`,
+    )
     return undefined
   }
   // OpenCode sends every model to `options.baseURL`, else to the model's own `provider.api`, else to
@@ -108,10 +119,14 @@ function convertModel(provider, id, entry, notices) {
   const baseURL = provider.optionsBaseURL ?? text(source.provider?.api) ?? provider.baseURL
   const baseUrl = fixedUrl(baseURL) === undefined ? undefined : engineBaseUrl(api, baseURL)
   if (baseUrl === undefined) {
-    notices.push(`NOTICE opencode: model ${provider.id}/${id} baseURL ${baseURL} is not a fixed URL omo's ${api} client can use; not imported`)
+    notices.push(
+      `NOTICE opencode: model ${provider.id}/${id} baseURL ${baseURL} is not a fixed URL omo's ${api} client can use; not imported`,
+    )
     return undefined
   }
-  const input = Array.isArray(source.modalities?.input) ? source.modalities.input.filter((kind) => MODEL_INPUTS.has(kind)) : []
+  const input = Array.isArray(source.modalities?.input)
+    ? source.modalities.input.filter((kind) => MODEL_INPUTS.has(kind))
+    : []
   return {
     id,
     // OpenCode's model `id` is the id sent to the API when the key is an alias; the engine's
@@ -143,14 +158,18 @@ function convertProvider(id, entry, context) {
   const { notices } = context
   const kind = isPlainObject(entry) && entry.catalog === true ? "catalog provider" : "custom provider"
   if (context.builtin.has(id)) {
-    notices.push(`NOTICE opencode: provider ${id} is one omo already serves; its opencode overrides (baseURL, models) are not imported - set them in models.json by hand if you need them`)
+    notices.push(
+      `NOTICE opencode: provider ${id} is one omo already serves; its opencode overrides (baseURL, models) are not imported - set them in models.json by hand if you need them`,
+    )
     return undefined
   }
   if (!isPlainObject(entry)) return undefined
   const npm = text(entry.npm) ?? DEFAULT_NPM
   const api = API_BY_NPM[npm]
   if (api === undefined) {
-    notices.push(`NOTICE opencode: ${kind} ${id} uses npm package ${npm}, which omo has no API adapter for; not imported`)
+    notices.push(
+      `NOTICE opencode: ${kind} ${id} uses npm package ${npm}, which omo has no API adapter for; not imported`,
+    )
     return undefined
   }
   const baseURL = text(entry.options?.baseURL) ?? text(entry.api)
@@ -160,16 +179,27 @@ function convertProvider(id, entry, context) {
   }
   const baseUrl = engineBaseUrl(api, baseURL)
   if (baseUrl === undefined) {
-    notices.push(`NOTICE opencode: ${kind} ${id} baseURL ${baseURL} does not end in /v1, which omo's Anthropic client needs; not imported`)
+    notices.push(
+      `NOTICE opencode: ${kind} ${id} baseURL ${baseURL} does not end in /v1, which omo's Anthropic client needs; not imported`,
+    )
     return undefined
   }
   const headers = convertHeaders(entry.options?.headers)
   if (headers === undefined) {
-    notices.push(`NOTICE opencode: ${kind} ${id} has a header with a {file:...} or {env:...} placeholder omo cannot express; not imported`)
+    notices.push(
+      `NOTICE opencode: ${kind} ${id} has a header with a {file:...} or {env:...} placeholder omo cannot express; not imported`,
+    )
     return undefined
   }
   const models = Object.entries(isPlainObject(entry.models) ? entry.models : {})
-    .map(([modelId, model]) => convertModel({ id, api, baseURL, baseUrl, optionsBaseURL: text(entry.options?.baseURL) }, modelId, model, notices))
+    .map(([modelId, model]) =>
+      convertModel(
+        { id, api, baseURL, baseUrl, optionsBaseURL: text(entry.options?.baseURL) },
+        modelId,
+        model,
+        notices,
+      ),
+    )
     .filter((model) => model !== undefined)
   if (models.length === 0) {
     notices.push(`NOTICE opencode: ${kind} ${id} declares no models omo can use; not imported`)
@@ -206,7 +236,8 @@ function readOpencodeCatalog(home, env, notices) {
 function overlay(base, own) {
   if (!isPlainObject(base) || !isPlainObject(own)) return own
   const merged = { ...base }
-  for (const [key, value] of Object.entries(own)) merged[key] = isPlainObject(value) && isPlainObject(base[key]) ? overlay(base[key], value) : value
+  for (const [key, value] of Object.entries(own))
+    merged[key] = isPlainObject(value) && isPlainObject(base[key]) ? overlay(base[key], value) : value
   return merged
 }
 
@@ -214,7 +245,9 @@ function overlay(base, own) {
 // models.dev marks deprecated stay behind, as OpenCode hides them.
 function catalogEntry(entry) {
   if (!isPlainObject(entry) || !isPlainObject(entry.models)) return undefined
-  const models = Object.fromEntries(Object.entries(entry.models).filter(([, model]) => isPlainObject(model) && model.status !== "deprecated"))
+  const models = Object.fromEntries(
+    Object.entries(entry.models).filter(([, model]) => isPlainObject(model) && model.status !== "deprecated"),
+  )
   return { name: entry.name, npm: entry.npm, api: entry.api, env: entry.env, models, catalog: true }
 }
 
@@ -227,11 +260,15 @@ function withCatalog(config, opencodeAuth, builtin, home, env, notices) {
   if (ids.length === 0) return config
   // Only an id that has no endpoint of its own depends on the catalog; a broken cache is worth a
   // warning for that one alone, while a block with its own endpoint still extends the catalog when found.
-  const ownEndpoint = (id) => isPlainObject(config[id]) && (text(config[id].options?.baseURL) !== undefined || text(config[id].api) !== undefined)
+  const ownEndpoint = (id) =>
+    isPlainObject(config[id]) && (text(config[id].options?.baseURL) !== undefined || text(config[id].api) !== undefined)
   const catalog = readOpencodeCatalog(home, env, ids.some((id) => !ownEndpoint(id)) ? notices : [])
   if (catalog === undefined) {
     const missing = ids.filter((id) => !Object.hasOwn(config, id))
-    if (missing.length > 0) notices.push(`NOTICE opencode: no models.dev catalog cache found, so ${missing.join(", ")} could not be described - if opencode serves them, run opencode once, then omo setup again`)
+    if (missing.length > 0)
+      notices.push(
+        `NOTICE opencode: no models.dev catalog cache found, so ${missing.join(", ")} could not be described - if opencode serves them, run opencode once, then omo setup again`,
+      )
     return config
   }
   const merged = { ...config }
@@ -268,5 +305,9 @@ export function planOpencodeProviders(options = {}) {
     if (converted) providers.push(converted)
     else skipped.push(id)
   }
-  return { providers: providers.sort((left, right) => left.id.localeCompare(right.id)), skipped: skipped.sort(), notices }
+  return {
+    providers: providers.sort((left, right) => left.id.localeCompare(right.id)),
+    skipped: skipped.sort(),
+    notices,
+  }
 }

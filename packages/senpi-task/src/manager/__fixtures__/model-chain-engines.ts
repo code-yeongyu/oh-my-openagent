@@ -1,6 +1,7 @@
 import { type ChildProcess, spawn } from "node:child_process"
 import { copyFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
+import { Transform } from "node:stream"
 import { fileURLToPath } from "node:url"
 
 import { RpcHostRunner } from "../../runners/rpc-host"
@@ -15,6 +16,11 @@ import { ENGINE_MODELS, startHttpProviders } from "./model-chain-http"
 
 const HOST_READY_LINE = "senpi rpc listening on"
 const HOST_READY_TIMEOUT_MS = 30_000
+// #12638: a process child gets its designated chain by `set_retry_fallback` within a deadline (10 s by default),
+// and past it the first prompt goes out on the engine's own fallback settings, which here name the parent's
+// model. A loaded host that took longer to start the child recorded that extra call. The cases run with a 60 s
+// timeout, so the chain gets nearly all of it: they wait for the engine's answer instead of racing a window.
+const CHAIN_DEADLINE_MS = 50_000
 
 export type EngineRunnerKind = "process" | "host"
 
@@ -22,6 +28,8 @@ export type EngineInput = {
   readonly root: string
   readonly settingsPath: string
   readonly scripts: Readonly<Record<string, readonly Step[]>>
+  /** Capabilities the per-child engine's `get_protocol_info` answer drops: the real engine as an older one. */
+  readonly hiddenCapabilities?: readonly string[]
 }
 
 export type EngineRunner = {
@@ -47,10 +55,24 @@ export async function startEngineRunner(kind: EngineRunnerKind, input: EngineInp
   const providers = startHttpProviders(input.scripts)
   copyFileSync(input.settingsPath, join(agentDir, "settings.json"))
   writeFileSync(join(agentDir, "models.json"), providers.modelsJson)
-  writeFileSync(join(agentDir, "auth.json"), JSON.stringify(Object.fromEntries(Object.keys(ENGINE_MODELS).map((provider) => [provider, { type: "api_key", key: "test-key" }]))), { mode: 0o600 })
-  const env = { PATH: process.env["PATH"] ?? "", HOME: home, SENPI_CODING_AGENT_DIR: agentDir, BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0" }
+  writeFileSync(
+    join(agentDir, "auth.json"),
+    JSON.stringify(
+      Object.fromEntries(
+        Object.keys(ENGINE_MODELS).map((provider) => [provider, { type: "api_key", key: "test-key" }]),
+      ),
+    ),
+    { mode: 0o600 },
+  )
+  const env = {
+    PATH: process.env["PATH"] ?? "",
+    HOME: home,
+    SENPI_CODING_AGENT_DIR: agentDir,
+    BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
+  }
   try {
-    const engine = kind === "process" ? processEngine(env) : await hostEngine(input.root, env)
+    const engine =
+      kind === "process" ? processEngine(env, input.hiddenCapabilities ?? []) : await hostEngine(input.root, env)
     return {
       runner: engine.runner,
       calls: providers.calls,
@@ -67,14 +89,26 @@ export async function startEngineRunner(kind: EngineRunnerKind, input: EngineInp
 
 type Engine = Omit<EngineRunner, "calls">
 
-function processEngine(env: Readonly<Record<string, string>>): Engine {
+function processEngine(env: Readonly<Record<string, string>>, hiddenCapabilities: readonly string[]): Engine {
   const children: ChildProcess[] = []
+  const warnings: string[] = []
   const runner = new RpcProcessRunner({
     modelAdmission: async () => {},
+    fallbackChainDeadlineMs: CHAIN_DEADLINE_MS,
+    onWarning: (message) => {
+      warnings.push(message)
+    },
     buildSpawn: (spec) => buildRpcSpawn(spec, { parentEnv: env, resolveSenpiExecutable: () => null }),
     spawnChild: (descriptor) => {
-      const child = spawn(descriptor.command, [...descriptor.args], { cwd: descriptor.cwd, env: descriptor.env, stdio: ["pipe", "pipe", "pipe"] })
+      const child = spawn(descriptor.command, [...descriptor.args], {
+        cwd: descriptor.cwd,
+        env: descriptor.env,
+        stdio: ["pipe", "pipe", "pipe"],
+      })
       children.push(child)
+      if (hiddenCapabilities.length > 0 && child.stdout !== null) {
+        Object.defineProperty(child, "stdout", { value: child.stdout.pipe(withoutCapabilities(hiddenCapabilities)) })
+      }
       return child
     },
   })
@@ -84,11 +118,53 @@ function processEngine(env: Readonly<Record<string, string>>): Engine {
       await runner.settleTeardowns()
       // A finished child stays resident; it must be gone before the world's directories are removed.
       await Promise.all(children.splice(0).map(stopChild))
+      // A chain that was not applied makes any model-call assertion meaningless, so it fails the case by name.
+      if (warnings.length > 0) throw new Error(`process runner warned: ${warnings.join("; ")}`)
     },
   }
 }
 
-async function hostEngine(root: string, engineEnv: Readonly<Record<string, string>>): Promise<Engine> {
+/** Rewrites each `get_protocol_info` response line without `hidden`; every other line passes unchanged. */
+function withoutCapabilities(hidden: readonly string[]): Transform {
+  let pending = ""
+  const rewrite = (line: string): string => {
+    try {
+      const frame: unknown = JSON.parse(line)
+      if (typeof frame !== "object" || frame === null || Reflect.get(frame, "command") !== "get_protocol_info")
+        return line
+      const data: unknown = Reflect.get(frame, "data")
+      if (typeof data !== "object" || data === null) return line
+      const capabilities: unknown = Reflect.get(data, "capabilities")
+      if (!Array.isArray(capabilities)) return line
+      return JSON.stringify({
+        ...frame,
+        data: { ...data, capabilities: capabilities.filter((entry) => !hidden.includes(entry)) },
+      })
+    } catch {
+      return line
+    }
+  }
+  return new Transform({
+    transform(chunk: Buffer, _encoding, done) {
+      pending += chunk.toString()
+      const lines = pending.split("\n")
+      pending = lines.pop() ?? ""
+      done(null, lines.map((line) => `${rewrite(line)}\n`).join(""))
+    },
+    flush(done) {
+      done(null, pending.length > 0 ? rewrite(pending) : "")
+    },
+  })
+}
+
+export type SocketHost = {
+  readonly socket: string
+  readonly pid: number
+  stop(): Promise<void>
+}
+
+/** A real multi-session senpi host process listening on a short socket, with no extensions or skills. */
+export async function startSocketHost(root: string, engineEnv: Readonly<Record<string, string>>): Promise<SocketHost> {
   // A socket host advertises `extension_events` (a capability omo requires of a task host) only for this client set.
   const env = { ...engineEnv, SENPI_RPC_CLIENT_CAPABILITIES: "extension_events" }
   const { dir: socketDir, socket } = shortSocketDir("model-chain-host", "h.sock")
@@ -108,6 +184,11 @@ async function hostEngine(root: string, engineEnv: Readonly<Record<string, strin
     await stop()
     throw error
   }
+  return { socket, pid: host.pid ?? 0, stop }
+}
+
+async function hostEngine(root: string, engineEnv: Readonly<Record<string, string>>): Promise<Engine> {
+  const { socket, pid, stop } = await startSocketHost(root, engineEnv)
   const clients: HostSessionClient[] = []
   const runner = new RpcHostRunner({
     createClient: (socketPath) => {
@@ -122,12 +203,17 @@ async function hostEngine(root: string, engineEnv: Readonly<Record<string, strin
     closeGraceMs: 50,
     modelAdmission: () => Promise.resolve(),
     storeDir: join(root, "host-store"),
-    shardResolver: () => ({ socket, shard: { kind: "p", key: "0000000000000000", ownerSessionId: "root-0", inherited: false }, root: "primary" }),
+    shardResolver: () => ({
+      socket,
+      shard: { kind: "p", key: "0000000000000000", ownerSessionId: "root-0", inherited: false },
+      root: "primary",
+    }),
     ownHostSocket: () => undefined,
     insideHost: () => false,
     onNotice: () => undefined,
     shardEvents: {},
-    ensureDaemon: () => Promise.resolve({ action: "reuse", reason: "compatible", socket, pid: host.pid ?? 0, reused: true, upgradeable: true }),
+    ensureDaemon: () =>
+      Promise.resolve({ action: "reuse", reason: "compatible", socket, pid, reused: true, upgradeable: true }),
   })
   return {
     runner: createRpcManagedRunner(runner),
@@ -143,7 +229,10 @@ async function hostEngine(root: string, engineEnv: Readonly<Record<string, strin
 function hostListening(host: ChildProcess): Promise<void> {
   const { promise, resolve, reject } = Promise.withResolvers<void>()
   let stderr = ""
-  const timer = setTimeout(() => reject(new Error(`senpi host did not listen within ${HOST_READY_TIMEOUT_MS} ms: ${stderr}`)), HOST_READY_TIMEOUT_MS)
+  const timer = setTimeout(
+    () => reject(new Error(`senpi host did not listen within ${HOST_READY_TIMEOUT_MS} ms: ${stderr}`)),
+    HOST_READY_TIMEOUT_MS,
+  )
   host.stderr?.on("data", (chunk: Buffer) => {
     stderr += chunk.toString()
     if (stderr.includes(HOST_READY_LINE)) resolve()

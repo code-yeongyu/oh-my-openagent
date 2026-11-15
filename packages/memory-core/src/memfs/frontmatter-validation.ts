@@ -55,7 +55,8 @@ export function describeHeaderGrammarViolation(headerText: string): string | nul
   let description: string | undefined
   for (const line of headerText.split("\n")) {
     if (line.trim().length === 0) continue
-    if (/^[ \t]/.test(line)) return `indented continuation lines are not allowed (single-line scalars only): ${line.trim()}`
+    if (/^[ \t]/.test(line))
+      return `indented continuation lines are not allowed (single-line scalars only): ${line.trim()}`
     if (line.startsWith("#")) return `comment lines are not allowed in frontmatter: ${line}`
     const parsed = HEADER_LINE_RE.exec(line)
     if (parsed === null) return `not a 'key: value' line: ${line}`

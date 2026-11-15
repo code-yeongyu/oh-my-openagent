@@ -28,7 +28,11 @@ describe("memory tool execution", () => {
     ].join("\n")
 
     // when
-    const result = await applyPatchTool.execute("call-1", { command: "apply_patch", reason: "Refine coding preferences", input })
+    const result = await applyPatchTool.execute("call-1", {
+      command: "apply_patch",
+      reason: "Refine coding preferences",
+      input,
+    })
 
     // then
     expect(result.isError).toBeUndefined()
@@ -43,7 +47,11 @@ describe("memory tool execution", () => {
     const [applyPatchTool] = createMemoryTools(() => fixture.context)
 
     // when
-    const result = await applyPatchTool.execute("call-1", { command: "apply_patch", reason: "Broken", input: "definitely not a patch" })
+    const result = await applyPatchTool.execute("call-1", {
+      command: "apply_patch",
+      reason: "Broken",
+      input: "definitely not a patch",
+    })
 
     // then
     expect(result.isError).toBe(true)

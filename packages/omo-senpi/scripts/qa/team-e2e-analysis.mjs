@@ -1,13 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
-import {
-  findResults,
-  inboxCounts,
-  memberInboxDir,
-  memberTaskId,
-  sessionContainsText,
-} from "./team-e2e-support.mjs"
+import { findResults, inboxCounts, memberInboxDir, memberTaskId, sessionContainsText } from "./team-e2e-support.mjs"
 
 export function analyzeMain(run, sandbox, obsDir, observedEvidence = undefined) {
   const create = findResults(run.events, "team_create")[0]
@@ -46,17 +40,18 @@ export function injectionEvidence(sandbox, runId, quickTask, leadMessage, obsDir
     quickTask,
     leadMessage,
     memberEnvelopeEchoed:
-      quickTask !== undefined
-      && leadMessage !== undefined
-      && sessionContainsText(sandbox, quickTask, leadMessage),
-    memberToLeadInjected:
-      existsSync(leadReceipt)
-      && readFileSync(leadReceipt, "utf8").includes("QUICK2LEAD"),
-    leadInbox: runId === undefined ? { unread: 0, reserved: 0, processed: 0 } : inboxCounts(memberInboxDir(sandbox, runId, "lead")),
+      quickTask !== undefined && leadMessage !== undefined && sessionContainsText(sandbox, quickTask, leadMessage),
+    memberToLeadInjected: existsSync(leadReceipt) && readFileSync(leadReceipt, "utf8").includes("QUICK2LEAD"),
+    leadInbox:
+      runId === undefined
+        ? { unread: 0, reserved: 0, processed: 0 }
+        : inboxCounts(memberInboxDir(sandbox, runId, "lead")),
   }
 }
 
 export function verdict(checks) {
-  const failed = Object.entries(checks).filter(([, value]) => value !== true).map(([name]) => name)
+  const failed = Object.entries(checks)
+    .filter(([, value]) => value !== true)
+    .map(([name]) => name)
   return { result: failed.length === 0 ? "PASS" : "FAIL", failed }
 }

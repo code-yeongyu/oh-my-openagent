@@ -70,10 +70,20 @@ describe("lifecycle revivals racing the runtime-fallback close", () => {
         cwd: project,
         hostPid: 11_001,
         runners: { process: runner, "in-process": runner },
-        planner: () => ({ kind: "resolved", plan: { model: "test/first", resolved_model: rung("first"), fallback_models: [rung("next")] } }),
+        planner: () => ({
+          kind: "resolved",
+          plan: { model: "test/first", resolved_model: rung("first"), fallback_models: [rung("next")] },
+        }),
         destruction: { destroyResidentTask: (taskId, cause) => lifecycle.destroyResidentTask(taskId, cause) },
       })
-      const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, config, hostPid: 11_001, registry: createManagerResidencyRegistry(() => manager), signaller: { isAlive: (pid) => pid === 11_001, signal: () => undefined } })
+      const lifecycle = createTaskLifecycle({
+        hostEndpoint: NO_HOST_ENDPOINT,
+        store,
+        config,
+        hostPid: 11_001,
+        registry: createManagerResidencyRegistry(() => manager),
+        signaller: { isAlive: (pid) => pid === 11_001, signal: () => undefined },
+      })
       const task = await manager.start(baseSpec())
       if (task.kind !== "started") throw new Error("expected the task to start")
       const first = runner.handles.get(task.task_id)
@@ -121,14 +131,39 @@ describe("lifecycle revivals racing the runtime-fallback close", () => {
       const host = await harness.fakeHost({ transcripts: true })
       const rpc = harness.runnerOver(host)
       const taskId = scope === undefined ? "st_0000d001" : "st_0000d002"
-      const old = await rpc.start({ task_id: taskId, cwd: project, state_dir: store.stateDir, prompt: "original work", model: "test/first" })
+      const old = await rpc.start({
+        task_id: taskId,
+        cwd: project,
+        state_dir: store.stateDir,
+        prompt: "original work",
+        model: "test/first",
+      })
       const [original] = host.sessions()
       if (original === undefined) throw new Error("expected the failed rung's session")
       const disconnected = host.waitForConnections(0)
       await old.dispose()
       await disconnected
-      seedRecord(store, { task_id: taskId, status: "running", execution_mode: "process", host_pid: 11_001, run_epoch: 1, spawn_spec: { version: 1, cwd: project, prompt: "original work" } })
-      store.mutate(taskId, (record) => ({ ...record, model: "test/next", fallback_handoff_epoch: 1, fallback_closing_child: { host_session: { socket: host.socketPath, routing_id: original.routingId, session_path: original.sessionPath, instance_id: host.instanceId } } }))
+      seedRecord(store, {
+        task_id: taskId,
+        status: "running",
+        execution_mode: "process",
+        host_pid: 11_001,
+        run_epoch: 1,
+        spawn_spec: { version: 1, cwd: project, prompt: "original work" },
+      })
+      store.mutate(taskId, (record) => ({
+        ...record,
+        model: "test/next",
+        fallback_handoff_epoch: 1,
+        fallback_closing_child: {
+          host_session: {
+            socket: host.socketPath,
+            routing_id: original.routingId,
+            session_path: original.sessionPath,
+            instance_id: host.instanceId,
+          },
+        },
+      }))
       const closeEntered = Promise.withResolvers<void>()
       const releaseClose = Promise.withResolvers<void>()
       const manager = createTaskManager({
@@ -141,7 +176,11 @@ describe("lifecycle revivals racing the runtime-fallback close", () => {
         planner: () => ({ kind: "resolved", plan: { model: "test/next" } }),
         destruction: { destroyResidentTask: (id, cause) => lifecycle.destroyResidentTask(id, cause) },
       })
-      const { hostSessionProbe: _fakeProbe, hostSessionClose: _fakeClose, ...deps } = hostLifecycleDeps({ store, hostPid: 22_002, isAlive: (pid) => pid === 22_002 }).deps
+      const {
+        hostSessionProbe: _fakeProbe,
+        hostSessionClose: _fakeClose,
+        ...deps
+      } = hostLifecycleDeps({ store, hostPid: 22_002, isAlive: (pid) => pid === 22_002 }).deps
       const lifecycle = createTaskLifecycle({
         ...deps,
         registry: createManagerResidencyRegistry(() => manager),

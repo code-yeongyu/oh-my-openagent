@@ -80,10 +80,32 @@ use `OmO`. Machine contracts remain explicitly pinned by the other fields:
 `.omo`, `OMO_*`, the `omo` User-Agent/originator, and the lowercase `omo`
 command/package names do not derive from the display spelling.
 
-The update channel matters: omo-ai's `latest` tag is pinned to the deprecated bootstrap
-placeholder forever, so a `latest` lookup would never see a release. The engine therefore reads
-the dist-tag named in the profile. `omo update`, `omo update --self` and the engine's own
-self-update path all answer with the npm command instead of replacing the pinned engine.
+The engine checks the dist-tag named in the profile. `omo update` and `omo update --self`
+update npm/Bun installations through their package manager, keeping the engine pinned to omo.
+The startup notice uses the same product channel.
+
+Standalone release binaries install updates directly. They download the matching platform asset
+from get.omo.dev, falling back to the pinned GitHub release, and require its published
+`SHA256SUMS` entry. On macOS the existing release signature is verified and preserved. A sibling
+file is renamed over the installed launcher, with the previous executable retained until the
+installed `--version` reports the target version; a failed probe restores it. An unwritable
+directory returns `directory_not_writable` without downloading or leaving partial files.
+`--dry-run` and `--print` only print the replacement command.
+
+Symlink launchers retain their link: the updater stages and replaces the resolved target.
+Install locks record the owner's PID, process-start identity and acquisition time. A dead
+owner or a lease older than 15 minutes can be reclaimed under an ownership guard; a
+superseded downloader cannot replace the executable or remove its successor's lock.
+The lock is released even if staging or rollback-file cleanup fails.
+
+Interactive standalone release launches also install updates asynchronously through that same
+verified path, at most once per UTC day for each canonical agent directory. Concurrent launches
+share one daily scheduling marker; explicit `omo update` always bypasses this throttle.
+Background diagnostics go to `auto-update.log` in the canonical agent directory rather than
+the active terminal. Set `OMO_SKIP_VERSION_CHECK=1` or `OMO_OFFLINE=1` to disable the startup check;
+the legacy `SENPI_*` and `PI_*` equivalents are honored too. Maintainer builds, noninteractive
+commands and directly invoked provisioned runtime copies do not auto-update. An already-running
+session keeps its provisioned runtime; the new launcher takes effect on the next launch.
 
 Requires an engine release that understands `SENPI_BRAND`; the pin in `packages/omo-native/package.json`
 must point at that release or newer.

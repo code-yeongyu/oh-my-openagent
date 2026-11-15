@@ -50,13 +50,20 @@ async function approveOnce(deps: DarwinReadDeps): Promise<ApprovalAnswer> {
   const running = deps.cache.inFlight()
   if (running !== null) return running
   const release = await deps.takePromptLock()
-  if (release === null) throw new HelperReadError("pending", "Another omo process is waiting for your keychain approval.")
+  if (release === null)
+    throw new HelperReadError("pending", "Another omo process is waiting for your keychain approval.")
   try {
     return await deps.cache.approve(async () => {
       const reply = await deps.access.call({ verb: "approve", account: deps.account })
       if (reply.missing === true) return { kind: "missing" }
       if (reply.error === "denied") return { kind: "denied" }
-      if (reply.error !== undefined || reply.value === undefined || reply.cdat === undefined || reply.mdat === undefined) throw failure(reply)
+      if (
+        reply.error !== undefined ||
+        reply.value === undefined ||
+        reply.cdat === undefined ||
+        reply.mdat === undefined
+      )
+        throw failure(reply)
       return { kind: "approved", value: reply.value, attributes: { cdat: reply.cdat, mdat: reply.mdat } }
     })
   } finally {
@@ -74,7 +81,12 @@ export async function readThroughHelper(deps: DarwinReadDeps, allowPrompt: boole
   if (reply.error !== undefined) throw failure(reply)
   if (reply.missing === true) return { kind: "missing", reply }
   if (reply.owned === true && reply.value !== undefined)
-    return { kind: "value", value: reply.value, source: reply.marker === true || reply.recover === true ? "owned" : "owned-unmarked", reply }
+    return {
+      kind: "value",
+      value: reply.value,
+      source: reply.marker === true || reply.recover === true ? "owned" : "owned-unmarked",
+      reply,
+    }
 
   const own = await deps.ownSilentGet().catch(() => undefined)
   if (typeof own === "string") return { kind: "value", value: own, source: "own-identity", reply }
@@ -82,7 +94,8 @@ export async function readThroughHelper(deps: DarwinReadDeps, allowPrompt: boole
   const cached = deps.cache.consume({ cdat: reply.cdat, mdat: reply.mdat })
   if (cached !== null) return { kind: "value", value: cached, source: "approved", reply }
 
-  const reloginInstead = reply.partition !== "ours" && reply.partition !== "none" && (deps.row8b ?? ROW_8B_DEFAULT) === "re-login"
+  const reloginInstead =
+    reply.partition !== "ours" && reply.partition !== "none" && (deps.row8b ?? ROW_8B_DEFAULT) === "re-login"
   if (!allowPrompt) {
     if (reloginInstead) return { kind: "missing", reply }
     throw new HelperReadError("pending", "The keychain needs your approval; run an omo command in a terminal.")
@@ -95,7 +108,8 @@ export async function readThroughHelper(deps: DarwinReadDeps, allowPrompt: boole
   // Only here, where this process would otherwise show its one dialog, ask the item's creator to move it first.
   if (deps.handOff !== undefined && (await deps.handOff())) {
     const after = await deps.access.call({ verb: "read", account: deps.account })
-    if (after.owned === true && after.value !== undefined) return { kind: "value", value: after.value, source: "owned", reply: after }
+    if (after.owned === true && after.value !== undefined)
+      return { kind: "value", value: after.value, source: "owned", reply: after }
   }
   const answer = await approveOnce(deps)
   if (answer.kind === "approved") return { kind: "value", value: answer.value, source: "approved", reply }

@@ -19,8 +19,7 @@ import { holdsClaim, rollbackOrDeferred } from "./revive-rollback"
  */
 
 export type HostSessionParkOutcome =
-  | { readonly kind: "revived" }
-  | { readonly kind: "suspended"; readonly reason: HostParkedReason }
+  { readonly kind: "revived" } | { readonly kind: "suspended"; readonly reason: HostParkedReason }
 
 export type HostSessionParkOptions = {
   /** Test seam: observe (and drive) the daemon between the bounded reconcile's attempts. */
@@ -125,15 +124,21 @@ export function retryDeferredHostSessions(
   for (const outcome of outcomes) {
     if (outcome.kind !== "deferred") continue
     const record = context.store.load(outcome.task_id)
-    const scoped = parentSessionId !== undefined && record?.parent_session_id === parentSessionId
-      && SCOPED_RETRY_REASONS.has(outcome.reason ?? "")
+    const scoped =
+      parentSessionId !== undefined &&
+      record?.parent_session_id === parentSessionId &&
+      SCOPED_RETRY_REASONS.has(outcome.reason ?? "")
     const host = DEFERRED_REASONS.has(outcome.reason ?? "") && isHostSessionRecord(record)
     if ((!scoped && !host) || active.has(outcome.task_id)) continue
     active.add(outcome.task_id)
-    void (scoped && parentSessionId !== undefined && outcome.reason !== undefined
-      ? retryDeferredScopedChild(context, outcome.task_id, parentSessionId, outcome.reason)
-      : retryDeferredHostSession(context, outcome.task_id))
-      .catch((error: unknown) => log("senpi-task deferred host session retry failed", { taskId: outcome.task_id, error: String(error) }))
+    void (
+      scoped && parentSessionId !== undefined && outcome.reason !== undefined
+        ? retryDeferredScopedChild(context, outcome.task_id, parentSessionId, outcome.reason)
+        : retryDeferredHostSession(context, outcome.task_id)
+    )
+      .catch((error: unknown) =>
+        log("senpi-task deferred host session retry failed", { taskId: outcome.task_id, error: String(error) }),
+      )
       .finally(() => active.delete(outcome.task_id))
   }
 }
@@ -142,7 +147,13 @@ async function retryDeferredHostSession(context: LifecycleContext, taskId: strin
   for (const backoffMs of context.hostRetry.deferredRetryBackoffMs) {
     await context.hostRetry.wait(backoffMs)
     const fresh = context.store.load(taskId)
-    if (!isHostSessionRecord(fresh) || fresh.status !== "running" || fresh.residency_state !== "rpc_detached" || fresh.killed === true) return
+    if (
+      !isHostSessionRecord(fresh) ||
+      fresh.status !== "running" ||
+      fresh.residency_state !== "rpc_detached" ||
+      fresh.killed === true
+    )
+      return
     context.hostSessionProbe.refresh(fresh.host_session.socket)
     if (await reviveParkedHostSession(context, taskId)) return
   }

@@ -19,10 +19,7 @@ function pruneRecentPromptDispatches(now = Date.now()): void {
   }
 }
 
-export function getRecentPromptDispatch(
-  sessionID: string,
-  dedupeKey: string,
-): RecentPromptDispatch | undefined {
+export function getRecentPromptDispatch(sessionID: string, dedupeKey: string): RecentPromptDispatch | undefined {
   pruneRecentPromptDispatches()
   return recentPromptDispatches.get(recentDispatchKey(sessionID, dedupeKey))
 }

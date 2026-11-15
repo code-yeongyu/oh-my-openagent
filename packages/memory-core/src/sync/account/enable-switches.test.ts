@@ -16,39 +16,70 @@ import { joinAccount, principalOf } from "./join.ts"
 import { openAccountSession } from "./session.ts"
 
 const cleanups: (() => Promise<void>)[] = []
-afterEach(async () => { for (const close of cleanups.splice(0).reverse()) await close() })
+afterEach(async () => {
+  for (const close of cleanups.splice(0).reverse()) await close()
+})
 
 for (const member of ["pinned", "joiner", "resume", "creator"] as const) {
-  test.each([[false, true], [true, false], [false, false]])(`${member} restores both switches from %j`, async (accountOn, deviceOn) => {
+  test.each([
+    [false, true],
+    [true, false],
+    [false, false],
+  ])(`${member} restores both switches from %j`, async (accountOn, deviceOn) => {
     const f = await fixture()
     cleanups.push(f.close)
     if (member === "pinned" || member === "joiner") f.entries.push(await entryOf(f.built.request, f.keyring))
     if (member === "pinned") {
-      const walked = await appendEntries(emptyChain(ACCOUNT, creatorAnchor(ACCOUNT, f.keyring)), f.entries, createRejectionCounter())
+      const walked = await appendEntries(
+        emptyChain(ACCOUNT, creatorAnchor(ACCOUNT, f.keyring)),
+        f.entries,
+        createRejectionCounter(),
+      )
       if (!walked.ok || walked.state.pin === null) throw new Error("fixture pin")
       await pinTrustAnchor(f.input.pinDir, ACCOUNT, walked.state.pin)
     }
     if (member === "resume") {
-      await expect(enableSync({
-        ...f.input, chain: {
-          ...f.input.chain, appendKeys: async (request) => { await f.input.chain.appendKeys(request); throw new TypeError("lost ack") },
-        },
-      })).rejects.toThrow()
+      await expect(
+        enableSync({
+          ...f.input,
+          chain: {
+            ...f.input.chain,
+            appendKeys: async (request) => {
+              await f.input.chain.appendKeys(request)
+              throw new TypeError("lost ack")
+            },
+          },
+        }),
+      ).rejects.toThrow()
     }
     const keyring = member === "joiner" ? await deviceKeyring(12) : f.keyring
-    const token = f.server.tokenFor({ ...keyring.principal(), sealing_public_key: keyring.publicKeys().sealing, signing_public_key: keyring.publicKeys().signing }, "service-first")
+    const token = f.server.tokenFor(
+      {
+        ...keyring.principal(),
+        sealing_public_key: keyring.publicKeys().sealing,
+        signing_public_key: keyring.publicKeys().signing,
+      },
+      "service-first",
+    )
     await createPairingHttp({ baseUrl: f.server.url, token: () => token }).setAccountSync(accountOn)
     await createPairingHttp({ baseUrl: f.server.url, token: () => token }).setDeviceSync("service-first", deviceOn)
     f.server.switches.length = 0
     const outcome = await enableSync({
-      ...f.input, keyring,
+      ...f.input,
+      keyring,
       chain: createAccountHttp({ baseUrl: f.server.url, token: () => token }),
       pairing: createPairingHttp({ baseUrl: f.server.url, token: () => token }),
     })
     expect(outcome.kind).toBe(member === "joiner" ? "join_required" : "joined")
-    expect(f.server.switches).toEqual(['/v1/account/sync {"enabled":true}', '/v1/devices/service-first/sync {"enabled":true}'])
+    expect(f.server.switches).toEqual([
+      '/v1/account/sync {"enabled":true}',
+      '/v1/devices/service-first/sync {"enabled":true}',
+    ])
     expect(f.server.enabled("service-first")).toBe(true)
-    expect((await fetch(`${f.server.url}/v1/sync/batches?after=0`, { headers: { authorization: `Bearer ${token}` } })).status).toBe(200)
+    expect(
+      (await fetch(`${f.server.url}/v1/sync/batches?after=0`, { headers: { authorization: `Bearer ${token}` } }))
+        .status,
+    ).toBe(200)
   })
 }
 
@@ -56,7 +87,9 @@ for (const missing of ["serviceOrigin", "rpId", "userName"] as const) {
   test(`a genesis-capable first device missing ${missing} is refused with both switches left off`, async () => {
     const f = await fixture()
     cleanups.push(f.close)
-    await expect(enableSync({ ...f.input, [missing]: undefined })).rejects.toMatchObject({ reason: "missing_configuration" })
+    await expect(enableSync({ ...f.input, [missing]: undefined })).rejects.toMatchObject({
+      reason: "missing_configuration",
+    })
     expect(f.server.switches).toEqual([])
     expect(f.server.enabled("service-first")).toBe(false)
     expect(f.ceremonies()).toBe(0)
@@ -66,7 +99,9 @@ for (const missing of ["serviceOrigin", "rpId", "userName"] as const) {
 test("a first device without the genesis bridge needs a first device and leaves both switches off", async () => {
   const f = await fixture()
   cleanups.push(f.close)
-  expect(await enableSync({ ...f.input, genesis: { ...f.input.genesis, prfSupported: false } })).toEqual({ kind: "needs_first_device" })
+  expect(await enableSync({ ...f.input, genesis: { ...f.input.genesis, prfSupported: false } })).toEqual({
+    kind: "needs_first_device",
+  })
   expect(f.server.switches).toEqual([])
   expect(f.ceremonies()).toBe(0)
 })
@@ -74,9 +109,17 @@ test("a first device without the genesis bridge needs a first device and leaves 
 test("a failed device switch never disables the account or reports success", async () => {
   const f = await fixture()
   cleanups.push(f.close)
-  await expect(enableSync({ ...f.input, pairing: {
-    ...f.input.pairing, setDeviceSync: async () => { throw new Error("synthetic write failure") },
-  } })).rejects.toThrow("synthetic write failure")
+  await expect(
+    enableSync({
+      ...f.input,
+      pairing: {
+        ...f.input.pairing,
+        setDeviceSync: async () => {
+          throw new Error("synthetic write failure")
+        },
+      },
+    }),
+  ).rejects.toThrow("synthetic write failure")
   expect(f.server.switches).toEqual(['/v1/account/sync {"enabled":true}'])
   expect(f.ceremonies()).toBe(0)
 })
@@ -90,16 +133,33 @@ test("#given a joined device whose pin was retired #when it opens a session and 
   const second = await deviceKeyring(20)
   const token = f.server.tokenFor(principalOf(second), "service-second")
   const http = { baseUrl: f.server.url, token: () => token }
-  const joiner = { account: ACCOUNT, keyring: second, pinDir: join(f.input.pinDir, "second"), chain: createAccountHttp(http), pairing: createPairingHttp(http) }
+  const joiner = {
+    account: ACCOUNT,
+    keyring: second,
+    pinDir: join(f.input.pinDir, "second"),
+    chain: createAccountHttp(http),
+    pairing: createPairingHttp(http),
+  }
   /** A ceremony clock whose sleep resolves on the next server write, never on time. */
   const mailbox = () => {
     let queued = 0
     let waiter: (() => void) | undefined
     return {
-      signal() { if (waiter) { const resolve = waiter; waiter = undefined; resolve() } else queued++ },
+      signal() {
+        if (waiter) {
+          const resolve = waiter
+          waiter = undefined
+          resolve()
+        } else queued++
+      },
       sleep: async () => {
-        if (queued > 0) { queued--; return }
-        await new Promise<void>((resolve) => { waiter = resolve })
+        if (queued > 0) {
+          queued--
+          return
+        }
+        await new Promise<void>((resolve) => {
+          waiter = resolve
+        })
       },
       now: () => 0,
     }
@@ -116,7 +176,16 @@ test("#given a joined device whose pin was retired #when it opens a session and 
       if (id !== undefined) pending.resolve(id)
     }
     const joined = joinAccount({ ...joiner, clock: joining, showCode: () => undefined })
-    expect((await approveDevice({ ...f.input, clock: approver, pendingId: await pending.promise, confirmCode: async () => true })).kind).toBe("approved")
+    expect(
+      (
+        await approveDevice({
+          ...f.input,
+          clock: approver,
+          pendingId: await pending.promise,
+          confirmCode: async () => true,
+        })
+      ).kind,
+    ).toBe("approved")
     const outcome = await joined
     f.server.onWrite = null
     return outcome
@@ -125,8 +194,17 @@ test("#given a joined device whose pin was retired #when it opens a session and 
   expect(await pairOnce()).toEqual({ kind: "joined" })
 
   await forgetTrustAnchor(joiner.pinDir, ACCOUNT)
-  const anchors = async () => (await readdir(join(joiner.pinDir, "trust-anchor"))).filter((name) => !name.includes(".retired-"))
-  expect(await openAccountSession({ ...http, account: ACCOUNT, keyring: second, pinDir: joiner.pinDir, spaceId: new Uint8Array(16).fill(3) })).toEqual({ ok: false, reason: "no_pin" })
+  const anchors = async () =>
+    (await readdir(join(joiner.pinDir, "trust-anchor"))).filter((name) => !name.includes(".retired-"))
+  expect(
+    await openAccountSession({
+      ...http,
+      account: ACCOUNT,
+      keyring: second,
+      pinDir: joiner.pinDir,
+      spaceId: new Uint8Array(16).fill(3),
+    }),
+  ).toEqual({ ok: false, reason: "no_pin" })
   expect(await enableSync({ ...joiner, serviceDeviceId: "service-second" })).toEqual({ kind: "join_required" })
   expect(await anchors()).toEqual([])
   expect((await loadTrustAnchor(joiner.pinDir, ACCOUNT)).ok).toBe(false)

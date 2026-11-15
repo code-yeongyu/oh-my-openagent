@@ -1,9 +1,7 @@
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
 
-const ATTACHMENT_PROBE_PATH = fileURLToPath(
-  new URL("./windows-console-attachment-probe.ts", import.meta.url),
-)
+const ATTACHMENT_PROBE_PATH = fileURLToPath(new URL("./windows-console-attachment-probe.ts", import.meta.url))
 
 export type ConsoleAttachment = {
   readonly attached: boolean

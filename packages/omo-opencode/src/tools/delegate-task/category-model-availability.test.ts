@@ -40,10 +40,7 @@ afterEach(() => {
   }
 })
 
-function createExecutorContext(
-  category: CategoryConfig,
-  availableModelIDs: string[],
-): ExecutorContext {
+function createExecutorContext(category: CategoryConfig, availableModelIDs: string[]): ExecutorContext {
   cacheSpies.push(
     spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
       models: { [MODEL_PROVIDER]: availableModelIDs },
@@ -51,9 +48,7 @@ function createExecutorContext(
       updatedAt: "2026-08-18T00:00:00.000Z",
     }),
   )
-  cacheSpies.push(
-    spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue([MODEL_PROVIDER]),
-  )
+  cacheSpies.push(spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue([MODEL_PROVIDER]))
 
   return {
     client: unsafeTestValue({}),
@@ -67,7 +62,10 @@ function createExecutorContext(
 describe("category canonical model availability", () => {
   for (const runtime of ["opencode", "senpi"] as const) {
     for (const [target, catalog] of [
-      ["agent", false], ["agent", true], ["category", false], ["category", true],
+      ["agent", false],
+      ["agent", true],
+      ["category", false],
+      ["category", true],
     ] as const) {
       test(`real ${runtime} ${catalog ? "catalog" : "literal"} config preserves ${target} distribution through materialization`, async () => {
         const home = mkdtempSync(join(tmpdir(), "distribution-config-"))
@@ -76,18 +74,26 @@ describe("category canonical model availability", () => {
           mkdirSync(join(home, "project"))
           const name = `loaded-${runtime}-${target}-${catalog}`
           const definition = {
-            models: catalog ? ["first", "second", "third"]
+            models: catalog
+              ? ["first", "second", "third"]
               : ["test-provider/a", { model: "test-provider/b", reasoning: "high" }, "test-provider/c"],
             models_distribution: "round_robin",
           }
-          writeFileSync(join(home, ".omo", "omo.json"), JSON.stringify({
-            ...(catalog ? { models: {
-              first: { model: "test-provider/a" },
-              second: { model: "test-provider/b", reasoning: "high" },
-              third: { model: "test-provider/c" },
-            } } : {}),
-            [target === "agent" ? "agents" : "categories"]: { [name]: definition },
-          }))
+          writeFileSync(
+            join(home, ".omo", "omo.json"),
+            JSON.stringify({
+              ...(catalog
+                ? {
+                    models: {
+                      first: { model: "test-provider/a" },
+                      second: { model: "test-provider/b", reasoning: "high" },
+                      third: { model: "test-provider/c" },
+                    },
+                  }
+                : {}),
+              [target === "agent" ? "agents" : "categories"]: { [name]: definition },
+            }),
+          )
           const env = { HOME: home, USERPROFILE: home, XDG_CONFIG_HOME: join(home, ".config") }
           const context = createExecutorContext({}, ["a", "b", "c"])
           const actual: string[] = []
@@ -101,7 +107,12 @@ describe("category canonical model availability", () => {
                 const result = await resolveSubagentModel(name, { name, mode: "subagent" }, context)
                 actual.push(result.categoryModel?.modelID ?? "missing")
               } else {
-                const result = await resolveCategoryExecution({ ...args, category: name }, context, undefined, undefined)
+                const result = await resolveCategoryExecution(
+                  { ...args, category: name },
+                  context,
+                  undefined,
+                  undefined,
+                )
                 actual.push(result.categoryModel?.modelID ?? "missing")
               }
             }
@@ -115,7 +126,9 @@ describe("category canonical model availability", () => {
             }))
             for (let i = 0; i < 4; i++) {
               const result = planner({
-                prompt: "fixture", parent_session_id: "parent", depth: 0,
+                prompt: "fixture",
+                parent_session_id: "parent",
+                depth: 0,
                 ...(target === "agent" ? { subagent_type: name } : { category: name }),
               })
               if (result.kind !== "resolved") throw new Error(JSON.stringify(result))
@@ -133,7 +146,8 @@ describe("category canonical model availability", () => {
   test("reactive fallback consumes the spawn snapshot and exhausts without wrapping twice", async () => {
     const category = {
       models: [
-        "test-provider/a", "test-provider/b",
+        "test-provider/a",
+        "test-provider/b",
         { model: "test-provider/c", reasoningEffort: "high", temperature: 0.3 },
       ],
       models_distribution: "round_robin",
@@ -141,10 +155,16 @@ describe("category canonical model availability", () => {
     const executorContext = createExecutorContext(category, ["a", "b", "c"])
     executorContext.userCategories = { "reactive-distribution": category }
     await resolveCategoryExecution(
-      { ...args, category: "reactive-distribution" }, executorContext, undefined, undefined,
+      { ...args, category: "reactive-distribution" },
+      executorContext,
+      undefined,
+      undefined,
     )
     const result = await resolveCategoryExecution(
-      { ...args, category: "reactive-distribution" }, executorContext, undefined, undefined,
+      { ...args, category: "reactive-distribution" },
+      executorContext,
+      undefined,
+      undefined,
     )
     registerDelegatedChildSessionBootstrap({
       sessionID: "distribution-reactive",
@@ -155,16 +175,24 @@ describe("category canonical model availability", () => {
     const chain = getFallbackModelsForSession("distribution-reactive", undefined, {
       categories: executorContext.userCategories,
     })
-    expect(getRawFallbackModels("distribution-reactive", undefined, {
-      categories: executorContext.userCategories,
-    })?.[0]).toMatchObject({
-      model: "test-provider/c", reasoningEffort: "high", temperature: 0.3,
+    expect(
+      getRawFallbackModels("distribution-reactive", undefined, {
+        categories: executorContext.userCategories,
+      })?.[0],
+    ).toMatchObject({
+      model: "test-provider/c",
+      reasoningEffort: "high",
+      temperature: 0.3,
     })
     expect(chain).toEqual(["test-provider/c", "test-provider/a"])
     const state = createFallbackState("test-provider/b")
     const retryConfig = {
-      enabled: true, retry_on_errors: [429], max_fallback_attempts: 8,
-      cooldown_seconds: 60, timeout_seconds: 30, notify_on_fallback: false,
+      enabled: true,
+      retry_on_errors: [429],
+      max_fallback_attempts: 8,
+      cooldown_seconds: 60,
+      timeout_seconds: 30,
+      notify_on_fallback: false,
       restore_primary_after_cooldown: false,
     }
     expect(prepareFallback("distribution-reactive", state, chain, retryConfig).newModel).toBe("test-provider/c")
@@ -180,14 +208,21 @@ describe("category canonical model availability", () => {
       },
       ["a", "b", "c"],
     )
-    const results = await Promise.all(Array.from({ length: 4 }, () =>
-      resolveCategoryExecution(args, executorContext, undefined, undefined)))
+    const results = await Promise.all(
+      Array.from({ length: 4 }, () => resolveCategoryExecution(args, executorContext, undefined, undefined)),
+    )
     expect(results.map((result) => result.actualModel)).toEqual([
-      "test-provider/a", "test-provider/b", "test-provider/c", "test-provider/a",
+      "test-provider/a",
+      "test-provider/b",
+      "test-provider/c",
+      "test-provider/a",
     ])
     expect(results[1].categoryModel?.variant).toBe("high")
     expect(results.map((result) => result.fallbackChain?.map((entry) => entry.model))).toEqual([
-      ["b", "c"], ["c", "a"], ["a", "b"], ["b", "c"],
+      ["b", "c"],
+      ["c", "a"],
+      ["a", "b"],
+      ["b", "c"],
     ])
     expect(executorContext.userCategories?.[CATEGORY_NAME]?.models?.[0]).toBe("test-provider/a")
   })
@@ -200,21 +235,29 @@ describe("category canonical model availability", () => {
         models_distribution: "round_robin",
       },
     }
-    const results = await Promise.all(Array.from({ length: 4 }, () =>
-      resolveSubagentModel("distributor", { name: "distributor", mode: "subagent" }, executorContext)))
+    const results = await Promise.all(
+      Array.from({ length: 4 }, () =>
+        resolveSubagentModel("distributor", { name: "distributor", mode: "subagent" }, executorContext),
+      ),
+    )
     expect(results.map((result) => result.categoryModel?.modelID)).toEqual(["a", "b", "c", "a"])
     expect(results[1].categoryModel?.variant).toBe("high")
     expect(results.map((result) => result.fallbackChain?.map((entry) => entry.model))).toEqual([
-      ["b", "c"], ["c", "a"], ["a", "b"], ["b", "c"],
+      ["b", "c"],
+      ["c", "a"],
+      ["a", "b"],
+      ["b", "c"],
     ])
     registerDelegatedChildSessionBootstrap({
       sessionID: "distribution-agent",
       promptText: "fixture",
       fallbackChain: results[1].fallbackChain,
     })
-    expect(getFallbackModelsForSession("distribution-agent", "distributor", {
-      agents: executorContext.agentOverrides,
-    })).toEqual(["test-provider/c", "test-provider/a"])
+    expect(
+      getFallbackModelsForSession("distribution-agent", "distributor", {
+        agents: executorContext.agentOverrides,
+      }),
+    ).toEqual(["test-provider/c", "test-provider/a"])
   })
 
   test("sequential and omitted policies retain the primary for every spawn", async () => {
@@ -226,8 +269,9 @@ describe("category canonical model availability", () => {
         },
         ["a", "b"],
       )
-      const results = await Promise.all(Array.from({ length: 3 }, () =>
-        resolveCategoryExecution(args, executorContext, undefined, undefined)))
+      const results = await Promise.all(
+        Array.from({ length: 3 }, () => resolveCategoryExecution(args, executorContext, undefined, undefined)),
+      )
       expect(results.map((result) => result.actualModel)).toEqual(Array(3).fill("test-provider/a"))
       expect(results[0].fallbackChain?.map((entry) => entry.model)).toEqual(["b"])
     }
@@ -249,7 +293,9 @@ describe("category canonical model availability", () => {
       resolveCategoryExecution({ ...args, category }, executorContext, undefined, undefined)
     const results = await Promise.all(Array.from({ length: 3 }, () => spawn("rotation-availability")))
     expect(results.map((result) => result.actualModel)).toEqual([
-      "test-provider/a", "test-provider/a", "test-provider/b",
+      "test-provider/a",
+      "test-provider/a",
+      "test-provider/b",
     ])
     expect(results[2].fallbackChain?.map((entry) => entry.model)).toEqual(["a"])
     expect((await spawn("rotation-independent")).actualModel).toBe("test-provider/a")
@@ -284,10 +330,7 @@ describe("category canonical model availability", () => {
 
   test("keeps a configured fuzzy near-miss by resolving it to the available model id", async () => {
     // given
-    const executorContext = createExecutorContext(
-      { models: [`${MODEL_PROVIDER}/model-5.4`] },
-      ["model-5.4-preview"],
-    )
+    const executorContext = createExecutorContext({ models: [`${MODEL_PROVIDER}/model-5.4`] }, ["model-5.4-preview"])
 
     // when
     const result = await resolveCategoryExecution(args, executorContext, undefined, "system/default")
@@ -333,10 +376,7 @@ describe("category canonical model availability", () => {
 
   test("errors with the configured chain when every entry is unavailable", async () => {
     // given
-    const configuredModels = [
-      `${MODEL_PROVIDER}/missing-primary`,
-      `${MODEL_PROVIDER}/missing-fallback`,
-    ]
+    const configuredModels = [`${MODEL_PROVIDER}/missing-primary`, `${MODEL_PROVIDER}/missing-fallback`]
     const executorContext = createExecutorContext({ models: configuredModels }, ["unrelated-model"])
 
     // when

@@ -32,7 +32,11 @@ describe("install-codex Git Bash hooks", () => {
         repoRoot,
         platform: "win32",
         astGrepInstaller: skipAstGrepInstall,
-        gitBashResolver: () => ({ found: true, path: "C:\\Program Files\\Git\\bin\\bash.exe", source: "program-files" }),
+        gitBashResolver: () => ({
+          found: true,
+          path: "C:\\Program Files\\Git\\bin\\bash.exe",
+          source: "program-files",
+        }),
         runCommand: async () => undefined,
       })
 
@@ -86,7 +90,9 @@ describe("install-codex Git Bash hooks", () => {
       const hooks = await readInstalledPluginHooks(pluginPath)
       expect(hooks).not.toContain(GIT_BASH_PRE_TOOL_USE_HOOK)
       expect(hooks).not.toContain(GIT_BASH_POST_COMPACT_HOOK)
-      expect(await readGitBashMcpPath(pluginPath)).toBe(join(pluginPath, "components", "git-bash-mcp", "dist", "cli.js"))
+      expect(await readGitBashMcpPath(pluginPath)).toBe(
+        join(pluginPath, "components", "git-bash-mcp", "dist", "cli.js"),
+      )
     } finally {
       await Promise.all([
         rm(testRoot, { recursive: true, force: true }),

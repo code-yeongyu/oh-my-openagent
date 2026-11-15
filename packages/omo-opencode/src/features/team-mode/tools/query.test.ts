@@ -25,10 +25,13 @@ let listActiveTeamsImplementation: typeof import("../team-state-store/store").li
 }
 
 const deps = {
-  aggregateStatus: (...args: Parameters<typeof aggregateStatusImplementation>) => aggregateStatusImplementation(...args),
-  discoverTeamSpecs: (...args: Parameters<typeof discoverTeamSpecsImplementation>) => discoverTeamSpecsImplementation(...args),
+  aggregateStatus: (...args: Parameters<typeof aggregateStatusImplementation>) =>
+    aggregateStatusImplementation(...args),
+  discoverTeamSpecs: (...args: Parameters<typeof discoverTeamSpecsImplementation>) =>
+    discoverTeamSpecsImplementation(...args),
   loadTeamSpec: (...args: Parameters<typeof loadTeamSpecImplementation>) => loadTeamSpecImplementation(...args),
-  listActiveTeams: (...args: Parameters<typeof listActiveTeamsImplementation>) => listActiveTeamsImplementation(...args),
+  listActiveTeams: (...args: Parameters<typeof listActiveTeamsImplementation>) =>
+    listActiveTeamsImplementation(...args),
 }
 
 import { createTeamListTool, createTeamStatusTool } from "./query"
@@ -59,7 +62,13 @@ describe("query tools", () => {
       tasks: { pending: 0, claimed: 0, in_progress: 0, completed: 0, deleted: 0, total: 0 },
       shutdownRequests: [],
       concurrency: { runningOnSameModel: 0, queuedOnSameModel: 0 },
-      bounds: { maxMembers: 8, maxParallelMembers: 4, maxMessagesPerRun: 10000, maxWallClockMinutes: 120, maxMemberTurns: 500 },
+      bounds: {
+        maxMembers: 8,
+        maxParallelMembers: 4,
+        maxMessagesPerRun: 10000,
+        maxWallClockMinutes: 120,
+        maxMemberTurns: 500,
+      },
       staleLocks: [],
     } satisfies Awaited<ReturnType<typeof aggregateStatusImplementation>>
     aggregateStatusImplementation = async (teamRunId, passedConfig) => {
@@ -89,7 +98,16 @@ describe("query tools", () => {
         name: "foo",
         createdAt: 1,
         leadAgentId: "lead",
-        members: [{ kind: "category", name: "member-a", category: "agent", prompt: "do", backendType: "in-process", isActive: true }],
+        members: [
+          {
+            kind: "category",
+            name: "member-a",
+            category: "agent",
+            prompt: "do",
+            backendType: "in-process",
+            isActive: true,
+          },
+        ],
       }
     }
     listActiveTeamsImplementation = async () => [

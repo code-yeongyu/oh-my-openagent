@@ -8,7 +8,7 @@ test("real omo launcher signs in, reports status, and logs out without disk or o
   const home = await temporaryHome()
   let stored: string | null = null
   const requests: string[] = []
-  const api = fakeApi(async request => {
+  const api = fakeApi(async (request) => {
     const path = new URL(request.url).pathname
     requests.push(`${request.method} ${path}`)
     if (path === "/fake-keystore") {
@@ -17,9 +17,12 @@ test("real omo launcher signs in, reports status, and logs out without disk or o
       return Response.json(stored)
     }
     if (path === "/v1/health") return Response.json({ ok: true })
-    if (path === "/v1/device/code") return Response.json({
-      ...minted, intervalSeconds: 1, expiresAt: new Date(Date.now() + 60_000).toISOString(),
-    })
+    if (path === "/v1/device/code")
+      return Response.json({
+        ...minted,
+        intervalSeconds: 1,
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      })
     if (path === "/v1/device/token") return Response.json(grant)
     if (path === "/v1/devices/device-1" && request.method === "DELETE") return new Response(null, { status: 204 })
     return new Response(null, { status: 404 })
@@ -34,17 +37,28 @@ test("real omo launcher signs in, reports status, and logs out without disk or o
   })
   async function run(args: string[]) {
     const command = [
-      process.execPath, "--preload", join(import.meta.dir, "cli-keystore.fixture.ts"),
-      join(root, "packages/omo-native/bin/omo.js"), ...args,
+      process.execPath,
+      "--preload",
+      join(import.meta.dir, "cli-keystore.fixture.ts"),
+      join(root, "packages/omo-native/bin/omo.js"),
+      ...args,
     ]
     const env = {
-      PATH: process.env.PATH, HOME: home, USERPROFILE: home, OMO_RUNTIME: "bun",
-      OMO_SERVICE_API_URL: api, OMO_TEST_KEYSTORE_URL: `${api}/fake-keystore`,
+      PATH: process.env.PATH,
+      HOME: home,
+      USERPROFILE: home,
+      OMO_RUNTIME: "bun",
+      OMO_SERVICE_API_URL: api,
+      OMO_TEST_KEYSTORE_URL: `${api}/fake-keystore`,
+      // The child's own lock home: the test preload's account seam does not reach a child process (#12978).
+      OMO_TEST_CREDENTIAL_LOCK_HOME: home,
     }
     const child = Bun.spawn(command, { cwd: home, env, stdout: "pipe", stderr: "pipe" })
     children.push(child)
     const [stdout, stderr, code] = await Promise.all([
-      new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
     ])
     expect(stderr).toBe("")
     expect(code).toBe(0)
@@ -62,7 +76,7 @@ test("real omo launcher signs in, reports status, and logs out without disk or o
   expect(await run(["whoami"])).toContain(grant.device.name)
   await run(["logout"])
   expect(stored).toBeNull()
-  expect(requests.filter(path => path.startsWith("POST"))).toEqual(["POST /v1/device/code", "POST /v1/device/token"])
+  expect(requests.filter((path) => path.startsWith("POST"))).toEqual(["POST /v1/device/code", "POST /v1/device/token"])
   for (const name of await readdir(home, { recursive: true })) {
     const file = join(home, name)
     if (!(await stat(file)).isFile()) continue

@@ -73,7 +73,9 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
     return value === "" ? true : parseBoolean(name, value)
   }
   const verdict = judgeLeg({
-    outcomes: required(values, "outcomes").split(/\s+/).filter((outcome) => outcome.length > 0),
+    outcomes: required(values, "outcomes")
+      .split(/\s+/)
+      .filter((outcome) => outcome.length > 0),
     os: required(values, "os"),
     runHeavy: flag("run-heavy"),
     fullMatrix: flag("full-matrix"),

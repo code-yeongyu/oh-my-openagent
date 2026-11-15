@@ -13,13 +13,7 @@ import {
 
 import { lastJsonLine, runBin } from "./task-host-e2e-process.mjs"
 import { sandboxEnv } from "./task-host-e2e-sandbox.mjs"
-import {
-  mainProject,
-  newSandbox,
-  processTable,
-  statusAll,
-  taskConfig,
-} from "./task-host-e2e-shard-cost-support.mjs"
+import { mainProject, newSandbox, processTable, statusAll, taskConfig } from "./task-host-e2e-shard-cost-support.mjs"
 import { pass } from "./task-host-e2e-shards-support.mjs"
 import { startRoutedCompletionsServer } from "./task-host-e2e-shards-handoff-successors-http.mjs"
 
@@ -39,9 +33,11 @@ export function requestView(body) {
   const messages = Array.isArray(body?.messages) ? body.messages : []
   const userText = messages
     .filter((message) => message?.role === "user")
-    .map((message) => typeof message.content === "string"
-      ? message.content
-      : (message.content ?? []).map((part) => part?.text ?? "").join(""))
+    .map((message) =>
+      typeof message.content === "string"
+        ? message.content
+        : (message.content ?? []).map((part) => part?.text ?? "").join(""),
+    )
     .join("\n")
   const markers = userText.match(/T14_[A-Z0-9_]+/g)
   const calls = messages.flatMap((message) => [
@@ -52,8 +48,7 @@ export function requestView(body) {
   ])
   return {
     user: markers?.at(-1) ?? userText,
-    count: (name) => calls.filter((call) =>
-      call?.function?.name === name || call?.name === name).length,
+    count: (name) => calls.filter((call) => call?.function?.name === name || call?.name === name).length,
   }
 }
 
@@ -91,10 +86,17 @@ export const heldTaskStep = (text, releasePath, name, prompt, extra = {}) => ({
 })
 
 export function writeParentScript(sandbox, parentSteps) {
-  writeFileSync(join(sandbox.cwd, "mock-script.json"), `${JSON.stringify({
-    parentSteps,
-    childSteps: [{ type: "text", text: "unused" }],
-  }, null, 2)}\n`)
+  writeFileSync(
+    join(sandbox.cwd, "mock-script.json"),
+    `${JSON.stringify(
+      {
+        parentSteps,
+        childSteps: [{ type: "text", text: "unused" }],
+      },
+      null,
+      2,
+    )}\n`,
+  )
 }
 
 export function startHttpParent(sandbox, prompt, { session } = {}) {
@@ -120,8 +122,12 @@ export function startHttpParent(sandbox, prompt, { session } = {}) {
   const chunks = { stdout: "", stderr: "" }
   child.stdout?.setEncoding("utf8")
   child.stderr?.setEncoding("utf8")
-  child.stdout?.on("data", (chunk) => { chunks.stdout += chunk })
-  child.stderr?.on("data", (chunk) => { chunks.stderr += chunk })
+  child.stdout?.on("data", (chunk) => {
+    chunks.stdout += chunk
+  })
+  child.stderr?.on("data", (chunk) => {
+    chunks.stderr += chunk
+  })
   const closed = new Promise((resolve) => {
     child.once("close", (status, signal) => resolve({ status, signal }))
     child.once("error", () => resolve({ status: null, signal: null }))
@@ -138,8 +144,12 @@ export function startCommand(sandbox, args) {
   const chunks = { stdout: "", stderr: "" }
   child.stdout?.setEncoding("utf8")
   child.stderr?.setEncoding("utf8")
-  child.stdout?.on("data", (chunk) => { chunks.stdout += chunk })
-  child.stderr?.on("data", (chunk) => { chunks.stderr += chunk })
+  child.stdout?.on("data", (chunk) => {
+    chunks.stdout += chunk
+  })
+  child.stderr?.on("data", (chunk) => {
+    chunks.stderr += chunk
+  })
   const closed = new Promise((resolve) => {
     child.once("close", (status, signal) => resolve({ status, signal }))
     child.once("error", (error) => resolve({ status: null, signal: null, error }))
@@ -163,25 +173,34 @@ export async function createHttpScenario(current, name, route, long = false) {
     },
   })
   const baseUrl = await server.ready
-  writeFileSync(join(sandbox.agentDir, "models.json"), `${JSON.stringify({
-    providers: {
-      "omo-http": {
-        name: "todo 14 local http mock",
-        api: "openai-completions",
-        baseUrl,
-        apiKey: "local-qa-only",
-        models: [{
-          id: "mock-1",
-          name: "Todo 14 HTTP mock",
-          reasoning: false,
-          input: ["text"],
-          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-          contextWindow: 200000,
-          maxTokens: 4096,
-        }],
+  writeFileSync(
+    join(sandbox.agentDir, "models.json"),
+    `${JSON.stringify(
+      {
+        providers: {
+          "omo-http": {
+            name: "todo 14 local http mock",
+            api: "openai-completions",
+            baseUrl,
+            apiKey: "local-qa-only",
+            models: [
+              {
+                id: "mock-1",
+                name: "Todo 14 HTTP mock",
+                reasoning: false,
+                input: ["text"],
+                cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+                contextWindow: 200000,
+                maxTokens: 4096,
+              },
+            ],
+          },
+        },
       },
-    },
-  }, null, 2)}\n`)
+      null,
+      2,
+    )}\n`,
+  )
   return { sandbox, project: mainProject(sandbox), requestLog, close: server.close }
 }
 
@@ -200,8 +219,7 @@ export function swapBinary(source, destination) {
   renameSync(staged, destination)
 }
 
-export const endpoint = (sandbox, kind) =>
-  statusAll(sandbox).endpoints.find((row) => row.shard?.kind === kind)
+export const endpoint = (sandbox, kind) => statusAll(sandbox).endpoints.find((row) => row.shard?.kind === kind)
 
 export function handoff(sandbox) {
   const result = runBin(sandbox, ["daemon", "handoff", "--json"], { timeoutMs: 240_000 })
@@ -221,18 +239,20 @@ export function privateHostSocket(endpointFact) {
 }
 
 export function supervisorCount(socket) {
-  return [...processTable().values()].filter((row) =>
-    row.args.includes("--internal-rpc-host-supervisor") && row.args.includes(socket)).length
+  return [...processTable().values()].filter(
+    (row) => row.args.includes("--internal-rpc-host-supervisor") && row.args.includes(socket),
+  ).length
 }
 
 export function nextSockets(socket) {
   const prefix = `${socket.split("/").at(-1)}.next-`
-  return readdirSync(dirname(socket)).filter((name) => name.startsWith(prefix)).sort()
+  return readdirSync(dirname(socket))
+    .filter((name) => name.startsWith(prefix))
+    .sort()
 }
 
 export function sessionFile(sandbox, sessionId) {
-  const name = readdirSync(sandbox.sessionDir)
-    .find((entry) => entry.includes(sessionId) && entry.endsWith(".jsonl"))
+  const name = readdirSync(sandbox.sessionDir).find((entry) => entry.includes(sessionId) && entry.endsWith(".jsonl"))
   if (name === undefined) throw new Error(`session transcript missing for ${sessionId}`)
   return join(sandbox.sessionDir, name)
 }

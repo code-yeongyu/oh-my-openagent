@@ -1,6 +1,8 @@
 //! The session thread's state and request dispatch.
 
+use std::cell::Cell;
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
@@ -50,6 +52,13 @@ pub(crate) struct Worker {
     pub(crate) watching_user_input: bool,
     /// The user's input into the apps this session works in (#11459).
     pub(crate) intervention: crate::intervention::Intervention,
+    /// The route and hit of the mutating request being served, for its
+    /// object-mode report.
+    pub(crate) report_extras: Rc<Cell<Option<crate::report::ReportExtras>>>,
+    /// The coordinate epoch; moves supersede frames and expire refs.
+    pub(crate) epochs: crate::epoch::Epochs,
+    /// The time the actionability battery waits on.
+    pub(crate) battery_clock: Box<dyn crate::actionability::BatteryClock>,
 }
 
 /// A mutating request's reply and the audit event it emitted.
@@ -89,6 +98,9 @@ impl Worker {
             notes,
             watching_user_input: false,
             intervention: crate::intervention::Intervention::new(),
+            report_extras: Rc::default(),
+            epochs: crate::epoch::Epochs::default(),
+            battery_clock: Box::new(crate::actionability::HostClock::new()),
         };
         worker.install_screen_probe();
         worker.refresh_capabilities();
@@ -134,6 +146,12 @@ impl Worker {
             }
         }
         self.install_screen_probe();
+        let (source, screen) = self
+            .backend
+            .as_ref()
+            .ok()
+            .map_or((None, None), |backend| (backend.epoch_source(), backend.screen_probe()));
+        self.epochs.arm(options.report_mode == ReportMode::Object, source, screen);
         self.registry = AxRegistry::with_report_mode(options.report_mode);
         self.frames = FrameCache::with_report_mode(options.report_mode);
         self.options = Some(options);
@@ -156,6 +174,11 @@ impl Worker {
             .as_ref()
             .and_then(|options| options.artifact_dir.clone())
             .unwrap_or_else(|| std::env::temp_dir().join(DEFAULT_ARTIFACT_DIR))
+    }
+
+    /// The `backend` name of the capabilities read last.
+    pub(crate) fn backend_name(&self) -> String {
+        self.capabilities.lock().backend.clone()
     }
 
     pub(crate) fn refresh_capabilities(&mut self) -> DesktopCapabilities {
@@ -183,24 +206,42 @@ impl Worker {
             self.attach_user_input_feed();
             self.drain_user_input();
         }
-        self.serve(op, cancelled)
+        self.apply_epoch();
+        let result = self.serve(op, cancelled);
+        if matches!(&result, Err(error) if error.code == ErrorCode::SpaceUnsupported) {
+            self.epochs.record(senpi_desktop_core::protocol_results::EpochReason::Space);
+        }
+        self.apply_epoch();
+        result
     }
 
     fn serve(&mut self, op: Op, cancelled: &dyn Fn() -> bool) -> CoreResult<Response> {
         let mode = self.registry.report_mode();
-        let served = |audited: CoreResult<Audited>| match audited {
-            Ok((response, audit)) => Ok(crate::report::respond(mode, response, &audit)),
-            // `mutate` reports every error it returns in object mode, so an
-            // unreported one was refused before it (bad params): nothing was sent.
-            Err(error) if mode == ReportMode::Object => {
-                Err(error.with_fallback_disposition(Disposition::NOT_DELIVERED_SAFE))
+        let extras = Rc::clone(&self.report_extras);
+        let served = |audited: CoreResult<Audited>| {
+            let extras = extras.take().unwrap_or_default();
+            match audited {
+                Ok((response, audit)) => {
+                    Ok(crate::report::respond(mode, response, &audit, extras))
+                }
+                // `mutate` reports every error it returns in object mode, so an
+                // unreported one was refused before it (bad params): nothing was sent.
+                Err(error) if mode == ReportMode::Object => {
+                    Err(error.with_fallback_disposition(Disposition::NOT_DELIVERED_SAFE))
+                }
+                Err(error) => Err(error),
             }
-            Err(error) => Err(error),
         };
         // Every mutating request goes through `mutate`; reads bypass it.
         match op {
             Op::Displays => Ok(Response::Displays(self.backend()?.displays()?)),
-            Op::Windows => Ok(Response::Windows(self.backend()?.windows()?)),
+            Op::Windows => {
+                let mut windows = self.backend()?.windows()?;
+                if mode == ReportMode::Null {
+                    windows.iter_mut().for_each(|window| window.identity = None);
+                }
+                Ok(Response::Windows(windows))
+            }
             Op::Capture(params) => self.capture(&params),
             Op::Observe(params) => self.observe(&params, cancelled),
             Op::CaptureRegion(params) => self.capture_region(&params, cancelled),

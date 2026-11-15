@@ -4,7 +4,13 @@ import { mkdir, mkdtemp, readdir, readFile, rm, utimes, writeFile } from "node:f
 import { tmpdir } from "node:os"
 import { basename, dirname, join } from "node:path"
 
-import { acquireLock, buildIdentityPaths, containsSecretLikeMaterial, createLockRecord, releaseLock } from "@oh-my-opencode/memory-core"
+import {
+  acquireLock,
+  buildIdentityPaths,
+  containsSecretLikeMaterial,
+  createLockRecord,
+  releaseLock,
+} from "@oh-my-opencode/memory-core"
 import type { RunnerOutcome } from "@oh-my-opencode/senpi-task"
 
 import { createMemoryBinding } from "../binding"
@@ -75,9 +81,17 @@ async function fixture(): Promise<Fixture> {
   const warnings: Fixture["warnings"] = []
   const clock = { now: Date.UTC(2026, 8, 11, 12, 0, 0) }
   const observe = createKibitzerObservability({
-    appendEntry: (customType, data) => { entries.push({ customType, data }) },
+    appendEntry: (customType, data) => {
+      entries.push({ customType, data })
+    },
     now: () => clock.now,
-    logger: { info: () => {}, warn: (message, details) => { warnings.push({ message, details }) }, error: () => {} },
+    logger: {
+      info: () => {},
+      warn: (message, details) => {
+        warnings.push({ message, details })
+      },
+      error: () => {},
+    },
   })
   return {
     root,
@@ -90,13 +104,19 @@ async function fixture(): Promise<Fixture> {
     async wakes(sessionId) {
       const text = await readFile(kibitzerWakesFile(context.identityPaths.recall, sessionId), "utf8")
       expect(text.endsWith("\n")).toBe(true)
-      return text.trimEnd().split("\n").map((line) => JSON.parse(line) as KibitzerWakeRecord)
+      return text
+        .trimEnd()
+        .split("\n")
+        .map((line) => JSON.parse(line) as KibitzerWakeRecord)
     },
-    gates: () => entries.filter((entry) => entry.customType === GATE_ENTRY_TYPE).map((entry) => entry.data as KibitzerGateRecord),
+    gates: () =>
+      entries.filter((entry) => entry.customType === GATE_ENTRY_TYPE).map((entry) => entry.data as KibitzerGateRecord),
   }
 }
 
-function outcome(overrides: Partial<KibitzerWakeOutcome> & Pick<KibitzerWakeOutcome, "wake" | "status">): KibitzerWakeOutcome {
+function outcome(
+  overrides: Partial<KibitzerWakeOutcome> & Pick<KibitzerWakeOutcome, "wake" | "status">,
+): KibitzerWakeOutcome {
   const failed = overrides.status === "failed"
   return {
     sessionId: SESSION_ID,
@@ -125,11 +145,18 @@ async function backdate(dir: string, at: number): Promise<void> {
   await utimes(dir, stamp, stamp)
 }
 
-async function sidecarDirWithTranscript(context: MemoryIdentityContext, sessionId: string, idleSince: number): Promise<string> {
+async function sidecarDirWithTranscript(
+  context: MemoryIdentityContext,
+  sessionId: string,
+  idleSince: number,
+): Promise<string> {
   const dir = kibitzerSidecarSessionDir(context.identityPaths.recall, sessionId)
   await mkdir(dir, { recursive: true })
   await writeFile(join(dir, "20260901T000000_child.jsonl"), `${JSON.stringify({ type: "session", id: "child" })}\n`)
-  await writeFile(join(dir, KIBITZER_WAKES_FILENAME), `${JSON.stringify({ version: 1, wake: 1, status: "completed" })}\n`)
+  await writeFile(
+    join(dir, KIBITZER_WAKES_FILENAME),
+    `${JSON.stringify({ version: 1, wake: 1, status: "completed" })}\n`,
+  )
   await backdate(dir, idleSince)
   return dir
 }
@@ -168,9 +195,27 @@ describe("kibitzer wake records", () => {
     expect(await harness.offer([candidate(K8S)])).toEqual({ action: "seeded", wake: 1 })
     const child = harness.children[0]
     if (child === undefined) throw new Error("the seeded wake started no child")
-    child.emit({ type: "message_end", message: { role: "assistant", provider: "omo-mock", model: "mock-1", content: [], usage: { input: 1_200, output: 40, cacheRead: 300, cacheWrite: 0 } } })
+    child.emit({
+      type: "message_end",
+      message: {
+        role: "assistant",
+        provider: "omo-mock",
+        model: "mock-1",
+        content: [],
+        usage: { input: 1_200, output: 40, cacheRead: 300, cacheWrite: 0 },
+      },
+    })
     expect((await child.nudge(K8S, HINT)).isError).not.toBe(true)
-    child.emit({ type: "message_end", message: { role: "assistant", provider: "omo-mock", model: "mock-1", content: [], usage: { input: 1_500, output: 25, cacheRead: 300, cacheWrite: 10 } } })
+    child.emit({
+      type: "message_end",
+      message: {
+        role: "assistant",
+        provider: "omo-mock",
+        model: "mock-1",
+        content: [],
+        usage: { input: 1_500, output: 25, cacheRead: 300, cacheWrite: 10 },
+      },
+    })
     harness.clock.now += 1_500
     child.settle(completed)
     await withinMs(harness.sidecar.whenIdle(), "the wake to settle")
@@ -213,14 +258,20 @@ describe("kibitzer wake records", () => {
       "x".repeat(5_000),
     ]
     for (const [index, reason] of leaky.entries()) {
-      f.observe.onWake(outcome({
-        wake: index + 1,
-        status: "failed",
-        cause: "child_failed",
-        reason,
-        model: `omo-mock/${"m".repeat(400)}`,
-        nudges: Array.from({ length: 5 }, (_, item) => ({ path: `reference/${"p".repeat(1_000)}-${item}.md`, hint: HINT })),
-      }), f.context)
+      f.observe.onWake(
+        outcome({
+          wake: index + 1,
+          status: "failed",
+          cause: "child_failed",
+          reason,
+          model: `omo-mock/${"m".repeat(400)}`,
+          nudges: Array.from({ length: 5 }, (_, item) => ({
+            path: `reference/${"p".repeat(1_000)}-${item}.md`,
+            hint: HINT,
+          })),
+        }),
+        f.context,
+      )
     }
     await f.idle()
 
@@ -228,7 +279,15 @@ describe("kibitzer wake records", () => {
     const lines = text.trimEnd().split("\n")
     expect(lines).toHaveLength(leaky.length)
     expect(containsSecretLikeMaterial(text)).toBe(false)
-    for (const needle of [FAKE_SK_TOKEN, FAKE_GITHUB_TOKEN, "Bearer sk-", "OPENAI_API_KEY=sk", "/Users/someone", "private-project", "    at "]) {
+    for (const needle of [
+      FAKE_SK_TOKEN,
+      FAKE_GITHUB_TOKEN,
+      "Bearer sk-",
+      "OPENAI_API_KEY=sk",
+      "/Users/someone",
+      "private-project",
+      "    at ",
+    ]) {
       expect(text).not.toContain(needle)
     }
     const records = lines.map((line) => JSON.parse(line) as KibitzerWakeRecord)
@@ -249,7 +308,15 @@ describe("kibitzer wake records", () => {
 describe("kibitzer diagnostic streak notice", () => {
   test("#given three isolated failures each followed by a normal completion #when the wakes are observed #then no omo-kibitzer:gate notice is appended while every wake is still recorded", async () => {
     const f = await fixture()
-    const statuses: KibitzerWakeOutcome["status"][] = ["failed", "completed", "failed", "tool_budget_exceeded", "failed", "deadline", "failed"]
+    const statuses: KibitzerWakeOutcome["status"][] = [
+      "failed",
+      "completed",
+      "failed",
+      "tool_budget_exceeded",
+      "failed",
+      "deadline",
+      "failed",
+    ]
     for (const [index, status] of statuses.entries()) f.observe.onWake(outcome({ wake: index + 1, status }), f.context)
     await f.idle()
 
@@ -263,7 +330,8 @@ describe("kibitzer diagnostic streak notice", () => {
 
   test("#given the session's recall category #when a failure streak raises the gate notice #then the record names that category beside the model", async () => {
     const f = await fixture()
-    for (const wake of [1, 2, 3]) f.observe.onWake(outcome({ wake, status: "failed" }), f.context, { category: "quick" })
+    for (const wake of [1, 2, 3])
+      f.observe.onWake(outcome({ wake, status: "failed" }), f.context, { category: "quick" })
     expect(f.gates()).toHaveLength(1)
     expect(f.gates()[0]).toMatchObject({ model: "omo-mock/mock-1", category: "quick", consecutiveFailures: 3 })
   })
@@ -272,10 +340,21 @@ describe("kibitzer diagnostic streak notice", () => {
     const f = await fixture()
     expect(KIBITZER_PERSISTENT_FAILURE_THRESHOLD).toBe(3)
 
-    f.observe.onWake(outcome({ wake: 1, status: "failed", cause: "start_failed", reason: "Kibitzer sidecar model unavailable: quick (category_unavailable)" }), f.context)
+    f.observe.onWake(
+      outcome({
+        wake: 1,
+        status: "failed",
+        cause: "start_failed",
+        reason: "Kibitzer sidecar model unavailable: quick (category_unavailable)",
+      }),
+      f.context,
+    )
     f.observe.onWake(outcome({ wake: 2, status: "failed", generation: 2 }), f.context)
     expect(f.gates()).toEqual([])
-    f.observe.onWake(outcome({ wake: 3, status: "failed", generation: 3, reason: `Authorization: Bearer ${FAKE_SK_TOKEN}` }), f.context)
+    f.observe.onWake(
+      outcome({ wake: 3, status: "failed", generation: 3, reason: `Authorization: Bearer ${FAKE_SK_TOKEN}` }),
+      f.context,
+    )
     expect(f.gates()).toHaveLength(1)
     f.observe.onWake(outcome({ wake: 4, status: "failed", generation: 4 }), f.context)
     expect(f.gates()).toHaveLength(1)
@@ -306,7 +385,8 @@ describe("kibitzer diagnostic streak notice", () => {
     expect(f.gates()).toHaveLength(2)
 
     // Streaks are per main session: another session's failures never add to this one.
-    for (const wake of [1, 2]) f.observe.onWake(outcome({ wake, status: "failed", sessionId: "other-main-session" }), f.context)
+    for (const wake of [1, 2])
+      f.observe.onWake(outcome({ wake, status: "failed", sessionId: "other-main-session" }), f.context)
     expect(f.gates()).toHaveLength(2)
 
     await f.idle()
@@ -319,17 +399,35 @@ describe("kibitzer diagnostic streak notice", () => {
     const f = await fixture()
     // The builtin quick chain's twelve unconnected providers (resolver order) plus a user-extended tail:
     // all twelve survive, the stored notice keeps the first sixteen, like every other bounded field.
-    const quickChain = ["chatgpt-subscription", "openai", "deepseek", "qwen-token-plan", "alibaba-token-plan", "bailian-coding-plan", "opencode-go", "xai", "anthropic-subscription", "anthropic", "anthropic-api", "github-copilot"]
+    const quickChain = [
+      "chatgpt-subscription",
+      "openai",
+      "deepseek",
+      "qwen-token-plan",
+      "alibaba-token-plan",
+      "bailian-coding-plan",
+      "opencode-go",
+      "xai",
+      "anthropic-subscription",
+      "anthropic",
+      "anthropic-api",
+      "github-copilot",
+    ]
     const chainProviders = [...quickChain, ...Array.from({ length: 6 }, (_, index) => `extra-${index}`)]
-    const configuration = { category: "quick", cause: "category_unavailable" as const, missingProviders: chainProviders }
-    const refusal = (wake: number): KibitzerWakeOutcome => outcome({
-      wake,
-      status: "failed",
-      cause: "start_failed",
-      reason: "Kibitzer sidecar model unavailable: quick (category_unavailable)",
-      diagnostic: false,
-      configuration,
-    })
+    const configuration = {
+      category: "quick",
+      cause: "category_unavailable" as const,
+      missingProviders: chainProviders,
+    }
+    const refusal = (wake: number): KibitzerWakeOutcome =>
+      outcome({
+        wake,
+        status: "failed",
+        cause: "start_failed",
+        reason: "Kibitzer sidecar model unavailable: quick (category_unavailable)",
+        diagnostic: false,
+        configuration,
+      })
 
     // Three consecutive configuration refusals: a permanent state, not a streak - the gate stays silent.
     f.observe.onWake(refusal(1), f.context)
@@ -339,8 +437,15 @@ describe("kibitzer diagnostic streak notice", () => {
     expect(f.gates()).toEqual([])
     const notices = f.entries.filter((entry) => entry.customType === "omo-kibitzer:unavailable")
     expect(notices).toHaveLength(1)
-    expect((notices[0]?.data as { missingProviders: string[] }).missingProviders).toEqual(expect.arrayContaining(quickChain))
-    expect(notices[0]?.data).toEqual({ version: 1, category: "quick", cause: "category_unavailable", missingProviders: chainProviders.slice(0, 16) })
+    expect((notices[0]?.data as { missingProviders: string[] }).missingProviders).toEqual(
+      expect.arrayContaining(quickChain),
+    )
+    expect(notices[0]?.data).toEqual({
+      version: 1,
+      category: "quick",
+      cause: "category_unavailable",
+      missingProviders: chainProviders.slice(0, 16),
+    })
 
     // Every refusal is still recorded, marked non-diagnostic, with the configuration named.
     const recorded = await f.wakes(SESSION_ID)
@@ -349,7 +454,11 @@ describe("kibitzer diagnostic streak notice", () => {
       [2, "failed", false],
       [3, "failed", false],
     ])
-    expect(recorded[0]?.configuration).toEqual({ category: "quick", cause: "category_unavailable", missingProviders: chainProviders.slice(0, 16) })
+    expect(recorded[0]?.configuration).toEqual({
+      category: "quick",
+      cause: "category_unavailable",
+      missingProviders: chainProviders.slice(0, 16),
+    })
 
     // A fourth refusal adds no second notice...
     f.observe.onWake(refusal(4), f.context)
@@ -397,7 +506,12 @@ describe("kibitzer sidecar retention", () => {
     const foreign = await createLockRecord("recall-sidecar")
     await acquireLock(kibitzerSidecarOwnerLockPath(locks, "other-process-session"), foreign)
 
-    const first = await pruneKibitzerSidecars({ recallDir: recall, locksDir: locks, now, owned: new Set([basename(active)]) })
+    const first = await pruneKibitzerSidecars({
+      recallDir: recall,
+      locksDir: locks,
+      now,
+      owned: new Set([basename(active)]),
+    })
     expect(first.pruned).toEqual([basename(stale)])
     expect([...first.kept].sort()).toEqual([basename(active), basename(fresh), basename(otherProcess)].sort())
     expect(existsSync(stale)).toBe(false)
@@ -406,7 +520,12 @@ describe("kibitzer sidecar retention", () => {
 
     // The owner lock alone kept `other-process-session`: once its owner lets go, the aged directory is prunable.
     expect(await releaseLock(kibitzerSidecarOwnerLockPath(locks, "other-process-session"), foreign)).toBe(true)
-    const second = await pruneKibitzerSidecars({ recallDir: recall, locksDir: locks, now, owned: new Set([basename(active)]) })
+    const second = await pruneKibitzerSidecars({
+      recallDir: recall,
+      locksDir: locks,
+      now,
+      owned: new Set([basename(active)]),
+    })
     expect(second.pruned).toEqual([basename(otherProcess)])
     expect(existsSync(active)).toBe(true)
 
@@ -433,7 +552,9 @@ describe("kibitzer sidecar retention", () => {
     f.observe.onWake(outcome({ wake: 1, status: "cancelled", cause: "shutdown", diagnostic: false }), f.context)
     await f.observe.onSessionShutdown(SESSION_ID, f.context)
 
-    expect((await f.wakes(SESSION_ID)).map((record) => [record.status, record.cause])).toEqual([["cancelled", "shutdown"]])
+    expect((await f.wakes(SESSION_ID)).map((record) => [record.status, record.cause])).toEqual([
+      ["cancelled", "shutdown"],
+    ])
     await f.idle()
     expect(existsSync(kibitzerSidecarOwnerLockPath(f.context.identityPaths.locks, SESSION_ID))).toBe(false)
     expect(f.warnings).toEqual([])

@@ -28,7 +28,7 @@ function memoryStore(initial: Credentials | null, onClear: () => void): Credenti
   return {
     read: async () => value,
     readAuthoritative: async () => value,
-    write: async next => {
+    write: async (next) => {
       value = next
     },
     clear: async () => {
@@ -49,10 +49,18 @@ function machine(initial: Credentials | null) {
   const account = async (args: string[], stdin = "") => {
     const out: string[] = []
     const code = await runAccountVerb(
-      { api, store, home, pinDir: () => join(home, "sync-device"), readStdin: async () => stdin, output: line => out.push(line), error: () => {} },
+      {
+        api,
+        store,
+        home,
+        pinDir: () => join(home, "sync-device"),
+        readStdin: async () => stdin,
+        output: (line) => out.push(line),
+        error: () => {},
+      },
       args,
     )
-    return { code, out: out.map(line => JSON.parse(line) as Record<string, unknown>) }
+    return { code, out: out.map((line) => JSON.parse(line) as Record<string, unknown>) }
   }
   const session = createSession({ api, store, home, beforeKeysDiscarded: async () => undefined })
   return { account, session, home, markerPath, markerAtClear, stop: () => server.stop(true) }
@@ -137,30 +145,33 @@ describe("omo logout sign-out marker (#11434)", () => {
 
   describe("#given an empty store and a marker that cannot be used", () => {
     const corruptions: Array<[string, (path: string) => void]> = [
-      ["corrupt JSON", path => writeFileSync(path, "{not json")],
-      ["schema-invalid JSON", path => writeFileSync(path, JSON.stringify({ device: 5 }))],
-      ["unreadable (a directory)", path => mkdirSync(path)],
+      ["corrupt JSON", (path) => writeFileSync(path, "{not json")],
+      ["schema-invalid JSON", (path) => writeFileSync(path, JSON.stringify({ device: 5 }))],
+      ["unreadable (a directory)", (path) => mkdirSync(path)],
     ]
 
-    test.each(corruptions)("#when the marker is %s #then token and export answer exit 4 and show still answers", async (_label, corrupt) => {
-      // given
-      const m = machine(null)
-      mkdirSync(dirname(m.markerPath), { recursive: true })
-      corrupt(m.markerPath)
-      try {
-        // when
-        const token = await m.account(["token"])
-        const exported = await m.account(["export"])
-        const show = await m.account(["show"])
+    test.each(corruptions)(
+      "#when the marker is %s #then token and export answer exit 4 and show still answers",
+      async (_label, corrupt) => {
+        // given
+        const m = machine(null)
+        mkdirSync(dirname(m.markerPath), { recursive: true })
+        corrupt(m.markerPath)
+        try {
+          // when
+          const token = await m.account(["token"])
+          const exported = await m.account(["export"])
+          const show = await m.account(["show"])
 
-        // then
-        expect(token).toEqual({ code: ACCOUNT_EXIT.signedOut, out: [{ signedIn: false }] })
-        expect(exported.code).toBe(ACCOUNT_EXIT.signedOut)
-        expect(show).toEqual({ code: ACCOUNT_EXIT.ok, out: [{ signedIn: false }] })
-      } finally {
-        m.stop()
-      }
-    })
+          // then
+          expect(token).toEqual({ code: ACCOUNT_EXIT.signedOut, out: [{ signedIn: false }] })
+          expect(exported.code).toBe(ACCOUNT_EXIT.signedOut)
+          expect(show).toEqual({ code: ACCOUNT_EXIT.ok, out: [{ signedIn: false }] })
+        } finally {
+          m.stop()
+        }
+      },
+    )
   })
 
   describe("#given a logged-out machine", () => {

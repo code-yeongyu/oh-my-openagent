@@ -3,19 +3,18 @@ import { legacyMigrationHistory } from "./legacy-history"
 import { isPlainRecord, mergeRecords, withoutLegacyMetadata } from "./record-values"
 import { OMO_SCHEMA_URL } from "./schema-url"
 import type { DiscoveredLegacyConfigSource } from "./types"
-import type { TransformOpenCodeSourcesInput, ConfigMigrationTransformResult, LoadedLegacyConfigSource } from "./transform-types"
+import type {
+  TransformOpenCodeSourcesInput,
+  ConfigMigrationTransformResult,
+  LoadedLegacyConfigSource,
+} from "./transform-types"
 
 type LoadedConfig = {
   readonly metadata: DiscoveredLegacyConfigSource
   readonly value: Record<string, unknown>
 }
 
-const MIGRATED_OPENCODE_FIELDS = new Set([
-  "disabled_providers",
-  "model_fallback",
-  "models",
-  "sisyphus_agent",
-])
+const MIGRATED_OPENCODE_FIELDS = new Set(["disabled_providers", "model_fallback", "models", "sisyphus_agent"])
 
 function transformLegacyKeys(value: Readonly<Record<string, unknown>>): Record<string, unknown> {
   const config = withoutLegacyMetadata(value)
@@ -25,9 +24,7 @@ function transformLegacyKeys(value: Readonly<Record<string, unknown>>): Record<s
     config.sisyphus_agent = config.omo_agent
     delete config.omo_agent
   }
-  return Object.fromEntries(
-    Object.entries(config).filter(([key]) => MIGRATED_OPENCODE_FIELDS.has(key)),
-  )
+  return Object.fromEntries(Object.entries(config).filter(([key]) => MIGRATED_OPENCODE_FIELDS.has(key)))
 }
 
 function loadedConfigs(
@@ -85,7 +82,9 @@ function transformUserSources(
   const profiles: Record<string, unknown> = {}
   for (const profile of new Set(configs.map((config) => config.metadata.profile))) {
     if (profile === undefined) continue
-    const profileConfigs = configs.filter((config) => config.metadata.kind === "profile-config" && config.metadata.profile === profile)
+    const profileConfigs = configs.filter(
+      (config) => config.metadata.kind === "profile-config" && config.metadata.profile === profile,
+    )
     const differences = profileConfigs.map((config) => ({
       metadata: config.metadata,
       value: deepDifference(rootByDirectory.get(config.metadata.baseRoot ?? "") ?? {}, config.value),
@@ -93,7 +92,12 @@ function transformUserSources(
     const difference = mergedConfigs(differences)
     if (Object.keys(difference).length > 0) profiles[profile] = { "[opencode]": difference }
   }
-  return documentWithHistory(mergedConfigs(rootConfigs), profiles, discovered.filter((source) => source.projectRoot === undefined), sources)
+  return documentWithHistory(
+    mergedConfigs(rootConfigs),
+    profiles,
+    discovered.filter((source) => source.projectRoot === undefined),
+    sources,
+  )
 }
 
 function transformProjectSources(

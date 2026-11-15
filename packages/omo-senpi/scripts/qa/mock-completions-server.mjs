@@ -46,12 +46,15 @@ export function startMockCompletionsServer({ steps, onRequest, requestLogPath, c
     arrivalOrder += 1
     const lane = typeof classifyRequest === "function" ? classifyRequest(body) : undefined
     if (requestLogPath !== undefined) {
-      appendFileSync(requestLogPath, `${JSON.stringify({
-        arrivalOrder,
-        lane,
-        timestamp: new Date().toISOString(),
-        stepIndex,
-      })}\n`)
+      appendFileSync(
+        requestLogPath,
+        `${JSON.stringify({
+          arrivalOrder,
+          lane,
+          timestamp: new Date().toISOString(),
+          stepIndex,
+        })}\n`,
+      )
     }
     try {
       await waitForStep(step)
@@ -128,14 +131,19 @@ function writeStream(response, steps) {
     if (index === 0 || toolCalls.length === 0) send(response, chunk({ content: step.text }))
   }
   for (const [index, step] of toolCalls.entries()) {
-    send(response, chunk({
-      tool_calls: [{
-        index,
-        id: step.id ?? `${TOOL_CALL_ID_PREFIX}${index + 1}`,
-        type: "function",
-        function: { name: step.name, arguments: JSON.stringify(step.arguments ?? {}) },
-      }],
-    }))
+    send(
+      response,
+      chunk({
+        tool_calls: [
+          {
+            index,
+            id: step.id ?? `${TOOL_CALL_ID_PREFIX}${index + 1}`,
+            type: "function",
+            function: { name: step.name, arguments: JSON.stringify(step.arguments ?? {}) },
+          },
+        ],
+      }),
+    )
   }
   send(response, chunk({}, toolCalls.length > 0 ? "tool_calls" : "stop", usage))
   response.write("data: [DONE]\n\n")
@@ -166,7 +174,12 @@ async function runSelfTest() {
       { type: "text", text: "a" },
       { type: "text", text: "b", releaseWhen: () => released },
       { type: "text", text: "c" },
-      { type: "text", text: "d", delayMs: 80, usage: { prompt_tokens: 40000, completion_tokens: 3, total_tokens: 40003 } },
+      {
+        type: "text",
+        text: "d",
+        delayMs: 80,
+        usage: { prompt_tokens: 40000, completion_tokens: 3, total_tokens: 40003 },
+      },
     ],
     requestLogPath: logPath,
     classifyRequest: (body) => body.lane ?? "parent",
@@ -174,7 +187,11 @@ async function runSelfTest() {
   try {
     const base = await server.ready
     const post = async (lane) => {
-      const res = await fetch(base, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ lane }) })
+      const res = await fetch(base, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ lane }),
+      })
       return { status: res.status, text: await res.text() }
     }
     const a = await post("parent")
@@ -189,9 +206,13 @@ async function runSelfTest() {
     const d = await post("parent")
     if (Date.now() - t0 < 50) throw new Error("self-test: delayMs")
     if (!d.text.includes("d")) throw new Error("self-test: delayed step")
-    if (!d.text.includes('"usage":{"prompt_tokens":40000')) throw new Error("self-test: a step's usage must ride the finish chunk")
+    if (!d.text.includes('"usage":{"prompt_tokens":40000'))
+      throw new Error("self-test: a step's usage must ride the finish chunk")
     if (a.text.includes('"usage"')) throw new Error("self-test: a step without usage must not invent one")
-    const rows = readFileSync(logPath, "utf8").trim().split("\n").map((line) => JSON.parse(line))
+    const rows = readFileSync(logPath, "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line))
     if (rows.length !== 4) throw new Error(`self-test: log length ${rows.length}`)
     if (rows[1].lane !== "judge" || rows[1].stepIndex !== 1) throw new Error("self-test: log classification")
     console.log("SELF-TEST OK")

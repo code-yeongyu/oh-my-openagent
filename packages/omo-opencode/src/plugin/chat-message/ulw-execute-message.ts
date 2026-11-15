@@ -23,10 +23,7 @@ export function isUlwExecuteHookOutput(value: unknown): value is UlwExecuteHookO
 }
 
 export function isUlwExecuteFallbackTemplate(promptText: string): boolean {
-  return (
-    promptText.includes("<session-context>") &&
-    promptText.includes(ULW_EXECUTE_TEMPLATE_MARKER)
-  )
+  return promptText.includes("<session-context>") && promptText.includes(ULW_EXECUTE_TEMPLATE_MARKER)
 }
 
 export function clearStoppedContinuationBeforeUlwExecute(

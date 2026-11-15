@@ -11,7 +11,9 @@ const storage = {
 const fixEmptyMessagesWithSDK = (params: Parameters<typeof fixEmptyMessagesWithSDKImpl>[0]) =>
   fixEmptyMessagesWithSDKImpl(params, storage)
 
-function createMockClient(messages: Array<{ info?: { id?: string }; parts?: Array<{ type?: string; text?: string }> }>) {
+function createMockClient(
+  messages: Array<{ info?: { id?: string }; parts?: Array<{ type?: string; text?: string }> }>,
+) {
   return {
     session: {
       messages: mock(() => Promise.resolve({ data: messages })),
@@ -29,9 +31,7 @@ describe("fixEmptyMessagesWithSDK", () => {
 
   it("returns fixed=false when no empty messages exist", async () => {
     //#given
-    const client = createMockClient([
-      { info: { id: "msg_1" }, parts: [{ type: "text", text: "Hello" }] },
-    ])
+    const client = createMockClient([{ info: { id: "msg_1" }, parts: [{ type: "text", text: "Hello" }] }])
 
     //#when
     const result = await fixEmptyMessagesWithSDK({
@@ -48,9 +48,7 @@ describe("fixEmptyMessagesWithSDK", () => {
 
   it("fixes empty message via replace when scanning all", async () => {
     //#given
-    const client = createMockClient([
-      { info: { id: "msg_1" }, parts: [{ type: "text", text: "" }] },
-    ])
+    const client = createMockClient([{ info: { id: "msg_1" }, parts: [{ type: "text", text: "" }] }])
     mockReplaceEmptyTextParts.mockReturnValue(Promise.resolve(true))
 
     //#when
@@ -68,9 +66,7 @@ describe("fixEmptyMessagesWithSDK", () => {
 
   it("falls back to inject when replace fails", async () => {
     //#given
-    const client = createMockClient([
-      { info: { id: "msg_1" }, parts: [] },
-    ])
+    const client = createMockClient([{ info: { id: "msg_1" }, parts: [] }])
     mockReplaceEmptyTextParts.mockReturnValue(Promise.resolve(false))
     mockInjectTextPart.mockReturnValue(Promise.resolve(true))
 
@@ -110,10 +106,7 @@ describe("fixEmptyMessagesWithSDK", () => {
 
   it("skips messages without info.id", async () => {
     //#given
-    const client = createMockClient([
-      { parts: [] },
-      { info: {}, parts: [] },
-    ])
+    const client = createMockClient([{ parts: [] }, { info: {}, parts: [] }])
 
     //#when
     const result = await fixEmptyMessagesWithSDK({
@@ -129,9 +122,7 @@ describe("fixEmptyMessagesWithSDK", () => {
 
   it("treats thinking-only messages as empty", async () => {
     //#given
-    const client = createMockClient([
-      { info: { id: "msg_1" }, parts: [{ type: "thinking", text: "hmm" }] },
-    ])
+    const client = createMockClient([{ info: { id: "msg_1" }, parts: [{ type: "thinking", text: "hmm" }] }])
     mockReplaceEmptyTextParts.mockReturnValue(Promise.resolve(true))
 
     //#when
@@ -148,9 +139,7 @@ describe("fixEmptyMessagesWithSDK", () => {
 
   it("treats tool_use messages as non-empty", async () => {
     //#given
-    const client = createMockClient([
-      { info: { id: "msg_1" }, parts: [{ type: "tool_use" }] },
-    ])
+    const client = createMockClient([{ info: { id: "msg_1" }, parts: [{ type: "tool_use" }] }])
 
     //#when
     const result = await fixEmptyMessagesWithSDK({

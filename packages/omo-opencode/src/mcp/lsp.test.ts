@@ -291,10 +291,7 @@ describe("createLspMcpConfig", () => {
       join(cwd, ".omo", "lsp-client.json"),
     ])
     expectPathSuffix(config.environment?.LSP_TOOLS_MCP_USER_CONFIG, ["opencode", "lsp.json"])
-    expectPathSuffix(config.environment?.LSP_TOOLS_MCP_INSTALL_DECISIONS, [
-      "opencode",
-      "lsp-install-decisions.json",
-    ])
+    expectPathSuffix(config.environment?.LSP_TOOLS_MCP_INSTALL_DECISIONS, ["opencode", "lsp-install-decisions.json"])
   })
 
   it("matches user config path suffixes across POSIX and Windows separators", () => {

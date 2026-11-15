@@ -11,7 +11,9 @@ export class MemberValidationError extends Error {
 
 function translateMemberError(
   input: Record<string, unknown>,
-  agentEligibilityRegistry: Readonly<Record<string, { verdict: "eligible" | "conditional" | "hard-reject"; rejectionMessage?: string }>>,
+  agentEligibilityRegistry: Readonly<
+    Record<string, { verdict: "eligible" | "conditional" | "hard-reject"; rejectionMessage?: string }>
+  >,
 ): MemberValidationError {
   const name = typeof input.name === "string" ? input.name : "<unnamed>"
   const hasCategory = input.category != null
@@ -59,7 +61,9 @@ function translateMemberError(
 
 export function createParseMember<TMember>(
   memberSchema: { safeParse(input: unknown): { success: true; data: TMember } | { success: false } },
-  agentEligibilityRegistry: Readonly<Record<string, { verdict: "eligible" | "conditional" | "hard-reject"; rejectionMessage?: string }>>,
+  agentEligibilityRegistry: Readonly<
+    Record<string, { verdict: "eligible" | "conditional" | "hard-reject"; rejectionMessage?: string }>
+  >,
 ): (input: unknown) => TMember {
   return function parseMember(input: unknown) {
     if (input == null || typeof input !== "object") {
