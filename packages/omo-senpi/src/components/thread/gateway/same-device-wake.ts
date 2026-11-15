@@ -9,8 +9,8 @@ export type SameDeviceWakeOptions = {
   readonly store: GatewayStore
   readonly sessionsDirectory: string
   /**
-   * `session_wake.same_device`, read per send for the TARGET session's cwd (its project's configuration); off unless
-   * the machine's omo configuration turns it on.
+   * `session_wake.same_device`, read per send for the TARGET session's cwd (its project's configuration); on unless
+   * the machine's omo configuration opts out.
    */
   readonly enabled: (cwd: string) => boolean
   readonly carrier?: SameDeviceCarrier
