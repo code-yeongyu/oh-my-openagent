@@ -33,7 +33,8 @@ export class TrustStorageError extends Error {
 export class UnsafeTrustAncestor extends Error {
   constructor(
     readonly path: string,
-    readonly problem: "group-writable" | "world-writable" | "owned by another user" | "a symbolic link or not a directory",
+    readonly problem:
+      "group-writable" | "world-writable" | "owned by another user" | "a symbolic link or not a directory",
   ) {
     super(problem === "a symbolic link or not a directory" ? "unsafe trust directory" : "unsafe trust ancestor")
   }
