@@ -223,6 +223,52 @@ describe("verified acquisition of the device service", () => {
       expect(() => parseReleaseKeySet(bad)).toThrow()
   })
 
+  test("malformed compiled key documents import and refuse acquisition before fetching or writing", () => {
+    const valid = { alg: "Ed25519", public_keys_hex: DEVICE_SERVICE_RELEASE_KEYS }
+    const acquisition = new URL("../src/release/acquire.ts", import.meta.url).href
+    for (const fixture of [
+      { ...valid, unexpected: true },
+      { ...valid, alg: "Ed448" },
+      { ...valid, public_keys_hex: ["AB".repeat(32)] },
+      { ...valid, public_keys_hex: ["ab".repeat(32), "ab".repeat(32)] },
+    ]) {
+      const state = stateDir()
+      const child = Bun.spawnSync(
+        [
+          process.execPath,
+          "--eval",
+          `
+        import { plugin } from "bun"
+        import { existsSync } from "node:fs"
+        plugin({
+          name: "compiled-release-key-fixture",
+          setup(build) {
+            build.onLoad({ filter: /release-key\\.json$/ }, () => ({
+              contents: "export default " + ${JSON.stringify(JSON.stringify(fixture))},
+              loader: "js",
+            }))
+          },
+        })
+        const { acquireDeviceService } = await import(${JSON.stringify(acquisition)})
+        let fetches = 0
+        const result = await acquireDeviceService({
+          version: ${JSON.stringify(PIN_VERSION)}, host: ${JSON.stringify(HOST)},
+          engineVersion: ${JSON.stringify(ENGINE_VERSION)}, stateDir: ${JSON.stringify(state)},
+          fetch: async () => { fetches++; return new Response("", { status: 404 }) },
+        })
+        console.log(JSON.stringify({ result, fetches, written: existsSync(${JSON.stringify(state)}) }))
+      `,
+        ],
+        { timeout: 20_000 },
+      )
+      expect(child.exitCode, child.stderr.toString()).toBe(0)
+      const observation = JSON.parse(child.stdout.toString())
+      expect(observation.result).toMatchObject({ ok: false, refusal: "release_key_invalid" })
+      expect(observation.fetches).toBe(0)
+      expect(observation.written).toBe(false)
+    }
+  })
+
   // #12656: an origin that has never published the pinned release answers 404 for every file of it. That is not a
   // connection problem, so it is its own refusal; a transport failure, a 5xx or a half-published release still is one.
   test("a release that was never published (404 for every file) is refused as not_published and nothing is written", async () => {
