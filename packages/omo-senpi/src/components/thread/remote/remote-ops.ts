@@ -144,24 +144,110 @@ export function replyData(response: JsonObject): JsonObject {
   return typeof data === "object" && data !== null && !Array.isArray(data) ? (data as JsonObject) : {}
 }
 
+/** How the send a follow belongs to was answered, so it prints only that send's own turn (#13267). */
+type RemoteFollowLane = "started" | "queued" | "steered"
+
 export type RemoteFollow = {
-  /** "settled" once the session's run settles (`agent_settled`), "session_closed" when its close cut the run short, else the reason its attach ended first. */
+  /** "settled" once the turn this send started settles, "interrupted" when that turn was stopped before it finished, "session_closed" when its close cut the run short, else the reason its attach ended first. */
   readonly settled: Promise<string>
   readonly stop: () => void
+  /**
+   * Names how the send's delivery answered, once its reply is known (#13267): `started` and `steered` print stream
+   * deltas from the aim (a `started` turn that already finished before the aim is read once from the transcript);
+   * `queued` reads the answer from the session's own transcript, anchored on the send's user entry - the stream's
+   * arrival order can never prove which turn a record belongs to (a queued follow-up drains
+   * inside the same run with plain `turn_start`/`turn_end` markers, retries open extra `agent_start` pairs, and a
+   * late replay lands after the aim), so the stream only signals that a run settled and the transcript decides
+   * what prints.
+   */
+  readonly aim: (lane: RemoteFollowLane) => void
 }
 
 const isRecord = (value: unknown): value is JsonObject =>
   typeof value === "object" && value !== null && !Array.isArray(value)
 
+/** How many trailing transcript entries a follow reads to find the send's own turn. */
+const READ_TAIL = 256
+
+/** The joined text of a transcript message entry, or undefined for anything that is not one. */
+const entryTextOf = (entry: JsonObject): string | undefined => {
+  const message = isRecord(entry["message"]) ? entry["message"] : entry["role"] !== undefined ? entry : undefined
+  if (message === undefined) return undefined
+  const content = message["content"]
+  if (typeof content === "string") return content
+  if (!Array.isArray(content)) return undefined
+  const texts: string[] = []
+  for (const part of content)
+    if (isRecord(part) && part["type"] === "text" && typeof part["text"] === "string") texts.push(part["text"])
+  return texts.length > 0 ? texts.join("") : undefined
+}
+
+/** Whether a transcript entry is a user message, in either stored shape. */
+export const isUserEntry = (entry: JsonObject): boolean => {
+  const message = isRecord(entry["message"]) ? entry["message"] : entry
+  return message["role"] === "user"
+}
+
+/** The client message id senpi stamped on a stored user entry (`clientMessageId` on the message), if any. */
+const entryClientMessageIdOf = (entry: JsonObject): string | undefined => {
+  const message = isRecord(entry["message"]) ? entry["message"] : entry
+  const id = message["clientMessageId"]
+  return typeof id === "string" && id !== "" ? id : undefined
+}
+
+/** A stored entry's identity: its own `id`, or its whole record when it has none. */
+const entryKeyOf = (entry: JsonObject): string =>
+  typeof entry["id"] === "string" ? entry["id"] : JSON.stringify(entry)
+
+/** The user entries whose text carries `text`, exact or wrapped, in transcript order. */
+const textCarryingUserEntries = (entries: readonly JsonObject[], text: string): number[] => {
+  const found: number[] = []
+  for (let index = 0; index < entries.length; index++) {
+    if (!isUserEntry(entries[index])) continue
+    if (entryTextOf(entries[index])?.includes(text) === true) found.push(index)
+  }
+  return found
+}
+
 /**
- * Follows another device's session from now on: each assistant text delta (`message_update` / `text_delta`) goes to
- * `onText` in the order the session wrote it, until its run settles, with a line break between the text of separate
- * messages or content blocks. Start it before the send it follows.
+ * The matches that can anchor a send's turn. The user entry carrying the send's own client message id wins outright:
+ * senpi stores it on the entry it admits, whatever text a prompt template or skill expansion stored (#13272 review).
+ * An engine that stored no such id falls back to text: exact first, else entries containing it.
+ */
+export const anchorMatches = (entries: readonly JsonObject[], text: string, clientMessageId?: string): number[] => {
+  if (clientMessageId !== undefined) {
+    for (let index = 0; index < entries.length; index++)
+      if (isUserEntry(entries[index]) && entryClientMessageIdOf(entries[index]) === clientMessageId) return [index]
+  }
+  const exact: number[] = []
+  const contained: number[] = []
+  for (let index = 0; index < entries.length; index++) {
+    const entry = entries[index]
+    if (!isUserEntry(entry)) continue
+    const entryText = entryTextOf(entry)
+    if (entryText === undefined) continue
+    if (entryText === text) exact.push(index)
+    else if (entryText.includes(text)) contained.push(index)
+  }
+  return exact.length > 0 ? exact : contained
+}
+
+/**
+ * Follows the answer to one send on another device's session. A queued send's user entry in the session's transcript
+ * anchors its turn: its answer entries print once the turn is final - superseded by a later message's turn, or the
+ * transcript's tail when a run settled - with the record stream as the completion signal. A started send or a steer
+ * prints its deltas from the aim on instead, settling with its run.
  */
 export async function followRemote(
   remote: RemoteThreadSurface,
   row: RemoteSessionRow,
   onText: (text: string) => void,
+  options?: {
+    /** The text the send delivered; its user entry in the transcript anchors a queued follow's answer. */
+    readonly text?: string
+    /** The client message id the send carried; the entry senpi stamps with it anchors before any text match. */
+    readonly clientMessageId?: string
+  },
 ): Promise<RemoteFollow | Failure> {
   const offline = await deviceOnline(remote, row.device)
   if (offline !== undefined) return offline
@@ -169,12 +255,127 @@ export async function followRemote(
   const settled = new Promise<string>((resolve) => {
     settle = resolve
   })
+  let done = false
+  const end = (reason: string): void => {
+    if (done) return
+    done = true
+    settle(reason)
+  }
+  let mode: "buffer" | "stream" | "transcript" = "buffer"
   let last: { readonly index: unknown; readonly endsLine: boolean } | undefined
   let newMessage = false
-  const watched = await remote.sessions.watch(row.device, row.session_id, (record) => {
-    // senpi settles a turn the session's close cut short with reason session_closed: that turn never finished.
-    if (record["type"] === "agent_settled")
-      return settle(record["reason"] === "session_closed" ? "session_closed" : "settled")
+  let checking = false
+  let pendingSignal = false
+  // Without a client message id: this send's ordinal among identical-text entries, fixed at its first read (its own
+  // entry assumed the newest).
+  let matchOrdinal: number | undefined
+  // With an id the engine has not stamped: the identities of the user entries carrying this send's text at its first
+  // read. A queued entry is stored only when the queue drains, so every one of them is an earlier send (#13272 review).
+  let earlierEntries: ReadonlySet<string> | undefined
+  const check = async (settleSignal: boolean): Promise<void> => {
+    const text = options?.text
+    if (done || mode !== "transcript" || text === undefined) return
+    if (checking) {
+      if (settleSignal) pendingSignal = true
+      return
+    }
+    checking = true
+    try {
+      const page = await remote.sessions.read(row.device, row.session_id, READ_TAIL)
+      if (done || mode !== "transcript" || page.kind !== "ok") return
+      const raw = page.response["entries"]
+      if (!Array.isArray(raw)) return
+      const entries = raw.filter(isRecord)
+      const clientMessageId = options?.clientMessageId
+      const own =
+        clientMessageId === undefined
+          ? -1
+          : entries.findIndex((entry) => isUserEntry(entry) && entryClientMessageIdOf(entry) === clientMessageId)
+      let anchor: number
+      if (own >= 0) anchor = own
+      else {
+        const matches = anchorMatches(entries, text)
+        if (clientMessageId === undefined) {
+          if (matches.length === 0) return
+          if (matchOrdinal === undefined) matchOrdinal = matches.length
+          anchor = matches[Math.min(matchOrdinal, matches.length) - 1]
+        } else {
+          // senpi stores a queued send's entry only when the queue drains, so a send that carries an id and finds no
+          // entry with it has not been stored yet: every user entry carrying its text that its first read sees is an
+          // earlier send. Its own is the first exact one after those, else the first wrapped one (another message that merely
+          // contains the text must not win over the send's own exact entry), keyed by entry identity so older
+          // entries scrolling out of the read window cannot shift it (#13272 review). It waits for that entry rather
+          // than print an older answer.
+          const carrying = textCarryingUserEntries(entries, text)
+          if (earlierEntries === undefined)
+            earlierEntries = new Set(carrying.map((index) => entryKeyOf(entries[index])))
+          const seen = earlierEntries
+          const unseen = carrying.filter((index) => !seen.has(entryKeyOf(entries[index])))
+          const fresh = unseen.find((index) => entryTextOf(entries[index]) === text) ?? unseen[0]
+          if (fresh === undefined) return
+          anchor = fresh
+        }
+      }
+      const answer: string[] = []
+      let superseded = false
+      let answerAtTail = false
+      let stopReason: unknown
+      for (let index = anchor + 1; index < entries.length; index++) {
+        const entry = entries[index]
+        const message = isRecord(entry["message"]) ? entry["message"] : entry
+        if (message["role"] === "user") {
+          superseded = true
+          break
+        }
+        if (message["role"] !== "assistant") continue
+        stopReason = message["stopReason"]
+        const entryText = entryTextOf(entry)
+        if (entryText !== undefined && entryText !== "") {
+          answer.push(entryText)
+          answerAtTail = true
+        } else answerAtTail = false
+      }
+      // A later message's turn makes this send's turn final whether it wrote text or not: the wait ends instead of
+      // living until the session closes (#13272 review).
+      // A turn stopped before it finished stores its last assistant message as "aborted" (#13272 review).
+      const interrupted = stopReason === "aborted"
+      if (superseded) {
+        for (const [index, entryText] of answer.entries()) {
+          if (index > 0) onText("\n")
+          onText(entryText)
+        }
+        return end(interrupted ? "interrupted" : "settled")
+      }
+      // A queued send whose run settled without writing any answer keeps waiting: its run may simply not have
+      // started yet, and the attach's own end still ends the wait with a typed reason. An interrupted turn is final
+      // with or without text.
+      if (answer.length === 0 && !(settleSignal && interrupted)) return
+      if (settleSignal && (answerAtTail || interrupted)) {
+        for (const [index, entryText] of answer.entries()) {
+          if (index > 0) onText("\n")
+          onText(entryText)
+        }
+        end(interrupted ? "interrupted" : "settled")
+      }
+    } finally {
+      checking = false
+      if (pendingSignal) {
+        pendingSignal = false
+        void check(true)
+      }
+    }
+  }
+  // The stop reason of the run's last assistant message: an interrupted turn ends its run with "aborted" (#13272).
+  let lastStopReason: unknown
+  const streamRecord = (record: JsonObject): void => {
+    if (record["type"] === "agent_settled") {
+      if (record["reason"] === "session_closed") return end("session_closed")
+      return end(lastStopReason === "aborted" ? "interrupted" : "settled")
+    }
+    if (record["type"] === "message_end") {
+      const message = record["message"]
+      if (isRecord(message) && message["role"] === "assistant") lastStopReason = message["stopReason"]
+    }
     if (record["type"] === "message_start" || record["type"] === "message_end") newMessage = true
     const event = record["assistantMessageEvent"]
     if (
@@ -190,8 +391,97 @@ export async function followRemote(
     newMessage = false
     last = { index: event["contentIndex"], endsLine: delta.endsWith("\n") }
     onText(delta)
-  })
+  }
+  const probe = async (settleSignal: boolean): Promise<void> => {
+    const text = options?.text
+    if (done || text === undefined) return
+    const page = await remote.sessions.read(row.device, row.session_id, READ_TAIL)
+    if (done || page.kind !== "ok") return
+    const raw = page.response["entries"]
+    if (!Array.isArray(raw)) return
+    const entries = raw.filter(isRecord)
+    const matches = anchorMatches(entries, text, options?.clientMessageId)
+    if (matches.length === 0) return
+    const anchor = matches[matches.length - 1]
+    const answer: string[] = []
+    let superseded = false
+    let answerAtTail = false
+    let stopReason: unknown
+    for (let index = anchor + 1; index < entries.length; index++) {
+      const entry = entries[index]
+      const message = isRecord(entry["message"]) ? entry["message"] : entry
+      if (message["role"] === "user") {
+        superseded = true
+        break
+      }
+      if (message["role"] !== "assistant") continue
+      stopReason = message["stopReason"]
+      const entryText = entryTextOf(entry)
+      if (entryText !== undefined && entryText !== "") {
+        answer.push(entryText)
+        answerAtTail = true
+      } else answerAtTail = false
+    }
+    // Final once a later message supersedes the turn, or once a run settled (the buffer's own trailing settle
+    // counts: the turn finished before the aim) with this answer as the transcript's tail.
+    const interrupted = stopReason === "aborted"
+    if (!(superseded || (settleSignal && (answerAtTail || interrupted)))) return
+    if (answer.length === 0 && !interrupted) return
+    for (const [index, entryText] of answer.entries()) {
+      if (index > 0) onText("\n")
+      onText(entryText)
+    }
+    end(interrupted ? "interrupted" : "settled")
+  }
+  const buffer: JsonObject[] = []
+  const receive = (record: JsonObject): void => {
+    // A run's settle always ends the wait, whatever the mode (senpi settles a turn the session's close cut short
+    // with reason session_closed).
+    if (record["type"] === "agent_settled" && record["reason"] === "session_closed") return end("session_closed")
+    if (mode === "buffer") {
+      // The attach's replayed history is never this send's answer: it arrived before the aim and is dropped (#13267).
+      buffer.push(record)
+      return
+    }
+    if (mode === "stream") return streamRecord(record)
+    // Transcript mode reads the answer from the session; the stream is only a signal - a settle, a run end or a
+    // new user message means the transcript may hold this send's answer - because no event order can attribute a
+    // queued follow-up's records to its turn (#13272 review).
+    const type = record["type"]
+    if (type === "agent_settled") void check(true)
+    else if (type === "agent_end") void check(false)
+    else if (type === "message_start" && isRecord(record["message"]) && record["message"]["role"] === "user")
+      void check(false)
+  }
+  const aim: RemoteFollow["aim"] = (lane) => {
+    if (done || mode !== "buffer") return
+    if (lane === "queued") {
+      mode = "transcript"
+      void check(false)
+      return
+    }
+    // A send that started or steered a turn streams its deltas from the aim on. Whatever the attach replayed before
+    // the aim is history and is dropped; the wait ends at the run's settle - retries included (#13267, #13272
+    // review). A started turn may also have already finished before this aim: the probe reads the transcript and
+    // prints a superseded answer at once.
+    mode = "stream"
+    // The run's own records the buffer already holds (after its agent_start) still say how its last message ended:
+    // a turn aborted before the aim and settled after it is interrupted, not settled (#13272 review L2).
+    const runStart = buffer.findLastIndex((record) => record["type"] === "agent_start")
+    if (runStart >= 0)
+      for (const record of buffer.slice(runStart + 1)) {
+        const ended = record["message"]
+        if (record["type"] === "message_end" && isRecord(ended) && ended["role"] === "assistant")
+          lastStopReason = ended["stopReason"]
+      }
+    if (lane === "started") {
+      // A run whose settle the buffer already holds ended before this aim: its settle is the probe's signal.
+      const settledAlready = buffer.length > 0 && buffer[buffer.length - 1]?.["type"] === "agent_settled"
+      void probe(settledAlready)
+    }
+  }
+  const watched = await remote.sessions.watch(row.device, row.session_id, receive)
   if (watched.kind !== "ok") return outcomeFailure(watched, row.device)
-  void watched.watch.ended.then(settle)
-  return { settled, stop: watched.watch.stop }
+  void watched.watch.ended.then(end)
+  return { settled, stop: watched.watch.stop, aim }
 }

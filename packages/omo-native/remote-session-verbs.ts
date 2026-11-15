@@ -198,6 +198,8 @@ async function sendTo(
     relay: createRelayTransport({ remote, store, senderProvenance }),
   })
   const person = { kind: "person" as const, uid: process.getuid?.() ?? 0, user: userInfo().username }
+  // A waiting send names its prompt, so the follow finds the entry senpi stores for it whatever text it holds.
+  const clientMessageId = args.wait ? randomUUID() : undefined
   const deliver = async (): Promise<ThreadToolResult> => {
     const sent = await pipeline.deliver({
       sender: person,
@@ -206,6 +208,7 @@ async function sendTo(
       text: args.text,
       mode: args.delivery,
       idempotency_key: randomUUID(),
+      ...(clientMessageId === undefined ? {} : { client_message_id: clientMessageId }),
       args: { target: label, text: args.text, delivery: args.delivery },
     })
     if (sent.kind === "error") return sent
@@ -240,15 +243,26 @@ async function sendTo(
       const sent = await deliver()
       return nothingToSteer(sent) ?? show(sent, label)
     }
-    // Followed before the send, so no delta of the turn it starts can arrive unseen.
+    // Followed before the send, so no delta of the turn it starts can arrive unseen, and aimed once the send's own
+    // reply names its lane: a started or steered send streams its turn from the aim, a queued one is read from the
+    // transcript anchored on this send's user entry, so only that turn's text prints and only its end ends the wait
+    // (#13267).
     let reply = ""
-    follow = await followRemote(remote, row, (text) => {
-      reply += text
-      if (!json) dependencies.write(text)
-    })
+    follow = await followRemote(
+      remote,
+      row,
+      (text) => {
+        reply += text
+        if (!json) dependencies.write(text)
+      },
+      { text: args.text, ...(clientMessageId === undefined ? {} : { clientMessageId }) },
+    )
     if ("kind" in follow) return show(follow, label)
     const sent = await deliver()
     if (sent.kind === "error") return nothingToSteer(sent) ?? show(sent, label)
+    // The ok send always carries its delivery; without one the attach's own end still settles the follow below.
+    if ("delivery" in sent)
+      follow.aim(sent.delivery.kind === "started" ? "started" : sent.delivery.kind === "steered" ? "steered" : "queued")
     // A send that waits behind a running turn says so at once (#13268); stdout stays the answer alone, so this is stderr.
     const waitNotice = sendWaitNotice(label, sent)
     if (waitNotice !== null && !json) dependencies.error(waitNotice)
@@ -256,6 +270,10 @@ async function sendTo(
     if (!json && reply.length > 0 && !reply.endsWith("\n")) dependencies.write("\n")
     // --json: the send's typed result, with the answer it streamed.
     if (json && end === "settled") dependencies.output(JSON.stringify({ ...sent, reply }))
+    if (end === "interrupted") {
+      dependencies.error(`omo remote: the turn on ${label} was interrupted before it finished.`)
+      return REMOTE_EXIT.failed
+    }
     if (end !== "settled") {
       dependencies.error(`omo remote: the session on ${row.device} ended before its turn settled (${end}).`)
       return REMOTE_EXIT.failed
