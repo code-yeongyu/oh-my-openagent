@@ -108,6 +108,33 @@ test(
 )
 
 test(
+  "a stable hold adds no engine state write: each further idle cycle writes the state once, for its sync time, and the hold still counts its cycles (#12393)",
+  async () => {
+    const held = await makeDevice(new FakeSyncServer(), "held", undefined, { batchBytes: 1024 })
+    devices.push(held)
+    await held.write("big.md", `${"q".repeat(4096)}\n`)
+    const heldAt = held.clock.now()
+    await held.engine.runCycle()
+    const writes = spyOn(held.engine.journal, "updateState")
+    for (let cycle = 0; cycle < 3; cycle += 1) {
+      held.clock.advance(10_000)
+      expect(await held.engine.runCycle()).toMatchObject({ held: ["big.md"] })
+    }
+    const count = writes.mock.calls.length
+    writes.mockRestore()
+    expect(count).toBe(3)
+    expect((await held.engine.state()).lastSyncedAt).toBe(held.clock.now())
+    expect(await held.engine.status()).toMatchObject({
+      kind: "failing",
+      since: heldAt,
+      attempts: 4,
+      failure: { kind: "oversized_item", keys: ["big.md"] },
+    })
+  },
+  SMALL_SET_TIMEOUT,
+)
+
+test(
   "a refused entry is never hidden behind a held file: the pause carries the hold, which shows on its own once the refusal clears",
   async () => {
     const server = new FakeSyncServer()

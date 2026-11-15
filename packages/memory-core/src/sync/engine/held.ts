@@ -10,7 +10,7 @@ import { createHash } from "node:crypto"
 import { MAX_BATCH_BYTES, planBatches } from "./batches"
 import type { EngineDeps } from "./engine-deps"
 import { describeOversizedItems, type SyncFailure } from "./failure"
-import type { HeldItems, OwedRender, SyncJournal } from "./journal"
+import type { EngineState, HeldItems, OwedRender, SyncJournal } from "./journal"
 
 export const batchBound = (deps: EngineDeps): number => deps.batchBytes ?? MAX_BATCH_BYTES
 
@@ -30,15 +30,27 @@ export const heldPrint = (text: string | null, version: string): string =>
     .update(text === null ? "\u0000absent" : `t:${text}`)
     .digest("hex")}@${version}`
 
+/** Whether two holds name the same items the same way: the cycle count alone is no change. */
+const sameHold = (a: HeldItems | null, b: HeldItems | null): boolean =>
+  a === null || b === null
+    ? a === b
+    : JSON.stringify([a.keys, a.stuck ?? [], Object.entries(a.prints ?? {}).sort()]) ===
+      JSON.stringify([b.keys, b.stuck ?? [], Object.entries(b.prints ?? {}).sort()])
+
 /**
  * Records this cycle's held keys and returns them: `captured` by fingerprint, plus the stuck ones (pending
  * ops no batch can carry and this device could not wind back, and the `withheld` keys it must not send).
+ * `settled` is what the cycle writes to the state anyway (its sync time, when it saw no refusal). The hold
+ * rides on that write, and is written on its own only when it begins, ends or names other items (#12393):
+ * a hold that only lasts one more cycle in a cycle that writes nothing else costs no write, and its count
+ * waits for the next write.
  */
 export async function recordHeld(
   deps: EngineDeps,
   journal: SyncJournal,
   captured: ReadonlyMap<string, string>,
   withheld: ReadonlySet<string>,
+  settled: Partial<EngineState> = {},
 ): Promise<readonly string[]> {
   const stuck = [
     ...new Set([
@@ -58,7 +70,7 @@ export async function recordHeld(
           cycles: (previous?.cycles ?? 0) + 1,
           prints: Object.fromEntries(captured),
         }
-  await journal.updateState({ held })
+  if (Object.keys(settled).length > 0 || !sameHold(previous, held)) await journal.updateState({ ...settled, held })
   return keys
 }
 
