@@ -3,6 +3,7 @@
 // key the engine compares to announce transitions only.
 
 import { describeSyncFailure, isFailureShown, type SyncFailure } from "./failure"
+import type { SyncStage } from "./failure-cause"
 import type { Frozen } from "./push-cycle"
 
 interface Failing {
@@ -40,8 +41,8 @@ export class StatusTracker {
     this.shown = null
   }
 
-  failed(error: unknown): void {
-    const failure = describeSyncFailure(error)
+  failed(error: unknown, stage: SyncStage): void {
+    const failure = describeSyncFailure(error, stage)
     const previous = this.failing
     const failing =
       previous?.failure.kind === failure.kind

@@ -98,6 +98,39 @@ test(
 )
 
 test(
+  "a cycle stopped by a full disk while applying names the disk, its errno code and the stage, and logs the whole error (#13635)",
+  async () => {
+    const server = new FakeSyncServer()
+    const lines: string[] = []
+    const a = await makeDevice(server, "a")
+    const b = await makeDevice(server, "b", undefined, { log: (line) => lines.push(line) })
+    devices.push(a, b)
+    await b.engine.runCycle()
+    await a.write("one.md", "one\n")
+    await a.engine.runCycle()
+    const full = new Error("commit failed", {
+      cause: Object.assign(new Error("ENOSPC: no space left on device, write"), { code: "ENOSPC" }),
+    })
+    const commit = spyOn(b.repo, "commit").mockImplementation(async () => {
+      throw full
+    })
+
+    expect(await failedCycle(b)).toBe(full)
+
+    expect(await b.engine.status()).toMatchObject({
+      kind: "failing",
+      failure: { kind: "disk_full", cause: { errorClass: "Error", code: "ENOSPC", stage: "apply" } },
+    })
+    const logged = lines.filter((line) => line.startsWith("sync cycle failed"))
+    expect(logged).toEqual([expect.stringContaining("during apply")])
+    expect(logged[0]).toContain(String(full.stack))
+    expect(logged[0]).toContain("ENOSPC: no space left on device")
+    commit.mockRestore()
+  },
+  GIT_TEST_TIMEOUT,
+)
+
+test(
   "an unexpected cycle error reports failing with a generic reason, never the raw error text",
   async () => {
     const { b } = await pair()
@@ -106,7 +139,11 @@ test(
     })
     expect(String(await failedCycle(b))).toContain("secret-value")
     const status = await b.engine.status()
-    expect(status).toMatchObject({ kind: "failing", attempts: 1, failure: { kind: "unknown" } })
+    expect(status).toMatchObject({
+      kind: "failing",
+      attempts: 1,
+      failure: { kind: "unknown", cause: { errorClass: "Error", stage: "load" } },
+    })
     expect(JSON.stringify(status)).not.toContain("secret-value")
     load.mockRestore()
     await b.engine.runCycle()

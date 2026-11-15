@@ -140,6 +140,19 @@ export class SyncJournal {
     return next
   }
 
+  /**
+   * A journal names the device peer it was created under. One from another peer arrived with a
+   * copied repo: its pending ops are that device's to push, so it is retired, never resumed.
+   */
+  async claim(peer: string, log?: (line: string) => void): Promise<void> {
+    const owner = (await this.state()).peer
+    if (owner !== null && owner !== peer) {
+      log?.(`sync: journal belongs to peer ${owner}, this device is ${peer}; retiring it`)
+      await this.retire()
+    }
+    if (owner !== peer) await this.updateState({ peer })
+  }
+
   /** Moves the whole journal aside (another device's, carried by a copied repo); a fresh one starts empty. */
   async retire(): Promise<void> {
     try {
