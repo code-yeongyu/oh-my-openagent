@@ -74,7 +74,8 @@ async function removeRequested(record: Record<string, unknown>, root: string, gi
   // `branch -D` would drop. The reflog of a branch a create just made holds exactly its creation entry; a second entry
   // means work happened on the branch, and a branch whose reflog shows anything else - nothing readable, no entries at
   // all (git reports an empty reflog with exit 0), or an unreadable one - is refused the same way (#13450 re-review
-  // L2). The one a failed open left is fresh and has exactly the one entry. Work outside git's view (an excluded folder
+  // L2). A repo with reflogs disabled reports no entry even for a branch just made, so there even the worktree a failed
+  // open left is refused and stays for its local owner to remove. Work outside git's view (an excluded folder
   // elsewhere) is not covered.
   const status = await git(["status", "--porcelain", "--ignored", "--untracked-files=all"], path)
   if (status.exit !== 0 || status.stdout.trim() !== "")
