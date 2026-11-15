@@ -45,6 +45,16 @@ describe("thread_create: the folder a new thread starts in", () => {
     })
   })
 
+  test("#given b says the cwd is a file #when the thread is created there #then invalid_arguments not_a_directory naming b", async () => {
+    const a = account({ refuse: "session_cwd_not_directory" })
+    const { run } = surface(a.remote)
+    const result = await run("thread_create", { device: "studio", cwd: "/etc/hostname" })
+    expect(failure(result)).toMatchObject({
+      code: "invalid_arguments",
+      details: { reason: "not_a_directory", device: "b", path: "/etc/hostname" },
+    })
+  })
+
   test("#given a Windows absolute cwd #when the thread is created on device b #then it is passed to b unchanged", async () => {
     const a = account()
     const { run } = surface(a.remote)
