@@ -9,7 +9,7 @@ import { launchdSessionHostPlist, SESSION_HOST_LAUNCHD_LABEL, type SessionHostLa
 // plist (launchd has no drop-ins). The device service's installer rewrites that plist on every install and update and
 // drops the table, so every bootstrap checks it and writes it back (the installer carrying it forward is tracked with
 // the device service). plutil edits the plist in place and keeps it XML, which the installer reads as text.
-export const RELAYD_LAUNCHD_LABEL = "ai.omo.relay-daemon"
+const RELAYD_LAUNCHD_LABEL = "ai.omo.relay-daemon"
 
 const TABLE_KEY = `EnvironmentVariables.${SERVICE_TABLE_ENV}`
 const BOOTSTRAP_ATTEMPTS = 5

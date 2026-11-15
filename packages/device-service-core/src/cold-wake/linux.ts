@@ -12,8 +12,8 @@ import {
 // Linux: the session host is a systemd user unit, and the table lives in a drop-in of the device service's unit. Its
 // installer rewrites the unit file itself on every install and update but never a drop-in, and a drop-in leaves the
 // unit's FragmentPath alone, so the installer still recognises its own registration.
-export const RELAYD_SYSTEMD_UNIT = "omo-relay-daemon.service"
-export const COLD_WAKE_DROP_IN = "50-omo-cold-wake.conf"
+const RELAYD_SYSTEMD_UNIT = "omo-relay-daemon.service"
+const COLD_WAKE_DROP_IN = "50-omo-cold-wake.conf"
 
 const unitDir = (home: string): string => join(home, ".config", "systemd", "user")
 const dropInPath = (home: string): string => join(unitDir(home), `${RELAYD_SYSTEMD_UNIT}.d`, COLD_WAKE_DROP_IN)

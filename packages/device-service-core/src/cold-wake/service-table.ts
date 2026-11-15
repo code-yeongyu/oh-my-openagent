@@ -3,7 +3,7 @@ import { SESSION_HOST_LAUNCHD_LABEL, SESSION_HOST_SYSTEMD_UNIT } from "./session
 // The device service's launch-time service table (read once at its start) and the one entry it starts for a cold wake.
 // omo owns only that entry: every other entry is kept as written, and a table that does not parse is never rewritten.
 export const SERVICE_TABLE_ENV = "OMO_RELAYD_SERVICES"
-export const COLD_WAKE_SERVICE = "omo"
+const COLD_WAKE_SERVICE = "omo"
 
 export type ServicePlatform = "linux" | "darwin"
 

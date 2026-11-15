@@ -54,7 +54,7 @@ export function coldWakeSetup(options: {
 }
 
 /** One line for stderr when the cold wake could not be set up or removed; nothing when it was, or never applies here. */
-export function coldWakeNotice(outcome: ColdWakeOutcome): string | undefined {
+function coldWakeNotice(outcome: ColdWakeOutcome): string | undefined {
   switch (outcome.kind) {
     case "installed":
     case "removed":
