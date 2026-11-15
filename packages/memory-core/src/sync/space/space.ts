@@ -5,6 +5,8 @@
 // remote-less project, so restarts keep one space. The git-backed store reads and writes
 // the memory repo's LOCAL config only.
 
+import { join } from "node:path"
+
 import { memoryGitEnvironment } from "../../git/exec-environment"
 import { AUTO_AGENT_VALUE } from "../../identity/resolve"
 import type { BindingKey, Remote } from "./binding"
@@ -75,6 +77,19 @@ export class GitSpaceConfig implements SpaceConfigStore {
     const out = runGit(this.repoDir, ["config", "--local", key, value])
     if (out === null) throw new Error(`GitSpaceConfig: failed to write ${key}`)
   }
+}
+
+/**
+ * True once the memory repository holds its first commit: `git init` and the first memory write have both finished, so
+ * no other writer is still creating its config (#13486). Asked through `--git-dir`, so a half-created `.git` is never a
+ * repository and git cannot fall through to a checkout above the memory root.
+ */
+export function repoHasCommit(repoDir: string): boolean {
+  const r = Bun.spawnSync(
+    ["git", "--git-dir", join(repoDir, ".git"), "rev-parse", "--verify", "--quiet", "HEAD^{commit}"],
+    { env: memoryGitEnvironment(process.env) },
+  )
+  return r.exitCode === 0
 }
 
 export function listRemotes(repoDir: string): Remote[] {

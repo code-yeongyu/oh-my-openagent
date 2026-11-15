@@ -38,4 +38,4 @@ export type { PhraseGate, PhraseGateRefusal, ServiceFloor } from "../genesis/phr
 export { readServiceFloor } from "../genesis/phrase-gate.ts"
 export { SYNC_CAPABILITIES, SYNC_CONTRACT_VERSION } from "../contract-version.ts"
 export type { DeviceKeyMaterial } from "../keyring-port"
-export { GitSpaceConfig, listRemotes, resolveSpace } from "../space/space"
+export { GitSpaceConfig, listRemotes, repoHasCommit, resolveSpace } from "../space/space"
