@@ -34,6 +34,8 @@
         "src/components/memory/palace/runtime.ts",
         "src/components/memory/recall-store-runtime.ts",
         "src/components/memory/sync-runtime.ts",
+        // spawned by path as the supervisor in spawn-supervisor-exit.test.ts
+        "src/components/memory/worker/__fixtures__/supervisor-exits-unpublished.ts",
         "src/components/onboarding/session-history/runtime.ts",
         "src/components/onboarding/session-history/test-support.ts",
         "src/components/onboarding/test-harness.ts",
@@ -726,8 +728,6 @@
     "packages/omo-senpi/src/components/memory/worker/model-cost.ts": ["estimateFreshCost", "estimateInheritCost"],
     // pre-existing at origin dev 4686e425b5: unused export(s) renderReflectionParkedEntry
     "packages/omo-senpi/src/components/memory/worker/park-alert.ts": ["renderReflectionParkedEntry"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) probeUntil
-    "packages/omo-senpi/src/components/memory/worker/process-liveness.test-support.ts": ["probeUntil"],
     // pre-existing at origin dev 4686e425b5: unused export(s) REFLECTION_REPORT_MAX_BYTES
     "packages/omo-senpi/src/components/memory/worker/reflection-recap.ts": ["REFLECTION_REPORT_MAX_BYTES"],
     // pre-existing at origin dev 4686e425b5: unused export(s) recoverUnpublishedWorktreeTip
@@ -850,8 +850,8 @@
     "packages/omo-senpi/src/components/thread/gateway/schema.ts": ["GATEWAY_TABLES"],
     // pre-existing at origin dev 4686e425b5: unused export(s) recordThreadCreation, sessionCall
     "packages/omo-senpi/src/components/thread/gateway/store-extension-session-ops.ts": ["recordThreadCreation", "sessionCall"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) GatewayMigrationError, migrate, reconcile, claim, recordOutcome, refuseQueued, listDeliveries, isReferenced, journalMode, stats and 1 more
-    "packages/omo-senpi/src/components/thread/gateway/store-ops.ts": ["GatewayMigrationError", "migrate", "reconcile", "claim", "recordOutcome", "refuseQueued", "listDeliveries", "isReferenced", "journalMode", "stats", "migrateLegacyMailboxes"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) migrate, reconcile, claim, recordOutcome, refuseQueued, listDeliveries, isReferenced, journalMode, stats, migrateLegacyMailboxes
+    "packages/omo-senpi/src/components/thread/gateway/store-ops.ts": ["migrate", "reconcile", "claim", "recordOutcome", "refuseQueued", "listDeliveries", "isReferenced", "journalMode", "stats", "migrateLegacyMailboxes"],
     // pre-existing at origin dev 4686e425b5: unused export(s) registerIncarnation, clearEndpoint, sessionOwner
     "packages/omo-senpi/src/components/thread/gateway/store-ownership.ts": ["registerIncarnation", "clearEndpoint", "sessionOwner"],
     // pre-existing at origin dev 4686e425b5: unused export(s) toolReceiptBegin, toolReceiptSettle, registerIncarnation, pendingCompletionArms, latestCompletionArm, closeQuestion
@@ -860,8 +860,8 @@
     "packages/omo-senpi/src/components/thread/gateway/store-retention.ts": ["sweepRetention"],
     // pre-existing at origin dev 4686e425b5: unused export(s) matcherAwaits
     "packages/omo-senpi/src/components/thread/gateway/worker-reply-matchers.test.ts": ["matcherAwaits"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) messageText, parseSessionLines, summarizeSessionEntries
-    "packages/omo-senpi/src/components/thread/session-facts.ts": ["messageText", "parseSessionLines", "summarizeSessionEntries"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) messageText
+    "packages/omo-senpi/src/components/thread/session-facts.ts": ["messageText"],
     // pre-existing at origin dev 4686e425b5: unused export(s) THREAD_LINK_SCHEME
     "packages/omo-senpi/src/components/thread/thread-link.ts": ["THREAD_LINK_SCHEME"],
     // pre-existing at origin dev 4686e425b5: unused export(s) resolveCallerDurableId

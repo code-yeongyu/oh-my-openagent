@@ -379,6 +379,23 @@ describe("checkExtensionCurrent", () => {
     expect(threadClientInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(true)
   })
 
+  test("#given thread_create's folder and worktree code #when bundle inputs are inspected #then it lives only in the thread client sidecar", async () => {
+    const { mainInputs, threadClientInputs } = await sharedOutputs()
+    for (const suffix of [
+      "/components/thread/control/local-open.ts",
+      "/components/thread/worktree/thread-worktree.ts",
+      "/components/thread/worktree/discard-worktree.ts",
+      "/components/thread/worktree/failures.ts",
+      "/components/thread/worktree/worktree-rpc.ts",
+      "/components/thread/worktree/remote-worktree.ts",
+      "/components/thread/remote/create-folder.ts",
+      "/components/thread/remote/plan-create.ts",
+    ]) {
+      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(false)
+      expect(threadClientInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(true)
+    }
+  })
+
   test("#given lazy session-summary recovery #when bundle inputs are inspected #then the recovery sweep is confined to its sidecar", async () => {
     const { mainInputs, telemetryRecoveryInputs } = await sharedOutputs()
     const suffix = "/components/telemetry/session-summary-recovery.ts"
