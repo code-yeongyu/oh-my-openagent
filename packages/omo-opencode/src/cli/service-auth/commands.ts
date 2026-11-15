@@ -115,7 +115,7 @@ async function run(
       console.log("Signed out of OmO. Stored credentials and device keys were removed.")
       if (!revoked)
         console.error(
-          "Server device revocation could not be confirmed. Remove this device from the Devices page of your OmO account when connected.",
+          "Server device revocation could not be confirmed. The next omo login on this computer revokes it; to revoke it sooner, remove this device from the Devices page of your OmO account.",
         )
       return
     }
