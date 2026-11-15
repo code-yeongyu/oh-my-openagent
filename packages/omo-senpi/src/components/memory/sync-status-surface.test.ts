@@ -161,12 +161,15 @@ test("#given a change for the active repo #when it is delivered #then the footer
 
 test.each([
   [
-    "files held for being too large (#12284)",
+    "files held for being too large (#12284, #12392)",
     {
-      kind: "failing",
-      since: 0,
-      attempts: 1,
-      failure: { kind: "oversized_item", keys: ["big.md"], stuck: [], limitBytes: 8388608, reason: "r", action: "a" },
+      kind: "held",
+      at: 1,
+      held: {
+        since: 0,
+        attempts: 1,
+        failure: { kind: "oversized_item", keys: ["big.md"], stuck: [], limitBytes: 8388608, reason: "r", action: "a" },
+      },
     } as const,
     SYNC_HELD_NOTICE_PREFIX,
   ],

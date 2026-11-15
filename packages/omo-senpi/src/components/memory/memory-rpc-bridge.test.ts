@@ -794,8 +794,9 @@ describe("memory rpc bridge sync field (omo #10637)", () => {
     bridge.dispose()
   })
 
-  // A held file (#12284) reaches the desktop the same way as a freeze above: a failure of the "unknown" kind,
-  // carrying its reason, action and held keys (the desktop's schema ignores fields it does not know).
+  // A held file (#12284) is not a failure (#12392): it reaches the desktop as the synced (or never synced) state it
+  // is, with an additive `held` object naming the files (the desktop's schema ignores fields it does not know). A
+  // pause that carries held files keeps the "unknown" failure an older desktop renders, and names them the same way.
   const cases: ReadonlyArray<readonly [string, SyncStatusReader, MemoryRpcSync | undefined]> = [
     [
       "synced",
@@ -819,31 +820,58 @@ describe("memory rpc bridge sync field (omo #10637)", () => {
       { state: "unavailable" },
     ],
     [
-      "holding files too large to sync (#12284)",
+      "holding files too large to sync, everything else synced (#12284, #12392)",
       async () => ({
-        kind: "failing",
-        since: Date.parse("2026-10-22T10:00:00.000Z"),
-        attempts: 2,
-        failure: {
-          kind: "oversized_item",
-          keys: ["big.md", "old.md"],
-          stuck: ["old.md"],
-          limitBytes: 8388608,
-          reason: "r",
-          action: "a",
+        kind: "held",
+        at: Date.parse("2026-10-22T11:00:00.000Z"),
+        held: {
+          since: Date.parse("2026-10-22T10:00:00.000Z"),
+          attempts: 2,
+          failure: {
+            kind: "oversized_item",
+            keys: ["big.md", "old.md"],
+            stuck: ["old.md"],
+            limitBytes: 8388608,
+            reason: "r",
+            action: "a",
+          },
         },
       }),
       {
-        state: "failing",
-        failure: {
-          kind: "unknown",
+        state: "synced",
+        lastSyncedAtISO: "2026-10-22T11:00:00.000Z",
+        held: {
+          keys: ["big.md", "old.md"],
+          stuckKeys: ["old.md"],
+          limitBytes: 8388608,
           reason: "r",
           action: "a",
           sinceISO: "2026-10-22T10:00:00.000Z",
           attempts: 2,
-          keys: ["big.md", "old.md"],
-          stuckKeys: ["old.md"],
+        },
+      },
+    ],
+    [
+      "holding files before any sync completed (#12392)",
+      async () => ({
+        kind: "held",
+        at: null,
+        held: {
+          since: Date.parse("2026-10-22T10:00:00.000Z"),
+          attempts: 1,
+          failure: { kind: "oversized_item", keys: ["big.md"], stuck: [], limitBytes: 8388608, reason: "r", action: "a" },
+        },
+      }),
+      {
+        state: "never_synced",
+        held: {
+          keys: ["big.md"],
+          stuckKeys: [],
           limitBytes: 8388608,
+          reason: "r",
+          action: "a",
+          sinceISO: "2026-10-22T10:00:00.000Z",
+          attempts: 1,
         },
       },
     ],
@@ -877,6 +905,15 @@ describe("memory rpc bridge sync field (omo #10637)", () => {
           keys: ["big.md", "old.md"],
           stuckKeys: ["old.md"],
           limitBytes: 8388608,
+        },
+        held: {
+          keys: ["big.md", "old.md"],
+          stuckKeys: ["old.md"],
+          limitBytes: 8388608,
+          reason: "r",
+          action: "a",
+          sinceISO: "2026-10-22T10:00:00.000Z",
+          attempts: 2,
         },
       },
     ],
