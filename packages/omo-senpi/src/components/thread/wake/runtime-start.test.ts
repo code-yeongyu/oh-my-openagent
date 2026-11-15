@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { AsyncLocalStorage, AsyncResource } from "node:async_hooks"
 import { mkdtempSync } from "node:fs"
 import { join } from "node:path"
 
@@ -481,6 +482,50 @@ describe("the wake's process scope", () => {
     const running = latch.running?.get(agentDir)
     expect(running).toBeDefined()
     expect(runs.length).toBe(1)
+    await running?.stop()
+  })
+
+  // #13456's MEDIUM M1: a send's wake reaches the carrier from the sending session's handler, so the renewal timer and
+  // the woken session's connection it creates would land in that session's handle ledger and be reclaimed at its
+  // shutdown. The wake must run in the process scope, as the carrier's start does.
+  test("#given a wake started in a process scope #when a sending session's handler wakes a session #then the carrier's renewal timer is created in the process scope, not the sender's", async () => {
+    const agentDir = mkdtempSync("/tmp/omo-wake-scope-")
+    const latch: ThreadWakeLatch = {}
+    latches.push(latch)
+    const store = createGatewayStore({ agentDir })
+    const context = new AsyncLocalStorage<string>()
+    const resource = context.run("process", () => new AsyncResource("omo-thread-wake-carrier-test"))
+    const scheduledIn: (string | undefined)[] = []
+    const options: ThreadWakeOptions = {
+      env: { HOME: agentDir },
+      latch,
+      store,
+      engineVersion: "2026.12.1",
+      minimumEngine: "2026.12.1",
+      connect: () => Promise.reject(new Error("no carrier may open a session")),
+      schedule: () => {
+        scheduledIn.push(context.getStore())
+        return () => undefined
+      },
+    }
+    startThreadWakeAtSession({ mode: "tui" }, {
+      options,
+      agentDir: () => agentDir,
+      sessionsDirectory: () => join(agentDir, "sessions"),
+      settings: () => ({ sameDevice: true, wakeLimit: 0 }),
+      engineVersion: "2026.12.1",
+      ensureHost: undefined,
+      warn: () => undefined,
+      scope: { runInAsyncScope: (fn) => resource.runInAsyncScope(fn) },
+    })
+    const running = latch.running?.get(agentDir)
+    expect(running).toBeDefined()
+    await running?.ready
+    const before = scheduledIn.length
+    await context.run("sessionA-send", () => running?.wake("0198a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b"))
+    // The wake armed the renewal timer, and every timer the wake runtime armed belongs to the process scope.
+    expect(scheduledIn.length).toBeGreaterThan(before)
+    expect(scheduledIn.filter((owner) => owner !== "process")).toEqual([])
     await running?.stop()
   })
 })
