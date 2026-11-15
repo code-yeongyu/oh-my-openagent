@@ -74,14 +74,16 @@ export async function installDarwin(host: ColdWakeHost, launch: SessionHostLaunc
   return applyTable(host, (raw) => withColdWake(raw, "darwin"), "installed")
 }
 
-// The bootout leaves the host the job started (AbandonProcessGroup), so the pinned one is drained next.
+// The bootout leaves the host the job started (AbandonProcessGroup), so the pinned one is drained next. Only when a
+// LaunchAgent was there: with none, no host is ours to end. The plist goes only after the drain, so a failed drain is
+// tried again by the next uninstall.
 export async function uninstallDarwin(host: ColdWakeHost, launch: SessionHostLaunch): Promise<ColdWakeOutcome> {
   const plist = plistPath(host.home, SESSION_HOST_LAUNCHD_LABEL)
   if (existsSync(plist)) {
     await host.run(["launchctl", "bootout", `gui/${host.uid}/${SESSION_HOST_LAUNCHD_LABEL}`])
+    const drainFailure = await drainPinnedHost(host, launch)
+    if (drainFailure !== undefined) return drainFailure
     removeIfPresent(plist)
   }
-  const drainFailure = await drainPinnedHost(host, launch)
-  if (drainFailure !== undefined) return drainFailure
   return applyTable(host, withoutColdWake, "removed")
 }
