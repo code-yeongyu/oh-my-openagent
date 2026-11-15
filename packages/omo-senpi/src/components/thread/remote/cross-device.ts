@@ -14,7 +14,7 @@ import {
   type RemoteThreadSurface,
 } from "./ports"
 import { remoteNotSetUp } from "./address-book"
-import { aliasFailure, deviceOnline, remoteAvailable } from "./remote-ops"
+import { aliasFailure, deviceOnline, onAccount, remoteAvailable } from "./remote-ops"
 
 type LocalEntry = {
   readonly thread_id: string
@@ -442,7 +442,7 @@ export async function listAcross(
   if (!listed.ok) return withAliases(remote, { ...local, remote_unavailable: "host_unavailable" }, ids)
   const listing = listed.listing
   const shown = listedStates(states)
-  const others = listing.rows.filter(
+  const others = onAccount(listing.rows, roster.ok ? roster.devices : undefined, here).filter(
     (row) => row.device !== here && !known.has(rowThreadId(row)) && shown.has(rowState(row)),
   )
   const threads = [

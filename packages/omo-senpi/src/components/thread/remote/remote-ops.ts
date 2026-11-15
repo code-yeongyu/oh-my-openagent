@@ -1,7 +1,14 @@
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import type { CommandResult } from "@oh-my-opencode/device-service-core"
 import { outcomeFailure, READ_UNCERTAIN } from "./outcome"
-import type { AliasError, AliasHolder, JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
+import type {
+  AliasError,
+  AliasHolder,
+  JsonObject,
+  RemoteDevice,
+  RemoteSessionRow,
+  RemoteThreadSurface,
+} from "./ports"
 
 type Failure = { readonly kind: "error"; readonly error: ThreadToolFailure }
 const fail = (
@@ -10,6 +17,21 @@ const fail = (
   next: string,
   details?: Readonly<Record<string, unknown>>,
 ): Failure => ({ kind: "error", error: threadToolFailure(code, message, next, details) })
+
+/**
+ * The listing rows whose device is still on the account: in its roster, or this device (the roster leaves this device
+ * out). A removed device's cached rows go; an offline one keeps its rows. With no roster (`undefined`) nothing can be
+ * judged, so every row stays, as before the account's device list was read.
+ */
+export function onAccount(
+  rows: readonly RemoteSessionRow[],
+  roster: readonly RemoteDevice[] | undefined,
+  here: string | null,
+): readonly RemoteSessionRow[] {
+  if (roster === undefined) return rows
+  const listed = new Set(roster.map((row) => row.device))
+  return rows.filter((row) => row.device === here || listed.has(row.device))
+}
 
 /** A5: the relay is paid only; on any other plan the remote path answers this, never a silent failure or a queue. */
 export async function remoteAvailable(remote: RemoteThreadSurface): Promise<Failure | undefined> {

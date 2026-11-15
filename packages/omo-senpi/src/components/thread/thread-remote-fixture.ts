@@ -104,6 +104,8 @@ export function createRemoteThreadFixture() {
       incomplete?: readonly string[]
       /** Extra devices the account lists beyond this one and b. */
       devices?: readonly RemoteDevice[]
+      /** Devices removed from the account: the listing still carries their cached rows, the roster no longer names them. */
+      removed?: readonly string[]
       /** The roster as relayd answers it: without this device (its row then comes from thisDeviceName). */
       rosterWithoutSelf?: boolean
       failDevices?: boolean
@@ -235,7 +237,7 @@ export function createRemoteThreadFixture() {
       ...(options.devices ?? []),
     ]
     for (const row of options.rows ?? [])
-      if (!devices.some((known) => known.device === row.device))
+      if (!devices.some((known) => known.device === row.device) && !(options.removed ?? []).includes(row.device))
         devices.push({ device: row.device, label: row.device, online: true })
     const registryCalls: string[] = []
     const down = <T>(): Promise<AliasResult<T>> =>
