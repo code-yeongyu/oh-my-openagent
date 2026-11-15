@@ -102,7 +102,7 @@ asked: derived numbers
 
 Values carry no parentheses; `pending` goes only with `answered_by: pending`. When an answer lands, rewrite that one line with `answered_by: user` and leave `asked:` as history; a late answer after `fact fill` is a re-render: fill again, then verify.
 
-**Re-entry.** An `edit-existing` session, or any session created before this block existed, has no `## Fidelity`. Before any `fact` command, run the inference step above and write the block with `answered_by: default` on every field. `claims index` on a free-form `claim-graph.md` (no claim table) returns `{claims: [], errors: [...]}`, exits 2, and writes no `claims.json`; run `fact verify` without it, and the gate reports each unbound sentence as `unbound_sentence` (major) instead of blocking.
+**Re-entry.** An `edit-existing` session, or any session created before this block existed, has no `## Fidelity`. Before any `fact` command, run the inference step above and write the block with `answered_by: default` on every field. `claims index` on a free-form `claim-graph.md` (no claim table) returns `{claims: [], errors: [...]}`, exits 2, and writes no `claims.json`; run `fact verify` without it, and the gate reports each unbound sentence as `unbound_sentence` (major), which blocks delivery until the sentence is bound.
 
 **Calibration.** `fact meaning-check` appends one line per flagged pair to `--calibration` (default `$SESSION_DIR/fidelity-calibration.jsonl`). After each run, also append that run's new lines to the workspace-level `.omo/ulw-research/fidelity-calibration.jsonl`; promotion of `meaning_drift_confirmed` is decided from that log.
 
@@ -129,7 +129,7 @@ Scaling floor — more angles always justify more workers:
 Role protocols — embed the relevant one in each spawn message; every worker gets a unique angle:
 
 - **Codebase (explore), 2-4 workers.** Grep with 3+ keyword variations; structural/AST search; LSP definitions and references; file-name globs; `git log --all -S '<keyword>'` and `--grep` for history including deleted code. Cross-validate hits across tools. Report absolute file paths, patterns with `file:line`, and how findings connect.
-- **Web, 3-9 workers, every one loaded with the `browser` skill.** Search with 10+ websearch queries per worker, each with a different operator or angle (see Search craft); a result is a candidate, not a source. Read every candidate in the user's browser through the `browser` skill's attached engine: one named session per worker, one tab per source, several tabs open side by side while sources are compared — `session.tabCreate` / `tabSelect` / `tabClose` where the harness has a JS eval kernel, `bsk tab create --url <url>` / `tab select <id>` / `tab close <id>` / `tab list` on the CLI — the page scrolled to its end, a full-page screenshot of each top source saved as provenance, the tab closed once reported. A browser on another machine is reached through the `browser` skill's remote reference or a user-level skill that bridges to it, never replaced by a local headless one. `webfetch` is for raw files only: PDF, JSON, feeds, sitemaps. A host the browser cannot open (WAF, bot score, 403) goes to `ultimate-browsing`, whose provenance travels with the claim: a `snapshot` result cites its `snapshot_timestamp` and is never stated as the live page; a `proxy` result is `untrusted` until a second independent route agrees. Context7 with 3+ queries per known library; grep.app and `gh search code|repos|issues` for real-world usage; official docs via sitemap discovery (`<base>/sitemap.xml`), then targeted pages. A worker whose sources are all fetched text has searched, not read.
+- **Web, 3-9 workers, every one loaded with the `browser` skill.** Search with 10+ websearch queries per worker, each with a different operator or angle (see Search craft); a result is a candidate, not a source. Read every candidate in the user's browser through the `browser` skill's attached engine: one named session per worker, one tab per source, several tabs open side by side while sources are compared — `session.tabCreate` / `tabSelect` / `tabClose` where the harness has a JS eval kernel, `bsk tab create --session <session> --url <url>` / `tab select --session <session> <id>` / `tab close --session <session> <id>` / `tab list --session <session>` on the CLI — the page scrolled to its end, a full-page screenshot of each top source saved as provenance, the tab closed once reported. A browser on another machine is reached through the `browser` skill's remote reference or a user-level skill that bridges to it, never replaced by a local headless one. `webfetch` is for raw files only: PDF, JSON, feeds, sitemaps. A host the browser cannot open (WAF, bot score, 403) goes to `ultimate-browsing`, whose provenance travels with the claim: a `snapshot` result cites its `snapshot_timestamp` and is never stated as the live page; a `proxy` result is `untrusted` until a second independent route agrees. Context7 with 3+ queries per known library; grep.app and `gh search code|repos|issues` for real-world usage; official docs via sitemap discovery (`<base>/sitemap.xml`), then targeted pages. A worker whose sources are all fetched text has searched, not read.
 - **Repo deep-dive (librarian), 0-2 workers.** Shallow-clone the most relevant repos to `${TMPDIR:-/tmp}`, pin the HEAD SHA, read core modules, follow call chains, return SHA-pinned permalinks.
 
 Example spawn (codebase axis; web and repo-dive follow the same contract with their own protocol):
@@ -139,7 +139,7 @@ task(subagent_type="explore", run_in_background=true, prompt="TASK: act as a cod
 This is an explicit exhaustive-research assignment. Your default retrieval budget and stop-when-answered rules do not apply — run the full protocol below and report every lead.
 SCOPE: find everything in this codebase related to <angle>: <what complete looks like>.
 PROTOCOL: grep 3+ keyword variations; structural search; LSP references; globs; git history (-S and --grep). Cross-validate across tools. Report absolute paths and file:line patterns.
-End your reply with the ## EXPAND tail: '- LEAD: <discovery> — WHY: <why> — ANGLE: <search>' per lead, or 'none — <reason>'.")
+Tag every claim OBSERVED: <URL | file:line | command>. End your reply with the ## EXPAND tail: '- LEAD: <discovery> — WHY: <why> — ANGLE: <search>' per lead, '- DEAD END: <lead> — PROBED: <what exhausted it>', or 'none — <reason>'.")
 ```
 
 ## Phase 2 — Expand until convergence
@@ -154,7 +154,7 @@ This loop is what makes the mode research rather than search. Collect returns as
 task(category="deep-low", load_skills=["browser"], run_in_background=true, prompt="TASK: expansion wave <N> — investigate: <lead>.
 PARENT: <which return surfaced it>. This is an explicit exhaustive-research assignment; budgets do not apply.
 <role protocol for the lead's territory — web protocol for external leads, explore protocol for codebase leads>
-End your reply with the ## EXPAND tail.")
+Tag every claim OBSERVED: <URL | file:line | command>. End your reply with the ## EXPAND tail.")
 ```
 
 ### Excursions — dive deep on a new find, then surface back out

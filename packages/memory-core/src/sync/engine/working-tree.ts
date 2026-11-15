@@ -21,7 +21,10 @@ export interface TreeEntry {
 /** Lists one directory, named relative to the memory root ("" is the root itself). */
 export type ListDir = (relative: string) => Promise<readonly TreeEntry[]>
 
-export const diskLister = (root: string): ListDir => (relative) => readdir(join(root, relative), { withFileTypes: true })
+export const diskLister =
+  (root: string): ListDir =>
+  (relative) =>
+    readdir(join(root, relative), { withFileTypes: true })
 
 export interface WorkingTree {
   /** Regular files, "/"-separated and relative to the root; .git and temp files excluded. */

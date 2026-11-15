@@ -4,7 +4,12 @@ import { afterEach, describe, expect, it } from "bun:test"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { createOnboardingComponent } from "./component"
-import { createSessionHistoryScanner, nodeSessionHistoryFs, type SessionHistoryOptions, type SessionHistoryScanner } from "./session-history"
+import {
+  createSessionHistoryScanner,
+  nodeSessionHistoryFs,
+  type SessionHistoryOptions,
+  type SessionHistoryScanner,
+} from "./session-history"
 import { claudeSessionLine, createTempDirectories, encodeRecord, writeTranscript } from "./session-history/test-support"
 import {
   OMO_SESSION_PROJECTS_RPC_METHOD,
@@ -12,13 +17,12 @@ import {
   OMO_SESSION_THREADS_RPC_METHOD,
   registerSessionHistoryRpc,
 } from "./session-history-rpc"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const temp = createTempDirectories()
 afterEach(() => temp.cleanup())
 
 const nowMs = Date.parse("2026-08-24T12:00:00.000Z")
-const EVENT_TIMEOUT_MS = 10_000
-
 type Handler = (data: unknown) => unknown | Promise<unknown>
 
 /**
@@ -44,7 +48,10 @@ function rpcOnlyHost() {
   }) as unknown as SenpiExtensionAPI
   const terminal = (scanId: () => string | undefined) =>
     new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error(`waited ${EVENT_TIMEOUT_MS}ms for a done/failed event, never fired`)), EVENT_TIMEOUT_MS)
+      const timer = setTimeout(
+        () => reject(new Error(`waited out the test budget for a done/failed event, never fired`)),
+        remainingTestTime(),
+      )
       listeners.push(() => {
         const last = emits.at(-1)?.data as { scanId?: string; kind?: string } | undefined
         if (last !== undefined && last.scanId === scanId() && (last.kind === "done" || last.kind === "failed")) {
@@ -61,7 +68,14 @@ async function homes() {
 }
 
 const codexSession = (id: string, cwd: string, prompt: string) =>
-  [encodeRecord({ type: "session_meta", payload: { id, cwd } }), encodeRecord({ type: "event_msg", timestamp: "2026-08-24T10:00:00.000Z", payload: { type: "user_message", message: prompt } })].join("\n")
+  [
+    encodeRecord({ type: "session_meta", payload: { id, cwd } }),
+    encodeRecord({
+      type: "event_msg",
+      timestamp: "2026-08-24T10:00:00.000Z",
+      payload: { type: "user_message", message: prompt },
+    }),
+  ].join("\n")
 const rolloutPath = (codexHome: string, name: string) => join(codexHome, "sessions", "2026", "08", "24", name)
 
 function deterministicScanner(seen: Array<SessionHistoryOptions> = []) {
@@ -79,7 +93,10 @@ describe("onboarding session-history rpc", () => {
     ;(pi as unknown as { rpc: unknown }).rpc = { emit: () => {}, handle: (name: string) => void handled.push(name) }
 
     // when
-    createOnboardingComponent().register(pi, { logger: { info() {}, warn() {}, error() {} }, config: { getFlag: () => false } })
+    createOnboardingComponent().register(pi, {
+      logger: { info() {}, warn() {}, error() {} },
+      config: { getFlag: () => false },
+    })
 
     // then
     expect(handled).toEqual(expect.arrayContaining([OMO_SESSION_PROJECTS_RPC_METHOD, OMO_SESSION_THREADS_RPC_METHOD]))
@@ -91,14 +108,29 @@ describe("onboarding session-history rpc", () => {
     const imported = await temp.make("workspace-imported-")
     const fresh = await temp.make("workspace-fresh-")
     const appState = await temp.make("desktop-state-")
-    await writeTranscript({ filePath: join(claude, "projects", "-a", "a.jsonl"), contents: claudeSessionLine(imported), mtimeMs: Date.parse("2026-08-01T00:00:00.000Z") })
-    await writeTranscript({ filePath: join(claude, "projects", "-b", "b.jsonl"), contents: claudeSessionLine(fresh), mtimeMs: Date.parse("2026-08-02T00:00:00.000Z") })
-    await writeTranscript({ filePath: join(claude, "projects", "-c", "c.jsonl"), contents: claudeSessionLine(appState), mtimeMs: Date.parse("2026-08-03T00:00:00.000Z") })
+    await writeTranscript({
+      filePath: join(claude, "projects", "-a", "a.jsonl"),
+      contents: claudeSessionLine(imported),
+      mtimeMs: Date.parse("2026-08-01T00:00:00.000Z"),
+    })
+    await writeTranscript({
+      filePath: join(claude, "projects", "-b", "b.jsonl"),
+      contents: claudeSessionLine(fresh),
+      mtimeMs: Date.parse("2026-08-02T00:00:00.000Z"),
+    })
+    await writeTranscript({
+      filePath: join(claude, "projects", "-c", "c.jsonl"),
+      contents: claudeSessionLine(appState),
+      mtimeMs: Date.parse("2026-08-03T00:00:00.000Z"),
+    })
     const host = rpcOnlyHost()
     const seen: Array<SessionHistoryOptions> = []
     registerSessionHistoryRpc(host.pi, { createScanner: deterministicScanner(seen) })
     const request = {
-      homes: [{ source: "claudeAgent" as const, homePath: claude }, { source: "codex" as const, homePath: codex }],
+      homes: [
+        { source: "claudeAgent" as const, homePath: claude },
+        { source: "codex" as const, homePath: codex },
+      ],
       importedProjects: [{ id: "project-1", workspaceRoot: imported }],
       excludedDirectories: [appState],
       managedWorktreeDirectories: [],
@@ -108,11 +140,35 @@ describe("onboarding session-history rpc", () => {
     const reply = await host.handlers.get(OMO_SESSION_PROJECTS_RPC_METHOD)?.(request)
 
     // then
-    expect(seen).toEqual([{ homes: request.homes, importedProjects: request.importedProjects, excludedDirectories: [appState], managedWorktreeDirectories: [] }])
+    expect(seen).toEqual([
+      {
+        homes: request.homes,
+        importedProjects: request.importedProjects,
+        excludedDirectories: [appState],
+        managedWorktreeDirectories: [],
+      },
+    ])
     expect(reply).toEqual({
       candidates: [
-        { path: fresh, title: expect.any(String), sources: ["claudeAgent"], threadCount: 1, lastActiveAt: "2026-08-02T00:00:00.000Z", alreadyImported: false, git: null },
-        { path: imported, title: expect.any(String), projectId: "project-1", sources: ["claudeAgent"], threadCount: 1, lastActiveAt: "2026-08-01T00:00:00.000Z", alreadyImported: true, git: null },
+        {
+          path: fresh,
+          title: expect.any(String),
+          sources: ["claudeAgent"],
+          threadCount: 1,
+          lastActiveAt: "2026-08-02T00:00:00.000Z",
+          alreadyImported: false,
+          git: null,
+        },
+        {
+          path: imported,
+          title: expect.any(String),
+          projectId: "project-1",
+          sources: ["claudeAgent"],
+          threadCount: 1,
+          lastActiveAt: "2026-08-01T00:00:00.000Z",
+          alreadyImported: true,
+          git: null,
+        },
       ],
       scannedAt: new Date(nowMs).toISOString(),
       counts: { found: 3, read: 3, cap: expect.any(Number) },
@@ -127,8 +183,18 @@ describe("onboarding session-history rpc", () => {
     registerSessionHistoryRpc(host.pi, { createScanner: deterministicScanner(seen) })
 
     // when
-    const projects = await host.handlers.get(OMO_SESSION_PROJECTS_RPC_METHOD)?.({ homes: [{ source: "gemini", homePath: "/x" }], importedProjects: [], excludedDirectories: [], managedWorktreeDirectories: [] })
-    const sessions = await host.handlers.get(OMO_SESSION_THREADS_RPC_METHOD)?.({ homes: [], completed: [], excludedDirectories: [], managedWorktreeDirectories: [] })
+    const projects = await host.handlers.get(OMO_SESSION_PROJECTS_RPC_METHOD)?.({
+      homes: [{ source: "gemini", homePath: "/x" }],
+      importedProjects: [],
+      excludedDirectories: [],
+      managedWorktreeDirectories: [],
+    })
+    const sessions = await host.handlers.get(OMO_SESSION_THREADS_RPC_METHOD)?.({
+      homes: [],
+      completed: [],
+      excludedDirectories: [],
+      managedWorktreeDirectories: [],
+    })
 
     // then
     expect(projects).toEqual({ kind: "unavailable", reason: expect.any(String) })
@@ -141,11 +207,19 @@ describe("onboarding session-history rpc", () => {
     // given
     const host = rpcOnlyHost()
     registerSessionHistoryRpc(host.pi, {
-      createScanner: (options: SessionHistoryOptions) => ({ ...createSessionHistoryScanner(options), scanProjects: () => Promise.reject(new Error("disk gone")) }),
+      createScanner: (options: SessionHistoryOptions) => ({
+        ...createSessionHistoryScanner(options),
+        scanProjects: () => Promise.reject(new Error("disk gone")),
+      }),
     })
 
     // when
-    const reply = await host.handlers.get(OMO_SESSION_PROJECTS_RPC_METHOD)?.({ homes: [], importedProjects: [], excludedDirectories: [], managedWorktreeDirectories: [] })
+    const reply = await host.handlers.get(OMO_SESSION_PROJECTS_RPC_METHOD)?.({
+      homes: [],
+      importedProjects: [],
+      excludedDirectories: [],
+      managedWorktreeDirectories: [],
+    })
 
     // then
     expect(reply).toEqual({ kind: "unavailable", reason: "disk gone" })
@@ -158,12 +232,33 @@ describe("onboarding session-history rpc", () => {
     const done = rolloutPath(codex, "rollout-done.jsonl")
     const fresh = rolloutPath(codex, "rollout-fresh.jsonl")
     const copy = rolloutPath(codex, "rollout-copy.jsonl")
-    await writeTranscript({ filePath: done, contents: codexSession("done-session", workspace, "Old work"), mtimeMs: nowMs - 1_000 })
-    await writeTranscript({ filePath: fresh, contents: codexSession("fresh-session", workspace, "New work"), mtimeMs: nowMs - 2_000 })
-    await writeTranscript({ filePath: copy, contents: codexSession("fresh-session", workspace, "New work"), mtimeMs: nowMs - 3_000 })
+    await writeTranscript({
+      filePath: done,
+      contents: codexSession("done-session", workspace, "Old work"),
+      mtimeMs: nowMs - 1_000,
+    })
+    await writeTranscript({
+      filePath: fresh,
+      contents: codexSession("fresh-session", workspace, "New work"),
+      mtimeMs: nowMs - 2_000,
+    })
+    await writeTranscript({
+      filePath: copy,
+      contents: codexSession("fresh-session", workspace, "New work"),
+      mtimeMs: nowMs - 3_000,
+    })
     const doneStats = await nodeSessionHistoryFs.stat(done)
     const freshStats = await nodeSessionHistoryFs.stat(fresh)
-    const completed = { provider: "codex", providerSessionId: "done-session", filePath: done, size: doneStats.size, mtimeMs: doneStats.mtimeMs, device: doneStats.dev, inode: doneStats.ino, birthtimeMs: doneStats.birthtimeMs }
+    const completed = {
+      provider: "codex",
+      providerSessionId: "done-session",
+      filePath: done,
+      size: doneStats.size,
+      mtimeMs: doneStats.mtimeMs,
+      device: doneStats.dev,
+      inode: doneStats.ino,
+      birthtimeMs: doneStats.birthtimeMs,
+    }
     const host = rpcOnlyHost()
     registerSessionHistoryRpc(host.pi, { createScanner: deterministicScanner(), newScanId: () => "scan-1" })
     let scanId: string | undefined
@@ -172,7 +267,10 @@ describe("onboarding session-history rpc", () => {
     // when
     const reply = await host.handlers.get(OMO_SESSION_THREADS_RPC_METHOD)?.({
       workspaceRoot: workspace,
-      homes: [{ source: "claudeAgent", homePath: claude }, { source: "codex", homePath: codex }],
+      homes: [
+        { source: "claudeAgent", homePath: claude },
+        { source: "codex", homePath: codex },
+      ],
       completed: [completed],
       excludedDirectories: [],
       managedWorktreeDirectories: [],
@@ -186,7 +284,11 @@ describe("onboarding session-history rpc", () => {
     expect(emittedAtReply).toBe(0)
     expect(host.emits.every((emit) => emit.name === OMO_SESSION_THREADS_RPC_EVENT)).toBe(true)
     expect(host.emits.map((emit) => emit.data)).toEqual([
-      { scanId: "scan-1", kind: "outcome", outcome: { _tag: "AlreadyImported", source: { ...completed, homePath: codex } } },
+      {
+        scanId: "scan-1",
+        kind: "outcome",
+        outcome: { _tag: "AlreadyImported", source: { ...completed, homePath: codex } },
+      },
       {
         scanId: "scan-1",
         kind: "outcome",
@@ -201,10 +303,27 @@ describe("onboarding session-history rpc", () => {
             updatedAt: expect.any(String),
             messages: [{ role: "user", text: "New work", createdAt: expect.any(String) }],
           },
-          source: { provider: "codex", homePath: codex, providerSessionId: "fresh-session", filePath: fresh, size: freshStats.size, mtimeMs: freshStats.mtimeMs, device: freshStats.dev, inode: freshStats.ino, birthtimeMs: freshStats.birthtimeMs },
+          source: {
+            provider: "codex",
+            homePath: codex,
+            providerSessionId: "fresh-session",
+            filePath: fresh,
+            size: freshStats.size,
+            mtimeMs: freshStats.mtimeMs,
+            device: freshStats.dev,
+            inode: freshStats.ino,
+            birthtimeMs: freshStats.birthtimeMs,
+          },
         },
       },
-      { scanId: "scan-1", kind: "outcome", outcome: { _tag: "Duplicate", source: expect.objectContaining({ filePath: copy, providerSessionId: "fresh-session", homePath: codex }) } },
+      {
+        scanId: "scan-1",
+        kind: "outcome",
+        outcome: {
+          _tag: "Duplicate",
+          source: expect.objectContaining({ filePath: copy, providerSessionId: "fresh-session", homePath: codex }),
+        },
+      },
       { scanId: "scan-1", kind: "done" },
     ])
   })
@@ -228,7 +347,13 @@ describe("onboarding session-history rpc", () => {
     const finished = host.terminal(() => "scan-2")
 
     // when
-    const reply = await host.handlers.get(OMO_SESSION_THREADS_RPC_METHOD)?.({ workspaceRoot: "/w", homes: [], completed: [], excludedDirectories: [], managedWorktreeDirectories: [] })
+    const reply = await host.handlers.get(OMO_SESSION_THREADS_RPC_METHOD)?.({
+      workspaceRoot: "/w",
+      homes: [],
+      completed: [],
+      excludedDirectories: [],
+      managedWorktreeDirectories: [],
+    })
     await finished
 
     // then
@@ -244,17 +369,31 @@ describe("onboarding session-history rpc", () => {
     const host = rpcOnlyHost()
     let next = 0
     registerSessionHistoryRpc(host.pi, { createScanner: deterministicScanner(), newScanId: () => `scan-${++next}` })
-    const request = { workspaceRoot: await temp.make("empty-"), homes: [], completed: [], excludedDirectories: [], managedWorktreeDirectories: [] }
+    const request = {
+      workspaceRoot: await temp.make("empty-"),
+      homes: [],
+      completed: [],
+      excludedDirectories: [],
+      managedWorktreeDirectories: [],
+    }
     const first = host.terminal(() => "scan-1")
     const second = host.terminal(() => "scan-2")
 
     // when
-    const replies = await Promise.all([host.handlers.get(OMO_SESSION_THREADS_RPC_METHOD)?.(request), host.handlers.get(OMO_SESSION_THREADS_RPC_METHOD)?.(request)])
+    const replies = await Promise.all([
+      host.handlers.get(OMO_SESSION_THREADS_RPC_METHOD)?.(request),
+      host.handlers.get(OMO_SESSION_THREADS_RPC_METHOD)?.(request),
+    ])
     await Promise.all([first, second])
 
     // then
     expect(replies).toEqual([{ scanId: "scan-1" }, { scanId: "scan-2" }])
-    expect(host.emits.map((emit) => emit.data)).toEqual(expect.arrayContaining([{ scanId: "scan-1", kind: "done" }, { scanId: "scan-2", kind: "done" }]))
+    expect(host.emits.map((emit) => emit.data)).toEqual(
+      expect.arrayContaining([
+        { scanId: "scan-1", kind: "done" },
+        { scanId: "scan-2", kind: "done" },
+      ]),
+    )
     expect(host.emits).toHaveLength(2)
   })
 })

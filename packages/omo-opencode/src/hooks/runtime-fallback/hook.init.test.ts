@@ -4,7 +4,7 @@ import type { HookDeps, RuntimeFallbackInterval, RuntimeFallbackPluginInput } fr
 
 type RuntimeFallbackModule = typeof import("./hook")
 
-const loadPluginConfigMock = mock(() => ({} satisfies OhMyOpenCodeConfig))
+const loadPluginConfigMock = mock(() => ({}) satisfies OhMyOpenCodeConfig)
 const createAutoRetryHelpersMock = mock((_deps: HookDeps) => {
   void _deps
 

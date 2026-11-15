@@ -3,18 +3,11 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import {
-  discoverOpencodeProjectSkills,
-  discoverProjectAgentsSkills,
-  discoverProjectClaudeSkills,
-} from "./loader"
+import { discoverOpencodeProjectSkills, discoverProjectAgentsSkills, discoverProjectClaudeSkills } from "./loader"
 
 function writeSkill(directory: string, name: string, description: string): void {
   mkdirSync(directory, { recursive: true })
-  writeFileSync(
-    join(directory, "SKILL.md"),
-    `---\nname: ${name}\ndescription: ${description}\n---\nBody\n`,
-  )
+  writeFileSync(join(directory, "SKILL.md"), `---\nname: ${name}\ndescription: ${description}\n---\nBody\n`)
 }
 
 describe("project skill discovery", () => {
@@ -79,8 +72,8 @@ describe("project skill discovery", () => {
     ])
 
     // then
-    expect(claudeSkills.map(skill => skill.name)).toEqual(["repo-claude"])
-    expect(agentSkills.map(skill => skill.name)).toEqual(["repo-agents"])
-    expect(opencodeSkills.map(skill => skill.name)).toEqual(["repo-opencode"])
+    expect(claudeSkills.map((skill) => skill.name)).toEqual(["repo-claude"])
+    expect(agentSkills.map((skill) => skill.name)).toEqual(["repo-agents"])
+    expect(opencodeSkills.map((skill) => skill.name)).toEqual(["repo-opencode"])
   })
 })

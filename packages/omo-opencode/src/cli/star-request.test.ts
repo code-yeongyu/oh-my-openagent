@@ -10,7 +10,9 @@ describe("star-request", () => {
     const command = formatGitHubStarCommand(repository)
 
     // then
-    expect(command).toBe("gh api --silent --method PUT /user/starred/code-yeongyu/oh-my-openagent >/dev/null 2>&1 || true")
+    expect(command).toBe(
+      "gh api --silent --method PUT /user/starred/code-yeongyu/oh-my-openagent >/dev/null 2>&1 || true",
+    )
   })
 
   test("stars only the OpenCode repository for opencode platform", async () => {

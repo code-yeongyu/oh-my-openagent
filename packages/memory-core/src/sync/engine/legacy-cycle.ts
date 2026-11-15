@@ -18,7 +18,8 @@ interface LegacyRender {
   readonly landed: boolean
 }
 
-const isObject = (value: unknown): value is Readonly<Record<string, unknown>> => typeof value === "object" && value !== null
+const isObject = (value: unknown): value is Readonly<Record<string, unknown>> =>
+  typeof value === "object" && value !== null
 
 const isText = (value: unknown): value is string | null => value === null || typeof value === "string"
 

@@ -17,10 +17,7 @@ import {
 } from "@oh-my-opencode/senpi-task"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import {
-  RESUMPTION_CHANNEL_STATE_EVENT,
-  createResumptionChannelEmitter,
-} from "./resumption-channel-emitter"
+import { RESUMPTION_CHANNEL_STATE_EVENT, createResumptionChannelEmitter } from "./resumption-channel-emitter"
 
 const SESSION_ID = "parent-session"
 const TEAM_RUN_ID = "11111111-1111-4111-8111-111111111111"
@@ -72,11 +69,13 @@ function taskRecord(overrides: Partial<TaskRecord> = {}): TaskRecord {
   }
 }
 
-function createHarness(options: {
-  readonly records?: TaskRecord[]
-  readonly ownedTaskIds?: ReadonlySet<string>
-  readonly withEvents?: boolean
-} = {}) {
+function createHarness(
+  options: {
+    readonly records?: TaskRecord[]
+    readonly ownedTaskIds?: ReadonlySet<string>
+    readonly withEvents?: boolean
+  } = {},
+) {
   const records = options.records ?? []
   const emitted: Array<{ name: string; data: unknown }> = []
   const pi = new FakeExtensionAPI()
@@ -123,16 +122,20 @@ describe("createResumptionChannelEmitter", () => {
           source: "senpi-task",
           kind: "children",
           activeCount: 1,
-          items: [{
-            id: "st_00000001",
-            description: "Inspect continuation timing",
-            startedAtMs: Date.parse("2026-08-08T01:02:03.000Z"),
-          }],
-          channels: [{
-            id: "st_00000001",
-            description: "Inspect continuation timing",
-            startedAtMs: Date.parse("2026-08-08T01:02:03.000Z"),
-          }],
+          items: [
+            {
+              id: "st_00000001",
+              description: "Inspect continuation timing",
+              startedAtMs: Date.parse("2026-08-08T01:02:03.000Z"),
+            },
+          ],
+          channels: [
+            {
+              id: "st_00000001",
+              description: "Inspect continuation timing",
+              startedAtMs: Date.parse("2026-08-08T01:02:03.000Z"),
+            },
+          ],
         },
       },
       {
@@ -157,24 +160,30 @@ describe("createResumptionChannelEmitter", () => {
     await harness.emitter.emitSessionStart()
 
     // then
-    expect(harness.emitted).toEqual([{
-      name: "wake_source_state",
-      data: {
-        source: "senpi-task",
-        kind: "children",
-        activeCount: 1,
-        items: [{
-          id: member.task_id,
-          description: "Review the implementation",
-          startedAtMs: Date.parse(member.created_at),
-        }],
-        channels: [{
-          id: member.task_id,
-          description: "Review the implementation",
-          startedAtMs: Date.parse(member.created_at),
-        }],
+    expect(harness.emitted).toEqual([
+      {
+        name: "wake_source_state",
+        data: {
+          source: "senpi-task",
+          kind: "children",
+          activeCount: 1,
+          items: [
+            {
+              id: member.task_id,
+              description: "Review the implementation",
+              startedAtMs: Date.parse(member.created_at),
+            },
+          ],
+          channels: [
+            {
+              id: member.task_id,
+              description: "Review the implementation",
+              startedAtMs: Date.parse(member.created_at),
+            },
+          ],
+        },
       },
-    }])
+    ])
   })
 
   it("#given a foreground owned team member resolved through the real ownership helper #when the session snapshot is emitted #then the member counts as active", async () => {
@@ -214,24 +223,30 @@ describe("createResumptionChannelEmitter", () => {
     await emitter.emitSessionStart()
 
     // then
-    expect(emitted).toEqual([{
-      name: "wake_source_state",
-      data: {
-        source: "senpi-task",
-        kind: "children",
-        activeCount: 1,
-        items: [{
-          id: member.task_id,
-          description: "Review the implementation",
-          startedAtMs: Date.parse(member.created_at),
-        }],
-        channels: [{
-          id: member.task_id,
-          description: "Review the implementation",
-          startedAtMs: Date.parse(member.created_at),
-        }],
+    expect(emitted).toEqual([
+      {
+        name: "wake_source_state",
+        data: {
+          source: "senpi-task",
+          kind: "children",
+          activeCount: 1,
+          items: [
+            {
+              id: member.task_id,
+              description: "Review the implementation",
+              startedAtMs: Date.parse(member.created_at),
+            },
+          ],
+          channels: [
+            {
+              id: member.task_id,
+              description: "Review the implementation",
+              startedAtMs: Date.parse(member.created_at),
+            },
+          ],
+        },
       },
-    }])
+    ])
   })
 
   it("#given an active child count of one #when a store mutation preserves that count #then no duplicate snapshot is emitted", async () => {

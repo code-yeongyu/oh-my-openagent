@@ -49,7 +49,12 @@ function fakeSource(options: FakeOptions = {}) {
   return { port, touched }
 }
 
-const wakesFile = join(identity.recallDir, "sidecars", Buffer.from(SESSION, "utf8").toString("base64url"), "wakes.ndjson")
+const wakesFile = join(
+  identity.recallDir,
+  "sidecars",
+  Buffer.from(SESSION, "utf8").toString("base64url"),
+  "wakes.ndjson",
+)
 const ledgerFile = join(identity.recallLedgerDir, `${SESSION}.json`)
 const pendingFile = join(identity.recallPendingDir, `${SESSION}.json`)
 const readMemory = (source: PanelMemorySource) => createPanelMemoryReader(source, () => Date.parse(PARKED_AT))
@@ -319,7 +324,12 @@ describe("the kibitzer's own wake log", () => {
   test("#given the last wake was a diagnostic failure #when read #then it is flagged", async () => {
     // given three consecutive diagnostic failures are what raise the host's own gate notice
     const source = fakeSource({
-      tails: { [wakesFile]: { text: wake({ status: "failed", diagnostic: true, reason: "model refused" }) + "\n", truncated: false } },
+      tails: {
+        [wakesFile]: {
+          text: wake({ status: "failed", diagnostic: true, reason: "model refused" }) + "\n",
+          truncated: false,
+        },
+      },
     })
 
     // when
@@ -334,7 +344,9 @@ describe("the kibitzer's own wake log", () => {
     // given the writer appends; a reader can always catch a half-written last line, and the host's
     // own nudge reader is fail-closed per line for exactly this reason
     const source = fakeSource({
-      tails: { [wakesFile]: { text: [wake(), '{"version":1,"at":"2026', wake({ wake: 3 })].join("\n"), truncated: false } },
+      tails: {
+        [wakesFile]: { text: [wake(), '{"version":1,"at":"2026', wake({ wake: 3 })].join("\n"), truncated: false },
+      },
     })
 
     // when / then

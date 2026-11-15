@@ -1,11 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import {
-  AGENT_ELIGIBILITY_REGISTRY,
-  CategoryMemberSchema,
-  MemberSchema,
-  parseMember,
-  TeamSpecSchema,
-} from "./types"
+import { AGENT_ELIGIBILITY_REGISTRY, CategoryMemberSchema, MemberSchema, parseMember, TeamSpecSchema } from "./types"
 
 describe("team-mode types", () => {
   test("member category branch parses and narrows", () => {
@@ -55,7 +49,9 @@ describe("team-mode types", () => {
 
     // then
     expect(parse).toThrow(
-      new Error("Member 'm1' specifies both 'category' and 'subagent_type'. Must specify exactly one via 'kind' discriminator."),
+      new Error(
+        "Member 'm1' specifies both 'category' and 'subagent_type'. Must specify exactly one via 'kind' discriminator.",
+      ),
     )
   })
 
@@ -68,7 +64,9 @@ describe("team-mode types", () => {
 
     // then
     expect(parse).toThrow(
-      new Error("Member 'm1' missing 'kind' discriminator. Specify either {kind:'category', category, prompt} or {kind:'subagent_type', subagent_type}."),
+      new Error(
+        "Member 'm1' missing 'kind' discriminator. Specify either {kind:'category', category, prompt} or {kind:'subagent_type', subagent_type}.",
+      ),
     )
   })
 
@@ -81,7 +79,9 @@ describe("team-mode types", () => {
 
     // then
     expect(parse).toThrow(
-      new Error("Member 'm1' uses category 'deep' but is missing required 'prompt' field. Category members must supply a task prompt."),
+      new Error(
+        "Member 'm1' uses category 'deep' but is missing required 'prompt' field. Category members must supply a task prompt.",
+      ),
     )
   })
 
@@ -136,9 +136,9 @@ describe("team-mode types", () => {
     // when
     for (const [subagentType, expectedMessage] of cases) {
       // then
-      expect(() =>
-        parseMember({ kind: "subagent_type", name: "x", subagent_type: subagentType }),
-      ).toThrow(expectedMessage)
+      expect(() => parseMember({ kind: "subagent_type", name: "x", subagent_type: subagentType })).toThrow(
+        expectedMessage,
+      )
     }
   })
 
@@ -191,7 +191,10 @@ describe("team-mode types", () => {
 
   test("team spec defaults version when omitted", () => {
     // given
-    const teamSpec = { name: "solo-team", members: [{ kind: "category", name: "solo", category: "deep", prompt: "implement the assigned work" }] }
+    const teamSpec = {
+      name: "solo-team",
+      members: [{ kind: "category", name: "solo", category: "deep", prompt: "implement the assigned work" }],
+    }
 
     // when
     const result = TeamSpecSchema.parse(teamSpec)
@@ -205,7 +208,10 @@ describe("team-mode types", () => {
     // given
     const originalDateNow = Date.now
     Date.now = () => 123_456_789
-    const teamSpec = { name: "solo-team", members: [{ kind: "category", name: "solo", category: "deep", prompt: "implement the assigned work" }] }
+    const teamSpec = {
+      name: "solo-team",
+      members: [{ kind: "category", name: "solo", category: "deep", prompt: "implement the assigned work" }],
+    }
 
     try {
       // when
@@ -234,10 +240,12 @@ describe("team-mode types", () => {
     // then
     expect(result.success).toBe(false)
     if (!result.success) {
-      expect(result.error.issues).toContainEqual(expect.objectContaining({
-        path: ["leadAgentId"],
-        message: "leadAgentId required (or write a `lead: {...}` field, or mark one member with `isLead: true`)",
-      }))
+      expect(result.error.issues).toContainEqual(
+        expect.objectContaining({
+          path: ["leadAgentId"],
+          message: "leadAgentId required (or write a `lead: {...}` field, or mark one member with `isLead: true`)",
+        }),
+      )
     }
   })
 
@@ -258,7 +266,7 @@ describe("team-mode types", () => {
     expect(entries).toHaveLength(11)
     expect(verdictCounts).toEqual({ eligible: 3, conditional: 1, "hard-reject": 7 })
     expect(AGENT_ELIGIBILITY_REGISTRY.hephaestus.rejectionMessage).toBe(
-      "Agent 'hephaestus' lacks teammate permission. Either apply D-36 (add teammate: \"allow\" in tool-config-handler.ts) or use subagent_type: \"sisyphus\" instead.",
+      'Agent \'hephaestus\' lacks teammate permission. Either apply D-36 (add teammate: "allow" in tool-config-handler.ts) or use subagent_type: "sisyphus" instead.',
     )
   })
 })

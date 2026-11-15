@@ -13,13 +13,17 @@ const MODELS: readonly SenpiModelPort[] = [
 
 const REGISTRY = {
   getAvailable: () => MODELS,
-  find: (provider: string, modelId: string) => MODELS.find((model) => model.provider === provider && model.id === modelId),
+  find: (provider: string, modelId: string) =>
+    MODELS.find((model) => model.provider === provider && model.id === modelId),
 }
 
 describe("resolveReflectionModel with exclude_models", () => {
   test("#given a user pin outside artistry's chain #when a memory child resolves #then the appended builtin rungs skip the excluded model", () => {
     // given
-    const config: OmoConfig = { categories: { artistry: { model: "openai/gpt-6.1-sol" } }, exclude_models: ["claude-fable-*"] }
+    const config: OmoConfig = {
+      categories: { artistry: { model: "openai/gpt-6.1-sol" } },
+      exclude_models: ["claude-fable-*"],
+    }
 
     // when
     const result = resolveReflectionModel("artistry", config, REGISTRY)
@@ -32,7 +36,10 @@ describe("resolveReflectionModel with exclude_models", () => {
 
   test("#given an excluded pin and a stale availability snapshot #when a memory child resolves #then the pin is not revived", () => {
     // given
-    const config: OmoConfig = { categories: { quick: { model: "anthropic/claude-fable-5-1" } }, exclude_models: ["claude-fable-5-1"] }
+    const config: OmoConfig = {
+      categories: { quick: { model: "anthropic/claude-fable-5-1" } },
+      exclude_models: ["claude-fable-5-1"],
+    }
 
     // when
     const result = resolveReflectionModel("quick", config, REGISTRY)

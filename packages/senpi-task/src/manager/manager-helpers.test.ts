@@ -36,7 +36,13 @@ describe("buildRecordInput task_summary", () => {
 
   test("#given no task_summary #when the record input is built #then the field stays absent", () => {
     // given / when
-    const input = buildRecordInput({ spec: spawnSpec({}), plan: PLAN, name: "auditor", executionMode: "in-process", taskSeq: 0 })
+    const input = buildRecordInput({
+      spec: spawnSpec({}),
+      plan: PLAN,
+      name: "auditor",
+      executionMode: "in-process",
+      taskSeq: 0,
+    })
 
     // then
     expect("task_summary" in input).toBe(false)
@@ -44,7 +50,7 @@ describe("buildRecordInput task_summary", () => {
 })
 
 describe("buildRecordInput background_mode", () => {
-  test("#given a spawn spec with run_in_background true #when the record is built #then background_mode is \"background\" and a foreground spawn yields \"foreground\"", () => {
+  test('#given a spawn spec with run_in_background true #when the record is built #then background_mode is "background" and a foreground spawn yields "foreground"', () => {
     // given / when
     const background = buildRecordInput({
       spec: spawnSpec({ run_in_background: true }),

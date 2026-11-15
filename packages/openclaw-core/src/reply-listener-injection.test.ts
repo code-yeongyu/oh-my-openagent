@@ -19,19 +19,7 @@ describe("sanitizeReplyInput", () => {
 
   test("removes bidi and zero-width format controls", () => {
     // given bidi and zero-width code points stripped by the sanitizer
-    const formatControls = [
-      0x200e,
-      0x200f,
-      0x202a,
-      0x202b,
-      0x202c,
-      0x202d,
-      0x202e,
-      0x2066,
-      0x2067,
-      0x2068,
-      0x2069,
-    ]
+    const formatControls = [0x200e, 0x200f, 0x202a, 0x202b, 0x202c, 0x202d, 0x202e, 0x2066, 0x2067, 0x2068, 0x2069]
       .map((code) => String.fromCharCode(code))
       .join("")
     const input = `a${formatControls}b`

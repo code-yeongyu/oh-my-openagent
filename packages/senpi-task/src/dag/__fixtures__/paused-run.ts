@@ -11,7 +11,8 @@ export async function pausedRun() {
   if (started.kind !== "started") throw new Error("expected a started child")
   h.store.transition(started.task_id, { type: "pause", timestamp: new Date(0).toISOString() })
   const definition: DagDefinition = {
-    key: "paused-controls", name: "paused controls",
+    key: "paused-controls",
+    name: "paused controls",
     nodes: [
       { id: "a", category: "quick", prompt: "a" },
       { id: "b", category: "quick", prompt: "b", dependsOn: ["a"] },
@@ -24,15 +25,32 @@ export async function pausedRun() {
   const runId = "paused-controls" as DagRunId
   const store = createDagFileStore({ project_dir: h.project })
   const record: DagRunRecordV1 = {
-    schemaVersion: 1, checkpointSeq: 0, runId, runKey: definition.key, name: definition.name,
-    parentSessionId: "parent-1", rootSessionId: "parent-1", definitionFingerprint: "fixture",
-    definition: { ...definition, nodes: definition.nodes.map(node => ({ ...node, effectivePrompt: node.prompt })) },
-    status: "paused", pause: { reason: "user_stop", pauseSeq: 7 }, generation: 1,
-    createdAt: at, updatedAt: at,
-    nodes: compiled.nodes.map(node => node.id === "a" ? { ...node, state: "completed", output: "keep-a" }
-      : node.id === "b" ? { ...node, state: "paused", taskId: started.task_id, attempt: 1 } : { ...node, state: "blocked" }),
-    edges: compiled.edges, waves: compiled.waves, criticalPath: compiled.criticalPath,
-    bottlenecks: compiled.bottlenecks, diagnostics: compiled.diagnostics,
+    schemaVersion: 1,
+    checkpointSeq: 0,
+    runId,
+    runKey: definition.key,
+    name: definition.name,
+    parentSessionId: "parent-1",
+    rootSessionId: "parent-1",
+    definitionFingerprint: "fixture",
+    definition: { ...definition, nodes: definition.nodes.map((node) => ({ ...node, effectivePrompt: node.prompt })) },
+    status: "paused",
+    pause: { reason: "user_stop", pauseSeq: 7 },
+    generation: 1,
+    createdAt: at,
+    updatedAt: at,
+    nodes: compiled.nodes.map((node) =>
+      node.id === "a"
+        ? { ...node, state: "completed", output: "keep-a" }
+        : node.id === "b"
+          ? { ...node, state: "paused", taskId: started.task_id, attempt: 1 }
+          : { ...node, state: "blocked" },
+    ),
+    edges: compiled.edges,
+    waves: compiled.waves,
+    criticalPath: compiled.criticalPath,
+    bottlenecks: compiled.bottlenecks,
+    diagnostics: compiled.diagnostics,
   }
   store.writeCheckpoint(runId, record)
   const options: DagSchedulerOptions = { store, taskManager: h.manager, initialRecord: record, now: () => 0 }
@@ -41,6 +59,17 @@ export async function pausedRun() {
     if (current === null) throw new Error("fixture checkpoint disappeared")
     return current
   }
-  return { ...h, definition, taskStore: h.store, store, record, options, read, runId, taskId: started.task_id,
-    b: "b" as DagNodeId, c: "c" as DagNodeId }
+  return {
+    ...h,
+    definition,
+    taskStore: h.store,
+    store,
+    record,
+    options,
+    read,
+    runId,
+    taskId: started.task_id,
+    b: "b" as DagNodeId,
+    c: "c" as DagNodeId,
+  }
 }

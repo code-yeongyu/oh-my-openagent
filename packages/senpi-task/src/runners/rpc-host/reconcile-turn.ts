@@ -18,11 +18,17 @@ export type InputEffectStatus = {
   }
 }
 
-export type HostTurnReconciliation = "streaming" | "adopted" | "continued" | "idle_queued" | "idle_empty" | "interrupted" | "stopped_deadline" | "failed"
+export type HostTurnReconciliation =
+  "streaming" | "adopted" | "continued" | "idle_queued" | "idle_empty" | "interrupted" | "stopped_deadline" | "failed"
 
 export type ReconciledTurnNotice =
   | { readonly kind: "adopted"; readonly entryId: string }
-  | { readonly kind: "interrupted"; readonly reason: string; readonly action?: string; readonly deadline?: Readonly<Record<string, unknown>> }
+  | {
+      readonly kind: "interrupted"
+      readonly reason: string
+      readonly action?: string
+      readonly deadline?: Readonly<Record<string, unknown>>
+    }
   | { readonly kind: "idle_queued"; readonly reason: string }
 
 export interface ReconcileTurnPort {
@@ -37,7 +43,8 @@ export interface ReconcileTurnPort {
 }
 
 const INTERRUPTED_REASON = "The child's previous turn was interrupted; its continuation is being delivered."
-export const DEADLINE_REASON = "The child stopped because its turn deadline expired. Action: inspect task_output, then use task_send to continue it."
+export const DEADLINE_REASON =
+  "The child stopped because its turn deadline expired. Action: inspect task_output, then use task_send to continue it."
 const QUEUED_REASON = "The child is idle with queued input. Action: use task_send to start its next turn."
 export const HOST_RESPAWN_CONTINUATION =
   "Your previous turn was interrupted by a host process restart. Resume your task from its current state and finish it - do not restart from scratch, and do not repeat work already recorded in this session."
@@ -72,11 +79,18 @@ export async function reconcileHostTurn(
   }
   const tail = await sessionTailReconciliation(sessionPath, [reattachContinuationPrompt(), HOST_RESPAWN_CONTINUATION])
   const outcome = receipt?.state === "done" ? receipt.outcome : undefined
-  const deadline = outcome?.kind === "deadline"
-    ? outcome.deadline ?? {}
-    : outcome === undefined ? tail?.endEvent?.deadline : undefined
+  const deadline =
+    outcome?.kind === "deadline"
+      ? (outcome.deadline ?? {})
+      : outcome === undefined
+        ? tail?.endEvent?.deadline
+        : undefined
   if (outcome?.kind === "deadline" || (deadline !== undefined && typeof deadline === "object" && deadline !== null)) {
-    port.notify({ kind: "interrupted", reason: DEADLINE_REASON, deadline: typeof deadline === "object" && deadline !== null ? { ...deadline } : {} })
+    port.notify({
+      kind: "interrupted",
+      reason: DEADLINE_REASON,
+      deadline: typeof deadline === "object" && deadline !== null ? { ...deadline } : {},
+    })
     port.settle({ status: "cancelled" })
     return "stopped_deadline"
   }
@@ -108,9 +122,14 @@ export async function reconcileHostTurn(
   if (finished !== undefined || outcome?.kind === "completed") {
     // Pre-S1 test transcripts need not carry ids; real message entries always do.
     const entryId = tail?.entryId
-    if (entryId !== undefined && (entryId === port.adoptedEntryId ||
-      (entryId === record.host_session?.adopted_entry_id && record.final_response !== undefined))) return "adopted"
-    if (entryId !== undefined && entryId !== record.host_session?.adopted_entry_id) port.notify({ kind: "adopted", entryId })
+    if (
+      entryId !== undefined &&
+      (entryId === port.adoptedEntryId ||
+        (entryId === record.host_session?.adopted_entry_id && record.final_response !== undefined))
+    )
+      return "adopted"
+    if (entryId !== undefined && entryId !== record.host_session?.adopted_entry_id)
+      port.notify({ kind: "adopted", entryId })
     port.settle({ status: "completed", finalResponse: finished ?? "" })
     return "adopted"
   }
@@ -123,8 +142,11 @@ export async function reconcileHostTurn(
     port.settle({ status: "cancelled" })
     return "interrupted"
   }
-  if (receipt?.state === "applied" || (tail === undefined && port.interruptedWithoutTranscript === true) ||
-    tail?.needsContinuation === true) {
+  if (
+    receipt?.state === "applied" ||
+    (tail === undefined && port.interruptedWithoutTranscript === true) ||
+    tail?.needsContinuation === true
+  ) {
     if (tail?.lastMessage.stopReason === "aborted") port.notify({ kind: "interrupted", reason: INTERRUPTED_REASON })
     return "continued"
   }

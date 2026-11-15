@@ -8,7 +8,9 @@ export type { OwnedCredential } from "./protocol-v2"
 export class RecoveryExhausted extends SignInError {
   readonly code = "refresh_recovery_expired"
   readonly deviceRevoked = false
-  constructor() { super("Refresh recovery can no longer be proved safe. Sign in again with omo login.") }
+  constructor() {
+    super("Refresh recovery can no longer be proved safe. Sign in again with omo login.")
+  }
 }
 
 export class RecoveryPending extends SignInError {
@@ -18,14 +20,23 @@ export class RecoveryPending extends SignInError {
 }
 
 class OwnedSessionEnded extends SignInError {
-  constructor(readonly code: string, readonly deviceRevoked: boolean) {
+  constructor(
+    readonly code: string,
+    readonly deviceRevoked: boolean,
+  ) {
     super("Sign in again with omo login.")
   }
 }
 
 const terminal = new Set([
-  "unauthorized", "invalid_grant", "account_deleted", "reauth_required", "device_revoked",
-  "client_upgrade_required", "writer_floor_mismatch", "refresh_recovery_expired",
+  "unauthorized",
+  "invalid_grant",
+  "account_deleted",
+  "reauth_required",
+  "device_revoked",
+  "client_upgrade_required",
+  "writer_floor_mismatch",
+  "refresh_recovery_expired",
 ])
 const revoked = new Set(["account_deleted", "reauth_required", "device_revoked"])
 
@@ -43,15 +54,19 @@ export async function refreshOwnedCredential(options: {
   const first = await clock()
   if (first === null) throw new RecoveryExhausted()
   if (current.refreshState === "uncertain" && current.refreshAttempt === undefined) throw new RecoveryExhausted()
-  if (current.refreshAttempt === undefined && Date.parse(current.accessTokenExpiresAt) > first.wallTimeMs + 30_000) return current
-  const attempt = current.refreshAttempt === undefined
-    ? newRefreshAttempt(origin, current.owner, current.refreshToken, first)
-    : eligibleAttempt(current.refreshAttempt, origin, current.owner, current.refreshToken, first)
+  if (current.refreshAttempt === undefined && Date.parse(current.accessTokenExpiresAt) > first.wallTimeMs + 30_000)
+    return current
+  const attempt =
+    current.refreshAttempt === undefined
+      ? newRefreshAttempt(origin, current.owner, current.refreshToken, first)
+      : eligibleAttempt(current.refreshAttempt, origin, current.owner, current.refreshToken, first)
   if (attempt === null) throw new RecoveryExhausted()
-  if (current.refreshAttempt === undefined) await write({ ...current, refreshState: "uncertain", refreshAttempt: attempt })
+  if (current.refreshAttempt === undefined)
+    await write({ ...current, refreshState: "uncertain", refreshAttempt: attempt })
   const sent: RefreshAttempt = { ...attempt, state: "sent_unknown" }
   await write({ ...current, refreshState: "uncertain", refreshAttempt: sent })
-  if (eligibleAttempt(sent, origin, current.owner, current.refreshToken, await clock()) === null) throw new RecoveryExhausted()
+  if (eligibleAttempt(sent, origin, current.owner, current.refreshToken, await clock()) === null)
+    throw new RecoveryExhausted()
   let successor: OwnedCredential
   try {
     successor = await rotate(current, sent)
@@ -63,16 +78,26 @@ export async function refreshOwnedCredential(options: {
     }
     // A refused or unsent transmission says nothing about any earlier unanswered transmission.
     // Keep the identity and deadline even for invalid_request, 429, or a connection refusal.
-    if (eligibleAttempt(sent, origin, current.owner, current.refreshToken, await clock()) === null) throw new RecoveryExhausted()
+    if (eligibleAttempt(sent, origin, current.owner, current.refreshToken, await clock()) === null)
+      throw new RecoveryExhausted()
     throw new RecoveryPending(attempt.deadline)
   }
-  if (successor.writerFloor !== 2 || !sameOwner(current.owner, successor.owner) ||
-      successor.owner.generation !== current.owner.generation + 1 ||
-      successor.refreshToken === current.refreshToken || successor.device.id !== current.owner.deviceId) {
-    if (eligibleAttempt(sent, origin, current.owner, current.refreshToken, await clock()) === null) throw new RecoveryExhausted()
+  if (
+    successor.writerFloor !== 2 ||
+    !sameOwner(current.owner, successor.owner) ||
+    successor.owner.generation !== current.owner.generation + 1 ||
+    successor.refreshToken === current.refreshToken ||
+    successor.device.id !== current.owner.deviceId
+  ) {
+    if (eligibleAttempt(sent, origin, current.owner, current.refreshToken, await clock()) === null)
+      throw new RecoveryExhausted()
     throw new RecoveryPending(attempt.deadline)
   }
-  await write({ ...current, refreshState: "uncertain", refreshAttempt: { ...attempt, state: "successor_received_uncommitted" } })
+  await write({
+    ...current,
+    refreshState: "uncertain",
+    refreshAttempt: { ...attempt, state: "successor_received_uncommitted" },
+  })
   const { refreshAttempt: _attempt, refreshState: _state, ...committed } = successor
   // A failed replacement retains successor_received_uncommitted with the original attempt identity.
   // No successor token is published.

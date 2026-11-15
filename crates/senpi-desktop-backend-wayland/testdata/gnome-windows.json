@@ -1,0 +1,13 @@
+{
+  "shell": {"overview":false,"modal":false,"locked":false},
+  "chrome": [{"x":0,"y":0,"width":2560,"height":32}],
+  "windows": [
+    {"id":"3","pid":801,"title":"Desktop Icons","x":0,"y":0,"width":2560,"height":1440,"shown":true,"desktopWindow":true},
+    {"id":"17","pid":1201,"title":"~ : bash","x":10,"y":48,"width":1260,"height":1012,"shown":true,"desktopWindow":false},
+    {"id":"21","pid":1302,"title":"notes.txt - Text Editor","x":1290,"y":48,"width":1260,"height":1012,"shown":true,"desktopWindow":false},
+    {"id":"22","pid":1302,"title":"Save As","x":1500,"y":300,"width":600,"height":400,"shown":true,"desktopWindow":false},
+    {"id":"25","pid":1403,"title":"Docs - Firefox","x":200,"y":100,"width":1000,"height":800,"shown":false,"desktopWindow":false},
+    {"id":"30","pid":1504,"title":"Settings","x":300,"y":200,"width":900,"height":700,"shown":false,"desktopWindow":false},
+    {"id":"31","pid":1605,"title":"Picture-in-Picture","x":2200,"y":1100,"width":320,"height":180,"shown":true,"desktopWindow":false}
+  ]
+}

@@ -3,54 +3,81 @@ import { spawn } from "node:child_process"
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { captureChild, dumpRunProcesses, OUTPUT_TAIL_LIMIT, stageRecorder, withinDeadline } from "./task-rpc-diagnostics.mjs"
+import {
+  captureChild,
+  dumpRunProcesses,
+  OUTPUT_TAIL_LIMIT,
+  stageRecorder,
+  withinDeadline,
+} from "./task-rpc-diagnostics.mjs"
 import { waitForRecord } from "./task-rpc-record-wait.mjs"
 import { summarizeRuns } from "./task-rpc-reconcile-batch.mjs"
+import { remainingTestTime, useTestTimeout } from "../../../../test-support/test-deadline"
 
-test.each([undefined, "0", "1"])("a failed initial parent retains diagnostics and opts into stage stderr with %s", async (stageEnv) => {
-  // Given a Bun executable receiving Senpi-only arguments, the parent really fails to launch.
-  const env = { ...process.env }
-  delete env.OMO_RECONCILE_STAGES
-  delete env.OMO_QA_BUN_BIN
-  if (stageEnv !== undefined) env.OMO_RECONCILE_STAGES = stageEnv
-  const scenarios = new URL("./task-rpc-e2e-scenarios.mjs", import.meta.url).href
-  const child = spawn(process.execPath, ["-e", `
+test.each([undefined, "0", "1"])(
+  "a failed initial parent retains diagnostics and opts into stage stderr with %s",
+  async (stageEnv) => {
+    useTestTimeout(20_000)
+    // Given a Bun executable receiving Senpi-only arguments, the parent really fails to launch.
+    const env = { ...process.env }
+    delete env.OMO_RECONCILE_STAGES
+    delete env.OMO_QA_BUN_BIN
+    if (stageEnv !== undefined) env.OMO_RECONCILE_STAGES = stageEnv
+    const scenarios = new URL("./task-rpc-e2e-scenarios.mjs", import.meta.url).href
+    const child = spawn(
+      process.execPath,
+      [
+        "-e",
+        `
     const { runReconcileCheck } = await import(${JSON.stringify(scenarios)})
     console.log(JSON.stringify(await runReconcileCheck(process.execPath)))
-  `], { env, stdio: ["ignore", "pipe", "pipe"] })
-  const capture = captureChild(child)
-  let output
-  try {
-    output = await withinDeadline(capture.closed, 15_000, () => child.kill("SIGKILL"))
-  } finally {
-    if (child.exitCode === null) child.kill("SIGKILL")
-    await capture.closed
-  }
-  expect(output.status).toBe(0)
-  const result = JSON.parse(output.stdoutTail)
-  // Then a dead parent cannot consume the 120-second task-creation budget.
-  expect(result.verdict).toBe("FAIL")
-  expect(result.reason).toBe("parent exited before RPC child became running")
-  expect(result.facts.parent.status).not.toBe(0)
-  expect(result.facts.parent.stderrTail.length).toBeGreaterThan(0)
-  expect(result.facts.stages.map((stage) => stage.stage)).toEqual(["parent_spawned"])
-  expect(existsSync(result.facts.sandboxRoot)).toBe(false)
-  if (stageEnv === "1") {
-    const lines = output.stderrTail.trimEnd().split("\n")
-    expect(lines).toHaveLength(1)
-    expect(lines[0].startsWith("OMO_RECONCILE_STAGE ")).toBe(true)
-    expect(JSON.parse(lines[0].slice("OMO_RECONCILE_STAGE ".length))).toEqual(result.facts.stages[0])
-  } else {
-    expect(output.stderrTail).toBe("")
-  }
-}, 20_000)
+  `,
+      ],
+      { env, stdio: ["ignore", "pipe", "pipe"] },
+    )
+    const capture = captureChild(child)
+    let output
+    try {
+      output = await withinDeadline(capture.closed, remainingTestTime(), () => child.kill("SIGKILL")).catch((error) => {
+        throw new Error("the captured child did not close within the test budget", { cause: error })
+      })
+    } finally {
+      if (child.exitCode === null) child.kill("SIGKILL")
+      await capture.closed
+    }
+    expect(output.status).toBe(0)
+    const result = JSON.parse(output.stdoutTail)
+    // Then a dead parent cannot consume the 120-second task-creation budget.
+    expect(result.verdict).toBe("FAIL")
+    expect(result.reason).toBe("parent exited before RPC child became running")
+    expect(result.facts.parent.status).not.toBe(0)
+    expect(result.facts.parent.stderrTail.length).toBeGreaterThan(0)
+    expect(result.facts.stages.map((stage) => stage.stage)).toEqual(["parent_spawned"])
+    expect(existsSync(result.facts.sandboxRoot)).toBe(false)
+    if (stageEnv === "1") {
+      const lines = output.stderrTail.trimEnd().split("\n")
+      expect(lines).toHaveLength(1)
+      expect(lines[0].startsWith("OMO_RECONCILE_STAGE ")).toBe(true)
+      expect(JSON.parse(lines[0].slice("OMO_RECONCILE_STAGE ".length))).toEqual(result.facts.stages[0])
+    } else {
+      expect(output.stderrTail).toBe("")
+    }
+  },
+  20_000,
+)
 
 test("captured child output retains both bounded tails through actual exit", async () => {
-  const child = spawn(process.execPath, ["-e", `process.stdout.write("x".repeat(20000)+"OUT"); process.stderr.write("y".repeat(20000)+"ERR")`], {
-    stdio: ["ignore", "pipe", "pipe"],
-  })
+  const child = spawn(
+    process.execPath,
+    ["-e", `process.stdout.write("x".repeat(20000)+"OUT"); process.stderr.write("y".repeat(20000)+"ERR")`],
+    {
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  )
   let updates = 0
-  const capture = captureChild(child, () => { updates += 1 })
+  const capture = captureChild(child, () => {
+    updates += 1
+  })
   const result = await capture.closed
   expect(result.status).toBe(0)
   expect(result.stdoutTail).toBe("x".repeat(OUTPUT_TAIL_LIMIT - 3) + "OUT")
@@ -140,5 +167,12 @@ test("stage receipts and min-of-N retain slow and failed control runs", () => {
     { label: "B1", elapsedMs: 30, verdict: "PASS", stages: [], cpu: [{ values: [40] }] },
     { label: "B2", elapsedMs: 300, verdict: "FAIL", stages: [], cpu: [{ values: [90] }] },
   ])
-  expect(summary[1]).toMatchObject({ runs: 2, passed: 1, minMs: 30, maxMs: 300, fseventsdMinCpu: 40, fseventsdMaxCpu: 90 })
+  expect(summary[1]).toMatchObject({
+    runs: 2,
+    passed: 1,
+    minMs: 30,
+    maxMs: 300,
+    fseventsdMinCpu: 40,
+    fseventsdMaxCpu: 90,
+  })
 })

@@ -1,6 +1,6 @@
 export function deepMergeRecord<TTarget extends Record<string, unknown>>(
   target: TTarget,
-  source: Partial<TTarget>
+  source: Partial<TTarget>,
 ): TTarget {
   const result: TTarget = { ...target }
 
@@ -19,7 +19,7 @@ export function deepMergeRecord<TTarget extends Record<string, unknown>>(
     ) {
       result[key] = deepMergeRecord(
         targetValue as Record<string, unknown>,
-        sourceValue as Record<string, unknown>
+        sourceValue as Record<string, unknown>,
       ) as TTarget[keyof TTarget]
     } else if (sourceValue !== undefined) {
       result[key] = sourceValue as TTarget[keyof TTarget]

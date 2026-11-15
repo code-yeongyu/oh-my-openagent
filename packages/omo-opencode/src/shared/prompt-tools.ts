@@ -3,7 +3,7 @@ import { getSessionTools } from "./session-tools-store"
 export type PromptToolPermission = boolean | "allow" | "deny" | "ask"
 
 export function normalizePromptTools(
-  tools: Record<string, PromptToolPermission> | undefined
+  tools: Record<string, PromptToolPermission> | undefined,
 ): Record<string, boolean> | undefined {
   if (!tools) {
     return undefined
@@ -25,7 +25,7 @@ export function normalizePromptTools(
 
 export function resolveInheritedPromptTools(
   sessionID: string,
-  fallbackTools?: Record<string, PromptToolPermission>
+  fallbackTools?: Record<string, PromptToolPermission>,
 ): Record<string, boolean> | undefined {
   const sessionTools = getSessionTools(sessionID)
   if (sessionTools && Object.keys(sessionTools).length > 0) {

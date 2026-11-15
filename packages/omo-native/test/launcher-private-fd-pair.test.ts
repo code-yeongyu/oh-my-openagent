@@ -18,17 +18,28 @@ describe.skipIf(process.platform !== "win32")("Windows launcher pipe pair (#1195
       try {
         mkdirSync(join(engine, "dist", "core"), { recursive: true })
         cpSync(join(SOURCE, "bin"), join(pkg, "bin"), { recursive: true })
-        writeFileSync(join(pkg, "package.json"), JSON.stringify({ name: "omo-ai", version: "0.0.0-test", type: "module" }))
-        writeFileSync(join(engine, "package.json"), JSON.stringify({
-          name: "@code-yeongyu/senpi", version: "0.0.0-test", type: "module", exports: { ".": "./dist/index.js" },
-        }))
+        writeFileSync(
+          join(pkg, "package.json"),
+          JSON.stringify({ name: "omo-ai", version: "0.0.0-test", type: "module" }),
+        )
+        writeFileSync(
+          join(engine, "package.json"),
+          JSON.stringify({
+            name: "@code-yeongyu/senpi",
+            version: "0.0.0-test",
+            type: "module",
+            exports: { ".": "./dist/index.js" },
+          }),
+        )
         writeFileSync(join(engine, "dist", "index.js"), "export {}\n")
         writeFileSync(join(engine, "dist", "core", "brand.js"), "export {}\n")
         // This stand-in models an installed, prepared engine. It deliberately has no
         // provider/RPC implementation for postinstall to patch.
         writeFileSync(join(engine, ".omo-engine-prepared"), "0.0.0-test\n")
         const entry = join(engine, "dist", "cli.js")
-        writeFileSync(entry, `
+        writeFileSync(
+          entry,
+          `
 import { createReadStream, createWriteStream, fstatSync } from "node:fs"
 if (process.env.SENPI_PRIVATE_FDS !== '{"a":[5,6]}') {
   throw new Error("pair lost at launcher hop: " + JSON.stringify({ hop: ${JSON.stringify(hop)}, table: process.env.SENPI_PRIVATE_FDS ?? null, bun: process.versions.bun ?? null }))
@@ -47,7 +58,8 @@ for (const stream of [input, output]) stream.on("close", () => {
   process.stdin.on("end", () => console.log(JSON.stringify({ closed })))
   process.stdin.resume()
 })
-`)
+`,
+        )
         let command = process.execPath
         let args = [join(pkg, "bin", "omo.js"), "host", "ensure"]
         if (hop === "npm" || hop === "bun-reexec") {
@@ -56,12 +68,17 @@ for (const stream of [input, output]) stream.on("close", () => {
           command = node
         } else {
           const probe = join(root, "handoff.ts")
-          writeFileSync(probe, `
+          writeFileSync(
+            probe,
+            `
 import { reexecProvisionedRuntime } from ${JSON.stringify(join(SOURCE, "provisioned-handoff.ts"))}
 await reexecProvisionedRuntime(process.env.PAIR_BUN, { argv: [${JSON.stringify(entry)}, "host", "ensure"] })
-`)
+`,
+          )
           command = join(root, "handoff.exe")
-          const build = spawnSync(process.execPath, ["build", "--compile", probe, "--outfile", command], { encoding: "utf8" })
+          const build = spawnSync(process.execPath, ["build", "--compile", probe, "--outfile", command], {
+            encoding: "utf8",
+          })
           expect(build.status, build.stderr).toBe(0)
           args = []
         }
@@ -86,9 +103,15 @@ await reexecProvisionedRuntime(process.env.PAIR_BUN, { argv: [${JSON.stringify(e
         let received = ""
         let report = ""
         let errors = ""
-        output.on("data", (chunk: Buffer) => { received += chunk.toString() })
-        child.stdout?.on("data", (chunk: Buffer) => { report += chunk.toString() })
-        child.stderr?.on("data", (chunk: Buffer) => { errors += chunk.toString() })
+        output.on("data", (chunk: Buffer) => {
+          received += chunk.toString()
+        })
+        child.stdout?.on("data", (chunk: Buffer) => {
+          report += chunk.toString()
+        })
+        child.stderr?.on("data", (chunk: Buffer) => {
+          errors += chunk.toString()
+        })
         // Listeners are registered before sending the frame. EOF proves that the waiting launcher
         // no longer owns either pipe, not merely that it eventually closes them on process exit.
         input.end("ping")

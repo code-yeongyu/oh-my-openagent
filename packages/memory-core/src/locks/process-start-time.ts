@@ -86,7 +86,10 @@ async function openKernel32(): Promise<Kernel32ProcessTimes | null> {
     const { dlopen, FFIType } = await import("bun:ffi")
     const library = dlopen("kernel32.dll", {
       OpenProcess: { args: [FFIType.u32, FFIType.i32, FFIType.u32], returns: FFIType.ptr },
-      GetProcessTimes: { args: [FFIType.ptr, FFIType.ptr, FFIType.ptr, FFIType.ptr, FFIType.ptr], returns: FFIType.i32 },
+      GetProcessTimes: {
+        args: [FFIType.ptr, FFIType.ptr, FFIType.ptr, FFIType.ptr, FFIType.ptr],
+        returns: FFIType.i32,
+      },
       CloseHandle: { args: [FFIType.ptr], returns: FFIType.i32 },
     })
     return library.symbols
@@ -109,7 +112,13 @@ export async function readWin32ProcessCreationFiletime(pid: number): Promise<big
   if (handle === null || handle === 0 || handle === 0n) return null
   try {
     const creation = new BigUint64Array(1)
-    const ok = kernel32.GetProcessTimes(handle, creation, new BigUint64Array(1), new BigUint64Array(1), new BigUint64Array(1))
+    const ok = kernel32.GetProcessTimes(
+      handle,
+      creation,
+      new BigUint64Array(1),
+      new BigUint64Array(1),
+      new BigUint64Array(1),
+    )
     const filetime = creation[0] ?? 0n
     return ok === 0 || filetime === 0n ? null : filetime
   } finally {

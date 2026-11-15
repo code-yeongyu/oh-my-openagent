@@ -184,7 +184,7 @@ lsp_diagnostics(filePath)  // Errors, warnings before we start
 
 \`\`\`bash
 // Find structural patterns
-python3 scripts/ast_grep_helper.py search 'function $NAME($$$) { $$$ }' --lang ts src/
+python3 scripts/ast_grep_helper.py search 'function $NAME($$$) { $$$ }' src/ --lang ts
 
 # Preview refactoring first
 sg --pattern '[old_pattern]' --rewrite '[new_pattern]' --lang ts src/

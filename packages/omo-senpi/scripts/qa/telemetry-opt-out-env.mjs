@@ -33,5 +33,9 @@ export function telemetryLocalSinkEnv(sinkUrl) {
   }
   // A QA sandbox is an automated run (temp HOME, often CI), which the runtime keeps telemetry off for
   // (#10934); the documented override lets this deliberate, loopback-only run report.
-  return { ...Object.fromEntries(TELEMETRY_OPT_OUT_NAMES.map((name) => [name, ""])), OMO_TELEMETRY_ALLOW_AUTOMATION: "1", POSTHOG_HOST: sinkUrl }
+  return {
+    ...Object.fromEntries(TELEMETRY_OPT_OUT_NAMES.map((name) => [name, ""])),
+    OMO_TELEMETRY_ALLOW_AUTOMATION: "1",
+    POSTHOG_HOST: sinkUrl,
+  }
 }

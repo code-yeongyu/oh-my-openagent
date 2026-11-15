@@ -88,7 +88,13 @@ describe("omo-senpi skill-pointers suppression", () => {
       const pi = new FakeExtensionAPI()
       await registerSkillPointers(pi)
 
-      for (const tag of ["omo-ulw-loop-pointer", "omo-mass-ulw-pointer", "omo-mass-ulw-mode", "ultrawork-mode", "omo-ultrawork-reminder"]) {
+      for (const tag of [
+        "omo-ulw-loop-pointer",
+        "omo-mass-ulw-pointer",
+        "omo-mass-ulw-mode",
+        "ultrawork-mode",
+        "omo-ultrawork-reminder",
+      ]) {
         const text = `<${tag}>ulw-loop</${tag}>`
         expect(matchedSkillPointerNames(text)).toEqual([])
         expectNoInjection(pi, await dispatchInput(pi, text))

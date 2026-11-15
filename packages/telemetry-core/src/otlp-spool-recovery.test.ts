@@ -50,10 +50,14 @@ function recordTimers(): {
     const timer: RecordedTimer = { seq: armed.length, ms: Number(ms ?? 0), fired: false }
     armed.push(timer)
     if (typeof handler !== "function") return original(handler, ms, ...args)
-    return original((...handlerArgs: unknown[]) => {
-      timer.fired = true
-      return handler(...handlerArgs)
-    }, ms, ...args)
+    return original(
+      (...handlerArgs: unknown[]) => {
+        timer.fired = true
+        return handler(...handlerArgs)
+      },
+      ms,
+      ...args,
+    )
   }
   globalThis.setTimeout = recording as unknown as typeof setTimeout
   const sleep = spyOn(Bun, "sleep")
@@ -136,7 +140,10 @@ describe("spool recovery", () => {
   test("#given a file written by service.version 1.0.0 #when a 1.1.0 build replays it #then the request's Resource says 1.0.0", async () => {
     // given
     const dir = root()
-    const old = makeTransport(dir, { resource: testResource("1.0.0"), fetch: recordingFetch(() => new Response(null, { status: 503 })).fetch })
+    const old = makeTransport(dir, {
+      resource: testResource("1.0.0"),
+      fetch: recordingFetch(() => new Response(null, { status: 503 })).fetch,
+    })
     capture(old, "feature_used", { feature: "a" })
     await old.flush()
     const { calls, fetch } = recordingFetch()
@@ -218,7 +225,10 @@ describe("spool recovery", () => {
     // given
     const dir = root()
     mkdirSync(dir, { recursive: true })
-    writeFileSync(join(dir, `batch-logs-${createBatchId(Date.now() - 15 * DAY_MS)}.otlp`), Buffer.concat([frame(new Uint8Array([1, 1])), frame(new Uint8Array([8, 1]))]))
+    writeFileSync(
+      join(dir, `batch-logs-${createBatchId(Date.now() - 15 * DAY_MS)}.otlp`),
+      Buffer.concat([frame(new Uint8Array([1, 1])), frame(new Uint8Array([8, 1]))]),
+    )
     const { calls, fetch } = recordingFetch()
     const transport = makeTransport(dir, { fetch })
 
@@ -248,7 +258,9 @@ describe("spool recovery", () => {
     const records = calls.flatMap((c) => logRecordsOf(decodeLogs(c.body)))
     const reports = records.filter((r) => r.eventName === "omo.client_dropped").map((r) => attributeMap(r.attributes))
     expect(droppedBeforeSend).toBeGreaterThan(0)
-    expect(reports).toEqual([expect.objectContaining({ "omo.dropped.reason": "evicted", "omo.dropped.count": droppedBeforeSend })])
+    expect(reports).toEqual([
+      expect.objectContaining({ "omo.dropped.reason": "evicted", "omo.dropped.count": droppedBeforeSend }),
+    ])
     expect(records.length - 1 + droppedBeforeSend).toBe(2_000)
     expect(transport.droppedEvents()).toBe(0)
   }, 60_000)
@@ -257,7 +269,10 @@ describe("spool recovery", () => {
     // given
     const dir = root()
     const timers = recordTimers()
-    const transport = makeTransport(dir, { shutdownTimeoutMs: CAP_MS, fetch: () => new Promise<Response>(() => undefined) })
+    const transport = makeTransport(dir, {
+      shutdownTimeoutMs: CAP_MS,
+      fetch: () => new Promise<Response>(() => undefined),
+    })
     capture(transport, "feature_used", { feature: "a" })
 
     try {
@@ -294,9 +309,10 @@ describe("spool recovery", () => {
       // ...and nothing waited through Bun.sleep or node:timers/promises either.
       expect(otherWaitsWhenShutdownReturned).toBe(0)
       const entries = spoolNames(dir).map(parseSpoolName)
-      expect(entries.filter((entry) => entry.kind !== "lock"), `spool entries: ${JSON.stringify(entries)}`).toEqual([
-        expect.objectContaining({ kind: expect.stringMatching(/^(batch|sending)$/), signal: "logs" }),
-      ])
+      expect(
+        entries.filter((entry) => entry.kind !== "lock"),
+        `spool entries: ${JSON.stringify(entries)}`,
+      ).toEqual([expect.objectContaining({ kind: expect.stringMatching(/^(batch|sending)$/), signal: "logs" })])
     } finally {
       timers.restore()
     }
@@ -315,7 +331,11 @@ describe("spool recovery", () => {
       }
       return true
     }
-    const transport = makeTransport(dir, { consent, shutdownTimeoutMs: CAP_MS, fetch: () => new Promise<Response>(() => undefined) })
+    const transport = makeTransport(dir, {
+      consent,
+      shutdownTimeoutMs: CAP_MS,
+      fetch: () => new Promise<Response>(() => undefined),
+    })
     capture(transport, "feature_used", { feature: "a" })
     markNextConsentCheck = true
 
@@ -327,9 +347,10 @@ describe("spool recovery", () => {
       expect(outcome).toBe("settled")
       expect(armedWhenFlushWorkRan).toEqual(expect.arrayContaining([FLUSH_DEADLINE_MS, CAP_MS]))
       const entries = spoolNames(dir).map(parseSpoolName)
-      expect(entries.filter((entry) => entry.kind !== "lock"), `spool entries: ${JSON.stringify(entries)}`).toEqual([
-        expect.objectContaining({ kind: expect.stringMatching(/^(batch|sending)$/), signal: "logs" }),
-      ])
+      expect(
+        entries.filter((entry) => entry.kind !== "lock"),
+        `spool entries: ${JSON.stringify(entries)}`,
+      ).toEqual([expect.objectContaining({ kind: expect.stringMatching(/^(batch|sending)$/), signal: "logs" })])
     } finally {
       timers.restore()
     }

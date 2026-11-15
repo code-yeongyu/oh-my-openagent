@@ -36,7 +36,7 @@ describe("Agent Config Integration", () => {
       expect(result.migrated.sisyphus).toEqual({ model: "anthropic/claude-opus-4-7" })
       expect(result.migrated.atlas).toEqual({ model: "anthropic/claude-opus-4-7" })
       expect(result.migrated.prometheus).toEqual({ model: "anthropic/claude-opus-4-7" })
-      
+
       // then - changed flag is true
       expect(result.changed).toBe(true)
     })
@@ -54,7 +54,7 @@ describe("Agent Config Integration", () => {
 
       // then - keys remain unchanged
       expect(result.migrated).toEqual(config)
-      
+
       // then - changed flag is false
       expect(result.changed).toBe(false)
     })
@@ -77,7 +77,7 @@ describe("Agent Config Integration", () => {
       expect(result.migrated).toHaveProperty("prometheus")
       expect(result.migrated).toHaveProperty("librarian")
       expect(Object.keys(result.migrated).every((key) => key === key.toLowerCase())).toBe(true)
-      
+
       // then - changed flag is true
       expect(result.changed).toBe(true)
     })
@@ -86,7 +86,18 @@ describe("Agent Config Integration", () => {
   describe("Display name resolution", () => {
     test("returns correct display names for all builtin agents", () => {
       // given - lowercase config keys
-      const agents = ["sisyphus", "hephaestus", "prometheus", "atlas", "metis", "momus", "oracle", "librarian", "explore", "multimodal-looker"]
+      const agents = [
+        "sisyphus",
+        "hephaestus",
+        "prometheus",
+        "atlas",
+        "metis",
+        "momus",
+        "oracle",
+        "librarian",
+        "explore",
+        "multimodal-looker",
+      ]
 
       // when - display names are requested
       const displayNames = agents.map((agent) => getAgentDisplayName(agent))
@@ -146,7 +157,18 @@ describe("Agent Config Integration", () => {
 
     test("model requirements include all builtin agents", () => {
       // given - expected builtin agents
-      const expectedAgents = ["sisyphus", "hephaestus", "prometheus", "atlas", "metis", "momus", "oracle", "librarian", "explore", "multimodal-looker"]
+      const expectedAgents = [
+        "sisyphus",
+        "hephaestus",
+        "prometheus",
+        "atlas",
+        "metis",
+        "momus",
+        "oracle",
+        "librarian",
+        "explore",
+        "multimodal-looker",
+      ]
 
       // when - checking AGENT_MODEL_REQUIREMENTS
       const agentKeys = Object.keys(AGENT_MODEL_REQUIREMENTS)
@@ -209,7 +231,7 @@ describe("Agent Config Integration", () => {
 
       // then - config is unchanged
       expect(result.migrated).toEqual(newConfig)
-      
+
       // then - changed flag is false
       expect(result.changed).toBe(false)
 

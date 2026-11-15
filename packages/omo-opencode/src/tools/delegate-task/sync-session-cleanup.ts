@@ -23,11 +23,13 @@ export function scheduleSyncSessionDeletion(
   const timer = setTimeout(() => {
     pendingDeletionTimers.delete(sessionID)
     try {
-      void deleteSession({ path: { id: sessionID } }).then(() => {
-      handedBackSyncSessions.delete(sessionID)
-      }).catch((error: unknown) => {
-        log("[task] Failed to delete completed sync session:", { sessionID, error: String(error) })
-      })
+      void deleteSession({ path: { id: sessionID } })
+        .then(() => {
+          handedBackSyncSessions.delete(sessionID)
+        })
+        .catch((error: unknown) => {
+          log("[task] Failed to delete completed sync session:", { sessionID, error: String(error) })
+        })
     } catch (error) {
       log("[task] Failed to schedule completed sync session deletion:", { sessionID, error: String(error) })
     }

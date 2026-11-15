@@ -62,12 +62,16 @@ function homeWith(config: Record<string, unknown> = {}): string {
 /** The method the fake engine reports receiving, from one of its `engine.log` lines. */
 function receivedMethod(line: string): string | undefined {
   const message: unknown = JSON.parse(line)
-  if (typeof message !== "object" || message === null || !("method" in message) || message.method !== "engine.log") return undefined
+  if (typeof message !== "object" || message === null || !("method" in message) || message.method !== "engine.log")
+    return undefined
   if (!("params" in message) || typeof message.params !== "object" || message.params === null) return undefined
   const text = "message" in message.params ? message.params.message : undefined
   if (typeof text !== "string" || !text.startsWith(RECEIVED)) return undefined
   const received: unknown = JSON.parse(text.slice(RECEIVED.length))
-  return typeof received === "object" && received !== null && "method" in received && typeof received.method === "string"
+  return typeof received === "object" &&
+    received !== null &&
+    "method" in received &&
+    typeof received.method === "string"
     ? received.method
     : undefined
 }

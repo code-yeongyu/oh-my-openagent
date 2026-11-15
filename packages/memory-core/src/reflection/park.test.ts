@@ -101,7 +101,10 @@ describe("reflection park policy", () => {
 
     // when
     const state = applyReflectionParkFailure(parked, {
-      runId: "run-probe", at: at(7 * 60 * 60_000), fingerprint: "x:y", retryable: false,
+      runId: "run-probe",
+      at: at(7 * 60 * 60_000),
+      fingerprint: "x:y",
+      retryable: false,
     })
 
     // then
@@ -113,7 +116,11 @@ describe("reflection park policy", () => {
   test("#given a detail longer than the cap #when applied #then the stored detail is bounded", () => {
     // when
     const state = applyReflectionParkFailure(emptyReflectionParkState(), {
-      runId: "run-1", at: at(0), fingerprint: "f", retryable: true, detail: "x".repeat(10_000),
+      runId: "run-1",
+      at: at(0),
+      fingerprint: "f",
+      retryable: true,
+      detail: "x".repeat(10_000),
     })
 
     // then
@@ -144,7 +151,10 @@ describe("reflection park gate", () => {
     const gate = gateReflectionRequest(parked, stepCount, new Date(parkedAt + 60_000).toISOString())
 
     // then
-    expect(gate).toEqual({ kind: "parked", nextProbeAt: new Date(parkedAt + REFLECTION_PARK_PROBE_INTERVAL_MS).toISOString() })
+    expect(gate).toEqual({
+      kind: "parked",
+      nextProbeAt: new Date(parkedAt + REFLECTION_PARK_PROBE_INTERVAL_MS).toISOString(),
+    })
     expect(gateReflectionRequest(parked, compaction, new Date(parkedAt + 60_000).toISOString()).kind).toBe("parked")
     expect(gateReflectionRequest(parked, dreamIdle, new Date(parkedAt + 60_000).toISOString()).kind).toBe("parked")
   })
@@ -172,7 +182,10 @@ describe("reflection park gate", () => {
     // then
     expect(first).toEqual({ kind: "probe" })
     expect(isReflectionParked(probed)).toBe(true)
-    expect(second).toEqual({ kind: "parked", nextProbeAt: new Date(Date.parse(due) + REFLECTION_PARK_PROBE_INTERVAL_MS).toISOString() })
+    expect(second).toEqual({
+      kind: "parked",
+      nextProbeAt: new Date(Date.parse(due) + REFLECTION_PARK_PROBE_INTERVAL_MS).toISOString(),
+    })
   })
 
   test("#given request kinds #when classified #then only manual reflections and manual dreams are not automatic", () => {

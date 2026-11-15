@@ -23,23 +23,27 @@ export async function executeSyncTask(
   systemContent: string | undefined,
   modelInfo?: ModelFallbackInfo,
   fallbackChain?: FallbackEntry[],
-  deps: SyncTaskDeps = syncTaskDeps
+  deps: SyncTaskDeps = syncTaskDeps,
 ): Promise<string> {
   const { client, directory, syncPollTimeoutMs, taskCleanupDelayMs } = executorCtx
   const toastManager = getTaskToastManager()
   let taskId: string | undefined
   let syncSessionID: string | undefined
-  let spawnReservation:
-    | Awaited<ReturnType<ExecutorContext["manager"]["reserveSubagentSpawn"]>>
-    | undefined
+  let spawnReservation: Awaited<ReturnType<ExecutorContext["manager"]["reserveSubagentSpawn"]>> | undefined
   let concurrencyAcquired = false
-  const concurrencyModel = categoryModel && typeof categoryModel.providerID === "string" && typeof categoryModel.modelID === "string"
-    ? `${categoryModel.providerID}/${categoryModel.modelID}`
-    : typeof agentToUse === "string" ? agentToUse : "default"
+  const concurrencyModel =
+    categoryModel && typeof categoryModel.providerID === "string" && typeof categoryModel.modelID === "string"
+      ? `${categoryModel.providerID}/${categoryModel.modelID}`
+      : typeof agentToUse === "string"
+        ? agentToUse
+        : "default"
   const manager = executorCtx?.manager
 
   try {
-    if (!subagentSessions.has(parentContext.sessionID) && typeof manager?.acquireSyncSubagentConcurrency === "function") {
+    if (
+      !subagentSessions.has(parentContext.sessionID) &&
+      typeof manager?.acquireSyncSubagentConcurrency === "function"
+    ) {
       await manager.acquireSyncSubagentConcurrency(concurrencyModel)
       concurrencyAcquired = true
     }

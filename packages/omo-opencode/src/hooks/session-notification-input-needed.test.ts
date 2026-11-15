@@ -11,9 +11,7 @@ describe("session-notification input-needed events", () => {
   function createMockPluginInput() {
     return {
       $: async (cmd: TemplateStringsArray | string, ...values: unknown[]) => {
-        const cmdStr = typeof cmd === "string"
-          ? cmd
-          : cmd.reduce((acc, part, i) => acc + part + (values[i] ?? ""), "")
+        const cmdStr = typeof cmd === "string" ? cmd : cmd.reduce((acc, part, i) => acc + part + (values[i] ?? ""), "")
 
         if (cmdStr.includes("osascript") || cmdStr.includes("notify-send") || cmdStr.includes("powershell")) {
           notificationCalls.push(cmdStr)
@@ -39,9 +37,11 @@ describe("session-notification input-needed events", () => {
     spyOn(utils, "getPowershellPath").mockResolvedValue("powershell")
     spyOn(utils, "startBackgroundCheck").mockImplementation(() => {})
     spyOn(sender, "detectPlatform").mockReturnValue("darwin")
-    spyOn(sender, "sendSessionNotification").mockImplementation(async (_ctx: unknown, _platform: unknown, _title: unknown, message: string) => {
-      notificationCalls.push(message)
-    })
+    spyOn(sender, "sendSessionNotification").mockImplementation(
+      async (_ctx: unknown, _platform: unknown, _title: unknown, message: string) => {
+        notificationCalls.push(message)
+      },
+    )
   })
 
   afterEach(() => {

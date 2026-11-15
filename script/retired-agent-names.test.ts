@@ -95,7 +95,10 @@ async function scanSurface(surface: GovernedSurface): Promise<string[]> {
 function trackedFiles(): string[] {
   const result = spawnSync("git", ["ls-files", "-z"], { cwd: REPO_ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 })
   if (result.status !== 0) throw new Error(`git ls-files failed: ${result.stderr}`)
-  return result.stdout.split("\0").filter((entry) => entry.length > 0).map(toPosix)
+  return result.stdout
+    .split("\0")
+    .filter((entry) => entry.length > 0)
+    .map(toPosix)
 }
 
 describe("retired agent names gate", () => {

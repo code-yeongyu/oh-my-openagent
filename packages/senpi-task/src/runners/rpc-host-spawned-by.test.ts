@@ -25,8 +25,9 @@ async function fixture() {
   })
   const ancestry = { parent_session_id: "nested-parent", root_session_id: "tree-root", depth: 3 }
   const check = (taskId: string, parentSessionId = ancestry.parent_session_id) => {
-    const open = host.commands.find((command) =>
-      command.type === "open_session" && String(command.payload.sessionPath).includes(taskId))
+    const open = host.commands.find(
+      (command) => command.type === "open_session" && String(command.payload.sessionPath).includes(taskId),
+    )
     expect(open?.payload.spawnedBy).toEqual({ parentSessionId, rootSessionId: "tree-root", taskId })
   }
   return { ...f, host, ancestry, check }
@@ -49,11 +50,15 @@ test("workflow node wire uses the manager task ID, not the workflow node ID", as
   const store = createDagFileStore({ project_dir: f.project })
   const dag = createDagManager({ store })
   const { snapshot } = await dag.start({
-    parentSessionId: "nested-parent", rootSessionId: "tree-root",
+    parentSessionId: "nested-parent",
+    rootSessionId: "tree-root",
     definition: { key: "ancestry", name: "ancestry", nodes: [{ id: "node", category: "quick", prompt: "work" }] },
   })
   const scheduler = createDagScheduler({
-    store, taskManager: f.manager, initialRecord: dag.record(snapshot.runId, "nested-parent"), ancestry: { depth: 2 },
+    store,
+    taskManager: f.manager,
+    initialRecord: dag.record(snapshot.runId, "nested-parent"),
+    ancestry: { depth: 2 },
   })
   const prompted = f.host.waitForCommand("prompt")
   // when the node reaches the real host wire
@@ -77,8 +82,14 @@ test("team member wire preserves a nested lead's root", async () => {
   // when the nested lead creates a member
   const result = await spawnTeamMembers({
     spec: normalizeSenpiTeamSpec({ members: [{ name: "member", kind: "category", category: "quick" }] }, "ancestry"),
-    manager: f.manager, leadSessionId: "nested-parent", rootSessionId: "tree-root",
-    teamRunId: "team-run", spawnDepth: 3, maxParallel: 1, deadlineAt: Number.MAX_SAFE_INTEGER, now: () => 0,
+    manager: f.manager,
+    leadSessionId: "nested-parent",
+    rootSessionId: "tree-root",
+    teamRunId: "team-run",
+    spawnDepth: 3,
+    maxParallel: 1,
+    deadlineAt: Number.MAX_SAFE_INTEGER,
+    now: () => 0,
   })
   if (result.failure !== undefined) throw result.failure
   const member = result.spawned.get("member")
@@ -104,9 +115,12 @@ test.each(["fresh", "keep_alive"] as const)("workpool %s worker keeps ancestry a
       if (event.task_id === undefined || event.run_epoch === undefined) throw new Error("worker task missing")
       ids.push(event.task_id)
       f.check(event.task_id)
-      expect(pools.yieldResults(event.task_id, event.run_epoch, {
-        op: "yield", results: [{ key, data: key }],
-      }).results[0]?.status).toBe("accepted")
+      expect(
+        pools.yieldResults(event.task_id, event.run_epoch, {
+          op: "yield",
+          results: [{ key, data: key }],
+        }).results[0]?.status,
+      ).toBe("accepted")
       const session = f.host.sessions().find((entry) => entry.sessionPath.includes(event.task_id ?? "missing"))
       if (session === undefined) throw new Error("worker session missing")
       const idle = pools.waitForEvent(pool.pool_id, "worker_idle", AbortSignal.timeout(5000))
@@ -115,7 +129,9 @@ test.each(["fresh", "keep_alive"] as const)("workpool %s worker keeps ancestry a
     }
     // then keep-alive reuse retains the original header and task identity
     expect(ids[0] === ids[1]).toBe(mode === "keep_alive")
-    expect(f.host.commands.filter((command) => command.type === "open_session")).toHaveLength(mode === "keep_alive" ? 1 : 2)
+    expect(f.host.commands.filter((command) => command.type === "open_session")).toHaveLength(
+      mode === "keep_alive" ? 1 : 2,
+    )
   } finally {
     pools.dispose()
   }

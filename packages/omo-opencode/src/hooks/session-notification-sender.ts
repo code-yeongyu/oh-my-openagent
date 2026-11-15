@@ -1,8 +1,4 @@
-import {
-  type Platform,
-  detectPlatform,
-  getDefaultSoundPath,
-} from "./session-notification-platform"
+import { type Platform, detectPlatform, getDefaultSoundPath } from "./session-notification-platform"
 import { playSessionNotificationSound } from "./session-notification-sound"
 import { sendSessionNotification } from "./session-notification-send"
 

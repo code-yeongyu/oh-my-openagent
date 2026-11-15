@@ -38,7 +38,10 @@ const pythonCacheEnv = {
 
 // Read through a call: after `delete process.env.X`, TypeScript narrows a direct `process.env.X` read to undefined.
 function readPythonCacheEnv(): Record<"PYTHONDONTWRITEBYTECODE" | "PYTHONPYCACHEPREFIX", string | undefined> {
-  return { PYTHONDONTWRITEBYTECODE: process.env.PYTHONDONTWRITEBYTECODE, PYTHONPYCACHEPREFIX: process.env.PYTHONPYCACHEPREFIX }
+  return {
+    PYTHONDONTWRITEBYTECODE: process.env.PYTHONDONTWRITEBYTECODE,
+    PYTHONPYCACHEPREFIX: process.env.PYTHONPYCACHEPREFIX,
+  }
 }
 
 afterEach(() => {
@@ -49,7 +52,9 @@ afterEach(() => {
   }
 })
 
-function createRecordingLogger(): ComponentLogger & { entries: Array<{ level: string; message: string; details?: unknown }> } {
+function createRecordingLogger(): ComponentLogger & {
+  entries: Array<{ level: string; message: string; details?: unknown }>
+} {
   const entries: Array<{ level: string; message: string; details?: unknown }> = []
   return {
     entries,
@@ -102,9 +107,7 @@ describe("composeOmoSenpiExtension", () => {
     ])
     expect(pi.tools.map((tool) => tool.name)).toEqual(["alpha_tool"])
     expect(pi.commands.map((command) => command.name)).toEqual(["beta"])
-    expect(pi.userMessages).toEqual([
-      { content: "flag=false", options: { deliverAs: "followUp" } },
-    ])
+    expect(pi.userMessages).toEqual([{ content: "flag=false", options: { deliverAs: "followUp" } }])
   })
 
   it("#given one component disabled by flag #when composed #then skips exactly that component", async () => {
@@ -142,7 +145,12 @@ describe("composeOmoSenpiExtension", () => {
     // given
     const pi = new FakeExtensionAPI()
     const components: OmoSenpiComponent[] = [
-      { name: "alpha", register(api) { api.registerTool({ name: "alpha_tool" }) } },
+      {
+        name: "alpha",
+        register(api) {
+          api.registerTool({ name: "alpha_tool" })
+        },
+      },
     ]
 
     // when
@@ -167,14 +175,23 @@ describe("composeOmoSenpiExtension", () => {
     try {
       // when
       await composeOmoSenpiExtension([])(new FakeExtensionAPI())
-      const child = Bun.spawn([process.platform === "win32" ? "python" : "python3", "main.py"], { cwd: project, env: process.env, stdout: "pipe", stderr: "pipe" })
+      const child = Bun.spawn([process.platform === "win32" ? "python" : "python3", "main.py"], {
+        cwd: project,
+        env: process.env,
+        stdout: "pipe",
+        stderr: "pipe",
+      })
       const [stdout, exitCode] = await Promise.all([new Response(child.stdout).text(), child.exited])
 
       // then
       const prefix = join(work, "omo-senpi", "pycache")
       expect(readPythonCacheEnv()).toEqual({ PYTHONDONTWRITEBYTECODE: undefined, PYTHONPYCACHEPREFIX: prefix })
       expect({ exitCode, stdout: stdout.trim() }).toEqual({ exitCode: 0, stdout: "7" })
-      expect(readdirSync(prefix, { recursive: true, encoding: "utf8" }).some((path) => path.includes("helper.") && path.endsWith(".pyc"))).toBe(true)
+      expect(
+        readdirSync(prefix, { recursive: true, encoding: "utf8" }).some(
+          (path) => path.includes("helper.") && path.endsWith(".pyc"),
+        ),
+      ).toBe(true)
       expect(readdirSync(project).sort()).toEqual(["helper.py", "main.py"])
     } finally {
       rmSync(work, { recursive: true, force: true })
@@ -182,7 +199,12 @@ describe("composeOmoSenpiExtension", () => {
   }, 30_000)
 
   it("#given the user set either Python cache variable, even empty #when composed #then both are left exactly as they were (#11373)", async () => {
-    for (const choice of [{ PYTHONDONTWRITEBYTECODE: "1" }, { PYTHONDONTWRITEBYTECODE: "" }, { PYTHONPYCACHEPREFIX: "/mine" }, { PYTHONPYCACHEPREFIX: "" }]) {
+    for (const choice of [
+      { PYTHONDONTWRITEBYTECODE: "1" },
+      { PYTHONDONTWRITEBYTECODE: "" },
+      { PYTHONPYCACHEPREFIX: "/mine" },
+      { PYTHONPYCACHEPREFIX: "" },
+    ]) {
       // given
       delete process.env.PYTHONDONTWRITEBYTECODE
       delete process.env.PYTHONPYCACHEPREFIX
@@ -357,7 +379,15 @@ describe("composeOmoSenpiExtension", () => {
         level: "warn",
         message: "omo-senpi ExtensionAPI version mismatch; extension disabled",
         details: {
-          expected: ["on", "registerFlag", "getFlag", "registerTool", "registerCommand", "sendMessage", "sendUserMessage"],
+          expected: [
+            "on",
+            "registerFlag",
+            "getFlag",
+            "registerTool",
+            "registerCommand",
+            "sendMessage",
+            "sendUserMessage",
+          ],
           missing: ["sendMessage"],
         },
       },
@@ -543,6 +573,8 @@ describe("idle-injection retire on session_shutdown (#10782)", () => {
 
     // then
     expect(laterHandlerRan).toBe(true)
-    expect(logger.entries.some((entry) => entry.level === "warn" && entry.message.includes("receipt failed on shutdown"))).toBe(true)
+    expect(
+      logger.entries.some((entry) => entry.level === "warn" && entry.message.includes("receipt failed on shutdown")),
+    ).toBe(true)
   })
 })

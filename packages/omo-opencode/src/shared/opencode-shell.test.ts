@@ -108,7 +108,11 @@ describe("resolveOpenCodeShell on Windows", () => {
 
   test("#given OPENCODE_GIT_BASH_PATH #when bash is configured #then that Git Bash path is used", () => {
     const custom = "D:\\tools\\git\\bin\\bash.exe"
-    const host = windowsHost({ ...windowsPowerShell51, files: [...windowsPowerShell51.files, custom], env: { OPENCODE_GIT_BASH_PATH: custom } })
+    const host = windowsHost({
+      ...windowsPowerShell51,
+      files: [...windowsPowerShell51.files, custom],
+      env: { OPENCODE_GIT_BASH_PATH: custom },
+    })
 
     expect(resolveOpenCodeShell("bash", host)).toBe(custom)
   })
@@ -134,22 +138,28 @@ describe("unusable shell files", () => {
 
   test("an inaccessible rooted shell falls back to the platform default", () => {
     const host = posixHost("darwin", {}, [])
-    expect(resolveOpenCodeShell("/blocked/bash", {
-      ...host,
-      isFile() { throw Object.assign(new Error("EACCES"), { code: "EACCES" }) },
-    })).toBe("/bin/zsh")
+    expect(
+      resolveOpenCodeShell("/blocked/bash", {
+        ...host,
+        isFile() {
+          throw Object.assign(new Error("EACCES"), { code: "EACCES" })
+        },
+      }),
+    ).toBe("/bin/zsh")
   })
 
   test("an inaccessible derived Git Bash file falls back to cmd", () => {
     const host = windowsHost({ pathDirs: [GIT_CMD], files: [path.win32.join(GIT_CMD, "git.exe")] })
     const probe = host.isFile
-    expect(resolveOpenCodeShell(undefined, {
-      ...host,
-      isFile(file) {
-        if (file === GIT_BASH) throw Object.assign(new Error("EPERM"), { code: "EPERM" })
-        return probe(file)
-      },
-    })).toBe(`${SYSTEM32}\\cmd.exe`)
+    expect(
+      resolveOpenCodeShell(undefined, {
+        ...host,
+        isFile(file) {
+          if (file === GIT_BASH) throw Object.assign(new Error("EPERM"), { code: "EPERM" })
+          return probe(file)
+        },
+      }),
+    ).toBe(`${SYSTEM32}\\cmd.exe`)
   })
 })
 
@@ -163,8 +173,12 @@ describe("resolveOpenCodeShell off Windows", () => {
   test("#given SHELL is fish or nu #when resolving #then OpenCode falls back to bash", () => {
     const files = ["/usr/bin/fish", "/usr/bin/nu", "/usr/bin/bash"]
 
-    expect(resolveOpenCodeShell(undefined, posixHost("linux", { SHELL: "/usr/bin/fish", PATH: "/usr/bin" }, files))).toBe("/usr/bin/bash")
-    expect(resolveOpenCodeShell(undefined, posixHost("linux", { SHELL: "/usr/bin/nu", PATH: "/usr/bin" }, files))).toBe("/usr/bin/bash")
+    expect(
+      resolveOpenCodeShell(undefined, posixHost("linux", { SHELL: "/usr/bin/fish", PATH: "/usr/bin" }, files)),
+    ).toBe("/usr/bin/bash")
+    expect(resolveOpenCodeShell(undefined, posixHost("linux", { SHELL: "/usr/bin/nu", PATH: "/usr/bin" }, files))).toBe(
+      "/usr/bin/bash",
+    )
   })
 
   test("#given macOS without SHELL but with PSModulePath #when resolving #then zsh runs and unix syntax is used", () => {
@@ -175,7 +189,10 @@ describe("resolveOpenCodeShell off Windows", () => {
   })
 
   test("#given a configured pwsh on macOS #when resolving #then powershell syntax is used", () => {
-    const host = posixHost("darwin", { SHELL: "/bin/zsh", PATH: "/opt/homebrew/bin" }, ["/bin/zsh", "/opt/homebrew/bin/pwsh"])
+    const host = posixHost("darwin", { SHELL: "/bin/zsh", PATH: "/opt/homebrew/bin" }, [
+      "/bin/zsh",
+      "/opt/homebrew/bin/pwsh",
+    ])
 
     expect(typeFor("pwsh", host)).toBe("powershell")
   })

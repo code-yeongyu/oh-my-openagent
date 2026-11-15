@@ -7,11 +7,7 @@ import { afterEach, describe, expect, mock as mockFn, spyOn, test } from "bun:te
 
 import { dispatchRunEnd, FakeExtensionAPI } from "../../test-support/fake-extension-api"
 import { createInitDeepAdvisorComponent, processStartTime } from "../components/init-deep-advisor"
-import {
-  makeCoverageRepo,
-  resetTestHome,
-  setTestHome,
-} from "../components/init-deep-advisor/component.test-support"
+import { makeCoverageRepo, resetTestHome, setTestHome } from "../components/init-deep-advisor/component.test-support"
 import { createOnboardingComponent } from "../components/onboarding"
 import { claimOnboarding, isOnboardingComplete, releaseOnboarding } from "../components/onboarding/state"
 import { createUltraworkComponent } from "../components/ultrawork"
@@ -52,7 +48,9 @@ describe("session_start component ordering", () => {
     const logger = createLogger()
     const scheduledFlushes: Array<() => void> = []
     const idleCoordinator = new IdleInjectionCoordinator(() => undefined, {
-      scheduleFlush: (flush) => { scheduledFlushes.push(flush) },
+      scheduleFlush: (flush) => {
+        scheduledFlushes.push(flush)
+      },
     })
     const enqueue = spyOn(idleCoordinator, "enqueue")
     const scheduleFlush = spyOn(idleCoordinator, "scheduleFlush")
@@ -67,7 +65,12 @@ describe("session_start component ordering", () => {
       idleCoordinator,
     }
     const components = [
-      createOnboardingComponent({ claimOnboarding, isOnboardingComplete, releaseOnboarding, scan: async () => undefined }),
+      createOnboardingComponent({
+        claimOnboarding,
+        isOnboardingComplete,
+        releaseOnboarding,
+        scan: async () => undefined,
+      }),
       createInitDeepAdvisorComponent(),
       createUltraworkComponent(),
       createUlwLoopComponent({

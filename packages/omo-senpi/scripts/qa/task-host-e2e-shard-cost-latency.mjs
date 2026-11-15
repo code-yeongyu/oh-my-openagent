@@ -32,7 +32,11 @@ const MAX_EXTRA_ATTEMPTS = 5
 async function firstChildScenario(run, name, prewarm, samples, cleanup, log) {
   const gated = prewarm !== "off"
   const script = {
-    parentSteps: [...(gated ? [holdStep("warm-go", 300)] : []), taskStep(childTask("first child")), { type: "text", text: "latency parent done" }],
+    parentSteps: [
+      ...(gated ? [holdStep("warm-go", 300)] : []),
+      taskStep(childTask("first child")),
+      { type: "text", text: "latency parent done" },
+    ],
     childSteps: CHILD_TEXT,
   }
   const sandbox = newSandbox(run.sharded, name, { omoConfig: taskConfig({ host_shard_prewarm: prewarm }), script })
@@ -54,9 +58,16 @@ async function firstChildScenario(run, name, prewarm, samples, cleanup, log) {
       const taskAt = parent.taskCallAt()
       const first = childRequests(project).slice(seen)[0]
       const sockets = endpointSockets(sandbox).filter((socket) => !known.has(socket))
-      const valid = taskAt !== undefined && first !== undefined && (!gated || (readyAt !== undefined && readyAt <= taskAt))
+      const valid =
+        taskAt !== undefined && first !== undefined && (!gated || (readyAt !== undefined && readyAt <= taskAt))
       if (valid) values.push(first.atMs - taskAt)
-      detail.push({ ms: valid ? first.atMs - taskAt : "invalid", valid, prewarmed_before_task_call: gated ? readyAt !== undefined && readyAt <= taskAt : false, parent_exit: exit.status, new_endpoints: sockets.length })
+      detail.push({
+        ms: valid ? first.atMs - taskAt : "invalid",
+        valid,
+        prewarmed_before_task_call: gated ? readyAt !== undefined && readyAt <= taskAt : false,
+        parent_exit: exit.status,
+        new_endpoints: sockets.length,
+      })
       if (gated) rmSync(join(project.cwd, ".omo", "warm-go"), { force: true })
       for (const socket of sockets) cleanup.push(await stopEndpoint(sandbox, socket))
     }
@@ -64,12 +75,21 @@ async function firstChildScenario(run, name, prewarm, samples, cleanup, log) {
     cleanup.push(await teardownSandbox(sandbox))
   }
   log(`(e) ${name}: ${values.length}/${samples} valid samples`)
-  return summarizeSamples(values, { definition: "parent task tool_execution_start (driver clock) -> first child provider request (mock clock)", prewarm, invalid_samples: detail.filter((entry) => !entry.valid).length, detail })
+  return summarizeSamples(values, {
+    definition: "parent task tool_execution_start (driver clock) -> first child provider request (mock clock)",
+    prewarm,
+    invalid_samples: detail.filter((entry) => !entry.valid).length,
+    detail,
+  })
 }
 
 async function reattachScenario(run, samples, cleanup, log) {
   const script = {
-    parentSteps: [taskStep(childTask("held child", { run_in_background: true })), holdStep("parent-release", 900), { type: "text", text: "reattach parent done" }],
+    parentSteps: [
+      taskStep(childTask("held child", { run_in_background: true })),
+      holdStep("parent-release", 900),
+      { type: "text", text: "reattach parent done" },
+    ],
     childSteps: heldChild(600_000),
   }
   const sandbox = newSandbox(run.sharded, "lr", { script })
@@ -85,18 +105,35 @@ async function reattachScenario(run, samples, cleanup, log) {
       const socket = endpointSockets(sandbox).find((candidate) => !known.has(candidate))
       const supervisor = socket === undefined ? undefined : supervisorPid(sandbox, socket)
       const table = processTable()
-      const host = supervisor === undefined ? undefined : treePids(supervisor, table).find((pid) => table.get(pid)?.args.includes("--mode rpc"))
+      const host =
+        supervisor === undefined
+          ? undefined
+          : treePids(supervisor, table).find((pid) => table.get(pid)?.args.includes("--mode rpc"))
       let ms = null
       let replacement
       if (midTurn !== undefined && host !== undefined) {
         const killedAt = Date.now()
         process.kill(host, "SIGSEGV")
-        const continuation = await until(sandbox, () => childRequests(project).slice(seen).find((request) => request.atMs > killedAt), 120_000)
+        const continuation = await until(
+          sandbox,
+          () =>
+            childRequests(project)
+              .slice(seen)
+              .find((request) => request.atMs > killedAt),
+          120_000,
+        )
         replacement = supervisorPid(sandbox, socket)
         if (continuation !== undefined) ms = continuation.atMs - killedAt
       }
       if (ms !== null) values.push(ms)
-      detail.push({ ms: ms ?? "invalid", valid: ms !== null, killed_host_pid: host ?? "none", old_supervisor: supervisor ?? "none", new_supervisor: replacement ?? "none", new_generation: replacement !== undefined && replacement !== supervisor })
+      detail.push({
+        ms: ms ?? "invalid",
+        valid: ms !== null,
+        killed_host_pid: host ?? "none",
+        old_supervisor: supervisor ?? "none",
+        new_supervisor: replacement ?? "none",
+        new_generation: replacement !== undefined && replacement !== supervisor,
+      })
       await stopParent(parent)
       for (const pid of [supervisor, host].filter((pid) => pid !== undefined && pidAlive(pid))) {
         try {
@@ -111,7 +148,12 @@ async function reattachScenario(run, samples, cleanup, log) {
     cleanup.push(await teardownSandbox(sandbox))
   }
   log(`(e) reattach_after_crash: ${values.length}/${samples} valid samples`)
-  return summarizeSamples(values, { definition: "SIGSEGV to the shard's host process (driver clock) -> the child's first provider request after it (mock clock); includes the fresh-generation ensure and reopen", invalid_samples: detail.filter((entry) => !entry.valid).length, detail })
+  return summarizeSamples(values, {
+    definition:
+      "SIGSEGV to the shard's host process (driver clock) -> the child's first provider request after it (mock clock); includes the fresh-generation ensure and reopen",
+    invalid_samples: detail.filter((entry) => !entry.valid).length,
+    detail,
+  })
 }
 
 async function ensureScenario(run, liveHosts, samples, cleanup) {
@@ -120,7 +162,11 @@ async function ensureScenario(run, liveHosts, samples, cleanup) {
   mkdirSync(dir, { recursive: true })
   const ensure = (socket) => {
     const started = performance.now()
-    const result = runBin(sandbox, ["host", "ensure", "--socket", socket, "--launch-spec", run.sharded.specPath, "--policy", "never", "--json"], { timeoutMs: 120_000 })
+    const result = runBin(
+      sandbox,
+      ["host", "ensure", "--socket", socket, "--launch-spec", run.sharded.specPath, "--policy", "never", "--json"],
+      { timeoutMs: 120_000 },
+    )
     return { ms: performance.now() - started, exit: result.status }
   }
   const values = []
@@ -140,7 +186,8 @@ async function ensureScenario(run, liveHosts, samples, cleanup) {
       cleanup.push(await stopEndpoint(sandbox, socket))
     }
   } finally {
-    for (let index = 0; index < liveHosts - 1; index += 1) cleanup.push(await stopEndpoint(sandbox, join(dir, `b${index}.sock`)))
+    for (let index = 0; index < liveHosts - 1; index += 1)
+      cleanup.push(await stopEndpoint(sandbox, join(dir, `b${index}.sock`)))
     cleanup.push(await teardownSandbox(sandbox))
   }
   return summarizeSamples(values, {

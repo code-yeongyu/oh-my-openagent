@@ -77,7 +77,11 @@ test("an agent commit landing while the sync commits is kept: HEAD moves by comp
   await sync.commit(["synced.md"], "sync: 1 memories updated\n\nSync-Seq: 3-3")
   await sync.syncIndex(["synced.md"])
   expect(await git(root, "log", "--format=%s", "-3")).toBe("sync: 1 memories updated\nagent: write\ninit")
-  expect((await git(root, "ls-tree", "--name-only", "HEAD")).split("\n").sort()).toEqual(["agent.md", "base.md", "synced.md"])
+  expect((await git(root, "ls-tree", "--name-only", "HEAD")).split("\n").sort()).toEqual([
+    "agent.md",
+    "base.md",
+    "synced.md",
+  ])
   expect(await porcelain(root)).toBe("")
 })
 
@@ -88,7 +92,10 @@ test("a stranded .git/HEAD.lock whose owner cannot be proven dead stops the sync
   await writeFile(join(root, "synced.md"), "from sync\n")
   const lock = join(root, ".git", "HEAD.lock")
   await writeFile(lock, "")
-  const failure = await sync.commit(["synced.md"], "sync: 1 memories updated\n\nSync-Seq: 1-1").then(() => null, (error: unknown) => error)
+  const failure = await sync.commit(["synced.md"], "sync: 1 memories updated\n\nSync-Seq: 1-1").then(
+    () => null,
+    (error: unknown) => error,
+  )
   expect(failure).toBeInstanceOf(StrandedGitLockError)
   expect((failure as StrandedGitLockError).paths).toContain(lock)
   expect(await git(root, "rev-parse", "HEAD")).toBe(head)
@@ -101,7 +108,10 @@ test("a stranded .git/index.lock whose owner cannot be proven dead stops the ind
   const lock = join(root, ".git", "index.lock")
   await writeFile(lock, "")
   await sync.commit(["synced.md"], "sync: 1 memories updated\n\nSync-Seq: 1-1")
-  const failure = await sync.syncIndex(["synced.md"]).then(() => null, (error: unknown) => error)
+  const failure = await sync.syncIndex(["synced.md"]).then(
+    () => null,
+    (error: unknown) => error,
+  )
   expect(failure).toBeInstanceOf(StrandedGitLockError)
   expect((failure as StrandedGitLockError).paths).toContain(lock)
 })

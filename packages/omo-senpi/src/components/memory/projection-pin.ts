@@ -63,9 +63,15 @@ export interface ProjectionPins {
    * The revision the next `advance` compiles at, without recording, caching or announcing anything:
    * a before_agent_start preview must compose the real turn's bytes and leave the session untouched.
    */
-  peek(input: Omit<ProjectionAdvanceInput, "record">): Promise<{ readonly revision: string | null; readonly asOfMs: number }>
+  peek(
+    input: Omit<ProjectionAdvanceInput, "record">,
+  ): Promise<{ readonly revision: string | null; readonly asOfMs: number }>
   /** Records that expiry instants up to `throughMs` were announced to the session. */
-  noticeExpiries(input: { readonly sessionId: string; readonly throughMs: number; readonly record: (record: ProjectionPinRecord) => void }): void
+  noticeExpiries(input: {
+    readonly sessionId: string
+    readonly throughMs: number
+    readonly record: (record: ProjectionPinRecord) => void
+  }): void
   /** /recompile: every session repins to HEAD on its next turn, including ones resumed later in this process. */
   requestRefresh(): void
 }
@@ -87,9 +93,10 @@ export function createProjectionPins(options: ProjectionPinsOptions = {}): Proje
     const compactionId = latestCompactionId(branch)
     const cached = live.get(sessionId)
     const state = cached?.record ?? readPinRecord(branch, sessionId)
-    const staleByRefresh = cached === undefined
-      ? state !== undefined && state.pinnedAtMs < refreshRequestedAtMs
-      : cached.epoch < refreshEpoch
+    const staleByRefresh =
+      cached === undefined
+        ? state !== undefined && state.pinnedAtMs < refreshRequestedAtMs
+        : cached.epoch < refreshEpoch
     const reason = staleByRefresh ? "refresh" : await repinReason(repo, state, cached === undefined, compactionId, head)
     return { compactionId, state, reason }
   }
@@ -161,7 +168,11 @@ function shownPaths(changes: ProjectedChanges): Set<string> {
 
 /** A device name as it may appear in the prompt: one line, no control characters, bounded. */
 function promptSafeName(name: string): string | undefined {
-  const clean = name.replace(/[\p{Cc}\p{Cf}\u2028\u2029]+/gu, " ").replace(/\s+/g, " ").trim().slice(0, 64)
+  const clean = name
+    .replace(/[\p{Cc}\p{Cf}\u2028\u2029]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 64)
   return clean.length === 0 ? undefined : clean
 }
 
@@ -176,7 +187,10 @@ function syncedSources(
   for (const commit of commits) {
     const principals = commit.trailers[SYNC_PRINCIPALS_TRAILER]
     if (principals === undefined || !(commit.paths ?? []).some((path) => listed.has(path))) continue
-    for (const principal of principals.split(",").map((p) => p.trim()).filter((p) => p.length > 0)) {
+    for (const principal of principals
+      .split(",")
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0)) {
       const known = deviceName(principal)
       names.add((known === undefined ? undefined : promptSafeName(known)) ?? UNKNOWN_DEVICE)
     }
@@ -215,17 +229,21 @@ function readPinRecord(branch: readonly unknown[], sessionId: string): Projectio
 function parsePinRecord(value: unknown): ProjectionPinRecord | undefined {
   if (!isRecord(value) || value.version !== 1 || typeof value.sessionId !== "string") return undefined
   const { revision, noticedThrough, compactionId, pinnedAtMs } = value
-  if (!isNullableString(revision) || !isNullableString(noticedThrough) || !isNullableString(compactionId)) return undefined
+  if (!isNullableString(revision) || !isNullableString(noticedThrough) || !isNullableString(compactionId))
+    return undefined
   if (typeof pinnedAtMs !== "number" || !Number.isFinite(pinnedAtMs)) return undefined
   const record = { version: 1 as const, sessionId: value.sessionId, revision, noticedThrough, compactionId, pinnedAtMs }
   const noticed = value.expiryNoticedThroughMs
-  return typeof noticed === "number" && Number.isFinite(noticed) ? { ...record, expiryNoticedThroughMs: noticed } : record
+  return typeof noticed === "number" && Number.isFinite(noticed)
+    ? { ...record, expiryNoticedThroughMs: noticed }
+    : record
 }
 
 function latestCompactionId(branch: readonly unknown[]): string | null {
   for (let index = branch.length - 1; index >= 0; index -= 1) {
     const entry = branch[index]
-    if (isRecord(entry) && entry.type === "compaction") return typeof entry.id === "string" ? entry.id : `index:${index}`
+    if (isRecord(entry) && entry.type === "compaction")
+      return typeof entry.id === "string" ? entry.id : `index:${index}`
   }
   return null
 }

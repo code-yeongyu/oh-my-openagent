@@ -1,9 +1,5 @@
 import { excludedModelPattern } from "@oh-my-opencode/omo-config-core"
-import {
-  resolveExplicitTaskPin,
-  splitModelDecorators,
-  type SettingsDefaultRoute,
-} from "@oh-my-opencode/senpi-task"
+import { resolveExplicitTaskPin, splitModelDecorators, type SettingsDefaultRoute } from "@oh-my-opencode/senpi-task"
 
 import type { TaskModelRegistry } from "./planner"
 
@@ -20,8 +16,16 @@ type ResolvedModelMetadata = {
 }
 
 export type ExplicitPinResolution =
-  | { readonly kind: "resolved"; readonly canonical: string; readonly metadata: ResolvedModelMetadata; readonly thinkingLevel?: string }
-  | { readonly kind: "error"; readonly error: { readonly code: "invalid_target" | "model_unavailable"; readonly message: string } }
+  | {
+      readonly kind: "resolved"
+      readonly canonical: string
+      readonly metadata: ResolvedModelMetadata
+      readonly thinkingLevel?: string
+    }
+  | {
+      readonly kind: "error"
+      readonly error: { readonly code: "invalid_target" | "model_unavailable"; readonly message: string }
+    }
 
 /**
  * Parse an explicit task model pin ONCE and resolve it against the live registry, or fail closed
@@ -57,7 +61,10 @@ function resolveLivePin(
 ): ExplicitPinResolution {
   const registry = resolveRegistry()
   if (registry === undefined) {
-    return { kind: "error", error: { code: "model_unavailable", message: withDefaultRoute(NO_REGISTRY_MESSAGE, resolveDefaultRoute) } }
+    return {
+      kind: "error",
+      error: { code: "model_unavailable", message: withDefaultRoute(NO_REGISTRY_MESSAGE, resolveDefaultRoute) },
+    }
   }
   const runtime = registry.modelRuntime
   if (runtime !== undefined) {
@@ -67,7 +74,10 @@ function resolveLivePin(
         kind: "error",
         error: {
           code: resolved.kind,
-          message: resolved.kind === "model_unavailable" ? withDefaultRoute(resolved.message, resolveDefaultRoute) : resolved.message,
+          message:
+            resolved.kind === "model_unavailable"
+              ? withDefaultRoute(resolved.message, resolveDefaultRoute)
+              : resolved.message,
         },
       }
     }
@@ -88,7 +98,10 @@ function resolvePinByExactId(
   if (slash <= 0 || slash === base.length - 1) {
     return {
       kind: "error",
-      error: { code: "invalid_target", message: `The task model pin "${pin}" is malformed: use provider/model with an optional :thinking-level suffix.` },
+      error: {
+        code: "invalid_target",
+        message: `The task model pin "${pin}" is malformed: use provider/model with an optional :thinking-level suffix.`,
+      },
     }
   }
   if (serviceTier !== undefined) {
@@ -108,7 +121,10 @@ function resolvePinByExactId(
       kind: "error",
       error: {
         code: "model_unavailable",
-        message: withDefaultRoute(`The task model pin "${pin}" did not resolve to a model in the live registry.`, resolveDefaultRoute),
+        message: withDefaultRoute(
+          `The task model pin "${pin}" did not resolve to a model in the live registry.`,
+          resolveDefaultRoute,
+        ),
       },
     }
   }

@@ -1,6 +1,13 @@
 import { win32 } from "node:path"
 
-import { canonicalPath, configPaths, discoveryFileSystem, pathKey, profileDirectories, projectDirectories } from "./discovery-paths"
+import {
+  canonicalPath,
+  configPaths,
+  discoveryFileSystem,
+  pathKey,
+  profileDirectories,
+  projectDirectories,
+} from "./discovery-paths"
 import { configRoots } from "./discovery-roots"
 import {
   type ConfigMigrationDiscoveryOptions,
@@ -21,9 +28,17 @@ function addConfigAndSidecar(
   const configKey = pathKey(configPath, options)
   if (!seen.has(configKey) && discoveryFileSystem(options).existsSync(source.configPath)) {
     seen.add(configKey)
-    sources.push({ ...source, configPath, kind: source.projectRoot === undefined
-      ? (source.profile === undefined ? "user-config" : "profile-config")
-      : "project-config", path: configPath })
+    sources.push({
+      ...source,
+      configPath,
+      kind:
+        source.projectRoot === undefined
+          ? source.profile === undefined
+            ? "user-config"
+            : "profile-config"
+          : "project-config",
+      path: configPath,
+    })
   }
   const sidecarPath = `${source.configPath}.migrations.json`
   const sidecarKey = pathKey(sidecarPath, options)
@@ -38,38 +53,52 @@ function discoverOpenCodeSources(options: ConfigMigrationDiscoveryOptions): read
   const seen = new Set<string>()
   for (const root of configRoots(options)) {
     for (const [index, configPath] of configPaths(root.path, options).entries()) {
-      addConfigAndSidecar(sources, seen, {
-        baseRoot: root.path,
-        configPath,
-        precedence: root.precedence * 10 + index,
-      }, options)
+      addConfigAndSidecar(
+        sources,
+        seen,
+        {
+          baseRoot: root.path,
+          configPath,
+          precedence: root.precedence * 10 + index,
+        },
+        options,
+      )
     }
     for (const profile of profileDirectories(root.path, options)) {
       const profileDirectory = options.pathOperations.join(root.path, "profiles", profile)
       for (const [index, configPath] of configPaths(profileDirectory, options).entries()) {
-        addConfigAndSidecar(sources, seen, {
-          baseRoot: root.path,
-          configPath,
-          ...(root.activeProfile !== undefined
-            && (root.activeProfile === profile || (
-              options.pathOperations === win32 && root.activeProfile.toLowerCase() === profile.toLowerCase()
-            ))
-            ? { isActiveProfile: true }
-            : {}),
-          precedence: root.precedence * 10 + index,
-          profile,
-        }, options)
+        addConfigAndSidecar(
+          sources,
+          seen,
+          {
+            baseRoot: root.path,
+            configPath,
+            ...(root.activeProfile !== undefined &&
+            (root.activeProfile === profile ||
+              (options.pathOperations === win32 && root.activeProfile.toLowerCase() === profile.toLowerCase()))
+              ? { isActiveProfile: true }
+              : {}),
+            precedence: root.precedence * 10 + index,
+            profile,
+          },
+          options,
+        )
       }
     }
   }
   for (const [directoryIndex, projectRoot] of projectDirectories(options).entries()) {
     const configDirectory = options.pathOperations.join(projectRoot, ".opencode")
     for (const [fileIndex, configPath] of configPaths(configDirectory, options).entries()) {
-      addConfigAndSidecar(sources, seen, {
-        configPath,
-        precedence: 1000 + directoryIndex * 10 + fileIndex,
-        projectRoot,
-      }, options)
+      addConfigAndSidecar(
+        sources,
+        seen,
+        {
+          configPath,
+          precedence: 1000 + directoryIndex * 10 + fileIndex,
+          projectRoot,
+        },
+        options,
+      )
     }
   }
   return sources
@@ -98,7 +127,9 @@ function discoverConfigJsoncSources(options: ConfigMigrationDiscoveryOptions): r
   return sources
 }
 
-export function discoverLegacyConfigGroups(options: ConfigMigrationDiscoveryOptions): readonly LegacyConfigMigrationGroup[] {
+export function discoverLegacyConfigGroups(
+  options: ConfigMigrationDiscoveryOptions,
+): readonly LegacyConfigMigrationGroup[] {
   return [
     { id: OPENCODE_CONFIG_MIGRATION_ID, sources: discoverOpenCodeSources(options) },
     { id: CONFIG_JSONC_MIGRATION_ID, sources: discoverConfigJsoncSources(options) },

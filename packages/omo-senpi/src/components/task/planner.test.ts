@@ -18,7 +18,9 @@ function registry(models: readonly FakeModel[]): TaskModelRegistry {
   }
 }
 
-function expectResolved(plan: ReturnType<ReturnType<typeof createTaskChildPlanner>>): Extract<typeof plan, { readonly kind: "resolved" }> {
+function expectResolved(
+  plan: ReturnType<ReturnType<typeof createTaskChildPlanner>>,
+): Extract<typeof plan, { readonly kind: "resolved" }> {
   if (plan.kind !== "resolved") {
     throw new Error(`Expected resolved plan, got ${plan.kind}`)
   }
@@ -65,13 +67,8 @@ describe("createTaskChildPlanner", () => {
 
   test("#given visual-engineering falls back to a variant-bearing model #when planned #then resolved_model keeps fallback variant metadata", () => {
     // given
-    const planner = createTaskChildPlanner(
-      {},
-      {},
-      () => registry([
-        model("anthropic", "claude-fable-5-1"),
-        model("google", "gemini-3.1-pro"),
-      ]),
+    const planner = createTaskChildPlanner({}, {}, () =>
+      registry([model("anthropic", "claude-fable-5-1"), model("google", "gemini-3.1-pro")]),
     )
 
     // when
@@ -198,11 +195,7 @@ describe("createTaskChildPlanner", () => {
 
   test("#given subagent_type naming a builtin agent #when planned against a registry serving its chain #then the plan carries the agent persona and an agent-sourced model", () => {
     // given
-    const planner = createTaskChildPlanner(
-      {},
-      BUILTIN_AGENTS,
-      () => registry([model("openai", "gpt-6-luna-fast")]),
-    )
+    const planner = createTaskChildPlanner({}, BUILTIN_AGENTS, () => registry([model("openai", "gpt-6-luna-fast")]))
 
     // when
     const result = planner({
@@ -261,11 +254,7 @@ describe("createTaskChildPlanner", () => {
 
   test("#given an explicit model with subagent_type against a serving registry #when planned #then the agent persona is kept and the canonical pin is used (#9722)", () => {
     // given
-    const planner = createTaskChildPlanner(
-      {},
-      BUILTIN_AGENTS,
-      () => registry([model("openai", "gpt-5.5")]),
-    )
+    const planner = createTaskChildPlanner({}, BUILTIN_AGENTS, () => registry([model("openai", "gpt-5.5")]))
 
     // when
     const result = planner({
@@ -317,11 +306,7 @@ describe("createTaskChildPlanner", () => {
 
   test("#given subagent_type naming a category rather than an agent #when planned #then it is a typed error instead of a silent category model", () => {
     // given
-    const planner = createTaskChildPlanner(
-      {},
-      BUILTIN_AGENTS,
-      () => registry([model("anthropic", "claude-fable-5-1")]),
-    )
+    const planner = createTaskChildPlanner({}, BUILTIN_AGENTS, () => registry([model("anthropic", "claude-fable-5-1")]))
 
     // when
     const result = planner({
@@ -335,7 +320,7 @@ describe("createTaskChildPlanner", () => {
     if (result.kind !== "error") throw new Error(`Expected error resolution, got ${result.kind}`)
     expect(result.error.code).toBe("unknown_target")
     expect(result.error.message).toContain('"visual-engineering"')
-    expect(result.error.message).toContain('is a category')
+    expect(result.error.message).toContain("is a category")
     expect(result.error.message).toContain('category="visual-engineering"')
     expect(result.error.availableAgents).toContain("explore")
   })
@@ -345,10 +330,7 @@ describe("createTaskChildPlanner", () => {
     const planner = createTaskChildPlanner(
       { categories: { architect: { model: "anthropic/claude-fable-5-1" } } },
       BUILTIN_AGENTS,
-      () => registry([
-        model("anthropic", "claude-fable-5-1"),
-        model("openai", "gpt-6-luna-fast"),
-      ]),
+      () => registry([model("anthropic", "claude-fable-5-1"), model("openai", "gpt-6-luna-fast")]),
     )
 
     // when
@@ -386,11 +368,7 @@ describe("createTaskChildPlanner", () => {
 
   test("#given a spec with no category, subagent_type or model #when planned #then it stays a typed invalid_target rejection", () => {
     // given
-    const planner = createTaskChildPlanner(
-      {},
-      BUILTIN_AGENTS,
-      () => registry([model("anthropic", "claude-fable-5-1")]),
-    )
+    const planner = createTaskChildPlanner({}, BUILTIN_AGENTS, () => registry([model("anthropic", "claude-fable-5-1")]))
 
     // when
     const result = planner({ prompt: "Do something.", parent_session_id: "parent-1", depth: 0 })
@@ -407,10 +385,7 @@ describe("createTaskChildPlanner", () => {
     const planner = createTaskChildPlanner(
       { categories: { explore: { model: "google/gemini-3.1-pro" } } },
       agents,
-      () => registry([
-        model("anthropic", "claude-fable-5-1"),
-        model("google", "gemini-3.1-pro"),
-      ]),
+      () => registry([model("anthropic", "claude-fable-5-1"), model("google", "gemini-3.1-pro")]),
     )
 
     // when
@@ -457,11 +432,7 @@ describe("createTaskChildPlanner", () => {
 
   test("#given an unknown subagent_type #when planned #then the unknown-target error lists available agents and categories", () => {
     // given
-    const planner = createTaskChildPlanner(
-      {},
-      BUILTIN_AGENTS,
-      () => registry([model("anthropic", "claude-opus-5-5")]),
-    )
+    const planner = createTaskChildPlanner({}, BUILTIN_AGENTS, () => registry([model("anthropic", "claude-opus-5-5")]))
 
     // when
     const result = planner({
@@ -491,11 +462,7 @@ describe("createTaskChildPlanner", () => {
 
   test("#given subagent_type naming a builtin agent whose chain no registry model satisfies #when planned #then it reports model_unavailable with the agent list", () => {
     // given
-    const planner = createTaskChildPlanner(
-      {},
-      BUILTIN_AGENTS,
-      () => registry([model("acme", "unrelated-1")]),
-    )
+    const planner = createTaskChildPlanner({}, BUILTIN_AGENTS, () => registry([model("acme", "unrelated-1")]))
 
     // when
     const result = planner({
@@ -508,7 +475,8 @@ describe("createTaskChildPlanner", () => {
     // then
     if (result.kind !== "error") throw new Error(`Expected error resolution, got ${result.kind}`)
     expect(result.error.code).toBe("model_unavailable")
-    expect(result.error.message).toContain('No available model for agent "explore"')
+    expect(result.error.message).toContain('Agent "explore"')
+    expect(result.error.message).toContain("agents.explore.model")
     expect(result.error.availableAgents).toEqual([
       "explore",
       "librarian",
@@ -608,11 +576,7 @@ describe("createTaskChildPlanner plan variant", () => {
 
   test("#given a category resolving a variant-bearing fallback without reasoning effort #when planned #then the applied variant is the resolved variant", () => {
     // given
-    const planner = createTaskChildPlanner(
-      {},
-      {},
-      () => registry([model("anthropic", "claude-fable-5-1")]),
-    )
+    const planner = createTaskChildPlanner({}, {}, () => registry([model("anthropic", "claude-fable-5-1")]))
 
     // when
     const result = planner({
@@ -628,11 +592,7 @@ describe("createTaskChildPlanner plan variant", () => {
 
   test("#given an explicit provider model #when planned #then no variant is applied", () => {
     // given
-    const planner = createTaskChildPlanner(
-      {},
-      {},
-      () => registry([model("openai", "gpt-5.5")]),
-    )
+    const planner = createTaskChildPlanner({}, {}, () => registry([model("openai", "gpt-5.5")]))
 
     // when
     const result = planner({
@@ -648,11 +608,7 @@ describe("createTaskChildPlanner plan variant", () => {
 
   test("#given plan-reviewer resolves a variant-bearing chain entry #when planned #then the applied variant matches the resolved model", () => {
     // given
-    const planner = createTaskChildPlanner(
-      {},
-      BUILTIN_AGENTS,
-      () => registry([model("openai", "gpt-6-astra")]),
-    )
+    const planner = createTaskChildPlanner({}, BUILTIN_AGENTS, () => registry([model("openai", "gpt-6-astra")]))
 
     // when
     const result = planner({
@@ -695,10 +651,8 @@ describe("createTaskChildPlanner reviewer category routing", () => {
 
   test("#given a registry serving deep-high and unspecified-high #when the gate reviewer is planned #then the deep-high model wins and unspecified-high extends the runtime chain", () => {
     // given
-    const planner = createTaskChildPlanner(
-      {},
-      BUILTIN_AGENTS,
-      () => registry([model("openai", "gpt-6-astra"), model("anthropic", "claude-opus-5-5")]),
+    const planner = createTaskChildPlanner({}, BUILTIN_AGENTS, () =>
+      registry([model("openai", "gpt-6-astra"), model("anthropic", "claude-opus-5-5")]),
     )
 
     // when
@@ -720,11 +674,7 @@ describe("createTaskChildPlanner reviewer category routing", () => {
 
   test("#given a registry without the deep-high gate model #when the gate reviewer is planned #then unspecified-high supplies the model", () => {
     // given
-    const planner = createTaskChildPlanner(
-      {},
-      BUILTIN_AGENTS,
-      () => registry([model("anthropic", "claude-opus-5-5")]),
-    )
+    const planner = createTaskChildPlanner({}, BUILTIN_AGENTS, () => registry([model("anthropic", "claude-opus-5-5")]))
 
     // when
     const result = planner({
@@ -747,10 +697,8 @@ describe("createTaskChildPlanner parent independence", () => {
   // never bleed into a child that asked for something else (#8348).
   test("#given one child spec #when planned after parents routed to two different categories #then the child resolves the same model both times", () => {
     // given
-    const planner = createTaskChildPlanner(
-      {},
-      BUILTIN_AGENTS,
-      () => registry([
+    const planner = createTaskChildPlanner({}, BUILTIN_AGENTS, () =>
+      registry([
         model("anthropic", "claude-fable-5-1"),
         model("anthropic", "claude-opus-5-5"),
         model("openai", "gpt-6-luna-fast"),
@@ -784,13 +732,8 @@ describe("createTaskChildPlanner parent independence", () => {
 
   test("#given a category child spec #when planned after parents routed to two different categories #then only the child's own category decides its model", () => {
     // given
-    const planner = createTaskChildPlanner(
-      {},
-      BUILTIN_AGENTS,
-      () => registry([
-        model("anthropic", "claude-fable-5-1"),
-        model("anthropic", "claude-opus-5-5"),
-      ]),
+    const planner = createTaskChildPlanner({}, BUILTIN_AGENTS, () =>
+      registry([model("anthropic", "claude-fable-5-1"), model("anthropic", "claude-opus-5-5")]),
     )
     const child = {
       prompt: "Ship the fix.",
@@ -822,7 +765,12 @@ describe("createTaskChildPlanner architect tool contract", () => {
 
     // when
     const result = expectResolved(
-      planner({ prompt: "Fix the off-by-one in src/range.ts.", parent_session_id: "root", depth: 0, category: "architect" }),
+      planner({
+        prompt: "Fix the off-by-one in src/range.ts.",
+        parent_session_id: "root",
+        depth: 0,
+        category: "architect",
+      }),
     )
 
     // then
@@ -831,5 +779,90 @@ describe("createTaskChildPlanner architect tool contract", () => {
     expect(result.plan.toolAllowlist).toBeUndefined()
     expect(result.plan.toolDenylist).toBeUndefined()
     expect(result.plan.promptAppend).toBeDefined()
+  })
+})
+
+// Q's standing model rule: a chain with no connected provider ends in a TYPED failure that names
+// each model and the fix; nothing is substituted and no child is spawned.
+describe("createTaskChildPlanner model refusals", () => {
+  const proxyOnly = () => registry([model("proxy-router", "gpt-6-astra")])
+
+  test("#given every provider of a category chain is unconnected #when planned #then the refusal carries the chain and the Settings fix", () => {
+    // given
+    const planner = createTaskChildPlanner({}, {}, proxyOnly)
+
+    // when
+    const result = planner({ prompt: "Find the hard bug.", parent_session_id: "parent-1", depth: 0, category: "quick" })
+
+    // then
+    expect(result.kind).toBe("error")
+    if (result.kind !== "error") return
+    expect(result.error.code).toBe("model_unavailable")
+    expect(result.error.attempted_chain?.length).toBeGreaterThan(0)
+    expect(result.error.message).toContain("categories.quick.model")
+    expect(result.error.message).toContain("No child was spawned")
+  })
+
+  test("#given explore's chain has no connected provider #when planned #then the refusal carries the agent chain and agents.explore.model", () => {
+    // given
+    const planner = createTaskChildPlanner({}, BUILTIN_AGENTS, proxyOnly)
+
+    // when
+    const result = planner({
+      prompt: "Find the auth flow.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      subagent_type: "explore",
+    })
+
+    // then
+    expect(result.kind).toBe("error")
+    if (result.kind !== "error") return
+    expect(result.error.code).toBe("model_unavailable")
+    expect(result.error.attempted_chain?.length).toBeGreaterThan(0)
+    // The chain branch must name a rung the chain actually carries: the pin text also names
+    // agents.explore.model and the no-spawn fact, so asserting only those let a pinned-agent
+    // regression pass as green.
+    const firstRung = result.error.attempted_chain?.[0]?.model
+    if (firstRung !== undefined) expect(result.error.message).toContain(firstRung)
+    expect(result.error.message).toContain("agents.explore.model")
+    expect(result.error.message).toContain("No child was spawned")
+  })
+
+  test("#given explore pinned to a model the registry does not serve #when planned #then the refusal names the pin, not its chain", () => {
+    // given
+    const explore = BUILTIN_AGENTS.explore
+    if (explore === undefined) throw new Error("explore must ship as a builtin agent")
+    const planner = createTaskChildPlanner({}, { explore: { ...explore, model: "openai/gpt-5.5" } }, proxyOnly)
+
+    // when
+    const result = planner({
+      prompt: "Find the auth flow.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      subagent_type: "explore",
+    })
+
+    // then
+    expect(result.kind).toBe("error")
+    if (result.kind !== "error") return
+    expect(result.error.message).toContain("openai/gpt-5.5")
+    expect(result.error.message).toContain("agents.explore.model")
+    expect(result.error.message).not.toContain("Chain, in order:")
+  })
+
+  test("#given a category pinned to a model the registry does not serve #when planned #then the refusal names the pin and the Settings key", () => {
+    // given
+    const planner = createTaskChildPlanner({ categories: { quick: { model: "openai/gpt-5.5" } } }, {}, proxyOnly)
+
+    // when
+    const result = planner({ prompt: "Find the hard bug.", parent_session_id: "parent-1", depth: 0, category: "quick" })
+
+    // then
+    expect(result.kind).toBe("error")
+    if (result.kind !== "error") return
+    expect(result.error.code).toBe("model_unavailable")
+    expect(result.error.message).toContain("openai/gpt-5.5")
+    expect(result.error.message).toContain("categories.quick.model")
   })
 })

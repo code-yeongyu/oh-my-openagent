@@ -24,7 +24,9 @@ function registry(models: readonly FakeModel[]) {
   }
 }
 
-function expectResolved(result: ReturnType<typeof resolveAgent>): Extract<typeof result, { readonly kind: "resolved" }> {
+function expectResolved(
+  result: ReturnType<typeof resolveAgent>,
+): Extract<typeof result, { readonly kind: "resolved" }> {
   if (result.kind !== "resolved") throw new Error(`Expected resolved agent, got ${result.kind}`)
   return result
 }

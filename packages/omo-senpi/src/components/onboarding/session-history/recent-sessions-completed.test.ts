@@ -10,7 +10,10 @@ afterEach(() => temp.cleanup())
 
 const nowMs = Date.parse("2026-08-24T12:00:00.000Z")
 const codexSession = (id: string, cwd: string, prompt: string) =>
-  [encodeRecord({ type: "session_meta", payload: { id, cwd } }), encodeRecord({ type: "event_msg", payload: { type: "user_message", message: prompt } })].join("\n")
+  [
+    encodeRecord({ type: "session_meta", payload: { id, cwd } }),
+    encodeRecord({ type: "event_msg", payload: { type: "user_message", message: prompt } }),
+  ].join("\n")
 const rolloutPath = (codexHomePath: string, name: string) => join(codexHomePath, "sessions", "2026", "08", "24", name)
 
 async function fixture() {
@@ -19,19 +22,37 @@ async function fixture() {
   const workspace = await temp.make("workspace-")
   const done = rolloutPath(codexHomePath, "rollout-done.jsonl")
   const fresh = rolloutPath(codexHomePath, "rollout-fresh.jsonl")
-  await writeTranscript({ filePath: done, contents: codexSession("done-session", workspace, "Already imported"), mtimeMs: nowMs - 1_000 })
-  await writeTranscript({ filePath: fresh, contents: codexSession("fresh-session", workspace, "New work"), mtimeMs: nowMs - 2_000 })
+  await writeTranscript({
+    filePath: done,
+    contents: codexSession("done-session", workspace, "Already imported"),
+    mtimeMs: nowMs - 1_000,
+  })
+  await writeTranscript({
+    filePath: fresh,
+    contents: codexSession("fresh-session", workspace, "New work"),
+    mtimeMs: nowMs - 2_000,
+  })
   return { claudeHomePath, codexHomePath, workspace, done, fresh }
 }
 
 async function identityOf(filePath: string) {
   const stats = await nodeSessionHistoryFs.stat(filePath)
-  return { filePath, size: stats.size, mtimeMs: stats.mtimeMs, device: stats.dev, inode: stats.ino, birthtimeMs: stats.birthtimeMs }
+  return {
+    filePath,
+    size: stats.size,
+    mtimeMs: stats.mtimeMs,
+    device: stats.dev,
+    inode: stats.ino,
+    birthtimeMs: stats.birthtimeMs,
+  }
 }
 
 function countingOpens(): { fs: SessionHistoryFs; opened: Array<string> } {
   const opened: Array<string> = []
-  return { opened, fs: { ...nodeSessionHistoryFs, open: (path) => (opened.push(path), nodeSessionHistoryFs.open(path)) } }
+  return {
+    opened,
+    fs: { ...nodeSessionHistoryFs, open: (path) => (opened.push(path), nodeSessionHistoryFs.open(path)) },
+  }
 }
 
 describe("session-history recentSessions completed transcripts", () => {
@@ -40,9 +61,16 @@ describe("session-history recentSessions completed transcripts", () => {
     const { claudeHomePath, codexHomePath, workspace, done } = await fixture()
     const completed = { provider: "codex" as const, providerSessionId: "done-session", ...(await identityOf(done)) }
     const baseline = countingOpens()
-    await collect(makeTestScanner({ claudeHomePath, codexHomePath, fs: baseline.fs, now: () => nowMs }).recentSessions({ workspaceRoot: workspace }))
+    await collect(
+      makeTestScanner({ claudeHomePath, codexHomePath, fs: baseline.fs, now: () => nowMs }).recentSessions({
+        workspaceRoot: workspace,
+      }),
+    )
     const { fs, opened } = countingOpens()
-    const run = makeTestScanner({ claudeHomePath, codexHomePath, fs, now: () => nowMs }).recentSessions({ workspaceRoot: workspace, completed: [completed] })
+    const run = makeTestScanner({ claudeHomePath, codexHomePath, fs, now: () => nowMs }).recentSessions({
+      workspaceRoot: workspace,
+      completed: [completed],
+    })
 
     // when
     const outcomes = await collect(run)
@@ -58,10 +86,20 @@ describe("session-history recentSessions completed transcripts", () => {
   it("#given a completed transcript that changed since import #when listed #then it is read again as Importable", async () => {
     // given
     const { claudeHomePath, codexHomePath, workspace, done } = await fixture()
-    const completed = { provider: "codex" as const, providerSessionId: "done-session", ...(await identityOf(done)), size: 1 }
+    const completed = {
+      provider: "codex" as const,
+      providerSessionId: "done-session",
+      ...(await identityOf(done)),
+      size: 1,
+    }
 
     // when
-    const outcomes = await collect(makeTestScanner({ claudeHomePath, codexHomePath, now: () => nowMs }).recentSessions({ workspaceRoot: workspace, completed: [completed] }))
+    const outcomes = await collect(
+      makeTestScanner({ claudeHomePath, codexHomePath, now: () => nowMs }).recentSessions({
+        workspaceRoot: workspace,
+        completed: [completed],
+      }),
+    )
 
     // then
     expect(outcomes.map((outcome) => outcome._tag)).toEqual(["Importable", "Importable"])
@@ -70,10 +108,19 @@ describe("session-history recentSessions completed transcripts", () => {
   it("#given a completed transcript named for another provider #when listed #then it is not matched", async () => {
     // given
     const { claudeHomePath, codexHomePath, workspace, done } = await fixture()
-    const completed = { provider: "claudeAgent" as const, providerSessionId: "done-session", ...(await identityOf(done)) }
+    const completed = {
+      provider: "claudeAgent" as const,
+      providerSessionId: "done-session",
+      ...(await identityOf(done)),
+    }
 
     // when
-    const outcomes = await collect(makeTestScanner({ claudeHomePath, codexHomePath, now: () => nowMs }).recentSessions({ workspaceRoot: workspace, completed: [completed] }))
+    const outcomes = await collect(
+      makeTestScanner({ claudeHomePath, codexHomePath, now: () => nowMs }).recentSessions({
+        workspaceRoot: workspace,
+        completed: [completed],
+      }),
+    )
 
     // then
     expect(outcomes.map((outcome) => outcome._tag)).toEqual(["Importable", "Importable"])
@@ -83,11 +130,20 @@ describe("session-history recentSessions completed transcripts", () => {
     // given
     const { claudeHomePath, codexHomePath, workspace, done } = await fixture()
     const copy = rolloutPath(codexHomePath, "rollout-copy.jsonl")
-    await writeTranscript({ filePath: copy, contents: codexSession("done-session", workspace, "Already imported"), mtimeMs: nowMs - 3_000 })
+    await writeTranscript({
+      filePath: copy,
+      contents: codexSession("done-session", workspace, "Already imported"),
+      mtimeMs: nowMs - 3_000,
+    })
     const completed = { provider: "codex" as const, providerSessionId: "done-session", ...(await identityOf(done)) }
 
     // when
-    const outcomes = await collect(makeTestScanner({ claudeHomePath, codexHomePath, now: () => nowMs }).recentSessions({ workspaceRoot: workspace, completed: [completed] }))
+    const outcomes = await collect(
+      makeTestScanner({ claudeHomePath, codexHomePath, now: () => nowMs }).recentSessions({
+        workspaceRoot: workspace,
+        completed: [completed],
+      }),
+    )
 
     // then
     expect(outcomes.map((outcome) => outcome._tag)).toEqual(["AlreadyImported", "Importable", "Duplicate"])
@@ -99,7 +155,9 @@ describe("session-history recentSessions completed transcripts", () => {
     const stats = await stat(fresh)
 
     // when
-    const outcomes = await collect(makeTestScanner({ claudeHomePath, codexHomePath, now: () => nowMs }).recentSessions({ workspaceRoot: workspace }))
+    const outcomes = await collect(
+      makeTestScanner({ claudeHomePath, codexHomePath, now: () => nowMs }).recentSessions({ workspaceRoot: workspace }),
+    )
     const importable = outcomes.find((outcome) => outcome._tag === "Importable" && outcome.source.filePath === fresh)
 
     // then

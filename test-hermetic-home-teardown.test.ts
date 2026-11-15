@@ -9,7 +9,10 @@ const PRELOAD = join(import.meta.dir, "test-support", "hermetic-home.preload.ts"
 
 function readPlanted(pidsFile: string): number[] {
   if (!existsSync(pidsFile)) return []
-  return readFileSync(pidsFile, "utf8").split("\n").filter((line) => line !== "").map(Number)
+  return readFileSync(pidsFile, "utf8")
+    .split("\n")
+    .filter((line) => line !== "")
+    .map(Number)
 }
 
 function alive(pid: number): boolean {
@@ -104,12 +107,21 @@ describe("hermetic-home teardown signals only the task hosts this run started (#
     // process it signalled, or scans the whole process table under load, overruns it as an unnamed hook failure.
     const child = spawn(process.execPath, ["test", "--timeout", "5000", "--preload", PRELOAD, "./planting.test.ts"], {
       cwd,
-      env: { ...process.env, PLANTED_PIDS_FILE: pidsFile, PLANTED_CWD: import.meta.dir, PLANTED_PORT: String(address.port) },
+      env: {
+        ...process.env,
+        PLANTED_PIDS_FILE: pidsFile,
+        PLANTED_CWD: import.meta.dir,
+        PLANTED_PORT: String(address.port),
+      },
       stdio: ["ignore", "pipe", "pipe"],
     })
     let output = ""
-    child.stdout.on("data", (chunk: Buffer) => { output += chunk.toString() })
-    child.stderr.on("data", (chunk: Buffer) => { output += chunk.toString() })
+    child.stdout.on("data", (chunk: Buffer) => {
+      output += chunk.toString()
+    })
+    child.stderr.on("data", (chunk: Buffer) => {
+      output += chunk.toString()
+    })
     const code = await new Promise<number | null>((resolve) => child.once("close", resolve))
     run = { code, output, elapsedMs: Date.now() - started }
     planted = readPlanted(pidsFile)
@@ -124,7 +136,10 @@ describe("hermetic-home teardown signals only the task hosts this run started (#
       if (alive(pid)) process.kill(pid, "SIGKILL")
     }
     // On Windows the kill is asynchronous: wait for each exit before removing anything it might hold open.
-    const exited = await settledWithin(Promise.all(pids.map((pid) => exits.get(pid) ?? Promise.resolve())), EXIT_WAIT_MS)
+    const exited = await settledWithin(
+      Promise.all(pids.map((pid) => exits.get(pid) ?? Promise.resolve())),
+      EXIT_WAIT_MS,
+    )
     server?.close()
     if (dir !== "") rmSync(dir, { recursive: true, force: true })
     if (!exited) throw new Error(`planted processes ${pids.join(", ")} had not exited ${EXIT_WAIT_MS}ms after SIGKILL`)

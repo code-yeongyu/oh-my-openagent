@@ -42,8 +42,7 @@ export function resolveDreamTriggerSettings(settings: OmoMemorySettings, agentNa
 export type DreamGateRejection = "disabled" | "shutdown_disabled" | "too_soon" | "insufficient_volume"
 
 export type DreamGateDecision =
-  | { readonly allowed: true }
-  | { readonly allowed: false; readonly rejection: DreamGateRejection }
+  { readonly allowed: true } | { readonly allowed: false; readonly rejection: DreamGateRejection }
 
 /** Lazily probed gate inputs so an early rejection never pays for a later probe. */
 export interface DreamGateProbe {

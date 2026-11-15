@@ -178,7 +178,9 @@ describe("deferred session_start work", () => {
     }
     await composeOmoSenpiExtension([probe], { logger: silentLogger })(pi)
 
-    expect(pi.handlers.find((registration) => registration.event === "before_agent_start")?.options).toEqual({ previewSafe: true })
+    expect(pi.handlers.find((registration) => registration.event === "before_agent_start")?.options).toEqual({
+      previewSafe: true,
+    })
 
     // when
     await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, { ui: {} })

@@ -4,7 +4,17 @@ import { join } from "node:path"
 
 import { GATE_ENTRY_TYPE } from "../notice"
 import { normalizeMemoryPath, resolveWorkspacePath } from "./path-safety"
-import { commitMemory, customEntry, harness, jsonOf, memoryRepo, message, sessionContext, tempRoot, writeMemory } from "./test-support"
+import {
+  commitMemory,
+  customEntry,
+  harness,
+  jsonOf,
+  memoryRepo,
+  message,
+  sessionContext,
+  tempRoot,
+  writeMemory,
+} from "./test-support"
 import { AUTOMOUNT_TRIGGER_CASES, withAutomountTrap } from "../../../../automount-trap.test-support"
 
 describe("normalizeMemoryPath", () => {
@@ -47,10 +57,12 @@ describe("sidecar tool path safety", () => {
     await commitMemory(repo, "notes/committed.md", "committed body")
     await writeMemory(repo, "notes/uncommitted.md", "uncommitted body")
     const h = harness({ workspaceRoot: root, repo })
-    h.snapshot.refresh(sessionContext([
-      message("user", "visible", "e0"),
-      customEntry(GATE_ENTRY_TYPE, "e1", { version: 1, status: "failed", candidateCount: 0 }),
-    ]))
+    h.snapshot.refresh(
+      sessionContext([
+        message("user", "visible", "e0"),
+        customEntry(GATE_ENTRY_TYPE, "e1", { version: 1, status: "failed", candidateCount: 0 }),
+      ]),
+    )
 
     const traversal = await h.call("read", { path: "../outside" })
     expect(traversal.isError).toBe(true)
@@ -76,8 +88,12 @@ describe("sidecar tool path safety", () => {
     await repo.commitWrite(["notes/link.md"], "commit symlink", { agentId: "t", authorName: "t" })
     const h = harness({ workspaceRoot: root, repo })
 
-    expect(jsonOf(await h.call("memory", { operation: "read", path: "../outside.md" }))).toMatchObject({ rejected: "path_traversal" })
-    expect(jsonOf(await h.call("memory", { operation: "read", path: "system/identity.md" }))).toMatchObject({ rejected: "system_path" })
+    expect(jsonOf(await h.call("memory", { operation: "read", path: "../outside.md" }))).toMatchObject({
+      rejected: "path_traversal",
+    })
+    expect(jsonOf(await h.call("memory", { operation: "read", path: "system/identity.md" }))).toMatchObject({
+      rejected: "system_path",
+    })
     const link = await h.call("memory", { operation: "read", path: "notes/link.md" })
     expect(link.isError).toBe(true)
     expect(jsonOf(link)).toMatchObject({ rejected: "not_committed" })
@@ -100,13 +116,16 @@ describe("sidecar tool path safety", () => {
 })
 
 describe("resolveWorkspacePath never resolves a macOS automount trigger (#11545)", () => {
-  test.each([...AUTOMOUNT_TRIGGER_CASES])("#given the model asks for %s on darwin #when resolved against a workspace #then it is rejected as an escape without resolving the trigger", async (path) => {
-    const root = await tempRoot("omo-kibitzer-automount-")
-    let verdict: unknown
-    const touched = await withAutomountTrap(async () => {
-      verdict = await resolveWorkspacePath(root, path)
-    })
-    expect(touched).toEqual([])
-    expect(verdict).toMatchObject({ ok: false, code: "path_escape" })
-  })
+  test.each([...AUTOMOUNT_TRIGGER_CASES])(
+    "#given the model asks for %s on darwin #when resolved against a workspace #then it is rejected as an escape without resolving the trigger",
+    async (path) => {
+      const root = await tempRoot("omo-kibitzer-automount-")
+      let verdict: unknown
+      const touched = await withAutomountTrap(async () => {
+        verdict = await resolveWorkspacePath(root, path)
+      })
+      expect(touched).toEqual([])
+      expect(verdict).toMatchObject({ ok: false, code: "path_escape" })
+    },
+  )
 })

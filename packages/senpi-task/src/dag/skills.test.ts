@@ -70,9 +70,14 @@ describe("createDagSkillMaterializer at run creation", () => {
     const store = createDagFileStore({ project_dir: project })
 
     // when
-    const result = materializer(store, cwd)({
+    const result = materializer(
+      store,
+      cwd,
+    )({
       runId,
-      definition: definition([{ id: "build", prompt: "ship the feature", category: "quick", load_skills: ["programming"] }]),
+      definition: definition([
+        { id: "build", prompt: "ship the feature", category: "quick", load_skills: ["programming"] },
+      ]),
       at,
     })
 
@@ -91,9 +96,14 @@ describe("createDagSkillMaterializer at run creation", () => {
     const store = createDagFileStore({ project_dir: project })
 
     // when
-    materializer(store, cwd)({
+    materializer(
+      store,
+      cwd,
+    )({
       runId,
-      definition: definition([{ id: "commit", prompt: "commit it", subagent_type: "explore", load_skills: ["git-master"] }]),
+      definition: definition([
+        { id: "commit", prompt: "commit it", subagent_type: "explore", load_skills: ["git-master"] },
+      ]),
       at,
     })
 
@@ -117,7 +127,10 @@ describe("createDagSkillMaterializer at run creation", () => {
     const store = createDagFileStore({ project_dir: project })
 
     // when
-    const result = materializer(store, cwd)({
+    const result = materializer(
+      store,
+      cwd,
+    )({
       runId,
       definition: definition([
         { id: "build", prompt: "ship the feature", category: "quick", load_skills: ["programming", "nonexistent"] },
@@ -127,9 +140,17 @@ describe("createDagSkillMaterializer at run creation", () => {
 
     // then
     expect(result.diagnostics).toEqual([
-      { kind: "missing_skill", nodeId: "build" as DagNodeId, skill: "nonexistent", message: 'Skill "nonexistent" was not found.', at },
+      {
+        kind: "missing_skill",
+        nodeId: "build" as DagNodeId,
+        skill: "nonexistent",
+        message: 'Skill "nonexistent" was not found.',
+        at,
+      },
     ])
-    expect(result.nodes[0]?.effectivePrompt).toBe(skillPrompt(cwd, "programming", "programming skill body", "ship the feature"))
+    expect(result.nodes[0]?.effectivePrompt).toBe(
+      skillPrompt(cwd, "programming", "programming skill body", "ship the feature"),
+    )
     expect(readDagSkillManifest(store, runId)?.nodes[0]?.missing).toEqual(["nonexistent"])
   })
 
@@ -142,7 +163,9 @@ describe("createDagSkillMaterializer at run creation", () => {
     const materialize = materializer(store, cwd)
     materialize({
       runId,
-      definition: definition([{ id: "build", prompt: "ship the feature", category: "quick", load_skills: ["programming"] }]),
+      definition: definition([
+        { id: "build", prompt: "ship the feature", category: "quick", load_skills: ["programming"] },
+      ]),
       at,
     })
 
@@ -163,7 +186,10 @@ describe("createDagSkillMaterializer at run creation", () => {
     const store = createDagFileStore({ project_dir: project })
 
     // when
-    const result = materializer(store, cwd)({
+    const result = materializer(
+      store,
+      cwd,
+    )({
       runId,
       definition: definition([{ id: "plain", prompt: "no skills here", category: "quick" }]),
       at,
@@ -187,7 +213,9 @@ describe("createDagSkillMaterializer wired into DagManager.start", () => {
       materializeSkills: createDagSkillMaterializer({ store, cwd, homeDir: tempDir("senpi-dag-skills-home-") }),
     })
     const started = await manager.start({
-      definition: definition([{ id: "build", prompt: "ship the feature", category: "quick", load_skills: ["programming"] }]),
+      definition: definition([
+        { id: "build", prompt: "ship the feature", category: "quick", load_skills: ["programming"] },
+      ]),
       parentSessionId,
       rootSessionId,
     })
@@ -197,7 +225,9 @@ describe("createDagSkillMaterializer wired into DagManager.start", () => {
 
     // then
     const record = manager.record(started.snapshot.runId, parentSessionId)
-    expect(record.definition.nodes[0]?.effectivePrompt).toBe(skillPrompt(cwd, "programming", "v1 skill body", "ship the feature"))
+    expect(record.definition.nodes[0]?.effectivePrompt).toBe(
+      skillPrompt(cwd, "programming", "v1 skill body", "ship the feature"),
+    )
     expect(record.definition.nodes[0]?.prompt).toBe("ship the feature")
   })
 
@@ -213,7 +243,9 @@ describe("createDagSkillMaterializer wired into DagManager.start", () => {
 
     // when
     const started = await manager.start({
-      definition: definition([{ id: "build", prompt: "ship the feature", category: "quick", load_skills: ["nonexistent"] }]),
+      definition: definition([
+        { id: "build", prompt: "ship the feature", category: "quick", load_skills: ["nonexistent"] },
+      ]),
       parentSessionId,
       rootSessionId,
     })

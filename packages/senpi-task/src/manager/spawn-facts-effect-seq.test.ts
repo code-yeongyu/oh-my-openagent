@@ -18,15 +18,23 @@ class SendDuringStampRunner extends FakeRunner {
     const handle = await super.start(spec)
     return Object.assign(handle, {
       kind: "host-session" as const,
-      hostSession: { socket: "/tmp/fake-host/rpc.sock", routingId: "routing-1", sessionPath: `/tmp/fake-host/${spec.taskId}.jsonl`, instanceId: "instance-1" },
+      hostSession: {
+        socket: "/tmp/fake-host/rpc.sock",
+        routingId: "routing-1",
+        sessionPath: `/tmp/fake-host/${spec.taskId}.jsonl`,
+        instanceId: "instance-1",
+      },
       // The manager reads the child's effective model while it stamps the spawn facts: a send lands right then,
       // minting its id the way input-effects.ts does.
       effectiveModel: () => {
-        this.store?.mutate(spec.taskId, record => {
+        this.store?.mutate(spec.taskId, (record) => {
           const seq = Math.max(record.effect_seq ?? 0, record.host_session?.effect_seq ?? 0) + 1
           this.minted = seq
-          return { ...record, effect_seq: seq,
-            ...(record.host_session === undefined ? {} : { host_session: { ...record.host_session, effect_seq: seq } }) }
+          return {
+            ...record,
+            effect_seq: seq,
+            ...(record.host_session === undefined ? {} : { host_session: { ...record.host_session, effect_seq: seq } }),
+          }
         })
         return undefined
       },

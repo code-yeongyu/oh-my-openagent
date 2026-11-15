@@ -115,20 +115,13 @@ describe("parseWorktreeListPorcelain", () => {
 
   test("#given bare worktree #when parsing #then marks bare flag", () => {
     // given
-    const output = [
-      "worktree /home/user/bare-repo",
-      "HEAD abc1234",
-      "bare",
-      "",
-    ].join("\n")
+    const output = ["worktree /home/user/bare-repo", "HEAD abc1234", "bare", ""].join("\n")
 
     // when
     const result = parseWorktreeListPorcelain(output)
 
     // then
-    expect(result).toEqual([
-      { path: "/home/user/bare-repo", branch: undefined, bare: true },
-    ])
+    expect(result).toEqual([{ path: "/home/user/bare-repo", branch: undefined, bare: true }])
   })
 
   test("#given empty output #when parsing #then returns empty array", () => {
@@ -137,19 +130,13 @@ describe("parseWorktreeListPorcelain", () => {
 
   test("#given output without trailing newline #when parsing #then still captures last entry", () => {
     // given
-    const output = [
-      "worktree /repo",
-      "HEAD abc1234",
-      "branch refs/heads/dev",
-    ].join("\n")
+    const output = ["worktree /repo", "HEAD abc1234", "branch refs/heads/dev"].join("\n")
 
     // when
     const result = parseWorktreeListPorcelain(output)
 
     // then
-    expect(result).toEqual([
-      { path: "/repo", branch: "dev", bare: false },
-    ])
+    expect(result).toEqual([{ path: "/repo", branch: "dev", bare: false }])
   })
 })
 

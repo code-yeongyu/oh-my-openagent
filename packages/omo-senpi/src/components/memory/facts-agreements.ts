@@ -22,8 +22,8 @@ export function resolveFactsAgreements(config: OmoConfig, identity: string): Fac
   return {
     enabled: override?.enabled ?? base?.enabled ?? true,
     policy: {
-      needsHumanThreshold: override?.needs_human_threshold ?? base?.needs_human_threshold
-        ?? DEFAULT_AGREEMENTS_POLICY.needsHumanThreshold,
+      needsHumanThreshold:
+        override?.needs_human_threshold ?? base?.needs_human_threshold ?? DEFAULT_AGREEMENTS_POLICY.needsHumanThreshold,
       maxItems: override?.max_items ?? base?.max_items ?? DEFAULT_AGREEMENTS_POLICY.maxItems,
     },
   }

@@ -15,24 +15,24 @@ describe("collectGitDiffStats", () => {
       throw new Error("execSync should not be called")
     })
 
-    execFileSyncSpy = spyOn(childProcess, "execFileSync").mockImplementation(
-      ((file: string, args: string[], _opts: { cwd?: string }) => {
-        if (file !== "git") throw new Error(`unexpected file: ${file}`)
-        const subcommand = args[0]
+    execFileSyncSpy = spyOn(childProcess, "execFileSync").mockImplementation(((
+      file: string,
+      args: string[],
+      _opts: { cwd?: string },
+    ) => {
+      if (file !== "git") throw new Error(`unexpected file: ${file}`)
+      const subcommand = args[0]
 
-        if (subcommand === "diff") return "1\t2\tfile.ts\0"
-        if (subcommand === "status") return " M file.ts\0?? new-file.ts\0"
-        if (subcommand === "ls-files") return "new-file.ts\0"
+      if (subcommand === "diff") return "1\t2\tfile.ts\0"
+      if (subcommand === "status") return " M file.ts\0?? new-file.ts\0"
+      if (subcommand === "ls-files") return "new-file.ts\0"
 
-        throw new Error(`unexpected args: ${args.join(" ")}`)
-      }) as typeof childProcess.execFileSync
-    )
+      throw new Error(`unexpected args: ${args.join(" ")}`)
+    }) as typeof childProcess.execFileSync)
 
-    readFileSyncSpy = spyOn(fs, "readFileSync").mockImplementation(
-      ((_path: unknown, _encoding: unknown) => {
-        return "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10\n"
-      }) as typeof fs.readFileSync
-    )
+    readFileSyncSpy = spyOn(fs, "readFileSync").mockImplementation(((_path: unknown, _encoding: unknown) => {
+      return "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10\n"
+    }) as typeof fs.readFileSync)
   })
 
   afterEach(() => {

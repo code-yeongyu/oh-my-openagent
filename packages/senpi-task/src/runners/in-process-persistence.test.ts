@@ -16,7 +16,6 @@ function makeTmpDir(): string {
   const dir = mkdtempSync(join(tmpdir(), "senpi-task-persistence-"))
   tmpDirs.push(dir)
   return dir
-
 }
 
 afterEach(() => {
@@ -98,9 +97,7 @@ describe("InProcessRunner session persistence", () => {
     })
 
     // when
-    const handle = await runner.start(
-      baseSpec({ toolAllowlist: ["read", "bash"], toolDenylist: ["write", "edit"] }),
-    )
+    const handle = await runner.start(baseSpec({ toolAllowlist: ["read", "bash"], toolDenylist: ["write", "edit"] }))
     await handle.waitForIdle()
 
     // then

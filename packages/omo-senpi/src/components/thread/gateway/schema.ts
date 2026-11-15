@@ -2,7 +2,11 @@ import { PROVENANCE_MIGRATION } from "./provenance-record"
 
 export class GatewaySchemaVersionError extends Error {
   readonly code = "gateway_schema_too_new"
-  constructor(readonly found: number, readonly supported: number, scope = "Gateway") {
+  constructor(
+    readonly found: number,
+    readonly supported: number,
+    scope = "Gateway",
+  ) {
     super(`${scope} schema ${found} is newer than this binary's supported version ${supported}.`)
   }
 }
@@ -275,6 +279,102 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
      SELECT s.type, s.name, NULL FROM sqlite_schema s
      WHERE NOT EXISTS (SELECT 1 FROM extension_objects e WHERE e.type = s.type AND e.name = s.name COLLATE NOCASE)`,
   ],
+
+  // v11 (#13014): what the receiver was parked on when its drain queued a delivery; NULL when it was not, and on older rows.
+  ["ALTER TABLE deliveries ADD COLUMN wait_kind TEXT CHECK (wait_kind IS NULL OR wait_kind = 'approval')"],
+
+  // v12 (#13037): a delivery taken in from another device for a session that is not running. `ledger_id` is the engine's
+  // ledger key for it (`device:<attested device>/<sender's delivery id>`), the key the drain admits it under and the
+  // reconcile, the transcript scan and the cause lookup match on; the two text columns hold the sender's rendered text and
+  // display text verbatim. All three are NULL on every other row, which behaves exactly as before.
+  [
+    "ALTER TABLE deliveries ADD COLUMN ledger_id TEXT",
+    "ALTER TABLE deliveries ADD COLUMN verbatim_text TEXT",
+    "ALTER TABLE deliveries ADD COLUMN verbatim_display_text TEXT",
+    "CREATE UNIQUE INDEX deliveries_ledger ON deliveries (ledger_id) WHERE ledger_id IS NOT NULL",
+    "INSERT OR IGNORE INTO extension_objects (type, name, owner) VALUES ('index', 'deliveries_ledger', NULL)",
+  ],
+
+  // v13 (#13037): one row per session a wake asked for or opened and that has not ended. A row past `requested` holds one
+  // of the store's places (the cap); `lease_owner` is the carrier's process identity and `generation` fences its writes;
+  // `attempts` and `next_attempt_at` are set when an open failed for a transient reason and the row went back to `requested`.
+  // Idempotent, so a store rewound to v12 re-runs it without touching the rows it holds.
+  [
+    `CREATE TABLE IF NOT EXISTS woken_sessions (
+      durable_id TEXT PRIMARY KEY,
+      session_file TEXT NOT NULL,
+      host_instance TEXT,
+      state TEXT NOT NULL CHECK (state IN ('requested', 'opening', 'open', 'closing')),
+      requested_at INTEGER NOT NULL,
+      opened_at INTEGER,
+      first_waiting_at INTEGER,
+      lease_owner TEXT,
+      lease_expires_at INTEGER,
+      generation INTEGER NOT NULL DEFAULT 0,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      next_attempt_at INTEGER
+    )`,
+    "CREATE INDEX IF NOT EXISTS woken_sessions_state ON woken_sessions (state)",
+    "INSERT OR IGNORE INTO extension_objects (type, name, owner) VALUES ('table', 'woken_sessions', NULL)",
+    "INSERT OR IGNORE INTO extension_objects (type, name, owner) VALUES ('index', 'woken_sessions_state', NULL)",
+  ],
+
+  // v14 (#13037): what the carrier and the consumer keep beside the woken row. `session_wait`: a session found held or
+  // waiting for a person, with its hold kinds and the size of its file then (a changed size allows one new probe).
+  // `wake_counts`: consecutive wakes per session, and the input revision they were counted at; it outlives the row.
+  // `intake_marks`: per sender device and session, the newest command that committed a new intake row; `intake_commands`:
+  // the command id each intake row was committed under (A5.3: an answer names it, a deduplicated repeat included). Idempotent.
+  [
+    `CREATE TABLE IF NOT EXISTS session_wait (
+      durable_id TEXT PRIMARY KEY,
+      wait TEXT NOT NULL CHECK (wait IN ('held', 'waiting')),
+      hold_kinds TEXT NOT NULL,
+      file_size INTEGER NOT NULL,
+      written_at INTEGER NOT NULL
+    )`,
+    `CREATE TABLE IF NOT EXISTS wake_counts (
+      durable_id TEXT PRIMARY KEY,
+      count INTEGER NOT NULL,
+      human_input_revision INTEGER
+    )`,
+    `CREATE TABLE IF NOT EXISTS intake_marks (
+      sender_device TEXT NOT NULL,
+      session_id TEXT NOT NULL,
+      last_command_id TEXT NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (sender_device, session_id)
+    )`,
+    "INSERT OR IGNORE INTO extension_objects (type, name, owner) VALUES ('table', 'session_wait', NULL)",
+    "INSERT OR IGNORE INTO extension_objects (type, name, owner) VALUES ('table', 'wake_counts', NULL)",
+    `CREATE TABLE IF NOT EXISTS intake_commands (
+      ledger_id TEXT PRIMARY KEY,
+      command_id TEXT NOT NULL
+    )`,
+    "INSERT OR IGNORE INTO extension_objects (type, name, owner) VALUES ('table', 'intake_marks', NULL)",
+    "INSERT OR IGNORE INTO extension_objects (type, name, owner) VALUES ('table', 'intake_commands', NULL)",
+  ],
 ]
 
-export const GATEWAY_TABLES = ["deliveries", "receipts", "causal_roots", "causal_edges", "rate_buckets", "session_meta", "bindings", "outbox", "gateway_meta", "outbox_cursors", "completion_arms", "extension_schema", "extension_objects", "thread_creations", "extension_registrations", "toolkit_replay_receipts"] as const
+export const GATEWAY_TABLES = [
+  "deliveries",
+  "receipts",
+  "causal_roots",
+  "causal_edges",
+  "rate_buckets",
+  "session_meta",
+  "bindings",
+  "outbox",
+  "gateway_meta",
+  "outbox_cursors",
+  "completion_arms",
+  "extension_schema",
+  "extension_objects",
+  "thread_creations",
+  "extension_registrations",
+  "toolkit_replay_receipts",
+  "woken_sessions",
+  "session_wait",
+  "wake_counts",
+  "intake_marks",
+  "intake_commands",
+] as const

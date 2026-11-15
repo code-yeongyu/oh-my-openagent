@@ -2,11 +2,7 @@ import { join } from "node:path"
 
 import type { ReservedRun } from "@oh-my-opencode/memory-core"
 
-import {
-  recordReflectionCompletion,
-  type ReflectionCompletionRecord,
-  type ReflectionLiveSession,
-} from "./completion"
+import { recordReflectionCompletion, type ReflectionCompletionRecord, type ReflectionLiveSession } from "./completion"
 import { classifyReflectionFailure } from "./failure-policy"
 import { readReflectionHealth } from "./health"
 import { emitReflectionHealthAlert } from "./health-alert"
@@ -52,8 +48,12 @@ export async function settleReflectionRun(input: {
       ? {
           model: input.result.model ?? input.resolution.model,
           ...(input.result.model === undefined
-            ? input.resolution.thinking === undefined ? {} : { thinking: input.resolution.thinking }
-            : input.result.thinking === undefined ? {} : { thinking: input.result.thinking }),
+            ? input.resolution.thinking === undefined
+              ? {}
+              : { thinking: input.resolution.thinking }
+            : input.result.thinking === undefined
+              ? {}
+              : { thinking: input.result.thinking }),
         }
       : {}),
     conversationIds: input.run.request.conversationIds,
@@ -80,7 +80,12 @@ export async function settleReflectionRun(input: {
     observedRunIds: [completion.runId],
     currentLauncher: launcher,
   })
-  await emitReflectionParkAlert(input.options.identity.paths.reflection, input.options.identity.id, live, input.warnedHealth)
+  await emitReflectionParkAlert(
+    input.options.identity.paths.reflection,
+    input.options.identity.id,
+    live,
+    input.warnedHealth,
+  )
   return {
     runId: input.run.runId,
     outcome: input.result.outcome,
@@ -121,6 +126,11 @@ export async function publishFinalizedReflectionRun(input: {
     observedRunIds: [completion.runId],
     ...(launcher === undefined ? {} : { currentLauncher: launcher }),
   })
-  await emitReflectionParkAlert(input.options.identity.paths.reflection, input.options.identity.id, live, input.warnedHealth)
+  await emitReflectionParkAlert(
+    input.options.identity.paths.reflection,
+    input.options.identity.id,
+    live,
+    input.warnedHealth,
+  )
   return { ...input.result, completion }
 }

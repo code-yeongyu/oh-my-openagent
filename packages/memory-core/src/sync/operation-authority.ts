@@ -25,13 +25,18 @@ export function checkSyncOperation(options: SyncOperationOptions): void {
 }
 
 export function syncOperationSignal(options: SyncOperationOptions): AbortSignal | undefined {
-  const signals = [options.signal, options.authority?.signal].filter((signal): signal is AbortSignal => signal !== undefined)
+  const signals = [options.signal, options.authority?.signal].filter(
+    (signal): signal is AbortSignal => signal !== undefined,
+  )
   return signals.length === 0 ? undefined : AbortSignal.any(signals)
 }
 
 export function isSyncOperationCancelled(options: SyncOperationOptions, error: unknown): boolean {
-  return options.signal?.aborted === true || options.authority?.signal.aborted === true ||
+  return (
+    options.signal?.aborted === true ||
+    options.authority?.signal.aborted === true ||
     (error instanceof Error && error.name === "AbortError")
+  )
 }
 
 /** Wait cancellation does not undo an already-admitted sign, append or publication. */
@@ -39,16 +44,26 @@ export function waitSyncOperation<T>(options: SyncOperationOptions, pending: Pro
   const signal = syncOperationSignal(options)
   if (signal === undefined) return pending
   return new Promise<T>((resolve, reject) => {
-    const onAbort = () => { cleanup(); reject(signal.reason) }
+    const onAbort = () => {
+      cleanup()
+      reject(signal.reason)
+    }
     const cleanup = () => signal.removeEventListener("abort", onAbort)
     signal.addEventListener("abort", onAbort, { once: true })
     if (signal.aborted) onAbort()
     pending.then(
-      value => {
+      (value) => {
         cleanup()
-        try { resolve(admitSyncOperation(options, () => value)) } catch (error) { reject(error) }
+        try {
+          resolve(admitSyncOperation(options, () => value))
+        } catch (error) {
+          reject(error)
+        }
       },
-      error => { cleanup(); reject(error) },
+      (error) => {
+        cleanup()
+        reject(error)
+      },
     )
   })
 }

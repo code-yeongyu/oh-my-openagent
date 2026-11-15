@@ -69,7 +69,10 @@ function capturingNotifier(): ParentNotifier & { readonly enqueued: ParentNotifi
   }
 }
 
-function recordingRuntime(): { runtime: { setTransition(t: ParentTransition): void }; transitions: ParentTransition[] } {
+function recordingRuntime(): {
+  runtime: { setTransition(t: ParentTransition): void }
+  transitions: ParentTransition[]
+} {
   const transitions: ParentTransition[] = []
   return { runtime: { setTransition: (transition) => transitions.push(transition) }, transitions }
 }
@@ -136,7 +139,11 @@ describe("createSessionTransitionBridge buffered-completion round trip", () => {
 
     // when the session enters compaction and a background terminal arrives
     bridge.onBeforeCompact("session-a")
-    const result = completion.notifyTerminal({ record: store.record(), parentState: runtime.parentState(), runInBackground: true })
+    const result = completion.notifyTerminal({
+      record: store.record(),
+      parentState: runtime.parentState(),
+      runInBackground: true,
+    })
 
     // then the completion buffered rather than delivering into a mid-compaction session
     expect(result.kind).toBe("buffered")

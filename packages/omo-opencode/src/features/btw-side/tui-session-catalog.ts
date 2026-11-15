@@ -32,9 +32,7 @@ type BtwSessionListResponse = {
 type LoadBtwSessionCatalogInput = {
   currentSessionID: string
   directory: string
-  listSessions: (
-    input: BtwSessionListInput,
-  ) => Promise<BtwSessionListResponse>
+  listSessions: (input: BtwSessionListInput) => Promise<BtwSessionListResponse>
   initialLimit?: number
   maximumLimit?: number
 }
@@ -43,44 +41,29 @@ export function classifyBtwSessionCatalog(
   sessions: BtwCatalogSession[],
   currentSessionID: string,
 ): BtwSessionCatalog | undefined {
-  const sessionsByID = new Map(
-    sessions.map((session) => [session.id, session]),
-  )
+  const sessionsByID = new Map(sessions.map((session) => [session.id, session]))
   const current = sessionsByID.get(currentSessionID)
   if (!current) return undefined
 
-  const rootSessionID =
-    getBtwSideMetadata(current)?.parent_session_id ?? current.id
+  const rootSessionID = getBtwSideMetadata(current)?.parent_session_id ?? current.id
   const main = sessionsByID.get(rootSessionID)
   if (!main || getBtwSideMetadata(main)) return undefined
 
   const sides = sessions
-    .filter(
-      (session) =>
-        getBtwSideMetadata(session)?.parent_session_id === rootSessionID,
-    )
-    .sort(
-      (left, right) =>
-        left.time.created - right.time.created ||
-        left.id.localeCompare(right.id),
-    )
+    .filter((session) => getBtwSideMetadata(session)?.parent_session_id === rootSessionID)
+    .sort((left, right) => left.time.created - right.time.created || left.id.localeCompare(right.id))
   return {
     main,
     sides,
   }
 }
 
-export async function loadBtwSessionCatalog(
-  input: LoadBtwSessionCatalogInput,
-): Promise<{
+export async function loadBtwSessionCatalog(input: LoadBtwSessionCatalogInput): Promise<{
   catalog: BtwSessionCatalog | undefined
   truncated: boolean
 }> {
   const maximumLimit = input.maximumLimit ?? DEFAULT_MAXIMUM_LIMIT
-  let limit = Math.min(
-    input.initialLimit ?? DEFAULT_INITIAL_LIMIT,
-    maximumLimit,
-  )
+  let limit = Math.min(input.initialLimit ?? DEFAULT_INITIAL_LIMIT, maximumLimit)
 
   while (true) {
     const response = await input.listSessions({
@@ -96,10 +79,7 @@ export async function loadBtwSessionCatalog(
     const atMaximum = limit >= maximumLimit
     if (!fullResponse || atMaximum) {
       return {
-        catalog: classifyBtwSessionCatalog(
-          sessions,
-          input.currentSessionID,
-        ),
+        catalog: classifyBtwSessionCatalog(sessions, input.currentSessionID),
         truncated: fullResponse && atMaximum,
       }
     }

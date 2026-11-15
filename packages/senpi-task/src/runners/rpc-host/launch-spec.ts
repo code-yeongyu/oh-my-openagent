@@ -26,19 +26,25 @@ export class DaemonLaunchSpecError extends Error {
 
 const SPEC_ENV_KEY = /^(SENPI|OMO|PI)_[A-Z0-9_]+$/
 
-const daemonLaunchSpecSchema = z.object({
-  spec_version: z.literal(1),
-  core: z.object({
-    session_runtime: z.literal("in-process"),
-    multi_session: z.literal(true),
-    extensions: z.array(z.string().min(1)).min(1),
-  }).strict(),
-  tunables: z.object({
-    idleExitMs: z.number().int().positive(),
-    coldStart: z.enum(["transient", "persistent"]),
-  }).strict(),
-  env: z.record(z.string(), z.string()),
-}).strict()
+const daemonLaunchSpecSchema = z
+  .object({
+    spec_version: z.literal(1),
+    core: z
+      .object({
+        session_runtime: z.literal("in-process"),
+        multi_session: z.literal(true),
+        extensions: z.array(z.string().min(1)).min(1),
+      })
+      .strict(),
+    tunables: z
+      .object({
+        idleExitMs: z.number().int().positive(),
+        coldStart: z.enum(["transient", "persistent"]),
+      })
+      .strict(),
+    env: z.record(z.string(), z.string()),
+  })
+  .strict()
 
 export type DaemonLaunchSpec = z.infer<typeof daemonLaunchSpecSchema>
 
@@ -84,10 +90,7 @@ export function readDaemonLaunchSpec(path: string): DaemonLaunchSpec {
   for (const extension of spec.core.extensions) {
     const resolved = resolveContainedExtension(specDir, extension)
     if (!existsSync(resolved)) {
-      throw new DaemonLaunchSpecError(
-        "launch_spec_missing_extension",
-        `launch_spec_missing_extension: ${extension}`,
-      )
+      throw new DaemonLaunchSpecError("launch_spec_missing_extension", `launch_spec_missing_extension: ${extension}`)
     }
   }
 

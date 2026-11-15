@@ -139,35 +139,45 @@ describe("resolveActualContextLimit", () => {
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]
 
-    expect(resolveActualContextLimit("anthropic", "claude-fable-5", {
-      anthropicContext1MEnabled: false,
-    })).toBe(1_000_000)
+    expect(
+      resolveActualContextLimit("anthropic", "claude-fable-5", {
+        anthropicContext1MEnabled: false,
+      }),
+    ).toBe(1_000_000)
 
-    expect(resolveActualContextLimit("anthropic", "claude-mythos-5", {
-      anthropicContext1MEnabled: false,
-    })).toBe(1_000_000)
+    expect(
+      resolveActualContextLimit("anthropic", "claude-mythos-5", {
+        anthropicContext1MEnabled: false,
+      }),
+    ).toBe(1_000_000)
 
-    expect(resolveActualContextLimit("anthropic", "claude-sonnet-5", {
-      anthropicContext1MEnabled: false,
-    })).toBe(1_000_000)
+    expect(
+      resolveActualContextLimit("anthropic", "claude-sonnet-5", {
+        anthropicContext1MEnabled: false,
+      }),
+    ).toBe(1_000_000)
   })
 
   it("returns GA 1M for claude-opus-4-8", () => {
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]
 
-    expect(resolveActualContextLimit("anthropic", "claude-opus-4-8", {
-      anthropicContext1MEnabled: false,
-    })).toBe(1_000_000)
+    expect(
+      resolveActualContextLimit("anthropic", "claude-opus-4-8", {
+        anthropicContext1MEnabled: false,
+      }),
+    ).toBe(1_000_000)
   })
 
   it("returns GA 1M for claude-fable-5 on google-vertex-anthropic", () => {
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]
 
-    expect(resolveActualContextLimit("google-vertex-anthropic", "claude-fable-5", {
-      anthropicContext1MEnabled: false,
-    })).toBe(1_000_000)
+    expect(
+      resolveActualContextLimit("google-vertex-anthropic", "claude-fable-5", {
+        anthropicContext1MEnabled: false,
+      }),
+    ).toBe(1_000_000)
   })
 
   const opus5Models = [
@@ -226,9 +236,11 @@ describe("resolveActualContextLimit", () => {
     it(`keeps the default for unsupported Opus ID ${modelID}`, () => {
       delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
       delete process.env[VERTEX_CONTEXT_ENV_KEY]
-      expect(resolveActualContextLimit("anthropic", modelID, {
-        anthropicContext1MEnabled: false,
-      })).toBe(200_000)
+      expect(
+        resolveActualContextLimit("anthropic", modelID, {
+          anthropicContext1MEnabled: false,
+        }),
+      ).toBe(200_000)
     })
   }
 

@@ -14,7 +14,10 @@ export const RECALL_WAKE_DEFAULT_SLOTS = 2
 
 export class RecallWakeBusyError extends Error {
   readonly retriable = true
-  constructor(readonly waitedMs: number, readonly maxConcurrent: number) {
+  constructor(
+    readonly waitedMs: number,
+    readonly maxConcurrent: number,
+  ) {
     super(`recall-wake: all ${maxConcurrent} slot(s) busy after ${waitedMs}ms`)
     this.name = "RecallWakeBusyError"
   }
@@ -28,13 +31,20 @@ export function recallWakeTicketDirectory(locksDirectory: string): string {
   return countingLeaseTicketDirectory(locksDirectory, "recall-wake")
 }
 
-export function acquireRecallWakeLease(locksDirectory: string, options: RecallWakeLeaseOptions = {}): Promise<RecallWakeLease> {
-  return acquireCountingLease(locksDirectory, {
-    purpose: "recall-wake",
-    defaultSlots: RECALL_WAKE_DEFAULT_SLOTS,
-    waitTimeoutMs: 0,
-    busyError: (waited, count) => new RecallWakeBusyError(waited, count),
-  }, options)
+export function acquireRecallWakeLease(
+  locksDirectory: string,
+  options: RecallWakeLeaseOptions = {},
+): Promise<RecallWakeLease> {
+  return acquireCountingLease(
+    locksDirectory,
+    {
+      purpose: "recall-wake",
+      defaultSlots: RECALL_WAKE_DEFAULT_SLOTS,
+      waitTimeoutMs: 0,
+      busyError: (waited, count) => new RecallWakeBusyError(waited, count),
+    },
+    options,
+  )
 }
 
 export async function withRecallWakeLease<T>(

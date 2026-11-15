@@ -12,7 +12,10 @@ const LOCK_NB = 4
 
 const LIBC: Partial<Record<NodeJS.Platform, { readonly names: readonly string[]; readonly errnoSymbol: string }>> = {
   darwin: { names: ["/usr/lib/libSystem.B.dylib"], errnoSymbol: "__error" },
-  linux: { names: ["libc.so.6", "libc.musl-x86_64.so.1", "libc.musl-aarch64.so.1", "libc.so"], errnoSymbol: "__errno_location" },
+  linux: {
+    names: ["libc.so.6", "libc.musl-x86_64.so.1", "libc.musl-aarch64.so.1", "libc.so"],
+    errnoSymbol: "__errno_location",
+  },
 }
 
 // Returns flock's result and, when it failed, the errno read right after the call on the same thread.
