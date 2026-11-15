@@ -84,7 +84,9 @@ async function bothIds(runtime: ReturnType<typeof compiledRuntime>, ensureArgs: 
   // The CLI: the wrapper builds the engine argv, the engine reads `--launch-spec` and predicts the host.
   const cliArgs = buildSenpiArgs(["host", "ensure", "--json", ...ensureArgs], runtime.execDir)
   const specFlag = cliArgs.indexOf("--launch-spec")
-  const spec = specFlag === -1 ? senpi.defaultSpec : await senpi.loadHostLaunchSpec(cliArgs[specFlag + 1]!)
+  const specPath = specFlag === -1 ? undefined : cliArgs[specFlag + 1]
+  if (specFlag !== -1 && specPath === undefined) throw new Error(`--launch-spec has no value in ${cliArgs.join(" ")}`)
+  const spec = specPath === undefined ? senpi.defaultSpec : await senpi.loadHostLaunchSpec(specPath)
   const client = await idOf(senpi.socketHostLaunchProfile(spec.hostArgs, runtime.root))
   // The host: the supervisor spawns this executable again, and the wrapper builds that argv too.
   const child = senpi.resolveHostChildLaunch({ hostArgs: spec.hostArgs }, join(runtime.root, "host.sock"), true)
