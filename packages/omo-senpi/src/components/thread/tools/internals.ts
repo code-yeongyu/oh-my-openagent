@@ -47,7 +47,11 @@ export function failure(
 }
 
 export function output(result: ThreadToolResult): ToolOutput {
-  return { content: [{ type: "text", text: JSON.stringify(result) }], details: { result } }
+  return {
+    content: [{ type: "text", text: JSON.stringify(result) }],
+    details: { result },
+    ...(result.kind === "error" ? { isError: true } : {}),
+  }
 }
 
 export type ThreadToolSummary = Omit<
