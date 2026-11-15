@@ -4,7 +4,7 @@ import type { ThreadErrorCode, ThreadToolFailure } from "./errors"
 import { type Static } from "typebox"
 import { toThreadAddressEntries } from "./address-book"
 import { checkNameConflict, normalizeThreadName, type ThreadResolveResult } from "./addressing"
-import { createLocalSessionHost } from "./control/local-session-host"
+import { createLocalSessionHost, workspaceNote } from "./control/local-session-host"
 import { checkInitialSkills } from "./initial-skills"
 import {
   parseThreadParams,
@@ -391,6 +391,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
           kind: "ok",
           thread: { ...opened.thread, ...(plan.creates && loaded !== undefined ? { requested_skills: loaded } : {}) },
           deduplicated: false,
+          ...workspaceNote(opened.thread, callerCwd),
         }
         const recorded = plan.creates ? await recordThreadCreator(options, current, callerId, created) : created
         if (plan.localAlias !== undefined)

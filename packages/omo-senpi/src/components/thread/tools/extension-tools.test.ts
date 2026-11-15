@@ -353,6 +353,7 @@ test("#given args that try to name the caller #when the tool runs #then it is re
     ectxFor("dur-caller") as never,
   )
   expect(resultOf(output)).toMatchObject({ code: "invalid_arguments" })
+  expect(output.isError).toBe(true)
 })
 
 test("#given a declaration whose module was deleted #when a session builds its tools #then building succeeds without importing it, and only the call fails extension_import_failed", async () => {

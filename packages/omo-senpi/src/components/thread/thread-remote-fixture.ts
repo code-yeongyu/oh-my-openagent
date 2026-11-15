@@ -99,6 +99,10 @@ export function createRemoteThreadFixture() {
       rowState?: string
       live?: readonly string[]
       records?: readonly JsonObject[]
+      /** Entries the session stores once its turn ran (a queued send is stored when the queue drains): served on reads after the turn's records went out. */
+      entriesAfterAnswer?: readonly JsonObject[]
+      /** The turn finishes before its prompt's reply reaches the sender: its records go out at once, before the aim. */
+      recordsBeforeReply?: boolean
       rows?: readonly RemoteSessionRow[]
       registryDown?: "refused" | "throws" | "signed_out"
       /** Only the claim fails (resolve and aliasesOf still answer): a token that expired between the two calls. */
@@ -131,12 +135,17 @@ export function createRemoteThreadFixture() {
     // admissions its user's open draft still holds (held_draft, taken by nothing).
     const admitted = new Set<string>()
     let heldDraft = options.heldDraft ?? 0
-    // The session's records a prompt makes it write, delivered to every watch after the prompt is answered.
+    // The session's records a prompt makes it write, held until the follower first reads after the answer: the
+    // engine's turn records follow its reply out over the wire, and the CLI's read is the first observable hop after
+    // its own bookkeeping for that reply.
     const watchers = new Set<(record: JsonObject) => void>()
-    const writeRecords = () =>
-      queueMicrotask(() => {
-        for (const record of options.records ?? []) for (const listener of [...watchers]) listener(record)
-      })
+    let answeredPrompt = false
+    let recordsOut = false
+    const writeRecords = () => {
+      if (recordsOut) return
+      recordsOut = true
+      for (const record of options.records ?? []) for (const listener of [...watchers]) listener(record)
+    }
     const hops: number[] = []
     const lookups: Array<{ readonly device: string; readonly durable_id: string }> = []
     const deviceReads = { thisDevice: 0, devices: 0 }
@@ -180,7 +189,7 @@ export function createRemoteThreadFixture() {
       }
       if (rpc["type"] === "open_session") {
         const opened = rpc["sessionPath"] === undefined ? "dur-new-on-b" : "dur-on-b"
-        live.add(opened)
+        for (const id of [opened, options.relayKeys?.get(opened) ?? opened]) live.add(id)
         return ok(options.openData ?? { sessionId: "rpc-9", state: { durableSessionId: opened } })
       }
       if (rpc["type"] === "get_state")
@@ -359,7 +368,10 @@ export function createRemoteThreadFixture() {
         sessionCommand: async (device, session, rpc) => {
           sent.push({ via: "session", device, session, rpc })
           const outcome = answer(rpc, session)
-          if (rpc["type"] === "prompt" && outcome.kind === "ok") writeRecords()
+          if (rpc["type"] === "prompt" && outcome.kind === "ok") {
+            answeredPrompt = true
+            if (options.recordsBeforeReply === true) writeRecords()
+          }
           return outcome
         },
         watch: async (device, session, listener) => {
@@ -406,12 +418,15 @@ export function createRemoteThreadFixture() {
         },
         read: async (device, session) => {
           sent.push({ via: "read", device, session })
+          const drained = recordsOut
+          if (answeredPrompt) writeRecords()
           return {
             kind: "ok",
             response: {
               entries: [
                 { role: "user", content: "hi b" },
                 { role: "assistant", content: "hello from b" },
+                ...(drained ? (options.entriesAfterAnswer ?? []) : []),
               ],
             },
           }
@@ -451,6 +466,8 @@ export function createRemoteThreadFixture() {
       caller?: string
       diskSessions?: readonly string[]
       closeOutcome?: ThreadCloseOutcome
+      /** Look session files up where senpi writes them, `<agentDir>/sessions`, as the component does. */
+      sessionsDirectory?: boolean
     } = {},
   ) {
     const engine = extra.engine ?? ENGINE
@@ -537,6 +554,7 @@ export function createRemoteThreadFixture() {
       store: countedStore,
       stateDirectory: join(agentDir, "state"),
       diskSessions: () => disk,
+      ...(extra.sessionsDirectory === true ? { sessionsDirectory: () => join(agentDir, "sessions") } : {}),
       callerSessionId: () => caller,
       callerWorkspaceRoot: () => process.cwd(),
       remote,
