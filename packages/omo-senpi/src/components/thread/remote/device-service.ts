@@ -332,6 +332,9 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       return { kind: "ok", watch: { ended: attached.detached, stop } }
     },
     close: async () => {
+      // Closing the connection ends every listing it answered: no read after this joins a round still running on it or
+      // reuses what it kept (the caller may close to force a fresh listing).
+      invalidate()
       const open = service
       service = undefined
       attaches.clear()

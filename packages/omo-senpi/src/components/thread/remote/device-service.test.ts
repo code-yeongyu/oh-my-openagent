@@ -1069,6 +1069,7 @@ describe("device-service adapter: the account listing is shared across the reads
         throw new LocalApiError("unsupported", "no endpoint", { not_sent: true })
       },
       closed: new Promise(() => {}),
+      close: () => undefined,
     } as unknown as DeviceService
     return { service, calls: () => calls, finish: () => release?.() }
   }
@@ -1087,6 +1088,30 @@ describe("device-service adapter: the account listing is shared across the reads
     s.finish()
     await Promise.all(reads)
     expect(s.calls()).toBe(1)
+  })
+
+  test("#given a listing then a close #when a read comes inside the reuse window #then it lists again instead of reusing the closed connection's round", async () => {
+    const s = countingService()
+    let clock = 0
+    const port = createDeviceServiceSessions({
+      version: "0.0.0-test",
+      connect: async () => s.service,
+      now: () => clock,
+    })
+    const first = port.sessions()
+    await Promise.resolve()
+    await Promise.resolve()
+    s.finish()
+    await first
+    expect(s.calls()).toBe(1)
+    await port.close?.()
+    clock = 1_000
+    const after = port.sessions()
+    await Promise.resolve()
+    await Promise.resolve()
+    s.finish()
+    await after
+    expect(s.calls()).toBe(2)
   })
 
   test("#given a round that just ended #when a read comes within the reuse window, then after it #then the first reuses the round and the second lists again", async () => {
