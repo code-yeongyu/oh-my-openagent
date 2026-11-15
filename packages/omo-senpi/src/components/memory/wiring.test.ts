@@ -272,6 +272,58 @@ describe("memory footer wiring", () => {
     expectRelativeStatus(statusCalls[0], fixture.identity)
     await pi.dispatch("session_shutdown", { type: "session_shutdown" }, toolContext)
   })
+
+  // #13695: a host that exits once the bounded shutdown handler returns must still have received the clear,
+  // so it is sent before the drain, which can spend its whole budget on work that never settles.
+  test("#given a memory write whose footer refresh never settles #when the session shuts down #then the footer is cleared before the drain and the drain still runs to its deadline", async () => {
+    // given
+    const fixture = await createFixture()
+    const pi = new MemoryFakeExtensionAPI()
+    const ctx = componentContext()
+    const refreshEntered = Promise.withResolvers<void>()
+    const refreshGate = Promise.withResolvers<MemoryStatusResult>()
+    createMemoryComponent({
+      env: fixture.env,
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      refreshStatus: () => {
+        refreshEntered.resolve()
+        return refreshGate.promise
+      },
+      resolveCwd: () => fixture.cwd,
+    }).register(pi, ctx)
+    const drainBudgetSteps = (): unknown[] =>
+      ctx.logs
+        .filter((log) => log.message === "memory shutdown drain hit its budget")
+        .map((log) => (log.details as { step?: string } | undefined)?.step)
+    await pi.dispatch("session_start", { type: "session_start" }, sessionContext(fixture.sessionId))
+    const toolResult = pi.dispatch("tool_result", memoryResult("memory"), sessionContext(fixture.sessionId, []))
+    await withinMs(refreshEntered.promise, "the footer refresh", remainingTestTime())
+
+    // when
+    const statusCalls: Array<{ key: string; text: string | undefined }> = []
+    const cleared = Promise.withResolvers<unknown[]>()
+    const shutdownContext = {
+      ...(sessionContext(fixture.sessionId) as Record<string, unknown>),
+      ui: {
+        notify: () => {},
+        setStatus: (key: string, text: string | undefined) => {
+          statusCalls.push({ key, text })
+          if (key === MEMORY_STATUS_KEY && text === undefined) cleared.resolve(drainBudgetSteps())
+        },
+      },
+    }
+    const shutdown = pi.dispatch("session_shutdown", { type: "session_shutdown" }, shutdownContext)
+    const budgetSpentAtClear = await withinMs(cleared.promise, "the footer clear", remainingTestTime())
+    await withinMs(shutdown, "the bounded session shutdown", remainingTestTime())
+
+    // then
+    expect(budgetSpentAtClear).toEqual([])
+    expect(statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: undefined }])
+    // The drain still waited on the in-flight write and gave up only at the deadline it was handed.
+    expect(drainBudgetSteps()).toContain("memory-work-settle")
+    refreshGate.resolve({ notified: false, footerShown: false })
+    await withinMs(toolResult, "the released memory write", remainingTestTime())
+  })
 })
 
 async function createFixture(): Promise<{
