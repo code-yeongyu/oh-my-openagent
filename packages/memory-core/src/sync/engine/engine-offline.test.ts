@@ -13,8 +13,9 @@ afterEach(async () => {
 const DAY = 24 * 60 * 60 * 1000
 const OFFLINE_DAYS = 40
 const RETAINED_DAYS = 30
-// Each sync cycle is 14 durable journal writes, so the scenario's cost is its cycle count. Device a
-// syncs once per this many fixture days; the days offline and the days retained are unchanged.
+// Each sync cycle is 14 durable operations on the sync journal (12 atomic writes, 2 removals), so the
+// scenario's cost is its cycle count. Device a syncs once per this many fixture days; the days offline
+// and the days retained are unchanged.
 const SYNC_EVERY_DAYS = 5
 
 test(
