@@ -52,9 +52,9 @@ An OmO Native session opens the engine with `reportMode: "object"` whenever the 
 | `route` | `ax`, `background_window`, `background_pid` or `foreground_hid` |
 | `hit` | The element under the point before sending (`role`, `label`); `label` is `null` for a secure field |
 | `focusRestoration` | `not_needed`, `restored`, `user_moved_on` or `not_confirmed` |
-| `openedSurfaces` | Sheets, dialogs, menus, popovers or windows the action opened |
-| `nextCall` | On a refusal, the next rung to try (an element action, the keyboard, foreground); never followed automatically |
-| `note`, `warning` | Short guidance; content from a secure field is never copied in, and long strings are cut at 256 characters |
+| `openedSurfaces` | Sheets, dialogs, menus, popovers or windows the action opened; a title over 256 characters is cut and ends `[truncated]`, as is a long `hit` label |
+| `nextCall` | On a `BackgroundUnavailable` refusal, the next rung to try (an element action, the keyboard, foreground); never followed automatically |
+| `note`, `warning` | `warning` is an open token set, in this release only `secure_field` (the point is a secure field, whose label is withheld); `note` is reserved and always `null` in this release |
 | `auditIds` | Ids of the audit events the action emitted |
 | `timings` | Always `null` in this release; per-stage timings are written to the trace file when `computer.trace` is on |
 | `legacy` | `true` when the engine replied `null` (an engine without `action-report`); the report then reads `delivered_unverified` / `unsafe` with `effect: "unverifiable"` |
@@ -122,7 +122,7 @@ A failed call carries one engine error code (`crates/senpi-desktop-core/src/erro
 
 | Code | Reasons |
 |------|---------|
-| `InvalidCoordinateFrame` | `resized` (the window changed size after the capture), `consumed` (the frame was used with `consume: true`), `zoom` (a zoomed crop is never an input frame), `wrong_target`, `out_of_bounds` |
+| `InvalidCoordinateFrame` | `resized` (the window changed size after the capture), `consumed` (the frame was used with `consume: true`), `zoom` (a zoomed crop is never an input frame), `superseded` (the desktop changed under the session, below; nothing was sent when it changed before the first input event, otherwise the disposition is `unknown`), `wrong_target`, `out_of_bounds` |
 | `WindowNotFound` | `identity_changed`: the window number is the same but its owning process differs from the captured one |
 | `InvalidTarget` | `ambiguous`: the filter matched several windows; `data.candidates` lists them |
 | `BackgroundUnavailable` | `key_route_unproven`, `user_active_in_target` (the user pressed a key or clicked in that frontmost app within the last 1.5 s; retry after they pause), `pointer_reading_toolkit`, `electron_select`, `wayland_window_targeting` |
@@ -132,7 +132,7 @@ A failed call carries one engine error code (`crates/senpi-desktop-core/src/erro
 | `Suspended` | `stop_marker` (reserved for an engine that starts behind the persistent stop marker) |
 | `Internal` | `request_too_large`, `other` |
 
-An object-mode session also announces `epoch.changed` when the desktop changes under it (display layout, lock, sleep, Space switch, engine restart); every frame and ref taken before it is superseded, so capture and read again.
+An object-mode session also announces `epoch.changed` when the desktop changes under it (display layout, lock, sleep, Space switch, engine restart); every frame and ref taken before it is superseded, so capture and read again. Input whose frame the change overtakes fails `InvalidCoordinateFrame` with reason `superseded`.
 
 ### Stop persistence
 
