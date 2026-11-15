@@ -1,5 +1,4 @@
-import type { ApproveOutcome } from "@oh-my-opencode/memory-core/sync-engine"
-import type { SyncEnableResponse, SyncRpcProblem, SyncUnavailableCode } from "./sync-rpc-contract"
+import type { SyncApproveOutcome, SyncEnableResponse, SyncRpcProblem, SyncUnavailableCode } from "./sync-rpc-contract"
 import type {
   SyncRpcAccount,
   SyncRpcAuthority,
@@ -72,7 +71,7 @@ export interface Operation {
   code: string | null
   confirmed: boolean
   enable: SyncEnableResponse | null
-  approval: ApproveOutcome | null
+  approval: SyncApproveOutcome | null
   problem: SyncRpcProblem | undefined
   timer: ReturnType<typeof setTimeout> | undefined
   done: Promise<void>
@@ -259,15 +258,19 @@ export async function runSyncRpcOperation(
         code: record.problem.code,
         ...syncErrorFields(error),
       })
+    // A refusal from the contract's list keeps its code once a pending row was answered too (#13659).
+    const problem = record.problem
     record.approval = record.expired
       ? { kind: "expired" }
-      : {
-          kind: "refused",
-          reason:
-            error instanceof RetiredSyncOperation
-              ? "The sync operation ended."
-              : "The sync service could not complete this operation.",
-        }
+      : problem.kind === "refused" && problem.code !== undefined
+        ? problem
+        : {
+            kind: "refused",
+            reason:
+              error instanceof RetiredSyncOperation
+                ? "The sync operation ended."
+                : "The sync service could not complete this operation.",
+          }
   } finally {
     record.code = null
     if (record.enable?.kind === "join_required")
