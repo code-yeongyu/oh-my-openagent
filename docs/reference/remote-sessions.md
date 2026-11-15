@@ -1,13 +1,15 @@
 # omo remote - sessions on your other devices
 
-`omo remote` lists and watches the OmO sessions running on the other devices signed in to your
-account. It talks to the OmO device service on this device, which holds the connection to your other
+`omo remote` lists, starts, watches and commands the OmO sessions running on the other devices signed
+in to your account. It talks to the OmO device service on this device, which holds the connection to your other
 devices; `omo remote` never connects to another machine itself. `status`, `devices`, `sessions` and
 `control` print a table, `enable` and `disable` print one sentence, and with `--json` each prints the
 SDK's typed value as one JSON line instead; `attach` takes no `--json`
 (`packages/omo-native/remote-cli.ts`). `bootstrap` prints the status rows when it connects, or a
 notice on stderr when it stops; with `--json` it prints one JSON line, `{state, status}` when it
-connects or `{state, notice}` when it stops (`packages/omo-native/remote-bootstrap.ts`).
+connects or `{state, notice}` when it stops (`packages/omo-native/remote-bootstrap.ts`). The session
+commands `open`, `send`, `model`, `interrupt` and `close` print a short result, or with `--json` the
+remote operation's typed result as one JSON line (`packages/omo-native/remote-session-verbs.ts`).
 
 ```bash
 omo remote status [--json]       # the device service's connection state
@@ -16,8 +18,19 @@ omo remote sessions [--device D] [--project P] [--state running|idle|ended] [--j
 omo remote enable | disable [--json]   # turn remote sessions on or off for this device
 omo remote control [on|off]      # whether your other devices may view and command this device's sessions
 omo remote bootstrap [--json]    # set up the device service for your sign-in (every omo start runs it)
-omo remote attach <device>/<session>   # watch a session on another device
+omo remote attach <device>/<session>   # open a session on another device in the terminal UI, to watch and type
+omo remote open <device> [--project P] [--model M] [--permission-preset MODE] [--json]
+                                 # start a session on another device; prints <device>/<session>
+omo remote send <device>/<session> <text> [--steer|--follow-up] [--no-wait] [--json]
+                                 # send a message and print the answer as it arrives
+omo remote model <device>/<session> <provider/id> [--json]   # switch the session's model
+omo remote interrupt <device>/<session> [--json]   # stop the session's running turn
+omo remote close <device>/<session> [--json]       # end the session on its device
 ```
+
+`open` runs the new session in `MODE` (default: this device's own setting, else full-access). `send`
+with `--steer` goes into the running turn, and `--no-wait` returns once the session took the message
+instead of printing the answer.
 
 Exit codes: `0` done, `1` the operation failed, `2` usage error, `3` unavailable (signed out, the
 device service is not set up or not running, or it lacks the feature). `omo remote bootstrap` exits `3`
@@ -67,15 +80,16 @@ their rows may be missing or cached.
 
 ## Watching a session
 
-`omo remote attach <device>/<session>` opens the session in the attach view. It is observe-only for
-now: anything you type is refused with "remote input not enabled yet: this view is observe-only"
+`omo remote attach <device>/<session>` opens the session in the terminal UI on this device. You watch
+it as it runs and can type into it: what you type is sent to the session's device, and a command that
+device does not apply is shown as `<state>: <reason>` with the outcomes below
 (`packages/omo-native/remote-attach.ts`).
 
 ## Command outcomes
 
 These are the outcomes the device service's local API reports for a command sent to a remote session
-(`packages/device-service-core/src/local-api/protocol-events.ts`). `omo remote` itself sends no
-commands today (`attach` is observe-only); clients of the local API see these words:
+(`packages/device-service-core/src/local-api/protocol-events.ts`). `omo remote attach` shows them for
+input the session's device did not apply, and clients of the local API see the same words:
 
 | Outcome | Meaning | Retry offered |
 | --- | --- | --- |
