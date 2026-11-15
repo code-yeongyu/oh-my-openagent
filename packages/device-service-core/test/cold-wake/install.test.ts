@@ -161,6 +161,29 @@ describe("cold wake on Linux", () => {
     expect(actions(runs)).toEqual([])
   })
 
+  // omo#13595 review M1 (second round): with remote sessions off, every omo start's bootstrap runs uninstall; with no
+  // unit there it must neither ask for nor drain any host (a pinned host this device never had a unit for is not ours).
+  test("uninstall with no unit installed asks for no host and drains none", async () => {
+    const { host, runs, omo } = fakeSystemd()
+    expect(await uninstallColdWake(host, LAUNCH)).toEqual({ kind: "removed", serviceRestarted: false })
+    expect(omo.state.running).toBe(true)
+    expect(runs.filter((r) => r.startsWith("/usr/bin/env"))).toEqual([])
+  })
+
+  test("a drain that fails keeps the unit file, so the next uninstall tries again", async () => {
+    const { host, home, omo } = fakeSystemd()
+    await installColdWake(host, LAUNCH)
+    const failing: ColdWakeHost = {
+      ...host,
+      run: async (argv) =>
+        argv.includes("stop") && argv[0] === "/usr/bin/env" ? { exitCode: 1, output: "busy\n" } : host.run(argv),
+    }
+    expect(await uninstallColdWake(failing, LAUNCH)).toEqual({ kind: "failed", step: "host_stop", detail: "busy" })
+    expect(existsSync(join(UNIT_DIR(home), "omo-session-host.service"))).toBe(true)
+    expect(await uninstallColdWake(host, LAUNCH)).toEqual({ kind: "removed", serviceRestarted: true })
+    expect(omo.state.running).toBe(false)
+  })
+
   test("uninstall leaves a host it did not pin to its own idle exit", async () => {
     const { host, runs, omo } = fakeSystemd({ pinned: false })
     await installColdWake(host, LAUNCH)
@@ -267,6 +290,27 @@ describe("cold wake on macOS", () => {
     const { host, runs } = fakeLaunchd({ bootstrapFailures: 2 })
     expect(await installColdWake(host, LAUNCH)).toEqual({ kind: "installed", serviceRestarted: true })
     expect(runs.filter((r) => r.includes("bootstrap gui/501") && r.includes("session-host"))).toHaveLength(3)
+  })
+
+  test("uninstall with no LaunchAgent installed asks for no host and drains none", async () => {
+    const { host, runs, omo } = fakeLaunchd()
+    await uninstallColdWake(host, LAUNCH)
+    expect(omo.state.running).toBe(true)
+    expect(runs.filter((r) => r.startsWith("/usr/bin/env"))).toEqual([])
+  })
+
+  test("a drain that fails keeps the LaunchAgent plist, so the next uninstall tries again", async () => {
+    const { host, home, omo } = fakeLaunchd()
+    await installColdWake(host, LAUNCH)
+    const failing: ColdWakeHost = {
+      ...host,
+      run: async (argv) =>
+        argv.includes("stop") && argv[0] === "/usr/bin/env" ? { exitCode: 1, output: "busy\n" } : host.run(argv),
+    }
+    expect(await uninstallColdWake(failing, LAUNCH)).toEqual({ kind: "failed", step: "host_stop", detail: "busy" })
+    expect(existsSync(LABEL_PLIST(home, "ai.omo.session-host"))).toBe(true)
+    expect(await uninstallColdWake(host, LAUNCH)).toEqual({ kind: "removed", serviceRestarted: true })
+    expect([existsSync(LABEL_PLIST(home, "ai.omo.session-host")), omo.state.running]).toEqual([false, false])
   })
 
   test("uninstall unloads and removes the LaunchAgent, drains its pinned host and removes the entry", async () => {

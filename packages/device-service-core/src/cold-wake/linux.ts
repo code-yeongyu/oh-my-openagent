@@ -134,13 +134,15 @@ export async function installLinux(host: ColdWakeHost, launch: SessionHostLaunch
 }
 
 // `disable --now` stops only the unit's own process (KillMode=process), so the pinned host it started is drained next.
+// Only when a unit was there: with no unit, no host is ours to end. The unit file goes only after the drain, so a
+// failed drain is tried again by the next uninstall.
 export async function uninstallLinux(host: ColdWakeHost, launch: SessionHostLaunch): Promise<ColdWakeOutcome> {
   const unitPath = join(unitDir(host.home), SESSION_HOST_SYSTEMD_UNIT)
   if (existsSync(unitPath)) {
     const disabled = await systemctl(host, "disable", "--now", SESSION_HOST_SYSTEMD_UNIT)
     if (disabled.exitCode !== 0) return failed("unit_disable", disabled.output)
+    const drainFailure = await drainPinnedHost(host, launch)
+    if (drainFailure !== undefined) return drainFailure
   }
-  const drainFailure = await drainPinnedHost(host, launch)
-  if (drainFailure !== undefined) return drainFailure
   return applyTable(host, withoutColdWake, removeIfPresent(unitPath), "removed")
 }
