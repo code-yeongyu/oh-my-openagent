@@ -37,7 +37,7 @@ const USAGE_ENTRIES: readonly { readonly verbs: readonly string[]; readonly text
   },
   {
     verbs: ["attach"],
-    text: "  attach <device>/<session>                open a session on another device in the terminal UI, to watch and type",
+    text: "  attach <session>                         open a session in the terminal UI; also takes <device>/<session>",
   },
   {
     verbs: ["open"],
@@ -47,21 +47,22 @@ const USAGE_ENTRIES: readonly { readonly verbs: readonly string[]; readonly text
   },
   {
     verbs: ["send"],
-    text: `  send <device>/<session> <text> [--steer|--follow-up] [--no-wait]
+    text: `  send <session> <text> [--steer|--follow-up] [--no-wait]
                                            send a message and print the answer as it arrives (--steer: into the
-                                           running turn; --no-wait: return once the session took it)`,
+                                           running turn; --no-wait: return once the session took it).
+                                           Use the durable thread_id from open --json, or <device>/<session>.`,
   },
   {
     verbs: ["model"],
-    text: "  model <device>/<session> <provider/id>   switch the session's model",
+    text: "  model <session> <provider/id>            switch the model; also takes <device>/<session>",
   },
   {
     verbs: ["interrupt"],
-    text: "  interrupt <device>/<session>             stop the session's running turn",
+    text: "  interrupt <session>                      stop the running turn; also takes <device>/<session>",
   },
   {
     verbs: ["close"],
-    text: "  close <device>/<session>                 end the session on its device",
+    text: "  close <session>                          end the session; also takes <device>/<session>",
   },
 ]
 
