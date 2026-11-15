@@ -163,7 +163,7 @@ export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: 
     dependencies.output(REMOTE_USAGE)
     return REMOTE_EXIT.ok
   }
-  // Only the options before a `--` terminator count: after it, `--help` is text (a message to send, #13431).
+  // Only the options before a `--` terminator count: after it, `--help` is text (a message to send). The `--` terminator itself lands with #13431.
   const terminator = afterFirst.indexOf("--")
   const options = terminator === -1 ? afterFirst : afterFirst.slice(0, terminator)
   if (VERBS.some((verb) => verb === first) && options.some(isHelpFlag)) {
