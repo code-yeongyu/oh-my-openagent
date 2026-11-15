@@ -1,3 +1,4 @@
+import { AsyncResource } from "node:async_hooks"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 
@@ -36,6 +37,13 @@ import type { ThreadWakeOptions } from "./wake/runtime"
  * retried after the store's busy timeout while another process keeps the lock, and logged.
  */
 export const COMPLETION_SETTLE_WAIT_MS = 250
+
+/**
+ * The wake's process-level async scope, captured while senpi imports omo.js. The wake sidecar is first imported
+ * from a `session_start` handler or a send, so a scope created there would inherit that session's handle ledger and
+ * its shutdown would reclaim the carrier's sockets and timers (the device-service registrant's reason, #13457).
+ */
+const wakeProcessScope = new AsyncResource("omo-thread-wake-carrier")
 
 /** The files the pre-gateway mailbox kept its queue in (`gateway/legacy-mailbox.ts`). */
 const LEGACY_MAILBOX_FILES = ["mailbox.jsonl", "mailbox.json"] as const
@@ -567,6 +575,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
               engineVersion: pi.hostVersion,
               ensureHost: options.ensureHost,
               warn,
+              scope: wakeProcessScope,
             }),
           )
           .catch((error: unknown) =>
