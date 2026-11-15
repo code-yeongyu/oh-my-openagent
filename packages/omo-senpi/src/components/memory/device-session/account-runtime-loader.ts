@@ -14,7 +14,7 @@ import {
   MEMORY_SYNC_WORKER_DATA,
   selectHostMemorySyncSource,
 } from "../desktop-sync/hostSelection"
-import { launchCarriedPrivateTable } from "../desktop-sync/launchClassification"
+import { deferUncapturedPrivateFdDeclaration, launchCarriedPrivateTable } from "../desktop-sync/launchClassification"
 import { SyncSidecarUnavailableError } from "../sync-runner"
 import type { DeviceAccountSource } from "./account-source"
 import type * as AccountRuntime from "./account-runtime"
@@ -44,6 +44,8 @@ export function selectedDeviceAccountSource(
     }))
   let selection: () => Promise<MemorySyncSelection>
   if (isMainThread) {
+    // Fallback path (no host CLI capture): the declaration leaves process.env now, before any claim (#12057).
+    deferUncapturedPrivateFdDeclaration()
     const host =
       memorySyncHost ??
       selectHostMemorySyncSource({
