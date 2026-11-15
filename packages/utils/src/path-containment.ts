@@ -74,9 +74,8 @@ export interface SegmentwiseResolveOptions extends PathContainmentOptions {
 
 /**
  * Canonicalizes `target` the way `open(2)` resolves it: symlinks expand one segment at a time, so a
- * `..` after a link climbs from the link's target, never from the literal string. `path.resolve` and
- * `realpathSync` collapse that `..` lexically first and name a different file, which let a symlink
- * inside a granted repo read a third identity's note while the containment check still said "inside".
+ * `..` after a link climbs from the link's target, never from the literal string. Lexically
+ * normalizing the path before resolving links can instead name a different file.
  *
  * A remainder that does not exist yet keeps its segments verbatim, because a missing note stays
  * readable; `allowMissing: false` refuses it instead. A `.`, `..` or empty segment inside such a
