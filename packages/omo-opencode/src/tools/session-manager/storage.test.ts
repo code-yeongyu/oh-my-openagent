@@ -79,8 +79,10 @@ mock.module("../../shared/opencode-message-dir", () => ({
 }))
 
 test("#given the ./constants restore set #then it names every export the real module declares", async () => {
-  // The real module's export list, read by Bun's parser from its source: unlike a namespace import, this does not count
-  // the exports as used, so knip still reports dead ones.
+  // Bun's parser lists the names constants.ts exports, its own declarations and its `export { ... } from` names. Reading
+  // them is not a use for knip, but passing this check is: every name must also be destructured into the restore set
+  // above, so a dead export added later stops being reported by knip once it is named there. When this fails on a new
+  // export, confirm production reads it before adding it to the restore set.
   const source = await Bun.file(join(import.meta.dir, "constants.ts")).text()
   const declared = new Bun.Transpiler({ loader: "ts" }).scan(source).exports
   expect(Object.keys(realConstants).sort()).toEqual([...declared].sort())
