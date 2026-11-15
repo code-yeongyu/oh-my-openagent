@@ -138,7 +138,7 @@ async function identify(dir: string): Promise<RegistryEndpoint> {
  */
 export async function claimedSessionPaths(dir: string): Promise<readonly string[]> {
   const names = await readdir(join(dir, "reservations")).catch(() => [] as string[])
-  // One claim file open at a time, so a pile of stale claims can never run the process out of descriptors (#13579).
+  // One claim file open at a time for this directory, so a pile of stale claims costs time, not file descriptors (#13579).
   const paths: string[] = []
   for (const name of names.filter((entry) => entry.endsWith(".json")).sort()) {
     const path = (await readRecord(join(dir, "reservations", name)))?.sessionPath
