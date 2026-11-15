@@ -1,7 +1,10 @@
 import { afterAll, describe, expect, it } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
+
+import { deviceServiceStateDir } from "@oh-my-opencode/device-service-core/state-dir"
+
 import type { MachineHubTransport } from "../../vendor/bunshin-ts/index.js"
 
 import { BunshinSessionError, pickTransport, type PickTransportDeps } from "./bunshin-ts-pick-transport"
@@ -80,15 +83,16 @@ describe("bunshin-ts pickTransport", () => {
   it("#given a relative OMO_DEVICE_SERVICE_STATE_DIR #when picked #then the probe asks the default state dir", async () => {
     const seams = deps({ connected: true })
     await pickTransport({ OMO_DEVICE_SERVICE_STATE_DIR: "rel/dir" }, seams)
-    expect(seams.probes).toEqual([join(home, ".omo", "device-service")])
+    expect(seams.probes).toEqual([deviceServiceStateDir(process.platform, {}, home)])
   })
 
   it("#given no variable and a discovery file naming a state dir #when picked #then the probe asks that dir", async () => {
     const own = mkdtempSync(join(home, "h-"))
     const alt = join(own, "alt")
     mkdirSync(alt)
-    mkdirSync(join(own, ".omo"))
-    writeFileSync(join(own, ".omo", "device-service.location.json"), JSON.stringify({ v: 1, state_dir: alt }))
+    const serviceHome = dirname(deviceServiceStateDir(process.platform, {}, own))
+    mkdirSync(serviceHome, { recursive: true })
+    writeFileSync(join(serviceHome, "device-service.location.json"), JSON.stringify({ v: 1, state_dir: alt }))
     const seams = deps({ connected: true, home: own })
     await pickTransport({}, seams)
     expect(seams.probes).toEqual([alt])
