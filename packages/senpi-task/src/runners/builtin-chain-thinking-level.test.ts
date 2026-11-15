@@ -143,6 +143,13 @@ describe("builtin category chains run at a thinking level the model accepts (#93
       effort: "high",
       why: "its GLM rung's level (#10306)",
     },
+    {
+      machine: ["opencode"],
+      category: "architect",
+      model: "anthropic/claude-fable-5-2",
+      effort: "xhigh",
+      why: "the architect lane's xhigh default; the engine serves its metered Claude lane under the anthropic provider id (#13543)",
+    },
   ])(
     "#given only $machine is logged in #when $category starts a child #then it runs $model at $effort, $why",
     async ({ machine: providers, category, model, effort }) => {
