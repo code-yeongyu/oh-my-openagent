@@ -3,7 +3,7 @@
 // `trust-tmpdir-unsafe` refusal and one stderr line that names the first unsafe directory, what is wrong with it, and
 // what to do, instead of dying with an uncaught error and a stack trace. A private ancestor reaches the next stage.
 import { afterAll, afterEach, beforeAll, describe, expect, mock, test } from "bun:test"
-import { chmod, mkdir, mkdtemp, realpath, rm } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runTrustStage } from "../trust-stage"
@@ -34,7 +34,7 @@ async function layout(name: string, sharedMode: number) {
   return { shared, home, temporary }
 }
 
-async function stage(home: string, temporary: string) {
+async function stage(home: string, temporary: string, directory = join(home, ".omo", "engine-trust")) {
   process.env.TMPDIR = temporary
   const stderr: string[] = []
   const acquire = mock(async () => ({ certificates: [], fallbackReason: null, codes: [] }))
@@ -42,8 +42,7 @@ async function stage(home: string, temporary: string) {
     args: ["remote", "--help"],
     env: { PATH: process.env.PATH ?? "", HOME: home, TMPDIR: temporary },
     platform: "linux",
-    // The requested directory sits under the same unsafe ancestor, so the stage falls back to TMPDIR.
-    directory: join(home, ".omo", "engine-trust"),
+    directory,
     executable: process.execPath,
     argv: [process.execPath],
     loadedExtra: () => [],
@@ -85,6 +84,29 @@ test.skipIf(process.platform === "win32")(
     expect(result).toMatchObject({ action: "refuse", code: "trust-tmpdir-unsafe" })
     expect(stderr.split("\n").filter((line) => line !== "")).toEqual([
       `omo: trust-tmpdir-unsafe: ${shared} is world-writable; run chmod go-w ${shared}, or set TMPDIR to a private directory, and start omo again`,
+    ])
+  },
+)
+
+test.skipIf(process.platform === "win32")(
+  "#given a trust directory whose defaults cannot be created and TMPDIR under a group-writable ancestor #when the trust stage runs #then the closure fallback keeps the typed refusal and names that directory",
+  async () => {
+    // given: the requested directory is SAFE, so prepare() succeeds, but its `defaults` path is a regular file, so
+    // generate()'s closure step fails and falls back to TMPDIR - which sits under a group-writable ancestor.
+    const safe = join(root, "safe")
+    const trust = join(safe, ".omo", "engine-trust")
+    await mkdir(trust, { recursive: true, mode: 0o700 })
+    for (const dir of [safe, join(safe, ".omo"), trust]) await chmod(dir, 0o700)
+    await writeFile(join(trust, "defaults"), "")
+    const { shared, home, temporary } = await layout("fallback", 0o775)
+
+    // when
+    const { result, stderr } = await stage(home, temporary, trust)
+
+    // then: the fallback keeps trust-tmpdir-unsafe and its named directory instead of trust-path-unrepresentable.
+    expect(result).toMatchObject({ action: "refuse", code: "trust-tmpdir-unsafe" })
+    expect(stderr.split("\n").filter((line) => line !== "")).toEqual([
+      `omo: trust-tmpdir-unsafe: ${shared} is group-writable; run chmod go-w ${shared}, or set TMPDIR to a private directory, and start omo again`,
     ])
   },
 )
