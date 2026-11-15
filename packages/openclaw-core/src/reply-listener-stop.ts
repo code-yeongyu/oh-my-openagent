@@ -1,8 +1,5 @@
 import { logReplyListenerMessage } from "./reply-listener-log"
-import {
-  isReplyListenerDaemonProcess,
-  isReplyListenerProcessRunning,
-} from "./reply-listener-process"
+import { isReplyListenerDaemonProcess, isReplyListenerProcessRunning } from "./reply-listener-process"
 import {
   markReplyListenerStopped,
   readReplyListenerDaemonState,

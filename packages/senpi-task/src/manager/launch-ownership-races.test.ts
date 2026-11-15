@@ -6,7 +6,15 @@ import { createTaskRecordStore } from "../store"
 import type { ManagedChildHandle } from "./child-handle"
 import { createTaskManager } from "./manager"
 import type { ManagedRunner, ManagedStartSpec, ResolvedChildPlan } from "./types"
-import { baseSpec, categoryPlanner, cleanupProjects, FakeRunner, makeHandle, settings, tempProject } from "./__fixtures__/manager-fakes"
+import {
+  baseSpec,
+  categoryPlanner,
+  cleanupProjects,
+  FakeRunner,
+  makeHandle,
+  settings,
+  tempProject,
+} from "./__fixtures__/manager-fakes"
 
 afterEach(cleanupProjects)
 
@@ -31,7 +39,8 @@ class HeldPrimaryStart implements ManagedRunner {
     this.models.push(spec.model ?? "")
     this.entered.resolve()
     await this.release.promise
-    if (this.outcome === "model_unavailable") throw new RunnerError({ kind: "model_unavailable", message: `${spec.model} is unavailable` })
+    if (this.outcome === "model_unavailable")
+      throw new RunnerError({ kind: "model_unavailable", message: `${spec.model} is unavailable` })
     const { handle } = makeHandle(spec.taskId)
     return {
       ...handle,
@@ -129,7 +138,12 @@ describe("a respawned child reattached after its task ended", () => {
     const disposed = Promise.withResolvers<void>()
     const { handle } = makeHandle(running.task_id)
 
-    const result = await manager.reattach(running, { ...handle, dispose: async () => { disposed.resolve() } })
+    const result = await manager.reattach(running, {
+      ...handle,
+      dispose: async () => {
+        disposed.resolve()
+      },
+    })
     await disposed.promise
 
     expect(result.ok).toBe(false)

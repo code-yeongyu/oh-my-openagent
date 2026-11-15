@@ -124,6 +124,9 @@ describe("session_summary lazy recovery", () => {
 
     expect(broken.loads).toBe(2)
     expect(next.published).toEqual([])
-    expect(next.diagnostics.map(({ event }) => event)).toEqual(["telemetry_activity_state_write_failed", "telemetry_activity_state_write_failed"])
+    expect(next.diagnostics.map(({ event }) => event)).toEqual([
+      "telemetry_activity_state_write_failed",
+      "telemetry_activity_state_write_failed",
+    ])
   })
 })

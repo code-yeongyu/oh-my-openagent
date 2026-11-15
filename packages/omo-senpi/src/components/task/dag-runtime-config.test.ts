@@ -15,16 +15,19 @@ import * as dagEngine from "@oh-my-opencode/senpi-task/dag"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { composeTaskEngine } from "./engine"
 import { createTeamServiceTestModelRegistry } from "./team-service-test-model-registry"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const cleanupRoots: string[] = []
 
 function deferred<T>() {
   let resolve = (_value: T): void => undefined
-  const promise = new Promise<T>((done) => { resolve = done })
+  const promise = new Promise<T>((done) => {
+    resolve = done
+  })
   return { promise, resolve }
 }
 
-function within<T>(promise: Promise<T>, label: string, ms = 300): Promise<T> {
+function within<T>(promise: Promise<T>, label: string, ms = remainingTestTime()): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
     void promise.then(
@@ -98,7 +101,10 @@ describe("assembled DAG runtime configuration", () => {
       runnerFactories: { inProcess: () => runner, process: () => runner },
     })
     const sessionId = "session-configured-ring"
-    engine.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => sessionId } })
+    engine.runtime.captureFrom({
+      modelRegistry: createTeamServiceTestModelRegistry(),
+      sessionManager: { getSessionId: () => sessionId },
+    })
     const runtime = createDagRuntime({
       pi,
       engine,
@@ -132,11 +138,9 @@ describe("assembled DAG runtime configuration", () => {
     // then
     expect(overflow.droppedCount).toBeGreaterThan(0)
     expect(overflow.recoverAfterSeq).toBe(started.snapshot.lastSeq)
-    expect(dagEngine.createDagFileStore({ project_dir: cwd }).readEvents(
-      started.snapshot.runId,
-      0,
-      { limit: 100 },
-    ).events).toContainEqual(overflow)
+    expect(
+      dagEngine.createDagFileStore({ project_dir: cwd }).readEvents(started.snapshot.runId, 0, { limit: 100 }).events,
+    ).toContainEqual(overflow)
     runtime.dispose()
   })
 })

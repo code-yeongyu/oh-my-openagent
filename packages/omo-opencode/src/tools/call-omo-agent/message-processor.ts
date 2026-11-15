@@ -7,10 +7,7 @@ interface SDKMessage {
   parts?: Array<{ type: string; text?: string; content?: string | Array<{ type: string; text?: string }> }>
 }
 
-export async function processMessages(
-  sessionID: string,
-  ctx: PluginInput
-): Promise<string> {
+export async function processMessages(sessionID: string, ctx: PluginInput): Promise<string> {
   const messagesResult = await ctx.client.session.messages({
     path: { id: sessionID },
   })
@@ -25,9 +22,7 @@ export async function processMessages(
 
   // Include both assistant messages AND tool messages
   // Tool results (grep, glob, bash output) come from role "tool"
-  const relevantMessages = messages.filter(
-    (m: SDKMessage) => m.info?.role === "assistant" || m.info?.role === "tool"
-  )
+  const relevantMessages = messages.filter((m: SDKMessage) => m.info?.role === "assistant" || m.info?.role === "tool")
 
   if (relevantMessages.length === 0) {
     log(`[call_omo_agent] No assistant or tool messages found`)
@@ -75,9 +70,7 @@ export async function processMessages(
     }
   }
 
-  const responseText = extractedContent
-    .filter((text) => text.length > 0)
-    .join("\n\n")
+  const responseText = extractedContent.filter((text) => text.length > 0).join("\n\n")
 
   log(`[call_omo_agent] Got response, length: ${responseText.length}`)
 

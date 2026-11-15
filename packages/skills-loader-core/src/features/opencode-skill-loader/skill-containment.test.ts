@@ -42,7 +42,8 @@ describe("legacy skill containment at discovery and reread", () => {
     try {
       // when
       const loaded = await loadSkillsFromDir({
-        skillsDir: f.skillsDir, scope: "project",
+        skillsDir: f.skillsDir,
+        scope: "project",
         onDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
       })
       // then
@@ -64,7 +65,8 @@ describe("legacy skill containment at discovery and reread", () => {
     const diagnostics: { category: string; path: string; message: string }[] = []
     // when
     const loaded = await discoverConfigSourceSkills({
-      config: { sources: [path] }, configDir: f.project,
+      config: { sources: [path] },
+      configDir: f.project,
       onDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
     })
     // then
@@ -84,7 +86,10 @@ describe("legacy skill containment at discovery and reread", () => {
     const diagnostics: { category: string; message: string }[] = []
     // when
     const loaded = await loadSkillFromPath({
-      skillPath: path, resolvedPath: dirname(path), defaultName: "directory", scope: "project",
+      skillPath: path,
+      resolvedPath: dirname(path),
+      defaultName: "directory",
+      scope: "project",
       onDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
     })
     // then
@@ -115,13 +120,16 @@ describe("legacy skill containment at discovery and reread", () => {
       const diagnostics: { category: string; message: string }[] = []
       // when
       const loaded = await loadSkillsFromDir({
-        skillsDir, scope: "opencode-project",
+        skillsDir,
+        scope: "opencode-project",
         provenance: { kind: "project-auto", selectedRoot: skillsDir, projectRoot: f.project },
         onDiagnostic: (diagnostic: { category: string; message: string }) => diagnostics.push(diagnostic),
       })
       // then
       expect(loaded).toEqual([])
-      expect(diagnostics.some((d) => d.category === "skill-link-blocked" && d.message.includes("outside the project"))).toBe(true)
+      expect(
+        diagnostics.some((d) => d.category === "skill-link-blocked" && d.message.includes("outside the project")),
+      ).toBe(true)
     })
   }
 
@@ -133,9 +141,15 @@ describe("legacy skill containment at discovery and reread", () => {
     symlinkSync(join(f.outside, "mcp.json"), join(f.skillsDir, "local", "mcp.json"))
     const diagnostics: { category: string }[] = []
     // when
-    const loaded = await loadSkillsFromDir(Object.assign({
-      skillsDir: f.skillsDir, scope: "project" as const,
-    }, { onDiagnostic: (diagnostic: { category: string }) => diagnostics.push(diagnostic) }))
+    const loaded = await loadSkillsFromDir(
+      Object.assign(
+        {
+          skillsDir: f.skillsDir,
+          scope: "project" as const,
+        },
+        { onDiagnostic: (diagnostic: { category: string }) => diagnostics.push(diagnostic) },
+      ),
+    )
     // then
     expect(loaded.flatMap((s) => Object.keys(s.mcpConfig ?? {}))).not.toContain("escape")
     expect(diagnostics.some((d) => d.category === "skill-link-blocked")).toBe(true)
@@ -147,10 +161,14 @@ describe("legacy skill containment at discovery and reread", () => {
     skill(join(f.outside, "entry", "SKILL.md"))
     const config = { sources: [f.outside] }
     // when
-    const project = await discoverConfigSourceSkills({ config, configDir: f.project,
+    const project = await discoverConfigSourceSkills({
+      config,
+      configDir: f.project,
       provenance: { kind: "project-auto", projectRoot: f.project, selectedRoot: f.outside },
     })
-    const user = await discoverConfigSourceSkills({ config, configDir: f.project,
+    const user = await discoverConfigSourceSkills({
+      config,
+      configDir: f.project,
       provenance: { kind: "user", selectedRoot: f.outside },
     })
     // then
@@ -183,7 +201,8 @@ describe("legacy skill containment at discovery and reread", () => {
     symlinkSync(f.outside, join(f.skillsDir, "installed"))
     // when
     const loaded = await loadSkillsFromDir({
-      skillsDir: f.skillsDir, scope: "project",
+      skillsDir: f.skillsDir,
+      scope: "project",
       provenance: { kind: "project-auto", selectedRoot: f.skillsDir, projectRoot: f.project, userRoots: [userRoot] },
     })
     // then
@@ -200,7 +219,8 @@ describe("legacy skill containment at discovery and reread", () => {
     symlinkSync(join(f.outside, "sibling.md"), join(f.skillsDir, "sibling.md"))
     // when
     const loaded = await loadSkillsFromDir({
-      skillsDir: f.skillsDir, scope: "project",
+      skillsDir: f.skillsDir,
+      scope: "project",
       provenance: { kind: "project-auto", selectedRoot: f.skillsDir, projectRoot: f.project, userFiles: [allowed] },
     })
     // then
@@ -260,7 +280,10 @@ describe("legacy skill containment at discovery and reread", () => {
     try {
       // when
       const loaded = await loadSkillFromPath({
-        skillPath: path, resolvedPath: dirname(path), defaultName: "local", scope: "project",
+        skillPath: path,
+        resolvedPath: dirname(path),
+        defaultName: "local",
+        scope: "project",
       })
       // then
       expect(loaded).toBeNull()
@@ -295,7 +318,8 @@ describe("legacy skill containment at discovery and reread", () => {
     // when
     const user = await loadSkillsFromDir({ skillsDir: userRoot, scope: "user" })
     const project = await loadSkillsFromDir({
-      skillsDir: f.skillsDir, scope: "project",
+      skillsDir: f.skillsDir,
+      scope: "project",
       provenance: { kind: "project-auto", selectedRoot: f.skillsDir, projectRoot: f.project, userRoots: [userRoot] },
     })
     // then

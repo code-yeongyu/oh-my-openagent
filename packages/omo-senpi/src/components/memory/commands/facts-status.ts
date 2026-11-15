@@ -135,9 +135,7 @@ export function formatFactsStatus(identity: string, state: FactsOverview): strin
 async function countPending(queueDir: string): Promise<number> {
   try {
     const names = await readdir(queueDir)
-    return names.filter(
-      (name) => name.endsWith(".json") && name !== "consumed.json" && name !== "failures.json",
-    ).length
+    return names.filter((name) => name.endsWith(".json") && name !== "consumed.json" && name !== "failures.json").length
   } catch {
     return 0
   }
@@ -157,9 +155,10 @@ export async function readFactsOverview(input: ReadFactsOverviewInput): Promise<
     const failures = await store.readFailures()
     return { pending, records: failures.entries, now: input.now, factsDir: input.identityPaths.facts }
   } catch (error) {
-    const corrupt = error instanceof FactsFailuresCorruptError
-      ? error.message
-      : `failure ledger unreadable: ${error instanceof Error ? error.message : String(error)}`
+    const corrupt =
+      error instanceof FactsFailuresCorruptError
+        ? error.message
+        : `failure ledger unreadable: ${error instanceof Error ? error.message : String(error)}`
     return { pending, records: [], now: input.now, factsDir: input.identityPaths.facts, corrupt }
   }
 }

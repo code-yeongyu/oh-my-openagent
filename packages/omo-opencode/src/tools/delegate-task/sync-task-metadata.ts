@@ -18,7 +18,9 @@ export async function publishSyncTaskMetadata(input: {
       prompt: input.args.prompt,
       agent: input.agentToUse,
       category: input.args.category,
-      ...(input.args.requested_subagent_type !== undefined ? { requested_subagent_type: input.args.requested_subagent_type } : {}),
+      ...(input.args.requested_subagent_type !== undefined
+        ? { requested_subagent_type: input.args.requested_subagent_type }
+        : {}),
       load_skills: input.args.load_skills,
       description: input.args.description,
       run_in_background: input.args.run_in_background,

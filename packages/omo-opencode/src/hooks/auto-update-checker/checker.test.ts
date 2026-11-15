@@ -14,11 +14,12 @@ describe("auto-update-checker/checker", () => {
   })
 
   function mockDistTags(distTags: Record<string, string>) {
-    fetchSpy.mockImplementation(async () =>
-      new Response(JSON.stringify(distTags), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      })
+    fetchSpy.mockImplementation(
+      async () =>
+        new Response(JSON.stringify(distTags), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
     )
   }
 

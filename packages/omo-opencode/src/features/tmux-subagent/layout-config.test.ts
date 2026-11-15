@@ -2,11 +2,7 @@ import { describe, expect, it } from "bun:test"
 import { decideSpawnActions, findSpawnTarget, type SessionMapping } from "./decision-engine"
 import type { CapacityConfig, WindowState } from "./types"
 
-function createState(
-  windowWidth: number,
-  windowHeight: number,
-  agentPanes: WindowState["agentPanes"],
-): WindowState {
+function createState(windowWidth: number, windowHeight: number, agentPanes: WindowState["agentPanes"]): WindowState {
   return {
     windowWidth,
     windowHeight,
@@ -102,9 +98,7 @@ describe("tmux layout-aware split behavior", () => {
         isActive: false,
       },
     ])
-    const mappings: SessionMapping[] = [
-      { sessionId: "old-ses", paneId: "%1", createdAt: new Date("2024-01-01") },
-    ]
+    const mappings: SessionMapping[] = [{ sessionId: "old-ses", paneId: "%1", createdAt: new Date("2024-01-01") }]
 
     const decision = decideSpawnActions(state, "new-ses", "agent", config, mappings)
 

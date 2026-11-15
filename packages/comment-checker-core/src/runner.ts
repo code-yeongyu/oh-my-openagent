@@ -14,14 +14,18 @@ import type {
 const EMPTY_RESULT: CheckResult = { hasComments: false, message: "" }
 const MAX_FAILURE_STDERR = 500
 
-type ExitOutcome = { readonly kind: "exited"; readonly code: number } | { readonly kind: "not-started"; readonly reason: string }
+type ExitOutcome =
+  { readonly kind: "exited"; readonly code: number } | { readonly kind: "not-started"; readonly reason: string }
 
 function normalizeMessage(message: string): string {
   return message.replace(/\r\n/g, "\n")
 }
 
 function failed(exitCode: number | null, stderr: string): CheckResult {
-  return { ...EMPTY_RESULT, failure: { exitCode, stderr: normalizeMessage(stderr).trim().slice(0, MAX_FAILURE_STDERR) } }
+  return {
+    ...EMPTY_RESULT,
+    failure: { exitCode, stderr: normalizeMessage(stderr).trim().slice(0, MAX_FAILURE_STDERR) },
+  }
 }
 
 function readText(stream: ReadableStream<Uint8Array>): Promise<string | undefined> {
@@ -125,7 +129,10 @@ export async function runCommentChecker(
     // streams, so neither may hide that the checker never started (#8850).
     const exitPromise = process.exited.then(
       (code): ExitOutcome => ({ kind: "exited", code }),
-      (error: unknown): ExitOutcome => ({ kind: "not-started", reason: error instanceof Error ? error.message : String(error) }),
+      (error: unknown): ExitOutcome => ({
+        kind: "not-started",
+        reason: error instanceof Error ? error.message : String(error),
+      }),
     )
     const completed = Promise.all([stdoutPromise, stderrPromise, exitPromise, inputDelivered] as const)
     const race = await Promise.race([completed, timeoutPromise] as const)

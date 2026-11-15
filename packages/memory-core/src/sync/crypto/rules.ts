@@ -121,7 +121,9 @@ export const checkRecordRules = async (
       return "bad_custody_root"
     }
     const key = body.recoveryKey
-    if (!(await countersignOk(account, body.custodyRoot, "", body.wrapsDigest, key.signing_public_key, body.countersign))) {
+    if (
+      !(await countersignOk(account, body.custodyRoot, "", body.wrapsDigest, key.signing_public_key, body.countersign))
+    ) {
       return "bad_countersign"
     }
     return checkWrapSet(entry.wraps, body.wrapsDigest, 1, [
@@ -162,7 +164,9 @@ export const checkRecordRules = async (
       return checkWrapSet(entry.wraps, body.wrapsDigest, before.epoch, [`device:${principal.id}`])
     }
     case "rotation": {
-      if (body.members.some((member) => before.members.get(member.id)?.signing_public_key !== member.signing_public_key)) {
+      if (
+        body.members.some((member) => before.members.get(member.id)?.signing_public_key !== member.signing_public_key)
+      ) {
         return "member_not_in_fold"
       }
       const recipients = [...body.members.map((member) => `device:${member.id}`), ...registryIds(before)]

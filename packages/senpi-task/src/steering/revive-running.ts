@@ -40,35 +40,56 @@ export async function reviveRunningOnSend(
     }
     if (!revived.ok) {
       if (queueRecovery !== undefined) return queueRecovery()
-      return revived.code === undefined ? lazyRevivalFailure(record, revived.reason) : { kind: revived.code, task_id: record.task_id, reason: revived.reason }
+      return revived.code === undefined
+        ? lazyRevivalFailure(record, revived.reason)
+        : { kind: revived.code, task_id: record.task_id, reason: revived.reason }
     }
     const reopened = port.store.load(record.task_id)
     const handle = port.liveHandle(record.task_id)
     if (reopened === null || handle === undefined) return lazyRevivalFailure(record, "child handle is unavailable")
-    if (!stillReopened(port, reopened, reopened, handle)) return lazyRevivalFailure(record, "task ownership or status changed before delivery")
+    if (!stillReopened(port, reopened, reopened, handle))
+      return lazyRevivalFailure(record, "task ownership or status changed before delivery")
     try {
       await handle.followUp(message)
     } catch (error) {
-      if (error instanceof InputUncertainError) return { kind: "uncertain", task_id: record.task_id,
-        effect_id: error.effectId, reason: error.message }
-      if (error instanceof InputConflictError) return { kind: "failed", task_id: record.task_id,
-        effect_id: error.effectId, reason: error.reason, detail: error.detail, action: error.action }
+      if (error instanceof InputUncertainError)
+        return { kind: "uncertain", task_id: record.task_id, effect_id: error.effectId, reason: error.message }
+      if (error instanceof InputConflictError)
+        return {
+          kind: "failed",
+          task_id: record.task_id,
+          effect_id: error.effectId,
+          reason: error.reason,
+          detail: error.detail,
+          action: error.action,
+        }
       const failed = await refusedDelivery(port, record, handle, error)
-      return (error instanceof HostSessionDetachedError || error instanceof SessionHeldElsewhereError)
-        && queueRecovery !== undefined ? queueRecovery() : failed
+      return (error instanceof HostSessionDetachedError || error instanceof SessionHeldElsewhereError) &&
+        queueRecovery !== undefined
+        ? queueRecovery()
+        : failed
     }
     if (!stillReopened(port, port.store.load(record.task_id), reopened, handle)) {
       return lazyRevivalFailure(record, "revived run ended or changed ownership before delivery acknowledged")
     }
-    port.store.appendEvent(record.task_id, { type: "steered", payload: { delivered: "followUp", run_epoch: reopened.notification.run_epoch } })
+    port.store.appendEvent(record.task_id, {
+      type: "steered",
+      payload: { delivered: "followUp", run_epoch: reopened.notification.run_epoch },
+    })
     return { kind: "revived", task_id: record.task_id, run_epoch: reopened.notification.run_epoch }
   } finally {
     endSend(record.task_id)
   }
 }
 
-function stillReopened(port: SteeringPort, current: TaskRecord | null, reopened: TaskRecord, handle: ManagedChildHandle): boolean {
-  return current !== null &&
+function stillReopened(
+  port: SteeringPort,
+  current: TaskRecord | null,
+  reopened: TaskRecord,
+  handle: ManagedChildHandle,
+): boolean {
+  return (
+    current !== null &&
     current.status === "running" &&
     current.residency_state === "resident" &&
     current.killed !== true &&
@@ -76,14 +97,21 @@ function stillReopened(port: SteeringPort, current: TaskRecord | null, reopened:
     current.host_pid === reopened.host_pid &&
     current.notification.run_epoch === reopened.notification.run_epoch &&
     port.liveHandle(current.task_id) === handle
+  )
 }
 
 // A live child refused the message before taking it, so the reopen is undone and an explicit retry is
 // safe. A child that exited may have taken it before the answer was lost: its outcome tracking ends
 // that run, and nothing here replays or rolls it back.
-async function refusedDelivery(port: SteeringPort, record: TaskRecord, handle: ManagedChildHandle, error: unknown): Promise<SendOutcome> {
+async function refusedDelivery(
+  port: SteeringPort,
+  record: TaskRecord,
+  handle: ManagedChildHandle,
+  error: unknown,
+): Promise<SendOutcome> {
   const reason = error instanceof Error ? error.message : String(error)
-  if (handle.hasExited?.() === true) return lazyRevivalFailure(record, `the reopened child ended before the message was acknowledged: ${reason}`)
+  if (handle.hasExited?.() === true)
+    return lazyRevivalFailure(record, `the reopened child ended before the message was acknowledged: ${reason}`)
   await bestEffortRollback(port, record)
   port.releaseTaskLeases?.(record.task_id)
   return lazyRevivalFailure(record, `the reopened child refused the message: ${reason}`)

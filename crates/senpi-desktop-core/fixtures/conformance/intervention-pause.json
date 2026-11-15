@@ -1,0 +1,190 @@
+{
+  "description": "computer-use v2 row 19 control: the same scenario with intervention pause (today's behavior, the engine default): the user's key before the first key stops the typeText with UserIntervened, delivered {count: 0, of: 10}, not_delivered/after_user, and the refusal is audited. The fake types in chunks of eight scalars, so its scripted press lands before the first chunk; the mid-text case (4 of 10, delivered_unverified/unsafe) is the session test over per-scalar typing.",
+  "scenario": "crates/senpi-desktop-backend-fake/fixtures/intervention-continue.json",
+  "env": {
+    "SENPI_DESKTOP_FAKE_CLOCK": "1"
+  },
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {
+          "allowHostRelayOnlyStop": true,
+          "showCursor": false,
+          "reportMode": "object",
+          "intervention": "pause"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 2,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": "no-global-listener",
+                "integrityLevel": null,
+                "screenLocked": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "stopPath.start",
+        "params": {
+          "chord": "ctrl+alt+shift+escape"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "suspended": false,
+              "globalLive": false,
+              "hostRelayLive": true,
+              "heartbeatFresh": true,
+              "stopPath": "host-relay",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/result/heartbeatFresh",
+            "/result/reason"
+          ]
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "stopPath.changed",
+            "params": {
+              "suspended": false,
+              "globalLive": false,
+              "hostRelayLive": true,
+              "heartbeatFresh": true,
+              "stopPath": "host-relay",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/params/heartbeatFresh",
+            "/params/reason"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "stopPath.heartbeat",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": null
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "typeText",
+        "params": {
+          "target": "101",
+          "text": "abcdefghij"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "error": {
+              "code": -32024,
+              "message": "the user pressed a key or clicked in Notes during this input; input sent before that may already have landed, and nothing more was sent; read the window again (win.ax(), win.observe() or win.screenshot()) before acting on it",
+              "data": {
+                "code": "UserIntervened",
+                "hint": null,
+                "disposition": {
+                  "delivery": "not_delivered",
+                  "retry": "after_user"
+                },
+                "delivered": {
+                  "count": 0,
+                  "of": 10
+                },
+                "focusRestoration": "restored"
+              }
+            }
+          },
+          "variable": [
+            "/error/data/hint",
+            "/error/data/focusRestoration"
+          ]
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "audit",
+            "params": {
+              "action": "typeText",
+              "target": "101",
+              "delivery": "background",
+              "frameId": null,
+              "code": "UserIntervened",
+              "durationMs": 0,
+              "focusRestored": true,
+              "textLength": 10,
+              "textDelivered": 0,
+              "textSha256": "72399361da6a7754",
+              "keys": null,
+              "id": "audit-id"
+            }
+          },
+          "variable": [
+            "/params/durationMs",
+            "/params/focusRestored",
+            "/params/id"
+          ]
+        }
+      ]
+    }
+  ]
+}

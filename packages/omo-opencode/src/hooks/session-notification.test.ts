@@ -33,7 +33,9 @@ function formatShellCommand(cmd: TemplateStringsArray | string, values: readonly
 }
 
 function createShellChain(result: MockShellResult, shouldReject = false): MockShellChain {
-  const promise = (shouldReject ? Promise.reject(Object.assign(new Error("command failed"), result)) : Promise.resolve(result)) as MockShellChain
+  const promise = (
+    shouldReject ? Promise.reject(Object.assign(new Error("command failed"), result)) : Promise.resolve(result)
+  ) as MockShellChain
   const resolvedNothrow = Promise.resolve(result) as MockShellChain
 
   promise.quiet = () => promise
@@ -47,17 +49,19 @@ function createShellChain(result: MockShellResult, shouldReject = false): MockSh
   return promise
 }
 
-function createShellMock(options: {
-  capture?: (commandString: string) => void
-  reject?: (commandString: string, values: readonly unknown[]) => boolean
-} = {}) {
+function createShellMock(
+  options: {
+    capture?: (commandString: string) => void
+    reject?: (commandString: string, values: readonly unknown[]) => boolean
+  } = {},
+) {
   return (cmd: TemplateStringsArray | string, ...values: unknown[]): MockShellChain => {
     const commandString = formatShellCommand(cmd, values)
     options.capture?.(commandString)
 
     return createShellChain(
       { stdout: Buffer.alloc(0), stderr: Buffer.alloc(0), exitCode: options.reject?.(commandString, values) ? 1 : 0 },
-      options.reject?.(commandString, values) ?? false
+      options.reject?.(commandString, values) ?? false,
     )
   }
 }
@@ -92,11 +96,11 @@ describe("session-notification", () => {
     return createMockInput(
       createShellMock({
         capture: (cmdStr) => {
-        // given - track notification commands (osascript, notify-send, powershell)
+          // given - track notification commands (osascript, notify-send, powershell)
           if (cmdStr.includes("osascript") || cmdStr.includes("notify-send") || cmdStr.includes("powershell")) {
             notificationCalls.push(cmdStr)
           }
-        }
+        },
       }),
       directory,
     )
@@ -109,7 +113,7 @@ describe("session-notification", () => {
     Date.now = originalDateNow
     _resetForTesting()
     notificationCalls = []
-    
+
     spyOn(utils, "getOsascriptPath").mockResolvedValue("/usr/bin/osascript")
     spyOn(utils, "getNotifySendPath").mockResolvedValue("/usr/bin/notify-send")
     spyOn(utils, "getPowershellPath").mockResolvedValue("powershell")
@@ -124,10 +128,10 @@ describe("session-notification", () => {
         _ctx: Parameters<typeof sender.sendSessionNotification>[0],
         _platform: Parameters<typeof sender.sendSessionNotification>[1],
         _title: Parameters<typeof sender.sendSessionNotification>[2],
-        message: Parameters<typeof sender.sendSessionNotification>[3]
+        message: Parameters<typeof sender.sendSessionNotification>[3],
       ) => {
         notificationCalls.push(message)
-      }
+      },
     )
   })
 
@@ -576,7 +580,7 @@ describe("session-notification", () => {
 
       // then - notification uses terminal-notifier with -activate flag
       expect(notifyCalls.length).toBeGreaterThanOrEqual(1)
-      const tnCall = notifyCalls.find(c => c.includes("terminal-notifier"))
+      const tnCall = notifyCalls.find((c) => c.includes("terminal-notifier"))
       expect(tnCall).toBeDefined()
       expect(tnCall).toContain("-activate")
       expect(tnCall).toContain("com.mitchellh.ghostty")
@@ -601,9 +605,9 @@ describe("session-notification", () => {
 
     // then - notification uses osascript (fallback)
     expect(notifyCalls.length).toBeGreaterThanOrEqual(1)
-    const osascriptCall = notifyCalls.find(c => c.includes("osascript"))
+    const osascriptCall = notifyCalls.find((c) => c.includes("osascript"))
     expect(osascriptCall).toBeDefined()
-    const tnCall = notifyCalls.find(c => c.includes("terminal-notifier"))
+    const tnCall = notifyCalls.find((c) => c.includes("terminal-notifier"))
     expect(tnCall).toBeUndefined()
   })
 
@@ -615,7 +619,7 @@ describe("session-notification", () => {
       createShellMock({
         capture: (commandString) => notifyCalls.push(commandString),
         reject: (commandString) => commandString.includes("terminal-notifier"),
-      })
+      }),
     )
     spyOn(utils, "getTerminalNotifierPath").mockResolvedValue("/usr/local/bin/terminal-notifier")
     spyOn(utils, "getOsascriptPath").mockResolvedValue("/usr/bin/osascript")
@@ -624,8 +628,8 @@ describe("session-notification", () => {
     await sender.sendSessionNotification(mockCtx, "darwin", "Test Title", "Test Message")
 
     // then - osascript fallback should be attempted after terminal-notifier failure
-    const tnCall = notifyCalls.find(c => c.includes("terminal-notifier"))
-    const osascriptCall = notifyCalls.find(c => c.includes("osascript"))
+    const tnCall = notifyCalls.find((c) => c.includes("terminal-notifier"))
+    const osascriptCall = notifyCalls.find((c) => c.includes("osascript"))
     expect(tnCall).toBeDefined()
     expect(osascriptCall).toBeDefined()
   })
@@ -638,7 +642,7 @@ describe("session-notification", () => {
       createShellMock({
         capture: (commandString) => notifyCalls.push(commandString),
         reject: (_commandString, values) => values.some(Array.isArray),
-      })
+      }),
     )
     spyOn(utils, "getTerminalNotifierPath").mockResolvedValue("/usr/local/bin/terminal-notifier")
     spyOn(utils, "getOsascriptPath").mockResolvedValue("/usr/bin/osascript")
@@ -647,8 +651,8 @@ describe("session-notification", () => {
     await sender.sendSessionNotification(mockCtx, "darwin", "Test Title", "Test Message")
 
     // then - terminal-notifier succeeds directly and fallback is not used
-    const tnCall = notifyCalls.find(c => c.includes("terminal-notifier"))
-    const osascriptCall = notifyCalls.find(c => c.includes("osascript"))
+    const tnCall = notifyCalls.find((c) => c.includes("terminal-notifier"))
+    const osascriptCall = notifyCalls.find((c) => c.includes("osascript"))
     expect(tnCall).toBeDefined()
     expect(osascriptCall).toBeUndefined()
   })
@@ -667,7 +671,7 @@ describe("session-notification", () => {
 
       // then - terminal-notifier used but without -activate flag
       expect(notifyCalls.length).toBeGreaterThanOrEqual(1)
-      const tnCall = notifyCalls.find(c => c.includes("terminal-notifier"))
+      const tnCall = notifyCalls.find((c) => c.includes("terminal-notifier"))
       expect(tnCall).toBeDefined()
       expect(tnCall).not.toContain("-activate")
     } finally {

@@ -37,10 +37,12 @@ function denied(toolCallId: string) {
     toolName: "computer",
     isError: true,
     result: {
-      content: [{
-        type: "text",
-        text: "The user has specified a rule which prevents you from using this specific tool call.",
-      }],
+      content: [
+        {
+          type: "text",
+          text: "The user has specified a rule which prevents you from using this specific tool call.",
+        },
+      ],
     },
   }
 }
@@ -53,14 +55,16 @@ describe("computer-use permission telemetry ordering", () => {
 
     f.telemetry.permissionTierDenied(denied("read-denied"), f.context, "quartz")
 
-    expect(f.observations).toEqual([{
-      kind: "permission_denied",
-      sessionId: "session-secret",
-      scope: "tier",
-      permission: "read",
-      platform: "darwin",
-      backend: "quartz",
-    }])
+    expect(f.observations).toEqual([
+      {
+        kind: "permission_denied",
+        sessionId: "session-secret",
+        scope: "tier",
+        permission: "read",
+        platform: "darwin",
+        backend: "quartz",
+      },
+    ])
     expect(JSON.stringify(f.observations)).not.toContain("private typed text")
   })
 
@@ -73,8 +77,10 @@ describe("computer-use permission telemetry ordering", () => {
     f.telemetry.permissionTierDenied(denied("read-denied"), f.context, "quartz")
     f.telemetry.permissionTierDenied(denied("exec-denied"), f.context, "quartz")
 
-    expect(f.observations.map((observation) =>
-      observation.kind === "permission_denied" ? observation.permission : "unexpected"
-    )).toEqual(["read", "exec"])
+    expect(
+      f.observations.map((observation) =>
+        observation.kind === "permission_denied" ? observation.permission : "unexpected",
+      ),
+    ).toEqual(["read", "exec"])
   })
 })

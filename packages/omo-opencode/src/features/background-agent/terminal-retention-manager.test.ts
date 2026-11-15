@@ -36,7 +36,11 @@ function createManager(): { manager: BackgroundManager; deleteCalls: string[] } 
     $: {} as PluginInput["$"],
   }
 
-  const manager = new BackgroundManager({ pluginContext: ctx, config: undefined, enableParentSessionNotifications: false })
+  const manager = new BackgroundManager({
+    pluginContext: ctx,
+    config: undefined,
+    enableParentSessionNotifications: false,
+  })
   return { manager, deleteCalls }
 }
 
@@ -68,7 +72,9 @@ function scheduleTaskRemovalForTest(manager: BackgroundManager, taskID: string):
 }
 
 function runManagerPrune(manager: BackgroundManager): void {
-  const prune = Reflect.get(manager, "pruneStaleTasksAndNotifications") as (allStatuses?: Record<string, { type: string }>) => void
+  const prune = Reflect.get(manager, "pruneStaleTasksAndNotifications") as (
+    allStatuses?: Record<string, { type: string }>,
+  ) => void
   prune.call(manager, undefined)
 }
 

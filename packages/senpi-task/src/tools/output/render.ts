@@ -33,7 +33,10 @@ function renderEntry(entry: TranscriptEntry): readonly string[] {
   return [`${marker}: ${entry.tool}`]
 }
 
-function takeTail(lines: readonly string[], tailLines: number): { readonly lines: readonly string[]; readonly cut: boolean } {
+function takeTail(
+  lines: readonly string[],
+  tailLines: number,
+): { readonly lines: readonly string[]; readonly cut: boolean } {
   if (tailLines <= 0 || lines.length <= tailLines) return { lines, cut: lines.length > tailLines }
   return { lines: lines.slice(lines.length - tailLines), cut: true }
 }

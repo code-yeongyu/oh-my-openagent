@@ -109,12 +109,7 @@ function isDagOwnedChild(spec: RpcSpawnSpec): boolean {
  *
  * Format: <stateDir>/sessions/<taskId>/<YYYY-MM-DDTHH-MM-SS.sssZ>_<uuid>.jsonl
  */
-export function resolveChildSessionPath(
-  stateDir: string,
-  taskId: string,
-  now: Date,
-  uuid: string,
-): string {
+export function resolveChildSessionPath(stateDir: string, taskId: string, now: Date, uuid: string): string {
   // Windows has no legal filename containing ":", so the time part uses "-" and the
   // stamp stays lexicographically sortable.
   const stamp = now.toISOString().replaceAll(":", "-")

@@ -18,14 +18,24 @@ async function fixture() {
   const root = await mkdtemp(join(tmpdir(), "health-edge-"))
   roots.push(root)
   for (let index = 0; index < 3; index++) {
-    await writeFile(join(root, `run-${index}.json`), JSON.stringify({
-      schemaVersion: 1, runId: `run-${index}`, identity: "agent-test", category: "quick",
-      conversationIds: ["old-session"], trigger: "manual", outcome: "failed",
-      reason: "child_exit", detail: "ENOENT: missing asset",
-      startedAt: new Date(now - 5000 + index).toISOString(),
-      finishedAt: new Date(now - 4000 + index).toISOString(),
-      launcher, delivery: { status: "consumed", sessionId: "old-session" },
-    }))
+    await writeFile(
+      join(root, `run-${index}.json`),
+      JSON.stringify({
+        schemaVersion: 1,
+        runId: `run-${index}`,
+        identity: "agent-test",
+        category: "quick",
+        conversationIds: ["old-session"],
+        trigger: "manual",
+        outcome: "failed",
+        reason: "child_exit",
+        detail: "ENOENT: missing asset",
+        startedAt: new Date(now - 5000 + index).toISOString(),
+        finishedAt: new Date(now - 4000 + index).toISOString(),
+        launcher,
+        delivery: { status: "consumed", sessionId: "old-session" },
+      }),
+    )
   }
   const api = new CapturedCompletionApi()
   const notifications: string[] = []
@@ -35,8 +45,11 @@ async function fixture() {
 
 test("#given historical consumed failures #when bind observes no completion #then no health alert is emitted", async () => {
   const item = await fixture()
-  const emitted = await emitReflectionHealthAlert(item.root, "agent-test", item.live, () => true,
-    { observedRunIds: [], currentLauncher, now })
+  const emitted = await emitReflectionHealthAlert(item.root, "agent-test", item.live, () => true, {
+    observedRunIds: [],
+    currentLauncher,
+    now,
+  })
   expect(emitted).toBe(false)
   expect(item.api.entries).toEqual([])
   expect(item.notifications).toEqual([])
@@ -45,20 +58,28 @@ test("#given historical consumed failures #when bind observes no completion #the
 
 test("#given a consumed member of the active streak #when alerted #then launcher attribution survives into the entry", async () => {
   const item = await fixture()
-  const emitted = await emitReflectionHealthAlert(item.root, "agent-test", item.live, () => true,
-    { observedRunIds: ["run-2"], currentLauncher, now })
+  const emitted = await emitReflectionHealthAlert(item.root, "agent-test", item.live, () => true, {
+    observedRunIds: ["run-2"],
+    currentLauncher,
+    now,
+  })
   expect(emitted).toBe(true)
   expect(item.api.entries).toHaveLength(1)
   expect(item.api.entries[0]?.data).toMatchObject({
-    launcher, thisRuntime: "new-runtime", streakRuntimes: ["old-runtime"],
+    launcher,
+    thisRuntime: "new-runtime",
+    streakRuntimes: ["old-runtime"],
   })
   expect(item.notifications).toHaveLength(1)
 })
 
 test("#given an unrelated observed run #when another session has a current failure streak #then that history is not replayed", async () => {
   const item = await fixture()
-  const emitted = await emitReflectionHealthAlert(item.root, "agent-test", item.live, () => true,
-    { observedRunIds: ["already-recovered-run"], currentLauncher, now })
+  const emitted = await emitReflectionHealthAlert(item.root, "agent-test", item.live, () => true, {
+    observedRunIds: ["already-recovered-run"],
+    currentLauncher,
+    now,
+  })
   expect(emitted).toBe(false)
   expect(item.api.entries).toEqual([])
 })

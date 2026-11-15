@@ -18,12 +18,7 @@ import {
   writeProjectDecline,
 } from "./state"
 
-const CHOICES = [
-  "Run now",
-  "Skip this time",
-  "Never in this project",
-  "Never anywhere",
-] as const
+const CHOICES = ["Run now", "Skip this time", "Never in this project", "Never anywhere"] as const
 
 export interface AdvisorPreflight {
   readonly root: string
@@ -42,12 +37,7 @@ export async function runAdvisorAfterPreflight(
   const cooldownUntil = readCooldownUntil(stateDir, repo)
   if (Date.now() < cooldownUntil) return
   const currentHead = gitHead(root)
-  const eligibility = computeEligibility(
-    root,
-    currentHead,
-    readLastProposedHead(stateDir, repo),
-    cooldownUntil,
-  )
+  const eligibility = computeEligibility(root, currentHead, readLastProposedHead(stateDir, repo), cooldownUntil)
   if (eligibility === null) return
   writeLastProposedHead(stateDir, repo, currentHead)
   await new Promise<void>((resolve) => setTimeout(resolve, 0))
@@ -73,10 +63,7 @@ function handleChoice(
       },
       { triggerTurn: true, deliverAs: "followUp" },
     )
-    pi.appendEntry?.(
-      "omo-init-deep-advisor:proposed",
-      buildProposedData(repo, eligibility, suggestedMode(root)),
-    )
+    pi.appendEntry?.("omo-init-deep-advisor:proposed", buildProposedData(repo, eligibility, suggestedMode(root)))
     return
   }
   if (choice === "Skip this time" || choice === undefined) {

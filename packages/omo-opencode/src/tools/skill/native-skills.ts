@@ -5,8 +5,12 @@ import { dirname, join } from "node:path"
 import { existsSync } from "node:fs"
 import { parseFrontmatter } from "@oh-my-opencode/utils"
 import {
-  readSkillFileChecked, skillProvenance, readMcpJsonFromDirChecked, parseSkillMcpConfigFromFrontmatter,
-  SkillLinkBlockedError, reportSkillLoadError,
+  readSkillFileChecked,
+  skillProvenance,
+  readMcpJsonFromDirChecked,
+  parseSkillMcpConfigFromFrontmatter,
+  SkillLinkBlockedError,
+  reportSkillLoadError,
 } from "@oh-my-opencode/skills-loader-core/opencode-skill-loader"
 import { detectWorktreePath } from "@oh-my-opencode/skills-loader-core/shared/project-discovery-dirs"
 
@@ -46,7 +50,9 @@ function nativeSkillScope(_native: NativeSkillEntry): LoadedSkill["scope"] {
 // A host row's file is re-read only to apply the link check. An unreadable file (EACCES, a delete race) keeps
 // the content the host already loaded, as before #10693; only a blocked link is refused.
 function readHostSkillFile(native: NativeSkillEntry, provenance: Parameters<typeof readSkillFileChecked>[1]): string {
-  try { return readSkillFileChecked(native.location, provenance) } catch (error) {
+  try {
+    return readSkillFileChecked(native.location, provenance)
+  } catch (error) {
     if (error instanceof SkillLinkBlockedError || !(error instanceof Error)) throw error
     return native.content
   }
@@ -61,13 +67,17 @@ function skipUnloadableNative(path: string, error: unknown): void {
 function nativeSkillToLoadedSkill(native: NativeSkillEntry, directory = process.cwd()): LoadedSkill {
   const provenance = skillProvenance(native.location, "config", {
     kind: native.location === "<built-in>" ? "builtin" : "host",
-    selectedRoot: native.location, projectRoot: detectWorktreePath(directory) ?? directory,
+    selectedRoot: native.location,
+    projectRoot: detectWorktreePath(directory) ?? directory,
   })
-  const checked = provenance.kind === "project-auto"
-    ? readSkillFileChecked(native.location, provenance) : undefined
-  const raw = checked ?? (provenance.kind !== "builtin" && existsSync(native.location)
-    ? readHostSkillFile(native, provenance) : native.content)
-  const sidecar = provenance.kind === "builtin" ? undefined : readMcpJsonFromDirChecked(dirname(native.location), provenance)
+  const checked = provenance.kind === "project-auto" ? readSkillFileChecked(native.location, provenance) : undefined
+  const raw =
+    checked ??
+    (provenance.kind !== "builtin" && existsSync(native.location)
+      ? readHostSkillFile(native, provenance)
+      : native.content)
+  const sidecar =
+    provenance.kind === "builtin" ? undefined : readMcpJsonFromDirChecked(dirname(native.location), provenance)
   return {
     name: native.name,
     path: provenance.kind === "builtin" ? undefined : native.location,
@@ -109,9 +119,12 @@ export function mergeNativeSkills(
   for (const native of nativeSkills) {
     const nativeName = normalizeSkillName(native.name)
     if (knownNames.has(nativeName)) continue
-    if (disabledSkillAliases && isDisabledSkillAlias(nativeSkillToAliasCheckSkill(native), disabledSkillAliases)) continue
+    if (disabledSkillAliases && isDisabledSkillAlias(nativeSkillToAliasCheckSkill(native), disabledSkillAliases))
+      continue
     let loadedSkill: LoadedSkill
-    try { loadedSkill = nativeSkillToLoadedSkill(native, directory) } catch (error) {
+    try {
+      loadedSkill = nativeSkillToLoadedSkill(native, directory)
+    } catch (error) {
       skipUnloadableNative(native.location, error)
       if (error instanceof Error) onRejected?.(nativeName, error)
       continue
@@ -133,8 +146,11 @@ export function mergeNativeSkillInfos(
   for (const native of nativeSkills) {
     const nativeName = normalizeSkillName(native.name)
     if (knownNames.has(nativeName)) continue
-    if (disabledSkillAliases && isDisabledSkillAlias(nativeSkillToAliasCheckSkill(native), disabledSkillAliases)) continue
-    try { nativeSkillToLoadedSkill(native, directory) } catch (error) {
+    if (disabledSkillAliases && isDisabledSkillAlias(nativeSkillToAliasCheckSkill(native), disabledSkillAliases))
+      continue
+    try {
+      nativeSkillToLoadedSkill(native, directory)
+    } catch (error) {
       skipUnloadableNative(native.location, error)
       if (error instanceof Error) onRejected?.(nativeName, error)
       continue

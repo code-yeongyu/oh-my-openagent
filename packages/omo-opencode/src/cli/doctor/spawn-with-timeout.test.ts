@@ -22,10 +22,10 @@ describe("spawnWithTimeout", () => {
   describe("#given a command that writes to stderr", () => {
     it("captures stderr output", async () => {
       // when
-      const result = await spawnWithTimeout(
-        [process.execPath, "-e", "console.error('err')"],
-        { stdout: "pipe", stderr: "pipe" }
-      )
+      const result = await spawnWithTimeout([process.execPath, "-e", "console.error('err')"], {
+        stdout: "pipe",
+        stderr: "pipe",
+      })
 
       // then
       expect(result.timedOut).toBe(false)
@@ -50,7 +50,7 @@ describe("spawnWithTimeout", () => {
       const result = await spawnWithTimeout(
         [process.execPath, "-e", "setInterval(() => {}, 1000)"],
         { stdout: "pipe", stderr: "pipe" },
-        200
+        200,
       )
 
       // then
@@ -66,7 +66,7 @@ describe("spawnWithTimeout", () => {
       const result = await spawnWithTimeout(
         ["nonexistent-binary-that-does-not-exist-12345"],
         { stdout: "pipe", stderr: "pipe" },
-        2000
+        2000,
       )
 
       // then

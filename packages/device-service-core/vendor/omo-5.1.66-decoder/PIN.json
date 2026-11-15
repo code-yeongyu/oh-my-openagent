@@ -1,0 +1,25 @@
+{
+  "tag": "v5.1.66",
+  "commit": "9e58c4d53f12e95246a7f8313ecc0f6596008086",
+  "path": "packages/device-service-core/src/local-api",
+  "blobs": {
+    "errors.ts": "eb43b0121f5554e04b8169d21d97e9e144cf57af",
+    "limits.ts": "41c934a22f0e0687d135a37e218fccc8990dddd7",
+    "protocol-command.ts": "45bd6ae3ccd5f17eeba1f3890495466dce61e06c",
+    "protocol-control.ts": "e346bec1ca472f2abf2969da2a497d84e399e38a",
+    "protocol-delegated.ts": "714f655b6bee9e39a544f2c7253645c47f163f45",
+    "protocol-events.ts": "eb0261c0b3b53b06f74ad898266dc06436b831da",
+    "protocol.ts": "c1e2789ff3ebafd8a229a2a9e696af7b366ccfb7",
+    "spec-proto.ts": "e5d56c1a926bb7023f8c50afa7eba172d7b632f1",
+    "upload.ts": "f116e9d29157b220b9cccf7ea6148ba7489a8762",
+    "validate-command.ts": "188d04489c65a11e14c9a55e25d197a4575ad31d",
+    "validate-delegated.ts": "83e28dde66f29eb5d4a7e61e13eb5740de3ad4a6",
+    "validate-events.ts": "26e39ea826e1f45f2de383b815d88ec63f8c6a44",
+    "validate-fields.ts": "2f60ca13ccb236a75cc72d79941afe6d3607ec37",
+    "validate-requests.ts": "e64a8c4b9054a8a9923fe022698327b7f49ac513",
+    "validate-shapes.ts": "c2cfe14b8395527141ba1e9c195d58a9725dc71e",
+    "validate-stream-events.ts": "2fb205a23e308e49cead88d1bdd87a54408abf73",
+    "validate.ts": "7ac02981feeeae0e2894ae989abc7bc633d0e195",
+    "vocabulary.ts": "61fec28a6f96ee82951efef2ed1824e32168776d"
+  }
+}

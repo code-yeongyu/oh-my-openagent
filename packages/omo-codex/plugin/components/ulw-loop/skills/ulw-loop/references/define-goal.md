@@ -87,7 +87,7 @@ Repaired: "Resolve every open change-requesting review comment on PR 123 touchin
 | an active goal conflicting with this intent | Stop and surface the conflict; the user decides whether to finish it, complete it, or branch. |
 
 2. Goals are unlimited. Never invent a numeric budget, token limit, or deadline the user did not state — that ban covers run quotas; the `assumed:` work constraints from Objective anatomy #4 are different and required.
-3. In a ulw-loop run, the loop CLI owns per-goal state (`.omo/ulw-loop/goals.json`): `create_goal` registers the aggregate objective from the printed handoff, and this reference shapes both that objective and every goal's `successCriteria` at `create-goals` time.
+3. In a ulw-loop run, the loop SDK owns per-goal state (`.omo/ulw-loop/<session-id>/goals.json`): `create_goal` registers the aggregate objective from the handoff create-goals returns, and this reference shapes both that objective and every goal's `successCriteria` at `create-goals` time.
 
 ## Completion honesty
 

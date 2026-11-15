@@ -6,13 +6,18 @@
 import { pairingAnchor } from "../crypto/anchor.ts"
 import { isObject, type Principal } from "../crypto/parse.ts"
 import { createRejectionCounter } from "../crypto/rejection.ts"
-import { pinTrustAnchor } from "../crypto/trust-pin.ts"
+import { pinTrustAnchor, rootChangedSinceRetired } from "../crypto/trust-pin.ts"
 import type { DeviceKeyring } from "../keyring-port.ts"
 import { openAccountChain } from "./account-chain.ts"
 import type { AccountHttp } from "./http.ts"
 import { approvalCode, approvalCommitment, newPairingNonce } from "./pairing.ts"
 import type { PairingHttp, PendingApproval } from "./pairing-http.ts"
-import { checkSyncOperation, admitSyncOperation, waitSyncOperation, type SyncOperationOptions } from "../operation-authority.ts"
+import {
+  checkSyncOperation,
+  admitSyncOperation,
+  waitSyncOperation,
+  type SyncOperationOptions,
+} from "../operation-authority.ts"
 import { accountOperation, pairingOperation } from "./operation-ports.ts"
 
 export interface CeremonyClock {
@@ -21,7 +26,8 @@ export interface CeremonyClock {
 }
 
 export type JoinOutcome =
-  | { readonly kind: "joined" }
+  /** `rootChanged`: the pinned root differs from the one this device held before its keys were discarded. */
+  | { readonly kind: "joined"; readonly rootChanged?: true }
   | { readonly kind: "expired" }
   | { readonly kind: "refused"; readonly reason: string }
 
@@ -34,16 +40,18 @@ export const principalOf = (keyring: DeviceKeyring): Principal => ({
   signing_public_key: keyring.publicKeys().signing,
 })
 
-export async function joinAccount(input: {
-  readonly account: string
-  readonly keyring: DeviceKeyring
-  readonly pinDir: string
-  readonly chain: AccountHttp
-  readonly pairing: PairingHttp
-  readonly clock: CeremonyClock
-  readonly showCode: (code: string) => void | Promise<void>
-  readonly onPending?: (pending: PendingApproval) => void
-} & SyncOperationOptions): Promise<JoinOutcome> {
+export async function joinAccount(
+  input: {
+    readonly account: string
+    readonly keyring: DeviceKeyring
+    readonly pinDir: string
+    readonly chain: AccountHttp
+    readonly pairing: PairingHttp
+    readonly clock: CeremonyClock
+    readonly showCode: (code: string) => void | Promise<void>
+    readonly onPending?: (pending: PendingApproval) => void
+  } & SyncOperationOptions,
+): Promise<JoinOutcome> {
   const { account, keyring, clock } = input
   const operation = input
   const chain = accountOperation(input.chain, operation)
@@ -64,25 +72,47 @@ export async function joinAccount(input: {
   }
   const answer = row.answer
   await pairing.revealPending(opened.id, self, nonce)
-  const code = await approvalCode(account, [{ principal: self, nonce }, { principal: answer.principal, nonce: answer.approver_nonce }])
-  await waitSyncOperation(operation, admitSyncOperation(operation, async () => input.showCode(code)))
-  const anchor = pairingAnchor({ account, keyring, approver: answer.principal, joiningNonce: nonce, approverNonce: answer.approver_nonce })
+  const code = await approvalCode(account, [
+    { principal: self, nonce },
+    { principal: answer.principal, nonce: answer.approver_nonce },
+  ])
+  await waitSyncOperation(
+    operation,
+    admitSyncOperation(operation, async () => input.showCode(code)),
+  )
+  const anchor = pairingAnchor({
+    account,
+    keyring,
+    approver: answer.principal,
+    joiningNonce: nonce,
+    approverNonce: answer.approver_nonce,
+  })
   for (;;) {
     const keys = await chain.listKeys()
-    const admitted = keys?.some((entry) => {
-      const principal = entry.body["principal"]
-      return entry.body.kind === "approval" && isObject(principal) && principal["id"] === self.id
-    }) === true
+    const admitted =
+      keys?.some((entry) => {
+        const principal = entry.body["principal"]
+        return entry.body.kind === "approval" && isObject(principal) && principal["id"] === self.id
+      }) === true
     if (admitted) {
-      const walked = await openAccountChain({ account, anchor, keyring, http: chain, rejections: createRejectionCounter() })
+      const walked = await openAccountChain({
+        account,
+        anchor,
+        keyring,
+        http: chain,
+        rejections: createRejectionCounter(),
+      })
       const pin = walked.state().pin
-      if (!walked.state().anchored || pin === null) return { kind: "refused", reason: "the approval does not match this device's ceremony" }
+      if (!walked.state().anchored || pin === null)
+        return { kind: "refused", reason: "the approval does not match this device's ceremony" }
       if (!walked.isMember() || (await walked.epochKey(walked.state().authority?.epoch ?? 0)) === null) {
         return { kind: "refused", reason: "the approval admits this device without a key it can open" }
       }
       await pinTrustAnchor(input.pinDir, account, pin, operation)
       checkSyncOperation(operation)
-      return { kind: "joined" }
+      return (await rootChangedSinceRetired(input.pinDir, account, pin.genesisDigest))
+        ? { kind: "joined", rootChanged: true }
+        : { kind: "joined" }
     }
     if (clock.now() >= opened.expires_at) return { kind: "expired" }
     await waitSyncOperation(operation, clock.sleep(POLL_MS))

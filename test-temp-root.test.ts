@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import { type ChildProcess, spawn, spawnSync } from "node:child_process"
+import { once } from "node:events"
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, utimesSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -42,8 +43,13 @@ describe("test temp root teardown", () => {
 
 describe("removeAbandonedRunRoots", () => {
   const fixtures: string[] = []
-  afterEach(() => {
-    for (const fixture of fixtures.splice(0)) removeTreeSync(fixture)
+  const removerExits: Promise<unknown[]>[] = []
+  afterEach(async () => {
+    for (const exited of removerExits.splice(0)) expect((await exited)[0]).toBe(0)
+    for (const fixture of fixtures.splice(0)) {
+      removeTreeSync(fixture)
+      expect(existsSync(fixture)).toBe(false)
+    }
   })
 
   function fixtureRoot(): string {
@@ -72,11 +78,13 @@ describe("removeAbandonedRunRoots", () => {
       const warnings = spyOn(console, "warn").mockImplementation(() => {})
 
       try {
-        expect(() => removeAbandonedRunRoots(fixture, (root) => {
-          attempted.push(root)
-          if (root === held) throw error
-          removeTreeSync(root)
-        })).not.toThrow()
+        expect(() =>
+          removeAbandonedRunRoots(fixture, (root) => {
+            attempted.push(root)
+            if (root === held) throw error
+            removeTreeSync(root)
+          }),
+        ).not.toThrow()
         const reports = warnings.mock.calls
           .filter(([kind]) => kind === "SKIPPED_TEST_TEMP_ROOT")
           .map(([, record]) => JSON.parse(String(record)))
@@ -89,7 +97,12 @@ describe("removeAbandonedRunRoots", () => {
       expect(existsSync(held)).toBe(true)
       expect(existsSync(removable)).toBe(false)
 
-      removeAbandonedRunRoots(fixture)
+      // Join the detached sweep before afterEach removes the fixture that contains it.
+      removeAbandonedRunRoots(fixture, undefined, (path) => {
+        const remover = spawn("/bin/rm", ["-rf", path], { stdio: "ignore" })
+        removerExits.push(once(remover, "exit", { signal: AbortSignal.timeout(5_000) }))
+        return remover
+      })
       expect(existsSync(held)).toBe(false)
     })
   }
@@ -100,7 +113,9 @@ describe("removeAbandonedRunRoots", () => {
     const error = Object.assign(new Error("device I/O error"), { code: "EIO" })
     let caught: unknown
     try {
-      removeAbandonedRunRoots(fixture, () => { throw error })
+      removeAbandonedRunRoots(fixture, () => {
+        throw error
+      })
     } catch (failure) {
       caught = failure
     }
@@ -115,7 +130,9 @@ describe("removeAbandonedRunRoots", () => {
     mkdirSync(unrelated)
     const attempted: string[] = []
 
-    removeAbandonedRunRoots(fixture, (root) => { attempted.push(root) })
+    removeAbandonedRunRoots(fixture, (root) => {
+      attempted.push(root)
+    })
 
     expect(attempted).toEqual([])
     expect(existsSync(live)).toBe(true)
@@ -126,11 +143,18 @@ describe("removeAbandonedRunRoots", () => {
 describe("removeRunRootAside (#11630)", () => {
   const fixtures: string[] = []
   afterEach(() => {
-    for (const fixture of fixtures.splice(0)) removeTreeSync(fixture)
+    for (const fixture of fixtures.splice(0)) {
+      removeTreeSync(fixture)
+      expect(existsSync(fixture)).toBe(false)
+    }
   })
 
   // Stands for the OS temp dir of a lane that keeps its bun caches there, beside one run's root.
-  function tempDirWithCachesAndRoot(files: number): { readonly tempDir: string; readonly cache: string; readonly root: string } {
+  function tempDirWithCachesAndRoot(files: number): {
+    readonly tempDir: string
+    readonly cache: string
+    readonly root: string
+  } {
     const tempDir = mkdtempSync(join(tmpdir(), "omo-aside-"))
     fixtures.push(tempDir)
     const cache = join(tempDir, "bun-transpiler")
@@ -171,7 +195,8 @@ describe("removeRunRootAside (#11630)", () => {
         removing.push(path)
         return spawn("true")
       })
-      if (standIn !== undefined && standIn.exitCode === null) await new Promise((resolve) => standIn.once("exit", resolve))
+      if (standIn !== undefined && standIn.exitCode === null)
+        await new Promise((resolve) => standIn.once("exit", resolve))
 
       expect(removing).toEqual([`${root}.removing`])
       expect(readdirSync(`${root}.removing`)).toHaveLength(11)

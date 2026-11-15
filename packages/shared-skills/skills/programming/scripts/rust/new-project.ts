@@ -15,10 +15,10 @@
  * Exit codes: 0 created, 1 cargo or scaffold failure, 2 usage error.
  */
 
-import { readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { parseArgs } from "node:util";
-import { assertNever, runTool } from "../shared/run-tool.ts";
+import { readFileSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
+import { parseArgs } from "node:util"
+import { assertNever, runTool } from "../shared/run-tool.ts"
 
 const USAGE = `Usage: bun run new-project.ts <name> [--path <dir>]
 
@@ -27,13 +27,13 @@ Arguments:
 
 Options:
   -p, --path    Parent directory where the project folder is created (default: cwd)
-  -h, --help    Show this help`;
+  -h, --help    Show this help`
 
 const RUST_TOOLCHAIN_TOML = `[toolchain]
 channel = "stable"
 components = ["rustfmt", "clippy", "rust-src"]
 profile = "default"
-`;
+`
 
 const CARGO_TOML_LINTS = `
 [lints.rust]
@@ -72,7 +72,7 @@ mem_forget = "deny"
 clone_on_ref_ptr = "warn"
 module_name_repetitions = { level = "allow" }
 must_use_candidate = { level = "allow" }
-`;
+`
 
 const DENY_TOML = `[advisories]
 yanked = "deny"
@@ -88,7 +88,7 @@ wildcards = "deny"
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
-`;
+`
 
 const MAIN_RS = `//! Command-line entry point.
 
@@ -97,30 +97,30 @@ use std::io::Write as _;
 fn main() -> std::io::Result<()> {
     writeln!(std::io::stdout().lock(), "Hello, world!")
 }
-`;
+`
 
 const RUSTFMT_TOML = `edition = "2024"
 max_width = 100
 use_field_init_shorthand = true
 use_try_shorthand = true
-`;
+`
 
-const EDITION_LINE = 'edition = "2024"\n';
+const EDITION_LINE = 'edition = "2024"\n'
 
-type ProjectOptions = { readonly name: string; readonly path: string };
+type ProjectOptions = { readonly name: string; readonly path: string }
 
 type Cli =
   | { readonly kind: "run"; readonly options: ProjectOptions }
   | { readonly kind: "help" }
-  | { readonly kind: "usage"; readonly problem: string };
+  | { readonly kind: "usage"; readonly problem: string }
 
 class ScaffoldError extends Error {
   constructor(
     readonly kind: "cargo-unavailable" | "cargo-init-failed" | "edition-too-old",
     message: string,
   ) {
-    super(message);
-    this.name = "ScaffoldError";
+    super(message)
+    this.name = "ScaffoldError"
   }
 }
 
@@ -134,82 +134,85 @@ function parseCli(): Cli {
       },
       allowPositionals: true,
       strict: true,
-    });
-    if (values.help) return { kind: "help" };
-    const [name, ...extra] = positionals;
-    if (name === undefined || extra.length > 0) return { kind: "usage", problem: "expected exactly one project name" };
-    return { kind: "run", options: { name, path: values.path } };
+    })
+    if (values.help) return { kind: "help" }
+    const [name, ...extra] = positionals
+    if (name === undefined || extra.length > 0) return { kind: "usage", problem: "expected exactly one project name" }
+    return { kind: "run", options: { name, path: values.path } }
   } catch (error) {
-    if (error instanceof TypeError) return { kind: "usage", problem: error.message };
-    throw error;
+    if (error instanceof TypeError) return { kind: "usage", problem: error.message }
+    throw error
   }
 }
 
 function cargoInit(projectDir: string, name: string): void {
-  const init = runTool("cargo", ["init", projectDir, "--name", name]);
+  const init = runTool("cargo", ["init", projectDir, "--name", name])
   switch (init.kind) {
     case "ok":
-      return;
+      return
     case "unavailable":
-      throw new ScaffoldError("cargo-unavailable", `cargo not found (${init.reason}). Install Rust via https://rustup.rs`);
+      throw new ScaffoldError(
+        "cargo-unavailable",
+        `cargo not found (${init.reason}). Install Rust via https://rustup.rs`,
+      )
     case "failed":
-      throw new ScaffoldError("cargo-init-failed", `cargo init failed:\n${init.stderr}`);
+      throw new ScaffoldError("cargo-init-failed", `cargo init failed:\n${init.stderr}`)
     default:
-      return assertNever(init);
+      return assertNever(init)
   }
 }
 
 function scaffold({ name, path }: ProjectOptions): void {
-  const projectDir = join(path, name);
-  console.error(`Creating project ${name} at ${projectDir}`);
-  cargoInit(projectDir, name);
+  const projectDir = join(path, name)
+  console.error(`Creating project ${name} at ${projectDir}`)
+  cargoInit(projectDir, name)
 
-  writeFileSync(join(projectDir, "rust-toolchain.toml"), RUST_TOOLCHAIN_TOML);
-  console.error("  wrote rust-toolchain.toml");
+  writeFileSync(join(projectDir, "rust-toolchain.toml"), RUST_TOOLCHAIN_TOML)
+  console.error("  wrote rust-toolchain.toml")
 
-  const cargoToml = join(projectDir, "Cargo.toml");
-  const manifest = readFileSync(cargoToml, "utf8");
+  const cargoToml = join(projectDir, "Cargo.toml")
+  const manifest = readFileSync(cargoToml, "utf8")
   if (!manifest.includes(EDITION_LINE)) {
-    throw new ScaffoldError("edition-too-old", "cargo did not create an edition 2024 package; install Rust >= 1.85");
+    throw new ScaffoldError("edition-too-old", "cargo did not create an edition 2024 package; install Rust >= 1.85")
   }
-  const withMsrv = manifest.replace(EDITION_LINE, `${EDITION_LINE}rust-version = "1.85"\npublish = false\n`);
-  writeFileSync(cargoToml, withMsrv + CARGO_TOML_LINTS);
-  writeFileSync(join(projectDir, "src", "main.rs"), MAIN_RS);
-  console.error("  appended [lints] to Cargo.toml");
+  const withMsrv = manifest.replace(EDITION_LINE, `${EDITION_LINE}rust-version = "1.85"\npublish = false\n`)
+  writeFileSync(cargoToml, withMsrv + CARGO_TOML_LINTS)
+  writeFileSync(join(projectDir, "src", "main.rs"), MAIN_RS)
+  console.error("  appended [lints] to Cargo.toml")
 
-  writeFileSync(join(projectDir, "deny.toml"), DENY_TOML);
-  console.error("  wrote deny.toml");
+  writeFileSync(join(projectDir, "deny.toml"), DENY_TOML)
+  console.error("  wrote deny.toml")
 
-  writeFileSync(join(projectDir, "rustfmt.toml"), RUSTFMT_TOML);
-  console.error("  wrote rustfmt.toml");
+  writeFileSync(join(projectDir, "rustfmt.toml"), RUSTFMT_TOML)
+  console.error("  wrote rustfmt.toml")
 
-  console.error(`\nDone! cd ${projectDir} && cargo check`);
+  console.error(`\nDone! cd ${projectDir} && cargo check`)
 }
 
 function main(): number {
-  const cli = parseCli();
+  const cli = parseCli()
   switch (cli.kind) {
     case "help":
-      console.log(USAGE);
-      return 0;
+      console.log(USAGE)
+      return 0
     case "usage":
-      console.error(`Error: ${cli.problem}\n\n${USAGE}`);
-      return 2;
+      console.error(`Error: ${cli.problem}\n\n${USAGE}`)
+      return 2
     case "run":
-      break;
+      break
     default:
-      return assertNever(cli);
+      return assertNever(cli)
   }
   try {
-    scaffold(cli.options);
-    return 0;
+    scaffold(cli.options)
+    return 0
   } catch (error) {
     if (error instanceof ScaffoldError) {
-      console.error(`Error: ${error.message}`);
-      return 1;
+      console.error(`Error: ${error.message}`)
+      return 1
     }
-    throw error;
+    throw error
   }
 }
 
-process.exit(main());
+process.exit(main())

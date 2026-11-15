@@ -37,7 +37,12 @@ describe("task_output effective model (#9722)", () => {
     const record: TaskRecord = {
       ...parked(),
       resolved_model: { provider: "anthropic", model_id: "claude", display: "anthropic/claude", source: "explicit" },
-      effective_model: { provider: "anthropic", model_id: "claude-other", display: "anthropic/claude-other", source: "explicit" },
+      effective_model: {
+        provider: "anthropic",
+        model_id: "claude-other",
+        display: "anthropic/claude-other",
+        source: "explicit",
+      },
     }
 
     // when

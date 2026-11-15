@@ -7,25 +7,25 @@ export function isInsideTmuxEnvironment(environment: Record<string, string | und
 }
 
 export function isTmuxPaneCompatibleEnvironment(environment: Record<string, string | undefined>): boolean {
-	return isInsideTmuxEnvironment(environment) || isCmuxCompatEnvironment(environment)
+  return isInsideTmuxEnvironment(environment) || isCmuxCompatEnvironment(environment)
 }
 
 export function isInsideTmux(): boolean {
-	return isInsideTmuxEnvironment(process.env)
+  return isInsideTmuxEnvironment(process.env)
 }
 
 export function isNativeTmuxEnvironment(environment: Record<string, string | undefined>): boolean {
-	return isInsideTmuxEnvironment(environment) && !isCmuxCompatEnvironment(environment)
+  return isInsideTmuxEnvironment(environment) && !isCmuxCompatEnvironment(environment)
 }
 
 export function isNativeTmux(): boolean {
-	return isNativeTmuxEnvironment(process.env)
+  return isNativeTmuxEnvironment(process.env)
 }
 
 export function isTmuxPaneCompatible(): boolean {
-	return isTmuxPaneCompatibleEnvironment(process.env)
+  return isTmuxPaneCompatibleEnvironment(process.env)
 }
 
 export function getCurrentPaneId(): string | undefined {
-	return process.env.TMUX_PANE
+  return process.env.TMUX_PANE
 }

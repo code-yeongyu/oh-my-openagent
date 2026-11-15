@@ -15,12 +15,19 @@ export type ClearEndpointRequest = Pick<RegisterIncarnationRequest, "durable_id"
 /** The endpoint and its fencing token become visible in the same transaction. */
 export async function registerIncarnation(ctx: StoreContext, request: RegisterIncarnationRequest): Promise<void> {
   await transaction(ctx, "register_incarnation", () => {
-    write(ctx,
+    write(
+      ctx,
       `INSERT INTO session_meta (durable_id, next_seq, incarnation, endpoint_socket, endpoint_kind)
        VALUES (?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM deliveries WHERE target_durable_id = ?), ?, ?, ?)
        ON CONFLICT(durable_id) DO UPDATE SET incarnation = excluded.incarnation,
        endpoint_socket = excluded.endpoint_socket, endpoint_kind = excluded.endpoint_kind`,
-      [request.durable_id, request.durable_id, request.incarnation, request.endpoint?.socket ?? null, request.endpoint?.kind ?? null],
+      [
+        request.durable_id,
+        request.durable_id,
+        request.incarnation,
+        request.endpoint?.socket ?? null,
+        request.endpoint?.kind ?? null,
+      ],
     )
   })
 }
@@ -28,7 +35,11 @@ export async function registerIncarnation(ctx: StoreContext, request: RegisterIn
 /** A late exit owns only its incarnation, never its successor's endpoint. */
 export async function clearEndpoint(ctx: StoreContext, request: ClearEndpointRequest): Promise<void> {
   await transaction(ctx, "clear_endpoint", () => {
-    write(ctx, "UPDATE session_meta SET endpoint_socket = NULL, endpoint_kind = NULL WHERE durable_id = ? AND incarnation = ?", [request.durable_id, request.incarnation])
+    write(
+      ctx,
+      "UPDATE session_meta SET endpoint_socket = NULL, endpoint_kind = NULL WHERE durable_id = ? AND incarnation = ?",
+      [request.durable_id, request.incarnation],
+    )
   })
 }
 
@@ -38,12 +49,17 @@ export async function clearEndpoint(ctx: StoreContext, request: ClearEndpointReq
  * incarnation, so only a row a registration wrote counts as published.
  */
 export function sessionOwner(ctx: StoreContext, durableId: string): SessionOwner | null {
-  const row = ctx.sql.one(["incarnation", "endpoint_socket", "endpoint_kind"], "SELECT incarnation, endpoint_socket, endpoint_kind FROM session_meta WHERE durable_id = ?", [durableId])
+  const row = ctx.sql.one(
+    ["incarnation", "endpoint_socket", "endpoint_kind"],
+    "SELECT incarnation, endpoint_socket, endpoint_kind FROM session_meta WHERE durable_id = ?",
+    [durableId],
+  )
   if (row === undefined || typeof row.incarnation !== "string") return null
   return {
     incarnation: row.incarnation,
-    endpoint: typeof row.endpoint_socket === "string" && (row.endpoint_kind === "tui" || row.endpoint_kind === "rpc_host")
-      ? { socket: row.endpoint_socket, kind: row.endpoint_kind }
-      : null,
+    endpoint:
+      typeof row.endpoint_socket === "string" && (row.endpoint_kind === "tui" || row.endpoint_kind === "rpc_host")
+        ? { socket: row.endpoint_socket, kind: row.endpoint_kind }
+        : null,
   }
 }

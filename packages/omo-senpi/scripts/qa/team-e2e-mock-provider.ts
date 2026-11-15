@@ -75,7 +75,8 @@ interface SimpleStreamOptions {
   signal?: AbortSignal
 }
 
-type AssistantContent = { type: "text"; text: string } | { type: "toolCall"; id: string; name: string; arguments: Record<string, unknown> }
+type AssistantContent =
+  { type: "text"; text: string } | { type: "toolCall"; id: string; name: string; arguments: Record<string, unknown> }
 
 interface AssistantMessage {
   role: "assistant"
@@ -93,8 +94,20 @@ interface MockProvider {
   baseUrl: string
   apiKey: string
   api: Api
-  models: Array<{ id: string; name: string; reasoning: boolean; input: Array<"text" | "image">; cost: { input: number; output: number; cacheRead: number; cacheWrite: number }; contextWindow: number; maxTokens: number }>
-  streamSimple(model: Model<Api>, context: Context, options?: SimpleStreamOptions): AsyncIterable<unknown> & { result(): Promise<AssistantMessage> }
+  models: Array<{
+    id: string
+    name: string
+    reasoning: boolean
+    input: Array<"text" | "image">
+    cost: { input: number; output: number; cacheRead: number; cacheWrite: number }
+    contextWindow: number
+    maxTokens: number
+  }>
+  streamSimple(
+    model: Model<Api>,
+    context: Context,
+    options?: SimpleStreamOptions,
+  ): AsyncIterable<unknown> & { result(): Promise<AssistantMessage> }
 }
 
 interface ExtensionAPI {
@@ -107,7 +120,15 @@ interface LocalAssistantMessageEventStream extends AsyncIterable<unknown> {
   result(): Promise<AssistantMessage>
 }
 
-const model = { id: "mock-1", name: "Mock 1", reasoning: false, input: ["text" as const], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 200_000, maxTokens: 4096 }
+const model = {
+  id: "mock-1",
+  name: "Mock 1",
+  reasoning: false,
+  input: ["text" as const],
+  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  contextWindow: 200_000,
+  maxTokens: 4096,
+}
 
 const ROLE_MARKERS: ReadonlyArray<readonly [string, string]> = [
   ["MOCKROLE=quick", "quick"],
@@ -156,12 +177,15 @@ function firstMatch(text: string, pattern: RegExp): string | undefined {
 
 function resolvePlaceholders(step: MockStep, text: string): MockStep {
   if (step.type !== "tool_call") return step
-  const teamRunId = firstMatch(text, /team_run_id"\s*:\s*"([^"]+)"/) ?? firstMatch(text, /Created team '[^']*' \(([^)]+)\)/)
+  const teamRunId =
+    firstMatch(text, /team_run_id"\s*:\s*"([^"]+)"/) ?? firstMatch(text, /Created team '[^']*' \(([^)]+)\)/)
   const taskId = firstMatch(text, /Created task (\d+)/) ?? firstMatch(text, /"id"\s*:\s*"(\d+)"/)
   const raw = JSON.stringify(step.arguments)
   const substituted = raw
-    .split("__TEAM_RUN_ID__").join(teamRunId ?? "__TEAM_RUN_ID__")
-    .split("__TASK_ID__").join(taskId ?? "__TASK_ID__")
+    .split("__TEAM_RUN_ID__")
+    .join(teamRunId ?? "__TEAM_RUN_ID__")
+    .split("__TASK_ID__")
+    .join(taskId ?? "__TASK_ID__")
   return { ...step, arguments: JSON.parse(substituted) as Record<string, unknown> }
 }
 
@@ -174,7 +198,10 @@ function recordObservation(role: string, text: string): void {
   }
   if (role === "lead" && text.includes("QUICK2LEAD")) {
     const carriesCustomType = text.includes("senpi-task.team-message") || text.includes("peer_message")
-    writeFileSync(join(obsDir, "lead-received.txt"), `${carriesCustomType ? "custom-message" : "plain"}\n${extractLine(text, "QUICK2LEAD")}`)
+    writeFileSync(
+      join(obsDir, "lead-received.txt"),
+      `${carriesCustomType ? "custom-message" : "plain"}\n${extractLine(text, "QUICK2LEAD")}`,
+    )
   }
 }
 
@@ -197,7 +224,15 @@ function seedDuraBacklog(cwd: string): void {
     const inboxDir = join(runtimeRoot, runId, "inboxes", "dura")
     if (!existsSync(inboxDir)) continue
     const messageId = randomUUID()
-    const message = { version: 1, messageId, from: "teammate", to: "dura", kind: "message", body: "DURA-BACKLOG redeliver me", timestamp: Date.now() }
+    const message = {
+      version: 1,
+      messageId,
+      from: "teammate",
+      to: "dura",
+      kind: "message",
+      body: "DURA-BACKLOG redeliver me",
+      timestamp: Date.now(),
+    }
     writeFileSync(join(inboxDir, `${messageId}.json`), `${JSON.stringify(message, null, 2)}\n`)
     if (obsDir !== undefined && obsDir.length > 0) {
       mkdirSync(obsDir, { recursive: true })
@@ -213,9 +248,10 @@ function stepToAssistantMessage(
   step: Exclude<MockStep, { type: "hang" } | { type: "wait_for_liveness" }>,
   callCount: number,
 ): AssistantMessage {
-  const content: AssistantContent[] = step.type === "text"
-    ? [{ type: "text", text: step.text }]
-    : [{ type: "toolCall", id: step.id ?? `omo-mock-tool-${callCount}`, name: step.name, arguments: step.arguments }]
+  const content: AssistantContent[] =
+    step.type === "text"
+      ? [{ type: "text", text: step.text }]
+      : [{ type: "toolCall", id: step.id ?? `omo-mock-tool-${callCount}`, name: step.name, arguments: step.arguments }]
   return {
     role: "assistant",
     content,
@@ -361,7 +397,9 @@ function createLocalAssistantMessageEventStream(): LocalAssistantMessageEventStr
   }
 }
 
-function isTerminalAssistantMessageEvent(event: unknown): event is { type: "done"; message: AssistantMessage } | { type: "error"; error: AssistantMessage } {
+function isTerminalAssistantMessageEvent(
+  event: unknown,
+): event is { type: "done"; message: AssistantMessage } | { type: "error"; error: AssistantMessage } {
   if (typeof event !== "object" || event === null) return false
   const candidate = event as { type?: unknown; message?: unknown; error?: unknown }
   if (candidate.type === "done") return isAssistantMessage(candidate.message)
@@ -369,7 +407,9 @@ function isTerminalAssistantMessageEvent(event: unknown): event is { type: "done
   return false
 }
 
-function extractAssistantMessageResult(event: { type: "done"; message: AssistantMessage } | { type: "error"; error: AssistantMessage }): AssistantMessage {
+function extractAssistantMessageResult(
+  event: { type: "done"; message: AssistantMessage } | { type: "error"; error: AssistantMessage },
+): AssistantMessage {
   return event.type === "done" ? event.message : event.error
 }
 
@@ -384,19 +424,22 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
     if (detectRole("prompt with MOCKROLE=quick here") !== "quick") throw new Error("quick role detection failed")
     if (detectRole("plain lead prompt") !== "lead") throw new Error("lead role detection failed")
     const resolved = resolvePlaceholders(
-      { type: "tool_call", name: "task_send", arguments: { team_run_id: "__TEAM_RUN_ID__", to: "quick", message: "hello" } },
+      {
+        type: "tool_call",
+        name: "task_send",
+        arguments: { team_run_id: "__TEAM_RUN_ID__", to: "quick", message: "hello" },
+      },
       'foo "team_run_id":"run-xyz" bar',
     )
-    if (resolved.type !== "tool_call" || resolved.arguments.team_run_id !== "run-xyz") throw new Error("placeholder resolution failed")
+    if (resolved.type !== "tool_call" || resolved.arguments.team_run_id !== "run-xyz")
+      throw new Error("placeholder resolution failed")
     const withTask = resolvePlaceholders(
       { type: "tool_call", name: "task_update", arguments: { task_id: "__TASK_ID__" } },
       "Created task 7.",
     )
-    if (withTask.type !== "tool_call" || withTask.arguments.task_id !== "7") throw new Error("task id resolution failed")
-    const waiting = resolveEventWait(
-      { type: "wait_for_liveness" },
-      "Created team 'crashteam' (run-xyz).",
-    )
+    if (withTask.type !== "tool_call" || withTask.arguments.task_id !== "7")
+      throw new Error("task id resolution failed")
+    const waiting = resolveEventWait({ type: "wait_for_liveness" }, "Created team 'crashteam' (run-xyz).")
     if (waiting.type !== "tool_call" || waiting.arguments.team_run_id !== "run-xyz") {
       throw new Error("liveness wait should create a real tool boundary")
     }

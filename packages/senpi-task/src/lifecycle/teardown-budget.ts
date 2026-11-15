@@ -25,10 +25,16 @@ export async function withinTeardownBudget(
   step: TeardownStep,
   run: () => Promise<void>,
 ): Promise<void> {
-  const work = Promise.resolve().then(run).then(() => "done" as const)
+  const work = Promise.resolve()
+    .then(run)
+    .then(() => "done" as const)
   const outcome = await Promise.race([work, deadline(step).then(() => "timed_out" as const)])
   if (outcome === "timed_out") {
     work.catch(() => undefined)
-    log("senpi-task teardown step exceeded its budget; continuing without it", { taskId: target.taskId, pid: target.pid, step })
+    log("senpi-task teardown step exceeded its budget; continuing without it", {
+      taskId: target.taskId,
+      pid: target.pid,
+      step,
+    })
   }
 }

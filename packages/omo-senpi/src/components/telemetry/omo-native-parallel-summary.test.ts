@@ -221,7 +221,11 @@ describe("omo-native parallelism summary emission", () => {
           non_eval_joined_calls: MAX_TRACKED_CALLS,
         })
         const paired = Number(properties?.non_eval_joined_calls)
-        const sinks = paired + Number(properties?.incomplete_calls) + Number(properties?.dropped_calls) + Number(properties?.clock_anomalies)
+        const sinks =
+          paired +
+          Number(properties?.incomplete_calls) +
+          Number(properties?.dropped_calls) +
+          Number(properties?.clock_anomalies)
         expect(sinks).toBe(observed)
         expect(String(properties?.non_eval_wave_size_histogram).length).toBeLessThan(64)
       })
@@ -256,7 +260,11 @@ describe("omo-native parallelism summary emission", () => {
         const fx = fixture()
         await fx.pi.dispatch("turn_start", { type: "turn_start", turnIndex: 0, timestamp: 1_000 }, context("s1"))
         fx.clock.advanceTo(1_900)
-        await fx.pi.dispatch("turn_end", { type: "turn_end", turnIndex: 0, message: {}, toolResults: [] }, context("s1"))
+        await fx.pi.dispatch(
+          "turn_end",
+          { type: "turn_end", turnIndex: 0, message: {}, toolResults: [] },
+          context("s1"),
+        )
         // when
         await shutdown(fx, "s1")
         // then

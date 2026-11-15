@@ -9,7 +9,7 @@ const { executeHookCommand } = await import("./execute-hook-command")
 function nodeCommand(directory: string, script: string, args: string[] = []): string {
   const scriptPath = join(directory, "hook-fixture.js")
   writeFileSync(scriptPath, script)
-  return [`"${process.execPath}"`, `"${scriptPath}"`, ...args.map(arg => `"${arg}"`)].join(" ")
+  return [`"${process.execPath}"`, `"${scriptPath}"`, ...args.map((arg) => `"${arg}"`)].join(" ")
 }
 
 describe("executeHookCommand", () => {
@@ -31,7 +31,10 @@ describe("executeHookCommand", () => {
 
     // when
     const result = await executeHookCommand(
-      nodeCommand(tempDirectory, "console.log(process.env.__OMO_TEST_ALLOWED_VAR || '', process.env.__OMO_TEST_SECRET_VAR || '')"),
+      nodeCommand(
+        tempDirectory,
+        "console.log(process.env.__OMO_TEST_ALLOWED_VAR || '', process.env.__OMO_TEST_SECRET_VAR || '')",
+      ),
       "",
       tempDirectory,
       { allowedEnvVars: ["__OMO_TEST_ALLOWED_VAR"] },

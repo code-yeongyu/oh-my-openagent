@@ -53,7 +53,8 @@ describe("child task progress", () => {
     const details = progress.details()
     expect(details).toEqual({
       progress: {
-        activity: "st_00000001 · category:quick(kimi-coding/kimi-k3-unlocked:max) · turn 1 (1 tool) · running · 50 tok/s",
+        activity:
+          "st_00000001 · category:quick(kimi-coding/kimi-k3-unlocked:max) · turn 1 (1 tool) · running · 50 tok/s",
         startedAt: 1_000,
       },
       childId: "st_00000001",
@@ -189,7 +190,9 @@ describe("child task progress before the first successful turn", () => {
 
   test("#given a progress created for an already-flagged record #when composed #then the initial state already reads resumed, waiting for input", () => {
     // given
-    const progress = createChildProgress("st_00032607", { category: "quick" }, 1_000, () => 2_000, { awaitingInput: true })
+    const progress = createChildProgress("st_00032607", { category: "quick" }, 1_000, () => 2_000, {
+      awaitingInput: true,
+    })
 
     // when / then
     expect(progress.details().progress.activity).toBe("st_00032607 · category:quick · resumed, waiting for input")
@@ -197,7 +200,9 @@ describe("child task progress before the first successful turn", () => {
 
   test("#given a flagged child whose turn starts moving #when events arrive #then the verb leaves waiting and reads like any live child", () => {
     // given
-    const progress = createChildProgress("st_00032608", { category: "quick" }, 1_000, () => 2_000, { awaitingInput: true })
+    const progress = createChildProgress("st_00032608", { category: "quick" }, 1_000, () => 2_000, {
+      awaitingInput: true,
+    })
 
     // when - a tool actually starts: the child is working again, so the waiting flag is over
     progress.accept({ type: "tool_execution_start", toolName: "bash", args: {} })
@@ -274,7 +279,9 @@ describe("child task progress before the first successful turn", () => {
     progress.accept({ type: "tool_execution_start", toolName: "read", args: { path: "a.ts" } })
 
     // then — tool calls are real progress, so the turn token renders with zero turns
-    expect(progress.details().progress.activity).toBe("st_00000008 · category:quick · turn 0 (1 tool) · running read a.ts")
+    expect(progress.details().progress.activity).toBe(
+      "st_00000008 · category:quick · turn 0 (1 tool) · running read a.ts",
+    )
   })
 
   test("#given details carrying failed turns #when read #then the field survives the round trip and stays optional", () => {
@@ -293,7 +300,12 @@ describe("child task progress before the first successful turn", () => {
       failedTurns: 2,
     })
     expect(
-      readToolProgressDetails({ progress: { activity: "starting", startedAt: 1 }, childId: "st_1", turns: 0, failedTurns: "2" }),
+      readToolProgressDetails({
+        progress: { activity: "starting", startedAt: 1 },
+        childId: "st_1",
+        turns: 0,
+        failedTurns: "2",
+      }),
     ).toBeUndefined()
   })
 })

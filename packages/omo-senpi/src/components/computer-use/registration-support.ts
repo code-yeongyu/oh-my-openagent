@@ -32,7 +32,10 @@ export function toolActivatedNames(payload: unknown): readonly string[] {
  * `session.close` stays the backstop; a runtime that never started has no engine to revoke on,
  * and a component without a runtime (computer use unavailable) wires nothing.
  */
-export function wireComputerControlEvents(pi: { on(event: string, handler: (payload: unknown, ctx?: unknown) => unknown | Promise<unknown>): void }, runtime: { started(): Promise<ComputerUseRuntime> | undefined } | undefined): void {
+export function wireComputerControlEvents(
+  pi: { on(event: string, handler: (payload: unknown, ctx?: unknown) => unknown | Promise<unknown>): void },
+  runtime: { started(): Promise<ComputerUseRuntime> | undefined } | undefined,
+): void {
   if (runtime === undefined) return
   const revokeStarted = async (): Promise<void> => {
     const started = runtime.started()

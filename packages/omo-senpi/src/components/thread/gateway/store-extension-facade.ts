@@ -5,20 +5,31 @@ import { awaitSessionRequest } from "./extension-session-await"
 import { AWAIT_REQUEST_ID } from "./extension-registrations"
 import { gatewayDatabasePath } from "./paths"
 import type { SessionCallReply, SessionCallRequest } from "./store-extension-session-ops"
-import type { SessionCaller, StoreExtensionApi, StoreExtensionRefusal, StoreExtensionRegistration, StoreExtensionResult, StoreExtensionSessionApi } from "./store-extensions"
+import type {
+  SessionCaller,
+  StoreExtensionApi,
+  StoreExtensionRefusal,
+  StoreExtensionRegistration,
+  StoreExtensionResult,
+  StoreExtensionSessionApi,
+} from "./store-extensions"
 
 /** The worker's registration reply: the caller's result, and whether calls for that name now use this registration. */
-export type ExtensionRegisterReply = { readonly result: StoreExtensionResult<{ readonly version: number }>; readonly retained: boolean }
+export type ExtensionRegisterReply = {
+  readonly result: StoreExtensionResult<{ readonly version: number }>
+  readonly retained: boolean
+}
 
 /** A registration the current worker holds, with the time it was made: a restarted worker replays it as of then. */
 export type RetainedRegistration = { readonly extension: StoreExtensionRegistration; readonly registeredAt: number }
 
 export type ThreadCreationRecord = { readonly creator_durable_id: string; readonly created_durable_id: string }
 
-export type ExtensionFacade = StoreExtensionApi & StoreExtensionSessionApi & {
-  /** The durable record that `creator` thread_create'd `created`; a session op's `caller_created_target` reads it. */
-  readonly recordThreadCreation: (record: ThreadCreationRecord) => Promise<void>
-}
+export type ExtensionFacade = StoreExtensionApi &
+  StoreExtensionSessionApi & {
+    /** The durable record that `creator` thread_create'd `created`; a session op's `caller_created_target` reads it. */
+    readonly recordThreadCreation: (record: ThreadCreationRecord) => Promise<void>
+  }
 
 type FacadeDeps = {
   readonly agentDir: string
@@ -38,11 +49,20 @@ function schemaTooNew(error: unknown): StoreExtensionRefusal {
   throw error
 }
 
-function cloneArgs(args: unknown): { readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly refusal: StoreExtensionRefusal } {
+function cloneArgs(
+  args: unknown,
+): { readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly refusal: StoreExtensionRefusal } {
   try {
     return { ok: true, value: structuredClone(args) }
   } catch (error) {
-    return { ok: false, refusal: { kind: "refused", code: "invalid_arguments", message: `Extension arguments are not cloneable: ${error instanceof Error ? error.message : String(error)}` } }
+    return {
+      ok: false,
+      refusal: {
+        kind: "refused",
+        code: "invalid_arguments",
+        message: `Extension arguments are not cloneable: ${error instanceof Error ? error.message : String(error)}`,
+      },
+    }
   }
 }
 
@@ -58,10 +78,23 @@ export function createExtensionFacade(deps: FacadeDeps): ExtensionFacade {
     }
   }
 
-  async function sessionRequest(name: string, op: string, phase: SessionCallRequest["phase"], args: unknown, caller: SessionCaller): Promise<SessionCallReply> {
+  async function sessionRequest(
+    name: string,
+    op: string,
+    phase: SessionCallRequest["phase"],
+    args: unknown,
+    caller: SessionCaller,
+  ): Promise<SessionCallReply> {
     const cloned = cloneArgs(args)
     if (!cloned.ok) return { result: cloned.refusal }
-    const request: SessionCallRequest = { name, op, phase, args: cloned.value, caller: caller.callerDurableId, now: now() }
+    const request: SessionCallRequest = {
+      name,
+      op,
+      phase,
+      args: cloned.value,
+      caller: caller.callerDurableId,
+      now: now(),
+    }
     try {
       return await call<SessionCallReply>("extension_session_call", request)
     } catch (error) {
@@ -83,22 +116,31 @@ export function createExtensionFacade(deps: FacadeDeps): ExtensionFacade {
     },
     extensionCall: async (name, op, args) => {
       const cloned = cloneArgs(args)
-      return cloned.ok ? await extensionRequest("extension_call", { name, op, args: cloned.value, now: now() }) : cloned.refusal
+      return cloned.ok
+        ? await extensionRequest("extension_call", { name, op, args: cloned.value, now: now() })
+        : cloned.refusal
     },
     // No store yet means no declarations: answered without opening (and so creating) the store.
-    sessionCallableOps: async () => (existsSync(gatewayDatabasePath(deps.agentDir)) ? await call("session_callable_ops") : []),
+    sessionCallableOps: async () =>
+      existsSync(gatewayDatabasePath(deps.agentDir)) ? await call("session_callable_ops") : [],
     extensionSessionAwait: async <T>(name: string, op: string, args: unknown, caller: SessionCaller) => {
       const reply = await sessionRequest(name, op, "op", args, caller)
       const { result } = reply
       if (result.kind !== "ok" || reply.await === undefined) return result as StoreExtensionResult<T>
       const value = result.value as { readonly await_request_id?: unknown } | null
-      if (typeof value !== "object" || value === null || value.await_request_id === undefined) return result as StoreExtensionResult<T>
+      if (typeof value !== "object" || value === null || value.await_request_id === undefined)
+        return result as StoreExtensionResult<T>
       const id = value.await_request_id
       // Checked before any path is built from it: a traversal attempt never names a file.
       if (typeof id !== "string" || !AWAIT_REQUEST_ID.test(id)) {
-        return { kind: "refused", code: "invalid_arguments", message: `await_request_id must match ${AWAIT_REQUEST_ID.source}.` }
+        return {
+          kind: "refused",
+          code: "invalid_arguments",
+          message: `await_request_id must match ${AWAIT_REQUEST_ID.source}.`,
+        }
       }
-      const phase = (which: "status" | "expire") => async () => (await sessionRequest(name, op, which, { await_request_id: id }, caller)).result
+      const phase = (which: "status" | "expire") => async () =>
+        (await sessionRequest(name, op, which, { await_request_id: id }, caller)).result
       return (await awaitSessionRequest({
         file: join(dirname(gatewayDatabasePath(deps.agentDir)), reply.await.wake_dir, id),
         timeoutMs: reply.await.timeout_ms,

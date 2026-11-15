@@ -1,0 +1,21 @@
+export declare const protocolVersion: "0.0.0";
+export declare const IdSchema: import("@sinclair/typebox").TString;
+export declare const OperationSchema: import("@sinclair/typebox").TString;
+export declare const TimestampSchema: import("@sinclair/typebox").TString;
+export declare const NonNegativeIntegerSchema: import("@sinclair/typebox").TInteger;
+export declare const PositiveIntegerSchema: import("@sinclair/typebox").TInteger;
+export declare const StringRecordSchema: import("@sinclair/typebox").TRecord<import("@sinclair/typebox").TString, import("@sinclair/typebox").TString>;
+export declare const SchemaId: {
+    readonly capabilityManifest: "https://bunshin.local/schema/capability-manifest.json";
+    readonly disconnected: "https://bunshin.local/schema/disconnected.json";
+    readonly doctorReport: "https://bunshin.local/schema/doctor-report.json";
+    readonly execCommandRequest: "https://bunshin.local/schema/exec-command-request.json";
+    readonly resumable: "https://bunshin.local/schema/resumable.json";
+    readonly shellRequest: "https://bunshin.local/schema/shell-request.json";
+    readonly shellResult: "https://bunshin.local/schema/shell-result.json";
+    readonly terminalHandle: "https://bunshin.local/schema/terminal-handle.json";
+    readonly terminalMessage: "https://bunshin.local/schema/terminal-message.json";
+    readonly waitForCommandRequest: "https://bunshin.local/schema/wait-for-command-request.json";
+    readonly writeStdinRequest: "https://bunshin.local/schema/write-stdin-request.json";
+};
+export type ProtocolVersion = typeof protocolVersion;

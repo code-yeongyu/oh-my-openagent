@@ -16,7 +16,10 @@ export async function initGitSyncTestRepo(root: string): Promise<void> {
   }
   disableFixtureAutoMaintenance(root)
   await writeFile(join(root, "base.md"), "base\n")
-  for (const argv of [["add", "base.md"], ["commit", "-q", "-m", "init"]]) {
+  for (const argv of [
+    ["add", "base.md"],
+    ["commit", "-q", "-m", "init"],
+  ]) {
     const result = await exec.run(argv, { cwd: root, timeoutMs: 20_000 })
     if (result.code !== 0) throw new Error(result.stderr)
   }

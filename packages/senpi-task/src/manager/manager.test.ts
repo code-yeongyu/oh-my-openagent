@@ -398,7 +398,11 @@ describe("TaskManager.start", () => {
     })
     const runner = new FakeRunner()
     runner.childEffectiveModel = { provider: "anthropic", id: "model-b" }
-    const { manager, store } = makeManager({ planner, process: runner, config: settings({ default_execution_mode: "process" }) })
+    const { manager, store } = makeManager({
+      planner,
+      process: runner,
+      config: settings({ default_execution_mode: "process" }),
+    })
 
     // when
     const result = await manager.start(baseSpec({}))
@@ -566,7 +570,11 @@ describe("TaskManager.waitFor", () => {
 describe("TaskManager child subscriptions", () => {
   test("#given a pending task #when its concurrency slot is promoted #then the deferred child listener attaches to its managed handle", async () => {
     const runner = new FakeRunner()
-    const { manager } = makeManager({ config: settings({ default_concurrency: 1 }), inProcess: runner, process: runner })
+    const { manager } = makeManager({
+      config: settings({ default_concurrency: 1 }),
+      inProcess: runner,
+      process: runner,
+    })
     const first = await manager.start(baseSpec({ name: "running" }))
     const queued = await manager.start(baseSpec({ name: "queued" }))
     if (first.kind !== "started" || queued.kind !== "started") throw new Error("expected starts")
@@ -609,7 +617,9 @@ describe("TaskManager pending cancellation", () => {
     expect((await waiting).status).toBe("cancelled")
     expect(store.load(queued.task_id)?.status).toBe("cancelled")
     expect(store.load(queued.task_id)?.residency_state).toBe("disposed")
-    expect(manager.list({ scope: "all" }).find((entry) => entry.record.task_id === queued.task_id)?.queue_position).toBeUndefined()
+    expect(
+      manager.list({ scope: "all" }).find((entry) => entry.record.task_id === queued.task_id)?.queue_position,
+    ).toBeUndefined()
 
     const later = await manager.start(baseSpec({ name: "later" }))
     expect(later.kind).toBe("started")

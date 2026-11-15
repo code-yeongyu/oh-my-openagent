@@ -1,0 +1,70 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/omo-codex/plugin/components/ulw-loop": {
+      "includeEntryExports": true,
+      // Vitest is installed by this package's own npm ci, which the root install does not run, so knip cannot load vitest.config.ts; these are its config and test globs.
+      "vitest": {"config":[],"entry":["vitest.config.ts","test/**/*.test.ts"]},
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "test/fixtures/barrier.ts",
+        "test/fixtures/checkpoint-builders.ts",
+        "test/fixtures/cli-session.ts",
+        "test/fixtures/commit-child.ts",
+        "test/fixtures/commit-cli-qa.mjs",
+        "test/fixtures/commit-crash.ts",
+        "test/fixtures/commit-mutations.mjs",
+        "test/fixtures/commit-writer.ts",
+        "test/fixtures/lease-clock.ts",
+        "test/fixtures/quality-gate-builder.ts",
+        "vitest.config.ts",
+      ],
+      "ignoreFiles": [
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/checkpoint-reconciliation.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/quality-gate-aggregate.ts",
+      ],
+      "ignoreDependencies": [
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@biomejs/biome",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@vitest/coverage-v8",
+      ],
+      // pre-existing at origin dev 4686e425b5: executables this package runs that it does not declare
+      "ignoreBinaries": ["biome", "vitest"],
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) ULW_LOOP_LEDGER_EVENT_KINDS
+    "packages/omo-codex/plugin/components/ulw-loop/src/constants.ts": ["ULW_LOOP_LEDGER_EVENT_KINDS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) writeViewFile
+    "packages/omo-codex/plugin/components/ulw-loop/src/plan-commit.ts": ["writeViewFile"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) appendLedgerEntries
+    "packages/omo-codex/plugin/components/ulw-loop/src/plan-io.ts": ["appendLedgerEntries"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) logNames
+    "packages/omo-codex/plugin/components/ulw-loop/src/plan-log.ts": ["logNames"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ULW_LOOP_CREATE_GOALS_COMMAND, planMissingRecovery
+    "packages/omo-codex/plugin/components/ulw-loop/src/plan-missing-recovery.ts": ["ULW_LOOP_CREATE_GOALS_COMMAND", "planMissingRecovery"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) SUPPORTED_SURFACES, SUPPORTED_KINDS, kindField
+    "packages/omo-codex/plugin/components/ulw-loop/src/quality-gate-artifacts.ts": ["SUPPORTED_SURFACES", "SUPPORTED_KINDS", "kindField"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) poisonField, isRecord
+    "packages/omo-codex/plugin/components/ulw-loop/src/quality-gate-fields.ts": ["poisonField", "isRecord"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) SURFACE_MARKER_FILENAME
+    "packages/omo-codex/plugin/components/ulw-loop/src/surface.ts": ["SURFACE_MARKER_FILENAME"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) batchOf
+    "packages/omo-codex/plugin/components/ulw-loop/src/validation-batch.ts": ["batchOf"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) NOW
+    "packages/omo-codex/plugin/components/ulw-loop/test/fixtures/checkpoint-builders.ts": ["NOW"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) qaDirFor, CODE_REVIEW_PATH, GATE_REVIEW_PATH, CLI_PASS_PATH, REJECTION_LOG_PATH, writeQualityGateArtifacts
+    "packages/omo-codex/plugin/components/ulw-loop/test/fixtures/quality-gate-builder.ts": ["qaDirFor", "CODE_REVIEW_PATH", "GATE_REVIEW_PATH", "CLI_PASS_PATH", "REJECTION_LOG_PATH", "writeQualityGateArtifacts"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/omo-codex/plugin/components/ulw-loop/vitest.config.ts": ["default"]
+  }
+}

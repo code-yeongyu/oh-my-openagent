@@ -4,7 +4,8 @@ import type { ComponentLogger } from "../../extension/types"
 
 type NotificationUi = { notify(message: string, level: "info" | "warning" | "error"): void }
 
-export const COMMENT_CHECKER_COULD_NOT_RUN = "omo-senpi comment-checker could not run; component disabled for this session"
+export const COMMENT_CHECKER_COULD_NOT_RUN =
+  "omo-senpi comment-checker could not run; component disabled for this session"
 
 // The logger alone is not enough: the interactive TUI diverts console output to the debug log, so the
 // session UI is the only place a user sees that edits are no longer checked (#8850).

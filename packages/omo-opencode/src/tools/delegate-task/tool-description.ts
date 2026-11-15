@@ -28,8 +28,9 @@ export function createDelegateTaskPresentation(options: DelegateTaskPresentation
   const categoryNames = categoryEntries.map(({ name }) => name)
   const categoryExamples = categoryNames.join(", ")
 
-  const availableCategories: AvailableCategory[] = options.availableCategories
-    ?? categoryEntries.map(({ name, categoryConfig, description }) => {
+  const availableCategories: AvailableCategory[] =
+    options.availableCategories ??
+    categoryEntries.map(({ name, categoryConfig, description }) => {
       return {
         name,
         description: description || "General tasks",
@@ -39,11 +40,13 @@ export function createDelegateTaskPresentation(options: DelegateTaskPresentation
 
   const availableSkills: AvailableSkill[] = options.availableSkills ?? []
 
-  const categoryList = categoryEntries.map(({ name, description, callerGuidance }) => {
-    const categoryLine = description ? `  - ${name}: ${description}` : `  - ${name}`
-    const indentedGuidance = callerGuidance?.replaceAll("\n", "\n    ")
-    return indentedGuidance ? `${categoryLine}\n    ${indentedGuidance}` : categoryLine
-  }).join("\n")
+  const categoryList = categoryEntries
+    .map(({ name, description, callerGuidance }) => {
+      const categoryLine = description ? `  - ${name}: ${description}` : `  - ${name}`
+      const indentedGuidance = callerGuidance?.replaceAll("\n", "\n    ")
+      return indentedGuidance ? `${categoryLine}\n    ${indentedGuidance}` : categoryLine
+    })
+    .join("\n")
 
   const description = `Spawn agent task with category-based or direct agent selection.
 

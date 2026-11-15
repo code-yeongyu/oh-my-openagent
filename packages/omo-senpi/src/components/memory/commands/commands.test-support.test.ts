@@ -19,19 +19,23 @@ test("#given trusted fixture seeds #when the fixture is prepared #then seed crea
     },
   }
   const path = "system/persona.md"
-  const repo = await seededRepo(identity, [
-    { relativePath: path, content: "---\ndescription: Fixture\n---\noriginal\n" },
-  ], exec)
+  const repo = await seededRepo(
+    identity,
+    [{ relativePath: path, content: "---\ndescription: Fixture\n---\noriginal\n" }],
+    exec,
+  )
   expect(hookAtCommit).toEqual([false])
   for (const name of ["pre-commit", "commit-msg", "post-commit"]) {
     expect(existsSync(join(repo.dir, ".git", "hooks", name))).toBe(true)
   }
   const head = await repo.head()
   await writeFile(join(repo.dir, path), "invalid memory without frontmatter\n")
-  await expect(repo.commitWrite([path], "test: invalid fixture edit", {
-    agentId: identity.identity,
-    authorName: "Fixture test",
-  })).rejects.toBeInstanceOf(GitCommandError)
+  await expect(
+    repo.commitWrite([path], "test: invalid fixture edit", {
+      agentId: identity.identity,
+      authorName: "Fixture test",
+    }),
+  ).rejects.toBeInstanceOf(GitCommandError)
   expect(hookAtCommit).toEqual([false, true])
   expect(await repo.head()).toBe(head)
 })

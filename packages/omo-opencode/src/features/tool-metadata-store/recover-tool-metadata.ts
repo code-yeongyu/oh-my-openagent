@@ -3,7 +3,7 @@ import { resolveToolCallID, type ToolCallIDCarrier } from "./resolve-tool-call-i
 
 export function recoverToolMetadata(
   sessionID: string,
-  source: ToolCallIDCarrier | string | undefined
+  source: ToolCallIDCarrier | string | undefined,
 ): PendingToolMetadata | undefined {
   if (typeof source === "string") {
     return consumeToolMetadata(sessionID, source)

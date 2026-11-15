@@ -17,7 +17,9 @@ describe("addPluginToOpenCodeConfig - tuple plugin entries", () => {
     mkdirSync(testConfigDir, { recursive: true })
     process.env.OPENCODE_CONFIG_DIR = testConfigDir
     resetConfigContext()
-    getPluginNameWithVersionSpy = spyOn(pluginNameWithVersion, "getPluginNameWithVersion").mockResolvedValue("oh-my-openagent")
+    getPluginNameWithVersionSpy = spyOn(pluginNameWithVersion, "getPluginNameWithVersion").mockResolvedValue(
+      "oh-my-openagent",
+    )
   })
 
   afterEach(() => {
@@ -64,7 +66,10 @@ describe("addPluginToOpenCodeConfig - tuple plugin entries", () => {
     expect(savedContent).toContain("// keep this comment")
 
     const savedConfig = JSON.parse(
-      savedContent.split("\n").filter((line) => !line.trim().startsWith("//")).join("\n"),
+      savedContent
+        .split("\n")
+        .filter((line) => !line.trim().startsWith("//"))
+        .join("\n"),
     )
     expect(savedConfig.plugin).toEqual([["some-plugin@1.2.3", { enabled: true }], "oh-my-openagent"])
   })
@@ -123,7 +128,9 @@ describe("addPluginToOpenCodeConfig - tuple plugin entries", () => {
 
   it("#given a tuple entry pinned above the install version #when adding the plugin #then the downgrade is blocked", async () => {
     // given
-    const versionSpy = spyOn(pluginNameWithVersion, "getPluginNameWithVersion").mockResolvedValue("oh-my-openagent@3.15.0")
+    const versionSpy = spyOn(pluginNameWithVersion, "getPluginNameWithVersion").mockResolvedValue(
+      "oh-my-openagent@3.15.0",
+    )
     const configPath = join(testConfigDir, "opencode.json")
     writeFileSync(
       configPath,

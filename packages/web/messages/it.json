@@ -519,5 +519,190 @@
     "title": "Impossibile trovare questa pagina.",
     "body": "Il link potrebbe essere vecchio o la pagina potrebbe essere stata spostata.",
     "home": "Torna alla home"
+  },
+  "home": {
+    "metaTitle": "OmO: Il tuo strumento per il lavoro vero. Ma è un agente.",
+    "nav": {
+      "primary": "Principale",
+      "skip": "Vai al contenuto",
+      "ultrawork": "Ultrawork",
+      "massUlw": "Mass ulw",
+      "models": "Modelli",
+      "skills": "Skill",
+      "docs": "Docs",
+      "install": "Installa",
+      "stars": "{count} stelle su GitHub",
+      "theme": "Tema",
+      "system": "Usa il tema di sistema",
+      "light": "Usa il tema chiaro",
+      "dark": "Usa il tema scuro",
+      "manifesto": "Manifesto",
+      "openMenu": "Apri menu",
+      "closeMenu": "Chiudi menu"
+    },
+    "hero": {
+      "title": "Il tuo strumento per il lavoro vero.",
+      "accent": "Ma è un agente.",
+      "sub": "Trasforma i tuoi token in risultati che contano: ricerche su diecimila fonti, una presentazione che si capisce davvero, backend, frontend e codice.",
+      "start": "Inizia",
+      "beta": "Scarica la beta desktop",
+      "download": "Scarica l'app desktop",
+      "makers": "Da <team>Sisyphus Labs</team>, chi ha creato <dori>Dori</dori> e <term>doriterm</term>."
+    },
+    "stats": {
+      "label": "Numeri in tempo reale",
+      "stars": "stelle su GitHub",
+      "total": "download totali",
+      "monthly": "download nell'ultimo mese"
+    },
+    "index": {
+      "label": "In questa pagina",
+      "ultrawork": "Una parola per un compito difficile",
+      "massUlw": "Un grafo di agenti",
+      "models": "Un prompt calibrato per ogni modello",
+      "kibitzer": "Memoria accanto all'agente",
+      "skills": "Caricate quando il compito le richiede",
+      "crafted": "Le parti che non vedi mai"
+    },
+    "ultrawork": {
+      "eyebrow": "Ultrawork",
+      "title": "Aggiungi una parola a un compito difficile.",
+      "soft": "Al resto pensa l'agente.",
+      "body": "Salta la teoria. Se un compito sembra difficile, aggiungi la parola ultrawork al tuo prompt. L'agente decide come affrontarlo e arriva da solo al risultato migliore.",
+      "prompt": "rendi il report trimestrale davvero leggibile",
+      "keyword": "ultrawork",
+      "step1": "legge l'intera codebase prima di toccare una riga",
+      "step2": "pianifica, poi verifica ogni passaggio prima di proseguire",
+      "step3": "verifica il risultato sulla superficie reale, poi si ferma",
+      "frame": "omo · ~/reports"
+    },
+    "massUlw": {
+      "eyebrow": "Mass ulw",
+      "title": "Una parola chiave, centinaia di agenti.",
+      "soft": "Ogni parte sul modello più adatto.",
+      "body": "Scrivi mass ulw e l'intero lavoro diventa un grafo di agenti: ricerca approfondita su migliaia di fonti, una pipeline completa di machine learning, una migrazione che nessuno vuole fare. Ogni parte gira in parallelo sul modello più adatto e viene verificata prima di dirsi conclusa."
+    },
+    "models": {
+      "eyebrow": "Modelli",
+      "title": "Modelli di punta ed economici, insieme.",
+      "soft": "Ognuno include un prompt calibrato su misura.",
+      "body": "Usa i modelli di punta che ami insieme a quelli economici. Basta accedere. Ogni modello include un system prompt calibrato su misura, così non scegli mai quello sbagliato.",
+      "caption": "Profili calibrati inclusi in OmO"
+    },
+    "kibitzer": {
+      "eyebrow": "Kibitzer",
+      "title": "Il tuo agente ricorda il tuo lavoro.",
+      "soft": "Un modello piccolo custodisce la memoria.",
+      "body": "Un modello piccolo ed economico affianca il costoso agente principale, legge ciò che hai già fatto e lo avvisa prima che ripeta un errore. Il modello costoso resta lucido; tu smetti di ripeterti.",
+      "sidecar": "Kibitzer · modello piccolo",
+      "main": "Agente principale · modello di punta",
+      "cheapLoop": "Modello piccolo ed economico · ciclo indipendente",
+      "expensiveLoop": "Modello di punta costoso · ciclo principale",
+      "watch": "Osserva",
+      "read": "Legge la memoria",
+      "judge": "Valuta",
+      "memory": "memoria",
+      "memoryNote": "Migrazione precedente: la produzione si è rotta saltando il test.",
+      "nudge": "avviso",
+      "plan": "Pianifica la modifica dello schema",
+      "act": "Agisce · scrive la migrazione",
+      "testFirst": "Verifica · esegue prima il test di migrazione",
+      "ship": "Rilascia la modifica",
+      "reason": "L'ultima volta questo ha rotto la produzione. Esegui prima il test di migrazione.",
+      "figure": "Un Kibitzer piccolo ed economico osserva e legge la memoria in un ciclo continuo accanto al ciclo indipendente del costoso agente principale, inserendo un promemoria per eseguire il test di migrazione prima del rilascio."
+    },
+    "skills": {
+      "eyebrow": "Skill",
+      "title": "Competenze reali, sotto forma di skill.",
+      "soft": "Caricate solo quando il compito le richiede.",
+      "body": "Il tuo modello è intelligente, ma sa ancora poco su come risolvere problemi reali. OmO fornisce le conoscenze mancanti sotto forma di skill e carica solo ciò che serve al compito.",
+      "more": "Vedi tutte le skill nella documentazione"
+    },
+    "crafted": {
+      "eyebrow": "Cura",
+      "title": "Tutto il resto è curato nei dettagli.",
+      "soft": "Gran parte non la vedrai.",
+      "body": "È proprio questo il punto. Ognuno di questi elementi è attivo in ogni sessione.",
+      "docs": "Leggi i dettagli nella documentazione",
+      "item1Name": "Chiamate tool in code-mode",
+      "item1Desc": "Le chiamate tool indipendenti vengono eseguite insieme in un piccolo programma invece di fare un lento round trip ciascuna.",
+      "item2Name": "Assorbimento delle chiamate tool",
+      "item2Desc": "Decine di chiamate di lettura, ricerca e consultazione si fondono in un unico passaggio. Meno turni, meno attese, meno token.",
+      "item3Name": "Correzione delle chiamate tool",
+      "item3Desc": "Gli argomenti malformati vengono riparati prima dell'esecuzione, così un refuso non diventa mai un turno sprecato.",
+      "item4Name": "Team mode",
+      "item4Desc": "Un agente leader guida un team di specialisti in parallelo quando un lavoro è abbastanza grande da essere diviso.",
+      "item5Name": "Monitoraggio, non polling",
+      "item5Desc": "Attendere una build, un deploy o un file è una sottoscrizione. L'agente continua a lavorare e si risveglia quando è pronto.",
+      "item6Name": "Obiettivi che sopravvivono",
+      "item6Desc": "I lavori lunghi vengono salvati con checkpoint e prove, così al riavvio della sessione tutto riprende da dove si era fermato.",
+      "item7Name": "Hot-reload di tutto",
+      "item7Desc": "Configurazioni, skill e prompt si ricaricano a caldo. Nessun riavvio per provare una modifica.",
+      "item8Name": "Uso del computer",
+      "item8Desc": "L'agente legge lo schermo e l'albero di accessibilità delle app native su macOS, Linux e Windows, poi fa clic e digita in background, lasciando intatti focus e cursore. Una combinazione di tasti lo sospende; solo tu puoi farlo riprendere."
+    },
+    "everywhere": {
+      "eyebrow": "Dove funziona",
+      "title": "Oggi nel tuo terminale.",
+      "soft": "Presto nelle tue app di chat.",
+      "terminalTitle": "Nel tuo terminale",
+      "terminalBody": "Un comando installa OmO. Poi esegui omo in qualsiasi progetto.",
+      "terminalMeta": "macOS, Linux, WSL e Windows",
+      "desktopTitle": "In un'app desktop",
+      "desktopBody": "L'app desktop di OmO per Mac, PC Windows o Linux.",
+      "desktopMeta": "Beta",
+      "chatTitle": "Dalle tue app di chat",
+      "chatBody": "Parla con il tuo agente dove ti trovi già. Invia messaggi a nome tuo, non come un bot, su ogni piattaforma che usi.",
+      "chatMeta": "In arrivo. Le piattaforme di messaggistica vengono collegate una alla volta."
+    },
+    "voices": {
+      "eyebrow": "Dagli utenti",
+      "title": "Cosa dicono le persone.",
+      "q1": "Mi ha fatto disdire l'abbonamento a Cursor. Stanno succedendo cose incredibili nella community open source.",
+      "a1": "Arthur Guiot",
+      "q2": "Se Claude Code fa in 7 giorni quello che un umano fa in 3 mesi, OmO lo fa in 1 ora.",
+      "a2": "B, Quant Researcher",
+      "q3": "Dovreste integrarlo nel core e assumerlo. Sul serio. È davvero, davvero, davvero ottimo.",
+      "a3": "Henning Kilset"
+    },
+    "makers": {
+      "title": "Creato da Sisyphus Labs.",
+      "soft": "Chi c'è dietro Dori e doriterm.",
+      "dori": "Un ingegnere che vive nella tua chat. Digli cosa fare su Slack, Discord o Telegram; assegna a ogni lavoro una sessione dedicata di un agente di programmazione e ti aggiorna quando è stato fatto il merge.",
+      "doriterm": "Tutte le tue macchine, collegate tramite una rete mesh crittografata end-to-end, in un unico terminale. Avvia OmO sul mac mini di casa e rispondigli dal telefono."
+    },
+    "closing": {
+      "title": "Un comando.",
+      "soft": "Poi torni al lavoro.",
+      "body": "Installa OmO, apri il tuo progetto, descrivi il lavoro. La configurazione è tutta qui.",
+      "docs": "Leggi la documentazione",
+      "manifesto": "Leggi il manifesto"
+    },
+    "install": {
+      "label": "Comando di installazione per il tuo sistema",
+      "unix": "macOS, Linux, WSL",
+      "powershell": "PowerShell",
+      "cmd": "CMD",
+      "next": "Poi apri un nuovo terminale ed esegui omo.",
+      "copy": "Copia",
+      "copied": "Copiato",
+      "copyAria": "Copia il comando di installazione",
+      "copiedStatus": "Comando di installazione copiato",
+      "windows": "Windows",
+      "onComputer": "Eseguilo sul tuo computer Mac, Linux o Windows."
+    },
+    "footer": {
+      "copyright": "© {year} Sisyphus Labs · Source-available sotto licenza SUL-1.0",
+      "docs": "Docs",
+      "manifesto": "Manifesto",
+      "releases": "Versioni",
+      "github": "GitHub",
+      "discord": "Discord",
+      "x": "X @justsisyphus",
+      "privacy": "Privacy",
+      "terms": "Termini",
+      "language": "Lingua",
+      "label": "Piè di pagina"
+    }
   }
 }

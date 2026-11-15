@@ -26,10 +26,10 @@ Jina Reader로 완전 접근 가능.
 
 ```bash
 # 기사 목록
-curl -s "https://r.jina.ai/https://news.naver.com/"
+curl -s -H "Authorization: Bearer ${JINA_API_KEY}" "https://r.jina.ai/https://news.naver.com/"
 
 # 개별 기사
-curl -s "https://r.jina.ai/https://n.news.naver.com/article/{press_id}/{article_id}"
+curl -s -H "Authorization: Bearer ${JINA_API_KEY}" "https://r.jina.ai/https://n.news.naver.com/article/{press_id}/{article_id}"
 ```
 
 ## 네이버 증권
@@ -37,7 +37,7 @@ curl -s "https://r.jina.ai/https://n.news.naver.com/article/{press_id}/{article_
 Jina Reader로 실시간 주가, 주요 뉴스 접근.
 
 ```bash
-curl -s "https://r.jina.ai/https://finance.naver.com/item/main.naver?code={종목코드}"
+curl -s -H "Authorization: Bearer ${JINA_API_KEY}" "https://r.jina.ai/https://finance.naver.com/item/main.naver?code={종목코드}"
 ```
 
 ## 네이버 금융 시세 (비공식, 무인증)

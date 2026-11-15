@@ -11,6 +11,7 @@ import { existsSync, readdir, rename, rm } from "../../fs/resilient"
 import { join } from "node:path"
 
 import { readJson, removeAtomic, TEMP_MARK, writeJson } from "./atomic"
+import { Outbox, type PendingOps } from "./outbox"
 import type { PulledEntry, RefusalCode } from "./ports"
 
 export type IncomingStage = "downloaded" | "verified"
@@ -37,6 +38,29 @@ export interface CycleRecord {
   readonly batches: readonly PulledEntry[]
   readonly keys: readonly string[]
   readonly treeId: string | null
+  /** Peers whose owed edits this cycle renders (#12284 review H1); absent in an older journal. */
+  readonly owedPrincipals?: readonly string[]
+}
+
+/** A key whose working file lags its item doc: a cycle skipped rendering over a held edit (#12284 review H1). */
+export interface OwedRender {
+  readonly key: string
+  /** The batch authors whose edit is owed, for the render commit's Sync-Principals. */
+  readonly principals: readonly string[]
+}
+
+/**
+ * Items held out of the push, since the cycle that first held any and for how many cycles in a row
+ * (#12284). `stuck` keys are queued ops this device cannot wind back, which shrinking will not fix;
+ * `prints` fingerprint each capture-held file (working text and doc version) so an unchanged one is
+ * not diffed again.
+ */
+export interface HeldItems {
+  readonly keys: readonly string[]
+  readonly stuck?: readonly string[]
+  readonly since: number
+  readonly cycles: number
+  readonly prints?: Readonly<Record<string, string>>
 }
 
 /**
@@ -62,6 +86,13 @@ export interface EngineState {
   readonly refused: number
   /** Received items dropped because their key may never reach this device's files (#12147); never pauses. */
   readonly rejectedItems: number
+  /**
+   * Items the last cycle held out of the push because one change to each exceeds the batch bound
+   * (#12284), since the cycle that first held any, and for how many cycles in a row; null when none.
+   */
+  readonly held: HeldItems | null
+  /** Keys whose file still owes a peer's edit; discharged by the cycle that renders them. */
+  readonly owed: readonly OwedRender[]
   readonly cycle: CycleRecord | null
   /** The entry the pull stopped at; cleared once a later pull verifies past it. */
   readonly paused: { readonly seq: number; readonly code: RefusalCode } | null
@@ -72,44 +103,30 @@ export interface EngineState {
   readonly peer: string | null
 }
 
-export interface OutgoingBatch {
-  readonly batchId: string
-  readonly baseSeq: number
-  readonly digest: string
-  readonly bytes: string
-  readonly uploadId: string | null
-  readonly epoch: number
-  readonly link: string
-  readonly recordSig: string
-  readonly stage: "sealed" | "reserved" | "uploaded"
-  readonly items: readonly WireItem[]
-}
-
-export interface PendingOps {
-  readonly items: readonly WireItem[]
-  readonly outgoing: OutgoingBatch | null
-}
-
 const EMPTY_STATE: EngineState = {
   applied: 0,
   eventHead: 0,
   refused: 0,
   rejectedItems: 0,
+  held: null,
+  owed: [],
   cycle: null,
   paused: null,
   lastSyncedAt: null,
   updatedWhileOffline: 0,
   peer: null,
 }
-const EMPTY_PENDING: PendingOps = { items: [], outgoing: null }
 
 export class SyncJournal {
   readonly dir: string
   readonly tmpDir: string
+  /** Captured ops waiting to be pushed: an index in pending.json, the ops in `pending/` (#12286). */
+  readonly outbox: Outbox
 
   constructor(gitDir: string) {
     this.dir = join(gitDir, "omo-sync")
     this.tmpDir = join(this.dir, "tmp")
+    this.outbox = new Outbox(this.dir)
   }
 
   async state(): Promise<EngineState> {
@@ -153,11 +170,6 @@ export class SyncJournal {
       records.push(await readJson<RenderRecord>(join(dir, name), null as never))
     }
     return records.sort((a, b) => a.seq - b.seq)
-  }
-
-  /** The seq the next render record of this cycle takes (records are append-only). */
-  async nextRenderSeq(id: string): Promise<number> {
-    return ((await this.renders(id)).at(-1)?.seq ?? 0) + 1
   }
 
   appendRender(id: string, record: RenderRecord): Promise<void> {
@@ -210,11 +222,11 @@ export class SyncJournal {
   }
 
   pending(): Promise<PendingOps> {
-    return readJson(join(this.dir, "pending.json"), EMPTY_PENDING)
+    return this.outbox.read()
   }
 
   setPending(pending: PendingOps): Promise<void> {
-    return writeJson(join(this.dir, "pending.json"), pending)
+    return this.outbox.write(pending)
   }
 
   private incomingPath(seq: number): string {

@@ -12,7 +12,11 @@ import { suspendHandle } from "./shutdown"
  * such resident here: not a finished result (cancelled, lost and killed records belong to destruction), not
  * resident, owned elsewhere, mail pending, or already being torn down.
  */
-export async function parkTerminalResident(context: LifecycleContext, taskId: string, reason: string): Promise<boolean> {
+export async function parkTerminalResident(
+  context: LifecycleContext,
+  taskId: string,
+  reason: string,
+): Promise<boolean> {
   if (context.registry.tryClaimEviction?.(taskId) === false) return false
   try {
     const fresh = context.store.load(taskId)
@@ -27,7 +31,8 @@ export async function parkTerminalResident(context: LifecycleContext, taskId: st
       fresh.status === "interrupted" ||
       fresh.killed === true ||
       blocksFinishedTeardown(context, taskId)
-    ) return false
+    )
+      return false
     const handle = context.registry.get(taskId)
     if (handle !== undefined) {
       await suspendHandle(context, handle, reason)

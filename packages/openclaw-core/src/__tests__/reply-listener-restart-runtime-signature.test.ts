@@ -38,8 +38,7 @@ const daemonPids = new Set<number>()
 
 let spawnImplementation: SpawnImplementation = () => ({
   pid: 0,
-  unref() {
-  },
+  unref() {},
 })
 
 let replyListenerModule: typeof import("../reply-listener")
@@ -212,8 +211,7 @@ describe("startReplyListener", () => {
 
       return {
         pid: nextPid,
-        unref() {
-        },
+        unref() {},
       }
     }
 
@@ -227,5 +225,4 @@ describe("startReplyListener", () => {
       killSpy.mockRestore()
     }
   })
-
 })

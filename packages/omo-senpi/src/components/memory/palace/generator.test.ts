@@ -3,12 +3,7 @@ import { readFile, stat } from "node:fs/promises"
 import { dirname } from "node:path"
 
 import { generatePalaceHtml } from "./generator"
-import {
-  INJECTION_PAYLOAD,
-  cleanupPalaceFixtures,
-  commitPalaceFile,
-  createPalaceFixture,
-} from "./palace.test-support"
+import { INJECTION_PAYLOAD, cleanupPalaceFixtures, commitPalaceFile, createPalaceFixture } from "./palace.test-support"
 
 afterAll(cleanupPalaceFixtures)
 
@@ -17,9 +12,7 @@ afterAll(cleanupPalaceFixtures)
 setDefaultTimeout(process.platform === "win32" ? 30_000 : 5_000)
 
 function inlineJson(html: string): Record<string, unknown> {
-  const match = html.match(
-    /<script type="application\/json" id="omo-palace-data">([\s\S]*?)<\/script>/,
-  )
+  const match = html.match(/<script type="application\/json" id="omo-palace-data">([\s\S]*?)<\/script>/)
   if (match?.[1] === undefined) throw new Error("palace html has no inline data script")
   const decoded = match[1]
     .replace(/\\u003c/g, "<")
@@ -99,9 +92,7 @@ describe("palace generator machine gate", () => {
     expect(html).not.toContain(INJECTION_PAYLOAD)
     expect(html).not.toContain("</script><img")
     // Escaping `<` is what neutralises the breakout: no `</script` sequence can survive.
-    expect(html.indexOf("</script", html.indexOf("id=\"omo-palace-data\""))).toBe(
-      html.indexOf("</script>\n<script>"),
-    )
+    expect(html.indexOf("</script", html.indexOf('id="omo-palace-data"'))).toBe(html.indexOf("</script>\n<script>"))
     expect(html).toContain("\\u003c/script>\\u003cimg src=x onerror=alert(1)>")
     expect(JSON.stringify(inlineJson(html))).toContain(INJECTION_PAYLOAD)
   })
@@ -144,9 +135,7 @@ describe("palace generator machine gate", () => {
     const external = section(inlineJson(html), "external").entries
 
     expect(Array.isArray(external)).toBe(true)
-    const binary = (external as Array<Record<string, unknown>>).find(
-      (entry) => entry.path === "reference/logo.png",
-    )
+    const binary = (external as Array<Record<string, unknown>>).find((entry) => entry.path === "reference/logo.png")
     expect(binary?.binary).toBe(true)
     expect(binary?.byteSize).toBe(12)
     expect(binary?.body).toBeUndefined()

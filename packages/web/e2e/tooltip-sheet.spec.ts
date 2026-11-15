@@ -80,6 +80,7 @@ test.describe("Icon control tooltip", () => {
   })
 })
 
+// The phone menu in the shared nav (components/home/mobile-menu.tsx).
 test("Escape closes the mobile nav sheet and returns focus to its toggle", async ({ page }) => {
   // given
   await page.setViewportSize({ width: 375, height: 800 })

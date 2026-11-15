@@ -6,9 +6,18 @@ export type ParsedAgentModel = {
 }
 
 const SECRET_LIKE_MODEL_FIELD_NAMES: ReadonlySet<string> = new Set([
-  "accesstoken", "apikey", "auth", "authorization",
-  "bearertoken", "clientsecret", "password", "privatekey",
-  "privatetoken", "secret", "secretkey", "token",
+  "accesstoken",
+  "apikey",
+  "auth",
+  "authorization",
+  "bearertoken",
+  "clientsecret",
+  "password",
+  "privatekey",
+  "privatetoken",
+  "secret",
+  "secretkey",
+  "token",
 ] as const)
 
 export function findExactAgentModel<TModel extends SenpiModelPort>(
@@ -31,10 +40,7 @@ export function parseAvailableAgentModels(models: unknown): readonly string[] | 
 }
 
 // Mirrors category/resolver.ts registry parsing so agent resolution preserves the same safe boundary.
-function parseRegistryModel(
-  model: unknown,
-  expected?: ParsedAgentModel,
-): ParsedAgentModel | undefined {
+function parseRegistryModel(model: unknown, expected?: ParsedAgentModel): ParsedAgentModel | undefined {
   if (typeof model !== "object" || model === null || hasSecretLikeModelField(model)) return undefined
   const provider = ownStringDataProperty(model, "provider")
   const modelId = ownStringDataProperty(model, "id")
@@ -51,13 +57,11 @@ function parseModel(model: string): ParsedAgentModel | undefined {
 
 function hasSecretLikeModelField(model: object): boolean {
   return Object.getOwnPropertyNames(model).some((key) =>
-    SECRET_LIKE_MODEL_FIELD_NAMES.has(key.replaceAll(/[^a-zA-Z0-9]/g, "").toLowerCase())
+    SECRET_LIKE_MODEL_FIELD_NAMES.has(key.replaceAll(/[^a-zA-Z0-9]/g, "").toLowerCase()),
   )
 }
 
 function ownStringDataProperty(model: object, key: "provider" | "id"): string | undefined {
   const descriptor = Object.getOwnPropertyDescriptor(model, key)
-  return descriptor && "value" in descriptor && typeof descriptor.value === "string"
-    ? descriptor.value
-    : undefined
+  return descriptor && "value" in descriptor && typeof descriptor.value === "string" ? descriptor.value : undefined
 }

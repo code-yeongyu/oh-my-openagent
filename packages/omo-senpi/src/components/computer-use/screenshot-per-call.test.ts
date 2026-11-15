@@ -20,15 +20,28 @@ import type { ComponentContext } from "../../extension/types"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createComputerUseComponent } from "./index"
 
-const FAKE_ENGINE = join(dirname(fileURLToPath(import.meta.url)), "../../../../senpi-desktop-service/test/fake-engine.mjs")
+const FAKE_ENGINE = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../../../senpi-desktop-service/test/fake-engine.mjs",
+)
 const RECEIVED = "recv "
 const senpiDist = dirname(fileURLToPath(import.meta.resolve("@code-yeongyu/senpi")))
-const wire = (await import(pathToFileURL(join(senpiDist, "..", "..", "..", "@earendil-works", "pi-agent-core", "dist", "index.js")).href)) as {
+const wire = (await import(
+  pathToFileURL(join(senpiDist, "..", "..", "..", "@earendil-works", "pi-agent-core", "dist", "index.js")).href
+)) as {
   encodeRemoteMessage(message: unknown): Uint8Array
-  decodeRemoteMessage(payload: Uint8Array): { readonly kind: string; readonly result?: { readonly content: ReadonlyArray<Part> } }
+  decodeRemoteMessage(payload: Uint8Array): {
+    readonly kind: string
+    readonly result?: { readonly content: ReadonlyArray<Part> }
+  }
 }
 
-interface Part { readonly type: string; readonly data?: string; readonly mimeType?: string; readonly text?: string }
+interface Part {
+  readonly type: string
+  readonly data?: string
+  readonly mimeType?: string
+  readonly text?: string
+}
 
 class HostApi extends FakeExtensionAPI {
   active: string[] = ["read"]
@@ -62,12 +75,16 @@ function session() {
   const pi = new HostApi()
   const requests: Array<{ readonly method: string; readonly params: unknown }> = []
   const factory: ChildFactory = () => {
-    const child = spawn(process.execPath, [FAKE_ENGINE, "--stdio"], { env: { ...process.env, FAKE_ENGINE_DESKTOP: "1", FAKE_ENGINE_CAPTURE_MARKERS: "1" }, stdio: "pipe" })
+    const child = spawn(process.execPath, [FAKE_ENGINE, "--stdio"], {
+      env: { ...process.env, FAKE_ENGINE_DESKTOP: "1", FAKE_ENGINE_CAPTURE_MARKERS: "1" },
+      stdio: "pipe",
+    })
     children.push(child)
     createInterface({ input: child.stdout }).on("line", (line) => {
       const message = JSON.parse(line) as { method?: unknown; params?: { message?: unknown } }
       const text = message.method === "engine.log" ? message.params?.message : undefined
-      if (typeof text === "string" && text.startsWith(RECEIVED)) requests.push(JSON.parse(text.slice(RECEIVED.length)) as { method: string; params: unknown })
+      if (typeof text === "string" && text.startsWith(RECEIVED))
+        requests.push(JSON.parse(text.slice(RECEIVED.length)) as { method: string; params: unknown })
     })
     return child
   }
@@ -76,15 +93,40 @@ function session() {
   mkdirSync(join(home, ".omo"), { recursive: true })
   writeFileSync(join(home, ".omo", "omo.jsonc"), "{}")
   const settings = resolveComputerSettings({}, "linux")
-  const context: ComponentContext = { logger: { info() {}, warn() {}, error() {} }, config: { getFlag: () => undefined } }
-  createComputerUseComponent({ platform: "linux", env: { HOME: home }, engineChild: () => factory, loadSettings: () => settings }).register(pi, context)
-  const hostContext = { cwd: "/work", model: undefined, hasUI: false, sessionManager: { getSessionId: () => "s", getSessionDir: () => join(home, "sessions") } }
+  const context: ComponentContext = {
+    logger: { info() {}, warn() {}, error() {} },
+    config: { getFlag: () => undefined },
+  }
+  createComputerUseComponent({
+    platform: "linux",
+    env: { HOME: home },
+    engineChild: () => factory,
+    loadSettings: () => settings,
+  }).register(pi, context)
+  const hostContext = {
+    cwd: "/work",
+    model: undefined,
+    hasUI: false,
+    sessionManager: { getSessionId: () => "s", getSessionDir: () => join(home, "sessions") },
+  }
   async function screenshot(callId: string): Promise<ReadonlyArray<Part>> {
     await pi.dispatch("tool_activated", { type: "tool_activated", toolNames: ["computer"] }, hostContext)
     const execute = pi.tools.find((tool) => tool.name === "computer")?.execute
     if (typeof execute !== "function") throw new Error("the computer tool is not registered")
-    const result = (await execute(callId, { action: "call", chain: [{ method: "screenshot", args: [] }] }, undefined, undefined, hostContext)) as { content: Part[]; details: unknown; isError?: boolean }
-    const settled = wire.decodeRemoteMessage(wire.encodeRemoteMessage({ kind: "settled", executionId: callId, result: { content: result.content, details: result.details ?? null, isError: result.isError === true } }))
+    const result = (await execute(
+      callId,
+      { action: "call", chain: [{ method: "screenshot", args: [] }] },
+      undefined,
+      undefined,
+      hostContext,
+    )) as { content: Part[]; details: unknown; isError?: boolean }
+    const settled = wire.decodeRemoteMessage(
+      wire.encodeRemoteMessage({
+        kind: "settled",
+        executionId: callId,
+        result: { content: result.content, details: result.details ?? null, isError: result.isError === true },
+      }),
+    )
     return settled.result?.content ?? []
   }
   return { pi, requests, settings, screenshot }
@@ -113,7 +155,9 @@ describe("one screenshot per computer call, across the hand wire (O1d, C4)", () 
 
     // then
     const capture = s.requests.find((request) => request.method === "capture")
-    expect(capture?.params).toMatchObject({ caps: { maxWidth: s.settings.maxWidth, maxHeight: s.settings.maxHeight, maxBytes: s.settings.screenshotMaxBytes } })
+    expect(capture?.params).toMatchObject({
+      caps: { maxWidth: s.settings.maxWidth, maxHeight: s.settings.maxHeight, maxBytes: s.settings.screenshotMaxBytes },
+    })
     expect(content.find((part) => part.type === "text" && part.text?.includes("scaled from 5120x3200"))).toBeDefined()
   })
 

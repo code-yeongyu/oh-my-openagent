@@ -1,4 +1,8 @@
-const MODULE_RESOLUTION_ERROR_CODES = new Set(["ERR_MODULE_NOT_FOUND", "MODULE_NOT_FOUND", "ERR_PACKAGE_PATH_NOT_EXPORTED"])
+const MODULE_RESOLUTION_ERROR_CODES = new Set([
+  "ERR_MODULE_NOT_FOUND",
+  "MODULE_NOT_FOUND",
+  "ERR_PACKAGE_PATH_NOT_EXPORTED",
+])
 
 /**
  * Bun reports failed module resolution (dynamic `import()` and
