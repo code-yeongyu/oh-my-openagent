@@ -4,7 +4,8 @@
 
 import { expect, test } from "bun:test"
 import { generateKeyPairSync, verify } from "node:crypto"
-import { mkdtemp, rm } from "node:fs/promises"
+import { watch } from "node:fs"
+import { mkdir, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -79,17 +80,34 @@ test("a sync refresh binds the CLI device to this machine once, through the sour
     { preconnect: fetch.preconnect },
   )
   const api = `http://127.0.0.1:${http.port}`
+  // The binding runs after the token read answers; its recorded answer is the signal that it finished. The watch is
+  // armed before the first resolve so the answer cannot land unseen.
+  const home = join(root, "home")
+  const accountState = join(home, ".omo", "account-state")
+  await mkdir(accountState, { recursive: true })
+  const watcher = watch(accountState)
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const answered = new Promise<void>((resolve, reject) => {
+    timer = setTimeout(() => reject(new Error("the machine binding answer was not recorded in 4 s")), 4_000)
+    watcher.on("change", (_event, name) => {
+      if (String(name).endsWith(".machine-binding.json")) {
+        clearTimeout(timer)
+        resolve()
+      }
+    })
+  })
   try {
     const source = createCliAccountSource({
       api,
       store,
-      home: join(root, "home"),
+      home,
       logger: { warn: () => undefined },
       fetch: sourceFetch,
       machineDigest: async () => DIGEST,
     })
 
     expect((await source())?.serviceDeviceId).toBe(DEVICE)
+    await answered
     expect(viaSourceFetch).toContain("PUT /v1/devices/current/machine")
     expect(binds).toHaveLength(1)
     const [bind] = binds
@@ -104,6 +122,8 @@ test("a sync refresh binds the CLI device to this machine once, through the sour
     expect(refreshes).toBeGreaterThanOrEqual(2)
     expect(binds).toHaveLength(1)
   } finally {
+    clearTimeout(timer)
+    watcher.close()
     http.stop(true)
     await rm(root, { recursive: true, force: true })
   }
