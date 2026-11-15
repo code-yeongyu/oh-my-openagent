@@ -1821,6 +1821,8 @@
         "scripts/qa/thread-tools/receiver-crash.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/repeated-wake.mjs",
+        // a QA scenario that run-all.mjs runs by name (#13396), like its siblings
+        "scripts/qa/thread-tools/report-origin-auto-steer.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/report-origin-steer.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs

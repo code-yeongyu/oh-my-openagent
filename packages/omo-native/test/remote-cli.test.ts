@@ -770,6 +770,30 @@ describe("omo remote session verbs", () => {
     expect([code, written.join("")]).toEqual([REMOTE_EXIT.ok, "OK\nDone.\n"])
   })
 
+  test("#13268: a waiting send queued behind a running turn names its position on stderr at once, never on stdout, and --json carries it only in the typed result", async () => {
+    const engine = { ...ENGINE, streaming: true, pending: 2 }
+    const human = await run(
+      ["send", "b/dur-on-b", "hi"],
+      undefined,
+      SIGNED_IN,
+      testBootstrap(),
+      fixture.account({ engine, records: [{ type: "agent_settled" }] }).remote,
+    )
+    expect(human.code).toBe(REMOTE_EXIT.ok)
+    expect(human.err).toEqual(["Queued on b/dur-on-b at position 2."])
+    expect([...human.out, ...human.written].some((line) => line.includes("Queued on"))).toBe(false)
+    const json = await run(
+      ["send", "b/dur-on-b", "hi", "--json"],
+      undefined,
+      SIGNED_IN,
+      testBootstrap(),
+      fixture.account({ engine, records: [{ type: "agent_settled" }] }).remote,
+    )
+    expect(json.code).toBe(REMOTE_EXIT.ok)
+    expect(json.err).toEqual([])
+    expect(JSON.parse(json.out.join(""))).toMatchObject({ delivery: { kind: "queued", queue_position: 2 } })
+  })
+
   test("send --steer steers the running turn, which the engine checks again", async () => {
     const a = fixture.account({ engine: { ...ENGINE, streaming: true, currentTurnId: "3" } })
     const { code, out } = await run(
