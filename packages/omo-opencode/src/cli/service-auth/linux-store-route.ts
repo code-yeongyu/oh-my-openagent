@@ -18,8 +18,10 @@ const LIBSECRET_NOTICE =
  * when none is on the session bus (or Bun has no OS store). A probe that cannot answer keeps an existing file in use
  * and otherwise asks libsecret, as before. Once the Secret Service answers unlocked, a state file moves into it under
  * the credential lock, only over an empty slot or an older copy of the same sign-in, and is deleted only after the
- * keyring returned exactly what was written. "No Secret Service" is per process (cron, su, ssh with no session bus), so
- * a file can hold a sign-in written beside one the keyring already holds: that keyring sign-in is never replaced.
+ * keyring returned exactly what was written; a staler copy of the keyring's own sign-in is deleted, so an outdated
+ * rotating refresh token never stays at rest (#13667). "No Secret Service" is per process (cron, su, ssh with no session
+ * bus), so a file can hold a sign-in written beside one the keyring already holds: that keyring sign-in is never
+ * replaced, and a file a sign-out here kept is never taken over here, so a sign-out never turns into another account.
  */
 export function routeLinuxStore<T>(input: {
   readonly api: string
@@ -37,6 +39,8 @@ export function routeLinuxStore<T>(input: {
   let storage: CredentialStorage = "keyring"
   let libsecretNoticed = false
   let keptNoticed = false
+  const keptLine = () =>
+    `omo: the private sign-in file in ${file.directory()} holds a sign-in from a session that cannot reach the keyring; it is kept for that session and not used here.`
   const underLock = (action: () => Promise<void>) => withCredentialLock(input.api, action, input.home ?? accountHome())
   const migrate = () =>
     underLock(async () => {
@@ -48,19 +52,29 @@ export function routeLinuxStore<T>(input: {
         await file.clear()
         return
       }
+      if (relation === "newer") {
+        await file.clear()
+        return
+      }
       if (keptNoticed) return
       keptNoticed = true
       notice(
-        `omo: the keyring already holds ${relation === "newer" ? "a newer copy of this" : "another"} OmO sign-in, which stays in use; the private sign-in file in ${file.directory()} is left as it is.`,
+        `omo: the keyring already holds another OmO sign-in, which stays in use; the private sign-in file in ${file.directory()} is left as it is.`,
       )
     })
   const choose = async (): Promise<CredentialStorage> => {
     const answer = await input.probe()
     if (answer === "absent") return "file"
     if (await file.present()) {
-      if (answer === "unknown") return "file"
-      await migrate()
-      return "keyring"
+      if (!(await file.kept())) {
+        if (answer === "unknown") return "file"
+        await migrate()
+        return "keyring"
+      }
+      if (!keptNoticed) {
+        keptNoticed = true
+        notice(keptLine())
+      }
     }
     if (answer === "unknown" && !libsecretNoticed) {
       libsecretNoticed = true
@@ -84,16 +98,22 @@ export function routeLinuxStore<T>(input: {
       await store.write(value, intent, beforeRetire)
     },
     // A sign-out removes the sign-in this context uses. The file goes with a keyring item only when the keyring is empty
-    // or holds that same sign-in; another sign-in in the file is not this context's to remove.
+    // or holds that same sign-in; another sign-in in the file is not this context's to remove, so it is marked kept
+    // (before the keyring item goes, so no crash in between can let the next command take it over) and named once.
     clear: async () => {
       const answer = await input.probe()
       const present = await file.present()
-      storage = answer === "absent" || (answer === "unknown" && present) ? "file" : "keyring"
+      const kept = present && (await file.kept())
+      storage = answer === "absent" || (answer === "unknown" && present && !kept) ? "file" : "keyring"
       if (storage === "file") return file.clear()
-      if (present)
+      if (present && !kept)
         await underLock(async () => {
           const text = await file.text()
-          if (text !== null && (await input.relation(text)) !== "other") await file.clear()
+          if (text === null) return
+          if ((await input.relation(text)) !== "other") return file.clear()
+          await file.markKept()
+          keptNoticed = true
+          notice(keptLine())
         })
       await keyring.clear()
     },

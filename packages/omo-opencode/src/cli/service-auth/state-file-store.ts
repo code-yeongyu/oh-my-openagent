@@ -129,10 +129,13 @@ export async function writeStateFile(dir: string, name: string, contents: string
   }
 }
 
-/** A symlink in the file's place is unlinked itself, never followed to its target. */
+const keptMarkerName = (name: string): string => `.${name}.kept`
+
+/** A symlink in the file's place is unlinked itself, never followed; the sign-out marker goes with the file. */
 export async function removeStateFile(dir: string, name: string): Promise<void> {
   await removeTempLeftovers(dir, name)
   await rm(join(dir, name), { force: true })
+  await rm(join(dir, keptMarkerName(name)), { force: true })
 }
 
 export type StateFileStore<T> = SealedStore<T> & {
@@ -140,6 +143,12 @@ export type StateFileStore<T> = SealedStore<T> & {
   readonly text: () => Promise<string | null>
   /** True while any entry sits at the file's path, refused or not. */
   readonly present: () => Promise<boolean>
+  /**
+   * A sign-out where the keyring is used kept this file because it holds another context's sign-in (#13667): that
+   * context keeps using it, and nothing where the keyring is used ever takes it over. The mark lives as long as the file.
+   */
+  readonly kept: () => Promise<boolean>
+  readonly markKept: () => Promise<void>
   readonly directory: () => string
 }
 
@@ -187,6 +196,15 @@ export function createStateFileStore<T>(input: {
     text,
     directory,
     present: async () => (await lstat(join(directory(), name)).catch(() => null)) !== null,
+    kept: async () => (await lstat(join(directory(), keptMarkerName(name))).catch(() => null)) !== null,
+    markKept: () =>
+      locked(async () => {
+        try {
+          await writeStateFile(directory(), keptMarkerName(name), "", uid)
+        } catch (error) {
+          throw failed("mark", error)
+        }
+      }),
     write: (value) =>
       locked(async () => {
         const next = codec.amend === undefined ? value : codec.amend(await text(), value)
