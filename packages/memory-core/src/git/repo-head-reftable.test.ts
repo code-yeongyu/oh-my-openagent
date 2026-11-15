@@ -19,7 +19,14 @@ afterEach(async () => {
 })
 
 function hostGitRunsReftable(): boolean {
-  const version = /(\d+)\.(\d+)/.exec(execFileSync("git", ["--version"], { encoding: "utf8" }))
+  let output: string
+  try {
+    output = execFileSync("git", ["--version"], { encoding: "utf8" })
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return false
+    throw error
+  }
+  const version = /(\d+)\.(\d+)/.exec(output)
   if (version === null) return false
   const major = Number(version[1])
   return major > REFTABLE_GIT.major || (major === REFTABLE_GIT.major && Number(version[2]) >= REFTABLE_GIT.minor)
