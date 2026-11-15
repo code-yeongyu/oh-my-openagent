@@ -208,6 +208,7 @@ export async function runSyncRpcOperation(
           record.enable = {
             kind: result.created === true ? "first_device_created" : "joined",
             ...(result.rootChanged && { rootChanged: true }),
+            ...(result.rootCheck && { rootCheck: result.rootCheck }),
           }
           break
         case "needs_first_device":
@@ -229,6 +230,9 @@ export async function runSyncRpcOperation(
           auth.admit(() => undefined)
           break
       }
+      const notice = record.enable
+      if (notice !== null && "rootCheck" in notice && notice.rootCheck !== undefined)
+        options.warn?.("memory sync root-change check skipped", { path: "enable", code: notice.rootCheck.reason })
     } else {
       record.approval = await options.runtime.approveDevice({
         ...input,

@@ -6,7 +6,7 @@
 import { pairingAnchor } from "../crypto/anchor.ts"
 import { isObject, type Principal } from "../crypto/parse.ts"
 import { createRejectionCounter } from "../crypto/rejection.ts"
-import { pinTrustAnchor, rootChangedSinceRetired } from "../crypto/trust-pin.ts"
+import { pinTrustAnchor, rootChangeNotice, type RootChangeNotice } from "../crypto/trust-pin.ts"
 import type { DeviceKeyring } from "../keyring-port.ts"
 import { openAccountChain } from "./account-chain.ts"
 import type { AccountHttp } from "./http.ts"
@@ -26,8 +26,7 @@ export interface CeremonyClock {
 }
 
 export type JoinOutcome =
-  /** `rootChanged`: the pinned root differs from the one this device held before its keys were discarded. */
-  | { readonly kind: "joined"; readonly rootChanged?: true }
+  | ({ readonly kind: "joined" } & RootChangeNotice)
   | { readonly kind: "expired" }
   | { readonly kind: "refused"; readonly reason: string }
 
@@ -50,8 +49,6 @@ export async function joinAccount(
     readonly clock: CeremonyClock
     readonly showCode: (code: string) => void | Promise<void>
     readonly onPending?: (pending: PendingApproval) => void
-    /** A best-effort step after the pin failed (#12382); stderr when absent. */
-    readonly onWarning?: (message: string) => void
   } & SyncOperationOptions,
 ): Promise<JoinOutcome> {
   const { account, keyring, clock } = input
@@ -112,9 +109,7 @@ export async function joinAccount(
       }
       await pinTrustAnchor(input.pinDir, account, pin, operation)
       checkSyncOperation(operation)
-      return (await rootChangedSinceRetired(input.pinDir, account, pin.genesisDigest, input.onWarning))
-        ? { kind: "joined", rootChanged: true }
-        : { kind: "joined" }
+      return { kind: "joined", ...(await rootChangeNotice(input.pinDir, account, pin.genesisDigest)) }
     }
     if (clock.now() >= opened.expires_at) return { kind: "expired" }
     await waitSyncOperation(operation, clock.sleep(POLL_MS))

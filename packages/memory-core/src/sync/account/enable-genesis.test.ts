@@ -1,8 +1,7 @@
 import { afterEach, expect, mock, spyOn, test } from "bun:test"
 import { readdir, readFile } from "node:fs/promises"
 import { join } from "node:path"
-import * as resilient from "../../fs/resilient"
-import * as trustPin from "../crypto/trust-pin.ts"
+import { failAnchorListingAfterPin } from "../crypto/testing/retired-pin-listing.test-support.ts"
 import { loadTrustAnchor } from "../crypto/trust-pin.ts"
 import { enableSync } from "./enable.ts"
 import { ACCOUNT, fixture, operationScope } from "./testing/genesis-enable.test-support.ts"
@@ -108,36 +107,22 @@ test("cancellation after PUT leaves the exact intent for a successor, without st
 })
 
 // #12382: the root-change notice runs after the pin is written, so a failure to list the retired pins must not turn a
-// pinned enable into an error. Anchor-root listings fail only once the real pin write has returned; all else is real disk.
-test("an enable that pinned still joins when the retired-pin listing for the notice fails", async () => {
+// pinned enable into an error. The skipped check is part of the outcome, for the caller to show; the library itself
+// writes nothing to the host's stderr (in-process it would draw over the TUI).
+test("an enable that pinned still joins, and reports the root-change check as skipped, when the retired pins cannot be listed", async () => {
   const f = await setup()
-  const pin = trustPin.pinTrustAnchor
-  let pinned = false
-  spyOn(trustPin, "pinTrustAnchor").mockImplementation(async (...args) => {
-    const anchor = await pin(...args)
-    pinned = true
-    return anchor
-  })
-  const listDir = resilient.readdir
-  spyOn(resilient, "readdir").mockImplementation(((path: Parameters<typeof listDir>[0]) =>
-    pinned && String(path) === join(f.input.pinDir, "trust-anchor")
-      ? Promise.reject(
-          Object.assign(new Error(`EACCES: permission denied, scandir '${String(path)}'`), { code: "EACCES" }),
-        )
-      : listDir(path)) as typeof listDir)
-  const warnings: string[] = []
+  const fault = failAnchorListingAfterPin(f.input.pinDir)
+  const stderr = spyOn(process.stderr, "write")
 
-  const outcome = await enableSync({ ...f.input, onWarning: (message) => warnings.push(message) })
+  const outcome = await enableSync(f.input)
+  const written = stderr.mock.calls.length
   mock.restore()
 
-  expect(pinned).toBe(true)
-
-  expect(outcome).toEqual({ kind: "joined", created: true })
-  expect(warnings).toEqual([
-    "memory sync: the account is pinned, but its retired pins could not be read to check for a root change (EACCES)",
-  ])
-  const written = await loadTrustAnchor(f.input.pinDir, ACCOUNT)
-  expect(written.ok && written.anchor.genesisDigest).toBe(f.built.digest)
+  expect(fault.pinned()).toBe(true)
+  expect(outcome).toEqual({ kind: "joined", created: true, rootCheck: { kind: "skipped", reason: "EACCES" } })
+  expect(written).toBe(0)
+  const pinned = await loadTrustAnchor(f.input.pinDir, ACCOUNT)
+  expect(pinned.ok && pinned.anchor.genesisDigest).toBe(f.built.digest)
 })
 
 test("no bridge preserves needs_first_device without changing switches", async () => {
