@@ -251,6 +251,20 @@ export async function followRemote(
 ): Promise<RemoteFollow | Failure> {
   const offline = await deviceOnline(remote, row.device)
   if (offline !== undefined) return offline
+  // An id-carrying send: the user entries carrying its text before it is sent (read before the watch, so before the
+  // send). On an engine that stamps no id they are all earlier sends, finished or not, and a prompt matched only by
+  // its text is never one of them; undefined when the read failed, and then no text match counts (#13481 delta M1).
+  let storedBeforeSend: ReadonlySet<string> | undefined
+  if (options?.text !== undefined && options.clientMessageId !== undefined) {
+    const page = await remote.sessions.read(row.device, row.session_id, READ_TAIL)
+    const raw = page.kind === "ok" ? page.response["entries"] : undefined
+    if (Array.isArray(raw)) {
+      const entries = raw.filter(isRecord)
+      storedBeforeSend = new Set(
+        textCarryingUserEntries(entries, options.text).map((index) => entryKeyOf(entries[index])),
+      )
+    }
+  }
   let settle!: (end: string) => void
   const settled = new Promise<string>((resolve) => {
     settle = resolve
@@ -443,7 +457,13 @@ export async function followRemote(
       // A prompt matched only by its text is this id-carrying send's only on an engine that stamps no id: a stamped
       // entry in the transcript says the matched prompt is an earlier send's (#13481 review M1, L1).
       if (storedByText && entries.some(showsStamping)) return
-      const matches = anchorMatches(entries, text)
+      // Nor is it an entry the transcript already held before the send: that is an earlier prompt with its own run,
+      // whatever settle the buffer holds after it (#13481 delta M1).
+      if (storedByText && storedBeforeSend === undefined) return
+      const before = storedByText ? storedBeforeSend : undefined
+      const matches = anchorMatches(entries, text).filter(
+        (index) => before === undefined || !before.has(entryKeyOf(entries[index])),
+      )
       if (matches.length === 0) return
       anchor = matches[matches.length - 1]
     }

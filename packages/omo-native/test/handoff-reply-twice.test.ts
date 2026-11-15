@@ -119,6 +119,8 @@ async function send(script: Script) {
         return outcome
       },
       read: async () => {
+        // A read before the watch attaches is the send's pre-send transcript: none of these sessions holds this text yet.
+        if (listener === undefined) return { kind: "ok", response: { entries: [] } }
         const step = script.reads[reads]
         reads += 1
         if (step === undefined) return { kind: "ok", response: { entries: [...STORED] } }

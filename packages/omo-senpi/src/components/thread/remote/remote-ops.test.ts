@@ -6,7 +6,8 @@ import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 // returns; over the relay the previous turn's replay arrives exactly then, after the send's reply (#13267).
 type RecordListener = (record: JsonObject) => void
 
-function followSurface(transcript: JsonObject[]) {
+// `before`: the transcript as it stands before the send (a read made before the watch attaches).
+function followSurface(transcript: JsonObject[], before: JsonObject[] = []) {
   let listener: RecordListener | undefined
   const deliver = (records: readonly JsonObject[]): void => {
     if (listener !== undefined) for (const record of records) listener(record)
@@ -21,7 +22,10 @@ function followSurface(transcript: JsonObject[]) {
           watch: { ended: new Promise<string>(() => {}), stop: () => (listener = undefined) },
         }
       },
-      read: async () => ({ kind: "ok" as const, response: { entries: [...transcript] } }),
+      read: async () => ({
+        kind: "ok" as const,
+        response: { entries: [...(listener === undefined ? before : transcript)] },
+      }),
     },
     chain: { stamp: (record: JsonObject) => record },
   } as unknown as RemoteThreadSurface
@@ -615,6 +619,27 @@ describe("#13481 review: a started send prints its own turn, never an earlier id
       follow.stop()
     })
   }
+
+  test("#given an earlier identical prompt typed with no id, already settled and stored, on an engine that stamps no id #when a first waiting send's reply arrives before its own prompt is stored #then only its own answer prints, never the earlier one", async () => {
+    // The earlier "ping" (typed in the TUI, or sent without --wait) is stored before this send goes out; nothing in the
+    // session carries a client message id, so only that pre-send transcript tells it from this send's (#13481 delta M1).
+    const earlier = [message("u1", "user", "ping"), message("a1", "assistant", "EARLIER")]
+    const { remote, deliver } = followSurface(earlier, earlier)
+    const printed: string[] = []
+    const follow = await followRemote(remote, ROW, (text) => printed.push(text), {
+      text: "ping",
+      clientMessageId: "cm-new",
+    })
+    if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
+    deliver([{ type: "agent_start" }, prompted("ping"), delta("EARLIER"), { type: "agent_settled" }])
+    follow.aim("started")
+    // The probe's transcript read completes before this send's own run streams.
+    await flush()
+    deliver([{ type: "agent_start" }, prompted("ping"), delta("pong"), { type: "agent_settled" }])
+    expect(await withTimeout(follow.settled, 2000, "the follow never settled")).toBe("settled")
+    expect(printed).toEqual(["pong"])
+    follow.stop()
+  })
 
   // The stream printed all of the partial text, or only a prefix of it: the unprinted tail still prints (#13481 review L2).
   for (const [streamedText, expected] of [
