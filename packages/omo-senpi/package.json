@@ -94,6 +94,7 @@
     "@code-yeongyu/senpi": "2026.11.15-2",
     "@code-yeongyu/senpi-agent-core": "2026.11.15-2",
     "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.15-2",
+    "@oh-my-opencode/senpi-desktop-sdk": "workspace:*",
     "@types/node": "26.6.2",
     "bun-types": "1.4.4",
     "terser": "5.51.2"
