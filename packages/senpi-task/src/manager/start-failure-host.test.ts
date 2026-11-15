@@ -10,10 +10,7 @@ const PRIVATE_DETAIL = "Timeout waiting for response to open_session. Stderr: ap
 
 afterEach(cleanupProjects)
 
-function closedRunnerError(
-  kind: RunnerFailure["kind"],
-  reason: NonNullable<RunnerFailure["reason"]>,
-): RunnerError {
+function closedRunnerError(kind: RunnerFailure["kind"], reason: NonNullable<RunnerFailure["reason"]>): RunnerError {
   return new RunnerError({ kind, reason, message: PRIVATE_DETAIL, cause: new Error(PRIVATE_DETAIL) })
 }
 
@@ -139,9 +136,7 @@ describe("TaskManager host start failures", () => {
 
     // then
     if (result.kind !== "start_failed") throw new Error("expected start_failed")
-    expect(result.error_message).toBe(
-      "The task host refused the child session (host_memory_pressure).",
-    )
+    expect(result.error_message).toBe("The task host refused the child session (host_memory_pressure).")
     const eventLog = readFileSync(join(store.stateDir, "logs", `${result.task_id}.jsonl`), "utf8")
     expect(eventLog).toContain('"failure_reason":"host_memory_pressure"')
     expect(eventLog).not.toContain(PRIVATE_DETAIL)

@@ -1,8 +1,4 @@
-const MEANINGFUL_ASSISTANT_PART_TYPES = new Set([
-  "reasoning",
-  "tool",
-  "tool_use",
-])
+const MEANINGFUL_ASSISTANT_PART_TYPES = new Set(["reasoning", "tool", "tool_use"])
 
 export type TailMonitorState = {
   currentMessageID?: string
@@ -12,26 +8,19 @@ export type TailMonitorState = {
   lastRecoveryAt?: number
 }
 
-export function finalizeTrackedAssistantMessage(
-  state: TailMonitorState,
-): number {
+export function finalizeTrackedAssistantMessage(state: TailMonitorState): number {
   if (!state.currentMessageID) {
     return state.consecutiveNoTextMessages
   }
 
-  state.consecutiveNoTextMessages = state.currentHasOutput
-    ? 0
-    : state.consecutiveNoTextMessages + 1
+  state.consecutiveNoTextMessages = state.currentHasOutput ? 0 : state.consecutiveNoTextMessages + 1
   state.currentMessageID = undefined
   state.currentHasOutput = false
 
   return state.consecutiveNoTextMessages
 }
 
-export function shouldTreatAssistantPartAsOutput(part: {
-  type?: string
-  text?: string
-}): boolean {
+export function shouldTreatAssistantPartAsOutput(part: { type?: string; text?: string }): boolean {
   if (part.type === "text") {
     return !!part.text?.trim()
   }
@@ -39,10 +28,7 @@ export function shouldTreatAssistantPartAsOutput(part: {
   return typeof part.type === "string" && MEANINGFUL_ASSISTANT_PART_TYPES.has(part.type)
 }
 
-export function trackAssistantOutput(
-  state: TailMonitorState,
-  messageID?: string,
-): void {
+export function trackAssistantOutput(state: TailMonitorState, messageID?: string): void {
   if (messageID && !state.currentMessageID) {
     state.currentMessageID = messageID
   }

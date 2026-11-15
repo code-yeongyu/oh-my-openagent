@@ -65,8 +65,14 @@ describe("a child still running on a draining generation is never recorded ended
     const store = recordingStore(tempStore(), events)
     const identity = hostSession("st_0b000001", { instance_id: "instance-old" })
     const fixture = hostLifecycleDeps({ store, hostPid: HOST_PID })
-    seedRecord(store, { ...hostSessionRecordInput("st_0b000001", identity), status: "running", residency_state: "rpc_detached" })
-    const engine = createSteeringEngine(steeringOver(store, { ...fixture.deps, hostGenerationView: drainingGenerationView(identity) }))
+    seedRecord(store, {
+      ...hostSessionRecordInput("st_0b000001", identity),
+      status: "running",
+      residency_state: "rpc_detached",
+    })
+    const engine = createSteeringEngine(
+      steeringOver(store, { ...fixture.deps, hostGenerationView: drainingGenerationView(identity) }),
+    )
 
     // when
     const outcome = await engine.cancelTask("st_0b000001")
@@ -85,8 +91,13 @@ describe("a child still running on a draining generation is never recorded ended
     const store = recordingStore(tempStore(), events)
     const identity = hostSession("st_0b000002", { instance_id: "instance-old" })
     const fixture = hostLifecycleDeps({ store, hostPid: HOST_PID })
-    const seeded = seedRecord(store, { ...hostSessionRecordInput("st_0b000002", identity), status: "running", residency_state: "rpc_detached" })
-    const record = store.mutate("st_0b000002", (fresh) => ({ ...fresh, cancel_requested: { requested_at: OLD } })) ?? seeded
+    const seeded = seedRecord(store, {
+      ...hostSessionRecordInput("st_0b000002", identity),
+      status: "running",
+      residency_state: "rpc_detached",
+    })
+    const record =
+      store.mutate("st_0b000002", (fresh) => ({ ...fresh, cancel_requested: { requested_at: OLD } })) ?? seeded
     const context = resolveContext({ ...fixture.deps, hostGenerationView: drainingGenerationView(identity) })
 
     // when

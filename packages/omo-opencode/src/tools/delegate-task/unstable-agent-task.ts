@@ -21,7 +21,7 @@ export async function executeUnstableAgentTask(
   agentToUse: string,
   categoryModel: DelegatedModelConfig | undefined,
   systemContent: string | undefined,
-  actualModel: string | undefined
+  actualModel: string | undefined,
 ): Promise<string> {
   const { manager, client, syncPollTimeoutMs, sisyphusAgentConfig } = executorCtx
   let cleanupReason: string | undefined
@@ -56,18 +56,21 @@ export async function executeUnstableAgentTask(
         cleanupReason = "Parent aborted while waiting for unstable task session start"
         return `Task aborted while waiting for session to start.\n\nTask ID: ${task.id}`
       }
-      await new Promise(resolve => setTimeout(resolve, timing.WAIT_FOR_SESSION_INTERVAL_MS))
+      await new Promise((resolve) => setTimeout(resolve, timing.WAIT_FOR_SESSION_INTERVAL_MS))
       const updated = manager.getTask(task.id)
       sessionID = updated?.sessionId
     }
     if (!sessionID) {
       cleanupReason = "Unstable task session start timed out before session became available"
-      return formatDetailedError(new Error(`Task failed to start within timeout (30s). Task ID: ${task.id}, Status: ${task.status}`), {
-        operation: "Launch monitored background task",
-        args,
-        agent: agentToUse,
-        category: args.category,
-      })
+      return formatDetailedError(
+        new Error(`Task failed to start within timeout (30s). Task ID: ${task.id}, Status: ${task.status}`),
+        {
+          operation: "Launch monitored background task",
+          args,
+          agent: agentToUse,
+          category: args.category,
+        },
+      )
     }
 
     const bgTaskMeta = {
@@ -76,7 +79,9 @@ export async function executeUnstableAgentTask(
         prompt: args.prompt,
         agent: agentToUse,
         category: args.category,
-        ...(args.requested_subagent_type !== undefined ? { requested_subagent_type: args.requested_subagent_type } : {}),
+        ...(args.requested_subagent_type !== undefined
+          ? { requested_subagent_type: args.requested_subagent_type }
+          : {}),
         load_skills: args.load_skills,
         description: args.description,
         run_in_background: args.run_in_background,
@@ -111,7 +116,10 @@ export async function executeUnstableAgentTask(
       }
 
       const currentTask = manager.getTask(task.id)
-      if (currentTask && (currentTask.status === "interrupt" || currentTask.status === "error" || currentTask.status === "cancelled")) {
+      if (
+        currentTask &&
+        (currentTask.status === "interrupt" || currentTask.status === "error" || currentTask.status === "cancelled")
+      ) {
         terminalStatus = { status: currentTask.status, error: currentTask.error }
         break
       }
@@ -122,7 +130,9 @@ export async function executeUnstableAgentTask(
 
       const timeoutBudgetMs = syncPollTimeoutMs ?? DEFAULT_SYNC_POLL_TIMEOUT_MS
       const remainingBudgetMs = timeoutBudgetMs - (Date.now() - pollStart)
-      await new Promise(resolve => setTimeout(resolve, Math.min(timingCfg.POLL_INTERVAL_MS, Math.max(1, remainingBudgetMs))))
+      await new Promise((resolve) =>
+        setTimeout(resolve, Math.min(timingCfg.POLL_INTERVAL_MS, Math.max(1, remainingBudgetMs))),
+      )
 
       const statusResult = await client.session.status()
       const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
@@ -204,7 +214,10 @@ ${taskMetadataBlock}`
     let textContent = ""
     for (const msg of assistantMessages) {
       const textParts = msg.parts?.filter((p) => p.type === "text" || p.type === "reasoning") ?? []
-      const content = textParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
+      const content = textParts
+        .map((p) => p.text ?? "")
+        .filter(Boolean)
+        .join("\n")
       if (content) {
         textContent = content
         break

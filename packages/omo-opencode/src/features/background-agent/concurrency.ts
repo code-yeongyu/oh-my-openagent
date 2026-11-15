@@ -27,7 +27,7 @@ export class ConcurrencyManager {
     if (modelLimit !== undefined) {
       return modelLimit === 0 ? Infinity : modelLimit
     }
-    const provider = model.split('/')[0]
+    const provider = model.split("/")[0]
     const providerLimit = this.config?.providerConcurrency?.[provider]
     if (providerLimit !== undefined) {
       return providerLimit === 0 ? Infinity : providerLimit
@@ -44,7 +44,7 @@ export class ConcurrencyManager {
       return model
     }
 
-    const provider = model.split('/')[0]
+    const provider = model.split("/")[0]
     if (provider && this.config?.providerConcurrency?.[provider] !== undefined) {
       return provider
     }
@@ -130,7 +130,7 @@ export class ConcurrencyManager {
     const queue = this.queues.get(key)
     if (!queue) return false
 
-    const index = queue.findIndex(entry => entry.taskId === taskId && !entry.settled)
+    const index = queue.findIndex((entry) => entry.taskId === taskId && !entry.settled)
     if (index === -1) return false
 
     const entry = queue[index]

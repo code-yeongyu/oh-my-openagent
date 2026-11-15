@@ -29,9 +29,7 @@ export function parseBtwQuestion(input: string): {
   }
 }
 
-export function findBtwBoundaryMessageID(
-  messages: BtwSessionMessage[],
-): string | undefined {
+export function findBtwBoundaryMessageID(messages: BtwSessionMessage[]): string | undefined {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index]
     if (!message) continue
@@ -40,4 +38,3 @@ export function findBtwBoundaryMessageID(
   }
   return undefined
 }
-

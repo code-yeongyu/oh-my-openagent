@@ -56,49 +56,61 @@ const NOTE_DEF = /(?:^|\u0001)(?: ?>)* ?\[\^(\d+)\]:/gu
 const TITLE = `(?:"[^"\u0001]*"|'[^'\u0001]*'|\\([^)\u0001]*\\))`
 /** A reference definition's title may sit alone on the next line (only whitespace after it). */
 const REF_DEFINITION = `(?:^|\u0001) ?\\[(?!\\^)[^\\]\u0001]+\\]: ?[^\\s\u0001]*(?: ${TITLE}| ?\u0001 ?${TITLE}(?= ?(?:\u0001|$)))?`
-const LINK_SYNTAX = new RegExp(`!\\[[^\\]\u0001]*\\](?:\\([^)\u0001]*\\))?|\\]\\([^)\u0001]*\\)|<https?:\\/\\/[^>\\s\u0001]+>|${REF_DEFINITION}`, "gu")
+const LINK_SYNTAX = new RegExp(
+  `!\\[[^\\]\u0001]*\\](?:\\([^)\u0001]*\\))?|\\]\\([^)\u0001]*\\)|<https?:\\/\\/[^>\\s\u0001]+>|${REF_DEFINITION}`,
+  "gu",
+)
 const TAG_NAME = /^[a-z][a-z0-9-]*$/u
 /** What a tag leaves in the numeric text on either side: sup, sub and every break join no neighbour. */
 const edgeOf = (tag) => (tag === "sup" || tag === "sub" || PROSE_BREAKS.has(tag) ? BOUNDARY : "")
 
 /** Prose text, attribute text and <ol> item numbers of an HTML document; a non-HTML document is prose only. */
 function numericText(source, html) {
-	if (!html) return { prose: decodeEntities(source), carried: "", listed: [] }
-	const chunks = []
-	const carried = []
-	const listed = []
-	const walk = (node) => {
-		if (node.tag === "#text") { chunks.push(node.text.replace(/\s+/gu, " ")); return }
-		for (const name of CARRIED) if (node.attrs?.[name] !== undefined) carried.push(node.attrs[name])
-		if (node.tag === "ol") {
-			const start = /^\s*\d+\s*$/u.test(node.attrs.start ?? "") ? Number(node.attrs.start) : 1
-			node.children.filter((child) => child.tag === "li").forEach((_, index) => listed.push(String(start + index)))
-		}
-		const edge = edgeOf(node.tag)
-		chunks.push(edge)
-		if (node.tag === "time" && node.attrs.datetime !== undefined) chunks.push(`${BOUNDARY}${node.attrs.datetime}${BOUNDARY}`)
-		for (const child of node.children) walk(child)
-		chunks.push(edge)
-	}
-	walk(parseHtml(source))
-	return { prose: chunks.join(""), carried: carried.join(BOUNDARY), listed }
+  if (!html) return { prose: decodeEntities(source), carried: "", listed: [] }
+  const chunks = []
+  const carried = []
+  const listed = []
+  const walk = (node) => {
+    if (node.tag === "#text") {
+      chunks.push(node.text.replace(/\s+/gu, " "))
+      return
+    }
+    for (const name of CARRIED) if (node.attrs?.[name] !== undefined) carried.push(node.attrs[name])
+    if (node.tag === "ol") {
+      const start = /^\s*\d+\s*$/u.test(node.attrs.start ?? "") ? Number(node.attrs.start) : 1
+      node.children.filter((child) => child.tag === "li").forEach((_, index) => listed.push(String(start + index)))
+    }
+    const edge = edgeOf(node.tag)
+    chunks.push(edge)
+    if (node.tag === "time" && node.attrs.datetime !== undefined)
+      chunks.push(`${BOUNDARY}${node.attrs.datetime}${BOUNDARY}`)
+    for (const child of node.children) walk(child)
+    chunks.push(edge)
+  }
+  walk(parseHtml(source))
+  return { prose: chunks.join(""), carried: carried.join(BOUNDARY), listed }
 }
 
 /** Raw inline HTML in converted Markdown: sup, sub and break tags become boundaries, other tags and comments go. */
 function inlineHtml(text) {
-	let out = ""
-	let kept = 0
-	for (let lt = text.indexOf("<"); lt !== -1; lt = text.indexOf("<", Math.max(lt + 1, kept))) {
-		const comment = text.startsWith("<!--", lt)
-		const name = lt + (text[lt + 1] === "/" ? 2 : 1)
-		if (escapedAt(text, lt) || (!comment && !/[a-z]/iu.test(text[name] ?? ""))) continue
-		const tag = comment ? null : readTag(text, name)
-		const end = comment ? text.indexOf("-->", lt + 4) + 3 : tag.end
-		if (end <= lt || (tag && !(TAG_NAME.test(tag.name) && text[end - 1] === ">")) || /\n[ \t\r]*\n/u.test(text.slice(lt, end))) continue
-		out += text.slice(kept, lt) + (tag ? edgeOf(tag.name) : "")
-		kept = end
-	}
-	return out + text.slice(kept)
+  let out = ""
+  let kept = 0
+  for (let lt = text.indexOf("<"); lt !== -1; lt = text.indexOf("<", Math.max(lt + 1, kept))) {
+    const comment = text.startsWith("<!--", lt)
+    const name = lt + (text[lt + 1] === "/" ? 2 : 1)
+    if (escapedAt(text, lt) || (!comment && !/[a-z]/iu.test(text[name] ?? ""))) continue
+    const tag = comment ? null : readTag(text, name)
+    const end = comment ? text.indexOf("-->", lt + 4) + 3 : tag.end
+    if (
+      end <= lt ||
+      (tag && !(TAG_NAME.test(tag.name) && text[end - 1] === ">")) ||
+      /\n[ \t\r]*\n/u.test(text.slice(lt, end))
+    )
+      continue
+    out += text.slice(kept, lt) + (tag ? edgeOf(tag.name) : "")
+    kept = end
+  }
+  return out + text.slice(kept)
 }
 
 /**
@@ -106,24 +118,32 @@ function inlineHtml(text) {
  * and of footnote definition labels ("[^1]:") whose "[^1]" is used (the use itself mirrors the source).
  */
 function referenceLabels(flat) {
-	const uses = [...flat.matchAll(REF_USE)]
-	const defs = [...flat.matchAll(REF_DEF)]
-	const used = new Set(uses.map((match) => match[1]))
-	const defined = new Set(defs.map((match) => match[1]))
-	const paired = [...uses.filter((match) => defined.has(match[1])), ...defs.filter((match) => used.has(match[1]))]
-	const noted = new Set([...flat.matchAll(NOTE_USE)].map((match) => match[1]))
-	const notes = [...flat.matchAll(NOTE_DEF)].filter((match) => noted.has(match[1]))
-	return new Set([...paired, ...notes].map((match) => match.index + match[0].search(/\d/u)))
+  const uses = [...flat.matchAll(REF_USE)]
+  const defs = [...flat.matchAll(REF_DEF)]
+  const used = new Set(uses.map((match) => match[1]))
+  const defined = new Set(defs.map((match) => match[1]))
+  const paired = [...uses.filter((match) => defined.has(match[1])), ...defs.filter((match) => used.has(match[1]))]
+  const noted = new Set([...flat.matchAll(NOTE_USE)].map((match) => match[1]))
+  const notes = [...flat.matchAll(NOTE_DEF)].filter((match) => noted.has(match[1]))
+  return new Set([...paired, ...notes].map((match) => match.index + match[0].search(/\d/u)))
 }
 
 /** Whether the dash at `at` is a minus: Markdown closers (and a backslash escaping the dash) before it are skipped, as is an opener run before a lone letter. */
 function signed(flat, at, dash) {
-	const before = stripClosers(flat.slice(Math.max(0, at - 512), escapedAt(flat, at) ? at - 1 : at))
-	const last = before.at(-1) ?? ""
-	if (!WORD.test(last)) return true
-	if (dash === "\u2013") return false
-	if (EXPONENT.test(before)) return true
-	return ALPHA.test(last) && !WORD.test(before.slice(0, -1).replace(/[*_~`[]+$/u, "").at(-1) ?? "")
+  const before = stripClosers(flat.slice(Math.max(0, at - 512), escapedAt(flat, at) ? at - 1 : at))
+  const last = before.at(-1) ?? ""
+  if (!WORD.test(last)) return true
+  if (dash === "\u2013") return false
+  if (EXPONENT.test(before)) return true
+  return (
+    ALPHA.test(last) &&
+    !WORD.test(
+      before
+        .slice(0, -1)
+        .replace(/[*_~`[]+$/u, "")
+        .at(-1) ?? "",
+    )
+  )
 }
 
 /**
@@ -132,26 +152,31 @@ function signed(flat, at, dash) {
  * the previous number.
  */
 function tokensOf(text, { links = false } = {}) {
-	const flat = text.replace(/\r\n?|\n|\f/gu, BOUNDARY).replace(/\s+/gu, " ")
-	const spans = links ? [...[...flat.matchAll(LINK_SYNTAX)].map((match) => [match.index, match.index + match[0].length]), ...inlineLinkSpans(flat)] : []
-	const markers = new Set([...flat.matchAll(LIST_MARKER)].map((match) => match.index + match[0].search(/\d/u)))
-	const labels = referenceLabels(flat)
-	let previousEnd = 0
-	return [...flat.matchAll(NUMBERS)].map((match, n) => {
-		const sign = match[1] !== undefined && signed(flat, match.index, match[1])
-		const at = sign ? match.index : match.index + match[0].length - match[3].length
-		const gap = flat.slice(previousEnd, at)
-		previousEnd = match.index + match[0].length
-		return {
-			n,
-			gap,
-			text: sign ? match[0] : match[3],
-			key: `${sign ? "-" : ""}${plainDecimal(match[3])}`,
-			linked: spans.some(([start, end]) => at >= start && at < end),
-			marker: markers.has(at),
-			label: labels.has(at),
-		}
-	})
+  const flat = text.replace(/\r\n?|\n|\f/gu, BOUNDARY).replace(/\s+/gu, " ")
+  const spans = links
+    ? [
+        ...[...flat.matchAll(LINK_SYNTAX)].map((match) => [match.index, match.index + match[0].length]),
+        ...inlineLinkSpans(flat),
+      ]
+    : []
+  const markers = new Set([...flat.matchAll(LIST_MARKER)].map((match) => match.index + match[0].search(/\d/u)))
+  const labels = referenceLabels(flat)
+  let previousEnd = 0
+  return [...flat.matchAll(NUMBERS)].map((match, n) => {
+    const sign = match[1] !== undefined && signed(flat, match.index, match[1])
+    const at = sign ? match.index : match.index + match[0].length - match[3].length
+    const gap = flat.slice(previousEnd, at)
+    previousEnd = match.index + match[0].length
+    return {
+      n,
+      gap,
+      text: sign ? match[0] : match[3],
+      key: `${sign ? "-" : ""}${plainDecimal(match[3])}`,
+      linked: spans.some(([start, end]) => at >= start && at < end),
+      marker: markers.has(at),
+      label: labels.has(at),
+    }
+  })
 }
 
 /** The comparison key of one number token, so other tools can match a converted number against a probe record. */
@@ -159,45 +184,49 @@ export const numberKey = (token) => tokensOf(String(token))[0]?.key ?? null
 
 /** The numbers in `texts` that the source's conversion probe recorded as altered (sources/<id>/conversion.json). */
 export function alteredIn(sourceDir, texts) {
-	const record = join(sourceDir, "conversion.json")
-	let altered = []
-	if (existsSync(record)) {
-		try {
-			altered = JSON.parse(readFileSync(record, "utf8")).conversion_altered_numbers ?? []
-		} catch (error) {
-			throw new CliError(`${record} is not a readable conversion record (${error.message}); snapshot the source again`)
-		}
-	}
-	const keys = new Set(altered.map(numberKey))
-	return texts.flatMap((text) => tokensOf(String(text ?? ""))).filter((token) => keys.has(token.key)).map((token) => token.text)
+  const record = join(sourceDir, "conversion.json")
+  let altered = []
+  if (existsSync(record)) {
+    try {
+      altered = JSON.parse(readFileSync(record, "utf8")).conversion_altered_numbers ?? []
+    } catch (error) {
+      throw new CliError(`${record} is not a readable conversion record (${error.message}); snapshot the source again`)
+    }
+  }
+  const keys = new Set(altered.map(numberKey))
+  return texts
+    .flatMap((text) => tokensOf(String(text ?? "")))
+    .filter((token) => keys.has(token.key))
+    .map((token) => token.text)
 }
 
 /** Rejoin a grouped number a hard wrap split over one line break, when only the joined reading is in the raw counts. */
 function joinWrapped(tokens, raw) {
-	const out = []
-	for (const token of tokens) {
-		const prev = out.at(-1)
-		const wrapped = prev?.n === token.n - 1 && /^ ?\u0001 ?$/u.test(token.gap) && !prev.linked && !token.linked
-		const [joined, ...more] = wrapped ? tokensOf(`${prev.text} ${token.text}`) : []
-		if (joined && more.length === 0 && raw.has(joined.key) && !(raw.has(prev.key) && raw.has(token.key))) {
-			out[out.length - 1] = { ...joined, n: token.n, text: `${prev.text}\n${token.text}` }
-			continue
-		}
-		out.push(token)
-	}
-	return out
+  const out = []
+  for (const token of tokens) {
+    const prev = out.at(-1)
+    const wrapped = prev?.n === token.n - 1 && /^ ?\u0001 ?$/u.test(token.gap) && !prev.linked && !token.linked
+    const [joined, ...more] = wrapped ? tokensOf(`${prev.text} ${token.text}`) : []
+    if (joined && more.length === 0 && raw.has(joined.key) && !(raw.has(prev.key) && raw.has(token.key))) {
+      out[out.length - 1] = { ...joined, n: token.n, text: `${prev.text}\n${token.text}` }
+      continue
+    }
+    out.push(token)
+  }
+  return out
 }
 
-const countOf = (tokens) => tokens.reduce((counts, token) => counts.set(token.key, (counts.get(token.key) ?? 0) + 1), new Map())
+const countOf = (tokens) =>
+  tokens.reduce((counts, token) => counts.set(token.key, (counts.get(token.key) ?? 0) + 1), new Map())
 
 /** The tokens `counts` cannot cover; each covered token uses up one count. */
 function uncovered(tokens, counts) {
-	return tokens.filter((token) => {
-		const remaining = counts.get(token.key) ?? 0
-		if (remaining === 0) return true
-		counts.set(token.key, remaining - 1)
-		return false
-	})
+  return tokens.filter((token) => {
+    const remaining = counts.get(token.key) ?? 0
+    if (remaining === 0) return true
+    counts.set(token.key, remaining - 1)
+    return false
+  })
 }
 
 /**
@@ -207,23 +236,42 @@ function uncovered(tokens, counts) {
  * marker or label is not a converted number at all: it neither covers a raw number nor counts as altered.
  */
 export function probeConversion(raw, converted, { attributes = true } = {}) {
-	const source = numericText(raw, /<[a-z!/]/i.test(raw))
-	const before = tokensOf(source.prose)
-	const listed = new Set(source.listed)
-	let items = attributes ? source.listed.length : 0
-	const syntax = tokensOf(attributes ? decodeEntities(inlineHtml(converted)) : converted, { links: attributes })
-		.filter((token) => !(attributes && token.label) && !(token.marker && listed.has(token.key) && items-- > 0))
-	const after = attributes ? joinWrapped(syntax, countOf(before)) : syntax
-	const counts = countOf(before)
-	const extra = new Set(uncovered(after.filter((token) => !token.linked), counts))
-	for (const token of tokensOf(source.carried)) counts.set(token.key, (counts.get(token.key) ?? 0) + 1)
-	for (const token of uncovered(after.filter((token) => token.linked), counts)) extra.add(token)
-	const lost = uncovered(before, countOf(after)).map((token) => token.text)
-	return { altered: after.filter((token) => extra.has(token)).map((token) => token.text), lost, raw_count: before.length, converted_count: after.length }
+  const source = numericText(raw, /<[a-z!/]/i.test(raw))
+  const before = tokensOf(source.prose)
+  const listed = new Set(source.listed)
+  let items = attributes ? source.listed.length : 0
+  const syntax = tokensOf(attributes ? decodeEntities(inlineHtml(converted)) : converted, { links: attributes }).filter(
+    (token) => !(attributes && token.label) && !(token.marker && listed.has(token.key) && items-- > 0),
+  )
+  const after = attributes ? joinWrapped(syntax, countOf(before)) : syntax
+  const counts = countOf(before)
+  const extra = new Set(
+    uncovered(
+      after.filter((token) => !token.linked),
+      counts,
+    ),
+  )
+  for (const token of tokensOf(source.carried)) counts.set(token.key, (counts.get(token.key) ?? 0) + 1)
+  for (const token of uncovered(
+    after.filter((token) => token.linked),
+    counts,
+  ))
+    extra.add(token)
+  const lost = uncovered(before, countOf(after)).map((token) => token.text)
+  return {
+    altered: after.filter((token) => extra.has(token)).map((token) => token.text),
+    lost,
+    raw_count: before.length,
+    converted_count: after.length,
+  }
 }
 
 export function runConversionProbe(argv) {
-	if (argv.length !== 2) throw new CliError("usage: source probe-conversion <raw-file> <converted-file>")
-	const result = probeConversion(readFileSync(argv[0], "utf8"), readFileSync(argv[1], "utf8"))
-	return { json: result, summary: `source probe-conversion: ${result.altered.length} altered, ${result.lost.length} lost`, exitCode: result.altered.length === 0 ? 0 : 1 }
+  if (argv.length !== 2) throw new CliError("usage: source probe-conversion <raw-file> <converted-file>")
+  const result = probeConversion(readFileSync(argv[0], "utf8"), readFileSync(argv[1], "utf8"))
+  return {
+    json: result,
+    summary: `source probe-conversion: ${result.altered.length} altered, ${result.lost.length} lost`,
+    exitCode: result.altered.length === 0 ? 0 : 1,
+  }
 }

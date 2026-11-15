@@ -23,11 +23,10 @@ import {
   type OnboardingScanResponse,
   type OnboardingScanStore,
 } from "./scan-component"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const roots: string[] = []
 const SECRET = "SK-SENTINEL-ONBOARDING-SCAN"
-const EVENT_TIMEOUT_MS = 20_000
-
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
@@ -49,15 +48,27 @@ function emptyProfile(): Profile {
 
 function openCodeProfile(): Profile {
   const profile = emptyProfile()
-  write(join(profile.home, ".local", "share", "opencode", "auth.json"), JSON.stringify({
-    openai: { type: "api", key: SECRET },
-    anthropic: { type: "oauth", refresh: "r", access: "a", expires: 1 },
-  }))
-  write(join(profile.home, ".config", "opencode", "opencode.json"), JSON.stringify({
-    model: "openai/gpt-5",
-    mcp: { ctx: { type: "local", command: ["npx", "ctx"] } },
-    provider: { myco: { npm: "@ai-sdk/openai-compatible", options: { baseURL: "https://example.invalid/v1" }, models: { m1: {} } } },
-  }))
+  write(
+    join(profile.home, ".local", "share", "opencode", "auth.json"),
+    JSON.stringify({
+      openai: { type: "api", key: SECRET },
+      anthropic: { type: "oauth", refresh: "r", access: "a", expires: 1 },
+    }),
+  )
+  write(
+    join(profile.home, ".config", "opencode", "opencode.json"),
+    JSON.stringify({
+      model: "openai/gpt-5",
+      mcp: { ctx: { type: "local", command: ["npx", "ctx"] } },
+      provider: {
+        myco: {
+          npm: "@ai-sdk/openai-compatible",
+          options: { baseURL: "https://example.invalid/v1" },
+          models: { m1: {} },
+        },
+      },
+    }),
+  )
   return profile
 }
 
@@ -82,7 +93,7 @@ function fakeHost() {
       eventHandlers.set(event, own)
     },
     async dispatchEvent(event: string, payload: unknown, ctx?: unknown) {
-      for (const handler of [...eventHandlers.get(event) ?? []]) await handler(payload, ctx)
+      for (const handler of [...(eventHandlers.get(event) ?? [])]) await handler(payload, ctx)
     },
   }
   const rpc = {
@@ -112,8 +123,8 @@ function fakeHost() {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         listeners.delete(listener)
-        reject(new Error(`waited ${EVENT_TIMEOUT_MS}ms for the done event of scan ${scanId}, never fired`))
-      }, EVENT_TIMEOUT_MS)
+        reject(new Error(`waited out the test budget for the done event of scan ${scanId}, never fired`))
+      }, remainingTestTime())
       const listener = (event: OnboardingScanEvent) => {
         if (event.scanId !== scanId || event.kind !== "done") return
         clearTimeout(timer)
@@ -127,7 +138,7 @@ function fakeHost() {
   async function scan(request: unknown): Promise<{ scanId: string; events: OnboardingScanEvent[] }> {
     const handler = handlers.get(ONBOARDING_SCAN_RPC_METHOD)
     if (handler === undefined) throw new Error("scan handler not registered")
-    const response = await handler(request) as OnboardingScanResponse
+    const response = (await handler(request)) as OnboardingScanResponse
     if (!("scanId" in response)) throw new Error(`scan unavailable: ${JSON.stringify(response)}`)
     return { scanId: response.scanId, events: await doneOf(response.scanId) }
   }
@@ -135,7 +146,7 @@ function fakeHost() {
   async function apply(request: unknown): Promise<OnboardingApplyResponse> {
     const handler = handlers.get(ONBOARDING_APPLY_RPC_METHOD)
     if (handler === undefined) throw new Error("apply handler not registered")
-    return await handler(request) as OnboardingApplyResponse
+    return (await handler(request)) as OnboardingApplyResponse
   }
 
   return { pi, handlers, events, modelAccess, scan, apply, waitForDone: doneOf, dispatchEvent: api.dispatchEvent }
@@ -177,7 +188,11 @@ function fileStore(path: string, log?: string[]) {
     async modify(provider: string, fn: (current: unknown) => unknown | Promise<unknown>) {
       log?.push(`enter:${provider}`)
       let entries: Record<string, unknown> = {}
-      try { entries = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown> } catch { /* absent */ }
+      try {
+        entries = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>
+      } catch {
+        /* absent */
+      }
       const next = await fn(entries[provider])
       if (next !== undefined) {
         entries[provider] = next
@@ -211,7 +226,11 @@ function gatedStore(path: string) {
       const run = mutex.then(async () => {
         log.push(`run:${provider}`)
         let entries: Record<string, unknown> = {}
-        try { entries = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown> } catch { /* absent */ }
+        try {
+          entries = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>
+        } catch {
+          /* absent */
+        }
         const next = await fn(entries[provider])
         if (next !== undefined) {
           entries[provider] = next
@@ -228,10 +247,10 @@ function gatedStore(path: string) {
     log.includes(`enter:${provider}`)
       ? Promise.resolve()
       : new Promise<void>((resolve) => {
-        const own = waiters.get(provider) ?? []
-        own.push(resolve)
-        waiters.set(provider, own)
-      })
+          const own = waiters.get(provider) ?? []
+          own.push(resolve)
+          waiters.set(provider, own)
+        })
   return { store, log, entered }
 }
 
@@ -272,7 +291,15 @@ function sourcesOf(events: readonly OnboardingScanEvent[]): string[] {
 describe("onboarding scan RPC", () => {
   test("#given the component registers #then it serves the scan and apply methods", () => {
     const host = register(emptyProfile())
-    expect([...host.handlers.keys()].sort()).toEqual([ONBOARDING_APPLY_RPC_METHOD, ONBOARDING_SCAN_RPC_METHOD, ONBOARDING_UNDERSTAND_RPC_METHOD, ONBOARDING_UNDERSTAND_SKIP_RPC_METHOD, ONBOARDING_UNDERSTAND_STOP_RPC_METHOD].sort())
+    expect([...host.handlers.keys()].sort()).toEqual(
+      [
+        ONBOARDING_APPLY_RPC_METHOD,
+        ONBOARDING_SCAN_RPC_METHOD,
+        ONBOARDING_UNDERSTAND_RPC_METHOD,
+        ONBOARDING_UNDERSTAND_SKIP_RPC_METHOD,
+        ONBOARDING_UNDERSTAND_STOP_RPC_METHOD,
+      ].sort(),
+    )
     expect(ONBOARDING_SCAN_RPC_METHOD).toBe("omo.onboarding.scan")
     expect(ONBOARDING_APPLY_RPC_METHOD).toBe("omo.onboarding.apply")
     expect(ONBOARDING_SCAN_RPC_EVENT).toBe("omo.onboarding.scan.event")
@@ -295,8 +322,12 @@ describe("onboarding scan RPC", () => {
       expect(own.slice(1, -1)).toEqual(items)
       expect(own.at(-1)?.counts?.found).toBe(items.length)
     }
-    const boundaries = events.filter((event) => event.kind === "source_started" || event.kind === "source_done").map((event) => `${event.kind}:${event.source}`)
-    expect(boundaries).toEqual(sourcesOf(events).flatMap((source) => [`source_started:${source}`, `source_done:${source}`]))
+    const boundaries = events
+      .filter((event) => event.kind === "source_started" || event.kind === "source_done")
+      .map((event) => `${event.kind}:${event.source}`)
+    expect(boundaries).toEqual(
+      sourcesOf(events).flatMap((source) => [`source_started:${source}`, `source_done:${source}`]),
+    )
     expect(events.at(-1)?.kind).toBe("done")
     const items = events.filter((event) => event.kind === "item").map((event) => event.item)
     expect(items).toContainEqual(expect.objectContaining({ id: "openai", kind: "api-key", state: "import" }))
@@ -307,8 +338,18 @@ describe("onboarding scan RPC", () => {
   test("#given includeCustomProviders #when a scan runs #then the provider source streams too", async () => {
     const host = register(openCodeProfile())
     const { events } = await host.scan({ includeCustomProviders: true })
-    expect(sourcesOf(events)).toEqual(["detect", "providers", "credentials", "assets", "model-choices", "projects", "sessions"])
-    expect(events.filter((event) => event.kind === "item").map((event) => event.item)).toContainEqual(expect.objectContaining({ id: "myco", kind: "provider", state: "import" }))
+    expect(sourcesOf(events)).toEqual([
+      "detect",
+      "providers",
+      "credentials",
+      "assets",
+      "model-choices",
+      "projects",
+      "sessions",
+    ])
+    expect(events.filter((event) => event.kind === "item").map((event) => event.item)).toContainEqual(
+      expect.objectContaining({ id: "myco", kind: "provider", state: "import" }),
+    )
   })
 
   test("#given no model configured and the network refused #when a scan and an apply of every stage run #then both complete without a socket or a model lookup", async () => {
@@ -325,7 +366,9 @@ describe("onboarding scan RPC", () => {
 
     expect(network.attempts).toEqual([])
     expect(host.modelAccess).toEqual([])
-    expect(applied).toEqual(expect.objectContaining({ applied: ["credentials", "assets", "providers", "model-choices"] }))
+    expect(applied).toEqual(
+      expect.objectContaining({ applied: ["credentials", "assets", "providers", "model-choices"] }),
+    )
     expect(JSON.parse(readFileSync(join(profile.agentDir, "auth.json"), "utf8")).openai).toBeDefined()
     expect(JSON.parse(readFileSync(join(profile.agentDir, "mcp.json"), "utf8")).mcpServers.ctx).toBeDefined()
     expect(JSON.parse(readFileSync(join(profile.agentDir, "models.json"), "utf8")).providers.myco).toBeDefined()
@@ -333,16 +376,21 @@ describe("onboarding scan RPC", () => {
 
   test("#given a custom provider with a key and new credentials #when every stage applies #then the credentials write does not make the provider stage stale (#10496 review)", async () => {
     const profile = openCodeProfile()
-    write(join(profile.home, ".local", "share", "opencode", "auth.json"), JSON.stringify({
-      openai: { type: "api", key: SECRET },
-      myco: { type: "api", key: `${SECRET}-myco` },
-    }))
+    write(
+      join(profile.home, ".local", "share", "opencode", "auth.json"),
+      JSON.stringify({
+        openai: { type: "api", key: SECRET },
+        myco: { type: "api", key: `${SECRET}-myco` },
+      }),
+    )
     const host = register(profile, { authStore: () => fileStore(authPath(profile)) })
     const { scanId } = await host.scan({ includeCustomProviders: true })
 
     const applied = await host.apply({ scanId, stages: ["credentials", "assets", "providers", "model-choices"] })
 
-    expect(applied).toEqual(expect.objectContaining({ applied: ["credentials", "assets", "providers", "model-choices"] }))
+    expect(applied).toEqual(
+      expect.objectContaining({ applied: ["credentials", "assets", "providers", "model-choices"] }),
+    )
     const auth = JSON.parse(readFileSync(authPath(profile), "utf8")) as Record<string, unknown>
     expect(auth.openai).toBeDefined()
     expect(auth.myco).toBeDefined()
@@ -363,8 +411,32 @@ describe("onboarding scan RPC", () => {
   test("#given a scan id the engine does not hold #when apply runs #then it answers unavailable and writes nothing", async () => {
     const profile = openCodeProfile()
     const host = register(profile)
-    expect(await host.apply({ scanId: "missing", stages: ["credentials"] })).toEqual(expect.objectContaining({ kind: "unavailable" }))
+    expect(await host.apply({ scanId: "missing", stages: ["credentials"] })).toEqual(
+      expect.objectContaining({ kind: "unavailable" }),
+    )
     expect(existsSync(profile.agentDir)).toBe(false)
+  })
+})
+
+describe("onboarding retained-scan cap (#12527)", () => {
+  test("#given eight retained scans, the two oldest applied #when more scans run #then the oldest scan leaves first, applied or not, and applied scans count toward the cap", async () => {
+    // given: since #12509 an applied scan stays retained for understanding, so it holds one of the eight slots
+    const profile = emptyProfile()
+    const store = createOnboardingScanStore()
+    const host = registerSession(profile, store)
+    const ids: string[] = []
+    for (let index = 0; index < 8; index += 1) ids.push((await host.scan({})).scanId)
+    for (const scanId of ids.slice(0, 2))
+      expect(await host.apply({ scanId, stages: [] })).toEqual(expect.objectContaining({ scanId }))
+
+    // when / then: each new scan evicts exactly the oldest retained one
+    ids.push((await host.scan({})).scanId)
+    expect([...store.scans.keys()]).toEqual(ids.slice(1))
+    ids.push((await host.scan({})).scanId)
+    expect([...store.scans.keys()]).toEqual(ids.slice(2))
+    ids.push((await host.scan({})).scanId)
+    expect([...store.scans.keys()]).toEqual(ids.slice(3))
+    expect(store.scans.get(ids[3] ?? "")?.applied).toBe(false)
   })
 })
 
@@ -375,12 +447,20 @@ describe("onboarding apply staleness", () => {
     const { scanId } = await host.scan({})
 
     // The engine refreshes a token under its own store after the scan read the file.
-    await fileStore(authPath(profile)).modify("anthropic", async () => ({ type: "oauth", access: "a2", refresh: "r2", expires: 2 }))
+    await fileStore(authPath(profile)).modify("anthropic", async () => ({
+      type: "oauth",
+      access: "a2",
+      refresh: "r2",
+      expires: 2,
+    }))
 
     const response = await host.apply({ scanId, stages: ["credentials"] })
     expect(response).toEqual(expect.objectContaining({ kind: "stale" }))
     expect((response as { paths?: readonly string[] }).paths).toContain(authPath(profile))
-    const auth = JSON.parse(readFileSync(authPath(profile), "utf8")) as { anthropic?: { refresh?: string }; openai?: unknown }
+    const auth = JSON.parse(readFileSync(authPath(profile), "utf8")) as {
+      anthropic?: { refresh?: string }
+      openai?: unknown
+    }
     expect(auth.anthropic?.refresh).toBe("r2")
     expect(auth.openai).toBeUndefined()
   })
@@ -446,9 +526,13 @@ describe("onboarding apply credential writes", () => {
     const profile = openCodeProfile()
     const host = register(profile)
     const log: string[] = []
-    await host.dispatchEvent("session_start", { type: "session_start", reason: "startup" }, {
-      modelRegistry: { authStorage: fileStore(authPath(profile), log) },
-    })
+    await host.dispatchEvent(
+      "session_start",
+      { type: "session_start", reason: "startup" },
+      {
+        modelRegistry: { authStorage: fileStore(authPath(profile), log) },
+      },
+    )
     const { scanId } = await host.scan({})
 
     const response = await host.apply({ scanId, stages: ["credentials"] })
@@ -467,7 +551,9 @@ describe("onboarding apply credential writes", () => {
 
     // The refresh starts first and holds the store; the apply must queue behind it, not write past it.
     let release!: () => void
-    const gate = new Promise<void>((resolve) => { release = resolve })
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
     const refresh = store.modify("anthropic", async () => {
       await gate
       return { type: "oauth", access: "a2", refresh: "r2", expires: 2 }
@@ -480,7 +566,10 @@ describe("onboarding apply credential writes", () => {
 
     expect(log).toContain("enter:openai")
     expect(response).toEqual(expect.objectContaining({ applied: ["credentials"] }))
-    const auth = JSON.parse(readFileSync(authPath(profile), "utf8")) as Record<string, { refresh?: string; key?: string }>
+    const auth = JSON.parse(readFileSync(authPath(profile), "utf8")) as Record<
+      string,
+      { refresh?: string; key?: string }
+    >
     expect(auth.anthropic?.refresh).toBe("r2")
     expect(auth.openai?.key).toBe(SECRET)
   })
@@ -499,7 +588,9 @@ describe("onboarding scan and apply across sessions of one process", () => {
     const response = await b.apply({ scanId, stages: ["assets"] })
 
     expect(response).toEqual(expect.objectContaining({ scanId, applied: ["assets"] }))
-    const servers = (JSON.parse(readFileSync(join(profile.agentDir, "mcp.json"), "utf8")) as { mcpServers: Record<string, unknown> }).mcpServers
+    const servers = (
+      JSON.parse(readFileSync(join(profile.agentDir, "mcp.json"), "utf8")) as { mcpServers: Record<string, unknown> }
+    ).mcpServers
     expect(servers.ctx).toBeDefined()
   })
 
@@ -508,9 +599,13 @@ describe("onboarding scan and apply across sessions of one process", () => {
     const store = createOnboardingScanStore()
     const a = registerSession(profile, store)
     const log: string[] = []
-    await a.dispatchEvent("session_start", { type: "session_start", reason: "startup" }, {
-      modelRegistry: { authStorage: fileStore(authPath(profile), log) },
-    })
+    await a.dispatchEvent(
+      "session_start",
+      { type: "session_start", reason: "startup" },
+      {
+        modelRegistry: { authStorage: fileStore(authPath(profile), log) },
+      },
+    )
     const { scanId } = await a.scan({})
     const b = registerSession(profile, store)
 
@@ -546,7 +641,11 @@ describe("onboarding scan and apply across sessions of one process", () => {
       b.apply({ scanId, stages: ["assets"] }),
     ])
 
-    expect(responses.filter((response) => "applied" in response && (response as { applied: readonly string[] }).applied.includes("assets"))).toHaveLength(1)
+    expect(
+      responses.filter(
+        (response) => "applied" in response && (response as { applied: readonly string[] }).applied.includes("assets"),
+      ),
+    ).toHaveLength(1)
     expect(responses.filter((response) => "kind" in response && response.kind === "unavailable")).toHaveLength(1)
   })
 
@@ -596,9 +695,13 @@ describe("onboarding apply ordering and notice routing", () => {
       host.apply({ scanId, stages: ["assets"] }),
     ])
 
-    const successes = [first, second].filter((response) => "applied" in response && (response as { applied: readonly string[] }).applied.includes("assets"))
+    const successes = [first, second].filter(
+      (response) => "applied" in response && (response as { applied: readonly string[] }).applied.includes("assets"),
+    )
     expect(successes).toHaveLength(1)
-    const servers = (JSON.parse(readFileSync(join(profile.agentDir, "mcp.json"), "utf8")) as { mcpServers: Record<string, unknown> }).mcpServers
+    const servers = (
+      JSON.parse(readFileSync(join(profile.agentDir, "mcp.json"), "utf8")) as { mcpServers: Record<string, unknown> }
+    ).mcpServers
     expect(servers.ctx).toBeDefined()
   })
 
@@ -607,7 +710,7 @@ describe("onboarding apply ordering and notice routing", () => {
     const handler = host.handlers.get(ONBOARDING_SCAN_RPC_METHOD)
     if (handler === undefined) throw new Error("scan handler not registered")
 
-    const response = await handler({}) as OnboardingScanResponse
+    const response = (await handler({})) as OnboardingScanResponse
     const eventsBeforeReply = host.events.length
     await host.waitForDone((response as { scanId: string }).scanId)
 
@@ -625,7 +728,10 @@ describe("onboarding apply ordering and notice routing", () => {
     writeFileSync(profile.agentDir, "")
     const written: string[] = []
     const originalWrite = process.stdout.write
-    process.stdout.write = ((chunk: unknown) => { written.push(String(chunk)); return true }) as typeof process.stdout.write
+    process.stdout.write = ((chunk: unknown) => {
+      written.push(String(chunk))
+      return true
+    }) as typeof process.stdout.write
     let response: OnboardingApplyResponse
     try {
       response = await host.apply({ scanId, stages: ["model-choices"] })

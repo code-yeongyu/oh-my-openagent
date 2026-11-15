@@ -30,17 +30,32 @@ function fixture(): Fixture {
   const root = mkdtempSync(join(tmpdir(), "omo-setup-stream-"))
   roots.push(root)
   const home = join(root, "home")
-  write(join(home, ".local", "share", "opencode", "auth.json"), JSON.stringify({
-    openai: { type: "api", key: SECRET_A },
-    anthropic: { type: "oauth", refresh: "r", access: "a", expires: 1 },
-    myco: { type: "api", key: SECRET_B },
-  }))
-  write(join(home, ".config", "opencode", "opencode.json"), JSON.stringify({
-    model: "openai/gpt-5",
-    mcp: { ctx: { type: "local", command: ["npx", "ctx"] } },
-    provider: { myco: { npm: "@ai-sdk/openai-compatible", options: { baseURL: "https://example.invalid/v1" }, models: { m1: { name: "M1" } } } },
-  }))
-  write(join(home, ".config", "opencode", "skills", "my-skill", "SKILL.md"), "---\nname: my-skill\ndescription: d\n---\nbody\n")
+  write(
+    join(home, ".local", "share", "opencode", "auth.json"),
+    JSON.stringify({
+      openai: { type: "api", key: SECRET_A },
+      anthropic: { type: "oauth", refresh: "r", access: "a", expires: 1 },
+      myco: { type: "api", key: SECRET_B },
+    }),
+  )
+  write(
+    join(home, ".config", "opencode", "opencode.json"),
+    JSON.stringify({
+      model: "openai/gpt-5",
+      mcp: { ctx: { type: "local", command: ["npx", "ctx"] } },
+      provider: {
+        myco: {
+          npm: "@ai-sdk/openai-compatible",
+          options: { baseURL: "https://example.invalid/v1" },
+          models: { m1: { name: "M1" } },
+        },
+      },
+    }),
+  )
+  write(
+    join(home, ".config", "opencode", "skills", "my-skill", "SKILL.md"),
+    "---\nname: my-skill\ndescription: d\n---\nbody\n",
+  )
   return { home, agentDir: join(home, ".omo", "agent"), env: { HOME: home } }
 }
 
@@ -70,11 +85,17 @@ describe("setup-stream", () => {
     const items = Object.fromEntries(results.map((result) => [result.source, result.items]))
     expect(items.detect).toContainEqual(expect.objectContaining({ id: "opencode", kind: "harness", state: "found" }))
     expect(items.providers).toContainEqual(expect.objectContaining({ id: "myco", kind: "provider", state: "import" }))
-    expect(items.credentials).toContainEqual(expect.objectContaining({ id: "openai", kind: "api-key", state: "import" }))
-    expect(items.credentials).toContainEqual(expect.objectContaining({ id: "anthropic", kind: "oauth", state: "login" }))
+    expect(items.credentials).toContainEqual(
+      expect.objectContaining({ id: "openai", kind: "api-key", state: "import" }),
+    )
+    expect(items.credentials).toContainEqual(
+      expect.objectContaining({ id: "anthropic", kind: "oauth", state: "login" }),
+    )
     expect(items.assets).toContainEqual(expect.objectContaining({ id: "ctx", kind: "mcp", state: "import" }))
     expect(items.assets).toContainEqual(expect.objectContaining({ id: "my-skill", kind: "skill", state: "import" }))
-    expect(items["model-choices"]).toContainEqual(expect.objectContaining({ id: "default model", kind: "default", state: "import" }))
+    expect(items["model-choices"]).toContainEqual(
+      expect.objectContaining({ id: "default model", kind: "default", state: "import" }),
+    )
     // Items travel over RPC: a key never rides in one.
     const serialized = JSON.stringify(results.map((result) => result.items))
     expect(serialized).not.toContain(SECRET_A)
@@ -91,13 +112,17 @@ describe("setup-stream", () => {
     expect(providers?.items).toEqual([])
     expect(providers?.plan.pending).toBe(0)
     const credentials = results.find((result) => result.source === "credentials")
-    expect(credentials?.items).toContainEqual(expect.objectContaining({ id: "myco", kind: "api-key", state: "unmapped" }))
+    expect(credentials?.items).toContainEqual(
+      expect.objectContaining({ id: "myco", kind: "api-key", state: "unmapped" }),
+    )
   })
 
   test("#given a consumer reading one stage at a time #when it has read four stages #then the model-choice stage has not loaded the model catalog yet", async () => {
     const { home, agentDir, env } = fixture()
     const { calls, loadModelCatalog } = catalogSpy()
-    const stream = scanSetup({ home, env, loadModelCatalog }, agentDir, { includeCustomProviders: true })[Symbol.asyncIterator]()
+    const stream = scanSetup({ home, env, loadModelCatalog }, agentDir, { includeCustomProviders: true })[
+      Symbol.asyncIterator
+    ]()
     for (let index = 0; index < 4; index++) expect((await stream.next()).done).toBe(false)
     expect(calls).toHaveLength(0)
     const last = await stream.next()
@@ -109,11 +134,17 @@ describe("setup-stream", () => {
   test("#given collected plans #when only the credential stage is accepted #then only auth.json is written", async () => {
     const { home, agentDir, env } = fixture()
     const { loadModelCatalog } = catalogSpy()
-    const { inventory, plans } = await collectSetupPlans(scanSetup({ home, env, loadModelCatalog }, agentDir, { includeCustomProviders: true }))
+    const { inventory, plans } = await collectSetupPlans(
+      scanSetup({ home, env, loadModelCatalog }, agentDir, { includeCustomProviders: true }),
+    )
     expect(inventory.harnesses.map((harness) => harness.id)).toContain("opencode")
 
     const reported: string[] = []
-    const applied = await applySetupStages(plans, async (stage) => stage.id === "credentials", (line) => reported.push(line))
+    const applied = await applySetupStages(
+      plans,
+      async (stage) => stage.id === "credentials",
+      (line) => reported.push(line),
+    )
 
     expect([...applied]).toEqual(["credentials"])
     expect(JSON.parse(readFileSync(join(agentDir, "auth.json"), "utf8")).openai).toBeDefined()
@@ -125,12 +156,24 @@ describe("setup-stream", () => {
   test("#given a target edited after planning #when apply runs with a stale guard #then it writes nothing and names the path", async () => {
     const { home, agentDir, env } = fixture()
     const { loadModelCatalog } = catalogSpy()
-    const { plans } = await collectSetupPlans(scanSetup({ home, env, loadModelCatalog }, agentDir, { includeCustomProviders: true }))
+    const { plans } = await collectSetupPlans(
+      scanSetup({ home, env, loadModelCatalog }, agentDir, { includeCustomProviders: true }),
+    )
     // The engine refreshes a token into auth.json after the plan read it.
-    write(join(agentDir, "auth.json"), JSON.stringify({ anthropic: { type: "oauth", access: "a2", refresh: "r2", expires: 2 } }, null, 2))
+    write(
+      join(agentDir, "auth.json"),
+      JSON.stringify({ anthropic: { type: "oauth", access: "a2", refresh: "r2", expires: 2 } }, null, 2),
+    )
     const staleGuard = (stageId: string) => (stageId === "credentials" ? [join(agentDir, "auth.json")] : [])
 
-    await expect(applySetupStages(plans, () => true, () => {}, { staleGuard })).rejects.toThrow(/changed since planning/)
+    await expect(
+      applySetupStages(
+        plans,
+        () => true,
+        () => {},
+        { staleGuard },
+      ),
+    ).rejects.toThrow(/changed since planning/)
 
     const auth = JSON.parse(readFileSync(join(agentDir, "auth.json"), "utf8"))
     expect(auth.anthropic.refresh).toBe("r2")
@@ -140,7 +183,9 @@ describe("setup-stream", () => {
   test("#given a skill directory created after planning #when the stale targets are read #then it counts as changed (#10496 review)", async () => {
     const { home, agentDir, env } = fixture()
     const { loadModelCatalog } = catalogSpy()
-    const { plans } = await collectSetupPlans(scanSetup({ home, env, loadModelCatalog }, agentDir, { includeCustomProviders: true }))
+    const { plans } = await collectSetupPlans(
+      scanSetup({ home, env, loadModelCatalog }, agentDir, { includeCustomProviders: true }),
+    )
     const skillDir = join(agentDir, "skills", "my-skill")
     expect(staleSetupTargets(plans, ["assets"])).not.toContain(skillDir)
     mkdirSync(skillDir, { recursive: true })
@@ -157,7 +202,11 @@ describe("setup-stream", () => {
     const writeAuth = async (path: string, additions: ReadonlyArray<{ provider: string; key: string }>) => {
       expect(path).toBe(target)
       let entries: Record<string, unknown> = {}
-      try { entries = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown> } catch { /* absent */ }
+      try {
+        entries = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>
+      } catch {
+        /* absent */
+      }
       // A store writes under its lock and keeps whatever it already holds - a concurrent login survives.
       for (const item of additions) {
         calls.push(item.provider)
@@ -166,7 +215,12 @@ describe("setup-stream", () => {
       write(path, JSON.stringify(entries, null, 2))
     }
 
-    const applied = await applySetupStages(plans, (stage) => stage.id === "credentials", () => {}, { writeAuth })
+    const applied = await applySetupStages(
+      plans,
+      (stage) => stage.id === "credentials",
+      () => {},
+      { writeAuth },
+    )
 
     expect([...applied]).toEqual(["credentials"])
     expect(calls).toEqual(["openai"])
@@ -196,7 +250,12 @@ describe("setup-stream commandcode", () => {
 
     // then
     const providers = results.find((result) => result.source === "providers")
-    expect(providers?.items).toContainEqual({ id: "commandcode", kind: "provider", state: "import", detail: "12 model(s)" })
+    expect(providers?.items).toContainEqual({
+      id: "commandcode",
+      kind: "provider",
+      state: "import",
+      detail: "13 model(s)",
+    })
     // Items travel over RPC: a key never rides in one.
     expect(JSON.stringify(results.map((result) => result.items))).not.toContain(SENTINEL)
   })
@@ -207,7 +266,11 @@ describe("setup-stream commandcode", () => {
     const { plans } = await collectSetupPlans(scanSetup({ home, env }, agentDir, { includeCustomProviders: true }))
 
     // when
-    const applied = await applySetupStages(plans, (stage) => stage.id === "providers", () => {})
+    const applied = await applySetupStages(
+      plans,
+      (stage) => stage.id === "providers",
+      () => {},
+    )
 
     // then
     expect([...applied]).toEqual(["providers"])
@@ -221,7 +284,9 @@ describe("setup-stream commandcode", () => {
     expect(claude.api).toBe("anthropic-messages")
     expect(claude.baseUrl).toBe("https://api.commandcode.ai/provider")
     expect(claude.maxTokens).toBe(32000)
-    expect(models.commandcode.models.some((model: { id: string }) => model.id === "deepseek/deepseek-v4-pro")).toBe(true)
+    expect(models.commandcode.models.some((model: { id: string }) => model.id === "deepseek/deepseek-v4-pro")).toBe(
+      true,
+    )
     // The engine interpolates the `${NAME}` reference; the env value itself is never stored.
     const authText = readFileSync(join(agentDir, "auth.json"), "utf8")
     expect(JSON.parse(authText).commandcode).toEqual({ type: "api_key", key: `\${CMD_API_KEY}` })
@@ -240,7 +305,9 @@ describe("setup-stream commandcode", () => {
     expect(providers.result.added[0]?.key.source).toBe("environment variable COMMANDCODE_API_KEY")
 
     // given: both env vars set
-    const both = await drain(scanSetup({ home, env: { ...env, CMD_API_KEY: SENTINEL } }, agentDir, { includeCustomProviders: true }))
+    const both = await drain(
+      scanSetup({ home, env: { ...env, CMD_API_KEY: SENTINEL } }, agentDir, { includeCustomProviders: true }),
+    )
     const providersBoth = both.find((result) => result.source === "providers")
     expect(providersBoth?.items).toContainEqual(expect.objectContaining({ id: "commandcode", state: "import" }))
   })
@@ -264,13 +331,24 @@ describe("setup-stream commandcode", () => {
     const root = mkdtempSync(join(tmpdir(), "omo-setup-stream-cc-"))
     roots.push(root)
     const home = join(root, "home")
-    write(join(home, ".config", "opencode", "opencode.json"), JSON.stringify({
-      provider: { commandcode: { npm: "@ai-sdk/openai-compatible", options: { baseURL: "https://mine.example/v1", apiKey: "their-key" }, models: { m1: {} } } },
-    }))
+    write(
+      join(home, ".config", "opencode", "opencode.json"),
+      JSON.stringify({
+        provider: {
+          commandcode: {
+            npm: "@ai-sdk/openai-compatible",
+            options: { baseURL: "https://mine.example/v1", apiKey: "their-key" },
+            models: { m1: {} },
+          },
+        },
+      }),
+    )
     const agentDir = join(home, ".omo", "agent")
 
     // when
-    const { plans } = await collectSetupPlans(scanSetup({ home, env: { HOME: home, CMD_API_KEY: SENTINEL } }, agentDir, { includeCustomProviders: true }))
+    const { plans } = await collectSetupPlans(
+      scanSetup({ home, env: { HOME: home, CMD_API_KEY: SENTINEL } }, agentDir, { includeCustomProviders: true }),
+    )
 
     // then
     const providers = plans.providers as { result: { added: Array<{ id: string; config: { baseUrl: string } }> } }
@@ -278,12 +356,19 @@ describe("setup-stream commandcode", () => {
     expect(providers.result.added[0]?.config.baseUrl).toBe("https://mine.example/v1")
 
     // when
-    await applySetupStages(plans, (stage) => stage.id === "providers", () => {})
+    await applySetupStages(
+      plans,
+      (stage) => stage.id === "providers",
+      () => {},
+    )
 
     // then
     const models = JSON.parse(readFileSync(join(agentDir, "models.json"), "utf8")).providers
     expect(models.commandcode.baseUrl).toBe("https://mine.example/v1")
     expect(models.commandcode.models.map((model: { id: string }) => model.id)).toEqual(["m1"])
-    expect(JSON.parse(readFileSync(join(agentDir, "auth.json"), "utf8")).commandcode).toEqual({ type: "api_key", key: "their-key" })
+    expect(JSON.parse(readFileSync(join(agentDir, "auth.json"), "utf8")).commandcode).toEqual({
+      type: "api_key",
+      key: "their-key",
+    })
   })
 })

@@ -166,15 +166,65 @@ describe("event-bridge before_agent_start", () => {
   })
 })
 
+describe("event-bridge before_agent_start stale Stop release", () => {
+  it("#given a run-pause bridge #when a preview and then real turns start #then only real turns release a stale Stop for their session, a release that never settles does not hold the turn, and a failed release is logged", async () => {
+    // given
+    const released: string[] = []
+    const failure = Promise.withResolvers<void>()
+    const results = [new Promise<void>(() => {}), failure.promise]
+    const runPause = {
+      restore: async () => {},
+      reconciled: async () => {},
+      changed: async () => {},
+      releaseStale: (sessionId: string) => {
+        released.push(sessionId)
+        return results[released.length - 1] ?? Promise.resolve()
+      },
+    }
+    const { pi, warnings } = wireHarness("parent-session", { runPause })
+
+    // when: the first real turn's release never settles (a child resume port that never answers)
+    await pi.dispatch("before_agent_start", { type: "before_agent_start", preview: true }, {})
+    await pi.dispatch("before_agent_start", { type: "before_agent_start" }, {})
+    // then: the turn started anyway, and its usage guidance went out
+    expect(pi.messages).toEqual([
+      expect.objectContaining({ message: expect.objectContaining({ customType: "senpi-task.usage" }) }),
+    ])
+
+    // when: the next turn's release fails
+    await pi.dispatch("before_agent_start", { type: "before_agent_start" }, {})
+    failure.reject(new Error("resume port down"))
+    // The bridge attached its handler during dispatch, so it runs before this later one.
+    await failure.promise.catch(() => undefined)
+
+    // then
+    expect(released).toEqual(["parent-session", "parent-session"])
+    expect(warnings).toEqual([
+      { message: "omo-senpi task stale run Stop release failed", details: { error: "Error: resume port down" } },
+    ])
+  })
+})
+
+describe("event-bridge session_compact", () => {
+  it("#given rejected, malformed, and accepted compactions #when they fire #then only accepted compaction forgets task-output status reads", async () => {
+    const { pi, forgottenTaskOutputSessions } = wireHarness("parent-session")
+
+    await pi.dispatch("session_compact", { type: "session_compact", accepted: false }, {})
+    expect(forgottenTaskOutputSessions).toEqual([])
+
+    await pi.dispatch("session_compact", { type: "session_compact" }, {})
+    expect(forgottenTaskOutputSessions).toEqual([])
+
+    await pi.dispatch("session_compact", { type: "session_compact", accepted: true }, {})
+    expect(forgottenTaskOutputSessions).toEqual(["parent-session"])
+  })
+})
+
 describe("event-bridge session_shutdown", () => {
   it("#given a session_shutdown with a reason and a captured session id #when the event fires #then it suspends with parentSessionId and reason", async () => {
     const { pi, calls, order } = wireHarness("parent-session")
 
-    await pi.dispatch(
-      "session_shutdown",
-      { type: "session_shutdown", reason: "quit" } as SessionShutdownEvent,
-      {},
-    )
+    await pi.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" } as SessionShutdownEvent, {})
 
     expect(order).toEqual([
       "capture",
@@ -199,11 +249,7 @@ describe("event-bridge session_shutdown", () => {
       const { pi, calls } = wireHarness("child-session", { stateDir: "/stores/proj/senpi-task" })
       Object.assign(pi, { sessionContext: { role: "child", task_id: "st_0000c0de", state_dir: stateDir } })
 
-      await pi.dispatch(
-        "session_shutdown",
-        { type: "session_shutdown", reason: "quit" } as SessionShutdownEvent,
-        {},
-      )
+      await pi.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" } as SessionShutdownEvent, {})
 
       expect(calls).toEqual([{ parentSessionId: "child-session", reason: "quit", ...expected }])
     })
@@ -212,20 +258,9 @@ describe("event-bridge session_shutdown", () => {
   it("#given a session_shutdown with no captured session id and no live handles #when the event fires #then nothing is suspended and nothing is warned", async () => {
     const { pi, calls, order, warnings } = wireHarness(undefined)
 
-    await pi.dispatch(
-      "session_shutdown",
-      { type: "session_shutdown", reason: "reload" } as SessionShutdownEvent,
-      {},
-    )
+    await pi.dispatch("session_shutdown", { type: "session_shutdown", reason: "reload" } as SessionShutdownEvent, {})
 
-    expect(order).toEqual([
-      "capture",
-      "transition",
-      "clearUi",
-      "dispose",
-      "leadShutdown",
-      "resumptionShutdown:0",
-    ])
+    expect(order).toEqual(["capture", "transition", "clearUi", "dispose", "leadShutdown", "resumptionShutdown:0"])
     expect(calls).toHaveLength(0)
     expect(warnings).toHaveLength(0)
   })
@@ -239,11 +274,7 @@ describe("event-bridge session_shutdown", () => {
       resident: ["task-owned", "task-sibling"],
     })
 
-    await pi.dispatch(
-      "session_shutdown",
-      { type: "session_shutdown", reason: "reload" } as SessionShutdownEvent,
-      {},
-    )
+    await pi.dispatch("session_shutdown", { type: "session_shutdown", reason: "reload" } as SessionShutdownEvent, {})
 
     expect(order.at(-1)).toBe("suspend")
     expect(calls).toEqual([{ parentSessionId: "parent-a", reason: "reload" }])

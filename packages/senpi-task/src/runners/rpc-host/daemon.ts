@@ -253,7 +253,8 @@ function bunRuntimeAvailable(env: Readonly<Record<string, string | undefined>>):
 }
 
 function hostUnavailableReason(reason: string): HostUnavailableReason {
-  if (reason === "protocol" || reason === "capability" || reason === "legacy_host" || reason === "engine_mismatch") return reason
+  if (reason === "protocol" || reason === "capability" || reason === "legacy_host" || reason === "engine_mismatch")
+    return reason
   return "engine_refused"
 }
 
@@ -262,7 +263,10 @@ function sanitize(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error)
   const masked = home === "" ? raw : raw.replaceAll(home, "~")
   // Control bytes and stack newlines never reach the operator line the fallback warning carries.
-  const flat = masked.replace(/[\u0000-\u001F\u007F]+/g, " ").replace(/ {2,}/g, " ").trim()
+  const flat = masked
+    .replace(/[\u0000-\u001F\u007F]+/g, " ")
+    .replace(/ {2,}/g, " ")
+    .trim()
   return flat.length > 200 ? `${flat.slice(0, 200)}...` : flat
 }
 

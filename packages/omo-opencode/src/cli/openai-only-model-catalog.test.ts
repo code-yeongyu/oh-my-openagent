@@ -79,7 +79,10 @@ describe("generateModelConfig OpenAI-only model catalog", () => {
     expect(result.categories?.quick).toMatchObject({
       model: "openai/gpt-6-luna-fast",
       variant: "low",
-      fallback_models: [{ model: "opencode-go/minimax-m3", variant: "high" }, { model: "opencode-go/minimax-m2.7", variant: "high" }],
+      fallback_models: [
+        { model: "opencode-go/minimax-m3", variant: "high" },
+        { model: "opencode-go/minimax-m2.7", variant: "high" },
+      ],
     })
   })
 

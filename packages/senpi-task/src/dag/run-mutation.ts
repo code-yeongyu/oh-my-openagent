@@ -25,7 +25,16 @@ export function applyDagRunMutation(record: DagRunRecordV1, event: DagRunEvent):
       ...record,
       nodes: record.nodes.map((node) => {
         if (node.id !== event.nodeId) return node
-        const { error: _error, resultArtifact: _resultArtifact, runStats: _runStats, completedAt: _completedAt, startedAt: _startedAt, output: _output, outputBytes: _outputBytes, ...kept } = node as DagNode & {
+        const {
+          error: _error,
+          resultArtifact: _resultArtifact,
+          runStats: _runStats,
+          completedAt: _completedAt,
+          startedAt: _startedAt,
+          output: _output,
+          outputBytes: _outputBytes,
+          ...kept
+        } = node as DagNode & {
           readonly resultArtifact?: unknown
         }
         return { ...kept, state: "pending", execAttempt: event.execAttempt }
@@ -61,14 +70,17 @@ export function applyDagRunMutation(record: DagRunRecordV1, event: DagRunEvent):
     criticalPath: mutation.criticalPath,
     bottlenecks: mutation.bottlenecks,
     diagnostics: mutation.diagnostics,
-    amendHistory: [...(record.amendHistory ?? []), {
-      at: event.at,
-      previousFingerprint: event.previousFingerprint,
-      fingerprint: event.fingerprint,
-      changedNodeIds: event.changedNodeIds,
-      addedNodeIds: event.addedNodeIds,
-      invalidatedNodeIds: event.invalidatedNodeIds,
-    }],
+    amendHistory: [
+      ...(record.amendHistory ?? []),
+      {
+        at: event.at,
+        previousFingerprint: event.previousFingerprint,
+        fingerprint: event.fingerprint,
+        changedNodeIds: event.changedNodeIds,
+        addedNodeIds: event.addedNodeIds,
+        invalidatedNodeIds: event.invalidatedNodeIds,
+      },
+    ],
     updatedAt: event.at,
   }
 }

@@ -23,7 +23,9 @@ function createPluginContext(client: object): PluginInput {
   }
 }
 
-function createManagerWithStatus(statusImpl: () => Promise<{ data: Record<string, { type: string }> }>): BackgroundManager {
+function createManagerWithStatus(
+  statusImpl: () => Promise<{ data: Record<string, { type: string }> }>,
+): BackgroundManager {
   const client = {
     session: {
       status: statusImpl,
@@ -72,7 +74,6 @@ describe("BackgroundManager polling overlap", () => {
   })
 })
 
-
 function createRunningTask(sessionId: string): BackgroundTask {
   return {
     id: `bg_test_${sessionId}`,
@@ -102,20 +103,25 @@ function createManagerWithClient(clientOverrides: Record<string, unknown> = {}):
       abort: async () => ({}),
       todo: async () => ({ data: [] }),
       messages: async () => ({
-        data: [{
-          info: { role: "assistant", finish: "end_turn", id: "msg-2" },
-          parts: [{ type: "text", text: "done" }],
-        }, {
-          info: { role: "user", id: "msg-1" },
-          parts: [{ type: "text", text: "go" }],
-        }],
+        data: [
+          {
+            info: { role: "assistant", finish: "end_turn", id: "msg-2" },
+            parts: [{ type: "text", text: "done" }],
+          },
+          {
+            info: { role: "user", id: "msg-1" },
+            parts: [{ type: "text", text: "go" }],
+          },
+        ],
       }),
       ...clientOverrides,
     },
   }
-  return new BackgroundManager(
-    { pluginContext: createPluginContext(client), config: undefined, enableParentSessionNotifications: false },
-  )
+  return new BackgroundManager({
+    pluginContext: createPluginContext(client),
+    config: undefined,
+    enableParentSessionNotifications: false,
+  })
 }
 
 describe("BackgroundManager verifySessionExists", () => {
@@ -202,9 +208,17 @@ describe("BackgroundManager pollRunningTasks", () => {
     })
 
     test("#when status polling is unavailable #then it does not complete or increment missed polls", async () => {
-      const cases: Array<{ name: string; status?: (() => Promise<{ data: Record<string, { type: string }> }>) | undefined }> = [
+      const cases: Array<{
+        name: string
+        status?: (() => Promise<{ data: Record<string, { type: string }> }>) | undefined
+      }> = [
         { name: "missing status method", status: undefined },
-        { name: "throwing status method", status: async () => { throw new Error("status unavailable") } },
+        {
+          name: "throwing status method",
+          status: async () => {
+            throw new Error("status unavailable")
+          },
+        },
       ]
 
       for (const testCase of cases) {
@@ -284,10 +298,12 @@ describe("BackgroundManager pollRunningTasks", () => {
         messages: async () => {
           messagesCallCount += 1
           return {
-            data: [{
-              info: { role: "assistant", finish: "end_turn", id: "msg-2" },
-              parts: [{ type: "text", text: "done" }],
-            }],
+            data: [
+              {
+                info: { role: "assistant", finish: "end_turn", id: "msg-2" },
+                parts: [{ type: "text", text: "done" }],
+              },
+            ],
           }
         },
       })
@@ -330,9 +346,7 @@ describe("BackgroundManager pollRunningTasks", () => {
         type: "todo.updated",
         properties: {
           sessionID: "ses-idle-todo-cached",
-          todos: [
-            { id: "todo-1", content: "done", status: "completed", priority: "high" },
-          ],
+          todos: [{ id: "todo-1", content: "done", status: "completed", priority: "high" }],
         },
       })
 
@@ -354,9 +368,7 @@ describe("BackgroundManager pollRunningTasks", () => {
         todo: async () => {
           todoCallCount += 1
           return {
-            data: [
-              { content: "compile result", status: "completed", priority: "high" },
-            ],
+            data: [{ content: "compile result", status: "completed", priority: "high" }],
           }
         },
       })
@@ -371,9 +383,7 @@ describe("BackgroundManager pollRunningTasks", () => {
         type: "todo.updated",
         properties: {
           sessionID: "ses-idle-stale-todos",
-          todos: [
-            { content: "compile result", status: "in_progress", priority: "high" },
-          ],
+          todos: [{ content: "compile result", status: "in_progress", priority: "high" }],
         },
       })
 
@@ -449,7 +459,7 @@ describe("BackgroundManager pollRunningTasks", () => {
       expect(task.completedAt).toBeDefined()
     })
 
-    test('#when session status is an unknown type #then completes the task', async () => {
+    test("#when session status is an unknown type #then completes the task", async () => {
       //#given
       const manager = createManagerWithClient({
         status: async () => ({ data: { "ses-unknown": { type: "some-weird-status" } } }),

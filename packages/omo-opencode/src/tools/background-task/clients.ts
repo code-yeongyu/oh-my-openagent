@@ -16,8 +16,7 @@ export type BackgroundOutputMessage = {
 }
 
 export type BackgroundOutputMessagesResult =
-  | { data?: BackgroundOutputMessage[]; error?: unknown }
-  | BackgroundOutputMessage[]
+  { data?: BackgroundOutputMessage[]; error?: unknown } | BackgroundOutputMessage[]
 
 export type BackgroundOutputClient = {
   session: {

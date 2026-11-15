@@ -132,20 +132,24 @@ describe("/dream external transcript staging and target validation", () => {
     // given
     const { identity, requests, pi, ctx } = await harness()
     const transcript = join(ctx.agentDir ?? "", "source.jsonl")
-    await writeFile(transcript, [
-      JSON.stringify({ type: "session", id: "source-session", timestamp: "2026-08-10T10:00:00.000Z" }),
-      JSON.stringify({
-        type: "message",
-        id: "message-1",
-        timestamp: "2026-08-10T10:01:00.000Z",
-        message: { role: "user", content: [{ type: "text", text: "remember tabs" }] },
-      }),
-      "{ malformed",
-      JSON.stringify({
-        type: "message",
-        message: { role: "assistant", content: [{ type: "text", text: "tabs are preferred" }] },
-      }),
-    ].join("\n"), "utf8")
+    await writeFile(
+      transcript,
+      [
+        JSON.stringify({ type: "session", id: "source-session", timestamp: "2026-08-10T10:00:00.000Z" }),
+        JSON.stringify({
+          type: "message",
+          id: "message-1",
+          timestamp: "2026-08-10T10:01:00.000Z",
+          message: { role: "user", content: [{ type: "text", text: "remember tabs" }] },
+        }),
+        "{ malformed",
+        JSON.stringify({
+          type: "message",
+          message: { role: "assistant", content: [{ type: "text", text: "tabs are preferred" }] },
+        }),
+      ].join("\n"),
+      "utf8",
+    )
     const fileMtime = new Date("2026-08-10T10:02:00.000Z")
     await utimes(transcript, fileMtime, fileMtime)
 
@@ -158,14 +162,8 @@ describe("/dream external transcript staging and target validation", () => {
     }).readEntries()
 
     // then
-    const firstDerivedId = createHash("sha1")
-      .update(`${transcript}:1:remember tabs`)
-      .digest("hex")
-      .slice(0, 16)
-    const secondDerivedId = createHash("sha1")
-      .update(`${transcript}:3:tabs are preferred`)
-      .digest("hex")
-      .slice(0, 16)
+    const firstDerivedId = createHash("sha1").update(`${transcript}:1:remember tabs`).digest("hex").slice(0, 16)
+    const secondDerivedId = createHash("sha1").update(`${transcript}:3:tabs are preferred`).digest("hex").slice(0, 16)
     expect(new Set(first.stagedMessageIds)).toEqual(new Set([firstDerivedId, secondDerivedId]))
     expect(second.stagedMessageIds).toEqual([])
     expect(new Set(second.skippedMessageIds)).toEqual(new Set(first.stagedMessageIds))

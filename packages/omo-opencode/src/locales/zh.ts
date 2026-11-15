@@ -4,7 +4,7 @@ const overrides: Partial<Record<TranslationKey, string>> = {
   "toast.new_background_task": "新后台任务",
   "toast.new_task_executed": "新任务已执行",
   "toast.task_completed": "任务完成",
-  "toast.task_completion_message": "\"{{description}}\" 完成，耗时 {{duration}}",
+  "toast.task_completion_message": '"{{description}}" 完成，耗时 {{duration}}',
   "toast.task_completion_remaining": "仍在运行: {{running}} | 排队中: {{queued}}",
   "toast.status_queued": "排队中",
   "toast.task_list_running": "运行中 ({{count}}):",

@@ -164,7 +164,12 @@ describe("createFirstPaintScheduler", () => {
       on: (event, handler) => handlers.set(event, [...(handlers.get(event) ?? []), handler]),
       backstopMs: 60_000,
     })
-    return { schedule, fire: (event) => { for (const handler of handlers.get(event) ?? []) handler() } }
+    return {
+      schedule,
+      fire: (event) => {
+        for (const handler of handlers.get(event) ?? []) handler()
+      },
+    }
   }
 
   it("#given queued work #when no post-paint edge has fired #then nothing runs before the gate opens", () => {
@@ -173,7 +178,9 @@ describe("createFirstPaintScheduler", () => {
     let ran = 0
 
     // when
-    schedule(() => { ran += 1 })
+    schedule(() => {
+      ran += 1
+    })
 
     // then
     expect(ran).toBe(0)
@@ -192,7 +199,9 @@ describe("createFirstPaintScheduler", () => {
     let ran = 0
 
     // when
-    schedule(() => { ran += 1 })
+    schedule(() => {
+      ran += 1
+    })
 
     // then
     expect(ran).toBe(0)
@@ -208,7 +217,9 @@ describe("createFirstPaintScheduler", () => {
     // given
     const { schedule, fire } = gate()
     let ran = 0
-    const cancel = schedule(() => { ran += 1 })
+    const cancel = schedule(() => {
+      ran += 1
+    })
 
     // when
     cancel()
@@ -224,7 +235,9 @@ describe("createFirstPaintScheduler", () => {
     let ran = 0
 
     // when
-    schedule(() => { ran += 1 })
+    schedule(() => {
+      ran += 1
+    })
     await new Promise((resolve) => setTimeout(resolve, 20))
 
     // then

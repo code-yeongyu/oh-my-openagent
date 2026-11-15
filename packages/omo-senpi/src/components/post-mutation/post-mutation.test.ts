@@ -18,10 +18,14 @@ const event = (input: Record<string, unknown>, toolName = "apply_patch") => ({
 describe("shared post-mutation primitives", () => {
   it("extracts all files from an apply_patch result and centralizes mutation names", () => {
     expect(MUTATION_TOOL_NAMES).toEqual(new Set(["write", "edit", "apply_patch"]))
-    expect(extractMutatedFilePaths(event({
-      input: "*** Begin Patch\n*** Update File: a.ts\n*** Add File: b.ts\n*** End Patch",
-      files: [{ filePath: "c.ts", movePath: "d.ts" }],
-    }))).toEqual(["a.ts", "b.ts", "c.ts", "d.ts"])
+    expect(
+      extractMutatedFilePaths(
+        event({
+          input: "*** Begin Patch\n*** Update File: a.ts\n*** Add File: b.ts\n*** End Patch",
+          files: [{ filePath: "c.ts", movePath: "d.ts" }],
+        }),
+      ),
+    ).toEqual(["a.ts", "b.ts", "c.ts", "d.ts"])
   })
 
   it("coalesces duplicate in-flight paths", async () => {

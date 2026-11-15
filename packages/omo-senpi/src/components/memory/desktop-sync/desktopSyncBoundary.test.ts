@@ -10,17 +10,30 @@ import { desktopSyncBoundary } from "./desktopSyncBoundary"
 // while main's durable record is active and names the captured identity, generation and incarnation.
 
 const homes: string[] = []
-afterEach(async () => { for (const home of homes.splice(0)) await rm(home, { recursive: true, force: true }) })
+afterEach(async () => {
+  for (const home of homes.splice(0)) await rm(home, { recursive: true, force: true })
+})
 
 const descriptor: DesktopSyncDescriptor = {
-  genesis: "supported", rpId: "recovery.example.test", userName: "account-1",
-  serviceOrigin: "https://api.example.test", accountId: "account-1", serviceDeviceId: "device-1",
-  syncPrincipalId: "principal-1", publicKeys: { signing: "signing-1", sealing: "sealing-1" },
-  generation: "generation-1", incarnation: "incarnation-1",
+  genesis: "supported",
+  rpId: "recovery.example.test",
+  userName: "account-1",
+  serviceOrigin: "https://api.example.test",
+  accountId: "account-1",
+  serviceDeviceId: "device-1",
+  syncPrincipalId: "principal-1",
+  publicKeys: { signing: "signing-1", sealing: "sealing-1" },
+  generation: "generation-1",
+  incarnation: "incarnation-1",
 }
 const active = {
-  version: 1, state: "active", generation: "generation-1", incarnation: "incarnation-1",
-  accountId: "account-1", serviceDeviceId: "device-1", publicKeys: { signing: "signing-1", sealing: "sealing-1" },
+  version: 1,
+  state: "active",
+  generation: "generation-1",
+  incarnation: "incarnation-1",
+  accountId: "account-1",
+  serviceDeviceId: "device-1",
+  publicKeys: { signing: "signing-1", sealing: "sealing-1" },
 }
 
 async function homeWith(record: unknown | "missing" | "corrupt"): Promise<string> {
@@ -55,8 +68,16 @@ describe("the desktop engine pin boundary", () => {
     test(`${name} refuses before the dispatch runs`, async () => {
       const home = await homeWith(record)
       let dispatched = false
-      const outcome = await desktopSyncBoundary(descriptor, new AbortController().signal, home)(() => { dispatched = true })
-        .then(() => "admitted", () => "refused")
+      const outcome = await desktopSyncBoundary(
+        descriptor,
+        new AbortController().signal,
+        home,
+      )(() => {
+        dispatched = true
+      }).then(
+        () => "admitted",
+        () => "refused",
+      )
       expect(outcome).toBe("refused")
       expect(dispatched).toBe(false)
     })
@@ -67,8 +88,16 @@ describe("the desktop engine pin boundary", () => {
     const lifetime = new AbortController()
     lifetime.abort()
     let dispatched = false
-    const outcome = await desktopSyncBoundary(descriptor, lifetime.signal, home)(() => { dispatched = true })
-      .then(() => "admitted", () => "refused")
+    const outcome = await desktopSyncBoundary(
+      descriptor,
+      lifetime.signal,
+      home,
+    )(() => {
+      dispatched = true
+    }).then(
+      () => "admitted",
+      () => "refused",
+    )
     expect(outcome).toBe("refused")
     expect(dispatched).toBe(false)
   })

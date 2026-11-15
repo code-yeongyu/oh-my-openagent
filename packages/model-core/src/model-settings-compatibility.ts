@@ -33,11 +33,7 @@ export type ModelSettingsCompatibilityChange = {
   field: CompatibilityField
   from: string
   to?: string
-  reason:
-  | "unsupported-by-model-family"
-  | "unknown-model-family"
-  | "unsupported-by-model-metadata"
-  | "max-output-limit"
+  reason: "unsupported-by-model-family" | "unknown-model-family" | "unsupported-by-model-metadata" | "max-output-limit"
 }
 
 export type ModelSettingsCompatibilityResult = {
@@ -61,7 +57,9 @@ function normalizeCapabilitiesVariants(capabilities: CompatibilityCapabilities |
   return capabilities.variants.map((v) => v.toLowerCase())
 }
 
-function normalizeCapabilitiesReasoningEfforts(capabilities: CompatibilityCapabilities | undefined): string[] | undefined {
+function normalizeCapabilitiesReasoningEfforts(
+  capabilities: CompatibilityCapabilities | undefined,
+): string[] | undefined {
   if (!capabilities?.reasoningEfforts || capabilities.reasoningEfforts.length === 0) {
     return undefined
   }
@@ -145,18 +143,12 @@ export function resolveCompatibleModelSettings(
   const familyDisallowsTemperature =
     metadataSupportsTemperature === undefined &&
     (isClaudeOpus47OrLaterModel(input.modelID) || family?.supportsTemperature === false)
-  if (
-    temperature !== undefined &&
-    (metadataSupportsTemperature === false || familyDisallowsTemperature)
-  ) {
+  if (temperature !== undefined && (metadataSupportsTemperature === false || familyDisallowsTemperature)) {
     changes.push({
       field: "temperature",
       from: String(temperature),
       to: undefined,
-      reason:
-        metadataSupportsTemperature === false
-          ? "unsupported-by-model-metadata"
-          : "unsupported-by-model-family",
+      reason: metadataSupportsTemperature === false ? "unsupported-by-model-metadata" : "unsupported-by-model-family",
     })
     temperature = undefined
   }

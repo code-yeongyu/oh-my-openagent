@@ -2,10 +2,7 @@ import {
   _setModelResolutionLogImplementationForTesting,
   resolveModelPipeline as resolveModelPipelineFromCore,
 } from "@oh-my-opencode/model-core"
-import type {
-  PipelineModelResolutionRequest,
-  PipelineModelResolutionResult,
-} from "@oh-my-opencode/model-core"
+import type { PipelineModelResolutionRequest, PipelineModelResolutionResult } from "@oh-my-opencode/model-core"
 import * as connectedProvidersCache from "./connected-providers-cache"
 
 export { _setModelResolutionLogImplementationForTesting }

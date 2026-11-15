@@ -89,7 +89,8 @@ export function at(state: Stage, point: Point): JsonObject {
 
 export function stagingChecks(state: Stage, point: Point): Checks {
   const { before, front } = state
-  const far = Math.abs(before.cursor.x - point.x) > POINT_TOLERANCE || Math.abs(before.cursor.y - point.y) > POINT_TOLERANCE
+  const far =
+    Math.abs(before.cursor.x - point.x) > POINT_TOLERANCE || Math.abs(before.cursor.y - point.y) > POINT_TOLERANCE
   return [
     ["front-raised-before", before.foreground === front.id],
     ["target-point-covered-by-front", inside(before.hosts[front.id]?.rect ?? null, point)],

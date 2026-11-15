@@ -9,12 +9,34 @@ import { TaskParentControlError, type TaskParentWire } from "../task-parent-cont
 export type HostRunHoldClient = {
   setClientInfo?(width: number, capabilities?: string[]): Promise<void>
   pauseForRun?(owner: { parentSessionId: string; parentPauseSeq: number; runRef: RunRef }): Promise<unknown>
-  resumeForRun?(request: { parentSessionId: string; parentPauseSeq: number; resumeId: string; childSeqCutoff: number }): Promise<unknown>
-  holdInput?(input: { inputId: string; revision: number; text: string; parentSessionId?: string; origin?: "human" }): Promise<unknown>
+  resumeForRun?(request: {
+    parentSessionId: string
+    parentPauseSeq: number
+    resumeId: string
+    childSeqCutoff: number
+  }): Promise<unknown>
+  holdInput?(input: {
+    inputId: string
+    revision: number
+    text: string
+    parentSessionId?: string
+    origin?: "human"
+  }): Promise<unknown>
   getState?(): Promise<unknown>
 }
 
 const WIDTH = 80
+
+// One wire per engine connection: a reattach's new connection declares task_parent again.
+const wiresByClient = new WeakMap<HostRunHoldClient, TaskParentWire>()
+
+export function hostTaskParentWireOf(client: HostRunHoldClient): TaskParentWire {
+  const known = wiresByClient.get(client)
+  if (known !== undefined) return known
+  const wire = createHostTaskParentWire(client)
+  wiresByClient.set(client, wire)
+  return wire
+}
 
 export function createHostTaskParentWire(client: HostRunHoldClient): TaskParentWire {
   const answer = async (run: () => Promise<unknown>) => {
@@ -25,34 +47,57 @@ export function createHostTaskParentWire(client: HostRunHoldClient): TaskParentW
       return { success: false as const, error: error instanceof Error ? error.message : String(error) }
     }
   }
-  const unsupported = (): never => { throw new TaskParentControlError("unsupported") }
+  const unsupported = (): never => {
+    throw new TaskParentControlError("unsupported")
+  }
   return {
     width: WIDTH,
-    send: command => {
+    send: (command) => {
       switch (command.type) {
         case "set_client_info": {
           const declare = client.setClientInfo
-          return declare === undefined ? unsupported() : answer(() => declare.call(client, command.width, [...command.capabilities]))
+          return declare === undefined
+            ? unsupported()
+            : answer(() => declare.call(client, command.width, [...command.capabilities]))
         }
         case "pause_for_run": {
           const pause = client.pauseForRun
-          return pause === undefined ? unsupported() : answer(() => pause.call(client, {
-            parentSessionId: command.parentSessionId, parentPauseSeq: command.parentPauseSeq, runRef: command.runRef,
-          }))
+          return pause === undefined
+            ? unsupported()
+            : answer(() =>
+                pause.call(client, {
+                  parentSessionId: command.parentSessionId,
+                  parentPauseSeq: command.parentPauseSeq,
+                  runRef: command.runRef,
+                }),
+              )
         }
         case "resume_for_run": {
           const resume = client.resumeForRun
-          return resume === undefined ? unsupported() : answer(() => resume.call(client, {
-            parentSessionId: command.parentSessionId, parentPauseSeq: command.parentPauseSeq,
-            resumeId: command.resumeId, childSeqCutoff: command.childSeqCutoff,
-          }))
+          return resume === undefined
+            ? unsupported()
+            : answer(() =>
+                resume.call(client, {
+                  parentSessionId: command.parentSessionId,
+                  parentPauseSeq: command.parentPauseSeq,
+                  resumeId: command.resumeId,
+                  childSeqCutoff: command.childSeqCutoff,
+                }),
+              )
         }
         case "hold_input": {
           const hold = client.holdInput
-          return hold === undefined ? unsupported() : answer(() => hold.call(client, {
-            inputId: command.inputId, revision: command.revision, text: command.text,
-            parentSessionId: command.parentSessionId, origin: command.origin,
-          }))
+          return hold === undefined
+            ? unsupported()
+            : answer(() =>
+                hold.call(client, {
+                  inputId: command.inputId,
+                  revision: command.revision,
+                  text: command.text,
+                  parentSessionId: command.parentSessionId,
+                  origin: command.origin,
+                }),
+              )
         }
         case "get_state": {
           const state = client.getState

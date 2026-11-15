@@ -15,7 +15,8 @@ describe("truncateDescription", () => {
 
   it("truncates to 120 characters by default and appends ellipsis", () => {
     // given
-    const description = "This is a very long description that exceeds the default maximum length of 120 characters and should be truncated with an ellipsis at the end"
+    const description =
+      "This is a very long description that exceeds the default maximum length of 120 characters and should be truncated with an ellipsis at the end"
 
     // when
     const result = truncateDescription(description)
@@ -65,7 +66,8 @@ describe("truncateDescription", () => {
 
   it("handles description with periods correctly", () => {
     // given
-    const description = "First sentence. Second sentence. Third sentence that is very long and continues beyond the normal truncation point with even more text to ensure it exceeds 120 characters."
+    const description =
+      "First sentence. Second sentence. Third sentence that is very long and continues beyond the normal truncation point with even more text to ensure it exceeds 120 characters."
 
     // when
     const result = truncateDescription(description)
@@ -78,7 +80,8 @@ describe("truncateDescription", () => {
 
   it("handles description with URLs correctly", () => {
     // given
-    const description = "Check out https://example.com/very/long/path/that/contains/many/segments for more information about this feature and its capabilities"
+    const description =
+      "Check out https://example.com/very/long/path/that/contains/many/segments for more information about this feature and its capabilities"
 
     // when
     const result = truncateDescription(description)
@@ -91,7 +94,8 @@ describe("truncateDescription", () => {
 
   it("handles description with version numbers correctly", () => {
     // given
-    const description = "Version 1.2.3 of the library includes many improvements and bug fixes that make it more stable and performant with additional enhancements"
+    const description =
+      "Version 1.2.3 of the library includes many improvements and bug fixes that make it more stable and performant with additional enhancements"
 
     // when
     const result = truncateDescription(description)

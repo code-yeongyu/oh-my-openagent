@@ -2,7 +2,12 @@ import { randomUUID } from "node:crypto"
 
 import type { TuiScanResult } from "./component"
 import type { OnboardingScanEvent } from "./scan-contract"
-import { migrationFactsFromScan, onboardingScanContext, runOnboardingScan, type OnboardingScanEnvironment } from "./scan-runtime"
+import {
+  migrationFactsFromScan,
+  onboardingScanContext,
+  runOnboardingScan,
+  type OnboardingScanEnvironment,
+} from "./scan-runtime"
 
 // The TUI reads this computer through the one shared scan (`omo setup`'s detection, plus the engine
 // session history when `sessions` is true), so it never grows a second reader. Its digests stay in
@@ -16,7 +21,9 @@ export async function runTuiOnboardingScan(
   const { results, digests, projectRoots } = await runOnboardingScan(
     environment,
     { scanId, includeCustomProviders: true, sessions: options.sessions },
-    (event) => { events.push(event) },
+    (event) => {
+      events.push(event)
+    },
   )
   const inventory = migrationFactsFromScan(results)
   return {

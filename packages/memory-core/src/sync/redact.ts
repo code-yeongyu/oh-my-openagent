@@ -96,7 +96,7 @@ function normalizeForSecretScan(text: string, formatCharacters: FormatCharacterH
   const map: number[] = []
   const seams = new Set<number>()
   let dropped = false
-  for (let index = 0; index < text.length; ) {
+  for (let index = 0; index < text.length;) {
     // Walk by code point: a format character above U+FFFF (the tag block) is two UTF-16 units, and
     // neither lone surrogate matches \p{Cf}, so a per-unit walk would keep it in the shadow.
     const code = text.codePointAt(index) ?? 0
@@ -249,13 +249,19 @@ export function scanSecretLikeMaterial(value: string): SecretMatch[] {
     if (span !== undefined) matches.push({ class: "pem_block", ...span })
     pemOffset = block.end
   }
-  for (const [patternClass, source, flags] of SECRET_PATTERN_SOURCES) matches.push(...patternMatches(joined, patternClass, source, flags))
+  for (const [patternClass, source, flags] of SECRET_PATTERN_SOURCES)
+    matches.push(...patternMatches(joined, patternClass, source, flags))
   // A format character between a word character and a secret hides the secret's leading or trailing
   // \b once dropped; the separated shadow keeps that boundary. A separated match is kept unless a joined
   // match already covers all of it: one that only overlaps (a token read through the next key) would
   // otherwise leave the rest of the secret unmasked. The split pass follows the same rule. Masking merges
   // the overlapping spans.
-  keepUncovered(matches, SECRET_PATTERN_SOURCES.flatMap(([patternClass, source, flags]) => patternMatches(separated, patternClass, source, flags)))
+  keepUncovered(
+    matches,
+    SECRET_PATTERN_SOURCES.flatMap(([patternClass, source, flags]) =>
+      patternMatches(separated, patternClass, source, flags),
+    ),
+  )
   keepUncovered(matches, seamMatches(joined))
   keepUncovered(matches, patternMatches(joined, "split_credential_assignment", SPLIT_CREDENTIAL_ASSIGNMENT_SOURCE, "i"))
   return matches.sort((a, b) => a.start - b.start || a.end - b.end)
@@ -333,13 +339,14 @@ export function redactUrl(value: string): string {
   if (!value) return ""
   const withUrlCredentials = value.includes("://")
     ? value.replace(URL_USERINFO, (_match, scheme: string, _user: string, password?: string) =>
-      password === undefined ? `${scheme}${MASK}@` : `${scheme}${MASK}:${MASK}@`,
-    )
+        password === undefined ? `${scheme}${MASK}@` : `${scheme}${MASK}:${MASK}@`,
+      )
     : value
   const withScpCredentials = withUrlCredentials.includes("@")
-    ? withUrlCredentials.replace(SCP_USERINFO, (_match, prefix: string, _user: string, host: string) =>
-      `${prefix}${MASK}@${host}:`,
-    )
+    ? withUrlCredentials.replace(
+        SCP_USERINFO,
+        (_match, prefix: string, _user: string, host: string) => `${prefix}${MASK}@${host}:`,
+      )
     : withUrlCredentials
   return redactSecretLikeMaterial(withScpCredentials)
 }

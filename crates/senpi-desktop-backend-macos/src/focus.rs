@@ -281,6 +281,7 @@ pub(crate) fn mark_key_window(front: &FrontWindow) -> CoreResult<()> {
         return Ok(());
     };
     let window = DesktopWindow {
+        identity: None,
         id: id.to_string(),
         title: String::new(),
         app: front.app.clone(),

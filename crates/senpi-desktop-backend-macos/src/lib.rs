@@ -8,14 +8,18 @@ mod ax;
 mod backend;
 mod capture;
 mod cursor;
+mod epoch_sources;
 mod focus;
 mod front_app;
 mod launch_gate;
 mod launch_services;
 mod overlay;
+mod parent_death;
+mod power;
 mod release_helper;
 mod responsible;
 mod input;
+mod screen;
 #[cfg(test)]
 mod partial_coverage_tests;
 mod skylight;

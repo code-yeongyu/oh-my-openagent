@@ -1,0 +1,206 @@
+# One line per (engine code or layer failure, data.reason) pair the design pin or row 12's backend defaults emit, swept from every design-pin file (task-13.design-sweep.txt). reason '-' is the bare row. source is a line under the design pin's root (design/..., waves/...), a repository line (crates/...), or interpretation:I-<n> for a spelling the executor chose (task-13.interpretations.txt); source_sha256 is the sha256 of the cited line, checked by check-design-citations.mjs against the pin.
+refusal	kind	code	reason	computer	source	source_sha256	note
+PermissionDenied	engine	PermissionDenied	-	COMPUTER_PERMISSION_REQUIRED	design/d-sdk-skill.md:476	044e42383dfebea2ee50ab8b7ff91f462cf49261aa16fccd6fce4f3f638eb4a3	-
+CaptureFailed	engine	CaptureFailed	-	COMPUTER_SCREENSHOT_FAILED	design/d-sdk-skill.md:495	c2496b2a5b085d4132aa940aa245cf69405df3a8daac99515998c01feb278d7d	-
+InputFailed	engine	InputFailed	-	COMPUTER_INPUT_FAILED	design/d-sdk-skill.md:525	a3962de61bd0a85b5847d03b9e5e1439f4724ae6bb5367b93e2f1a1a7eba0291	-
+BackgroundUnavailable	engine	BackgroundUnavailable	-	COMPUTER_BACKGROUND_UNAVAILABLE	design/d-sdk-skill.md:499	6fd00f8c528e9d40c03332a958d2d0e050d9d18825e3f59982eba4d723092685	-
+WindowNotFound	engine	WindowNotFound	-	COMPUTER_WINDOW_NOT_FOUND	design/d-sdk-skill.md:479	7c06afd9f521b192da8b026b66c53141dbde28f461b3feeabfdfd7aa5536799d	-
+InvalidTarget	engine	InvalidTarget	-	COMPUTER_INVALID_TARGET	design/d-sdk-skill.md:483	4fd8186abdfa70b6f5a42b590802aaf9fafeaa5dddf13b309f42d8844a0df57e	-
+InvalidKey	engine	InvalidKey	-	COMPUTER_INVALID_KEY	design/d-sdk-skill.md:530	0439cc31f19c20a4af3d0ff194cd0b51cdceafac9d9af24300d274ca4c4cb6c2	-
+InvalidCoordinateFrame	engine	InvalidCoordinateFrame	-	COMPUTER_DISPLAY_STALE	design/d-sdk-skill.md:478	649cfc95ad157c8a132bb22bbdb576f99c7e56d51499b29c766f42d2eea7a337	-
+StaleRef	engine	StaleRef	-	COMPUTER_STALE_REF	design/d-sdk-skill.md:485	0e1231fcc7fc5488d3266c09c6ec8c902ba2411383eb2de240093b587452a2b3	-
+AxUnsupported	engine	AxUnsupported	-	COMPUTER_AX_UNAVAILABLE	design/d-sdk-skill.md:481	5ceb500eeaddda59e572e4c4146ec59f79aaa6e83dc6f2bd7209d8cf7961d333	-
+AxFailed	engine	AxFailed	-	COMPUTER_AX_UNAVAILABLE	design/d-sdk-skill.md:481	5ceb500eeaddda59e572e4c4146ec59f79aaa6e83dc6f2bd7209d8cf7961d333	-
+Timeout	engine	Timeout	-	COMPUTER_CANCELLED	design/d-sdk-skill.md:534	ebd7da3ab7adc5dd94675a6fac98ba54fc896059d20fba5e9163446c58d0ad36	-
+Closed	engine	Closed	-	COMPUTER_TRANSPORT_LOST	interpretation:I-7	-	closed 33-code table; no design row: interpretation I-7; design spelling at design/d-arch.md:356
+Internal	engine	Internal	-	COMPUTER_INTERNAL	design/d-sdk-skill.md:559	98e54856720456f4b8249248ffaa5fbad1c783f76ab7ba116eff6a06bca44d0b	-
+StopPathUnavailable	engine	StopPathUnavailable	-	COMPUTER_SUPERVISOR_NOT_LIVE	design/d-sdk-skill.md:474	62df1d900273c0e7e9276efb263d508b4d65661b7e1157b2f72b445af31f1b02	-
+Suspended	engine	Suspended	-	COMPUTER_SUSPENDED	design/d-sdk-skill.md:470	5250d43c9ebc608b5489127aed6ea30e82e6f130da58b5b503c3ab8e47a34bc8	-
+ScreenLocked	engine	ScreenLocked	-	COMPUTER_SCREEN_LOCKED	design/d-sdk-skill.md:487	36398acd841f96916ed14aca14af401f513c40e4d889c7a877cf8150f12673b3	-
+Cancelled	engine	Cancelled	-	COMPUTER_CANCELLED	design/d-sdk-skill.md:534	ebd7da3ab7adc5dd94675a6fac98ba54fc896059d20fba5e9163446c58d0ad36	-
+CursorRestoreFailed	engine	CursorRestoreFailed	-	COMPUTER_CURSOR_RESTORE_FAILED	design/d-sdk-skill.md:498	9cdc8f1c9bf2c577943c320f618c05d13e40dcfc1700c531d1deb2fa509dac41	-
+FocusRestoreFailed	engine	FocusRestoreFailed	-	COMPUTER_FOCUS_RESTORE_FAILED	design/d-sdk-skill.md:498	9cdc8f1c9bf2c577943c320f618c05d13e40dcfc1700c531d1deb2fa509dac41	-
+TransactionFailed	engine	TransactionFailed	-	COMPUTER_TRANSACTION_FAILED	design/d-sdk-skill.md:480	2e5640840e5a43055f48aab22fa7946fb00ad782cb4c3b640c87559b14632dc8	-
+InputBusy	engine	InputBusy	-	COMPUTER_INPUT_BUSY	design/d-sdk-skill.md:518	c506733b98b2ca6c08aeaaadc4239a5ef45c711ac93aad9fc26caae5662d5cb4	-
+ControlRequired	engine	ControlRequired	-	COMPUTER_CONTROL_REQUIRED	design/d-sdk-skill.md:508	9568e299a9db050b1ecfa4ee06d39bb3a54cf59b01a87434508d903270addaa2	-
+CaptureUnavailable	engine	CaptureUnavailable	-	COMPUTER_CAPTURE_UNAVAILABLE	design/d-sdk-skill.md:496	e04ada3bcc001f60c4a8b29cb64c1d8b414ebe18dfc004575430563895bd406b	-
+UserIntervened	engine	UserIntervened	-	COMPUTER_USER_INTERVENED	design/d-sdk-skill.md:521	9b25acea631bbb120623c62bdea38da6b4df898dbb706a174f7cb556c35ed973	-
+AxUnconfirmed	engine	AxUnconfirmed	-	COMPUTER_AX_UNCONFIRMED	design/d-sdk-skill.md:522	d68cad93ae7cfec8beb088fc1da23bb2b5f5d8fdad7cac22992039915130db80	-
+SpaceUnsupported	engine	SpaceUnsupported	-	COMPUTER_SPACE_UNSUPPORTED	design/d-sdk-skill.md:532	8ec90273c855e2759260180bedd18dd6cd845f18ca9425e488cc057e7769b290	-
+SpaceMoveDenied	engine	SpaceMoveDenied	-	COMPUTER_SPACE_MOVE_DENIED	design/d-sdk-skill.md:532	8ec90273c855e2759260180bedd18dd6cd845f18ca9425e488cc057e7769b290	-
+AmbiguousTarget	engine	AmbiguousTarget	-	COMPUTER_AMBIGUOUS_TARGET	design/d-sdk-skill.md:486	4ae7fdab5385ca37eb3ab357f3264a23b60d69c7c6852bb271d62ed17174ca35	-
+CaptureConsentRequired	engine	CaptureConsentRequired	-	COMPUTER_CAPTURE_CONSENT_REQUIRED	design/d-sdk-skill.md:497	d21c146ba6a85499bfe33f0a15da3f30e7ca56a9a13fcdae95bfefbe3fd9621b	-
+ProtectedProcess	engine	ProtectedProcess	-	COMPUTER_PROTECTED_TARGET	design/d-sdk-skill.md:535	b36495a334d14e7587488e41bd51ba84c1e12e7441aae8dd24237332dc748a1d	-
+SessionInactive	engine	SessionInactive	-	COMPUTER_SESSION_INACTIVE	design/d-sdk-skill.md:489	d19c38d4693743c871306d8c31476615381ba49af0f9a43b9fb51d6ca2686fad	-
+ConsequentialAction	engine	ConsequentialAction	-	COMPUTER_CONSEQUENTIAL_ACTION	design/d-sdk-skill.md:491	d96f206b3d249aef9331215e0015a4153e748470ed09b7c557b8a5f0525d636d	-
+PermissionDenied{not_interactive}	engine	PermissionDenied	not_interactive	COMPUTER_PERMISSION_REQUIRED	design/d-sdk-skill.md:528	cf77309980ad172192f8f7d5268fed5bf5a29e6f7bd822da7b06903f4a051611	design spells it session:not_interactive
+PermissionDenied{prompt_pending}	engine	PermissionDenied	prompt_pending	COMPUTER_PERMISSION_REQUIRED	design/d-arch.md:127	7e1ab8c1d083371ed1fc497be7784c618315d914ba390aace28c8879125b7bc7	-
+PermissionDenied{revoked}	engine	PermissionDenied	revoked	COMPUTER_PERMISSION_REQUIRED	design/d-macos.md:43	3e94fddae35b539d21aaf37aca7dccfbd3e77976583967d2ad4a427a7b9ebfc2	-
+CaptureFailed{geometry_changed}	engine	CaptureFailed	geometry_changed	COMPUTER_SCREENSHOT_FAILED	design/d-sdk-skill.md:495	c2496b2a5b085d4132aa940aa245cf69405df3a8daac99515998c01feb278d7d	-
+CaptureFailed{timeout}	engine	CaptureFailed	timeout	COMPUTER_SCREENSHOT_FAILED	design/d-sdk-skill.md:495	c2496b2a5b085d4132aa940aa245cf69405df3a8daac99515998c01feb278d7d	-
+CaptureFailed{null_frame}	engine	CaptureFailed	null_frame	COMPUTER_SCREENSHOT_FAILED	design/d-sdk-skill.md:495	c2496b2a5b085d4132aa940aa245cf69405df3a8daac99515998c01feb278d7d	-
+CaptureFailed{black_frame}	engine	CaptureFailed	black_frame	COMPUTER_SCREENSHOT_FAILED	design/d-sdk-skill.md:495	c2496b2a5b085d4132aa940aa245cf69405df3a8daac99515998c01feb278d7d	-
+CaptureFailed{screen_locked}	engine	CaptureFailed	screen_locked	COMPUTER_SCREENSHOT_FAILED	design/d-sdk-skill.md:495	c2496b2a5b085d4132aa940aa245cf69405df3a8daac99515998c01feb278d7d	-
+CaptureFailed{minimized}	engine	CaptureFailed	minimized	COMPUTER_SCREENSHOT_FAILED	design/d-sdk-skill.md:495	c2496b2a5b085d4132aa940aa245cf69405df3a8daac99515998c01feb278d7d	-
+CaptureFailed{untrusted_pixels}	engine	CaptureFailed	untrusted_pixels	COMPUTER_SCREENSHOT_FAILED	design/d-vision.md:473	033aab4cc93213579a815dfab2d863f9d9da842ff87846e7454ece643af2a653	-
+InputFailed{no_region}	engine	InputFailed	no_region	COMPUTER_INPUT_FAILED	design/d-sdk-skill.md:523	e859add0b1539247cd6b55904e879c36496b9311c9710e45ee9463cb40f4e6a8	-
+InputFailed{app_unresponsive}	engine	InputFailed	app_unresponsive	COMPUTER_INPUT_FAILED	design/d-sdk-skill.md:524	039cc58c93a4f4b2e9fa76c6834eba7214ddfb4406208f62c7901c5d8e16e5b4	-
+InputFailed{activation_refused}	engine	InputFailed	activation_refused	COMPUTER_INPUT_FAILED	design/d-windows.md:128	191c0ed5a4d5b1909ae7776e8a6729ad43c3c0d17f60779472f5a7df859732f4	-
+BackgroundUnavailable{toolkit}	engine	BackgroundUnavailable	toolkit	COMPUTER_BACKGROUND_UNAVAILABLE	design/d-sdk-skill.md:499	6fd00f8c528e9d40c03332a958d2d0e050d9d18825e3f59982eba4d723092685	-
+BackgroundUnavailable{multi_window}	engine	BackgroundUnavailable	multi_window	COMPUTER_BACKGROUND_UNAVAILABLE	design/d-sdk-skill.md:499	6fd00f8c528e9d40c03332a958d2d0e050d9d18825e3f59982eba4d723092685	-
+BackgroundUnavailable{key_route_unproven}	engine	BackgroundUnavailable	key_route_unproven	COMPUTER_BACKGROUND_UNAVAILABLE	design/d-sdk-skill.md:499	6fd00f8c528e9d40c03332a958d2d0e050d9d18825e3f59982eba4d723092685	-
+BackgroundUnavailable{windowless}	engine	BackgroundUnavailable	windowless	COMPUTER_BACKGROUND_UNAVAILABLE	design/d-sdk-skill.md:499	6fd00f8c528e9d40c03332a958d2d0e050d9d18825e3f59982eba4d723092685	-
+BackgroundUnavailable{no_focus_target}	engine	BackgroundUnavailable	no_focus_target	COMPUTER_BACKGROUND_UNAVAILABLE	design/d-sdk-skill.md:499	6fd00f8c528e9d40c03332a958d2d0e050d9d18825e3f59982eba4d723092685	-
+BackgroundUnavailable{modal_loop}	engine	BackgroundUnavailable	modal_loop	COMPUTER_BACKGROUND_UNAVAILABLE	design/d-sdk-skill.md:499	6fd00f8c528e9d40c03332a958d2d0e050d9d18825e3f59982eba4d723092685	-
+BackgroundUnavailable{wayland_window_targeting}	engine	BackgroundUnavailable	wayland_window_targeting	COMPUTER_BACKGROUND_UNAVAILABLE	design/d-sdk-skill.md:499	6fd00f8c528e9d40c03332a958d2d0e050d9d18825e3f59982eba4d723092685	-
+BackgroundUnavailable{user_modifier_held}	engine	BackgroundUnavailable	user_modifier_held	COMPUTER_BACKGROUND_UNAVAILABLE	design/d-sdk-skill.md:500	52938ae5e0435898666b8c24b74342e184451fe99377a71215545c1171b83403	-
+BackgroundUnavailable{posted_modifier_chord}	engine	BackgroundUnavailable	posted_modifier_chord	COMPUTER_BACKGROUND_UNAVAILABLE	design/d-sdk-skill.md:501	b1374ef4f1a911f32d342c4d842aedddfabbd737668604fc49e5c07490c4d2c0	-
+BackgroundUnavailable{canvas_gl}	engine	BackgroundUnavailable	canvas_gl	COMPUTER_BACKGROUND_UNAVAILABLE	design/d-sdk-skill.md:502	c92ac72c76c3ad35366b44deb5237ace9c1a22b5d9e2d5472f74ac34a6598e46	toolkit value keyed as the reason: interpretation I-9
+BackgroundUnavailable{chromium_electron}	engine	BackgroundUnavailable	chromium_electron	COMPUTER_BACKGROUND_UNAVAILABLE	design/d-sdk-skill.md:503	eeb3414b1533b8413f9dd73c54d5acc9dcb43c6af7ccb2c39d572267a3169ce9	toolkit value keyed as the reason: interpretation I-9
+BackgroundUnavailable{pointer_hw}	engine	BackgroundUnavailable	pointer_hw	COMPUTER_BACKGROUND_UNAVAILABLE	design/d-sdk-skill.md:504	b847abe9bc3d9bc0f523b6fecbfd70fe18d7125bf6baf946763759247ec9ed2f	toolkit value keyed as the reason: interpretation I-9
+BackgroundUnavailable{QT_CORE_KEYBOARD}	engine	BackgroundUnavailable	QT_CORE_KEYBOARD	COMPUTER_BACKGROUND_UNAVAILABLE	design/d-sdk-skill.md:505	7d455cccfb58c872a293b6fa47e8e2c39d565a9a8317d6228fda692ea751dcac	toolkit qt_xcb carries this reason token
+BackgroundUnavailable{focus_unknown}	engine	BackgroundUnavailable	focus_unknown	COMPUTER_BACKGROUND_UNAVAILABLE	design/d-sdk-skill.md:506	9be50d2aa48f4726d155689cd771e855973925fb775ef9024919b8cb21b44cc5	-
+BackgroundUnavailable{user_active_in_target}	engine	BackgroundUnavailable	user_active_in_target	COMPUTER_BACKGROUND_UNAVAILABLE	design/d-sdk-skill.md:507	c6b60a14ce20da99cabd4b3fdf5d5ee044c2ec1ed38b6289503d858fa7108943	-
+BackgroundUnavailable{target_unknown}	engine	BackgroundUnavailable	target_unknown	COMPUTER_BACKGROUND_UNAVAILABLE	design/d-macos.md:318	c099b46897d15d9dbf2d884bb3139da31de69c98fc7d0a7b7b036995b9b1db85	-
+BackgroundUnavailable{provider_self_activates}	engine	BackgroundUnavailable	provider_self_activates	COMPUTER_BACKGROUND_UNAVAILABLE	design/d-windows.md:277	98157a5b367763e9c22a932b7d242726fa3f65c00beafbe1ef8c5f8f31a74eff	-
+WindowNotFound{identity_changed}	engine	WindowNotFound	identity_changed	COMPUTER_WINDOW_NOT_FOUND	design/d-sdk-skill.md:479	7c06afd9f521b192da8b026b66c53141dbde28f461b3feeabfdfd7aa5536799d	-
+InvalidTarget{drag_destination}	engine	InvalidTarget	drag_destination	COMPUTER_INVALID_TARGET	design/d-sdk-skill.md:482	43b9f00fc0ecbbf61b443f79a53cfde068cb69ab609c73b50ed79460077f684a	-
+InvalidTarget{protected_surface}	engine	InvalidTarget	protected_surface	COMPUTER_INVALID_TARGET	design/d-sdk-skill.md:483	4fd8186abdfa70b6f5a42b590802aaf9fafeaa5dddf13b309f42d8844a0df57e	-
+InvalidTarget{ref_unqualified}	engine	InvalidTarget	ref_unqualified	COMPUTER_INVALID_TARGET	design/d-sdk-skill.md:483	4fd8186abdfa70b6f5a42b590802aaf9fafeaa5dddf13b309f42d8844a0df57e	-
+InvalidTarget{hand_unknown}	engine	InvalidTarget	hand_unknown	COMPUTER_INVALID_TARGET	design/d-sdk-skill.md:541	3d3f2a8319dcf1af1d4e11b8dc29f6ab246ffbfef64c307d46741c693e498e8a	-
+InvalidTarget{self_hand}	engine	InvalidTarget	self_hand	COMPUTER_INVALID_TARGET	design/d-sdk-skill.md:542	cf97dc8cfeb48bc5aba948bfa4c1aaeb9c79c7858e85b393a8c2de39bec3a830	-
+InvalidTarget{app_unknown}	engine	InvalidTarget	app_unknown	COMPUTER_INVALID_TARGET	design/d-macos.md:214	1843f52647d94bd21850a1ac2f354871b8bdbfb94bcbe507c9839dedf52b014c	-
+InvalidTarget{ambiguous}	engine	InvalidTarget	ambiguous	COMPUTER_AMBIGUOUS_TARGET	waves/analysis/ideal-state.md:30	06f466d91443b645ef39a25f4ed741c078008dafc6c977f2f0e20b0048b6864e	-
+InvalidTarget{identity_changed}	engine	InvalidTarget	identity_changed	COMPUTER_INVALID_TARGET	design/d-remote.md:177	5161e10367ee69a6a52844bd5705f2cd21cd3ce060c25c9f00f78d743d6eb06e	-
+InvalidTarget{ref_foreign_hand}	engine	InvalidTarget	ref_foreign_hand	COMPUTER_INVALID_TARGET	design/d-a11y-model.md:164	980136e2ea063fb20ed19d56b09e49be717a5304ce7cf9fa96213005513c8eea	-
+InvalidTarget{window_immovable}	engine	InvalidTarget	window_immovable	COMPUTER_WINDOW_IMMOVABLE	interpretation:I-3	-	WindowImmovable as a reason of InvalidTarget: interpretation I-3; design spelling at design/d-sdk-skill.md:537
+InvalidTarget{window_frame_unavailable}	engine	InvalidTarget	window_frame_unavailable	COMPUTER_WINDOW_FRAME_UNAVAILABLE	interpretation:I-4	-	WindowFrameUnavailable{reason} generic: interpretation I-4; design spelling at design/d-sdk-skill.md:537
+InvalidTarget{gnome_extension_missing}	engine	InvalidTarget	gnome_extension_missing	COMPUTER_WINDOW_FRAME_UNAVAILABLE	design/d-linux.md:43	be3fb74595a8dc74f98d653d919f07a3805a875df9d32cfdcab764ce4480039d	WindowFrameUnavailable reason: I-4
+InvalidTarget{kwin_write_unproven}	engine	InvalidTarget	kwin_write_unproven	COMPUTER_WINDOW_FRAME_UNAVAILABLE	design/d-linux.md:44	b4f63380535104d42502325287d822cac8ab342d4827f7a1e7c28d38740cd648	WindowFrameUnavailable reason: I-4
+InvalidKey{dangerous_chord}	engine	InvalidKey	dangerous_chord	COMPUTER_INVALID_KEY	design/d-sdk-skill.md:529	fe62c80216ab6fb8c6bdb5e7d105bc64c575d2e498682ac9a2b4ad7938e635fb	-
+InvalidKey{unresolvable}	engine	InvalidKey	unresolvable	COMPUTER_INVALID_KEY	design/d-sdk-skill.md:530	0439cc31f19c20a4af3d0ff194cd0b51cdceafac9d9af24300d274ca4c4cb6c2	-
+InvalidKey{unknown_key}	engine	InvalidKey	unknown_key	COMPUTER_INVALID_KEY	design/d-sdk-skill.md:530	0439cc31f19c20a4af3d0ff194cd0b51cdceafac9d9af24300d274ca4c4cb6c2	-
+InvalidKey{text_unsupported}	engine	InvalidKey	text_unsupported	COMPUTER_INVALID_KEY	design/d-windows.md:149	a475941f930baeb20a58c6541e7eb4c119d18d8448753380d712a37b237a3ac6	-
+InvalidKey{unknown}	engine	InvalidKey	unknown	COMPUTER_INVALID_KEY	design/d-vision.md:363	4608c249d8e9e5d9f6a51e150434ce59f2050a9d7cf4577de72631ae37a03766	-
+InvalidCoordinateFrame{frame_required}	engine	InvalidCoordinateFrame	frame_required	COMPUTER_DISPLAY_STALE	design/d-sdk-skill.md:478	649cfc95ad157c8a132bb22bbdb576f99c7e56d51499b29c766f42d2eea7a337	-
+InvalidCoordinateFrame{wrong_target}	engine	InvalidCoordinateFrame	wrong_target	COMPUTER_DISPLAY_STALE	design/d-sdk-skill.md:478	649cfc95ad157c8a132bb22bbdb576f99c7e56d51499b29c766f42d2eea7a337	-
+InvalidCoordinateFrame{no_capture}	engine	InvalidCoordinateFrame	no_capture	COMPUTER_DISPLAY_STALE	design/d-sdk-skill.md:478	649cfc95ad157c8a132bb22bbdb576f99c7e56d51499b29c766f42d2eea7a337	-
+InvalidCoordinateFrame{superseded}	engine	InvalidCoordinateFrame	superseded	COMPUTER_DISPLAY_STALE	design/d-sdk-skill.md:478	649cfc95ad157c8a132bb22bbdb576f99c7e56d51499b29c766f42d2eea7a337	-
+InvalidCoordinateFrame{consumed}	engine	InvalidCoordinateFrame	consumed	COMPUTER_DISPLAY_STALE	design/d-sdk-skill.md:478	649cfc95ad157c8a132bb22bbdb576f99c7e56d51499b29c766f42d2eea7a337	-
+InvalidCoordinateFrame{resized}	engine	InvalidCoordinateFrame	resized	COMPUTER_DISPLAY_STALE	design/d-vision.md:220	028d6b532c4cfdc71e44eced4781ec1ed9a2e40a84d6f8f0eb6b37f6aa7f9f51	-
+InvalidCoordinateFrame{pixels_only}	engine	InvalidCoordinateFrame	pixels_only	COMPUTER_DISPLAY_STALE	design/d-vision.md:221	36d1d5541016c041468628169420a19d4e0f7c3e912df41617b5b77f480b18e0	-
+InvalidCoordinateFrame{outside_frame}	engine	InvalidCoordinateFrame	outside_frame	COMPUTER_COORD_INVALID	design/d-vision.md:222	6b9e520149ffb4bbce452a6e4513580dfb6eb89cfd2b479b88da659e43b94952	the code table's 'coordinates outside the frame' row (d-sdk-skill.md:484)
+StaleRef{epoch}	engine	StaleRef	epoch	COMPUTER_STALE_REF	design/d-a11y-model.md:120	b452d3c8850746f5e0fb8c0b85b68c21a916d1e52115412e54c8608cdb10d020	-
+StaleRef{identity_changed}	engine	StaleRef	identity_changed	COMPUTER_STALE_REF	design/d-a11y-model.md:120	b452d3c8850746f5e0fb8c0b85b68c21a916d1e52115412e54c8608cdb10d020	-
+StaleRef{not_unique_at_capture}	engine	StaleRef	not_unique_at_capture	COMPUTER_STALE_REF	design/d-a11y-model.md:133	dc414eff5dfff9e422b5cfc794f4b62b2221500ce6124dd56e2ca58651a4623a	-
+StaleRef{saved_ref_absent}	engine	StaleRef	saved_ref_absent	COMPUTER_STALE_REF	design/d-a11y-model.md:131	63bf193912c229e0ace3c8c69df6aa28440565ca0d83faa61de195ce7bc69ec6	-
+AxUnsupported{table_cell}	engine	AxUnsupported	table_cell	COMPUTER_AX_UNAVAILABLE	design/d-sdk-skill.md:481	5ceb500eeaddda59e572e4c4146ec59f79aaa6e83dc6f2bd7209d8cf7961d333	-
+AxUnsupported{elevated_target}	engine	AxUnsupported	elevated_target	COMPUTER_AX_UNAVAILABLE	design/d-sdk-skill.md:481	5ceb500eeaddda59e572e4c4146ec59f79aaa6e83dc6f2bd7209d8cf7961d333	-
+AxUnsupported{not_on_bus}	engine	AxUnsupported	not_on_bus	COMPUTER_AX_UNAVAILABLE	design/d-sdk-skill.md:481	5ceb500eeaddda59e572e4c4146ec59f79aaa6e83dc6f2bd7209d8cf7961d333	-
+Timeout{resolution_identity_unknown}	engine	Timeout	resolution_identity_unknown	COMPUTER_STALE_REF	design/d-sdk-skill.md:527	5434aa34bb32d991582b8029ce60cbcfd7ad87674c3fd6853b216e99605311b5	-
+ControlRequired{no_presence_surface}	engine	ControlRequired	no_presence_surface	COMPUTER_PRESENCE_UNAVAILABLE	crates/omo-computer-core/src/backend/mod.rs:131	ef5f713dcd5b6b14946137289e2ef3a71a355abb1f056d06da5f0c902d8d74cb	PresenceUnavailable as a reason of ControlRequired (I-2); design names PresenceUnavailable at design/d-sdk-skill.md:538
+ControlRequired{wayland_no_escape}	engine	ControlRequired	wayland_no_escape	COMPUTER_PRESENCE_UNAVAILABLE	design/d-linux.md:252	93893f89417b468ce01a3fc3b045159b15302f1318a252ec29132d3980a34e8e	PresenceUnavailable reason: I-2
+Internal{wayland_no_pointer_read}	engine	Internal	wayland_no_pointer_read	COMPUTER_UNAVAILABLE	design/d-sdk-skill.md:526	7818d3cb380e0b87109544e07373efbb90d25d0264fdce7623a900ff10651745	Unavailable as a reason of Internal: I-5
+Internal{surface_unsupported}	engine	Internal	surface_unsupported	COMPUTER_UNAVAILABLE	interpretation:I-5	-	Unavailable{surface, reason}: the design leaves the reason token unnamed; named here (I-5); design spelling at design/d-sdk-skill.md:526
+Internal{no_notification_surface}	engine	Internal	no_notification_surface	COMPUTER_UNAVAILABLE	design/d-a11y-model.md:339	22f7ab8bd8123eb60182e727d7544ce04a743f54ef4b4f578fc72722efa0e3e8	I-5
+Internal{wayland_activation_token}	engine	Internal	wayland_activation_token	COMPUTER_UNAVAILABLE	design/d-sdk-skill.md:526	7818d3cb380e0b87109544e07373efbb90d25d0264fdce7623a900ff10651745	I-5
+Internal{clipboard}	engine	Internal	clipboard	COMPUTER_UNAVAILABLE	design/d-sdk-skill.md:526	7818d3cb380e0b87109544e07373efbb90d25d0264fdce7623a900ff10651745	I-5
+Internal{no_clipboard_route}	engine	Internal	no_clipboard_route	COMPUTER_UNAVAILABLE	design/d-sdk-skill.md:526	7818d3cb380e0b87109544e07373efbb90d25d0264fdce7623a900ff10651745	I-5
+Internal{launch_needs_user}	engine	Internal	launch_needs_user	COMPUTER_UNAVAILABLE	design/d-macos.md:214	1843f52647d94bd21850a1ac2f354871b8bdbfb94bcbe507c9839dedf52b014c	I-5
+Internal{audit_unavailable}	engine	Internal	audit_unavailable	COMPUTER_AUDIT_UNAVAILABLE	design/d-sdk-skill.md:556	6e215dbd19652c8d376f693c96d052d5e144f8971057c3229515b956e84a9814	I-5
+Internal{request_too_large}	engine	Internal	request_too_large	COMPUTER_INVALID_ARGUMENTS	design/d-remote.md:260	b10c1c7146342579ba04c97371364942d687e4857271feeb3bf6019b0ffb3cd6	interpretation I-14
+StopPathUnavailable{deaf}	engine	StopPathUnavailable	deaf	COMPUTER_SUPERVISOR_NOT_LIVE	design/d-sdk-skill.md:471	af29e231dd5b11f0e63d7a42d0f8f06fd04c5d60370267bd700c64b299d4eca5	-
+StopPathUnavailable{host_relay_not_allowed}	engine	StopPathUnavailable	host_relay_not_allowed	COMPUTER_SUPERVISOR_NOT_LIVE	design/d-sdk-skill.md:472	a337a0f00630ad4059f8ade8dfe648dbe1d608bbdb36ac09fcc035ddb62d0ad8	-
+StopPathUnavailable{heartbeat_stale}	engine	StopPathUnavailable	heartbeat_stale	COMPUTER_SUPERVISOR_NOT_LIVE	design/d-sdk-skill.md:473	299ec46cc0024893cde0718fa9cbc05e6c70d6b4e8b281f6ef4d92193d75e88a	-
+StopPathUnavailable{no_listener}	engine	StopPathUnavailable	no_listener	COMPUTER_SUPERVISOR_NOT_LIVE	design/d-sdk-skill.md:474	62df1d900273c0e7e9276efb263d508b4d65661b7e1157b2f72b445af31f1b02	-
+StopPathUnavailable{release_helper_unavailable}	engine	StopPathUnavailable	release_helper_unavailable	COMPUTER_SUPERVISOR_NOT_LIVE	design/d-sdk-skill.md:475	c87efbea3ec9e5ba171738caf653bb0e0fc27e5f033f4dc58615ac5d8b1a59f3	-
+StopPathUnavailable{enclosing_job_no_breakaway}	engine	StopPathUnavailable	enclosing_job_no_breakaway	COMPUTER_SUPERVISOR_NOT_LIVE	design/d-sdk-skill.md:475	c87efbea3ec9e5ba171738caf653bb0e0fc27e5f033f4dc58615ac5d8b1a59f3	-
+StopPathUnavailable{wayland_release_unproven}	engine	StopPathUnavailable	wayland_release_unproven	COMPUTER_SUPERVISOR_NOT_LIVE	design/d-sdk-skill.md:475	c87efbea3ec9e5ba171738caf653bb0e0fc27e5f033f4dc58615ac5d8b1a59f3	-
+Suspended{stop_marker}	engine	Suspended	stop_marker	COMPUTER_SUSPENDED	design/d-safety.md:175	099a00f0ea6f88e94ec6939754e948289eddfe2bce034ae9a6e5534143429606	-
+Suspended{hotkey}	engine	Suspended	hotkey	COMPUTER_SUSPENDED	design/d-safety.md:238	de79ea5e8b39bbc26a4d98b320dd44565f95b097b78a7a2f58e974d9b89c2fa1	-
+Suspended{host_relay}	engine	Suspended	host_relay	COMPUTER_SUSPENDED	design/d-safety.md:238	de79ea5e8b39bbc26a4d98b320dd44565f95b097b78a7a2f58e974d9b89c2fa1	-
+Suspended{api}	engine	Suspended	api	COMPUTER_SUSPENDED	design/d-safety.md:238	de79ea5e8b39bbc26a4d98b320dd44565f95b097b78a7a2f58e974d9b89c2fa1	-
+Suspended{fleet}	engine	Suspended	fleet	COMPUTER_SUSPENDED	design/d-remote.md:222	f9e63d8dcd197b9510078471aa3bbd3542df0189e62b271b531c208254d8fa5d	-
+Suspended{host_latch}	engine	Suspended	host_latch	COMPUTER_SUSPENDED	design/FOLD-13.md:33	3241db036bc900cdc2fedd019fcafba4d3f953e0e025cfef0993d66b8d3930ab	-
+Suspended{hand_latch}	engine	Suspended	hand_latch	COMPUTER_SUSPENDED	design/d-safety.md:673	c8486396b3792e43ea1e283df2747cb083e6e60edc13eb027fd7a228f929f43d	-
+ScreenLocked{screen_locked}	engine	ScreenLocked	screen_locked	COMPUTER_SCREEN_LOCKED	design/d-sdk-skill.md:487	36398acd841f96916ed14aca14af401f513c40e4d889c7a877cf8150f12673b3	-
+TransactionFailed{marker_unavailable}	engine	TransactionFailed	marker_unavailable	COMPUTER_TRANSACTION_FAILED	design/d-sdk-skill.md:480	2e5640840e5a43055f48aab22fa7946fb00ad782cb4c3b640c87559b14632dc8	-
+TransactionFailed{recovery_required}	engine	TransactionFailed	recovery_required	COMPUTER_TRANSACTION_FAILED	design/d-sdk-skill.md:480	2e5640840e5a43055f48aab22fa7946fb00ad782cb4c3b640c87559b14632dc8	-
+TransactionFailed{replayed}	engine	TransactionFailed	replayed	COMPUTER_REPLAYED	design/d-sdk-skill.md:551	ec4284628f02a79b468d1e81ecbdef8c9ae4c029a8d60c08584a08d8b9392109	-
+InputBusy{app_leased}	engine	InputBusy	app_leased	COMPUTER_INPUT_BUSY	design/d-sdk-skill.md:518	c506733b98b2ca6c08aeaaadc4239a5ef45c711ac93aad9fc26caae5662d5cb4	-
+InputBusy{window}	engine	InputBusy	window	COMPUTER_INPUT_BUSY	design/d-sdk-skill.md:518	c506733b98b2ca6c08aeaaadc4239a5ef45c711ac93aad9fc26caae5662d5cb4	InputBusy{window, holder}: the window reservation keyed by its reason
+InputBusy{budget}	engine	InputBusy	budget	COMPUTER_BUSY	design/d-sdk-skill.md:519	5cb9b3a6582cbd1c55f7a6704967a0574ea69ce9cff89bbe5405ba8b87ecb4cd	-
+InputBusy{target_busy}	engine	InputBusy	target_busy	COMPUTER_INPUT_BUSY	design/d-sdk-skill.md:520	edb7f2df02857aee5790518759e84d8b91a5fb5a9885cedbbee97dc16e2519d6	-
+ControlRequired{foreground}	engine	ControlRequired	foreground	COMPUTER_CONTROL_REQUIRED	design/d-sdk-skill.md:508	9568e299a9db050b1ecfa4ee06d39bb3a54cf59b01a87434508d903270addaa2	-
+ControlRequired{headless_host}	engine	ControlRequired	headless_host	COMPUTER_CONTROL_REQUIRED	design/d-sdk-skill.md:508	9568e299a9db050b1ecfa4ee06d39bb3a54cf59b01a87434508d903270addaa2	-
+ControlRequired{app_scope}	engine	ControlRequired	app_scope	COMPUTER_CONTROL_REQUIRED	design/d-sdk-skill.md:508	9568e299a9db050b1ecfa4ee06d39bb3a54cf59b01a87434508d903270addaa2	-
+ControlRequired{denied_this_turn}	engine	ControlRequired	denied_this_turn	COMPUTER_CONTROL_REQUIRED	design/d-sdk-skill.md:509	7a30d8207f7597836e5f00c84f6ae0c0dd62bb77680f3575dbf714ddde80f90e	-
+ControlRequired{consent_off}	engine	ControlRequired	consent_off	COMPUTER_CONTROL_REQUIRED	design/d-sdk-skill.md:510	0a58cfd221ca96fb3ac280d320c99ab75adccbd95ce4fe7786cca5af8a198151	-
+ControlRequired{user_stopped}	engine	ControlRequired	user_stopped	COMPUTER_CONTROL_REQUIRED	design/d-sdk-skill.md:511	0faa1bb565011304ed3adc80a73be5f0e151fddfd3ea13286c563b7497cfade7	-
+ControlRequired{spawn_inside_session}	engine	ControlRequired	spawn_inside_session	COMPUTER_CONTROL_REQUIRED	design/d-sdk-skill.md:512	a761c798dc86b943db156297a344f819cf79929b5d969780e406354b6f58768b	-
+ControlRequired{attach_inside_session}	engine	ControlRequired	attach_inside_session	COMPUTER_CONTROL_REQUIRED	design/d-sdk-skill.md:512	a761c798dc86b943db156297a344f819cf79929b5d969780e406354b6f58768b	-
+ControlRequired{needs_observe}	engine	ControlRequired	needs_observe	COMPUTER_CONTROL_REQUIRED	design/d-sdk-skill.md:513	2d83da6515f5909237e33e473f72cca2378fd9d22d0de3eb11a99902ec130574	-
+ControlRequired{authority_changed}	engine	ControlRequired	authority_changed	COMPUTER_CONTROL_REQUIRED	design/d-sdk-skill.md:514	4790116179891f6ab666da7046fd6d8fe2278d767d75975227d6f0b3976fff17	-
+ControlRequired{permission_changed}	engine	ControlRequired	permission_changed	COMPUTER_CONTROL_REQUIRED	design/d-sdk-skill.md:515	a58ddbb74c23c6323ada47901c00e6b64bc966162e4fc59c88e08fe5f70be4ca	-
+ControlRequired{tampered}	engine	ControlRequired	tampered	COMPUTER_CONTROL_REQUIRED	design/d-sdk-skill.md:516	bc1aa3f1175e7848bb9ff0a5b8c2b8a411218d5b17ff6be0c68fcec8791a4496	permission_changed, tampered: the second token keys the row
+ControlRequired{rebased}	engine	ControlRequired	rebased	COMPUTER_CONTROL_REQUIRED	design/d-safety.md:335	6915413d93694aff7215518f1cd83f38f401e628396fc7daec972d41aa0ef117	permission_changed, rebased: the second token keys the row
+ControlRequired{lease_missing}	engine	ControlRequired	lease_missing	COMPUTER_CONTROL_REQUIRED	design/d-sdk-skill.md:517	928369372296f27979807b9a1106da977efb338e9ed2b16bc7eb4c15da252680	-
+ControlRequired{display_asleep}	engine	ControlRequired	display_asleep	COMPUTER_CONTROL_REQUIRED	design/d-sdk-skill.md:488	063e2e17a5c570a4e66e31c0735ed116b6df16fed203427694c645249293d9cf	-
+ControlRequired{provider_safety_check}	engine	ControlRequired	provider_safety_check	COMPUTER_CONTROL_REQUIRED	design/d-sdk-skill.md:492	34deb3c26183da9099aa2d8f8bdcd2fdcbe5b0b5571c11c0529c596bea4bc9d8	-
+ControlRequired{url_policy}	engine	ControlRequired	url_policy	COMPUTER_CONTROL_REQUIRED	design/d-sdk-skill.md:493	9aba3ebb30623044c62b427d03c0ccb46568a72b333213e9372bf677a385a63a	-
+ControlRequired{identity_changed}	engine	ControlRequired	identity_changed	COMPUTER_CONTROL_REQUIRED	design/d-sdk-skill.md:494	dffe6e89c42d76ed216a542626ed7731385c415bd210df725f32120809ce8cde	-
+ControlRequired{denied_app}	engine	ControlRequired	denied_app	COMPUTER_CONTROL_REQUIRED	design/FOLD-13.md:40	9d66601ba6e6c4fd1b8d5665494d9f7484461b3d9acf0a60aac3bae4367c8542	app_scope, denied_app: the second token keys the row
+ControlRequired{origin_unattended}	engine	ControlRequired	origin_unattended	COMPUTER_CONTROL_REQUIRED	design/FOLD-13.md:37	9289c3ae89c3f7a78b725e42171fdc08892039fa1e6d5eb17f33925e503dd817	-
+CaptureUnavailable{minimized}	engine	CaptureUnavailable	minimized	COMPUTER_CAPTURE_UNAVAILABLE	design/d-sdk-skill.md:496	e04ada3bcc001f60c4a8b29cb64c1d8b414ebe18dfc004575430563895bd406b	-
+CaptureUnavailable{offscreen_unsupported}	engine	CaptureUnavailable	offscreen_unsupported	COMPUTER_CAPTURE_UNAVAILABLE	design/d-sdk-skill.md:496	e04ada3bcc001f60c4a8b29cb64c1d8b414ebe18dfc004575430563895bd406b	-
+CaptureUnavailable{other_desktop}	engine	CaptureUnavailable	other_desktop	COMPUTER_CAPTURE_UNAVAILABLE	design/d-windows.md:85	abc032657e367f7283d351f7d444a0517219c5739a42a6072ce7e4241bff808f	-
+CaptureUnavailable{unmapped}	engine	CaptureUnavailable	unmapped	COMPUTER_CAPTURE_UNAVAILABLE	design/d-linux.md:56	0595a81c57e9e54df2b7681bb11abd8a24dfa67ea7492f2199f1bda029821be9	-
+SpaceUnsupported{windows_public_api}	engine	SpaceUnsupported	windows_public_api	COMPUTER_SPACE_UNSUPPORTED	design/d-windows.md:242	66aaa0a433e9ec23258065bda631bbeebc495839cd78cbf6f753ebe66af05466	-
+AmbiguousTarget{occurrences}	engine	AmbiguousTarget	occurrences	COMPUTER_AMBIGUOUS_TARGET	design/d-a11y-model.md:311	bf387967d6c48a6d72051548b8cddc4547f40a7c6cd03c28d13cf6913fec6685	-
+CaptureConsentRequired{direct_capture}	engine	CaptureConsentRequired	direct_capture	COMPUTER_CAPTURE_CONSENT_REQUIRED	design/d-sdk-skill.md:497	d21c146ba6a85499bfe33f0a15da3f30e7ca56a9a13fcdae95bfefbe3fd9621b	-
+ProtectedProcess{self_target}	engine	ProtectedProcess	self_target	COMPUTER_SELF_TARGET	interpretation:I-1	-	SelfTarget as a reason of ProtectedProcess: I-1; design spelling at design/d-sdk-skill.md:536
+SessionInactive{session_deactivated}	engine	SessionInactive	session_deactivated	COMPUTER_SESSION_INACTIVE	design/d-sdk-skill.md:489	d19c38d4693743c871306d8c31476615381ba49af0f9a43b9fb51d6ca2686fad	-
+SessionInactive{system_suspended}	engine	SessionInactive	system_suspended	COMPUTER_SESSION_INACTIVE	design/d-sdk-skill.md:490	09d2a60c7b6cab69bf2ec16624a460b1cc8246ce336a2d59da62fd5a26480f98	-
+ConsequentialAction{send_on_enter}	engine	ConsequentialAction	send_on_enter	COMPUTER_CONSEQUENTIAL_ACTION	design/d-sdk-skill.md:491	d96f206b3d249aef9331215e0015a4153e748470ed09b7c557b8a5f0525d636d	-
+Internal{windows_unsupported}	engine	Internal	windows_unsupported	COMPUTER_UNAVAILABLE	crates/omo-computer-core/src/backend/mod.rs:35	f16c27d72b9cd04b7c5e2ece62b25ea4180d062d0eb3beb4ad03aac899cb0a59	row 12 backend default refusal
+Internal{displays_unsupported}	engine	Internal	displays_unsupported	COMPUTER_UNAVAILABLE	crates/omo-computer-core/src/backend/mod.rs:41	46d7096430254e3c46884bb169d8067643a66e18fb6c6ded733c8f2fdfcd1275	row 12 backend default refusal
+CaptureUnavailable{capture_unsupported}	engine	CaptureUnavailable	capture_unsupported	COMPUTER_CAPTURE_UNAVAILABLE	crates/omo-computer-core/src/backend/mod.rs:50	405e81620054252573edb0cff217d2492f1a3a76969c9539b24c1f9560e716f9	row 12 backend default refusal
+Internal{input_unsupported}	engine	Internal	input_unsupported	COMPUTER_UNAVAILABLE	crates/omo-computer-core/src/backend/mod.rs:60	e14fd1f42eeafdc2fb44fbb6a1b3904a15d64a0f2e4730246b2c5457a608484d	row 12 backend default refusal
+AxUnsupported{snapshot_unsupported}	engine	AxUnsupported	snapshot_unsupported	COMPUTER_AX_UNAVAILABLE	crates/omo-computer-core/src/backend/mod.rs:99	4cae1300198250035b2ba69ef52ced023944b5a0a42cb5e4af4b83ef106e61a4	row 12 backend default refusal
+AxUnsupported{resolve_unsupported}	engine	AxUnsupported	resolve_unsupported	COMPUTER_AX_UNAVAILABLE	crates/omo-computer-core/src/backend/mod.rs:109	3742eed4c5c9331ab06f355be17cd38ea6c5dfeb54f501a5fce6b9cec789ddae	row 12 backend default refusal
+AxUnsupported{perform_unsupported}	engine	AxUnsupported	perform_unsupported	COMPUTER_AX_UNAVAILABLE	crates/omo-computer-core/src/backend/mod.rs:119	65769154173906488de0ebb9a4e97fb88e7531c1c4e280ad18e81b45c491a59e	row 12 backend default refusal
+Internal{epoch_source_unsupported}	engine	Internal	epoch_source_unsupported	COMPUTER_UNAVAILABLE	crates/omo-computer-core/src/backend/sources.rs:53	b7c2a1c8f05d743c520d23db535bc12d09d62013d0df4d4d7e63ab2586e82239	row 12 backend default refusal
+AxUnsupported{ax_events_unsupported}	engine	AxUnsupported	ax_events_unsupported	COMPUTER_AX_UNAVAILABLE	crates/omo-computer-core/src/backend/sources.rs:66	fa97ca38d06dc5bc6aa184bad94165d7490113d662009d64ba7bc7cacd049c0a	row 12 backend default refusal
+PermissionRuleDenied	layer	PermissionRuleDenied	-	COMPUTER_PERMISSION_DENIED	interpretation:I-10	-	design spelling at design/d-sdk-skill.md:477
+InvalidArguments	layer	InvalidArguments	-	COMPUTER_INVALID_ARGUMENTS	design/d-sdk-skill.md:533	5c27a437d183579bd5c287e916f1a168817ebd14a78a24fdca26f3b6154c9ddf	-
+InvalidArguments{session_ended}	layer	InvalidArguments	session_ended	COMPUTER_INVALID_ARGUMENTS	design/d-sdk-skill.md:533	5c27a437d183579bd5c287e916f1a168817ebd14a78a24fdca26f3b6154c9ddf	-
+MethodNotFound	layer	MethodNotFound	-	COMPUTER_INVALID_ARGUMENTS	interpretation:I-10	-	JSON-RPC -32601 (hostOnly refusals included): interpretation I-10; design spelling at design/d-arch.md:356
+MalformedMessage	layer	MalformedMessage	-	COMPUTER_INTERNAL	interpretation:I-10	-	JSON-RPC parse / invalid request: I-10; design spelling at design/d-sdk-skill.md:559
+MalformedReport	layer	MalformedReport	-	COMPUTER_INTERNAL	interpretation:I-10	-	design spelling at design/d-sdk-skill.md:559
+HandCrashed	layer	HandCrashed	-	COMPUTER_HAND_CRASHED	design/d-sdk-skill.md:539	e0489b05ee979411b65f27c96559a17ea964c234f933968957c24ad780777341	-
+HandCrashed{engine_exited}	layer	HandCrashed	engine_exited	COMPUTER_HAND_CRASHED	interpretation:I-10	-	EngineCrashed name: I-10; design spelling at design/d-sdk-skill.md:539
+HandCrashed{hand_exited}	layer	HandCrashed	hand_exited	COMPUTER_HAND_CRASHED	interpretation:I-10	-	HandCrashed name: I-10; design spelling at design/d-sdk-skill.md:539
+HandOffline	layer	HandOffline	-	COMPUTER_HAND_OFFLINE	design/d-sdk-skill.md:540	505843ea05baaa977aedf43285cfd89cf16348a32b1d0ca932d2a6d84ca7801a	-
+HandOffline{unreachable}	layer	HandOffline	unreachable	COMPUTER_HAND_OFFLINE	design/d-sdk-skill.md:540	505843ea05baaa977aedf43285cfd89cf16348a32b1d0ca932d2a6d84ca7801a	-
+HandOffline{no_bridge}	layer	HandOffline	no_bridge	COMPUTER_HAND_OFFLINE	design/d-sdk-skill.md:540	505843ea05baaa977aedf43285cfd89cf16348a32b1d0ca932d2a6d84ca7801a	-
+HandOffline{not_interactive}	layer	HandOffline	not_interactive	COMPUTER_HAND_OFFLINE	design/d-sdk-skill.md:540	505843ea05baaa977aedf43285cfd89cf16348a32b1d0ca932d2a6d84ca7801a	-
+LinkDegraded	layer	LinkDegraded	-	COMPUTER_LINK_DEGRADED	interpretation:I-10	-	design spelling at design/d-sdk-skill.md:544
+TransportLost	layer	TransportLost	-	COMPUTER_TRANSPORT_LOST	interpretation:I-10	-	design spelling at design/d-sdk-skill.md:545
+RemoteCommandsDisabled	layer	RemoteCommandsDisabled	-	COMPUTER_REMOTE_COMMANDS_DISABLED	design/d-sdk-skill.md:546	1b249ea7b1fb4a7a095151523565b7db0f42c6b0ff3512eb1925b5f3aa7e4643	-
+EntitlementRequired	layer	EntitlementRequired	-	COMPUTER_ENTITLEMENT_REQUIRED	design/d-sdk-skill.md:547	b40dca8c56283cc481eaf0312994e370e938b26a0c41545da671c6d9da4608e4	-
+ProtocolMismatch	layer	ProtocolMismatch	-	COMPUTER_PROTOCOL_MISMATCH	design/d-sdk-skill.md:548	b807be814acd8ed8a8dacf2252d5abb0b95f2f5871580da27fa6a9a731fb73e7	-
+ProtocolMismatch{abi_mismatch}	layer	ProtocolMismatch	abi_mismatch	COMPUTER_PROTOCOL_MISMATCH	interpretation:I-10	-	AbiMismatch name: I-10; design spelling at design/d-sdk-skill.md:548
+FeatureUnavailable	layer	FeatureUnavailable	-	COMPUTER_FEATURE_UNAVAILABLE	design/d-sdk-skill.md:549	dfee238a0304d6a44585d3145df3628cce2db571c43b3c0007b12205139c4798	-
+HandOutdated	layer	HandOutdated	-	COMPUTER_HAND_OUTDATED	design/d-sdk-skill.md:550	d90fa32d709bd4c935f3b42eabf52468706bbd90df8d42caf3983f10ba8f90d5	-
+UnsupportedAction	layer	UnsupportedAction	-	COMPUTER_UNSUPPORTED_ACTION	design/d-sdk-skill.md:552	87d8ca785737b6136336190c96d27840e7bb9a35d891b23580d113a005629838	-
+SafetyCheckDeclined	layer	SafetyCheckDeclined	-	COMPUTER_SAFETY_CHECK_DECLINED	design/d-sdk-skill.md:553	fac439dc7e07a8b6889fbe2c920ff7ae34abc14c407861adf00fe3c498848d63	-
+Disabled	layer	Disabled	-	COMPUTER_DISABLED	design/d-sdk-skill.md:554	fcb098d93430cd66e4cee4fb28fa6c131662888863f82e88823866c5a4132ac8	-
+SecureFocus	layer	SecureFocus	-	COMPUTER_SECURE_FOCUS	interpretation:I-10	-	design spelling at design/d-sdk-skill.md:555
+LaunchContextRequired	layer	LaunchContextRequired	-	COMPUTER_LAUNCH_CONTEXT_REQUIRED	design/d-sdk-skill.md:557	c1601c09d8355fa9d223a40973de6a20c6baa906144801834faec7ad8088070e	-
+RunLimit	layer	RunLimit	-	COMPUTER_RUN_LIMIT	design/d-sdk-skill.md:558	b3488074b894f10f5e0dd6567e26fe5a5de0ee658037715b5d1f2582f0ca6c74	-
+RunLimit{host_global}	layer	RunLimit	host_global	COMPUTER_RUN_LIMIT	design/d-sdk-skill.md:558	b3488074b894f10f5e0dd6567e26fe5a5de0ee658037715b5d1f2582f0ca6c74	-
+RunFailed	layer	RunFailed	-	COMPUTER_RUN_LIMIT	design/d-sdk-skill.md:543	98905b0e220824688e5574de957f821673dd1174b9b6459309c088021e32f635	-
+RunFailed{body_threw}	layer	RunFailed	body_threw	COMPUTER_RUN_LIMIT	design/d-sdk-skill.md:543	98905b0e220824688e5574de957f821673dd1174b9b6459309c088021e32f635	-
+refused{concealed_clipboard}	layer	SecureFocus	concealed_clipboard	COMPUTER_SECURE_FOCUS	design/d-safety.md:761	560109e6789ff8607bb036aaae11c3b25522d4b565c219f6b2a70444eb35f970	interpretation I-19: keyed under the SecureFocus layer failure, following secure_focus
+refused{secret_no_clipboard_route}	engine	Internal	secret_no_clipboard_route	COMPUTER_UNAVAILABLE	design/d-sdk-skill.md:526	7818d3cb380e0b87109544e07373efbb90d25d0264fdce7623a900ff10651745	interpretation I-20: keyed under Internal like the other Unavailable reasons of the same row (I-5)
+HandOffline{unmeasured}	layer	HandOffline	unmeasured	COMPUTER_HAND_OFFLINE	design/d-sdk-skill.md:540	505843ea05baaa977aedf43285cfd89cf16348a32b1d0ca932d2a6d84ca7801a	the lan pipe still unmeasured on the roster

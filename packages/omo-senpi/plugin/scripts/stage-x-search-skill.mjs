@@ -55,10 +55,7 @@ export async function checkXSearchSkillStaged(options = {}) {
     throw new Error(`x-search conditional skill stale: staged SKILL.md is not a file: ${targetSkill}`)
   }
 
-  const [sourceBody, stagedBody] = await Promise.all([
-    readFile(sourceSkill, "utf8"),
-    readFile(targetSkill, "utf8"),
-  ])
+  const [sourceBody, stagedBody] = await Promise.all([readFile(sourceSkill, "utf8"), readFile(targetSkill, "utf8")])
   if (sourceBody !== stagedBody) {
     throw new Error(`x-search conditional skill stale: staged SKILL.md does not match the source: ${targetSkill}`)
   }

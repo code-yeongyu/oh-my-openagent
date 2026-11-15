@@ -41,23 +41,24 @@ describe("createUnstableAgentBabysitter", () => {
         client: {
           session: {
             messages: async ({ path }: { path: { id: string } }) => ({
-              data: path.id === "main-1"
-                ? [
-                    {
-                      info: {
-                        role: "assistant",
-                        finish: "end_turn",
-                        agent: "sisyphus",
-                        model: { providerID: "openai", modelID: "gpt-4" },
+              data:
+                path.id === "main-1"
+                  ? [
+                      {
+                        info: {
+                          role: "assistant",
+                          finish: "end_turn",
+                          agent: "sisyphus",
+                          model: { providerID: "openai", modelID: "gpt-4" },
+                        },
                       },
-                    },
-                  ]
-                : [
-                    {
-                      info: { role: "assistant" },
-                      parts: [{ type: "thinking", thinking: "deep thought" }],
-                    },
-                  ],
+                    ]
+                  : [
+                      {
+                        info: { role: "assistant" },
+                        parts: [{ type: "thinking", thinking: "deep thought" }],
+                      },
+                    ],
             }),
             status: async () => ({ data: { "main-1": { type: "idle" } } }),
             promptAsync: async (input: unknown) => {

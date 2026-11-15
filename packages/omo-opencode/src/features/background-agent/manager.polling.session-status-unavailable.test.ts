@@ -38,10 +38,12 @@ function createManager(overrides: SessionOverrides): BackgroundManager {
     abort: overrides.abort ?? (async () => ({})),
     todo: async () => ({ data: [] }),
     messages: async () => ({
-      data: [{
-        info: { role: "assistant", finish: "end_turn", id: "message-2" },
-        parts: [{ type: "text", text: "done" }],
-      }],
+      data: [
+        {
+          info: { role: "assistant", finish: "end_turn", id: "message-2" },
+          parts: [{ type: "text", text: "done" }],
+        },
+      ],
     }),
   }
   const client = { session }
@@ -66,7 +68,12 @@ describe("BackgroundManager pollRunningTasks when session status registry is una
   test("keeps running tasks active and does not increment missed polls when status is unavailable or throws", async () => {
     const cases: Array<{ name: string; status?: () => Promise<SessionStatusResponse> }> = [
       { name: "missing status method" },
-      { name: "throwing status method", status: async () => { throw new Error("status unavailable") } },
+      {
+        name: "throwing status method",
+        status: async () => {
+          throw new Error("status unavailable")
+        },
+      },
     ]
 
     for (const testCase of cases) {

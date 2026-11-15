@@ -8,7 +8,4 @@ export {
   type SkillUsageEntry,
 } from "./skills-usage-ledger"
 export { extractSkillId, SkillsUsageTracker } from "./skills-usage-tracker"
-export {
-  registerSkillsUsage,
-  type SkillsUsageOptions,
-} from "./skills-usage-wiring"
+export { registerSkillsUsage, type SkillsUsageOptions } from "./skills-usage-wiring"

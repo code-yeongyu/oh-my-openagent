@@ -1,5 +1,15 @@
 import { expect, test } from "bun:test"
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -46,11 +56,20 @@ function createSetupFixture(options: { readonly built?: boolean; readonly withNo
   }
   chmodSync(join(agentDir, "setup.sh"), 0o755)
   // The fake bun records every non-version invocation so the test sees what setup.sh actually ran.
-  writeExecutable(join(fakeBin, "bun"), `#!/usr/bin/env bash\n[ "$1" = "--version" ] && { printf '1.3.12\\n'; exit 0; }\nprintf '%s\\n' "$*" >> '${toBashPath(bunLog)}'\n[ "$1" = "install" ] && { printf 'fake bun install\\n'; exit 0; }\n[ "$1 $2" = "run build" ] && { printf 'fake bun build\\n'; exit 0; }\nprintf 'unexpected bun command: %s\\n' "$*" >&2\nexit 64\n`)
+  writeExecutable(
+    join(fakeBin, "bun"),
+    `#!/usr/bin/env bash\n[ "$1" = "--version" ] && { printf '1.3.12\\n'; exit 0; }\nprintf '%s\\n' "$*" >> '${toBashPath(bunLog)}'\n[ "$1" = "install" ] && { printf 'fake bun install\\n'; exit 0; }\n[ "$1 $2" = "run build" ] && { printf 'fake bun build\\n'; exit 0; }\nprintf 'unexpected bun command: %s\\n' "$*" >&2\nexit 64\n`,
+  )
   if (options.withNode ?? true) {
-    writeExecutable(join(fakeBin, "node"), "#!/usr/bin/env bash\n[ \"$1\" = \"--version\" ] && { printf 'v24.0.0\\n'; exit 0; }\nprintf 'fake materialize failure\\n' >&2\nexit 42\n")
+    writeExecutable(
+      join(fakeBin, "node"),
+      "#!/usr/bin/env bash\n[ \"$1\" = \"--version\" ] && { printf 'v24.0.0\\n'; exit 0; }\nprintf 'fake materialize failure\\n' >&2\nexit 42\n",
+    )
   }
-  writeExecutable(join(fakeBin, "git"), "#!/usr/bin/env bash\n[ \"$1\" = \"--version\" ] && { printf 'git version 2.50.0\\n'; exit 0; }\n[ \"$1\" = \"submodule\" ] && { printf 'fake submodule failure\\n' >&2; exit 43; }\nprintf 'unexpected git command: %s\\n' \"$*\" >&2\nexit 64\n")
+  writeExecutable(
+    join(fakeBin, "git"),
+    '#!/usr/bin/env bash\n[ "$1" = "--version" ] && { printf \'git version 2.50.0\\n\'; exit 0; }\n[ "$1" = "submodule" ] && { printf \'fake submodule failure\\n\' >&2; exit 43; }\nprintf \'unexpected git command: %s\\n\' "$*" >&2\nexit 64\n',
+  )
   return { repo, fakeBin, bunLog }
 }
 

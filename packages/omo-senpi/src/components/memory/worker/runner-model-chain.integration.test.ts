@@ -16,15 +16,21 @@ describe("reflection model-chain integration", () => {
     let admittedDeadline: number | undefined
     const item: RunnerHarness = await harness({
       childMode: "model-fallback",
-      resolveAndPreflightLaunch: async (input) => resolveAndPreflightMemoryLaunch({ ...input, attempt: async (...args) => {
-        const child = await input.attempt(...args)
-        if (args[1] === 1) {
-          admittedDeadline = (await readRunJson<ReservationRunLedger>(
-            join(item.identity.paths.reflection, "runs", item.run.runId, "ledger.json"),
-          )).hardDeadlineAt
-        }
-        return child
-      } }),
+      resolveAndPreflightLaunch: async (input) =>
+        resolveAndPreflightMemoryLaunch({
+          ...input,
+          attempt: async (...args) => {
+            const child = await input.attempt(...args)
+            if (args[1] === 1) {
+              admittedDeadline = (
+                await readRunJson<ReservationRunLedger>(
+                  join(item.identity.paths.reflection, "runs", item.run.runId, "ledger.json"),
+                )
+              ).hardDeadlineAt
+            }
+            return child
+          },
+        }),
     })
 
     // when
@@ -80,10 +86,19 @@ describe("reflection model-chain integration", () => {
     const fresh = await item.runner.launch(item.run)
     // The first run now merges and advances the cursor, so the second reservation needs fresh backlog,
     // and the stub child's identical commit needs a real diff against the parent to merge again.
-    await item.journal.reconcile([{ kind: "assistant", messageId: "assistant-2", textBlocks: ["Remember another fact"] }])
+    await item.journal.reconcile([
+      { kind: "assistant", messageId: "assistant-2", textBlocks: ["Remember another fact"] },
+    ])
     const parent = new GitMemoryRepo({ dir: item.identity.paths.repo, agentId: item.identity.id })
-    await writeFile(join(item.identity.paths.repo, "system", "reflected.md"), "---\ndescription: Edited between runs\n---\nEdited between runs.\n", "utf8")
-    await parent.commitWrite(["system/reflected.md"], "edit between runs", { agentId: item.identity.id, authorName: "Test" })
+    await writeFile(
+      join(item.identity.paths.repo, "system", "reflected.md"),
+      "---\ndescription: Edited between runs\n---\nEdited between runs.\n",
+      "utf8",
+    )
+    await parent.commitWrite(["system/reflected.md"], "edit between runs", {
+      agentId: item.identity.id,
+      authorName: "Test",
+    })
     const cached = await item.runner.launch(await item.reserveAgain())
 
     // then
@@ -110,5 +125,4 @@ describe("reflection model-chain integration", () => {
     expect(result.detail).toContain("attempted:extension-only/primary,kimi-coding/fallback")
     expect(item.spawnCalls).toHaveLength(2)
   }, 60_000)
-
 })

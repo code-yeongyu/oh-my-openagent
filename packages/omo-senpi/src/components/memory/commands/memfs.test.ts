@@ -23,18 +23,14 @@ const tempDirs: string[] = []
 afterEach(async () => {
   // Windows releases git's handles slightly after the child exits, so a bare recursive remove
   // throws EBUSY. Retry the unlink instead of failing an otherwise passing case.
-  await Promise.all(
-    tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 50 })),
-  )
+  await Promise.all(tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 50 })))
 })
 
 // These cases drive real git subprocesses (init, commit, push); the 5s default is not a budget
 // they fit on a loaded Windows runner.
 setDefaultTimeout(process.platform === "win32" ? 30_000 : 5_000)
 
-const SEEDS = [
-  { relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\nseeded persona\n" },
-]
+const SEEDS = [{ relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\nseeded persona\n" }]
 
 async function harness(options: { readonly seeded?: boolean; readonly hasUI?: boolean } = {}): Promise<{
   identity: Awaited<ReturnType<typeof tempIdentity>>["identity"]
@@ -71,7 +67,10 @@ describe("/memfs status", () => {
   test("#given uncommitted changes #when status runs #then the dirty state is reported as a warning", async () => {
     // given
     const { identity, pi, ctx } = await harness()
-    await writeFile(join(identity.identityPaths.repo, "system", "persona.md"), "---\ndescription: Persona\n---\nedited\n")
+    await writeFile(
+      join(identity.identityPaths.repo, "system", "persona.md"),
+      "---\ndescription: Persona\n---\nedited\n",
+    )
 
     // when
     const text = await invoke(pi, "memfs", "status", ctx)

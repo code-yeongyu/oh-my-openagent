@@ -41,9 +41,11 @@ Input defaults to background delivery when supported. On macOS it leaves the fro
 
 Foreground delivery also needs this session's live control grant. The host asks the human to confirm, then calls `control.grant { reason, confirmationId }` (host-only); `control.revoke` releases it, `session.close` and a stop chord revoke it too, and `stopPath.resume` never restores it. At most one session of the process holds the grant; another session's grant is refused `InputBusy`, never stolen. `control.state` (public) reports `{ active, reason?, grantedAt? }`. An omitted delivery stays background, except that pointer and keyboard input on the `desktop` or a `display:*` target (click, moveMouse, drag, scroll, typeText, keyChord, holdKeys, holdMouse) always needs the grant: every backend posts it globally, onto the user's real pointer and frontmost app, so the engine admits it by its effect rather than the requested delivery (#10788). In full access the OmO host takes the grant itself, without a confirm and in non-interactive runs too, and revokes it once the session leaves full access. `raiseWindow` (`win.raise()`) always needs the grant, because raising a window always takes the user's foreground; this is deliberately stricter than upstream oh-my-pi, which gates only takeover input.
 
+On macOS the engine keeps the display awake while the agent operates: the first request other than `capabilities`, `control.state` and `stopPath.*` takes a `PreventUserIdleDisplaySleep` power assertion, listed by `pmset -g assertions` as "OmO computer use is operating the desktop", and it lasts until 60 seconds after the last such request finished. `session.close`, a disconnect and a stop release it at once. `capabilities.displayAsleep` is true when every display the session can capture is asleep; the screen lock still refuses input with `ScreenLocked`.
+
 ## Error codes
 
-A failed call carries one engine error code (`crates/senpi-desktop-core/src/error.rs`). The ones a user or model acts on:
+A failed call carries one engine error code (`crates/senpi-desktop-core/src/error.rs`), and some codes also carry a `data.reason` naming the cause (for example `consumed` for `InvalidCoordinateFrame`); the tool's recovery hint follows that reason when it knows it. The ones a user or model acts on:
 
 | Code | Meaning | What to do |
 |------|---------|------------|
@@ -62,7 +64,12 @@ A failed call carries one engine error code (`crates/senpi-desktop-core/src/erro
 | `UserIntervened` | The user was using the target app, or brought another window forward, so the action stopped; the message says whether any input was sent | Read the window again once the user pauses; never repeat the action as it was |
 | `AxUnconfirmed` | An accessibility request was made but the app did not confirm it (no reply in time, or a modal dialog opened). On macOS, `ax.perform` (press and the other named actions), `ax.setValue` and `ax.focus` report it when the app answers `kAXErrorCannotComplete`; a refused request stays `AxFailed`, and so does a value the app answered but did not take | It may already have taken effect: read the element back before any retry |
 | `SpaceUnsupported`, `SpaceMoveDenied` | A window could not be moved to the current Space (macOS), because the platform lacks support or the window server refused or could not verify the move | Ask the user to bring the window to the current Space |
-| `CaptureFailed`, `InputFailed`, `Timeout`, `Cancelled`, `Closed`, `TransactionFailed`, `Internal` | The platform call failed, took too long, was aborted, or the session ended | Observe again before retrying; stop after repeated failures |
+| `AmbiguousTarget` | Several windows or elements match the request | List them again and target one by its id or ref |
+| `CaptureConsentRequired` | The system needs the user to approve screen capture first | Ask the user to approve capture, then capture again |
+| `ProtectedProcess` | The target app is protected from automation | Do not retry; ask the user to act in that app |
+| `CaptureFailed`, `InputFailed`, `Timeout`, `Cancelled`, `Closed`, `TransactionFailed`, `Internal` | The platform call failed, took too long, was aborted, or the session ended. On macOS a `CaptureFailed`, `InputFailed` or `Timeout` message that ends `(the screen is locked)` or `(the display is asleep)` names the likely cause | Observe again before retrying; stop after repeated failures; for a lock or sleep note, ask the user to unlock or wake the Mac |
+
+A stop persists across an engine restart only on the macOS XPC agent path, which keeps a private stopped marker that no operation clears. The `--serve` daemon behind `--oneshot` and `--mcp` keeps its stop in memory: `--resume` lifts it, and a daemon that restarts (after a crash, an idle exit or a kill) starts unstopped, so a v1 consumer never stays `Suspended` behind a file the user would have to delete.
 
 Engine start failures are reported by `/computer status` as `engine: native-unavailable`, `quarantined` or `abi-mismatch`, and are described in [Troubleshooting](../guide/computer-use.md#troubleshooting).
 

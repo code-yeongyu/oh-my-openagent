@@ -144,7 +144,9 @@ describe("createConfigWatchComponent", () => {
 
     createComponent().register(createPi(), createContext(logs))
 
-    expect(logs).toEqual([{ level: "warn", message: "config-watch skipped: events capability missing", details: undefined }])
+    expect(logs).toEqual([
+      { level: "warn", message: "config-watch skipped: events capability missing", details: undefined },
+    ])
   })
 
   it("warns that creating user config later requires a reload when its directory and parent are absent", () => {
@@ -182,7 +184,11 @@ describe("createConfigWatchComponent", () => {
     })
 
     expect(logs).toEqual([
-      { level: "info", message: "omo config hot-reloaded", details: { paths: ["/project/.omo/omo.jsonc"], pathCount: 1 } },
+      {
+        level: "info",
+        message: "omo config hot-reloaded",
+        details: { paths: ["/project/.omo/omo.jsonc"], pathCount: 1 },
+      },
       {
         level: "warn",
         message: "omo config hot-reload rejected",
@@ -212,7 +218,11 @@ describe("createConfigWatchComponent", () => {
 
     const before = events.registrations.get("omo")
     const deferred = nextRegisterEmit(events)
-    events.emit("config-watch:rejected", { registrationId: "omo", paths: ["/project/.omo"], errors: ["invalid config"] })
+    events.emit("config-watch:rejected", {
+      registrationId: "omo",
+      paths: ["/project/.omo"],
+      errors: ["invalid config"],
+    })
 
     // The rejection must NOT synchronously re-emit: senpi rejects on the same
     // stack as REGISTER, so a direct re-emit recurses until stack overflow.

@@ -24,9 +24,12 @@ describe("model-resolution-config", () => {
   it("#given a user omo config #when loading model settings #then reads its opencode view", () => {
     const path = join(temporaryDirectory, ".omo", "omo.jsonc")
     mkdirSync(join(path, ".."), { recursive: true })
-    writeFileSync(path, JSON.stringify({
-      "[opencode]": { agents: { atlas: { model: "opencode-go/kimi-k2.6" } } },
-    }) + "\n")
+    writeFileSync(
+      path,
+      JSON.stringify({
+        "[opencode]": { agents: { atlas: { model: "opencode-go/kimi-k2.6" } } },
+      }) + "\n",
+    )
 
     expect(loadOmoConfig().agents?.atlas?.model).toBe("opencode-go/kimi-k2.6")
   })

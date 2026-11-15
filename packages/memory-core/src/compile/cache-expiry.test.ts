@@ -30,8 +30,14 @@ async function createRepo(): Promise<GitMemoryRepo> {
   await repo.init({
     seedFiles: [
       { relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\nsteady\n" },
-      { relativePath: "system/outage.md", content: "---\ndescription: Outage\nexpires: 2026-10-27T06:33Z\n---\noutage body\n" },
-      { relativePath: "system/freeze.md", content: "---\ndescription: Freeze\nexpires: 2026-10-28\n---\nfreeze body\n" },
+      {
+        relativePath: "system/outage.md",
+        content: "---\ndescription: Outage\nexpires: 2026-10-27T06:33Z\n---\noutage body\n",
+      },
+      {
+        relativePath: "system/freeze.md",
+        content: "---\ndescription: Freeze\nexpires: 2026-10-28\n---\nfreeze body\n",
+      },
     ],
   })
   return repo

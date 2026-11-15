@@ -19,7 +19,9 @@ export const EMPTY_HEAD = { seq: 0, link: "", keyring_link: "" } as const
 export const deviceKeyring = async (seed = 1): Promise<DeviceKeyring> => {
   const signingPrivatePkcs8 = privateDer("ed25519", bytes(32, seed)).toString("base64url")
   const sealingPrivatePkcs8 = privateDer("x25519", bytes(32, seed + 1)).toString("base64url")
-  const publicKey = createPublicKey(createPrivateKey({ key: Buffer.from(signingPrivatePkcs8, "base64url"), format: "der", type: "pkcs8" })).export({ format: "jwk" }).x
+  const publicKey = createPublicKey(
+    createPrivateKey({ key: Buffer.from(signingPrivatePkcs8, "base64url"), format: "der", type: "pkcs8" }),
+  ).export({ format: "jwk" }).x
   const id = await deviceIdOf(publicKey ?? "")
   if (id === null) throw new Error("invalid test signing key")
   return createDeviceKeyring(id, { signingPrivatePkcs8, sealingPrivatePkcs8 })
@@ -55,12 +57,27 @@ export const vector = async () => {
 }
 
 export const entryOf = async (request: KeyringAppendRequest, keyring: DeviceKeyring): Promise<KeyringEntry> => ({
-  seq: 1, kind: "keyring", account: request.record.account, epoch: request.record.epoch,
-  author: { ...keyring.principal(), sealing_public_key: keyring.publicKeys().sealing, signing_public_key: keyring.publicKeys().signing },
-  body: request.record, digest: await sha256B64(jcsBytes(request.record)),
-  base_seq: request.base_seq, link: request.link, keyring_link: request.keyring_link,
-  record_sig: request.record_sig, wraps: request.wraps,
+  seq: 1,
+  kind: "keyring",
+  account: request.record.account,
+  epoch: request.record.epoch,
+  author: {
+    ...keyring.principal(),
+    sealing_public_key: keyring.publicKeys().sealing,
+    signing_public_key: keyring.publicKeys().signing,
+  },
+  body: request.record,
+  digest: await sha256B64(jcsBytes(request.record)),
+  base_seq: request.base_seq,
+  link: request.link,
+  keyring_link: request.keyring_link,
+  record_sig: request.record_sig,
+  wraps: request.wraps,
 })
 
 export const walk = async (request: KeyringAppendRequest, signer: DeviceKeyring, anchor = signer) =>
-  appendEntries(emptyChain(ACCOUNT, creatorAnchor(ACCOUNT, anchor)), [await entryOf(request, signer)], createRejectionCounter())
+  appendEntries(
+    emptyChain(ACCOUNT, creatorAnchor(ACCOUNT, anchor)),
+    [await entryOf(request, signer)],
+    createRejectionCounter(),
+  )

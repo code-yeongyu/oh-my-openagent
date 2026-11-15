@@ -83,7 +83,9 @@ export function createDagRpcBridge(pi: SenpiExtensionAPI, deps: DagRpcBridgeDeps
       const message = error instanceof Error ? error.message : String(error)
       if (!reportedReadFaults.has(message)) {
         reportedReadFaults.add(message)
-        deps.logger?.warn(`omo-dag ${surface} read failed; nothing published until the store reads again`, { error: message })
+        deps.logger?.warn(`omo-dag ${surface} read failed; nothing published until the store reads again`, {
+          error: message,
+        })
       }
       return undefined
     }
@@ -100,8 +102,7 @@ export function createDagRpcBridge(pi: SenpiExtensionAPI, deps: DagRpcBridgeDeps
     emit(DAG_EVENT_CHANNEL, event)
   }
 
-  const liveRuns = (): readonly DagBridgeRun[] =>
-    ownedRuns().filter((run) => !TERMINAL_RUN_STATUSES.has(run.status))
+  const liveRuns = (): readonly DagBridgeRun[] => ownedRuns().filter((run) => !TERMINAL_RUN_STATUSES.has(run.status))
 
   const stopHeartbeat = (): void => {
     if (heartbeat === undefined) return
@@ -173,6 +174,12 @@ export function createDagRpcBridge(pi: SenpiExtensionAPI, deps: DagRpcBridgeDeps
     snapshotFlush = undefined
   }
 
+  // A client attaching is owed the current state now, not one debounce window later (#12113).
+  const publishSnapshotNow = (): void => {
+    stopSnapshotFlush()
+    flushSnapshot()
+  }
+
   const detach = (): void => {
     attached = false
     for (const unsubscribe of subscriptions.values()) unsubscribe()
@@ -202,9 +209,15 @@ export function createDagRpcBridge(pi: SenpiExtensionAPI, deps: DagRpcBridgeDeps
       detach()
       attached = true
       sync()
+      publishSnapshotNow()
     },
     sync,
     detach,
+    resend() {
+      if (!attached) return
+      lastSnapshotFingerprint = undefined
+      publishSnapshotNow()
+    },
     notifyStoreMutation() {
       if (!attached) return
       scheduleSnapshot()

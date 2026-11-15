@@ -3,11 +3,7 @@ import { applyToolConfig } from "./tool-config-handler"
 import type { OhMyOpenCodeConfig } from "../config"
 import { getAgentDisplayName } from "../shared/agent-display-names"
 
-function createParams(overrides: {
-  taskSystem?: boolean
-  agents?: string[]
-  disabledTools?: string[]
-}) {
+function createParams(overrides: { taskSystem?: boolean; agents?: string[]; disabledTools?: string[] }) {
   const agentResult: Record<string, { permission?: Record<string, unknown> }> = {}
   for (const agent of overrides.agents ?? []) {
     agentResult[agent] = { permission: {} }
@@ -66,26 +62,23 @@ describe("applyToolConfig", () => {
         expect(tools.todoread).toBe(false)
       })
 
-      it.each([
-        "atlas",
-        "sisyphus",
-        "hephaestus",
-        "prometheus",
-        "sisyphus-junior",
-      ])("#then should deny todo tools for %s agent", (agentName) => {
-        const params = createParams({
-          taskSystem: true,
-          agents: [agentName],
-        })
+      it.each(["atlas", "sisyphus", "hephaestus", "prometheus", "sisyphus-junior"])(
+        "#then should deny todo tools for %s agent",
+        (agentName) => {
+          const params = createParams({
+            taskSystem: true,
+            agents: [agentName],
+          })
 
-        applyToolConfig(params)
+          applyToolConfig(params)
 
-        const agent = params.agentResult[agentName] as {
-          permission: Record<string, unknown>
-        }
-        expect(agent.permission.todowrite).toBe("deny")
-        expect(agent.permission.todoread).toBe("deny")
-      })
+          const agent = params.agentResult[agentName] as {
+            permission: Record<string, unknown>
+          }
+          expect(agent.permission.todowrite).toBe("deny")
+          expect(agent.permission.todoread).toBe("deny")
+        },
+      )
     })
   })
 
@@ -219,26 +212,23 @@ describe("applyToolConfig", () => {
 
   describe("#given task_system is disabled", () => {
     describe("#when applying tool config", () => {
-      it.each([
-        "atlas",
-        "sisyphus",
-        "hephaestus",
-        "prometheus",
-        "sisyphus-junior",
-      ])("#then should NOT deny todo tools for %s agent", (agentName) => {
-        const params = createParams({
-          taskSystem: false,
-          agents: [agentName],
-        })
+      it.each(["atlas", "sisyphus", "hephaestus", "prometheus", "sisyphus-junior"])(
+        "#then should NOT deny todo tools for %s agent",
+        (agentName) => {
+          const params = createParams({
+            taskSystem: false,
+            agents: [agentName],
+          })
 
-        applyToolConfig(params)
+          applyToolConfig(params)
 
-        const agent = params.agentResult[agentName] as {
-          permission: Record<string, unknown>
-        }
-        expect(agent.permission.todowrite).toBeUndefined()
-        expect(agent.permission.todoread).toBeUndefined()
-      })
+          const agent = params.agentResult[agentName] as {
+            permission: Record<string, unknown>
+          }
+          expect(agent.permission.todowrite).toBeUndefined()
+          expect(agent.permission.todoread).toBeUndefined()
+        },
+      )
     })
   })
 
@@ -254,25 +244,22 @@ describe("applyToolConfig", () => {
         expect(tools.todoread).toBeUndefined()
       })
 
-      it.each([
-        "atlas",
-        "sisyphus",
-        "hephaestus",
-        "prometheus",
-        "sisyphus-junior",
-      ])("#then should NOT deny todo tools for %s agent by default", (agentName) => {
-        const params = createParams({
-          agents: [agentName],
-        })
+      it.each(["atlas", "sisyphus", "hephaestus", "prometheus", "sisyphus-junior"])(
+        "#then should NOT deny todo tools for %s agent by default",
+        (agentName) => {
+          const params = createParams({
+            agents: [agentName],
+          })
 
-        applyToolConfig(params)
+          applyToolConfig(params)
 
-        const agent = params.agentResult[agentName] as {
-          permission: Record<string, unknown>
-        }
-        expect(agent.permission.todowrite).toBeUndefined()
-        expect(agent.permission.todoread).toBeUndefined()
-      })
+          const agent = params.agentResult[agentName] as {
+            permission: Record<string, unknown>
+          }
+          expect(agent.permission.todowrite).toBeUndefined()
+          expect(agent.permission.todoread).toBeUndefined()
+        },
+      )
     })
   })
 
@@ -310,40 +297,40 @@ describe("applyToolConfig", () => {
     describe("#when applyToolConfig runs", () => {
       it("#then should NOT clobber task:deny to allow (sub-bug of #5193)", () => {
         // given a sisyphus-junior agent with permission.task === "deny" (factory output)
-        const params = createParams({ agents: ["sisyphus-junior"] });
-        (params.agentResult["sisyphus-junior"] as { permission: Record<string, unknown> }).permission = {
+        const params = createParams({ agents: ["sisyphus-junior"] })
+        ;(params.agentResult["sisyphus-junior"] as { permission: Record<string, unknown> }).permission = {
           task: "deny",
-        };
+        }
 
         // when applyToolConfig runs
-        applyToolConfig(params);
+        applyToolConfig(params)
 
         // then task remains "deny" (NOT overwritten to "allow")
         const junior = params.agentResult["sisyphus-junior"] as {
-          permission: Record<string, unknown>;
-        };
-        expect(junior.permission.task).toBe("deny");
-      });
+          permission: Record<string, unknown>
+        }
+        expect(junior.permission.task).toBe("deny")
+      })
 
       it("#then should still add task_*:allow and teammate:allow to sisyphus-junior", () => {
         // given
-        const params = createParams({ agents: ["sisyphus-junior"] });
-        (params.agentResult["sisyphus-junior"] as { permission: Record<string, unknown> }).permission = {
+        const params = createParams({ agents: ["sisyphus-junior"] })
+        ;(params.agentResult["sisyphus-junior"] as { permission: Record<string, unknown> }).permission = {
           task: "deny",
-        };
+        }
 
         // when
-        applyToolConfig(params);
+        applyToolConfig(params)
 
         // then
         const junior = params.agentResult["sisyphus-junior"] as {
-          permission: Record<string, unknown>;
-        };
-        expect(junior.permission["task_*"]).toBe("allow");
-        expect(junior.permission.teammate).toBe("allow");
-      });
-    });
-  });
+          permission: Record<string, unknown>
+        }
+        expect(junior.permission["task_*"]).toBe("allow")
+        expect(junior.permission.teammate).toBe("allow")
+      })
+    })
+  })
 
   describe("#given disabled_tools includes 'question'", () => {
     let originalConfigContent: string | undefined
@@ -370,60 +357,51 @@ describe("applyToolConfig", () => {
     })
 
     describe("#when question is in disabled_tools", () => {
-      it.each(["sisyphus", "hephaestus", "prometheus"])(
-        "#then should deny question for %s agent",
-        (agentName) => {
-          const params = createParams({
-            agents: [agentName],
-            disabledTools: ["question"],
-          })
+      it.each(["sisyphus", "hephaestus", "prometheus"])("#then should deny question for %s agent", (agentName) => {
+        const params = createParams({
+          agents: [agentName],
+          disabledTools: ["question"],
+        })
 
-          applyToolConfig(params)
+        applyToolConfig(params)
 
-          const agent = params.agentResult[agentName] as {
-            permission: Record<string, unknown>
-          }
-          expect(agent.permission.question).toBe("deny")
-        },
-      )
+        const agent = params.agentResult[agentName] as {
+          permission: Record<string, unknown>
+        }
+        expect(agent.permission.question).toBe("deny")
+      })
     })
 
     describe("#when question is in disabled_tools alongside other tools", () => {
-      it.each(["sisyphus", "hephaestus", "prometheus"])(
-        "#then should deny question for %s agent",
-        (agentName) => {
-          const params = createParams({
-            agents: [agentName],
-            disabledTools: ["todowrite", "question", "interactive_bash"],
-          })
+      it.each(["sisyphus", "hephaestus", "prometheus"])("#then should deny question for %s agent", (agentName) => {
+        const params = createParams({
+          agents: [agentName],
+          disabledTools: ["todowrite", "question", "interactive_bash"],
+        })
 
-          applyToolConfig(params)
+        applyToolConfig(params)
 
-          const agent = params.agentResult[agentName] as {
-            permission: Record<string, unknown>
-          }
-          expect(agent.permission.question).toBe("deny")
-        },
-      )
+        const agent = params.agentResult[agentName] as {
+          permission: Record<string, unknown>
+        }
+        expect(agent.permission.question).toBe("deny")
+      })
     })
 
     describe("#when disabled_tools does not include question", () => {
-      it.each(["sisyphus", "hephaestus", "prometheus"])(
-        "#then should allow question for %s agent",
-        (agentName) => {
-          const params = createParams({
-            agents: [agentName],
-            disabledTools: ["todowrite", "interactive_bash"],
-          })
+      it.each(["sisyphus", "hephaestus", "prometheus"])("#then should allow question for %s agent", (agentName) => {
+        const params = createParams({
+          agents: [agentName],
+          disabledTools: ["todowrite", "interactive_bash"],
+        })
 
-          applyToolConfig(params)
+        applyToolConfig(params)
 
-          const agent = params.agentResult[agentName] as {
-            permission: Record<string, unknown>
-          }
-          expect(agent.permission.question).toBe("allow")
-        },
-      )
+        const agent = params.agentResult[agentName] as {
+          permission: Record<string, unknown>
+        }
+        expect(agent.permission.question).toBe("allow")
+      })
     })
   })
 })

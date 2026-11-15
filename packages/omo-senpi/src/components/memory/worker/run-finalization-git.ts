@@ -8,6 +8,7 @@ import {
   integrateValidatedReflection,
   maybeKillAt,
   memoryWriterLockPath,
+  pathsOutsideTarget,
   probeLegacyAutoRunReceipt,
   probeReflectionIntegration,
   preflightReflectionDescriptions,
@@ -20,21 +21,9 @@ import {
 } from "@oh-my-opencode/memory-core"
 
 import { estimateSystemTokens } from "../commands/tokens"
-import {
-  readRunJson,
-  readRunTextTail,
-  updateRunLedger,
-  type RunOutcome,
-} from "./run-artifacts"
-import type {
-  DurableFinalizationDecision,
-  RunFinalizationContext,
-} from "./run-finalization-types"
-import {
-  parseReservationRunLedger,
-  worktreeFromLedger,
-  type ReservationRunLedger,
-} from "./reservation-run-ledger"
+import { readRunJson, readRunTextTail, updateRunLedger, type RunOutcome } from "./run-artifacts"
+import type { DurableFinalizationDecision, RunFinalizationContext } from "./run-finalization-types"
+import { parseReservationRunLedger, worktreeFromLedger, type ReservationRunLedger } from "./reservation-run-ledger"
 
 export async function resolveFinalizationDecision(
   context: RunFinalizationContext,
@@ -72,9 +61,12 @@ export async function resolveFinalizationDecision(
     const validation = await validateCompletion(worktree, ledger.baseSha, worktree.exec)
     if (validation.status === "valid") {
       maybeKillAt("after-validate")
-      if (ledger.targetDoc !== undefined
-        && validation.changedPaths.some((path) => path !== ledger.targetDoc)) {
-        const decision = { outcome: "failed" as const, reason: "invalid_target", detail: "Dream changed paths outside targetDoc" }
+      if (ledger.targetDoc !== undefined && pathsOutsideTarget(validation, [ledger.targetDoc]).length > 0) {
+        const decision = {
+          outcome: "failed" as const,
+          reason: "invalid_target",
+          detail: "Dream changed paths outside targetDoc",
+        }
         await checkpointDecision(ledgerPath, decision)
         await cleanupAndRecord(context, ledger, runDir)
         return decision
@@ -163,9 +155,7 @@ export async function resolveFinalizationDecision(
     withWriterLock: (operation) => writerLock(context, operation),
   })
   maybeKillAt("after-merge")
-  const budget = integrated.outcome === "merged"
-    ? await validateIntegratedDreamBudget(context, ledger)
-    : {}
+  const budget = integrated.outcome === "merged" ? await validateIntegratedDreamBudget(context, ledger) : {}
   const decision: DurableFinalizationDecision = {
     outcome: integrated.outcome,
     ...(integrated.detail === undefined && droppedNote === undefined
@@ -186,9 +176,7 @@ function validatedFromLedger(ledger: ReservationRunLedger): ValidatedReflectionT
     : { tipSha: ledger.validatedTipSha, changedPaths: ledger.validatedChangedPaths ?? [] }
 }
 
-function decisionFromLedger(
-  ledger: ReservationRunLedger,
-): DurableFinalizationDecision | undefined {
+function decisionFromLedger(ledger: ReservationRunLedger): DurableFinalizationDecision | undefined {
   if (ledger.finalizeOutcome === undefined) return undefined
   return {
     outcome: ledger.finalizeOutcome,

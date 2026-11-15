@@ -16,10 +16,26 @@ afterEach(async () => {
   harness = undefined
 })
 
-function insertDelivery(db: Database, id: string, state: string, updatedAt: number, extra: { readonly target?: string; readonly seq: number; readonly root?: string; readonly binding?: string }): void {
+function insertDelivery(
+  db: Database,
+  id: string,
+  state: string,
+  updatedAt: number,
+  extra: { readonly target?: string; readonly seq: number; readonly root?: string; readonly binding?: string },
+): void {
   db.run(
-    "INSERT INTO deliveries (delivery_id, target_durable_id, seq, sender, envelope, body, bytes, mode_requested, state, root_id, hop, created_at, updated_at, expires_at, binding_id) VALUES (?, ?, ?, 'session:A', '{\"provenance\":{\"workspace\":\"Example\",\"project\":\"project\"}}', 'body', 4, 'auto', ?, ?, 1, ?, ?, ?, ?)",
-    [id, extra.target ?? "B", extra.seq, state, extra.root ?? "root-x", updatedAt, updatedAt, updatedAt + DAY, extra.binding ?? null],
+    'INSERT INTO deliveries (delivery_id, target_durable_id, seq, sender, envelope, body, bytes, mode_requested, state, root_id, hop, created_at, updated_at, expires_at, binding_id) VALUES (?, ?, ?, \'session:A\', \'{"provenance":{"workspace":"Example","project":"project"}}\', \'body\', 4, \'auto\', ?, ?, 1, ?, ?, ?, ?)',
+    [
+      id,
+      extra.target ?? "B",
+      extra.seq,
+      state,
+      extra.root ?? "root-x",
+      updatedAt,
+      updatedAt,
+      updatedAt + DAY,
+      extra.binding ?? null,
+    ],
   )
 }
 
@@ -31,13 +47,35 @@ function insertBinding(db: Database, id: string, status: string, updatedAt: numb
 }
 
 function ids(db: Database, table: string, column: string): string[] {
-  return db.query(`SELECT ${column} AS id FROM ${table} ORDER BY ${column}`).all().map((row) => String((row as { id: unknown }).id))
+  return db
+    .query(`SELECT ${column} AS id FROM ${table} ORDER BY ${column}`)
+    .all()
+    .map((row) => String((row as { id: unknown }).id))
 }
 
 /** A relay mutation: one write transaction, which runs the retention sweep when one is due. */
 async function bindSomething(store: GatewayStore, now: number, chat: string, keyed = false) {
-  const receipt = keyed ? { principal: "session:A", operation: "thread_bind", idempotency_key: `bind-${chat}`, args_hash: "h" } : null
-  const bound = await store.bind({ now, receipt, binding: { platform: "custom", account_id: "bot", chat_id: chat, thread_id: "@chat", root_message_id: null, progress_message_id: null, session_durable_id: "C", direction: { inbound: true, outbound: true }, inbound_mode: "auto", outbound_events: ["report"], policy_id: "default", ttl_seconds: null } })
+  const receipt = keyed
+    ? { principal: "session:A", operation: "thread_bind", idempotency_key: `bind-${chat}`, args_hash: "h" }
+    : null
+  const bound = await store.bind({
+    now,
+    receipt,
+    binding: {
+      platform: "custom",
+      account_id: "bot",
+      chat_id: chat,
+      thread_id: "@chat",
+      root_message_id: null,
+      progress_message_id: null,
+      session_durable_id: "C",
+      direction: { inbound: true, outbound: true },
+      inbound_mode: "auto",
+      outbound_events: ["report"],
+      policy_id: "default",
+      ttl_seconds: null,
+    },
+  })
   if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
 }
 
@@ -50,8 +88,14 @@ describe("gateway store retention", () => {
     const db = new Database(gatewayDatabasePath(h.agentDir))
     try {
       db.run("PRAGMA busy_timeout = 5000")
-      db.run("INSERT INTO causal_roots (root_id, origin_principal, created_at, expires_at) VALUES ('root-old', 'session:A', ?, ?), ('root-live', 'session:A', ?, ?)", [t0, t0 + 7 * DAY, t0, t0 + 40 * DAY])
-      db.run("INSERT INTO causal_edges (root_id, from_durable_id, to_durable_id, delivery_id, created_at) VALUES ('root-old', 'A', 'B', 'd-applied', ?), ('root-live', 'A', 'B', 'd-recent', ?)", [t0, t0])
+      db.run(
+        "INSERT INTO causal_roots (root_id, origin_principal, created_at, expires_at) VALUES ('root-old', 'session:A', ?, ?), ('root-live', 'session:A', ?, ?)",
+        [t0, t0 + 7 * DAY, t0, t0 + 40 * DAY],
+      )
+      db.run(
+        "INSERT INTO causal_edges (root_id, from_durable_id, to_durable_id, delivery_id, created_at) VALUES ('root-old', 'A', 'B', 'd-applied', ?), ('root-live', 'A', 'B', 'd-recent', ?)",
+        [t0, t0],
+      )
       insertDelivery(db, "d-applied", "applied", t0, { seq: 1, root: "root-old" })
       insertDelivery(db, "d-refused", "refused", t0, { seq: 2 })
       insertDelivery(db, "d-queued", "queued", t0, { seq: 3 })
@@ -59,15 +103,27 @@ describe("gateway store retention", () => {
       insertDelivery(db, "d-receipt", "applied", t0, { seq: 5 })
       insertDelivery(db, "d-recent", "applied", t0 + 30 * DAY, { seq: 6, root: "root-live" })
       insertDelivery(db, "d-open-binding", "queued", t0, { seq: 7, binding: "bnd-in-flight" })
-      db.run("INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, created_at, updated_at, expires_at) VALUES ('session:A', 'deliver', 'k', 'h', 'completed', 'd-receipt', 'i', ?, ?, ?)", [t0, t0, t0 + 60 * DAY])
-      db.run("INSERT INTO rate_buckets (sender, target_durable_id, tokens, updated_at) VALUES ('session:A', 'B', 0, ?), ('session:C', 'B', 0, ?)", [t0, t0 + 31 * DAY - 1_000])
+      db.run(
+        "INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, created_at, updated_at, expires_at) VALUES ('session:A', 'deliver', 'k', 'h', 'completed', 'd-receipt', 'i', ?, ?, ?)",
+        [t0, t0, t0 + 60 * DAY],
+      )
+      db.run(
+        "INSERT INTO rate_buckets (sender, target_durable_id, tokens, updated_at) VALUES ('session:A', 'B', 0, ?), ('session:C', 'B', 0, ?)",
+        [t0, t0 + 31 * DAY - 1_000],
+      )
       insertBinding(db, "bnd-closed", "detached", t0)
       insertBinding(db, "bnd-active", "active", t0, "B", "chat-active")
       insertBinding(db, "bnd-acked-row", "detached", t0)
       insertBinding(db, "bnd-in-flight", "expired", t0)
       insertBinding(db, "bnd-recent", "detached", t0 + 20 * DAY)
-      db.run("INSERT INTO outbox (binding_id, revision, event_kind, payload, state, created_at, acked_at) VALUES ('bnd-acked-row', 1, 'report', '{}', 'acked', ?, ?)", [t0, t0 + 30 * DAY])
-      db.run("INSERT INTO outbox_cursors (binding_id, acked_cursor, updated_at) VALUES ('bnd-closed', 1, ?), ('bnd-active', 0, ?)", [t0, t0])
+      db.run(
+        "INSERT INTO outbox (binding_id, revision, event_kind, payload, state, created_at, acked_at) VALUES ('bnd-acked-row', 1, 'report', '{}', 'acked', ?, ?)",
+        [t0, t0 + 30 * DAY],
+      )
+      db.run(
+        "INSERT INTO outbox_cursors (binding_id, acked_cursor, updated_at) VALUES ('bnd-closed', 1, ?), ('bnd-active', 0, ?)",
+        [t0, t0],
+      )
       db.run("INSERT INTO session_meta (durable_id, next_seq) VALUES ('B', 8), ('S-gone', 3)")
       h.clock.now = t0 + 31 * DAY
       await bindSomething(store, h.clock.now, "trigger")
@@ -104,7 +160,9 @@ describe("gateway store retention", () => {
     try {
       db.run("PRAGMA busy_timeout = 5000")
       const total = RETENTION_SWEEP_BATCH + 44
-      db.transaction(() => { for (let seq = 1; seq <= total; seq++) insertDelivery(db, `d-${seq}`, "refused", t0, { seq }) })()
+      db.transaction(() => {
+        for (let seq = 1; seq <= total; seq++) insertDelivery(db, `d-${seq}`, "refused", t0, { seq })
+      })()
       h.clock.now = t0 + DELIVERY_RETENTION_MS + 1
       await bindSomething(store, h.clock.now, "first")
       expect(ids(db, "deliveries", "delivery_id")).toHaveLength(total - RETENTION_SWEEP_BATCH)
@@ -126,13 +184,18 @@ describe("gateway store retention", () => {
       const total = RETENTION_SWEEP_BATCH + 44
       db.transaction(() => {
         for (let index = 1; index <= total; index++) {
-          db.run("INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, created_at, updated_at, expires_at) VALUES ('session:A', 'thread_rename', ?, 'h', 'completed', NULL, 'i', ?, ?, ?)", [`k-${index}`, t0, t0, t0 + DAY])
+          db.run(
+            "INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, created_at, updated_at, expires_at) VALUES ('session:A', 'thread_rename', ?, 'h', 'completed', NULL, 'i', ?, ?, ?)",
+            [`k-${index}`, t0, t0, t0 + DAY],
+          )
         }
       })()
       h.clock.now = t0 + 2 * DAY
       // Keyed binds: the receipt check of a keyed call clears only its own key's expired receipt.
       await bindSomething(store, h.clock.now, "first", true)
-      expect(ids(db, "receipts", "idempotency_key").filter((key) => key.startsWith("k-"))).toHaveLength(total - RETENTION_SWEEP_BATCH)
+      expect(ids(db, "receipts", "idempotency_key").filter((key) => key.startsWith("k-"))).toHaveLength(
+        total - RETENTION_SWEEP_BATCH,
+      )
       await bindSomething(store, h.clock.now, "second", true)
       expect(ids(db, "receipts", "idempotency_key")).toEqual(["bind-first", "bind-second"])
     } finally {
@@ -146,12 +209,17 @@ describe("gateway store retention", () => {
     const store = h.store()
     expect(await store.journalMode()).toBe("wal")
     const db = new Database(gatewayDatabasePath(h.agentDir))
-    const seed = (prefix: string, count: number, expiresAt: number) => db.transaction(() => {
-      for (let index = 1; index <= count; index++) {
-        db.run("INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, created_at, updated_at, expires_at) VALUES ('session:A', 'thread_rename', ?, 'h', 'completed', NULL, 'i', ?, ?, ?)", [`${prefix}-${index}`, t0, t0, expiresAt])
-      }
-    })()
-    const expired = (prefix: string) => ids(db, "receipts", "idempotency_key").filter((key) => key.startsWith(`${prefix}-`)).length
+    const seed = (prefix: string, count: number, expiresAt: number) =>
+      db.transaction(() => {
+        for (let index = 1; index <= count; index++) {
+          db.run(
+            "INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, created_at, updated_at, expires_at) VALUES ('session:A', 'thread_rename', ?, 'h', 'completed', NULL, 'i', ?, ?, ?)",
+            [`${prefix}-${index}`, t0, t0, expiresAt],
+          )
+        }
+      })()
+    const expired = (prefix: string) =>
+      ids(db, "receipts", "idempotency_key").filter((key) => key.startsWith(`${prefix}-`)).length
     const toolCall = async (key: string) => {
       const scope = { principal: "session:caller", operation: "thread_list", idempotency_key: key }
       expect(await store.toolReceiptBegin({ ...scope, now: h.clock.now, args_hash: "h" })).toEqual({ kind: "accepted" })
@@ -179,60 +247,93 @@ describe("gateway store retention", () => {
     }
   })
 
-  type KeyedCall = { readonly principal: string; readonly operation: string; readonly call: (h: GatewayHarness, key: string) => Promise<void> }
+  type KeyedCall = {
+    readonly principal: string
+    readonly operation: string
+    readonly call: (h: GatewayHarness, key: string) => Promise<void>
+  }
   const keyedCalls: readonly (readonly [string, KeyedCall])[] = [
-    ["peer tool call", {
-      principal: "session:caller",
-      operation: "thread_list",
-      call: async (h, key) => {
-        const scope = { principal: "session:caller", operation: "thread_list", idempotency_key: key }
-        const store = h.get("A").store
-        expect(await store.toolReceiptBegin({ ...scope, now: h.clock.now, args_hash: "h" })).toEqual({ kind: "accepted" })
-        expect(await store.toolReceiptSettle({ ...scope, now: h.clock.now, result: { kind: "ok" } })).toBe(true)
+    [
+      "peer tool call",
+      {
+        principal: "session:caller",
+        operation: "thread_list",
+        call: async (h, key) => {
+          const scope = { principal: "session:caller", operation: "thread_list", idempotency_key: key }
+          const store = h.get("A").store
+          expect(await store.toolReceiptBegin({ ...scope, now: h.clock.now, args_hash: "h" })).toEqual({
+            kind: "accepted",
+          })
+          expect(await store.toolReceiptSettle({ ...scope, now: h.clock.now, result: { kind: "ok" } })).toBe(true)
+        },
       },
-    }],
-    ["keyed relay mutation", {
-      principal: "session:A",
-      operation: "thread_bind",
-      call: async (h, key) => await bindSomething(h.get("A").store, h.clock.now, key.slice("bind-".length), true),
-    }],
-    ["keyed send", {
-      principal: "session:A",
-      operation: "deliver",
-      call: async (h, key) => {
-        const sent = await h.get("A").engine.deliver({ sender: { kind: "session", durable_id: "A" }, target: "B", text: "hello", idempotency_key: key })
-        expect(sent.kind).toBe("ok")
+    ],
+    [
+      "keyed relay mutation",
+      {
+        principal: "session:A",
+        operation: "thread_bind",
+        call: async (h, key) => await bindSomething(h.get("A").store, h.clock.now, key.slice("bind-".length), true),
       },
-    }],
+    ],
+    [
+      "keyed send",
+      {
+        principal: "session:A",
+        operation: "deliver",
+        call: async (h, key) => {
+          const sent = await h.get("A").engine.deliver({
+            sender: { kind: "session", durable_id: "A" },
+            target: "B",
+            text: "hello",
+            idempotency_key: key,
+          })
+          expect(sent.kind).toBe("ok")
+        },
+      },
+    ],
   ]
 
-  test.each(keyedCalls)("#given more expired receipts than one sweep may delete, one of them under the calling key #when a %s reuses that expired key #then the call deletes at most one batch of receipts in total, and the next call drains the rest", async (_name, entry) => {
-    const h = (harness = createGatewayHarness())
-    const t0 = h.clock.now
-    h.session("A")
-    h.session("B")
-    expect(await h.get("A").store.journalMode()).toBe("wal")
-    const db = new Database(gatewayDatabasePath(h.agentDir))
-    const prefix = entry.operation === "thread_bind" ? "bind" : "old"
-    const expired = () => Number((db.query("SELECT COUNT(*) AS n FROM receipts WHERE expires_at <= ?").get(h.clock.now) as { n: number }).n)
-    try {
-      db.run("PRAGMA busy_timeout = 5000")
-      const total = RETENTION_SWEEP_BATCH + 44
-      db.transaction(() => {
-        for (let index = 1; index <= total; index++) {
-          db.run("INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, created_at, updated_at, expires_at) VALUES (?, ?, ?, 'h', 'completed', NULL, 'i', ?, ?, ?)", [entry.principal, entry.operation, `${prefix}-${index}`, t0, t0, t0 + DAY])
-        }
-      })()
-      h.clock.now = t0 + 2 * DAY
-      const before = expired()
-      await entry.call(h, `${prefix}-${total}`)
-      const afterFirst = expired()
-      await entry.call(h, `${prefix}-fresh`)
-      expect({ before, deletedByFirstCall: before - afterFirst, leftAfterSecondCall: expired() }).toEqual({ before: total, deletedByFirstCall: RETENTION_SWEEP_BATCH, leftAfterSecondCall: 0 })
-    } finally {
-      db.close()
-    }
-  })
+  test.each(keyedCalls)(
+    "#given more expired receipts than one sweep may delete, one of them under the calling key #when a %s reuses that expired key #then the call deletes at most one batch of receipts in total, and the next call drains the rest",
+    async (_name, entry) => {
+      const h = (harness = createGatewayHarness())
+      const t0 = h.clock.now
+      h.session("A")
+      h.session("B")
+      expect(await h.get("A").store.journalMode()).toBe("wal")
+      const db = new Database(gatewayDatabasePath(h.agentDir))
+      const prefix = entry.operation === "thread_bind" ? "bind" : "old"
+      const expired = () =>
+        Number(
+          (db.query("SELECT COUNT(*) AS n FROM receipts WHERE expires_at <= ?").get(h.clock.now) as { n: number }).n,
+        )
+      try {
+        db.run("PRAGMA busy_timeout = 5000")
+        const total = RETENTION_SWEEP_BATCH + 44
+        db.transaction(() => {
+          for (let index = 1; index <= total; index++) {
+            db.run(
+              "INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, created_at, updated_at, expires_at) VALUES (?, ?, ?, 'h', 'completed', NULL, 'i', ?, ?, ?)",
+              [entry.principal, entry.operation, `${prefix}-${index}`, t0, t0, t0 + DAY],
+            )
+          }
+        })()
+        h.clock.now = t0 + 2 * DAY
+        const before = expired()
+        await entry.call(h, `${prefix}-${total}`)
+        const afterFirst = expired()
+        await entry.call(h, `${prefix}-fresh`)
+        expect({ before, deletedByFirstCall: before - afterFirst, leftAfterSecondCall: expired() }).toEqual({
+          before: total,
+          deletedByFirstCall: RETENTION_SWEEP_BATCH,
+          leftAfterSecondCall: 0,
+        })
+      } finally {
+        db.close()
+      }
+    },
+  )
 
   test("#given a sweep that hit no batch bound #when another write follows within the sweep interval #then it deletes nothing, and the first write after the interval does", async () => {
     const h = (harness = createGatewayHarness())

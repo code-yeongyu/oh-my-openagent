@@ -102,7 +102,7 @@ export { buildRgArgs, buildFindArgs, buildPowerShellCommand }
 export async function runRgFiles(
   options: GlobOptions,
   resolvedCli?: ResolvedCli,
-  processSpawner: SearchProcessSpawner = spawn
+  processSpawner: SearchProcessSpawner = spawn,
 ): Promise<GlobResult> {
   await rgSemaphore.acquire()
   try {
@@ -115,7 +115,7 @@ export async function runRgFiles(
 async function runRgFilesInternal(
   options: GlobOptions,
   resolvedCli?: ResolvedCli,
-  processSpawner: SearchProcessSpawner = spawn
+  processSpawner: SearchProcessSpawner = spawn,
 ): Promise<GlobResult> {
   const cli = resolvedCli ?? resolveGrepCli()
   const timeout = Math.min(options.timeout ?? DEFAULT_TIMEOUT_MS, DEFAULT_TIMEOUT_MS)
@@ -153,7 +153,7 @@ async function runRgFilesInternal(
     const { stdout, stderr, exitCode } = await collectSearchProcessOutput(
       proc,
       timeout,
-      `Glob search timeout after ${timeout}ms`
+      `Glob search timeout after ${timeout}ms`,
     )
 
     if (exitCode > 1 && stderr.trim()) {

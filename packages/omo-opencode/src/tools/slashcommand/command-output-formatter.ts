@@ -2,10 +2,7 @@ import { dirname } from "path"
 import { resolveCommandsInText, resolveFileReferencesInText } from "../../shared"
 import type { CommandInfo } from "./types"
 
-export async function formatLoadedCommand(
-  command: CommandInfo,
-  userMessage?: string
-): Promise<string> {
+export async function formatLoadedCommand(command: CommandInfo, userMessage?: string): Promise<string> {
   const sections: string[] = []
 
   sections.push(`# /${command.name} Command\n`)
@@ -49,9 +46,7 @@ export async function formatLoadedCommand(
 
   let finalContent = resolvedContent.trim()
   if (userMessage) {
-    finalContent = finalContent
-      .replace(/\$\{user_message\}/g, userMessage)
-      .replace(/\$ARGUMENTS/g, userMessage)
+    finalContent = finalContent.replace(/\$\{user_message\}/g, userMessage).replace(/\$ARGUMENTS/g, userMessage)
   }
 
   sections.push(finalContent)
@@ -66,7 +61,7 @@ export function formatCommandList(items: CommandInfo[]): string {
   for (const command of items) {
     const hint = command.metadata.argumentHint ? ` ${command.metadata.argumentHint}` : ""
     lines.push(
-      `- **/${command.name}${hint}**: ${command.metadata.description || "(no description)"} (${command.scope})`
+      `- **/${command.name}${hint}**: ${command.metadata.description || "(no description)"} (${command.scope})`,
     )
   }
 

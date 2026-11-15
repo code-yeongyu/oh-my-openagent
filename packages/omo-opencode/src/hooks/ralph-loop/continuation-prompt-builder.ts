@@ -2,7 +2,7 @@ import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
 import type { RalphLoopState } from "./types"
 
 function getMaxIterationsLabel(state: RalphLoopState): string {
-	return typeof state.max_iterations === "number" ? String(state.max_iterations) : "unbounded"
+  return typeof state.max_iterations === "number" ? String(state.max_iterations) : "unbounded"
 }
 
 const CONTINUATION_PROMPT = `${SYSTEM_DIRECTIVE_PREFIX} - RALPH LOOP {{ITERATION}}/{{MAX}}]
@@ -42,29 +42,22 @@ Original task:
 {{PROMPT}}`
 
 export function buildContinuationPrompt(state: RalphLoopState): string {
-	const template = state.verification_pending
-		? ULTRAWORK_VERIFICATION_PROMPT
-		: CONTINUATION_PROMPT
-	const continuationPrompt = template.replace(
-		"{{ITERATION}}",
-		String(state.iteration),
-	)
-		.replace("{{MAX}}", getMaxIterationsLabel(state))
-		.replace("{{INITIAL_PROMISE}}", state.initial_completion_promise ?? state.completion_promise)
-		.replace("{{PROMISE}}", state.completion_promise)
-		.replace("{{PROMPT}}", state.prompt)
+  const template = state.verification_pending ? ULTRAWORK_VERIFICATION_PROMPT : CONTINUATION_PROMPT
+  const continuationPrompt = template
+    .replace("{{ITERATION}}", String(state.iteration))
+    .replace("{{MAX}}", getMaxIterationsLabel(state))
+    .replace("{{INITIAL_PROMISE}}", state.initial_completion_promise ?? state.completion_promise)
+    .replace("{{PROMISE}}", state.completion_promise)
+    .replace("{{PROMPT}}", state.prompt)
 
-	return state.ultrawork ? `ultrawork ${continuationPrompt}` : continuationPrompt
+  return state.ultrawork ? `ultrawork ${continuationPrompt}` : continuationPrompt
 }
 
 export function buildVerificationFailurePrompt(state: RalphLoopState): string {
-	const continuationPrompt = ULTRAWORK_VERIFICATION_FAILED_PROMPT.replace(
-		"{{ITERATION}}",
-		String(state.iteration),
-	)
-		.replace("{{MAX}}", getMaxIterationsLabel(state))
-		.replace("{{PROMISE}}", state.completion_promise)
-		.replace("{{PROMPT}}", state.prompt)
+  const continuationPrompt = ULTRAWORK_VERIFICATION_FAILED_PROMPT.replace("{{ITERATION}}", String(state.iteration))
+    .replace("{{MAX}}", getMaxIterationsLabel(state))
+    .replace("{{PROMISE}}", state.completion_promise)
+    .replace("{{PROMPT}}", state.prompt)
 
-	return state.ultrawork ? `ultrawork ${continuationPrompt}` : continuationPrompt
+  return state.ultrawork ? `ultrawork ${continuationPrompt}` : continuationPrompt
 }

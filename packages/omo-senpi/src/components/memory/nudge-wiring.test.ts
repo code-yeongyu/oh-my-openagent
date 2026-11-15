@@ -53,7 +53,11 @@ function disposition(inputId: string, value: "handled" | "queued" | "started" | 
 }
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(
+    roots
+      .splice(0)
+      .map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })),
+  )
 })
 
 describe("createMemoryNudgeWiring", () => {
@@ -126,11 +130,13 @@ describe("createMemoryNudgeWiring", () => {
       resolveSettings: () => ({ enabled: true, everyUserTurns: 2 }),
     })
     wiring.register(pi)
-    const ctx = eventContext("session-order", [{
-      type: "custom",
-      customType: ACCEPTED_TURNS_ENTRY_TYPE,
-      data: { version: 1, sessionId: "session-order", priorUserTurns: 1, sessionBaselineTurns: 0 },
-    }])
+    const ctx = eventContext("session-order", [
+      {
+        type: "custom",
+        customType: ACCEPTED_TURNS_ENTRY_TYPE,
+        data: { version: 1, sessionId: "session-order", priorUserTurns: 1, sessionBaselineTurns: 0 },
+      },
+    ])
     await pi.dispatch("session_start", {}, ctx)
     await pi.dispatch("input", input("second-before-started"), ctx)
 
@@ -144,7 +150,12 @@ describe("createMemoryNudgeWiring", () => {
   test("#given a threshold on an identity with no repository yet #when nudge state resolves #then the fresh-session baseline is used without requiring git history", async () => {
     // given
     const { context } = await fixture()
-    await rmEfaultTolerant(context.identityPaths.repo, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+    await rmEfaultTolerant(context.identityPaths.repo, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 200,
+    })
     const repo = new GitMemoryRepo({ dir: context.identityPaths.repo, agentId: context.identity })
     const pi = new MemoryFakeExtensionAPI()
     const wiring = createMemoryNudgeWiring({
@@ -152,11 +163,17 @@ describe("createMemoryNudgeWiring", () => {
       resolveSettings: () => ({ enabled: true, everyUserTurns: 2 }),
     })
     wiring.register(pi)
-    await pi.dispatch("session_start", {}, eventContext("session-no-repo", [{
-      type: "custom",
-      customType: ACCEPTED_TURNS_ENTRY_TYPE,
-      data: { version: 1, sessionId: "session-no-repo", priorUserTurns: 2, sessionBaselineTurns: 0 },
-    }]))
+    await pi.dispatch(
+      "session_start",
+      {},
+      eventContext("session-no-repo", [
+        {
+          type: "custom",
+          customType: ACCEPTED_TURNS_ENTRY_TYPE,
+          data: { version: 1, sessionId: "session-no-repo", priorUserTurns: 2, sessionBaselineTurns: 0 },
+        },
+      ]),
+    )
 
     // when
     const turns = wiring.nudgeTurns(repo, "session-no-repo", context.identity)
@@ -175,11 +192,13 @@ describe("createMemoryNudgeWiring", () => {
       resolveSettings: () => ({ enabled, everyUserTurns: 2 }),
     })
     wiring.register(pi)
-    const ctx = eventContext("session-clear", [{
-      type: "custom",
-      customType: ACCEPTED_TURNS_ENTRY_TYPE,
-      data: { version: 1, sessionId: "session-clear", priorUserTurns: 2, sessionBaselineTurns: 0 },
-    }])
+    const ctx = eventContext("session-clear", [
+      {
+        type: "custom",
+        customType: ACCEPTED_TURNS_ENTRY_TYPE,
+        data: { version: 1, sessionId: "session-clear", priorUserTurns: 2, sessionBaselineTurns: 0 },
+      },
+    ])
     await pi.dispatch("session_start", {}, ctx)
     expect(await wiring.nudgeTurns(repo, "session-clear", context.identity)).toBe(2)
 
@@ -216,14 +235,18 @@ describe("createMemoryNudgeWiring", () => {
     const startedEarlier = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
 
     // when
-    await pi.dispatch("session_start", {}, eventContext("session-resumed", [
-      { type: "message", timestamp: startedEarlier, data: { role: "user" } },
-      {
-        type: "custom",
-        customType: ACCEPTED_TURNS_ENTRY_TYPE,
-        data: { version: 1, sessionId: "session-resumed", priorUserTurns: 4, sessionBaselineTurns: 0 },
-      },
-    ]))
+    await pi.dispatch(
+      "session_start",
+      {},
+      eventContext("session-resumed", [
+        { type: "message", timestamp: startedEarlier, data: { role: "user" } },
+        {
+          type: "custom",
+          customType: ACCEPTED_TURNS_ENTRY_TYPE,
+          data: { version: 1, sessionId: "session-resumed", priorUserTurns: 4, sessionBaselineTurns: 0 },
+        },
+      ]),
+    )
 
     // then: 4 accepted turns, saved at turn 3 -> 1 since the save, under the threshold of 2
     expect(await wiring.nudgeTurns(repo, "session-resumed", context.identity)).toBeUndefined()
@@ -238,11 +261,17 @@ describe("createMemoryNudgeWiring", () => {
       resolveSettings: () => ({ enabled: true, everyUserTurns: 2 }),
     })
     wiring.register(pi)
-    await pi.dispatch("session_start", {}, eventContext("session-busy", [{
-      type: "custom",
-      customType: ACCEPTED_TURNS_ENTRY_TYPE,
-      data: { version: 1, sessionId: "session-busy", priorUserTurns: 2, sessionBaselineTurns: 0 },
-    }]))
+    await pi.dispatch(
+      "session_start",
+      {},
+      eventContext("session-busy", [
+        {
+          type: "custom",
+          customType: ACCEPTED_TURNS_ENTRY_TYPE,
+          data: { version: 1, sessionId: "session-busy", priorUserTurns: 2, sessionBaselineTurns: 0 },
+        },
+      ]),
+    )
     expect(await wiring.nudgeTurns(repo, "session-busy", context.identity)).toBe(2)
     const commit = async (file: string, session: string, turn: number) => {
       await writeFile(join(repo.dir, file), `${file}\n`)
@@ -271,11 +300,17 @@ describe("createMemoryNudgeWiring", () => {
       resolveSettings: () => ({ enabled: true, everyUserTurns: 2 }),
     })
     wiring.register(pi)
-    await pi.dispatch("session_start", {}, eventContext("x", [{
-      type: "custom",
-      customType: ACCEPTED_TURNS_ENTRY_TYPE,
-      data: { version: 1, sessionId: "x", priorUserTurns: 10, sessionBaselineTurns: 0 },
-    }]))
+    await pi.dispatch(
+      "session_start",
+      {},
+      eventContext("x", [
+        {
+          type: "custom",
+          customType: ACCEPTED_TURNS_ENTRY_TYPE,
+          data: { version: 1, sessionId: "x", priorUserTurns: 10, sessionBaselineTurns: 0 },
+        },
+      ]),
+    )
     const save = async (file: string, session: string, turn: number) => {
       await writeFile(join(repo.dir, file), `${file}\n`)
       await repo.commitWrite(
@@ -302,11 +337,13 @@ describe("createMemoryNudgeWiring", () => {
       resolveSettings: () => ({ enabled: true, everyUserTurns: 2 }),
     })
     wiring.register(pi)
-    const ctx = eventContext("session-tool", [{
-      type: "custom",
-      customType: ACCEPTED_TURNS_ENTRY_TYPE,
-      data: { version: 1, sessionId: "session-tool", priorUserTurns: 5, sessionBaselineTurns: 1 },
-    }])
+    const ctx = eventContext("session-tool", [
+      {
+        type: "custom",
+        customType: ACCEPTED_TURNS_ENTRY_TYPE,
+        data: { version: 1, sessionId: "session-tool", priorUserTurns: 5, sessionBaselineTurns: 1 },
+      },
+    ])
     await pi.dispatch("session_start", {}, ctx)
     const call: {
       type: string
@@ -341,11 +378,13 @@ describe("createMemoryNudgeWiring", () => {
       resolveSettings: () => ({ enabled: true, everyUserTurns: 2 }),
     })
     wiring.register(pi)
-    const ctx = eventContext("session-mcp-call", [{
-      type: "custom",
-      customType: ACCEPTED_TURNS_ENTRY_TYPE,
-      data: { version: 1, sessionId: "session-mcp-call", priorUserTurns: 4, sessionBaselineTurns: 1 },
-    }])
+    const ctx = eventContext("session-mcp-call", [
+      {
+        type: "custom",
+        customType: ACCEPTED_TURNS_ENTRY_TYPE,
+        data: { version: 1, sessionId: "session-mcp-call", priorUserTurns: 4, sessionBaselineTurns: 1 },
+      },
+    ])
     await pi.dispatch("session_start", {}, ctx)
     const call: {
       type: string
@@ -381,7 +420,10 @@ const PLAIN_THEME = {
 }
 
 function recordingTheme(): {
-  readonly theme: { fg: (color: ThemeColor, text: string) => string; bg: (color: "customMessageBg", text: string) => string }
+  readonly theme: {
+    fg: (color: ThemeColor, text: string) => string
+    bg: (color: "customMessageBg", text: string) => string
+  }
   readonly colors: ThemeColor[]
 } {
   const colors: ThemeColor[] = []
@@ -470,7 +512,9 @@ describe("renderAcceptedTurnsEntry", () => {
     const recorder = recordingTheme()
 
     // when
-    renderAcceptedTurnsEntry({ data: acceptedTurns() } as never, { expanded: true }, recorder.theme as never)!.render(120)
+    renderAcceptedTurnsEntry({ data: acceptedTurns() } as never, { expanded: true }, recorder.theme as never)!.render(
+      120,
+    )
 
     // then
     expect(recorder.colors).toEqual(["dim", "dim", "dim", "dim"])

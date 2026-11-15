@@ -52,7 +52,8 @@ export class FakeSyncServer {
       upload: async (uploadId, bytes) => {
         const upload = this.uploads.get(uploadId)
         if (upload === undefined) throw new Error(`no upload ${uploadId}`)
-        if (bytes.length !== upload.size || sha256Hex(bytes) !== upload.digest) throw new Error("bytes differ from the reservation")
+        if (bytes.length !== upload.size || sha256Hex(bytes) !== upload.digest)
+          throw new Error("bytes differ from the reservation")
         upload.bytes = bytes
       },
       append: async (request) => {
@@ -110,7 +111,10 @@ export class FakeSyncServer {
     this.objects.set(objectId, snapshotBytes)
     this.snapshot = { coversSeq, objectIds: [objectId], digest: sha256Hex(snapshotBytes) }
     this.trimmedThrough = coversSeq
-    this.entries.splice(0, this.entries.findIndex((e) => e.seq > coversSeq))
+    this.entries.splice(
+      0,
+      this.entries.findIndex((e) => e.seq > coversSeq),
+    )
   }
 
   private pull(after: number, limit: number): PullPage {
@@ -125,10 +129,18 @@ export class FakeSyncServer {
     return { snapshot, entries, head: this.head, more: later.length > limit }
   }
 
+  /** The service's revoke freeze: while set, every append is refused `stale_base`. */
+  frozen = false
+
+  /** Announces `sync.state.changed` to every subscriber. */
+  stateChanged(): void {
+    for (const l of this.listeners) l.onStateChanged()
+  }
+
   private append(request: Parameters<Transport["append"]>[0], author: string): AppendResult {
     const known = this.byBatch.get(request.batchId)
     if (known !== undefined) return { ok: true, seq: known }
-    const ok = request.baseSeq === this.head
+    const ok = request.baseSeq === this.head && !this.frozen
     this.appends.push({ batchId: request.batchId, baseSeq: request.baseSeq, ok })
     if (!ok) return { ok: false, error: "stale_base", head: this.head }
     const upload = this.uploads.get(request.uploadId)

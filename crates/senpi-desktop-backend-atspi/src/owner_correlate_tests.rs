@@ -10,6 +10,7 @@ const PID: u32 = 4242;
 
 fn win(id: &str, title: &str, pid: Option<u32>, rect: (i32, i32, u32, u32)) -> DesktopWindow {
     DesktopWindow {
+        identity: None,
         id: id.to_string(),
         title: title.to_string(),
         app: "gedit".to_string(),

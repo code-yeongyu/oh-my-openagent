@@ -17,8 +17,11 @@ export function priorityAliasBaseId(id: string): string | undefined {
 }
 
 export function differsOnlyByPriorityAlias(started: ModelIdentity, pinned: ModelIdentity): boolean {
-  return started.provider === pinned.provider && started.id !== pinned.id
-    && (priorityAliasBaseId(started.id) === pinned.id || priorityAliasBaseId(pinned.id) === started.id)
+  return (
+    started.provider === pinned.provider &&
+    started.id !== pinned.id &&
+    (priorityAliasBaseId(started.id) === pinned.id || priorityAliasBaseId(pinned.id) === started.id)
+  )
 }
 
 /**
@@ -48,9 +51,14 @@ function aliasPairing(entry: ModelIdentity & object, registry: PriorityPairingRe
 }
 
 function isModelIdentity(entry: unknown): entry is ModelIdentity & object {
-  return typeof entry === "object" && entry !== null
-    && "provider" in entry && typeof entry.provider === "string"
-    && "id" in entry && typeof entry.id === "string"
+  return (
+    typeof entry === "object" &&
+    entry !== null &&
+    "provider" in entry &&
+    typeof entry.provider === "string" &&
+    "id" in entry &&
+    typeof entry.id === "string"
+  )
 }
 
 /**
@@ -58,7 +66,8 @@ function isModelIdentity(entry: unknown): entry is ModelIdentity & object {
  * scope the pairing is read the way senpi reads it; without one, from the entry's own fields.
  */
 export function isPriorityAliasOf(entry: unknown, base: ModelIdentity, registry?: PriorityPairingRegistry): boolean {
-  if (!isModelIdentity(entry) || entry.provider !== base.provider || priorityAliasBaseId(entry.id) !== base.id) return false
+  if (!isModelIdentity(entry) || entry.provider !== base.provider || priorityAliasBaseId(entry.id) !== base.id)
+    return false
   const pairing = aliasPairing(entry, registry)
   return pairing.serviceTier === "priority" && pairing.upstreamModelId === base.id
 }
@@ -76,9 +85,15 @@ export function startedOnPinnedModel(
 }
 
 /** The effective tier comes from the session, never the catalog's requested tier. */
-export function reportedEffectiveModel(model: ModelIdentity | undefined, serviceTier: string | undefined): EffectiveModel | undefined {
-  return model === undefined ? undefined : {
-    provider: model.provider, id: model.id,
-    ...(serviceTier === undefined ? {} : { serviceTier }),
-  }
+export function reportedEffectiveModel(
+  model: ModelIdentity | undefined,
+  serviceTier: string | undefined,
+): EffectiveModel | undefined {
+  return model === undefined
+    ? undefined
+    : {
+        provider: model.provider,
+        id: model.id,
+        ...(serviceTier === undefined ? {} : { serviceTier }),
+      }
 }

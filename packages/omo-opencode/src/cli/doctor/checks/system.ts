@@ -6,7 +6,12 @@ import { findOpenCodeBinary, getOpenCodeVersion, compareVersions } from "./syste
 import { getPluginInfo } from "./system-plugin"
 import { getLatestPluginVersion, getLoadedPluginVersion, getSuggestedInstallTag } from "./system-loaded-version"
 import { parseJsonc } from "../../../shared/jsonc-parser"
-import { ACCEPTED_PACKAGE_NAMES, PUBLISHED_PACKAGE_NAME, PLUGIN_NAME, LEGACY_PLUGIN_NAME } from "../../../shared/plugin-identity"
+import {
+  ACCEPTED_PACKAGE_NAMES,
+  PUBLISHED_PACKAGE_NAME,
+  PLUGIN_NAME,
+  LEGACY_PLUGIN_NAME,
+} from "../../../shared/plugin-identity"
 import { getPluginEntryName } from "../../../shared/plugin-entry-shape"
 
 const runtime = globalThis as typeof globalThis & { Bun?: { version?: string } }
@@ -75,10 +80,7 @@ function getLoadedPackageName(installedPackagePath: string): string {
 }
 
 export async function gatherSystemInfo(deps: SystemCheckDeps = defaultDeps): Promise<SystemInfo> {
-  const [binaryInfo, pluginInfo] = await Promise.all([
-    deps.findOpenCodeBinary(),
-    Promise.resolve(deps.getPluginInfo()),
-  ])
+  const [binaryInfo, pluginInfo] = await Promise.all([deps.findOpenCodeBinary(), Promise.resolve(deps.getPluginInfo())])
   const loadedInfo = deps.getLoadedPluginVersion()
 
   const opencodeVersion = binaryInfo ? await deps.getOpenCodeVersion(binaryInfo.path) : null
@@ -97,10 +99,7 @@ export async function gatherSystemInfo(deps: SystemCheckDeps = defaultDeps): Pro
 }
 
 export async function checkSystem(deps: SystemCheckDeps = defaultDeps): Promise<CheckResult> {
-  const [systemInfo, pluginInfo] = await Promise.all([
-    gatherSystemInfo(deps),
-    Promise.resolve(deps.getPluginInfo()),
-  ])
+  const [systemInfo, pluginInfo] = await Promise.all([gatherSystemInfo(deps), Promise.resolve(deps.getPluginInfo())])
   const loadedInfo = deps.getLoadedPluginVersion()
   const latestVersion = await deps.getLatestPluginVersion(systemInfo.loadedVersion)
   const installTag = deps.getSuggestedInstallTag(systemInfo.loadedVersion)
@@ -116,10 +115,7 @@ export async function checkSystem(deps: SystemCheckDeps = defaultDeps): Promise<
     })
   }
 
-  if (
-    systemInfo.opencodeVersion &&
-    !deps.compareVersions(systemInfo.opencodeVersion, MIN_OPENCODE_VERSION)
-  ) {
+  if (systemInfo.opencodeVersion && !deps.compareVersions(systemInfo.opencodeVersion, MIN_OPENCODE_VERSION)) {
     issues.push({
       title: "OpenCode version below minimum",
       description: `Detected ${systemInfo.opencodeVersion}; required >= ${MIN_OPENCODE_VERSION}.`,
@@ -141,8 +137,7 @@ export async function checkSystem(deps: SystemCheckDeps = defaultDeps): Promise<
 
   if (pluginInfo.entry && !pluginInfo.isLocalDev) {
     const entryName = getPluginEntryName(pluginInfo.entry)
-    const isLegacyName = entryName === LEGACY_PLUGIN_NAME
-      || entryName.startsWith(`${LEGACY_PLUGIN_NAME}@`)
+    const isLegacyName = entryName === LEGACY_PLUGIN_NAME || entryName.startsWith(`${LEGACY_PLUGIN_NAME}@`)
 
     if (isLegacyName) {
       const suggestedEntry = entryName.replace(LEGACY_PLUGIN_NAME, PLUGIN_NAME)
@@ -156,7 +151,11 @@ export async function checkSystem(deps: SystemCheckDeps = defaultDeps): Promise<
     }
   }
 
-  if (loadedInfo.expectedVersion && loadedInfo.loadedVersion && loadedInfo.expectedVersion !== loadedInfo.loadedVersion) {
+  if (
+    loadedInfo.expectedVersion &&
+    loadedInfo.loadedVersion &&
+    loadedInfo.expectedVersion !== loadedInfo.loadedVersion
+  ) {
     issues.push({
       title: "Loaded plugin version mismatch",
       description: `Cache expects ${loadedInfo.expectedVersion} but loaded ${loadedInfo.loadedVersion}.`,
@@ -166,16 +165,13 @@ export async function checkSystem(deps: SystemCheckDeps = defaultDeps): Promise<
     })
   }
 
-  if (
-    systemInfo.loadedVersion &&
-    latestVersion &&
-    !deps.compareVersions(systemInfo.loadedVersion, latestVersion)
-  ) {
+  if (systemInfo.loadedVersion && latestVersion && !deps.compareVersions(systemInfo.loadedVersion, latestVersion)) {
     const loadedPackageName = getLoadedPackageName(loadedInfo.installedPackagePath)
     issues.push({
       title: "Loaded plugin is outdated",
       description: `Loaded ${systemInfo.loadedVersion}, latest ${latestVersion}.`,
-      fix: `Update: cd "${loadedInfo.cacheDir}" && bun add ${loadedPackageName}@${installTag}\n` +
+      fix:
+        `Update: cd "${loadedInfo.cacheDir}" && bun add ${loadedPackageName}@${installTag}\n` +
         `If Bun reports blocked postinstalls, inspect them: cd "${loadedInfo.cacheDir}" && bun pm untrusted\n` +
         `Then trust only OMO-related packages from that list: cd "${loadedInfo.cacheDir}" && bun pm trust ${loadedPackageName}`,
       severity: "warning",

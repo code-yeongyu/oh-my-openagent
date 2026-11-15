@@ -39,7 +39,10 @@ function createFileSystem(): CrossDeviceBackupFileSystem {
   return fileSystem
 }
 
-function run(fileSystem: MemoryMigrationFileSystem, options: { readonly onBoundary?: (boundary: MigrationBoundary) => void } = {}) {
+function run(
+  fileSystem: MemoryMigrationFileSystem,
+  options: { readonly onBoundary?: (boundary: MigrationBoundary) => void } = {},
+) {
   return runOpenCodeStartupMigration({
     backupTimestamp: "2026-07-27T12-34-56-789Z",
     clock: { now: () => 1 },
@@ -79,8 +82,16 @@ describe("runOpenCodeStartupMigration", () => {
     })
     expect(fileSystem.existsSync(rootSourcePath)).toBe(false)
     expect(fileSystem.existsSync(configJsoncPath)).toBe(false)
-    expect(fileSystem.existsSync(`${homeDir}/.omo/migration-backup-2026-07-27T12-34-56-789Z-opencode-config/.config/opencode/oh-my-openagent.json`)).toBe(true)
-    expect(fileSystem.existsSync(`${homeDir}/.omo/migration-backup-2026-07-27T12-34-56-789Z-opencode-config/.omo/config.jsonc`)).toBe(true)
+    expect(
+      fileSystem.existsSync(
+        `${homeDir}/.omo/migration-backup-2026-07-27T12-34-56-789Z-opencode-config/.config/opencode/oh-my-openagent.json`,
+      ),
+    ).toBe(true)
+    expect(
+      fileSystem.existsSync(
+        `${homeDir}/.omo/migration-backup-2026-07-27T12-34-56-789Z-opencode-config/.omo/config.jsonc`,
+      ),
+    ).toBe(true)
   })
 
   test("#given a legacy source on another filesystem #when its backup rename throws EXDEV #then startup copies and removes the source", () => {
@@ -96,7 +107,11 @@ describe("runOpenCodeStartupMigration", () => {
     expect(result.error).toBeUndefined()
     expect(result.migratedFrom).toEqual([rootSourcePath])
     expect(fileSystem.existsSync(rootSourcePath)).toBe(false)
-    expect(fileSystem.existsSync(`${homeDir}/.omo/migration-backup-2026-07-27T12-34-56-789Z-opencode-config/.config/opencode/oh-my-openagent.json`)).toBe(true)
+    expect(
+      fileSystem.existsSync(
+        `${homeDir}/.omo/migration-backup-2026-07-27T12-34-56-789Z-opencode-config/.config/opencode/oh-my-openagent.json`,
+      ),
+    ).toBe(true)
     expect(fileSystem.existsSync(`${homeDir}/.omo/.migration-journal.json`)).toBe(false)
   })
 
@@ -112,7 +127,11 @@ describe("runOpenCodeStartupMigration", () => {
     // then
     expect(result.error).toContain("EACCES")
     expect(fileSystem.existsSync(rootSourcePath)).toBe(true)
-    expect(fileSystem.existsSync(`${homeDir}/.omo/migration-backup-2026-07-27T12-34-56-789Z-opencode-config/.config/opencode/oh-my-openagent.json`)).toBe(false)
+    expect(
+      fileSystem.existsSync(
+        `${homeDir}/.omo/migration-backup-2026-07-27T12-34-56-789Z-opencode-config/.config/opencode/oh-my-openagent.json`,
+      ),
+    ).toBe(false)
   })
 
   test("#given no legacy source #when startup migration runs #then it does not create a target or backups", () => {

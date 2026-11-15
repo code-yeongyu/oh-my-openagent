@@ -11,11 +11,7 @@ import {
   toCanonicalPath,
   type GuardArgs,
 } from "./hook"
-import {
-  evictLeastRecentlyUsedSession,
-  touchSession,
-  trimSessionReadSet,
-} from "./session-read-permissions"
+import { evictLeastRecentlyUsedSession, touchSession, trimSessionReadSet } from "./session-read-permissions"
 
 function ensureSessionReadSet(params: {
   sessionID: string
@@ -173,7 +169,10 @@ export async function handleWriteExistingFileGuardToolExecuteBefore(params: {
     return
   }
 
-  if (input.sessionID && consumeReadPermission({ sessionID: input.sessionID, canonicalPath, readPermissionsBySession, sessionLastAccess })) {
+  if (
+    input.sessionID &&
+    consumeReadPermission({ sessionID: input.sessionID, canonicalPath, readPermissionsBySession, sessionLastAccess })
+  ) {
     log("[write-existing-file-guard] Allowing overwrite after read", {
       sessionID: input.sessionID,
       filePath,

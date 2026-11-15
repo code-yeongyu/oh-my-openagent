@@ -13,11 +13,7 @@ import type {
 import { getActivityStateDir } from "./data-path"
 import { writeTelemetryDiagnostic } from "./diagnostics"
 import { getPostHogActivityCaptureState } from "./posthog-activity-state"
-import {
-  DEFAULT_POSTHOG_API_KEY,
-  DEFAULT_POSTHOG_HOST,
-  createCodexTelemetryProductConfig,
-} from "./product-identity"
+import { DEFAULT_POSTHOG_API_KEY, DEFAULT_POSTHOG_HOST, createCodexTelemetryProductConfig } from "./product-identity"
 
 export { DEFAULT_POSTHOG_API_KEY, DEFAULT_POSTHOG_HOST }
 
@@ -69,10 +65,7 @@ function resolveActivityStateProvider(options: CreatePostHogClientOptions): Acti
   return () => getPostHogActivityCaptureState(options.now ?? new Date())
 }
 
-function createPostHogClient(
-  source: PostHogSource,
-  options: CreatePostHogClientOptions = {},
-): PostHogClient {
+function createPostHogClient(source: PostHogSource, options: CreatePostHogClientOptions = {}): PostHogClient {
   const client = createTelemetryClient({
     diagnostics: writeTelemetryDiagnostic,
     env: options.env ?? process.env,
@@ -90,13 +83,14 @@ function createPostHogClient(
 
   return {
     trackActive: (reason) => {
-      const activityState = options.stateDir === undefined
-        ? activityStateProvider()
-        : getDailyActiveCaptureState({
-            diagnostics: writeTelemetryDiagnostic,
-            now: options.now,
-            stateDir: options.stateDir,
-          })
+      const activityState =
+        options.stateDir === undefined
+          ? activityStateProvider()
+          : getDailyActiveCaptureState({
+              diagnostics: writeTelemetryDiagnostic,
+              now: options.now,
+              stateDir: options.stateDir,
+            })
       if (!activityState.captureDaily) {
         return
       }
@@ -125,10 +119,7 @@ export function createPluginPostHog(): PostHogClient {
   return createPostHogClient("plugin")
 }
 
-export function __createPostHogForTesting(
-  source: PostHogSource,
-  options: CreatePostHogClientOptions,
-): PostHogClient {
+export function __createPostHogForTesting(source: PostHogSource, options: CreatePostHogClientOptions): PostHogClient {
   return createPostHogClient(source, options)
 }
 

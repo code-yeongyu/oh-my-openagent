@@ -5,14 +5,27 @@ import { sameIdentity } from "./recovery-ownership"
 
 export class FactsOwnershipLostError extends Error {
   override readonly name = "FactsOwnershipLostError"
-  constructor(message: string, readonly recoveryPath?: string) {
+  constructor(
+    message: string,
+    readonly recoveryPath?: string,
+  ) {
     super(message)
   }
 }
 
 type MutationRecord =
-  | { readonly path: string; readonly surface: "index"; readonly before: GitIndexIdentity | null; readonly after: GitIndexIdentity | null }
-  | { readonly path: string; readonly surface: "worktree"; readonly before: GitWorktreeIdentity; readonly after: GitWorktreeIdentity }
+  | {
+      readonly path: string
+      readonly surface: "index"
+      readonly before: GitIndexIdentity | null
+      readonly after: GitIndexIdentity | null
+    }
+  | {
+      readonly path: string
+      readonly surface: "worktree"
+      readonly before: GitWorktreeIdentity
+      readonly after: GitWorktreeIdentity
+    }
 
 export class FactsMutationTransaction {
   private readonly mutations: MutationRecord[] = []
@@ -33,7 +46,8 @@ export class FactsMutationTransaction {
   }
 
   async applyPostState(): Promise<void> {
-    for (const entry of this.recovery.paths) await this.compareAndSetIndex(entry.path, entry.pre.index, entry.post.index)
+    for (const entry of this.recovery.paths)
+      await this.compareAndSetIndex(entry.path, entry.pre.index, entry.post.index)
     for (const entry of this.recovery.paths) {
       await this.compareAndSetWorktree(entry.path, entry.pre.worktree, entry.post.worktree)
     }
@@ -61,7 +75,7 @@ export class FactsMutationTransaction {
     next: GitIndexIdentity | null,
   ): Promise<void> {
     if (sameIdentity(expected, next)) return
-    if (!await this.repo.pathState.writeIndexIfIdentity(path, expected, next)) {
+    if (!(await this.repo.pathState.writeIndexIfIdentity(path, expected, next))) {
       throw new FactsOwnershipLostError(`Facts ownership changed: ${path}:index`)
     }
     this.mutations.push({ path, surface: "index", before: expected, after: next })
@@ -74,10 +88,11 @@ export class FactsMutationTransaction {
   ): Promise<void> {
     if (sameIdentity(expected, next)) return
     const written = await this.repo.pathState.writeWorktreeIfIdentity(path, expected, next)
-    if (!written) throw new FactsOwnershipLostError(
-      `Facts ownership changed: ${path}:worktree`,
-      this.repo.pathState.consumeOwnershipLossRecoveryPath(),
-    )
+    if (!written)
+      throw new FactsOwnershipLostError(
+        `Facts ownership changed: ${path}:worktree`,
+        this.repo.pathState.consumeOwnershipLossRecoveryPath(),
+      )
     this.mutations.push({ path, surface: "worktree", before: expected, after: next })
   }
 }

@@ -10,7 +10,10 @@ import { buildSisyphusJuniorPrompt } from "./sisyphus-junior/agent"
 // One model per Native preset (senpi's own case table) plus an uncatalogued model for the default core,
 // so a new preset is covered without editing this file.
 const ROUTES = [
-  ...PROMPT_PRESET_MODEL_CASES.map((entry) => ({ model: `${entry.providerID}/${entry.modelID}`, preset: entry.preset })),
+  ...PROMPT_PRESET_MODEL_CASES.map((entry) => ({
+    model: `${entry.providerID}/${entry.modelID}`,
+    preset: entry.preset,
+  })),
   { model: "synthetic/vendor/uncatalogued-model", preset: "default" },
 ]
 

@@ -52,7 +52,10 @@ async function createInstalledFixture(options: FixtureOptions = {}): Promise<Fix
   const pluginRoot = join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", PLUGIN_VERSION)
   await mkdir(join(pluginRoot, ".codex-plugin"), { recursive: true })
   await mkdir(binDir, { recursive: true })
-  await writeFile(join(pluginRoot, ".codex-plugin", "plugin.json"), JSON.stringify({ name: "omo", version: PLUGIN_VERSION }))
+  await writeFile(
+    join(pluginRoot, ".codex-plugin", "plugin.json"),
+    JSON.stringify({ name: "omo", version: PLUGIN_VERSION }),
+  )
   await writeFile(join(codexHome, "config.toml"), ['[plugins."omo@sisyphuslabs"]', "enabled = true", ""].join("\n"))
 
   await writeBundleFile(
@@ -101,9 +104,10 @@ async function createInstalledFixture(options: FixtureOptions = {}): Promise<Fix
     await writeFile(runtimeSgPath, Buffer.alloc(VALID_BINARY_BYTES, 120))
   }
 
-  const bootstrapState = options.bootstrapState === undefined
-    ? { completedForVersion: PLUGIN_VERSION, lastAttemptAt: 1_770_000_000_000, lastStatus: "success", degraded: [] }
-    : options.bootstrapState
+  const bootstrapState =
+    options.bootstrapState === undefined
+      ? { completedForVersion: PLUGIN_VERSION, lastAttemptAt: 1_770_000_000_000, lastStatus: "success", degraded: [] }
+      : options.bootstrapState
   if (bootstrapState !== null) {
     const statePath = join(codexHome, "plugins", "data", "omo-sisyphuslabs", "bootstrap", "state.json")
     await mkdir(dirname(statePath), { recursive: true })
@@ -235,9 +239,7 @@ describe("codex components doctor check", () => {
     await writeFile(overridePath, Buffer.alloc(VALID_BINARY_BYTES, 121))
 
     // when
-    const result = await checkCodexComponents(
-      buildDeps(fixture, { env: { OMO_AST_GREP_SG_PATH: overridePath } }),
-    )
+    const result = await checkCodexComponents(buildDeps(fixture, { env: { OMO_AST_GREP_SG_PATH: overridePath } }))
 
     // then
     expect(result.status).toBe("pass")
@@ -273,9 +275,7 @@ describe("codex components doctor check", () => {
     // then
     expect(result.status).toBe("pass")
     expect(result.issues).toEqual([])
-    expect(
-      result.details?.some((detail) => detail.includes("bootstrap pending: start a Codex session")),
-    ).toBe(true)
+    expect(result.details?.some((detail) => detail.includes("bootstrap pending: start a Codex session"))).toBe(true)
     expect(result.details?.some((detail) => detail.includes("state none"))).toBe(true)
   })
 
@@ -332,9 +332,7 @@ describe("codex components doctor check", () => {
 
     // then
     expect(result.status).toBe("pass")
-    expect(
-      result.details?.some((detail) => detail.includes("bootstrap pending: start a Codex session")),
-    ).toBe(true)
+    expect(result.details?.some((detail) => detail.includes("bootstrap pending: start a Codex session"))).toBe(true)
   })
 
   test("#given a nested dev manifest pointing outside the bundle #when checking components #then out-of-bundle dev refs are tolerated", async () => {
@@ -343,7 +341,11 @@ describe("codex components doctor check", () => {
     await writeBundleFile(
       fixture.pluginRoot,
       "components/local-dev/.mcp.json",
-      JSON.stringify({ mcpServers: { local_dev: { command: "node", args: ["../../../../dev-packages/custom-mcp/dist/cli.js", "mcp"] } } }),
+      JSON.stringify({
+        mcpServers: {
+          local_dev: { command: "node", args: ["../../../../dev-packages/custom-mcp/dist/cli.js", "mcp"] },
+        },
+      }),
     )
 
     // when
@@ -360,7 +362,13 @@ describe("codex components doctor check", () => {
 
     // when
     const result = await checkCodexComponents(
-      buildDeps({ root, codexHome: join(root, ".codex"), binDir: join(root, "bin"), pluginRoot: "", runtimeSgPath: "" }),
+      buildDeps({
+        root,
+        codexHome: join(root, ".codex"),
+        binDir: join(root, "bin"),
+        pluginRoot: "",
+        runtimeSgPath: "",
+      }),
     )
 
     // then

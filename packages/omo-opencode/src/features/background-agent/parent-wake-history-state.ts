@@ -32,9 +32,9 @@ export function latestAssistantTurnHasToolBlock(messages: readonly unknown[]): b
     const message = messages[index]
     const role = messageRole(message)
     if (role === "assistant") {
-      return messageFinish(message) === "tool-calls"
-        || messageHasWaitingTool(message)
-        || messageHasUnresolvedTool(message)
+      return (
+        messageFinish(message) === "tool-calls" || messageHasWaitingTool(message) || messageHasUnresolvedTool(message)
+      )
     }
     if (role === "user" && !messageIsSyntheticOrInternalUser(message)) {
       return false
@@ -78,10 +78,12 @@ export function latestAssistantTurnHasStaleUnknownSubstantiveOutput(
     const role = messageRole(message)
     if (role === "assistant") {
       const finish = messageFinish(message)
-      return (finish === undefined || finish === "unknown")
-        && !messageCompleted(message)
-        && messageHasSubstantiveAssistantOutput(message)
-        && !messageHasFreshActivity(message, now, maxAgeMs)
+      return (
+        (finish === undefined || finish === "unknown") &&
+        !messageCompleted(message) &&
+        messageHasSubstantiveAssistantOutput(message) &&
+        !messageHasFreshActivity(message, now, maxAgeMs)
+      )
     }
     if (role === "user" && !messageIsSyntheticOrInternalUser(message)) {
       return false
@@ -103,10 +105,9 @@ function partHasFreshToolActivity(part: unknown, now: number, maxAgeMs: number):
   if (!isRecord(part)) {
     return false
   }
-  return timeHasFreshActivity(part.time, now, maxAgeMs) || timeHasFreshActivity(
-    isRecord(part.state) ? part.state.time : undefined,
-    now,
-    maxAgeMs,
+  return (
+    timeHasFreshActivity(part.time, now, maxAgeMs) ||
+    timeHasFreshActivity(isRecord(part.state) ? part.state.time : undefined, now, maxAgeMs)
   )
 }
 

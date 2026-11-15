@@ -2,10 +2,6 @@ const ATTACHABLE_SESSION_STATUSES = ["idle", "running", "busy", "retry"] as cons
 
 export type AttachableSessionStatus = (typeof ATTACHABLE_SESSION_STATUSES)[number]
 
-export function isAttachableSessionStatus(
-  status: string | undefined,
-): status is AttachableSessionStatus {
-  return ATTACHABLE_SESSION_STATUSES.some(
-    (attachableSessionStatus) => attachableSessionStatus === status,
-  )
+export function isAttachableSessionStatus(status: string | undefined): status is AttachableSessionStatus {
+  return ATTACHABLE_SESSION_STATUSES.some((attachableSessionStatus) => attachableSessionStatus === status)
 }

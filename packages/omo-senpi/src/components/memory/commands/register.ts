@@ -67,7 +67,9 @@ function registerLazyMemoryCommand(
   pi.registerCommand(name, {
     ...LAZY_MEMORY_COMMANDS[name],
     handler: async (args: string, ctx: MemoryCommandContext): Promise<string> => {
-      const runtime = await loadRuntime().catch((error: unknown) => error instanceof Error ? error : new Error(String(error)))
+      const runtime = await loadRuntime().catch((error: unknown) =>
+        error instanceof Error ? error : new Error(String(error)),
+      )
       if (runtime instanceof Error) return respond(ctx, memoryCommandsRuntimeLoadFailure(name, runtime), "error")
       return runtime.runMemoryCommand(name, pi, deps, args, ctx)
     },

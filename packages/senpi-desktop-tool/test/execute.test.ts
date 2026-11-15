@@ -1,44 +1,44 @@
-import { join } from "node:path";
-import { ComputerCallError } from "@oh-my-opencode/senpi-desktop-protocol";
-import { DesktopEngineRpcError, type ExecuteTool } from "@oh-my-opencode/senpi-desktop-service";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { rejectionOf } from "../../senpi-desktop-service/test/harness";
-import type { ComputerHandle } from "../src/activation";
-import { AUDIT_FILE_NAME, type ComputerModel } from "../src/session";
-import { createComputerTool } from "../src/tool";
-import { closeDesktops, desktopFixture, hostContext, methodsOf } from "./fixtures";
+import { join } from "node:path"
+import { ComputerCallError } from "@oh-my-opencode/senpi-desktop-protocol"
+import { DesktopEngineRpcError, type ExecuteTool } from "@oh-my-opencode/senpi-desktop-service"
+import { afterEach, describe, expect, it, vi } from "vitest"
+import { rejectionOf } from "../../senpi-desktop-service/test/harness"
+import type { ComputerHandle } from "../src/activation"
+import { AUDIT_FILE_NAME, type ComputerModel } from "../src/session"
+import { createComputerTool } from "../src/tool"
+import { closeDesktops, desktopFixture, hostContext, methodsOf } from "./fixtures"
 
 // Every case waits on real child-process I/O; the guard only catches a hang, it never times behavior.
-const HANG_GUARD = { timeout: 30_000 };
+const HANG_GUARD = { timeout: 30_000 }
 
-const claude: ComputerModel = { id: "claude-sonnet-4-6", provider: "anthropic", api: "anthropic-messages" };
-const detailedModel: ComputerModel = { id: "gpt-5.6", provider: "openai", api: "openai-responses", compat: {} };
+const claude: ComputerModel = { id: "claude-sonnet-4-6", provider: "anthropic", api: "anthropic-messages" }
+const detailedModel: ComputerModel = { id: "gpt-5.6", provider: "openai", api: "openai-responses", compat: {} }
 
-afterEach(closeDesktops);
+afterEach(closeDesktops)
 
-const noTools: ExecuteTool = () => Promise.reject(new Error("no tools"));
+const noTools: ExecuteTool = () => Promise.reject(new Error("no tools"))
 
 function toolFor(handle: ComputerHandle, executeTool: ExecuteTool = noTools) {
-	return createComputerTool({ handle, executeTool });
+  return createComputerTool({ handle, executeTool })
 }
 
 describe("computer tool execute", HANG_GUARD, () => {
-	it("runs a window->screenshot chain through the facade and returns the inline image", async () => {
-		// Given
-		const { handle } = desktopFixture();
-		const params = {
-			action: "call" as const,
-			chain: [{ method: "window", args: ["101"] }, { method: "screenshot" }],
-		};
+  it("runs a window->screenshot chain through the facade and returns the inline image", async () => {
+    // Given
+    const { handle } = desktopFixture()
+    const params = {
+      action: "call" as const,
+      chain: [{ method: "window", args: ["101"] }, { method: "screenshot" }],
+    }
 
-		// When
-		const result = await toolFor(handle).execute("call-1", params, undefined, undefined, hostContext());
+    // When
+    const result = await toolFor(handle).execute("call-1", params, undefined, undefined, hostContext())
 
-		// Then
-		expect({
-			images: result.content.filter((part) => part.type === "image").length,
-			value: result.details.value,
-		}).toMatchInlineSnapshot(`
+    // Then
+    expect({
+      images: result.content.filter((part) => part.type === "image").length,
+      value: result.details.value,
+    }).toMatchInlineSnapshot(`
 			{
 			  "images": 1,
 			  "value": {
@@ -53,189 +53,329 @@ describe("computer tool execute", HANG_GUARD, () => {
 			    "width": 1200,
 			  },
 			}
-		`);
-	});
+		`)
+  })
 
-	it("shows observe's accessibility tree once, not again inside the returned value", async () => {
-		// Given
-		const { handle } = desktopFixture();
-		const params = { action: "run" as const, code: "const win = await desktop.window('101'); return await win.observe();" };
+  it("shows observe's accessibility tree once, not again inside the returned value", async () => {
+    // Given
+    const { handle } = desktopFixture()
+    const params = {
+      action: "run" as const,
+      code: "const win = await desktop.window('101'); return await win.observe();",
+    }
 
-		// When
-		const result = await toolFor(handle).execute("call-observe", params, undefined, undefined, hostContext());
+    // When
+    const result = await toolFor(handle).execute("call-observe", params, undefined, undefined, hostContext())
 
-		// Then
-		const texts = result.content.flatMap((part) => (part.type === "text" ? [part.text] : []));
-		expect(texts.filter((text) => text.includes("button Run [ref=e1]"))).toEqual(["button Run [ref=e1]"]);
-		expect(texts.at(-1)).toContain('"ax": "[shown above]"');
-		expect(result.details.value).toMatchObject({ ax: "button Run [ref=e1]" });
-	});
+    // Then
+    const texts = result.content.flatMap((part) => (part.type === "text" ? [part.text] : []))
+    expect(texts.filter((text) => text.includes("button Run [ref=e1]"))).toEqual(["button Run [ref=e1]"])
+    expect(texts.at(-1)).toContain('"ax": "[shown above]"')
+    expect(result.details.value).toMatchObject({ ax: "button Run [ref=e1]" })
+  })
 
-	it("keeps a short printed string in the returned value", async () => {
-		// Given
-		const { handle } = desktopFixture();
-		const params = { action: "run" as const, code: "console.log('Terminal'); return { title: 'Terminal' };" };
+  it("keeps a short printed string in the returned value", async () => {
+    // Given
+    const { handle } = desktopFixture()
+    const params = { action: "run" as const, code: "console.log('Terminal'); return { title: 'Terminal' };" }
 
-		// When
-		const result = await toolFor(handle).execute("call-print", params, undefined, undefined, hostContext());
+    // When
+    const result = await toolFor(handle).execute("call-print", params, undefined, undefined, hostContext())
 
-		// Then
-		const texts = result.content.flatMap((part) => (part.type === "text" ? [part.text] : []));
-		expect(texts.at(-1)).toContain('"title": "Terminal"');
-	});
+    // Then
+    const texts = result.content.flatMap((part) => (part.type === "text" ? [part.text] : []))
+    expect(texts.at(-1)).toContain('"title": "Terminal"')
+  })
 
-	it("rejects a userReset chain as an unknown method before any engine is started", async () => {
-		// Given
-		const { handle, log } = desktopFixture();
-		const params = { action: "call" as const, chain: [{ method: "userReset" }] };
+  it("rejects a userReset chain as an unknown method before any engine is started", async () => {
+    // Given
+    const { handle, log } = desktopFixture()
+    const params = { action: "call" as const, chain: [{ method: "userReset" }] }
 
-		// When
-		const error = await rejectionOf(toolFor(handle).execute("call-1", params, undefined, undefined, hostContext()));
+    // When
+    const error = await rejectionOf(toolFor(handle).execute("call-1", params, undefined, undefined, hostContext()))
 
-		// Then
-		expect({
-			reason: error instanceof ComputerCallError ? error.reason : error,
-			spawned: log.children.length,
-		}).toEqual({ reason: "unknownMethod", spawned: 0 });
-	});
+    // Then
+    expect({
+      reason: error instanceof ComputerCallError ? error.reason : error,
+      spawned: log.children.length,
+    }).toEqual({ reason: "unknownMethod", spawned: 0 })
+  })
 
-	it("refuses input inside a read_only run before it reaches the engine", async () => {
-		// Given: a read_only run whose code clicks.
-		const { handle, log } = desktopFixture();
-		const params = { action: "run" as const, code: "await desktop.click(1, 1);", read_only: true };
+  it("refuses input inside a read_only run before it reaches the engine", async () => {
+    // Given: a read_only run whose code clicks.
+    const { handle, log } = desktopFixture()
+    const params = { action: "run" as const, code: "await desktop.click(1, 1);", read_only: true }
 
-		// When
-		const error = await rejectionOf(toolFor(handle).execute("call-1", params, undefined, undefined, hostContext()));
+    // When
+    const error = await rejectionOf(toolFor(handle).execute("call-1", params, undefined, undefined, hostContext()))
 
-		// Then
-		expect({
-			message: error instanceof Error ? error.message : error,
-			clicks: methodsOf(log).filter((m) => m === "click"),
-		}).toEqual({ message: "read-only run: 'click' requires read_only: false", clicks: [] });
-	});
+    // Then
+    expect({
+      message: error instanceof Error ? error.message : error,
+      clicks: methodsOf(log).filter((m) => m === "click"),
+    }).toEqual({ message: "read-only run: 'click' requires read_only: false", clicks: [] })
+  })
 
-	it("reaches host tools from run code through the injected executeTool", async () => {
-		// Given
-		const { handle } = desktopFixture();
-		const executeTool = (name: string, params: unknown) => Promise.resolve({ name, params });
-		const params = { action: "run" as const, code: 'return await tool.read({ path: "a.txt" });' };
+  it("reaches host tools from run code through the injected executeTool", async () => {
+    // Given
+    const { handle } = desktopFixture()
+    const executeTool = (name: string, params: unknown) => Promise.resolve({ name, params })
+    const params = { action: "run" as const, code: 'return await tool.read({ path: "a.txt" });' }
 
-		// When
-		const result = await toolFor(handle, executeTool).execute("call-1", params, undefined, undefined, hostContext());
+    // When
+    const result = await toolFor(handle, executeTool).execute("call-1", params, undefined, undefined, hostContext())
 
-		// Then
-		expect(result.details.value).toEqual({ name: "read", params: { path: "a.txt" } });
-	});
+    // Then
+    expect(result.details.value).toEqual({ name: "read", params: { path: "a.txt" } })
+  })
 
-	it("returns live capabilities as the facade value", async () => {
-		// Given
-		const { handle } = desktopFixture();
+  it("returns live capabilities as the facade value", async () => {
+    // Given
+    const { handle } = desktopFixture()
 
-		// When
-		const result = await toolFor(handle).execute(
-			"call-1",
-			{ action: "capabilities" },
-			undefined,
-			undefined,
-			hostContext(),
-		);
+    // When
+    const result = await toolFor(handle).execute(
+      "call-1",
+      { action: "capabilities" },
+      undefined,
+      undefined,
+      hostContext(),
+    )
 
-		// Then
-		expect(result.details.value).toMatchObject({ backend: "fake", stopPath: "global", focusGuard: true });
-	});
+    // Then
+    expect(result.details.value).toMatchObject({ backend: "fake", stopPath: "global", focusGuard: true })
+  })
 
-	for (const method of ["open", "capabilities"] as const) {
-		it.each([
-			["PermissionDenied", "COMPUTER_PERMISSION_REQUIRED"],
-			["ControlRequired", "COMPUTER_CONTROL_REQUIRED"],
-			["InputBusy", "COMPUTER_INPUT_BUSY"],
-			["Suspended", "COMPUTER_SUSPENDED"],
-		] as const)(`returns a structured %s failure from capabilities ${method}`, async (code, publicCode) => {
-			// Given: activation or the subsequent capability query fails at the service boundary.
-			const { handle, service } = desktopFixture({ auditLog: { enabled: false } });
-			vi.spyOn(service, method).mockRejectedValueOnce(new DesktopEngineRpcError("capabilities", {
-				code: -32000, message: "fixture engine failure", data: { code },
-			}));
+  for (const method of ["open", "capabilities"] as const) {
+    it.each([
+      ["PermissionDenied", "COMPUTER_PERMISSION_REQUIRED"],
+      ["ControlRequired", "COMPUTER_CONTROL_REQUIRED"],
+      ["InputBusy", "COMPUTER_INPUT_BUSY"],
+      ["Suspended", "COMPUTER_SUSPENDED"],
+    ] as const)(`returns a structured %s failure from capabilities ${method}`, async (code, publicCode) => {
+      // Given: activation or the subsequent capability query fails at the service boundary.
+      const { handle, service } = desktopFixture({ auditLog: { enabled: false } })
+      vi.spyOn(service, method).mockRejectedValueOnce(
+        new DesktopEngineRpcError("capabilities", {
+          code: -32000,
+          message: "fixture engine failure",
+          data: { code },
+        }),
+      )
 
-			// When
-			const result = await toolFor(handle).execute("capabilities-failure", { action: "capabilities" },
-				undefined, undefined, hostContext());
+      // When
+      const result = await toolFor(handle).execute(
+        "capabilities-failure",
+        { action: "capabilities" },
+        undefined,
+        undefined,
+        hostContext(),
+      )
 
-			// Then: the code-mode value and the host tool result agree that this failed.
-			expect(result).toMatchObject({
-				isError: true, details: { isError: true, value: { code: publicCode } },
-			});
-		});
-	}
+      // Then: the code-mode value and the host tool result agree that this failed.
+      expect(result).toMatchObject({
+        isError: true,
+        details: { isError: true, value: { code: publicCode } },
+      })
+    })
+  }
 
-	it("still throws an unrelated capabilities failure", async () => {
-		const { handle, service } = desktopFixture({ auditLog: { enabled: false } });
-		const original = new Error("fixture capability transport failure");
-		vi.spyOn(service, "capabilities").mockRejectedValueOnce(original);
-		await expect(toolFor(handle).execute("capabilities-failure", { action: "capabilities" },
-			undefined, undefined, hostContext())).rejects.toBe(original);
-	});
+  it("returns an expired ref as a structured COMPUTER_STALE_REF failure the kernel facade can read", async () => {
+    // Given: the engine's real StaleRef reply, whose message names no code (crates/senpi-desktop-core ax/registry.rs).
+    const { handle, service } = desktopFixture({ auditLog: { enabled: false } })
+    const call = service.call.bind(service)
+    vi.spyOn(service, "call").mockImplementation((method, ...rest) =>
+      method.startsWith("ax.")
+        ? Promise.reject(
+            new DesktopEngineRpcError(method, {
+              code: -32000,
+              message: "e5 expired; re-run ax()/find()",
+              data: { code: "StaleRef" },
+            }),
+          )
+        : call(method, ...rest),
+    )
 
-	it("opens the session with the audit path, tmp artifacts, and coordinate-safe caps for a Claude model", async () => {
-		// Given
-		const { handle, log } = desktopFixture({ maxWidth: 2000, screenshotMaxBytes: 1_000_000 });
+    // When
+    const result = await toolFor(handle).execute(
+      "stale-ref",
+      { action: "call", chain: [{ method: "ref", args: ["e5"] }] },
+      undefined,
+      undefined,
+      hostContext(),
+    )
 
-		// When
-		await toolFor(handle).execute("call-1", { action: "capabilities" }, undefined, undefined, hostContext(claude));
+    // Then
+    expect(result).toMatchObject({
+      isError: true,
+      details: {
+        isError: true,
+        value: { code: "COMPUTER_STALE_REF", message: "COMPUTER_STALE_REF: e5 expired; re-run ax()/find()" },
+      },
+    })
+  })
 
-		// Then
-		const open = log.requests.find((request) => request.method === "session.open");
-		expect(open?.params).toMatchObject({
-			auditPath: join("/sessions/project", AUDIT_FILE_NAME),
-			captureCaps: { maxWidth: 2000, maxHeight: 2400, coordinateSafe: true, maxBytes: 1_000_000 },
-			screenshotGc: { staleMs: 43_200_000, scanIntervalMs: 1_800_000 },
-		});
-	});
+  it("still throws an unrelated capabilities failure", async () => {
+    const { handle, service } = desktopFixture({ auditLog: { enabled: false } })
+    const original = new Error("fixture capability transport failure")
+    vi.spyOn(service, "capabilities").mockRejectedValueOnce(original)
+    await expect(
+      toolFor(handle).execute("capabilities-failure", { action: "capabilities" }, undefined, undefined, hostContext()),
+    ).rejects.toBe(original)
+  })
 
-	it("turns auditing off and keeps native caps when settings and model ask for it", async () => {
-		// Given
-		const { handle, log } = desktopFixture({ auditLog: { enabled: false } });
+  it("opens the session with the audit path, tmp artifacts, and coordinate-safe caps for a Claude model", async () => {
+    // Given
+    const { handle, log } = desktopFixture({ maxWidth: 2000, screenshotMaxBytes: 1_000_000 })
 
-		// When
-		await toolFor(handle).execute(
-			"call-1",
-			{ action: "capabilities" },
-			undefined,
-			undefined,
-			hostContext(detailedModel),
-		);
+    // When
+    await toolFor(handle).execute("call-1", { action: "capabilities" }, undefined, undefined, hostContext(claude))
 
-		// Then
-		const open = log.requests.find((request) => request.method === "session.open");
-		expect(open?.params).toMatchObject({ auditPath: null, captureCaps: { coordinateSafe: false } });
-	});
+    // Then
+    const open = log.requests.find((request) => request.method === "session.open")
+    expect(open?.params).toMatchObject({
+      auditPath: join("/sessions/project", AUDIT_FILE_NAME),
+      captureCaps: { maxWidth: 2000, maxHeight: 2400, coordinateSafe: true, maxBytes: 1_000_000 },
+      screenshotGc: { staleMs: 43_200_000, scanIntervalMs: 1_800_000 },
+    })
+  })
 
-	it.each(["session", "off"] as const)("carries the %s canary policy into an engine session", async (macosCanary) => {
-		// Given
-		const { handle, log } = desktopFixture({ macosCanary });
+  it("turns auditing off and keeps native caps when settings and model ask for it", async () => {
+    // Given
+    const { handle, log } = desktopFixture({ auditLog: { enabled: false } })
 
-		// When
-		await toolFor(handle).execute("call-1", { action: "capabilities" }, undefined, undefined, hostContext());
+    // When
+    await toolFor(handle).execute(
+      "call-1",
+      { action: "capabilities" },
+      undefined,
+      undefined,
+      hostContext(detailedModel),
+    )
 
-		// Then
-		const open = log.requests.find((request) => request.method === "session.open");
-		expect(open?.params).toMatchObject({ macosCanary });
-	});
+    // Then
+    const open = log.requests.find((request) => request.method === "session.open")
+    expect(open?.params).toMatchObject({ auditPath: null, captureCaps: { coordinateSafe: false } })
+  })
 
-	it("arms the configured stop chord once across repeated calls", async () => {
-		// Given
-		const { handle, log } = desktopFixture({ stopHotkey: "ctrl+alt+shift+f12" });
-		const tool = toolFor(handle);
+  it.each(["session", "off"] as const)("carries the %s canary policy into an engine session", async (macosCanary) => {
+    // Given
+    const { handle, log } = desktopFixture({ macosCanary })
 
-		// When
-		await tool.execute("call-1", { action: "capabilities" }, undefined, undefined, hostContext());
-		await tool.execute("call-2", { action: "capabilities" }, undefined, undefined, hostContext());
+    // When
+    await toolFor(handle).execute("call-1", { action: "capabilities" }, undefined, undefined, hostContext())
 
-		// Then
-		const starts = log.requests.filter((request) => request.method === "stopPath.start");
-		expect({
-			starts: starts.map((request) => request.params),
-			opens: methodsOf(log).filter((m) => m === "session.open").length,
-		}).toEqual({ starts: [{ chord: "ctrl+alt+shift+f12" }], opens: 1 });
-	});
-});
+    // Then
+    const open = log.requests.find((request) => request.method === "session.open")
+    expect(open?.params).toMatchObject({ macosCanary })
+  })
+
+  // Contract: tool result `details.report` (SDK ActionReport) for omo sessions; fails if the service stops asking for
+  // object reports, the tool drops them, or a pre-features engine's `null` stops mapping to the legacy report.
+  it.each([
+    [
+      "an engine advertising action-report",
+      { FAKE_ENGINE_FEATURES: '["action-report"]' },
+      "object",
+      {
+        disposition: { delivery: "delivered_unverified", retry: "unsafe" },
+        effect: "unverifiable",
+        focusRestoration: "not_needed",
+        auditIds: ["audit-typeText"],
+        legacy: false,
+      },
+    ],
+    [
+      "a v1 engine without features",
+      {},
+      undefined,
+      {
+        disposition: { delivery: "delivered_unverified", retry: "unsafe" },
+        effect: "unverifiable",
+        focusRestoration: "not_confirmed",
+        auditIds: [],
+        legacy: true,
+      },
+    ],
+  ] as const)("returns the input action's report in details for %s", async (_engine, env, reportMode, report) => {
+    // Given
+    const { handle, log } = desktopFixture({}, env)
+    const params = {
+      action: "call" as const,
+      chain: [
+        { method: "window", args: [{ app: "Code" }] },
+        { method: "type", args: ["hi"] },
+      ],
+    }
+
+    // When
+    const result = await toolFor(handle).execute("call-report", params, undefined, undefined, hostContext())
+
+    // Then
+    const open = log.requests.find((request) => request.method === "session.open")
+    expect({
+      reportMode: (open?.params as { reportMode?: string } | undefined)?.reportMode,
+      report: result.details.report,
+      reports: result.details.reports,
+    }).toMatchObject({ reportMode, report, reports: undefined })
+  })
+
+  it("lists every input action's report in send order and leaves a read-only run without one", async () => {
+    // Given
+    const { handle } = desktopFixture({}, { FAKE_ENGINE_FEATURES: '["action-report"]' })
+    const tool = toolFor(handle)
+    const code = "const win = await desktop.window('101'); await win.type('a'); await win.press('enter');"
+
+    // When
+    const sent = await tool.execute("call-run", { action: "run", code }, undefined, undefined, hostContext())
+    const read = await tool.execute(
+      "call-read",
+      { action: "call", chain: [{ method: "windows" }] },
+      undefined,
+      undefined,
+      hostContext(),
+    )
+
+    // Then
+    expect({
+      auditIds: sent.details.reports?.map((report) => report.auditIds),
+      last: sent.details.report?.auditIds,
+      read: "report" in read.details,
+    }).toEqual({ auditIds: [["audit-typeText"], ["audit-keyChord"]], last: ["audit-keyChord"], read: false })
+  })
+
+  // Contract: omo's resolved default `computer.intervention` (DESIGN 7, Q decision 1) reaches an engine that
+  // advertises `intervention-policy`; fails if the default reverts to pause or the open stops carrying it.
+  it.each([
+    ["advertising intervention-policy", { FAKE_ENGINE_FEATURES: '["intervention-policy"]' }, "continue"],
+    ["without the feature", {}, undefined],
+  ] as const)("opens an engine %s with the resolved intervention default", async (_engine, env, intervention) => {
+    // Given
+    const { handle, log } = desktopFixture({}, env)
+
+    // When
+    await toolFor(handle).execute("call-1", { action: "capabilities" }, undefined, undefined, hostContext())
+
+    // Then
+    const open = log.requests.find((request) => request.method === "session.open")
+    expect((open?.params as { intervention?: string } | undefined)?.intervention).toBe(intervention)
+  })
+
+  it("arms the configured stop chord once across repeated calls", async () => {
+    // Given
+    const { handle, log } = desktopFixture({ stopHotkey: "ctrl+alt+shift+f12" })
+    const tool = toolFor(handle)
+
+    // When
+    await tool.execute("call-1", { action: "capabilities" }, undefined, undefined, hostContext())
+    await tool.execute("call-2", { action: "capabilities" }, undefined, undefined, hostContext())
+
+    // Then
+    const starts = log.requests.filter((request) => request.method === "stopPath.start")
+    expect({
+      starts: starts.map((request) => request.params),
+      opens: methodsOf(log).filter((m) => m === "session.open").length,
+    }).toEqual({ starts: [{ chord: "ctrl+alt+shift+f12" }], opens: 1 })
+  })
+})

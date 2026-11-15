@@ -82,7 +82,7 @@ async function sweepRunRoots(
       totals.kept += 1
       continue
     }
-    if (await probeTreeActivity(runRoot, now() - maxAgeMs) !== "idle") {
+    if ((await probeTreeActivity(runRoot, now() - maxAgeMs)) !== "idle") {
       totals.kept += 1
       continue
     }
@@ -157,7 +157,7 @@ async function sweepStrayIdentities(input: TransientSweepInput, totals: Totals, 
       totals.kept += 1
       continue
     }
-    if (await probeTreeActivity(root, now() - maxAgeMs) !== "idle") {
+    if ((await probeTreeActivity(root, now() - maxAgeMs)) !== "idle") {
       totals.kept += 1
       continue
     }

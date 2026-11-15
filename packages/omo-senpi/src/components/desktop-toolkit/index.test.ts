@@ -14,12 +14,17 @@ import {
 type Handler = (data: unknown) => unknown | Promise<unknown>
 type ToolkitTool = {
   exposure: string
-  execute: (id: string, params: Record<string, unknown>) => Promise<{ content: { text: string }[]; details: Record<string, unknown> }>
+  execute: (
+    id: string,
+    params: Record<string, unknown>,
+  ) => Promise<{ content: { text: string }[]; details: Record<string, unknown> }>
 }
 
 const GRANT = { endpoint: "http://127.0.0.1:41234/toolkit/browser", tokenFile: "/tmp/omo-toolkit/browser.token" }
 
-async function setup(options: { readonly sessionContext?: unknown; readonly timeoutMs?: number; readonly withRpc?: boolean } = {}) {
+async function setup(
+  options: { readonly sessionContext?: unknown; readonly timeoutMs?: number; readonly withRpc?: boolean } = {},
+) {
   const pi = new FakeExtensionAPI() as FakeExtensionAPI & { sessionContext?: unknown }
   const handlers = new Map<string, Handler>()
   if (options.withRpc !== false) {
@@ -51,7 +56,9 @@ describe("desktop toolkit", () => {
     const request = await nextRequest()
     expect(request.name).toBe(TOOLKIT_REQUEST_EVENT)
     expect(request.data.toolkit).toBe("browser")
-    expect(await handlers.get(TOOLKIT_GRANT_RPC)?.({ requestId: request.data.requestId, grant: GRANT })).toEqual({ accepted: true })
+    expect(await handlers.get(TOOLKIT_GRANT_RPC)?.({ requestId: request.data.requestId, grant: GRANT })).toEqual({
+      accepted: true,
+    })
 
     expect((await pendingResult).details).toEqual({ ok: true, grant: GRANT })
     expect(tool.exposure).toBe("eval")
@@ -67,7 +74,10 @@ describe("desktop toolkit", () => {
       expect(pi.rpcEvents).toEqual([])
     }
     const noHost = await setup({ withRpc: false })
-    expect((await noHost.tool.execute("c1", { op: "acquire", toolkit: "browser" })).details).toEqual({ ok: false, reason: "unavailable" })
+    expect((await noHost.tool.execute("c1", { op: "acquire", toolkit: "browser" })).details).toEqual({
+      ok: false,
+      reason: "unavailable",
+    })
   })
 
   it("#given the app never answers #when the deadline passes #then the skill gets a timeout and a late grant is refused", async () => {
@@ -77,7 +87,9 @@ describe("desktop toolkit", () => {
     const request = await nextRequest()
     expect((await pendingResult).details).toEqual({ ok: false, reason: "timeout" })
 
-    expect(await handlers.get(TOOLKIT_GRANT_RPC)?.({ requestId: request.data.requestId, grant: GRANT })).toEqual({ accepted: false })
+    expect(await handlers.get(TOOLKIT_GRANT_RPC)?.({ requestId: request.data.requestId, grant: GRANT })).toEqual({
+      accepted: false,
+    })
   })
 
   it("#given the app refuses #when the skill acquires #then it gets the app's reason", async () => {
@@ -85,7 +97,10 @@ describe("desktop toolkit", () => {
 
     const pendingResult = tool.execute("c1", { op: "acquire", toolkit: "browser" })
     const request = await nextRequest()
-    await handlers.get(TOOLKIT_GRANT_RPC)?.({ requestId: request.data.requestId, refusal: { reason: "app_window_closed" } })
+    await handlers.get(TOOLKIT_GRANT_RPC)?.({
+      requestId: request.data.requestId,
+      refusal: { reason: "app_window_closed" },
+    })
 
     expect((await pendingResult).details).toEqual({ ok: false, reason: "app_window_closed" })
   })
@@ -119,7 +134,9 @@ describe("desktop toolkit", () => {
     const firstRequest = await first.nextRequest()
     await second.nextRequest()
     await first.handlers.get(TOOLKIT_GRANT_RPC)?.({ requestId: firstRequest.data.requestId, grant: GRANT })
-    expect(await second.handlers.get(TOOLKIT_GRANT_RPC)?.({ requestId: firstRequest.data.requestId, grant: GRANT })).toEqual({ accepted: false })
+    expect(
+      await second.handlers.get(TOOLKIT_GRANT_RPC)?.({ requestId: firstRequest.data.requestId, grant: GRANT }),
+    ).toEqual({ accepted: false })
 
     expect((await firstResult).details).toEqual({ ok: true, grant: GRANT })
     expect((await secondResult).details).toEqual({ ok: false, reason: "timeout" })

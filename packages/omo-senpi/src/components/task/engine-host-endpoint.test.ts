@@ -6,7 +6,10 @@ import { join } from "node:path"
 import { loadOmoConfig, OmoTaskSettingsSchema } from "@oh-my-opencode/omo-config-core"
 import { createTaskRecordStore, type EnsureTaskDaemonInput } from "@oh-my-opencode/senpi-task"
 
-import { hostSession, hostSessionRecordInput } from "../../../../senpi-task/src/lifecycle/__fixtures__/host-session-fakes"
+import {
+  hostSession,
+  hostSessionRecordInput,
+} from "../../../../senpi-task/src/lifecycle/__fixtures__/host-session-fakes"
 import { seedRecord } from "../../../../senpi-task/src/lifecycle/__fixtures__/lifecycle-fakes"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { composeTaskEngine } from "./engine"
@@ -27,16 +30,21 @@ describe("composeTaskEngine wires the session's host endpoint into the lifecycle
     const recordedSocket = join(cwd, "agent", "rpc", "shards", "p-00000000000000cc.sock")
     const ensures: EnsureTaskDaemonInput[] = []
     const omoConfig = loadOmoConfig({ cwd }).config
-    const host = createEngineHostRuntime(omoConfig.task ?? OmoTaskSettingsSchema.parse({}), new TaskRuntimeContext(cwd), {}, {
-      env: {},
-      platform: "darwin",
-      agentDir: join(cwd, "agent"),
-      ensureDaemon: (request) => {
-        ensures.push(request)
-        return Promise.reject(new Error("the recorded shard stays silent"))
+    const host = createEngineHostRuntime(
+      omoConfig.task ?? OmoTaskSettingsSchema.parse({}),
+      new TaskRuntimeContext(cwd),
+      {},
+      {
+        env: {},
+        platform: "darwin",
+        agentDir: join(cwd, "agent"),
+        ensureDaemon: (request) => {
+          ensures.push(request)
+          return Promise.reject(new Error("the recorded shard stays silent"))
+        },
+        probeHost: () => Promise.resolve(undefined),
       },
-      probeHost: () => Promise.resolve(undefined),
-    })
+    )
     const engine = composeTaskEngine({ pi: new FakeExtensionAPI(), omoConfig, cwd, sharedParentTools: () => [], host })
     const store = createTaskRecordStore({ project_dir: cwd, task: { state_dir: engine.stateDir } })
     seedRecord(store, {

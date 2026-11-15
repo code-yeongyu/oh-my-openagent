@@ -7,66 +7,74 @@ const environmentSpecifier = import.meta.resolve("./environment")
 const loggerSpecifier = import.meta.resolve("../../logger")
 const runnerSpecifier = import.meta.resolve("../runner")
 const tmuxPathResolverSpecifier = import.meta.resolve("../../../tools/interactive-bash/tmux-path-resolver")
+// Complete module mocks: once bun has built a module from a mock factory, that module keeps the factory's export names
+// for the rest of the process, so a partial mock hides the real exports from every later test file even after the
+// restore (#13331). Each factory spreads the real module and overrides only what this file controls.
+const actualEnvironment = await import(environmentSpecifier)
+const actualLogger = await import(loggerSpecifier)
+const actualRunner = await import(runnerSpecifier)
+const actualTmuxPathResolver = await import(tmuxPathResolverSpecifier)
 
 const runTmuxCommandMock = mock(async (): Promise<TmuxCommandResult> => ({
-	success: true,
-	output: "",
-	stdout: "",
-	stderr: "",
-	exitCode: 0,
+  success: true,
+  output: "",
+  stdout: "",
+  stderr: "",
+  exitCode: 0,
 }))
 const isInsideTmuxMock = mock((): boolean => true)
 const getTmuxPathMock = mock(async (): Promise<string | undefined> => "sh")
 const logMock = mock(() => undefined)
 
 async function loadCloseTmuxPane(): Promise<typeof import("./pane-close").closeTmuxPane> {
-	const module = await import(`${paneCloseSpecifier}?test=${crypto.randomUUID()}`)
-	return module.closeTmuxPane
+  const module = await import(`${paneCloseSpecifier}?test=${crypto.randomUUID()}`)
+  return module.closeTmuxPane
 }
 
 function registerModuleMocks(): void {
-	mock.module(environmentSpecifier, () => ({
-		isInsideTmux: isInsideTmuxMock,
-		isNativeTmux: isInsideTmuxMock,
-		isTmuxPaneCompatible: isInsideTmuxMock,
-	}))
-	mock.module(loggerSpecifier, () => ({ log: logMock }))
-	mock.module(runnerSpecifier, () => ({ runTmuxCommand: runTmuxCommandMock }))
-	mock.module(tmuxPathResolverSpecifier, () => ({ getTmuxPath: getTmuxPathMock }))
+  mock.module(environmentSpecifier, () => ({
+    ...actualEnvironment,
+    isInsideTmux: isInsideTmuxMock,
+    isNativeTmux: isInsideTmuxMock,
+    isTmuxPaneCompatible: isInsideTmuxMock,
+  }))
+  mock.module(loggerSpecifier, () => ({ ...actualLogger, log: logMock }))
+  mock.module(runnerSpecifier, () => ({ ...actualRunner, runTmuxCommand: runTmuxCommandMock }))
+  mock.module(tmuxPathResolverSpecifier, () => ({ ...actualTmuxPathResolver, getTmuxPath: getTmuxPathMock }))
 }
 
 describe("closeTmuxPane runner integration", () => {
-	beforeEach(() => {
-		registerModuleMocks()
-		runTmuxCommandMock.mockClear()
-		isInsideTmuxMock.mockClear()
-		getTmuxPathMock.mockClear()
-		logMock.mockClear()
+  beforeEach(() => {
+    registerModuleMocks()
+    runTmuxCommandMock.mockClear()
+    isInsideTmuxMock.mockClear()
+    getTmuxPathMock.mockClear()
+    logMock.mockClear()
 
-		runTmuxCommandMock.mockResolvedValue({
-			success: true,
-			output: "",
-			stdout: "",
-			stderr: "",
-			exitCode: 0,
-		})
-		isInsideTmuxMock.mockReturnValue(true)
-		getTmuxPathMock.mockResolvedValue("sh")
-	})
+    runTmuxCommandMock.mockResolvedValue({
+      success: true,
+      output: "",
+      stdout: "",
+      stderr: "",
+      exitCode: 0,
+    })
+    isInsideTmuxMock.mockReturnValue(true)
+    getTmuxPathMock.mockResolvedValue("sh")
+  })
 
-	it("#given pane exists #when closeTmuxPane called #then delegates send-keys and kill-pane to shared runner", async () => {
-		// given
-		const closeTmuxPane = await loadCloseTmuxPane()
+  it("#given pane exists #when closeTmuxPane called #then delegates send-keys and kill-pane to shared runner", async () => {
+    // given
+    const closeTmuxPane = await loadCloseTmuxPane()
 
-		// when
-		const result = await closeTmuxPane("%42")
+    // when
+    const result = await closeTmuxPane("%42")
 
-		// then
-		expect(result).toBe(true)
-		const paneCloseCalls = runTmuxCommandMock.mock.calls.filter((call: [string, string[]]) => call[1].includes("%42"))
-		expect(paneCloseCalls).toEqual([
-			["sh", ["send-keys", "-t", "%42", "C-c"]],
-			["sh", ["kill-pane", "-t", "%42"]],
-		])
-	})
+    // then
+    expect(result).toBe(true)
+    const paneCloseCalls = runTmuxCommandMock.mock.calls.filter((call: [string, string[]]) => call[1].includes("%42"))
+    expect(paneCloseCalls).toEqual([
+      ["sh", ["send-keys", "-t", "%42", "C-c"]],
+      ["sh", ["kill-pane", "-t", "%42"]],
+    ])
+  })
 })

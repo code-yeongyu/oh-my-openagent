@@ -15,7 +15,7 @@ import { SyncEngine, type EngineFault } from "./engine"
 import { FakeSealer, FakeVerifier } from "./fake-crypto.test-support"
 import type { FakeSyncServer } from "./fake-server.test-support"
 import { FakeItemStore } from "./fake-store.test-support"
-import type { Clock, ItemStore, SyncRepo, Transport, WriterLock } from "./ports"
+import type { Clock, FreezeSettler, ItemStore, SyncRepo, Transport, WriterLock } from "./ports"
 
 export const ACCOUNT = "acc_test"
 /** Every engine test drives real git processes; under machine load a cycle can take seconds. */
@@ -118,10 +118,12 @@ export const inProcessLock = (): WriterLock & { held: boolean } => {
 
 /** The transport refuses every network call made while the writer lock is held (sync-design §5). */
 function lockGuarded(transport: Transport, lock: { readonly held: boolean }): Transport {
-  const guard = <A extends unknown[], R>(name: string, fn: (...args: A) => R) => (...args: A): R => {
-    if (lock.held) throw new Error(`network call ${name} while the writer lock is held`)
-    return fn(...args)
-  }
+  const guard =
+    <A extends unknown[], R>(name: string, fn: (...args: A) => R) =>
+    (...args: A): R => {
+      if (lock.held) throw new Error(`network call ${name} while the writer lock is held`)
+      return fn(...args)
+    }
   return {
     pull: guard("pull", transport.pull),
     download: guard("download", transport.download),
@@ -160,9 +162,17 @@ export interface DeviceOptions {
   /** Use the production item store over the #10203 device (Loro) instead of the line-set fake. */
   readonly realStore?: boolean
   readonly onStatusChange?: () => void
+  readonly log?: (line: string) => void
+  /** The account session's freeze settler (rotation on revoke). */
+  readonly freeze?: FreezeSettler
 }
 
-export async function makeDevice(server: FakeSyncServer, name: string, fault?: EngineFault, options: DeviceOptions = {}): Promise<Device> {
+export async function makeDevice(
+  server: FakeSyncServer,
+  name: string,
+  fault?: EngineFault,
+  options: DeviceOptions = {},
+): Promise<Device> {
   const base = await mkdtemp(join(tmpdir(), `omo-sync-${name}-`))
   const root = join(base, "memory")
   const stateDir = join(base, "device")
@@ -173,9 +183,15 @@ export async function makeDevice(server: FakeSyncServer, name: string, fault?: E
   const clock = new ManualClock()
   const verifier = new FakeVerifier(ACCOUNT)
   const build = (f?: EngineFault) => {
-    const store: ItemStore = options.realStore === true
-      ? createDeviceItemStore({ stateDir, memoryRoot: root, syncDir: join(root, ".git", "omo-sync"), machineId: `machine-${name}` })
-      : new FakeItemStore(stateDir, name)
+    const store: ItemStore =
+      options.realStore === true
+        ? createDeviceItemStore({
+            stateDir,
+            memoryRoot: root,
+            syncDir: join(root, ".git", "omo-sync"),
+            machineId: `machine-${name}`,
+          })
+        : new FakeItemStore(stateDir, name)
     const lock = inProcessLock()
     const engine = new SyncEngine({
       repo,
@@ -188,6 +204,8 @@ export async function makeDevice(server: FakeSyncServer, name: string, fault?: E
       random: () => 0,
       ...(options.batchBytes === undefined ? {} : { batchBytes: options.batchBytes }),
       ...(options.onStatusChange === undefined ? {} : { onStatusChange: options.onStatusChange }),
+      ...(options.log === undefined ? {} : { log: options.log }),
+      ...(options.freeze === undefined ? {} : { freeze: options.freeze }),
       ...(f === undefined ? {} : { fault: f }),
     })
     return { store, engine }

@@ -12,21 +12,14 @@ import { PLUGIN_NAME } from "./plugin-identity"
  * Both plugins listen to session.idle and send notifications simultaneously,
  * which can cause crashes on Windows due to resource contention.
  */
-const KNOWN_NOTIFICATION_PLUGINS = [
-  "opencode-notifier",
-  "@mohak34/opencode-notifier",
-  "mohak34/opencode-notifier",
-]
+const KNOWN_NOTIFICATION_PLUGINS = ["opencode-notifier", "@mohak34/opencode-notifier", "mohak34/opencode-notifier"]
 
 /**
  * Known skill plugins that conflict with oh-my-opencode's skill loading.
  * Both plugins scan ~/.config/opencode/skills/ and register tools independently,
  * causing "Duplicate tool names detected" warnings and HTTP 400 errors.
  */
-const KNOWN_SKILL_PLUGINS = [
-  "opencode-skills",
-  "@opencode/skills",
-]
+const KNOWN_SKILL_PLUGINS = ["opencode-skills", "@opencode/skills"]
 
 const OMO_PACKAGE_PLUGINS = [
   "oh-my-opencode",
@@ -41,10 +34,8 @@ function matchesKnownPlugin(entry: string, knownPlugins: readonly string[]): str
     if (normalized === known) return known
     if (normalized.startsWith(`${known}@`)) return known
     if (normalized === `npm:${known}` || normalized.startsWith(`npm:${known}@`)) return known
-    if (normalized.startsWith("file://") && (
-      normalized.endsWith(`/${known}`) ||
-      normalized.endsWith(`\\${known}`)
-    )) return known
+    if (normalized.startsWith("file://") && (normalized.endsWith(`/${known}`) || normalized.endsWith(`\\${known}`)))
+      return known
   }
 
   return null

@@ -14,7 +14,11 @@ const appendLine = fs.appendFileSync.bind(fs)
 const readText = fs.readFileSync.bind(fs)
 const exists = fs.existsSync.bind(fs)
 const isDirectory = (value) => {
-  try { return fs.statSync(toPath(value)).isDirectory() } catch { return false }
+  try {
+    return fs.statSync(toPath(value)).isDirectory()
+  } catch {
+    return false
+  }
 }
 
 const toPath = (value) => {
@@ -49,7 +53,8 @@ wrap(fs.promises, "cp", copyKind)
 for (const name of ["readdir", "opendir"]) wrap(fs.promises, name, "list")
 
 let metafiles = 0
-const isBunBuild = (command, args) => /^bun(?:\.exe)?$/.test(basename(String(command))) && Array.isArray(args) && args[0] === "build"
+const isBunBuild = (command, args) =>
+  /^bun(?:\.exe)?$/.test(basename(String(command))) && Array.isArray(args) && args[0] === "build"
 const recordMetafile = (metafile, cwd) => {
   const path = isAbsolute(metafile) ? metafile : resolve(cwd, metafile)
   if (!exists(path)) return record("missing-metafile", path)
@@ -59,7 +64,8 @@ const spawnSync = childProcess.spawnSync
 childProcess.spawnSync = function tracedSpawnSync(command, args, options) {
   if (!isBunBuild(command, args)) return spawnSync.call(this, command, args, options)
   const given = args.find((arg) => typeof arg === "string" && arg.startsWith("--metafile="))
-  const metafile = given?.slice("--metafile=".length) ?? join(scratch ?? process.cwd(), `meta-${process.pid}-${metafiles++}.json`)
+  const metafile =
+    given?.slice("--metafile=".length) ?? join(scratch ?? process.cwd(), `meta-${process.pid}-${metafiles++}.json`)
   // A shell spawn (build-install uses shell: true on win32) joins argv unquoted, so a scratch path with spaces would split.
   const added = options?.shell ? `--metafile="${metafile}"` : `--metafile=${metafile}`
   const result = spawnSync.call(this, command, given === undefined ? [...args, added] : args, options)
@@ -81,21 +87,44 @@ if (typeof module.registerHooks === "function") {
   // Bun has no load hooks, and a named node:fs import there escapes the wraps above, so a module the
   // step's entry pulls in could read files this trace never sees. The entry's own imports are recorded
   // (the recipe names them); any deeper import fails the trace (mapFromTrace) instead of under-reporting.
-  const real = (path) => { try { return fs.realpathSync(path) } catch { return path } }
+  const real = (path) => {
+    try {
+      return fs.realpathSync(path)
+    } catch {
+      return path
+    }
+  }
   // A file entry imports as itself; a `bun -e` entry imports as a path that is no file (`<dir>/[eval]` or a directory).
-  const isFile = (path) => { try { return fs.statSync(path).isFile() } catch { return false } }
+  const isFile = (path) => {
+    try {
+      return fs.statSync(path).isFile()
+    } catch {
+      return false
+    }
+  }
   const isEntry = (importer) => !isFile(importer) || real(importer) === entry
   const resolveFrom = (path, importer) => {
     if (path.startsWith("file:")) return new URL(path)
     const from = isFile(importer) || importer.endsWith("[eval]") ? dirname(importer) : importer
-    try { return Bun.resolveSync(path, from) } catch { return undefined }
+    try {
+      return Bun.resolveSync(path, from)
+    } catch {
+      return undefined
+    }
   }
   let resolving = false // Bun.resolveSync runs this plugin again
   Bun.plugin({
     name: "omo-bundle-inputs-trace",
     setup(build) {
       build.onResolve({ filter: /.*/ }, ({ path, importer }) => {
-        if (resolving || importer === undefined || importer === "" || importer.startsWith("bun:") || module.isBuiltin(path)) return undefined
+        if (
+          resolving ||
+          importer === undefined ||
+          importer === "" ||
+          importer.startsWith("bun:") ||
+          module.isBuiltin(path)
+        )
+          return undefined
         if (!isEntry(importer)) {
           record("missing-module-hooks", `${importer} -> ${path}`)
           return undefined

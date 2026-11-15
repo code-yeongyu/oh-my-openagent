@@ -39,7 +39,11 @@ describe("senpi brand contract pin", () => {
     describe("#when the pin is inspected", () => {
       test("#then a brand-aware pin must ship the brand resolver", () => {
         const installed = installedSenpi()
-        if (FIRST_BRAND_AWARE_SENPI === null || installed === undefined || !sameVersion(installed.version, PINNED_VERSION)) {
+        if (
+          FIRST_BRAND_AWARE_SENPI === null ||
+          installed === undefined ||
+          !sameVersion(installed.version, PINNED_VERSION)
+        ) {
           // No brand-aware engine release exists yet, or the workspace has a different engine
           // installed than the pin names. The launcher still always injects the profile; the engine
           // simply ignores it until the pinned release understands it.

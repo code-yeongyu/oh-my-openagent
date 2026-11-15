@@ -1,13 +1,27 @@
 import { readdir, readFile } from "node:fs/promises"
 import { join } from "node:path"
 
-import { ackMessages, commitDeliveryReservation, isMessageConsumed, listUnreadMessages, releaseDeliveryReservation, reserveMessageForDelivery, withInboxConsumerLease } from "@oh-my-opencode/team-core/team-mailbox"
+import {
+  ackMessages,
+  commitDeliveryReservation,
+  isMessageConsumed,
+  listUnreadMessages,
+  releaseDeliveryReservation,
+  reserveMessageForDelivery,
+  withInboxConsumerLease,
+} from "@oh-my-opencode/team-core/team-mailbox"
 import { getInboxDir, resolveBaseDir } from "@oh-my-opencode/team-core/team-registry"
 import { MessageSchema, type Message } from "@oh-my-opencode/team-core/types"
 
 import { TEAM_LEAD_SENTINEL } from "../normalize"
 import { appendDeliveredEvent } from "./delivery-events"
-import { InvalidReservedLeadMessageError, type LeadPoller, type LeadPollerDeps, type LeadPollState, type PendingDelivery } from "./lead-poller-types"
+import {
+  InvalidReservedLeadMessageError,
+  type LeadPoller,
+  type LeadPollerDeps,
+  type LeadPollState,
+  type PendingDelivery,
+} from "./lead-poller-types"
 import { buildPeerMessageEnvelope } from "./message"
 import { createSessionMarkerIndex } from "./session-marker-index"
 
@@ -21,9 +35,10 @@ export function createLeadPoller(deps: LeadPollerDeps): LeadPoller {
   const pending = new Map<string, PendingDelivery>()
   let stopped = false
   const state: LeadPollState = { pending, isStopped: () => stopped, markerIndex: createSessionMarkerIndex() }
-  const withLease = <T>(fn: () => Promise<T>): Promise<T> => withInboxConsumerLease(
-    deps.teamRunId, TEAM_LEAD_SENTINEL, deps.config, fn, { staleAfterMs: DEAD_PID_LEASE_STALE_MS },
-  )
+  const withLease = <T>(fn: () => Promise<T>): Promise<T> =>
+    withInboxConsumerLease(deps.teamRunId, TEAM_LEAD_SENTINEL, deps.config, fn, {
+      staleAfterMs: DEAD_PID_LEASE_STALE_MS,
+    })
 
   return {
     async pollOnce(filter = {}) {
@@ -48,9 +63,14 @@ async function settlePending(deps: LeadPollerDeps, state: LeadPollState): Promis
   for (const delivery of [...state.pending.values()]) {
     let releaseWhenMissing: boolean
     switch (delivery.phase) {
-      case "awaiting_flush": continue
-      case "awaiting_persistence": releaseWhenMissing = false; break
-      case "recovery": releaseWhenMissing = true; break
+      case "awaiting_flush":
+        continue
+      case "awaiting_persistence":
+        releaseWhenMissing = false
+        break
+      case "recovery":
+        releaseWhenMissing = true
+        break
       default: {
         const exhaustive: never = delivery.phase
         throw new TypeError(`Unexpected lead delivery phase: ${exhaustive}`)
@@ -79,7 +99,10 @@ async function processMessage(deps: LeadPollerDeps, message: Message, state: Lea
   }
 
   const reservation = await reserveMessageForDelivery(
-    deps.teamRunId, TEAM_LEAD_SENTINEL, message.messageId, deps.config,
+    deps.teamRunId,
+    TEAM_LEAD_SENTINEL,
+    message.messageId,
+    deps.config,
   )
   if (reservation === null) return
   if (state.isStopped()) {
@@ -130,7 +153,10 @@ async function recoverReservations(deps: LeadPollerDeps, state: LeadPollState): 
     const message = await readReservedMessage(join(inboxDir(deps), entry))
     if (state.pending.has(message.messageId)) continue
     const reservation = await reserveMessageForDelivery(
-      deps.teamRunId, TEAM_LEAD_SENTINEL, message.messageId, deps.config,
+      deps.teamRunId,
+      TEAM_LEAD_SENTINEL,
+      message.messageId,
+      deps.config,
     )
     if (reservation === null) continue
     const sessionFile = deps.leadSessionFile?.()

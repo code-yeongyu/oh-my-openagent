@@ -52,8 +52,13 @@ export function loadStreamCaptures(cwd) {
 
 export function observeEngineThinking(entries, captures) {
   const changes = entries.filter((entry) => entry.type === "thinking_level_change")
-  const lastAssistant = entries.filter((entry) => entry.type === "message" && entry.message?.role === "assistant").at(-1)
-  const fromCapture = captures.map((capture) => capture.configurationUpdateEffort ?? capture.thinking).find((value) => typeof value === "string" && value.length > 0) ?? null
+  const lastAssistant = entries
+    .filter((entry) => entry.type === "message" && entry.message?.role === "assistant")
+    .at(-1)
+  const fromCapture =
+    captures
+      .map((capture) => capture.configurationUpdateEffort ?? capture.thinking)
+      .find((value) => typeof value === "string" && value.length > 0) ?? null
   const fromChange = readThinkingField(changes.at(-1)) ?? changes.at(-1)?.thinkingLevel ?? changes.at(-1)?.level ?? null
   const fromAssistant = lastAssistant?.message?.thinkingLevel ?? lastAssistant?.thinkingLevel ?? null
   return {

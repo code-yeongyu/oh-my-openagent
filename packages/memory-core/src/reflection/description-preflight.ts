@@ -39,9 +39,13 @@ export async function preflightReflectionDescriptions(
     try {
       warn?.("memory description preflight failed; completion validation will decide the outcome", {
         error: redactSecretLikeMaterial(error instanceof Error ? error.message : String(error)),
-        ...(rollbackError === undefined ? {} : {
-          rollbackError: redactSecretLikeMaterial(rollbackError instanceof Error ? rollbackError.message : String(rollbackError)),
-        }),
+        ...(rollbackError === undefined
+          ? {}
+          : {
+              rollbackError: redactSecretLikeMaterial(
+                rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+              ),
+            }),
       })
     } catch {
       // A diagnostic sink must not prevent the gate from settling the run either.
@@ -59,7 +63,7 @@ async function trimDescriptions(
   rewritten: string[],
 ): Promise<readonly TrimmedDescription[]> {
   // Leave dirty or tampered runs to the gate; never commit their unrelated changes.
-  if (await readFile(worktree.gitFilePath, "utf8") !== worktree.gitFileSnapshot) return []
+  if ((await readFile(worktree.gitFilePath, "utf8")) !== worktree.gitFileSnapshot) return []
   const config = await readFile(worktree.commonConfigPath, "utf8").catch((error: unknown) => {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") return null
     throw error
@@ -75,7 +79,7 @@ async function trimDescriptions(
     return result.stdout.trimEnd()
   }
   if ((await git(["status", "--porcelain"])).trim()) return []
-  if (await git(["branch", "--show-current"]) !== worktree.branch) return []
+  if ((await git(["branch", "--show-current"])) !== worktree.branch) return []
   const tipSha = await git(["rev-parse", "--verify", "HEAD"])
   if (tipSha === recordedBase) return []
   const based = await exec.run(["merge-base", "--is-ancestor", recordedBase, tipSha], {
@@ -94,7 +98,10 @@ async function trimDescriptions(
     if (violation === null) continue
     // Grammar is validated before description length, so equality excludes every other violation.
     if (!violation.startsWith(`'description' exceeds ${MAX_DESCRIPTION_LENGTH} characters (`)) continue
-    const base = await exec.run(["cat-file", "blob", `${recordedBase}:${path}`], { cwd: worktree.dir, timeoutMs: 30_000 })
+    const base = await exec.run(["cat-file", "blob", `${recordedBase}:${path}`], {
+      cwd: worktree.dir,
+      timeoutMs: 30_000,
+    })
     if (base.code === 0 && frontmatterBlock(base.stdout) === frontmatterBlock(content)) continue
     const parsed = parseMemoryFile(content)
     const original = parsed.frontmatter.description
@@ -110,23 +117,34 @@ async function trimDescriptions(
     const description = `${(boundary > 0 ? original.slice(0, boundary) : prefix).trimEnd()}…`
     const header = FRONTMATTER_RE.exec(content)?.[1] ?? ""
     const headerStart = content.indexOf("\n") + 1
-    const rendered = content.slice(0, headerStart)
-      + header.replace(/^(description:[ \t]+)[^\r\n]*/m, (_line, spacing: string) => `${spacing}${renderStringScalar(description)}`)
-      + content.slice(headerStart + header.length)
+    const rendered =
+      content.slice(0, headerStart) +
+      header.replace(
+        /^(description:[ \t]+)[^\r\n]*/m,
+        (_line, spacing: string) => `${spacing}${renderStringScalar(description)}`,
+      ) +
+      content.slice(headerStart + header.length)
     rewritten.push(path)
     await writeFile(absolute, rendered, "utf8")
-    trimmed.push({ path, originalLength: original.length, newLength: parseMemoryFile(rendered).frontmatter.description.length })
+    trimmed.push({
+      path,
+      originalLength: original.length,
+      newLength: parseMemoryFile(rendered).frontmatter.description.length,
+    })
   }
   if (trimmed.length === 0) return trimmed
 
-  const [authorName = "", authorEmail = ""] = (await git([...STABLE_LOG_OUTPUT, "show", "-s", "--format=%an%x00%ae", tipSha])).split("\0")
+  const [authorName = "", authorEmail = ""] = (
+    await git([...STABLE_LOG_OUTPUT, "show", "-s", "--format=%an%x00%ae", tipSha])
+  ).split("\0")
   await repo.commitWrite(
     trimmed.map(({ path }) => path),
     [
       "fix(reflection): trim oversized memory descriptions",
       "",
-      ...trimmed.map(({ path, originalLength, newLength }) =>
-        `Omo-Description-Trimmed: ${path} (${originalLength} -> ${newLength})`),
+      ...trimmed.map(
+        ({ path, originalLength, newLength }) => `Omo-Description-Trimmed: ${path} (${originalLength} -> ${newLength})`,
+      ),
     ].join("\n"),
     { agentId: worktree.parent.agentId, authorName, authorEmail },
   )

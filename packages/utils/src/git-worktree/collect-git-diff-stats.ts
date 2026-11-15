@@ -14,12 +14,16 @@ export function collectGitDiffStats(directory: string): GitFileStat[] {
       stdio: ["pipe", "pipe", "pipe"],
     })
 
-    const statusOutput = childProcess.execFileSync("git", ["status", "--porcelain", "-z", "--find-renames", "--untracked-files=all"], {
-      cwd: directory,
-      encoding: "utf-8",
-      timeout: 5000,
-      stdio: ["pipe", "pipe", "pipe"],
-    })
+    const statusOutput = childProcess.execFileSync(
+      "git",
+      ["status", "--porcelain", "-z", "--find-renames", "--untracked-files=all"],
+      {
+        cwd: directory,
+        encoding: "utf-8",
+        timeout: 5000,
+        stdio: ["pipe", "pipe", "pipe"],
+      },
+    )
 
     const untrackedOutput = childProcess.execFileSync("git", ["ls-files", "-z", "--others", "--exclude-standard"], {
       cwd: directory,

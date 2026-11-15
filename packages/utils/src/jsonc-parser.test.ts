@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { clearPluginConfigFileDetectionCache, detectConfigFile, detectPluginConfigFile, parseJsonc, parseJsoncSafe, readJsoncFile } from "./jsonc-parser"
+import {
+  clearPluginConfigFileDetectionCache,
+  detectConfigFile,
+  detectPluginConfigFile,
+  parseJsonc,
+  parseJsoncSafe,
+  readJsoncFile,
+} from "./jsonc-parser"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 

@@ -29,10 +29,17 @@ describe("/agreements: the person's own write path", () => {
     await run("add --project Never filter the message monitor output")
 
     // then
-    expect(await ledger()).toEqual([{
-      id: agreementId("Never filter the message monitor output"), scope: "project", by: "human",
-      text: "Never filter the message monitor output", n: 0, since: expect.any(String), status: "active",
-    }])
+    expect(await ledger()).toEqual([
+      {
+        id: agreementId("Never filter the message monitor output"),
+        scope: "project",
+        by: "human",
+        text: "Never filter the message monitor output",
+        n: 0,
+        since: expect.any(String),
+        status: "active",
+      },
+    ])
     expect((await repo.log())[0]?.trailers["Omo-Writer"]).toBe("human-command")
     expect(deps.busts).toHaveLength(1)
   }, 30_000)
