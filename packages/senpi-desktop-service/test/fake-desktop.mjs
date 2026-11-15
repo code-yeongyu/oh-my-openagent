@@ -7,7 +7,6 @@
 // FAKE_ENGINE_INPUT_ERROR=<engine error code> makes every input method fail with that code, the way the
 // engine's input gate refuses (Suspended, StopPathUnavailable, PermissionDenied, ScreenLocked);
 // FAKE_ENGINE_INPUT_REASON adds that failure's `data.reason`.
-// FAKE_ENGINE_CLIPBOARD_BYTES=<n> starts the clipboard with n bytes of text (an oversized engine result).
 
 const PNG_1X1 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
 
@@ -111,7 +110,7 @@ const audit = (action, target, frameId, code) => ({
  */
 export function createDesktop() {
   const frames = new Map()
-  let clipboard = "c".repeat(Number(process.env.FAKE_ENGINE_CLIPBOARD_BYTES ?? 0))
+  let clipboard = ""
   const inputError = process.env.FAKE_ENGINE_INPUT_ERROR
   return (method, params) => {
     const target = params?.target

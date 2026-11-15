@@ -19,13 +19,11 @@ export type ComputerRunErrorReason =
   | "window"
   | "wait"
   | "unavailable"
-  // QuickJS run cell limits (run/sandbox): fatal to the run, except `payloadSize` and `resultSize`, which reject
-  // one bridged call (its arguments or its result over the cap) and are catchable in the body.
+  // QuickJS run cell limits (run/sandbox): fatal to the run, except `payloadSize`, which rejects one bridged call.
   | "calls"
   | "memory"
   | "stack"
   | "payloadSize"
-  | "resultSize"
   | "stalled"
   | "crashed"
 
