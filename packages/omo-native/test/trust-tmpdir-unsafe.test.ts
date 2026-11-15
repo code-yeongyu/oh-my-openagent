@@ -2,11 +2,12 @@
 // (group- or world-writable without the sticky bit, or owned by another user), the stage refuses with the typed
 // `trust-tmpdir-unsafe` refusal and one stderr line that names the first unsafe directory, what is wrong with it, and
 // what to do, instead of dying with an uncaught error and a stack trace. A private ancestor reaches the next stage.
-import { afterAll, afterEach, beforeAll, expect, mock, test } from "bun:test"
+import { afterAll, afterEach, beforeAll, describe, expect, mock, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, realpath, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runTrustStage } from "../trust-stage"
+import { unsafeAncestorProblem } from "../trust-generation"
 
 let root = ""
 const savedTmpdir = process.env.TMPDIR
@@ -82,9 +83,25 @@ test.skipIf(process.platform === "win32")(
 
     // then
     expect(result).toMatchObject({ action: "refuse", code: "trust-tmpdir-unsafe" })
-    expect(stderr).toContain(`${shared} is world-writable;`)
+    expect(stderr.split("\n").filter((line) => line !== "")).toEqual([
+      `omo: trust-tmpdir-unsafe: ${shared} is world-writable; run chmod go-w ${shared}, or set TMPDIR to a private directory, and start omo again`,
+    ])
   },
 )
+
+describe("the named problem of a refused ancestor", () => {
+  test.each([
+    [0o777, "world-writable"],
+    [0o775, "group-writable"],
+    // The bytes are writable but the sticky bit is what keeps them safe, so the refusal is the owner's and the
+    // remedy must not be `chmod go-w` (which a non-owner cannot run and which would not be the problem).
+    [0o1777, "owned by another user"],
+    [0o1775, "owned by another user"],
+    [0o755, "owned by another user"],
+  ] as const)("#given mode %s #then the problem is %s", (mode, problem) => {
+    expect(unsafeAncestorProblem(mode)).toBe(problem)
+  })
+})
 
 test.skipIf(process.platform === "win32")(
   "#given TMPDIR under private directories #when the trust stage runs #then it does not refuse on the directory",
@@ -93,10 +110,11 @@ test.skipIf(process.platform === "win32")(
     const { home, temporary } = await layout("private", 0o700)
 
     // when
-    const { result, acquire } = await stage(home, temporary)
+    const { result, stderr, acquire } = await stage(home, temporary)
 
     // then
     expect(result).not.toMatchObject({ action: "refuse", code: "trust-tmpdir-unsafe" })
+    expect(stderr).toBe("")
     expect(acquire).toHaveBeenCalled()
   },
 )

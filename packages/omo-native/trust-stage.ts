@@ -189,7 +189,13 @@ export async function runTrustStage(options: TrustStageOptions): Promise<TrustSt
   }
   let unsafe: UnsafeTrustAncestor | undefined
   const refuse = async (code: Refusal, check: Check | null = null): Promise<TrustStageResult> => {
-    await record({ kind, action: "refuse", generation: addressed?.sha256 ?? null, codes: [...codes, { code }], check })
+    await record({
+      kind,
+      action: "refuse",
+      generation: addressed?.sha256 ?? null,
+      codes: [...codes, { code }],
+      check,
+    })
     if (code === "trust-tmpdir-unsafe" && unsafe !== undefined) {
       const remedy =
         unsafe.problem === "group-writable" || unsafe.problem === "world-writable"
@@ -260,7 +266,13 @@ export async function runTrustStage(options: TrustStageOptions): Promise<TrustSt
           directory = await temporaryTrustDirectory(platform)
           codes.push({ code: "trust-dir-unsafe" })
           defaults = await createTrustDefaults(directory)
-        } catch {
+        } catch (fallback) {
+          // A temporary directory refused for an unsafe ancestor keeps its own typed refusal and its named
+          // directory; folding it into trust-path-unrepresentable would print the TMPDIR-separator remedy instead.
+          if (fallback instanceof TrustStorageError) {
+            unsafe = fallback.unsafe
+            return fallback.code
+          }
           return "trust-path-unrepresentable" as const
         }
       }
@@ -320,7 +332,10 @@ export async function runTrustStage(options: TrustStageOptions): Promise<TrustSt
   const originals =
     addressed === undefined
       ? env
-      : { ...env, ...Object.fromEntries(Object.entries(restore).map(([k, v]) => [k, v ?? undefined])) }
+      : {
+          ...env,
+          ...Object.fromEntries(Object.entries(restore).map(([k, v]) => [k, v ?? undefined])),
+        }
   const generation = await generate(owner === "server" || !optedIn(originals, platform), process.pid)
   if (typeof generation === "string") return refuse(generation)
   const marker: EngineTrustMarker = { v: 1, ...generation, owner, restore }

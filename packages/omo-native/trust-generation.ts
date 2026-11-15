@@ -115,6 +115,16 @@ export function judgeAncestor(
   return "unsafe-ancestor"
 }
 
+/**
+ * The problem named for a refused ancestor. The write bits are named only when they are what refused it: a sticky
+ * writable directory is accepted for its write bits and refused for its owner, so naming it world/group-writable
+ * would print a remedy (`chmod go-w`) that is not the problem and that a non-owner cannot run.
+ */
+export function unsafeAncestorProblem(mode: number): UnsafeTrustAncestor["problem"] {
+  if ((mode & 0o022) === 0 || (mode & 0o1000) !== 0) return "owned by another user"
+  return (mode & 0o002) !== 0 ? "world-writable" : "group-writable"
+}
+
 /** Ancestors may be system-owned (/home, /tmp); none may redirect through a link. */
 async function ancestors(path: string): Promise<void> {
   let current = resolve(path)
@@ -137,11 +147,7 @@ async function ancestors(path: string): Promise<void> {
     )
     if (verdict === "unsafe-directory") throw new UnsafeTrustAncestor(current, "a symbolic link or not a directory")
     if (verdict === "unsafe-ancestor") {
-      const mode = Number(stat.mode)
-      throw new UnsafeTrustAncestor(
-        current,
-        (mode & 0o002) !== 0 ? "world-writable" : (mode & 0o020) !== 0 ? "group-writable" : "owned by another user",
-      )
+      throw new UnsafeTrustAncestor(current, unsafeAncestorProblem(Number(stat.mode)))
     }
     if (verdict === "unattested") throw new TrustStorageError("trust-userns-unattested")
     const parent = dirname(current)
