@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "61e82ab22e11ca3014190b4c1d976cd40d20657adaed5a82a8861a80cdbf7b0f" as const
+export const SCHEMA_SHA256 = "ad8744400b66d9a942afa107fbd32f5008c890c0806fe4de9828874208852d9a" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -148,12 +148,6 @@ export const SETTINGS_TABLE = [
 		"status": "new",
 		"reader": "session.open: Consequential gate URL read",
 		"admissionKey": true
-	},
-	{
-		"key": "run_limits",
-		"status": "new",
-		"reader": "QuickJS run cell ceilings",
-		"admissionKey": false
 	},
 	{
 		"key": "record",
@@ -1254,22 +1248,6 @@ export type Route = "ax" | "background_window" | "background_pid" | "foreground_
 
 export type RouteRung = "physical" | "semantic"
 
-export type RunLimits = {
-	source?: number
-	wallMs?: number
-	heapBytes?: number
-	stackBytes?: number
-	calls?: number
-	pending?: number
-	argBytes?: number
-	returnBytes?: number
-	treeBytes?: number
-	imageBytes?: number
-	journal?: number
-	children?: number
-	batchCalls?: number
-}
-
 export type Runtime = "legacy" | "v3"
 
 export type ScreenshotGc = {
@@ -1373,7 +1351,6 @@ export type Settings = {
 	engine_path?: string | null
 	send_on_enter?: Record<string, SendOnEnterRule> | null
 	url_policy?: string[] | null
-	run_limits?: RunLimits | null
 	record?: boolean | null
 	pause_ceiling_ms?: number | null
 	display_awake_grace_ms?: number | null

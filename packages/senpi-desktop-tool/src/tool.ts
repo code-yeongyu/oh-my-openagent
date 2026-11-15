@@ -9,7 +9,6 @@ import {
 import type { ActionReport } from "@oh-my-opencode/senpi-desktop-sdk"
 import {
   type ComputerRunHost,
-  type ComputerRunSandbox,
   DesktopEngineRpcError,
   DesktopLaunchContextError,
   type ExecuteTool,
@@ -46,8 +45,6 @@ export interface ComputerToolDetails {
   readonly readOnly?: boolean
   readonly screenshots?: readonly ComputerScreenshot[]
   readonly audit?: readonly AuditRecord[]
-  /** Where the run executed: `quickjs` only for model-written `run` code under `computer.run_sandbox: "quickjs"`. */
-  readonly sandbox?: ComputerRunSandbox
   /**
    * The SDK `ActionReport` of the run's last input action; absent when the run sent none. `legacy: true` when the
    * engine replied `null` (it does not advertise `action-report`).
@@ -201,8 +198,6 @@ export async function runComputer(
     readonly code: string
     readonly readOnly: boolean
     readonly timeoutSeconds: number
-    /** `host` for code the host built (call chains, the CUA batch), which stays on vm whatever the setting. */
-    readonly origin: "host" | "model"
   },
   signal: AbortSignal | undefined,
 ): Promise<ComputerToolResult> {
@@ -218,8 +213,6 @@ export async function runComputer(
       code: request.code,
       snapshot,
       timeoutMs,
-      sandbox: settings.runSandbox,
-      origin: request.origin,
       ...(signal === undefined ? {} : { signal }),
     },
     {
@@ -245,7 +238,6 @@ export async function runComputer(
       readOnly: request.readOnly,
       screenshots: outcome.screenshots,
       audit: outcome.audit,
-      sandbox: outcome.sandbox,
       ...(reports.length === 0 ? {} : { report: reports[reports.length - 1] }),
       ...(reports.length > 1 ? { reports } : {}),
     },
@@ -281,18 +273,14 @@ export function createComputerTool(deps: ComputerToolDeps) {
           const readOnly = isReadOnlyComputerCall(params.chain)
           const code = renderCallChain(params.chain)
           return permissionResult(
-            run(context, { code, readOnly, timeoutSeconds: DEFAULT_TIMEOUT_SECONDS, origin: "host" }, signal),
+            run(context, { code, readOnly, timeoutSeconds: DEFAULT_TIMEOUT_SECONDS }, signal),
             handle,
           )
         }
         case "run": {
           const timeoutSeconds = params.timeout ?? DEFAULT_TIMEOUT_SECONDS
           return permissionResult(
-            run(
-              context,
-              { code: params.code, readOnly: params.read_only === true, timeoutSeconds, origin: "model" },
-              signal,
-            ),
+            run(context, { code: params.code, readOnly: params.read_only === true, timeoutSeconds }, signal),
             handle,
           )
         }

@@ -7,9 +7,6 @@ import { artifactsMatch } from "./build-artifact.mjs"
 import {
   buildExtension,
   COMPUTER_PRELUDE_ASSET_NAME,
-  COMPUTER_RUN_WASM_NAME,
-  COMPUTER_RUN_WORKER_NAME,
-  computerRunWasmSourcePath,
   extensionBuildPaths,
   GATEWAY_STORE_WORKER_NAME,
   memorySyncAssetSources,
@@ -128,17 +125,6 @@ export async function checkExtensionCurrent(options = {}) {
   if (currentClaimReceipt === undefined) return { ok: false, reason: "missing-output", output: claimReceiptOutput }
   const currentComputerUse = await readBuiltEntry(computerUseOutput)
   if (currentComputerUse === undefined) return { ok: false, reason: "missing-output", output: computerUseOutput }
-  const computerRunWorkerOutput = join(dirname(computerUseOutput), COMPUTER_RUN_WORKER_NAME)
-  const currentComputerRunWorker = await readBuiltEntry(computerRunWorkerOutput)
-  if (currentComputerRunWorker === undefined)
-    return { ok: false, reason: "missing-output", output: computerRunWorkerOutput }
-  const computerRunWasmOutput = join(dirname(computerUseOutput), COMPUTER_RUN_WASM_NAME)
-  const currentComputerRunWasm = await readFile(computerRunWasmOutput).catch(() => undefined)
-  if (currentComputerRunWasm === undefined)
-    return { ok: false, reason: "missing-output", output: computerRunWasmOutput }
-  if (sha256(currentComputerRunWasm) !== sha256(await readFile(computerRunWasmSourcePath()))) {
-    return { ok: false, reason: "stale-output", output: computerRunWasmOutput }
-  }
   const currentGatewayStoreWorker = await readBuiltEntry(gatewayStoreWorkerOutput)
   if (currentGatewayStoreWorker === undefined)
     return { ok: false, reason: "missing-output", output: gatewayStoreWorkerOutput }
@@ -210,11 +196,6 @@ export async function checkExtensionCurrent(options = {}) {
       [currentDesktopToolkit, expected.desktopToolkitOutputPath, desktopToolkitOutput],
       [currentClaimReceipt, expected.claimReceiptOutputPath, claimReceiptOutput],
       [currentComputerUse, expected.computerUseOutputPath, computerUseOutput],
-      [
-        currentComputerRunWorker,
-        join(dirname(expected.computerUseOutputPath), COMPUTER_RUN_WORKER_NAME),
-        computerRunWorkerOutput,
-      ],
       [currentGatewayStoreWorker, expected.gatewayStoreWorkerOutputPath, gatewayStoreWorkerOutput],
       [currentThreadSdk, expected.threadSdkOutputPath, threadSdkOutput],
     ]) {

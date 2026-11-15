@@ -805,12 +805,6 @@
       "admissionKey": true
     },
     {
-      "key": "run_limits",
-      "status": "new",
-      "reader": "QuickJS run cell ceilings",
-      "admissionKey": false
-    },
-    {
       "key": "record",
       "status": "new",
       "reader": "per-run recording writer",
@@ -5331,91 +5325,6 @@
         "semantic"
       ]
     },
-    "RunLimits": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "source": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0,
-          "default": 65536
-        },
-        "wallMs": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0,
-          "default": 30000
-        },
-        "heapBytes": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0,
-          "default": 16777216
-        },
-        "stackBytes": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0,
-          "default": 1048576
-        },
-        "calls": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0,
-          "default": 64
-        },
-        "pending": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0,
-          "default": 4
-        },
-        "argBytes": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0,
-          "default": 65536
-        },
-        "returnBytes": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0,
-          "default": 65536
-        },
-        "treeBytes": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0,
-          "default": 131072
-        },
-        "imageBytes": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0,
-          "default": 2097152
-        },
-        "journal": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0,
-          "default": 64
-        },
-        "children": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0,
-          "default": 4
-        },
-        "batchCalls": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0,
-          "default": 16
-        }
-      },
-      "description": "`run_limits`: the QuickJS cell's ceilings. Every member is overridable per hand; an\nomitted member keeps its default."
-    },
     "Runtime": {
       "type": "string",
       "enum": [
@@ -5939,16 +5848,6 @@
           "items": {
             "type": "string"
           }
-        },
-        "run_limits": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/RunLimits"
-            },
-            {
-              "type": "null"
-            }
-          ]
         },
         "record": {
           "type": [

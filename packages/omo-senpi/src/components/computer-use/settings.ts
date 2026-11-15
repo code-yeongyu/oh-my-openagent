@@ -28,7 +28,6 @@ export function toComputerSettingsInput(block: OmoComputerSettings | undefined):
           },
     enginePath: block.engine_path,
     cuaAdapter: block.cua_adapter,
-    runSandbox: block.run_sandbox,
     intervention: block.intervention,
     macosKeyPriming: block.macos_key_priming,
     trace: block.trace,
