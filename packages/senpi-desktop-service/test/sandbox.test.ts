@@ -292,6 +292,23 @@ describe("QuickJS run cell", HANG_GUARD, () => {
     expect(flood).toBe("calls")
   })
 
+  it("resolves an undefined bridged result as undefined and a nested undefined as JSON does", async () => {
+    // Given
+    const bridge = {
+      none: async () => undefined,
+      nested: async () => ({ dropped: undefined, list: [undefined, 1] }),
+    }
+
+    // When
+    const result = await cell(
+      `const empty = await none(); const value = await nested(); return [empty === undefined, Object.hasOwn(value, "dropped"), value.list];`,
+      { bridge },
+    )
+
+    // Then
+    expect(result.returnValue).toEqual([true, false, [null, 1]])
+  })
+
   it("refuses a non-JSON bridged argument with a TypeError inside the VM", async () => {
     // When
     const result = await cell(`try { await echo(() => 1); return "sent"; } catch (error) { return error.name; }`, {

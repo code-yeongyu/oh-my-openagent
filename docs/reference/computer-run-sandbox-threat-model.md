@@ -56,7 +56,7 @@ In scope (the QuickJS cell must stop these):
 | T5 | Host-object mutation / prototype pollution of shared facade objects, inside the VM or on the host side | possible (facade objects live in the host realm) | impossible in the VM: it holds stubs only, the host keeps its objects in a per-run handle table. On the host side, arguments from the VM are data: they are parsed from JSON and passed to the engine, never merged into host state (section 4) |
 | T6 | Work leaked past the run's end (pending promises, timers) resuming later | frozen by design (no drain after end) | the VM and its worker are destroyed at settle; nothing survives the run |
 | T7 | Oversized results/output exhausting host memory or the model context | `cloneSafe` copy, size unbounded | return value and output are serialized across the boundary and capped (section 6) |
-| T8 | Engine (QuickJS) memory-safety bug or trap | n/a | wasm linear memory in a worker thread: a crash or trap kills the worker, not the host, and the run settles at once with `sandbox` (section 5); the engine version is exact-pinned |
+| T8 | Engine (QuickJS) memory-safety bug or trap | n/a | wasm linear memory in a worker thread: a crash or trap kills the worker, not the host, and the run settles at once with `crashed` (section 5); the engine version is exact-pinned |
 
 Out of scope (stated so nobody relies on the sandbox for them):
 
@@ -138,9 +138,12 @@ Handles. The facade returns three handle kinds, and each becomes a VM stub:
 A stub carries its engine identity (window `id`, element `ref`, or `display:<selector>`, the same keys the
 facade already re-resolves on every call, `run/handles.ts:41,110`) plus its snapshot fields as plain JSON
 properties, so bodies that read `editor.title` or `el.role` synchronously (`run.test.ts:103` does) keep working.
-The host keeps no per-handle objects: a stub's call names its identity and the host re-resolves it exactly as the
-vm facade does, so a body that creates thousands of handles costs the host nothing between calls. An identity
-from an earlier run is refused like any unknown id/ref today.
+The host keeps a per-run handle table (`run/sandbox/bridge.ts`): each distinct engine identity a result carries
+gets one entry holding the facade's handle object, and the stub's calls name that entry by its index, so a call
+runs the same handle object the vm facade would. The table is capped at 10,000 distinct handles per run; a call
+whose result would add one more rejects inside the VM with `ComputerRunError("resultSize")`, catchable like an
+over-cap result. The table and the descriptor key that marks a handle in a result are created per run and dropped
+with it, so an index from an earlier run is an unknown handle in the next.
 
 Values. Everything crosses as JSON: arguments host-ward, results VM-ward. Functions, `RegExp` and other
 non-JSON values are refused at the boundary with a `TypeError` in the VM (a facade method that needs a
@@ -154,8 +157,9 @@ Serialization rules, both directions (the builder of row 32 implements exactly t
 
 - Host-ward arguments go through `JSON.stringify` with an explicit replacer that throws a VM `TypeError` on a
   function, `RegExp`, symbol, `bigint`, `NaN` or `Infinity` (plain `JSON.stringify` would silently drop the first
-  two, turn the next into `{}` and the last two into `null`). `undefined` in an argument list is kept as an absent
-  trailing argument or an absent property, as JavaScript calls already treat it.
+  two, turn the next into `{}` and the last two into `null`). Trailing `undefined` arguments are dropped, so they
+  stay absent as JavaScript calls already treat them, and an `undefined` property is absent; a non-trailing
+  `undefined` argument becomes `null` (JSON).
 - VM-ward results travel in an envelope `{ "ok": true, "value": <json> }`; an `undefined` result (for example
   `el.value()`, `run/handles.ts:146-148`) is the envelope without `value`, and `pid` and other optional snapshot
   fields are simply absent, so the VM sees `undefined`, not `null`.
@@ -191,19 +195,19 @@ checkpoint, and terminate still ends it. The run settles with the error. The fai
 (`runtime.ts:199`) applies unchanged.
 
 Worker crash: a worker `error` or `exit` before the run settled (a wasm trap, an engine bug, T8) settles the
-run at once with `ComputerRunError("sandbox")`, cancels the in-flight call, revokes the grant, and the next
+run at once with `ComputerRunError("crashed")`, cancels the in-flight call, revokes the grant, and the next
 run starts a fresh worker. A crash never leaves a run pending until its wall deadline.
 
 Result size, VM-ward: an engine result is checked against a per-result cap (8 MiB serialized) on the host
 before it is copied into the VM; over the cap, the bridged call rejects inside the VM with
-`ComputerRunError("payloadSize")` naming the size (the worker applies the same rule host-ward: an argument list
-over 1 MiB is rejected before it is posted), so the script can narrow the query (`observe({ since })`, a
+`ComputerRunError("resultSize")` naming the size (the worker applies the same rule host-ward: an argument list
+over 1 MiB is rejected with `ComputerRunError("payloadSize")` before it is posted), so the script can narrow the query (`observe({ since })`, a
 subtree) instead of the run dying on the 64 MiB heap.
 
 ## 6. Limits and structured errors
 
-All limits are per run. `ComputerRunErrorReason` (`run/context.ts:10`) gains six values: `calls`, `memory`,
-`stack`, `payloadSize`, `stalled`, `sandbox`. Existing values keep their meaning; in particular `unavailable`
+All limits are per run. `ComputerRunErrorReason` (`run/context.ts:10`) gains seven values: `calls`, `memory`,
+`stack`, `payloadSize`, `resultSize`, `stalled`, `crashed`. Existing values keep their meaning; in particular `unavailable`
 stays "this engine lacks the feature" (`run/observe.ts:33`, `run/hold-call.ts:10`) and is not reused for a crash.
 
 | Limit | Default | Enforced by | Error (`ComputerRunError.reason`) | Fatal to the run? |
@@ -212,9 +216,10 @@ stays "this engine lacks the feature" (`run/observe.ts:33`, `run/hold-call.ts:10
 | Bridged calls | 1,000 per run | host call queue counter | `calls` | yes |
 | Heap | 64 MiB VM memory | `memoryLimit` | `memory` (QuickJS `InternalError: out of memory`) | yes |
 | Stack | QuickJS `maxStackSize` guard | `maxStackSize` | `stack` (QuickJS `RangeError: Maximum call stack size exceeded`, reported by the host) | yes |
-| Bridged payload, either direction | 8 MiB serialized per result (VM-ward), 1 MiB per argument list (host-ward) | host before copying a result in; worker before posting arguments out | `payloadSize`, as a rejection of that one call inside the VM | no: catchable, the body can narrow its query |
+| Bridged payload, either direction | 8 MiB serialized per result (VM-ward), 1 MiB per argument list (host-ward) | host before copying a result in; worker before posting arguments out | `resultSize` (result) or `payloadSize` (arguments), as a rejection of that one call inside the VM | no: catchable, the body can narrow its query |
+| Handles | 10,000 distinct handles per run (by engine identity) | host handle table, before a result adds one | `resultSize`, as a rejection of that one call inside the VM | no: catchable |
 | Stall | nothing in flight, nothing queued, VM job queue empty | host, after each drain | `stalled` | yes, at once |
-| Worker crash | n/a | worker `error`/`exit` handler | `sandbox` | yes, at once |
+| Worker crash | n/a | worker `error`/`exit` handler | `crashed` | yes, at once |
 | Output + return value | 1 MiB serialized per run | worker, before posting | none: truncated (see note) | no |
 
 Note on output: an oversized console stream is cut with a visible marker. An oversized return value is
@@ -321,7 +326,7 @@ Row 22 (`packages/senpi-desktop-service`, quickjs mode):
 8. A single long builtin (`/(a+)+$/.test("a".repeat(40) + "b")`) under a short `timeout` settles with `timeout`
    by `worker.terminate()`; the next run works.
 9. Worker crash: a worker that exits before the run settles (test hook) settles the run at once with
-   `sandbox`, not at the wall deadline; the next run works.
+   `crashed`, not at the wall deadline; the next run works.
 10. Output caps: a console stream past 1 MiB is cut with the marker; a return value past 1 MiB comes back as a
     string ending in the truncation marker, never as invalid JSON.
 11. Stall: `await new Promise(() => {})` settles with `stalled` well before a 30 s `timeout`.
@@ -350,8 +355,8 @@ Row 32 (bridge):
     `const el = await desktop.ref("e1"); return el.role` return the snapshot without an extra engine call.
 11. Arguments are data: a call whose argument object carries a `"__proto__"` key leaves `Object.prototype` on
     the host unchanged and the engine receives the key as an own property.
-12. Payload caps: a fake engine result past 8 MiB, and an argument list past 1 MiB, each reject that call inside
-    the VM with `payloadSize`; a `try/catch` in the body recovers and the run returns normally.
+12. Payload caps: a fake engine result past 8 MiB rejects that call inside the VM with `resultSize`, and an
+    argument list past 1 MiB with `payloadSize`; a `try/catch` in the body recovers and the run returns normally.
 13. Serialization: `computer.windows(() => true)` and `computer.click(NaN, 1)` throw a VM `TypeError` before any
     engine request; `(await computer.ref("e1")).value()` on an element with no value returns `undefined`;
     `computer.clipboard.read` is a nested function.

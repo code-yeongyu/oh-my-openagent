@@ -5,6 +5,7 @@ import type {
   AuditEvent,
   AuditRecord,
   ComputerRunOk,
+  ComputerScreenshot,
   ComputerSessionSnapshot,
 } from "@oh-my-opencode/senpi-desktop-protocol"
 import { isRecord } from "../service/parse"
@@ -18,6 +19,7 @@ import {
   RunOutput,
 } from "./context"
 import { createDesktopFacade } from "./facade"
+import { createComputerBridge } from "./sandbox/bridge"
 import { runQuickJsCode } from "./sandbox/quickjs"
 import { createWait, type WaitOptions } from "./wait"
 
@@ -96,7 +98,8 @@ function auditRecord(event: AuditEvent, sessionId: string, runId: string): Audit
 }
 
 /**
- * Runs model-written `code` in the QuickJS cell (`run/sandbox`) when `sandbox` is `quickjs`; otherwise
+ * Runs model-written `code` in the QuickJS cell (`run/sandbox`) when `sandbox` is `quickjs`, with `computer`
+ * (alias `desktop`), `assert` and `console` as its globals (`computer` bridged to this run's facade); otherwise
  * (the default, and always for host-built code) in a fresh `node:vm` context of this process, with `desktop`, `wait`, `assert`, `tool`,
  * and `console` as its globals. The vm is not a security boundary; it scopes the run's globals and
  * bounds its synchronous work.
@@ -113,9 +116,32 @@ export async function runComputerCode(
   host: ComputerRunHost,
 ): Promise<ComputerRunOk & { readonly sandbox: ComputerRunSandbox }> {
   if (request.sandbox === "quickjs" && request.origin !== "host") {
-    return { ...(await runQuickJsCode(request, host)), sandbox: "quickjs" }
+    return { ...(await runInQuickJs(request, host)), sandbox: "quickjs" }
   }
   return { ...(await runInVm(request, host)), sandbox: "vm" }
+}
+
+async function runInQuickJs(request: ComputerRunRequest, host: ComputerRunHost): Promise<ComputerRunOk> {
+  const { snapshot } = request
+  const runId = randomUUID()
+  const audit: AuditRecord[] = []
+  const unsubscribe = host.service.onAudit((event) => audit.push(auditRecord(event, snapshot.sessionId, runId)))
+  const output = new RunOutput()
+  const screenshots: ComputerScreenshot[] = []
+  const { bridge, setup } = createComputerBridge({
+    snapshot,
+    deadline: Date.now() + request.timeoutMs,
+    output,
+    screenshots,
+    call: (method, params, signal) => host.service.call(method, params, { signal }),
+    ...(host.confirmControl === undefined ? {} : { confirmControl: host.confirmControl }),
+  })
+  try {
+    const result = await runQuickJsCode(request, host, { bridge, setup, output })
+    return { ...result, screenshots: [...screenshots], audit: [...audit] }
+  } finally {
+    unsubscribe()
+  }
 }
 
 async function runInVm(request: ComputerRunRequest, host: ComputerRunHost): Promise<ComputerRunOk> {
