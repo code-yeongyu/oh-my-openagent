@@ -443,7 +443,8 @@ export function createLiveThreadSurface(
     error: unknown,
     reason: "live_unresponsive" | "dead" | null,
   ): Promise<EndpointListing> => {
-    // One file at a time, off the event loop: a host that died holding many claims costs time, never file descriptors (#13579).
+    // One file at a time for this endpoint, off the event loop: a host that died holding many claims costs time, not file
+    // descriptors. listView lists endpoints concurrently, so open files are bounded by the endpoint count (#13579, #13584).
     const known = new Set(endpoint.paths)
     for (const dir of endpoint.claimDirs) for (const path of await claimedSessionPaths(dir)) known.add(path)
     for (const path of lastListed.get(endpoint.socket) ?? []) known.add(path)
