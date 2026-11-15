@@ -41,7 +41,7 @@ export function owner(id: string) {
   }
 }
 
-export async function setup(extra: Partial<Pick<SyncRpcOptions, "phraseGate">> = {}) {
+export async function setup(overrides: Partial<SyncRpcOptions> = {}) {
   const device = await newDevice()
   const accountAbort = new AbortController()
   const hostAbort = new AbortController()
@@ -136,7 +136,7 @@ export async function setup(extra: Partial<Pick<SyncRpcOptions, "phraseGate">> =
     pinDir: "/unused",
     signal: hostAbort.signal,
     syncStatus: async () => ({ state: "paused" }),
-    ...extra,
+    ...overrides,
   }
   const coordinator = registerSyncRpc(
     {

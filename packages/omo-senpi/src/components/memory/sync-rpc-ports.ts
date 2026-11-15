@@ -129,4 +129,6 @@ export interface SyncRpcOptions {
   readonly clock?: CeremonyClock
   /** Releases recovery-phrase key creation (amendment A1); absent means off. */
   readonly phraseGate?: PhraseGate
+  /** Receives one warning each time the status read's unavailable cause changes. */
+  readonly warn?: (message: string, fields: Record<string, unknown>) => void
 }
