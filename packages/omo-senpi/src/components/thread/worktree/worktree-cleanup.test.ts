@@ -271,6 +271,24 @@ describe("the remove request another device sends removes only a worktree OmO ma
     },
   )
 
+  test("#given a thread worktree whose branch was created with the reflog disabled #when a remote remove names it #then it is refused worktree_left_behind and the work stays", async () => {
+    const repo = kit.repository()
+    kit.git(repo, "config", "core.logAllRefUpdates", "false")
+    const root = kit.folder("thread-wt-root-")
+    const made = await createThreadWorktree({ repository: repo, request: { branch: "unlogged" }, root })
+    if (made.kind !== "ok") throw new Error(JSON.stringify(made))
+    const work = join(made.worktree.path, "done.txt")
+    writeFileSync(work, "committed\n")
+    kit.git(made.worktree.path, "add", "done.txt")
+    kit.git(made.worktree.path, "commit", "-q", "-m", "work")
+    const outcome = await answerWorktreeRequest({ remove: { path: made.worktree.path, branch: "unlogged" } }, root)
+    expect(errorOf(outcome)).toMatchObject({
+      code: "partial_commit",
+      details: { reason: "worktree_left_behind", path: made.worktree.path },
+    })
+    expect([existsSync(work), branchExists(repo, "unlogged"), worktreeCount(repo)]).toEqual([true, true, 2])
+  })
+
   test("#given the worktree a failed open left #when removal is requested with its path and branch #then it and its branch are removed", async () => {
     const repo = kit.repository()
     const root = kit.folder("thread-wt-root-")
