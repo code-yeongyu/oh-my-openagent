@@ -49,7 +49,11 @@ type ConfirmControl = (request: ControlConfirmRequest) => Promise<boolean>
  * before its own consent is consulted, and a granted decision records the scope as the holder. The caller
  * releases the lease on the scope's revoke, stop or close.
  */
-export function leasedConfirmControl(confirm: ConfirmControl, lease: ForegroundLease, owner: () => LeaseOwner): ConfirmControl {
+export function leasedConfirmControl(
+  confirm: ConfirmControl,
+  lease: ForegroundLease,
+  owner: () => LeaseOwner,
+): ConfirmControl {
   return async (request) => {
     const current = lease.holder()
     if (current !== undefined && !sameOwner(current, owner())) return false

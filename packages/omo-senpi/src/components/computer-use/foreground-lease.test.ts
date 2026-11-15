@@ -10,12 +10,26 @@ const scopeA: LeaseOwner = { issuer: "session-a", scope: "scope-a" }
 const scopeB: LeaseOwner = { issuer: "session-b", scope: "scope-b" }
 
 function request(): ControlConfirmRequest {
-  return { context: { hasUI: false } as ControlConfirmRequest["context"], reason: "click Run", signal: new AbortController().signal, budgetMs: 60_000 }
+  return {
+    context: { hasUI: false } as ControlConfirmRequest["context"],
+    reason: "click Run",
+    signal: new AbortController().signal,
+    budgetMs: 60_000,
+  }
 }
 
-function consent(answer: boolean): { readonly asked: number[]; readonly confirm: (request: ControlConfirmRequest) => Promise<boolean> } {
+function consent(answer: boolean): {
+  readonly asked: number[]
+  readonly confirm: (request: ControlConfirmRequest) => Promise<boolean>
+} {
   const asked: number[] = []
-  return { asked, confirm: () => { asked.push(1); return Promise.resolve(answer) } }
+  return {
+    asked,
+    confirm: () => {
+      asked.push(1)
+      return Promise.resolve(answer)
+    },
+  }
 }
 
 describe("foreground lease between sessions on one device (O1c)", () => {
