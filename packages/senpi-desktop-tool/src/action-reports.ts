@@ -86,7 +86,7 @@ export function reportingService(
       }
       return reply
     },
-    auditBarrier: () => service.auditBarrier(),
+    auditBarrier: (options) => service.auditBarrier(options),
     onAudit: (listener) => service.onAudit(listener),
     revokeControl: () => service.revokeControl(),
     reportError: (error) => service.reportError(error),

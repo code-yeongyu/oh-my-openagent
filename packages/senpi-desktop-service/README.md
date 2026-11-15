@@ -25,7 +25,7 @@ Runs one `senpi-desktop-engine` child process per agent session and talks JSON-R
 
 ## Call budget
 
-- `DesktopService` counts the requests sent through `call` and refuses the first one past `callBudget` (option, default 20,000 per session) with `DesktopCallBudgetError` (`reason: "CallBudgetExceeded"`, `limit`) before an engine starts or anything is sent. `close()` (the tool's `close` action and `/computer off`) resets it.
+- `DesktopService` counts the requests sent through `call` and refuses the first one past `callBudget` (option, default 20,000 per session) with `DesktopCallBudgetError` (`reason: "CallBudgetExceeded"`, `limit`) before an engine starts or anything is sent. Only `resetCallBudget()` (the user's `/computer off`) resets it; `close()`, including the model's `close` action, does not.
 
 ## Engine spawn contract
 

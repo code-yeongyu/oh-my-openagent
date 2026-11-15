@@ -10,6 +10,7 @@ export type ComputerService = Pick<
   | "ensureStopPath"
   | "call"
   | "auditBarrier"
+  | "resetCallBudget"
   | "onAudit"
   | "capabilities"
   | "stopPathStatus"
@@ -114,9 +115,10 @@ export class ComputerHandle {
     return status
   }
 
-  /** Closes the engine session and reports the tool inactive (`/computer off`). */
+  /** Closes the engine session and reports the tool inactive (`/computer off`); the call budget starts over. */
   async deactivate(): Promise<void> {
     await this.close()
+    this.#service.resetCallBudget()
     this.#setActive(false)
   }
 

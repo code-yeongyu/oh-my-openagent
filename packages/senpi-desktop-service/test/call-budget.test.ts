@@ -41,7 +41,7 @@ describe("per-session desktop call budget", { timeout: 30_000 }, () => {
     expect(log.children).toHaveLength(0)
   })
 
-  it("starts a fresh budget once the session is closed", async () => {
+  it("keeps a spent budget across close and reopen, and starts a fresh one only on resetCallBudget", async () => {
     // Given: a session whose one allowed request is spent
     const log = fakeEngineFactory({ FAKE_ENGINE_DESKTOP: "1" })
     const service = new DesktopService({ createChild: log.factory, callBudget: 1 })
@@ -53,8 +53,11 @@ describe("per-session desktop call budget", { timeout: 30_000 }, () => {
     // When
     await service.close()
     await service.open({})
+    const afterClose = await rejectionOf(service.call("windows", {}))
+    service.resetCallBudget()
 
     // Then
+    expect(afterClose).toMatchObject({ reason: "CallBudgetExceeded" })
     expect(await service.call("windows", {})).toEqual(expect.any(Array))
   })
 })
