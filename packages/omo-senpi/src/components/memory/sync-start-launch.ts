@@ -14,7 +14,7 @@ const DEFERRED_STILL_WAITING_MS = 900_000
 /** Far past the 15 s credential-lock wait plus the account read and the engine open: a pass still running is stuck. */
 const START_PASS_DEADLINE_MS = 120_000
 
-export const SYNC_START_FAILED = "sync-start-failed"
+const SYNC_START_FAILED = "sync-start-failed"
 
 /** What a start pass reports while it runs: why it defers, and the stage a stuck pass is named by. */
 export interface StartPassHooks {
@@ -50,17 +50,18 @@ interface RetryState {
   readonly failures: number
 }
 
-const firstRetry = (launch: StartLaunch<unknown>): RetryState => ({
-  retryMs: Math.max(
-    Math.min(launch.deferredRetryMs ?? DEFERRED_RETRY_MS, DEFERRED_RETRY_MAX_MS),
-    DEFERRED_RETRY_MIN_MS,
-  ),
+const firstRetry = (deferredRetryMs: number | undefined): RetryState => ({
+  retryMs: Math.max(Math.min(deferredRetryMs ?? DEFERRED_RETRY_MS, DEFERRED_RETRY_MAX_MS), DEFERRED_RETRY_MIN_MS),
   previousRetryMs: 0,
   quietMs: 0,
   failures: 0,
 })
 
-export function launchStart<T>(launch: StartLaunch<T>, users: number, state = firstRetry(launch)): HeldStart<T> {
+export function launchStart<T>(
+  launch: StartLaunch<T>,
+  users: number,
+  state = firstRetry(launch.deferredRetryMs),
+): HeldStart<T> {
   const { logger, identity } = launch
   let retrying = false
   let nextQuietMs = 0
