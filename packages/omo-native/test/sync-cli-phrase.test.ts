@@ -69,8 +69,9 @@ const shownWords = (terminal: ReadonlyArray<string>): ReadonlyArray<string> =>
 const runEnable = async (
   dependencies: Partial<SyncCommandDependencies>,
   before: (f: Awaited<ReturnType<typeof fixture>>) => Promise<void> = async () => undefined,
+  setup: { readonly server?: Parameters<typeof fixture>[0]; readonly productionFloor?: boolean } = {},
 ) => {
-  const f = await fixture()
+  const f = await fixture(setup.server)
   cleanups.push(f.close)
   await before(f)
   const { genesis: _genesis, method: _method, rpId: _rp, userName: _user, roaming: _roaming, ...base } = f.input
@@ -89,7 +90,7 @@ const runEnable = async (
     confirm: async () => false,
     interactive: true,
     terminalAvailable: () => true,
-    phraseFloor: async () => "on",
+    ...(setup.productionFloor === true ? {} : { phraseFloor: async () => "on" as const }),
     ...dependencies,
   })
   await program.parseAsync(["sync", "enable"], { from: "user" })
@@ -140,6 +141,34 @@ test("#given a person at the terminal #when enable creates a phrase genesis #the
   expect(terminal.written.join("")).toContain(`Save your recovery phrase for ${ACCOUNT}`)
   expect(terminal.written.at(-1)).toContain("\u001b[?1049l")
 })
+
+// #13631 (CLI half): with no injected floor port the CLI reads the service floor itself, fresh, through the
+// operation's own signed-in chain (`GET /v1/sync/state` `accepts_phrase_keys`). Only a literal true creates a phrase.
+for (const [label, acceptsPhraseKeys] of [
+  ["true", true],
+  ["false", false],
+  ["absent", undefined],
+] as const) {
+  test(`#given no injected floor port and accepts_phrase_keys ${label} on the service state route #when enable must create a phrase #then ${acceptsPhraseKeys === true ? "the phrase genesis is created" : "it is refused as unavailable and nothing is written"}`, async () => {
+    const terminal = scriptedTerminal()
+    const r = await runEnable({ env: { [PHRASE_GENESIS_FLAG]: "1" }, terminal: terminal.open }, undefined, {
+      server: acceptsPhraseKeys === undefined ? {} : { acceptsPhraseKeys },
+      productionFloor: true,
+    })
+    if (acceptsPhraseKeys === true) {
+      expect(r.exit).toBe(0)
+      expect(r.out).toContain("Memory sync is on for this device.")
+      expect(shownWords(terminal.written).length).toBe(24)
+      return
+    }
+    expect(r.exit).toBe(EXIT_UNSUPPORTED_HERE)
+    expect(r.err.join("\n")).toContain("isn't available on this device yet")
+    expect(r.err.join("\n")).toContain("(service-floor-off)")
+    expect(shownWords(terminal.written)).toEqual([])
+    expect(r.f.entries).toEqual([])
+    expect(r.f.server.switches).toEqual([])
+  })
+}
 
 test("#given a shown phrase that contains memory and device #when the only output is the CLI's success line #then no leak is reported (no random false failure)", () => {
   expect(leakedWords(["memory", "device", "abandon"], ["Memory sync is on for this device."])).toEqual([])

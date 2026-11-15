@@ -10,7 +10,7 @@ import { TypedPhrase } from "../memory-core/src/sync/recovery/phrase.ts"
  * are written there and nowhere else (never stdout, stderr or a logger) and typed there with echo off; argv, env,
  * stdin and pipes are never read for them. An agent harness or CI refuses before anything secret exists.
  */
-export const AGENT_MARKERS = ["PI_CODING_AGENT", "AI_AGENT", "CI"] as const
+const AGENT_MARKERS = ["PI_CODING_AGENT", "AI_AGENT", "CI"] as const
 
 export interface PhraseTerminal {
   write(text: string): void
@@ -128,7 +128,7 @@ const ALT_SCREEN_OFF = "\u001b[2J\u001b[H\u001b[?1049l"
  * alternate screen, which is cleared and left on every exit. The account label comes from this CLI's own
  * signed-in session, never from the engine wire (C1).
  */
-export function terminalPhraseSurface(
+function terminalPhraseSurface(
   terminal: PhraseTerminal,
   accountLabel: string,
 ): PhraseSurface & PhraseEntrySurface & { readonly done: () => void } {

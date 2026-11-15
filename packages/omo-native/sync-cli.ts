@@ -7,7 +7,7 @@ import { createRecoveryBridge } from "../memory-core/src/sync/recovery/bridge.ts
 import type { PasskeyAuthenticator } from "../memory-core/src/sync/recovery/ports.ts"
 import { recoverOnFreshDevice } from "../memory-core/src/sync/recovery/recover.ts"
 import { createPhraseGenesisBridge } from "../memory-core/src/sync/genesis/phrase-bridge.ts"
-import type { PhraseGate } from "../memory-core/src/sync/genesis/phrase-gate.ts"
+import { type PhraseGate, readServiceFloor } from "../memory-core/src/sync/genesis/phrase-gate.ts"
 import {
   agentMarkerSet,
   controllingTerminalAvailable,
@@ -34,7 +34,10 @@ export interface SyncCommandDependencies {
   /** Opens the controlling terminal; null when there is none. Words never go anywhere else. */
   readonly terminal?: () => PhraseTerminal | null
   readonly terminalAvailable?: () => boolean
-  /** The service floor reader; absent (production until the A1.1 gate conditions hold) reads unknown and refuses. */
+  /**
+   * The service floor reader; tests inject one. Absent, the gate reads the service's own `accepts_phrase_keys`
+   * fresh for every creation through the operation's signed-in chain, and any failure refuses (#13631).
+   */
   readonly phraseFloor?: PhraseGate["serviceFloor"]
 }
 
@@ -85,7 +88,7 @@ const phraseSetup = (
   refused: agentMarkerSet(env) || !(dependencies.terminalAvailable ?? controllingTerminalAvailable)(),
   gate: {
     enabled: env[PHRASE_GENESIS_FLAG] === "1",
-    ...(dependencies.phraseFloor === undefined ? {} : { serviceFloor: dependencies.phraseFloor }),
+    serviceFloor: dependencies.phraseFloor ?? readServiceFloor,
     refused: (reason, account) =>
       dependencies.error(`memory sync refused to create a recovery phrase (${reason}) for account ${account}.`),
   },
