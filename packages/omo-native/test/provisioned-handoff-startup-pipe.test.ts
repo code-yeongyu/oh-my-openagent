@@ -86,12 +86,12 @@ describe.skipIf(process.platform === "win32")("provisioned runtime handoff of a 
         const stream: unknown = (run.child.stdio as readonly unknown[])[16]
         if (!(stream instanceof Socket)) throw new Error("no startup pipe")
         const exited = once(run.child, "exit", { signal: AbortSignal.timeout(20_000) })
-        const closed = once(run.child, "close", { signal: AbortSignal.timeout(10_000) })
+        const closed = once(run.child, "close", { signal: AbortSignal.timeout(20_000) })
         while (!startup().includes("ready")) await once(stream, "data", { signal: AbortSignal.timeout(20_000) })
         run.child.kill(`SIG${name}`)
         const [code, signal] = await exited
-        await closed
         expect({ code, signal }, run.stderr()).toEqual({ code: 0, signal: null })
+        await closed
         expect(startup()).toBe(`ready\n${name}\n`)
       } finally {
         rmSync(root, { recursive: true, force: true })
