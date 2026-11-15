@@ -113,6 +113,9 @@ afterAll(async () => {
     `compaction-marker.part=${getCompactionPartStorageDir("msg_boundary")}`,
   ]
   expect(exposed.filter((entry) => entry.includes(TEST_DIR))).toEqual([])
+  // #13502: TEST_DIR is the mocked storage root; remove it after the file's last test whatever block ran last.
+  storage.resetStorageClient()
+  rmSync(TEST_DIR, { recursive: true, force: true })
 })
 
 const { getAllSessions, getMessageDir, sessionExists, readSessionMessages, readSessionTodos, getSessionInfo } =
@@ -585,6 +588,12 @@ describe("session-manager storage - SDK path (beta mode)", () => {
     mockClient.session.list.mockClear()
     mockClient.session.messages.mockClear()
     mockClient.session.todo.mockClear()
+  })
+
+  // #13502: this block reads through the same mocked storage root, so it cleans up like the two blocks above.
+  afterEach(() => {
+    storage.resetStorageClient()
+    rmSync(TEST_DIR, { recursive: true, force: true })
   })
 
   test("getMainSessions uses SDK when beta mode is enabled", async () => {

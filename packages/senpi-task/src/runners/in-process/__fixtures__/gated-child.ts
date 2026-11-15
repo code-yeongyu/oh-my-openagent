@@ -16,8 +16,9 @@ const MODEL = "gated"
 export type GatedChildMachine = {
   readonly probe: string
   spec(taskId: string, parentSessionId?: string): ChildSpec
-  // A live parent session in this process, on the host default (no client-named mode); `dispose` releases it.
-  openParent(): Promise<{ readonly sessionId: string; dispose(): void }>
+  // A live parent session in this process, on the host default (no client-named mode); `dispose` releases it and
+  // resolves once the session's own shutdown barrier has settled, so a caller can remove the root after it.
+  openParent(): Promise<{ readonly sessionId: string; dispose(): Promise<void> }>
   probeExists(): boolean
   cleanup(): void
 }
@@ -76,7 +77,13 @@ export async function createGatedChildMachine(
         modelRegistry,
         model,
       })
-      return { sessionId: session.sessionManager.getSessionId(), dispose: () => session.dispose() }
+      return {
+        sessionId: session.sessionManager.getSessionId(),
+        dispose: async () => {
+          session.dispose()
+          await session.whenToolChildClosed()
+        },
+      }
     },
     spec: (taskId, parentSessionId = "parent-6189") => ({
       taskId,
