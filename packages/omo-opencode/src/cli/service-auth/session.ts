@@ -108,8 +108,11 @@ export function createSession(options: {
   readonly beforeKeysDiscarded: BeforeKeysDiscarded
   /** This machine's device service; absent, no device service is told anything. */
   readonly deviceService?: DeviceServiceHandoff
+  /** Where a sign-in reports what it left undone after its credential was stored; standard error when absent. */
+  readonly log?: (line: string) => void
 }) {
   const api = serviceOrigin(options.api)
+  const log = options.log ?? ((line: string) => console.error(line))
   const deviceService = options.deviceService
   const now = options.now ?? Date.now
   const { store, signal, beforeKeysDiscarded } = options
@@ -264,7 +267,15 @@ export function createSession(options: {
       // After the marker is gone, so a stale marker from an earlier sign-out cannot park this sign-in; from the value
       // in memory, never read back from the store.
       await deviceService?.adopt(value)
-      await settleOwedRevokes({ path: owedPath, signedIn: value, request, locked })
+      // #12281: the credential is stored, so an owed revoke left unsettled is reported and never fails the sign-in.
+      const unsettled = (reason: string) =>
+        log(
+          `A device this computer signed out of earlier is not revoked yet (${reason}). Remove it from the Devices page of your OmO account; the next omo login also tries again.`,
+        )
+      await settleOwedRevokes({ path: owedPath, signedIn: value, request, locked }).then(
+        (unsent) => (unsent > 0 ? unsettled("the service could not be reached") : undefined),
+        (error: unknown) => unsettled(error instanceof Error ? error.message : String(error)),
+      )
     },
     /** The marker an explicit `omo logout` left, or null; only an empty store makes it meaningful. */
     signedOutMarker: () => readSignedOutMarker(markerPath),
