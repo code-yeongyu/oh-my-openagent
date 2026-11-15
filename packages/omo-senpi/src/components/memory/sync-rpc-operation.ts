@@ -1,5 +1,5 @@
 import type { ApproveOutcome } from "@oh-my-opencode/memory-core/sync-engine"
-import type { SyncEnableResponse, SyncRpcProblem } from "./sync-rpc-contract"
+import type { SyncEnableResponse, SyncRpcProblem, SyncUnavailableCode } from "./sync-rpc-contract"
 import type {
   SyncRpcAccount,
   SyncRpcAuthority,
@@ -9,9 +9,10 @@ import type {
   SyncRpcOptions,
 } from "./sync-rpc-ports"
 
-export const unavailable = (): SyncRpcProblem => ({
+export const unavailable = (code?: SyncUnavailableCode): SyncRpcProblem => ({
   kind: "unavailable",
   reason: "Memory sync authority is unavailable.",
+  ...(code === undefined ? {} : { code }),
 })
 export const refused = (): SyncRpcProblem => ({
   kind: "refused",
@@ -25,10 +26,20 @@ export function serviceProblem(error: unknown): SyncRpcProblem {
     error.status >= 400 &&
     error.status < 500
     ? { kind: "refused", reason: "The service refused this sync request." }
-    : unavailable()
+    : unavailable(error instanceof RetiredSyncOperation ? error.code : "operation_failed")
 }
 
-export class RetiredSyncOperation extends Error {}
+/** Log fields for the error behind an unavailable problem; a RetiredSyncOperation says all it knows in its code. */
+export function syncErrorFields(error: unknown): { readonly error?: string } {
+  if (error instanceof RetiredSyncOperation) return {}
+  return { error: error instanceof Error ? `${error.name}: ${error.message}` : String(error) }
+}
+
+export class RetiredSyncOperation extends Error {
+  constructor(readonly code: SyncUnavailableCode = "retired") {
+    super(code)
+  }
+}
 
 /** A record that runs a ceremony and takes a claim; a "read" record never does. */
 export type CeremonyOperation = Operation & { readonly kind: "enable" | "approve" }
@@ -230,6 +241,12 @@ export async function runSyncRpcOperation(
         : refused()
       : serviceProblem(error)
     record.problem = record.controller.signal.aborted ? refused() : serviceProblem(error)
+    if (record.problem.kind === "unavailable")
+      options.warn?.(`memory sync ${record.kind} unavailable`, {
+        path: record.kind,
+        code: record.problem.code,
+        ...syncErrorFields(error),
+      })
     record.approval = record.expired
       ? { kind: "expired" }
       : {
