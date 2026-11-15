@@ -5,6 +5,7 @@
 // without OMO_DEBUG tells "started" from "never started".
 
 import type { ComponentLogger } from "../../extension/types"
+import { raceDeadline } from "./sync-deadline"
 import { SYNC_SESSION_DEFERRED } from "./sync-session-deferred"
 
 const DEFERRED_RETRY_MS = 15_000
@@ -13,6 +14,8 @@ const DEFERRED_RETRY_MIN_MS = 1_000
 const DEFERRED_STILL_WAITING_MS = 900_000
 /** Far past the 15 s credential-lock wait plus the account read and the engine open: a pass still running is stuck. */
 const START_PASS_DEADLINE_MS = 120_000
+/** Replaced passes still running before a retry waits for one of them to settle instead of starting another. */
+const ABANDONED_PASS_LIMIT = 2
 
 const SYNC_START_FAILED = "sync-start-failed"
 
@@ -24,6 +27,22 @@ export interface StartPassHooks {
   replaced(): boolean
   /** True while a replaced start of this repo, in this process, is still running and may hold the engine lease. */
   ownStartInFlight(): boolean
+}
+
+/** A repo's starts replaced at their deadline and still running. The runner keeps one per repo, so a release and a
+ * new acquire see the starts the earlier chain left behind (#13706 review L4). */
+export interface AbandonedStarts {
+  inFlight: number
+  /** Of those, the ones replaced inside the engine open: only these may hold the engine lease (review L6). */
+  atOpen: number
+  readonly parked: (() => void)[]
+}
+
+/** The repo's entry in a runner's registry, created on first use. */
+export function abandonedStartsOf(registry: Map<string, AbandonedStarts>, repo: string): AbandonedStarts {
+  const known = registry.get(repo) ?? { inFlight: 0, atOpen: 0, parked: [] }
+  registry.set(repo, known)
+  return known
 }
 
 export interface HeldStart<T> {
@@ -41,6 +60,7 @@ export interface StartLaunch<T> {
   /** Whether `held` is still the repo's pass: a retry replaces only its own pass. */
   readonly current: (held: HeldStart<T>) => boolean
   readonly replace: (next: HeldStart<T>) => void
+  readonly abandoned: AbandonedStarts
   readonly deferredRetryMs: number | undefined
   readonly startPassDeadlineMs: number | undefined
 }
@@ -50,8 +70,6 @@ interface RetryState {
   readonly previousRetryMs: number
   readonly quietMs: number
   readonly failures: number
-  /** Passes of this chain replaced at their deadline and still running; at most one is ever left behind. */
-  readonly abandoned: { inFlight: number }
 }
 
 const firstRetry = (deferredRetryMs: number | undefined): RetryState => ({
@@ -59,7 +77,6 @@ const firstRetry = (deferredRetryMs: number | undefined): RetryState => ({
   previousRetryMs: 0,
   quietMs: 0,
   failures: 0,
-  abandoned: { inFlight: 0 },
 })
 
 export function launchStart<T>(
@@ -67,7 +84,7 @@ export function launchStart<T>(
   users: number,
   state = firstRetry(launch.deferredRetryMs),
 ): HeldStart<T> {
-  const { logger, identity, running } = launch
+  const { logger, identity, running, abandoned } = launch
   let retrying = false
   let nextQuietMs = 0
   let failures = state.failures
@@ -99,7 +116,7 @@ export function launchStart<T>(
         stage = name
       },
       replaced: () => replaced,
-      ownStartInFlight: () => state.abandoned.inFlight > 0,
+      ownStartInFlight: () => abandoned.atOpen > 0,
     })
     .catch((error: unknown) => {
       if (!replaced) failures += 1
@@ -118,31 +135,20 @@ export function launchStart<T>(
     return outcome
   }
   const deadlineMs = launch.startPassDeadlineMs ?? START_PASS_DEADLINE_MS
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const deadline = new Promise<"stuck">((resolve) => {
-    timer = setTimeout(() => resolve("stuck"), deadlineMs)
-    timer.unref?.()
-  })
-  const ready = Promise.race([pass, deadline]).then((outcome): T | null | Promise<T | null> => {
-    clearTimeout(timer)
-    if (outcome !== "stuck") return finished(outcome)
-    const stuckLine = `memory sync start is stuck at the ${stage} after ${Math.round(deadlineMs / 1000)} s.`
-    // At most one replaced pass is left running: while an earlier one is still out, this pass stays the repo's pass.
-    if (state.abandoned.inFlight > 0) {
-      logger.warn(`${stuckLine} An earlier start is still finishing; sync waits for this one.`, {
-        identity,
-        code: SYNC_START_FAILED,
-      })
-      return pass.then(finished)
-    }
+  // Every pass, a second stuck one included, settles `ready` by its deadline (#13706 review M2): status() and
+  // release() wait on it.
+  const ready = raceDeadline(pass, deadlineMs).then((outcome): T | null => {
+    if (outcome !== "timeout") return finished(outcome)
     failures += 1
     waiting(
-      `${stuckLine} Sync retries on its own.`,
+      `memory sync start is stuck at the ${stage} after ${Math.round(deadlineMs / 1000)} s. Sync retries on its own.`,
       `memory sync start is still stuck at the ${stage}`,
       SYNC_START_FAILED,
     )
     replaced = true
-    state.abandoned.inFlight += 1
+    const atOpen = stage === "engine open"
+    abandoned.inFlight += 1
+    if (atOpen) abandoned.atOpen += 1
     // The replaced pass may still finish; an engine it opened then is closed, never a second engine for the repo.
     void pass
       .then((late) => (late !== null && running(late) ? launch.discard(late) : undefined))
@@ -150,25 +156,37 @@ export function launchStart<T>(
         logger.warn(`memory sync: closing the engine of a replaced start failed: ${String(error)}`, { identity }),
       )
       .finally(() => {
-        state.abandoned.inFlight -= 1
+        abandoned.inFlight -= 1
+        if (atOpen) abandoned.atOpen -= 1
+        for (const wake of abandoned.parked.splice(0)) wake()
       })
     return null
   })
   const held: HeldStart<T> = { users, ready }
+  const relaunch = (): void => {
+    if (!launch.current(held)) return
+    // A start that never settles must not pile up passes: past the limit the next one waits for a replaced one to end.
+    if (abandoned.inFlight >= ABANDONED_PASS_LIMIT) {
+      if (abandoned.parked.length === 0)
+        logger.warn("memory sync: earlier starts are still stuck; the next start waits for one of them to finish.", {
+          identity,
+          code: SYNC_START_FAILED,
+        })
+      abandoned.parked.push(relaunch)
+      return
+    }
+    launch.replace(
+      launchStart(launch, held.users, {
+        retryMs: Math.min(state.retryMs * 2, DEFERRED_RETRY_MAX_MS),
+        previousRetryMs: state.retryMs,
+        quietMs: nextQuietMs,
+        failures,
+      }),
+    )
+  }
   void ready.then(() => {
     if (!retrying) return
-    const retry = setTimeout(() => {
-      if (!launch.current(held)) return
-      launch.replace(
-        launchStart(launch, held.users, {
-          retryMs: Math.min(state.retryMs * 2, DEFERRED_RETRY_MAX_MS),
-          previousRetryMs: state.retryMs,
-          quietMs: nextQuietMs,
-          failures,
-          abandoned: state.abandoned,
-        }),
-      )
-    }, state.retryMs)
+    const retry = setTimeout(relaunch, state.retryMs)
     retry.unref?.()
   })
   return held

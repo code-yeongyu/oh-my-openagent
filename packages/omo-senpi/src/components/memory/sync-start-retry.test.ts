@@ -1,43 +1,11 @@
 import { afterEach, expect, jest, test } from "bun:test"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
 
-import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
-import type { DeviceSync, EngineStatus, SyncSession } from "@oh-my-opencode/memory-core/sync-engine"
+import type { DeviceSync, EngineStatus } from "@oh-my-opencode/memory-core/sync-engine"
 
 import { createSyncRunner } from "./sync-runner"
+import { identity, removeIdentities, session, within } from "./sync-start.test-support"
 
-const dirs: string[] = []
-afterEach(async () => {
-  for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true })
-})
-
-async function identity() {
-  const root = await mkdtemp(join(tmpdir(), "omo-sync-start-retry-"))
-  dirs.push(root)
-  const paths = buildIdentityPaths(root, "agent")
-  await mkdir(join(paths.repo, ".git", "logs"), { recursive: true })
-  await writeFile(join(paths.repo, ".git", "logs", "HEAD"), "")
-  return paths
-}
-
-const session = {} as SyncSession
-
-// Captured before any test fakes the clock, so the circuit breaker below always runs on real time.
-const realSetTimeout = globalThis.setTimeout
-const realClearTimeout = globalThis.clearTimeout
-async function within<T>(work: Promise<T>, what: string): Promise<T> {
-  let breaker: ReturnType<typeof setTimeout> | undefined
-  const never = new Promise<never>((_resolve, reject) => {
-    breaker = realSetTimeout(() => reject(new Error(`waited 5s for ${what}, never happened`)), 5_000)
-  })
-  try {
-    return await Promise.race([work, never])
-  } finally {
-    realClearTimeout(breaker)
-  }
-}
+afterEach(removeIdentities)
 
 function engines() {
   const started: number[] = []

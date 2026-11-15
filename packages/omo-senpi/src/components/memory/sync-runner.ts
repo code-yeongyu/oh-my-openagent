@@ -20,7 +20,14 @@ import type {
 import type { ComponentLogger } from "../../extension/types"
 import { isSyncConfigError, SYNC_CONFIG_INVALID } from "./sync-config-error"
 import { isSyncSessionDeferred } from "./sync-session-deferred"
-import { type HeldStart, launchStart, type StartPassHooks } from "./sync-start-launch"
+import { raceDeadline } from "./sync-deadline"
+import {
+  type AbandonedStarts,
+  abandonedStartsOf,
+  type HeldStart,
+  launchStart,
+  type StartPassHooks,
+} from "./sync-start-launch"
 
 /** The one line a runner logs when this device has no session to sync with (no network, no state). */
 export const SYNC_IDLE_NO_DEVICE_SESSION = "sync idle: no device session"
@@ -167,6 +174,8 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
   const nameLookups = new Map<string, (principal: string) => string | undefined>()
   // A repo whose last session released it, until its engine has closed and dropped the device lease.
   const closing = new Map<string, Promise<void>>()
+  // Starts replaced at their deadline outlive the chain that launched them, so they are counted per repo.
+  const abandoned = new Map<string, AbandonedStarts>()
 
   // The device's sign-in ended under a running engine: close it and keep the repo held but idle, so
   // the sessions bound to it release normally and a later sign-in starts fresh on the next bind.
@@ -291,6 +300,7 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
         },
         current: (held) => repos.get(paths.repo) === held,
         replace: (next) => repos.set(paths.repo, next),
+        abandoned: abandonedStartsOf(abandoned, paths.repo),
         deferredRetryMs: options.deferredRetryMs,
         startPassDeadlineMs: options.startPassDeadlineMs,
       },
@@ -303,23 +313,12 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
       // A session rebinding the repo right after the previous one released it would otherwise race
       // the old engine's lease and stay idle; wait for that close first.
       const pending = closing.get(paths.repo)
-      if (pending !== undefined) {
-        const waitMs = options.closeWaitMs ?? CLOSE_WAIT_MS
-        let timer: ReturnType<typeof setTimeout> | undefined
-        const closed = await Promise.race([
-          pending.then(() => true),
-          new Promise<false>((resolve) => {
-            timer = setTimeout(() => resolve(false), waitMs)
-          }),
-        ])
-        clearTimeout(timer)
-        if (!closed) {
-          logger.error(
-            `memory sync: the previous engine for this memory did not close within ${waitMs} ms; starting anyway, and this device may stay idle if it still holds its lease`,
-            { identity, code: SYNC_CLOSE_WAIT_EXCEEDED },
-          )
-        }
-      }
+      const waitMs = options.closeWaitMs ?? CLOSE_WAIT_MS
+      if (pending !== undefined && (await raceDeadline(pending, waitMs)) === "timeout")
+        logger.error(
+          `memory sync: the previous engine for this memory did not close within ${waitMs} ms; starting anyway, and this device may stay idle if it still holds its lease`,
+          { identity, code: SYNC_CLOSE_WAIT_EXCEEDED },
+        )
       const held = repos.get(paths.repo)
       if (held !== undefined) {
         held.users += 1
