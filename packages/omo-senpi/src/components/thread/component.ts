@@ -8,7 +8,7 @@ import { SESSION_CONTROL_DELIVERY_TYPE } from "./gateway/constants"
 import { gatewayDatabasePath } from "./gateway/paths"
 import { loadProvenanceWorkspaces } from "./gateway/provenance-config"
 import { resolveProvenance } from "./gateway/provenance-resolver"
-import { registerInitialSkills } from "./initial-skills"
+import { registerCreateReceivers } from "./create-receivers"
 import {
   controlSessionOf,
   createControlEndpointRegistrant,
@@ -281,7 +281,7 @@ function registerControlEndpoint(
       )
   })
   // A session thread_create opened runs on a host, so its initial skills ride with the control endpoint.
-  registerInitialSkills(pi, ctx)
+  registerCreateReceivers(pi, ctx)
   pi.on("session_before_compact", () => registrant.noteCompaction(true))
   pi.on("session_compact", () => registrant.noteCompaction(false))
   // A steer into a session waiting on a question is `not_steerable` (`decision.ts`): the answer comes
