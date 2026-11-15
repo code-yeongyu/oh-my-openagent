@@ -12,6 +12,7 @@ import {
 import { HelperOldSlotsFull, type WriteIntent } from "./keychain-helper/darwin-store"
 import { bindKeychainHelper, type LockedStore, lockedStoreView } from "./keychain-helper/store-binding"
 import { probeSecretServiceLock, type SecretServiceLockProbe } from "./secret-service-lock"
+import { accountHome } from "./account-home"
 import { heldCredentialLease, withCredentialLock } from "./credential-lock"
 import { type KeyringRelation, type OpenKeyringState, routeLinuxStore } from "./linux-store-route"
 import { createStateFileStore } from "./state-file-store"
@@ -429,12 +430,11 @@ export function createSealedStore<T>(
   }
   if (stateFile === null) return keyring
   return routeLinuxStore({
-    api,
+    lock: (action) => withCredentialLock(api, action, home ?? accountHome()),
     keyring,
     file: stateFile,
     probe: keyringState,
     notice,
-    ...(home === undefined ? {} : { home }),
     async relation(text) {
       let stored: string | null
       try {
