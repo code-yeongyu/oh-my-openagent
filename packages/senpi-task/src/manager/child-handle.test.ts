@@ -47,7 +47,8 @@ function fakeRpcHandle(options: FakeRpcOptions = {}): RpcChildHandle {
     dispose: () => Promise.resolve(),
     terminate: () => Promise.resolve(),
     exitOutcome: () => options.exit,
-    waitForExit: () => Promise.resolve(options.exit ?? { kind: "clean", facts: { pid: 4242, code: 0, signal: null, stderrTail: "" } }),
+    waitForExit: () =>
+      Promise.resolve(options.exit ?? { kind: "clean", facts: { pid: 4242, code: 0, signal: null, stderrTail: "" } }),
     lastSeen: () => undefined,
   }
 }

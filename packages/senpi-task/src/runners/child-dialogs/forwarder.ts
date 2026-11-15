@@ -2,7 +2,13 @@ import type { RpcExtensionUIResponse } from "@code-yeongyu/senpi"
 import { log } from "@oh-my-opencode/utils"
 
 import { buildAutoUiResponse, type AutoAnswerableUiRequest } from "../rpc/ui-auto-answer"
-import { CANCELLED, forwardableDialogOf, forwardedUiResponse, type ForwardableDialog, type ForwardedAnswer } from "./forwardable-dialog"
+import {
+  CANCELLED,
+  forwardableDialogOf,
+  forwardedUiResponse,
+  type ForwardableDialog,
+  type ForwardedAnswer,
+} from "./forwardable-dialog"
 
 export type ForwardedChild = {
   readonly taskId: string
@@ -37,9 +43,14 @@ export function answerChildUiRequest(
     if (answer !== null) void Promise.resolve(send(answer)).catch((error: unknown) => logFailure(frame, error))
     return
   }
-  void answering.forwarder.forward(dialog, { taskId: answering.taskId, signal })
+  void answering.forwarder
+    .forward(dialog, { taskId: answering.taskId, signal })
     .catch((error: unknown): ForwardedAnswer => {
-      log("senpi-task child dialog forward failed", { taskId: answering.taskId, method: frame.method, error: String(error) })
+      log("senpi-task child dialog forward failed", {
+        taskId: answering.taskId,
+        method: frame.method,
+        error: String(error),
+      })
       return CANCELLED
     })
     .then(async (answer) => {

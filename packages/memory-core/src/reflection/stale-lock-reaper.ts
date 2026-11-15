@@ -24,12 +24,18 @@ import { isReservedRun, moveTornReservationAside } from "./reservation-files"
 import { recordReflectionRunIdMark, scanReflectionRunHighWater } from "./run-id-high-water"
 import { parseReservationRunLedger } from "./run-ledger"
 import { classifyRecordedProcess, classifyRecordedProcessLenient, type RecordedProcessClassifier } from "./run-process"
-import { classifyReflectionLockHolder, reflectionLauncherLiveness, type ReflectionLockProbe, type ReflectionLockVerdict } from "./stale-holder"
+import {
+  classifyReflectionLockHolder,
+  reflectionLauncherLiveness,
+  type ReflectionLockProbe,
+  type ReflectionLockVerdict,
+} from "./stale-holder"
 
 export const REFLECTION_LAUNCH_WINDOW_MS = 60_000
 export const STRANDED_RUN_GRACE_MS = REFLECTION_LAUNCH_WINDOW_MS + REFLECTION_ORPHAN_GRACE_MS
 
-export type StaleLockReapAction = "launch-interrupted" | "processes-dead" | "ledger-unreadable" | "lock-torn" | "terminal-recorded" | "release-settled"
+export type StaleLockReapAction =
+  "launch-interrupted" | "processes-dead" | "ledger-unreadable" | "lock-torn" | "terminal-recorded" | "release-settled"
 
 export type StaleLockDecision =
   | { readonly kind: "none" }
@@ -39,7 +45,11 @@ export type StaleLockDecision =
 
 export type StrandedRunDecision =
   | { readonly kind: "keep"; readonly reason: string }
-  | { readonly kind: "reap"; readonly action: "no-ledger" | "processes-dead" | "ledger-unreadable"; readonly reason: string }
+  | {
+      readonly kind: "reap"
+      readonly action: "no-ledger" | "processes-dead" | "ledger-unreadable"
+      readonly reason: string
+    }
 
 export interface StaleLockProbe extends ReflectionLockProbe {
   readonly now?: () => number
@@ -52,7 +62,8 @@ const TERMINAL_SENTINELS = ["final.json", "abandoned.json", "quarantined.json"] 
 const TOMBSTONE_PREFIX = ".prune-"
 const TORN_RUN_ID = /reflection-run-(\d+)"/g
 
-type TextRead = { readonly kind: "missing" } | { readonly kind: "unreadable" } | { readonly kind: "text"; readonly text: string }
+type TextRead =
+  { readonly kind: "missing" } | { readonly kind: "unreadable" } | { readonly kind: "text"; readonly text: string }
 
 function errorCode(error: unknown): string | undefined {
   return error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : undefined
@@ -75,13 +86,16 @@ function parseJson(text: string): { readonly ok: true; readonly value: unknown }
 }
 
 function fieldsOf(value: unknown): Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : {}
+  return typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
 }
 
 async function listDirectory(path: string, probe: StaleLockProbe): Promise<readonly string[]> {
   if (probe.listDirectory !== undefined) return probe.listDirectory(path)
   try {
-    return (await readdir(path, { withFileTypes: true })).filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort()
+    return (await readdir(path, { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .sort()
   } catch {
     return []
   }
@@ -89,7 +103,10 @@ async function listDirectory(path: string, probe: StaleLockProbe): Promise<reado
 
 async function modifiedAt(path: string, probe: StaleLockProbe): Promise<number | undefined> {
   if (probe.modifiedAt !== undefined) return probe.modifiedAt(path)
-  return stat(path).then((status) => status.mtimeMs, () => undefined)
+  return stat(path).then(
+    (status) => status.mtimeMs,
+    () => undefined,
+  )
 }
 
 async function exists(path: string, probe: StaleLockProbe): Promise<boolean> {
@@ -112,7 +129,12 @@ async function readFinalOutcome(runDir: string, probe: StaleLockProbe): Promise<
 
 // An abandoned.json or quarantined.json that settles THIS reservation (DESIGN.r3 13b c.14): same run id,
 // and a generation no older than the reservation (or equal to the ledger's start).
-async function settledSentinel(runDir: string, runId: string, active: Record<string, unknown>, probe: StaleLockProbe): Promise<"match" | "other-generation" | undefined> {
+async function settledSentinel(
+  runDir: string,
+  runId: string,
+  active: Record<string, unknown>,
+  probe: StaleLockProbe,
+): Promise<"match" | "other-generation" | undefined> {
   for (const name of ["abandoned.json", "quarantined.json"]) {
     const read = await readText(join(runDir, name), probe)
     if (read.kind === "missing") continue
@@ -123,7 +145,11 @@ async function settledSentinel(runDir: string, runId: string, active: Record<str
     const reservedAt = typeof active.reservedAt === "string" ? Date.parse(active.reservedAt) : Number.NaN
     const ledger = await readLedger(runDir, probe)
     const startedAt = ledger.present ? ledger.fields.startedAt : undefined
-    if ((Number.isFinite(generation) && Number.isFinite(reservedAt) && generation >= reservedAt) || startedAt === sentinel.generation) return "match"
+    if (
+      (Number.isFinite(generation) && Number.isFinite(reservedAt) && generation >= reservedAt) ||
+      startedAt === sentinel.generation
+    )
+      return "match"
     return "other-generation"
   }
   return undefined
@@ -142,10 +168,20 @@ type RecordedProcesses = { readonly live: false } | { readonly live: true; reado
 
 // The supervisor and child a ledger recorded. A valid ledger is read with the strict classifier the
 // session uses; only an unparseable one is read leniently (DESIGN.r2 4.3).
-async function recordedProcesses(ledger: Record<string, unknown>, probe: StaleLockProbe, classify: RecordedProcessClassifier): Promise<RecordedProcesses> {
-  for (const [role, pidKey, startKey] of [["supervisor", "pid", "processStart"], ["child", "childPid", "childProcessStart"]] as const) {
-    const pid = typeof ledger[pidKey] === "number" ? ledger[pidKey] as number : undefined
-    const start = typeof ledger[startKey] === "string" || ledger[startKey] === null ? ledger[startKey] as string | null : undefined
+async function recordedProcesses(
+  ledger: Record<string, unknown>,
+  probe: StaleLockProbe,
+  classify: RecordedProcessClassifier,
+): Promise<RecordedProcesses> {
+  for (const [role, pidKey, startKey] of [
+    ["supervisor", "pid", "processStart"],
+    ["child", "childPid", "childProcessStart"],
+  ] as const) {
+    const pid = typeof ledger[pidKey] === "number" ? (ledger[pidKey] as number) : undefined
+    const start =
+      typeof ledger[startKey] === "string" || ledger[startKey] === null
+        ? (ledger[startKey] as string | null)
+        : undefined
     const verdict = await classify(pid, start, probe)
     if (verdict === "alive") return { live: true, reason: `its ${role} pid ${pid} is still running` }
     if (verdict === "unknown") return { live: true, reason: `its ${role} pid ${pid} could not be checked` }
@@ -156,7 +192,10 @@ async function recordedProcesses(ledger: Record<string, unknown>, probe: StaleLo
 // A valid ledger the launcher wrote with `launching: true` before its detached supervisor recorded a pid:
 // both pids read absent while that supervisor may still be starting, so reconciliation keeps it until the
 // hard deadline (run-reconciliation.ts), and so does the reaper.
-function stillLaunching(ledger: { readonly fields: Record<string, unknown>; readonly valid: boolean }, now: number): boolean {
+function stillLaunching(
+  ledger: { readonly fields: Record<string, unknown>; readonly valid: boolean },
+  now: number,
+): boolean {
   const hardDeadlineAt = ledger.fields.hardDeadlineAt
   return ledger.valid && ledger.fields.launching === true && typeof hardDeadlineAt === "number" && now <= hardDeadlineAt
 }
@@ -171,7 +210,13 @@ function validLedger(value: unknown, runId: string): boolean {
   }
 }
 
-async function readLedger(runDir: string, probe: StaleLockProbe): Promise<{ readonly present: false } | { readonly present: true; readonly fields: Record<string, unknown>; readonly valid: boolean }> {
+async function readLedger(
+  runDir: string,
+  probe: StaleLockProbe,
+): Promise<
+  | { readonly present: false }
+  | { readonly present: true; readonly fields: Record<string, unknown>; readonly valid: boolean }
+> {
   const read = await readText(join(runDir, "ledger.json"), probe)
   if (read.kind === "missing") return { present: false }
   const parsed = read.kind === "text" ? parseJson(read.text) : { ok: false as const }
@@ -188,7 +233,11 @@ const TORN_LAUNCHER_START = /"launcherProcessStart"\s*:\s*"([^"]*)"/
 
 // The fail-closed conditions under which a torn active.lock may be moved aside (DESIGN.r2 4.4, M4);
 // the first one that fails is the reason it is kept.
-async function tornLockBlocker(reflectionDir: string, bytes: string, probe: StaleLockProbe): Promise<string | undefined> {
+async function tornLockBlocker(
+  reflectionDir: string,
+  bytes: string,
+  probe: StaleLockProbe,
+): Promise<string | undefined> {
   const now = (probe.now ?? Date.now)()
   const lockAt = await modifiedAt(join(reflectionDir, "active.lock"), probe)
   if (lockAt === undefined || now - lockAt <= TORN_LOCK_MIN_AGE_MS) return "it is recent" // rule:torn-recent
@@ -197,7 +246,10 @@ async function tornLockBlocker(reflectionDir: string, bytes: string, probe: Stal
   const pid = TORN_LAUNCHER_PID.exec(bytes)?.[1]
   // The reservation writes the pid before the hostname, so a pid with no complete host may be another host's.
   if (pid !== undefined && host === undefined) return "its launcher host is unknown" // rule:torn-host-unknown
-  if (pid !== undefined && await reflectionLauncherLiveness(Number.parseInt(pid, 10), TORN_LAUNCHER_START.exec(bytes)?.[1], probe) !== "dead") {
+  if (
+    pid !== undefined &&
+    (await reflectionLauncherLiveness(Number.parseInt(pid, 10), TORN_LAUNCHER_START.exec(bytes)?.[1], probe)) !== "dead"
+  ) {
     return `its launcher pid ${pid} may still be alive` // rule:torn-launcher-alive
   }
   const runsDir = join(reflectionDir, "runs")
@@ -209,18 +261,28 @@ async function tornLockBlocker(reflectionDir: string, bytes: string, probe: Stal
     if (at === undefined || now - at <= REFLECTION_ORPHAN_GRACE_MS) return `run ${name} is a young run dir` // rule:torn-young-run-dir
     const ledger = await readLedger(runDir, probe)
     if (ledger.present && stillLaunching(ledger, now)) return `run ${name} is still launching` // rule:torn-launching-run
-    if (ledger.present && (await recordedProcesses(ledger.fields, probe, classifyRecordedProcess)).live) return `run ${name} may still be live` // rule:torn-live-run
+    if (ledger.present && (await recordedProcesses(ledger.fields, probe, classifyRecordedProcess)).live)
+      return `run ${name} may still be live` // rule:torn-live-run
   }
   return undefined
 }
 
-async function tornLock(reflectionDir: string, bytes: string, reason: string, probe: StaleLockProbe): Promise<StaleLockDecision> {
+async function tornLock(
+  reflectionDir: string,
+  bytes: string,
+  reason: string,
+  probe: StaleLockProbe,
+): Promise<StaleLockDecision> {
   const blocker = await tornLockBlocker(reflectionDir, bytes, probe)
   if (blocker !== undefined) return { kind: "stuck", runId: "unknown", reason: `${reason} and ${blocker}` }
   return { kind: "reap", action: "lock-torn", runId: "unknown", reason } // rule:lock-torn
 }
 
-async function decideStuck(reflectionDir: string, verdict: Extract<ReflectionLockVerdict, { state: "stuck" }>, probe: StaleLockProbe): Promise<StaleLockDecision> {
+async function decideStuck(
+  reflectionDir: string,
+  verdict: Extract<ReflectionLockVerdict, { state: "stuck" }>,
+  probe: StaleLockProbe,
+): Promise<StaleLockDecision> {
   const passThrough: StaleLockDecision = { kind: "stuck", runId: verdict.runId, reason: verdict.reason }
   const lock = await readText(join(reflectionDir, "active.lock"), probe)
   if (lock.kind !== "text") return passThrough
@@ -230,36 +292,69 @@ async function decideStuck(reflectionDir: string, verdict: Extract<ReflectionLoc
   const launcherPid = typeof fields.launcherPid === "number" ? fields.launcherPid : undefined
   const launcherHostname = typeof fields.launcherHostname === "string" ? fields.launcherHostname : undefined
   if (launcherPid === undefined || launcherHostname === undefined) {
-    if (!isReservedRun(parsed.value)) return tornLock(reflectionDir, lock.text, "active.lock is not a reservation", probe)
+    if (!isReservedRun(parsed.value))
+      return tornLock(reflectionDir, lock.text, "active.lock is not a reservation", probe)
     return { kind: "stuck", runId: verdict.runId, reason: "its launcher identity is missing; a session reconciles it" } // rule:legacy-lock
   }
   if (launcherHostname !== (probe.hostname ?? readHostname)()) return passThrough
-  if (await reflectionLauncherLiveness(launcherPid, fields.launcherProcessStart, probe) !== "dead") return passThrough
+  if ((await reflectionLauncherLiveness(launcherPid, fields.launcherProcessStart, probe)) !== "dead") return passThrough
   const runId = verdict.runId
   const runDir = join(reflectionDir, "runs", runId)
   if (await exists(join(runDir, "outcome.json"), probe)) return passThrough
   if (!isReservedRun(parsed.value)) return tornLock(reflectionDir, lock.text, "active.lock is not a reservation", probe)
   const finalOutcome = await readFinalOutcome(runDir, probe)
   if (finalOutcome === "merged" || finalOutcome === "no_changes") {
-    return { kind: "stuck", runId, reason: "it finished with a folded outcome that only a session can settle; open a session" } // rule:final-folded
+    return {
+      kind: "stuck",
+      runId,
+      reason: "it finished with a folded outcome that only a session can settle; open a session",
+    } // rule:final-folded
   }
-  if (finalOutcome !== undefined) return { kind: "reap", action: "terminal-recorded", runId, reason: "the run already recorded its terminal state" } // rule:terminal-recorded
+  if (finalOutcome !== undefined)
+    return { kind: "reap", action: "terminal-recorded", runId, reason: "the run already recorded its terminal state" } // rule:terminal-recorded
   const settled = await settledSentinel(runDir, runId, fields, probe)
-  if (settled === "match") return { kind: "reap", action: "release-settled", runId, reason: "it was already settled and only the release is missing" } // rule:release-settled
-  if (settled === "other-generation") return { kind: "stuck", runId, reason: "its run dir holds a terminal record from another generation" } // rule:settled-other-generation
+  if (settled === "match")
+    return {
+      kind: "reap",
+      action: "release-settled",
+      runId,
+      reason: "it was already settled and only the release is missing",
+    } // rule:release-settled
+  if (settled === "other-generation")
+    return { kind: "stuck", runId, reason: "its run dir holds a terminal record from another generation" } // rule:settled-other-generation
   const ledger = await readLedger(runDir, probe)
   if (!ledger.present) {
     const reservedAt = typeof fields.reservedAt === "string" ? Date.parse(fields.reservedAt) : Number.NaN
     if (Number.isFinite(reservedAt) && (probe.now ?? Date.now)() - reservedAt <= REFLECTION_LAUNCH_WINDOW_MS) {
       return { kind: "stuck", runId, reason: "its launcher is gone but the launch window has not closed" } // rule:launch-window
     }
-    return { kind: "reap", action: "launch-interrupted", runId, reason: `launcher pid ${launcherPid} is gone and the run never started` } // rule:launch-interrupted
+    return {
+      kind: "reap",
+      action: "launch-interrupted",
+      runId,
+      reason: `launcher pid ${launcherPid} is gone and the run never started`,
+    } // rule:launch-interrupted
   }
   if (stillLaunching(ledger, (probe.now ?? Date.now)())) return { kind: "stuck", runId, reason: STILL_LAUNCHING } // rule:run-launching
-  const processes = await recordedProcesses(ledger.fields, probe, ledger.valid ? classifyRecordedProcess : classifyRecordedProcessLenient)
+  const processes = await recordedProcesses(
+    ledger.fields,
+    probe,
+    ledger.valid ? classifyRecordedProcess : classifyRecordedProcessLenient,
+  )
   if (processes.live) return { kind: "stuck", runId, reason: processes.reason } // rule:run-process-alive
-  if (ledger.valid) return { kind: "reap", action: "processes-dead", runId, reason: "its launcher, supervisor and child are all gone and it recorded no outcome" } // rule:processes-dead
-  return { kind: "reap", action: "ledger-unreadable", runId, reason: "its ledger cannot be read and its recorded processes are gone" } // rule:ledger-unreadable
+  if (ledger.valid)
+    return {
+      kind: "reap",
+      action: "processes-dead",
+      runId,
+      reason: "its launcher, supervisor and child are all gone and it recorded no outcome",
+    } // rule:processes-dead
+  return {
+    kind: "reap",
+    action: "ledger-unreadable",
+    runId,
+    reason: "its ledger cannot be read and its recorded processes are gone",
+  } // rule:ledger-unreadable
 }
 
 export async function decideStaleReflectionLock(
@@ -275,7 +370,7 @@ export async function decideStaleReflectionLock(
 /** When a ledger-less run dir was last launched: its prelaunch.json's mtime, else the dir's own (DESIGN.r3 c.16). */
 export async function strandedSince(runDir: string, probe: StaleLockProbe = {}): Promise<number | undefined> {
   const prelaunch = join(runDir, "prelaunch.json")
-  return await exists(prelaunch, probe) ? await modifiedAt(prelaunch, probe) : await modifiedAt(runDir, probe)
+  return (await exists(prelaunch, probe)) ? await modifiedAt(prelaunch, probe) : await modifiedAt(runDir, probe)
 }
 
 export async function decideStrandedRun(runDir: string, probe: StaleLockProbe = {}): Promise<StrandedRunDecision> {
@@ -295,10 +390,23 @@ export async function decideStrandedRun(runDir: string, probe: StaleLockProbe = 
     return { kind: "reap", action: "no-ledger", reason: "it never got a ledger" } // rule:stranded-no-ledger
   }
   if (stillLaunching(ledger, (probe.now ?? Date.now)())) return { kind: "keep", reason: STILL_LAUNCHING } // rule:stranded-launching
-  const processes = await recordedProcesses(ledger.fields, probe, ledger.valid ? classifyRecordedProcess : classifyRecordedProcessLenient)
+  const processes = await recordedProcesses(
+    ledger.fields,
+    probe,
+    ledger.valid ? classifyRecordedProcess : classifyRecordedProcessLenient,
+  )
   if (processes.live) return { kind: "keep", reason: processes.reason } // rule:stranded-process-alive
-  if (ledger.valid) return { kind: "reap", action: "processes-dead", reason: "its supervisor and child are gone and it recorded no outcome" } // rule:stranded-processes-dead
-  return { kind: "reap", action: "ledger-unreadable", reason: "its ledger cannot be read and its recorded processes are gone" } // rule:stranded-ledger-unreadable
+  if (ledger.valid)
+    return {
+      kind: "reap",
+      action: "processes-dead",
+      reason: "its supervisor and child are gone and it recorded no outcome",
+    } // rule:stranded-processes-dead
+  return {
+    kind: "reap",
+    action: "ledger-unreadable",
+    reason: "its ledger cannot be read and its recorded processes are gone",
+  } // rule:stranded-ledger-unreadable
 }
 
 export interface StaleLockReaperOptions {
@@ -357,7 +465,9 @@ async function emitReceipt(context: ReaperContext, input: MemoryReceiptInput): P
   try {
     await context.appendReceipt(context.runtimeDir, input)
   } catch (error) {
-    context.warnings.push(`receipt for ${"runId" in input ? input.runId : input.batchId} not written: ${error instanceof Error ? error.message : String(error)}`)
+    context.warnings.push(
+      `receipt for ${"runId" in input ? input.runId : input.batchId} not written: ${error instanceof Error ? error.message : String(error)}`,
+    )
   }
 }
 
@@ -394,7 +504,15 @@ function identityFromReservation(active: Record<string, unknown>): RunIdentity {
   return { kind: trigger === "dream" ? "dream" : "reflection", trigger, ...(origin === undefined ? {} : { origin }) }
 }
 
-async function abandonRun(context: ReaperContext, runDir: string, runId: string, reason: AbandonedReason, generation: string, identity: RunIdentity, launcher?: Record<string, unknown>): Promise<void> {
+async function abandonRun(
+  context: ReaperContext,
+  runDir: string,
+  runId: string,
+  reason: AbandonedReason,
+  generation: string,
+  identity: RunIdentity,
+  launcher?: Record<string, unknown>,
+): Promise<void> {
   await mkdir(runDir, { recursive: true, mode: 0o700 })
   await writeAbandoned(runDir, {
     version: 1,
@@ -403,31 +521,62 @@ async function abandonRun(context: ReaperContext, runDir: string, runId: string,
     reason,
     generation,
     ...identity,
-    ...(launcher === undefined ? {} : {
-      launcher: {
-        pid: typeof launcher.launcherPid === "number" ? launcher.launcherPid : undefined,
-        hostname: typeof launcher.launcherHostname === "string" ? launcher.launcherHostname : undefined,
-        processStart: typeof launcher.launcherProcessStart === "string" ? launcher.launcherProcessStart : null,
-      },
-    }),
+    ...(launcher === undefined
+      ? {}
+      : {
+          launcher: {
+            pid: typeof launcher.launcherPid === "number" ? launcher.launcherPid : undefined,
+            hostname: typeof launcher.launcherHostname === "string" ? launcher.launcherHostname : undefined,
+            processStart: typeof launcher.launcherProcessStart === "string" ? launcher.launcherProcessStart : null,
+          },
+        }),
   })
-  await emitReceipt(context, { kind: identity.kind, runId, trigger: identity.origin ?? identity.trigger, event: "abandoned", generation, reason })
-}
-
-async function quarantineRun(context: ReaperContext, runDir: string, runId: string, generation: string, identity: RunIdentity, reservation?: ReservedRun, reason: QuarantineReason = "ledger_unreadable"): Promise<void> {
-  const evidence = [...(await readdir(runDir).catch(() => [] as string[])).sort(), ...(reservation === undefined ? [] : [RESERVATION_EVIDENCE_FILENAME])]
-  await writeQuarantine(runDir, {
-    version: 1,
-    runId,
+  await emitReceipt(context, {
     kind: identity.kind,
-    trigger: identity.trigger,
-    ...(identity.origin === undefined ? {} : { origin: identity.origin }),
+    runId,
+    trigger: identity.origin ?? identity.trigger,
+    event: "abandoned",
     generation,
     reason,
-    quarantinedAt: new Date(context.now()).toISOString(),
-    evidence,
-  }, reservation)
-  await emitReceipt(context, { kind: identity.kind, runId, trigger: identity.origin ?? identity.trigger, event: "quarantined", generation, reason })
+  })
+}
+
+async function quarantineRun(
+  context: ReaperContext,
+  runDir: string,
+  runId: string,
+  generation: string,
+  identity: RunIdentity,
+  reservation?: ReservedRun,
+  reason: QuarantineReason = "ledger_unreadable",
+): Promise<void> {
+  const evidence = [
+    ...(await readdir(runDir).catch(() => [] as string[])).sort(),
+    ...(reservation === undefined ? [] : [RESERVATION_EVIDENCE_FILENAME]),
+  ]
+  await writeQuarantine(
+    runDir,
+    {
+      version: 1,
+      runId,
+      kind: identity.kind,
+      trigger: identity.trigger,
+      ...(identity.origin === undefined ? {} : { origin: identity.origin }),
+      generation,
+      reason,
+      quarantinedAt: new Date(context.now()).toISOString(),
+      evidence,
+    },
+    reservation,
+  )
+  await emitReceipt(context, {
+    kind: identity.kind,
+    runId,
+    trigger: identity.origin ?? identity.trigger,
+    event: "quarantined",
+    generation,
+    reason,
+  })
 }
 
 async function reservedRunId(path: string): Promise<string | undefined> {
@@ -444,7 +593,10 @@ async function readActiveFields(reflectionDir: string): Promise<Record<string, u
   return parsed.ok ? fieldsOf(parsed.value) : undefined
 }
 
-async function releaseReservation(context: ReaperContext, runId: string): Promise<{ readonly released: boolean; readonly pendingRunId?: string }> {
+async function releaseReservation(
+  context: ReaperContext,
+  runId: string,
+): Promise<{ readonly released: boolean; readonly pendingRunId?: string }> {
   try {
     return await releaseReservationWithoutPromotion({
       reflectionDir: context.reflectionDir,
@@ -463,43 +615,68 @@ type MinimalSettle =
   | { readonly settled: true; readonly pendingRunId?: string; readonly alreadyReleased?: boolean }
   | { readonly settled: false; readonly reason: string }
 
-async function settleActiveMinimally(context: ReaperContext, decision: Extract<StaleLockDecision, { kind: "reap" }>): Promise<MinimalSettle> {
+async function settleActiveMinimally(
+  context: ReaperContext,
+  decision: Extract<StaleLockDecision, { kind: "reap" }>,
+): Promise<MinimalSettle> {
   const runId = decision.runId
   const runDir = join(context.reflectionDir, "runs", runId)
-  const written = await underLock(runFinalizationLockPath(context.locksDir, runId), "reflection-finalize", async (): Promise<MinimalSettle> => {
-    const again = (await decideStaleReflectionLock(context.reflectionDir, context.probe)).decision
-    if (again.kind !== "reap" || again.action !== decision.action || again.runId !== runId) return { settled: false, reason: "the decision changed" }
-    const active = await readActiveFields(context.reflectionDir) ?? {}
-    const identity = identityFromReservation(active)
-    const reservedAt = isoOr(active.reservedAt, new Date(context.now()).toISOString())
-    if (decision.action === "launch-interrupted") {
-      await abandonRun(context, runDir, runId, "launch_interrupted", reservedAt, identity, active)
+  const written = await underLock(
+    runFinalizationLockPath(context.locksDir, runId),
+    "reflection-finalize",
+    async (): Promise<MinimalSettle> => {
+      const again = (await decideStaleReflectionLock(context.reflectionDir, context.probe)).decision
+      if (again.kind !== "reap" || again.action !== decision.action || again.runId !== runId)
+        return { settled: false, reason: "the decision changed" }
+      const active = (await readActiveFields(context.reflectionDir)) ?? {}
+      const identity = identityFromReservation(active)
+      const reservedAt = isoOr(active.reservedAt, new Date(context.now()).toISOString())
+      if (decision.action === "launch-interrupted") {
+        await abandonRun(context, runDir, runId, "launch_interrupted", reservedAt, identity, active)
+        return { settled: true }
+      }
+      // An earlier settle wrote the sentinel and stopped before releasing (REVIEW-2 N2): only release,
+      // inside this finalize lock and after the re-decide above (DESIGN.r4 c.20).
+      if (decision.action === "terminal-recorded" || decision.action === "release-settled") {
+        const released = await releaseReservation(context, runId)
+        return released.released
+          ? {
+              settled: true,
+              alreadyReleased: true,
+              ...(released.pendingRunId === undefined ? {} : { pendingRunId: released.pendingRunId }),
+            }
+          : { settled: false, reason: "the reservation changed before it could be released" }
+      }
+      if (decision.action !== "processes-dead" && decision.action !== "ledger-unreadable")
+        return { settled: false, reason: `${decision.action} is not settled from here` }
+      const ledger = await readLedger(runDir, {})
+      const fields = ledger.present ? ledger.fields : {}
+      const attempt = typeof fields.attempt === "number" ? fields.attempt : undefined
+      const published = readRunTerminalPublication(runDir, attempt)
+      if (published !== undefined)
+        return {
+          settled: false,
+          reason: `the run is already ${published === "settled" ? "settled" : "publishing its outcome"}`,
+        }
+      const claim = await claimRunTerminal(runDir, { runId, attempt: attempt ?? 1 }, "abandon", context.probe)
+      if (!runTerminalClaimMatches(claim, { runId, attempt: attempt ?? 1 }, "abandon"))
+        return { settled: false, reason: "another process claimed the run" }
+      const generation = isoOr(fields.startedAt, reservedAt)
+      if (decision.action === "processes-dead") {
+        await abandonRun(context, runDir, runId, "processes_dead", generation, identityFromLedger(fields, identity))
+      } else {
+        await quarantineRun(
+          context,
+          runDir,
+          runId,
+          generation,
+          identityFromLedger(fields, identity),
+          isReservedRun(active) ? active : undefined,
+        )
+      }
       return { settled: true }
-    }
-    // An earlier settle wrote the sentinel and stopped before releasing (REVIEW-2 N2): only release,
-    // inside this finalize lock and after the re-decide above (DESIGN.r4 c.20).
-    if (decision.action === "terminal-recorded" || decision.action === "release-settled") {
-      const released = await releaseReservation(context, runId)
-      return released.released
-        ? { settled: true, alreadyReleased: true, ...(released.pendingRunId === undefined ? {} : { pendingRunId: released.pendingRunId }) }
-        : { settled: false, reason: "the reservation changed before it could be released" }
-    }
-    if (decision.action !== "processes-dead" && decision.action !== "ledger-unreadable") return { settled: false, reason: `${decision.action} is not settled from here` }
-    const ledger = await readLedger(runDir, {})
-    const fields = ledger.present ? ledger.fields : {}
-    const attempt = typeof fields.attempt === "number" ? fields.attempt : undefined
-    const published = readRunTerminalPublication(runDir, attempt)
-    if (published !== undefined) return { settled: false, reason: `the run is already ${published === "settled" ? "settled" : "publishing its outcome"}` }
-    const claim = await claimRunTerminal(runDir, { runId, attempt: attempt ?? 1 }, "abandon", context.probe)
-    if (!runTerminalClaimMatches(claim, { runId, attempt: attempt ?? 1 }, "abandon")) return { settled: false, reason: "another process claimed the run" }
-    const generation = isoOr(fields.startedAt, reservedAt)
-    if (decision.action === "processes-dead") {
-      await abandonRun(context, runDir, runId, "processes_dead", generation, identityFromLedger(fields, identity))
-    } else {
-      await quarantineRun(context, runDir, runId, generation, identityFromLedger(fields, identity), isReservedRun(active) ? active : undefined)
-    }
-    return { settled: true }
-  })
+    },
+  )
   if (written === "busy") return { settled: false, reason: "a session is finalizing it" }
   if (!written.settled) return written
   if (written.alreadyReleased === true) return written
@@ -508,12 +685,17 @@ async function settleActiveMinimally(context: ReaperContext, decision: Extract<S
   return { settled: true, ...(released.pendingRunId === undefined ? {} : { pendingRunId: released.pendingRunId }) }
 }
 
-async function reapTornLock(context: ReaperContext, paths: { reflectionSessions: string; worktrees: string }): Promise<boolean> {
+async function reapTornLock(
+  context: ReaperContext,
+  paths: { reflectionSessions: string; worktrees: string },
+): Promise<boolean> {
   const moved = await underLock(reflectionSchedulerLockPath(context.locksDir), "reflection-scheduler", async () => {
     const again = (await decideStaleReflectionLock(context.reflectionDir, context.probe)).decision
     if (again.kind !== "reap" || again.action !== "lock-torn") return false
     const bytes = await readFile(join(context.reflectionDir, "active.lock"), "utf8")
-    const named = [...bytes.matchAll(TORN_RUN_ID)].map((match) => Number.parseInt(match[1] ?? "0", 10)).filter(Number.isSafeInteger)
+    const named = [...bytes.matchAll(TORN_RUN_ID)]
+      .map((match) => Number.parseInt(match[1] ?? "0", 10))
+      .filter(Number.isSafeInteger)
     const scanned = await scanReflectionRunHighWater({ reflection: context.reflectionDir, ...paths })
     const highWater = Math.max(scanned, ...named)
     if (highWater > 0) await recordReflectionRunIdMark(context.reflectionDir, highWater)
@@ -521,13 +703,25 @@ async function reapTornLock(context: ReaperContext, paths: { reflectionSessions:
     const name = await moveTornReservationAside(context.reflectionDir, bytes, at)
     if (name === undefined) return false
     const tornRun = named.length === 0 ? "unknown" : `reflection-run-${Math.max(...named)}`
-    await emitReceipt(context, { kind: "reflection", runId: tornRun, trigger: "unknown", event: "abandoned", generation: at.toISOString(), reason: "lock_torn" })
+    await emitReceipt(context, {
+      kind: "reflection",
+      runId: tornRun,
+      trigger: "unknown",
+      event: "abandoned",
+      generation: at.toISOString(),
+      reason: "lock_torn",
+    })
     return true
   })
   return moved === true
 }
 
-async function settleStrandedRunUnderLock(context: ReaperContext, runDir: string, runId: string, decision: Extract<StrandedRunDecision, { kind: "reap" }>): Promise<boolean> {
+async function settleStrandedRunUnderLock(
+  context: ReaperContext,
+  runDir: string,
+  runId: string,
+  decision: Extract<StrandedRunDecision, { kind: "reap" }>,
+): Promise<boolean> {
   const since = await strandedSince(runDir, {})
   const applied = await underLock(runFinalizationLockPath(context.locksDir, runId), "reflection-finalize", async () => {
     if (await hasTerminalSentinel(runDir, {})) return false
@@ -540,7 +734,8 @@ async function settleStrandedRunUnderLock(context: ReaperContext, runDir: string
       return true
     }
     const generation = isoOr(fields.startedAt, fallback)
-    if (decision.action === "processes-dead") await abandonRun(context, runDir, runId, "processes_dead", generation, identityFromLedger(fields, unknown))
+    if (decision.action === "processes-dead")
+      await abandonRun(context, runDir, runId, "processes_dead", generation, identityFromLedger(fields, unknown))
     else await quarantineRun(context, runDir, runId, generation, identityFromLedger(fields, unknown))
     return true
   })
@@ -581,7 +776,8 @@ async function strandedRuns(context: ReaperContext, apply: boolean): Promise<Str
   for (const name of ["active.lock", "pending.json"]) {
     const raw = await readFile(join(context.reflectionDir, name), "utf8").catch(() => undefined)
     const parsed = raw === undefined ? undefined : parseJson(raw)
-    if (parsed?.ok === true && typeof fieldsOf(parsed.value).runId === "string") reserved.add(fieldsOf(parsed.value).runId as string)
+    if (parsed?.ok === true && typeof fieldsOf(parsed.value).runId === "string")
+      reserved.add(fieldsOf(parsed.value).runId as string)
   }
   const reports: StrandedRunReport[] = []
   for (const runId of await listDirectory(runsDir, {})) {
@@ -601,7 +797,9 @@ async function strandedRuns(context: ReaperContext, apply: boolean): Promise<Str
 
 async function removeTombstones(context: ReaperContext, apply: boolean): Promise<TombstoneReport[]> {
   const runsDir = join(context.reflectionDir, "runs")
-  const names = (await readdir(runsDir).catch(() => [] as string[])).filter((name) => name.startsWith(TOMBSTONE_PREFIX)).sort()
+  const names = (await readdir(runsDir).catch(() => [] as string[]))
+    .filter((name) => name.startsWith(TOMBSTONE_PREFIX))
+    .sort()
   const reports: TombstoneReport[] = []
   for (const name of names) {
     if (!apply) {
@@ -630,7 +828,10 @@ export async function runStaleLockReaper(options: StaleLockReaperOptions): Promi
     appendReceipt: options.appendReceipt ?? appendMemoryReceiptOnce,
     warnings: [],
   }
-  const paths = { reflectionSessions: join(options.runtimeDir, "reflection-sessions"), worktrees: join(options.runtimeDir, "worktrees") }
+  const paths = {
+    reflectionSessions: join(options.runtimeDir, "reflection-sessions"),
+    worktrees: join(options.runtimeDir, "worktrees"),
+  }
   const { verdict: before, decision } = await decideStaleReflectionLock(context.reflectionDir, probe)
   const minimal = options.settle === undefined
   let action: StaleLockReaperAction
@@ -640,10 +841,13 @@ export async function runStaleLockReaper(options: StaleLockReaperOptions): Promi
     action = decision.kind === "reap" ? "would-reap" : decision.kind === "none" ? "none" : "kept"
     if (decision.kind === "reap") pendingKept = await reservedRunId(join(context.reflectionDir, "pending.json"))
   } else if (decision.kind === "reap" && decision.action === "lock-torn") {
-    action = await reapTornLock(context, paths) ? "reaped" : "kept"
+    action = (await reapTornLock(context, paths)) ? "reaped" : "kept"
   } else if (decision.kind === "reap" || decision.kind === "finalize") {
     if (options.settle === undefined) {
-      const settled = decision.kind === "reap" ? await settleActiveMinimally(context, decision) : { settled: false as const, reason: "it recorded its outcome; open a session to finalize it" }
+      const settled =
+        decision.kind === "reap"
+          ? await settleActiveMinimally(context, decision)
+          : { settled: false as const, reason: "it recorded its outcome; open a session to finalize it" }
       action = settled.settled ? "reaped" : "kept"
       if (settled.settled && settled.pendingRunId !== undefined) pendingKept = settled.pendingRunId
       if (!settled.settled) keptReason = settled.reason
@@ -656,12 +860,20 @@ export async function runStaleLockReaper(options: StaleLockReaperOptions): Promi
   } else {
     action = decision.kind === "none" ? "none" : "kept"
   }
-  if (options.settle !== undefined && options.settleAlways === true && options.dryRun !== true && action !== "settled") await options.settle()
+  if (options.settle !== undefined && options.settleAlways === true && options.dryRun !== true && action !== "settled")
+    await options.settle()
   const stranded = minimal ? await strandedRuns(context, options.dryRun !== true) : []
   const tombstones = minimal ? await removeTombstones(context, options.dryRun !== true) : []
   const after = options.dryRun === true ? before : await classifyReflectionLockHolder(context.reflectionDir, probe)
   return {
-    before, decision, action, after, stranded, tombstones, warnings: context.warnings, dryRun: options.dryRun === true,
+    before,
+    decision,
+    action,
+    after,
+    stranded,
+    tombstones,
+    warnings: context.warnings,
+    dryRun: options.dryRun === true,
     ...(pendingKept === undefined ? {} : { pendingKept }),
     ...(keptReason === undefined ? {} : { keptReason }),
   }
@@ -677,45 +889,69 @@ export async function reclaimDeadOwnerLocks(locksDir: string): Promise<DeadOwner
   const reclaimed: string[] = []
   const failures = new Map<string, string>()
   await sweepDeadOwnerLocks(locksDir, {
-    onReclaimed: (lockPath) => { reclaimed.push(basename(lockPath)) },
-    onFailure: (lockPath, error) => { failures.set(basename(lockPath), error instanceof Error ? error.message : String(error)) },
+    onReclaimed: (lockPath) => {
+      reclaimed.push(basename(lockPath))
+    },
+    onFailure: (lockPath, error) => {
+      failures.set(basename(lockPath), error instanceof Error ? error.message : String(error))
+    },
   })
-  const kept = names.filter((name) => !reclaimed.includes(name)).map((name) => ({ name, reason: failures.get(name) ?? "owner is alive or not provably dead" }))
+  const kept = names
+    .filter((name) => !reclaimed.includes(name))
+    .map((name) => ({ name, reason: failures.get(name) ?? "owner is alive or not provably dead" }))
   return { reclaimed, kept }
 }
 
-export function formatStaleLockFixLines(identity: string, report: StaleLockReaperReport, locks?: DeadOwnerLockReport): string[] {
+export function formatStaleLockFixLines(
+  identity: string,
+  report: StaleLockReaperReport,
+  locks?: DeadOwnerLockReport,
+): string[] {
   const lines: string[] = []
   const { decision } = report
   if (decision.kind === "reap" || decision.kind === "finalize") {
     const label = decision.kind === "reap" ? decision.action : "finalize"
     if (report.action === "would-reap") {
       lines.push(`WOULD FIX ${identity} active.lock run ${decision.runId} (${label})`)
-      if (report.pendingKept !== undefined) lines.push(`INFO ${identity} pending ${report.pendingKept} stays queued for the next session`)
-    }
-    else if (report.action === "reaped" || (report.action === "settled" && (report.after.state === "none" || ("runId" in report.after && report.after.runId !== decision.runId)))) {
+      if (report.pendingKept !== undefined)
+        lines.push(`INFO ${identity} pending ${report.pendingKept} stays queued for the next session`)
+    } else if (
+      report.action === "reaped" ||
+      (report.action === "settled" &&
+        (report.after.state === "none" || ("runId" in report.after && report.after.runId !== decision.runId)))
+    ) {
       lines.push(`FIXED ${identity} active.lock run ${decision.runId} (${label})`)
-      if (report.pendingKept !== undefined) lines.push(`INFO ${identity} pending ${report.pendingKept} kept for the next session`)
+      if (report.pendingKept !== undefined)
+        lines.push(`INFO ${identity} pending ${report.pendingKept} kept for the next session`)
     } else if (decision.kind === "finalize" && report.action === "kept") {
-      lines.push(`KEPT ${identity} active.lock run ${decision.runId} (it recorded its outcome; open a session to finalize it)`)
+      lines.push(
+        `KEPT ${identity} active.lock run ${decision.runId} (it recorded its outcome; open a session to finalize it)`,
+      )
     } else {
-      lines.push(`KEPT ${identity} active.lock run ${decision.runId} (${report.keptReason ?? `${label} did not release the lock`})`)
+      lines.push(
+        `KEPT ${identity} active.lock run ${decision.runId} (${report.keptReason ?? `${label} did not release the lock`})`,
+      )
     }
   } else if (decision.kind === "stuck") {
     lines.push(`KEPT ${identity} active.lock run ${decision.runId} (${decision.reason})`)
   }
   for (const entry of report.stranded) {
     if (entry.decision.kind !== "reap") continue
-    lines.push(`${entry.applied ? "FIXED" : report.dryRun ? "WOULD FIX" : "KEPT"} ${identity} run ${entry.runId} (${entry.decision.action})`)
+    lines.push(
+      `${entry.applied ? "FIXED" : report.dryRun ? "WOULD FIX" : "KEPT"} ${identity} run ${entry.runId} (${entry.decision.action})`,
+    )
   }
   for (const tombstone of report.tombstones) {
     if (tombstone.removed) lines.push(`FIXED ${identity} removed tombstone ${tombstone.name}`)
-    else if (tombstone.error !== undefined) lines.push(`KEPT ${identity} tombstone ${tombstone.name} (${tombstone.error})`)
+    else if (tombstone.error !== undefined)
+      lines.push(`KEPT ${identity} tombstone ${tombstone.name} (${tombstone.error})`)
   }
   for (const warning of report.warnings) lines.push(`WARN ${identity} ${warning}`)
   if (locks !== undefined) {
     const failed = locks.kept.filter((entry) => entry.reason !== "owner is alive or not provably dead")
-    lines.push(`INFO ${identity} locks reclaimed ${locks.reclaimed.length}, kept ${locks.kept.length}${failed.length === 0 ? "" : ` (${failed.map((entry) => `${entry.name}: ${entry.reason}`).join("; ")})`}`)
+    lines.push(
+      `INFO ${identity} locks reclaimed ${locks.reclaimed.length}, kept ${locks.kept.length}${failed.length === 0 ? "" : ` (${failed.map((entry) => `${entry.name}: ${entry.reason}`).join("; ")})`}`,
+    )
   }
   return lines
 }

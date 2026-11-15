@@ -95,7 +95,10 @@ export class RpcProtocolClient {
     return this.request(command, {})
   }
 
-  private request(command: { readonly type: string; readonly id?: string }, options: { readonly deadlineMs?: number }): Promise<RpcResponse> {
+  private request(
+    command: { readonly type: string; readonly id?: string },
+    options: { readonly deadlineMs?: number },
+  ): Promise<RpcResponse> {
     const stdin = this.child.stdin
     if (this.isDetached) return Promise.reject(new Error("RPC client detached"))
     if (this.isExited || stdin === null || stdin === undefined) {
@@ -113,10 +116,23 @@ export class RpcProtocolClient {
           reject(new RpcRequestTimeout(command.type, ms))
         }, ms)
       }
-      arm(options.deadlineMs ?? (command.type === "get_state" ? 10_000 : command.type === "abort" ? TEARDOWN_STEP_BUDGET_MS : RPC_REQUEST_DEADLINE_MS))
+      arm(
+        options.deadlineMs ??
+          (command.type === "get_state"
+            ? 10_000
+            : command.type === "abort"
+              ? TEARDOWN_STEP_BUDGET_MS
+              : RPC_REQUEST_DEADLINE_MS),
+      )
       const pending: PendingRequest = {
-        resolve: (response) => { clearTimeout(timer); resolve(response) },
-        reject: (error) => { clearTimeout(timer); reject(error) },
+        resolve: (response) => {
+          clearTimeout(timer)
+          resolve(response)
+        },
+        reject: (error) => {
+          clearTimeout(timer)
+          reject(error)
+        },
         received: () => {
           if (!isInput || received) return
           received = true
@@ -132,7 +148,12 @@ export class RpcProtocolClient {
   // The classic child's live mode setter (senpi set_permission_preset_v1): applied only when the echo names it.
   private async setPermissionPreset(permissionPreset: string): Promise<void> {
     const response = await this.send({ type: "set_permission_preset", permissionPreset })
-    if (response.success && response.command === "set_permission_preset" && response.data.permissionPreset === permissionPreset) return
+    if (
+      response.success &&
+      response.command === "set_permission_preset" &&
+      response.data.permissionPreset === permissionPreset
+    )
+      return
     throw commandError(response, "set_permission_preset")
   }
 
@@ -187,7 +208,9 @@ export class RpcProtocolClient {
       this.writeFailed(error)
     })
     this.child.once("error", (error) => this.finalize(error))
-    this.child.once("exit", () => { this.processExited = true })
+    this.child.once("exit", () => {
+      this.processExited = true
+    })
     this.child.once("close", () => this.finalize())
   }
 

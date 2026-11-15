@@ -40,7 +40,10 @@ export type PauseRegistryRecord = {
 }
 
 export class PauseRegistry {
-  constructor(readonly stateDir: string, readonly barrier: AdmissionBarrier) {}
+  constructor(
+    readonly stateDir: string,
+    readonly barrier: AdmissionBarrier,
+  ) {}
 
   #path(parentSessionId: string): string {
     if (!parentSessionId || parentSessionId === "." || parentSessionId === ".." || /[\\/\0:]/.test(parentSessionId)) {
@@ -51,14 +54,21 @@ export class PauseRegistry {
 
   load(parentSessionId: string): PauseRegistryRecord | undefined {
     let text: string
-    try { text = readFileSync(this.#path(parentSessionId), "utf8") }
-    catch (error) {
+    try {
+      text = readFileSync(this.#path(parentSessionId), "utf8")
+    } catch (error) {
       if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined
       throw error
     }
     const record: PauseRegistryRecord = JSON.parse(text)
-    if (record.parentSessionId !== parentSessionId || !Number.isSafeInteger(record.pauseSeq) || record.pauseSeq < 1
-      || typeof record.participants !== "object" || record.participants === null) throw new Error("invalid pause registry")
+    if (
+      record.parentSessionId !== parentSessionId ||
+      !Number.isSafeInteger(record.pauseSeq) ||
+      record.pauseSeq < 1 ||
+      typeof record.participants !== "object" ||
+      record.participants === null
+    )
+      throw new Error("invalid pause registry")
     return record
   }
 
@@ -76,26 +86,33 @@ export class PauseRegistry {
     const prior = this.load(parentSessionId)
     if (prior !== undefined && prior.pauseSeq >= pauseSeq) return prior
     const record: PauseRegistryRecord = {
-      parentSessionId, pauseSeq, phase: "propagating", barrier: { kind: "closed", pauseSeq },
-      participants: Object.fromEntries(participants.map(participant => [participant.key, participant])),
+      parentSessionId,
+      pauseSeq,
+      phase: "propagating",
+      barrier: { kind: "closed", pauseSeq },
+      participants: Object.fromEntries(participants.map((participant) => [participant.key, participant])),
     }
     this.#write(record)
     return record
   }
 
-  restore(parentSessionId: string, ledger: {
-    readonly pauseSeq: number
-    readonly superseded?: boolean
-    readonly requestedResumeId?: string
-    readonly rebuild?: () => readonly PauseParticipant[]
-  }): PauseRegistryRecord {
+  restore(
+    parentSessionId: string,
+    ledger: {
+      readonly pauseSeq: number
+      readonly superseded?: boolean
+      readonly requestedResumeId?: string
+      readonly rebuild?: () => readonly PauseParticipant[]
+    },
+  ): PauseRegistryRecord {
     let record = this.load(parentSessionId)
     if (record === undefined || record.pauseSeq < ledger.pauseSeq) {
       this.barrier.close(parentSessionId, ledger.pauseSeq)
       record = this.begin(parentSessionId, ledger.pauseSeq, ledger.rebuild?.() ?? [])
     }
     this.barrier.restore(parentSessionId, record.barrier, {
-      newestSeq: ledger.pauseSeq, superseded: ledger.superseded === true,
+      newestSeq: ledger.pauseSeq,
+      superseded: ledger.superseded === true,
     })
     if (ledger.requestedResumeId !== undefined && ledger.superseded !== true) {
       this.requestResume(parentSessionId, ledger.pauseSeq, ledger.requestedResumeId)
@@ -136,14 +153,21 @@ export class PauseRegistry {
     return true
   }
 
-  requestResume(parentSessionId: string, pauseSeq: number, resumeId: string): NonNullable<PauseRegistryRecord["resume"]> {
+  requestResume(
+    parentSessionId: string,
+    pauseSeq: number,
+    resumeId: string,
+  ): NonNullable<PauseRegistryRecord["resume"]> {
     const record = this.require(parentSessionId)
     if (record.pauseSeq !== pauseSeq) throw new Error("stale resume sequence")
     if (record.resume?.resumeId === resumeId) return record.resume
     const resume = {
       resumeId,
-      childSeqCutoffs: Object.fromEntries(Object.values(record.participants)
-        .flatMap(participant => participant.observedChildSeq === undefined ? [] : [[participant.key, participant.observedChildSeq]])),
+      childSeqCutoffs: Object.fromEntries(
+        Object.values(record.participants).flatMap((participant) =>
+          participant.observedChildSeq === undefined ? [] : [[participant.key, participant.observedChildSeq]],
+        ),
+      ),
     }
     this.#write({ ...record, phase: "resuming", resume })
     return resume
@@ -171,9 +195,11 @@ export class PauseRegistry {
   }
 
   orderedAdmissions(parentSessionId: string): readonly PauseParticipant[] {
-    return Object.values(this.require(parentSessionId).participants).toSorted((a, b) =>
-      Number(a.admission?.phase !== "parked") - Number(b.admission?.phase !== "parked")
-      || (a.admission?.sequence ?? 0) - (b.admission?.sequence ?? 0)
-      || a.key.localeCompare(b.key))
+    return Object.values(this.require(parentSessionId).participants).toSorted(
+      (a, b) =>
+        Number(a.admission?.phase !== "parked") - Number(b.admission?.phase !== "parked") ||
+        (a.admission?.sequence ?? 0) - (b.admission?.sequence ?? 0) ||
+        a.key.localeCompare(b.key),
+    )
   }
 }

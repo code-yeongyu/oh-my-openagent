@@ -93,9 +93,7 @@ describe("memory git exec win32 console suppression", () => {
 
     describe("#when git is absent from PATH and the windows install fallbacks are tried", () => {
       test("#then every fallback executable is spawned with windowsHide: true", async () => {
-        const captured = captureSpawns((executable) =>
-          executable === "git" ? missingBinaryChild() : closingChild(),
-        )
+        const captured = captureSpawns((executable) => (executable === "git" ? missingBinaryChild() : closingChild()))
         const { createNodeGitExec } = await import("./exec")
 
         await createNodeGitExec({ platform: "win32" }).run(["status", "--porcelain"], {

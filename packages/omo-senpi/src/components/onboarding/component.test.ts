@@ -59,9 +59,11 @@ describe("onboarding entry", () => {
     const dir = freshDir()
     const h = createOnboardingHarness(dir, "first", "tui")
     await h.start()
-    expect(await h.prompt()).toEqual([{
-      message: { customType: "omo-onboarding:context", content: expect.any(String), display: false },
-    }])
+    expect(await h.prompt()).toEqual([
+      {
+        message: { customType: "omo-onboarding:context", content: expect.any(String), display: false },
+      },
+    ])
     expect(isOnboardingComplete(dir)).toBe(true)
     expect(h.pi.messages).toEqual([])
     expect(h.widgets.has("omo-onboarding")).toBe(false)
@@ -120,9 +122,11 @@ describe("onboarding entry", () => {
     const dir = freshDir()
     const h = createOnboardingHarness(dir)
     const preview = await h.prompt({ preview: true })
-    expect(preview).toEqual([{
-      message: { customType: "omo-onboarding:context", content: expect.any(String), display: false },
-    }])
+    expect(preview).toEqual([
+      {
+        message: { customType: "omo-onboarding:context", content: expect.any(String), display: false },
+      },
+    ])
     expect(isOnboardingComplete(dir)).toBe(false)
     expect(h.pi.handlers.find((entry) => entry.event === "before_agent_start")?.options?.previewSafe).toBe(true)
     expect(await h.prompt()).toEqual(preview)
@@ -149,10 +153,12 @@ describe("onboarding entry", () => {
     h.pi.setFlag("onboard", true)
     await h.start()
     await h.start()
-    expect(h.pi.messages).toEqual([{
-      message: { customType: "omo-onboarding:bootstrap", content: expect.any(String), display: false },
-      options: { triggerTurn: true, deliverAs: "followUp" },
-    }])
+    expect(h.pi.messages).toEqual([
+      {
+        message: { customType: "omo-onboarding:bootstrap", content: expect.any(String), display: false },
+        options: { triggerTurn: true, deliverAs: "followUp" },
+      },
+    ])
     expect(await h.prompt()).toEqual([undefined])
     await h.agentStart()
     await h.end()
@@ -208,7 +214,8 @@ describe("onboarding entry", () => {
       sessionHistory: async () => undefined,
     })
     const h = createOnboardingHarness(dir, "retry", "rpc", component)
-    const contentOf = (results: unknown[]) => String((results.find(Boolean) as { message: { content: unknown } }).message.content)
+    const contentOf = (results: unknown[]) =>
+      String((results.find(Boolean) as { message: { content: unknown } }).message.content)
 
     expect(contentOf(await h.prompt())).not.toContain("SCAN-RETRY-OK")
     await h.pi.dispatch("input_disposition", { disposition: "rejected" }, h.ctx)
@@ -219,7 +226,12 @@ describe("onboarding entry", () => {
   test("#given the first understanding scan fails #when onboarding_understand runs again, twice at once #then one retried scan serves both", async () => {
     const dir = freshDir()
     let open = (): void => undefined
-    const flaky = flakyScan("unused", new Promise<void>((resolve) => { open = resolve }))
+    const flaky = flakyScan(
+      "unused",
+      new Promise<void>((resolve) => {
+        open = resolve
+      }),
+    )
     const component = createOnboardingComponent({
       claimOnboarding: () => claimOnboarding(dir),
       isOnboardingComplete: () => isOnboardingComplete(dir),
@@ -230,10 +242,17 @@ describe("onboarding entry", () => {
     })
     const h = createOnboardingHarness(dir, "understand", "tui", component)
     const understand = h.pi.tools.find((tool) => tool["name"] === "onboarding_understand") as unknown as {
-      execute(id: string, params: unknown, signal?: AbortSignal, onUpdate?: unknown, ctx?: unknown): Promise<{ content: Array<{ text?: string }>; isError?: boolean }>
+      execute(
+        id: string,
+        params: unknown,
+        signal?: AbortSignal,
+        onUpdate?: unknown,
+        ctx?: unknown,
+      ): Promise<{ content: Array<{ text?: string }>; isError?: boolean }>
     }
     const toolCtx = { model: { provider: "omo-mock", id: "mock-1" }, modelRegistry: registrySnapshot() }
-    const text = (result: { content: Array<{ text?: string }> }) => result.content.map((part) => part.text ?? "").join("")
+    const text = (result: { content: Array<{ text?: string }> }) =>
+      result.content.map((part) => part.text ?? "").join("")
 
     const failed = await understand.execute("u1", { consent: true }, undefined, undefined, toolCtx)
     expect(text(failed)).toContain("scan did not run")
@@ -252,8 +271,8 @@ describe("onboarding entry", () => {
       h.pi.setFlag("onboard", entry !== "context")
       await h.start()
       const results = await h.prompt()
-      const message = entry === "bootstrap" ? h.pi.messages[0]?.message
-        : (results[0] as { message: { content: unknown } }).message
+      const message =
+        entry === "bootstrap" ? h.pi.messages[0]?.message : (results[0] as { message: { content: unknown } }).message
       expect(typeof message?.content).toBe("string")
       const content = String(message?.content)
       // #12150: the context carries no absolute install path; the tour names the skill, which
@@ -269,11 +288,13 @@ describe("onboarding entry", () => {
     test("#given a user skill named onboarding wins the listing #when prompting #then the context falls back to the built-in path", async () => {
       const dir = freshDir()
       const h = createOnboardingHarness(dir, "shadowed", "rpc")
-      h.pi.getCommands = () => [{
-        name: "skill:onboarding",
-        source: "skill",
-        sourceInfo: { path: join(dir, "user-skills", "onboarding", "SKILL.md") },
-      }]
+      h.pi.getCommands = () => [
+        {
+          name: "skill:onboarding",
+          source: "skill",
+          sourceInfo: { path: join(dir, "user-skills", "onboarding", "SKILL.md") },
+        },
+      ]
       await h.start()
       const results = await h.prompt()
       const content = String((results[0] as { message: { content: unknown } }).message.content)
@@ -284,11 +305,13 @@ describe("onboarding entry", () => {
     test("#given the listing resolves onboarding to the built-in file #when prompting #then the context names the skill, not its path", async () => {
       const dir = freshDir()
       const h = createOnboardingHarness(dir, "listed", "rpc")
-      h.pi.getCommands = () => [{
-        name: "skill:onboarding",
-        source: "skill",
-        sourceInfo: { path: join(getBuiltinSkillsRoot(), "onboarding", "SKILL.md") },
-      }]
+      h.pi.getCommands = () => [
+        {
+          name: "skill:onboarding",
+          source: "skill",
+          sourceInfo: { path: join(getBuiltinSkillsRoot(), "onboarding", "SKILL.md") },
+        },
+      ]
       await h.start()
       const results = await h.prompt()
       const content = String((results[0] as { message: { content: unknown } }).message.content)

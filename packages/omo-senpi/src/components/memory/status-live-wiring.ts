@@ -1,17 +1,8 @@
 import { GitMemoryRepo } from "@oh-my-opencode/memory-core"
 
 import type { MemoryIdentityContext } from "./context"
-import {
-  formatMemoryStatusLine,
-  formatRelativeAge,
-  readMemoryStatusSegments,
-  type GitRepoForStatus,
-} from "./status"
-import {
-  createMemoryFooterLive,
-  type MemoryFooterTimers,
-  type MemoryFooterUi,
-} from "./status-live"
+import { formatMemoryStatusLine, formatRelativeAge, readMemoryStatusSegments, type GitRepoForStatus } from "./status"
+import { createMemoryFooterLive, type MemoryFooterTimers, type MemoryFooterUi } from "./status-live"
 import type { SyncStatusReader } from "./sync-status-surface"
 
 const SECOND_MS = 1_000
@@ -43,9 +34,7 @@ export interface MemoryFooterStatusLive {
  * session, computes the todo-18 segment line, and gates recomputation behind a cheap fingerprint
  * so agent_settled does not shell out to git on every event.
  */
-export function createMemoryFooterStatusLive(
-  options: MemoryFooterStatusLiveOptions,
-): MemoryFooterStatusLive {
+export function createMemoryFooterStatusLive(options: MemoryFooterStatusLiveOptions): MemoryFooterStatusLive {
   const now = options.now ?? Date.now
   const createRepo = options.createGitRepo ?? defaultGitRepo
   const repos = new Map<string, GitRepoForStatus>()

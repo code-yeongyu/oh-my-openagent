@@ -3,7 +3,17 @@ import { mkdir } from "node:fs/promises"
 import { join } from "node:path"
 import { auditMemoryRepo } from "../audit/audit"
 import { validateCompletion } from "./completion-validation"
-import { LINK_TEST_TIMEOUT_MS, cleanupLinkFixtures, INVALID, commitAll, git, linkFixture as fixture, note, put, read } from "./completion-links.test-support"
+import {
+  LINK_TEST_TIMEOUT_MS,
+  cleanupLinkFixtures,
+  INVALID,
+  commitAll,
+  git,
+  linkFixture as fixture,
+  note,
+  put,
+  read,
+} from "./completion-links.test-support"
 import { finalizeReflectionWorktree } from "./worktree"
 
 setDefaultTimeout(LINK_TEST_TIMEOUT_MS)
@@ -15,7 +25,10 @@ describe("reflection completion repoints links to the notes a run removed (#1264
     const worktree = await fixture({
       "ARCHIVE.md": "# Archive\n",
       "notes/facts/2026-10.md": note("Explicit facts for 2026-10", "- [2026-10-01] The build uses Bun.\n"),
-      "notes/facts/2026-10-topic.md": note("Build topic", "See [[notes/facts/2026-10.md]] and [the ledger](2026-10.md#top).\n"),
+      "notes/facts/2026-10-topic.md": note(
+        "Build topic",
+        "See [[notes/facts/2026-10.md]] and [the ledger](2026-10.md#top).\n",
+      ),
     })
     await git(worktree.dir, "rm", "-q", "notes/facts/2026-10.md")
     await put(worktree.dir, "ARCHIVE.md", "# Archive\n\n- 2026-10 (notes/facts/2026-10.md): the build uses Bun.\n")
@@ -39,7 +52,10 @@ describe("reflection completion repoints links to the notes a run removed (#1264
     // given
     const worktree = await fixture({
       "reference/old.md": note("Old home", "content\n"),
-      "notes/user.md": note("User", "[[reference/old|the note]], [[reference/old.md#part]], [x](../reference/old.md#sec).\n"),
+      "notes/user.md": note(
+        "User",
+        "[[reference/old|the note]], [[reference/old.md#part]], [x](../reference/old.md#sec).\n",
+      ),
     })
     await mkdir(join(worktree.dir, "reference/new"), { recursive: true })
     await git(worktree.dir, "mv", "reference/old.md", "reference/new/home.md")
@@ -60,7 +76,10 @@ describe("reflection completion repoints links to the notes a run removed (#1264
     // given
     const worktree = await fixture({
       "reference/junk.md": note("Junk", "junk\n"),
-      "notes/user.md": note("User", "Gone: [[reference/junk.md|junk]] and [j](../reference/junk.md).\n\n```\n[[reference/junk.md]]\n```\n"),
+      "notes/user.md": note(
+        "User",
+        "Gone: [[reference/junk.md|junk]] and [j](../reference/junk.md).\n\n```\n[[reference/junk.md]]\n```\n",
+      ),
     })
     await git(worktree.dir, "rm", "-q", "reference/junk.md")
     await commitAll(worktree.dir, "chore(dream): delete junk")
@@ -70,7 +89,9 @@ describe("reflection completion repoints links to the notes a run removed (#1264
 
     // then
     expect(result.status).toBe("valid")
-    expect(await read(worktree.dir, "notes/user.md")).toContain("Gone: junk and j.\n\n```\n[[reference/junk.md]]\n```\n")
+    expect(await read(worktree.dir, "notes/user.md")).toContain(
+      "Gone: junk and j.\n\n```\n[[reference/junk.md]]\n```\n",
+    )
   })
 
   it("#given a link that already dangled before the run #when validated #then the run leaves it to the audit", async () => {
@@ -171,7 +192,9 @@ describe("reflection completion repoints links to the notes a run removed (#1264
 
     // then
     expect(result.status).toBe("valid")
-    expect(await git(worktree.dir, "log", "--format=%s", `${worktree.baseSha}..HEAD`)).toContain("chore(dream): retire x")
+    expect(await git(worktree.dir, "log", "--format=%s", `${worktree.baseSha}..HEAD`)).toContain(
+      "chore(dream): retire x",
+    )
     expect(await read(worktree.dir, "reference/user.md")).toContain("x\n")
   })
 

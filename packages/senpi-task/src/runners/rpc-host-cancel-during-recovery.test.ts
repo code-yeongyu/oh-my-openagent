@@ -32,9 +32,18 @@ describe("cancellation while transport recovery reads state", () => {
     const pendingOpens: Promise<OpenedHostSession>[] = []
     const open = HostSessionClient.prototype.open
     let gated = false
-    const openSpy = spyOn(HostSessionClient.prototype, "open").mockImplementation(function (this: HostSessionClient, input) {
+    const openSpy = spyOn(HostSessionClient.prototype, "open").mockImplementation(function (
+      this: HostSessionClient,
+      input,
+    ) {
       // Hold only this child's recovery; the non-retained cancellation channel still closes it.
-      if (gated || this.socketPath !== world.host.socketPath || input.sessionPath !== original.sessionPath || !input.retainOnDisconnect) return open.call(this, input)
+      if (
+        gated ||
+        this.socketPath !== world.host.socketPath ||
+        input.sessionPath !== original.sessionPath ||
+        !input.retainOnDisconnect
+      )
+        return open.call(this, input)
       gated = true
       const pending = (async () => {
         await resumeOpen.promise
@@ -59,7 +68,8 @@ describe("cancellation while transport recovery reads state", () => {
       resumeOpen.resolve()
       const reopened = await bounded(lateSession.promise, "the reopened session")
       expect(reopened.attached).toBe(false)
-      if (reopened.session.processPid === undefined || reopened.session.processExit === undefined) throw new Error("the late reopen did not start a session process")
+      if (reopened.session.processPid === undefined || reopened.session.processExit === undefined)
+        throw new Error("the late reopen did not start a session process")
       await bounded(reopened.session.processExit, "the late reopened process exit")
 
       expect(["cancel_pending", "cancelled"]).toContain(cancelled.details.kind)

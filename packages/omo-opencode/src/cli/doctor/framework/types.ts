@@ -104,13 +104,7 @@ export interface CodexDoctorSummary {
   readonly agents: readonly string[]
 }
 
-export type CheckCategory =
-  | "installation"
-  | "configuration"
-  | "authentication"
-  | "dependencies"
-  | "tools"
-  | "updates"
+export type CheckCategory = "installation" | "configuration" | "authentication" | "dependencies" | "tools" | "updates"
 
 export interface OpenCodeInfo {
   installed: boolean

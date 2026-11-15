@@ -6,8 +6,14 @@ import { runCompiledLauncher } from "../compile-entry"
 import { compiledDiagnosticRuntimeLoader } from "../compiled-diagnostic-runtime"
 
 const roots: string[] = []
-const temp = () => { const root = mkdtempSync(join(tmpdir(), "omo-compiled-parity-")); roots.push(root); return root }
-afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
+const temp = () => {
+  const root = mkdtempSync(join(tmpdir(), "omo-compiled-parity-"))
+  roots.push(root)
+  return root
+}
+afterEach(() => {
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
+})
 
 function runtimeRoot(version = "9.2.1"): string {
   const root = temp()
@@ -23,7 +29,9 @@ async function captureLog(run: () => Promise<unknown>): Promise<string> {
   const output: string[] = []
   const originalLog = console.log
   const originalExitCode = process.exitCode
-  console.log = (value?: unknown) => { output.push(String(value)) }
+  console.log = (value?: unknown) => {
+    output.push(String(value))
+  }
   try {
     await run()
   } finally {
@@ -38,23 +46,26 @@ describe("compiled omo setup", () => {
     const root = runtimeRoot()
     const calls: { args: string[]; options: Record<string, unknown> }[] = []
     const handled = await runCompiledLauncher(["setup", "--dry-run"], root, "2026.8.28", root, {
-      runSetup: async (args, options) => { calls.push({ args, options }) },
+      runSetup: async (args, options) => {
+        calls.push({ args, options })
+      },
     })
     expect(handled).toBe(true)
     expect(calls.map((call) => call.args)).toEqual([["--dry-run"]])
     expect(typeof calls[0]?.options.loadCoverageRuntime).toBe("function")
     expect(typeof calls[0]?.options.loadCoverageEngine).toBe("function")
   })
-
 })
 
 describe("compiled omo doctor", () => {
   test("#given a release binary #when doctor runs #then it prints the update command and the computer-use and task-category sections", async () => {
     const root = runtimeRoot()
-    const output = await captureLog(() => runCompiledLauncher(["doctor"], root, "2026.8.28", root, {
-      computerUseLines: async () => ["INFO computer use: enabled=true supported=true host=fixture"],
-      coverageLines: async () => ["WARN task categories: 0 of 10 usable with your connected providers"],
-    }))
+    const output = await captureLog(() =>
+      runCompiledLauncher(["doctor"], root, "2026.8.28", root, {
+        computerUseLines: async () => ["INFO computer use: enabled=true supported=true host=fixture"],
+        coverageLines: async () => ["WARN task categories: 0 of 10 usable with your connected providers"],
+      }),
+    )
     const lines = output.split("\n")
     expect(lines).toContain("INFO omo 9.2.1 (engine: senpi 2026.8.28; scheme nodef)")
     expect(lines).toContain("INFO Update: omo update")
@@ -84,12 +95,14 @@ describe("compiled omo doctor", () => {
     mkdirSync(join(memoryHome, "agents", "fixture-agent", "repo"), { recursive: true })
     mkdirSync(join(memoryHome, "agents", "fixture-agent", "runtime"), { recursive: true })
     writeFileSync(join(memoryHome, "agents", "fixture-agent", "runtime", "note.txt"), "x".repeat(2048))
-    const output = await captureLog(() => runCompiledLauncher(["doctor"], root, "2026.8.28", root, {
-      env: { ...process.env, OMO_MEMORY_HOME: memoryHome },
-      computerUseLines: async () => [],
-      coverageLines: async () => [],
-      trustLines: async () => [],
-    }))
+    const output = await captureLog(() =>
+      runCompiledLauncher(["doctor"], root, "2026.8.28", root, {
+        env: { ...process.env, OMO_MEMORY_HOME: memoryHome },
+        computerUseLines: async () => [],
+        coverageLines: async () => [],
+        trustLines: async () => [],
+      }),
+    )
     const lines = output.split("\n")
     expect(lines.filter((line) => line.startsWith("INFO memory runtime: fixture-agent "))).toHaveLength(1)
     expect(lines.filter((line) => line.startsWith("INFO memory runtime total: "))).toHaveLength(1)
@@ -103,7 +116,9 @@ describe("compiled omo doctor", () => {
         computerUseLines: async () => [],
         coverageLines: async () => [],
         trustLines: async () => [],
-        memoryRuntimeLines: async () => { throw new Error("EACCES: permission denied, scandir runtime/locked") },
+        memoryRuntimeLines: async () => {
+          throw new Error("EACCES: permission denied, scandir runtime/locked")
+        },
       })
       exitCode = Number(process.exitCode)
     })
@@ -131,10 +146,16 @@ describe("compiled omo doctor --reap", () => {
   test("#given --reap <pid> #when the compiled doctor runs #then it reaps instead of printing the report", async () => {
     const root = runtimeRoot()
     const signalled: number[] = []
-    const output = await captureLog(() => runCompiledLauncher(["doctor", "--reap", "4242"], root, "2026.8.28", root, {
-      list: () => [{ pid: 4242, ppid: 1, elapsed: "01:00", tty: "ttys001", command: "/home/u/.omo/binary-runtime/9.2.1/omo" }],
-      kill: (pid) => { signalled.push(pid) },
-    }))
+    const output = await captureLog(() =>
+      runCompiledLauncher(["doctor", "--reap", "4242"], root, "2026.8.28", root, {
+        list: () => [
+          { pid: 4242, ppid: 1, elapsed: "01:00", tty: "ttys001", command: "/home/u/.omo/binary-runtime/9.2.1/omo" },
+        ],
+        kill: (pid) => {
+          signalled.push(pid)
+        },
+      }),
+    )
     expect(signalled).toEqual([4242])
     expect(output).toContain("PASS reaped stale engine pid 4242")
     expect(output).not.toContain("PASS plugin manifest")
@@ -147,7 +168,7 @@ describe("compiled diagnostic runtime", () => {
     const bundle = join(root, "plugin", "runtime", "category-coverage", "index.js")
     mkdirSync(join(bundle, ".."), { recursive: true })
     writeFileSync(bundle, "export const marker = 'provisioned-runtime'\n")
-    const loaded = await compiledDiagnosticRuntimeLoader(root)() as { marker?: string }
+    const loaded = (await compiledDiagnosticRuntimeLoader(root)()) as { marker?: string }
     expect(loaded.marker).toBe("provisioned-runtime")
   })
 })

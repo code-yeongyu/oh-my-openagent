@@ -34,12 +34,14 @@ export interface PrelaunchReconcile {
 
 export async function reconcilePrelaunch(context: ReconcileContext): Promise<PrelaunchReconcile> {
   context.signal?.throwIfAborted()
-  const active = (await context.reservation.readState(
-    context.deferOnSchedulerContention ? { waitTimeoutMs: 0 } : undefined,
-  )).active
+  const active = (
+    await context.reservation.readState(context.deferOnSchedulerContention ? { waitTimeoutMs: 0 } : undefined)
+  ).active
   context.signal?.throwIfAborted()
   if (active === undefined) {
-    const promoted = await context.reservation.promotePending?.(context.deferOnSchedulerContention ? { waitTimeoutMs: 0 } : undefined)
+    const promoted = await context.reservation.promotePending?.(
+      context.deferOnSchedulerContention ? { waitTimeoutMs: 0 } : undefined,
+    )
     context.signal?.throwIfAborted()
     if (promoted !== undefined) context.launch?.(promoted)
     return {}
@@ -48,7 +50,10 @@ export async function reconcilePrelaunch(context: ReconcileContext): Promise<Pre
   if (await isSettledUnderDeadLauncher(context.identity.paths.reflection, context)) {
     // Under the run's finalize lock without waiting (REVIEW-3 R2): a settler still holding it finishes first.
     const released = await withRunFinalizeLock(context.identity.paths.locks, active.runId, async () =>
-      await isSettledUnderDeadLauncher(context.identity.paths.reflection, context) ? releaseReservationAsFailed(context, active.runId) : undefined)
+      (await isSettledUnderDeadLauncher(context.identity.paths.reflection, context))
+        ? releaseReservationAsFailed(context, active.runId)
+        : undefined,
+    )
     return released === undefined ? {} : { result: released, retiredRunId: active.runId }
   }
   const ghost = await classifyGhostActive({ identity: context.identity, active })
@@ -60,7 +65,8 @@ export async function reconcilePrelaunch(context: ReconcileContext): Promise<Pre
     }
     return { result: await releaseReservationAsFailed(context, active.runId), retiredRunId: active.runId }
   }
-  if (active.reservedAt === undefined || active.launcherPid === undefined || active.launcherHostname === undefined) return {}
+  if (active.reservedAt === undefined || active.launcherPid === undefined || active.launcherHostname === undefined)
+    return {}
   const runDir = join(context.identity.paths.reflection, "runs", active.runId)
   let retiredGeneration = false
   if (existsSync(join(runDir, "ledger.json"))) {
@@ -78,16 +84,18 @@ export async function reconcilePrelaunch(context: ReconcileContext): Promise<Pre
       if (!ghost.ghost) return {}
       retiredGeneration = true
     } else {
-      const terminalAt = await terminalTimestamp(terminalPath, hasFinal) ?? Number.NaN
+      const terminalAt = (await terminalTimestamp(terminalPath, hasFinal)) ?? Number.NaN
       const reservedAt = Date.parse(active.reservedAt)
       const startedAt = Date.parse(ledger.startedAt)
       const finalizedAt = ledger.finalizedAt === undefined ? undefined : Date.parse(ledger.finalizedAt)
-      if (![terminalAt, reservedAt, startedAt].every(Number.isFinite)
-        || (finalizedAt !== undefined && !Number.isFinite(finalizedAt))) {
+      if (
+        ![terminalAt, reservedAt, startedAt].every(Number.isFinite) ||
+        (finalizedAt !== undefined && !Number.isFinite(finalizedAt))
+      ) {
         return releaseFinishedUnderDeadLauncher(context, active)
       }
-      retiredGeneration = startedAt < reservedAt && terminalAt < reservedAt
-        && (finalizedAt === undefined || finalizedAt < reservedAt)
+      retiredGeneration =
+        startedAt < reservedAt && terminalAt < reservedAt && (finalizedAt === undefined || finalizedAt < reservedAt)
       if (!retiredGeneration) return {}
     }
   }
@@ -97,14 +105,18 @@ export async function reconcilePrelaunch(context: ReconcileContext): Promise<Pre
     if (context.now() - createdAt <= LAUNCH_WINDOW_MS) return {}
     return quarantineUnderDeadLauncher(context, active, runDir, "prelaunch_missing_after_deadline")
   }
-  if (context.now() - Date.parse(active.reservedAt) <= LAUNCH_WINDOW_MS || active.launcherHostname !== context.hostname()) {
+  if (
+    context.now() - Date.parse(active.reservedAt) <= LAUNCH_WINDOW_MS ||
+    active.launcherHostname !== context.hostname()
+  ) {
     return retiredGeneration ? { retiredRunId: active.runId } : {}
   }
   if (!(await isLauncherDead(active.launcherPid, active.launcherProcessStart, context))) {
     return retiredGeneration ? { retiredRunId: active.runId } : {}
   }
   // Retired artifacts are historical evidence, not resources owned by this reservation.
-  if (retiredGeneration) return { result: await releaseReservationAsFailed(context, active.runId), retiredRunId: active.runId }
+  if (retiredGeneration)
+    return { result: await releaseReservationAsFailed(context, active.runId), retiredRunId: active.runId }
   if (existsSync(prelaunchPath)) {
     const prelaunch = parseRunPrelaunchArtifact(await readRunJson<unknown>(prelaunchPath))
     context.signal?.throwIfAborted()
@@ -125,7 +137,12 @@ export async function reconcilePrelaunch(context: ReconcileContext): Promise<Pre
 
 async function withRunFinalizeLock<T>(locksDir: string, runId: string, task: () => Promise<T>): Promise<T | undefined> {
   try {
-    return await withLock(runFinalizationLockPath(locksDir, runId), await createLockRecord("reflection-finalize", { runId }), task, { waitTimeoutMs: 0 })
+    return await withLock(
+      runFinalizationLockPath(locksDir, runId),
+      await createLockRecord("reflection-finalize", { runId }),
+      task,
+      { waitTimeoutMs: 0 },
+    )
   } catch (error) {
     if (error instanceof LockContentionError) return undefined
     throw error
@@ -152,10 +169,25 @@ async function recordInterruptedLaunch(context: ReconcileContext, runDir: string
     kind,
     trigger: active.request.trigger,
     ...(origin === undefined ? {} : { origin }),
-    launcher: { pid: active.launcherPid, hostname: active.launcherHostname, processStart: active.launcherProcessStart ?? null },
+    launcher: {
+      pid: active.launcherPid,
+      hostname: active.launcherHostname,
+      processStart: active.launcherProcessStart ?? null,
+    },
   })
-  const run: RunReceiptLedger = { kind, runId: active.runId, trigger: active.request.trigger, ...(origin === undefined ? {} : { origin }), startedAt: generation }
-  await emitMemoryReceipt(context.identity.paths.runtime, runReceipt(run, "abandoned", { reason: "launch_interrupted" }), context.receipts, context.warn)
+  const run: RunReceiptLedger = {
+    kind,
+    runId: active.runId,
+    trigger: active.request.trigger,
+    ...(origin === undefined ? {} : { origin }),
+    startedAt: generation,
+  }
+  await emitMemoryReceipt(
+    context.identity.paths.runtime,
+    runReceipt(run, "abandoned", { reason: "launch_interrupted" }),
+    context.receipts,
+    context.warn,
+  )
 }
 
 /**
@@ -163,7 +195,10 @@ async function recordInterruptedLaunch(context: ReconcileContext, runDir: string
  * artifact as its one recorded outcome. Under a dead launcher the reservation is released without
  * touching the run dir, so a later backfill sees exactly one terminal state.
  */
-async function releaseFinishedUnderDeadLauncher(context: ReconcileContext, active: ReservedRun): Promise<PrelaunchReconcile> {
+async function releaseFinishedUnderDeadLauncher(
+  context: ReconcileContext,
+  active: ReservedRun,
+): Promise<PrelaunchReconcile> {
   if (active.launcherPid === undefined || active.launcherHostname !== context.hostname()) return {}
   if (!(await isLauncherDead(active.launcherPid, active.launcherProcessStart, context))) return {}
   return { result: await releaseReservationAsFailed(context, active.runId), retiredRunId: active.runId }
@@ -178,13 +213,17 @@ async function recordedProcessesDead(context: ReconcileContext, runDir: string):
   let raw: Record<string, unknown>
   try {
     const value = await readRunJson<unknown>(join(runDir, "ledger.json"))
-    raw = typeof value === "object" && value !== null ? value as Record<string, unknown> : {}
+    raw = typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {}
   } catch {
     raw = {}
   }
-  const pid = (key: string) => typeof raw[key] === "number" ? raw[key] as number : undefined
-  const start = (key: string) => typeof raw[key] === "string" || raw[key] === null ? raw[key] as string | null : undefined
-  for (const [pidKey, startKey] of [["pid", "processStart"], ["childPid", "childProcessStart"]] as const) {
+  const pid = (key: string) => (typeof raw[key] === "number" ? (raw[key] as number) : undefined)
+  const start = (key: string) =>
+    typeof raw[key] === "string" || raw[key] === null ? (raw[key] as string | null) : undefined
+  for (const [pidKey, startKey] of [
+    ["pid", "processStart"],
+    ["childPid", "childProcessStart"],
+  ] as const) {
     // Lenient on purpose (#11920): an unparseable ledger has no queued/launching state to protect.
     const verdict = await classifyRecordedProcessLenient(pid(pidKey), start(startKey), context)
     if (verdict !== "dead" && verdict !== "absent") return false
@@ -202,7 +241,9 @@ async function quarantineUnderDeadLauncher(
 ): Promise<PrelaunchReconcile> {
   if (active.launcherPid === undefined || active.launcherHostname !== context.hostname()) return {}
   if (!(await isLauncherDead(active.launcherPid, active.launcherProcessStart, context))) return {}
-  const result = await withRunFinalizeLock(context.identity.paths.locks, active.runId, () => quarantineRun(context, runDir, active.runId, reason, ledger, active))
+  const result = await withRunFinalizeLock(context.identity.paths.locks, active.runId, () =>
+    quarantineRun(context, runDir, active.runId, reason, ledger, active),
+  )
   return result === undefined ? {} : { result, retiredRunId: active.runId }
 }
 
@@ -227,24 +268,36 @@ export async function quarantineRun(
   }
   const evidence = [...(await readdir(runDir)).sort(), ...(active === undefined ? [] : [RESERVATION_EVIDENCE_FILENAME])]
   context.signal?.throwIfAborted()
-  await writeQuarantine(runDir, {
-    version: 1,
-    runId,
-    kind: run.kind,
-    trigger: run.trigger,
-    ...(origin === undefined ? {} : { origin }),
-    generation,
-    reason,
-    quarantinedAt: new Date(context.now()).toISOString(),
-    evidence,
-  }, active)
-  await emitMemoryReceipt(context.identity.paths.runtime, runReceipt(run, "quarantined", { reason }), context.receipts, context.warn)
+  await writeQuarantine(
+    runDir,
+    {
+      version: 1,
+      runId,
+      kind: run.kind,
+      trigger: run.trigger,
+      ...(origin === undefined ? {} : { origin }),
+      generation,
+      reason,
+      quarantinedAt: new Date(context.now()).toISOString(),
+      evidence,
+    },
+    active,
+  )
+  await emitMemoryReceipt(
+    context.identity.paths.runtime,
+    runReceipt(run, "quarantined", { reason }),
+    context.receipts,
+    context.warn,
+  )
   return active === undefined ? { runId, outcome: "failed" } : releaseReservationAsFailed(context, runId)
 }
 
 // No abort check here (DESIGN.r4 c.21): callers check before any sentinel write, so a written sentinel
 // is always followed by its release in the same call.
-async function releaseReservationAsFailed(context: ReconcileContext, runId: string): Promise<ReflectionRunReconcileResult> {
+async function releaseReservationAsFailed(
+  context: ReconcileContext,
+  runId: string,
+): Promise<ReflectionRunReconcileResult> {
   const transition = await context.reservation.complete(
     runId,
     "failed",

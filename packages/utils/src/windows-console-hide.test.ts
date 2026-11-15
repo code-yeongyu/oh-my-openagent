@@ -14,7 +14,12 @@ const ENTRY_POINTS = ["spawnSync", "spawn", "execFileSync", "execFile", "execSyn
 
 // Calls whose call text cannot carry the literal flag. Each entry names the reason; an intentionally
 // visible process would also be listed here.
-const ALLOWLIST: readonly { readonly file: string; readonly callee: string; readonly via: string; readonly reason: string }[] = [
+const ALLOWLIST: readonly {
+  readonly file: string
+  readonly callee: string
+  readonly via: string
+  readonly reason: string
+}[] = [
   {
     file: "runtime/spawn.ts",
     callee: "nodeSpawn",
@@ -128,7 +133,9 @@ function auditedCalls(): readonly ChildProcessCall[] {
 }
 
 function isAllowlisted(call: ChildProcessCall): boolean {
-  return ALLOWLIST.some((entry) => entry.file === call.file && entry.callee === call.callee && call.text.includes(entry.via))
+  return ALLOWLIST.some(
+    (entry) => entry.file === call.file && entry.callee === call.callee && call.text.includes(entry.via),
+  )
 }
 
 describe("utils win32 console suppression", () => {
@@ -162,7 +169,12 @@ describe("utils win32 console suppression", () => {
       const calls = auditedCalls()
 
       // when
-      const stale = ALLOWLIST.filter((entry) => !calls.some((call) => call.file === entry.file && call.callee === entry.callee && call.text.includes(entry.via)))
+      const stale = ALLOWLIST.filter(
+        (entry) =>
+          !calls.some(
+            (call) => call.file === entry.file && call.callee === entry.callee && call.text.includes(entry.via),
+          ),
+      )
 
       // then
       expect(stale).toEqual([])

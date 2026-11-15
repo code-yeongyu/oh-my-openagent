@@ -23,8 +23,16 @@ const installId = "a".repeat(64)
 const installHash = createHash("sha256").update(installId).digest("hex")
 function collect(env: Readonly<Record<string, string>> = {}) {
   return collectHostSections({
-    env: { HOME: root, USERPROFILE: root, OMO_CODING_AGENT_DIR: join(root, "agent"), OMO_NATIVE_INSTALL_ID: installId, ...env },
-    omoVersion: "synthetic", senpiVersion: "synthetic", channel: "test",
+    env: {
+      HOME: root,
+      USERPROFILE: root,
+      OMO_CODING_AGENT_DIR: join(root, "agent"),
+      OMO_NATIVE_INSTALL_ID: installId,
+      ...env,
+    },
+    omoVersion: "synthetic",
+    senpiVersion: "synthetic",
+    channel: "test",
     now: new Date("2026-10-26T00:00:00.000Z"),
     session: { sessionId: "synthetic-session", entries: [] },
   })
@@ -41,14 +49,17 @@ const gates: ReadonlyArray<readonly [string, Readonly<Record<string, string>>]> 
   ["feedback disable", { OMO_TELEMETRY_ALLOW_AUTOMATION: "1", OMO_NATIVE_DISABLE_POSTHOG: "1" }],
   ["global opt-out", { OMO_TELEMETRY_ALLOW_AUTOMATION: "1", DO_NOT_TRACK: "1" }],
 ]
-test.each(gates)("#given %s suppresses telemetry #when feedback is collected #then hashes are absent and ordinary sections remain", (_name, env) => {
-  const result = collect(env)
-  expect(result.installHash).toBeUndefined()
-  expect(result.sessionHash).toBeUndefined()
-  expect(result.sections.find((section) => section.id === "identity")?.text).not.toContain(installHash)
-  expect(result.sections.map((section) => section.id)).toEqual(["identity", "environment", "config", "session"])
-  expect(existsSync(join(root, "agent", "omo-senpi", "omo-native", "session-id-salt"))).toBe(false)
-})
+test.each(gates)(
+  "#given %s suppresses telemetry #when feedback is collected #then hashes are absent and ordinary sections remain",
+  (_name, env) => {
+    const result = collect(env)
+    expect(result.installHash).toBeUndefined()
+    expect(result.sessionHash).toBeUndefined()
+    expect(result.sections.find((section) => section.id === "identity")?.text).not.toContain(installHash)
+    expect(result.sections.map((section) => section.id)).toEqual(["identity", "environment", "config", "session"])
+    expect(existsSync(join(root, "agent", "omo-senpi", "omo-native", "session-id-salt"))).toBe(false)
+  },
+)
 
 test("#given a deliberate automation opt-in #when feedback is collected #then allowed hashes remain available", () => {
   const result = collect({ OMO_TELEMETRY_ALLOW_AUTOMATION: "1" })

@@ -21,22 +21,23 @@
 //
 // Prints a JSON summary to stdout. Exit 0 iff the turn completed, every
 // EXPECT_HOOK fired with status "completed", and no hook completed failed.
-import { spawn } from "node:child_process";
-import { pathToFileURL } from "node:url";
+import { spawn } from "node:child_process"
+import { pathToFileURL } from "node:url"
 
 export function parseExpectedHooks(value) {
-  return (value || "").split(",").map((s) => s.trim()).filter(Boolean);
+  return (value || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
 }
 
 export function summarizeRun({ turnStatus, assistantText, threadId, turnId, expectHook, hooks, stderr }) {
   const completed = new Set(
-    hooks
-      .filter((h) => h.method === "hook/completed" && h.status === "completed")
-      .map((h) => h.eventName),
-  );
-  const missingHooks = expectHook.filter((eventName) => !completed.has(eventName));
-  const failedHooks = hooks.filter((h) => h.method === "hook/completed" && h.status !== "completed");
-  const ok = turnStatus === "completed" && missingHooks.length === 0 && failedHooks.length === 0;
+    hooks.filter((h) => h.method === "hook/completed" && h.status === "completed").map((h) => h.eventName),
+  )
+  const missingHooks = expectHook.filter((eventName) => !completed.has(eventName))
+  const failedHooks = hooks.filter((h) => h.method === "hook/completed" && h.status !== "completed")
+  const ok = turnStatus === "completed" && missingHooks.length === 0 && failedHooks.length === 0
   return {
     ok,
     turnStatus,
@@ -48,20 +49,20 @@ export function summarizeRun({ turnStatus, assistantText, threadId, turnId, expe
     failedHooks,
     hooks,
     stderrTail: stderr.split("\n").slice(-10).join("\n"),
-  };
+  }
 }
 
 function main() {
-  const CODEX_BIN = process.env.CODEX_BIN || "codex";
-  const MOCK_PORT = process.env.MOCK_PORT;
-  const PROMPT = process.env.PROMPT || "say hello";
-  const CWD = process.env.QA_CWD || process.cwd();
-  const DEADLINE_MS = Number(process.env.DEADLINE_MS || 60000);
-  const EXPECT = parseExpectedHooks(process.env.EXPECT_HOOK || "");
+  const CODEX_BIN = process.env.CODEX_BIN || "codex"
+  const MOCK_PORT = process.env.MOCK_PORT
+  const PROMPT = process.env.PROMPT || "say hello"
+  const CWD = process.env.QA_CWD || process.cwd()
+  const DEADLINE_MS = Number(process.env.DEADLINE_MS || 60000)
+  const EXPECT = parseExpectedHooks(process.env.EXPECT_HOOK || "")
 
   if (!MOCK_PORT) {
-    console.error("app-server-client: MOCK_PORT is required (start lib/mock-model.mjs first)");
-    process.exit(2);
+    console.error("app-server-client: MOCK_PORT is required (start lib/mock-model.mjs first)")
+    process.exit(2)
   }
 
   // Config overrides force codex onto the local mock provider, never the real one.
@@ -75,48 +76,48 @@ function main() {
     `model_providers.mock_provider.stream_max_retries=0`,
     `approval_policy="never"`,
     `sandbox_mode="read-only"`,
-  ];
-  const args = overrides.flatMap((o) => ["-c", o]).concat("app-server");
+  ]
+  const args = overrides.flatMap((o) => ["-c", o]).concat("app-server")
 
-  const child = spawn(CODEX_BIN, args, { stdio: ["pipe", "pipe", "pipe"], env: process.env });
-  let stderr = "";
-  child.stderr.on("data", (c) => (stderr += c));
+  const child = spawn(CODEX_BIN, args, { stdio: ["pipe", "pipe", "pipe"], env: process.env })
+  let stderr = ""
+  child.stderr.on("data", (c) => (stderr += c))
 
-  const hooks = [];
-  let assistantText = null;
-  let threadId = null;
-  let turnId = null;
-  let turnStatus = null;
-  let buf = "";
-  let finished = false;
+  const hooks = []
+  let assistantText = null
+  let threadId = null
+  let turnId = null
+  let turnStatus = null
+  let buf = ""
+  let finished = false
 
-  const send = (obj) => child.stdin.write(JSON.stringify(obj) + "\n");
+  const send = (obj) => child.stdin.write(JSON.stringify(obj) + "\n")
 
   function finish() {
-    if (finished) return;
-    finished = true;
+    if (finished) return
+    finished = true
     try {
-      child.kill("SIGTERM");
+      child.kill("SIGTERM")
     } catch (error) {
-      const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-      stderr += `\n[driver] failed to terminate app-server: ${message}\n`;
+      const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+      stderr += `\n[driver] failed to terminate app-server: ${message}\n`
     }
-    const summary = summarizeRun({ turnStatus, assistantText, threadId, turnId, expectHook: EXPECT, hooks, stderr });
-    console.log(JSON.stringify(summary, null, 2));
-    process.exit(summary.ok ? 0 : 1);
+    const summary = summarizeRun({ turnStatus, assistantText, threadId, turnId, expectHook: EXPECT, hooks, stderr })
+    console.log(JSON.stringify(summary, null, 2))
+    process.exit(summary.ok ? 0 : 1)
   }
 
   function handle(msg) {
     if (msg.id === 1 && msg.result) {
-      send({ method: "initialized" });
-      send({ id: 2, method: "thread/start", params: { cwd: CWD } });
+      send({ method: "initialized" })
+      send({ id: 2, method: "thread/start", params: { cwd: CWD } })
     } else if (msg.id === 2 && msg.result) {
-      threadId = msg.result.thread?.id;
-      send({ id: 3, method: "turn/start", params: { threadId, input: [{ type: "text", text: PROMPT }] } });
+      threadId = msg.result.thread?.id
+      send({ id: 3, method: "turn/start", params: { threadId, input: [{ type: "text", text: PROMPT }] } })
     } else if (msg.id === 3 && msg.result) {
-      turnId = msg.result.turn?.id;
+      turnId = msg.result.turn?.id
     } else if (msg.method === "hook/started" || msg.method === "hook/completed") {
-      const run = msg.params?.run || {};
+      const run = msg.params?.run || {}
       hooks.push({
         method: msg.method,
         eventName: run.eventName,
@@ -125,43 +126,59 @@ function main() {
         pluginId: run.pluginId,
         hookName: run.hookName ?? run.name,
         runId: run.id,
-      });
+      })
     } else if (msg.method === "item/completed") {
-      const item = msg.params?.item;
-      if (item?.type === "agentMessage" && typeof item.text === "string") assistantText = item.text;
+      const item = msg.params?.item
+      if (item?.type === "agentMessage" && typeof item.text === "string") assistantText = item.text
     } else if (msg.method === "turn/completed") {
-      turnStatus = msg.params?.turn?.status;
-      finish();
+      turnStatus = msg.params?.turn?.status
+      finish()
     }
   }
 
   child.stdout.on("data", (chunk) => {
-    buf += chunk;
-    let nl;
+    buf += chunk
+    let nl
     while ((nl = buf.indexOf("\n")) >= 0) {
-      const line = buf.slice(0, nl).trim();
-      buf = buf.slice(nl + 1);
-      if (!line) continue;
-      let msg;
+      const line = buf.slice(0, nl).trim()
+      buf = buf.slice(nl + 1)
+      if (!line) continue
+      let msg
       try {
-        msg = JSON.parse(line);
+        msg = JSON.parse(line)
       } catch (error) {
-        if (error instanceof SyntaxError) continue;
-        throw error;
+        if (error instanceof SyntaxError) continue
+        throw error
       }
-      handle(msg);
+      handle(msg)
     }
-  });
+  })
   child.on("exit", (code) => {
-    if (finished) return;
-    console.log(JSON.stringify({ ok: false, exitCode: code, turnStatus, hooks, stderrTail: stderr.split("\n").slice(-15).join("\n") }, null, 2));
-    process.exit(1);
-  });
+    if (finished) return
+    console.log(
+      JSON.stringify(
+        { ok: false, exitCode: code, turnStatus, hooks, stderrTail: stderr.split("\n").slice(-15).join("\n") },
+        null,
+        2,
+      ),
+    )
+    process.exit(1)
+  })
 
-  send({ id: 1, method: "initialize", params: { clientInfo: { name: "codex-qa", version: "0.1.0" }, capabilities: { experimentalApi: true, requestAttestation: false } } });
-  setTimeout(() => { stderr += "\n[driver] deadline reached\n"; finish(); }, DEADLINE_MS);
+  send({
+    id: 1,
+    method: "initialize",
+    params: {
+      clientInfo: { name: "codex-qa", version: "0.1.0" },
+      capabilities: { experimentalApi: true, requestAttestation: false },
+    },
+  })
+  setTimeout(() => {
+    stderr += "\n[driver] deadline reached\n"
+    finish()
+  }, DEADLINE_MS)
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main();
+  main()
 }

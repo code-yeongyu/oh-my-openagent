@@ -12,7 +12,11 @@ const EXCERPT_CHARS = 200
  * only when no earlier list matches. Whitespace is collapsed to single spaces and the
  * result never exceeds EXCERPT_CHARS.
  */
-export function buildExcerpt(body: string, terms: readonly string[], ...fallbackTerms: readonly (readonly string[])[]): string {
+export function buildExcerpt(
+  body: string,
+  terms: readonly string[],
+  ...fallbackTerms: readonly (readonly string[])[]
+): string {
   const normalized = body.replace(/\s+/g, " ").trim()
   if (normalized === "") return ""
 

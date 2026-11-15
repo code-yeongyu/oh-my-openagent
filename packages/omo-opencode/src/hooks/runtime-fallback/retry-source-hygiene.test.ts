@@ -27,10 +27,14 @@ describe("runtime fallback retry source hygiene", () => {
   })
 
   test("retry parts skip a compaction row", () => {
-    expect(getLastUserRetryParts({ data: [
-      { info: { role: "user" }, parts: [{ type: "text", text: "real prompt" }] },
-      { info: { role: "user" }, parts: [{ type: "compaction" }] },
-    ] })).toEqual([{ type: "text", text: "real prompt" }])
+    expect(
+      getLastUserRetryParts({
+        data: [
+          { info: { role: "user" }, parts: [{ type: "text", text: "real prompt" }] },
+          { info: { role: "user" }, parts: [{ type: "compaction" }] },
+        ],
+      }),
+    ).toEqual([{ type: "text", text: "real prompt" }])
   })
 
   test("prefers non-empty info parts when top-level parts are empty", () => {
@@ -55,9 +59,9 @@ describe("runtime fallback retry source hygiene", () => {
   })
 
   test("uses an explicit synthetic continuation when every user row is a synthetic continuation", () => {
-    const onlySyntheticContinuations = { data: [
-      { info: { id: "synthetic", role: "user" }, parts: [syntheticContinuation] },
-    ] }
+    const onlySyntheticContinuations = {
+      data: [{ info: { id: "synthetic", role: "user" }, parts: [syntheticContinuation] }],
+    }
 
     expect(resolveOriginalUserRetryMetadata(onlySyntheticContinuations)).toEqual({ parts: [] })
     expect(getLastUserRetryParts(onlySyntheticContinuations)).toEqual([])
@@ -65,10 +69,12 @@ describe("runtime fallback retry source hygiene", () => {
 
   test("keeps a retry-marked row when its text still contains the real prompt", () => {
     const markedPrompt = {
-      data: [{
-        info: { id: "marked-real", role: "user", model: "openai/real" },
-        parts: [{ type: "text", text: `real prompt\n${OMO_RUNTIME_FALLBACK_RETRY_MARKER}` }],
-      }],
+      data: [
+        {
+          info: { id: "marked-real", role: "user", model: "openai/real" },
+          parts: [{ type: "text", text: `real prompt\n${OMO_RUNTIME_FALLBACK_RETRY_MARKER}` }],
+        },
+      ],
     }
 
     expect(resolveOriginalUserRetryMetadata(markedPrompt)).toEqual({

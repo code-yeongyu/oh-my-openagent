@@ -165,14 +165,16 @@ export class FakeExtensionAPI implements SenpiExtensionAPI {
     this.messages.push({ message, options })
   }
 
-  sendUserMessage(content: string | readonly Record<string, unknown>[], options?: { deliverAs?: "steer" | "followUp" }): void {
+  sendUserMessage(
+    content: string | readonly Record<string, unknown>[],
+    options?: { deliverAs?: "steer" | "followUp" },
+  ): void {
     this.userMessages.push({ content, options })
   }
 
   registerMcpServer(name: string, config: Record<string, unknown>): void {
     this.mcpServers.push({ name, config })
   }
-
 
   async dispatch(event: string, payload: unknown, ctx?: unknown): Promise<unknown[]> {
     const results: unknown[] = []
@@ -196,10 +198,18 @@ export function withInertSenpiSeams<T extends object>(pi: T): T {
     for (const key of keys) {
       const next: unknown = Reflect.get(holder, key)
       if (typeof next === "object" && next !== null) holder = next
-      else { const created = {}; Reflect.set(holder, key, created); holder = created }
+      else {
+        const created = {}
+        Reflect.set(holder, key, created)
+        holder = created
+      }
     }
     const kind = SENPI_SEAMS[path as keyof typeof SENPI_SEAMS]
-    Reflect.set(holder, last, kind === "function" ? () => undefined : kind === "object" ? {} : kind === "string" ? "/" : undefined)
+    Reflect.set(
+      holder,
+      last,
+      kind === "function" ? () => undefined : kind === "object" ? {} : kind === "string" ? "/" : undefined,
+    )
   }
   return pi
 }

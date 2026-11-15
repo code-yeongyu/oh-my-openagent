@@ -6,7 +6,7 @@ export type DeliveryState = "queued" | "admitting" | "admitted" | "applied" | "r
 
 export type EffectiveLane = "steer" | "follow_up"
 
-export type RefusalReason = "not_steerable" | "turn_conflict" | "expired" | "binding_closed"
+export type RefusalReason = "not_steerable" | "turn_conflict" | "expired" | "binding_closed" | "sender_not_admitted"
 
 export type ProcessIdentity = {
   readonly pid: number
@@ -98,7 +98,50 @@ export type DeliveryRow = {
   readonly binding_id: string | null
   readonly binding_revision: number | null
   readonly actor_user_id: string | null
+  /** The engine ledger key of a delivery taken in from another device (`device:<attested device>/<sender's id>`); null on every other row. */
+  readonly ledger_id?: string | null
+  /** The sender's rendered text and display text of such a delivery, handed to the engine unrendered; null on every other row. */
+  readonly verbatim_text?: string | null
+  readonly verbatim_display_text?: string | null
 }
+
+/** A delivery record another device's service attested, as the sender's relay leg writes it (`remote/relay-transport.ts`). */
+export type IntakeRecord = {
+  readonly sessionId: string
+  readonly deliveryId: string
+  readonly text: string
+  readonly displayText: string
+  readonly sender: { readonly kind: string; readonly session_id?: string; readonly name?: string }
+  readonly deliverAs: "followUp" | "steer"
+  readonly chainCount: number
+}
+
+/**
+ * Takes a record in for a session on this device that is not running (#13037). `attested_device` comes from the receiving
+ * device service, never from the record; `target_session_kind` and `chain_count_limit` are this device's facts.
+ */
+export type IntakeRequest = {
+  readonly now: number
+  readonly attested_device: string
+  readonly record: IntakeRecord
+  readonly provenance: Pick<Provenance, "workspace" | "project" | "lane" | "session">
+  readonly target_session_kind: "interactive" | "worker" | "child"
+  /** The machine's chain limit setting; absent when the user set none. */
+  readonly chain_count_limit?: number
+}
+
+export type IntakeOutcome =
+  | {
+      readonly kind: "queued"
+      /** The sender's own delivery id. */
+      readonly delivery_id: string
+      readonly row_id: string
+      readonly ledger_id: string
+      readonly queue_position: number
+      readonly deduplicated: boolean
+    }
+  | StoreRefusal
+  | { readonly kind: "busy" }
 
 /**
  * Who is sending. Every kind maps to one receipt/budget principal and one causal-graph node:
@@ -175,7 +218,11 @@ export type ReconcileRequest = {
 
 export type ReconcileOutcome = {
   readonly queued: readonly DeliveryRow[]
-  readonly transitions: readonly { readonly delivery_id: string; readonly from: DeliveryState; readonly to: DeliveryState }[]
+  readonly transitions: readonly {
+    readonly delivery_id: string
+    readonly from: DeliveryState
+    readonly to: DeliveryState
+  }[]
   readonly dual_runtime: readonly string[]
 }
 
@@ -186,11 +233,23 @@ export type ClaimRequest = {
   readonly lane: EffectiveLane
 }
 
-export type ClaimOutcome = { readonly kind: "claimed"; readonly row: DeliveryRow } | { readonly kind: "lost"; readonly state: DeliveryState | null }
+export type ClaimOutcome =
+  | { readonly kind: "claimed"; readonly row: DeliveryRow }
+  | { readonly kind: "lost"; readonly state: DeliveryState | null }
 
 export type OutcomeRecord =
-  | { readonly kind: "admitted"; readonly admission_kind: string; readonly turn_epoch: number; readonly wait_kind?: "approval" }
-  | { readonly kind: "applied"; readonly admission_kind: string; readonly turn_epoch: number; readonly wait_kind?: "approval" }
+  | {
+      readonly kind: "admitted"
+      readonly admission_kind: string
+      readonly turn_epoch: number
+      readonly wait_kind?: "approval"
+    }
+  | {
+      readonly kind: "applied"
+      readonly admission_kind: string
+      readonly turn_epoch: number
+      readonly wait_kind?: "approval"
+    }
   | { readonly kind: "requeue" }
   | { readonly kind: "refused"; readonly reason: RefusalReason }
 
@@ -203,13 +262,16 @@ export type RecordOutcomeRequest = {
 
 export type GatewayDeliveryDelivery =
   | { readonly kind: "started" | "steered"; readonly turn_id: string }
-  | { readonly kind: "queued" | "queued_offline"; readonly queue_position: number; readonly waiting_on?: DeliveryWait }
+  | { readonly kind: "queued"; readonly queue_position: number; readonly waiting_on?: DeliveryWait }
+  /** `reason: wake_unavailable`: the same-device switch is on and the target was asked to wake, but no carrier runs (#13037). */
+  | { readonly kind: "queued_offline"; readonly queue_position: number; readonly reason?: "wake_unavailable" }
 
 /**
- * What the receiver is parked on while the delivery waits: an approval (a tool permission or question) a human must answer on
- * that device. `device` is the account device it waits on; absent when this install has no device identity (#13014).
+ * What the receiver is parked on while the delivery waits (omo#13037 5.1): an approval (a tool permission or question) a
+ * human must answer on that device, a hold on the session, or the wake of a session no engine runs. `device` is the account
+ * device it waits on; absent when this install has no device identity (#13014).
  */
-export type DeliveryWait = { readonly kind: "approval"; readonly device?: string }
+export type DeliveryWait = { readonly kind: "approval" | "hold" | "wake"; readonly device?: string }
 
 export type GatewayDeliverySuccess = {
   readonly kind: "ok"
@@ -222,22 +284,36 @@ export type GatewayDeliverySuccess = {
   readonly deduplicated: boolean
 }
 
-export type GatewayDeliveryResult = GatewayDeliverySuccess | { readonly kind: "error"; readonly error: ThreadToolFailure }
+export type GatewayDeliveryResult =
+  GatewayDeliverySuccess | { readonly kind: "error"; readonly error: ThreadToolFailure }
 
 export type GatewayStoreEvent =
-  | { readonly kind: "extension_error"; readonly extension: string; readonly phase: "stale_transaction" | "after_commit" | "after_rollback" | "async"; readonly error: string }
+  | {
+      readonly kind: "extension_error"
+      readonly extension: string
+      readonly phase: "stale_transaction" | "after_commit" | "after_rollback" | "async"
+      readonly error: string
+    }
   | { readonly kind: "busy"; readonly op: string }
   | { readonly kind: "lock_wait_exceeded"; readonly op: string; readonly waited_ms: number }
   | { readonly kind: "completions_emitted"; readonly session_durable_id: string; readonly cursors: readonly number[] }
   | { readonly kind: "paused"; readonly hook: string }
   | { readonly kind: "barrier"; readonly op: string }
   | { readonly kind: "legacy_mailbox_invalid"; readonly directory: string; readonly error: string }
-  | { readonly kind: "legacy_mailbox_skipped"; readonly directory: string; readonly items: readonly LegacyMailboxSkip[] }
+  | {
+      readonly kind: "legacy_mailbox_skipped"
+      readonly directory: string
+      readonly items: readonly LegacyMailboxSkip[]
+    }
   /** The worker closed the database after a failed open (a migration that rolled back); it exits next. */
   | { readonly kind: "store_closed" }
 
 /** A legacy mailbox item that can never be delivered (its target is not a durable session id); it is reported, not imported. */
-export type LegacyMailboxSkip = { readonly message_seq: number; readonly target: string; readonly reason: "invalid_target" }
+export type LegacyMailboxSkip = {
+  readonly message_seq: number
+  readonly target: string
+  readonly reason: "invalid_target"
+}
 
 export type GatewayTestHookAction = "pause" | "sigkill" | "throw"
 

@@ -30,7 +30,10 @@ mock.module("./storage", () => ({
 
 preserveModuleMocksForTestFile(import.meta.url)
 
-import { _resetForTesting as resetSessionState, updateSessionAgent } from "../../features/claude-code-session-state/state"
+import {
+  _resetForTesting as resetSessionState,
+  updateSessionAgent,
+} from "../../features/claude-code-session-state/state"
 import { runAggressiveTruncationStrategy } from "./aggressive-truncation-strategy"
 
 type FakeClient = {
@@ -51,10 +54,12 @@ type FakeSDKMessage = {
   }
 }
 
-function createRecordingClient(params: {
-  readonly messages?: readonly FakeSDKMessage[]
-  readonly status?: () => Promise<unknown>
-} = {}): { client: FakeClient; calls: PromptAsyncCall[] } {
+function createRecordingClient(
+  params: {
+    readonly messages?: readonly FakeSDKMessage[]
+    readonly status?: () => Promise<unknown>
+  } = {},
+): { client: FakeClient; calls: PromptAsyncCall[] } {
   const calls: PromptAsyncCall[] = []
   const client: FakeClient = {
     session: {
@@ -131,14 +136,16 @@ describe("runAggressiveTruncationStrategy - pins agent/model/variant on recovere
   test("pins provider/model/variant resolved from the nearest prior assistant message", async () => {
     // given
     const { client, calls } = createRecordingClient({
-      messages: [{
-        id: "msg_1",
-        info: {
-          agent: "atlas",
-          model: { providerID: "anthropic", modelID: "claude-opus-4-7", variant: "high" },
-          time: { created: 1 },
+      messages: [
+        {
+          id: "msg_1",
+          info: {
+            agent: "atlas",
+            model: { providerID: "anthropic", modelID: "claude-opus-4-7", variant: "high" },
+            time: { created: 1 },
+          },
         },
-      }],
+      ],
     })
     const sessionID = "session-truncation-model"
 

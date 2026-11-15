@@ -35,7 +35,9 @@ function readSandboxText(root) {
   const files = []
   collectFiles(root, files)
   return files
-    .filter((file) => file.endsWith(".json") || file.endsWith(".jsonl") || file.endsWith(".log") || file.endsWith(".md"))
+    .filter(
+      (file) => file.endsWith(".json") || file.endsWith(".jsonl") || file.endsWith(".log") || file.endsWith(".md"),
+    )
     .map((file) => readFileSync(file, "utf8"))
     .join("\n")
 }
@@ -107,7 +109,9 @@ function stagedSkillChecks() {
       !research.includes("## Senpi Harness Tool Compatibility") &&
       research.includes("team_create") &&
       research.includes("ULW-RESEARCH MODE ENABLED!"),
-    ultraworkDescriptionOk: (ultrawork.match(/^description: (.*)$/m)?.[1] ?? "").includes("injects the full directive as a hidden custom message"),
+    ultraworkDescriptionOk: (ultrawork.match(/^description: (.*)$/m)?.[1] ?? "").includes(
+      "injects the full directive as a hidden custom message",
+    ),
   }
 }
 
@@ -116,7 +120,8 @@ function runSelfTest() {
   try {
     seedSandbox(sandbox)
     if (REQUIRED_DIRECTIVE_MARKERS.some((marker) => marker.length === 0)) throw new Error("empty required marker")
-    if (digestDirectory(join(sandbox.root, "missing")) !== "absent") throw new Error("missing directory digest should be absent")
+    if (digestDirectory(join(sandbox.root, "missing")) !== "absent")
+      throw new Error("missing directory digest should be absent")
     const staged = stagedSkillChecks()
     if (!staged.ulwResearchExists) throw new Error("staged ulw-research skill missing; run sync-skills.mjs first")
 
@@ -165,24 +170,28 @@ function main() {
       join(sandbox.cwd, "mock-script.json"),
       `${JSON.stringify({ steps: [{ type: "text", text: "ulw prompts e2e complete" }] }, null, 2)}\n`,
     )
-    const run = spawnSync(resolvedSenpi, ["-e", mockProviderEntry, "-p", "--provider", "omo-mock", "--model", "mock-1", "ulw please respond"], {
-      cwd: sandbox.cwd,
-      env: {
-        ...isolatedChildEnv(process.env, sandbox.agentDir),
-        OMO_CODING_AGENT_DIR: sandbox.agentDir,
-        SENPI_CODING_AGENT_DIR: sandbox.agentDir,
-        PI_CODING_AGENT_DIR: sandbox.agentDir,
-        HOME: sandbox.homeDir,
-        USERPROFILE: sandbox.homeDir,
-        XDG_CONFIG_HOME: sandbox.xdgConfigHome,
-        XDG_DATA_HOME: sandbox.xdgDataHome,
-        XDG_CACHE_HOME: sandbox.xdgCacheHome,
-        PI_OFFLINE: "1",
-        OMO_SENPI_QA: "1",
+    const run = spawnSync(
+      resolvedSenpi,
+      ["-e", mockProviderEntry, "-p", "--provider", "omo-mock", "--model", "mock-1", "ulw please respond"],
+      {
+        cwd: sandbox.cwd,
+        env: {
+          ...isolatedChildEnv(process.env, sandbox.agentDir),
+          OMO_CODING_AGENT_DIR: sandbox.agentDir,
+          SENPI_CODING_AGENT_DIR: sandbox.agentDir,
+          PI_CODING_AGENT_DIR: sandbox.agentDir,
+          HOME: sandbox.homeDir,
+          USERPROFILE: sandbox.homeDir,
+          XDG_CONFIG_HOME: sandbox.xdgConfigHome,
+          XDG_DATA_HOME: sandbox.xdgDataHome,
+          XDG_CACHE_HOME: sandbox.xdgCacheHome,
+          PI_OFFLINE: "1",
+          OMO_SENPI_QA: "1",
+        },
+        encoding: "utf8",
+        timeout: 60_000,
       },
-      encoding: "utf8",
-      timeout: 60_000,
-    })
+    )
     transcript = run.status === 0 ? readSandboxText(sandbox.agentDir) : ""
 
     const missingMarkers = REQUIRED_DIRECTIVE_MARKERS.filter((marker) => !transcript.includes(marker))
@@ -190,13 +199,18 @@ function main() {
     const staged = stagedSkillChecks()
     const ultraworkInjected = run.status === 0 && missingMarkers.length === 0 && forbiddenHits.length === 0
     const session = inspectSession(sandbox.agentDir)
-    const userTextClean = session.userTexts.length > 0 && session.userTexts.every((text) => !text.includes("<ultrawork-mode>"))
+    const userTextClean =
+      session.userTexts.length > 0 && session.userTexts.every((text) => !text.includes("<ultrawork-mode>"))
     const hiddenInjectionOk =
       session.hiddenDirectives.length === 1 &&
       session.visibleDirectives.length === 0 &&
       REQUIRED_DIRECTIVE_MARKERS.every((marker) => session.hiddenDirectives[0].content.includes(marker))
     result =
-      ultraworkInjected && staged.ulwResearchNative && staged.ultraworkDescriptionOk && userTextClean && hiddenInjectionOk
+      ultraworkInjected &&
+      staged.ulwResearchNative &&
+      staged.ultraworkDescriptionOk &&
+      userTextClean &&
+      hiddenInjectionOk
         ? "PASS"
         : "FAIL"
     return printResult({

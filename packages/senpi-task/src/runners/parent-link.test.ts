@@ -10,8 +10,14 @@ function parentMode(initial: string): ParentPermissionMode & { change(preset: st
   const listeners = new Set<(preset: string) => void>()
   return {
     current: () => current,
-    onChange: (listener) => { listeners.add(listener); return () => listeners.delete(listener) },
-    change: (preset) => { current = preset; for (const listener of listeners) listener(preset) },
+    onChange: (listener) => {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
+    change: (preset) => {
+      current = preset
+      for (const listener of listeners) listener(preset)
+    },
   }
 }
 
@@ -20,14 +26,19 @@ function notices() {
   const active = new Map<number, string>()
   let next = 0
   let waiters: Array<() => void> = []
-  const changed = () => { for (const wake of waiters.splice(0)) wake() }
+  const changed = () => {
+    for (const wake of waiters.splice(0)) wake()
+  }
   return {
     active: () => [...active.values()],
     add: (_message: string, token: string) => {
       const id = next++
       active.set(id, token)
       changed()
-      return () => { active.delete(id); changed() }
+      return () => {
+        active.delete(id)
+        changed()
+      }
     },
     until: async (predicate: () => boolean) => {
       while (!predicate()) await new Promise<void>((resolve) => waiters.push(resolve))
@@ -39,9 +50,17 @@ function pushes() {
   const calls: Array<PromiseWithResolvers<void>> = []
   let waiter: (() => void) | undefined
   return {
-    push: (_preset: string) => { const call = Promise.withResolvers<void>(); calls.push(call); waiter?.(); return call.promise },
+    push: (_preset: string) => {
+      const call = Promise.withResolvers<void>()
+      calls.push(call)
+      waiter?.()
+      return call.promise
+    },
     nth: async (index: number) => {
-      while (calls.length <= index) await new Promise<void>((resolve) => { waiter = resolve })
+      while (calls.length <= index)
+        await new Promise<void>((resolve) => {
+          waiter = resolve
+        })
       return calls[index] as PromiseWithResolvers<void>
     },
   }

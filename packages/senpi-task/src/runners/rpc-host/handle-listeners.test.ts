@@ -109,9 +109,10 @@ describe("events a warm host delivers before the manager subscribes (#9512)", ()
     listeners.emitEvent(turnEnded)
 
     // when
-    const subscribeThrowing = () => listeners.registrations.subscribe(() => {
-      throw new Error("observer failed")
-    })
+    const subscribeThrowing = () =>
+      listeners.registrations.subscribe(() => {
+        throw new Error("observer failed")
+      })
     expect(subscribeThrowing).not.toThrow()
     const stats = collect(listeners)
 

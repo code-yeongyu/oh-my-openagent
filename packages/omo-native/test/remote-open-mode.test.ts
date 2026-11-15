@@ -14,7 +14,10 @@ import { localPermissionPreset } from "../remote-permission-preset"
 // #6189: `omo remote open` names the mode the new session runs in - --permission-preset, else this device's own
 // engine setting - so the session never falls into the engine's delegated `ask` default with nobody to answer.
 
-const SIGNED_IN = { exitCode: 0, stdout: JSON.stringify({ signedIn: true, device: { id: "dev-self", name: "This Mac" }, refreshState: "ok" }) }
+const SIGNED_IN = {
+  exitCode: 0,
+  stdout: JSON.stringify({ signedIn: true, device: { id: "dev-self", name: "This Mac" }, refreshState: "ok" }),
+}
 const fixture = createRemoteThreadFixture()
 const dirs: string[] = []
 const owners: FakeOwner[] = []
@@ -32,19 +35,29 @@ async function open(args: readonly string[], localMode: () => string = () => "wo
   const owner = await startFakeOwner({ stateDir, world: defaultWorld() })
   owners.push(owner)
   const err: string[] = []
-  const code = await runRemoteVerb({
-    accountShow: async () => SIGNED_IN,
-    stateDir: owner.stateDir,
-    connect: () => connectDeviceService({ version: "5.1.52", stateDir: owner.stateDir }),
-    now: () => 0,
-    output: () => {},
-    write: () => {},
-    error: (line) => err.push(line),
-    bootstrap: { pinVersion: "1.4.0", install: async () => ({ ok: false, state: "service_degraded", action: "none" }), refresher: { binaryPath: "/x", version: "0" }, agentDir: "/x" },
-    remote: () => a.remote,
-    localPermissionPreset: localMode,
-  }, ["open", "b", ...args])
-  const modes = a.sent.filter((entry) => entry.rpc?.["type"] === "open_session").map((entry) => entry.rpc?.["permissionPreset"])
+  const code = await runRemoteVerb(
+    {
+      accountShow: async () => SIGNED_IN,
+      stateDir: owner.stateDir,
+      connect: () => connectDeviceService({ version: "5.1.52", stateDir: owner.stateDir }),
+      now: () => 0,
+      output: () => {},
+      write: () => {},
+      error: (line) => err.push(line),
+      bootstrap: {
+        pinVersion: "1.4.0",
+        install: async () => ({ ok: false, state: "service_degraded", action: "none" }),
+        refresher: { binaryPath: "/x", version: "0" },
+        agentDir: "/x",
+      },
+      remote: () => a.remote,
+      localPermissionPreset: localMode,
+    },
+    ["open", "b", ...args],
+  )
+  const modes = a.sent
+    .filter((entry) => entry.rpc?.["type"] === "open_session")
+    .map((entry) => entry.rpc?.["permissionPreset"])
   return { code, err, modes }
 }
 
@@ -58,7 +71,9 @@ describe("omo remote open and the approval mode", () => {
   })
 
   test("#given this device's setting cannot be read #when no flag is given #then the command is a usage error and nothing is opened", async () => {
-    const result = await open([], () => { throw new UsageError("omo remote open: unreadable setting") })
+    const result = await open([], () => {
+      throw new UsageError("omo remote open: unreadable setting")
+    })
     expect(result.modes).toEqual([])
     expect(result.code).toBe(REMOTE_EXIT.usage)
   })
@@ -79,7 +94,14 @@ describe("localPermissionPreset", () => {
   }
 
   test("#given settings.jsonc beside settings.json #when read #then the jsonc mode wins, as the engine reads it", () => {
-    expect(localPermissionPreset(agentDir({ "settings.jsonc": '{ // mine\n "permissionPreset": "read-only" }', "settings.json": '{"permissionPreset":"ask"}' }))).toBe("read-only")
+    expect(
+      localPermissionPreset(
+        agentDir({
+          "settings.jsonc": '{ // mine\n "permissionPreset": "read-only" }',
+          "settings.json": '{"permissionPreset":"ask"}',
+        }),
+      ),
+    ).toBe("read-only")
   })
 
   test("#given no settings or no mode in them #when read #then the engine default full-access", () => {
@@ -89,7 +111,9 @@ describe("localPermissionPreset", () => {
 
   // Review of 12839 (LOW): a setting that cannot be read never falls back to the loosest mode.
   test("#given settings naming an unknown mode or not parsing #when read #then it is a usage error, never full-access", () => {
-    expect(() => localPermissionPreset(agentDir({ "settings.json": '{"permissionPreset":"everything"}' }))).toThrow(UsageError)
+    expect(() => localPermissionPreset(agentDir({ "settings.json": '{"permissionPreset":"everything"}' }))).toThrow(
+      UsageError,
+    )
     expect(() => localPermissionPreset(agentDir({ "settings.json": '{"permissionPreset": ' }))).toThrow(UsageError)
   })
 })

@@ -61,9 +61,8 @@ function taskCallLineForWidth(args: TaskCallArgs, mode: string, plainMode: strin
   const fixedWidth = rendererVisibleWidth("task") + rendererVisibleWidth(plainMode) + 4
   const available = Math.min(TASK_PROMPT_EXCERPT_WIDTH, Math.max(0, width - fixedWidth))
   const normalized = callRowText(args)
-  const prompt = normalized === undefined || available <= 0
-    ? undefined
-    : `"${excerptRendererPromptText(normalized, available)}"`
+  const prompt =
+    normalized === undefined || available <= 0 ? undefined : `"${excerptRendererPromptText(normalized, available)}"`
   return piTui().truncateToWidth(joinRendererTokens(["task", prompt, mode]), width, ELLIPSIS)
 }
 

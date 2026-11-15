@@ -9,7 +9,10 @@ import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
 import type { TaskRecordStore } from "../store"
 
 export type LifecycleChaosObservations = {
-  readonly actionCounts: Record<"suspend_session" | "resume_session" | "crash_mid_suspend" | "sibling_reconcile_race" | "mass_revive_at_cap", number>
+  readonly actionCounts: Record<
+    "suspend_session" | "resume_session" | "crash_mid_suspend" | "sibling_reconcile_race" | "mass_revive_at_cap",
+    number
+  >
   readonly liveHandleBreaches: string[]
   readonly pidBreaches: string[]
   readonly reclamationBreaches: string[]
@@ -27,7 +30,9 @@ export class ChaosProcessTable implements ProcessSignaller {
     this.alive.add(pid)
     return pid
   }
-  isAlive(pid: number): boolean { return this.alive.has(pid) }
+  isAlive(pid: number): boolean {
+    return this.alive.has(pid)
+  }
   signal(pid: number, signal: NodeJS.Signals): void {
     this.signals.push(`${signal}:${pid}`)
     this.alive.delete(pid)
@@ -47,7 +52,11 @@ function observeLaunch(
   observations: LifecycleChaosObservations,
 ): void {
   const record = store.load(taskId)
-  if (record !== null && (record.status === "completed" || record.status === "error" || record.status === "interrupted") && !hasSession(store, taskId)) {
+  if (
+    record !== null &&
+    (record.status === "completed" || record.status === "error" || record.status === "interrupted") &&
+    !hasSession(store, taskId)
+  ) {
     observations.terminalRelaunches.push(`${engineId}:${taskId}`)
   }
   if (record?.pid !== undefined && processes.isAlive(record.pid)) {
@@ -98,7 +107,9 @@ export class ChaosRunner implements ManagedRunner {
     const handle: ManagedChildHandle = {
       ...fake.handle,
       ...(pid === undefined ? {} : { pid }),
-      terminate: async () => { if (pid !== undefined) this.#processes.signal(pid, "SIGTERM") },
+      terminate: async () => {
+        if (pid !== undefined) this.#processes.signal(pid, "SIGTERM")
+      },
       dispose: async () => {
         if (disposed) return
         disposed = true
@@ -136,9 +147,13 @@ export class ChaosRpcRespawnRunner {
       subscribe: () => () => {},
       waitForIdle: async () => {},
       lastAssistantText: () => "rpc resumed",
-      dispose: async () => { this.#processes.alive.delete(pid) },
+      dispose: async () => {
+        this.#processes.alive.delete(pid)
+      },
       switchSession: async () => ({ cancelled: false }),
-      terminate: async () => { this.#processes.signal(pid, "SIGTERM") },
+      terminate: async () => {
+        this.#processes.signal(pid, "SIGTERM")
+      },
       exitOutcome: () => undefined,
       waitForExit: async () => ({ kind: "clean", facts: { pid, code: 0, signal: null, stderrTail: "" } }),
       lastSeen: () => undefined,

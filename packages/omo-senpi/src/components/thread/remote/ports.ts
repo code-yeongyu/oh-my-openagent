@@ -27,14 +27,25 @@ export type RemoteCommandOutcome =
    * session an endpoint open made, when the open asked for it and the host named it on the reply.
    */
   | { readonly kind: "ok"; readonly response: JsonObject; readonly local?: true; readonly located?: string }
-  | { readonly kind: "refused"; readonly reason: string }
+  /** `detail`: the receiving service's own reason in the command's receipt (`receipt.reason`), when it names one. */
+  | { readonly kind: "refused"; readonly reason: string; readonly detail?: string }
   | { readonly kind: "uncertain"; readonly reason: string }
+
+/**
+ * One single-probe look for a durable id on one device (omo#13037 A4.3.3): `found` names the device's stable key for it,
+ * `none` that the device answered and holds no such session, `silent` that it did not answer within the bound, and
+ * `unavailable` that this device's own service cannot make the single probe (no lookup is made at all).
+ */
+export type RemoteLookupOutcome =
+  | { readonly kind: "found"; readonly key: string }
+  | { readonly kind: "none" }
+  | { readonly kind: "silent"; readonly reason: string }
+  | { readonly kind: "unavailable" }
 
 export type RemoteServiceState = { readonly state: string }
 
 export type RemoteLocateOutcome =
-  | { readonly kind: "ok"; readonly sessionId: string }
-  | { readonly kind: "refused"; readonly reason: string }
+  { readonly kind: "ok"; readonly sessionId: string } | { readonly kind: "refused"; readonly reason: string }
 
 /** A session on another device followed from now on: its records go to the listener until `stop` or the attach ends. */
 export type RemoteSessionWatch = {
@@ -43,20 +54,26 @@ export type RemoteSessionWatch = {
   readonly stop: () => void
 }
 
-export type RemoteWatchOutcome = { readonly kind: "ok"; readonly watch: RemoteSessionWatch } | { readonly kind: "refused"; readonly reason: string }
+export type RemoteWatchOutcome =
+  { readonly kind: "ok"; readonly watch: RemoteSessionWatch } | { readonly kind: "refused"; readonly reason: string }
 
 export type RemoteSessionsPort = {
   /** The device service state; `plan_required` means the account's plan has no relay (A5: paid only). */
   readonly status: () => Promise<RemoteServiceState>
   readonly thisDevice: () => Promise<string | null>
   readonly devices: () => Promise<readonly RemoteDevice[]>
-  readonly sessions: () => Promise<readonly RemoteSessionRow[]>
+  /** The account's session list; with `device`, that one device's rows only (no account-wide round). */
+  readonly sessions: (filter?: { readonly device?: string }) => Promise<readonly RemoteSessionRow[]>
   /**
    * A session-less engine record (`open_session`, `list_sessions`) on `device`'s engine endpoint, with no
    * attach: the attach-less `session.command {device, endpoint, rpc}` shape (relay daemon #393). `locate` asks a
    * create or fork for its new session's listing key on the reply (`located`), so no session.locate follows it.
    */
-  readonly endpointCommand: (device: string, rpc: JsonObject, options?: { readonly locate?: boolean }) => Promise<RemoteCommandOutcome>
+  readonly endpointCommand: (
+    device: string,
+    rpc: JsonObject,
+    options?: { readonly locate?: boolean },
+  ) => Promise<RemoteCommandOutcome>
   /**
    * The id a session just created on `device` is addressed by (its listing row's `session_id`, the key an attach
    * takes), from the durable engine session id the create reply names; settles once that id attaches.
@@ -66,13 +83,37 @@ export type RemoteSessionsPort = {
    * An engine record for one session on `device` (`prompt`, `abort`, `get_state`), through an attach. A read the
    * session's mirror holds is answered locally unless `fresh` is set.
    */
-  readonly sessionCommand: (device: string, sessionId: string, rpc: JsonObject, options?: { readonly fresh?: boolean }) => Promise<RemoteCommandOutcome>
+  readonly sessionCommand: (
+    device: string,
+    sessionId: string,
+    rpc: JsonObject,
+    options?: { readonly fresh?: boolean },
+  ) => Promise<RemoteCommandOutcome>
   readonly read: (device: string, sessionId: string, tail: number) => Promise<RemoteCommandOutcome>
+  /** omo#13037 A4.2/A4.3: one single-probe locate of `durableId` on `device`. Absent: no lookup is ever made. */
+  readonly lookup?: (device: string, durableId: string) => Promise<RemoteLookupOutcome>
+  /**
+   * omo#13037 5.4: an `admit_external_message` record to a session of `device` that no listing maps, by its durable id.
+   * `unavailable` when this device's own service cannot carry it (nothing is sent). Absent: the same as `unavailable`.
+   */
+  readonly wake?: (
+    device: string,
+    durableId: string,
+    rpc: JsonObject,
+  ) => Promise<RemoteCommandOutcome | { readonly kind: "unavailable" }>
+  /** Whether `wake` can be sent at all, read before deciding a lane (nothing is sent). Absent: false. */
+  readonly canWake?: () => Promise<boolean>
+  /** omo#13037: this device's own service can make the single probe (read from its connection; no round trip). */
+  readonly canLookup?: () => Promise<boolean>
   /**
    * The records `device`'s session writes from now on (none of the ones before), on the attach this port holds for it.
    * Refused, typed, when that attach cannot be made.
    */
-  readonly watch: (device: string, sessionId: string, listener: (record: JsonObject) => void) => Promise<RemoteWatchOutcome>
+  readonly watch: (
+    device: string,
+    sessionId: string,
+    listener: (record: JsonObject) => void,
+  ) => Promise<RemoteWatchOutcome>
   /** Closes the device-service connection this port opened, if any; a short-lived caller (the CLI) calls it at the end. */
   readonly close?: () => Promise<void>
 }
@@ -95,13 +136,26 @@ export type AliasError = {
   readonly details?: { readonly holder?: AliasHolder; readonly reason?: string }
 }
 
-export type AliasResult<T> = { readonly kind: "ok"; readonly value: T } | { readonly kind: "error"; readonly error: AliasError }
+export type AliasResult<T> =
+  { readonly kind: "ok"; readonly value: T } | { readonly kind: "error"; readonly error: AliasError }
 
 /** Frozen port v1 (`o8/alias-port.v1.ts`): the account service's alias registry implements exactly this. */
 export type AliasRegistry = {
-  readonly claim: (input: { readonly alias: string; readonly holder: AliasHolder; readonly idempotency_key: string }) => Promise<AliasResult<{ readonly alias: string; readonly holder: AliasHolder }>>
-  readonly rename: (input: { readonly session_id: string; readonly from: string; readonly to: string; readonly idempotency_key: string }) => Promise<AliasResult<{ readonly alias: string; readonly holder: AliasHolder }>>
-  readonly release: (input: { readonly session_id: string; readonly alias: string }) => Promise<AliasResult<{ readonly released: boolean }>>
+  readonly claim: (input: {
+    readonly alias: string
+    readonly holder: AliasHolder
+    readonly idempotency_key: string
+  }) => Promise<AliasResult<{ readonly alias: string; readonly holder: AliasHolder }>>
+  readonly rename: (input: {
+    readonly session_id: string
+    readonly from: string
+    readonly to: string
+    readonly idempotency_key: string
+  }) => Promise<AliasResult<{ readonly alias: string; readonly holder: AliasHolder }>>
+  readonly release: (input: {
+    readonly session_id: string
+    readonly alias: string
+  }) => Promise<AliasResult<{ readonly released: boolean }>>
   readonly resolve: (alias: string) => Promise<AliasResult<AliasHolder>>
   readonly aliasesOf: (sessionIds: readonly string[]) => Promise<AliasResult<ReadonlyMap<string, string>>>
 }
@@ -118,3 +172,20 @@ export type RemoteThreadSurface = {
 
 /** The id a listing row has ABOVE the ports (decision 0027 D2): its durable id and nothing else; "" when the device publishes none. */
 export const rowThreadId = (row: RemoteSessionRow): string => row.durable_id ?? ""
+
+/**
+ * A session a device holds on disk but no engine runs (omo#13037 A4.2): built from that device's own probe answer, its
+ * stable key and the durable id. It carries no name and no folder, and its state `ended` sends a delivery down the wake path.
+ */
+export function endedRow(device: string, key: string, durableId: string): RemoteSessionRow {
+  return {
+    device,
+    session_id: key,
+    durable_id: durableId,
+    title: "",
+    project: "",
+    path: "",
+    state: "ended",
+    updated_ms: 0,
+  }
+}

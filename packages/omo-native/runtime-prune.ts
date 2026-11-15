@@ -1,7 +1,7 @@
 import { readdirSync, renameSync, rmSync } from "node:fs"
 import { basename, dirname, join, sep } from "node:path"
-import { listProcesses } from "./bin/lib/doctor.js"
-import { RELEASE_VERSION } from "./compiled-update"
+import { listProcesses } from "./bin/lib/process-list.js"
+import { RELEASE_VERSION } from "./release-version"
 
 // Every release provisions ~/.omo/binary-runtime/<version>/ (~250MB) and nothing removed the old ones,
 // so a standalone install grew by one runtime per update. A launch prunes the versions older than its
@@ -128,7 +128,14 @@ export function removeReplacedLauncher(launcher: string, platform: NodeJS.Platfo
     return
   }
   for (const entry of entries) {
-    if (entry !== prefix && !(entry.startsWith(`${prefix}-`) && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(entry.slice(prefix.length + 1)))) continue
+    if (
+      entry !== prefix &&
+      !(
+        entry.startsWith(`${prefix}-`) &&
+        /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(entry.slice(prefix.length + 1))
+      )
+    )
+      continue
     try {
       rmSync(join(directory, entry), { force: true })
     } catch {

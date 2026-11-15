@@ -1,11 +1,20 @@
 import { outcomeOf } from "./outcome"
-import { connectDeviceService, LocalApiError, type CommandResult, type DeviceService, type RemoteAttach } from "@oh-my-opencode/device-service-core"
+import {
+  connectDeviceService,
+  LocalApiError,
+  WAKE_ACCEPTS,
+  type CommandResult,
+  type DeviceService,
+  type RemoteAttach,
+} from "@oh-my-opencode/device-service-core/device-service"
 import type { JsonObject, RemoteCommandOutcome, RemoteSessionsPort } from "./ports"
 
 export type DeviceServiceSessionsOptions = {
   readonly version: string
   /** Test seam: the proven local API connection (the device service SDK by default). */
   readonly connect?: () => Promise<DeviceService>
+  /** Test seam: the client's own cap on one single-probe locate (LOOKUP_CAP_MS). */
+  readonly lookupCapMs?: number
   /** Test seam: the wait between attaches of a just-created session while its device's listing catches up. */
   readonly retryDelay?: (ms: number) => Promise<void>
 }
@@ -26,7 +35,11 @@ function wireValue(value: unknown): WireValue {
 }
 
 function wireRecord(record: Readonly<Record<string, unknown>>): WireRpc {
-  return Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined).map(([key, value]) => [key, wireValue(value)]))
+  return Object.fromEntries(
+    Object.entries(record)
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => [key, wireValue(value)]),
+  )
 }
 
 // The local API codes that answer a session.command before anything leaves this device: the owner's error responses
@@ -34,11 +47,35 @@ function wireRecord(record: Readonly<Record<string, unknown>>): WireRpc {
 // Everything else - `closed` and `protocol_violation` can fail a command already written to the connection, and
 // `internal` proves nothing about dispatch - may have run on the other device, so it is never reported as refused.
 const REFUSED_BEFORE_SENDING: ReadonlySet<LocalApiError["code"]> = new Set<LocalApiError["code"]>([
-  "unauthenticated", "client_proof_invalid", "invalid_request", "unknown_type", "forbidden", "owner_transfer", "signed_out",
-  "device_mismatch", "device_changed", "account_changed", "device_key_invalid", "service_disabled", "sign_in_required",
-  "plan_required", "activation_pending", "authorization_stale", "peer_not_found", "peer_not_session_client", "session_not_found",
-  "engine_too_old", "not_attached", "command_id_conflict", "message_too_long", "upload_incomplete", "malformed",
-  "method_unclassified", "method_local_only", "host_not_answering", "unsupported",
+  "unauthenticated",
+  "client_proof_invalid",
+  "invalid_request",
+  "unknown_type",
+  "forbidden",
+  "owner_transfer",
+  "signed_out",
+  "device_mismatch",
+  "device_changed",
+  "account_changed",
+  "device_key_invalid",
+  "service_disabled",
+  "sign_in_required",
+  "plan_required",
+  "activation_pending",
+  "authorization_stale",
+  "peer_not_found",
+  "peer_not_session_client",
+  "session_not_found",
+  "engine_too_old",
+  "not_attached",
+  "command_id_conflict",
+  "message_too_long",
+  "upload_incomplete",
+  "malformed",
+  "method_unclassified",
+  "method_local_only",
+  "host_not_answering",
+  "unsupported",
 ])
 
 const notSentReason = (error: unknown): string => (error instanceof LocalApiError ? error.code : "attach_failed")
@@ -51,6 +88,13 @@ const sessionReason = (code: string): string => (code === "session_not_found" ? 
 // The engine records the thread tools send that change nothing on the other device (thread_read, the pre-send probe).
 // Like the port's read, every failure of one is a typed refusal: there is nothing that may have run.
 const READ_ONLY_RECORDS: ReadonlySet<string> = new Set(["get_state", "get_messages"])
+
+// omo#13037 A6: only a peer delivery carries the wake mark, and only through a service that carries it.
+const MARKED_RECORDS: ReadonlySet<string> = new Set(["admit_external_message"])
+
+// A single-probe locate that ran and found nothing: the device answered and holds no such session. Any other failure
+// means the device did not answer within the bound (or could not be reached), so the lookup counts it as silent.
+const LOOKUP_NONE: ReadonlySet<string> = new Set(["session_not_found", "peer_not_found", "peer_not_session_client"])
 
 // The one read a session's attach holds: its model catalog (`get_available_models`). The catalog does not change with
 // what the session does, so it is held until the attach shows a new snapshot (the host re-established it) or ends, and
@@ -71,7 +115,8 @@ function createCatalogHold(attached: RemoteAttach) {
   })
   return {
     snapshots: () => snapshots,
-    get: (key: string): JsonObject | undefined => (held !== undefined && held.key === key && Date.now() - held.at <= CATALOG_MAX_AGE_MS ? held.response : undefined),
+    get: (key: string): JsonObject | undefined =>
+      held !== undefined && held.key === key && Date.now() - held.at <= CATALOG_MAX_AGE_MS ? held.response : undefined,
     keep: (key: string, response: JsonObject, sentAt: number): void => {
       if (sentAt === snapshots) held = { key, response, at: Date.now() }
     },
@@ -80,8 +125,8 @@ function createCatalogHold(attached: RemoteAttach) {
 
 type Session = { readonly attached: RemoteAttach; readonly catalog: ReturnType<typeof createCatalogHold> }
 
-const recordKey = (record: WireRpc): string => JSON.stringify(Object.entries(record).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
-
+const recordKey = (record: WireRpc): string =>
+  JSON.stringify(Object.entries(record).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
 
 /**
  * The account half of the thread tools over this device's device service: one proven connection, rebuilt after it
@@ -94,37 +139,68 @@ function durableIdOf(row: object): { readonly durable_id?: string } {
   return typeof value === "string" && value !== "" ? { durable_id: value } : {}
 }
 
+// omo#13037 A4.3.3: the service bounds a single-probe locate at 3 s; the client holds its own cap so a send's bound does
+// not rest on the service honouring it. A device past the cap counts as silent.
+const LOOKUP_CAP_MS = 3_500
+
 export function createDeviceServiceSessions(options: DeviceServiceSessionsOptions): RemoteSessionsPort {
   let service: Promise<DeviceService> | undefined
   const attaches = new Map<string, Promise<Session>>()
   const connect = options.connect ?? (() => connectDeviceService({ version: options.version }))
   const retryDelay = options.retryDelay ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
-  const svc = (): Promise<DeviceService> => service ??= connect().then(
-    (connected) => {
-      void connected.closed.then(() => { service = undefined; attaches.clear() })
-      return connected
-    },
-    (error: unknown) => { service = undefined; throw error },
-  )
+  const svc = (): Promise<DeviceService> =>
+    (service ??= connect().then(
+      (connected) => {
+        void connected.closed.then(() => {
+          service = undefined
+          attaches.clear()
+        })
+        return connected
+      },
+      (error: unknown) => {
+        service = undefined
+        throw error
+      },
+    ))
   const attach = (device: string, sessionId: string): Promise<Session> => {
     const key = `${device}\u0000${sessionId}`
     const known = attaches.get(key)
     if (known !== undefined) return known
-    const opened = svc().then((connected) => connected.attach(device, sessionId)).then(
-      (attached) => {
-        void attached.detached.then(() => { if (attaches.get(key) === opened) attaches.delete(key) })
-        return { attached, catalog: createCatalogHold(attached) }
-      },
-      (error: unknown) => { attaches.delete(key); throw error },
-    )
+    const opened = svc()
+      .then((connected) => connected.attach(device, sessionId))
+      .then(
+        (attached) => {
+          void attached.detached.then(() => {
+            if (attaches.get(key) === opened) attaches.delete(key)
+          })
+          return { attached, catalog: createCatalogHold(attached) }
+        },
+        (error: unknown) => {
+          attaches.delete(key)
+          throw error
+        },
+      )
     attaches.set(key, opened)
     return opened
   }
   return {
     status: async () => ({ state: (await (await svc()).status()).state }),
     thisDevice: async () => (await (await svc()).thisDevice())?.id ?? null,
-    devices: async () => (await (await svc()).devices()).map((row) => ({ device: row.device, label: row.label, online: row.online })),
-    sessions: async () => (await (await svc()).sessions()).rows.map((row) => ({ device: row.device, session_id: row.session_id, ...durableIdOf(row), title: row.title, project: row.project, path: row.path, state: row.state, updated_ms: row.updated_ms })),
+    devices: async () =>
+      (await (await svc()).devices()).map((row) => ({ device: row.device, label: row.label, online: row.online })),
+    sessions: async (filter) =>
+      (await (await svc()).sessions(filter?.device === undefined ? undefined : { device: filter.device })).rows.map(
+        (row) => ({
+          device: row.device,
+          session_id: row.session_id,
+          ...durableIdOf(row),
+          title: row.title,
+          project: row.project,
+          path: row.path,
+          state: row.state,
+          updated_ms: row.updated_ms,
+        }),
+      ),
     // create / open / fork on another device: relay daemon #393's attach-less `session.command {device, endpoint, rpc}`.
     // The endpoint lookup and every refusal answered before sending ran nothing; anything after sending may have.
     endpointCommand: async (device, rpc, endpointOptions) => {
@@ -146,7 +222,8 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         // The SDK marks a failure before session.command was written (the endpoint lookup timing out or the connection
         // closing during it) not_sent: nothing ran, so it is refused. The same codes after sending stay uncertain.
         if (error instanceof LocalApiError && error.not_sent === true) return { kind: "refused", reason: error.code }
-        if (error instanceof LocalApiError && error.command_id === undefined && REFUSED_BEFORE_SENDING.has(error.code)) return { kind: "refused", reason: error.code }
+        if (error instanceof LocalApiError && error.command_id === undefined && REFUSED_BEFORE_SENDING.has(error.code))
+          return { kind: "refused", reason: error.code }
         return { kind: "uncertain", reason: "reply_lost" }
       }
     },
@@ -174,16 +251,22 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         if (held !== undefined) return { kind: "ok", response: held, local: true }
       }
       const sentAt = catalog.snapshots()
+      // The gate is this connection's: a reconnect to an older service stops the mark.
+      const carries =
+        MARKED_RECORDS.has(String(rpc["type"])) && (await svc().catch(() => undefined))?.carriesWakeMark === true
+      const marked = carries ? { accepts: WAKE_ACCEPTS } : undefined
       try {
-        const outcome = outcomeOf(await attached.command(record))
+        const outcome = outcomeOf(await attached.command(record, marked))
         if (isCatalog && outcome.kind === "ok") catalog.keep(key, outcome.response, sentAt)
         return readOnly && outcome.kind === "uncertain" ? { kind: "refused", reason: outcome.reason } : outcome
       } catch (error) {
         // The attach succeeded, so a failure without a local API code is a lost reply, not a failed attach.
-        if (readOnly) return { kind: "refused", reason: error instanceof LocalApiError ? sessionReason(error.code) : "reply_lost" }
+        if (readOnly)
+          return { kind: "refused", reason: error instanceof LocalApiError ? sessionReason(error.code) : "reply_lost" }
         // Only a code that answers before sending ran nothing. Anything else - a timeout after sending, the attach or
         // connection ending, a broken protocol - may have run on the other device, so it is uncertain and never retried.
-        if (error instanceof LocalApiError && error.command_id === undefined && REFUSED_BEFORE_SENDING.has(error.code)) return { kind: "refused", reason: sessionReason(error.code) }
+        if (error instanceof LocalApiError && error.command_id === undefined && REFUSED_BEFORE_SENDING.has(error.code))
+          return { kind: "refused", reason: sessionReason(error.code) }
         return { kind: "uncertain", reason: "reply_lost" }
       }
     },
@@ -195,7 +278,11 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       } catch (error) {
         return { kind: "refused", reason: sessionReason(notSentReason(error)) }
       }
-      const entries: JsonObject[] = page.entries.flatMap((item) => ("entry" in item && typeof item.entry === "object" && item.entry !== null && !Array.isArray(item.entry) ? [item.entry as JsonObject] : []))
+      const entries: JsonObject[] = page.entries.flatMap((item) =>
+        "entry" in item && typeof item.entry === "object" && item.entry !== null && !Array.isArray(item.entry)
+          ? [item.entry as JsonObject]
+          : [],
+      )
       return { kind: "ok", response: { entries } }
     },
     watch: async (device, sessionId, listener) => {
@@ -213,6 +300,55 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       live = true
       return { kind: "ok", watch: { ended: attached.detached, stop } }
     },
+    lookup: async (device, durableId) => {
+      let connected: DeviceService
+      try {
+        connected = await svc()
+      } catch (error) {
+        return { kind: "silent", reason: notSentReason(error) }
+      }
+      if (!connected.takesSingleLocate) return { kind: "unavailable" }
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const capped = new Promise<"timeout">((resolve) => {
+        timer = setTimeout(() => resolve("timeout"), options.lookupCapMs ?? LOOKUP_CAP_MS)
+        timer.unref?.()
+      })
+      try {
+        const answer = await Promise.race([connected.locate(device, durableId, { single: true }), capped])
+        if (answer === "timeout") return { kind: "silent", reason: "lookup_timeout" }
+        return { kind: "found", key: answer.key }
+      } catch (error) {
+        const code = error instanceof LocalApiError ? error.code : "locate_failed"
+        return LOOKUP_NONE.has(code) ? { kind: "none" } : { kind: "silent", reason: code }
+      } finally {
+        clearTimeout(timer)
+      }
+    },
+    canWake: async () => (await svc().catch(() => undefined))?.carriesWakeMark === true,
+    canLookup: async () => (await svc().catch(() => undefined))?.takesSingleLocate === true,
+    wake: async (device, durableId, rpc) => {
+      let record: WireRpc
+      try {
+        record = wireRecord(rpc)
+      } catch {
+        return { kind: "refused", reason: "invalid_record" }
+      }
+      let connected: DeviceService
+      try {
+        connected = await svc()
+      } catch (error) {
+        return { kind: "refused", reason: notSentReason(error) }
+      }
+      if (!connected.carriesWakeMark) return { kind: "unavailable" }
+      try {
+        return outcomeOf(await connected.wakeCommand(device, durableId, record))
+      } catch (error) {
+        if (error instanceof LocalApiError && error.not_sent === true) return { kind: "refused", reason: error.code }
+        if (error instanceof LocalApiError && error.command_id === undefined && REFUSED_BEFORE_SENDING.has(error.code))
+          return { kind: "refused", reason: error.code }
+        return { kind: "uncertain", reason: "reply_lost" }
+      }
+    },
     close: async () => {
       const open = service
       service = undefined
@@ -229,11 +365,12 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       // A create reply that already names the session's listing key needs no session.locate round trip.
       let key: string
       if (knownKey !== undefined) key = knownKey
-      else try {
-        key = (await connected.locate(device, engineId)).key
-      } catch (error) {
-        return { kind: "refused", reason: error instanceof LocalApiError ? error.code : "locate_failed" }
-      }
+      else
+        try {
+          key = (await connected.locate(device, engineId)).key
+        } catch (error) {
+          return { kind: "refused", reason: error instanceof LocalApiError ? error.code : "locate_failed" }
+        }
       // The session exists under `key` from here on; wait (bounded) until the listing names it so the next command's
       // attach finds it, and keep that attach for it.
       const deadline = Date.now() + CREATED_ATTACH_WAIT_MS
@@ -242,7 +379,8 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
           await attach(device, key)
           break
         } catch (error) {
-          if (!(error instanceof LocalApiError && error.code === "session_not_found") || Date.now() + wait > deadline) break
+          if (!(error instanceof LocalApiError && error.code === "session_not_found") || Date.now() + wait > deadline)
+            break
           await retryDelay(wait)
         }
       }

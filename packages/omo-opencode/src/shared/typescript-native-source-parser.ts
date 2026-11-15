@@ -11,14 +11,16 @@ export class TypeScriptSourceParser {
   async parse(filePaths: readonly string[]): Promise<ReadonlyMap<string, SourceFile>> {
     const snapshot = await this.#api.updateSnapshot({ openFiles: [...filePaths] })
     try {
-      const sourceFiles = await Promise.all(filePaths.map(async (filePath) => {
-        const project = await snapshot.getDefaultProjectForFile(filePath)
-        const sourceFile = await project?.program.getSourceFile(filePath)
-        if (!sourceFile) {
-          throw new Error(`TypeScript did not parse ${filePath}`)
-        }
-        return [filePath, sourceFile] as const
-      }))
+      const sourceFiles = await Promise.all(
+        filePaths.map(async (filePath) => {
+          const project = await snapshot.getDefaultProjectForFile(filePath)
+          const sourceFile = await project?.program.getSourceFile(filePath)
+          if (!sourceFile) {
+            throw new Error(`TypeScript did not parse ${filePath}`)
+          }
+          return [filePath, sourceFile] as const
+        }),
+      )
       return new Map(sourceFiles)
     } finally {
       await snapshot.dispose()

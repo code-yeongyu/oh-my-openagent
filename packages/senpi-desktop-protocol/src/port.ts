@@ -1,21 +1,21 @@
-import type { EngineMethod, ErrorCode } from "./engine-schema.generated";
-import type { JsonRpcErrorData, JsonRpcNotification } from "./json-rpc";
+import type { EngineMethod, ErrorCode } from "./engine-schema.generated"
+import type { JsonRpcErrorData, JsonRpcNotification } from "./json-rpc"
 
 /** Per-call options a port honours; a port that cannot cancel ignores them. */
 export interface RpcCallOptions {
-	/** Abort cancels the request (`$/cancel` on a JSON-RPC port). */
-	readonly signal?: AbortSignal;
-	/** Expiry cancels the request the same way. */
-	readonly timeoutMs?: number;
+  /** Abort cancels the request (`$/cancel` on a JSON-RPC port). */
+  readonly signal?: AbortSignal
+  /** Expiry cancels the request the same way. */
+  readonly timeoutMs?: number
 }
 
 /** Called once per server-to-client notification, in arrival order. */
-export type RpcNotificationListener = (notification: JsonRpcNotification) => void;
+export type RpcNotificationListener = (notification: JsonRpcNotification) => void
 
 /** The notification stream of one port. */
 export interface RpcNotifications {
-	/** Returns the unsubscribe function. */
-	subscribe(listener: RpcNotificationListener): () => void;
+  /** Returns the unsubscribe function. */
+  subscribe(listener: RpcNotificationListener): () => void
 }
 
 /**
@@ -24,11 +24,11 @@ export interface RpcNotifications {
  * `nothingSent` is `true` only when the port knows the request never reached the engine.
  */
 export interface RpcPortFailure {
-	readonly message: string;
-	readonly rpcCode?: number;
-	readonly data?: JsonRpcErrorData | null;
-	readonly code?: ErrorCode;
-	readonly nothingSent?: boolean;
+  readonly message: string
+  readonly rpcCode?: number
+  readonly data?: JsonRpcErrorData | null
+  readonly code?: ErrorCode
+  readonly nothingSent?: boolean
 }
 
 /**
@@ -37,8 +37,8 @@ export interface RpcPortFailure {
  * caller validates it) or rejects with an `RpcPortFailure`.
  */
 export interface RpcPort {
-	call(method: EngineMethod, params: unknown, options?: RpcCallOptions): Promise<unknown>;
-	readonly notifications: RpcNotifications;
-	/** Ends the connection; only the port's owner calls it. */
-	close(): Promise<void>;
+  call(method: EngineMethod, params: unknown, options?: RpcCallOptions): Promise<unknown>
+  readonly notifications: RpcNotifications
+  /** Ends the connection; only the port's owner calls it. */
+  close(): Promise<void>
 }

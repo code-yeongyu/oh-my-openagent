@@ -2,14 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { GitMemoryRepo, installHooks } from "@oh-my-opencode/memory-core"
 
 import { MemoryFakeExtensionAPI } from "../memory.test-support"
-import {
-  fakeCommandContext,
-  fakeDeps,
-  invoke,
-  seededRepo,
-  tempIdentity,
-  trackSendOrder,
-} from "./commands.test-support"
+import { fakeCommandContext, fakeDeps, invoke, seededRepo, tempIdentity, trackSendOrder } from "./commands.test-support"
 import { registerInitCommand } from "./init"
 import { removeTree } from "../../../../../../test-support/remove-tree"
 

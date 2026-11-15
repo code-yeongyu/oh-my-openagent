@@ -28,6 +28,11 @@ still throws. `state` is the service's status (for example `connected`, `sign_in
 `clientVersion` and `reportError` (receives an exception thrown by an `events()` subscriber; by default it is rethrown
 on its own microtask).
 
+`clientName` identifies a local API role, not an application label. This transport accepts only `sdk`, its default.
+Other values, including the privileged `omo` and `installer` roles, `desktop` and application names such as
+`duty-probe`, throw `RelayTransportError` with code `invalid_client_name` when the transport is created,
+before any connection is opened. The error names `sdk` as the only supported role.
+
 ## Machines and operations
 
 `listMachines()` lists the account's other devices, then this device. Each device's describe settles on its own: a
@@ -56,7 +61,8 @@ Beyond `MachineHubTransport`, the transport (`kind: "relay"`) has:
 
 ## Errors
 
-- `RelayTransportError`, by `code`: `not_connected` (no service is listening, or `connect()` was not called),
+- `RelayTransportError`, by `code`: `invalid_client_name` (the client role is unsupported),
+  `not_connected` (no service is listening, or `connect()` was not called),
   `server_proof_invalid`, `insecure_state_dir`, `refused`, `request_timeout`, `closed`, `unsupported` (the service
   does not serve machine operations) and `result_expired` (`resultOf` for an op the service holds no result for). A
   `request_timeout` on an invoke means the op may have run; its `requestId` names the op for `resultOf`.

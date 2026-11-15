@@ -24,7 +24,11 @@ import type { SyncStatusReader } from "./sync-status-surface"
 
 const roots: string[] = []
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(
+    roots
+      .splice(0)
+      .map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })),
+  )
 })
 
 interface FakeRpcHost {
@@ -84,10 +88,7 @@ async function writeTranscriptState(
   await writeFile(join(dir, "state.json"), JSON.stringify(state), "utf8")
 }
 
-async function writeCompletion(
-  context: MemoryIdentityContext,
-  record: Record<string, unknown>,
-): Promise<void> {
+async function writeCompletion(context: MemoryIdentityContext, record: Record<string, unknown>): Promise<void> {
   const dir = join(context.identityPaths.reflection, "completions")
   await mkdir(dir, { recursive: true })
   await writeFile(join(dir, `${String(record.runId)}.json`), JSON.stringify(record), "utf8")
@@ -111,56 +112,76 @@ function failedCompletion(runId: string, finishedAt: string): Record<string, unk
 }
 
 describe("memory rpc bridge", () => {
-  test.each(["new", "failed-full"] as const)("#given a %s binding without a published snapshot #when journal delivery runs #then it never reads git", async (mode) => {
-    const context = await contextFixture()
-    const host = rpcHost()
-    let gitReads = 0
-    const bridge = createMemoryRpcBridge(host.pi, {
-      resolveContext: () => context, activeRun: () => undefined,
-      createGitRepo: () => stubRepo({ head: async () => { gitReads++; throw new Error("git unavailable") } }),
-    })
-    bridge.attach("session-1")
-    if (mode === "failed-full") await expect(bridge.sync()).rejects.toThrow("git unavailable")
-    const before = gitReads
-    await bridge.syncJournal([{ kind: "assistant", messageId: "answer", textBlocks: ["Done."] }])
-    expect(gitReads).toBe(before)
-    expect(host.emits).toHaveLength(1)
-    expect(host.emits[0]?.data).toMatchObject({
-      nonJournalState: "unknown", journal: { sessionId: "session-1", totalSteps: 1 },
-      reflection: { backlogSteps: 1 },
-    })
-  })
+  test.each(["new", "failed-full"] as const)(
+    "#given a %s binding without a published snapshot #when journal delivery runs #then it never reads git",
+    async (mode) => {
+      const context = await contextFixture()
+      const host = rpcHost()
+      let gitReads = 0
+      const bridge = createMemoryRpcBridge(host.pi, {
+        resolveContext: () => context,
+        activeRun: () => undefined,
+        createGitRepo: () =>
+          stubRepo({
+            head: async () => {
+              gitReads++
+              throw new Error("git unavailable")
+            },
+          }),
+      })
+      bridge.attach("session-1")
+      if (mode === "failed-full") await expect(bridge.sync()).rejects.toThrow("git unavailable")
+      const before = gitReads
+      await bridge.syncJournal([{ kind: "assistant", messageId: "answer", textBlocks: ["Done."] }])
+      expect(gitReads).toBe(before)
+      expect(host.emits).toHaveLength(1)
+      expect(host.emits[0]?.data).toMatchObject({
+        nonJournalState: "unknown",
+        journal: { sessionId: "session-1", totalSteps: 1 },
+        reflection: { backlogSteps: 1 },
+      })
+    },
+  )
 
-  test.each(["changed", "unchanged"] as const)("#given an unreadable transcript and %s durable counters #when journal delivery runs #then durable accounting is still published", async (mode) => {
-    const context = await contextFixture()
-    const host = rpcHost()
-    const bridge = createMemoryRpcBridge(host.pi, {
-      resolveContext: () => context, activeRun: () => undefined, createGitRepo: () => stubRepo(),
-    })
-    bridge.attach("session-1")
-    const state = {
-      total_completed_steps: 7, reflected_completed_steps: 3,
-      steps_since_last_successful_reflection: 4, pending_compaction: true,
-    }
-    if (mode === "unchanged") await writeTranscriptState(context, "session-1", state)
-    await bridge.sync()
-    if (mode === "changed") await writeTranscriptState(context, "session-1", state)
-    // A directory at the file path produces a real non-ENOENT filesystem error, without permission assumptions.
-    await mkdir(join(context.identityPaths.transcripts, "session-1", "transcript.jsonl"))
-    await bridge.syncJournal([{ kind: "assistant", messageId: "answer", textBlocks: ["Done."] }])
-    expect(host.emits).toHaveLength(2)
-    expect(host.emits[1]?.data).toMatchObject({
-      journal: { totalSteps: 7, reflectedSteps: 3 },
-      reflection: { backlogSteps: 4, pendingCompaction: true },
-    })
-    if (mode === "unchanged") expect(host.emits[1]?.data).toEqual(host.emits[0]?.data)
-  })
+  test.each(["changed", "unchanged"] as const)(
+    "#given an unreadable transcript and %s durable counters #when journal delivery runs #then durable accounting is still published",
+    async (mode) => {
+      const context = await contextFixture()
+      const host = rpcHost()
+      const bridge = createMemoryRpcBridge(host.pi, {
+        resolveContext: () => context,
+        activeRun: () => undefined,
+        createGitRepo: () => stubRepo(),
+      })
+      bridge.attach("session-1")
+      const state = {
+        total_completed_steps: 7,
+        reflected_completed_steps: 3,
+        steps_since_last_successful_reflection: 4,
+        pending_compaction: true,
+      }
+      if (mode === "unchanged") await writeTranscriptState(context, "session-1", state)
+      await bridge.sync()
+      if (mode === "changed") await writeTranscriptState(context, "session-1", state)
+      // A directory at the file path produces a real non-ENOENT filesystem error, without permission assumptions.
+      await mkdir(join(context.identityPaths.transcripts, "session-1", "transcript.jsonl"))
+      await bridge.syncJournal([{ kind: "assistant", messageId: "answer", textBlocks: ["Done."] }])
+      expect(host.emits).toHaveLength(2)
+      expect(host.emits[1]?.data).toMatchObject({
+        journal: { totalSteps: 7, reflectedSteps: 3 },
+        reflection: { backlogSteps: 4, pendingCompaction: true },
+      })
+      if (mode === "unchanged") expect(host.emits[1]?.data).toEqual(host.emits[0]?.data)
+    },
+  )
 
   test("#given persisted and observed branch steps #when replay, reflection and rebinding occur #then counters count each canonical answer once", async () => {
     const context = await contextFixture()
     const host = rpcHost()
     const bridge = createMemoryRpcBridge(host.pi, {
-      resolveContext: () => context, activeRun: () => undefined, createGitRepo: () => stubRepo(),
+      resolveContext: () => context,
+      activeRun: () => undefined,
+      createGitRepo: () => stubRepo(),
     })
     const journal = new TranscriptJournal({ journalDir: join(context.identityPaths.transcripts, "session-1") })
     const first = { kind: "assistant", messageId: "first", textBlocks: ["One."] } as const
@@ -172,15 +193,19 @@ describe("memory rpc bridge", () => {
     await bridge.syncJournal([first, second, toolOnly])
     expect(host.emits).toHaveLength(1)
     expect(host.emits[0]?.data).toMatchObject({
-      journal: { totalSteps: 2, reflectedSteps: 0 }, reflection: { backlogSteps: 2 },
+      journal: { totalSteps: 2, reflectedSteps: 0 },
+      reflection: { backlogSteps: 2 },
     })
     // A completed reflection may advance the cursor while the new answer is not journaled yet.
     await writeTranscriptState(context, "session-1", {
-      total_completed_steps: 1, reflected_completed_steps: 1, steps_since_last_successful_reflection: 0,
+      total_completed_steps: 1,
+      reflected_completed_steps: 1,
+      steps_since_last_successful_reflection: 0,
     })
     await bridge.sync()
     expect(host.emits.at(-1)?.data).toMatchObject({
-      journal: { totalSteps: 2, reflectedSteps: 1 }, reflection: { backlogSteps: 1 },
+      journal: { totalSteps: 2, reflectedSteps: 1 },
+      reflection: { backlogSteps: 1 },
     })
     // A branch that omits the already observed answer cannot rewind the session's step count.
     await bridge.syncJournal([first])
@@ -188,7 +213,8 @@ describe("memory rpc bridge", () => {
     bridge.attach("session-2")
     await bridge.syncJournal([toolOnly])
     expect(host.emits.at(-1)?.data).toMatchObject({
-      journal: { sessionId: "session-2", totalSteps: 0 }, reflection: { backlogSteps: 0 },
+      journal: { sessionId: "session-2", totalSteps: 0 },
+      reflection: { backlogSteps: 0 },
     })
   })
 
@@ -200,14 +226,16 @@ describe("memory rpc bridge", () => {
     let gitReads = 0
     let stall = false
     const bridge = createMemoryRpcBridge(host.pi, {
-      resolveContext: () => context, activeRun: () => undefined,
-      createGitRepo: () => stubRepo({
-        head: () => {
-          gitReads += 1
-          if (stall) gitEntered.resolve()
-          return stall ? stalled.promise : Promise.resolve("0123456789abcdef0123456789abcdef01234567")
-        },
-      }),
+      resolveContext: () => context,
+      activeRun: () => undefined,
+      createGitRepo: () =>
+        stubRepo({
+          head: () => {
+            gitReads += 1
+            if (stall) gitEntered.resolve()
+            return stall ? stalled.promise : Promise.resolve("0123456789abcdef0123456789abcdef01234567")
+          },
+        }),
     })
     bridge.attach("session-1")
     await bridge.sync()
@@ -219,7 +247,8 @@ describe("memory rpc bridge", () => {
       expect(gitReads).toBe(readsBefore)
       expect(host.emits.map(({ data }) => (data as MemoryRpcSnapshot).journal.totalSteps)).toEqual([0, 1])
       expect(host.emits.at(-1)?.data).toMatchObject({
-        repo: { headSha: "0123456789abcdef0123456789abcdef01234567" }, reflection: { backlogSteps: 1 },
+        repo: { headSha: "0123456789abcdef0123456789abcdef01234567" },
+        reflection: { backlogSteps: 1 },
       })
     } finally {
       stalled.resolve("0123456789abcdef0123456789abcdef01234567")
@@ -234,14 +263,16 @@ describe("memory rpc bridge", () => {
     const release = Promise.withResolvers<string>()
     let builds = 0
     const bridge = createMemoryRpcBridge(host.pi, {
-      resolveContext: () => context, activeRun: () => undefined,
-      createGitRepo: () => stubRepo({
-        head: () => {
-          if (++builds !== 1) return Promise.resolve("new")
-          entered.resolve()
-          return release.promise
-        },
-      }),
+      resolveContext: () => context,
+      activeRun: () => undefined,
+      createGitRepo: () =>
+        stubRepo({
+          head: () => {
+            if (++builds !== 1) return Promise.resolve("new")
+            entered.resolve()
+            return release.promise
+          },
+        }),
     })
     bridge.attach("old")
     const first = bridge.sync()
@@ -268,16 +299,17 @@ describe("memory rpc bridge", () => {
     const bridge = createMemoryRpcBridge(host.pi, {
       resolveContext: () => context,
       activeRun: () => undefined,
-      createGitRepo: () => stubRepo({
-        head: () => {
-          builds += 1
-          if (builds === 1) {
-            entered.resolve()
-            return release.promise
-          }
-          return Promise.resolve("newer")
-        },
-      }),
+      createGitRepo: () =>
+        stubRepo({
+          head: () => {
+            builds += 1
+            if (builds === 1) {
+              entered.resolve()
+              return release.promise
+            }
+            return Promise.resolve("newer")
+          },
+        }),
     })
     bridge.attach("session-1")
     const first = bridge.sync()
@@ -302,7 +334,13 @@ describe("memory rpc bridge", () => {
       const bridge = createMemoryRpcBridge(host.pi, {
         resolveContext: () => context,
         activeRun: () => undefined,
-        createGitRepo: () => stubRepo({ head: () => { entered.resolve(); return release.promise } }),
+        createGitRepo: () =>
+          stubRepo({
+            head: () => {
+              entered.resolve()
+              return release.promise
+            },
+          }),
       })
       const controller = new AbortController()
       bridge.attach("session-1")
@@ -320,8 +358,11 @@ describe("memory rpc bridge", () => {
   test("#given a never-written identity #when backfill reads #then no runtime directories are created", async () => {
     const root = await mkdtemp(join(tmpdir(), "recap-read-only-"))
     roots.push(root)
-    const context = createMemoryIdentityContext({ identity: "agent-test", identityPaths: buildIdentityPaths(root, "agent-test"),
-      binding: { identity: "agent-test", repoPathHash: "hash", boundAt: 1 } })
+    const context = createMemoryIdentityContext({
+      identity: "agent-test",
+      identityPaths: buildIdentityPaths(root, "agent-test"),
+      binding: { identity: "agent-test", repoPathHash: "hash", boundAt: 1 },
+    })
     expect((await readMemoryReflections(context, "session-1", {})).entries).toEqual([])
     expect(await readdir(root)).toEqual([])
   })
@@ -342,30 +383,41 @@ describe("memory rpc bridge", () => {
     expect((await readMemoryReflections(first.context, "unrelated", {})).entries).toHaveLength(0)
   })
 
-  test.each([{ limit: 0 }, { limit: 101 }, { limit: 1.5 }, { cursor: "../secret" }, { cursor: "e30" }, { directory: "/tmp" }])(
-    "#given malformed request %j #when paging #then it is rejected", async (request) => {
+  test.each([
+    { limit: 0 },
+    { limit: 101 },
+    { limit: 1.5 },
+    { cursor: "../secret" },
+    { cursor: "e30" },
+    { directory: "/tmp" },
+  ])("#given malformed request %j #when paging #then it is rejected", async (request) => {
+    const context = await contextFixture()
+    await expect(readMemoryReflections(context, "session-1", request)).rejects.toThrow()
+  })
+
+  test.each(["attach", "detach", "dispose"] as const)(
+    "#given an in-flight page #when %s changes binding #then the stale result is discarded",
+    async (operation) => {
       const context = await contextFixture()
-      await expect(readMemoryReflections(context, "session-1", request)).rejects.toThrow()
+      const host = rpcHost()
+      const bridge = createMemoryRpcBridge(host.pi, { resolveContext: () => context, activeRun: () => undefined })
+      bridge.attach("session-1")
+      const result = host.handlers.get("omo.memory.reflections")?.({})
+      if (operation === "attach") bridge.attach("session-1")
+      else bridge[operation]()
+      expect(await result).toMatchObject({ kind: "unavailable" })
     },
   )
-
-  test.each(["attach", "detach", "dispose"] as const)("#given an in-flight page #when %s changes binding #then the stale result is discarded", async (operation) => {
-    const context = await contextFixture()
-    const host = rpcHost()
-    const bridge = createMemoryRpcBridge(host.pi, { resolveContext: () => context, activeRun: () => undefined })
-    bridge.attach("session-1")
-    const result = host.handlers.get("omo.memory.reflections")?.({})
-    if (operation === "attach") bridge.attach("session-1")
-    else bridge[operation]()
-    expect(await result).toMatchObject({ kind: "unavailable" })
-  })
   test("#given a bound session #when reflections are requested #then a read-only page is returned", async () => {
     const context = await contextFixture()
     const host = rpcHost()
     const bridge = createMemoryRpcBridge(host.pi, { resolveContext: () => context, activeRun: () => undefined })
     bridge.attach("session-1")
     expect(await host.handlers.get("omo.memory.reflections")?.({ limit: 1 })).toEqual({
-      schemaVersion: 1, identity: context.identity, sessionId: "session-1", entries: [],
+      schemaVersion: 1,
+      identity: context.identity,
+      sessionId: "session-1",
+      entries: [],
     })
     expect(host.emits).toEqual([])
   })
@@ -620,7 +672,8 @@ describe("memory rpc bridge", () => {
       const bridge = createMemoryRpcBridge(host.pi, {
         resolveContext: () => context,
         activeRun: () => undefined,
-        createGitRepo: () => stubRepo({ head: async () => null, headCommitTimestamp: async () => null, headSubject: async () => null }),
+        createGitRepo: () =>
+          stubRepo({ head: async () => null, headCommitTimestamp: async () => null, headSubject: async () => null }),
       })
 
       bridge.attach("session-1")
@@ -685,7 +738,12 @@ describe("memory rpc bridge sync field (omo #10637)", () => {
           kind: "failing",
           since: Date.parse("2026-10-22T10:00:00.000Z"),
           attempts: 2,
-          failure: { kind: "stranded_lock", paths: ["/m/.git/index.lock"], reason: "A git lock blocks sync.", action: "Run /memory unlock /m/.git/index.lock." },
+          failure: {
+            kind: "stranded_lock",
+            paths: ["/m/.git/index.lock"],
+            reason: "A git lock blocks sync.",
+            action: "Run /memory unlock /m/.git/index.lock.",
+          },
         }
       },
     })
@@ -717,13 +775,20 @@ describe("memory rpc bridge sync field (omo #10637)", () => {
       resolveContext: () => context,
       activeRun: () => undefined,
       createGitRepo: () => stubRepo(),
-      syncStatus: async () => ({ kind: "frozen", reason: "device_list_unusable", since: Date.parse("2026-11-03T10:00:00.000Z") }),
+      syncStatus: async () => ({
+        kind: "frozen",
+        reason: "device_list_unusable",
+        since: Date.parse("2026-11-03T10:00:00.000Z"),
+      }),
     })
     bridge.attach("session-1")
     const snapshot = (await host.handlers.get(MEMORY_STATUS_RPC_METHOD)?.({})) as MemoryRpcSnapshot
     expect(["never_synced", "synced", "paused", "failing", "unavailable"]).toContain(String(snapshot.sync?.state))
     expect(["stranded_lock", "auth_expired", "offline", "unknown"]).toContain(String(snapshot.sync?.failure?.kind))
-    expect(snapshot.sync).toMatchObject({ state: "failing", failure: { kind: "unknown", sinceISO: "2026-11-03T10:00:00.000Z", attempts: 1 } })
+    expect(snapshot.sync).toMatchObject({
+      state: "failing",
+      failure: { kind: "unknown", sinceISO: "2026-11-03T10:00:00.000Z", attempts: 1 },
+    })
     expect(snapshot.sync?.failure?.reason).toEqual(expect.any(String))
     expect(snapshot.sync?.failure?.action).toEqual(expect.any(String))
     bridge.dispose()
@@ -732,28 +797,114 @@ describe("memory rpc bridge sync field (omo #10637)", () => {
   // A held file (#12284) reaches the desktop the same way as a freeze above: a failure of the "unknown" kind,
   // carrying its reason, action and held keys (the desktop's schema ignores fields it does not know).
   const cases: ReadonlyArray<readonly [string, SyncStatusReader, MemoryRpcSync | undefined]> = [
-    ["synced", async () => ({ kind: "synced", at: Date.parse("2026-10-22T10:00:00.000Z"), updatedWhileOffline: 0 }), { state: "synced", lastSyncedAtISO: "2026-10-22T10:00:00.000Z" }],
+    [
+      "synced",
+      async () => ({ kind: "synced", at: Date.parse("2026-10-22T10:00:00.000Z"), updatedWhileOffline: 0 }),
+      { state: "synced", lastSyncedAtISO: "2026-10-22T10:00:00.000Z" },
+    ],
     ["never synced", async () => ({ kind: "never_synced" }), { state: "never_synced" }],
     ["paused at a refused entry", async () => ({ kind: "paused", seq: 1, code: "signature" }), { state: "paused" }],
-    ["unavailable on this device", async () => ({ kind: "sync-unavailable", reason: "Another process holds the engine." }), { state: "unavailable" }],
-    ["off because its configuration is invalid", async () => ({ kind: "sync-config-invalid", variable: "OMO_SERVICE_API_URL", reason: "OMO_SERVICE_API_URL is not a valid service URL" }), { state: "unavailable" }],
-    ["holding files too large to sync (#12284)", async () => ({ kind: "failing", since: Date.parse("2026-10-22T10:00:00.000Z"), attempts: 2, failure: { kind: "oversized_item", keys: ["big.md", "old.md"], stuck: ["old.md"], limitBytes: 8388608, reason: "r", action: "a" } }), { state: "failing", failure: { kind: "unknown", reason: "r", action: "a", sinceISO: "2026-10-22T10:00:00.000Z", attempts: 2, keys: ["big.md", "old.md"], stuckKeys: ["old.md"], limitBytes: 8388608 } }],
-    ["paused at a refused entry while holding files (#12284)", async () => ({ kind: "paused", seq: 1, code: "signature", held: { since: Date.parse("2026-10-22T10:00:00.000Z"), attempts: 2, failure: { kind: "oversized_item", keys: ["big.md", "old.md"], stuck: ["old.md"], limitBytes: 8388608, reason: "r", action: "a" } } }), { state: "paused", failure: { kind: "unknown", reason: "r", action: "a", sinceISO: "2026-10-22T10:00:00.000Z", attempts: 2, keys: ["big.md", "old.md"], stuckKeys: ["old.md"], limitBytes: 8388608 } }],
+    [
+      "unavailable on this device",
+      async () => ({ kind: "sync-unavailable", reason: "Another process holds the engine." }),
+      { state: "unavailable" },
+    ],
+    [
+      "off because its configuration is invalid",
+      async () => ({
+        kind: "sync-config-invalid",
+        variable: "OMO_SERVICE_API_URL",
+        reason: "OMO_SERVICE_API_URL is not a valid service URL",
+      }),
+      { state: "unavailable" },
+    ],
+    [
+      "holding files too large to sync (#12284)",
+      async () => ({
+        kind: "failing",
+        since: Date.parse("2026-10-22T10:00:00.000Z"),
+        attempts: 2,
+        failure: {
+          kind: "oversized_item",
+          keys: ["big.md", "old.md"],
+          stuck: ["old.md"],
+          limitBytes: 8388608,
+          reason: "r",
+          action: "a",
+        },
+      }),
+      {
+        state: "failing",
+        failure: {
+          kind: "unknown",
+          reason: "r",
+          action: "a",
+          sinceISO: "2026-10-22T10:00:00.000Z",
+          attempts: 2,
+          keys: ["big.md", "old.md"],
+          stuckKeys: ["old.md"],
+          limitBytes: 8388608,
+        },
+      },
+    ],
+    [
+      "paused at a refused entry while holding files (#12284)",
+      async () => ({
+        kind: "paused",
+        seq: 1,
+        code: "signature",
+        held: {
+          since: Date.parse("2026-10-22T10:00:00.000Z"),
+          attempts: 2,
+          failure: {
+            kind: "oversized_item",
+            keys: ["big.md", "old.md"],
+            stuck: ["old.md"],
+            limitBytes: 8388608,
+            reason: "r",
+            action: "a",
+          },
+        },
+      }),
+      {
+        state: "paused",
+        failure: {
+          kind: "unknown",
+          reason: "r",
+          action: "a",
+          sinceISO: "2026-10-22T10:00:00.000Z",
+          attempts: 2,
+          keys: ["big.md", "old.md"],
+          stuckKeys: ["old.md"],
+          limitBytes: 8388608,
+        },
+      },
+    ],
     ["not syncing on this device", async () => null, undefined],
     ["a reader that throws", async () => Promise.reject(new Error("runner gone")), undefined],
   ]
-  test.each(cases)("#given sync %s #when the status is pulled #then the sync field matches", async (_name, syncStatus, expected) => {
-    const context = await contextFixture()
-    const host = rpcHost()
-    const bridge = createMemoryRpcBridge(host.pi, { resolveContext: () => context, activeRun: () => undefined, createGitRepo: () => stubRepo(), syncStatus })
-    bridge.attach("session-1")
+  test.each(cases)(
+    "#given sync %s #when the status is pulled #then the sync field matches",
+    async (_name, syncStatus, expected) => {
+      const context = await contextFixture()
+      const host = rpcHost()
+      const bridge = createMemoryRpcBridge(host.pi, {
+        resolveContext: () => context,
+        activeRun: () => undefined,
+        createGitRepo: () => stubRepo(),
+        syncStatus,
+      })
+      bridge.attach("session-1")
 
-    const snapshot = (await host.handlers.get(MEMORY_STATUS_RPC_METHOD)?.({})) as MemoryRpcSnapshot
+      const snapshot = (await host.handlers.get(MEMORY_STATUS_RPC_METHOD)?.({})) as MemoryRpcSnapshot
 
-    if (snapshot.sync !== undefined) expect(["never_synced", "synced", "paused", "failing", "unavailable"]).toContain(String(snapshot.sync.state))
-    if (snapshot.sync?.failure !== undefined) expect(["stranded_lock", "auth_expired", "offline", "unknown"]).toContain(String(snapshot.sync.failure.kind))
-    expect(snapshot.sync).toEqual(expected)
-    expect("sync" in snapshot).toBe(expected !== undefined)
-    bridge.dispose()
-  })
+      if (snapshot.sync !== undefined)
+        expect(["never_synced", "synced", "paused", "failing", "unavailable"]).toContain(String(snapshot.sync.state))
+      if (snapshot.sync?.failure !== undefined)
+        expect(["stranded_lock", "auth_expired", "offline", "unknown"]).toContain(String(snapshot.sync.failure.kind))
+      expect(snapshot.sync).toEqual(expected)
+      expect("sync" in snapshot).toBe(expected !== undefined)
+      bridge.dispose()
+    },
+  )
 })

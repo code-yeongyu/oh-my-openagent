@@ -30,8 +30,6 @@ function getAuthFilePath(): string {
   return path.join(getDataDir(), "opencode", "auth.json")
 }
 
-
-
 function loadAuthMap(): Map<string, string> {
   const filePath = getAuthFilePath()
 

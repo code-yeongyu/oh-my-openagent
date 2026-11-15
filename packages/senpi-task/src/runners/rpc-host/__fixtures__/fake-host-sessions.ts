@@ -196,7 +196,14 @@ export class FakeSessionTable {
     return [...this.#sessions.values()].flatMap((session) =>
       session.parked || (session.kind === "worker" && !includeWorkers)
         ? []
-        : [{ sessionId: session.routingId, sessionPath: session.sessionPath, kind: session.kind, context: publishedContext(session) }],
+        : [
+            {
+              sessionId: session.routingId,
+              sessionPath: session.sessionPath,
+              kind: session.kind,
+              context: publishedContext(session),
+            },
+          ],
     )
   }
 

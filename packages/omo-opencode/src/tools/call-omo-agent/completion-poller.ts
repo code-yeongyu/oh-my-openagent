@@ -11,7 +11,7 @@ export async function waitForCompletion(
     abort: AbortSignal
     metadata?: (input: { title?: string; metadata?: Record<string, unknown> }) => void
   },
-  ctx: PluginInput
+  ctx: PluginInput,
 ): Promise<void> {
   log(`[call_omo_agent] Polling for completion...`)
 
@@ -30,7 +30,7 @@ export async function waitForCompletion(
       throw new Error("Task aborted.")
     }
 
-    await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS))
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
 
     const statusResult = await ctx.client.session.status()
     const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)

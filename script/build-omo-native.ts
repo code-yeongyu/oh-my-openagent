@@ -31,7 +31,16 @@ export { REQUIRED_PLUGIN_ARTIFACTS }
 export const PAYLOAD_DIRECTORIES = ["extensions", "skills", "skills-conditional", "runtime"] as const
 // Root-level plugin files. The daemon launch spec is the task daemon's only argv source; it is
 // generated at build time and must reach every payload, not just the source tree.
-export const PAYLOAD_FILES = ["package.json", "CHANGELOG.md", "README.md", "NOTICE", "LICENSE", "daemon-launch-spec.json", "telemetry-schema.json", "telemetry-schema.omo-cloud.json"] as const
+export const PAYLOAD_FILES = [
+  "package.json",
+  "CHANGELOG.md",
+  "README.md",
+  "NOTICE",
+  "LICENSE",
+  "daemon-launch-spec.json",
+  "telemetry-schema.json",
+  "telemetry-schema.omo-cloud.json",
+] as const
 export const PAYLOAD_SCRIPT = join("scripts", "install.mjs")
 
 // Native-only runtime: `omo doctor` / `omo setup` import it to classify task-category coverage with
@@ -41,7 +50,13 @@ export const CATEGORY_COVERAGE_ENTRY = join(packageDir, "category-coverage-entry
 export const CATEGORY_COVERAGE_ARTIFACT = join("runtime", "category-coverage", "index.js")
 // The bundle inlines the computer-use doctor, whose prelude assets are read from beside the bundle
 // at import time: the same contract build-extension-core.mjs keeps for extensions/ (#9193).
-const COMPUTER_PRELUDE_ASSET_SOURCE = join(repoRoot, "packages", "senpi-desktop-prelude", "src", "assets.generated.json")
+const COMPUTER_PRELUDE_ASSET_SOURCE = join(
+  repoRoot,
+  "packages",
+  "senpi-desktop-prelude",
+  "src",
+  "assets.generated.json",
+)
 export const CATEGORY_COVERAGE_PRELUDE_ASSET = join("runtime", "category-coverage", "assets.generated.json")
 // Native-only runtime: `omo daemon` resolves its settings (task.host_engine_policy and task.host_idle_exit_ms)
 // through the omo-config-core loader with it (packages/omo-native/task-config-entry.ts), loaded fail-open like
@@ -166,7 +181,18 @@ function runSenpiPluginBuild(outputDir: string): void {
 function buildRuntimeBundle(entry: string, outfile: string, name: string): void {
   const result = spawnSync(
     "bun",
-    ["build", entry, "--target", "node", "--format", "esm", "--minify-syntax", "--minify-whitespace", "--outfile", outfile],
+    [
+      "build",
+      entry,
+      "--target",
+      "node",
+      "--format",
+      "esm",
+      "--minify-syntax",
+      "--minify-whitespace",
+      "--outfile",
+      outfile,
+    ],
     { cwd: repoRoot, stdio: "inherit" },
   )
   if (result.error !== undefined) throw result.error
@@ -228,9 +254,7 @@ function main(argv: readonly string[]): number {
   }
   const missing = findMissingArtifact(options.outputDir)
   if (missing !== undefined) {
-    console.error(
-      `omo-native payload completeness check failed: missing required artifact: ${missing}`,
-    )
+    console.error(`omo-native payload completeness check failed: missing required artifact: ${missing}`)
     return 1
   }
   // Only the default package plugin dir is git-ignored; staging builds (--output)
@@ -246,8 +270,8 @@ function main(argv: readonly string[]): number {
 
 try {
   if (import.meta.main) {
-  process.exit(main(process.argv.slice(2)))
-}
+    process.exit(main(process.argv.slice(2)))
+  }
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error))
   process.exit(1)

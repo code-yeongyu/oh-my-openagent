@@ -6,6 +6,8 @@
  * table when its CLI captured it, else the launcher's table still in this process's env, which the claim then captures.
  */
 export function launchCarriedPrivateTable(): boolean {
-  const table = (globalThis as { [key: symbol]: { readonly present?: unknown } | undefined })[Symbol.for("senpi.private-fds.v3")]
+  const table = (globalThis as { [key: symbol]: { readonly present?: unknown } | undefined })[
+    Symbol.for("senpi.private-fds.v3")
+  ]
   return table ? table.present === true : Boolean(process.env.SENPI_PRIVATE_FDS)
 }

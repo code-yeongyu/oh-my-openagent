@@ -39,7 +39,10 @@ function makeTool(name: string): ToolDefinition {
   }
 }
 
-function createFakeSession(sessionId = "child-session-1"): { readonly session: ChildSession; resolvePrompt: () => void } {
+function createFakeSession(sessionId = "child-session-1"): {
+  readonly session: ChildSession
+  resolvePrompt: () => void
+} {
   const listeners = new Set<ChildSessionListener>()
   let settle: { resolve: () => void } | undefined
   const session: ChildSession = {
@@ -90,7 +93,12 @@ describe("task child parent-only tool exclusion", () => {
     let captured: CreateAgentSessionOptions | undefined
     const fake = createFakeSession()
     const runner = new InProcessRunner({
-      sharedParentTools: [makeTool("grep"), makeTool("memory"), makeTool("ask_user_question"), makeTool("request_user_input")],
+      sharedParentTools: [
+        makeTool("grep"),
+        makeTool("memory"),
+        makeTool("ask_user_question"),
+        makeTool("request_user_input"),
+      ],
       uiOnlyToolNames: TASK_CHILD_UI_ONLY_TOOL_NAMES,
       createSession: async (options) => {
         captured = options

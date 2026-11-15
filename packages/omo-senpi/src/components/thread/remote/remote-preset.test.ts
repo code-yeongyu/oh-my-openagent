@@ -19,8 +19,17 @@ describe("the remote surface carries the session's permission preset (#6189)", (
   })
 
   test("#given a lazy surface with or without an alias registry #when read #then both forward the getter without loading the runtime", () => {
-    const withRegistry = createLazyRemoteSurface({ version: "0.0.0", loadRuntime: neverLoads, loadAliasRegistry: neverLoads, permissionPreset: () => "full-access" })
-    const withoutRegistry = createLazyRemoteSurface({ version: "0.0.0", loadRuntime: neverLoads, permissionPreset: () => "full-access" })
+    const withRegistry = createLazyRemoteSurface({
+      version: "0.0.0",
+      loadRuntime: neverLoads,
+      loadAliasRegistry: neverLoads,
+      permissionPreset: () => "full-access",
+    })
+    const withoutRegistry = createLazyRemoteSurface({
+      version: "0.0.0",
+      loadRuntime: neverLoads,
+      permissionPreset: () => "full-access",
+    })
     expect(withRegistry.permissionPreset?.()).toBe("full-access")
     expect(withoutRegistry.permissionPreset?.()).toBe("full-access")
   })

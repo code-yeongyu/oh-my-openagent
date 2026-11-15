@@ -11,11 +11,7 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-function createProcessTimeout(
-  proc: SpawnedProcess,
-  timeoutMs: number,
-  timeoutMessage: string
-): Promise<never> {
+function createProcessTimeout(proc: SpawnedProcess, timeoutMs: number, timeoutMessage: string): Promise<never> {
   return new Promise<never>((_, reject) => {
     const id = setTimeout(() => {
       proc.kill()
@@ -25,7 +21,7 @@ function createProcessTimeout(
     // #3919: Handle rejected exits here so timeout cleanup cannot leak unhandled rejections.
     void proc.exited.then(
       () => clearTimeout(id),
-      () => clearTimeout(id)
+      () => clearTimeout(id),
     )
   })
 }
@@ -33,7 +29,7 @@ function createProcessTimeout(
 export async function collectSearchProcessOutput(
   proc: SpawnedProcess,
   timeoutMs: number,
-  timeoutMessage: string
+  timeoutMessage: string,
 ): Promise<SearchProcessOutput> {
   const stderrPromise = readProcessStream(proc.stderr).catch(getErrorMessage)
   const stdout = await Promise.race([

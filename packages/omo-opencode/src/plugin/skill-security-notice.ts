@@ -2,7 +2,11 @@ import type { PluginContext } from "./types"
 import { log } from "../shared/logger"
 import type { SkillDiagnostic } from "@oh-my-opencode/skills-loader-core/opencode-skill-loader"
 
-export function showSkillSecurityNotice(ctx: Pick<PluginContext, "client">, message: string, category: SkillDiagnostic["category"] = "skill-link-blocked"): void {
+export function showSkillSecurityNotice(
+  ctx: Pick<PluginContext, "client">,
+  message: string,
+  category: SkillDiagnostic["category"] = "skill-link-blocked",
+): void {
   const security = category === "skill-link-blocked"
   log(`[${security ? "skill-security" : "skill-load"}] ` + message)
   // The notice runs inside skill discovery and the skill tool; a client without a TUI, or a toast that throws

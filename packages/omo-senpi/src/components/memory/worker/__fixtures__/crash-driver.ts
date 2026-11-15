@@ -28,7 +28,9 @@ const value = (name: string) => {
 }
 const root = value("--root")
 if (root === undefined) throw new Error("--root is required")
-const report = (line: string) => { process.stdout.write(`${line}\n`) }
+const report = (line: string) => {
+  process.stdout.write(`${line}\n`)
+}
 const childMode = (mode: string | undefined) => {
   if (mode === undefined) return "commit" as const
   if (mode === "noop" || mode === "commit-fail" || mode === "commit-hang" || mode === "commit-late-ok") return mode
@@ -37,18 +39,19 @@ const childMode = (mode: string | undefined) => {
 
 if (flag("--run")) {
   const killSelf = flag("--kill-self-after-supervisor-exit")
-  const observed: ResolveAndPreflightMemoryLaunch = (input) => resolveAndPreflightMemoryLaunch({
-    ...input,
-    attempt: async (candidate, attemptNumber, nextAttempt) => {
-      try {
-        return await input.attempt(candidate, attemptNumber, nextAttempt)
-      } catch (error) {
-        report(`supervisor-exit: ${error instanceof Error ? error.message : String(error)}`)
-        if (killSelf) process.kill(process.pid, process.platform === "win32" ? undefined : "SIGKILL")
-        throw error
-      }
-    },
-  })
+  const observed: ResolveAndPreflightMemoryLaunch = (input) =>
+    resolveAndPreflightMemoryLaunch({
+      ...input,
+      attempt: async (candidate, attemptNumber, nextAttempt) => {
+        try {
+          return await input.attempt(candidate, attemptNumber, nextAttempt)
+        } catch (error) {
+          report(`supervisor-exit: ${error instanceof Error ? error.message : String(error)}`)
+          if (killSelf) process.kill(process.pid, process.platform === "win32" ? undefined : "SIGKILL")
+          throw error
+        }
+      },
+    })
   const harness = await createRunnerHarness({
     root,
     dream: flag("--dream"),
@@ -60,12 +63,19 @@ if (flag("--run")) {
   const result = await harness.runner.launch(harness.run)
   report(`launched: ${JSON.stringify({ runId: result.runId, outcome: result.outcome })}`)
 } else if (flag("--reconcile")) {
-  const identity: MemoryIdentity = { id: "agent-test", safeSlug: "agent-test", paths: buildIdentityPaths(root, "agent-test") }
+  const identity: MemoryIdentity = {
+    id: "agent-test",
+    safeSlug: "agent-test",
+    paths: buildIdentityPaths(root, "agent-test"),
+  }
   const store = new ReflectionReservationStore({
     identity,
     config: { stepCount: 1, onCompaction: true },
-    getJournal: async (conversationId) => new TranscriptJournal({ journalDir: join(identity.paths.transcripts, conversationId) }),
-    createRunId: () => { throw new Error("reconciliation mints no run id") },
+    getJournal: async (conversationId) =>
+      new TranscriptJournal({ journalDir: join(identity.paths.transcripts, conversationId) }),
+    createRunId: () => {
+      throw new Error("reconciliation mints no run id")
+    },
   })
   const failing = value("--fail-receipt")
   const receipts: MemoryReceiptsPort = {

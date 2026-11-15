@@ -28,7 +28,10 @@ async function thisDeviceId(remote: RemoteThreadSurface | undefined): Promise<Th
 }
 
 /** A sender's provenance with this device stamped, or the reason it carries none: every delivery path uses this. */
-export async function stampThisDevice(provenance: Promise<Provenance>, remote: RemoteThreadSurface | undefined): Promise<Provenance> {
+export async function stampThisDevice(
+  provenance: Promise<Provenance>,
+  remote: RemoteThreadSurface | undefined,
+): Promise<Provenance> {
   const [resolved, here] = await Promise.all([provenance, thisDeviceId(remote)])
   return { ...resolved, ...here }
 }

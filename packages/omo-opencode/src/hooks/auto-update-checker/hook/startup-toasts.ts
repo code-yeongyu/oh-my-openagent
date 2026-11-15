@@ -11,7 +11,7 @@ export async function showVersionToast(ctx: PluginInput, version: string | null,
 export async function showLocalDevToast(
   ctx: PluginInput,
   version: string | null,
-  isSisyphusEnabled: boolean
+  isSisyphusEnabled: boolean,
 ): Promise<void> {
   const displayVersion = version ?? "dev"
   const message = isSisyphusEnabled

@@ -28,7 +28,8 @@ export async function reconcileFactsRuns(options: {
   for (const name of names.sort()) {
     const runDir = join(runsDir, name)
     if (existsSync(join(runDir, "final.json")) || existsSync(join(runDir, "abandoned.json"))) {
-      if (options.receiptsDir !== undefined) await backfillFactsReceipt(options.receiptsDir, runDir, options.receipts, options.warn)
+      if (options.receiptsDir !== undefined)
+        await backfillFactsReceipt(options.receiptsDir, runDir, options.receipts, options.warn)
       continue
     }
     const ledger = await readRunJson<FactsRunLedger>(join(runDir, "ledger.json")).catch(() => undefined)
@@ -80,13 +81,17 @@ async function backfillFactsReceipt(
   receipts: MemoryReceiptsPort | undefined,
   warn: ((message: string, fields: Readonly<Record<string, unknown>>) => void) | undefined,
 ): Promise<void> {
-  const ledger = await readRunJson<{ readonly runId?: unknown; readonly batchId?: unknown }>(join(runDir, "ledger.json")).catch(() => undefined)
+  const ledger = await readRunJson<{ readonly runId?: unknown; readonly batchId?: unknown }>(
+    join(runDir, "ledger.json"),
+  ).catch(() => undefined)
   if (typeof ledger?.batchId !== "string") {
     // Never guess a batch identity: a receipt keyed to the wrong batch would be a false record.
     warn?.("facts receipt backfill skipped: ledger unreadable", { runDir })
     return
   }
-  const final = await readRunJson<{ readonly runId?: unknown; readonly outcome?: unknown; readonly sha?: unknown }>(join(runDir, "final.json")).catch(() => undefined)
+  const final = await readRunJson<{ readonly runId?: unknown; readonly outcome?: unknown; readonly sha?: unknown }>(
+    join(runDir, "final.json"),
+  ).catch(() => undefined)
   if (final !== undefined) {
     const event = typeof final.outcome === "string" ? FACTS_OUTCOME_EVENTS[final.outcome] : undefined
     if (event === undefined || final.runId !== ledger.runId) return
@@ -94,7 +99,9 @@ async function backfillFactsReceipt(
     await emitMemoryReceipt(runtimeDir, factsReceipt(ledger.batchId, event, sha), receipts, warn)
     return
   }
-  const abandoned = await readRunJson<{ readonly runId?: unknown; readonly reason?: unknown }>(join(runDir, "abandoned.json")).catch(() => undefined)
+  const abandoned = await readRunJson<{ readonly runId?: unknown; readonly reason?: unknown }>(
+    join(runDir, "abandoned.json"),
+  ).catch(() => undefined)
   if (abandoned === undefined || abandoned.runId !== ledger.runId) return
   const reason = typeof abandoned.reason === "string" ? { reason: abandoned.reason } : {}
   await emitMemoryReceipt(runtimeDir, factsReceipt(ledger.batchId, "abandoned", reason), receipts, warn)

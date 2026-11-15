@@ -33,11 +33,17 @@ export function parseMaintenanceArgs(argv: readonly string[]): MaintenanceArgs {
   if (!isChannel(channel)) throw new MirrorPlanError(`--channel must be ${CHANNELS.join(" or ")}, got ${channel}`)
   if (op === "head") return { op, channel, version: null }
   const version = values.version ?? ""
-  if (!VERSION_PATTERN.test(version)) throw new MirrorPlanError(`--version must be X.Y.Z[-pre] for recreate, got ${JSON.stringify(version)}`)
+  if (!VERSION_PATTERN.test(version))
+    throw new MirrorPlanError(`--version must be X.Y.Z[-pre] for recreate, got ${JSON.stringify(version)}`)
   return { op, channel, version }
 }
 
-async function describe(credentials: R2Credentials, method: "HEAD" | "GET", key: string, log: (line: string) => void): Promise<Response> {
+async function describe(
+  credentials: R2Credentials,
+  method: "HEAD" | "GET",
+  key: string,
+  log: (line: string) => void,
+): Promise<Response> {
   const redact = credentialRedactor(credentials)
   const response = await signedRequest(credentials, method, key)
   log(`${method} ${key} -> HTTP ${response.status} ${response.statusText}`)
@@ -45,34 +51,50 @@ async function describe(credentials: R2Credentials, method: "HEAD" | "GET", key:
   return response
 }
 
-export async function inspectChannel(credentials: R2Credentials, channel: Channel, log: (line: string) => void): Promise<void> {
+export async function inspectChannel(
+  credentials: R2Credentials,
+  channel: Channel,
+  log: (line: string) => void,
+): Promise<void> {
   const key = `channels/${channel}`
   await describe(credentials, "HEAD", key, log)
   const response = await describe(credentials, "GET", key, log)
   log(`  body: ${JSON.stringify(credentialRedactor(credentials)(await response.text()))}`)
 }
 
-export async function recreateChannel(credentials: R2Credentials, channel: Channel, version: string, log: (line: string) => void): Promise<void> {
+export async function recreateChannel(
+  credentials: R2Credentials,
+  channel: Channel,
+  version: string,
+  log: (line: string) => void,
+): Promise<void> {
   const key = `channels/${channel}`
-  // publish.yml's rule: a prerelease ships on beta, a stable release on latest.
-  const expected: Channel = isPrerelease(version) ? "beta" : "latest"
-  if (channel !== expected) throw new MirrorPlanError(`${version} belongs on channels/${expected}, not ${key}`)
+  // publish.yml's rule: latest only ever holds a stable release, while beta holds the newer of the latest stable and
+  // the newest prerelease (#12987), so a stable version may sit on beta but a prerelease never on latest.
+  if (channel === "latest" && isPrerelease(version))
+    throw new MirrorPlanError(`${version} belongs on channels/beta, not ${key}`)
   const marker = `releases/v${version}/.complete`
   const mirrored = await signedRequest(credentials, "HEAD", marker)
-  if (mirrored.status !== 200) throw new MirrorPlanError(`${marker} -> HTTP ${mirrored.status}; point ${key} only at a fully mirrored version`)
+  if (mirrored.status !== 200)
+    throw new MirrorPlanError(`${marker} -> HTTP ${mirrored.status}; point ${key} only at a fully mirrored version`)
   const before = await signedRequest(credentials, "GET", key)
-  log(`${key} before: HTTP ${before.status} ${JSON.stringify(credentialRedactor(credentials)(before.ok ? await before.text() : ""))}`)
+  log(
+    `${key} before: HTTP ${before.status} ${JSON.stringify(credentialRedactor(credentials)(before.ok ? await before.text() : ""))}`,
+  )
 
   await deleteObject(credentials, key)
   log(`deleted ${key}`)
   const body = `${version}\n`
   const sha256 = new Bun.CryptoHasher("sha256").update(body).digest("hex")
-  await putVerified(credentials, key, new Blob([body], { type: "text/plain" }), sha256, { "content-type": "text/plain" })
+  await putVerified(credentials, key, new Blob([body], { type: "text/plain" }), sha256, {
+    "content-type": "text/plain",
+  })
   log(`created ${key} = ${version}`)
 
   const after = await signedRequest(credentials, "GET", key)
   const pointer = after.ok ? (await after.text()).trim() : ""
-  if (pointer !== version) throw new MirrorPlanError(`${key}: read-back HTTP ${after.status} ${JSON.stringify(pointer)} != ${version}`)
+  if (pointer !== version)
+    throw new MirrorPlanError(`${key}: read-back HTTP ${after.status} ${JSON.stringify(pointer)} != ${version}`)
   log(`read back ${key} = ${pointer}`)
 }
 

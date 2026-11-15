@@ -17,12 +17,17 @@ export interface PermissionPushPorts {
 export async function reapplyPermissionPreset(input: HostSessionOpenInput, ports: PermissionPushPorts): Promise<void> {
   let side: HostRpcClient | undefined
   try {
-    const { opened } = await openHostSessionConnection({ ...input, retainOnDisconnect: false }, {
-      ...ports,
-      onDisconnect: () => {},
-      onEvent: () => {},
-      bindClient: (client) => { side = client },
-    })
+    const { opened } = await openHostSessionConnection(
+      { ...input, retainOnDisconnect: false },
+      {
+        ...ports,
+        onDisconnect: () => {},
+        onEvent: () => {},
+        bindClient: (client) => {
+          side = client
+        },
+      },
+    )
     if (opened.attached !== true) {
       await side?.closeSession(opened.sessionId)
       throw new Error("the child's session is no longer on its task host; its approval mode was not changed")

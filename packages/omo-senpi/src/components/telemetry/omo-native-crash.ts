@@ -1,7 +1,4 @@
-import type {
-  EventTelemetryProperties,
-  TelemetryOsProvider,
-} from "@oh-my-opencode/telemetry-core"
+import type { EventTelemetryProperties, TelemetryOsProvider } from "@oh-my-opencode/telemetry-core"
 
 import { CRASH_DETECTIONS, CRASH_SIGNALS, PROCESS_KINDS, UPTIME_BUCKETS } from "./crash-schema"
 import type { ClaimedCrashRecord } from "./process-crash-records"
@@ -62,6 +59,10 @@ function versionOrUnknown(value: string | undefined): string {
   return value !== undefined && /^[0-9][0-9A-Za-z.+-]{0,31}$/.test(value) ? value : "unknown"
 }
 
-function oneOf<const Values extends readonly string[]>(values: Values, value: string, fallback: Values[number]): Values[number] {
+function oneOf<const Values extends readonly string[]>(
+  values: Values,
+  value: string,
+  fallback: Values[number],
+): Values[number] {
   return values.includes(value) ? value : fallback
 }

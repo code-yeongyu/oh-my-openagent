@@ -151,7 +151,14 @@ export async function planCredentials(runtime, target, customProviderIds) {
   const current = readAuthStore(target)
   if (current.malformed) {
     const notices = [...sources.notices, "WARN senpi: malformed auth.json; credentials were not imported"]
-    return { target, current, notices, malformed: true, pending: 0, found: sources.candidates.length + sources.oauth.length }
+    return {
+      target,
+      current,
+      notices,
+      malformed: true,
+      pending: 0,
+      found: sources.candidates.length + sources.oauth.length,
+    }
   }
   const result = classify(sources, current.entries, customProviderIds)
   return {
@@ -182,7 +189,10 @@ function list(label, ids) {
 export function credentialPlanLines(plan) {
   if (plan.malformed) return []
   return [
-    list("planned-add", plan.result.additions.map((item) => item.provider)),
+    list(
+      "planned-add",
+      plan.result.additions.map((item) => item.provider),
+    ),
     list("skipped-existing", plan.result.skippedExisting),
     list("skipped-oauth", plan.result.skippedOauth),
     list("skipped-unmapped", plan.result.skippedUnmapped),

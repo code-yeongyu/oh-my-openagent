@@ -51,10 +51,13 @@ export async function appendRetentionLog(
     if (Buffer.byteLength(line) <= MAX_LINE_BYTES || maxNames === 0) break
   }
   const path = join(runtimeDir, RETENTION_LOG_FILE)
-  const size = await stat(path).then((stats) => stats.size, (error: unknown) => {
-    if (errorCode(error) === "ENOENT") return 0
-    throw error
-  })
+  const size = await stat(path).then(
+    (stats) => stats.size,
+    (error: unknown) => {
+      if (errorCode(error) === "ENOENT") return 0
+      throw error
+    },
+  )
   if (size > 0 && size + Buffer.byteLength(line) > (limits.maxBytes ?? DEFAULT_MAX_BYTES)) {
     await rename(path, join(runtimeDir, RETENTION_LOG_PREVIOUS_FILE))
   }
@@ -62,7 +65,12 @@ export async function appendRetentionLog(
   await appendFile(path, line, { encoding: "utf8", mode: 0o600 })
 }
 
-function formatLine(input: RetentionLogInput, total: number, stores: readonly (readonly [string, readonly string[]])[], maxNames: number): string {
+function formatLine(
+  input: RetentionLogInput,
+  total: number,
+  stores: readonly (readonly [string, readonly string[]])[],
+  maxNames: number,
+): string {
   const removed: Record<string, readonly string[]> = {}
   const more: Record<string, number> = {}
   for (const [store, names] of stores) {
@@ -75,7 +83,9 @@ function formatLine(input: RetentionLogInput, total: number, stores: readonly (r
     total,
     removed,
     ...(Object.keys(more).length === 0 ? {} : { more }),
-    ...(input.capEvictedBytes === undefined || input.capEvictedBytes === 0 ? {} : { capEvictedBytes: input.capEvictedBytes }),
+    ...(input.capEvictedBytes === undefined || input.capEvictedBytes === 0
+      ? {}
+      : { capEvictedBytes: input.capEvictedBytes }),
   })}\n`
 }
 

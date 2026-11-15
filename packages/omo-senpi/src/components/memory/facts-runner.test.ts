@@ -2,7 +2,13 @@ import { describe, expect, test } from "bun:test"
 import { existsSync } from "node:fs"
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { FactsFailureStore, FactsQueue, GitMemoryRepo, buildDefaultSeedFiles, factsQueuePaths } from "@oh-my-opencode/memory-core"
+import {
+  FactsFailureStore,
+  FactsQueue,
+  GitMemoryRepo,
+  buildDefaultSeedFiles,
+  factsQueuePaths,
+} from "@oh-my-opencode/memory-core"
 import type { ChildHandle, ChildSpec, InProcessRunnerLike, SenpiModelPort } from "@oh-my-opencode/senpi-task"
 import { FactsExtractorRunner } from "./facts-runner"
 import { createFactsRecordTool } from "./facts-record-tool"
@@ -17,8 +23,12 @@ describe("facts launch ownership", () => {
     let starts = 0
     let releaseChild!: () => void
     let signalStarted!: () => void
-    const childStarted = new Promise<void>((resolve) => { signalStarted = resolve })
-    const childReleased = new Promise<void>((resolve) => { releaseChild = resolve })
+    const childStarted = new Promise<void>((resolve) => {
+      signalStarted = resolve
+    })
+    const childReleased = new Promise<void>((resolve) => {
+      releaseChild = resolve
+    })
     const createRunner = (): InProcessRunnerLike => ({
       start: async (spec: ChildSpec): Promise<ChildHandle> => {
         starts += 1
@@ -26,7 +36,9 @@ describe("facts launch ownership", () => {
         await childReleased
         const tool = createFactsRecordTool({ exchanges: [], extractionPath: join(spec.cwd, "extraction.jsonl") })
         const recorded = await tool.execute("fact-1", {
-          scope: "project", text: "The project uses Bun.", date: "2026-08-10",
+          scope: "project",
+          text: "The project uses Bun.",
+          date: "2026-08-10",
         })
         expect(recorded.isError).not.toBe(true)
         return {
@@ -71,7 +83,10 @@ describe("quick-pinned facts launch", () => {
     // when
     const result = await runner.launchPending()
     const runDir = await onlyRunDir(identity)
-    const ledger = JSON.parse(await readFile(join(runDir, "ledger.json"), "utf8")) as { hardDeadlineAt: number; startedAt: string }
+    const ledger = JSON.parse(await readFile(join(runDir, "ledger.json"), "utf8")) as {
+      hardDeadlineAt: number
+      startedAt: string
+    }
 
     // then
     expect(result.status).toBe("committed")
@@ -144,9 +159,11 @@ describe("quick-pinned facts launch", () => {
     // given
     const { root, identity, queue } = await fixture()
     await enqueue(queue, identity, "session-2", "m2", "The project uses TypeScript.")
-    const runner = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fact", {
-      createBatchId: () => "11111111-1111-4111-8111-111111111111",
-    }))
+    const runner = new FactsExtractorRunner(
+      runnerOptions(root, identity, queue, "fact", {
+        createBatchId: () => "11111111-1111-4111-8111-111111111111",
+      }),
+    )
 
     // when
     const result = await runner.launchPending()
@@ -158,7 +175,9 @@ describe("quick-pinned facts launch", () => {
     const [commit] = await repo.log({ limit: 1 })
     expect(commit?.trailers["Generated-By"]).toBe("facts-extractor")
     expect(commit?.trailers["Omo-Facts-Batch"]).toBe("11111111-1111-4111-8111-111111111111")
-    expect(await readFile(join(identity.paths.repo, "notes/facts/2026-08.md"), "utf8")).toContain("fixture consumed 2 queue entries")
+    expect(await readFile(join(identity.paths.repo, "notes/facts/2026-08.md"), "utf8")).toContain(
+      "fixture consumed 2 queue entries",
+    )
     const runDir = await onlyRunDir(identity)
     const ledger = JSON.parse(await readFile(join(runDir, "ledger.json"), "utf8"))
     expect(JSON.parse(await readFile(join(runDir, "final.json"), "utf8"))).toMatchObject({ outcome: "committed" })
@@ -182,7 +201,8 @@ describe("quick-pinned facts launch", () => {
     const model = { provider: "omo-mock", id: "mock-1" }
     const registry = {
       getAvailable: () => [model],
-      find: (provider: string, modelId: string) => provider === model.provider && modelId === model.id ? model : undefined,
+      find: (provider: string, modelId: string) =>
+        provider === model.provider && modelId === model.id ? model : undefined,
       getProviderAuth: () => undefined,
     }
     let calls = 0
@@ -226,7 +246,10 @@ describe("quick-pinned facts launch", () => {
     const runner = new FactsExtractorRunner({
       ...base,
       resolveModelRegistry: () => ({
-        getAvailable: () => [{ provider: "extension-only", id: "primary" }, { provider: "omo-mock", id: "mock-1" }],
+        getAvailable: () => [
+          { provider: "extension-only", id: "primary" },
+          { provider: "omo-mock", id: "mock-1" },
+        ],
         find: (provider, modelId) => {
           if (provider === "extension-only") {
             primaryLookups += 1
@@ -245,7 +268,10 @@ describe("quick-pinned facts launch", () => {
 
     // then
     expect({ status: result.status, detail: final.detail }).toEqual({ status: "committed", detail: undefined })
-    expect(JSON.parse(await readFile(join(runDir, "ledger.json"), "utf8"))).toMatchObject({ attempt: 2, model: "omo-mock/mock-1" })
+    expect(JSON.parse(await readFile(join(runDir, "ledger.json"), "utf8"))).toMatchObject({
+      attempt: 2,
+      model: "omo-mock/mock-1",
+    })
     expect(JSON.parse(await readFile(join(runDir, "outcome.json"), "utf8"))).toMatchObject({ attempt: 2 })
     expect(warnings.filter((message) => message.includes("facts model candidate skipped"))).toHaveLength(1)
     expect(await queue.listPending()).toHaveLength(0)
@@ -262,7 +288,10 @@ describe("quick-pinned facts launch", () => {
 
     // then
     expect(result.status).toBe("failed")
-    expect(JSON.parse(await readFile(join(runDir, "outcome.json"), "utf8"))).toMatchObject({ timedOut: true, childExit: { code: null } })
+    expect(JSON.parse(await readFile(join(runDir, "outcome.json"), "utf8"))).toMatchObject({
+      timedOut: true,
+      childExit: { code: null },
+    })
     expect(JSON.parse(await readFile(join(runDir, "final.json"), "utf8"))).toMatchObject({ outcome: "failed" })
   }, 30_000)
 
@@ -293,13 +322,17 @@ describe("quick-pinned facts launch", () => {
       timedOut: false,
     })
     const warnings: string[] = []
-    const runner = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fact", {
-      logger: {
-        info: () => undefined,
-        warn: (message) => { warnings.push(message) },
-        error: () => undefined,
-      },
-    }))
+    const runner = new FactsExtractorRunner(
+      runnerOptions(root, identity, queue, "fact", {
+        logger: {
+          info: () => undefined,
+          warn: (message) => {
+            warnings.push(message)
+          },
+          error: () => undefined,
+        },
+      }),
+    )
 
     // when
     const result = await runner.reconcilePending()
@@ -351,15 +384,17 @@ describe("quick-pinned facts launch", () => {
     const cursorBefore = await readFile(cursorPath, "utf8")
     const consumedBefore = await readFile(paths.consumedPath, "utf8").catch(() => undefined)
     let injectDirty = true
-    const first = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fact", {
-      withWriterLock: async (operation) => {
-        if (injectDirty) {
-          injectDirty = false
-          await writeFile(join(identity.paths.repo, "foreign.md"), "parent bytes\n")
-        }
-        return operation()
-      },
-    }))
+    const first = new FactsExtractorRunner(
+      runnerOptions(root, identity, queue, "fact", {
+        withWriterLock: async (operation) => {
+          if (injectDirty) {
+            injectDirty = false
+            await writeFile(join(identity.paths.repo, "foreign.md"), "parent bytes\n")
+          }
+          return operation()
+        },
+      }),
+    )
 
     const blocked = await first.launchPending()
 
@@ -373,9 +408,11 @@ describe("quick-pinned facts launch", () => {
 
     await rm(join(identity.paths.repo, "foreign.md"))
     // The blocked run recorded a one-minute backoff; the retry clock clears that window.
-    const retried = await new FactsExtractorRunner(runnerOptions(root, identity, queue, "fact", {
-      now: () => new Date("2026-08-10T12:01:00.000Z"),
-    })).launchPending()
+    const retried = await new FactsExtractorRunner(
+      runnerOptions(root, identity, queue, "fact", {
+        now: () => new Date("2026-08-10T12:01:00.000Z"),
+      }),
+    ).launchPending()
 
     expect(retried.status).toBe("committed")
     expect(await queue.listPending()).toHaveLength(0)

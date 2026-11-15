@@ -53,7 +53,8 @@ describe("interrupts the parent did not request (omo#10112)", () => {
     // given
     const record = interruptedRecord({
       interrupt_cause: "session_replaced",
-      error_message: "The child's session was replaced (new) by s2, which stopped its running turn. Use task_send to continue it in the new session.",
+      error_message:
+        "The child's session was replaced (new) by s2, which stopped its running turn. Use task_send to continue it in the new session.",
     })
     const { parent, calls } = fakeParent()
     const notifier = createCompletionNotifier({ notifier: parent, store: fakeStore(record) })

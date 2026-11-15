@@ -71,7 +71,7 @@ describe("executeUnstableAgentTask timeout handling", () => {
       "test-agent",
       undefined,
       undefined,
-      "gpt-test"
+      "gpt-test",
     )
 
     // #then

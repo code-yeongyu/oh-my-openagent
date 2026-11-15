@@ -5,10 +5,17 @@ import { DEFAULT_CATEGORIES } from "../tools/delegate-task/constants"
 
 // Every builtin agent and category that leads its Claude rungs with the current Fable resolves to Fable 5.2
 // at the rung's effort on every resolver, and drops to Fable 5.1 at the same effort when only 5.1 is served.
-type Lane = { name: string; chain: { providers: string[]; model: string; variant?: string }[]; categoryDefaultModel?: string }
+type Lane = {
+  name: string
+  chain: { providers: string[]; model: string; variant?: string }[]
+  categoryDefaultModel?: string
+}
 
 const lanes: Lane[] = [
-  ...Object.entries(AGENT_MODEL_REQUIREMENTS).map(([name, requirement]) => ({ name: `agent ${name}`, chain: requirement.fallbackChain ?? [] })),
+  ...Object.entries(AGENT_MODEL_REQUIREMENTS).map(([name, requirement]) => ({
+    name: `agent ${name}`,
+    chain: requirement.fallbackChain ?? [],
+  })),
   ...Object.entries(CATEGORY_MODEL_REQUIREMENTS).map(([name, requirement]) => ({
     name: `category ${name}`,
     chain: requirement.fallbackChain ?? [],
@@ -24,7 +31,11 @@ function resolveEverywhere(lane: Lane, availableModels: Set<string>) {
   })
   const delegated = resolveModelForDelegateTask(
     { availableModels, categoryDefaultModel: lane.categoryDefaultModel, fallbackChain: lane.chain },
-    { connectedProviders: ["anthropic"], hasProviderModelsCache: availableModels.size > 0, hasConnectedProvidersCache: true },
+    {
+      connectedProviders: ["anthropic"],
+      hasProviderModelsCache: availableModels.size > 0,
+      hasConnectedProvidersCache: true,
+    },
   )
   return {
     pipeline: pipeline?.model,

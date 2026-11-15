@@ -39,16 +39,11 @@ export async function run(options: RunOptions): Promise<number> {
   process.env.OPENCODE_CLIENT = "run"
 
   const startTime = Date.now()
-  const {
-    message,
-    directory = process.cwd(),
-  } = options
+  const { message, directory = process.cwd() } = options
 
   const jsonManager = options.json ? createJsonOutputManager() : null
   if (jsonManager) jsonManager.redirectToStderr()
-  const timestampOutput = options.json || options.timestamp === false
-    ? null
-    : createTimestampedStdoutController()
+  const timestampOutput = options.json || options.timestamp === false ? null : createTimestampedStdoutController()
   timestampOutput?.enable()
 
   const pluginConfig = loadPluginConfig(directory, { command: "run" })
@@ -111,9 +106,7 @@ export async function run(options: RunOptions): Promise<number> {
       const events = await client.event.subscribe({ query: { directory } })
       const eventState = createEventState()
       eventState.agentColorsByName = await loadAgentProfileColors(client)
-      const eventProcessor = processEvents(ctx, events.stream, eventState).catch(
-        () => {},
-      )
+      const eventProcessor = processEvents(ctx, events.stream, eventState).catch(() => {})
 
       const promptResult = await dispatchInternalPrompt({
         mode: "async",
@@ -135,8 +128,8 @@ export async function run(options: RunOptions): Promise<number> {
           query: { directory },
         },
       })
-      const promptMayHaveBeenAccepted = promptResult.status === "failed"
-        && isAmbiguousPostDispatchPromptFailure(promptResult)
+      const promptMayHaveBeenAccepted =
+        promptResult.status === "failed" && isAmbiguousPostDispatchPromptFailure(promptResult)
       if (promptResult.status === "failed") {
         if (promptMayHaveBeenAccepted) {
           if (options.verbose) {

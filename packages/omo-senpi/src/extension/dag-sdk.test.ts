@@ -81,9 +81,7 @@ describe("dag eval sdk", () => {
       it("#then each call maps to the matching dag tool action in order and wait returns the run result", async () => {
         const runResult = { kind: "waited", run_id: "run-7", result: { status: "completed" } }
         const calls = installToolStub((args) =>
-          args.action === "start"
-            ? { details: { kind: "started", run_id: "run-7" } }
-            : { details: runResult },
+          args.action === "start" ? { details: { kind: "started", run_id: "run-7" } } : { details: runResult },
         )
         const sdk = await loadSdk()
 
@@ -110,10 +108,12 @@ describe("dag eval sdk", () => {
           },
           { action: "wait", run_id: "run-7", detach: false },
         ])
-        expect(started).toEqual(expect.objectContaining({
-          run_id: "run-7",
-          details: { kind: "started", run_id: "run-7" },
-        }))
+        expect(started).toEqual(
+          expect.objectContaining({
+            run_id: "run-7",
+            details: { kind: "started", run_id: "run-7" },
+          }),
+        )
         expect(waited).toEqual({ details: runResult })
       })
     })
@@ -162,10 +162,7 @@ describe("dag eval sdk", () => {
         const calls = installToolStub(() => ({ details: { kind: "started", run_id: "run-3" } }))
         const sdk = await loadSdk()
 
-        await sdk
-          .define({ key: "docs-refresh" })
-          .node({ id: "audit", prompt: "Audit docs", category: "quick" })
-          .start()
+        await sdk.define({ key: "docs-refresh" }).node({ id: "audit", prompt: "Audit docs", category: "quick" }).start()
 
         expect(calls).toHaveLength(1)
         expect(Value.Check(DagToolParams, calls[0])).toBe(true)
@@ -188,9 +185,7 @@ describe("dag eval sdk", () => {
 
       await sdk.retry("run-10", ["a", "b"], { prompt: "Try again" })
 
-      expect(calls).toEqual([
-        { action: "retry", run_id: "run-10", node_ids: ["a", "b"], prompt: "Try again" },
-      ])
+      expect(calls).toEqual([{ action: "retry", run_id: "run-10", node_ids: ["a", "b"], prompt: "Try again" }])
     })
   })
 
@@ -223,9 +218,7 @@ describe("dag eval sdk", () => {
 
       await sdk.send("run-13", "a", "Keep going")
 
-      expect(calls).toEqual([
-        { action: "send", run_id: "run-13", node_id: "a", message: "Keep going" },
-      ])
+      expect(calls).toEqual([{ action: "send", run_id: "run-13", node_id: "a", message: "Keep going" }])
     })
   })
 
@@ -296,7 +289,7 @@ describe("dag eval sdk", () => {
     describe("#when attach receives the same error envelope", () => {
       it("#then it rejects rather than handing back a handle for a run that was never attached", async () => {
         installToolStub(() => ({
-          content: [{ type: "text", text: "dag run \"run-88\" was not found" }],
+          content: [{ type: "text", text: 'dag run "run-88" was not found' }],
           details: {
             kind: "error",
             error: {

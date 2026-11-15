@@ -1,4 +1,13 @@
-import { constants, copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, realpathSync, type Stats } from "node:fs"
+import {
+  constants,
+  copyFileSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  realpathSync,
+  type Stats,
+} from "node:fs"
 import { homedir, userInfo } from "node:os"
 import { dirname, join, relative, resolve } from "node:path"
 
@@ -46,7 +55,8 @@ function copyMissingEntries(legacyPath: string, targetPath: string, targetRoot: 
     if (legacyStat.isDirectory() && targetStat.isDirectory()) {
       let copiedChild = false
       for (const entry of readdirSync(legacyPath)) {
-        copiedChild = copyMissingEntries(join(legacyPath, entry), join(targetPath, entry), targetRoot, skipped) || copiedChild
+        copiedChild =
+          copyMissingEntries(join(legacyPath, entry), join(targetPath, entry), targetRoot, skipped) || copiedChild
       }
       return copiedChild
     }
@@ -59,7 +69,8 @@ function copyMissingEntries(legacyPath: string, targetPath: string, targetRoot: 
     mkdirSync(targetPath, { recursive: true })
     let copiedChild = false
     for (const entry of readdirSync(legacyPath)) {
-      copiedChild = copyMissingEntries(join(legacyPath, entry), join(targetPath, entry), targetRoot, skipped) || copiedChild
+      copiedChild =
+        copyMissingEntries(join(legacyPath, entry), join(targetPath, entry), targetRoot, skipped) || copiedChild
     }
     return copiedChild
   }

@@ -5,7 +5,10 @@ import { BunshinSessionError, pickTransport, type PickTransportDeps } from "./bu
 
 const hubTransport = { kind: "hub" } as const satisfies Partial<MachineHubTransport>
 
-function deps(options: { connected: boolean; hub?: "bundled" | "bundled-without-config" }): PickTransportDeps & { probes: string[] } {
+function deps(options: {
+  connected: boolean
+  hub?: "bundled" | "bundled-without-config"
+}): PickTransportDeps & { probes: string[] } {
   const probes: string[] = []
   return {
     probes,
@@ -25,7 +28,10 @@ function deps(options: { connected: boolean; hub?: "bundled" | "bundled-without-
 }
 
 async function errorCode(run: Promise<unknown>): Promise<string> {
-  const error = await run.then(() => undefined, (caught: unknown) => caught)
+  const error = await run.then(
+    () => undefined,
+    (caught: unknown) => caught,
+  )
   expect(error).toBeInstanceOf(BunshinSessionError)
   return (error as BunshinSessionError).code
 }
@@ -45,7 +51,9 @@ describe("bunshin-ts pickTransport", () => {
 
   it("#given no choice, a disconnected service and no usable hub #when picked #then no_transport is thrown", async () => {
     expect(await errorCode(pickTransport({}, deps({ connected: false })))).toBe("no_transport")
-    expect(await errorCode(pickTransport({}, deps({ connected: false, hub: "bundled-without-config" })))).toBe("no_transport")
+    expect(await errorCode(pickTransport({}, deps({ connected: false, hub: "bundled-without-config" })))).toBe(
+      "no_transport",
+    )
   })
 
   it("#given relay forced while the service is disconnected #when picked #then a relay transport is returned without a probe", async () => {
@@ -56,10 +64,14 @@ describe("bunshin-ts pickTransport", () => {
   })
 
   it("#given hub forced in a build without the hub transport #when picked #then hub_not_bundled is thrown", async () => {
-    expect(await errorCode(pickTransport({ BUNSHIN_TS_TRANSPORT: "hub" }, deps({ connected: true })))).toBe("hub_not_bundled")
+    expect(await errorCode(pickTransport({ BUNSHIN_TS_TRANSPORT: "hub" }, deps({ connected: true })))).toBe(
+      "hub_not_bundled",
+    )
   })
 
   it("#given an unknown choice #when picked #then bad_choice is thrown", async () => {
-    expect(await errorCode(pickTransport({ BUNSHIN_TS_TRANSPORT: "nonsense" }, deps({ connected: true })))).toBe("bad_choice")
+    expect(await errorCode(pickTransport({ BUNSHIN_TS_TRANSPORT: "nonsense" }, deps({ connected: true })))).toBe(
+      "bad_choice",
+    )
   })
 })

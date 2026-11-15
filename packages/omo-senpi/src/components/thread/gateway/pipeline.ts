@@ -22,7 +22,15 @@ export function createDeliveryPipeline(options: DeliveryPipelineOptions): Delive
   return {
     deliver: async (delivery) => {
       if (delivery.target.kind === "local") return await options.local.deliver(delivery)
-      if (options.relay === undefined) return { kind: "error", error: { code: "host_unavailable", message: `Thread ${delivery.target.row.session_id} is on device ${delivery.target.row.device}, which this device cannot reach.`, next_action: "Sign in to the account's device service, then retry." } }
+      if (options.relay === undefined)
+        return {
+          kind: "error",
+          error: {
+            code: "host_unavailable",
+            message: `Thread ${delivery.target.row.session_id} is on device ${delivery.target.row.device}, which this device cannot reach.`,
+            next_action: "Sign in to the account's device service, then retry.",
+          },
+        }
       return await options.relay.deliver(delivery)
     },
     dispose: () => {

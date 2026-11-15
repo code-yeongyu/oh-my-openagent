@@ -13,10 +13,7 @@ export const TASK_HOST_SOCKET_ENV_NAMES = [
 ] as const
 
 /** The ONE public socket of the machine-wide daemon: an override, else `<agentDir>/rpc/rpc.sock`. */
-export function resolveTaskHostSocket(
-  env: Readonly<Record<string, string | undefined>>,
-  agentDir: string,
-): string {
+export function resolveTaskHostSocket(env: Readonly<Record<string, string | undefined>>, agentDir: string): string {
   for (const name of TASK_HOST_SOCKET_ENV_NAMES) {
     const configured = env[name]?.trim()
     if (configured) return configured

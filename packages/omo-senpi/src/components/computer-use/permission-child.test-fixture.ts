@@ -18,13 +18,23 @@ for await (const line of createInterface({ input: process.stdin })) {
   }
   // A task child's engine must hold its designated model chain before its first prompt (#12759).
   if (command.type === "get_protocol_info") {
-    send({ type: "response", command: command.type, id: command.id, success: true,
-      data: { protocolVersion: 1, capabilities: ["retry_fallback_command"] } })
+    send({
+      type: "response",
+      command: command.type,
+      id: command.id,
+      success: true,
+      data: { protocolVersion: 1, capabilities: ["retry_fallback_command"] },
+    })
     continue
   }
   if (command.type === "get_state") {
-    send({ type: "response", command: command.type, id: command.id, success: true,
-      data: { sessionId: fixture.session.sessionId, isStreaming: false, isCompacting: false } })
+    send({
+      type: "response",
+      command: command.type,
+      id: command.id,
+      success: true,
+      data: { sessionId: fixture.session.sessionId, isStreaming: false, isCompacting: false },
+    })
     continue
   }
   if (command.type !== "prompt") {
@@ -34,11 +44,17 @@ for await (const line of createInterface({ input: process.stdin })) {
   // The response deliberately follows the denial: the owner must retain startup events.
   if (command.message === "nested") await fixture.child("process")
   else if (command.message === "invalid") {
-    send({ type: "extension_event", name: "computer.permission_required",
-      data: { type: "computer.permission_required", permission: "camera", app: "Test App" } })
+    send({
+      type: "extension_event",
+      name: "computer.permission_required",
+      data: { type: "computer.permission_required", permission: "camera", app: "Test App" },
+    })
   } else await fixture.execute("computer", capture)
   send({ type: "response", command: command.type, id: command.id, success: true })
-  send({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "done" }], stopReason: "stop" } })
+  send({
+    type: "message_end",
+    message: { role: "assistant", content: [{ type: "text", text: "done" }], stopReason: "stop" },
+  })
   send({ type: "agent_end", messages: [], willRetry: false })
   send({ type: "agent_idle" })
 }

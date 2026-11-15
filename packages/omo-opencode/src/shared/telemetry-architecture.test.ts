@@ -21,5 +21,4 @@ describe("omo-opencode telemetry architecture", () => {
     expect(posthogSource).toContain("createTelemetryClient")
     expect(posthogSource).not.toContain("recordDailyActive")
   })
-
 })

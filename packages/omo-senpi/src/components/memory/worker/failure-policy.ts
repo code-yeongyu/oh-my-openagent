@@ -25,9 +25,11 @@ const NON_RETRYABLE_REASONS = new Set([
 // Outcomes the child did not cause: the parent repo was busy or drifted while the run merged.
 const ENVIRONMENTAL_OUTCOMES = new Set<ReflectionOutcome>(["parent_dirty", "merge_conflict", "timed_out"])
 
-const NON_RETRYABLE_DETAIL = /\bModel "[^"]+" not found\b|\bmodel_not_visible\b|\bexhausted\b|\bNo API key\b|\bauth_missing\b|\bENOENT\b|\bexecvp\(\)|\bsandbox-exec\b|\bbwrap\b|\bsupervisor exited with 0\b|\bdid not receive a pid\b|\bnot a git repository\b/i
+const NON_RETRYABLE_DETAIL =
+  /\bModel "[^"]+" not found\b|\bmodel_not_visible\b|\bexhausted\b|\bNo API key\b|\bauth_missing\b|\bENOENT\b|\bexecvp\(\)|\bsandbox-exec\b|\bbwrap\b|\bsupervisor exited with 0\b|\bdid not receive a pid\b|\bnot a git repository\b/i
 
-const RETRYABLE_DETAIL = /\b(?:429|502|503|504|529)\b|\brate.?limit|\busage_limit|\bcooling down\b|\boverloaded\b|\bEAGAIN\b|\bECONNRESET\b|\bECONNREFUSED\b|\bETIMEDOUT\b|\bENOTFOUND\b|\bEAI_AGAIN\b|\btemporarily unavailable\b|\bsocket hang up\b|\bprovider_unavailable\b|\bdeadline_exceeded\b|\bdied before publishing\b/i
+const RETRYABLE_DETAIL =
+  /\b(?:429|502|503|504|529)\b|\brate.?limit|\busage_limit|\bcooling down\b|\boverloaded\b|\bEAGAIN\b|\bECONNRESET\b|\bECONNREFUSED\b|\bETIMEDOUT\b|\bENOTFOUND\b|\bEAI_AGAIN\b|\btemporarily unavailable\b|\bsocket hang up\b|\bprovider_unavailable\b|\bdeadline_exceeded\b|\bdied before publishing\b/i
 
 export function classifyReflectionFailure(decision: ReflectionFailureDecision): ReflectionFailureSignal | undefined {
   if (decision.outcome === "merged" || decision.outcome === "no_changes") return undefined

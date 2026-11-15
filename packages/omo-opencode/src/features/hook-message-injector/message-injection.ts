@@ -45,24 +45,27 @@ function removeInjectionArtifact(path: string, sessionID: string): void {
 export function injectHookMessage(
   sessionID: string,
   hookContent: string,
-  originalMessage: OriginalMessageContext
+  originalMessage: OriginalMessageContext,
 ): boolean {
   if (!hookContent || hookContent.trim().length === 0) {
     log("[hook-message-injector] Attempted to inject empty hook content, skipping injection", {
       sessionID,
       hasAgent: !!originalMessage.agent,
-      hasModel: !!(originalMessage.model?.providerID && originalMessage.model?.modelID)
+      hasModel: !!(originalMessage.model?.providerID && originalMessage.model?.modelID),
     })
     return false
   }
 
   if (isSqliteBackend()) {
-    log("[hook-message-injector] Skipping JSON message injection on SQLite backend. " +
+    log(
+      "[hook-message-injector] Skipping JSON message injection on SQLite backend. " +
         "In-flight injection is handled via experimental.chat.messages.transform hook. " +
-        "JSON write path is not needed when SQLite is the storage backend.", {
-      sessionID,
-      agent: originalMessage.agent,
-    })
+        "JSON write path is not needed when SQLite is the storage backend.",
+      {
+        sessionID,
+        agent: originalMessage.agent,
+      },
+    )
     return false
   }
 
@@ -70,10 +73,7 @@ export function injectHookMessage(
   if (!messageDir) {
     return false
   }
-  const needsFallback =
-    !originalMessage.agent ||
-    !originalMessage.model?.providerID ||
-    !originalMessage.model?.modelID
+  const needsFallback = !originalMessage.agent || !originalMessage.model?.providerID || !originalMessage.model?.modelID
   const fallback = needsFallback ? findNearestMessageWithFields(messageDir) : null
   const now = Date.now()
   const messageID = generateMessageId()
@@ -88,13 +88,12 @@ export function injectHookMessage(
     },
     agent: originalMessage.agent ?? fallback?.agent ?? "general",
     model: resolveModel(originalMessage, fallback),
-    path:
-      originalMessage.path?.cwd
-        ? {
-            cwd: originalMessage.path.cwd,
-            root: originalMessage.path.root ?? "/",
-          }
-        : undefined,
+    path: originalMessage.path?.cwd
+      ? {
+          cwd: originalMessage.path.cwd,
+          root: originalMessage.path.root ?? "/",
+        }
+      : undefined,
     tools: originalMessage.tools ?? fallback?.tools,
   }
 

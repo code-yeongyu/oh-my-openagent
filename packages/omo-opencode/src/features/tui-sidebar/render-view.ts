@@ -2,14 +2,7 @@ import { LABEL_MAX } from "./constants"
 import { box, text } from "./element-helpers"
 import type { ViewNode } from "./element-helpers"
 import { assertNever } from "./state-types"
-import type {
-  AgentsState,
-  ConfigBanner,
-  JobBoardState,
-  LoopState,
-  RosterState,
-  SidebarView,
-} from "./state-types"
+import type { AgentsState, ConfigBanner, JobBoardState, LoopState, RosterState, SidebarView } from "./state-types"
 
 type ThemeLike = {
   readonly error?: unknown
@@ -161,7 +154,10 @@ function jobNodes(jobs: JobBoardState, theme: ThemeLike): ViewNode[] {
           "Jobs",
           theme,
           jobs.jobs.map((job) =>
-            text({ fg: theme.text }, `${truncate(job.title)} ${job.status} ${job.toolCalls ?? 0} ${job.lastTool ?? "none"}`),
+            text(
+              { fg: theme.text },
+              `${truncate(job.title)} ${job.status} ${job.toolCalls ?? 0} ${job.lastTool ?? "none"}`,
+            ),
           ),
         ),
       ]
@@ -194,7 +190,13 @@ function brokenNodes(messages: readonly string[], theme: ThemeLike): ViewNode[] 
 }
 
 function idleNodes(roster: RosterState, theme: ThemeLike): ViewNode[] {
-  return [section("Models", theme, rosterLines(roster).map((line) => text({ fg: theme.text }, line)))]
+  return [
+    section(
+      "Models",
+      theme,
+      rosterLines(roster).map((line) => text({ fg: theme.text }, line)),
+    ),
+  ]
 }
 
 function rosterLines(roster: RosterState): string[] {

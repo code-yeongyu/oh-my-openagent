@@ -51,7 +51,10 @@ async function processPinDir(): Promise<string> {
   return dir
 }
 
-export type PinResult = { readonly kind: "pinned"; readonly path: string } | { readonly kind: "invalid" } | { readonly kind: "unavailable"; readonly reason: string }
+export type PinResult =
+  | { readonly kind: "pinned"; readonly path: string }
+  | { readonly kind: "invalid" }
+  | { readonly kind: "unavailable"; readonly reason: string }
 
 const pinned = new Map<string, Promise<PinResult>>()
 
@@ -60,7 +63,11 @@ async function sourceIdentity(source: string): Promise<string> {
   return `${source}\0${info.dev}\0${info.ino}\0${info.size}\0${info.mtimeMs}\0${info.ctimeMs}`
 }
 
-async function copyAndVerify(source: string, verify: (path: string) => Promise<SignatureVerdict>, dir: string): Promise<PinResult> {
+async function copyAndVerify(
+  source: string,
+  verify: (path: string) => Promise<SignatureVerdict>,
+  dir: string,
+): Promise<PinResult> {
   const target = join(dir, `${crypto.randomUUID()}-${basename(source)}`)
   try {
     await copyFile(source, target, constants.COPYFILE_EXCL)
@@ -114,8 +121,11 @@ export async function pinVerifiedCopy(
     if (verdict === "valid") return result
   }
   const created = Promise.resolve(dir ?? processPinDir()).then(
-    target => copyAndVerify(source, verify, target),
-    (error: unknown): PinResult => ({ kind: "unavailable", reason: error instanceof Error ? error.message : String(error) }),
+    (target) => copyAndVerify(source, verify, target),
+    (error: unknown): PinResult => ({
+      kind: "unavailable",
+      reason: error instanceof Error ? error.message : String(error),
+    }),
   )
   pinned.set(identity, created)
   const result = await created

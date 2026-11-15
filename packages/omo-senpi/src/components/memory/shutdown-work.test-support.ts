@@ -47,7 +47,10 @@ export function gatedStep(held: Gate): { readonly step: () => Promise<void>; rea
 }
 
 export class HeadGatedRepo extends GitMemoryRepo {
-  constructor(dir: string, private readonly headGate: Gate) {
+  constructor(
+    dir: string,
+    private readonly headGate: Gate,
+  ) {
     super({ dir, agentId: AGENT_ID })
   }
 
@@ -67,7 +70,11 @@ export async function tempRoot(prefix: string): Promise<string> {
 }
 
 export async function removeTempRoots(): Promise<void> {
-  await Promise.all(tempDirs.splice(0).map((dir) => rmEfaultTolerant(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(
+    tempDirs
+      .splice(0)
+      .map((dir) => rmEfaultTolerant(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })),
+  )
 }
 
 export async function seededRepoDir(): Promise<string> {
@@ -78,7 +85,13 @@ export async function seededRepoDir(): Promise<string> {
   return dir
 }
 
-export const EMPTY_SWEEP: TransientSweepResult = { removedRuns: 0, removedIdentities: 0, promoted: 0, stranded: 0, kept: 0 }
+export const EMPTY_SWEEP: TransientSweepResult = {
+  removedRuns: 0,
+  removedIdentities: 0,
+  promoted: 0,
+  stranded: 0,
+  kept: 0,
+}
 
 export const idleSyncRunner: SyncRunner = {
   acquire: async () => {},

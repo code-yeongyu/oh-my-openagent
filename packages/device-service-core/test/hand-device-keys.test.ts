@@ -4,7 +4,15 @@ import { chmodSync, linkSync, mkdirSync, mkdtempSync, renameSync, rmSync } from 
 import { createServer } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { connectDeviceService, type DeviceService, deviceServiceEndpointPath, forgetDeviceService, handDeviceKeys, type HeldDeviceCredential, LocalApiError } from "../src/index.ts"
+import {
+  connectDeviceService,
+  type DeviceService,
+  deviceServiceEndpointPath,
+  forgetDeviceService,
+  handDeviceKeys,
+  type HeldDeviceCredential,
+  LocalApiError,
+} from "../src/index.ts"
 import { writeToken } from "../src/local-api/access.ts"
 import { startFakeOwner, type FakeOwner } from "./local-api/conformance/fake-owner.ts"
 import { testSecure } from "./local-api/support.ts"
@@ -25,8 +33,12 @@ afterEach(async () => {
 const held = (): HeldDeviceCredential => ({
   device: { id: "dev-self", name: "This Mac" },
   account: "acct_42",
-  signingPrivateKey: generateKeyPairSync("ed25519").privateKey.export({ format: "der", type: "pkcs8" }).toString("base64"),
-  sealingPrivateKey: generateKeyPairSync("x25519").privateKey.export({ format: "der", type: "pkcs8" }).toString("base64"),
+  signingPrivateKey: generateKeyPairSync("ed25519")
+    .privateKey.export({ format: "der", type: "pkcs8" })
+    .toString("base64"),
+  sealingPrivateKey: generateKeyPairSync("x25519")
+    .privateKey.export({ format: "der", type: "pkcs8" })
+    .toString("base64"),
 })
 
 const stateDirOf = (): string => {
@@ -63,9 +75,9 @@ const deadEndpoint = async (stateDir: string): Promise<void> => {
   mkdirSync(stateDir, { recursive: true, mode: 0o700 })
   const endpoint = deviceServiceEndpointPath(stateDir)
   const server = createServer()
-  await new Promise<void>(resolve => server.listen(endpoint, resolve))
+  await new Promise<void>((resolve) => server.listen(endpoint, resolve))
   linkSync(endpoint, `${endpoint}.kept`)
-  await new Promise<void>(resolve => server.close(() => resolve()))
+  await new Promise<void>((resolve) => server.close(() => resolve()))
   renameSync(`${endpoint}.kept`, endpoint)
   chmodSync(endpoint, 0o600)
   // A dead service leaves its per-boot token too, so the connect reaches the socket and nothing answers.
@@ -73,7 +85,8 @@ const deadEndpoint = async (stateDir: string): Promise<void> => {
 }
 
 /** The cause word the not-running log line starts with (after the fixed prefix). */
-const causeOf = (line: string | undefined): string | undefined => /^OmO device service: ([a-z_]+),/.exec(line ?? "")?.[1]
+const causeOf = (line: string | undefined): string | undefined =>
+  /^OmO device service: ([a-z_]+),/.exec(line ?? "")?.[1]
 
 describe.skipIf(process.platform === "win32")("a relayd that died and left its endpoint file behind", () => {
   test("the hand-off reads it as no relayd running, logs it, and never throws", async () => {
@@ -81,7 +94,10 @@ describe.skipIf(process.platform === "win32")("a relayd that died and left its e
     await deadEndpoint(stateDir)
     const lines: string[] = []
     const outcome = await handDeviceKeys({
-      stateDir, credential: held(), when: "always", log: line => lines.push(line),
+      stateDir,
+      credential: held(),
+      when: "always",
+      log: (line) => lines.push(line),
       connect: () => connectDeviceService({ version: "5.1.60", stateDir }),
     })
     expect(outcome).toBe("not_running")
@@ -94,7 +110,10 @@ describe.skipIf(process.platform === "win32")("a relayd that died and left its e
     await Bun.write(deviceServiceEndpointPath(stateDir), "")
     const lines: string[] = []
     const outcome = await handDeviceKeys({
-      stateDir, credential: held(), when: "always", log: line => lines.push(line),
+      stateDir,
+      credential: held(),
+      when: "always",
+      log: (line) => lines.push(line),
       connect: () => connectDeviceService({ version: "5.1.60", stateDir }),
     })
     expect(outcome).toBe("not_running")
@@ -111,8 +130,13 @@ describe.skipIf(process.platform === "win32")("a relayd that died and left its e
     await deadEndpoint(stateDir)
     const lines: string[] = []
     const outcome = await handDeviceKeys({
-      stateDir, credential: held(), when: "always", log: line => lines.push(line),
-      connect: async () => { throw new LocalApiError(code, "synthetic") },
+      stateDir,
+      credential: held(),
+      when: "always",
+      log: (line) => lines.push(line),
+      connect: async () => {
+        throw new LocalApiError(code, "synthetic")
+      },
     })
     expect(outcome).toBe("not_running")
     expect(lines.map(causeOf)).toEqual([cause])
@@ -123,7 +147,8 @@ describe.skipIf(process.platform === "win32")("a relayd that died and left its e
     await deadEndpoint(stateDir)
     const lines: string[] = []
     const outcome = await forgetDeviceService({
-      stateDir, log: line => lines.push(line),
+      stateDir,
+      log: (line) => lines.push(line),
       connect: () => connectDeviceService({ version: "5.1.60", stateDir }),
     })
     expect(outcome).toBe("not_running")
@@ -143,24 +168,34 @@ describe("handing held device keys to the device service", () => {
     const stateDir = stateDirOf()
     const owner = await ownerAt(stateDir, false)
     const credential = held()
-    expect(await handDeviceKeys({ stateDir, connect: connector(stateDir).connect, credential, when: "not_adopted" })).toBe("adopted")
-    expect(owner.state.adoptRequests).toEqual([expect.objectContaining({
-      account: "acct_42", device: credential.device,
-      signing_private_key: credential.signingPrivateKey, sealing_private_key: credential.sealingPrivateKey,
-    })])
+    expect(
+      await handDeviceKeys({ stateDir, connect: connector(stateDir).connect, credential, when: "not_adopted" }),
+    ).toBe("adopted")
+    expect(owner.state.adoptRequests).toEqual([
+      expect.objectContaining({
+        account: "acct_42",
+        device: credential.device,
+        signing_private_key: credential.signingPrivateKey,
+        sealing_private_key: credential.sealingPrivateKey,
+      }),
+    ])
   })
 
   test("an adopted service is left alone by the re-adopt", async () => {
     const stateDir = stateDirOf()
     const owner = await ownerAt(stateDir, true)
-    expect(await handDeviceKeys({ stateDir, connect: connector(stateDir).connect, credential: held(), when: "not_adopted" })).toBe("already_adopted")
+    expect(
+      await handDeviceKeys({ stateDir, connect: connector(stateDir).connect, credential: held(), when: "not_adopted" }),
+    ).toBe("already_adopted")
     expect(owner.state.adoptions).toBe(0)
   })
 
   test("a fresh sign-in hands its keys even to an adopted service", async () => {
     const stateDir = stateDirOf()
     const owner = await ownerAt(stateDir, true)
-    expect(await handDeviceKeys({ stateDir, connect: connector(stateDir).connect, credential: held(), when: "always" })).toBe("adopted")
+    expect(
+      await handDeviceKeys({ stateDir, connect: connector(stateDir).connect, credential: held(), when: "always" }),
+    ).toBe("adopted")
     expect(owner.state.adoptions).toBe(1)
   })
 })

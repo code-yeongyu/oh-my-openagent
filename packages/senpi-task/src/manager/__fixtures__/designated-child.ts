@@ -70,8 +70,20 @@ export async function runCategoryChildren(
   const [parentProvider = "", parentId = ""] = chainIds(kind).parent.split("/")
   const manager = createTaskManager({
     store: createTaskRecordStore({ project_dir: project }),
-    runners: { "in-process": inProcess, process: kind === "in-process" ? inProcess : await world.engineRunner(kind, first.engineHides === undefined ? {} : { hiddenCapabilities: first.engineHides }) },
-    planner: (spec) => ({ kind: "resolved", plan: chainPlan(spec.category ?? "", chains.get(spec.category ?? "") ?? []) }),
+    runners: {
+      "in-process": inProcess,
+      process:
+        kind === "in-process"
+          ? inProcess
+          : await world.engineRunner(
+              kind,
+              first.engineHides === undefined ? {} : { hiddenCapabilities: first.engineHides },
+            ),
+    },
+    planner: (spec) => ({
+      kind: "resolved",
+      plan: chainPlan(spec.category ?? "", chains.get(spec.category ?? "") ?? []),
+    }),
     config: settings({ default_concurrency: inputs.length + 1, max_depth: 1 }),
     cwd: project,
     destruction: { destroyResidentTask: async () => {} },
@@ -80,16 +92,25 @@ export async function runCategoryChildren(
     const deps = makeDeps(manager)
     const task = settings({ default_execution_mode: kind === "in-process" ? "in-process" : "process" })
     const execute = buildTaskExecute({ ...deps, omoConfig: { ...deps.omoConfig, task } })
-    const taskIds = await Promise.all(inputs.map(async (input, index) => {
-      const result = await execute(`call-${index + 1}`, { prompt: "do the thing", category: input.category, run_in_background: true }, undefined, undefined, {
-        cwd: project,
-        sessionManager: { getSessionId: () => "parent-1" },
-        model: { provider: parentProvider, id: parentId },
-      })
-      const taskId = result.details.task_id
-      if (typeof taskId !== "string" || !taskId.startsWith("st_")) throw new Error(`child did not start: ${JSON.stringify(result.details)}`)
-      return taskId
-    }))
+    const taskIds = await Promise.all(
+      inputs.map(async (input, index) => {
+        const result = await execute(
+          `call-${index + 1}`,
+          { prompt: "do the thing", category: input.category, run_in_background: true },
+          undefined,
+          undefined,
+          {
+            cwd: project,
+            sessionManager: { getSessionId: () => "parent-1" },
+            model: { provider: parentProvider, id: parentId },
+          },
+        )
+        const taskId = result.details.task_id
+        if (typeof taskId !== "string" || !taskId.startsWith("st_"))
+          throw new Error(`child did not start: ${JSON.stringify(result.details)}`)
+        return taskId
+      }),
+    )
     return { records: await Promise.all(taskIds.map((taskId) => manager.waitFor(taskId))), world }
   } finally {
     manager.workpools.dispose()

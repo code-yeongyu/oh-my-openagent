@@ -21,9 +21,7 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   }
   return value as Record<string, unknown>
 }
-function isImageAttachmentRecord(
-  value: Record<string, unknown>,
-): value is Record<string, unknown> & ImageAttachment {
+function isImageAttachmentRecord(value: Record<string, unknown>): value is Record<string, unknown> & ImageAttachment {
   const filename = value.filename
   return (
     typeof value.mime === "string" &&

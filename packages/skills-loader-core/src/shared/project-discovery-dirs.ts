@@ -123,15 +123,23 @@ export type DiscoveredProjectDirectory = {
   readonly projectRoot: string
 }
 
-function projectDirectories(start: string, paths: readonly (readonly string[])[], stop?: string): DiscoveredProjectDirectory[] {
+function projectDirectories(
+  start: string,
+  paths: readonly (readonly string[])[],
+  stop?: string,
+): DiscoveredProjectDirectory[] {
   const projectRoot = stop ?? detectWorktreePath(start)
   return findAncestorDirectories(start, paths, projectRoot).map((discovered) => ({
-    discovered, resolved: normalizePath(discovered),
+    discovered,
+    resolved: normalizePath(discovered),
     projectRoot: projectRoot ?? dirname(dirname(discovered)),
   }))
 }
 
-export function findProjectClaudeSkillDirs(startDirectory: string, stopDirectory?: string): DiscoveredProjectDirectory[] {
+export function findProjectClaudeSkillDirs(
+  startDirectory: string,
+  stopDirectory?: string,
+): DiscoveredProjectDirectory[] {
   return projectDirectories(
     startDirectory,
     [[".claude", "skills"]],
@@ -139,7 +147,10 @@ export function findProjectClaudeSkillDirs(startDirectory: string, stopDirectory
   )
 }
 
-export function findProjectAgentsSkillDirs(startDirectory: string, stopDirectory?: string): DiscoveredProjectDirectory[] {
+export function findProjectAgentsSkillDirs(
+  startDirectory: string,
+  stopDirectory?: string,
+): DiscoveredProjectDirectory[] {
   return projectDirectories(
     startDirectory,
     [[".agents", "skills"]],
@@ -147,7 +158,10 @@ export function findProjectAgentsSkillDirs(startDirectory: string, stopDirectory
   )
 }
 
-export function findProjectOpencodeSkillDirs(startDirectory: string, stopDirectory?: string): DiscoveredProjectDirectory[] {
+export function findProjectOpencodeSkillDirs(
+  startDirectory: string,
+  stopDirectory?: string,
+): DiscoveredProjectDirectory[] {
   return projectDirectories(
     startDirectory,
     [
@@ -169,10 +183,7 @@ export function findProjectOpencodeCommandDirs(startDirectory: string, stopDirec
   )
 }
 
-export function findProjectOpencodePluginConfigFiles(
-  startDirectory: string,
-  stopDirectory?: string,
-): string[] {
+export function findProjectOpencodePluginConfigFiles(startDirectory: string, stopDirectory?: string): string[] {
   const paths: string[] = []
   const seen = new Set<string>()
   let currentDirectory = normalizePath(startDirectory)

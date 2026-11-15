@@ -23,13 +23,18 @@ export const buildGenesis = async (
   const own = keyring.principal()
   const keys = keyring.publicKeys()
   const first = body.bootstrap.first_device
-  if (own.kind !== first.kind || own.id !== first.id ||
-      keys.sealing !== first.sealing_public_key || keys.signing !== first.signing_public_key) {
+  if (
+    own.kind !== first.kind ||
+    own.id !== first.id ||
+    keys.sealing !== first.sealing_public_key ||
+    keys.signing !== first.signing_public_key
+  ) {
     throw new GenesisBuildError("principal_mismatch")
   }
   await validatePrepared(prepared)
   const digest = await sha256B64(jcsBytes(body))
   const signed = await signedAppend(keyring, { seq: 0, link: "", keyring_link: "" }, body, wraps, operation)
-  if (!await verifyRecordSig(keys.signing, { ...signed, account, epoch: 1, digest })) throw new GenesisBuildError("bad_signature")
+  if (!(await verifyRecordSig(keys.signing, { ...signed, account, epoch: 1, digest })))
+    throw new GenesisBuildError("bad_signature")
   return frozenCopy({ request: { ...signed, record: body, base_seq: 0, wraps }, digest }, () => false)
 }

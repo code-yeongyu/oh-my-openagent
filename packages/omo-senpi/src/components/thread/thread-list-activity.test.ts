@@ -70,9 +70,30 @@ test("#given mixed live and degraded rows with known and unknown activity #when 
     unknownDead: sessionFile(directory, "unknown-dead", partial),
   }
   const sessions: ThreadHostSession[] = [
-    { sessionId: "unknown-live", durableSessionId: "unknown-live", cwd: directory, sessionPath: paths.unknownLive, status: "open", socket: "/tmp/live.sock" },
-    { sessionId: "z-known", durableSessionId: "z-known", cwd: directory, sessionPath: paths.zKnown, status: "open", socket: "/tmp/live.sock" },
-    { sessionId: "a-known", durableSessionId: "a-known", cwd: directory, sessionPath: paths.aKnown, status: "open", socket: "/tmp/live.sock" },
+    {
+      sessionId: "unknown-live",
+      durableSessionId: "unknown-live",
+      cwd: directory,
+      sessionPath: paths.unknownLive,
+      status: "open",
+      socket: "/tmp/live.sock",
+    },
+    {
+      sessionId: "z-known",
+      durableSessionId: "z-known",
+      cwd: directory,
+      sessionPath: paths.zKnown,
+      status: "open",
+      socket: "/tmp/live.sock",
+    },
+    {
+      sessionId: "a-known",
+      durableSessionId: "a-known",
+      cwd: directory,
+      sessionPath: paths.aKnown,
+      status: "open",
+      socket: "/tmp/live.sock",
+    },
   ]
   const dead = readDiskSession(paths.unknownDead, deadSocket)
   if (dead === null) throw new Error("dead session fixture did not parse")
@@ -80,7 +101,13 @@ test("#given mixed live and degraded rows with known and unknown activity #when 
     sessions,
     hosts: [
       { socket: "/tmp/live.sock", endpoint_kind: "rpc_host", alive: true, list_sessions: { sessions } },
-      { socket: deadSocket, endpoint_kind: "tui", alive: false, reason: "live_unresponsive", error: "live_unresponsive" },
+      {
+        socket: deadSocket,
+        endpoint_kind: "tui",
+        alive: false,
+        reason: "live_unresponsive",
+        error: "live_unresponsive",
+      },
     ],
     disk: [dead],
   }

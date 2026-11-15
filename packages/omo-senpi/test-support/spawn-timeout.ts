@@ -7,6 +7,9 @@ import { remainingTestTime } from "../../../test-support/test-deadline"
  */
 export function spawnTimeout(remainingMs: number = remainingTestTime()): number {
   const ms = Math.floor(remainingMs)
-  if (ms < 1) throw new Error(`the test budget is spent (${remainingMs} ms left); refusing to spawn a child without a kill timeout`)
+  if (ms < 1)
+    throw new Error(
+      `the test budget is spent (${remainingMs} ms left); refusing to spawn a child without a kill timeout`,
+    )
   return ms
 }

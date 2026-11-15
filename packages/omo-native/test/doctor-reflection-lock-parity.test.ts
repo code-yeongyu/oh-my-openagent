@@ -10,7 +10,11 @@ import {
   reaperProbeFor,
 } from "../../memory-core/src/reflection/stale-holder.scenarios.test-support"
 import { decideStaleReflectionLock, decideStrandedRun } from "../../memory-core/src/reflection/stale-lock-reaper"
-import { classifyReflectionLock, decideReflectionLock, decideStrandedReflectionRun } from "../bin/lib/doctor-reflection-lock.js"
+import {
+  classifyReflectionLock,
+  decideReflectionLock,
+  decideStrandedReflectionRun,
+} from "../bin/lib/doctor-reflection-lock.js"
 import { classifyActiveReflectionHolder } from "../../omo-senpi/src/components/memory/reflection-stale-active"
 
 describe("the session and omo doctor decide a reflection lock the same way (#10377)", () => {

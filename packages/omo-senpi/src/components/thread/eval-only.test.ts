@@ -4,7 +4,14 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Type } from "typebox"
 
-import { DefaultResourceLoader, ModelRegistry, ModelRuntime, SessionManager, SettingsManager, createAgentSession } from "../../senpi-test-runtime"
+import {
+  DefaultResourceLoader,
+  ModelRegistry,
+  ModelRuntime,
+  SessionManager,
+  SettingsManager,
+  createAgentSession,
+} from "../../senpi-test-runtime"
 import type { ThreadToolResult } from "./contracts"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { THREAD_FAMILY_PROMPT_GUIDELINES, THREAD_TOOL_METADATA } from "./metadata"
@@ -17,19 +24,33 @@ const THREAD_TOOL_NAMES = THREAD_TOOL_METADATA.map((entry) => entry.name)
 const EVAL_HINT = /inside an eval cell via tool\.thread_read\(/
 
 type Session = Awaited<ReturnType<typeof createAgentSession>>["session"]
-type ExtensionFactory = NonNullable<ConstructorParameters<typeof DefaultResourceLoader>[0]["extensionFactories"]>[number]
+type ExtensionFactory = NonNullable<
+  ConstructorParameters<typeof DefaultResourceLoader>[0]["extensionFactories"]
+>[number]
 
 const roots: string[] = []
 const stores: GatewayStore[] = []
 const sessions: Session[] = []
 afterEach(async () => {
-  for (const session of sessions.splice(0)) session.dispose()
+  // senpi's fallback logger finishes its first-start removal asynchronously; removing the agent dir before it settles leaks it (#9766).
+  await Promise.all(
+    sessions.splice(0).map((session) => {
+      session.dispose()
+      return session.whenToolChildClosed()
+    }),
+  )
   await Promise.all(stores.splice(0).map((store) => store.dispose()))
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
 function fixture(root: string) {
-  const peer: ThreadHostSession = { sessionId: "route-peer", durableSessionId: "dur-peer", cwd: root, name: "peer", status: "open" }
+  const peer: ThreadHostSession = {
+    sessionId: "route-peer",
+    durableSessionId: "dur-peer",
+    cwd: root,
+    name: "peer",
+    status: "open",
+  }
   const getMessages = mock(async () => [{ role: "user" as const, content: "hello" }])
   const host: ThreadHost = {
     socket: join(root, "thread-eval-only.sock"),
@@ -64,7 +85,10 @@ const evalStub: ExtensionFactory = (pi) => {
   })
 }
 
-async function openSession(options: { readonly withEval: boolean; readonly extraFactories?: readonly ExtensionFactory[] }) {
+async function openSession(options: {
+  readonly withEval: boolean
+  readonly extraFactories?: readonly ExtensionFactory[]
+}) {
   const root = mkdtempSync(join(tmpdir(), "thread-eval-only-"))
   roots.push(root)
   const agentDir = join(root, "agent")
@@ -76,14 +100,26 @@ async function openSession(options: { readonly withEval: boolean; readonly extra
     registerThreadTools(pi as unknown as Parameters<typeof registerThreadTools>[0], f)
   }
   const loader = new DefaultResourceLoader({
-    cwd: root, agentDir, settingsManager, noExtensions: true, noSkills: true, noPromptTemplates: true, noThemes: true, noContextFiles: true,
+    cwd: root,
+    agentDir,
+    settingsManager,
+    noExtensions: true,
+    noSkills: true,
+    noPromptTemplates: true,
+    noThemes: true,
+    noContextFiles: true,
     extensionFactories: [threadFactory, ...(options.withEval ? [evalStub] : []), ...(options.extraFactories ?? [])],
   })
   await loader.reload()
   expect(loader.getExtensions().errors).toEqual([])
   const { session } = await createAgentSession({
-    cwd: root, agentDir, settingsManager, modelRegistry: registry, resourceLoader: loader,
-    sessionManager: SessionManager.inMemory(root), autoTitleSessions: false,
+    cwd: root,
+    agentDir,
+    settingsManager,
+    modelRegistry: registry,
+    resourceLoader: loader,
+    sessionManager: SessionManager.inMemory(root),
+    autoTitleSessions: false,
   })
   sessions.push(session)
   await session.bindExtensions({ mode: "print" })
@@ -94,7 +130,8 @@ function threadResult(result: { details: unknown }): ThreadToolResult {
   return (result.details as { result: ThreadToolResult }).result
 }
 
-type Outcome = { readonly threw: { readonly code: unknown; readonly toolName: unknown } } | { readonly result: ThreadToolResult }
+type Outcome =
+  { readonly threw: { readonly code: unknown; readonly toolName: unknown } } | { readonly result: ThreadToolResult }
 
 async function outcomeOf(session: Session, name: string, args: unknown): Promise<Outcome> {
   try {
@@ -134,9 +171,14 @@ describe("thread tools are eval-only, like bash", () => {
     if (!direct) throw new Error("thread_read is missing from the thread tool family")
 
     // when
-    const listed = threadResult(await session.executeTool("thread_list", { all_scope: true }, { activateInactiveTool: true }))
-    const viaEval = threadResult(await session.executeTool("thread_read", { thread: "missing" }, { activateInactiveTool: true }))
-    const viaDirect = (await direct.execute("call-direct", { thread: "missing" }, undefined, undefined, {} as never)).details.result as ThreadToolResult
+    const listed = threadResult(
+      await session.executeTool("thread_list", { all_scope: true }, { activateInactiveTool: true }),
+    )
+    const viaEval = threadResult(
+      await session.executeTool("thread_read", { thread: "missing" }, { activateInactiveTool: true }),
+    )
+    const viaDirect = (await direct.execute("call-direct", { thread: "missing" }, undefined, undefined, {} as never))
+      .details.result as ThreadToolResult
 
     // then: the call reached the tool and listed the fixture peer
     expect(listed).toMatchObject({ kind: "ok", scope: "all" })
@@ -159,8 +201,13 @@ describe("thread tools are eval-only, like bash", () => {
     const { session, f } = await openSession({ withEval: true, extraFactories: [policy] })
 
     // when / then: the hook's refusal surfaces as the call's error, naming the tool
-    await expect(session.executeTool("thread_read", { thread: "peer" }, { activateInactiveTool: true })).rejects.toMatchObject({
-      name: "ExecuteToolError", code: "blocked", toolName: "thread_read", message: reason,
+    await expect(
+      session.executeTool("thread_read", { thread: "peer" }, { activateInactiveTool: true }),
+    ).rejects.toMatchObject({
+      name: "ExecuteToolError",
+      code: "blocked",
+      toolName: "thread_read",
+      message: reason,
     })
     expect(f.getMessages).not.toHaveBeenCalled()
   })
@@ -196,6 +243,9 @@ describe("thread tools are eval-only, like bash", () => {
     expect(active.filter((name) => THREAD_TOOL_NAMES.includes(name))).toEqual(THREAD_TOOL_NAMES)
     expect(session.agent.removedToolHints.thread_read).toBeUndefined()
     expect(session.systemPrompt).not.toContain("tool.thread_read(")
-    expect(threadResult(await session.executeTool("thread_read", { thread: "missing" }))).toMatchObject({ kind: "error", error: { code: "not_found" } })
+    expect(threadResult(await session.executeTool("thread_read", { thread: "missing" }))).toMatchObject({
+      kind: "error",
+      error: { code: "not_found" },
+    })
   })
 })

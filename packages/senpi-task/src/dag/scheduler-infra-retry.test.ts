@@ -17,7 +17,8 @@ test("retries seven infrastructure-failed roots so all their fan-in dependents r
   const roots = Array.from({ length: 7 }, (_, index) => `root-${index}`)
   const dependents = Array.from({ length: 7 }, (_, index) => dagNode(`dependent-${index}`, roots))
   const fixture = infraFixture((name, attempt) =>
-    roots.includes(name) && attempt === 1 ? infrastructureFailure() : success())
+    roots.includes(name) && attempt === 1 ? infrastructureFailure() : success(),
+  )
   fixtures.push(fixture)
   const scheduler = await fixture.scheduler([...roots.map((id) => dagNode(id)), ...dependents])
 
@@ -39,11 +40,18 @@ test("retries seven infrastructure-failed roots so all their fan-in dependents r
 test("exhausts two infrastructure retries and skips only that root's descendants", async () => {
   // Given a broken branch and an independent branch, with a controlled backoff clock.
   const clock = new RetryClock()
-  const fixture = infraFixture((name) => name === "broken" ? infrastructureFailure() : success(), clock.schedule, clock.now)
+  const fixture = infraFixture(
+    (name) => (name === "broken" ? infrastructureFailure() : success()),
+    clock.schedule,
+    clock.now,
+  )
   fixtures.push(fixture)
   const scheduler = await fixture.scheduler([
-    dagNode("broken"), dagNode("child", ["broken"]), dagNode("grandchild", ["child"]),
-    dagNode("independent"), dagNode("independent-child", ["independent"]),
+    dagNode("broken"),
+    dagNode("child", ["broken"]),
+    dagNode("grandchild", ["child"]),
+    dagNode("independent"),
+    dagNode("independent-child", ["independent"]),
   ])
   const first = clock.whenScheduled(1)
   // When each infrastructure attempt fails and the injected timers fire.
@@ -61,10 +69,14 @@ test("exhausts two infrastructure retries and skips only that root's descendants
   expect(result.status).toBe("failed")
   expect(fixture.starts.get("broken")).toBe(3)
   expect(clock.delays).toEqual([1000, 2000])
-  expect(result.nodes.filter((node) => node.state === "skipped").map((node) => String(node.id))).toEqual(["child", "grandchild"])
+  expect(result.nodes.filter((node) => node.state === "skipped").map((node) => String(node.id))).toEqual([
+    "child",
+    "grandchild",
+  ])
   expect(result.nodes.filter((node) => node.state === "completed")).toHaveLength(2)
-  const retries = fixture.store.readEvents(result.runId, 0, { limit: 1000 }).events
-    .filter((event) => event.type === "dag.node.retried")
+  const retries = fixture.store
+    .readEvents(result.runId, 0, { limit: 1000 })
+    .events.filter((event) => event.type === "dag.node.retried")
   expect(retries.map((event) => event.automatic?.attempt)).toEqual([1, 2])
 })
 
@@ -152,7 +164,8 @@ test("preserves the infrastructure retry budget and backoff across scheduler re-
 test("retries a typed host-unavailable start refusal", async () => {
   // Given an unavailable host before the child can start.
   const fixture = infraFixture((_name, attempt) => {
-    if (attempt === 1) throw new RunnerError({ kind: "host_unavailable", reason: "host_unreachable", message: "synthetic host failure" })
+    if (attempt === 1)
+      throw new RunnerError({ kind: "host_unavailable", reason: "host_unreachable", message: "synthetic host failure" })
     return success()
   })
   fixtures.push(fixture)
@@ -165,7 +178,7 @@ test("retries a typed host-unavailable start refusal", async () => {
 })
 
 test("manually retries an exhausted infrastructure node with a prompt override", async () => {
-  const fixture = infraFixture((prompt) => prompt === "work" ? infrastructureFailure() : success())
+  const fixture = infraFixture((prompt) => (prompt === "work" ? infrastructureFailure() : success()))
   fixtures.push(fixture)
   const scheduler = await fixture.scheduler([dagNode("work"), dagNode("child", ["work"])])
   const failed = await scheduler.run()
@@ -191,5 +204,7 @@ test("manually retries an exhausted infrastructure node with a prompt override",
   // Completed work must still be rejected before an override can amend its definition.
   expect(() => retry.scheduler.retryNode(result.runId, nodeIds, { prompt: "again" })).toThrow()
   expect(fixture.store.readEvents(result.runId, 0, { limit: 1000 }).events).toHaveLength(events.length)
-  expect(fixture.store.readCheckpoint<typeof result>(result.runId)?.definitionFingerprint).toBe(result.definitionFingerprint)
+  expect(fixture.store.readCheckpoint<typeof result>(result.runId)?.definitionFingerprint).toBe(
+    result.definitionFingerprint,
+  )
 })

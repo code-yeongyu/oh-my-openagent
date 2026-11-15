@@ -107,7 +107,8 @@ describe("parseMemoryFile quoted scalars and extra keys", () => {
 
   it("#given a SKILL.md with name/version/deprecated #when parsed and re-rendered #then every key survives with its type", () => {
     // #given
-    const content = "---\nname: deploy\ndescription: Use when deploying\nversion: 0.2.0\ndeprecated: true\n---\n# Deploy\n"
+    const content =
+      "---\nname: deploy\ndescription: Use when deploying\nversion: 0.2.0\ndeprecated: true\n---\n# Deploy\n"
 
     // #when
     const parsed = parseMemoryFile(content)
@@ -204,7 +205,9 @@ describe("describeFrontmatterViolation", () => {
   })
 
   it("#given a SKILL.md-shaped file with extra keys #then only the description contract is checked", () => {
-    expect(describeFrontmatterViolation("---\nname: deploy\ndescription: Use when deploying\nversion: 0.2.0\n---\nsteps\n")).toBeNull()
+    expect(
+      describeFrontmatterViolation("---\nname: deploy\ndescription: Use when deploying\nversion: 0.2.0\n---\nsteps\n"),
+    ).toBeNull()
   })
 
   it("#given no description #then the violation names the field", () => {

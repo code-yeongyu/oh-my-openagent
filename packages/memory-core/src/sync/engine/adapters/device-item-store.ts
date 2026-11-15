@@ -122,7 +122,9 @@ export function createDeviceItemStore(options: DeviceItemStoreOptions): ItemStor
       return diskText === null ? renderItem(doc) : renderForDisk(doc, diskText)
     },
     async version(key) {
-      const frontier = itemFrontier(await docOf(key)).map((id) => `${id.peer}:${id.counter}`).sort()
+      const frontier = itemFrontier(await docOf(key))
+        .map((id) => `${id.peer}:${id.counter}`)
+        .sort()
       return frontier.join(",")
     },
     markMaterialized: recovery.materialize,
@@ -139,7 +141,8 @@ export function createDeviceItemStore(options: DeviceItemStoreOptions): ItemStor
     async persist() {
       for (const key of dirty) {
         const doc = docs.get(key)
-        if (doc !== undefined && syncable(key)) await writeAtomic(join(crdt, "docs", `${fileOf(key)}.loro`), doc.export({ mode: "snapshot" }))
+        if (doc !== undefined && syncable(key))
+          await writeAtomic(join(crdt, "docs", `${fileOf(key)}.loro`), doc.export({ mode: "snapshot" }))
       }
       dirty.clear()
       await writeJson(join(crdt, "docs.json"), [...docs.keys()].filter(syncable).sort())

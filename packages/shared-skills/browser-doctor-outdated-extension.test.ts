@@ -34,7 +34,10 @@ async function fakeDaemon(browsers: ReadonlyArray<Record<string, unknown>>) {
       for (let index = buffer.indexOf("\n"); index !== -1; index = buffer.indexOf("\n")) {
         const frame = JSON.parse(buffer.slice(0, index)) as { id: string; method: string }
         buffer = buffer.slice(index + 1)
-        const result = frame.method === "system.status" ? { daemon_version: "0.4.0", protocol_version: "1.7", browsers, sessions: [] } : { pong: true }
+        const result =
+          frame.method === "system.status"
+            ? { daemon_version: "0.4.0", protocol_version: "1.7", browsers, sessions: [] }
+            : { pong: true }
         socket.write(`${JSON.stringify({ id: frame.id, result })}\n`)
       }
     })
@@ -71,20 +74,28 @@ const OLD = { instance_id: "abc12345", browser_name: "chrome", browser_version: 
 const CURRENT = { instance_id: "def67890", browser_name: "edge", browser_version: "153", extension_version: "0.4.2" }
 
 // Unix only: the fake daemon listens on a Unix socket under its home; Windows reaches the daemon over a named pipe.
-test.skipIf(process.platform === "win32")("a browser connected only through BrowserSkill extension 0.4.0 is not ready", async () => {
-  const summary = await doctor([OLD])
-  expect(summary.state).toBe("outdated-extension")
-  expect(summary.remedy).toContain("0.4.1")
-  expect(summary.browsersConnected).toEqual([{ instanceId: "abc12345", name: "chrome", version: "153", extensionVersion: "0.4.0" }])
-})
+test.skipIf(process.platform === "win32")(
+  "a browser connected only through BrowserSkill extension 0.4.0 is not ready",
+  async () => {
+    const summary = await doctor([OLD])
+    expect(summary.state).toBe("outdated-extension")
+    expect(summary.remedy).toContain("0.4.1")
+    expect(summary.browsersConnected).toEqual([
+      { instanceId: "abc12345", name: "chrome", version: "153", extensionVersion: "0.4.0" },
+    ])
+  },
+)
 
-test.skipIf(process.platform === "win32")("beside a 0.4.0 browser, the ready remedy names the up-to-date browser and lists the outdated one", async () => {
-  const mixed = await doctor([OLD, CURRENT])
-  expect(mixed.state).toBe("ready")
-  expect(mixed.remedy).toContain('browser: "def67890"')
-  expect(mixed.remedy).toContain("abc12345")
+test.skipIf(process.platform === "win32")(
+  "beside a 0.4.0 browser, the ready remedy names the up-to-date browser and lists the outdated one",
+  async () => {
+    const mixed = await doctor([OLD, CURRENT])
+    expect(mixed.state).toBe("ready")
+    expect(mixed.remedy).toContain('browser: "def67890"')
+    expect(mixed.remedy).toContain("abc12345")
 
-  const current = await doctor([CURRENT])
-  expect(current.state).toBe("ready")
-  expect(current.remedy).not.toContain("browser:")
-})
+    const current = await doctor([CURRENT])
+    expect(current.state).toBe("ready")
+    expect(current.remedy).not.toContain("browser:")
+  },
+)

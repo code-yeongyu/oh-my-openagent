@@ -25,12 +25,19 @@ export function localPermissionPreset(agentDir: string = canonicalAgentDir()): s
     try {
       document = parseJsonc(readFileSync(path, "utf8"))
     } catch (error) {
-      throw new UsageError(`omo remote open: ${path} could not be read (${error instanceof Error ? error.message : String(error)}); pass --permission-preset`)
+      throw new UsageError(
+        `omo remote open: ${path} could not be read (${error instanceof Error ? error.message : String(error)}); pass --permission-preset`,
+      )
     }
-    const preset = typeof document === "object" && document !== null ? (document as { readonly permissionPreset?: unknown }).permissionPreset : undefined
+    const preset =
+      typeof document === "object" && document !== null
+        ? (document as { readonly permissionPreset?: unknown }).permissionPreset
+        : undefined
     if (preset === undefined) return DEFAULT_PERMISSION_PRESET
     if (typeof preset === "string" && isPermissionPreset(preset)) return preset
-    throw new UsageError(`omo remote open: ${path} names permissionPreset ${JSON.stringify(preset)}, which is not one of ${PERMISSION_PRESETS.join(", ")}; pass --permission-preset`)
+    throw new UsageError(
+      `omo remote open: ${path} names permissionPreset ${JSON.stringify(preset)}, which is not one of ${PERMISSION_PRESETS.join(", ")}; pass --permission-preset`,
+    )
   }
   return DEFAULT_PERMISSION_PRESET
 }

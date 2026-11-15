@@ -247,9 +247,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
 
     //#then
     expectFn(launchCalls).toHaveLength(1)
-    expectFn(launchCalls[0].sessionPermission).toEqual([
-      { permission: "question", action: "deny", pattern: "*" },
-    ])
+    expectFn(launchCalls[0].sessionPermission).toEqual([{ permission: "question", action: "deny", pattern: "*" }])
   })
 
   testFn("strips leading zwsp from agent name before launching background task", async () => {
@@ -387,7 +385,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
       [{ providers: ["openai"], model: "gpt-5.4" }],
     )
 
-    await new Promise(resolve => setTimeout(resolve, 5))
+    await new Promise((resolve) => setTimeout(resolve, 5))
 
     //#then - late session setup should still register category for runtime fallback
     expectFn(result).toContain("Background task launched")

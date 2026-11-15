@@ -1,15 +1,8 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test"
 
 import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
-import {
-  _resetForTesting,
-  getMainSessionID,
-  setMainSession,
-} from "../features/claude-code-session-state"
-import {
-  BTW_SIDE_METADATA_KEY,
-  createBtwSideMetadata,
-} from "../features/btw-side/metadata"
+import { _resetForTesting, getMainSessionID, setMainSession } from "../features/claude-code-session-state"
+import { BTW_SIDE_METADATA_KEY, createBtwSideMetadata } from "../features/btw-side/metadata"
 import { resetBtwSideSessionRegistryForTesting } from "../features/btw-side/server-session-registry"
 import {
   handleSessionCreatedEvent,

@@ -14,7 +14,10 @@ function unpinnedSpec(): RpcRunnerSpec {
 
 function durableIdHeard(handle: { onDurableSessionId(listener: (id: string) => void): () => void }): Promise<string> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("waited 5s for a heartbeat to report the durable id; none did")), 5_000)
+    const timer = setTimeout(
+      () => reject(new Error("waited 5s for a heartbeat to report the durable id; none did")),
+      5_000,
+    )
     const stop = handle.onDurableSessionId((id) => {
       clearTimeout(timer)
       stop()
@@ -28,7 +31,10 @@ function durableIdHeard(handle: { onDurableSessionId(listener: (id: string) => v
 // happened and a grandchild's parent_session_id joined back to no task (#10873). The harness
 // heartbeat interval is 60 s, so in the first two cases only the open's own state read can answer.
 describe("a hosted child's durable session id (#10873)", () => {
-  for (const [label, spec] of [["with a pinned model", () => childSpec()], ["without a model", unpinnedSpec]] as const) {
+  for (const [label, spec] of [
+    ["with a pinned model", () => childSpec()],
+    ["without a model", unpinnedSpec],
+  ] as const) {
     test(`#given a fresh host open ${label} #when the child starts #then its handle already carries the host's durable session id`, async () => {
       const host = await harness.fakeHost()
 

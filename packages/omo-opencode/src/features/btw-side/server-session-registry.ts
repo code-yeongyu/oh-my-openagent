@@ -2,10 +2,7 @@ import { getBtwSideMetadata } from "./metadata"
 
 const serverSideSessionIDs = new Set<string>()
 
-export function trackBtwSideSession(session: {
-  id: string
-  metadata?: Record<string, unknown>
-}): boolean {
+export function trackBtwSideSession(session: { id: string; metadata?: Record<string, unknown> }): boolean {
   if (!getBtwSideMetadata(session)) return false
   markBtwSideSession(session.id)
   return true
@@ -26,4 +23,3 @@ export function isTrackedBtwSideSession(sessionID: string): boolean {
 export function resetBtwSideSessionRegistryForTesting(): void {
   serverSideSessionIDs.clear()
 }
-

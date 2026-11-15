@@ -37,7 +37,10 @@ describe("measureRuntimeSize (B09)", () => {
 
     const size = await measureRuntimeSize(runtime)
 
-    const expected = [runtime, join(runtime, "reflection"), join(runtime, "reflection", "runs"), link].reduce((sum, path) => sum + charged(path), 0)
+    const expected = [runtime, join(runtime, "reflection"), join(runtime, "reflection", "runs"), link].reduce(
+      (sum, path) => sum + charged(path),
+      0,
+    )
     expect(size.bytes).toBe(expected)
     expect(size.bytes).toBeLessThan(4 * 1024 * 1024)
   })
@@ -50,7 +53,10 @@ describe("measureRuntimeSize (B09)", () => {
 
     const size = await measureRuntimeSize(runtime)
 
-    const directories = [runtime, join(runtime, "transcripts"), join(runtime, "transcripts", "s1")].reduce((sum, path) => sum + charged(path), 0)
+    const directories = [runtime, join(runtime, "transcripts"), join(runtime, "transcripts", "s1")].reduce(
+      (sum, path) => sum + charged(path),
+      0,
+    )
     expect(size.bytes).toBe(directories + charged(file))
     expect(charged(file)).toBeGreaterThanOrEqual(10_001)
   })
@@ -67,9 +73,20 @@ describe("measureRuntimeSize (B09)", () => {
 
     const size = await measureRuntimeSize(runtime)
 
-    expect(size.stores.slice(0, 3).map((store) => store.store)).toEqual(["reflection/runs", "recall/sidecars", "transcripts"])
-    expect(size.stores.reduce((sum, store) => sum + store.bytes, charged(runtime) + charged(join(runtime, "reflection")) + charged(join(runtime, "recall")))).toBe(size.bytes)
-    expect(size.stores.find((store) => store.store === "receipts.jsonl")?.bytes).toBe(charged(join(runtime, "receipts.jsonl")))
+    expect(size.stores.slice(0, 3).map((store) => store.store)).toEqual([
+      "reflection/runs",
+      "recall/sidecars",
+      "transcripts",
+    ])
+    expect(
+      size.stores.reduce(
+        (sum, store) => sum + store.bytes,
+        charged(runtime) + charged(join(runtime, "reflection")) + charged(join(runtime, "recall")),
+      ),
+    ).toBe(size.bytes)
+    expect(size.stores.find((store) => store.store === "receipts.jsonl")?.bytes).toBe(
+      charged(join(runtime, "receipts.jsonl")),
+    )
   })
 
   test("#given a deadline signal that has fired #when measured #then the walk aborts instead of finishing (r4 R5)", async () => {

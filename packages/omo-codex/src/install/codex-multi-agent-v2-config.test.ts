@@ -11,9 +11,27 @@ import { ensureCodexMultiAgentV2Config, resolveCodexMultiAgentVersion } from "./
 describe("codex MultiAgentV2 config", () => {
   for (const fixture of [
     { name: "bare", key: "max_threads", v2Key: "max_concurrent_threads_per_session", before: "", equals: "=" },
-    { name: "double-quoted", key: '"max_threads"', v2Key: '"max_concurrent_threads_per_session"', before: "", equals: " = " },
-    { name: "single-quoted", key: "'max_threads'", v2Key: "'max_concurrent_threads_per_session'", before: " \t", equals: "\t=  " },
-    { name: "escaped-quoted", key: '"max_thread\\u0073"', v2Key: '"max_concurrent_threads_per_sessio\\u006e"', before: "\t ", equals: "  =\t" },
+    {
+      name: "double-quoted",
+      key: '"max_threads"',
+      v2Key: '"max_concurrent_threads_per_session"',
+      before: "",
+      equals: " = ",
+    },
+    {
+      name: "single-quoted",
+      key: "'max_threads'",
+      v2Key: "'max_concurrent_threads_per_session'",
+      before: " \t",
+      equals: "\t=  ",
+    },
+    {
+      name: "escaped-quoted",
+      key: '"max_thread\\u0073"',
+      v2Key: '"max_concurrent_threads_per_sessio\\u006e"',
+      before: "\t ",
+      equals: "  =\t",
+    },
   ]) {
     test(`#given ${fixture.name} thread-cap keys with varied spacing #when normalizing #then removes managed values and retains user values`, () => {
       for (const value of [1000, 16, 6, 8, 10000]) {
@@ -32,7 +50,10 @@ describe("codex MultiAgentV2 config", () => {
         const result = ensureCodexMultiAgentV2Config(config, { multiAgentVersion: "v1" })
         const expected = config
           .replace(value === 1000 ? `${fixture.before}${fixture.key}${fixture.equals}${value} # cap\n` : "", "")
-          .replace(value === 1000 || value === 16 ? `${fixture.before}${fixture.v2Key}${fixture.equals}${value} # cap\n` : "", "")
+          .replace(
+            value === 1000 || value === 16 ? `${fixture.before}${fixture.v2Key}${fixture.equals}${value} # cap\n` : "",
+            "",
+          )
         expect(result).toBe(expected)
         expect(Bun.TOML.parse(result)).toEqual(Bun.TOML.parse(expected))
         expect(ensureCodexMultiAgentV2Config(result, { multiAgentVersion: "v1" })).toBe(result)
@@ -63,7 +84,16 @@ describe("codex MultiAgentV2 config", () => {
     const configPath = join(root, "config.toml")
     await writeFile(
       configPath,
-      ['model = "unknown-model"', "", "[features.multi_agent_v2]", "enabled = true", "", "[agents]", "max_threads = 6", ""].join("\n"),
+      [
+        'model = "unknown-model"',
+        "",
+        "[features.multi_agent_v2]",
+        "enabled = true",
+        "",
+        "[agents]",
+        "max_threads = 6",
+        "",
+      ].join("\n"),
     )
 
     // when
@@ -261,13 +291,7 @@ describe("codex MultiAgentV2 config", () => {
     const configPath = join(root, "config.toml")
     await writeFile(
       configPath,
-      [
-        'notes = """',
-        "[features.multi_agent_v2]",
-        "max_concurrent_threads_per_session = 7",
-        '"""',
-        "",
-      ].join("\n"),
+      ['notes = """', "[features.multi_agent_v2]", "max_concurrent_threads_per_session = 7", '"""', ""].join("\n"),
     )
 
     // when
@@ -292,13 +316,7 @@ describe("codex MultiAgentV2 config", () => {
     const configPath = join(root, "config.toml")
     await writeFile(
       configPath,
-      [
-        "[features.multi_agent_v2]",
-        'notes = """',
-        "max_concurrent_threads_per_session = 16",
-        '"""',
-        "",
-      ].join("\n"),
+      ["[features.multi_agent_v2]", 'notes = """', "max_concurrent_threads_per_session = 16", '"""', ""].join("\n"),
     )
 
     // when
@@ -385,9 +403,7 @@ describe("codex MultiAgentV2 config", () => {
     const configPath = join(root, "config.toml")
     await writeFile(
       configPath,
-      ['notes = """abc\\\""""', "[features.multi_agent_v2]", "max_concurrent_threads_per_session = 7", ""].join(
-        "\n",
-      ),
+      ['notes = """abc\\\""""', "[features.multi_agent_v2]", "max_concurrent_threads_per_session = 7", ""].join("\n"),
     )
 
     // when
@@ -455,7 +471,16 @@ describe("codex MultiAgentV2 config", () => {
 
     await writeFile(
       configPath,
-      ['model = "gpt-6-astra"', "", "[features.multi_agent_v2]", "max_concurrent_threads_per_session = 8", "", "[agents]", "max_threads = 6", ""].join("\n"),
+      [
+        'model = "gpt-6-astra"',
+        "",
+        "[features.multi_agent_v2]",
+        "max_concurrent_threads_per_session = 8",
+        "",
+        "[agents]",
+        "max_threads = 6",
+        "",
+      ].join("\n"),
     )
     await updateCodexConfig(updateInput)
     const userValues = await readFile(configPath, "utf8")
@@ -485,7 +510,19 @@ describe("codex MultiAgentV2 config", () => {
   test("#given user caps #when updating config #then does not raise them", async () => {
     const root = await mkdtemp(join(tmpdir(), "omo-codex-mav2-preserve-caps-"))
     const configPath = join(root, "config.toml")
-    await writeFile(configPath, ['model = "gpt-5.5"', "", "[features.multi_agent_v2]", "max_concurrent_threads_per_session = 8", "", "[agents]", "max_threads = 6", ""].join("\n"))
+    await writeFile(
+      configPath,
+      [
+        'model = "gpt-5.5"',
+        "",
+        "[features.multi_agent_v2]",
+        "max_concurrent_threads_per_session = 8",
+        "",
+        "[agents]",
+        "max_threads = 6",
+        "",
+      ].join("\n"),
+    )
 
     await updateCodexConfig({
       configPath,

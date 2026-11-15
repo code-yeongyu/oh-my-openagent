@@ -24,7 +24,9 @@ function registry(models: readonly FakeModel[]): FakeRegistry {
   }
 }
 
-function expectResolved(result: ReturnType<typeof resolveCategory<FakeModel>>): Extract<typeof result, { readonly kind: "resolved" }> {
+function expectResolved(
+  result: ReturnType<typeof resolveCategory<FakeModel>>,
+): Extract<typeof result, { readonly kind: "resolved" }> {
   if (result.kind !== "resolved") {
     throw new Error(`Expected resolved category, got ${result.kind}`)
   }
@@ -100,11 +102,7 @@ describe("resolveCategory", () => {
     const models = registry([model("openai", "gpt-5.5")])
 
     // when
-    const result = resolveCategory(
-      "ultrabrain",
-      { categories: { ultrabrain: { disable: true } } },
-      models,
-    )
+    const result = resolveCategory("ultrabrain", { categories: { ultrabrain: { disable: true } } }, models)
 
     // then
     expect(result.kind).toBe("disabled")
@@ -134,10 +132,7 @@ describe("resolveCategory", () => {
 
   test("#given configured runtime fallback preserves requested and resolved models #when resolved #then the ordered runtime chain is retained", () => {
     // given
-    const models = registry([
-      model("vendor-b", "fallback-model"),
-      model("vendor-c", "final-model"),
-    ])
+    const models = registry([model("vendor-b", "fallback-model"), model("vendor-c", "final-model")])
 
     // when
     const result = resolveCategory(
@@ -146,10 +141,7 @@ describe("resolveCategory", () => {
         categories: {
           quick: {
             model: "vendor-a/primary-model",
-            fallback_models: [
-              "vendor-b/fallback-model",
-              "vendor-c/final-model",
-            ],
+            fallback_models: ["vendor-b/fallback-model", "vendor-c/final-model"],
           },
         },
       },
@@ -180,10 +172,7 @@ describe("resolveCategory", () => {
 
   test("#given a canonical models chain with per-entry reasoning #when resolved #then the canonical chain and reasoning reach the resolved model", () => {
     // given
-    const models = registry([
-      model("vendor-a", "primary-model"),
-      model("vendor-b", "fallback-model"),
-    ])
+    const models = registry([model("vendor-a", "primary-model"), model("vendor-b", "fallback-model")])
 
     // when
     const result = resolveCategory(
@@ -342,10 +331,7 @@ describe("resolveCategory", () => {
   test("#given an unlisted Vercel gateway and Copilot GPT models #when deep categories resolve #then the listed Copilot rung wins", () => {
     for (const { category, modelId, mixedWinner } of gpt56CategoryCases) {
       const gatewayModelId = `openai/${modelId}`
-      const models = registry([
-        model("github-copilot", modelId),
-        model("vercel", gatewayModelId),
-      ])
+      const models = registry([model("github-copilot", modelId), model("vercel", gatewayModelId)])
       const result = expectResolved(resolveCategory(category, {}, models))
 
       expect(result.spec.provider).toBe(mixedWinner.provider)
@@ -377,11 +363,7 @@ describe("resolveCategory", () => {
     const models = registry([model("anthropic", "claude-sonnet-4-6")])
 
     // when
-    const result = resolveCategory(
-      "quick",
-      { categories: { quick: { model: "openai/not-installed" } } },
-      models,
-    )
+    const result = resolveCategory("quick", { categories: { quick: { model: "openai/not-installed" } } }, models)
 
     // then
     expect(result.kind).toBe("model_unavailable")
@@ -452,12 +434,16 @@ describe("resolveCategory", () => {
 })
 
 describe("builtin category defaults", () => {
-  test.each(["architect", "artistry", "visual-engineering"])("%s prefers 5.2 and falls back to 5.1 at the same effort", (name) => {
+  test.each([
+    ["architect", "xhigh"],
+    ["artistry", "max"],
+    ["visual-engineering", "max"],
+  ])("%s prefers 5.2 and falls back to 5.1 at the same effort", (name: string, variant: string) => {
     // given / when / then
     for (const ids of [["claude-fable-5-2", "claude-fable-5-1"], ["claude-fable-5-1"]]) {
       const result = expectResolved(resolveCategory(name, {}, registry(ids.map((id) => model("anthropic", id)))))
       const expected = ids[0]
-      expect([result.spec.provider, result.spec.modelId, result.spec.variant]).toEqual(["anthropic", expected, "max"])
+      expect([result.spec.provider, result.spec.modelId, result.spec.variant]).toEqual(["anthropic", expected, variant])
     }
   })
 
@@ -475,7 +461,7 @@ describe("builtin category defaults", () => {
       ["quick", "chatgpt-subscription/gpt-6-luna-fast", "low"],
       ["unspecified-low", "anthropic/claude-sonnet-5-5", "medium"],
       ["unspecified-high", "anthropic/claude-opus-5-5", "medium"],
-      ["architect", "anthropic/claude-fable-5-2", "max"],
+      ["architect", "anthropic/claude-fable-5-2", "xhigh"],
       ["writing", "google/gemini-4-argon", "low"],
     ])
 

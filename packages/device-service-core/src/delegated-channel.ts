@@ -43,12 +43,18 @@ export function followDelegatedChannel(device: string): DelegatedChannel {
     }
     const commandId = value["command_id"]
     const response = value["response"]
-    if (typeof commandId !== "string" || !isObject(response)) return lost("a command event with neither a frame nor a reply")
+    if (typeof commandId !== "string" || !isObject(response))
+      return lost("a command event with neither a frame nor a reply")
     replies.set(commandId, response)
     // A reply too large for one line carries `located` inside its blob, which the event validator never saw: only a
     // pair that names this device's session is kept, and anything else leaves the caller to locate as before.
     const located = value["located"]
-    if (isObject(located) && typeof located["key"] === "string" && located["key"].length > 0 && located["session"] === `${device}.${located["key"]}`)
+    if (
+      isObject(located) &&
+      typeof located["key"] === "string" &&
+      located["key"].length > 0 &&
+      located["session"] === `${device}.${located["key"]}`
+    )
       locateds.set(commandId, { key: located["key"], session: located["session"] })
   }
   const accept = (event: LocalEvent): void => {
@@ -94,21 +100,21 @@ export function followDelegatedChannel(device: string): DelegatedChannel {
     }
   }
   return {
-    takeReply: commandId => {
+    takeReply: (commandId) => {
       const reply = replies.get(commandId)
       replies.delete(commandId)
       return reply
     },
-    takeLocated: commandId => {
+    takeLocated: (commandId) => {
       const located = locateds.get(commandId)
       locateds.delete(commandId)
       return located
     },
-    onFrame: listener => {
+    onFrame: (listener) => {
       frames.add(listener)
       return () => frames.delete(listener)
     },
-    onLoss: listener => {
+    onLoss: (listener) => {
       losses.add(listener)
       return () => losses.delete(listener)
     },

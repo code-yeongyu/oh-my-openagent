@@ -4,7 +4,11 @@ import { join } from "node:path"
 import { createGatewayStore } from "../../omo-senpi/src/components/thread/gateway/store"
 import { createLiveThreadSurface } from "../../omo-senpi/src/components/thread/live-surface"
 import { createThreadSdk } from "../../omo-senpi/src/components/thread/sdk"
-import { withContractHost, type ContractHost, type ContractHostOptions } from "../../senpi-task/src/runners/rpc-host/testing/contract-host"
+import {
+  withContractHost,
+  type ContractHost,
+  type ContractHostOptions,
+} from "../../senpi-task/src/runners/rpc-host/testing/contract-host"
 import { DAEMON_EXIT } from "../bin/lib/daemon-args.js"
 import { runAdoptCommand } from "../bin/lib/daemon-adopt.js"
 
@@ -24,9 +28,17 @@ async function adopt(host: ContractHost): Promise<{ readonly outcome: unknown; r
   const store = createGatewayStore({ agentDir: host.root })
   const surface = createLiveThreadSurface(undefined, {
     env: { OMO_CODING_AGENT_DIR: host.root, SENPI_RPC_SOCKET: host.socket, SENPI_RPC_KEY_ROOT: host.root },
-    statusAll: async () => undefined, registry: async () => [],
+    statusAll: async () => undefined,
+    registry: async () => [],
   })
-  const sdk = createThreadSdk({ agentDir: host.root, cwd: host.root, uid: 501, user: "adopt-test", host: surface, store })
+  const sdk = createThreadSdk({
+    agentDir: host.root,
+    cwd: host.root,
+    uid: 501,
+    user: "adopt-test",
+    host: surface,
+    store,
+  })
   const stdout = capture()
   const stderr = capture()
   try {
@@ -41,14 +53,17 @@ describe("omo daemon adopt against an attach-capable host", () => {
     ["the session vanished", { attachRefusal: "unknown_session" }, DAEMON_EXIT.notRunning, "unknown_session"],
     ["the host is draining", { attachRefusal: "host_draining" }, DAEMON_EXIT.unsupported, "host_draining"],
   ]
-  test.each(cases)("#given %s #when adopt releases it #then it exits with the documented code and names the refusal", async (_name, options, exit, code) => {
-    await withContractHost({ auth: true, ...options }, async (host) => {
-      const { outcome, stderr } = await adopt(host)
-      expect(outcome).toBe(exit)
-      expect(stderr).toContain(`${code}:`)
-      expect(host.mutations).toEqual([])
-    })
-  })
+  test.each(cases)(
+    "#given %s #when adopt releases it #then it exits with the documented code and names the refusal",
+    async (_name, options, exit, code) => {
+      await withContractHost({ auth: true, ...options }, async (host) => {
+        const { outcome, stderr } = await adopt(host)
+        expect(outcome).toBe(exit)
+        expect(stderr).toContain(`${code}:`)
+        expect(host.mutations).toEqual([])
+      })
+    },
+  )
 
   test("#given a release that fails after the session is already gone #when adopt asks again #then the gone session counts as released and is resumed here", async () => {
     await withContractHost({ auth: true, releaseFailsThenGone: true }, async (host) => {

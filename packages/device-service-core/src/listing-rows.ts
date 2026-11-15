@@ -10,7 +10,10 @@ type RowsVersion = 3 | 2 | undefined
 // the listing then steps down one version and remembers the version this service accepted for the next listing.
 export function newestRowsListing(client: LocalApiClient) {
   let rows: RowsVersion = 3
-  return async function list(filter?: SessionFilter, onRevision?: (revision: ListingRevision) => void): Promise<ListingResult> {
+  return async function list(
+    filter?: SessionFilter,
+    onRevision?: (revision: ListingRevision) => void,
+  ): Promise<ListingResult> {
     for (;;) {
       try {
         return await client.list(filter, onRevision, rows)

@@ -19,13 +19,21 @@ import { shutdownDeadlineAt } from "./shutdown-drain"
 import { createMemoryIdentityContext } from "./context"
 import { FactsExtractorRunner } from "./facts-runner"
 import type { MemoryIdentityRuntime } from "./identity-runtime"
-import { classifyActiveReflectionHolder, type ActiveHolderSeams, type ActiveHolderVerdict } from "./reflection-stale-active"
+import {
+  classifyActiveReflectionHolder,
+  type ActiveHolderSeams,
+  type ActiveHolderVerdict,
+} from "./reflection-stale-active"
 import { MemoryFakeExtensionAPI, componentContext, loadedMemoryConfig, memorySettings } from "./memory.test-support"
 import { createMemoryMaintenance } from "./memory-maintenance"
 import { createMemoryWiring, type MemoryWiringOptions } from "./wiring"
 import { writeRunJsonAtomic } from "./worker/run-artifacts"
 import type { ReservationStatePort } from "./worker/run-finalization-types"
-import { reconcileReflectionRuns, type ReflectionRunReconcileResult, type ReflectionRunReconciliationOptions } from "./worker/run-reconciliation"
+import {
+  reconcileReflectionRuns,
+  type ReflectionRunReconcileResult,
+  type ReflectionRunReconciliationOptions,
+} from "./worker/run-reconciliation"
 
 const fixtures: Array<{ readonly root: string; shutdown: () => Promise<void> }> = []
 const SESSION_ID = "session-1"
@@ -72,27 +80,44 @@ export function callerSite(stack: string | undefined): string {
   return frames[0]?.trim() ?? "unknown site"
 }
 
-function observeContention(store: ReservationStatePort, contention: SchedulerContention[], pass: number): ReservationStatePort {
-  async function observed<T>(read: SchedulerContention["read"], waitTimeoutMs: number | undefined, site: string, operation: () => Promise<T>): Promise<T> {
+function observeContention(
+  store: ReservationStatePort,
+  contention: SchedulerContention[],
+  pass: number,
+): ReservationStatePort {
+  async function observed<T>(
+    read: SchedulerContention["read"],
+    waitTimeoutMs: number | undefined,
+    site: string,
+    operation: () => Promise<T>,
+  ): Promise<T> {
     try {
       return await operation()
     } catch (error) {
-      if (error instanceof LockContentionError) contention.push({ pass, read, waitTimeoutMs, site, lockPath: error.lockPath, owner: error.owner })
+      if (error instanceof LockContentionError)
+        contention.push({ pass, read, waitTimeoutMs, site, lockPath: error.lockPath, owner: error.owner })
       throw error
     }
   }
   return {
-    readState: (options) => observed("readState", options?.waitTimeoutMs, callerSite(new Error().stack), () => store.readState(options)),
-    complete: (runId, outcome, options) => observed("complete", options?.waitTimeoutMs, callerSite(new Error().stack), () => store.complete(runId, outcome, options)),
+    readState: (options) =>
+      observed("readState", options?.waitTimeoutMs, callerSite(new Error().stack), () => store.readState(options)),
+    complete: (runId, outcome, options) =>
+      observed("complete", options?.waitTimeoutMs, callerSite(new Error().stack), () =>
+        store.complete(runId, outcome, options),
+      ),
   }
 }
 
-export async function staleLockFixture(seams?: ActiveHolderSeams, options: {
-  readonly reconcileReleases?: boolean
-  readonly createFactsExtractor?: MemoryWiringOptions["createFactsExtractor"]
-  /** Process and sentinel seams for the real reconciliation the runtime runs. */
-  readonly reconcileSeams?: Pick<ReflectionRunReconciliationOptions, "getPidLiveness" | "waitForOutcome">
-} = {}) {
+export async function staleLockFixture(
+  seams?: ActiveHolderSeams,
+  options: {
+    readonly reconcileReleases?: boolean
+    readonly createFactsExtractor?: MemoryWiringOptions["createFactsExtractor"]
+    /** Process and sentinel seams for the real reconciliation the runtime runs. */
+    readonly reconcileSeams?: Pick<ReflectionRunReconciliationOptions, "getPidLiveness" | "waitForOutcome">
+  } = {},
+) {
   const eventCtx = createEventCtx()
   const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-reflection-stale-lock-")))
   const fixture = { root, shutdown: async (): Promise<void> => {} }
@@ -132,7 +157,10 @@ export async function staleLockFixture(seams?: ActiveHolderSeams, options: {
     store,
     reservationPort: store,
     launch,
-    async reconcile(_signal?: AbortSignal, reconcileOptions?: { readonly waitPolicy?: "deadline" | "none" }): Promise<void> {
+    async reconcile(
+      _signal?: AbortSignal,
+      reconcileOptions?: { readonly waitPolicy?: "deadline" | "none" },
+    ): Promise<void> {
       reconciles.count += 1
       // Passes are numbered from 1 (the count after this call); a mark holds the count before the step under test.
       const pass = reconciles.count
@@ -140,14 +168,23 @@ export async function staleLockFixture(seams?: ActiveHolderSeams, options: {
       if (options.reconcileReleases === false) return
       const reservation = observeContention(store, reconciles.contention, pass)
       try {
-        reconciles.results.push({ pass, results: await reconcileReflectionRuns({
-          identity: memoryIdentity, reservation, launch, deferOnSchedulerContention: true,
-          ...(reconcileOptions?.waitPolicy === undefined ? {} : { waitPolicy: reconcileOptions.waitPolicy }),
-          ...options.reconcileSeams,
-        }) })
+        reconciles.results.push({
+          pass,
+          results: await reconcileReflectionRuns({
+            identity: memoryIdentity,
+            reservation,
+            launch,
+            deferOnSchedulerContention: true,
+            ...(reconcileOptions?.waitPolicy === undefined ? {} : { waitPolicy: reconcileOptions.waitPolicy }),
+            ...options.reconcileSeams,
+          }),
+        })
       } catch (error) {
         // The wiring swallows a reconcile failure into its logger; keep it for the diagnosis, then rethrow unchanged.
-        reconciles.errors.push({ pass, error: error instanceof Error ? `${error.name}: ${error.message}` : String(error) })
+        reconciles.errors.push({
+          pass,
+          error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+        })
         throw error
       }
     },
@@ -166,7 +203,9 @@ export async function staleLockFixture(seams?: ActiveHolderSeams, options: {
     createRuntime: () => runtime,
     createFactsExtractor: (input) => {
       const extractor = options.createFactsExtractor?.(input) ?? new FactsExtractorRunner(input)
-      settlements.push(async () => { await extractor.cancelActive?.() })
+      settlements.push(async () => {
+        await extractor.cancelActive?.()
+      })
       return extractor
     },
     createMaintenance: (input) => {
@@ -180,7 +219,11 @@ export async function staleLockFixture(seams?: ActiveHolderSeams, options: {
     ...(seams === undefined ? {} : { reflectionHolderSeams: seams }),
   })
   fixture.shutdown = async () => {
-    await wiring.onSessionShutdown({ reason: "reload", sessionId: SESSION_ID, deadlineAt: shutdownDeadlineAt(Date.now) })
+    await wiring.onSessionShutdown({
+      reason: "reload",
+      sessionId: SESSION_ID,
+      deadlineAt: shutdownDeadlineAt(Date.now),
+    })
     // Production shutdown is bounded; fixture removal must await these exact writers even if its budget expired.
     await Promise.all(settlements.map((settle) => settle()))
   }
@@ -197,7 +240,11 @@ let inputCounter = 0
 export async function settleTurn(item: Fixture): Promise<void> {
   const inputId = `input-${++inputCounter}`
   await item.pi.dispatch("input", { type: "input", source: "rpc", inputId, text: "Work on this." }, item.eventCtx)
-  await item.pi.dispatch("input_disposition", { type: "input_disposition", inputId, disposition: "started" }, item.eventCtx)
+  await item.pi.dispatch(
+    "input_disposition",
+    { type: "input_disposition", inputId, disposition: "started" },
+    item.eventCtx,
+  )
   await item.pi.dispatch("agent_end", { aborted: false, willRetry: false }, item.eventCtx)
   await item.pi.dispatch("agent_settled", {}, item.eventCtx)
 }
@@ -222,7 +269,10 @@ export async function hostDiesMidPublish(item: Fixture, pid: number, now: () => 
   const runDir = join(item.paths.reflection, "runs", runId)
   await mkdir(runDir, { recursive: true, mode: 0o700 })
   await writeRunJsonAtomic(join(runDir, "prelaunch.json"), {
-    version: 1, runId, worktreeDir: worktree.dir, worktreeBranch: worktree.branch,
+    version: 1,
+    runId,
+    worktreeDir: worktree.dir,
+    worktreeBranch: worktree.branch,
   })
   const startedAt = now()
   const hardDeadlineAt = startedAt + 600_000
@@ -251,15 +301,26 @@ export async function hostDiesMidPublish(item: Fixture, pid: number, now: () => 
     commonConfigSnapshot: worktree.commonConfigSnapshot,
   })
   await writeRunJsonAtomic(join(runDir, "outcome.json"), {
-    version: 1, runId, attempt: 1, finishedAt: new Date().toISOString(), childExit: { code: 0, signal: null }, timedOut: false,
+    version: 1,
+    runId,
+    attempt: 1,
+    finishedAt: new Date().toISOString(),
+    childExit: { code: 0, signal: null },
+    timedOut: false,
   })
   await writeRunJsonAtomic(join(runDir, "terminal-claim.json"), {
-    version: 1, kind: "publish", runId, attempt: 1, claimantPid: pid,
+    version: 1,
+    kind: "publish",
+    runId,
+    attempt: 1,
+    claimantPid: pid,
   })
   const activePath = join(item.paths.reflection, "active.lock")
   const active = JSON.parse(await readFile(activePath, "utf8")) as Record<string, unknown>
   const launcherHostname = hostname()
-  await writeFile(activePath, `${JSON.stringify({ ...active, launcherPid: pid, launcherHostname }, null, 2)}\n`, { mode: 0o600 })
+  await writeFile(activePath, `${JSON.stringify({ ...active, launcherPid: pid, launcherHostname }, null, 2)}\n`, {
+    mode: 0o600,
+  })
   item.holders.push({ runId, pid, hostname: launcherHostname })
   return runId
 }
@@ -281,7 +342,8 @@ export function holderVerdict(item: Fixture): Promise<ActiveHolderVerdict> {
 
 function bootId(): string {
   try {
-    if (process.platform === "darwin") return execFileSync("sysctl", ["-n", "kern.bootsessionuuid"], { encoding: "utf8" }).trim()
+    if (process.platform === "darwin")
+      return execFileSync("sysctl", ["-n", "kern.bootsessionuuid"], { encoding: "utf8" }).trim()
     if (process.platform === "linux") return readFileSync("/proc/sys/kernel/random/boot_id", "utf8").trim()
   } catch (error) {
     return `unavailable (${error instanceof Error ? error.message : String(error)})`
@@ -315,19 +377,27 @@ export function afterMark(item: Fixture, mark: DiagnosisMark) {
 function heldLocks(locksDir: string): string {
   let names: string[]
   try {
-    names = readdirSync(locksDir).filter((name) => name.endsWith(".lock")).sort()
+    names = readdirSync(locksDir)
+      .filter((name) => name.endsWith(".lock"))
+      .sort()
   } catch (error) {
     return `unreadable (${error instanceof Error ? error.message : String(error)})`
   }
   if (names.length === 0) return "none"
-  return names.map((name) => {
-    try {
-      const owner = JSON.parse(readFileSync(join(locksDir, name), "utf8")) as { purpose?: unknown; pid?: unknown; hostname?: unknown }
-      return `${name} (${String(owner.purpose)} pid ${String(owner.pid)} on ${String(owner.hostname)})`
-    } catch (error) {
-      return `${name} (owner unreadable: ${error instanceof Error ? error.message : String(error)})`
-    }
-  }).join(", ")
+  return names
+    .map((name) => {
+      try {
+        const owner = JSON.parse(readFileSync(join(locksDir, name), "utf8")) as {
+          purpose?: unknown
+          pid?: unknown
+          hostname?: unknown
+        }
+        return `${name} (${String(owner.purpose)} pid ${String(owner.pid)} on ${String(owner.hostname)})`
+      } catch (error) {
+        return `${name} (owner unreadable: ${error instanceof Error ? error.message : String(error)})`
+      }
+    })
+    .join(", ")
 }
 
 /**
@@ -348,19 +418,20 @@ export async function staleRunDiagnosis(
   const host = `recorded host ${holder?.hostname ?? "unknown"}, current host ${hostname()}, boot ${bootId()}`
   const { reconciled, passes, contention, errors } = afterMark(item, observed.mark)
   const ran = `reconcile ran ${reconciled} time(s) after the mark`
-  const branch = observed.verdictBefore.state === "live"
-    ? `A live: holder verdict live; ${ran}`
-    : observed.verdictBefore.state === "stuck"
-      ? `A stuck: ${observed.verdictBefore.reason}; ${ran}`
-      : observed.verdictBefore.state === "none"
-        ? `A none: active.lock was gone before recovery; ${ran}`
-        : reconciled === 0
-          ? `A not reconciled: holder verdict dead; ${ran}`
-          : errors.length > 0
-            ? `B threw: ${errors.map((entry) => `pass ${entry.pass}: ${entry.error}`).join("; ")}`
-            : contention.length > 0
-              ? `B deferred: ${contention.map((entry) => `pass ${entry.pass} ${entry.read}(waitTimeoutMs=${String(entry.waitTimeoutMs)}) from ${entry.site.replace(/^at /, "")} on ${entry.lockPath} held by ${JSON.stringify(entry.owner)}`).join("; ")}`
-              : "unclassified: reconcile ran without settling the run and no reservation-port contention was observed (a finalize claim or writer lock held elsewhere is not visible to the port; see locks)"
+  const branch =
+    observed.verdictBefore.state === "live"
+      ? `A live: holder verdict live; ${ran}`
+      : observed.verdictBefore.state === "stuck"
+        ? `A stuck: ${observed.verdictBefore.reason}; ${ran}`
+        : observed.verdictBefore.state === "none"
+          ? `A none: active.lock was gone before recovery; ${ran}`
+          : reconciled === 0
+            ? `A not reconciled: holder verdict dead; ${ran}`
+            : errors.length > 0
+              ? `B threw: ${errors.map((entry) => `pass ${entry.pass}: ${entry.error}`).join("; ")}`
+              : contention.length > 0
+                ? `B deferred: ${contention.map((entry) => `pass ${entry.pass} ${entry.read}(waitTimeoutMs=${String(entry.waitTimeoutMs)}) from ${entry.site.replace(/^at /, "")} on ${entry.lockPath} held by ${JSON.stringify(entry.owner)}`).join("; ")}`
+                : "unclassified: reconcile ran without settling the run and no reservation-port contention was observed (a finalize claim or writer lock held elsewhere is not visible to the port; see locks)"
   return [
     branch,
     `verdict before ${JSON.stringify(observed.verdictBefore)}, after ${JSON.stringify(verdictAfter)}`,

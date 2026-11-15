@@ -23,9 +23,11 @@ const mockProviderEntry = join(scriptDir, "team-e2e-mock-provider.ts")
 const senpiBin = process.env.SENPI_BIN ?? "senpi"
 const inheritedEnvKeys = Object.keys(process.env).filter((key) => key.startsWith("SENPI_TASK_"))
 // Wrapped so the opt-out survives this extraEnv, which is spread after the child's own opt-out.
-const scrubbedEnv = withTelemetryOptOut(Object.fromEntries(
-  [...inheritedEnvKeys, "OMO_PROFILE", "OCX_PROFILE", "OPENCODE_CONFIG_DIR"].map((key) => [key, undefined]),
-))
+const scrubbedEnv = withTelemetryOptOut(
+  Object.fromEntries(
+    [...inheritedEnvKeys, "OMO_PROFILE", "OCX_PROFILE", "OPENCODE_CONFIG_DIR"].map((key) => [key, undefined]),
+  ),
+)
 
 const QA_OMO_CONFIG = {
   categories: {
@@ -221,7 +223,8 @@ async function main() {
     writeFileSync(join(evidenceDir, "member-pids.json"), JSON.stringify({ wrapper, children, detached }, null, 2))
 
     const verifyPath = join(sandbox.cwd, "verify-dead.json")
-    if (!existsSync(verifyPath)) throw new Error(`in-turn verification did not pass; run status ${String(result.status)}`)
+    if (!existsSync(verifyPath))
+      throw new Error(`in-turn verification did not pass; run status ${String(result.status)}`)
     writeFileSync(join(evidenceDir, "verify-dead.json"), readFileSync(verifyPath))
     for (const pid of recordedPids) assertDead(pid)
 
@@ -247,6 +250,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error instanceof Error ? error.stack ?? error.message : String(error))
+  console.error(error instanceof Error ? (error.stack ?? error.message) : String(error))
   process.exitCode = 1
 })

@@ -23,7 +23,11 @@ export function candidate(path: string, score = 1): RecallCandidate {
 
 /** A user message on the parent branch; the branch length is the event cursor. */
 export function branchOf(length: number): unknown[] {
-  return Array.from({ length }, (_, index) => ({ type: "message", id: `entry-${index}`, message: { role: "user", content: [{ type: "text", text: `turn ${index}` }] } }))
+  return Array.from({ length }, (_, index) => ({
+    type: "message",
+    id: `entry-${index}`,
+    message: { role: "user", content: [{ type: "text", text: `turn ${index}` }] },
+  }))
 }
 
 /** Rejects after `ms` so a test that waits for a signal that never comes fails with a name, not a hang. */
@@ -110,7 +114,10 @@ export interface FakeChild {
   nudge(path: string, hint: string): Promise<KibitzerToolResult>
 }
 
-export function fakeChild(input: KibitzerSidecarChildInput, sessionId = `kibitzer-child-${input.generation}`): FakeChild {
+export function fakeChild(
+  input: KibitzerSidecarChildInput,
+  sessionId = `kibitzer-child-${input.generation}`,
+): FakeChild {
   const steers: string[] = []
   const followUps: string[] = []
   const queuedFollowUps: string[] = []
@@ -169,7 +176,10 @@ export function fakeChild(input: KibitzerSidecarChildInput, sessionId = `kibitze
     const toolCallId = `call-${counters.calls}`
     emit({ type: "tool_execution_start", ...({ toolCallId, toolName: name, args: params } as Record<string, unknown>) })
     const result = await definition.execute(toolCallId, params as never)
-    emit({ type: "tool_execution_end", ...({ toolCallId, toolName: name, isError: result.isError === true } as Record<string, unknown>) })
+    emit({
+      type: "tool_execution_end",
+      ...({ toolCallId, toolName: name, isError: result.isError === true } as Record<string, unknown>),
+    })
     return result
   }
 
@@ -344,7 +354,8 @@ export function sidecarHarness(overrides: Partial<KibitzerSidecarOptions> = {}):
     timers,
     clock,
     offer: (candidates, maxItems = 2) => sidecar.offer({ candidates, surfaced: new Set(surfaced), maxItems }),
-    nextWake: () => withinMs(new Promise<KibitzerWakeOutcome>((resolve) => wakeWaiters.push(resolve)), "the next wake outcome"),
+    nextWake: () =>
+      withinMs(new Promise<KibitzerWakeOutcome>((resolve) => wakeWaiters.push(resolve)), "the next wake outcome"),
     nextChild: () => withinMs(new Promise<FakeChild>((resolve) => childWaiters.push(resolve)), "the next child"),
     toolCall(cursor, tool = "read", input = { path: `src/file-${cursor}.ts` }) {
       sidecar.events.onToolCall({ toolName: tool, toolCallId: `parent-call-${cursor}`, input }, branchOf(cursor))

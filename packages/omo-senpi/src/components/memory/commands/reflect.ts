@@ -17,7 +17,10 @@ import { LAZY_MEMORY_COMMANDS, type MemoryCommandPort } from "./metadata"
 
 function parseConversationIds(value: string | true | undefined): string[] | undefined {
   if (value === undefined || value === true) return undefined
-  const ids = value.split(",").map((id) => id.trim()).filter((id) => id.length > 0)
+  const ids = value
+    .split(",")
+    .map((id) => id.trim())
+    .filter((id) => id.length > 0)
   return ids.length > 0 ? ids : undefined
 }
 
@@ -31,12 +34,20 @@ export function registerReflectCommand(pi: MemoryCommandPort, deps: MemoryComman
       const { settings } = deps.loadSettings()
       const triggerConfig = resolveReflectionTriggerConfig(settings, identity.identity)
       if (!triggerConfig.enabled) {
-        return respond(ctx, "reflection is disabled; set reflection.enabled to true in your omo config to enable it", "error")
+        return respond(
+          ctx,
+          "reflection is disabled; set reflection.enabled to true in your omo config to enable it",
+          "error",
+        )
       }
 
       const sink = deps.reflectionSink
       if (sink === undefined) {
-        return respond(ctx, "reflection is not available in this session; enable memory reflection in the omo config", "error")
+        return respond(
+          ctx,
+          "reflection is not available in this session; enable memory reflection in the omo config",
+          "error",
+        )
       }
 
       const parsed = parseCommandArgs(args)

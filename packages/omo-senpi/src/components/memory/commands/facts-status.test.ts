@@ -7,12 +7,7 @@ import { join } from "node:path"
 import type { FactsFailureRecord } from "@oh-my-opencode/memory-core"
 
 import { factsParkedCauseSummary } from "./facts-failure-cause"
-import {
-  factsRemediationHint,
-  formatFactsAdvisory,
-  formatFactsStatus,
-  type FactsOverview,
-} from "./facts-status"
+import { factsRemediationHint, formatFactsAdvisory, formatFactsStatus, type FactsOverview } from "./facts-status"
 
 const NOW = new Date("2026-08-16T12:00:00.000Z")
 
@@ -56,9 +51,7 @@ function overview(overrides: Partial<FactsOverview> = {}): FactsOverview {
 const tempFactsDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(
-    tempFactsDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })),
-  )
+  await Promise.all(tempFactsDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
 })
 
 /** A real run dir whose ledger names `batchId`; the dir name deliberately differs from it. */
@@ -83,7 +76,12 @@ describe("facts status rendering", () => {
   test("#given parked and backoff records #when rendering the advisory #then one bounded line names both counts", () => {
     // given
     const state = overview({
-      records: [parkedRecord(), parkedRecord({ end_message_id: "msg-c" }), parkedRecord({ end_message_id: "msg-d" }), backoffRecord()],
+      records: [
+        parkedRecord(),
+        parkedRecord({ end_message_id: "msg-c" }),
+        parkedRecord({ end_message_id: "msg-d" }),
+        backoffRecord(),
+      ],
     })
 
     // when

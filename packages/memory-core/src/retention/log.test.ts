@@ -5,19 +5,17 @@ import { join } from "node:path"
 
 import { runRuntimeRetention } from "./pass"
 import { DEFAULT_RUNTIME_RETENTION } from "./policy"
-import {
-  RETENTION_LOG_FILE,
-  RETENTION_LOG_PREVIOUS_FILE,
-  appendRetentionLog,
-  readLastRetentionLogEntry,
-} from "./log"
+import { RETENTION_LOG_FILE, RETENTION_LOG_PREVIOUS_FILE, appendRetentionLog, readLastRetentionLogEntry } from "./log"
 import { NOW, cleanupRoots, daysAgo, identity, iso, now, reflectionRun } from "./retention.test-support"
 
 afterEach(cleanupRoots)
 
 async function logLines(runtimeDir: string): Promise<Record<string, unknown>[]> {
   const raw = await readFile(join(runtimeDir, RETENTION_LOG_FILE), "utf8")
-  return raw.split("\n").filter((line) => line !== "").map((line) => JSON.parse(line) as Record<string, unknown>)
+  return raw
+    .split("\n")
+    .filter((line) => line !== "")
+    .map((line) => JSON.parse(line) as Record<string, unknown>)
 }
 
 describe("retention removal log (#12932)", () => {
@@ -62,15 +60,23 @@ describe("retention removal log (#12932)", () => {
 
     await appendRetentionLog(paths.runtime, { at: NOW, removed: { runs } }, { maxNamesPerStore: 5 })
 
-    expect(await logLines(paths.runtime)).toEqual([{ v: 1, at: iso(NOW), total: 7, removed: { runs: runs.slice(0, 5) }, more: { runs: 2 } }])
+    expect(await logLines(paths.runtime)).toEqual([
+      { v: 1, at: iso(NOW), total: 7, removed: { runs: runs.slice(0, 5) }, more: { runs: 2 } },
+    ])
   })
 
   test("#given a small entry then a cleanup naming 200 long names in each of 6 stores #when the last entry is read #then it is the newest one and its line fits the reader's tail (#12949 review M2)", async () => {
     const paths = await identity()
     await reflectionRun(paths, "reflection-run-9", { finishedAt: daysAgo(1) })
     await appendRetentionLog(paths.runtime, { at: daysAgo(1), removed: { runs: ["reflection-run-1"] } })
-    const names = (store: string) => Array.from({ length: 200 }, (_, index) => `${store}-${"x".repeat(56)}-${String(index).padStart(3, "0")}`)
-    const removed = Object.fromEntries(["runs", "journals", "sidecars", "cap:runs", "cap:journals", "cap:sidecars"].map((store) => [store, names(store)]))
+    const names = (store: string) =>
+      Array.from({ length: 200 }, (_, index) => `${store}-${"x".repeat(56)}-${String(index).padStart(3, "0")}`)
+    const removed = Object.fromEntries(
+      ["runs", "journals", "sidecars", "cap:runs", "cap:journals", "cap:sidecars"].map((store) => [
+        store,
+        names(store),
+      ]),
+    )
 
     await appendRetentionLog(paths.runtime, { at: NOW, removed })
 
@@ -84,7 +90,10 @@ describe("retention removal log (#12932)", () => {
     await reflectionRun(paths, "reflection-run-9", { finishedAt: daysAgo(1) })
     expect(await readLastRetentionLogEntry(paths.runtime)).toBeUndefined()
 
-    await writeFile(join(paths.runtime, RETENTION_LOG_PREVIOUS_FILE), `${JSON.stringify({ v: 1, at: iso(daysAgo(9)), total: 4, removed: {} })}\n`)
+    await writeFile(
+      join(paths.runtime, RETENTION_LOG_PREVIOUS_FILE),
+      `${JSON.stringify({ v: 1, at: iso(daysAgo(9)), total: 4, removed: {} })}\n`,
+    )
     expect(await readLastRetentionLogEntry(paths.runtime)).toEqual({ at: iso(daysAgo(9)), total: 4 })
 
     const first = JSON.stringify({ v: 1, at: iso(daysAgo(2)), total: 3, removed: {} })

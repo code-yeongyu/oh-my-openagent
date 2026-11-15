@@ -5,9 +5,23 @@ import type { RpcExtensionUIResponse } from "@code-yeongyu/senpi"
  * permanent grant selection (those stay with the raiser and keep the auto-cancel, so a secret never travels).
  */
 export type ForwardableDialog =
-  | { readonly method: "select"; readonly title: string; readonly options: readonly string[]; readonly toolCallId?: string; readonly parentToolCallId?: string; readonly timeout?: number }
+  | {
+      readonly method: "select"
+      readonly title: string
+      readonly options: readonly string[]
+      readonly toolCallId?: string
+      readonly parentToolCallId?: string
+      readonly timeout?: number
+    }
   | { readonly method: "confirm"; readonly title: string; readonly message: string; readonly timeout?: number }
-  | { readonly method: "input"; readonly title: string; readonly placeholder?: string; readonly toolCallId?: string; readonly parentToolCallId?: string; readonly timeout?: number }
+  | {
+      readonly method: "input"
+      readonly title: string
+      readonly placeholder?: string
+      readonly toolCallId?: string
+      readonly parentToolCallId?: string
+      readonly timeout?: number
+    }
   | { readonly method: "editor"; readonly title: string; readonly prefill?: string }
 
 export type ForwardedAnswer =
@@ -32,7 +46,10 @@ export function forwardableDialogOf(frame: Frame): ForwardableDialog | undefined
   const title = text(frame["title"])
   if (title === undefined) return undefined
   const timeout = optional("timeout", positive(frame["timeout"]))
-  const toolCallId = { ...optional("toolCallId", text(frame["toolCallId"])), ...optional("parentToolCallId", text(frame["parentToolCallId"])) }
+  const toolCallId = {
+    ...optional("toolCallId", text(frame["toolCallId"])),
+    ...optional("parentToolCallId", text(frame["parentToolCallId"])),
+  }
   switch (frame["method"]) {
     case "select": {
       const options = frame["options"]
@@ -44,7 +61,13 @@ export function forwardableDialogOf(frame: Frame): ForwardableDialog | undefined
       return message === undefined ? undefined : { method: "confirm", title, message, ...timeout }
     }
     case "input":
-      return { method: "input", title, ...optional("placeholder", text(frame["placeholder"])), ...toolCallId, ...timeout }
+      return {
+        method: "input",
+        title,
+        ...optional("placeholder", text(frame["placeholder"])),
+        ...toolCallId,
+        ...timeout,
+      }
     case "editor":
       return { method: "editor", title, ...optional("prefill", text(frame["prefill"])) }
     default:

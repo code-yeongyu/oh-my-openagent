@@ -33,7 +33,12 @@ function load(extra: Record<string, unknown>) {
     reinstall: "Reinstall omo, then retry.",
     engine: { run: () => ({ exitCode: 0, stdout: "", stderr: "" }) },
     loadSqlite: async () => ({}),
-    importSdk: async () => ({ createThreadSdk: (options: Record<string, unknown>) => { received = options; return {} } }),
+    importSdk: async () => ({
+      createThreadSdk: (options: Record<string, unknown>) => {
+        received = options
+        return {}
+      },
+    }),
     identity: { uid: 501, user: "qa" },
     ...extra,
   })
@@ -43,7 +48,12 @@ function load(extra: Record<string, unknown>) {
 describe("omo thread: remote sidecars", () => {
   test("#given a thread client sidecar that cannot be imported #when the SDK loads #then it keeps this device's threads and says on stderr that aliases and other devices are unavailable, with the reinstall step", async () => {
     const reinstall = "Reinstall omo with: npm i -g omo-ai@beta, then retry."
-    const { loading, stderr, received } = load({ reinstall, importThreadClient: async () => { throw new Error("Cannot find module omo-thread-client.js") } })
+    const { loading, stderr, received } = load({
+      reinstall,
+      importThreadClient: async () => {
+        throw new Error("Cannot find module omo-thread-client.js")
+      },
+    })
 
     const loaded = await loading
 
@@ -67,9 +77,20 @@ describe("omo thread: remote sidecars", () => {
     const pluginRoot = mkdtempSync(join(tmpdir(), "omo-thread-sidecar-"))
     roots.push(pluginRoot)
     mkdirSync(join(pluginRoot, "extensions"))
-    writeFileSync(join(pluginRoot, "extensions", "omo-device-account.js"), "export function cliServiceAccess(options) { options.log?.(\"thread aliases: the device service forget failed (gone)\"); return { origin: \"https://svc\" } }\n")
+    writeFileSync(
+      join(pluginRoot, "extensions", "omo-device-account.js"),
+      'export function cliServiceAccess(options) { options.log?.("thread aliases: the device service forget failed (gone)"); return { origin: "https://svc" } }\n',
+    )
     let offered: { loadAccess?: () => Promise<unknown> } = {}
-    const { loading, stderr } = load({ pluginRoot, importThreadClient: async () => ({ createCliRemoteSurface: (options: typeof offered) => { offered = options; return {} } }) })
+    const { loading, stderr } = load({
+      pluginRoot,
+      importThreadClient: async () => ({
+        createCliRemoteSurface: (options: typeof offered) => {
+          offered = options
+          return {}
+        },
+      }),
+    })
     await loading
 
     await offered.loadAccess?.()

@@ -11,7 +11,15 @@ import { FakeRegistry, settings } from "../lifecycle/__fixtures__/lifecycle-fake
 import type { TaskRecord } from "../state"
 import type { ManagedChildHandle } from "../manager/child-handle"
 import type { SteeringPort } from "./types"
-import { roots, cleanupRoots, detachedTerminal, fakeHandle, rpcHandle, portFor, storeLoad } from "./__fixtures__/residency"
+import {
+  roots,
+  cleanupRoots,
+  detachedTerminal,
+  fakeHandle,
+  rpcHandle,
+  portFor,
+  storeLoad,
+} from "./__fixtures__/residency"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
 
 afterEach(cleanupRoots)
@@ -22,14 +30,23 @@ describe("task_send lazy terminal RPC revival", () => {
     roots.push(project)
     const store = createTaskRecordStore({ project_dir: project })
     const record = detachedTerminal(store)
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings() })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings(),
+    })
     const manager = createTaskManager({
       store,
       runners: { "in-process": new FakeRunner(), process: new FakeRunner() },
       planner: () => ({ kind: "resolved", plan: { model: "anthropic/claude" } }),
       config: settings(),
       cwd: project,
-      rpcRespawnRunner: { start: async () => { throw new Error("respawn unavailable") } },
+      rpcRespawnRunner: {
+        start: async () => {
+          throw new Error("respawn unavailable")
+        },
+      },
     })
 
     const outcome = await manager.sendToTask({ idOrName: record.task_id, message: "retry" })
@@ -77,7 +94,12 @@ describe("task_send lazy terminal RPC revival", () => {
         },
       },
     })
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings({ default_concurrency: 1, global_concurrency: 1 }) })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings({ default_concurrency: 1, global_concurrency: 1 }),
+    })
     const holder = await manager.start({ prompt: "hold", parent_session_id: "parent", depth: 1 })
     if (holder.kind !== "started") throw new Error("expected holder")
 
@@ -112,9 +134,17 @@ describe("task_send lazy terminal RPC revival", () => {
       pid: 7000,
       abort: async () => undefined,
       terminate: async () => undefined,
-      dispose: async () => { live = false },
+      dispose: async () => {
+        live = false
+      },
     })
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config: settings(), hostPid: 6000 })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry,
+      config: settings(),
+      hostPid: 6000,
+    })
     const port: SteeringPort = {
       store,
       liveHandle: () => (live ? handle : undefined),
@@ -165,11 +195,12 @@ describe("task_send lazy terminal RPC revival", () => {
     const handle = fakeHandle(record.task_id, followUps)
     const failingStore = {
       ...baseStore,
-      mutate: (taskId: string, update: (fresh: TaskRecord) => TaskRecord) => baseStore.mutate(taskId, (fresh) => {
-        const next = update(fresh)
-        if (next.status === "running") throw new Error("persistence failed")
-        return next
-      }),
+      mutate: (taskId: string, update: (fresh: TaskRecord) => TaskRecord) =>
+        baseStore.mutate(taskId, (fresh) => {
+          const next = update(fresh)
+          if (next.status === "running") throw new Error("persistence failed")
+          return next
+        }),
     }
     const port: SteeringPort = {
       store: failingStore,

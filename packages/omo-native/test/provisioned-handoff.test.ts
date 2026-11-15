@@ -2,7 +2,12 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { copyFileSync, mkdirSync, mkdtempSync, realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
-import { handOffToProvisionedRuntime, planProvisionedLaunch, PROVISIONED_HANDOFF_ENV, PROVISIONED_LAUNCHER_ENV } from "../provisioned-handoff"
+import {
+  handOffToProvisionedRuntime,
+  planProvisionedLaunch,
+  PROVISIONED_HANDOFF_ENV,
+  PROVISIONED_LAUNCHER_ENV,
+} from "../provisioned-handoff"
 import { removeTree } from "../../../test-support/remove-tree"
 
 const exe = process.platform === "win32" ? ".exe" : ""
@@ -15,20 +20,30 @@ const provisioned = join(home, ".omo", "binary-runtime", "handoff-fixture", `omo
 const canonical = (path: string) => realpathSync.native(path)
 
 type Run = { code: number; stdout: string; stderr: string }
-type Report = { version: string; execPath: string; args: string[]; launch: { provision: boolean; handOff: boolean; launcher?: string } }
+type Report = {
+  version: string
+  execPath: string
+  args: string[]
+  launch: { provision: boolean; handOff: boolean; launcher?: string }
+}
 
 async function run(command: string[]): Promise<Run> {
   const env: Record<string, string | undefined> = { ...process.env, HOME: home, USERPROFILE: home }
   delete env.OMO_PROVISIONED_HANDOFF
   delete env.OMO_PROVISIONED_LAUNCHER
   const child = Bun.spawn(command, { cwd: root, env, stdout: "pipe", stderr: "pipe" })
-  const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+  const [stdout, stderr, code] = await Promise.all([
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+    child.exited,
+  ])
   return { code, stdout, stderr }
 }
 
 function report(result: Run): Report {
   const line = result.stdout.trim().split(/\r?\n/).at(-1) ?? ""
-  if (!line.startsWith("{")) throw new Error(`fixture printed no report (exit ${result.code}):\n${result.stdout}\n${result.stderr}`)
+  if (!line.startsWith("{"))
+    throw new Error(`fixture printed no report (exit ${result.code}):\n${result.stdout}\n${result.stderr}`)
   return JSON.parse(line) as Report
 }
 
@@ -81,7 +96,10 @@ describe("provisioned launch plan", () => {
     expect(env[PROVISIONED_LAUNCHER_ENV]).toBeUndefined()
   })
 
-  for (const [name, launcher] of [["the runtime copy itself", expected], ["a relative path", `bin/omo${exe}`]] as const) {
+  for (const [name, launcher] of [
+    ["the runtime copy itself", expected],
+    ["a relative path", `bin/omo${exe}`],
+  ] as const) {
     test(`#given a handed-off child #when the launcher marker names ${name} #then no launcher is trusted`, () => {
       const env: NodeJS.ProcessEnv = { [PROVISIONED_HANDOFF_ENV]: expected, [PROVISIONED_LAUNCHER_ENV]: launcher }
       expect(planProvisionedLaunch(expected, expected, { env }).launcher).toBeUndefined()
@@ -99,7 +117,8 @@ describe("provisioned launch plan", () => {
     let childEnv: NodeJS.ProcessEnv | undefined
     // when
     await handOffToProvisionedRuntime(expected, {
-      env: { [PROVISIONED_LAUNCHER_ENV]: join(root, "stale", `omo${exe}`) }, platform: "win32",
+      env: { [PROVISIONED_LAUNCHER_ENV]: join(root, "stale", `omo${exe}`) },
+      platform: "win32",
       run: async (_file, _argv, options) => {
         childEnv = (options as { env?: NodeJS.ProcessEnv } | undefined)?.env
         return { status: 0, signal: null }
@@ -123,13 +142,17 @@ describe("provisioned launch plan", () => {
     const propagated: unknown[] = []
     // when
     await handOffToProvisionedRuntime(expected, {
-      argv: ["-p", "hi"], env: { KEEP: "1" }, platform: "win32",
+      argv: ["-p", "hi"],
+      env: { KEEP: "1" },
+      platform: "win32",
       run: async (_file, _argv, options) => {
         seen.env = (options as { env?: NodeJS.ProcessEnv } | undefined)?.env
         seen.sigintListeners = process.listenerCount("SIGINT")
         return { status: 5, signal: null }
       },
-      propagate: (result: unknown) => { propagated.push(result) },
+      propagate: (result: unknown) => {
+        propagated.push(result)
+      },
     })
     // then
     expect(seen.env).toEqual({ KEEP: "1", [PROVISIONED_HANDOFF_ENV]: expected })

@@ -29,7 +29,10 @@ async function pinnedHome() {
     logs,
     pins: async () => {
       const names = await readdir(parent)
-      return { live: names.filter((n) => n === key).length, retired: names.filter((n) => n.startsWith(`${key}.retired-`)).length }
+      return {
+        live: names.filter((n) => n === key).length,
+        retired: names.filter((n) => n.startsWith(`${key}.retired-`)).length,
+      }
     },
   }
 }
@@ -42,8 +45,12 @@ function memoryStore(initial: Credentials | null, unreadable = false) {
       if (unreadable) throw new InvalidCredentialState("the stored sign-in does not parse")
       return value
     },
-    write: async (next) => { value = next },
-    clear: async () => { value = null },
+    write: async (next) => {
+      value = next
+    },
+    clear: async () => {
+      value = null
+    },
   }
   return { store, current: () => value }
 }
@@ -55,7 +62,9 @@ describe("the credential write seam retires the sync pin (#12280)", () => {
   test("#given a stored sign-in #when a save replaces it with another device #then the previous principal's pin is retired and the new credential is stored", async () => {
     const h = await pinnedHome()
     const s = memoryStore(stored)
-    await createSession({ api: "https://api.omo.dev", store: s.store, home: h.home, beforeKeysDiscarded: h.hook }).save(anotherDevice)
+    await createSession({ api: "https://api.omo.dev", store: s.store, home: h.home, beforeKeysDiscarded: h.hook }).save(
+      anotherDevice,
+    )
     expect(await h.pins()).toEqual({ live: 0, retired: 1 })
     expect(s.current()?.device.id).toBe("device-2")
   })
@@ -63,14 +72,18 @@ describe("the credential write seam retires the sync pin (#12280)", () => {
   test("#given a stored sign-in #when a save hands over fresh tokens for the same device #then the pin is kept", async () => {
     const h = await pinnedHome()
     const s = memoryStore(stored)
-    await createSession({ api: "https://api.omo.dev", store: s.store, home: h.home, beforeKeysDiscarded: h.hook }).save({ ...stored, accessToken: "fresh" })
+    await createSession({ api: "https://api.omo.dev", store: s.store, home: h.home, beforeKeysDiscarded: h.hook }).save(
+      { ...stored, accessToken: "fresh" },
+    )
     expect(await h.pins()).toEqual({ live: 1, retired: 0 })
   })
 
   test("#given an unreadable stored item #when a save replaces it #then the new credential is stored, nothing is retired, and one line is logged", async () => {
     const h = await pinnedHome()
     const s = memoryStore(stored, true)
-    await createSession({ api: "https://api.omo.dev", store: s.store, home: h.home, beforeKeysDiscarded: h.hook }).save(anotherDevice)
+    await createSession({ api: "https://api.omo.dev", store: s.store, home: h.home, beforeKeysDiscarded: h.hook }).save(
+      anotherDevice,
+    )
     expect(s.current()?.device.id).toBe("device-2")
     expect(await h.pins()).toEqual({ live: 1, retired: 0 })
     expect(h.logs).toHaveLength(1)
@@ -78,10 +91,18 @@ describe("the credential write seam retires the sync pin (#12280)", () => {
 
   test("#given a credential that names its account only in its owner record #when the refresh is refused device_revoked #then that account's pin is retired", async () => {
     const h = await pinnedHome()
-    const owner = { accountId: ACCOUNT, deviceId: "device-1", familyId: "family-1", generation: 1, ownerHandle: "handle-1" }
+    const owner = {
+      accountId: ACCOUNT,
+      deviceId: "device-1",
+      familyId: "family-1",
+      generation: 1,
+      ownerHandle: "handle-1",
+    }
     const s = memoryStore({ ...grant, ...privateKeys, owner, accessTokenExpiresAt: "2000-01-01T00:00:00Z" })
     const api = fakeApi(() => refusal("device_revoked", undefined, 401))
-    const error = await createSession({ api, store: s.store, home: h.home, beforeKeysDiscarded: h.hook }).accessToken().catch((e: unknown) => e)
+    const error = await createSession({ api, store: s.store, home: h.home, beforeKeysDiscarded: h.hook })
+      .accessToken()
+      .catch((e: unknown) => e)
     expect(error).toMatchObject({ code: "device_revoked" })
     expect(s.current()).toBeNull()
     expect(await h.pins()).toEqual({ live: 0, retired: 1 })
@@ -120,7 +141,9 @@ describe("the credential write seam retires the sync pin (#12280)", () => {
     const api = fakeApi((request) => {
       const path = new URL(request.url).pathname
       calls.push(`${request.method} ${path}`)
-      return path === "/v1/me" ? Response.json({ user: { id: "user-1" }, account: { id: ACCOUNT } }) : new Response(null, { status: 204 })
+      return path === "/v1/me"
+        ? Response.json({ user: { id: "user-1" }, account: { id: ACCOUNT } })
+        : new Response(null, { status: 204 })
     })
     const s = memoryStore({ ...grant, ...privateKeys })
     await createSession({ api, store: s.store, home: h.home, beforeKeysDiscarded: h.hook }).logout()

@@ -35,8 +35,12 @@ describe("memory pressure dream wiring", () => {
     const reservationAttempts: unknown[] = []
     let advisoryObserved!: () => void
     let reservationObserved!: () => void
-    const advisory = new Promise<void>((resolve) => { advisoryObserved = resolve })
-    const reservation = new Promise<void>((resolve) => { reservationObserved = resolve })
+    const advisory = new Promise<void>((resolve) => {
+      advisoryObserved = resolve
+    })
+    const reservation = new Promise<void>((resolve) => {
+      reservationObserved = resolve
+    })
     const runtime = {
       reconcile: async () => {},
       store: {
@@ -62,7 +66,12 @@ describe("memory pressure dream wiring", () => {
     wiring.registerStatic(pi, componentContext())
     const eventCtx = {
       sessionManager: { getSessionId: () => sessionId, getEntries: () => [] },
-      ui: { setStatus: () => {}, notify: () => { advisoryObserved() } },
+      ui: {
+        setStatus: () => {},
+        notify: () => {
+          advisoryObserved()
+        },
+      },
     }
     let advisoryTimeout: ReturnType<typeof setTimeout> | undefined
     const boundedAdvisory = Promise.race([
@@ -84,7 +93,10 @@ describe("memory pressure dream wiring", () => {
     const boundedReservation = Promise.race([
       reservation,
       new Promise<never>((_resolve, reject) => {
-        reservationTimeout = setTimeout(() => reject(new Error("pressure reservation was not observed after accepted input")), remainingTestTime())
+        reservationTimeout = setTimeout(
+          () => reject(new Error("pressure reservation was not observed after accepted input")),
+          remainingTestTime(),
+        )
       }),
     ])
     try {
@@ -96,11 +108,13 @@ describe("memory pressure dream wiring", () => {
       if (reservationTimeout !== undefined) clearTimeout(reservationTimeout)
     }
 
-    expect(reservationAttempts).toEqual([{
-      trigger: "dream",
-      origin: "pressure",
-      conversationIds: [],
-      snapshots: [],
-    }])
+    expect(reservationAttempts).toEqual([
+      {
+        trigger: "dream",
+        origin: "pressure",
+        conversationIds: [],
+        snapshots: [],
+      },
+    ])
   }, 30_000)
 })

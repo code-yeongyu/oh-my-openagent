@@ -11,18 +11,38 @@ import { remainingTestTime, useTestTimeout } from "../../../../../../test-suppor
 // Security contract (account-transport-api v9 section 7): a desktop host never constructs the CLI credential source,
 // in the main thread or in any session Worker; only a CLI selection does, and only the main thread selects.
 
-const cliCanary = (): DeviceAccountSource => { throw new Error("the CLI credential source was constructed on a desktop host") }
+const cliCanary = (): DeviceAccountSource => {
+  throw new Error("the CLI credential source was constructed on a desktop host")
+}
 const wire = (): DesktopSyncEngineWire & { readonly lifetime: AbortController } => {
   const lifetime = new AbortController()
-  return { lifetime, signal: lifetime.signal, close: () => lifetime.abort(), onEvent: () => () => {}, request: async () => { throw new Error("unused") } }
+  return {
+    lifetime,
+    signal: lifetime.signal,
+    close: () => lifetime.abort(),
+    onEvent: () => () => {},
+    request: async () => {
+      throw new Error("unused")
+    },
+  }
 }
-const desktopAccount = (generation: string, current: () => boolean) => ({ kind: "desktop", descriptor: { generation }, isCurrent: async () => current() }) as unknown as DesktopSyncAccount
-const desktop = (channel: DesktopSyncEngineWire) => async (): Promise<MemorySyncSelection> => ({ kind: "desktop", channel })
+const desktopAccount = (generation: string, current: () => boolean) =>
+  ({ kind: "desktop", descriptor: { generation }, isCurrent: async () => current() }) as unknown as DesktopSyncAccount
+const desktop = (channel: DesktopSyncEngineWire) => async (): Promise<MemorySyncSelection> => ({
+  kind: "desktop",
+  channel,
+})
 
 describe("the account source built from the engine's one selection", () => {
   test("a CLI selection builds the CLI source once", async () => {
     let built = 0
-    const source = accountSourceFromSelection({ selection: async () => ({ kind: "cli" }), cli: () => { built += 1; return async () => null } })
+    const source = accountSourceFromSelection({
+      selection: async () => ({ kind: "cli" }),
+      cli: () => {
+        built += 1
+        return async () => null
+      },
+    })
     expect(await source()).toBeNull()
     expect(await source()).toBeNull()
     expect(built).toBe(1)
@@ -30,7 +50,10 @@ describe("the account source built from the engine's one selection", () => {
 
   test("an unavailable selection passes its reason through and never builds the CLI source", async () => {
     for (const reason of ["private_channel_unavailable", "selection_failed"] as const) {
-      const source = accountSourceFromSelection({ selection: async () => ({ kind: "unavailable", reason }), cli: cliCanary })
+      const source = accountSourceFromSelection({
+        selection: async () => ({ kind: "unavailable", reason }),
+        cli: cliCanary,
+      })
       expect(await source()).toEqual({ kind: "unavailable", reason })
     }
   })
@@ -40,8 +63,12 @@ describe("the account source built from the engine's one selection", () => {
     let opened = 0
     let current = true
     const source = accountSourceFromSelection({
-      selection: desktop(channel), cli: cliCanary,
-      openAccount: async () => { opened += 1; return desktopAccount(`generation-${opened}`, () => current) },
+      selection: desktop(channel),
+      cli: cliCanary,
+      openAccount: async () => {
+        opened += 1
+        return desktopAccount(`generation-${opened}`, () => current)
+      },
     })
     const first = await source()
     expect(await source()).toBe(first)
@@ -53,10 +80,17 @@ describe("the account source built from the engine's one selection", () => {
   test("concurrent resolves with no current account share one open and get the same account", async () => {
     let opened = 0
     let release!: () => void
-    const gate = new Promise<void>((resolve) => { release = resolve })
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
     const source = accountSourceFromSelection({
-      selection: desktop(wire()), cli: cliCanary,
-      openAccount: async () => { opened += 1; await gate; return desktopAccount(`generation-${opened}`, () => true) },
+      selection: desktop(wire()),
+      cli: cliCanary,
+      openAccount: async () => {
+        opened += 1
+        await gate
+        return desktopAccount(`generation-${opened}`, () => true)
+      },
     })
     const both = Promise.all([source(), source()])
     release()
@@ -70,10 +104,13 @@ describe("the account source built from the engine's one selection", () => {
     let opened = 0
     let failing = true
     let release!: () => void
-    const gate = new Promise<void>((resolve) => { release = resolve })
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
     const failure = new Error("descriptor request failed")
     const source = accountSourceFromSelection({
-      selection: desktop(wire()), cli: cliCanary,
+      selection: desktop(wire()),
+      cli: cliCanary,
       openAccount: async () => {
         opened += 1
         await gate
@@ -83,7 +120,10 @@ describe("the account source built from the engine's one selection", () => {
     })
     const both = Promise.allSettled([source(), source()])
     release()
-    expect(await both).toEqual([{ status: "rejected", reason: failure }, { status: "rejected", reason: failure }])
+    expect(await both).toEqual([
+      { status: "rejected", reason: failure },
+      { status: "rejected", reason: failure },
+    ])
     expect(opened).toBe(1)
     failing = false
     expect((await source())?.kind).toBe("desktop")
@@ -93,8 +133,12 @@ describe("the account source built from the engine's one selection", () => {
   test("main with no account to describe is signed out, then the next resolve opens the account", async () => {
     let signedIn = false
     const source = accountSourceFromSelection({
-      selection: desktop(wire()), cli: cliCanary,
-      openAccount: async () => { if (!signedIn) throw new DesktopSyncRefused(); return desktopAccount("generation-1", () => true) },
+      selection: desktop(wire()),
+      cli: cliCanary,
+      openAccount: async () => {
+        if (!signedIn) throw new DesktopSyncRefused()
+        return desktopAccount("generation-1", () => true)
+      },
     })
     expect(await source()).toBeNull()
     signedIn = true
@@ -104,24 +148,53 @@ describe("the account source built from the engine's one selection", () => {
   test("a closed channel stays unavailable and the resolver reports why without loading the sync runtime", async () => {
     const channel = wire()
     const source = accountSourceFromSelection({
-      selection: desktop(channel), cli: cliCanary,
+      selection: desktop(channel),
+      cli: cliCanary,
       openAccount: async () => desktopAccount("generation-1", () => !channel.signal.aborted),
     })
     expect((await source())?.kind).toBe("desktop")
     channel.lifetime.abort()
     expect(await source()).toEqual({ kind: "unavailable", reason: "private_channel_unavailable" })
-    const resolve = createDeviceSessionResolver({ source, pinDir: "/unused", loadRuntime: async () => { throw new Error("an unavailable source loaded the sync runtime") } })
-    expect(await resolve({ paths: { repo: "/unused" }, space: { profile: "default", projectDir: "/unused" } } as never)).toEqual({ idle: "private_channel_unavailable" })
+    const resolve = createDeviceSessionResolver({
+      source,
+      pinDir: "/unused",
+      loadRuntime: async () => {
+        throw new Error("an unavailable source loaded the sync runtime")
+      },
+    })
+    expect(
+      await resolve({ paths: { repo: "/unused" }, space: { profile: "default", projectDir: "/unused" } } as never),
+    ).toEqual({ idle: "private_channel_unavailable" })
   })
 })
 
-type EngineReport = { readonly source: string; readonly cliBuilt: boolean; readonly handle?: string; readonly foreignEnd?: string; readonly events?: readonly string[] }
-async function engine(scenario: string): Promise<{ readonly claims: number; readonly ends: number; readonly reports: readonly EngineReport[]; readonly open?: readonly string[] }> {
-  const child = Bun.spawn([process.execPath, join(import.meta.dirname, "../desktop-sync/hostSelection.fixture.ts"), scenario], { stdout: "pipe", stderr: "pipe" })
-  const deadline = new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`the ${scenario} engine fixture did not exit within the test budget`)), remainingTestTime()))
+type EngineReport = {
+  readonly source: string
+  readonly cliBuilt: boolean
+  readonly handle?: string
+  readonly foreignEnd?: string
+  readonly events?: readonly string[]
+}
+async function engine(scenario: string): Promise<{
+  readonly claims: number
+  readonly ends: number
+  readonly reports: readonly EngineReport[]
+  readonly open?: readonly string[]
+}> {
+  const child = Bun.spawn(
+    [process.execPath, join(import.meta.dirname, "../desktop-sync/hostSelection.fixture.ts"), scenario],
+    { stdout: "pipe", stderr: "pipe" },
+  )
+  const deadline = new Promise<never>((_, reject) =>
+    setTimeout(
+      () => reject(new Error(`the ${scenario} engine fixture did not exit within the test budget`)),
+      remainingTestTime(),
+    ),
+  )
   const code = await Promise.race([child.exited, deadline])
   const out = await new Response(child.stdout).text()
-  if (code !== 0) throw new Error(`engine fixture ${scenario} exited ${code}: ${await new Response(child.stderr).text()}`)
+  if (code !== 0)
+    throw new Error(`engine fixture ${scenario} exited ${code}: ${await new Response(child.stderr).text()}`)
   return JSON.parse(out)
 }
 
@@ -152,7 +225,8 @@ describe("session Workers in a shared-worker engine", () => {
       useTestTimeout(30_000)
       const result = await engine(scenario)
       expect(result.claims).toBe(1)
-      for (const report of result.reports) expect(report).toEqual({ source: "unavailable:private_channel_unavailable", cliBuilt: false })
+      for (const report of result.reports)
+        expect(report).toEqual({ source: "unavailable:private_channel_unavailable", cliBuilt: false })
     }, 30_000)
   }
 
@@ -165,7 +239,13 @@ describe("session Workers in a shared-worker engine", () => {
 
   test("an attachment that connects after the deadline is closed, and the unavailable answer stands", async () => {
     useTestTimeout(30_000)
-    const result = await engine("late-connected") as unknown as { claims: number; answer: string; closed: string; opened: boolean; source: string }
+    const result = (await engine("late-connected")) as unknown as {
+      claims: number
+      answer: string
+      closed: string
+      opened: boolean
+      source: string
+    }
     expect(result.claims).toBe(1)
     expect(result.answer).toBe("unavailable:private_channel_unavailable")
     expect(result.closed).toBe("closed")
@@ -175,7 +255,12 @@ describe("session Workers in a shared-worker engine", () => {
 
   test("the selection is memoized per process: a second call returns the first and claims nothing again", async () => {
     useTestTimeout(30_000)
-    const result = await engine("memoized") as unknown as { claims: number; same: boolean; first: string; second: string }
+    const result = (await engine("memoized")) as unknown as {
+      claims: number
+      same: boolean
+      first: string
+      second: string
+    }
     expect(result.same).toBe(true)
     expect(result.claims).toBe(1)
     expect(result.second).toBe(result.first)

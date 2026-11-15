@@ -10,7 +10,11 @@ export const LIBRARIAN_PROMPT_METADATA: AgentPromptMetadata = {
   promptAlias: "Librarian",
   keyTrigger: "External library/source mentioned → fire `librarian` background",
   triggers: [
-    { domain: "Librarian", trigger: "Unfamiliar packages / libraries, struggles at weird behaviour (to find existing implementation of opensource)" },
+    {
+      domain: "Librarian",
+      trigger:
+        "Unfamiliar packages / libraries, struggles at weird behaviour (to find existing implementation of opensource)",
+    },
   ],
   useWhen: [
     "How do I use [library]?",
@@ -22,13 +26,7 @@ export const LIBRARIAN_PROMPT_METADATA: AgentPromptMetadata = {
 }
 
 export function createLibrarianAgent(model: string): AgentConfig {
-  const restrictions = createAgentToolRestrictions([
-    "write",
-    "edit",
-    "apply_patch",
-    "task",
-    "call_omo_agent",
-  ])
+  const restrictions = createAgentToolRestrictions(["write", "edit", "apply_patch", "task", "call_omo_agent"])
 
   return {
     description:

@@ -3,7 +3,12 @@ import { generateKeyPairSync } from "node:crypto"
 import { chmodSync, mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { ADOPT_ACCOUNT_MIN_SERVICE_VERSION, connectDeviceService, type DeviceCredential, type DeviceService } from "../src/index.ts"
+import {
+  ADOPT_ACCOUNT_MIN_SERVICE_VERSION,
+  connectDeviceService,
+  type DeviceCredential,
+  type DeviceService,
+} from "../src/index.ts"
 import { validateRequest } from "../src/local-api/validate.ts"
 import { startFakeOwner, type FakeOwner } from "./local-api/conformance/fake-owner.ts"
 import { defaultWorld } from "./local-api/conformance/world.ts"
@@ -22,8 +27,12 @@ afterEach(async () => {
 })
 
 const keys = () => ({
-  signingPrivateKey: generateKeyPairSync("ed25519").privateKey.export({ format: "der", type: "pkcs8" }).toString("base64"),
-  sealingPrivateKey: generateKeyPairSync("x25519").privateKey.export({ format: "der", type: "pkcs8" }).toString("base64"),
+  signingPrivateKey: generateKeyPairSync("ed25519")
+    .privateKey.export({ format: "der", type: "pkcs8" })
+    .toString("base64"),
+  sealingPrivateKey: generateKeyPairSync("x25519")
+    .privateKey.export({ format: "der", type: "pkcs8" })
+    .toString("base64"),
 })
 
 const credential = (account?: string): DeviceCredential => ({
@@ -50,28 +59,43 @@ describe("device.adopt account, gated on welcome.service_version", () => {
     expect(ADOPT_ACCOUNT_MIN_SERVICE_VERSION).toBe("0.1.3")
   })
 
-  test.each(["0.1.3", "0.1.4", "0.2.0", "1.4.0"])("a relayd at %s receives the account with the keys", async version => {
-    const { owner, service } = await serviceAt(version)
-    await service.adopt(credential("acct_42"))
-    expect(owner.state.adoptions).toBe(1)
-    expect(owner.state.adoptRequests.map(request => request["account"])).toEqual(["acct_42"])
-  })
+  test.each(["0.1.3", "0.1.4", "0.2.0", "1.4.0"])(
+    "a relayd at %s receives the account with the keys",
+    async (version) => {
+      const { owner, service } = await serviceAt(version)
+      await service.adopt(credential("acct_42"))
+      expect(owner.state.adoptions).toBe(1)
+      expect(owner.state.adoptRequests.map((request) => request["account"])).toEqual(["acct_42"])
+    },
+  )
 
   // 0.1.2 shipped without omo-relay-daemon#730: it must get today's exact request.
-  test.each(["0.1.0", "0.1.1", "0.1.2", "0.1.3-rc.1"])("new client + old relayd %s: no account field, and the shipped validator accepts the adopt", async version => {
-    const { owner, service } = await serviceAt(version)
-    expect(await service.adopt(credential("acct_42"))).toEqual({ id: "dev-self", name: "This Mac" })
-    expect(owner.state.adoptions).toBe(1)
-    const [sent] = owner.state.adoptRequests
-    expect(sent === undefined ? [] : Object.keys(sent).toSorted()).toEqual(["device", "id", "sealing_private_key", "signing_private_key", "type"])
-    expect(validateRequest(sent).ok).toBe(true)
-  })
+  test.each(["0.1.0", "0.1.1", "0.1.2", "0.1.3-rc.1"])(
+    "new client + old relayd %s: no account field, and the shipped validator accepts the adopt",
+    async (version) => {
+      const { owner, service } = await serviceAt(version)
+      expect(await service.adopt(credential("acct_42"))).toEqual({ id: "dev-self", name: "This Mac" })
+      expect(owner.state.adoptions).toBe(1)
+      const [sent] = owner.state.adoptRequests
+      expect(sent === undefined ? [] : Object.keys(sent).toSorted()).toEqual([
+        "device",
+        "id",
+        "sealing_private_key",
+        "signing_private_key",
+        "type",
+      ])
+      expect(validateRequest(sent).ok).toBe(true)
+    },
+  )
 
   test("control: the shipped validator refuses a device.adopt that carries an account", () => {
     const { signingPrivateKey, sealingPrivateKey } = keys()
     const request = {
-      id: "r1", type: "device.adopt", device: { id: "dev-self", name: "This Mac" },
-      signing_private_key: signingPrivateKey, sealing_private_key: sealingPrivateKey,
+      id: "r1",
+      type: "device.adopt",
+      device: { id: "dev-self", name: "This Mac" },
+      signing_private_key: signingPrivateKey,
+      sealing_private_key: sealingPrivateKey,
     }
     expect(validateRequest(request).ok).toBe(true)
     expect(validateRequest({ ...request, account: "acct_42" }).ok).toBe(false)
@@ -80,6 +104,6 @@ describe("device.adopt account, gated on welcome.service_version", () => {
   test("a credential that names no account sends none, even to a new relayd", async () => {
     const { owner, service } = await serviceAt("0.1.3")
     await service.adopt(credential())
-    expect(owner.state.adoptRequests.map(request => "account" in request)).toEqual([false])
+    expect(owner.state.adoptRequests.map((request) => "account" in request)).toEqual([false])
   })
 })

@@ -18,13 +18,23 @@ export type AnswerFields =
   | { readonly value: string }
   | { readonly confirmed: boolean }
   | { readonly answers: Readonly<Record<string, never>>; readonly comment: string }
-  | { readonly value: string; readonly answers: Readonly<Record<string, never>>; readonly comment: string; readonly confirmed?: boolean }
+  | {
+      readonly value: string
+      readonly answers: Readonly<Record<string, never>>
+      readonly comment: string
+      readonly confirmed?: boolean
+    }
 
-export type AnswerShape = { readonly ok: true; readonly fields: AnswerFields } | { readonly ok: false; readonly reason: string }
+export type AnswerShape =
+  { readonly ok: true; readonly fields: AnswerFields } | { readonly ok: false; readonly reason: string }
 
 const CONFIRM_ANSWERS: ReadonlyMap<string, boolean> = new Map([
-  ["yes", true], ["y", true], ["true", true],
-  ["no", false], ["n", false], ["false", false],
+  ["yes", true],
+  ["y", true],
+  ["true", true],
+  ["no", false],
+  ["n", false],
+  ["false", false],
 ])
 
 /** Nothing but whitespace and invisible format characters (zero-width space, joiners, BOM, soft hyphen). */
@@ -34,25 +44,40 @@ export function isBlankAnswer(text: string): boolean {
 
 function undeclaredFields(text: string): AnswerFields {
   const confirmed = CONFIRM_ANSWERS.get(text.trim().toLowerCase())
-  return confirmed === undefined ? { value: text, answers: {}, comment: text } : { value: text, answers: {}, comment: text, confirmed }
+  return confirmed === undefined
+    ? { value: text, answers: {}, comment: text }
+    : { value: text, answers: {}, comment: text, confirmed }
 }
 
 export function answerShape(kind: UiRequestKind | null, text: string): AnswerShape {
   switch (kind) {
     case null:
       return isBlankAnswer(text)
-        ? { ok: false, reason: "The question declared no request kind, so the answer needs text; this one is blank. An input or editor that takes an empty answer must be reported with its request kind." }
+        ? {
+            ok: false,
+            reason:
+              "The question declared no request kind, so the answer needs text; this one is blank. An input or editor that takes an empty answer must be reported with its request kind.",
+          }
         : { ok: true, fields: undeclaredFields(text) }
     case "input":
     case "editor":
       return { ok: true, fields: { value: text } }
     case "select":
-      return isBlankAnswer(text) ? { ok: false, reason: "A select answer names one of its options; the text is blank." } : { ok: true, fields: { value: text } }
+      return isBlankAnswer(text)
+        ? { ok: false, reason: "A select answer names one of its options; the text is blank." }
+        : { ok: true, fields: { value: text } }
     case "question":
-      return isBlankAnswer(text) ? { ok: false, reason: "A question answer needs text; this one is blank." } : { ok: true, fields: { answers: {}, comment: text } }
+      return isBlankAnswer(text)
+        ? { ok: false, reason: "A question answer needs text; this one is blank." }
+        : { ok: true, fields: { answers: {}, comment: text } }
     case "confirm": {
       const confirmed = CONFIRM_ANSWERS.get(text.trim().toLowerCase())
-      return confirmed === undefined ? { ok: false, reason: "A confirm answer is yes or no (also y/n, true/false; any case, surrounding spaces ignored)." } : { ok: true, fields: { confirmed } }
+      return confirmed === undefined
+        ? {
+            ok: false,
+            reason: "A confirm answer is yes or no (also y/n, true/false; any case, surrounding spaces ignored).",
+          }
+        : { ok: true, fields: { confirmed } }
     }
     default:
       return assertNever(kind)

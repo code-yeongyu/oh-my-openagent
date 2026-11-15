@@ -15,10 +15,9 @@ function getFallbackEntry(version: string, packageName: string): string {
 
 export async function getPluginNameWithVersion(
   currentVersion: string,
-  packageName: string = DEFAULT_PACKAGE_NAME
+  packageName: string = DEFAULT_PACKAGE_NAME,
 ): Promise<string> {
   const distTags = await fetchNpmDistTags(packageName)
-
 
   if (distTags) {
     const allTags = new Set([...PRIORITIZED_TAGS, ...Object.keys(distTags)])

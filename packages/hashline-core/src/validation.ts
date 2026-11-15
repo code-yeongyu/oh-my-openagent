@@ -48,29 +48,25 @@ export function parseLineRef(ref: string): LineRef {
       hash: match[2],
     }
   }
-  const hashIdx = normalized.indexOf('#')
+  const hashIdx = normalized.indexOf("#")
   if (hashIdx > 0) {
     const prefix = normalized.slice(0, hashIdx)
     const suffix = normalized.slice(hashIdx + 1)
     if (!/^\d+$/.test(prefix) && /^[ZPMQVRWSNKTXJBYH]{2}$/.test(suffix)) {
       throw new Error(
         `Invalid line reference: "${ref}". "${prefix}" is not a line number. ` +
-          `Use the actual line number from the read output.`
+          `Use the actual line number from the read output.`,
       )
     }
   }
-  throw new Error(
-    `Invalid line reference format: "${ref}". Expected format: "{line_number}#{hash_id}"`
-  )
+  throw new Error(`Invalid line reference format: "${ref}". Expected format: "{line_number}#{hash_id}"`)
 }
 
 export function validateLineRef(lines: string[], ref: string): void {
   const { line, hash } = parseLineRefWithHint(ref, lines)
 
   if (line < 1 || line > lines.length) {
-    throw new Error(
-      `Line number ${line} out of bounds. File has ${lines.length} lines.`
-    )
+    throw new Error(`Line number ${line} out of bounds. File has ${lines.length} lines.`)
   }
 
   const content = lines[line - 1]
@@ -84,7 +80,7 @@ export class HashlineMismatchError extends Error {
 
   constructor(
     private readonly mismatches: HashMismatch[],
-    private readonly fileLines: string[]
+    private readonly fileLines: string[],
   ) {
     super(HashlineMismatchError.formatMessage(mismatches, fileLines))
     this.name = "HashlineMismatchError"
@@ -111,7 +107,7 @@ export class HashlineMismatchError extends Error {
     const output: string[] = []
     output.push(
       `${mismatches.length} line${mismatches.length > 1 ? "s have" : " has"} changed since last read. ` +
-        "Use updated {line_number}#{hash_id} references below (>>> marks changed lines)."
+        "Use updated {line_number}#{hash_id} references below (>>> marks changed lines).",
     )
     output.push("")
 

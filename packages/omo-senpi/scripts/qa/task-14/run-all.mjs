@@ -21,16 +21,27 @@ for (const name of scenarios) {
 }
 const final = `${output.join("\n")}\n=== summary ===\n${failed ? "FAIL" : "PASS"} task-14 resilience injections\n`
 writeFileSync(join(evidence, "run-all.txt"), final)
-writeFileSync(join(evidence, "cleanup-receipt.txt"), `run_all=${failed ? "FAIL" : "PASS"}\nscenarios=${scenarios.join(",")}\nper_scenario_receipts=${scenarios.map((name) => `${name}-cleanup-receipt.txt`).join(",")}\nall_scratch_and_spawned_processes_checked=true\n`)
+writeFileSync(
+  join(evidence, "cleanup-receipt.txt"),
+  `run_all=${failed ? "FAIL" : "PASS"}\nscenarios=${scenarios.join(",")}\nper_scenario_receipts=${scenarios.map((name) => `${name}-cleanup-receipt.txt`).join(",")}\nall_scratch_and_spawned_processes_checked=true\n`,
+)
 process.stdout.write(final)
 process.exit(failed ? 1 : 0)
 
 function run(script) {
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, [script], { env: withTelemetryOptOut(process.env), stdio: ["ignore", "pipe", "pipe"] })
-    let stdout = "", stderr = ""
-    child.stdout.on("data", (value) => { stdout += value })
-    child.stderr.on("data", (value) => { stderr += value })
+    const child = spawn(process.execPath, [script], {
+      env: withTelemetryOptOut(process.env),
+      stdio: ["ignore", "pipe", "pipe"],
+    })
+    let stdout = "",
+      stderr = ""
+    child.stdout.on("data", (value) => {
+      stdout += value
+    })
+    child.stderr.on("data", (value) => {
+      stderr += value
+    })
     child.on("close", (status) => resolve({ status: status ?? 1, stdout, stderr }))
   })
 }

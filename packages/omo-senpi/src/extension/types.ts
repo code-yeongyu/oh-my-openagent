@@ -28,7 +28,12 @@ export interface SettleObserver {
   phase(label: string): void
 }
 
-type DialogOptions = { readonly signal?: AbortSignal; readonly timeout?: number; readonly toolCallId?: string; readonly parentToolCallId?: string }
+type DialogOptions = {
+  readonly signal?: AbortSignal
+  readonly timeout?: number
+  readonly toolCallId?: string
+  readonly parentToolCallId?: string
+}
 
 /** The prompting dialogs of senpi's ExtensionUIContext; `input`/`editor` are optional so narrow fakes still fit. */
 export interface DialogUi {
@@ -70,7 +75,10 @@ export interface SenpiExtensionAPI {
   ): void
   rpc?: {
     emit(name: string, data: unknown): void
-    handle?(name: string, handler: (data: unknown, context?: ExtensionRpcRequestContext) => unknown | Promise<unknown>): void
+    handle?(
+      name: string,
+      handler: (data: unknown, context?: ExtensionRpcRequestContext) => unknown | Promise<unknown>,
+    ): void
   }
   events?: {
     emit(name: string, data: unknown): void
@@ -99,7 +107,10 @@ export interface SenpiExtensionAPI {
   /** Dialogs every client attached to the session may answer (senpi#6204); absent on older engines. */
   readonly sessionDialog?: DialogUi
   sendMessage(message: Record<string, unknown>, options?: Record<string, unknown>): void | Promise<void>
-  sendUserMessage(content: string | readonly Record<string, unknown>[], options?: { deliverAs?: "steer" | "followUp" }): void
+  sendUserMessage(
+    content: string | readonly Record<string, unknown>[],
+    options?: { deliverAs?: "steer" | "followUp" },
+  ): void
   /** senpi's slash-command registry: extension commands, prompt templates, and `skill:<name>` entries. */
   getCommands?(): readonly {
     readonly name: string

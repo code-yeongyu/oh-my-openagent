@@ -103,8 +103,7 @@ describe("memory-core win32 console suppression", () => {
       test("#then the audit still reaches the git and start-identity spawn sites it exists for", () => {
         const audited = productionSources().flatMap(collectChildProcessCalls)
 
-        expect(audited.map((call) => call.file).filter((file) => file.includes("git/exec")).length)
-          .toBeGreaterThan(0)
+        expect(audited.map((call) => call.file).filter((file) => file.includes("git/exec")).length).toBeGreaterThan(0)
         expect(
           audited.map((call) => call.file).filter((file) => file.includes("locks/process-identity")).length,
         ).toBeGreaterThan(0)

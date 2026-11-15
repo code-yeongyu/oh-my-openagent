@@ -4,8 +4,12 @@ import { loadSenpiBarrel } from "../../lazy/senpi-barrel"
 import { engineAcceptsSpawnedBy } from "../engine-spawned-by"
 import { HostUnavailableError } from "./daemon"
 import {
-  assertHostUsable, toWireOpen,
-  type HostProtocolProbe, type HostRpcClient, type HostRpcClientFactory, type HostSessionOpenInput,
+  assertHostUsable,
+  toWireOpen,
+  type HostProtocolProbe,
+  type HostRpcClient,
+  type HostRpcClientFactory,
+  type HostSessionOpenInput,
 } from "./session-transport"
 import { toOpenFailure } from "./session-wire"
 

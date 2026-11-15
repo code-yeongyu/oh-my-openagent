@@ -404,11 +404,7 @@ describe("dag rpc handlers", () => {
       const listed = expectOk<{ readonly runs: readonly unknown[] }>(await handlers.call("omo.dag.list", {}))
 
       // then
-      expect([snapshot.code, history.code, subscribe.code]).toEqual([
-        "run_not_owned",
-        "run_not_owned",
-        "run_not_owned",
-      ])
+      expect([snapshot.code, history.code, subscribe.code]).toEqual(["run_not_owned", "run_not_owned", "run_not_owned"])
       expect(listed.runs).toHaveLength(0)
     })
 
@@ -423,11 +419,7 @@ describe("dag rpc handlers", () => {
       const subscribe = expectError(await handlers.call("omo.dag.subscribe", { runId: "run-missing" }))
 
       // then
-      expect([snapshot.code, history.code, subscribe.code]).toEqual([
-        "run_not_found",
-        "run_not_found",
-        "run_not_found",
-      ])
+      expect([snapshot.code, history.code, subscribe.code]).toEqual(["run_not_found", "run_not_found", "run_not_found"])
     })
 
     it("#when params are malformed #then the envelope carries invalid_arguments", async () => {
@@ -445,14 +437,7 @@ describe("dag rpc handlers", () => {
       const badPayload = expectError(await handlers.call("omo.dag.subscribe", "not-an-object"))
 
       // then
-      expect([
-        missingRunId.code,
-        badSince.code,
-        badLimit.code,
-        badLane.code,
-        badStatus.code,
-        badPayload.code,
-      ]).toEqual([
+      expect([missingRunId.code, badSince.code, badLimit.code, badLane.code, badStatus.code, badPayload.code]).toEqual([
         "invalid_arguments",
         "invalid_arguments",
         "invalid_arguments",
@@ -509,12 +494,7 @@ describe("dag rpc handlers", () => {
       const handlers = wire(target)
 
       // then
-      expect(handlers.names).toEqual([
-        "omo.dag.list",
-        "omo.dag.snapshot",
-        "omo.dag.history",
-        "omo.dag.subscribe",
-      ])
+      expect(handlers.names).toEqual(["omo.dag.list", "omo.dag.snapshot", "omo.dag.history", "omo.dag.subscribe"])
     })
   })
 })

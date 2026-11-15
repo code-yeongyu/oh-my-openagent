@@ -1,4 +1,11 @@
-import { appendBlock, findTomlSection, removeRootSetting, removeSetting, replaceOrInsertRootSetting, replaceOrInsertSetting } from "./toml-section-editor"
+import {
+  appendBlock,
+  findTomlSection,
+  removeRootSetting,
+  removeSetting,
+  replaceOrInsertRootSetting,
+  replaceOrInsertSetting,
+} from "./toml-section-editor"
 import { ensureFeatureEnabled } from "./codex-config-features"
 
 const AUTONOMOUS_FEATURES = ["multi_agent", "unified_exec", "goals"] as const

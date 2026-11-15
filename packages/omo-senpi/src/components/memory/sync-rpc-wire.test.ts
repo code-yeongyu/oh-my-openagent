@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { registerSyncRpc } from "./sync-rpc-registration"
@@ -9,13 +9,20 @@ import { creatorAnchor } from "../../../../memory-core/src/sync/crypto/anchor"
 import { appendEntries, emptyChain } from "../../../../memory-core/src/sync/crypto/chain"
 import { createRejectionCounter } from "../../../../memory-core/src/sync/crypto/rejection"
 import { pinTrustAnchor, loadTrustAnchor } from "../../../../memory-core/src/sync/crypto/trust-pin"
-import { createWorld, freshStateDir, newDevice, removeWorldStateDirs, type Device } from "../../../../memory-core/src/sync/recovery/testing/world.test-support"
+import {
+  createWorld,
+  freshStateDir,
+  newDevice,
+  removeWorldStateDirs,
+  type Device,
+} from "../../../../memory-core/src/sync/recovery/testing/world.test-support"
 import { createAccountHttp } from "../../../../memory-core/src/sync/account/http"
 import { createPairingHttp } from "../../../../memory-core/src/sync/account/pairing-http"
 import { enableSync } from "../../../../memory-core/src/sync/account/enable"
 import { joinAccount } from "../../../../memory-core/src/sync/account/join"
 import { approveDevice } from "../../../../memory-core/src/sync/account/approve"
 import { startChainWireServer } from "../../../../memory-core/src/sync/account/testing/chain-wire-server.test-support"
+import { removeTree } from "../../../../../test-support/remove-tree"
 
 const cleanup: (() => Promise<unknown>)[] = []
 afterEach(async () => {
@@ -48,11 +55,17 @@ async function setup(empty = false) {
   const server = startChainWireServer(world.account, chain)
   cleanup.push(() => server.stop())
   const claimsRoot = await mkdtemp(join(tmpdir(), "g3-wire-"))
-  cleanup.push(() => rm(claimsRoot, { recursive: true, force: true }))
+  // The claims churn lease, lock and guard files here up to dispose; on Windows a just-unlinked one can still be
+  // listed, and Bun's recursive rm then reports success but leaves the root. removeTree checks it is gone.
+  cleanup.push(() => removeTree(claimsRoot))
   const joining = await newDevice()
   const memberPin = freshStateDir()
   if (!empty) {
-    const anchored = await appendEntries(emptyChain(world.account, creatorAnchor(world.account, world.owner.keyring)), chain, createRejectionCounter())
+    const anchored = await appendEntries(
+      emptyChain(world.account, creatorAnchor(world.account, world.owner.keyring)),
+      chain,
+      createRejectionCounter(),
+    )
     if (!anchored.ok || anchored.state.pin === null) throw new Error("invalid fixture genesis")
     await pinTrustAnchor(memberPin, world.account, anchored.state.pin)
   }
@@ -63,25 +76,46 @@ async function setup(empty = false) {
     const joined = Promise.withResolvers<void>()
     const token = server.tokenFor({ ...device.principal })
     const owner: SyncRpcContext = {
-      ownerId: `owner-${device.principal.id}`, disconnectSignal: controller.signal,
-      admit: (dispatch) => { controller.signal.throwIfAborted(); return dispatch() },
+      ownerId: `owner-${device.principal.id}`,
+      disconnectSignal: controller.signal,
+      admit: (dispatch) => {
+        controller.signal.throwIfAborted()
+        return dispatch()
+      },
     }
     const account: SyncRpcAccount = {
       descriptor: {
-        genesis: "unsupported", rpId: null, userName: null,
-        serviceOrigin: server.url, accountId: world.account, serviceDeviceId: `service-${device.principal.id}`,
-        syncPrincipalId: device.principal.id, publicKeys: device.keyring.publicKeys(), generation: "g1", incarnation: "main-1",
+        genesis: "unsupported",
+        rpId: null,
+        userName: null,
+        serviceOrigin: server.url,
+        accountId: world.account,
+        serviceDeviceId: `service-${device.principal.id}`,
+        syncPrincipalId: device.principal.id,
+        publicKeys: device.keyring.publicKeys(),
+        generation: "g1",
+        incarnation: "main-1",
       },
       signal: controller.signal,
       isCurrent: async () => !controller.signal.aborted,
-      boundary: async (dispatch) => { controller.signal.throwIfAborted(); return dispatch() },
+      boundary: async (dispatch) => {
+        controller.signal.throwIfAborted()
+        return dispatch()
+      },
       forOperation: async (authority) => {
         const send: typeof fetch = Object.assign(
-          (request: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => authority.admit(() => fetch(request, { ...init, signal: authority.signal })),
+          (request: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) =>
+            authority.admit(() => fetch(request, { ...init, signal: authority.signal })),
           { preconnect: fetch.preconnect },
         )
         const options = { baseUrl: server.url, token: () => token, fetch: send }
-        return { keyring: device.keyring, chain: createAccountHttp(options), pairing: createPairingHttp(options), devices: async () => [], close: async () => undefined }
+        return {
+          keyring: device.keyring,
+          chain: createAccountHttp(options),
+          pairing: createPairingHttp(options),
+          devices: async () => [],
+          close: async () => undefined,
+        }
       },
     }
     // The core at the task's base predates the observation hooks. These adapters observe the
@@ -99,32 +133,58 @@ async function setup(empty = false) {
               return row
             },
           },
-          showCode: (value) => { input.showCode(value); code.resolve(value) },
+          showCode: (value) => {
+            input.showCode(value)
+            code.resolve(value)
+          },
         })
         joined.resolve()
         return result
       },
-      approveDevice: (input) => approveDevice({
-        ...input,
-        pairing: {
-          ...input.pairing,
-          answerPending: async (id, principal, nonce) => {
-            const row = await input.pairing.answerPending(id, principal, nonce)
-            input.onAnswered(row)
-            return row
+      approveDevice: (input) =>
+        approveDevice({
+          ...input,
+          pairing: {
+            ...input.pairing,
+            answerPending: async (id, principal, nonce) => {
+              const row = await input.pairing.answerPending(id, principal, nonce)
+              input.onAnswered(row)
+              return row
+            },
           },
-        },
-        confirmCode: (value) => { const answer = input.confirmCode(value); code.resolve(value); return answer },
-      }),
+          confirmCode: (value) => {
+            const answer = input.confirmCode(value)
+            code.resolve(value)
+            return answer
+          },
+        }),
     }
     const handlers = new Map<string, Parameters<SyncRpcRegistration["handle"]>[1]>()
-    const coordinator = registerSyncRpc({ handle: (name, handler) => { handlers.set(name, handler) } }, {
-      source: async () => account, runtime, claims: createSyncRpcClaims(claimsRoot),
-      signal: controller.signal, pinDir, clock, syncStatus: async () => ({ state: "never_synced" }),
+    const coordinator = registerSyncRpc(
+      {
+        handle: (name, handler) => {
+          handlers.set(name, handler)
+        },
+      },
+      {
+        source: async () => account,
+        runtime,
+        claims: createSyncRpcClaims(claimsRoot),
+        signal: controller.signal,
+        pinDir,
+        clock,
+        syncStatus: async () => ({ state: "never_synced" }),
+      },
+    )
+    cleanup.push(async () => {
+      controller.abort()
+      await coordinator.dispose()
     })
-    cleanup.push(async () => { controller.abort(); await coordinator.dispose() })
     return {
-      code: code.promise, joined: joined.promise, clock, pinDir,
+      code: code.promise,
+      joined: joined.promise,
+      clock,
+      pinDir,
       call: async (verb: string, data: unknown = {}) => {
         const handler = handlers.get(`omo.memory.sync.${verb}`)
         if (handler === undefined) throw new Error("missing registered handler")
@@ -142,13 +202,17 @@ test("#given two synthetic devices #when registered handlers confirm matching co
   if (pending === undefined) throw new Error("no pending row")
   expect(await f.joiner.call("enable")).toMatchObject({ kind: "join_required" })
   expect(f.server.pending()).toHaveLength(1)
-  expect(await f.member.call("pending")).toEqual({ pending: [{ id: pending.id, expiresAt: pending.expires_at, answered: false, revealed: false }] })
+  expect(await f.member.call("pending")).toEqual({
+    pending: [{ id: pending.id, expiresAt: pending.expires_at, answered: false, revealed: false }],
+  })
   await f.member.call("approve", { action: "begin", pendingId: pending.id })
   await f.joiner.clock.advance()
   const joiningCode = await f.joiner.code
   await f.member.clock.advance()
   expect(await f.member.code).toBe(joiningCode)
-  expect(await f.member.call("approve", { action: "confirm", pendingId: pending.id, code: joiningCode })).toMatchObject({ outcome: { kind: "approved" }, code: null })
+  expect(await f.member.call("approve", { action: "confirm", pendingId: pending.id, code: joiningCode })).toMatchObject(
+    { outcome: { kind: "approved" }, code: null },
+  )
   await f.joiner.clock.advance()
   await f.joiner.joined
   expect(await f.joiner.call("status")).toMatchObject({ enable: { kind: "joined" }, sync: { state: "never_synced" } })
@@ -167,7 +231,9 @@ test("#given actual pairing codes #when the person submits a different code #the
   await f.member.clock.advance()
   const code = await f.member.code
   const wrong = code === "000000" ? "111111" : "000000"
-  expect(await f.member.call("approve", { action: "confirm", pendingId: pending.id, code: wrong })).toMatchObject({ outcome: { kind: "declined" } })
+  expect(await f.member.call("approve", { action: "confirm", pendingId: pending.id, code: wrong })).toMatchObject({
+    outcome: { kind: "declined" },
+  })
   expect(f.chain.length).toBe(before)
 }, 15_000)
 
