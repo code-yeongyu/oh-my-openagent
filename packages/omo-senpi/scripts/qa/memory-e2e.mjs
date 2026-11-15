@@ -167,11 +167,23 @@ function writeMockScript(sandbox, script, name = "mock-script.json") {
 }
 
 function memoryRepos(memoryHome) {
-  const agentsDir = join(memoryHome, "agents")
-  if (!existsSync(agentsDir)) return []
-  return readdirSync(agentsDir)
-    .map((name) => join(agentsDir, name, "repo"))
-    .filter(existsSync)
+  const repos = []
+  const collect = (agentsDir) => {
+    if (!existsSync(agentsDir)) return
+    for (const name of readdirSync(agentsDir)) {
+      const repo = join(agentsDir, name, "repo")
+      if (existsSync(repo)) repos.push(repo)
+    }
+  }
+  collect(join(memoryHome, "agents"))
+  // A one-shot run (headless `senpi -p`, `--mode json`, a senpi-task child) routes its identity to
+  // `<memory>/transient-runs/<token>/agents/<id>` and keeps `repo/` there once it persists memory; the
+  // durable agents root is where the sweep later promotes it. Both are the run's own repo.
+  const transientDir = join(memoryHome, "transient-runs")
+  if (existsSync(transientDir)) {
+    for (const token of readdirSync(transientDir)) collect(join(transientDir, token, "agents"))
+  }
+  return repos
 }
 
 function gitLog(repo) {
