@@ -150,7 +150,7 @@ Each input helper resolves to `{ value, report, reports, auditIds, toolCallId }`
 
 The model's helper reference tells it that input helpers resolve with this report and that `report.disposition.retry` says whether sending the same input again is safe. Per error code it is told more: after `AxUnconfirmed`, observe the window before any retry and never repeat the action blindly; after `UserIntervened`, read the window again and never repeat the action as it was; on `Suspended` or `StopPathUnavailable`, stop and report. The full table is in [Dispositions](../reference/computer.md#dispositions).
 
-Each call has limits: its input may be at most 1 MiB of JSON, and a helper's return value at most 8 MiB (ask for one window, a subtree or a zoom region instead of everything). Each session may send 20,000 desktop requests; after that every call is refused with `COMPUTER_CALL_BUDGET_EXCEEDED` and nothing more is sent. Every audit record a call returns carries the id of the tool call that sent it, so a cell's steps can be told apart.
+Each call has limits: its input may be at most 1 MiB of JSON, and a helper's return value at most 8 MiB (ask for one window, a subtree or a zoom region instead of everything). Each desktop session may send 20,000 desktop requests; after that every call is refused with `COMPUTER_CALL_BUDGET_EXCEEDED` and nothing more is sent until the session is closed: `/computer off` then `/computer on`, or `computer.close()` in a cell, starts a fresh budget. Every audit record a call returns carries the id of the tool call that sent it, and a call that completes returns only after the records of everything it sent have arrived, so a cell's steps can be told apart in their results.
 
 ### Check the result with verify
 
