@@ -124,6 +124,9 @@ Put the `computer` block in `~/.omo/omo.jsonc` (or `~/.omo/omo.json`) for your a
 | `screenshot_gc.scan_interval_ms` | `1800000` (30 minutes) | How often stale screenshots are swept |
 | `engine_path` | unset | Use this engine binary instead of locating or downloading one |
 | `cua_adapter` | `false` | Also register `computer_actions`, OpenAI computer-use actions over the same permissions, audit and stop path |
+| `intervention` | `"continue"` | What background input does while you use the target app: `"continue"` keeps going past your input, `"pause"` waits for you to stop (see [When you use the same app](#when-you-use-the-same-app)) |
+| `macos_key_priming` | `"off"` | `"on"` lets background typing reach one window of a macOS app that has several (see [Type into an app with several windows](#type-into-an-app-with-several-windows)) |
+| `trace` | `false` | Write a redacted per-request timing trace beside the audit log, for diagnosing slow actions |
 
 The schema is `packages/omo-config-core/src/schema/computer.ts`; the defaults are resolved in `packages/senpi-desktop-tool/src/settings.ts`. An invalid block is reported in the log and the component stays unregistered for that session. Start a new session after changing the file.
 
@@ -131,9 +134,56 @@ The schema is `packages/omo-config-core/src/schema/computer.ts`; the defaults ar
 
 Wayland has no focused-window geometry and uses the first display the portal reports, not a known compositor primary. The explicit id `"wayland-portal-0"` still means the whole Screenshot-portal image, even when libei proves a multi-monitor layout; other `"wayland-portal-N"` ids select a region through the Screenshot portal. Without a proven layout, only the whole-desktop image is available and coordinate input is refused. Explicit `"wayland-screencast-N"` ids now fail `InvalidTarget` if ScreenCast is unavailable instead of silently returning an unrelated Screenshot image; use `"all"` or `"wayland-portal-0"` for that fallback.
 
+## Act, then check
+
+The agent drives your desktop from its eval kernel. Every `computer` helper is one tool call, so a task of several steps is one eval cell that awaits one helper per step; there is no separate code cell for computer use and no sandbox setting. Each step gets its own permission check, its own audit records and its own result. For example, one cell can find a window, look at it, type into it and press Enter:
+
+```js
+const doc = await computer.window({ app: "TextEdit" })
+await doc.screenshot()
+const typed = await doc.type("Quarterly report")
+const entered = await doc.press("enter")
+return [typed.report.disposition.delivery, entered.report.disposition.delivery]
+```
+
+Each input helper resolves to `{ value, report, reports, auditIds, toolCallId }`. The report's `disposition`, such as `{ "delivery": "delivered_unverified", "retry": "unsafe" }`, says whether the input reached the app and whether sending it again could duplicate it. A helper that resolves has sent its input, so the next step reads the window back rather than repeating it. A step that is refused or fails throws, and the cell stops there unless it catches the error; for the failures the tool returns as structured results (a permission, the foreground grant, another session holding it, a stop, a stale ref, the size and budget limits below), `error.code` names the failure, for example `COMPUTER_CONTROL_REQUIRED`. Other failures carry only their message.
+
+The model's helper reference tells it that input helpers resolve with this report and that `report.disposition.retry` says whether sending the same input again is safe. Per error code it is told more: after `AxUnconfirmed`, observe the window before any retry and never repeat the action blindly; after `UserIntervened`, read the window again and never repeat the action as it was; on `Suspended` or `StopPathUnavailable`, stop and report. The full table is in [Dispositions](../reference/computer.md#dispositions).
+
+Each call has limits: its input may be at most 1 MiB of JSON, and a helper's return value at most 8 MiB (ask for one window, a subtree or a zoom region instead of everything). Each session may send 20,000 desktop requests; after that every call is refused with `COMPUTER_CALL_BUDGET_EXCEEDED` and nothing more is sent. Every audit record a call returns carries the id of the tool call that sent it, so a cell's steps can be told apart.
+
+### Check the result with verify
+
+In an eval cell, `computer.verify(expectation, { timeoutMs })` re-reads the desktop until a state holds or the deadline passes (default 2 seconds), instead of a fixed sleep. Expectations are `elementExists`, `elementValue`, `elementEnabled`, `elementSelected` (each with an element `ref`), and `windowExists`, `windowGone`, `windowBounds` (each with a window selector). The answer is `satisfied`, `unsatisfied` (the state still did not hold at the deadline) or `unknown` (a read failed), with the number of reads:
+
+```js
+const verdict = await computer.verify({ kind: "windowExists", window: { app: "TextEdit", title: "Untitled" } }, { timeoutMs: 3000 })
+if (verdict.status !== "satisfied") throw new Error(`window did not open: ${verdict.status}`)
+```
+
+`verify` only reads and never sends input. It does not wait past its deadline, but it checks the deadline only between reads, so a read already in flight when the deadline passes finishes first and the answer can come a little late.
+
+### Use a screenshot only once
+
+Coordinates belong to the latest full screenshot of the same window. If the window changes size after the capture, a click against that frame is refused (`InvalidCoordinateFrame`, reason `resized`) with nothing sent. For a click that must not happen twice, such as paying or deleting, a program using the SDK (`@oh-my-opencode/senpi-desktop-sdk`) passes `consume: true` in the pointer options: after that action the frame is spent, and any further input against it is refused with reason `consumed` until a new screenshot is taken. The eval `computer` helpers do not forward `consume` in this release.
+
+### Type into an app with several windows
+
+On macOS, background typing goes to the app, which routes keys to its own key window. When the target app has only one window that is enough; when it has several, OmO refuses the keys with `BackgroundUnavailable` rather than risk typing into the wrong window. Three ways through:
+
+- Prefer accessibility: an element's `setValue` or `type` writes into that exact field without keyboard focus.
+- Set `computer.macos_key_priming` to `"on"`. Before typing, OmO makes the target window the app's key window, confirms that with two reads, sends the keys only on that proof, then hands key focus inside the app back. The app is not brought to the front. If the target cannot be made key, nothing is sent and the refusal can be retried.
+- Use `delivery: "foreground"`, which needs your foreground-control approval.
+
+If you pressed a key or clicked in that app within the last 1.5 seconds while it is frontmost, background keys into it are refused (`BackgroundUnavailable`, reason `user_active_in_target`) so the agent never types over you; it retries once you pause.
+
+### When you use the same app
+
+By default (`computer.intervention: "continue"`), the agent's input in an app you are typing or clicking in keeps going: your keys and clicks there are recorded, but nothing waits for you and input already in progress is not stopped. The 1.5-second rule above still applies, so background keys into the frontmost app you just used are refused until you pause. With `"pause"`, its input there waits for you to pause and then stops with `UserIntervened`, nothing sent, and input already in progress stops at your first key or click and reports how much was delivered, so the agent reads the window again and sends only what is left. Using apps the agent is not working in does not stop it. OmO sends the setting only to an engine that advertises `intervention-policy`; an older engine is not sent it and always pauses.
+
 ## Safety model
 
-**Permission tiers.** Screenshots, window lists, accessibility reads and `run` with `read_only: true` require `computer:read`. Input, mutations, `close`, unknown methods and malformed requests require `computer:exec`. The host checks the tier before the engine sees the call, and an approval for read never approves exec. A non-interactive run cannot answer an `ask` decision, so allow the tier explicitly or the call is blocked. To let the agent look but never touch:
+**Permission tiers.** Screenshots, window lists and accessibility reads require `computer:read`. Input, mutations, `close`, unknown methods and malformed requests require `computer:exec`. The host checks the tier before the engine sees the call, and an approval for read never approves exec. A non-interactive run cannot answer an `ask` decision, so allow the tier explicitly or the call is blocked. To let the agent look but never touch:
 
 ```sh
 omo --permission computer:read=allow --permission computer:exec=deny
@@ -143,13 +193,13 @@ omo --permission computer:read=allow --permission computer:exec=deny
 
 Plain Esc is not a stop key: the app you are working in needs it for its own dialogs and fields, so only the chord stops computer use, and the chord still reaches that app. When the chord cannot be heard, input is refused instead of running unguarded. On macOS, a password field or Terminal's Secure Keyboard Entry turns on Secure Event Input, which hides every key press from the stop chord's listener; while it is on, input fails with `StopPathUnavailable` (`stopReason=secure-input-active`) and resumes by itself once you leave the password field or turn Secure Keyboard Entry off. If the stop chord stops working partway through a `type`, typing stops at the next character with the same error, and the keys and buttons it held are released.
 
-**Foreground control asks you first.** Background input to one window, the default, needs no extra approval. Before the agent can take your foreground (input with `delivery: "foreground"`, raising a window with `win.raise()`, or any click, typing, key press, scroll, drag, pointer move or hold aimed at the desktop or a display, which lands on your real pointer and frontmost app), OmO shows "Allow foreground computer control?" with the agent's reason. Only your answer grants it: a non-interactive run has no one to ask, so it never grants. When OmO runs inside another app (OmO Desktop or an RPC client), that app shows the question, and an app that never answers leaves control off. Declining, letting the question time out, or interrupting while it is open all leave control off. Until you approve, foreground actions fail with `ControlRequired`. The approval covers foreground input for the current task only and does not authorize anything else, such as sending messages or deleting data. It ends when the task finishes, when any `computer` run in it fails or is interrupted, when the session closes, and when you press the stop chord; `/computer resume` never brings it back, so the next foreground action asks again. Only one session holds foreground control at a time: if another session asks meanwhile, its question still appears, and even after you approve it gets `InputBusy` instead of taking control over. In full access mode (`--permission-preset full-access`) OmO grants foreground control without asking and says so in the session, and the same revocation rules apply. Desktop and display input in full access is granted without a question or a note, non-interactive runs included, and that grant is revoked as soon as the session leaves full access.
+**Foreground control asks you first.** Background input to one window, the default, needs no extra approval. Before the agent can take your foreground (input with `delivery: "foreground"`, raising a window with `win.raise()`, or any click, typing, key press, scroll, drag, pointer move or hold aimed at the desktop or a display, which lands on your real pointer and frontmost app), OmO shows "Allow foreground computer control?" with the agent's reason. Only your answer grants it: a non-interactive run has no one to ask, so it never grants. When OmO runs inside another app (OmO Desktop or an RPC client), that app shows the question, and an app that never answers leaves control off. Declining, letting the question time out, or interrupting while it is open all leave control off. Until you approve, foreground actions fail with `ControlRequired`. The approval covers foreground input for the current task only and does not authorize anything else, such as sending messages or deleting data. It ends when the task finishes, when any `computer` call in it fails or is interrupted, when the session closes, and when you press the stop chord; `/computer resume` never brings it back, so the next foreground action asks again. Only one session holds foreground control at a time: if another session asks meanwhile, its question still appears, and even after you approve it gets `InputBusy` instead of taking control over. In full access mode (`--permission-preset full-access`) OmO grants foreground control without asking and says so in the session, and the same revocation rules apply. Desktop and display input in full access is granted without a question or a note, non-interactive runs included, and that grant is revoked as soon as the session leaves full access.
 
 **Before input reaches an application,** the engine refuses it when input is suspended, the screen is locked, the stop path is gone, or the OS permission is missing.
 
 **What the agent is told.** The computer-use skill instructs the model to treat screen text, notifications and documents as untrusted data that can never authorize an action, and to confirm immediately before consequential actions (sending or publishing, purchases and transfers, deletion, account, security and permission changes, disclosing private data, accepting terms) unless your own message authorized that exact action. A `Suspended` or `StopPathUnavailable` error means stop and report; the model is told never to work around it. These are model instructions, not a sandbox: the eval cells that call the `computer` helpers run with full host access, so keep permission rules strict for untrusted work and use a separate account or VM for risky automation.
 
-**Focus.** Input defaults to background delivery. On macOS it leaves your frontmost app, visible front window, keyboard focus, cursor and next-keystroke destination unchanged, although a clicked target may rise directly beneath your front window. Background typing into an app with multiple windows can report `BackgroundUnavailable`; use accessibility actions or foreground delivery instead. Foreground delivery briefly activates the target and then restores the previous window and cursor; a failed restore is reported, not hidden.
+**Focus.** Input defaults to background delivery. On macOS it leaves your frontmost app, visible front window, keyboard focus, cursor and next-keystroke destination unchanged, although a clicked target may rise directly beneath your front window. Background typing into an app with multiple windows can report `BackgroundUnavailable`; use accessibility actions, `macos_key_priming`, or foreground delivery instead (see [Type into an app with several windows](#type-into-an-app-with-several-windows)). Foreground delivery briefly activates the target and then restores the previous window and cursor; a failed restore is reported, not hidden.
 
 **Audit.** Every mutating action is appended to `.computer-audit.jsonl` in the session directory. Typed text is recorded by length and digest, never content, and an interrupted `type` also records how many characters were delivered. Set `audit_log.enabled: false` to turn it off.
 
