@@ -9,7 +9,7 @@
 // coordinated host start timed out in supervisor_bootstrap.
 
 import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, realpathSync, rmSync, symlinkSync } from "node:fs"
-import { dirname, join } from "node:path"
+import { dirname, join, sep } from "node:path"
 
 const SENPI_SCOPE = "@code-yeongyu"
 const SENPI_NAME = "senpi"
@@ -65,6 +65,10 @@ export function placeBuiltSenpi(omoDir: string, builtSenpiRoot: string): string 
     const resolved = resolvedOrUndefined(path)
     if (resolved !== undefined) others.add(resolved)
   }
+  const clone = realpathSync(omoDir) + sep
+  const outside = [...others].filter((directory) => !directory.startsWith(clone))
+  if (outside.length > 0)
+    throw new Error(`senpi resolves outside the clone ${omoDir}; refusing to replace: ${outside.join(", ")}`)
   rmSync(target, { recursive: true, force: true })
   mkdirSync(dirname(target), { recursive: true })
   cpSync(builtSenpiRoot, target, { recursive: true })

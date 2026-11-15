@@ -56,6 +56,25 @@ describe("placeBuiltSenpi", () => {
     }
   })
 
+  test("#given a workspace linked to a senpi outside the clone #when the built engine is placed #then it refuses and deletes nothing", () => {
+    const root = mkdtempSync(join(tmpdir(), "omob-senpi-swap-outside-"))
+    try {
+      const omoDir = join(root, "omo")
+      const outside = join(root, "bun-cache", "@code-yeongyu", "senpi")
+      writeEngine(outside, "global-cache")
+      link(outside, join(omoDir, "packages", "omo-native", "node_modules", "@code-yeongyu", "senpi"))
+      writeEngine(join(omoDir, "node_modules", "@code-yeongyu", "senpi"), "registry")
+      const built = join(root, "built")
+      writeEngine(built, "source-build")
+      expect(() => placeBuiltSenpi(omoDir, built)).toThrow(/outside the clone/)
+      expect(JSON.parse(readFileSync(join(outside, "package.json"), "utf8")).version).toBe("global-cache")
+      const rootEngine = join(omoDir, "node_modules", "@code-yeongyu", "senpi", "package.json")
+      expect(JSON.parse(readFileSync(rootEngine, "utf8")).version).toBe("registry")
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   test("#given a clone whose root is the only senpi #when the built engine is placed twice #then the root holds the build and nothing else resolves", () => {
     const root = mkdtempSync(join(tmpdir(), "omob-senpi-swap-root-"))
     try {
