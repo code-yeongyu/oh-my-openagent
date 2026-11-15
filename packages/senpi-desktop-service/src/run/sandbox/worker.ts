@@ -23,6 +23,18 @@ const PRELUDE = `(bridge, names) => {
 		error.reason = reason;
 		return error;
 	};
+	const hostFailure = (data) => {
+		const error = new Error(data.message);
+		error.name = data.name;
+		if (data.reason !== undefined) error.reason = data.reason;
+		if (data.data !== undefined) error.data = data.data;
+		if (data.rpcCode !== undefined) error.rpcCode = data.rpcCode;
+		if (data.code !== undefined) error.code = data.code;
+		if (data.engineRestarted !== undefined) error.engineRestarted = data.engineRestarted;
+		if (data.method !== undefined) error.method = data.method;
+		Object.defineProperty(error, "hostError", { value: data.hostError });
+		return error;
+	};
 	const boundary = (key, value) => {
 		const kind = typeof value;
 		if (kind === "function" || kind === "symbol" || kind === "bigint" || value instanceof RegExp ||
@@ -32,7 +44,10 @@ const PRELUDE = `(bridge, names) => {
 		return value;
 	};
 	const callHost = (name, args) => new Promise((resolve, reject) => {
-		const json = JSON.stringify(args, boundary);
+		// A trailing undefined argument stays absent, as in a JavaScript call; a non-trailing one becomes null (JSON).
+		const list = [...args];
+		while (list.length > 0 && list[list.length - 1] === undefined) list.pop();
+		const json = JSON.stringify(list, boundary);
 		const id = nextId++;
 		const refusal = bridge("call", id, name, json);
 		if (refusal !== undefined) {
@@ -67,9 +82,10 @@ const PRELUDE = `(bridge, names) => {
 			pending.delete(id);
 			const data = payload === undefined ? undefined : JSON.parse(payload);
 			if (ok) call.resolve(data);
-			else call.reject(runError(data.reason, data.message));
+			else call.reject(data.hostError === undefined ? runError(data.reason, data.message) : hostFailure(data));
 		},
 		pending: () => pending.size,
+		callHost,
 	};
 }`
 
@@ -117,11 +133,13 @@ function describeThrown(vm: QuickJS, thrown: JSValueHandle): SandboxErrorPayload
   }
   const stack = stringProp(thrown, "stack")
   const reason = stringProp(thrown, "reason")
+  const hostError = stringProp(thrown, "hostError")
   return {
     name: stringProp(thrown, "name") ?? "Error",
     message: stringProp(thrown, "message") ?? "",
     ...(stack === undefined ? {} : { stack }),
     ...(reason === undefined ? {} : { reason }),
+    ...(hostError === undefined ? {} : { hostError }),
   }
 }
 
@@ -207,6 +225,14 @@ async function main(data: SandboxWorkerData): Promise<void> {
   const run = api.getProp("run")
   const settle = api.getProp("settle")
   const pendingCalls = api.getProp("pending")
+  const { setup } = data
+  if (setup !== undefined) {
+    // Every handle created here is freed when the scope closes; the stubs live on in the VM's global object.
+    vm.withScope(() => {
+      const setupFunction = vm.evalCode(setup.source, "computer-run-bridge.js")
+      vm.callFunction(setupFunction, vm.undefined, api.getProp("callHost"), vm.newString(setup.data))
+    })
+  }
   // Run queued jobs, then fail a body that awaits nothing the host can ever settle.
   const drain = () => {
     vm.executePendingJobs()
