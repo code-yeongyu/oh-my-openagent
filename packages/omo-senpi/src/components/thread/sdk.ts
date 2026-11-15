@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 
 import { askHost } from "../../../../senpi-task/src/runners/rpc-host/host-request"
-import { classifyWarmReply, type WarmAnswer } from "../../../../senpi-task/src/runners/rpc-host/host-warmup"
+import { classifyWarmReply, type WarmAnswer } from "../../../../senpi-task/src/runners/rpc-host/host-warm-reply"
 
 import { toThreadAddressEntries, type AddressEntry } from "./address-book"
 import type { ThreadToolResult } from "./contracts"

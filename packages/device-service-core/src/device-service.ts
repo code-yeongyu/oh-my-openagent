@@ -246,12 +246,15 @@ const acceptsAdoptAccount = (serviceVersion: string): boolean =>
 
 /**
  * omo#13037 A6 (addenda 1 and 2): the first device service that carries the wake mark (`accepts` on session.command)
- * and the `wake` command target. Fixed at that service's release cut; null until then, and null means neither is ever
- * sent, so every command keeps its bytes. Gated on welcome.service_version, never on a capability word.
+ * and the `wake` command target: device-service-v0.1.31 (omo-relay-daemon #1076). Below it neither is ever sent, so
+ * every command keeps its bytes. Gated on welcome.service_version, never on a capability word; null would turn both off.
  */
-export const WAKE_MARK_MIN_SERVICE_VERSION: string | null = null
-/** omo#13037 A4.3.3: the first device service that takes `session.locate {single: true}`; null until its release cut. */
-export const LOCATE_SINGLE_MIN_SERVICE_VERSION: string | null = null
+export const WAKE_MARK_MIN_SERVICE_VERSION: string | null = "0.1.31"
+/**
+ * omo#13037 A4.3.3: the first device service that takes `session.locate {single: true}`: device-service-v0.1.13
+ * (omo-relay-daemon #393 part B and #692).
+ */
+export const LOCATE_SINGLE_MIN_SERVICE_VERSION: string | null = "0.1.13"
 
 const serviceAtLeast = (serviceVersion: string, minimum: string | null): boolean =>
   minimum !== null && compareVersions(serviceVersion, minimum) >= 0

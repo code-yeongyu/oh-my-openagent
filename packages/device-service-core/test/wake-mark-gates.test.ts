@@ -78,13 +78,16 @@ async function spiedService(
 const ADMIT = { type: "admit_external_message", sessionId: SESSION_ID, deliveryId: "d-1", text: "hello" }
 
 describe("omo#13037: the wake mark and the single-probe locate are gated on the service's version", () => {
-  test("#given the shipped minimums #then both are null, so no service carries the mark or takes the single probe", () => {
-    expect(WAKE_MARK_MIN_SERVICE_VERSION).toBeNull()
-    expect(LOCATE_SINGLE_MIN_SERVICE_VERSION).toBeNull()
+  // The release contract with omo-relay-daemon: the mark and the wake target shipped in device-service-v0.1.31 (#1076),
+  // the single-probe locate in device-service-v0.1.13 (#393, #692). A wrong pin either sends a field an older service
+  // refuses or never sends what a current one takes.
+  test("#given the shipped minimums #then the mark and the wake target need 0.1.31 and the single probe 0.1.13", () => {
+    expect(WAKE_MARK_MIN_SERVICE_VERSION).toBe("0.1.31")
+    expect(LOCATE_SINGLE_MIN_SERVICE_VERSION).toBe("0.1.13")
   })
 
-  test("#given the shipped null minimums #when a marked command, a wake and a single locate are asked #then the command goes unmarked, nothing wakes, and the locate is today's request", async () => {
-    const { service, calls } = await spiedService()
+  test("#given null minimums #when a marked command, a wake and a single locate are asked #then the command goes unmarked, nothing wakes, and the locate is today's request", async () => {
+    const { service, calls } = await spiedService({ wakeMark: null, singleLocate: null })
     expect({ mark: service.carriesWakeMark, single: service.takesSingleLocate }).toEqual({ mark: false, single: false })
     const attach = await service.attach(PEER, SESSION_ID)
     await attach.command(ADMIT, { accepts: ["session-wake:v1"] }).catch(() => undefined)
