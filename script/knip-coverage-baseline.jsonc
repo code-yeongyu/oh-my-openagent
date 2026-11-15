@@ -4004,6 +4004,7 @@
         "extensions/omo-telemetry-posthog.js",
         "extensions/omo-telemetry-recovery.js",
         "extensions/omo-thread-client.js",
+        "extensions/omo-wake.js",
         "runtime/agent-toolkit-sdk/sdk.js",
       ],
       "ignoreFiles": [
