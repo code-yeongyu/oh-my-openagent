@@ -2087,6 +2087,7 @@
     "packages/senpi-task/src/runners/rpc-host/host-endpoint-port.ts",
     "packages/senpi-task/src/runners/rpc-host/host-notice.ts",
     "packages/senpi-task/src/runners/rpc-host/host-request.ts",
+    "packages/senpi-task/src/runners/rpc-host/host-warm-reply.ts",
     "packages/senpi-task/src/runners/rpc-host/host-warmup.ts",
     "packages/senpi-task/src/runners/rpc-host/input-command.ts",
     "packages/senpi-task/src/runners/rpc-host/input-receipt.ts",
