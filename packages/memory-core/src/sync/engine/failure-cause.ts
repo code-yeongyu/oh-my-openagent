@@ -91,8 +91,16 @@ function printable(value: unknown): string {
 
 const GIT_SUBCOMMAND = /^[a-z][a-z0-9-]{0,31}$/
 
-/** A git error on a warning names its class, subcommand and exit code only: argv, stdout and stderr can hold memory paths and file text. */
+/**
+ * A git error on a warning names its class, subcommand and exit code only: argv, stdout and stderr can hold
+ * memory paths and file text. That covers the sync repo's own git failures (SyncCommitError, #13689) too.
+ */
 function printableAtWarn(value: unknown): string {
+  if (value instanceof SyncCommitError) {
+    if (value.git === undefined) return errorClassOf(value)
+    const subcommand = GIT_SUBCOMMAND.test(value.git.subcommand) ? value.git.subcommand : "command"
+    return `${errorClassOf(value)}: git ${subcommand} exited ${value.git.exitCode}`
+  }
   if (!(value instanceof GitError)) return printable(value)
   const argv: unknown = "argv" in value ? value.argv : undefined
   const subcommand = Array.isArray(argv)

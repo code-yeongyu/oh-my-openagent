@@ -27,6 +27,14 @@ const LITERAL = "--literal-pathspecs"
 
 export class SyncCommitError extends Error {
   override readonly name = "SyncCommitError"
+
+  /** `git` names the failed subcommand and its exit code, all a warning may show; the message keeps git's stderr for the log. */
+  constructor(
+    message: string,
+    readonly git?: { readonly subcommand: string; readonly exitCode: number },
+  ) {
+    super(message)
+  }
 }
 
 export interface GitSyncRepoOptions {
@@ -45,10 +53,13 @@ export function createGitSyncRepo(options: GitSyncRepoOptions): SyncRepo {
       ...(env === undefined ? {} : { env: { ...process.env, ...env } }),
       ...(stdin === undefined ? {} : { stdin }),
     })
-    if (result.code !== 0)
-      throw new SyncCommitError(
-        `git ${argv.find((arg) => !arg.startsWith("-") && !arg.includes("=")) ?? argv[0]} failed (${result.code}): ${result.stderr.trim()}`,
-      )
+    if (result.code !== 0) {
+      const subcommand = argv.find((arg) => !arg.startsWith("-") && !arg.includes("=")) ?? argv[0] ?? "command"
+      throw new SyncCommitError(`git ${subcommand} failed (${result.code}): ${result.stderr.trim()}`, {
+        subcommand,
+        exitCode: result.code,
+      })
+    }
     return result.stdout.trim()
   }
   const head = async (): Promise<string | null> => {
@@ -82,7 +93,10 @@ export function createGitSyncRepo(options: GitSyncRepoOptions): SyncRepo {
     })
     if (moved.code === 0) return true
     if (LOCK_FILE_EXISTS.test(moved.stderr))
-      throw new SyncCommitError(`git update-ref failed (${moved.code}): ${moved.stderr.trim()}`)
+      throw new SyncCommitError(`git update-ref failed (${moved.code}): ${moved.stderr.trim()}`, {
+        subcommand: "update-ref",
+        exitCode: moved.code,
+      })
     return false
   }
   return {

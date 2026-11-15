@@ -16,6 +16,10 @@ export type TrackedStatus =
   | { readonly kind: "failing"; readonly failure: SyncFailure; readonly since: number; readonly attempts: number }
   | ({ readonly kind: "frozen" } & Frozen)
 
+/** What a failure says caused it (class, code, stage); a failure without a cause has none to change. */
+const causeKey = (failure: SyncFailure): string =>
+  "cause" in failure ? `${failure.cause.errorClass}\n${failure.cause.code ?? ""}\n${failure.cause.stage}` : ""
+
 export class StatusTracker {
   private failing: Failing | null = null
   /** The failure a UI shows: set once a failure crosses its visibility threshold, cleared only by a successful cycle. */
@@ -41,7 +45,10 @@ export class StatusTracker {
     this.shown = null
   }
 
-  /** Records a failed cycle; true when the shown failure appeared or changed (#13635), the only time it is worth a warning. */
+  /**
+   * Records a failed cycle; true when the shown failure appeared or changed (#13635), or kept its kind and
+   * action but names another cause (#13689): the only times it is worth a warning.
+   */
   failed(error: unknown, stage: SyncStage): boolean {
     const failure = describeSyncFailure(error, stage)
     const previous = this.failing
@@ -56,6 +63,6 @@ export class StatusTracker {
     const shown = this.shown
     const same = shown !== null && shown.failure.kind === failure.kind && shown.failure.action === failure.action
     this.shown = same ? { failure, since: shown.since, attempts: shown.attempts + 1 } : failing
-    return !same
+    return !same || causeKey(shown.failure) !== causeKey(failure)
   }
 }

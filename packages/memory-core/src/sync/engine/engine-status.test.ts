@@ -1,6 +1,7 @@
 import { afterEach, expect, spyOn, test } from "bun:test"
 
 import { StrandedGitLockError } from "../../git/repo-lock-sweep"
+import { SyncCommitError } from "./adapters/git-sync-repo"
 import { SyncAuthError, SyncHttpError, SyncNetworkError } from "./adapters/http-transport"
 import { OFFLINE_SHOWN_AFTER_ATTEMPTS } from "./failure"
 import { type Device, GIT_TEST_TIMEOUT, makeDevice } from "./engine-harness.test-support"
@@ -158,6 +159,34 @@ test(
 
     expect(warnings()).toHaveLength(2)
     expect(warnings()[1]?.line).toContain("SyncHttpError")
+    load.mockRestore()
+  },
+  GIT_TEST_TIMEOUT,
+)
+
+test(
+  "two unknown failures in a row with different causes warn twice; the same cause again does not (#13689)",
+  async () => {
+    const lines: { readonly line: string; readonly level: string }[] = []
+    const b = await makeDevice(new FakeSyncServer(), "b", undefined, {
+      log: (line, level = "info") => lines.push({ line, level }),
+    })
+    devices.push(b)
+    let error: Error = new SyncCommitError("git write-tree failed (128): fatal: bad tree")
+    const load = spyOn(b.store, "load").mockImplementation(async () => {
+      throw error
+    })
+    const warnings = () => lines.filter(({ line, level }) => line.startsWith("sync cycle failed") && level === "warn")
+
+    expect(await failedCycle(b)).toBe(error)
+    expect(await b.engine.status()).toMatchObject({ failure: { kind: "unknown", cause: { errorClass: "SyncCommitError" } } })
+    error = new TypeError("x is not a function")
+    expect(await failedCycle(b)).toBe(error)
+    expect(await b.engine.status()).toMatchObject({ failure: { kind: "unknown", cause: { errorClass: "TypeError" } } })
+    expect(await failedCycle(b)).toBe(error)
+
+    expect(warnings()).toHaveLength(2)
+    expect(warnings()[1]?.line).toContain("TypeError")
     load.mockRestore()
   },
   GIT_TEST_TIMEOUT,
