@@ -1,100 +1,138 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
-import { FAKE_DEVICES, FAKE_SELF_DEVICE, startFakeDeviceService, type FakeDeviceService } from "../../../scripts/qa/bunshin-ts-fake-service"
-import { DeviceUnavailableError, execOnDevice, localDeviceRunner, type DeviceCommandRunner } from "./device-machine"
+import {
+  FAKE_DEVICES,
+  FAKE_SELF_DEVICE,
+  startFakeDeviceService,
+  type FakeCommand,
+  type FakeDeviceService,
+} from "../../../scripts/qa/bunshin-ts-fake-service"
+import { DeviceUnavailableError, execOnDevice, localDeviceRunner } from "./device-machine"
 
-let fake: FakeDeviceService | undefined
+const services: FakeDeviceService[] = []
 afterEach(async () => {
-  await fake?.stop()
-  fake = undefined
+  for (const service of services.splice(0)) await service.stop()
 })
 
-const execOps = (service: FakeDeviceService) =>
+const start = async (options: { commands?: Record<string, FakeCommand>; killFails?: boolean; stateDir?: string } = {}) => {
+  const service = await startFakeDeviceService({ devices: [...FAKE_DEVICES, FAKE_SELF_DEVICE], ...options })
+  services.push(service)
+  return service
+}
+
+// Every op the fake received, in order, with the device it was sent to.
+const ops = (service: FakeDeviceService, name: string) =>
   service.requests
     .filter((request) => request["type"] === "machine.batch")
-    .flatMap((request) => (Array.isArray(request["ops"]) ? (request["ops"] as Array<Record<string, unknown>>) : []).map((op) => ({ device: request["device"], op: op["op"] })))
-    .filter((entry) => entry.op === "exec_command")
+    .flatMap((request) =>
+      (Array.isArray(request["ops"]) ? (request["ops"] as Array<Record<string, unknown>>) : []).map((op) => ({
+        device: request["device"],
+        op: op["op"],
+      })),
+    )
+    .filter((entry) => entry.op === name)
+
+const HANG: Record<string, FakeCommand> = { "sleep forever": { chunks: ["started\n"], exitCode: 0, hang: true } }
+const live = () => new AbortController().signal
 
 describe("#given this device's service on its local API socket", () => {
   test("#when bash runs a command #then exactly one exec_command goes to this device, output streams, the exit code returns", async () => {
-    fake = await startFakeDeviceService({
-      devices: [...FAKE_DEVICES, FAKE_SELF_DEVICE],
-      commands: { "echo hello": { chunks: ["hel", "lo\n"], exitCode: 3 } },
-    })
+    const service = await start({ commands: { "echo hello": { chunks: ["hel", "lo\n"], exitCode: 3 } } })
     const chunks: string[] = []
     const result = await execOnDevice(
-      localDeviceRunner({ OMO_DEVICE_SERVICE_STATE_DIR: fake.stateDir }),
+      localDeviceRunner({ OMO_DEVICE_SERVICE_STATE_DIR: service.stateDir }),
       { command: "echo hello", onOutput: (chunk) => chunks.push(chunk.toString()) },
-      new AbortController().signal,
+      live(),
     )
     expect(chunks.join("")).toBe("hello\n")
     expect(result.exitCode).toBe(3)
-    expect(result.timedOut).toBe(false)
-    expect(execOps(fake)).toEqual([{ device: FAKE_SELF_DEVICE.device, op: "exec_command" }])
+    expect(ops(service, "exec_command")).toEqual([{ device: FAKE_SELF_DEVICE.device, op: "exec_command" }])
   })
 
-  test("#when the service is not there #then a typed DeviceUnavailableError and nothing runs", async () => {
-    fake = await startFakeDeviceService({ devices: [...FAKE_DEVICES, FAKE_SELF_DEVICE] })
-    const stateDir = fake.stateDir
-    await fake.stop()
-    fake = undefined
+  test("#when the service restarts #then the call in between is a typed DeviceUnavailableError and the next call reconnects", async () => {
+    const first = await start()
+    const stateDir = first.stateDir
+    const source = localDeviceRunner({ OMO_DEVICE_SERVICE_STATE_DIR: stateDir })
+    expect((await execOnDevice(source, { command: "echo one" }, live())).exitCode).toBe(0)
+    await first.stop()
+    services.splice(services.indexOf(first), 1)
     const chunks: string[] = []
+    const down = await execOnDevice(source, { command: "echo down", onOutput: (c) => chunks.push(c.toString()) }, live()).then(
+      () => undefined,
+      (error: unknown) => error,
+    )
+    expect(down).toBeInstanceOf(DeviceUnavailableError)
+    expect(chunks).toEqual([])
+    const second = await start({ stateDir })
+    expect((await execOnDevice(source, { command: "echo two" }, live())).exitCode).toBe(0)
+    expect(ops(second, "exec_command")).toHaveLength(1)
+  })
+
+  test("#when the signal is already aborted #then nothing is started on the device", async () => {
+    const service = await start()
+    const controller = new AbortController()
+    controller.abort()
+    const result = await execOnDevice(localDeviceRunner({ OMO_DEVICE_SERVICE_STATE_DIR: service.stateDir }), { command: "echo x" }, controller.signal)
+    expect(result.aborted).toBe(true)
+    expect(ops(service, "exec_command")).toHaveLength(0)
+  })
+})
+
+describe("#given a running device command", () => {
+  test("#when the caller aborts #then one kill_terminal reaches the device and the result says aborted", async () => {
+    const service = await start({ commands: HANG })
+    const controller = new AbortController()
+    const result = await execOnDevice(
+      localDeviceRunner({ OMO_DEVICE_SERVICE_STATE_DIR: service.stateDir }),
+      { command: "sleep forever", onOutput: () => controller.abort() },
+      controller.signal,
+    )
+    expect(result.aborted).toBe(true)
+    expect(result.exitCode).toBeNull()
+    expect(ops(service, "kill_terminal")).toEqual([{ device: FAKE_SELF_DEVICE.device, op: "kill_terminal" }])
+  })
+
+  test("#when its timeout passes #then one kill_terminal reaches the device and the result says timedOut", async () => {
+    const service = await start({ commands: HANG })
+    const result = await execOnDevice(
+      localDeviceRunner({ OMO_DEVICE_SERVICE_STATE_DIR: service.stateDir }),
+      { command: "sleep forever", timeoutMs: 50 },
+      live(),
+    )
+    expect(result.timedOut).toBe(true)
+    expect(ops(service, "kill_terminal")).toHaveLength(1)
+  })
+
+  test("#when the kill is refused #then the run ends with a typed DeviceUnavailableError instead of polling on", async () => {
+    const service = await start({ commands: HANG, killFails: true })
     const error = await execOnDevice(
-      localDeviceRunner({ OMO_DEVICE_SERVICE_STATE_DIR: stateDir }),
-      { command: "echo must-not-run", onOutput: (chunk) => chunks.push(chunk.toString()) },
-      new AbortController().signal,
+      localDeviceRunner({ OMO_DEVICE_SERVICE_STATE_DIR: service.stateDir }),
+      { command: "sleep forever", timeoutMs: 50 },
+      live(),
     ).then(
       () => undefined,
       (caught: unknown) => caught,
     )
     expect(error).toBeInstanceOf(DeviceUnavailableError)
-    expect((error as DeviceUnavailableError).code).toBe("device_unavailable")
-    expect(chunks).toEqual([])
+    expect(ops(service, "kill_terminal")).toHaveLength(1)
   })
-})
 
-// A command that produces nothing until it is killed, then ends its output.
-const hangingRunner = () => {
-  let kills = 0
-  let release: () => void = () => {}
-  const ended = new Promise<void>((resolve) => {
-    release = resolve
-  })
-  const runner: DeviceCommandRunner = {
-    spawn: async () =>
-      ({
-        handleId: "h-hang",
-        output: async function* () {
-          await ended
+  test("#when the output consumer throws #then the device command is killed once and the consumer's error surfaces", async () => {
+    const service = await start({ commands: HANG })
+    const error = await execOnDevice(
+      localDeviceRunner({ OMO_DEVICE_SERVICE_STATE_DIR: service.stateDir }),
+      {
+        command: "sleep forever",
+        onOutput: () => {
+          throw new Error("consumer boom")
         },
-        wait: async () => ({ exitCode: 0, output: "", durationMs: 0, truncated: false, omittedBytes: 0 }),
-        kill: async () => {
-          kills += 1
-          release()
-        },
-      }) as unknown as Awaited<ReturnType<DeviceCommandRunner["spawn"]>>,
-  }
-  return { runner, kills: () => kills }
-}
-
-describe("#given a running device command", () => {
-  test("#when the caller aborts #then the command is killed once and the result says aborted", async () => {
-    const hang = hangingRunner()
-    const controller = new AbortController()
-    const pending = execOnDevice(async () => hang.runner, { command: "sleep" }, controller.signal)
-    await Promise.resolve()
-    controller.abort()
-    const result = await pending
-    expect(hang.kills()).toBe(1)
-    expect(result.aborted).toBe(true)
-    expect(result.exitCode).toBeNull()
-  })
-
-  test("#when its timeout passes #then the command is killed once and the result says timedOut", async () => {
-    const hang = hangingRunner()
-    const result = await execOnDevice(async () => hang.runner, { command: "sleep", timeoutMs: 1 }, new AbortController().signal)
-    expect(hang.kills()).toBe(1)
-    expect(result.timedOut).toBe(true)
-    expect(result.exitCode).toBeNull()
+      },
+      live(),
+    ).then(
+      () => undefined,
+      (caught: unknown) => caught,
+    )
+    expect((error as Error).message).toBe("consumer boom")
+    expect(ops(service, "kill_terminal")).toHaveLength(1)
   })
 })

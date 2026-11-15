@@ -2,7 +2,7 @@
 // private state dir with a per-boot token, the real mutual-proof handshake, status.get, and the machine.* requests a
 // relay transport sends, answered from a fixed two-device table. It speaks the protocol directly instead of reusing
 // the vendored owner fake, whose request validator does not know machine.* yet. No network, no real service.
-import { chmodSync, mkdtempSync, rmSync } from "node:fs"
+import { chmodSync, mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -32,7 +32,8 @@ export type FakeDevice = Readonly<{
 export const FAKE_SELF_DEVICE: FakeDevice = { device: "fake-dev-self", label: "self", os: "linux", tags: [] }
 
 // A command the fake terminal runs: its output in the chunks it arrives in, then its exit code.
-export type FakeCommand = Readonly<{ chunks: readonly string[]; exitCode: number }>
+// hang: the command keeps running (empty polls) until it is killed.
+export type FakeCommand = Readonly<{ chunks: readonly string[]; exitCode: number; hang?: boolean }>
 
 export const FAKE_DEVICES: readonly FakeDevice[] = [
   { device: "fake-dev-builder", label: "builder", os: "linux", tags: ["builder"] },
@@ -71,13 +72,16 @@ const describeDevice = (device: FakeDevice): Message => ({
 type Terminal = Readonly<{
   commands: Readonly<Record<string, FakeCommand>>
   handles: Map<string, { command: FakeCommand; next: number; seq: number }>
+  killFails: boolean
 }>
 
 const terminalFrame = (handleId: string, run: { command: FakeCommand; next: number; seq: number }): Message => {
+  if (run.command.hang === true && run.next >= run.command.chunks.length)
+    return { handleId, output: "", state: "running", lastSeq: run.seq }
   const output = run.command.chunks[run.next] ?? ""
   run.next += 1
   run.seq += Buffer.byteLength(output)
-  const done = run.next >= run.command.chunks.length
+  const done = run.command.hang !== true && run.next >= run.command.chunks.length
   return {
     handleId,
     output,
@@ -103,6 +107,7 @@ const executeTerminal = (device: FakeDevice, op: OpRequest, terminal: Terminal):
   }
   if (op.op === "kill_terminal") {
     const handleId = String(op.args?.["handle_id"] ?? "")
+    if (terminal.killFails) return { state: "refused", error: { code: "terminal_error", message: "kill refused by the fake" } }
     return { state: "applied", response: { handleId, state: "task-failed", reason: "killed" } }
   }
   return undefined
@@ -120,11 +125,18 @@ const execute = (device: FakeDevice, op: OpRequest): Message => {
 }
 
 export async function startFakeDeviceService(
-  options: { devices?: readonly FakeDevice[]; commands?: Readonly<Record<string, FakeCommand>> } = {},
+  options: {
+    devices?: readonly FakeDevice[]
+    commands?: Readonly<Record<string, FakeCommand>>
+    killFails?: boolean
+    // Serve at this state dir (a service coming back where it was); default a fresh private one.
+    stateDir?: string
+  } = {},
 ) {
   const devices = options.devices ?? FAKE_DEVICES
-  const terminal: Terminal = { commands: options.commands ?? {}, handles: new Map() }
-  const stateDir = mkdtempSync(join(tmpdir(), "omo-bunshin-ts-fake-service-"))
+  const terminal: Terminal = { commands: options.commands ?? {}, handles: new Map(), killFails: options.killFails === true }
+  const stateDir = options.stateDir ?? mkdtempSync(join(tmpdir(), "omo-bunshin-ts-fake-service-"))
+  mkdirSync(stateDir, { recursive: true })
   chmodSync(stateDir, 0o700)
   const token = await writeToken(stateDir, secure)
   const sent: SentLine[] = []
