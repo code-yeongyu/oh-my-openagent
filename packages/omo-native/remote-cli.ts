@@ -95,12 +95,20 @@ export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: 
   // the verb's exit code: the unit goes even when the service could not be reached.
   if (parsed.command === "disable") await applyColdWake(dependencies.coldWake, false, dependencies.error)
   if (recordFailure !== undefined) {
-    dependencies.error(
-      `omo remote disable: remote is off now, but the choice could not be saved (${recordFailure}); the next omo login will turn it on again.`,
-    )
+    dependencies.error(disableNotSavedNotice(recordFailure, code === REMOTE_EXIT.ok))
     return REMOTE_EXIT.failed
   }
   return code
+}
+
+/**
+ * What `omo remote disable` says when it could not save the opt-out (#13602 review M3): that remote is off only when the
+ * verb turned the switch off; otherwise that it may still be on.
+ */
+export function disableNotSavedNotice(reason: string, switchedOff: boolean): string {
+  return switchedOff
+    ? `omo remote disable: remote is off now, but the choice could not be saved (${reason}); the next omo login will turn it on again.`
+    : `omo remote disable: the choice could not be saved (${reason}) and remote could not be turned off, so it may still be on. Fix the error above, then run omo remote disable again.`
 }
 
 export type RemoteAttachLaunch = { readonly engineArgs: readonly string[] }

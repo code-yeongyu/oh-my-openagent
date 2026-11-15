@@ -5,7 +5,7 @@ import { startFakeOwner } from "../../device-service-core/test/local-api/conform
 import { defaultWorld } from "../../device-service-core/test/local-api/conformance/world.ts"
 import { cliDeviceServiceHandoff } from "../device-service-handoff"
 import { REMOTE_KEPT_OFF_AFTER_SIGN_IN, REMOTE_ON_AFTER_SIGN_IN, runLoginSetup } from "../remote-bootstrap"
-import { REMOTE_EXIT } from "../remote-cli"
+import { disableNotSavedNotice, REMOTE_EXIT } from "../remote-cli"
 import { afterServiceAuth } from "../service-auth-command"
 import {
   owners,
@@ -98,7 +98,25 @@ describe("remote sessions on by default", () => {
       optOut: failing,
     })
     expect([code, owner.state.status.enabled, coldWake]).toEqual([REMOTE_EXIT.failed, false, ["uninstall"]])
-    expect(err).toHaveLength(1)
+    expect(err).toEqual([disableNotSavedNotice("~/.omo is not writable", true)])
+  })
+
+  // #13602 security review M3: when the verb itself did not turn remote off (signed out, service not running), the
+  // notice must not claim it did.
+  test("an unsaved opt-out with a disable that could not reach the service says remote may still be on", async () => {
+    const failing = {
+      read: () => false,
+      record: () => {
+        throw new Error("~/.omo is not writable")
+      },
+      clear: () => {},
+    }
+    const signedOut = { exitCode: 4, stdout: '{"signedIn":false}' }
+    const { code, err } = await run(["disable"], privateDir(), signedOut, testBootstrap(), undefined, {
+      optOut: failing,
+    })
+    expect(code).toBe(REMOTE_EXIT.failed)
+    expect(err.at(-1)).toBe(disableNotSavedNotice("~/.omo is not writable", false))
   })
 
   test("enable after disable clears the opt-out, and the bootstrap keeps it on again", async () => {
