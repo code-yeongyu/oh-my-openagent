@@ -221,10 +221,12 @@ test(
       release.resolve(null)
     }
 
-    // then: the held cycle applied nothing (it pulled before A's append), so the advertised head reruns it once
-    expect((await held).applied).toBe(0)
-    expect(await b.read("y.md")).toBeNull()
-    const rerun = await awaitWithinTestBudget(b.engine.nextCycle(), "B's rerun after the mid-cycle advertised head")
+    // then: the held cycle applied nothing (it pulled before A's append), so the advertised head reruns it once.
+    // The rerun starts as the held cycle settles, so it is taken before anything else is awaited.
+    const heldReport = await held
+    const rerunCycle = b.engine.nextCycle()
+    expect(heldReport.applied).toBe(0)
+    const rerun = await awaitWithinTestBudget(rerunCycle, "B's rerun after the mid-cycle advertised head")
     expect(rerun.applied).toBe(1)
     expect(await b.read("y.md")).toBe("y\n")
     await b.engine.stop()
