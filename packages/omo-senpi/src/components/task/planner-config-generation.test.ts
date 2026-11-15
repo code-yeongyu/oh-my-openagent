@@ -196,7 +196,8 @@ describe("category config generations at the planner seam", () => {
     // given a getter whose every read returns a different model, as a cache window expiring mid-plan would
     const reads: string[] = []
     const getOmoConfig = (): OmoConfig => {
-      const model = reads.length === 0 ? "kimi-coding/kimi-for-coding-highspeed-unlocked" : "meta/muse-spark-1.3-contributor"
+      const model =
+        reads.length === 0 ? "kimi-coding/kimi-for-coding-highspeed-unlocked" : "meta/muse-spark-1.3-contributor"
       reads.push(model)
       return { categories: { quick: { model } } }
     }
@@ -228,9 +229,7 @@ describe("category config generations at the planner seam", () => {
     const getOmoConfig = (): OmoConfig => ({
       categories: { quick: { model: "kimi-coding/kimi-for-coding-highspeed-unlocked" } },
     })
-    const models: FakeModel[] = [
-      { provider: "kimi-coding", id: "kimi-for-coding-highspeed-unlocked" },
-    ]
+    const models: FakeModel[] = [{ provider: "kimi-coding", id: "kimi-for-coding-highspeed-unlocked" }]
     const generations = createCategoryConfigGenerations()
     const resolveRegistry = (): TaskModelRegistry => registry(models)
     const planner = createGenerationObservingPlanner({

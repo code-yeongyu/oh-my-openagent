@@ -38,7 +38,13 @@ describe("task engine config generation across a mid-session edit", () => {
     const pi = new FakeExtensionAPI()
     let engine: ReturnType<typeof composeTaskEngine>
     try {
-      engine = composeTaskEngine({ pi, omoConfig: snapshot, getOmoConfig: () => live, cwd, sharedParentTools: () => [] })
+      engine = composeTaskEngine({
+        pi,
+        omoConfig: snapshot,
+        getOmoConfig: () => live,
+        cwd,
+        sharedParentTools: () => [],
+      })
     } finally {
       lifecycleSpy.mockRestore()
     }
@@ -56,8 +62,21 @@ describe("task engine config generation across a mid-session edit", () => {
     const policy = revivePolicies[0]
     const current = policy?.currentGeneration()
     const warnings: ReviveGenerationWarning[] = []
-    const record = { ...senpiTask.createTaskRecord({ parent_session_id: "parent-1", root_session_id: "parent-1", depth: 0, execution_mode: "in-process", model: "example-b/model-b", notify_on_terminal: false }), config_generation: plannedGeneration }
-    const admitted = policy === undefined ? false : checkReviveGeneration(record, { ...policy, warn: (warning) => warnings.push(warning) })
+    const record = {
+      ...senpiTask.createTaskRecord({
+        parent_session_id: "parent-1",
+        root_session_id: "parent-1",
+        depth: 0,
+        execution_mode: "in-process",
+        model: "example-b/model-b",
+        notify_on_terminal: false,
+      }),
+      config_generation: plannedGeneration,
+    }
+    const admitted =
+      policy === undefined
+        ? false
+        : checkReviveGeneration(record, { ...policy, warn: (warning) => warnings.push(warning) })
 
     // then the generation does not flip back to the register-time snapshot
     expect(edited.kind).toBe("resolved")

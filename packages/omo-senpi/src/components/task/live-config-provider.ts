@@ -26,7 +26,9 @@ function isErrorDiagnostic(diagnostic: SenpiConfigDiagnostic, result: SenpiOmoCo
     case "model_catalog_cycle":
       return true
     case "validation":
-      return diagnostic.path === MERGED_OMO_CONFIG_PATH || result.sources.some((source) => source.path === diagnostic.path)
+      return (
+        diagnostic.path === MERGED_OMO_CONFIG_PATH || result.sources.some((source) => source.path === diagnostic.path)
+      )
     case "deprecated-keys":
     case "invalid-value":
     case "profile":

@@ -48,7 +48,12 @@ function createTestLogger(): ComponentLogger & { warnings: Array<{ message: stri
 
 function createFakeClock(): { readonly now: () => number; readonly advance: (ms: number) => void } {
   let current = 1_000
-  return { now: () => current, advance: (ms) => { current += ms } }
+  return {
+    now: () => current,
+    advance: (ms) => {
+      current += ms
+    },
+  }
 }
 
 function mockResult(config: OmoConfig, diagnostics: readonly SenpiConfigDiagnostic[] = []): SenpiOmoConfigResult {
@@ -185,11 +190,15 @@ describe("createLiveConfigProvider", () => {
     expect(provider().categories?.quick?.model).toBe("initial-provider/model-a")
 
     // when a mid-session edit changes the model and adds a key the schema does not know
-    fixture.write(JSON.stringify({ categories: { quick: { model: "updated-provider/model-b" } }, not_a_real_key: true }))
+    fixture.write(
+      JSON.stringify({ categories: { quick: { model: "updated-provider/model-b" } }, not_a_real_key: true }),
+    )
     const reloaded = provider()
 
     // then the loader reports the ignored key, yet the new model is live
-    expect(fixture.load({ cwd: fixture.project }).diagnostics.map((diagnostic) => diagnostic.kind)).toEqual(["unknown-keys"])
+    expect(fixture.load({ cwd: fixture.project }).diagnostics.map((diagnostic) => diagnostic.kind)).toEqual([
+      "unknown-keys",
+    ])
     expect(reloaded.categories?.quick?.model).toBe("updated-provider/model-b")
   })
 
@@ -208,7 +217,7 @@ describe("createLiveConfigProvider", () => {
     })
 
     // when the file stops parsing and stays broken across reloads
-    fixture.write("{ \"categories\": { \"quick\": ")
+    fixture.write('{ "categories": { "quick": ')
     const result = provider()
     const again = provider()
 
@@ -233,15 +242,19 @@ describe("createLiveConfigProvider", () => {
     })
 
     // when the edit moves quick and adds a profile named like a catalog entry
-    fixture.write(JSON.stringify({
-      categories: { quick: { model: "b/two" } },
-      models: { capable: { model: "b/two" } },
-      model_profiles: { capable: { models: ["b/two"] } },
-    }))
+    fixture.write(
+      JSON.stringify({
+        categories: { quick: { model: "b/two" } },
+        models: { capable: { model: "b/two" } },
+        model_profiles: { capable: { models: ["b/two"] } },
+      }),
+    )
     const reloaded = provider()
 
     // then the loader reports the shadowing as validation, yet the new model is live
-    expect(fixture.load({ cwd: fixture.project }).diagnostics.map((diagnostic) => diagnostic.kind)).toContain("validation")
+    expect(fixture.load({ cwd: fixture.project }).diagnostics.map((diagnostic) => diagnostic.kind)).toContain(
+      "validation",
+    )
     expect(reloaded.categories?.quick?.model).toBe("b/two")
   })
 
@@ -249,7 +262,7 @@ describe("createLiveConfigProvider", () => {
     // given a session that started with a project omo.jsonc that does not parse
     const fixture = configFixture()
     fixture.write(JSON.stringify({ categories: { quick: { model: "a/one" } } }))
-    fixture.writeProject("{ \"categories\": ")
+    fixture.writeProject('{ "categories": ')
     const initialResult = fixture.load({ cwd: fixture.project })
     const logger = createTestLogger()
     const provider = createLiveConfigProvider({
