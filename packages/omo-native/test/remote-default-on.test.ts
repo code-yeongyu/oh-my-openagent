@@ -72,6 +72,18 @@ describe("remote sessions on by default", () => {
     expect([owner.state.status.enabled, restart.coldWake, owner.state.adoptions]).toEqual([false, ["uninstall"], 0])
   })
 
+  // #13602 security review M1: the user's off must hold even when disable cannot reach the service right now, or the
+  // default-on bootstrap would turn remote back on at the next start.
+  test.each([
+    ["the device service is not running", SIGNED_IN],
+    ["the account is signed out", { exitCode: 4, stdout: '{"signedIn":false}' }],
+  ])("disable records the opt-out and removes the unit when %s", async (_why, account) => {
+    const record = { off: false }
+    const optOut = { read: () => record.off, record: () => (record.off = true), clear: () => (record.off = false) }
+    const { code, coldWake } = await run(["disable"], privateDir(), account, testBootstrap(), undefined, { optOut })
+    expect([code, record.off, coldWake]).toEqual([REMOTE_EXIT.unavailable, true, ["uninstall"]])
+  })
+
   test("enable after disable clears the opt-out, and the bootstrap keeps it on again", async () => {
     const { owner, record, remote } = await device(true)
     await run(["disable"], owner.stateDir, SIGNED_IN, testBootstrap(), undefined, remote)

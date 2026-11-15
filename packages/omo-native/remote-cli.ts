@@ -74,17 +74,17 @@ export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: 
       : REMOTE_EXIT.unavailable
   // The service manager's view of this device's units is read here, outside remote-local's graph (omo#13440), and
   // handed to `status` as data.
+  // `disable` records the user's off before anything that can fail (#13602 review M1): a service that is not running,
+  // or a signed-out account, must not let the default-on bootstrap turn remote back on at the next start.
+  if (parsed.command === "disable") dependencies.optOut.record()
   const localUnits = parsed.command === "status" ? await dependencies.coldWake.status() : undefined
   const code = await runLocalRemoteVerb(
     localUnits === undefined ? dependencies : { ...dependencies, localUnits },
     parsed,
   )
-  // After the verb's connection is closed: a changed table restarts the device service, which would cut it.
-  // The opt-out is recorded first, so the default-on bootstrap keeps it off even if removing the unit fails here.
-  if (code === REMOTE_EXIT.ok && parsed.command === "disable") {
-    dependencies.optOut.record()
-    await applyColdWake(dependencies.coldWake, false, dependencies.error)
-  }
+  // After the verb's connection is closed (a changed table restarts the device service, which would cut it), and whatever
+  // the verb's exit code: the unit goes even when the service could not be reached.
+  if (parsed.command === "disable") await applyColdWake(dependencies.coldWake, false, dependencies.error)
   return code
 }
 
