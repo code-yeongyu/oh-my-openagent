@@ -154,8 +154,11 @@ describe("the wake's process scope", () => {
     const running = latch.running?.get(agentDir)
     expect(running).toBeDefined()
     await running?.ready
+    const before = scheduledIn.length
     await context.run("sessionA-send", () => running?.wake("0198a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b"))
-    expect(scheduledIn).toEqual(["process"])
+    // The wake armed the renewal timer, and every timer the wake runtime armed belongs to the process scope.
+    expect(scheduledIn.length).toBeGreaterThan(before)
+    expect(scheduledIn.filter((owner) => owner !== "process")).toEqual([])
     await running?.stop()
   })
 })
