@@ -221,6 +221,7 @@ test("#given an operator daemon whose endpoint registry lives under another agen
 test("#given an operator daemon whose registry dir variable is relative #when it loads omo #then it registers the launcher's agent dir", async () => {
   const daemonSocket = "/tmp/omo-daemon-registrant-c/rpc/rpc.sock"
   const started: Started[] = []
+  const warnings: string[] = []
   const pi = new FakeExtensionAPI()
   pi.cwd = "/work/project"
   Object.assign(pi, { sessionContext: { host_socket: daemonSocket, host_instance: "generation-1" } })
@@ -241,10 +242,49 @@ test("#given an operator daemon whose registry dir variable is relative #when it
         resolve()
       },
     }).register(pi, {
+      logger: {
+        info() {},
+        warn: (line: string) => {
+          warnings.push(line)
+        },
+        error() {},
+      },
+      config: { getFlag: () => undefined },
+      deferStartupWork: () => undefined,
+    })
+  })
+  expect(started.map(({ agentDir }) => agentDir)).toEqual([resolve(AGENT_DIR)])
+  expect(warnings).toHaveLength(1)
+})
+
+// #13609 review L2: a registry path with `..` names the same agent dir as its normalized spelling; the registrant
+// registers the normalized one, as resolveAgentHome would, so one dir is never registered under two strings.
+test("#given an operator daemon whose registry dir path is not normalized #when it loads omo #then it registers the normalized agent dir", async () => {
+  const daemonSocket = "/tmp/omo-daemon-registrant-d/rpc/rpc.sock"
+  const started: Started[] = []
+  const pi = new FakeExtensionAPI()
+  pi.cwd = "/work/project"
+  Object.assign(pi, { sessionContext: { host_socket: daemonSocket, host_instance: "generation-1" } })
+  await new Promise<void>((done, reject) => {
+    const timer = setTimeout(() => reject(new Error("waited 5s for the operator daemon's registrant to start")), 5_000)
+    createDeviceServiceComponent({
+      env: {
+        OMO_RPC_SOCKET_PATH: daemonSocket,
+        SENPI_RPC_HOST_DAEMON_DIR: "/srv/run-root/a/../b/.omo/agent/rpc-host-daemon/0123456789abcdef",
+      },
+      latch: { claimed: true },
+      registrantLatch: { claimed: false },
+      loadConfig: () => ({ config: {} }),
+      startRegistrant: ({ agentDir }) => {
+        started.push({ agentDir, sessionStore: sessionOwner.getStore() })
+        clearTimeout(timer)
+        done()
+      },
+    }).register(pi, {
       logger: { info() {}, warn() {}, error() {} },
       config: { getFlag: () => undefined },
       deferStartupWork: () => undefined,
     })
   })
-  expect(started.map(({ agentDir }) => agentDir)).toEqual([AGENT_DIR])
+  expect(started.map(({ agentDir }) => agentDir)).toEqual([resolve("/srv/run-root/b/.omo/agent")])
 })

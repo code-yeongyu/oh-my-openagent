@@ -1,5 +1,5 @@
 import { AsyncResource } from "node:async_hooks"
-import { basename, dirname, isAbsolute } from "node:path"
+import { basename, dirname, isAbsolute, resolve } from "node:path"
 
 import { deferUntilAfterFirstPaint } from "../../extension/startup-deferral"
 import type { OmoSenpiComponent } from "../../extension/types"
@@ -27,11 +27,16 @@ const processScope = new AsyncResource("omo-device-service-registrant")
 // launcher's own agent-dir variable used.
 const HOST_DAEMON_DIR_ENV = "SENPI_RPC_HOST_DAEMON_DIR"
 
-function daemonAgentDir(env: Readonly<Record<string, string | undefined>>): string | undefined {
+/**
+ * The agent dir holding the daemon's endpoint registry, normalized like resolveAgentHome so one dir is never
+ * registered under two spellings; `unreadable` when the variable is set but names no such registry.
+ */
+function daemonAgentDir(env: Readonly<Record<string, string | undefined>>): string | "unreadable" | undefined {
   const daemonDir = env[HOST_DAEMON_DIR_ENV]?.trim()
-  if (!daemonDir || !isAbsolute(daemonDir)) return undefined
-  const registry = dirname(daemonDir)
-  return basename(registry) === "rpc-host-daemon" ? dirname(registry) : undefined
+  if (!daemonDir) return undefined
+  if (!isAbsolute(daemonDir)) return "unreadable"
+  const registry = dirname(resolve(daemonDir))
+  return basename(registry) === "rpc-host-daemon" ? dirname(registry) : "unreadable"
 }
 
 export interface DeviceServiceComponentOptions extends DeviceServiceRuntimeOptions {
@@ -49,9 +54,18 @@ export function createDeviceServiceComponent(options: DeviceServiceComponentOpti
       const env = options.env ?? process.env
       const hostSocket = hostSocketOf(pi)
       if (hostSocket !== undefined && isThreadSocket(hostSocket, env)) {
+        const fromRegistry = daemonAgentDir(env)
+        if (fromRegistry === "unreadable")
+          ctx.logger.warn(
+            "device service: the daemon's endpoint registry dir is unreadable; registering the launcher's agent dir",
+            {
+              [HOST_DAEMON_DIR_ENV]: env[HOST_DAEMON_DIR_ENV],
+            },
+          )
         const atLoad = {
           mode: "rpc",
-          agentDir: daemonAgentDir(env) ?? resolveAgentHome({ env }),
+          agentDir:
+            fromRegistry === undefined || fromRegistry === "unreadable" ? resolveAgentHome({ env }) : fromRegistry,
           cwd: pi.cwd ?? process.cwd(),
         }
         void loadRuntime()
