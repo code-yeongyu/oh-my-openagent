@@ -50,10 +50,10 @@ export type ThreadDelivery =
   | {
       readonly kind: "queued"
       readonly queue_position: number
-      readonly waiting_on?: { readonly kind: "approval"; readonly device?: string }
+      readonly waiting_on?: { readonly kind: "approval" | "hold" | "wake"; readonly device?: string }
     }
   /** Gateway only: the target has no answering endpoint; the message is durable and its drain takes it on the next start. */
-  | { readonly kind: "queued_offline"; readonly queue_position: number }
+  | { readonly kind: "queued_offline"; readonly queue_position: number; readonly reason?: "wake_unavailable" }
 
 /**
  * What a send through the session gateway adds to a delivery result: the durable `delivery_id`, the
@@ -91,12 +91,19 @@ export type ThreadLocalAliasNote = {
   readonly local_name_unavailable?: ThreadErrorCode
 }
 
+/**
+ * Set when a thread this device opened is in a folder outside the caller's workspace: every thread tool answers it
+ * `scope_denied` from the caller unless `all_scope` is set, which `scope_next_action` says.
+ */
+export type ThreadWorkspaceNote = { readonly workspace_scope?: "outside"; readonly scope_next_action?: string }
+
 export type ThreadCreateResult =
   | ({
       readonly kind: "ok"
       readonly thread: ThreadResultSummary
       readonly deduplicated: boolean
-    } & ThreadLocalAliasNote)
+    } & ThreadLocalAliasNote &
+      ThreadWorkspaceNote)
   | ThreadDataError
 
 export type ThreadListResult =
