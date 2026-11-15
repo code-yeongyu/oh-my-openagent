@@ -70,6 +70,8 @@ async function readLinux(host: ColdWakeHost) {
       state: systemdState(sessionHost),
       enabled: sessionHost["UnitFileState"] === "enabled",
     },
+    // A unit whose latest ensure failed stays reported as such, even with a host up.
+    ensureFailed: sessionHost["ActiveState"] === "failed",
     deviceService: { unit: RELAYD_SYSTEMD_UNIT, state: systemdState(relayd) },
     coldWakeEntry:
       environment.exitCode === 0
@@ -102,23 +104,24 @@ async function readDarwin(host: ColdWakeHost) {
   ])
   const raw = table.exitCode === 0 ? table.output.replace(/\n$/, "") : undefined
   return {
-    // A loaded job has run its ensure at load; the host it started keeps running after the job exits.
+    // The job runs its ensure and exits, so loaded says nothing about the host: readColdWake asks the pinned host.
     sessionHost: {
       unit: SESSION_HOST_LAUNCHD_LABEL,
-      state: sessionHost.loaded ? ("running" as const) : sessionHost.state,
+      state: sessionHost.loaded ? ("stopped" as const) : sessionHost.state,
       enabled: sessionHost.loaded,
     },
+    ensureFailed: false,
     deviceService: { unit: RELAYD_LAUNCHD_LABEL, state: relayd.state },
     coldWakeEntry: relayd.state === "not_installed" ? false : withColdWake(raw, "darwin").kind === "unchanged",
   }
 }
 
 export async function readColdWake(host: ColdWakeHost, launch: SessionHostLaunch): Promise<ColdWakeStatus> {
-  const units = host.platform === "darwin" ? await readDarwin(host) : await readLinux(host)
+  const { ensureFailed, ...units } = host.platform === "darwin" ? await readDarwin(host) : await readLinux(host)
   const pinned = await readPinnedHost(host, launch)
   // The unit is one ensure per start, so between starts it is not active; the host it started is what runs.
   const sessionHost =
-    units.sessionHost.state === "stopped" && units.sessionHost.enabled && pinned === "pinned"
+    units.sessionHost.state === "stopped" && units.sessionHost.enabled && !ensureFailed && pinned === "pinned"
       ? { ...units.sessionHost, state: "running" as const }
       : units.sessionHost
   return { ...units, sessionHost, pinnedHost: typeof pinned === "string" ? pinned === "pinned" : "unknown" }

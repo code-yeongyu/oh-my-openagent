@@ -84,6 +84,17 @@ describe("reading back the units on Linux", () => {
     })
   })
 
+  // #13669 review L1: a unit whose latest ensure failed is not reported running because a host happens to be up.
+  test("a failed oneshot session host stays stopped even with a pinned host up", async () => {
+    const host = linuxHost({
+      sessionHost: "LoadState=loaded\nActiveState=failed\nUnitFileState=enabled\n",
+      relayd: "LoadState=loaded\nActiveState=active\n",
+      table: ENTRY_LINUX,
+      pinned: true,
+    })
+    expect((await readColdWake(host, LAUNCH)).sessionHost.state).toBe("stopped")
+  })
+
   test("an enabled oneshot session host with no host up is stopped", async () => {
     const host = linuxHost({
       sessionHost: "LoadState=loaded\nActiveState=inactive\nUnitFileState=enabled\n",
@@ -121,6 +132,23 @@ describe("reading back the units on Linux", () => {
 })
 
 describe("reading back the units on macOS", () => {
+  // #13669 review M1: without KeepAlive a loaded job says nothing about the host; with no host up it is stopped.
+  test("a loaded LaunchAgent with no host up reads stopped", async () => {
+    const home = mkdtempSync(join(tmpdir(), "cwr-"))
+    dirs.push(home)
+    const agents = join(home, "Library", "LaunchAgents")
+    mkdirSync(agents, { recursive: true })
+    for (const label of ["ai.omo.session-host", "ai.omo.relay-daemon"])
+      writeFileSync(join(agents, `${label}.plist`), "<plist/>")
+    const run: RunCommand = async (argv) => {
+      if (argv[0] === "/usr/bin/env") return hostStatus(undefined)
+      if (argv[0] === "plutil") return ok(`${ENTRY_DARWIN}\n`)
+      return ok(argv.at(-1)?.endsWith("relay-daemon") ? "\tstate = running\n" : "\tstate = not running\n")
+    }
+    const status = await readColdWake({ platform: "darwin", home, uid: 501, run, pause: async () => {} }, LAUNCH)
+    expect(status.sessionHost).toEqual({ unit: "ai.omo.session-host", state: "stopped", enabled: true })
+  })
+
   test("a loaded LaunchAgent counts as running and enabled, and the plist entry is read", async () => {
     const home = mkdtempSync(join(tmpdir(), "cwr-"))
     dirs.push(home)
