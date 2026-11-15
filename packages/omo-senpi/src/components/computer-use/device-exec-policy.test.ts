@@ -17,9 +17,18 @@ function request(context: Partial<Context>, signal = new AbortController().signa
   return { context: context as Context, reason: "click Run", signal, budgetMs: 60_000 }
 }
 
-function confirmCounter(answer: boolean): { readonly asked: string[]; readonly confirm: (title: string) => Promise<boolean> } {
+function confirmCounter(answer: boolean): {
+  readonly asked: string[]
+  readonly confirm: (title: string) => Promise<boolean>
+} {
   const asked: string[] = []
-  return { asked, confirm: (title) => { asked.push(title); return Promise.resolve(answer) } }
+  return {
+    asked,
+    confirm: (title) => {
+      asked.push(title)
+      return Promise.resolve(answer)
+    },
+  }
 }
 
 function device(enabled: boolean): DeviceExecPolicy {
@@ -34,7 +43,10 @@ describe("device exec policy for foreground control on a hand (O1b, C3(b))", () 
     const { asked, confirm } = confirmCounter(true)
 
     // when
-    const granted = await confirmComputerControl(request({ hasUI: true, ui: { confirm, notify: () => undefined } } as Partial<Context>), { placement: hand, deviceExec: device(false) })
+    const granted = await confirmComputerControl(
+      request({ hasUI: true, ui: { confirm, notify: () => undefined } } as Partial<Context>),
+      { placement: hand, deviceExec: device(false) },
+    )
 
     // then
     expect(granted).toBe(false)
@@ -59,7 +71,10 @@ describe("device exec policy for foreground control on a hand (O1b, C3(b))", () 
     aborted.abort()
 
     // when
-    const granted = await confirmComputerControl(request({ hasUI: false }, aborted.signal), { placement: hand, deviceExec: device(true) })
+    const granted = await confirmComputerControl(request({ hasUI: false }, aborted.signal), {
+      placement: hand,
+      deviceExec: device(true),
+    })
 
     // then
     expect(granted).toBe(false)
@@ -75,7 +90,10 @@ describe("device exec policy for foreground control on a hand (O1b, C3(b))", () 
 
   test("#given a fused headless session on a device with exec enabled #when it acquires #then today's rule holds and nothing is granted", async () => {
     // when
-    const granted = await confirmComputerControl(request({ hasUI: false }), { placement: () => "fused", deviceExec: device(true) })
+    const granted = await confirmComputerControl(request({ hasUI: false }), {
+      placement: () => "fused",
+      deviceExec: device(true),
+    })
 
     // then
     expect(granted).toBe(false)
@@ -86,7 +104,10 @@ describe("device exec policy for foreground control on a hand (O1b, C3(b))", () 
     const { asked, confirm } = confirmCounter(false)
 
     // when
-    const granted = await confirmComputerControl(request({ hasUI: true, ui: { confirm, notify: () => undefined } } as Partial<Context>), { deviceExec: device(true) })
+    const granted = await confirmComputerControl(
+      request({ hasUI: true, ui: { confirm, notify: () => undefined } } as Partial<Context>),
+      { deviceExec: device(true) },
+    )
 
     // then
     expect(granted).toBe(false)
