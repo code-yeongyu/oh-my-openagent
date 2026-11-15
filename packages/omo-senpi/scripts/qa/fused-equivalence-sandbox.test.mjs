@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -25,6 +25,24 @@ function harnessRun() {
 const pluginTelemetryOn = (env) => isTelemetryClientEnabled({ env, product: createOmoNativeProductConfig() })
 
 describe("prepareCaseSandbox", () => {
+  test("#given a sandbox reached through a symlink, as macOS /tmp is #when a case sandbox is prepared #then trust.json trusts the cwd the CLI resolves to", () => {
+    const real = mkdtempSync(join(tmpdir(), "eq-omo-sandbox-real-"))
+    const linkParent = mkdtempSync(join(tmpdir(), "eq-omo-sandbox-link-"))
+    roots.push(real, linkParent)
+    const dir = join(linkParent, "box")
+    symlinkSync(real, dir)
+    const box = { dir, agentDir: join(dir, "agent"), cwd: join(dir, "work") }
+    mkdirSync(box.agentDir, { recursive: true })
+    mkdirSync(box.cwd, { recursive: true })
+    const run = { box, childPath: "/usr/bin:/bin", env: { HOME: dir, PI_OFFLINE: "1", PI_TELEMETRY: "0" } }
+
+    prepareCaseSandbox(run, {})
+
+    const trusted = JSON.parse(readFileSync(join(box.agentDir, "trust.json"), "utf8"))
+    expect(trusted).toEqual({ [realpathSync(box.cwd)]: true })
+    expect(realpathSync(box.cwd)).not.toBe(box.cwd)
+  })
+
   test("#given the harness env, which leaves the plugin's telemetry on #when a case sandbox is prepared #then the CLI child's plugin telemetry is off", () => {
     const run = harnessRun()
     expect(pluginTelemetryOn(run.env)).toBe(true)
