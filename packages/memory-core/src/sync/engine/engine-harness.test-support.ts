@@ -15,7 +15,7 @@ import { SyncEngine, type EngineFault } from "./engine"
 import { FakeSealer, FakeVerifier } from "./fake-crypto.test-support"
 import type { FakeSyncServer } from "./fake-server.test-support"
 import { FakeItemStore } from "./fake-store.test-support"
-import type { Clock, FreezeSettler, ItemStore, SyncRepo, Transport, WriterLock } from "./ports"
+import type { Clock, FreezeSettler, ItemStore, SyncLog, SyncRepo, Transport, WriterLock } from "./ports"
 
 export const ACCOUNT = "acc_test"
 /** Every engine test drives real git processes; under machine load a cycle can take seconds. */
@@ -162,7 +162,7 @@ export interface DeviceOptions {
   /** Use the production item store over the #10203 device (Loro) instead of the line-set fake. */
   readonly realStore?: boolean
   readonly onStatusChange?: () => void
-  readonly log?: (line: string) => void
+  readonly log?: SyncLog
   /** The account session's freeze settler (rotation on revoke). */
   readonly freeze?: FreezeSettler
 }

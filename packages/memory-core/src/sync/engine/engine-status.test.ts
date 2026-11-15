@@ -101,9 +101,11 @@ test(
   "a cycle stopped by a full disk while applying names the disk, its errno code and the stage, and logs the whole error (#13635)",
   async () => {
     const server = new FakeSyncServer()
-    const lines: string[] = []
+    const lines: { readonly line: string; readonly level: string }[] = []
     const a = await makeDevice(server, "a")
-    const b = await makeDevice(server, "b", undefined, { log: (line) => lines.push(line) })
+    const b = await makeDevice(server, "b", undefined, {
+      log: (line, level = "info") => lines.push({ line, level }),
+    })
     devices.push(a, b)
     await b.engine.runCycle()
     await a.write("one.md", "one\n")
@@ -121,10 +123,10 @@ test(
       kind: "failing",
       failure: { kind: "disk_full", cause: { errorClass: "Error", code: "ENOSPC", stage: "apply" } },
     })
-    const logged = lines.filter((line) => line.startsWith("sync cycle failed"))
-    expect(logged).toEqual([expect.stringContaining("during apply")])
-    expect(logged[0]).toContain(String(full.stack))
-    expect(logged[0]).toContain("ENOSPC: no space left on device")
+    const logged = lines.filter(({ line }) => line.startsWith("sync cycle failed"))
+    expect(logged).toEqual([{ line: expect.stringContaining("during apply"), level: "warn" }])
+    expect(logged[0]?.line).toContain(String(full.stack))
+    expect(logged[0]?.line).toContain("ENOSPC: no space left on device")
     commit.mockRestore()
   },
   GIT_TEST_TIMEOUT,

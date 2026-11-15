@@ -6,6 +6,7 @@ import { GitCommandError, GitError, GitNotFoundError, GitTimeoutError } from "..
 import { SyncFormatError } from "../crypto/vendor/sync-format/jcs"
 import { SyncCommitError } from "./adapters/git-sync-repo"
 import { SyncHttpError } from "./adapters/http-transport"
+import type { SyncLog } from "./ports"
 
 /** The step of a cycle that threw. */
 export type SyncStage = "load" | "resume" | "receive" | "capture" | "apply" | "push" | "finish"
@@ -99,10 +100,10 @@ function errorForLog(error: unknown): string {
   return parts.join("\ncaused by: ")
 }
 
-/** Logs a failed cycle with its whole error, after the engine settled it; it never throws into the engine. */
-export function logCycleFailure(log: ((line: string) => void) | undefined, stage: SyncStage, error: unknown): void {
+/** Logs a failed cycle at warn with its whole error, after the engine settled it; it never throws into the engine. */
+export function logCycleFailure(log: SyncLog | undefined, stage: SyncStage, error: unknown): void {
   try {
-    log?.(`sync cycle failed during ${stage}: ${errorForLog(error)}`)
+    log?.(`sync cycle failed during ${stage}: ${errorForLog(error)}`, "warn")
   } catch {
     // A logger that throws has no channel left to report on; the status already carries the failure.
   }

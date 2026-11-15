@@ -250,3 +250,9 @@ export interface SyncRepo {
   /** True when a commit reachable from HEAD carries `Sync-Seq: <range>`. */
   hasSyncCommit(range: string): Promise<boolean>
 }
+
+/**
+ * The engine's log line. A failed cycle is a warning a person or harness must see (#13635); every
+ * other line is routine and stays at info.
+ */
+export type SyncLog = (line: string, level?: "info" | "warn") => void
