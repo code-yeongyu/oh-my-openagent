@@ -37,6 +37,7 @@ const UNRELATED: FakeModel = { provider: "example", id: "nothing-in-any-chain" }
 const SUBSCRIPTION_OPUS: FakeModel = { provider: "anthropic-subscription", id: "claude-opus-5-5" }
 const GATEWAY_OPUS: FakeModel = { provider: "opengateway", id: "anthropic/claude-opus-5-5" }
 const CODING_KIMI: FakeModel = { provider: "kimi-coding", id: "kimi-k3.1-pro" }
+const FABLE_52: FakeModel = { provider: "anthropic", id: "claude-fable-5-2" }
 
 type FakeCredential = { readonly accounts?: readonly { readonly name: string }[]; readonly pinned?: string }
 type FakeGetAuth = (target: string | FakeModel, overrides?: { readonly slotName?: string }) => Promise<unknown>
@@ -269,15 +270,15 @@ describe("createModelProfileComponent", () => {
     expect(pi.sessionThinkingLevels).toEqual(["medium"])
   })
 
-  test("#given unset with GPT-6.1 Sol and GPT-6 Sol connected beside GLM #when the session starts #then Daily · Normal's GLM rung is applied", async () => {
-    const { pi, start } = harness({}, [SOL, SOL_61, GLM, UNRELATED])
+  test("#given unset with GPT-6.1 Sol and GPT-6 Sol connected beside Kimi #when the session starts #then Daily · Normal's Kimi rung is applied", async () => {
+    const { pi, start } = harness({}, [SOL, SOL_61, KIMI, UNRELATED])
 
     await start(STARTUP)
 
-    expect(pi.sessionModels).toEqual([GLM])
+    expect(pi.sessionModels).toEqual([KIMI])
     expect(pi.sessionThinkingLevels).toEqual(["max"])
     expect(recordedOutcome(pi)).toMatchObject({
-      details: { profile: "daily-normal", model: "zai/glm-5.3", reasoning: "max" },
+      details: { profile: "daily-normal", model: "moonshotai/kimi-k3.1-pro", reasoning: "max" },
     })
   })
 
@@ -295,17 +296,17 @@ describe("createModelProfileComponent", () => {
 
   // Migration contract (#10029): a saved `recommended` starts the unset default, logged once, never unknown.
   test("#given a saved retired recommended model_profile #when two sessions start #then each applies the unset default and the retirement is logged once", async () => {
-    const { pi, logs, start } = harness({ model_profile: "recommended" }, [SOL, SOL_61, GLM, UNRELATED])
+    const { pi, logs, start } = harness({ model_profile: "recommended" }, [SOL, SOL_61, KIMI, UNRELATED])
 
     await start(STARTUP, "session-1")
     await start(STARTUP, "session-2")
 
-    expect(pi.sessionModels).toEqual([GLM, GLM])
+    expect(pi.sessionModels).toEqual([KIMI, KIMI])
     expect(pi.entries.map((entry) => entry.customType)).toEqual([
       MODEL_PROFILE_APPLIED_TYPE,
       MODEL_PROFILE_APPLIED_TYPE,
     ])
-    expect(recordedOutcome(pi)).toMatchObject({ details: { profile: "daily-normal", model: "zai/glm-5.3" } })
+    expect(recordedOutcome(pi)).toMatchObject({ details: { profile: "daily-normal", model: "moonshotai/kimi-k3.1-pro" } })
     expect(logs.filter((line) => line.includes('model_profile "recommended" is retired'))).toHaveLength(1)
   })
 
@@ -322,15 +323,15 @@ describe("createModelProfileComponent", () => {
     expect(logs.some((line) => line.includes("is retired"))).toBe(false)
   })
 
-  test("#given unset with only Copilot GPT-6 Sol and GLM #when the session starts #then Daily · Normal's GLM rung is applied", async () => {
-    const { pi, start } = harness({}, [SOL, GLM, UNRELATED])
+  test("#given unset with only Copilot GPT-6 Sol and Kimi #when the session starts #then Daily · Normal's Kimi rung is applied", async () => {
+    const { pi, start } = harness({}, [SOL, KIMI, UNRELATED])
 
     await start(STARTUP)
 
-    expect(pi.sessionModels).toEqual([GLM])
+    expect(pi.sessionModels).toEqual([KIMI])
     expect(pi.sessionThinkingLevels).toEqual(["max"])
     expect(recordedOutcome(pi)).toMatchObject({
-      details: { profile: "daily-normal", model: "zai/glm-5.3", reasoning: "max" },
+      details: { profile: "daily-normal", model: "moonshotai/kimi-k3.1-pro", reasoning: "max" },
     })
   })
 
@@ -366,11 +367,11 @@ describe("createModelProfileComponent", () => {
         profile: "daily-normal",
         model: "moonshotai/kimi-k3.1-pro",
         reasoning: "max",
-        skipped: ["anthropic-subscription/claude-opus-5-5"],
+        skipped: ["anthropic-subscription/claude-opus-5-5", "anthropic-subscription/claude-fable-5-2"],
       },
     })
     expect(appliedContent(pi)).toContain("moonshotai/kimi-k3.1-pro max")
-    expect(appliedContent(pi)).toContain("skipped: anthropic-subscription/claude-opus-5-5")
+    expect(appliedContent(pi)).toContain("skipped: anthropic-subscription/claude-opus-5-5, anthropic-subscription/claude-fable-5-2")
     expect(existsSync(join(agentDir, "settings.json"))).toBe(false)
   })
 
@@ -631,18 +632,18 @@ describe("createModelProfileComponent", () => {
 
   test("#given unset and a stored Anthropic login whose refresh is rejected #when a desktop session starts #then the next rung with working credentials is applied and the notice points at provider settings", async () => {
     const probe = authProbe({ dead: ["anthropic"] })
-    const harnessed = harness({}, [OPUS, FABLE, GLM], probe.getAuth)
+    const harnessed = harness({}, [OPUS, FABLE, KIMI], probe.getAuth)
     const { pi, logs, start } = harnessed
 
     await start(STARTUP)
 
-    expect(pi.sessionModels).toEqual([GLM])
+    expect(pi.sessionModels).toEqual([KIMI])
     expect(pi.sessionThinkingLevels).toEqual(["max"])
-    expect(probe.calls).toEqual(["anthropic", "zai", "zai/glm-5.3"])
+    expect(probe.calls).toEqual(["anthropic", "moonshotai", "moonshotai/kimi-k3.1-pro"])
     expect(pi.entries).toHaveLength(1)
     expect(recordedOutcome(pi)).toMatchObject({ customType: MODEL_PROFILE_APPLIED_TYPE })
     const details = recordedOutcome(pi)?.["details"] as Record<string, unknown>
-    expect(details).toMatchObject({ profile: "daily-normal", model: "zai/glm-5.3", reasoning: "max" })
+    expect(details).toMatchObject({ profile: "daily-normal", model: "moonshotai/kimi-k3.1-pro", reasoning: "max" })
     expect(details["authFailed"]).toEqual([{ provider: "anthropic", model: "claude-opus-5-5", reason: "refresh" }])
     expect(appliedContent(pi)).toContain("re-authenticate anthropic in Provider authentication settings")
     expect(appliedContent(pi)).not.toContain("/login")
@@ -675,32 +676,32 @@ describe("createModelProfileComponent", () => {
 
   test("#given a rejected refresh #when a headless session starts #then the notice names the interactive login instead of a desktop setting", async () => {
     const probe = authProbe({ dead: ["anthropic"] })
-    const { pi, start } = harness({}, [OPUS, GLM], probe.getAuth)
+    const { pi, start } = harness({}, [OPUS, KIMI], probe.getAuth)
 
     await start(STARTUP, "session-print", "print")
 
-    expect(pi.sessionModels).toEqual([GLM])
+    expect(pi.sessionModels).toEqual([KIMI])
     expect(appliedContent(pi)).toContain("/login anthropic")
     expect(appliedContent(pi)).not.toContain("Provider authentication settings")
   })
 
   test("#given two distinct providers whose refreshes are rejected ahead of a healthy one #when the session starts #then both are skipped and the third is applied", async () => {
-    const probe = authProbe({ dead: ["anthropic", "moonshotai"] })
-    const { pi, start } = harness({}, [OPUS, KIMI, GLM], probe.getAuth)
+    const probe = authProbe({ dead: ["anthropic", "kimi-coding"] })
+    const { pi, start } = harness({}, [OPUS, CODING_KIMI, KIMI], probe.getAuth)
 
     await start(STARTUP)
 
-    expect(pi.sessionModels).toEqual([GLM])
-    expect(probe.calls).toEqual(["anthropic", "moonshotai", "zai", "zai/glm-5.3"])
+    expect(pi.sessionModels).toEqual([KIMI])
+    expect(probe.calls).toEqual(["anthropic", "kimi-coding", "moonshotai", "moonshotai/kimi-k3.1-pro"])
     expect(recordedOutcome(pi)?.["details"]).toMatchObject({
-      model: "zai/glm-5.3",
+      model: "moonshotai/kimi-k3.1-pro",
       authFailed: [
         { provider: "anthropic", model: "claude-opus-5-5", reason: "refresh" },
-        { provider: "moonshotai", model: "kimi-k3.1-pro", reason: "refresh" },
+        { provider: "kimi-coding", model: "kimi-k3.1-pro", reason: "refresh" },
       ],
     })
     expect(appliedContent(pi)).toContain("skipped anthropic:")
-    expect(appliedContent(pi)).toContain("skipped moonshotai:")
+    expect(appliedContent(pi)).toContain("skipped kimi-coding:")
   })
 
   test("#given every provider on the ladder fails to resolve credentials #when the session starts #then no model is applied and the notice lists each provider", async () => {
@@ -728,15 +729,15 @@ describe("createModelProfileComponent", () => {
 
   test("#given one model whose request configuration fails on a provider whose credentials resolve #when the session starts #then only that model is skipped and the lane's next rung is applied", async () => {
     const probe = authProbe({ broken: ["anthropic/claude-opus-5-5"] })
-    const { pi, logs, start } = harness({}, [OPUS, FABLE, GLM], probe.getAuth)
+    const { pi, logs, start } = harness({}, [OPUS, FABLE_52], probe.getAuth)
 
     await start(STARTUP)
 
-    expect(pi.sessionModels).toEqual([GLM])
-    expect(pi.sessionThinkingLevels).toEqual(["max"])
-    expect(probe.calls).toEqual(["anthropic", "anthropic/claude-opus-5-5", "zai", "zai/glm-5.3"])
+    expect(pi.sessionModels).toEqual([FABLE_52])
+    expect(pi.sessionThinkingLevels).toEqual(["medium"])
+    expect(probe.calls).toEqual(["anthropic", "anthropic/claude-opus-5-5", "anthropic", "anthropic/claude-fable-5-2"])
     expect(recordedOutcome(pi)?.["details"]).toMatchObject({
-      model: "zai/glm-5.3",
+      model: "anthropic/claude-fable-5-2",
       authFailed: [{ provider: "anthropic", model: "claude-opus-5-5", reason: "request" }],
     })
     expect(appliedContent(pi)).toContain("skipped anthropic/claude-opus-5-5: its request configuration did not resolve")
@@ -844,7 +845,7 @@ describe("createModelProfileComponent", () => {
 
   test("#given a credential pool whose flat account is expired but a sibling account resolves #when the session starts #then the provider stays eligible through the healthy slot", async () => {
     const probe = authProbe({ deadSlots: ["anthropic@expired"] })
-    const { pi, start } = harness({}, [OPUS, GLM], probe.getAuth, {
+    const { pi, start } = harness({}, [OPUS, KIMI], probe.getAuth, {
       anthropic: { accounts: [{ name: "expired" }, { name: "healthy" }] },
     })
 
@@ -857,14 +858,14 @@ describe("createModelProfileComponent", () => {
 
   test("#given a credential pool pinned to an account whose refresh is rejected #when the session starts #then only the pinned slot is probed and the provider is skipped", async () => {
     const probe = authProbe({ deadSlots: ["anthropic@expired"] })
-    const { pi, start } = harness({}, [OPUS, GLM], probe.getAuth, {
+    const { pi, start } = harness({}, [OPUS, KIMI], probe.getAuth, {
       anthropic: { accounts: [{ name: "healthy" }, { name: "expired" }], pinned: "expired" },
     })
 
     await start(STARTUP)
 
-    expect(pi.sessionModels).toEqual([GLM])
-    expect(probe.calls).toEqual(["anthropic@expired", "zai", "zai/glm-5.3"])
+    expect(pi.sessionModels).toEqual([KIMI])
+    expect(probe.calls).toEqual(["anthropic@expired", "moonshotai", "moonshotai/kimi-k3.1-pro"])
     expect(recordedOutcome(pi)?.["details"]).toMatchObject({
       authFailed: [{ provider: "anthropic", model: "claude-opus-5-5", reason: "refresh" }],
     })
@@ -872,7 +873,7 @@ describe("createModelProfileComponent", () => {
 
   test("#given a pool whose provider disables rotation in models.json #when the session starts #then only the flat credential is probed, as the engine would use it", async () => {
     const probe = authProbe({ dead: ["anthropic"] })
-    const { pi, agentDir, start } = harness({}, [OPUS, GLM], probe.getAuth, {
+    const { pi, agentDir, start } = harness({}, [OPUS, KIMI], probe.getAuth, {
       anthropic: { accounts: [{ name: "expired" }, { name: "healthy" }] },
     })
     writeFileSync(
@@ -882,8 +883,8 @@ describe("createModelProfileComponent", () => {
 
     await start(STARTUP)
 
-    expect(pi.sessionModels).toEqual([GLM])
-    expect(probe.calls).toEqual(["anthropic", "zai", "zai/glm-5.3"])
+    expect(pi.sessionModels).toEqual([KIMI])
+    expect(probe.calls).toEqual(["anthropic", "moonshotai", "moonshotai/kimi-k3.1-pro"])
     expect(recordedOutcome(pi)?.["details"]).toMatchObject({
       authFailed: [{ provider: "anthropic", model: "claude-opus-5-5", reason: "refresh" }],
     })
@@ -891,12 +892,12 @@ describe("createModelProfileComponent", () => {
 
   test("#given rotation disabled for a different provider #when the session starts #then this provider's pool still rotates onto its healthy account", async () => {
     const probe = authProbe({ deadSlots: ["anthropic@expired"] })
-    const { pi, agentDir, start } = harness({}, [OPUS, GLM], probe.getAuth, {
+    const { pi, agentDir, start } = harness({}, [OPUS, KIMI], probe.getAuth, {
       anthropic: { accounts: [{ name: "expired" }, { name: "healthy" }] },
     })
     writeFileSync(
       join(agentDir, "models.json"),
-      JSON.stringify({ providers: { zai: { credentials: { rotation: false } } } }),
+      JSON.stringify({ providers: { moonshotai: { credentials: { rotation: false } } } }),
     )
 
     await start(STARTUP)
@@ -909,7 +910,7 @@ describe("createModelProfileComponent", () => {
     const probe = authProbe({ dead: ["anthropic"] })
     const { pi, start } = harness(
       {},
-      [OPUS, GLM],
+      [OPUS, KIMI],
       probe.getAuth,
       { anthropic: { accounts: [{ name: "expired" }, { name: "healthy" }] } },
       ["anthropic"],
@@ -917,8 +918,8 @@ describe("createModelProfileComponent", () => {
 
     await start(STARTUP)
 
-    expect(pi.sessionModels).toEqual([GLM])
-    expect(probe.calls).toEqual(["anthropic", "zai", "zai/glm-5.3"])
+    expect(pi.sessionModels).toEqual([KIMI])
+    expect(probe.calls).toEqual(["anthropic", "moonshotai", "moonshotai/kimi-k3.1-pro"])
   })
 
   test("#given a lane whose first rung resolves credentials #when the session starts #then it is applied after one provider and one model probe", async () => {
@@ -935,7 +936,7 @@ describe("createModelProfileComponent", () => {
 
   test("#given a literal provider/model pin with failing credentials #when the session starts #then the pin is applied unprobed", async () => {
     const probe = authProbe({ dead: ["anthropic"] })
-    const { pi, start } = harness({ model_profile: "anthropic/claude-opus-5-5" }, [OPUS, GLM], probe.getAuth)
+    const { pi, start } = harness({ model_profile: "anthropic/claude-opus-5-5" }, [OPUS, KIMI], probe.getAuth)
 
     await start(STARTUP)
 
@@ -944,7 +945,7 @@ describe("createModelProfileComponent", () => {
   })
 
   test("#given a host whose registry exposes no model runtime #when the session starts #then the plain walk applies the first listed rung", async () => {
-    const { pi, start } = harness({}, [OPUS, GLM])
+    const { pi, start } = harness({}, [OPUS, KIMI])
 
     await start(STARTUP)
 
@@ -952,13 +953,13 @@ describe("createModelProfileComponent", () => {
     expect(recordedOutcome(pi)?.["details"]).not.toHaveProperty("authFailed")
   })
 
-  test("#given GLM-only registry and unset profile #when the session starts #then glm max is applied", async () => {
+  test("#given GLM-only registry and unset profile #when the session starts #then no lane resolves and the session model is kept (#13547)", async () => {
     const { pi, start } = harness({}, [GLM, UNRELATED])
 
     await start(STARTUP)
 
-    expect(pi.sessionModels).toEqual([GLM])
-    expect(pi.sessionThinkingLevels).toEqual(["max"])
+    expect(pi.sessionModels).toEqual([])
+    expect(recordedOutcome(pi)).toMatchObject({ customType: MODEL_PROFILE_UNAVAILABLE_TYPE })
   })
 
   test("#given other events #when they fire #then the component never touches the model", async () => {

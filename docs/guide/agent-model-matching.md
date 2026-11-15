@@ -2,7 +2,7 @@
 
 > **For agents and users**: the four model-profile lanes that pick the main agent's model, which models carry tuned prompt presets, how curated agents and categories keep their own chains, and how to change any of it without breaking things.
 
-**OmO Native sets all of this up on its own, so you can probably skip this page.** With nothing in `omo.json`, a fresh session starts on Daily · Normal (Claude Opus 5.5, then Kimi K3.1 Pro, then GLM 5.3, whichever you have connected), or on the first other lane that resolves, and every category and curated agent picks its model from its own chain against the providers you are logged in to. A category that none of your providers can serve is left off the main agent's list, so it is never picked and then fails. Read on when you want to change a default, or when you want to know why a session landed on the model it did.
+**OmO Native sets all of this up on its own, so you can probably skip this page.** With nothing in `omo.json`, a fresh session starts on Daily · Normal (Claude Opus 5.5, then Claude Fable 5.2, then Kimi K3.1 Pro, whichever you have connected), or on the first other lane that resolves, and every category and curated agent picks its model from its own chain against the providers you are logged in to. A category that none of your providers can serve is left off the main agent's list, so it is never picked and then fails. Read on when you want to change a default, or when you want to know why a session landed on the model it did.
 
 ---
 
@@ -12,8 +12,8 @@ The main agent thinks with your session model. The easiest way to choose it is a
 
 | Lane | Id | Pick it for | Chain |
 | --- | --- | --- | --- |
-| Daily · Normal | `daily-normal` | Gets any task done without fuss. | `anthropic-subscription\|anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (medium)` -> `kimi-coding\|kimi-for-coding\|moonshotai\|opencode-go/kimi-k3.1-pro (max)` -> `zai-coding-plan\|opencode-go/glm-5.3 (max)` |
-| Daily · Heavy | `daily-heavy` | Gets any task done, after thinking it over from more sides. | `anthropic-subscription\|anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-2 (xhigh)` -> same Claude providers `/claude-fable-5-1 (xhigh)` |
+| Daily · Normal | `daily-normal` | Gets any task done without fuss. | `anthropic-subscription\|anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (medium)` -> `anthropic-subscription\|anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-2 (medium)` -> `kimi-coding\|kimi-for-coding\|moonshotai\|opencode-go/kimi-k3.1-pro (max)` |
+| Daily · Heavy | `daily-heavy` | Gets any task done, after thinking it over from more sides. | `anthropic-subscription\|anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-2 (high)` -> same Claude providers `/claude-fable-5-1 (xhigh)` |
 | Obsessive · Normal | `geeky-normal` | Obsessive focus on one hard task. Caution: NOT RECOMMENDED FOR WRITING OR EVERYDAY WORK. | `chatgpt-subscription\|openai\|github-copilot\|opencode/gpt-6-astra (medium)` -> `chatgpt-subscription\|openai/gpt-6.1-sol-fast (medium)` -> `chatgpt-subscription\|openai/gpt-6.1-sol (medium)` -> `chatgpt-subscription\|openai\|github-copilot\|opencode/gpt-5.6-sol (medium)` |
 | Obsessive · Heavy | `geeky-heavy` | Obsessive focus on one hard task, checked from every side. Caution: NOT RECOMMENDED FOR WRITING OR EVERYDAY WORK. | `chatgpt-subscription\|openai\|github-copilot\|opencode/gpt-6-astra (high)` |
 
@@ -67,7 +67,7 @@ The harness ships a prompt preset per model family. When your session model matc
 | `gpt-5.4`, `gpt-5.3-codex` and older GPT-5 presets | Older GPT-5 ids | Kept for configs that still pin them. |
 | `kimi-k3` | Kimi K3 (`k3` on Kimi Code) and Devin SWE-2 | Instruction-following mirrors Claude closely. The preset is calibrated to stop overthinking and keep work moving, so expect thinking-token cost. |
 | `kimi-k2-8` / `kimi-k2-7` / `kimi-k2-6` | Kimi K2.8 (including `kimi-for-coding`), K2.7 (including `kimi-for-coding-highspeed`, the `explore` and `librarian` head), K2.6 | Older Kimi line. Not a recommended main-agent configuration. |
-| `glm-5.3` / `glm-5.2` | GLM 5.3 and 5.2 | Claude-like, slightly looser on long nested workflows. GLM 5.3 is the last Daily · Normal rung; see the validation note above. |
+| `glm-5.3` / `glm-5.2` | GLM 5.3 and 5.2 | Claude-like, slightly looser on long nested workflows. No builtin lane runs it; name it in `model_profiles` to use it. See the validation note above. |
 | `deepseek-v4-pro` | DeepSeek V4 Pro | Preset exists. Not a recommended main-agent configuration. |
 | `deepseek-v4-1-flash` | DeepSeek V4.1 Flash, including `deepseek-flash` and `deepseek/deepseek-v4-flash` (DeepSeek's own API has served V4.1 under that name since 2026-09-10) | Preset exists. Not a recommended main-agent configuration. |
 | `deepseek-v4-flash` / `deepseek-v4-flash-0731` | DeepSeek V4 Flash on other hosts, and the dated snapshot | Preset exists. Not a recommended main-agent configuration. |
@@ -124,7 +124,7 @@ If one premium model is quota-limited while your other models are effectively un
 2. **Prefer a low-frequency, high-leverage role.** `plan-consultant` contributes one gap-analysis pass per plan generation. High-accuracy planning runs one `plan-reviewer` pass per round and repeats after any rejection. Both are far cheaper places for a rare model than the main agent, which runs throughout the workflow.
 3. **Avoid execution-heavy slots.** The category worker, `explore`, and `librarian` are high-volume. They're usually poor homes for the rarest model.
 
-Claude Fable 5.2 leads, with Fable 5.1 right behind it at the same effort, in `plan-consultant`, `architect`, `artistry` and Daily · Heavy. In `visual-engineering`, both Fable rungs follow Argon at low. With a tight Fable allocation, move the categories off it first, since each runs once per delegated task of its kind, and keep `plan-consultant`, which runs once per plan, at a lower effort. `architect` falls back only to Fable 5.1, so it disappears when both Fable generations are missing unless you configure it yourself.
+Claude Fable 5.2 leads, with Fable 5.1 right behind it at the same effort, in `plan-consultant`, `architect` and `artistry`; Daily · Heavy runs Fable 5.2 at high, then Fable 5.1 at xhigh. In `visual-engineering`, both Fable rungs follow Argon at low. With a tight Fable allocation, move the categories off it first, since each runs once per delegated task of its kind, and keep `plan-consultant`, which runs once per plan, at a lower effort. `architect` falls back only to Fable 5.1, so it disappears when both Fable generations are missing unless you configure it yourself.
 
 ```jsonc
 {
