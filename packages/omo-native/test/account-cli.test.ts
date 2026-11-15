@@ -415,6 +415,27 @@ describe("omo account on a locked OS credential store (desktop#3509)", () => {
     }
   })
 
+  // #13642 review: a forget the lock refuses discards nothing, so no line may claim the keys were discarded.
+  test("#given a locked keychain #when forget fails on it #then only the locked outcome is reported, never a discarded-keys line", async () => {
+    const locked = () =>
+      Promise.reject(
+        Object.assign(new Error("SecKeychain write failed (-25308)"), { code: "ERR_SECRETS_PLATFORM_ERROR" }),
+      )
+    const store = createCredentialStore("http://127.0.0.1:1", {
+      secrets: { get: locked, set: locked, delete: locked },
+      platform: "darwin",
+    })
+    const pinLog: string[] = []
+    const result = await run(store, ["forget"], {
+      beforeKeysDiscarded: retireSyncPinOnDiscard({ pinDir: () => "unused", log: (line) => pinLog.push(line) }),
+    })
+    expect({ code: result.code, out: result.out, pinLog }).toEqual({
+      code: ACCOUNT_EXIT.keychainLocked,
+      out: [{ keychain: "locked" }],
+      pinLog: [],
+    })
+  })
+
   test("an immediate native store failure returns store-unavailable", async () => {
     const broken = () => Promise.reject(new Error("boom"))
     const store = createCredentialStore("http://127.0.0.1:1", {
