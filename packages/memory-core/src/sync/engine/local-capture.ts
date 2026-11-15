@@ -7,7 +7,7 @@
 
 import { isSyncItemKey } from "../item"
 import { adoptLandedRenders } from "./apply"
-import { planBatches } from "./batches"
+import { batchCost, planBatches } from "./batches"
 import type { EngineDeps } from "./engine-deps"
 import { batchBound, heldPrint } from "./held"
 import { acceptedKeys, rejectItem } from "./item-keys"
@@ -178,7 +178,7 @@ export async function capture(
       const ops = unchanged ? null : await deps.store.capture(key, text)
       if (ops === null && !unchanged) continue
       // Checked before the segment sees it: a held edit is never journaled (#12284).
-      if (ops === null || ops.byteLength > batchBound(deps)) {
+      if (ops === null || batchCost({ key, bytes: ops.byteLength }) > batchBound(deps)) {
         // The doc did not move (held ops are never imported), so this version is the one the next cycle compares.
         held.set(key, unchanged && prior !== undefined ? prior : heldPrint(text, await deps.store.version(key)))
         await rejectItem(deps, journal, "capture", key, "oversized")

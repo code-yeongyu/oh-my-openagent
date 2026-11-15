@@ -15,6 +15,9 @@ import type { FreezeOutcome } from "./ports"
 // appends its own captures inline next to the index entries. Every such journal must still read,
 // and every item in it must reach the server exactly once.
 
+// 64 bytes of ops plus the framing of one record keyed "three.md": type (1), space id (16), key length (2), key, body length (4).
+const SMALL_BATCH = 64 + 1 + 16 + 2 + "three.md".length + 4
+
 const devices: Device[] = []
 afterEach(async () => {
   for (const d of devices.splice(0)) await d.dispose()
@@ -80,7 +83,7 @@ test(
   async () => {
     const server = new FakeSyncServer()
     const keys = ["one.md", "two.md", "three.md"]
-    const a = await withFiles(server, keys, crashAt("uploaded"), 64)
+    const a = await withFiles(server, keys, crashAt("uploaded"), SMALL_BATCH)
     const sent = await rewriteInline(a)
 
     await a.restart()
@@ -128,7 +131,7 @@ test(
   async () => {
     const server = new FakeSyncServer()
     const keys = ["one.md", "two.md", "three.md"]
-    const a = await withFiles(server, keys, crashAt("uploaded"), 64)
+    const a = await withFiles(server, keys, crashAt("uploaded"), SMALL_BATCH)
     const sent = await rewriteInline(a)
     await a.restart()
 
@@ -168,7 +171,7 @@ test(
   async () => {
     const server = new FakeSyncServer()
     let outcome: FreezeOutcome = { kind: "frozen", reason: "unverified" }
-    const a = await makeDevice(server, "a", undefined, { batchBytes: 64, freeze: { settle: async () => outcome } })
+    const a = await makeDevice(server, "a", undefined, { batchBytes: SMALL_BATCH, freeze: { settle: async () => outcome } })
     devices.push(a)
     const keys = ["one.md", "two.md", "three.md"]
     for (const key of keys) await a.write(key, `${key} body\n`)
