@@ -285,6 +285,16 @@ const BUILD_SETTINGS = JSON.stringify({
   secondaryMinifier: "terser@5.44.0",
   loaderAliases: SENPI_LOADER_ALIASES,
 })
+// #13155: the externals list carries the running node's builtinModules (node 26 adds node:ffi), and it
+// feeds the marker digest, so a byte-identical bundle built under another node read as stale. The digest
+// therefore records the builtin family as ONE stable token and digests only the source-derived
+// externals, which is what freshness must track.
+const NODE_BUILTIN_SET_MARKER = "<node-builtins>"
+export function digestSettingsFor(externals, builtinNames) {
+  const builtins = new Set(builtinNames)
+  const sourceDerived = externals.filter((specifier) => !builtins.has(specifier) && !specifier.startsWith("node:"))
+  return JSON.stringify({ settings: BUILD_SETTINGS, externals: [...sourceDerived, NODE_BUILTIN_SET_MARKER] })
+}
 
 export const extensionBuildPaths = {
   scriptDir,
@@ -555,7 +565,7 @@ async function buildEntry(entry, output, buildDefines, externals = externalSpeci
       metafile,
       buildDefines,
       repoRoot,
-      buildSettings: JSON.stringify({ settings: BUILD_SETTINGS, externals }),
+      buildSettings: digestSettingsFor(externals, builtinModuleNames),
       buildScriptPath,
     })
   } finally {
