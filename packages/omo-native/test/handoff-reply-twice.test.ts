@@ -8,17 +8,20 @@ import { createRemoteThreadFixture, ENGINE } from "../../omo-senpi/src/component
 import type { RemoteCommandDependencies } from "../remote-cli"
 import { runSession } from "../remote-session-verbs"
 
-// Scratch repro for Q's `pong pong` (#12777 comment, 5.1.69): drives `omo remote send` (runSession, wait) through the
-// remote fixture, with a wrapper that decides when the turn's records reach the follow relative to the send's reply,
-// the aim, and the probe's transcript read.
+// Regression for the answer printed twice (`pong pong`, #12777 comment, 5.1.69) and for an earlier run's settle taken
+// as this send's (#13481): drives `omo remote send` (runSession, wait) through the remote fixture, with a wrapper that
+// decides when the turn's records reach the follow relative to the send's reply, the aim, and the probe's transcript read.
 const TEXT = "Reply with exactly the word pong"
 const delta = (text: string): JsonObject => ({
   type: "message_update",
   message: null,
   assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: text },
 })
+// senpi's run opens with the prompt's own user message, as the engine streams it.
 const RUN: readonly JsonObject[] = [
   { type: "agent_start" },
+  { type: "message_start", message: { role: "user", content: TEXT } },
+  { type: "message_end", message: { role: "user", content: TEXT } },
   delta("pong"),
   { type: "message_end", message: { role: "assistant", stopReason: "stop" } },
   { type: "agent_end" },
@@ -28,9 +31,10 @@ const STORED: readonly JsonObject[] = [
   { role: "user", content: TEXT },
   { role: "assistant", content: "pong" },
 ]
+// An earlier identical send and its own answer, stored before this send's entry.
 const EARLIER_TURN: readonly JsonObject[] = [
   { role: "user", content: TEXT },
-  { role: "assistant", content: "pong" },
+  { role: "assistant", content: "EARLIER" },
 ]
 
 const fixture = createRemoteThreadFixture()
@@ -142,13 +146,19 @@ async function send(script: Script) {
     false,
     dependencies,
   ).then(done.resolve)
-  const timeout = new Promise<never>((_, reject) =>
-    setTimeout(
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
       () => reject(new Error(`send did not settle; printed so far ${JSON.stringify(written.join(""))}`)),
       5_000,
-    ),
-  )
-  const code = await Promise.race([done.promise, timeout])
+    )
+  })
+  let code: number
+  try {
+    code = await Promise.race([done.promise, timeout])
+  } finally {
+    clearTimeout(timer)
+  }
   return {
     code,
     printed: written.join(""),
@@ -158,7 +168,7 @@ async function send(script: Script) {
   }
 }
 
-describe("scratch: omo remote send prints the whole reply twice?", () => {
+describe("omo remote send prints its own turn's answer exactly once, whatever the record ordering (#13481)", () => {
   const orderings: ReadonlyArray<readonly [string, Script]> = [
     [
       "A started: deltas + settle after the aim, before the probe's read returns; transcript holds the answer",
@@ -185,7 +195,7 @@ describe("scratch: omo remote send prints the whole reply twice?", () => {
       { beforeReply: [SETTLE], reads: [{ before: RUN, entries: STORED, after: [SETTLE] }] },
     ],
     [
-      "G started: an earlier identical send in the transcript; earlier settle before the reply; this send not stored yet at the probe",
+      "G started: an earlier identical send stored with its own answer; its settle before the reply; this send not stored yet at the probe",
       { beforeReply: [SETTLE], reads: [{ entries: EARLIER_TURN, after: [...RUN, SETTLE] }] },
     ],
     [
@@ -203,11 +213,13 @@ describe("scratch: omo remote send prints the whole reply twice?", () => {
       },
     ],
   ]
-  // Ordering D (deltas before the reply, settle after the probe's read) is a SEPARATE defect: oh-my-openagent#13512.
-  for (const [name, script] of orderings.filter(([rowName]) => !rowName.startsWith("D started")))
-    test(name, async () => {
+  for (const [name, script] of orderings) {
+    const row = async () => {
       const result = await send(script)
-      console.log(`RESULT ${name.slice(0, 1)} ${JSON.stringify(result)}`)
       expect(result.printed).toBe("pong\n")
-    })
+    }
+    // Ordering D (deltas before the reply, settle after the probe's read) loses the answer: a separate defect.
+    if (name.startsWith("D started")) test.todo(`${name} (oh-my-openagent#13512)`, row)
+    else test(name, row)
+  }
 })

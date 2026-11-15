@@ -367,8 +367,8 @@ export async function followRemote(
   }
   // The stop reason of the run's last assistant message: an interrupted turn ends its run with "aborted" (#13272).
   let lastStopReason: unknown
-  // The stream printed text for this turn: the probe must not print the stored answer a second time (#13481).
-  let streamedThisTurn = false
+  // What the stream printed from the aim on: the probe prints only the part of the stored answer it has not (#13481).
+  let streamed = ""
   const streamRecord = (record: JsonObject): void => {
     if (record["type"] === "agent_settled") {
       if (record["reason"] === "session_closed") return end("session_closed")
@@ -391,13 +391,33 @@ export async function followRemote(
     )
       return
     const delta = event["delta"]
-    if (last !== undefined && !last.endsLine && (newMessage || event["contentIndex"] !== last.index)) onText("\n")
+    if (last !== undefined && !last.endsLine && (newMessage || event["contentIndex"] !== last.index)) {
+      streamed += "\n"
+      onText("\n")
+    }
     newMessage = false
     last = { index: event["contentIndex"], endsLine: delta.endsWith("\n") }
-    streamedThisTurn = true
+    streamed += delta
     onText(delta)
   }
-  const probe = async (settleSignal: boolean): Promise<void> => {
+  // Whether a buffered stream record is this send's own prompt: senpi streams the prompt's user message as the run
+  // starts, and stores its entry at that message's end. A message stamped with a client message id is this send's only
+  // when it carries the send's own id; an unstamped one is matched by its text, as the transcript readers match an
+  // engine that keeps no id (#13481 review M1).
+  const isOwnPrompt = (record: JsonObject): boolean => {
+    const text = options?.text
+    if (text === undefined || record["type"] !== "message_end" || !isUserEntry(record)) return false
+    const stamped = entryClientMessageIdOf(record)
+    if (stamped !== undefined) return stamped === options?.clientMessageId
+    return entryTextOf(record)?.includes(text) === true
+  }
+  /**
+   * Reads the transcript once for a started turn that may have finished, or been superseded, before the aim.
+   * `settleSignal`: this turn's own run settled before the aim. `promptStored`: the stream showed this send's prompt
+   * stored before the read, so the newest entry carrying its text is its own; without that (and without its client
+   * message id on an entry) the newest text match may be an earlier identical send, and nothing prints (#13481 review M1).
+   */
+  const probe = async (settleSignal: boolean, promptStored: boolean): Promise<void> => {
     const text = options?.text
     if (done || text === undefined) return
     const page = await remote.sessions.read(row.device, row.session_id, READ_TAIL)
@@ -405,9 +425,18 @@ export async function followRemote(
     const raw = page.response["entries"]
     if (!Array.isArray(raw)) return
     const entries = raw.filter(isRecord)
-    const matches = anchorMatches(entries, text, options?.clientMessageId)
-    if (matches.length === 0) return
-    const anchor = matches[matches.length - 1]
+    const clientMessageId = options?.clientMessageId
+    const own =
+      clientMessageId === undefined
+        ? -1
+        : entries.findIndex((entry) => isUserEntry(entry) && entryClientMessageIdOf(entry) === clientMessageId)
+    let anchor = own
+    if (anchor < 0) {
+      if (!promptStored) return
+      const matches = anchorMatches(entries, text)
+      if (matches.length === 0) return
+      anchor = matches[matches.length - 1]
+    }
     const answer: string[] = []
     let superseded = false
     let answerAtTail = false
@@ -430,13 +459,26 @@ export async function followRemote(
     // Final once a later message supersedes the turn, or once a run settled (the buffer's own trailing settle
     // counts: the turn finished before the aim) with this answer as the transcript's tail.
     const interrupted = stopReason === "aborted"
-    // A turn whose text the stream already printed is not printed again from the transcript (#13481).
-    if (streamedThisTurn && !interrupted) return
     if (!(superseded || (settleSignal && (answerAtTail || interrupted)))) return
     if (answer.length === 0 && !interrupted) return
-    for (const [index, entryText] of answer.entries()) {
-      if (index > 0) onText("\n")
-      onText(entryText)
+    // An interrupted turn whose partial text the stream already printed ends without printing it again (#13481 review L3).
+    if (interrupted && streamed !== "") return end("interrupted")
+    if (streamed === "")
+      for (const [index, entryText] of answer.entries()) {
+        if (index > 0) onText("\n")
+        onText(entryText)
+      }
+    else {
+      // The stream printed from the aim on: of this turn's stored answer only what it has not printed yet is written,
+      // so the answer prints once (#13481). Deltas that are not this answer (a later message's turn streaming after
+      // the aim of a superseded send) never drop it: it prints after them (#13481 review L3).
+      const stored = answer.join("\n")
+      if (stored.startsWith(streamed)) {
+        if (stored.length > streamed.length) onText(stored.slice(streamed.length))
+      } else if (!streamed.startsWith(stored)) {
+        if (!streamed.endsWith("\n")) onText("\n")
+        onText(stored)
+      }
     }
     end(interrupted ? "interrupted" : "settled")
   }
@@ -484,9 +526,12 @@ export async function followRemote(
           lastStopReason = ended["stopReason"]
       }
     if (lane === "started") {
-      // A run whose settle the buffer already holds ended before this aim: its settle is the probe's signal.
-      const settledAlready = buffer.length > 0 && buffer[buffer.length - 1]?.["type"] === "agent_settled"
-      void probe(settledAlready)
+      // This send's run ended before the aim only when the buffer holds a settle AFTER this send's own prompt: a settle
+      // buffered with no prompt of its own before it is an earlier run's, never this turn's signal (#13481 review M1).
+      const ownPrompt = buffer.findLastIndex(isOwnPrompt)
+      const settledAlready =
+        ownPrompt >= 0 && buffer.slice(ownPrompt + 1).some((record) => record["type"] === "agent_settled")
+      void probe(settledAlready, ownPrompt >= 0)
     }
   }
   const watched = await remote.sessions.watch(row.device, row.session_id, receive)
