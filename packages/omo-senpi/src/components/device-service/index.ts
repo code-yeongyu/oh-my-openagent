@@ -1,4 +1,5 @@
 import { AsyncResource } from "node:async_hooks"
+import { basename, dirname } from "node:path"
 
 import { deferUntilAfterFirstPaint } from "../../extension/startup-deferral"
 import type { OmoSenpiComponent } from "../../extension/types"
@@ -21,6 +22,18 @@ import type { DeviceServiceRuntimeOptions } from "./runtime"
 // a session_start handler inherits that session's ledger context at its own top level.
 const processScope = new AsyncResource("omo-device-service-registrant")
 
+// senpi names the directory a host keeps its endpoint record in, `<agent dir>/rpc-host-daemon/<id>`, in the host's own
+// environment. Its agent dir is the one the device service must scan to list the host's endpoint, whatever spelling the
+// launcher's own agent-dir variable used.
+const HOST_DAEMON_DIR_ENV = "SENPI_RPC_HOST_DAEMON_DIR"
+
+function daemonAgentDir(env: Readonly<Record<string, string | undefined>>): string | undefined {
+  const daemonDir = env[HOST_DAEMON_DIR_ENV]?.trim()
+  if (!daemonDir) return undefined
+  const registry = dirname(daemonDir)
+  return basename(registry) === "rpc-host-daemon" ? dirname(registry) : undefined
+}
+
 export interface DeviceServiceComponentOptions extends DeviceServiceRuntimeOptions {
   readonly loadRuntime?: () => Promise<Pick<typeof import("./runtime"), "startAtSession">>
 }
@@ -36,7 +49,11 @@ export function createDeviceServiceComponent(options: DeviceServiceComponentOpti
       const env = options.env ?? process.env
       const hostSocket = hostSocketOf(pi)
       if (hostSocket !== undefined && isThreadSocket(hostSocket, env)) {
-        const atLoad = { mode: "rpc", agentDir: resolveAgentHome({ env }), cwd: pi.cwd ?? process.cwd() }
+        const atLoad = {
+          mode: "rpc",
+          agentDir: daemonAgentDir(env) ?? resolveAgentHome({ env }),
+          cwd: pi.cwd ?? process.cwd(),
+        }
         void loadRuntime()
           .then((runtime) => runtime.startAtSession(atLoad, ctx.logger, { scope: processScope, ...options }))
           .catch((error: unknown) =>

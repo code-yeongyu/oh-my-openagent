@@ -177,3 +177,38 @@ describe("the operator daemon registers its agent dir when it loads omo", () => 
     },
   )
 })
+
+// Live cold wake (t2yy, goal1 row 3): the daemon registered its launcher's agent-dir spelling, and the device service,
+// scanning <that dir>/rpc-host-daemon, listed no endpoint. The daemon's own environment names its endpoint registry
+// (SENPI_RPC_HOST_DAEMON_DIR); the registrant registers that registry's agent dir.
+test("#given an operator daemon whose endpoint registry lives under another agent dir than its launcher variable names #when it loads omo #then it registers the agent dir that holds its endpoint registry", async () => {
+  const daemonSocket = "/tmp/omo-daemon-registrant-b/rpc/rpc.sock"
+  const registryOwner = "/srv/run-root/b/home/.omo/agent"
+  const started: Started[] = []
+  const pi = new FakeExtensionAPI()
+  pi.cwd = "/work/project"
+  Object.assign(pi, { sessionContext: { host_socket: daemonSocket, host_instance: "generation-1" } })
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("waited 5s for the operator daemon's registrant to start")), 5_000)
+    createDeviceServiceComponent({
+      env: {
+        OMO_RPC_SOCKET_PATH: daemonSocket,
+        OMO_CODING_AGENT_DIR: "/home/b/.omo/agent",
+        SENPI_RPC_HOST_DAEMON_DIR: `${registryOwner}/rpc-host-daemon/0123456789abcdef`,
+      },
+      latch: { claimed: true },
+      registrantLatch: { claimed: false },
+      loadConfig: () => ({ config: {} }),
+      startRegistrant: ({ agentDir }) => {
+        started.push({ agentDir, sessionStore: sessionOwner.getStore() })
+        clearTimeout(timer)
+        resolve()
+      },
+    }).register(pi, {
+      logger: { info() {}, warn() {}, error() {} },
+      config: { getFlag: () => undefined },
+      deferStartupWork: () => undefined,
+    })
+  })
+  expect(started.map(({ agentDir }) => agentDir)).toEqual([registryOwner])
+})
