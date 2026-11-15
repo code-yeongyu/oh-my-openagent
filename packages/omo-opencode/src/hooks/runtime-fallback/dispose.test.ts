@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { createRuntimeFallbackHook } from "./hook"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
+import { getCompaction, recordCompactionStart } from "../../shared/compaction-in-flight"
 
 let capturedDeps: HookDeps | undefined
 
@@ -23,12 +24,16 @@ const mockCreateMessageUpdateHandler = mock((_deps: HookDeps, _helpers: AutoRetr
 const mockCreateChatMessageHandler = mock((_deps: HookDeps) => async () => {})
 
 function createHookWithMocks() {
-  return createRuntimeFallbackHook(createMockContext(), { pluginConfig: {} }, {
-    createAutoRetryHelpers: mockCreateAutoRetryHelpers,
-    createEventHandler: mockCreateEventHandler,
-    createMessageUpdateHandler: mockCreateMessageUpdateHandler,
-    createChatMessageHandler: mockCreateChatMessageHandler,
-  })
+  return createRuntimeFallbackHook(
+    createMockContext(),
+    { pluginConfig: {} },
+    {
+      createAutoRetryHelpers: mockCreateAutoRetryHelpers,
+      createEventHandler: mockCreateEventHandler,
+      createMessageUpdateHandler: mockCreateMessageUpdateHandler,
+      createChatMessageHandler: mockCreateChatMessageHandler,
+    },
+  )
 }
 
 function createMockContext(): RuntimeFallbackPluginInput {
@@ -150,5 +155,14 @@ describe("createRuntimeFallbackHook dispose", () => {
     expect(clearedTimeouts).toEqual([fallbackTimeout])
     expect(timeoutMapSizesDuringClear).toEqual([1])
     expect(capturedDeps?.sessionFallbackTimeouts.size).toBe(0)
+  })
+
+  test("#given a registry compaction entry #when dispose() is called #then the shared entry is cleared", () => {
+    const hook = createHookWithMocks()
+    recordCompactionStart("session-dispose-compaction")
+
+    hook.dispose?.()
+
+    expect(getCompaction("session-dispose-compaction")).toBeUndefined()
   })
 })

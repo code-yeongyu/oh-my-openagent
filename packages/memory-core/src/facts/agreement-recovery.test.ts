@@ -15,7 +15,8 @@ import { applyFactsRecovery } from "./recovery"
 const TEXT = "Use the fixture convention"
 const ID = agreementId(TEXT)
 const AUTHOR = { agentId: "fixture", authorName: "Fixture" }
-const ledger = (n: number, date: string) => `---\ndescription: Agreements\n---\n\n- [global] ${TEXT} <!-- id: ${ID}; by: agent; n: ${n}; since: 2026-10-01; last: ${date}; status: active -->\n`
+const ledger = (n: number, date: string) =>
+  `---\ndescription: Agreements\n---\n\n- [global] ${TEXT} <!-- id: ${ID}; by: agent; n: ${n}; since: 2026-10-01; last: ${date}; status: active -->\n`
 
 async function fixture(date: string, partial: boolean) {
   const root = await mkdtemp(join(tmpdir(), "agreement-recovery-"))
@@ -25,21 +26,28 @@ async function fixture(date: string, partial: boolean) {
   const head = await repo.head()
   if (head === null) throw new Error("missing HEAD")
   const batch: FactsBatch = {
-    batchId: randomUUID(), records: [],
+    batchId: randomUUID(),
+    records: [],
     agreements: [{ action: "reaffirm", id: ID, date }],
   }
   const pre = await repo.pathState.capture(AGREEMENTS_PATH)
   const oldPost = ledger(2, date)
   const recovery: FactsApplyRecovery = {
-    version: 1, batchId: batch.batchId, headBeforeApply: head, recordsHash: factsRecordsHash([], batch.agreements),
+    version: 1,
+    batchId: batch.batchId,
+    headBeforeApply: head,
+    recordsHash: factsRecordsHash([], batch.agreements),
     people: null,
-    paths: [{
-      path: AGREEMENTS_PATH, pre,
-      post: {
-        index: { mode: "100644", oid: await repo.pathState.hashIndexBlob(AGREEMENTS_PATH, oldPost, true) },
-        worktree: { kind: "file", mode: 0o644, oid: await repo.pathState.hashWorktreeBlob(oldPost, true) },
+    paths: [
+      {
+        path: AGREEMENTS_PATH,
+        pre,
+        post: {
+          index: { mode: "100644", oid: await repo.pathState.hashIndexBlob(AGREEMENTS_PATH, oldPost, true) },
+          worktree: { kind: "file", mode: 0o644, oid: await repo.pathState.hashWorktreeBlob(oldPost, true) },
+        },
       },
-    }],
+    ],
   }
   const path = recovery.paths[0]
   if (path === undefined) throw new Error("missing recovery path")
@@ -51,7 +59,10 @@ async function fixture(date: string, partial: boolean) {
 }
 
 for (const partial of [false, true]) {
-  for (const [date, expected] of [["2026-10-01", 1], ["2026-10-02", 2]] as const) {
+  for (const [date, expected] of [
+    ["2026-10-01", 1],
+    ["2026-10-02", 2],
+  ] as const) {
     test(`legacy recovery partial=${partial} date=${date} publishes migrated receipts with count ${expected}`, async () => {
       const { root, repo, batch, recovery, pre } = await fixture(date, partial)
       let published: FactsApplyRecovery | undefined
@@ -75,13 +86,20 @@ test("a failed commit after recovery publication leaves a resumable migrated env
   const { root, repo, batch, recovery } = await fixture("2026-10-02", true)
   let published: FactsApplyRecovery | undefined
   const commit = repo.commitPrepared.bind(repo)
-  repo.commitPrepared = async () => { throw new Error("fixture commit failure") }
+  repo.commitPrepared = async () => {
+    throw new Error("fixture commit failure")
+  }
   let failure: unknown
   try {
     await applyFactsRecovery(repo, recovery, 1, AUTHOR, {
-      batch, publishRecovery: async (next) => { published = next },
+      batch,
+      publishRecovery: async (next) => {
+        published = next
+      },
     })
-  } catch (error) { failure = error }
+  } catch (error) {
+    failure = error
+  }
   if (!(failure instanceof Error)) throw new Error("expected commit failure")
   expect(failure.message).toBe("fixture commit failure")
   repo.commitPrepared = commit

@@ -23,8 +23,11 @@ GLib.MainLoop().run()
 `
 
 const has = (cmd: string, args: string[]) => spawnSync(cmd, args, { stdio: "ignore" }).status === 0
-const canRun = process.platform === "linux" && has("dbus-run-session", ["--version"]) && has("gdbus", ["help"])
-  && has("python3", ["-c", "from gi.repository import Gio"])
+const canRun =
+  process.platform === "linux" &&
+  has("dbus-run-session", ["--version"]) &&
+  has("gdbus", ["help"]) &&
+  has("python3", ["-c", "from gi.repository import Gio"])
 
 describe("probeSecretServiceLock without gdbus", () => {
   // #10658 review: a minimal install without libglib2.0-bin has no gdbus; that says nothing about the keyring.
@@ -50,24 +53,43 @@ describe("parseLockedReply", () => {
   })
 })
 
-describe.skipIf(!canRun)("probeSecretServiceLock against a fake Secret Service on a private D-Bus (desktop#3509)", () => {
-  const probeIn = (fake: "locked" | "unlocked" | "none"): string => {
-    const dir = mkdtempSync(join(tmpdir(), "omo-secret-service-"))
-    try {
-      const fakePath = join(dir, "fake.py")
-      writeFileSync(fakePath, FAKE_SECRET_SERVICE)
-      const probeModule = join(import.meta.dir, "secret-service-lock.ts")
-      const start = fake === "none" ? "" : `python3 ${JSON.stringify(fakePath)} ${fake} > "$D/ready" & until grep -q READY "$D/ready" 2>/dev/null; do :; done;`
-      const run = spawnSync("dbus-run-session", ["--", "bash", "-c",
-        `D=${JSON.stringify(dir)}; ${start} bun -e 'const { probeSecretServiceLock } = await import(${JSON.stringify(probeModule)}); console.log(await probeSecretServiceLock())'`],
-        { encoding: "utf8", timeout: 20_000 })
-      return run.stdout.trim().split("\n").at(-1) ?? ""
-    } finally {
-      rmSync(dir, { recursive: true, force: true })
+describe.skipIf(!canRun)(
+  "probeSecretServiceLock against a fake Secret Service on a private D-Bus (desktop#3509)",
+  () => {
+    const probeIn = (fake: "locked" | "unlocked" | "none"): string => {
+      const dir = mkdtempSync(join(tmpdir(), "omo-secret-service-"))
+      try {
+        const fakePath = join(dir, "fake.py")
+        writeFileSync(fakePath, FAKE_SECRET_SERVICE)
+        const probeModule = join(import.meta.dir, "secret-service-lock.ts")
+        const start =
+          fake === "none"
+            ? ""
+            : `python3 ${JSON.stringify(fakePath)} ${fake} > "$D/ready" & until grep -q READY "$D/ready" 2>/dev/null; do :; done;`
+        const run = spawnSync(
+          "dbus-run-session",
+          [
+            "--",
+            "bash",
+            "-c",
+            `D=${JSON.stringify(dir)}; ${start} bun -e 'const { probeSecretServiceLock } = await import(${JSON.stringify(probeModule)}); console.log(await probeSecretServiceLock())'`,
+          ],
+          { encoding: "utf8", timeout: 20_000 },
+        )
+        return run.stdout.trim().split("\n").at(-1) ?? ""
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
     }
-  }
 
-  test("a locked default collection is locked", () => { expect(probeIn("locked")).toBe("locked") })
-  test("an unlocked default collection is unlocked", () => { expect(probeIn("unlocked")).toBe("unlocked") })
-  test("no Secret Service on the bus is absent", () => { expect(probeIn("none")).toBe("absent") })
-})
+    test("a locked default collection is locked", () => {
+      expect(probeIn("locked")).toBe("locked")
+    })
+    test("an unlocked default collection is unlocked", () => {
+      expect(probeIn("unlocked")).toBe("unlocked")
+    })
+    test("no Secret Service on the bus is absent", () => {
+      expect(probeIn("none")).toBe("absent")
+    })
+  },
+)

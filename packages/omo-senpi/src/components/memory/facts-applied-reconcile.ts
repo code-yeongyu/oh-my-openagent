@@ -1,10 +1,20 @@
 import { join } from "node:path"
 
 import { readdir, rm } from "@oh-my-opencode/memory-core/fs"
-import { GitMemoryRepo, getPidLiveness, getProcessStartIdentity, type MemoryIdentity } from "@oh-my-opencode/memory-core"
+import {
+  GitMemoryRepo,
+  getPidLiveness,
+  getProcessStartIdentity,
+  type MemoryIdentity,
+} from "@oh-my-opencode/memory-core"
 
 import type { ComponentLogger } from "../../extension/types"
-import { activeAppliedBatches, appliedFactsDir, applyFactsWithRetries, type AppliedFactsRequest } from "./facts-batch-apply"
+import {
+  activeAppliedBatches,
+  appliedFactsDir,
+  applyFactsWithRetries,
+  type AppliedFactsRequest,
+} from "./facts-batch-apply"
 import { describe } from "./facts-run-storage"
 import type { FactsRunLedger } from "./facts-runner-types"
 import { readRunJson } from "./worker/run-artifacts"
@@ -59,7 +69,8 @@ export async function reconcileAppliedFactsBatches(options: {
     } catch (error) {
       outcome = `failed: ${describe(error)}`
     }
-    if (outcome !== "committed") options.logger?.warn("facts applied batch recovery ended without a commit", { batchId: name, outcome })
+    if (outcome !== "committed")
+      options.logger?.warn("facts applied batch recovery ended without a commit", { batchId: name, outcome })
     await rm(runDir, { recursive: true, force: true })
   }
   return active

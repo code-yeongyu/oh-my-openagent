@@ -41,7 +41,11 @@ function startFailed(taskId: string, name: string, message: string): StartResult
 
 describe("buildTaskExecute background batch fanout", () => {
   test("#given background capacity one #when three items start #then all ids and queue positions return as running", async () => {
-    const starts = [started(IDS[0], "one"), started(IDS[1], "two", "pending", 1), started(IDS[2], "three", "pending", 2)]
+    const starts = [
+      started(IDS[0], "one"),
+      started(IDS[1], "two", "pending", 1),
+      started(IDS[2], "three", "pending", 2),
+    ]
     let startIndex = 0
     const manager = createFakeManager({
       start: async (): Promise<StartResult> => {
@@ -54,7 +58,11 @@ describe("buildTaskExecute background batch fanout", () => {
 
     const output = await buildTaskExecute(makeDeps(manager))(
       "batch-background",
-      { category: "quick", run_in_background: true, tasks: [{ prompt: "one" }, { prompt: "two" }, { prompt: "three" }] },
+      {
+        category: "quick",
+        run_in_background: true,
+        tasks: [{ prompt: "one" }, { prompt: "two" }, { prompt: "three" }],
+      },
       undefined,
       undefined,
       CTX,
@@ -81,16 +89,18 @@ describe("buildTaskExecute background batch fanout", () => {
         return started(taskId, `item-${startIndex}`)
       },
     })
-    const execute = buildTaskExecute(makeDeps(manager, {
-      loadSkills: (names) => {
-        const resolved = names.filter((name) => name !== "ghost")
-        return {
-          prepend: resolved.length === 0 ? "" : `${resolved.join("+")} DIRECTIVE\n\n`,
-          resolved,
-          missing: names.filter((name) => name === "ghost"),
-        }
-      },
-    }))
+    const execute = buildTaskExecute(
+      makeDeps(manager, {
+        loadSkills: (names) => {
+          const resolved = names.filter((name) => name !== "ghost")
+          return {
+            prepend: resolved.length === 0 ? "" : `${resolved.join("+")} DIRECTIVE\n\n`,
+            resolved,
+            missing: names.filter((name) => name === "ghost"),
+          }
+        },
+      }),
+    )
 
     const output = await execute(
       "batch-skills",
@@ -98,10 +108,7 @@ describe("buildTaskExecute background batch fanout", () => {
         category: "quick",
         run_in_background: true,
         load_skills: ["shared"],
-        tasks: [
-          { prompt: "one" },
-          { prompt: "two", load_skills: ["specific", "ghost"] },
-        ],
+        tasks: [{ prompt: "one" }, { prompt: "two", load_skills: ["specific", "ghost"] }],
       },
       undefined,
       undefined,
@@ -135,7 +142,11 @@ describe("buildTaskExecute background batch fanout", () => {
 
     const output = await buildTaskExecute(makeDeps(manager))(
       "batch-all-failed",
-      { category: "quick", run_in_background: true, tasks: [{ prompt: "one" }, { prompt: "two" }, { prompt: "three" }] },
+      {
+        category: "quick",
+        run_in_background: true,
+        tasks: [{ prompt: "one" }, { prompt: "two" }, { prompt: "three" }],
+      },
       undefined,
       undefined,
       CTX,

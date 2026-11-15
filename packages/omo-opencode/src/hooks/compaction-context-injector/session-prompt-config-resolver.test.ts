@@ -3,10 +3,7 @@ import { afterEach, describe, expect, it } from "bun:test"
 import { _resetForTesting } from "../../features/claude-code-session-state"
 import { clearSessionModel, setSessionModel } from "../../shared/session-model-state"
 import { clearSessionTools } from "../../shared/session-tools-store"
-import {
-  resolveLatestSessionPromptConfig,
-  resolveSessionPromptConfig,
-} from "./session-prompt-config-resolver"
+import { resolveLatestSessionPromptConfig, resolveSessionPromptConfig } from "./session-prompt-config-resolver"
 
 type SessionMessage = {
   info?: {

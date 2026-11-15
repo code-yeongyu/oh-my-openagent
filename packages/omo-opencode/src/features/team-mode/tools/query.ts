@@ -44,21 +44,25 @@ export function createTeamStatusTool(
     args: {
       teamRunId: tool.schema.string().describe("Team run ID"),
     },
-    execute: async (args: { teamRunId: string }) => JSON.stringify(await deps.aggregateStatus(args.teamRunId, config, backgroundManager)),
+    execute: async (args: { teamRunId: string }) =>
+      JSON.stringify(await deps.aggregateStatus(args.teamRunId, config, backgroundManager)),
   })
 }
 
-export function createTeamListTool(config: TeamModeConfig, client: OpencodeClient, deps: QueryToolDeps = defaultDeps): ToolDefinition {
+export function createTeamListTool(
+  config: TeamModeConfig,
+  client: OpencodeClient,
+  deps: QueryToolDeps = defaultDeps,
+): ToolDefinition {
   void client
 
   return tool({
     description: "List declared and active teams.",
     args: {
-      scope: tool.schema.union([
-        tool.schema.literal("user"),
-        tool.schema.literal("project"),
-        tool.schema.literal("all"),
-      ]).optional().describe("Team scope filter"),
+      scope: tool.schema
+        .union([tool.schema.literal("user"), tool.schema.literal("project"), tool.schema.literal("all")])
+        .optional()
+        .describe("Team scope filter"),
     },
     execute: async (args: { scope?: TeamListScope }) => {
       const scope = args.scope ?? "all"
@@ -66,15 +70,16 @@ export function createTeamListTool(config: TeamModeConfig, client: OpencodeClien
       const declaredTeamSpecs = await deps.discoverTeamSpecs(config, projectRoot)
       const activeTeams = await deps.listActiveTeams(config)
 
-      const filteredDeclaredTeamSpecs = scope === "all"
-        ? declaredTeamSpecs
-        : declaredTeamSpecs.filter((teamSpec) => teamSpec.scope === scope)
+      const filteredDeclaredTeamSpecs =
+        scope === "all" ? declaredTeamSpecs : declaredTeamSpecs.filter((teamSpec) => teamSpec.scope === scope)
 
       const declaredTeamSpecsByName = new Map(
-        await Promise.all(filteredDeclaredTeamSpecs.map(async (teamSpec) => {
-          const loadedTeamSpec = await deps.loadTeamSpec(teamSpec.name, config, projectRoot)
-          return [teamSpec.name, loadedTeamSpec.members.length] as const
-        })),
+        await Promise.all(
+          filteredDeclaredTeamSpecs.map(async (teamSpec) => {
+            const loadedTeamSpec = await deps.loadTeamSpec(teamSpec.name, config, projectRoot)
+            return [teamSpec.name, loadedTeamSpec.members.length] as const
+          }),
+        ),
       )
 
       const activeTeamsByName = new Map(activeTeams.map((team) => [team.teamName, team]))

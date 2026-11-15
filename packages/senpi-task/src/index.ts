@@ -1,5 +1,9 @@
 // allow: SIZE_OK - package-root public API barrel contains re-exports only and intentionally preserves one stable root import surface.
-export { CHILD_PERMISSION_EVENT, TASK_CHILD_EXTENSION_EVENT, parseChildExtensionEvent } from "./runners/child-extension-events"
+export {
+  CHILD_PERMISSION_EVENT,
+  TASK_CHILD_EXTENSION_EVENT,
+  parseChildExtensionEvent,
+} from "./runners/child-extension-events"
 export type { ChildExtensionEvent, ChildExtensionListener } from "./runners/child-extension-events"
 export { createWorkpoolTool, createWorkpoolWorkerTool, buildWorkpoolExecute } from "./tools/workpool"
 export { WorkpoolParams, WorkpoolYieldParams } from "./tools/workpool-schema"
@@ -26,7 +30,15 @@ export {
   type KernelToolInvokeScope,
   type KernelToolsCapability,
 } from "./kernel-tools"
-export type { PoolId, ItemId, WorkpoolRecord, WorkpoolCaller, WorkpoolCreate, WorkpoolEvent, WorkpoolErrorCode } from "./workpool/types"
+export type {
+  PoolId,
+  ItemId,
+  WorkpoolRecord,
+  WorkpoolCaller,
+  WorkpoolCreate,
+  WorkpoolEvent,
+  WorkpoolErrorCode,
+} from "./workpool/types"
 export {
   BACKGROUND_MODES,
   COST_REPORT_STATUSES,
@@ -74,7 +86,13 @@ export type {
   TaskTransitionResult,
   TokenCoverageStatus,
 } from "./state"
-export { TaskRecordCollisionError, createTaskRecordStore, projectStateKey, resolveProjectStateDirectory, resolveStateDir } from "./store"
+export {
+  TaskRecordCollisionError,
+  createTaskRecordStore,
+  projectStateKey,
+  resolveProjectStateDirectory,
+  resolveStateDir,
+} from "./store"
 export type {
   ListTaskRecordsResult,
   PersistedTaskEvent,
@@ -95,7 +113,13 @@ export {
   taskIdentityLabel,
   toolCountSuffix,
 } from "./status-line"
-export type { LiveStatsTokens, StatusLineInput, StatusLineStats, StatusTargetInput, TaskIdentityInput } from "./status-line"
+export type {
+  LiveStatsTokens,
+  StatusLineInput,
+  StatusLineStats,
+  StatusTargetInput,
+  TaskIdentityInput,
+} from "./status-line"
 export { TASK_SUMMARY_MAX_LENGTH, clampTaskSummary } from "./task-summary"
 export {
   assistantLastLine,
@@ -227,6 +251,16 @@ export {
   RpcProtocolClient,
   createLiveHostChildren,
   buildAutoUiResponse,
+  CANCELLED_CHILD_DIALOG,
+  createForegroundDialogOrigins,
+  sharedForegroundDialogOrigins,
+  type ChildDialogForwarder,
+  type ForegroundDialogOrigins,
+  type ForwardableDialog,
+  type ForwardedAnswer,
+  type ForwardedChild,
+  type ParentPermissionMode,
+  type RunInOrigin,
   buildChildArgs,
   buildRpcSpawn,
   OMO_SENPI_TASK_RPC_CHILD,
@@ -481,7 +515,8 @@ export {
   linesComponent,
   listTaskAgents,
   listTaskCategories,
-  normalizeRendererText, recordSummary,
+  normalizeRendererText,
+  recordSummary,
   rendererVisibleWidth,
   statusThemeColor,
   taskCallLines,

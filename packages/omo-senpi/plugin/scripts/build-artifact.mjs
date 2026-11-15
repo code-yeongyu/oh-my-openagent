@@ -15,14 +15,13 @@ let nodeMinifier
 
 export async function normalizeBuiltinImports(output, builtinModuleNames) {
   const bundled = await readFile(output, "utf8")
-  const normalized = bundled.replace(
-    /(from\s*["']|import\s*\(\s*["']|import\s*["'])([^"']+)(["'])/g,
-    (match, prefix, specifier, suffix) => {
+  const normalized = bundled
+    .replace(/(from\s*["']|import\s*\(\s*["']|import\s*["'])([^"']+)(["'])/g, (match, prefix, specifier, suffix) => {
       if (specifier === "bun" || specifier.includes(":")) return match
       if (!builtinModuleNames.includes(specifier)) return match
       return `${prefix}node:${specifier}${suffix}`
-    },
-  ).replace(/^[\t ]+$/gm, "")
+    })
+    .replace(/^[\t ]+$/gm, "")
   if (normalized !== bundled) await writeFile(output, normalized)
 }
 
@@ -62,11 +61,12 @@ function minifyBundleWithNode(output) {
 
 function getNodeMinifier() {
   if (
-    nodeMinifier !== undefined
-    && nodeMinifier.child.stdin.writable
-    && !nodeMinifier.child.stdin.writableEnded
-    && !nodeMinifier.child.stdin.destroyed
-  ) return nodeMinifier
+    nodeMinifier !== undefined &&
+    nodeMinifier.child.stdin.writable &&
+    !nodeMinifier.child.stdin.writableEnded &&
+    !nodeMinifier.child.stdin.destroyed
+  )
+    return nodeMinifier
   nodeMinifier = undefined
   const child = spawn("node", [BUILD_ARTIFACT_PATH, "--minify-server"], {
     stdio: ["pipe", "pipe", "inherit"],
@@ -88,7 +88,9 @@ function getNodeMinifier() {
   child.on("exit", (code, signal) => {
     clearTimeout(minifier.idleTimer)
     if (nodeMinifier === minifier) nodeMinifier = undefined
-    const reason = new Error(`Node minifier exited before completing requests: code=${String(code)} signal=${String(signal)}`)
+    const reason = new Error(
+      `Node minifier exited before completing requests: code=${String(code)} signal=${String(signal)}`,
+    )
     for (const request of pending.values()) request.reject(reason)
     pending.clear()
   })
@@ -116,8 +118,10 @@ export async function attachBuildMarker(options) {
 }
 
 async function digestBuildSources(metadata, options) {
-  const inputs = metadata !== null && typeof metadata === "object" && metadata.inputs !== null
-    && typeof metadata.inputs === "object" ? Object.keys(metadata.inputs).sort() : []
+  const inputs =
+    metadata !== null && typeof metadata === "object" && metadata.inputs !== null && typeof metadata.inputs === "object"
+      ? Object.keys(metadata.inputs).sort()
+      : []
   const hash = createHash("sha256")
     .update(options.buildSettings)
     .update(JSON.stringify(options.buildDefines))
@@ -134,12 +138,15 @@ async function digestBuildSources(metadata, options) {
 export function artifactsMatch(currentText, expectedText) {
   const current = parseBuildArtifact(currentText)
   const expected = parseBuildArtifact(expectedText)
-  return current !== undefined && expected !== undefined
-    && current.sourceDigest === expected.sourceDigest
-    && current.bodyDigest === digest(current.body)
-    && expected.bodyDigest === digest(expected.body)
-    && current.bodyDigest === expected.bodyDigest
-    && current.body === expected.body
+  return (
+    current !== undefined &&
+    expected !== undefined &&
+    current.sourceDigest === expected.sourceDigest &&
+    current.bodyDigest === digest(current.body) &&
+    expected.bodyDigest === digest(expected.body) &&
+    current.bodyDigest === expected.bodyDigest &&
+    current.body === expected.body
+  )
 }
 
 function parseBuildArtifact(text) {
@@ -181,7 +188,9 @@ if (resolve(process.argv[1] ?? "") === resolve(BUILD_ARTIFACT_PATH)) {
         await minifyBundleInProcess(request.output)
         process.stdout.write(`${JSON.stringify({ id: request.id })}\n`)
       } catch (error) {
-        process.stdout.write(`${JSON.stringify({ id: request.id, error: error instanceof Error ? error.message : String(error) })}\n`)
+        process.stdout.write(
+          `${JSON.stringify({ id: request.id, error: error instanceof Error ? error.message : String(error) })}\n`,
+        )
       }
     }
   }

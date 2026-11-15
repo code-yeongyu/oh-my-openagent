@@ -111,7 +111,10 @@ describe("createKibitzerNudgeTool", () => {
 
   test("#given a secret-bearing hint #when nudge is called #then an error result names the secret rule and nothing is recorded", async () => {
     const { tool, accepted } = launch()
-    const result = await tool.execute("call-1", { path: CANDIDATE_PATH, hint: "Use AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE." })
+    const result = await tool.execute("call-1", {
+      path: CANDIDATE_PATH,
+      hint: "Use AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE.",
+    })
     expect(result.isError).toBe(true)
     const first = result.content[0]
     expect(first?.type).toBe("text")
@@ -147,45 +150,51 @@ describe("createKibitzerNudgeTool", () => {
   test.each([
     "No stored memory clears the bar for this planning step; the transcript already contains the full methodology, QA approach, and rollout.",
     "This memory covers OAuth login prompts and remote-test helpers, not the goal continuation timer delay.",
-  ])("#given a meta hint %s #when nudge is called #then it is rejected and a factual correction can still use the cap", async (hint) => {
-    const { accepted, tool } = launch({ maxItems: 1 })
+  ])(
+    "#given a meta hint %s #when nudge is called #then it is rejected and a factual correction can still use the cap",
+    async (hint) => {
+      const { accepted, tool } = launch({ maxItems: 1 })
 
-    const rejected = await tool.execute("call-meta", params(CANDIDATE_PATH, hint))
-    expect(rejected.isError).toBe(true)
-    expect(accepted).toEqual([])
+      const rejected = await tool.execute("call-meta", params(CANDIDATE_PATH, hint))
+      expect(rejected.isError).toBe(true)
+      expect(accepted).toEqual([])
 
-    const corrected = await tool.execute("call-fact", params(CANDIDATE_PATH, HINT))
-    expect(corrected.isError).toBeUndefined()
-    expect(accepted).toEqual([{ path: CANDIDATE_PATH, hint: HINT }])
-  })
+      const corrected = await tool.execute("call-fact", params(CANDIDATE_PATH, HINT))
+      expect(corrected.isError).toBeUndefined()
+      expect(accepted).toEqual([{ path: CANDIDATE_PATH, hint: HINT }])
+    },
+  )
 
   test.each([
     "Verify these before continuing.",
     "Do not rebase the worktree while a child task writes in it.",
     "You must keep the guard green before publishing.",
     "머지 전에 그린 메인 가드를 확인하십시오.",
-  ])("#given the agent-addressing hint %s #when nudge is called #then the rejection names the rule and one correction still lands", async (hint) => {
-    // given
-    const { accepted, tool } = launch({ maxItems: 1 })
+  ])(
+    "#given the agent-addressing hint %s #when nudge is called #then the rejection names the rule and one correction still lands",
+    async (hint) => {
+      // given
+      const { accepted, tool } = launch({ maxItems: 1 })
 
-    // when
-    const rejected = await tool.execute("call-instruction", params(CANDIDATE_PATH, hint))
+      // when
+      const rejected = await tool.execute("call-instruction", params(CANDIDATE_PATH, hint))
 
-    // then
-    expect(rejected.isError).toBe(true)
-    const first = rejected.content[0]
-    expect(first?.type).toBe("text")
-    if (first?.type === "text") {
-      expect(first.text).toContain("addresses the agent (second person or imperative)")
-      expect(first.text).toContain("restate what the note records as a plain observation")
-    }
-    expect(accepted).toEqual([])
+      // then
+      expect(rejected.isError).toBe(true)
+      const first = rejected.content[0]
+      expect(first?.type).toBe("text")
+      if (first?.type === "text") {
+        expect(first.text).toContain("addresses the agent (second person or imperative)")
+        expect(first.text).toContain("restate what the note records as a plain observation")
+      }
+      expect(accepted).toEqual([])
 
-    // and: the one correction the contract allows is accepted
-    const corrected = await tool.execute("call-observation", params(CANDIDATE_PATH, OBSERVATION))
-    expect(corrected.isError).toBeUndefined()
-    expect(accepted).toEqual([{ path: CANDIDATE_PATH, hint: OBSERVATION }])
-  })
+      // and: the one correction the contract allows is accepted
+      const corrected = await tool.execute("call-observation", params(CANDIDATE_PATH, OBSERVATION))
+      expect(corrected.isError).toBeUndefined()
+      expect(accepted).toEqual([{ path: CANDIDATE_PATH, hint: OBSERVATION }])
+    },
+  )
 
   test.each([
     "The fix is on senpi main, not the extension.",
@@ -272,7 +281,7 @@ describe("createKibitzerNudgeTool", () => {
     expect(tool.name).toBe(KIBITZER_NUDGE_TOOL_NAME)
     expect(tool.label).toBe("Kibitzer")
     expect(tool.description).toContain("read-only hint")
-    expect(JSON.stringify(tool.parameters)).toContain("\"path\"")
-    expect(JSON.stringify(tool.parameters)).toContain("\"hint\"")
+    expect(JSON.stringify(tool.parameters)).toContain('"path"')
+    expect(JSON.stringify(tool.parameters)).toContain('"hint"')
   })
 })

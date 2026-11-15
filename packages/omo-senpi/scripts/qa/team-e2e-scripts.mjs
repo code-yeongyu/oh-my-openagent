@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-const QUICK_PROMPT = "You are team member 'quick'. MOCKROLE=quick. Report to the lead when injected work arrives, then end your turn."
+const QUICK_PROMPT =
+  "You are team member 'quick'. MOCKROLE=quick. Report to the lead when injected work arrives, then end your turn."
 const FIXTURE_PROMPT = "You are team member 'fixture'. MOCKROLE=fixture. Acknowledge, then finish."
 const DURA_PROMPT = "You are team member 'dura'. MOCKROLE=dura. Seed your backlog, then end your turn."
 const RCL_PROMPT = "You are team member 'rcl'. MOCKROLE=quick. Acknowledge, then finish."
@@ -24,7 +25,11 @@ export const LEAD_SCRIPT = {
         ],
       },
     }),
-    toolCall("task_send", { team_run_id: "__TEAM_RUN_ID__", to: "quick", message: "LEAD2QUICK injected handshake: report QUICK2LEAD after this arrives" }),
+    toolCall("task_send", {
+      team_run_id: "__TEAM_RUN_ID__",
+      to: "quick",
+      message: "LEAD2QUICK injected handshake: report QUICK2LEAD after this arrives",
+    }),
     toolCall("task_list", { team_run_id: "__TEAM_RUN_ID__" }),
   ],
   quick: [
@@ -38,7 +43,10 @@ export const LEAD_SCRIPT = {
 export const DURA_REVIVE_SCRIPT = {
   lead: [
     toolCall("team_create", {
-      inline_spec: { name: "durateam", members: [{ name: "dura", kind: "category", category: "dura", prompt: DURA_PROMPT }] },
+      inline_spec: {
+        name: "durateam",
+        members: [{ name: "dura", kind: "category", category: "dura", prompt: DURA_PROMPT }],
+      },
     }),
     toolCall("task_send", { team_run_id: "__TEAM_RUN_ID__", to: "dura", message: "DURA-DRAIN durability payload one" }),
     toolCall("task_send", { team_run_id: "__TEAM_RUN_ID__", to: "dura", message: "DURA-DRAIN durability payload two" }),
@@ -50,7 +58,10 @@ export const DURA_REVIVE_SCRIPT = {
 export const DURA_SEED_SCRIPT = {
   lead: [
     toolCall("team_create", {
-      inline_spec: { name: "rclteam", members: [{ name: "rcl", kind: "category", category: "quick", prompt: RCL_PROMPT }] },
+      inline_spec: {
+        name: "rclteam",
+        members: [{ name: "rcl", kind: "category", category: "quick", prompt: RCL_PROMPT }],
+      },
     }),
     text("reclaim seed team is active"),
   ],
@@ -90,7 +101,15 @@ export const CRASH_SEED_SCRIPT = {
     toolCall("team_create", {
       inline_spec: {
         name: "crashteam",
-        members: [{ name: "crash", kind: "category", category: "quick", prompt: "You are team member 'crash'. MOCKROLE=quick. End your turn, then accept one crash-window injection." }],
+        members: [
+          {
+            name: "crash",
+            kind: "category",
+            category: "quick",
+            prompt:
+              "You are team member 'crash'. MOCKROLE=quick. End your turn, then accept one crash-window injection.",
+          },
+        ],
       },
     }),
     toolCall("task_send", { team_run_id: "__TEAM_RUN_ID__", to: "crash", message: "CRASH-ONCE inject exactly once" }),

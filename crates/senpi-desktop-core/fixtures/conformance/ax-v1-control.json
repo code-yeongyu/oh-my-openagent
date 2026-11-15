@@ -1,0 +1,116 @@
+{
+  "description": "computer-use v2 P9a null-mode control: the dense 10,000-node scenario without reportMode keeps protocol 1 replies byte-equal: ax.snapshot ignores timeoutMs, walks under today's node budget and answers only text, nodeCount and truncated; ax.node on a secure field carries no evidence, secure or subtreeTruncated member.",
+  "scenario": "crates/senpi-desktop-backend-fake/fixtures/v2-ax-dense.json",
+  "env": {},
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 1,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": null,
+                "integrityLevel": null,
+                "screenLocked": false,
+                "displayAsleep": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "ax.snapshot",
+        "params": {
+          "target": "101",
+          "opts": {
+            "timeoutMs": 50,
+            "maxNodes": 6
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "text": "- window \"Dense - Notes\" [ref=e1] app=Notes (focused)\n  - toolbar [ref=e2]\n    - button \"Back\" [ref=e3]\n  - textfield \"Password\" [ref=e4]: \"secret\"\n  - textfield \"Name\" [ref=e5]: \"Q\"\n  - text \"filler 5\" [ref=e6]\n… truncated (6 nodes)",
+              "nodeCount": 6,
+              "truncated": true
+            }
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "ax.node",
+        "params": {
+          "ref": "e4"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": {
+              "ref": "e4",
+              "role": "textfield",
+              "nativeRole": "AXSecureTextField",
+              "title": "Password",
+              "value": "secret",
+              "description": null,
+              "enabled": true,
+              "focused": false,
+              "x": 110.0,
+              "y": 170.0,
+              "width": 300.0,
+              "height": 24.0,
+              "actions": null,
+              "childCount": 0
+            }
+          },
+          "variable": []
+        }
+      ]
+    }
+  ]
+}

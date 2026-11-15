@@ -8,7 +8,10 @@ import { z } from "zod"
 import { formatHashLines } from "../../packages/omo-opencode/src/tools/hashline-edit/hash-computation"
 import { normalizeHashlineEdits } from "../../packages/omo-opencode/src/tools/hashline-edit/normalize-edits"
 import { applyHashlineEditsWithReport } from "../../packages/omo-opencode/src/tools/hashline-edit/edit-operations"
-import { canonicalizeFileText, restoreFileText } from "../../packages/omo-opencode/src/tools/hashline-edit/file-text-canonicalization"
+import {
+  canonicalizeFileText,
+  restoreFileText,
+} from "../../packages/omo-opencode/src/tools/hashline-edit/file-text-canonicalization"
 import { HASHLINE_EDIT_DESCRIPTION } from "../../packages/omo-opencode/src/tools/hashline-edit/tool-description"
 import { parseHashlineTestEnvironment } from "./test-environment"
 
@@ -62,14 +65,16 @@ const editFileTool = tool({
   description: HASHLINE_EDIT_DESCRIPTION,
   inputSchema: z.object({
     path: z.string(),
-    edits: z.array(
-      z.object({
-        op: z.enum(["replace", "append", "prepend"]),
-        pos: z.string().optional(),
-        end: z.string().optional(),
-        lines: z.union([z.array(z.string()), z.string(), z.null()]),
-      })
-    ).min(1),
+    edits: z
+      .array(
+        z.object({
+          op: z.enum(["replace", "append", "prepend"]),
+          pos: z.string().optional(),
+          end: z.string().optional(),
+          lines: z.union([z.array(z.string()), z.string(), z.null()]),
+        }),
+      )
+      .min(1),
   }),
   execute: async ({ path, edits }) => {
     const fullPath = join(process.cwd(), path)
@@ -85,9 +90,7 @@ const editFileTool = tool({
       const normalized = normalizeHashlineEdits(edits)
 
       if (!exists) {
-        const canCreate = normalized.every(
-          (e) => (e.op === "append" || e.op === "prepend") && !e.pos
-        )
+        const canCreate = normalized.every((e) => (e.op === "append" || e.op === "prepend") && !e.pos)
         if (!canCreate) return `Error: File not found: ${path}`
       }
 
@@ -133,7 +136,8 @@ async function run() {
   const system =
     "You are a code editing assistant. Use read_file to read files and edit_file to edit them. " +
     "Always read a file before editing it to get fresh LINE#ID anchors.\n\n" +
-    "edit_file tool description:\n" + HASHLINE_EDIT_DESCRIPTION
+    "edit_file tool description:\n" +
+    HASHLINE_EDIT_DESCRIPTION
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const stream = streamText({

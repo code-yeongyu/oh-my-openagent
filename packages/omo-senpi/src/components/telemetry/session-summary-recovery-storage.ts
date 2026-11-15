@@ -15,7 +15,11 @@ import {
   type WindowRecord,
 } from "./session-summary-storage"
 
-export type Leftover = { readonly path: string; readonly owner: ProcessOwner; readonly kind: "temp" | "window-claim" | "pending-claim" }
+export type Leftover = {
+  readonly path: string
+  readonly owner: ProcessOwner
+  readonly kind: "temp" | "window-claim" | "pending-claim"
+}
 
 /** The storage operations only recovery uses; they ship in the recovery sidecar, not the entry bundle. */
 export type RecoveryStorage = SummaryStorage & {
@@ -59,18 +63,20 @@ export function withRecoveryOps(storage: SummaryStorage): RecoveryStorage {
       }
     },
     claimWindow: (key) => claimFile(windowPath(key), owner, parseWindowRecord),
-    hasPending: (uuid) => listNames(pendingDir).some((name) => name === `${uuid}.json` || name.startsWith(`${uuid}.json.claimed-`)),
+    hasPending: (uuid) =>
+      listNames(pendingDir).some((name) => name === `${uuid}.json` || name.startsWith(`${uuid}.json.claimed-`)),
     readPending: (uuid) => parseRead(readJsonOrCorrupt(pendingPath(uuid)), parsePendingRecord),
     claimPending: (uuid) => claimFile(pendingPath(uuid), owner, parsePendingRecord),
-    leftovers: () => [
-      ...collectLeftovers(dir, "window-claim"),
-      ...collectLeftovers(pendingDir, "pending-claim"),
-    ],
+    leftovers: () => [...collectLeftovers(dir, "window-claim"), ...collectLeftovers(pendingDir, "pending-claim")],
   }
 }
 
 /** Hands `path` over to `owner` by renaming it; exactly one of several racing claimers gets it. */
-function claimFile<T>(path: string, owner: ProcessOwner, parse: (value: unknown) => T | undefined): Claimed<ReadResult<T>> | undefined {
+function claimFile<T>(
+  path: string,
+  owner: ProcessOwner,
+  parse: (value: unknown) => T | undefined,
+): Claimed<ReadResult<T>> | undefined {
   const claimPath = `${path}.claimed-${owner.pid}-${owner.bootId}`
   if (!renameIfPresent(path, claimPath)) return undefined
   return { claimPath, record: parseRead(readJsonOrCorrupt(claimPath), parse) }

@@ -27,8 +27,7 @@ describe("packaged eval smoke shutdown", () => {
 
   test("observed supervisors share one capped post-drain reserve", async () => {
     const clock = observer()
-    const failure = await waitForSmokeSupervisors([{ pid: 4242 }, { pid: 4243 }], {}, clock)
-      .catch((error) => error)
+    const failure = await waitForSmokeSupervisors([{ pid: 4242 }, { pid: 4243 }], {}, clock).catch((error) => error)
     expect(failure).toBeInstanceOf(Error)
     expect(failure.message).toContain(`reserve ${postDrainStopReserveMs()} ms`)
     expect(clock.elapsed()).toBe(postDrainStopReserveMs())
@@ -38,7 +37,9 @@ describe("packaged eval smoke shutdown", () => {
   test("a supervisor that never exits fails with pid and survival time", async () => {
     const clock = observer()
     const failure = await waitForSmokeSupervisors(
-      [{ pid: 4242, command: "engine --internal-rpc-host-supervisor" }], {}, clock,
+      [{ pid: 4242, command: "engine --internal-rpc-host-supervisor" }],
+      {},
+      clock,
     ).catch((error) => error)
     expect(failure).toBeInstanceOf(Error)
     expect(failure.message).toContain("pid 4242")
@@ -48,8 +49,7 @@ describe("packaged eval smoke shutdown", () => {
 
   test("a late supervisor exit cannot reset the shared deadline", async () => {
     const clock = observer({ 4242: 6_900 })
-    const failure = await waitForSmokeSupervisors([{ pid: 4242 }, { pid: 4243 }], {}, clock)
-      .catch((error) => error)
+    const failure = await waitForSmokeSupervisors([{ pid: 4242 }, { pid: 4243 }], {}, clock).catch((error) => error)
     expect(failure).toBeInstanceOf(Error)
     expect(failure.message).toContain("pid 4243")
     expect(failure.message).not.toContain("pid 4242")
@@ -78,9 +78,14 @@ describe("packaged eval smoke shutdown", () => {
     })
     onTestFinished(() => kill.mockRestore())
     const clock = observer()
-    const failure = await waitForSmokeSupervisors([{ pid: 4242 }], {}, {
-      now: clock.now, pause: clock.pause,
-    }).catch((error) => error)
+    const failure = await waitForSmokeSupervisors(
+      [{ pid: 4242 }],
+      {},
+      {
+        now: clock.now,
+        pause: clock.pause,
+      },
+    ).catch((error) => error)
     expect(failure).toBeInstanceOf(Error)
     expect(failure.message).toContain(`pid 4242 survived ${postDrainStopReserveMs()} ms after drain`)
     expect(clock.elapsed()).toBe(postDrainStopReserveMs())
@@ -98,7 +103,10 @@ describe("packaged eval smoke shutdown", () => {
         if (stat instanceof Error) throw stat
         return stat
       }
-      return { clock, run: () => waitForSmokeSupervisors([{ pid: 4242 }], {}, { now: clock.now, pause: clock.pause, readProcStat }) }
+      return {
+        clock,
+        run: () => waitForSmokeSupervisors([{ pid: 4242 }], {}, { now: clock.now, pause: clock.pause, readProcStat }),
+      }
     }
 
     test("counts as exited when /proc reports it as a zombie", async () => {
@@ -138,15 +146,24 @@ describe("packaged eval smoke shutdown", () => {
     },
   )
 
-  function binary(exitCode, { statusExitCode = 0, endpoints = [
-    { pid: 4242, generations: [{ pid: 4243 }] },
-    { pid: 9999, endpoint_kind: "tui" },
-  ], clockPath } = {}) {
+  function binary(
+    exitCode,
+    {
+      statusExitCode = 0,
+      endpoints = [
+        { pid: 4242, generations: [{ pid: 4243 }] },
+        { pid: 9999, endpoint_kind: "tui" },
+      ],
+      clockPath,
+    } = {},
+  ) {
     const root = mkdtempSync(join(tmpdir(), "omo-smoke-stop-"))
     onTestFinished(() => rmSync(root, { recursive: true, force: true }))
     const path = join(root, "omo")
     const stopReceipt = join(root, "stop-sent")
-    writeFileSync(path, `#!${process.execPath}
+    writeFileSync(
+      path,
+      `#!${process.execPath}
 import { writeFileSync } from "node:fs"
 const args = process.argv.slice(2)
 if (args[1] === "status") {
@@ -159,37 +176,56 @@ if (args[1] === "status") {
   console.log(${JSON.stringify(exitCode === 0 ? "/tmp/test.sock: drained (1 polls)" : "/tmp/test.sock: TIMEOUT: still live (pid 4243, 0 sessions, 0 claims)")})
   process.exit(${exitCode})
 }
-`)
+`,
+    )
     chmodSync(path, 0o755)
     return { root, path, stopReceipt }
   }
 
-  test.skipIf(process.platform === "win32")("an executable that drains immediately returns its shutdown receipt", async () => {
-    const fixture = binary(0)
-    const result = await stopSmokeHosts(fixture.path, { cwd: fixture.root, env: {} })
-    expect(result.stdout).toContain("drained (1 polls)")
-  })
+  test.skipIf(process.platform === "win32")(
+    "an executable that drains immediately returns its shutdown receipt",
+    async () => {
+      const fixture = binary(0)
+      const result = await stopSmokeHosts(fixture.path, { cwd: fixture.root, env: {} })
+      expect(result.stdout).toContain("drained (1 polls)")
+    },
+  )
 
-  test.skipIf(process.platform === "win32")("drain alone does not pass a never-exiting observed supervisor", async () => {
-    const fixture = binary(0)
-    const clock = observer()
-    let drained
-    const failure = await stopSmokeHosts(fixture.path, { cwd: fixture.root, env: {} }, {
-      supervisors: [{ pid: 4242 }], observer: clock,
-      onDrained: (result) => { drained = result.stdout },
-    }).catch((error) => error)
-    expect(failure).toBeInstanceOf(Error)
-    expect(failure.message).toContain("pid 4242")
-    expect(failure.message).toContain(`survived ${postDrainStopReserveMs()} ms after drain`)
-    expect(drained).toContain("/tmp/test.sock: drained")
-  })
+  test.skipIf(process.platform === "win32")(
+    "drain alone does not pass a never-exiting observed supervisor",
+    async () => {
+      const fixture = binary(0)
+      const clock = observer()
+      let drained
+      const failure = await stopSmokeHosts(
+        fixture.path,
+        { cwd: fixture.root, env: {} },
+        {
+          supervisors: [{ pid: 4242 }],
+          observer: clock,
+          onDrained: (result) => {
+            drained = result.stdout
+          },
+        },
+      ).catch((error) => error)
+      expect(failure).toBeInstanceOf(Error)
+      expect(failure.message).toContain("pid 4242")
+      expect(failure.message).toContain(`survived ${postDrainStopReserveMs()} ms after drain`)
+      expect(drained).toContain("/tmp/test.sock: drained")
+    },
+  )
 
   test.skipIf(process.platform === "win32")("drain waits for observed exit before returning its receipt", async () => {
     const fixture = binary(0)
     const clock = observer({ 4242: 150 })
-    const result = await stopSmokeHosts(fixture.path, { cwd: fixture.root, env: {} }, {
-      supervisors: [{ pid: 4242 }], observer: clock,
-    })
+    const result = await stopSmokeHosts(
+      fixture.path,
+      { cwd: fixture.root, env: {} },
+      {
+        supervisors: [{ pid: 4242 }],
+        observer: clock,
+      },
+    )
     expect(result.stdout).toContain("drained")
     expect(clock.elapsed()).toBeGreaterThanOrEqual(150)
     expect(clock.elapsed()).toBeLessThan(postDrainStopReserveMs())
@@ -205,25 +241,29 @@ if (args[1] === "status") {
     let drainedAt
     const receiptWorkMs = 6_950
     const waits = []
-    const failure = await stopSmokeHosts(fixture.path, { cwd: fixture.root, env: {} }, {
-      supervisors: [{ pid: 4242 }],
-      observer: {
-        now,
-        isAlive: () => true,
-        pause: async (ms) => {
-          waits.push(ms)
-          expect(ms).toBeGreaterThan(0)
-          expect(now() + ms).toBeLessThanOrEqual(drainedAt + postDrainStopReserveMs())
-          writeFileSync(clockPath, String(now() + ms))
+    const failure = await stopSmokeHosts(
+      fixture.path,
+      { cwd: fixture.root, env: {} },
+      {
+        supervisors: [{ pid: 4242 }],
+        observer: {
+          now,
+          isAlive: () => true,
+          pause: async (ms) => {
+            waits.push(ms)
+            expect(ms).toBeGreaterThan(0)
+            expect(now() + ms).toBeLessThanOrEqual(drainedAt + postDrainStopReserveMs())
+            writeFileSync(clockPath, String(now() + ms))
+          },
+        },
+        onDrained() {
+          // The executable advanced the fake clock during stop. Receipt work
+          // consumes reserve too; neither interval depends on real timing.
+          drainedAt = now()
+          writeFileSync(clockPath, String(drainedAt + receiptWorkMs))
         },
       },
-      onDrained() {
-        // The executable advanced the fake clock during stop. Receipt work
-        // consumes reserve too; neither interval depends on real timing.
-        drainedAt = now()
-        writeFileSync(clockPath, String(drainedAt + receiptWorkMs))
-      },
-    }).catch((error) => error)
+    ).catch((error) => error)
     expect(drainedAt).toBe(200_000)
     expect(failure).toBeInstanceOf(Error)
     expect(failure.message).toContain(`pid 4242 survived ${postDrainStopReserveMs()} ms after drain`)
@@ -231,13 +271,16 @@ if (args[1] === "status") {
     expect(waits.reduce((sum, ms) => sum + ms, 0)).toBe(postDrainStopReserveMs() - receiptWorkMs)
   })
 
-  test.skipIf(process.platform === "win32")("a failed executable keeps ownership pids and the timeout output", async () => {
-    const fixture = binary(3)
-    const failure = await stopSmokeHosts(fixture.path, { cwd: fixture.root, env: {} }).catch((error) => error)
-    expect(failure).toBeInstanceOf(Error)
-    expect(failure.message).toContain("daemon stop failed (pid 4243, 4242)")
-    expect(failure.message).toContain("TIMEOUT: still live (pid 4243")
-  })
+  test.skipIf(process.platform === "win32")(
+    "a failed executable keeps ownership pids and the timeout output",
+    async () => {
+      const fixture = binary(3)
+      const failure = await stopSmokeHosts(fixture.path, { cwd: fixture.root, env: {} }).catch((error) => error)
+      expect(failure).toBeInstanceOf(Error)
+      expect(failure.message).toContain("daemon stop failed (pid 4243, 4242)")
+      expect(failure.message).toContain("TIMEOUT: still live (pid 4243")
+    },
+  )
 
   test.skipIf(process.platform === "win32")("status exit 3 with no host still sends stop and passes", async () => {
     const fixture = binary(0, { statusExitCode: 3, endpoints: [] })
@@ -246,15 +289,18 @@ if (args[1] === "status") {
     expect(result.stdout).toContain("drained")
   })
 
-  test.skipIf(process.platform === "win32")("status exit 3 with a stalled host sends stop and names its pid on failure", async () => {
-    const fixture = binary(3, {
-      statusExitCode: 3,
-      endpoints: [{ pid: null, reachable: false, generations: [{ pid: 4243, alive: true }] }],
-    })
-    const failure = await stopSmokeHosts(fixture.path, { cwd: fixture.root, env: {} }).catch((error) => error)
-    expect(existsSync(fixture.stopReceipt)).toBe(true)
-    expect(failure).toBeInstanceOf(Error)
-    expect(failure.message).toContain("daemon stop failed (pid 4243)")
-    expect(failure.message).toContain("TIMEOUT: still live (pid 4243")
-  })
+  test.skipIf(process.platform === "win32")(
+    "status exit 3 with a stalled host sends stop and names its pid on failure",
+    async () => {
+      const fixture = binary(3, {
+        statusExitCode: 3,
+        endpoints: [{ pid: null, reachable: false, generations: [{ pid: 4243, alive: true }] }],
+      })
+      const failure = await stopSmokeHosts(fixture.path, { cwd: fixture.root, env: {} }).catch((error) => error)
+      expect(existsSync(fixture.stopReceipt)).toBe(true)
+      expect(failure).toBeInstanceOf(Error)
+      expect(failure.message).toContain("daemon stop failed (pid 4243)")
+      expect(failure.message).toContain("TIMEOUT: still live (pid 4243")
+    },
+  )
 })

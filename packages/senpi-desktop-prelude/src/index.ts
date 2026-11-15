@@ -1,51 +1,53 @@
-import { preludeAssets } from "./assets";
+import { preludeAssets } from "./assets"
 
 /**
  * Every method a `computer` call chain may name: the union of the protocol's desktop, window, and element tier
  * tables. The facades emit nothing else; `test/method-allowlist.test.ts` pins both directions.
  */
+// <generated:facade> from facade-manifest.json by scripts/generate-assets.ts; edit CHAIN_BINDINGS there, then `bun run generate`
 const METHOD_ALLOWLIST: readonly string[] = [
-	"actions",
-	"attributes",
-	"ax",
-	"bounds",
-	"capabilities",
-	"children",
-	"click",
-	"clipboard.read",
-	"clipboard.write",
-	"control.acquire",
-	"control.release",
-	"control.state",
-	"display",
-	"displays",
-	"doubleClick",
-	"drag",
-	"elementAt",
-	"find",
-	"focus",
-	"focusedElement",
-	"focusedWindow",
-	"holdKeys",
-	"holdMouse",
-	"move",
-	"observe",
-	"menu.items",
-	"menu.select",
-	"parent",
-	"perform",
-	"press",
-	"raise",
-	"ref",
-	"screenshot",
-	"scroll",
-	"setValue",
-	"type",
-	"value",
-	"window",
-	"windows",
-	"zoom",
-];
+  "actions",
+  "attributes",
+  "ax",
+  "bounds",
+  "capabilities",
+  "children",
+  "click",
+  "clipboard.read",
+  "clipboard.write",
+  "control.acquire",
+  "control.release",
+  "control.state",
+  "display",
+  "displays",
+  "doubleClick",
+  "drag",
+  "elementAt",
+  "find",
+  "focus",
+  "focusedElement",
+  "focusedWindow",
+  "holdKeys",
+  "holdMouse",
+  "menu.items",
+  "menu.select",
+  "move",
+  "observe",
+  "parent",
+  "perform",
+  "press",
+  "raise",
+  "ref",
+  "screenshot",
+  "scroll",
+  "setValue",
+  "type",
+  "value",
+  "window",
+  "windows",
+  "zoom",
+]
+// </generated:facade>
 
 /**
  * The `computer` eval-kernel contribution plus its model docs. `javascript`, `python`, `documentation`, and
@@ -55,24 +57,24 @@ const METHOD_ALLOWLIST: readonly string[] = [
  * (`test/assets-byte-identity.test.ts`).
  */
 export const computerPreludeAssets = {
-	get javascript(): string {
-		return preludeAssets().COMPUTER_PRELUDE_JAVASCRIPT;
-	},
-	get python(): string {
-		return preludeAssets().COMPUTER_PRELUDE_PYTHON;
-	},
-	/** TypeScript declarations of the JavaScript `computer` global. */
-	get declarations(): string {
-		return preludeAssets().COMPUTER_DECLARATIONS;
-	},
-	/** Helper-list lines for the eval prompt's prelude block. */
-	get documentation(): string {
-		return preludeAssets().COMPUTER_DOCUMENTATION;
-	},
-	/** System-prompt fragment for sessions where the `computer` tool is active. */
-	get safety(): string {
-		return preludeAssets().COMPUTER_SAFETY;
-	},
-	exports: ["computer"],
-	methodAllowlist: METHOD_ALLOWLIST,
-};
+  get javascript(): string {
+    return preludeAssets().COMPUTER_PRELUDE_JAVASCRIPT
+  },
+  get python(): string {
+    return preludeAssets().COMPUTER_PRELUDE_PYTHON
+  },
+  /** TypeScript declarations of the JavaScript `computer` global. */
+  get declarations(): string {
+    return preludeAssets().COMPUTER_DECLARATIONS
+  },
+  /** Helper-list lines for the eval prompt's prelude block. */
+  get documentation(): string {
+    return preludeAssets().COMPUTER_DOCUMENTATION
+  },
+  /** System-prompt fragment for sessions where the `computer` tool is active. */
+  get safety(): string {
+    return preludeAssets().COMPUTER_SAFETY
+  },
+  exports: ["computer"],
+  methodAllowlist: METHOD_ALLOWLIST,
+}

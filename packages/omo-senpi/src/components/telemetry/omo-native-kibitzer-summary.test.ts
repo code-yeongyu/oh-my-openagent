@@ -37,7 +37,10 @@ function wake(overrides: WakeOverrides = {}): KibitzerTelemetrySignal {
   }
 }
 
-function offer(action: "seeded" | "steered" | "buffered", reason?: "cooldown" | "no_new_candidate"): KibitzerTelemetrySignal {
+function offer(
+  action: "seeded" | "steered" | "buffered",
+  reason?: "cooldown" | "no_new_candidate",
+): KibitzerTelemetrySignal {
   return { kind: "offer", sessionId: SESSION, action, ...(reason === undefined ? {} : { reason }) }
 }
 

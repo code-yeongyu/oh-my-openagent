@@ -11,8 +11,7 @@ export type ConfigMigrationTransformResult = {
 }
 
 export type OpenCodeTransformScope =
-  | { readonly kind: "user" }
-  | { readonly kind: "project"; readonly projectRoot: string }
+  { readonly kind: "user" } | { readonly kind: "project"; readonly projectRoot: string }
 
 export type TransformOpenCodeSourcesInput = {
   readonly discovered: readonly DiscoveredLegacyConfigSource[]

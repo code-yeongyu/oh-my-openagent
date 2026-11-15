@@ -70,7 +70,9 @@ function createManager(directory: string, enableParentSessionNotifications = tru
   return new BackgroundManager({ pluginContext, enableParentSessionNotifications })
 }
 
-function createRunningTask(overrides: Partial<BackgroundTask> & { id: string; parentSessionId: string }): BackgroundTask {
+function createRunningTask(
+  overrides: Partial<BackgroundTask> & { id: string; parentSessionId: string },
+): BackgroundTask {
   return {
     parentMessageId: "parent-message-id",
     description: "test background task",
@@ -95,9 +97,11 @@ async function waitForBackgroundTaskMarkerState(
     if (observedState === expectedState) {
       return
     }
-    await new Promise(resolve => setTimeout(resolve, 10))
+    await new Promise((resolve) => setTimeout(resolve, 10))
   }
-  throw new Error(`Timed out waiting for background-task marker ${expectedState}; last state: ${observedState ?? "missing"}`)
+  throw new Error(
+    `Timed out waiting for background-task marker ${expectedState}; last state: ${observedState ?? "missing"}`,
+  )
 }
 
 describe("BackgroundManager run continuation marker parent-wake races", () => {
@@ -214,10 +218,7 @@ describe("BackgroundManager run continuation marker parent-wake races", () => {
       expect(dispatchedMarker?.sources["background-task"]?.state).toBe("idle")
 
       // when
-      const requeued = await internals.parentWakeNotifier.requeueDispatchedParentWake(
-        parentSessionID,
-        "session.error",
-      )
+      const requeued = await internals.parentWakeNotifier.requeueDispatchedParentWake(parentSessionID, "session.error")
 
       // then
       expect(requeued).toBe(true)

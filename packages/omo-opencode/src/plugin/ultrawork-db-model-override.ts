@@ -62,7 +62,11 @@ function closeDbWithLog(db: BunDatabase, message: string, metadata: Record<strin
   }
 }
 
-function finalizeStatementWithLog(stmt: BunStatement, message: string, metadata: Record<string, string | number | undefined>): void {
+function finalizeStatementWithLog(
+  stmt: BunStatement,
+  message: string,
+  metadata: Record<string, string | number | undefined>,
+): void {
   try {
     stmt.finalize()
   } catch (error) {
@@ -94,7 +98,9 @@ function tryUpdateMessageModel(
     try {
       variantStmt.run(variant, variant, messageId)
     } finally {
-      finalizeStatementWithLog(variantStmt, "[ultrawork-db-override] Failed to finalize variant update statement", { messageId })
+      finalizeStatementWithLog(variantStmt, "[ultrawork-db-override] Failed to finalize variant update statement", {
+        messageId,
+      })
     }
   }
   return true
@@ -115,7 +121,9 @@ async function retryViaMicrotask(
     await nextTimerTick()
     try {
       if (tryUpdateMessageModel(db, messageId, targetModel, variant)) {
-        log(`[ultrawork-db-override] setTimeout fallback succeeded: ${targetModel.providerID}/${targetModel.modelID}`, { messageId })
+        log(`[ultrawork-db-override] setTimeout fallback succeeded: ${targetModel.providerID}/${targetModel.modelID}`, {
+          messageId,
+        })
       } else {
         log("[ultrawork-db-override] setTimeout fallback failed - message not found", { messageId })
       }
@@ -133,7 +141,10 @@ async function retryViaMicrotask(
 
   try {
     if (tryUpdateMessageModel(db, messageId, targetModel, variant)) {
-      log(`[ultrawork-db-override] Deferred DB update (attempt ${attempt}): ${targetModel.providerID}/${targetModel.modelID}`, { messageId })
+      log(
+        `[ultrawork-db-override] Deferred DB update (attempt ${attempt}): ${targetModel.providerID}/${targetModel.modelID}`,
+        { messageId },
+      )
       return
     }
 

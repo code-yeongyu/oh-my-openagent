@@ -1,4 +1,4 @@
-import type { RecallCorpusCache } from "@oh-my-opencode/memory-core"
+import type { InFlightReads, RecallCorpusCache } from "@oh-my-opencode/memory-core"
 import type { ActiveHolderSeams } from "./reflection-stale-active"
 
 import type { ComponentContext, ComponentLogger, SenpiExtensionAPI } from "../../extension/types"
@@ -44,6 +44,8 @@ export interface MemoryWiringOptions {
   readonly deviceName?: (principal: string) => string | undefined
   /** A memory repository's sync status for the footer and its notice; production passes the sync runner's. */
   readonly syncStatus?: SyncStatusReader
+  /** The memory work the session_shutdown drain awaits; the component passes the tracker its hooks register through. */
+  readonly work?: InFlightReads
 }
 
 export interface MemoryWiring {

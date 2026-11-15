@@ -50,7 +50,7 @@ async function unsupportedEntries(root: string, directory: string): Promise<stri
   for (const name of await readdir(directory)) {
     const path = join(directory, name)
     const entry = await lstat(path)
-    if (entry.isDirectory()) unsupported.push(...await unsupportedEntries(root, path))
+    if (entry.isDirectory()) unsupported.push(...(await unsupportedEntries(root, path)))
     else if (!entry.isFile()) unsupported.push(relative(root, path))
   }
   return unsupported

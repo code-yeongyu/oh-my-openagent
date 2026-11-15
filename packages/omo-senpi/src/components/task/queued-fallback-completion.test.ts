@@ -2,11 +2,21 @@ import { afterEach, expect, test } from "bun:test"
 import { createCompletionNotifier } from "../../../../senpi-task/src/completion/notifier"
 import type { ParentNotifierMessage, ParentState } from "../../../../senpi-task/src/completion/types"
 import { bounded } from "../../../../senpi-task/src/lifecycle/__fixtures__/live-parent-clock"
-import { managerWithLifecycle, PRIMARY, stubbornChild } from "../../../../senpi-task/src/manager/__fixtures__/fallback-launch-fakes"
-import { baseSpec, cleanupProjects, makeHandle, tempProject } from "../../../../senpi-task/src/manager/__fixtures__/manager-fakes"
+import {
+  managerWithLifecycle,
+  PRIMARY,
+  stubbornChild,
+} from "../../../../senpi-task/src/manager/__fixtures__/fallback-launch-fakes"
+import {
+  baseSpec,
+  cleanupProjects,
+  makeHandle,
+  tempProject,
+} from "../../../../senpi-task/src/manager/__fixtures__/manager-fakes"
 import type { ManagedRunner } from "../../../../senpi-task/src/manager/types"
 import { createTaskRecordStore } from "../../../../senpi-task/src/store"
 import { createCompletionObservingStore } from "./completion-bridge"
+import { testBudgetSignal } from "../../../../../test-support/test-deadline"
 
 afterEach(cleanupProjects)
 
@@ -18,28 +28,38 @@ for (const buffered of [false, true]) {
     const messages: ParentNotifierMessage[] = []
     let parentState: ParentState = buffered ? { kind: "session_shutdown" } : { kind: "idle" }
     const notifier = createCompletionNotifier({
-      store: backing, notifier: { enqueue: message => messages.push(message) }, getCurrentSessionId: () => "parent-1",
+      store: backing,
+      notifier: { enqueue: (message) => messages.push(message) },
+      getCurrentSessionId: () => "parent-1",
     })
     const store = createCompletionObservingStore(backing, {
-      notifier, parentState: () => parentState, wasBackground: () => true, currentSessionId: () => "parent-1",
+      notifier,
+      parentState: () => parentState,
+      wasBackground: () => true,
+      currentSessionId: () => "parent-1",
     })
     const alive = new Set([3333])
     const starts: string[] = []
     let first: ReturnType<typeof makeHandle> | undefined
     const runner: ManagedRunner = {
-      start: async spec => {
+      start: async (spec) => {
         starts.push(spec.model ?? "")
         first = makeHandle(spec.taskId, 3333)
-        return { ...stubbornChild(spec.taskId, 3333), waitForOutcome: first.handle.waitForOutcome, subscribe: first.handle.subscribe }
+        return {
+          ...stubbornChild(spec.taskId, 3333),
+          waitForOutcome: first.handle.waitForOutcome,
+          subscribe: first.handle.subscribe,
+        }
       },
     }
     const h = managerWithLifecycle(store, runner, project, alive)
     const started = await h.manager.start(baseSpec({ execution_mode: "process", run_in_background: true }))
     if (started.kind !== "started" || first === undefined) throw new Error("setup failed")
-    store.mutate(started.task_id, record => ({
-      ...record, pending_steering: [{ id: "queued", message: "Q1", deliver_as: "steer" }],
+    store.mutate(started.task_id, (record) => ({
+      ...record,
+      pending_steering: [{ id: "queued", message: "Q1", deliver_as: "steer" }],
     }))
-    const completed = h.manager.waitFor(started.task_id, { signal: AbortSignal.timeout(5000) })
+    const completed = h.manager.waitFor(started.task_id, { signal: testBudgetSignal("h.manager.waitFor to settle") })
     try {
       // When runtime fallback cannot close its failed rung, and the real orphan cleanup finishes.
       first.settle({ status: "error", failure: { kind: "child-turn-failed", message: "500: upstream overloaded" } })

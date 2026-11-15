@@ -10,7 +10,14 @@ export {
   type TrustAnchor,
 } from "./anchor.ts"
 export { loadTrustAnchor, type PinLoad, pinTrustAnchor, TrustPinError, type TrustPinProblem } from "./trust-pin.ts"
-export { BatchInputError, type BatchInputProblem, buildBatch, type BuildBatchInput, signRecord, type SyncPayloadRecord } from "./build.ts"
+export {
+  BatchInputError,
+  type BatchInputProblem,
+  buildBatch,
+  type BuildBatchInput,
+  signRecord,
+  type SyncPayloadRecord,
+} from "./build.ts"
 export {
   type AcceptedBatch,
   type AppendOutcome,

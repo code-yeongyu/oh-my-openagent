@@ -20,17 +20,17 @@ command -v jdtls
 
 ## Configure
 
-Builtin — usually NO config needed (auto-resolved by extension). Configure only to set priority, init options, override extensions, or disable. Same JSON shape in `.codex/lsp-client.json` (Codex) AND `.opencode/lsp.json` (OpenCode/omo):
+Builtin — usually NO config needed (auto-resolved by extension). Configure only to set priority, init options, override extensions, or disable. Same JSON shape in every harness's project config (per-harness paths: the Configure step in `SKILL.md`):
 
 ```json
 { "lsp": { "jdtls": { "priority": 100 } } }
 ```
 
-For builtin ids in a PROJECT config, `command` is supplied automatically — only set `priority`/`initialization`/`extensions`/`disabled`/`env`. A fully custom (non-builtin) server with its own `command` must go in the USER config (`~/.codex/lsp-client.json`).
+For builtin ids in a PROJECT config, `command` is supplied automatically — only set `priority`/`initialization`/`extensions`/`disabled` (a project entry drops `env`). `env`, and a fully custom (non-builtin) server with its own `command`, must go in your harness's USER config (see the Configure step in `SKILL.md`).
 
 ### Initialization options (only if commonly needed)
 
-jdtls maintains a per-project **workspace data directory** and the **first index is slow** (it resolves the full classpath and builds). Point `JAVA_HOME` at a JDK 17+ if `jdtls` cannot find one:
+jdtls maintains a per-project **workspace data directory** and the **first index is slow** (it resolves the full classpath and builds). Point `JAVA_HOME` at a JDK 17+ if `jdtls` cannot find one (USER config only; a project entry drops `env`):
 
 ```json
 { "lsp": { "jdtls": { "env": { "JAVA_HOME": "/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home" } } } }

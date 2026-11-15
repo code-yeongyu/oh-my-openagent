@@ -36,7 +36,9 @@ export interface ComputerLifecycleSource {
   onClose(handler: () => Promise<void>): void
 }
 
-export function hostLifecycleSource(pi: { on(event: string, handler: () => Promise<void>): void }): ComputerLifecycleSource {
+export function hostLifecycleSource(pi: {
+  on(event: string, handler: () => Promise<void>): void
+}): ComputerLifecycleSource {
   return {
     onRunEnd: (handler) => pi.on("agent_end", handler),
     onClose: (handler) => pi.on("session_shutdown", handler),
@@ -50,7 +52,10 @@ export function hostLifecycleSource(pi: { on(event: string, handler: () => Promi
  * A runtime that never started has no engine to revoke on or close, and a component without a
  * runtime (computer use unavailable) wires nothing.
  */
-export function wireComputerControlEvents(lifecycle: ComputerLifecycleSource, runtime: { started(): Promise<ComputerUseRuntime> | undefined } | undefined): void {
+export function wireComputerControlEvents(
+  lifecycle: ComputerLifecycleSource,
+  runtime: { started(): Promise<ComputerUseRuntime> | undefined } | undefined,
+): void {
   if (runtime === undefined) return
   const revokeStarted = async (): Promise<void> => {
     const started = runtime.started()

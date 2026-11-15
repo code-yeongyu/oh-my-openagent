@@ -33,7 +33,8 @@ export function createProtocolTransport(
   function failInitialization(error: unknown): void {
     if (!initialize) return
     bridge.onmessage?.({
-      jsonrpc: "2.0", id: initialize.id,
+      jsonrpc: "2.0",
+      id: initialize.id,
       error: { code: -32000, message: error instanceof Error ? error.message : String(error) },
     })
   }
@@ -92,19 +93,28 @@ export function createProtocolTransport(
           if (message.id === discoveryID) {
             if (era !== "probing") return
             clearTimeout(discoveryTimer)
-            if ("result" in message && Array.isArray(message.result.supportedVersions)
-              && message.result.supportedVersions.includes(modernVersion)) {
+            if (
+              "result" in message &&
+              Array.isArray(message.result.supportedVersions) &&
+              message.result.supportedVersions.includes(modernVersion)
+            ) {
               era = "modern"
               const serverInfo = message.result._meta?.["io.modelcontextprotocol/serverInfo"]
-              bridge.onmessage?.({
-                jsonrpc: "2.0", id: initialize.id,
-                result: {
-                  protocolVersion: initialize.params?.protocolVersion,
-                  capabilities: message.result.capabilities ?? {},
-                  serverInfo: serverInfo ?? { name: "MCP server", version: "unknown" },
-                  ...(typeof message.result.instructions === "string" ? { instructions: message.result.instructions } : {}),
+              bridge.onmessage?.(
+                {
+                  jsonrpc: "2.0",
+                  id: initialize.id,
+                  result: {
+                    protocolVersion: initialize.params?.protocolVersion,
+                    capabilities: message.result.capabilities ?? {},
+                    serverInfo: serverInfo ?? { name: "MCP server", version: "unknown" },
+                    ...(typeof message.result.instructions === "string"
+                      ? { instructions: message.result.instructions }
+                      : {}),
+                  },
                 },
-              }, extra)
+                extra,
+              )
             } else {
               void useLegacy().catch(failInitialization)
             }
@@ -160,23 +170,27 @@ export function createProtocolTransport(
             if (!fallbackID) {
               fallbackID = `skill-mcp-legacy-${fallbackSequence++}`
               transport.setProtocolVersion?.(String(initialize.params?.protocolVersion))
-              void transport.send({ ...initialize, id: fallbackID })
-                .catch(failFallback)
+              void transport.send({ ...initialize, id: fallbackID }).catch(failFallback)
             }
             return
           }
           if (request && "result" in message) {
             const resultType = message.result.resultType
             if (resultType !== undefined && resultType !== "complete") {
-              bridge.onmessage?.({
-                jsonrpc: "2.0", id: message.id,
-                error: {
-                  code: -32000,
-                  message: resultType === "input_required"
-                    ? "Skill MCP does not support elicitation; the input-required operation was terminated."
-                    : `Skill MCP received unsupported resultType: ${String(resultType)}`,
+              bridge.onmessage?.(
+                {
+                  jsonrpc: "2.0",
+                  id: message.id,
+                  error: {
+                    code: -32000,
+                    message:
+                      resultType === "input_required"
+                        ? "Skill MCP does not support elicitation; the input-required operation was terminated."
+                        : `Skill MCP received unsupported resultType: ${String(resultType)}`,
+                  },
                 },
-              }, extra)
+                extra,
+              )
               return
             }
           }
@@ -200,7 +214,10 @@ export function createProtocolTransport(
           void useLegacy().catch(failInitialization)
         }, SKILL_MCP_DISCOVERY_TIMEOUT_MS)
         try {
-          await transport.send(withMetadata({ ...message, id: discoveryID, method: "server/discover", params: {} }), options)
+          await transport.send(
+            withMetadata({ ...message, id: discoveryID, method: "server/discover", params: {} }),
+            options,
+          )
         } catch {
           // The budget may already have fallen back; a late failure must not
           // send initialize a second time.

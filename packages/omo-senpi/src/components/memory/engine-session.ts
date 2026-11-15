@@ -53,7 +53,12 @@ export async function prepareMemoryEngineSession(
   if (!existsSync(join(identityPaths.repo, ".git"))) {
     await lock("memory-write", async () => {
       if (!existsSync(join(identityPaths.repo, ".git"))) {
-        await repo.init({ seedFiles: buildDefaultSeedFiles(), installHooks: (dir) => { installHooks(dir, { checker: memoryHookChecker() }) } })
+        await repo.init({
+          seedFiles: buildDefaultSeedFiles(),
+          installHooks: (dir) => {
+            installHooks(dir, { checker: memoryHookChecker() })
+          },
+        })
       }
     })
   }

@@ -10,9 +10,7 @@ import { createReflectionRunIdFactory } from "./reflection-run-id"
 import { removeTree } from "../../../../../test-support/remove-tree"
 
 const roots: string[] = []
-afterEach(async () =>
-  Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 }))),
-)
+afterEach(async () => Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 }))))
 
 async function fixture(): Promise<MemoryIdentityPaths> {
   const root = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-run-id-")))

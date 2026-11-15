@@ -18,8 +18,7 @@ export type FoldedRecord = {
   readonly before: Authority | null
 }
 
-const withEntry = <K, V>(map: ReadonlyMap<K, V>, key: K, value: V): ReadonlyMap<K, V> =>
-  new Map([...map, [key, value]])
+const withEntry = <K, V>(map: ReadonlyMap<K, V>, key: K, value: V): ReadonlyMap<K, V> => new Map([...map, [key, value]])
 
 const without = <K, V>(map: ReadonlyMap<K, V>, key: K): ReadonlyMap<K, V> => {
   const next = new Map(map)
@@ -50,10 +49,7 @@ const genesisAuthority = (record: FoldedRecord): Authority | null => {
  * the join's predecessor minus that key and cancels every keyring record after the join. A
  * fork-resolution, once the receiver has proven its evidence, takes the authority it states.
  */
-export const applyRecord = (
-  history: ReadonlyArray<FoldedRecord>,
-  record: FoldedRecord,
-): Authority | null => {
+export const applyRecord = (history: ReadonlyArray<FoldedRecord>, record: FoldedRecord): Authority | null => {
   const before = record.before
   if (before === null) return genesisAuthority(record)
   const body = record.body

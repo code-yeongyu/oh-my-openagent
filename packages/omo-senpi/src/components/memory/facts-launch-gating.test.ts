@@ -84,9 +84,7 @@ describe("facts launch gating on failure state", () => {
     const ledger = JSON.parse(
       await readFile(join(identity.paths.facts, "runs", names[0] ?? "missing", "ledger.json"), "utf8"),
     ) as FactsRunLedger
-    expect(ledger.queued).toEqual([
-      { conversationId: "session-2", end_message_id: "m2", end_snapshot_line: 1 },
-    ])
+    expect(ledger.queued).toEqual([{ conversationId: "session-2", end_message_id: "m2", end_snapshot_line: 1 }])
     const pending = await queue.listPending()
     expect(pending).toEqual([])
     expect(await readdir(factsQueuePaths(identity.paths).parkedDir)).toHaveLength(1)
@@ -103,13 +101,18 @@ describe("facts launch gating on failure state", () => {
     expect(await queue.listPending()).toEqual([])
     const runner = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fact", { now: () => NOW }))
     const launches: string[] = []
-    const deps = fakeDeps({ identity: identity.id, identityPaths: identity.paths }, {
-      factsSink: { reconcile: async () => {
-        expect(await readFile(join(layout.queueDir, name), "utf8")).toBe(original)
-        expect((await queue.listPending()).map((entry) => entry.range)).toEqual(before.map((entry) => entry.range))
-        launches.push((await runner.launchPending()).status)
-      } },
-    })
+    const deps = fakeDeps(
+      { identity: identity.id, identityPaths: identity.paths },
+      {
+        factsSink: {
+          reconcile: async () => {
+            expect(await readFile(join(layout.queueDir, name), "utf8")).toBe(original)
+            expect((await queue.listPending()).map((entry) => entry.range)).toEqual(before.map((entry) => entry.range))
+            launches.push((await runner.launchPending()).status)
+          },
+        },
+      },
+    )
     const pi = new MemoryFakeExtensionAPI()
     registerFactsCommand(pi, deps)
     const output = await invoke(pi, "facts", "retry --conversation session-1", fakeCommandContext())

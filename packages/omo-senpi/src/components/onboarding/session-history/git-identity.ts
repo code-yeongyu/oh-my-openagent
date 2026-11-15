@@ -19,7 +19,11 @@ function azureDevOpsRepositoryKey(host: string, segments: ReadonlyArray<string>)
 }
 
 export function normalizeGitRemoteUrl(value: string): string {
-  const normalized = value.trim().replace(/\/+$/g, "").replace(/\.git$/i, "").toLowerCase()
+  const normalized = value
+    .trim()
+    .replace(/\/+$/g, "")
+    .replace(/\.git$/i, "")
+    .toLowerCase()
   if (/^(?:ssh|https?|git):\/\//i.test(normalized)) {
     try {
       const url = new URL(normalized)

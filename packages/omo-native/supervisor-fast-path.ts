@@ -25,8 +25,7 @@ export async function runInternalSupervisor(args: readonly string[]): Promise<bo
   process.env.PI_CODING_AGENT = "true"
   process.env.AI_AGENT = APP_NAME
   process.emitWarning = (): void => {}
-  const { dispatchInternalSupervisor } = await import(
-    "../../node_modules/@code-yeongyu/senpi/dist/modes/rpc/supervisor-route.js"
-  )
+  const { dispatchInternalSupervisor } =
+    await import("../../node_modules/@code-yeongyu/senpi/dist/modes/rpc/supervisor-route.js")
   return dispatchInternalSupervisor(args)
 }

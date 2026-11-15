@@ -1,11 +1,6 @@
 import { dagEventLane, dagStreamOverflowEvent } from "./events"
 import type { DagFileStore } from "./store"
-import {
-  DAG_SETTINGS_DEFAULTS,
-  type DagRunEvent,
-  type DagRunEventPayload,
-  type DagRunId,
-} from "./types"
+import { DAG_SETTINGS_DEFAULTS, type DagRunEvent, type DagRunEventPayload, type DagRunId } from "./types"
 
 const REPLAY_PAGE_SIZE = 1000
 const commitSubscribers = new WeakMap<DagFileStore, Map<DagRunId, Set<CommitSubscriber>>>()
@@ -62,11 +57,7 @@ type CommitSubscriber = {
 }
 
 /** Process-local notification for durable commits, independent of a particular journal instance. */
-export function subscribeDagJournal(
-  store: DagFileStore,
-  runId: DagRunId,
-  listener: DagJournalListener,
-): () => void {
+export function subscribeDagJournal(store: DagFileStore, runId: DagRunId, listener: DagJournalListener): () => void {
   const storeSubscribers = commitSubscribers.get(store) ?? new Map<DagRunId, Set<CommitSubscriber>>()
   const runSubscribers = storeSubscribers.get(runId) ?? new Set<CommitSubscriber>()
   const subscriber: CommitSubscriber = { listener, active: true }
@@ -113,9 +104,10 @@ export function createDagJournal<TCheckpoint extends DagJournalCheckpoint>(
       }
       // Completed-node reducers synchronously stage result artifacts. Stage them before the WAL so
       // replay can rebuild metadata even if the process dies before checkpoint replacement.
-      const prepared = event.type === "dag.node.transitioned" && event.to === "completed"
-        ? options.applyEvent(recovered, event)
-        : undefined
+      const prepared =
+        event.type === "dag.node.transitioned" && event.to === "completed"
+          ? options.applyEvent(recovered, event)
+          : undefined
       options.store.appendEvent(event)
       const applied = prepared ?? options.applyEvent(recovered, event)
       const next = { ...applied, schemaVersion: 1, checkpointSeq: seq }
@@ -198,11 +190,7 @@ function eventLogTailSeq(store: DagFileStore, runId: DagRunId, sinceSeq: number)
   return store.readEvents(runId, sinceSeq, { limit: 1 }).headSeq
 }
 
-function enqueue(
-  subscriber: Subscriber,
-  event: DagRunEvent,
-  ringSize: number,
-): void {
+function enqueue(subscriber: Subscriber, event: DagRunEvent, ringSize: number): void {
   if (!subscriber.active) return
   if (subscriber.queue.length >= ringSize) {
     const dropped = subscriber.queue.shift()

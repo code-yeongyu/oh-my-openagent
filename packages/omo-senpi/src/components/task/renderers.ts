@@ -20,7 +20,11 @@ export const renderCategoryUnavailable: MessageRenderer<Readonly<Record<string, 
 export const renderTaskCompletion: MessageRenderer<readonly CompletionDetails[]> = (message, options, theme) => {
   const details = message.details ?? []
   if (details.length === 0) {
-    return buildNoticeBox({ title: "· Task completion", tone: "dim", why: "Task completion details are unavailable." }, options, theme)
+    return buildNoticeBox(
+      { title: "· Task completion", tone: "dim", why: "Task completion details are unavailable." },
+      options,
+      theme,
+    )
   }
   const components = details.map((detail) => buildNoticeBox(completionNotice(detail), options, theme))
   return {
@@ -32,19 +36,24 @@ export const renderTaskCompletion: MessageRenderer<readonly CompletionDetails[]>
 export const renderTeamMemberLiveness: MessageRenderer<TeamMemberLivenessDetails> = (message, options, theme) => {
   const details = message.details
   if (details === undefined) {
-    return buildNoticeBox({ title: "⚠ Team member unavailable", tone: "warning", why: "Team member liveness details are unavailable." }, options, theme)
+    return buildNoticeBox(
+      { title: "⚠ Team member unavailable", tone: "warning", why: "Team member liveness details are unavailable." },
+      options,
+      theme,
+    )
   }
   const state = normalizeRendererText(details.lastKnownState)
-  const deliveryKey = "deliveryKey" in details && typeof details.deliveryKey === "string" ? details.deliveryKey : undefined
+  const deliveryKey =
+    "deliveryKey" in details && typeof details.deliveryKey === "string" ? details.deliveryKey : undefined
   return buildNoticeBox(
     {
       title: `⚠ Team member unavailable · ${normalizeRendererText(details.memberName)}`,
       tone: details.lastKnownState === "error" || details.lastKnownState === "lost" ? "error" : "warning",
       why: `The team member is no longer making progress; its last known state was ${state}.`,
       extra: details.reason === undefined ? [] : [{ text: normalizeRendererText(details.reason), tone: "warning" }],
-      ...noticeExpandedLine(joinNoticeFields([
-        deliveryKey === undefined ? undefined : `delivery ${normalizeRendererText(deliveryKey)}`,
-      ])),
+      ...noticeExpandedLine(
+        joinNoticeFields([deliveryKey === undefined ? undefined : `delivery ${normalizeRendererText(deliveryKey)}`]),
+      ),
     },
     options,
     theme,
@@ -55,30 +64,35 @@ function completionNotice(detail: CompletionDetails): NoticeSpec {
   const status = normalizeRendererText(detail.status)
   const response = normalizeRendererText(detail.final_response).trim()
   const continuation = normalizeRendererText(detail.continuation_hint).trim()
-  const resultFile = detail.final_response_file === undefined ? undefined : normalizeRendererText(detail.final_response_file)
+  const resultFile =
+    detail.final_response_file === undefined ? undefined : normalizeRendererText(detail.final_response_file)
   return {
     title: `${statusGlyph(detail.status)} Task complete · ${normalizeRendererText(detail.name)}`,
     tone: statusTone(detail.status),
     why: response.length === 0 ? `Task ${status}.` : response,
-    extra: [{
-      text: joinNoticeFields([
-        `id ${normalizeRendererText(detail.task_id)}`,
-        formatTargetWithModel({
-          category: detail.category,
-          agentType: detail.agent_type,
-          resolvedModel: detail.resolved_model,
-          model: detail.model,
-        }),
-        `duration ${formatDuration(detail.duration_ms)}`,
-        detail.tokens === undefined ? undefined : `tokens ${detail.tokens}`,
-        detail.run_stats?.tool_calls === undefined ? undefined : `tools ${detail.run_stats.tool_calls}`,
-        detail.run_stats?.tokens_per_second === undefined ? undefined : `tps ${detail.run_stats.tokens_per_second}`,
+    extra: [
+      {
+        text: joinNoticeFields([
+          `id ${normalizeRendererText(detail.task_id)}`,
+          formatTargetWithModel({
+            category: detail.category,
+            agentType: detail.agent_type,
+            resolvedModel: detail.resolved_model,
+            model: detail.model,
+          }),
+          `duration ${formatDuration(detail.duration_ms)}`,
+          detail.tokens === undefined ? undefined : `tokens ${detail.tokens}`,
+          detail.run_stats?.tool_calls === undefined ? undefined : `tools ${detail.run_stats.tool_calls}`,
+          detail.run_stats?.tokens_per_second === undefined ? undefined : `tps ${detail.run_stats.tokens_per_second}`,
+        ]),
+      },
+    ],
+    ...noticeExpandedLine(
+      joinNoticeFields([
+        continuation.length === 0 ? undefined : continuation,
+        resultFile === undefined ? undefined : `result file ${resultFile}`,
       ]),
-    }],
-    ...noticeExpandedLine(joinNoticeFields([
-      continuation.length === 0 ? undefined : continuation,
-      resultFile === undefined ? undefined : `result file ${resultFile}`,
-    ])),
+    ),
   }
 }
 

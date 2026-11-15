@@ -1,11 +1,7 @@
 import type { CommandInfo } from "../slashcommand/types"
 import type { SkillInfo } from "./types"
 
-export function makeSkill(
-  name: string,
-  description = "desc",
-  overrides: Partial<SkillInfo> = {},
-): SkillInfo {
+export function makeSkill(name: string, description = "desc", overrides: Partial<SkillInfo> = {}): SkillInfo {
   return { name, description, scope: "builtin", ...overrides }
 }
 

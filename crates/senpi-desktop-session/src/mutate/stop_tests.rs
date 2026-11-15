@@ -39,6 +39,7 @@ fn press(worker: &mut Worker, keys: &[&str]) -> CoreResult<()> {
 
 fn chord_op(keys: &[&str], mode: &str) -> Op {
     Op::KeyChord(KeyChordParams {
+        force: false,
         target: "101".to_owned(),
         keys: keys.iter().map(|key| (*key).to_owned()).collect(),
         opts: delivery(mode),

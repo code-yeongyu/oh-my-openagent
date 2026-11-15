@@ -1,6 +1,12 @@
 import { expect, test } from "bun:test"
 import { z } from "zod"
-import { createCredentialStore, createSealedStore, credentialId, KeychainApprovalPendingError, type SecretApi } from "./keystore"
+import {
+  createCredentialStore,
+  createSealedStore,
+  credentialId,
+  KeychainApprovalPendingError,
+  type SecretApi,
+} from "./keystore"
 import { grant, memorySecrets, privateKeys } from "./test-support"
 
 test("legacy credential writers cannot read, overwrite or clear protocol-2 custody", async () => {
@@ -19,7 +25,8 @@ test("legacy credential writers cannot read, overwrite or clear protocol-2 custo
   expect(await active.read()).toEqual({ id: "B", cursor: 8 })
   expect(await pending.read()).toEqual({ id: "A", cursor: 7 })
   expect([...secrets.values.keys()].sort()).toEqual([
-    `omo-cli-revocations-v2:${credentialId(api)}`, `omo-cli-v2:${credentialId(api)}`,
+    `omo-cli-revocations-v2:${credentialId(api)}`,
+    `omo-cli-v2:${credentialId(api)}`,
   ])
 })
 
@@ -35,19 +42,17 @@ test("protocol-2 credential and pending-revocation reads share only their own sl
   }
   const schema = z.object({ id: z.string() })
   const api = "https://api.example"
-  const stores = (["omo-cli-v2", "omo-cli-revocations-v2"] as const).flatMap(namespace =>
-    [api, `${api}/`].map(origin => createSealedStore(origin, namespace, schema, secrets, "darwin")),
+  const stores = (["omo-cli-v2", "omo-cli-revocations-v2"] as const).flatMap((namespace) =>
+    [api, `${api}/`].map((origin) => createSealedStore(origin, namespace, schema, secrets, "darwin")),
   )
 
-  const outcomes = await Promise.allSettled(stores.map(store => store.read()))
+  const outcomes = await Promise.allSettled(stores.map((store) => store.read()))
 
   for (const outcome of outcomes) {
     expect(outcome.status).toBe("rejected")
     if (outcome.status === "rejected") expect(outcome.reason).toBeInstanceOf(KeychainApprovalPendingError)
   }
-  expect(gets.sort()).toEqual([
-    `omo-cli-revocations-v2:${credentialId(api)}`, `omo-cli-v2:${credentialId(api)}`,
-  ])
+  expect(gets.sort()).toEqual([`omo-cli-revocations-v2:${credentialId(api)}`, `omo-cli-v2:${credentialId(api)}`])
 }, 8_000)
 
 test("protocol-2 namespaces share canonical origin naming but isolate another origin", async () => {
@@ -55,6 +60,10 @@ test("protocol-2 namespaces share canonical origin naming but isolate another or
   const schema = z.object({ id: z.string() })
   await createSealedStore("https://api.example/", "omo-cli-v2", schema, secrets.api, "darwin").write({ id: "A" })
 
-  expect(await createSealedStore("https://api.example", "omo-cli-v2", schema, secrets.api, "darwin").read()).toEqual({ id: "A" })
-  expect(await createSealedStore("https://other.example", "omo-cli-v2", schema, secrets.api, "darwin").read()).toBeNull()
+  expect(await createSealedStore("https://api.example", "omo-cli-v2", schema, secrets.api, "darwin").read()).toEqual({
+    id: "A",
+  })
+  expect(
+    await createSealedStore("https://other.example", "omo-cli-v2", schema, secrets.api, "darwin").read(),
+  ).toBeNull()
 })

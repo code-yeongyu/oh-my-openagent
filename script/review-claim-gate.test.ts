@@ -49,9 +49,13 @@ async function runQueueGate(ref: string, labels: readonly string[], fetchError =
     payload: { merge_group: { head_ref: ref } },
   }
   const core = {
-    setOutput(name: string, value: number) { outputs.set(name, String(value)) },
+    setOutput(name: string, value: number) {
+      outputs.set(name, String(value))
+    },
     info(_message: string) {},
-    setFailed(message: string) { throw new Error(message) },
+    setFailed(message: string) {
+      throw new Error(message)
+    },
   }
   // Run the actual workflow step, including its import, so missing wiring fails.
   const originalWorkspace = process.env.GITHUB_WORKSPACE

@@ -7,14 +7,22 @@ import { writeModels, type Runtime } from "./runtime"
 
 export async function captureProviders(runtime: Runtime) {
   const observed: { readonly api: string; readonly path: string }[] = []
-  const bedrock = Bun.serve({ hostname: "127.0.0.1", port: 0, idleTimeout: 10,
+  const bedrock = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    idleTimeout: 10,
     fetch(request) {
       observed.push({ api: "bedrock-converse-stream", path: new URL(request.url).pathname })
-      return Response.json({ __type: "UnrecognizedClientException", message: "The security token included in the request is invalid." },
-        { status: 403, headers: { "x-amzn-errortype": "UnrecognizedClientException" } })
+      return Response.json(
+        { __type: "UnrecognizedClientException", message: "The security token included in the request is invalid." },
+        { status: 403, headers: { "x-amzn-errortype": "UnrecognizedClientException" } },
+      )
     },
   })
-  const devin = Bun.serve({ hostname: "127.0.0.1", port: 0, idleTimeout: 10,
+  const devin = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    idleTimeout: 10,
     fetch(request) {
       observed.push({ api: "devin-agent", path: new URL(request.url).pathname })
       return Response.json({ code: "unauthenticated", message: "Unauthorized audit credential" }, { status: 401 })
@@ -22,7 +30,10 @@ export async function captureProviders(runtime: Runtime) {
   })
   const sessions = new Set<ServerHttp2Session>()
   const cursor = createServer()
-  cursor.on("session", (session) => { sessions.add(session); session.on("close", () => sessions.delete(session)) })
+  cursor.on("session", (session) => {
+    sessions.add(session)
+    session.on("close", () => sessions.delete(session))
+  })
   cursor.on("stream", (stream: ServerHttp2Stream, headers: IncomingHttpHeaders) => {
     const path = String(headers[":path"])
     observed.push({ api: "cursor-agent", path })
@@ -47,19 +58,40 @@ export async function captureProviders(runtime: Runtime) {
         const before = observed.length
         await using rpc = new Rpc(runtime, mode, provider)
         await rpc.request({ type: "get_protocol_info" })
-        const sessionId = mode === "multi" ? await rpc.open(join(runtime.cwd, `${provider}.jsonl`), provider) : undefined
+        const sessionId =
+          mode === "multi" ? await rpc.open(join(runtime.cwd, `${provider}.jsonl`), provider) : undefined
         const message = await rpc.prompt("audit-provider-auth", sessionId)
         const errorMessage = message.errorMessage ?? message.content.map((part) => part.text ?? "").join("")
         const requests = observed.slice(before).filter((request) => request.api === model.api)
-        const requestObserved = model.api === "cursor-agent" ? requests.some((request) => request.path === "/agent.v1.AgentService/Run") : requests.length > 0
-        rows.push(providerSchema.parse({ mode, api: model.api, requestObserved, stopReason: message.stopReason,
-          failureClass: classifyFailure(errorMessage), errorMessage }))
+        const requestObserved =
+          model.api === "cursor-agent"
+            ? requests.some((request) => request.path === "/agent.v1.AgentService/Run")
+            : requests.length > 0
+        rows.push(
+          providerSchema.parse({
+            mode,
+            api: model.api,
+            requestObserved,
+            stopReason: message.stopReason,
+            failureClass: classifyFailure(errorMessage),
+            errorMessage,
+          }),
+        )
         if (sessionId) await rpc.request({ type: "close_session", sessionId })
       }
     }
-    return { pass: rows.every((row) => row.requestObserved && row.failureClass === "auth" && row.stopReason === "error"), rows, requests: observed, serversClosed: true }
+    return {
+      pass: rows.every((row) => row.requestObserved && row.failureClass === "auth" && row.stopReason === "error"),
+      rows,
+      requests: observed,
+      serversClosed: true,
+    }
   } finally {
     for (const session of sessions) session.destroy()
-    await Promise.all([bedrock.stop(true), devin.stop(true), new Promise<void>((resolve, reject) => cursor.close((error) => error ? reject(error) : resolve()))])
+    await Promise.all([
+      bedrock.stop(true),
+      devin.stop(true),
+      new Promise<void>((resolve, reject) => cursor.close((error) => (error ? reject(error) : resolve()))),
+    ])
   }
 }

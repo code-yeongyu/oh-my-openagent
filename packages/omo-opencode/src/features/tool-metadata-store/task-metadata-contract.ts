@@ -9,8 +9,6 @@ export interface TaskLink {
   category?: string
 }
 
-
-
 function readString(value: unknown): string | undefined {
   if (typeof value !== "string") {
     return undefined
@@ -29,9 +27,11 @@ function readTaskIdFromMetadata(metadata: Record<string, unknown>): string | und
 }
 
 function readBackgroundTaskIdFromMetadata(metadata: Record<string, unknown>): string | undefined {
-  return readString(metadata.backgroundTaskId)
-    ?? readString(metadata.backgroundTaskID)
-    ?? readString(metadata.background_task_id)
+  return (
+    readString(metadata.backgroundTaskId) ??
+    readString(metadata.backgroundTaskID) ??
+    readString(metadata.background_task_id)
+  )
 }
 
 function readAgentFromMetadata(metadata: Record<string, unknown>): string | undefined {
@@ -78,7 +78,7 @@ export function parseTaskMetadataBlock(text: string): TaskLink {
   const blockContent = extractTaskMetadataContent(text) ?? text
   const lines = blockContent
     .split("\n")
-    .map(line => line.trim())
+    .map((line) => line.trim())
     .filter(Boolean)
 
   const parsed: TaskLink = {}
@@ -122,7 +122,13 @@ export function extractTaskLink(metadata: unknown, outputText: string): TaskLink
       category: readCategoryFromMetadata(metadata),
     }
 
-    if (metadataLink.sessionId || metadataLink.taskId || metadataLink.backgroundTaskId || metadataLink.agent || metadataLink.category) {
+    if (
+      metadataLink.sessionId ||
+      metadataLink.taskId ||
+      metadataLink.backgroundTaskId ||
+      metadataLink.agent ||
+      metadataLink.category
+    ) {
       return metadataLink
     }
   }

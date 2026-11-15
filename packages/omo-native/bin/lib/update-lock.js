@@ -73,7 +73,12 @@ export function findHolders(installDir, processes, excludePids, held = undefined
   return processes.filter((entry) => {
     if (excludePids.includes(entry.pid)) return false
     // npm can name the held file itself; the process running exactly that executable holds it.
-    if (heldPath !== undefined && typeof entry.executablePath === "string" && normalizePath(entry.executablePath) === heldPath) return true
+    if (
+      heldPath !== undefined &&
+      typeof entry.executablePath === "string" &&
+      normalizePath(entry.executablePath) === heldPath
+    )
+      return true
     return [entry.executablePath, entry.commandLine].some((value) => {
       if (typeof value !== "string") return false
       const path = normalizePath(value)
@@ -97,7 +102,13 @@ export function listWindowsProcesses() {
         "-Command",
         "Get-CimInstance Win32_Process | Select-Object ProcessId,Name,ExecutablePath,CommandLine | ConvertTo-Json -Compress",
       ],
-      { encoding: "utf8", windowsHide: true, timeout: 15_000, maxBuffer: 32 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] },
+      {
+        encoding: "utf8",
+        windowsHide: true,
+        timeout: 15_000,
+        maxBuffer: 32 * 1024 * 1024,
+        stdio: ["ignore", "pipe", "ignore"],
+      },
     )
     const parsed = JSON.parse(output)
     const rows = Array.isArray(parsed) ? parsed : [parsed]

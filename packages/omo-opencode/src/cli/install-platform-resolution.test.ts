@@ -54,7 +54,9 @@ describe("install platform resolution", () => {
     delete process.env.OMO_ENABLE_NATIVE_DEV_PLATFORM
 
     // when / then
-    expect(() => resolveInstallArgs({ tui: true, platform: "native-dev" }, invocationName)).toThrow(/OMO_ENABLE_NATIVE_DEV_PLATFORM/)
+    expect(() => resolveInstallArgs({ tui: true, platform: "native-dev" }, invocationName)).toThrow(
+      /OMO_ENABLE_NATIVE_DEV_PLATFORM/,
+    )
   })
 
   test("resolves explicit --platform=native-dev when the native-dev platform flag is enabled", () => {
@@ -137,7 +139,9 @@ describe("install platform resolution", () => {
     const cliProgramSource = await Bun.file(new URL("./cli-program.ts", import.meta.url)).text()
 
     // when
-    const rootBlock = cliProgramSource.match(/program\s*\n\s*\.name\("oh-my-opencode"\)([\s\S]*?)\.enablePositionalOptions\(\)/)
+    const rootBlock = cliProgramSource.match(
+      /program\s*\n\s*\.name\("oh-my-opencode"\)([\s\S]*?)\.enablePositionalOptions\(\)/,
+    )
 
     // then
     expect(rootBlock).not.toBeNull()

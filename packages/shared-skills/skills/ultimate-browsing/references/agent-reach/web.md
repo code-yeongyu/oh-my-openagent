@@ -6,13 +6,13 @@
 
 ```bash
 # 读取任意网页内容
-curl -s "https://r.jina.ai/URL"
+curl -s -H "Authorization: Bearer ${JINA_API_KEY}" "https://r.jina.ai/URL"
 
 # 示例
-curl -s "https://r.jina.ai/https://example.com/article"
+curl -s -H "Authorization: Bearer ${JINA_API_KEY}" "https://r.jina.ai/https://example.com/article"
 ```
 
-**适用场景**: 大多数网页可以直接用 Jina Reader 读取。
+**适用场景**: 大多数网页可以直接用 Jina Reader 读取。匿名调用返回 401，必须带 `JINA_API_KEY`（见 [../insane-search/jina.md](../insane-search/jina.md)）。
 
 ## Web Reader (MCP)
 
@@ -69,7 +69,7 @@ for e in feedparser.parse('FEED_URL').entries[:5]:
 
 | 场景 | 推荐工具 |
 |-----|---------|
-| 通用网页 | Jina Reader (`curl r.jina.ai`) |
+| 通用网页 | Jina Reader (`curl r.jina.ai`，需 `JINA_API_KEY`) |
 | 需要图片/格式控制 | web-reader MCP |
 | 微信公众号 | Exa (搜索+阅读) / Camoufox (可选阅读) |
 | RSS 订阅 | feedparser |

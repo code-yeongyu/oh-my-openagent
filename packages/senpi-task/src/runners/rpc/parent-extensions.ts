@@ -28,9 +28,7 @@ export function parseExtensionEntries(argv: readonly string[]): readonly string[
  * ordinary spawn gets. Left absent, this degrades to the parent's argv entries, which is the correct
  * answer for a wiring with no package manager - and the exact behaviour that predates #8492.
  */
-export type InheritedExtensions =
-  | readonly string[]
-  | (() => readonly string[] | Promise<readonly string[]>)
+export type InheritedExtensions = readonly string[] | (() => readonly string[] | Promise<readonly string[]>)
 
 export async function resolveInheritedExtensionList(
   inherited: InheritedExtensions | undefined,
@@ -48,9 +46,14 @@ export function selectPackageExtensionPaths(
     const nested = relative(root, path)
     return nested === "" || (!isAbsolute(nested) && nested !== ".." && !nested.startsWith(`..${sep}`))
   }
-  return [...new Set(loadedExtensionPaths.filter((path) =>
-    !path.startsWith("<")
-    && installedPackageRoots.some((root) => isWithin(path, root))
-    && !argvEntries.some((entry) => isWithin(path, entry)),
-  ))]
+  return [
+    ...new Set(
+      loadedExtensionPaths.filter(
+        (path) =>
+          !path.startsWith("<") &&
+          installedPackageRoots.some((root) => isWithin(path, root)) &&
+          !argvEntries.some((entry) => isWithin(path, entry)),
+      ),
+    ),
+  ]
 }

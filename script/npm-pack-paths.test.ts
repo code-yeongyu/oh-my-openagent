@@ -3,7 +3,9 @@
 import { describe, expect, test } from "bun:test"
 import { parseNpmPackPaths } from "./npm-pack-paths.mjs"
 
-const npm11Output = JSON.stringify([{ id: "oh-my-opencode@5.0.0", files: [{ path: "package.json" }, { path: "bin/omo.js" }] }])
+const npm11Output = JSON.stringify([
+  { id: "oh-my-opencode@5.0.0", files: [{ path: "package.json" }, { path: "bin/omo.js" }] },
+])
 const npm12Output = JSON.stringify({
   "oh-my-opencode": { id: "oh-my-opencode@5.0.0", files: [{ path: "package.json" }, { path: "bin/omo.js" }] },
 })

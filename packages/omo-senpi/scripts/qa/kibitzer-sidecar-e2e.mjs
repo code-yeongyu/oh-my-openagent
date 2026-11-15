@@ -92,7 +92,16 @@ import {
   writeOmoConfig,
 } from "./kibitzer-sidecar-support.mjs"
 
-export const SCENARIOS = ["happy", "provider-429", "context-reseed", "category-unavailable", "refused-pinned-model", "fast-alias-config", "cjk-auto", "query-expansion"]
+export const SCENARIOS = [
+  "happy",
+  "provider-429",
+  "context-reseed",
+  "category-unavailable",
+  "refused-pinned-model",
+  "fast-alias-config",
+  "cjk-auto",
+  "query-expansion",
+]
 /**
  * #10536: a priority alias declared only in models.json on an openai-codex-responses provider. senpi's
  * service-tier extension starts such an alias on its base model at session_start, before any request,
@@ -105,8 +114,19 @@ const BUILTIN_RUNG = { provider: "deepseek", id: "deepseek-flash" }
 /** Scenario-specific omo config on top of the lane's defaults; `{}` categories kills the recall chain. */
 const CONFIG = {
   "category-unavailable": { categories: {} },
-  "refused-pinned-model": { categories: { quick: { description: "QA pin outside the builtin quick chain", model: `omo-mock/${REFUSED_MODEL}` } } },
-  "fast-alias-config": { categories: { quick: { description: "QA pin on a models.json priority alias", model: `${FAST_ALIAS.provider}/${FAST_ALIAS.alias}` } } },
+  "refused-pinned-model": {
+    categories: {
+      quick: { description: "QA pin outside the builtin quick chain", model: `omo-mock/${REFUSED_MODEL}` },
+    },
+  },
+  "fast-alias-config": {
+    categories: {
+      quick: {
+        description: "QA pin on a models.json priority alias",
+        model: `${FAST_ALIAS.provider}/${FAST_ALIAS.alias}`,
+      },
+    },
+  },
   "query-expansion": { recall: { query_expansion: true } },
 }
 /** A search whose own words match no seeded memory; only the added terms reach the helm memory. */
@@ -137,11 +157,19 @@ const SEEDS = {
 const PERMISSION_DENIED_STEP = {
   type: "error",
   status: 403,
-  body: { error: { type: "permission_error", code: "permission_denied", message: "permission_denied: an internal error occurred" } },
+  body: {
+    error: {
+      type: "permission_error",
+      code: "permission_denied",
+      message: "permission_denied: an internal error occurred",
+    },
+  },
 }
 /** Mock-provider lanes a scenario answers on its own, ahead of the parent/sidecar scripts. */
 const ROUTER_LANES = {
-  "refused-pinned-model": [{ name: "refused", matches: (body) => body?.model === REFUSED_MODEL, step: () => PERMISSION_DENIED_STEP }],
+  "refused-pinned-model": [
+    { name: "refused", matches: (body) => body?.model === REFUSED_MODEL, step: () => PERMISSION_DENIED_STEP },
+  ],
 }
 /** Scenario-specific provider wiring on top of the lane's `omo-mock/mock-1`, every provider served by the mock. */
 const SANDBOX = {
@@ -151,7 +179,13 @@ const SANDBOX = {
     const models = JSON.parse(readFileSync(modelsFile, "utf8"))
     const template = models.providers["omo-mock"].models[0]
     models.providers["omo-mock"].models.push({ ...template, id: REFUSED_MODEL, name: "Refused 1" })
-    models.providers[BUILTIN_RUNG.provider] = { name: "mock builtin quick rung", api: "openai-completions", baseUrl, apiKey: "mock", models: [{ ...template, id: BUILTIN_RUNG.id, name: "Mock DeepSeek Flash" }] }
+    models.providers[BUILTIN_RUNG.provider] = {
+      name: "mock builtin quick rung",
+      api: "openai-completions",
+      baseUrl,
+      apiKey: "mock",
+      models: [{ ...template, id: BUILTIN_RUNG.id, name: "Mock DeepSeek Flash" }],
+    }
     writeFileSync(modelsFile, `${JSON.stringify(models, null, 2)}\n`)
     const auth = JSON.parse(readFileSync(authFile, "utf8"))
     auth[BUILTIN_RUNG.provider] = { type: "api_key", key: "mock" }
@@ -162,10 +196,19 @@ const SANDBOX = {
     const models = JSON.parse(readFileSync(modelsFile, "utf8"))
     const template = { ...models.providers["omo-mock"].models[0], contextWindow: 400_000 }
     models.providers[FAST_ALIAS.provider] = {
-      name: "mock codex responses provider", api: "openai-codex-responses", baseUrl, apiKey: "mock",
+      name: "mock codex responses provider",
+      api: "openai-codex-responses",
+      baseUrl,
+      apiKey: "mock",
       models: [
         { ...template, id: FAST_ALIAS.base, name: "Mock Luna" },
-        { ...template, id: FAST_ALIAS.alias, name: "Mock Luna Fast", serviceTier: "priority", upstreamModelId: FAST_ALIAS.base },
+        {
+          ...template,
+          id: FAST_ALIAS.alias,
+          name: "Mock Luna Fast",
+          serviceTier: "priority",
+          upstreamModelId: FAST_ALIAS.base,
+        },
       ],
     }
     writeFileSync(modelsFile, `${JSON.stringify(models, null, 2)}\n`)
@@ -202,9 +245,14 @@ export function candidatePathsOf(text) {
 
 /** The assistant message that settled the turn opened by the user message matching `isUser`. */
 export function settledAfter(transcript, isUser) {
-  const index = transcript.entries.findIndex((entry) => entry.type === "message" && entry.message?.role === "user" && isUser(messageText(entry.message)))
+  const index = transcript.entries.findIndex(
+    (entry) => entry.type === "message" && entry.message?.role === "user" && isUser(messageText(entry.message)),
+  )
   if (index < 0) return undefined
-  return transcript.entries.slice(index + 1).map((entry) => entry.message).find((message) => message?.role === "assistant" && message.stopReason === "stop")
+  return transcript.entries
+    .slice(index + 1)
+    .map((entry) => entry.message)
+    .find((message) => message?.role === "assistant" && message.stopReason === "stop")
 }
 
 // ---- the scenario harness ----------------------------------------------------------------------------------
@@ -219,9 +267,15 @@ async function withHarness(scenario, options, run) {
   try {
     const command = resolveCommand(options)
     facts.command = command.display
-    const requestLogPath = options.evidenceDir === undefined ? undefined : writeEvidence(options.evidenceDir, `${scenario}-mock-requests.jsonl`, "")
+    const requestLogPath =
+      options.evidenceDir === undefined
+        ? undefined
+        : writeEvidence(options.evidenceDir, `${scenario}-mock-requests.jsonl`, "")
     const server = startMockCompletionsServer({ steps: router.steps, requestLogPath, classifyRequest: router.classify })
-    cleanup.add("mock server", () => { server.close(); return "closed" })
+    cleanup.add("mock server", () => {
+      server.close()
+      return "closed"
+    })
     facts.baseUrl = await server.ready
     const sandbox = prepareSandbox(options.pluginRoot, facts.baseUrl)
     cleanup.add("sandbox", () => removeSandbox(sandbox, options.keepSandbox))
@@ -230,8 +284,22 @@ async function withHarness(scenario, options, run) {
     const env = sandboxEnv(sandbox)
     assertSandboxEnv(sandbox, env)
     const seed = await seedMemories(command, sandbox, env, router, SEEDS[scenario] ?? [MEMORIES.rollout, MEMORIES.helm])
-    facts.seed = { sessionId: seed.sessionId, identities: seed.identities, results: seed.results, teardown: seed.teardown }
-    if (!record(`${scenario}.memory-seeded`, seed.ok, seed.ok ? `identity=${seed.identities[0]} memories=${seed.seeded.length}` : `seed failed: ${JSON.stringify(seed.results)} identities=${seed.identities.length} stderr=${seed.stderr?.replace(/\n/g, " | ")}`)) return facts
+    facts.seed = {
+      sessionId: seed.sessionId,
+      identities: seed.identities,
+      results: seed.results,
+      teardown: seed.teardown,
+    }
+    if (
+      !record(
+        `${scenario}.memory-seeded`,
+        seed.ok,
+        seed.ok
+          ? `identity=${seed.identities[0]} memories=${seed.seeded.length}`
+          : `seed failed: ${JSON.stringify(seed.results)} identities=${seed.identities.length} stderr=${seed.stderr?.replace(/\n/g, " | ")}`,
+      )
+    )
+      return facts
     identity = seed.identities[0]
     // The seed session's own provider turns never count as parent turns of the scenario.
     const seedRequests = router.state.parent
@@ -242,19 +310,45 @@ async function withHarness(scenario, options, run) {
     state = await getState(session)
     facts.sessionId = state.sessionId
     facts.sessionFile = state.sessionFile
-    record(`${scenario}.session-identified`, typeof state.sessionFile === "string" && state.sessionFile.length > 0, `pid=${session.pid} sessionId=${state.sessionId}`)
-    await run({ session, state, identity, router, facts, parentTurns: () => router.state.parent - seedRequests, record: (name, ok, detail) => record(`${scenario}.${name}`, ok, detail) })
+    record(
+      `${scenario}.session-identified`,
+      typeof state.sessionFile === "string" && state.sessionFile.length > 0,
+      `pid=${session.pid} sessionId=${state.sessionId}`,
+    )
+    await run({
+      session,
+      state,
+      identity,
+      router,
+      facts,
+      parentTurns: () => router.state.parent - seedRequests,
+      record: (name, ok, detail) => record(`${scenario}.${name}`, ok, detail),
+    })
     // Shut the parent down while the sandbox is still observable: the lease and the pending file must be gone.
     const exit = await teardown(session)
     const leases = leaseFiles(identity)
     const pendingLeft = existsSync(pendingFile(identity, state.sessionId))
-    facts.shutdown = { teardown: exit, leaseFiles: leases, pendingFilePresent: pendingLeft, sidecarLineages: sidecarDirs(identity).length }
-    record(`${scenario}.shutdown-clean`, leases.length === 0 && !pendingLeft, `teardown=${exit} leases=${leases.length} pending=${pendingLeft} stderrTail=${session.stderr().slice(-300).replace(/\n/g, " | ") || "none"}`)
+    facts.shutdown = {
+      teardown: exit,
+      leaseFiles: leases,
+      pendingFilePresent: pendingLeft,
+      sidecarLineages: sidecarDirs(identity).length,
+    }
+    record(
+      `${scenario}.shutdown-clean`,
+      leases.length === 0 && !pendingLeft,
+      `teardown=${exit} leases=${leases.length} pending=${pendingLeft} stderrTail=${session.stderr().slice(-300).replace(/\n/g, " | ") || "none"}`,
+    )
   } catch (error) {
     record(`${scenario}.uncaught`, false, error instanceof Error ? (error.stack ?? error.message) : String(error))
   } finally {
-    if (options.evidenceDir !== undefined && identity !== undefined) snapshotEvidence(options.evidenceDir, scenario, identity, state)
-    facts.requests = { parent: router.state.parent, sidecar: router.state.sidecar, sidecarToolNames: router.state.sidecarRequests.map((request) => request.toolNames) }
+    if (options.evidenceDir !== undefined && identity !== undefined)
+      snapshotEvidence(options.evidenceDir, scenario, identity, state)
+    facts.requests = {
+      parent: router.state.parent,
+      sidecar: router.state.sidecar,
+      sidecarToolNames: router.state.sidecarRequests.map((request) => request.toolNames),
+    }
     facts.cleanup = await cleanup.run()
     console.log(`cleanup: ${facts.cleanup.join(", ")}`)
   }
@@ -262,7 +356,8 @@ async function withHarness(scenario, options, run) {
 }
 
 function snapshotEvidence(evidenceDir, scenario, identity, state) {
-  if (state?.sessionFile !== undefined && existsSync(state.sessionFile)) copyFileSync(state.sessionFile, join(evidenceDir, `${scenario}-parent-session.jsonl`))
+  if (state?.sessionFile !== undefined && existsSync(state.sessionFile))
+    copyFileSync(state.sessionFile, join(evidenceDir, `${scenario}-parent-session.jsonl`))
   for (const lineage of sidecarDirs(identity)) {
     childTranscripts(lineage.dir).forEach((transcript, index) => {
       copyFileSync(transcript.file, join(evidenceDir, `${scenario}-sidecar-${lineage.name}-gen${index + 1}.jsonl`))
@@ -275,7 +370,11 @@ function snapshotEvidence(evidenceDir, scenario, identity, state) {
 async function runHappy({ session, state, identity, router, facts, parentTurns, record }) {
   const encoded = encodeSidecarDirName(state.sessionId)
   const pending = pendingFile(identity, state.sessionId)
-  router.setParentSteps([{ type: "text", text: "Checking." }, { type: "text", text: "Done." }, { type: "text", text: "Noted." }])
+  router.setParentSteps([
+    { type: "text", text: "Checking." },
+    { type: "text", text: "Done." },
+    { type: "text", text: "Noted." },
+  ])
   router.setSidecarSteps([nudgeStep(MEMORIES.rollout)])
 
   // Wake 1: the first fresh candidate seeds the resident child; delivery holds its accepted nudge.
@@ -283,17 +382,46 @@ async function runHappy({ session, state, identity, router, facts, parentTurns, 
   const held = await waitForAccepted(identity, state, MEMORIES.rollout, { description: "happy wake 1: accepted nudge" })
   const lineages = sidecarDirs(identity)
   const lineage = lineages[0]
-  record("one-sidecar-lineage", lineages.length === 1 && lineage?.name === encoded && lineage?.sessionId === state.sessionId, `dirs=[${lineages.map((entry) => entry.name).join(",")}] decoded=${lineage?.sessionId} parent=${state.sessionId}`)
+  record(
+    "one-sidecar-lineage",
+    lineages.length === 1 && lineage?.name === encoded && lineage?.sessionId === state.sessionId,
+    `dirs=[${lineages.map((entry) => entry.name).join(",")}] decoded=${lineage?.sessionId} parent=${state.sessionId}`,
+  )
   if (lineage === undefined) return
   let transcripts = childTranscripts(lineage.dir)
   const seedText = messageText(transcripts[0]?.users[0])
-  record("one-child-generation", transcripts.length === 1 && transcripts[0].users.length === 1, `transcripts=${transcripts.length} userMessages=${transcripts[0]?.users.length}`)
-  record("seed-envelope", seedText.startsWith("<kibitzer-seed ") && seedText.includes(`session="${state.sessionId}"`) && candidatePathsOf(seedText).includes(MEMORIES.rollout.path) && envelopeCursors(seedText) !== undefined, `head=${JSON.stringify(seedText.slice(0, 120))} candidates=${candidatePathsOf(seedText).join(",")} cursors=${JSON.stringify(envelopeCursors(seedText))}`)
+  record(
+    "one-child-generation",
+    transcripts.length === 1 && transcripts[0].users.length === 1,
+    `transcripts=${transcripts.length} userMessages=${transcripts[0]?.users.length}`,
+  )
+  record(
+    "seed-envelope",
+    seedText.startsWith("<kibitzer-seed ") &&
+      seedText.includes(`session="${state.sessionId}"`) &&
+      candidatePathsOf(seedText).includes(MEMORIES.rollout.path) &&
+      envelopeCursors(seedText) !== undefined,
+    `head=${JSON.stringify(seedText.slice(0, 120))} candidates=${candidatePathsOf(seedText).join(",")} cursors=${JSON.stringify(envelopeCursors(seedText))}`,
+  )
   const nudgeCall = transcripts[0]?.assistants.flatMap(toolCallsOf).find((call) => call.name === "nudge")
-  record("child-called-nudge", nudgeCall?.arguments?.path === MEMORIES.rollout.path, `nudge=${JSON.stringify(nudgeCall?.arguments ?? null)}`)
-  record("nudge-accepted", held.nudges.length === 1 && held.nudges[0].path === MEMORIES.rollout.path && held.nudges[0].hint === MEMORIES.rollout.body, `held=${JSON.stringify(held)}`)
+  record(
+    "child-called-nudge",
+    nudgeCall?.arguments?.path === MEMORIES.rollout.path,
+    `nudge=${JSON.stringify(nudgeCall?.arguments ?? null)}`,
+  )
+  record(
+    "nudge-accepted",
+    held.nudges.length === 1 &&
+      held.nudges[0].path === MEMORIES.rollout.path &&
+      held.nudges[0].hint === MEMORIES.rollout.body,
+    `held=${JSON.stringify(held)}`,
+  )
   const registry = router.state.sidecarRequests[0]?.toolNames ?? []
-  record("sidecar-registry-exact", router.state.sidecar === 1 && sameNames(registry, SIDECAR_TOOL_NAMES), `sidecarRequests=${router.state.sidecar} tools=[${registry.join(",")}]`)
+  record(
+    "sidecar-registry-exact",
+    router.state.sidecar === 1 && sameNames(registry, SIDECAR_TOOL_NAMES),
+    `sidecarRequests=${router.state.sidecar} tools=[${registry.join(",")}]`,
+  )
   record("lease-released-after-wake", leaseFiles(identity).length === 0, `leases=${leaseFiles(identity).length}`)
 
   // Turn 2 repeats the candidate: the held nudge is drained into the parent and no provider turn starts.
@@ -303,24 +431,56 @@ async function runHappy({ session, state, identity, router, facts, parentTurns, 
   let entries = readEntries(state.sessionFile)
   const nudged = entries.filter(isNudged)
   const recall = entries.filter(isRecall)
-  record("nudge-reached-parent", nudged.length === 1 && nudgedPaths(entries).join(",") === MEMORIES.rollout.path && recall.length === 1 && (recall[0].content ?? "").includes(MEMORIES.rollout.body), `nudgedEntries=${nudged.length} via=${nudged[0]?.data?.via} paths=${nudgedPaths(entries).join(",")} recallMessages=${recall.length}`)
+  record(
+    "nudge-reached-parent",
+    nudged.length === 1 &&
+      nudgedPaths(entries).join(",") === MEMORIES.rollout.path &&
+      recall.length === 1 &&
+      (recall[0].content ?? "").includes(MEMORIES.rollout.body),
+    `nudgedEntries=${nudged.length} via=${nudged[0]?.data?.via} paths=${nudgedPaths(entries).join(",")} recallMessages=${recall.length}`,
+  )
   transcripts = childTranscripts(lineage.dir)
-  record("repeated-candidate-no-turn", router.state.sidecar === sidecarBefore && transcripts.length === 1 && transcripts[0].users.length === usersBefore && sidecarDirs(identity).length === 1, `sidecarRequests=${router.state.sidecar} (was ${sidecarBefore}) transcripts=${transcripts.length} userMessages=${transcripts[0]?.users.length}`)
+  record(
+    "repeated-candidate-no-turn",
+    router.state.sidecar === sidecarBefore &&
+      transcripts.length === 1 &&
+      transcripts[0].users.length === usersBefore &&
+      sidecarDirs(identity).length === 1,
+    `sidecarRequests=${router.state.sidecar} (was ${sidecarBefore}) transcripts=${transcripts.length} userMessages=${transcripts[0]?.users.length}`,
+  )
   record("pending-drained", !existsSync(pending), `pending=${existsSync(pending)}`)
 
   // Turn 3 brings a fresh candidate to the IDLE child: a followUp wake on the same generation, declined.
   router.setSidecarSteps([{ type: "text", text: "No stored memory changes this." }])
   await prompt(session, MEMORIES.helm.prompt)
-  const woken = await watchUntil(lineage.dir, () => {
-    const current = childTranscripts(lineage.dir)
-    const settled = current[0] === undefined ? undefined : settledAfter(current[0], (text) => text.startsWith("<kibitzer-wake "))
-    return settled === undefined ? undefined : current
-  }, { timeoutMs: WAKE_TIMEOUT_MS, description: "happy wake 2: followUp wake settled in the child transcript" })
+  const woken = await watchUntil(
+    lineage.dir,
+    () => {
+      const current = childTranscripts(lineage.dir)
+      const settled =
+        current[0] === undefined ? undefined : settledAfter(current[0], (text) => text.startsWith("<kibitzer-wake "))
+      return settled === undefined ? undefined : current
+    },
+    { timeoutMs: WAKE_TIMEOUT_MS, description: "happy wake 2: followUp wake settled in the child transcript" },
+  )
   const wakeText = messageText(woken[0].users.find((message) => messageText(message).startsWith("<kibitzer-wake ")))
-  record("idle-followup-same-child", woken.length === 1 && woken[0].users.length === 2 && candidatePathsOf(wakeText).includes(MEMORIES.helm.path), `transcripts=${woken.length} userMessages=${woken[0].users.length} wakeCandidates=${candidatePathsOf(wakeText).join(",")} cursors=${JSON.stringify(envelopeCursors(wakeText))}`)
-  record("followup-request-counted", router.state.sidecar === sidecarBefore + 1 && router.state.sidecarRequests.every((request) => sameNames(request.toolNames, SIDECAR_TOOL_NAMES)), `sidecarRequests=${router.state.sidecar}`)
+  record(
+    "idle-followup-same-child",
+    woken.length === 1 && woken[0].users.length === 2 && candidatePathsOf(wakeText).includes(MEMORIES.helm.path),
+    `transcripts=${woken.length} userMessages=${woken[0].users.length} wakeCandidates=${candidatePathsOf(wakeText).join(",")} cursors=${JSON.stringify(envelopeCursors(wakeText))}`,
+  )
+  record(
+    "followup-request-counted",
+    router.state.sidecar === sidecarBefore + 1 &&
+      router.state.sidecarRequests.every((request) => sameNames(request.toolNames, SIDECAR_TOOL_NAMES)),
+    `sidecarRequests=${router.state.sidecar}`,
+  )
   entries = readEntries(state.sessionFile)
-  record("declined-wake-delivers-nothing", entries.filter(isNudged).length === 1 && !existsSync(pending), `nudgedEntries=${entries.filter(isNudged).length} pending=${existsSync(pending)}`)
+  record(
+    "declined-wake-delivers-nothing",
+    entries.filter(isNudged).length === 1 && !existsSync(pending),
+    `nudgedEntries=${entries.filter(isNudged).length} pending=${existsSync(pending)}`,
+  )
   facts.result = {
     resident: woken.length === 1 && sidecarDirs(identity).length === 1,
     childSessions: sidecarDirs(identity).length,
@@ -344,18 +504,37 @@ async function runProvider429({ session, state, identity, router, facts, parentT
 
   // Wake 1 fails: the child's provider answers 429 with a wait no fallback can absorb.
   await prompt(session, MEMORIES.rollout.prompt)
-  const failed = await watchUntil(recallDir, () => {
-    const lineage = sidecarDirs(identity)[0]
-    const transcripts = lineage === undefined ? [] : childTranscripts(lineage.dir)
-    const error = transcripts[0]?.assistants.find((message) => message.stopReason === "error")
-    return error === undefined ? undefined : { lineage, transcripts, error }
-  }, { timeoutMs: WAKE_TIMEOUT_MS, description: "provider-429 wake 1: child turn settled as an error" })
+  const failed = await watchUntil(
+    recallDir,
+    () => {
+      const lineage = sidecarDirs(identity)[0]
+      const transcripts = lineage === undefined ? [] : childTranscripts(lineage.dir)
+      const error = transcripts[0]?.assistants.find((message) => message.stopReason === "error")
+      return error === undefined ? undefined : { lineage, transcripts, error }
+    },
+    { timeoutMs: WAKE_TIMEOUT_MS, description: "provider-429 wake 1: child turn settled as an error" },
+  )
   const seed1 = messageText(failed.transcripts[0].users[0])
-  record("child-turn-failed-on-429", /429|rate.?limit/iu.test(failed.error.errorMessage ?? ""), `errorMessage=${JSON.stringify((failed.error.errorMessage ?? "").slice(0, 200))}`)
-  record("single-bounded-attempt", router.state.sidecar === 1 && failed.transcripts.length === 1, `sidecarRequests=${router.state.sidecar} transcripts=${failed.transcripts.length}`)
-  await watchUntil(locksDir, () => (leaseFiles(identity).length === 0 ? true : undefined), { timeoutMs: WAKE_TIMEOUT_MS, description: "provider-429: wake lease released after the failure" })
+  record(
+    "child-turn-failed-on-429",
+    /429|rate.?limit/iu.test(failed.error.errorMessage ?? ""),
+    `errorMessage=${JSON.stringify((failed.error.errorMessage ?? "").slice(0, 200))}`,
+  )
+  record(
+    "single-bounded-attempt",
+    router.state.sidecar === 1 && failed.transcripts.length === 1,
+    `sidecarRequests=${router.state.sidecar} transcripts=${failed.transcripts.length}`,
+  )
+  await watchUntil(locksDir, () => (leaseFiles(identity).length === 0 ? true : undefined), {
+    timeoutMs: WAKE_TIMEOUT_MS,
+    description: "provider-429: wake lease released after the failure",
+  })
   record("lease-released-after-failure", true, `leases=${leaseFiles(identity).length}`)
-  record("nothing-delivered-on-failure", readEntries(state.sessionFile).filter(isNudged).length === 0 && !existsSync(pending), `nudged=${readEntries(state.sessionFile).filter(isNudged).length} pending=${existsSync(pending)}`)
+  record(
+    "nothing-delivered-on-failure",
+    readEntries(state.sessionFile).filter(isNudged).length === 0 && !existsSync(pending),
+    `nudged=${readEntries(state.sessionFile).filter(isNudged).length} pending=${existsSync(pending)}`,
+  )
 
   // Recovery: the provider heals; parent turns are the only clock that can end the backoff band, so
   // each turn is followed by a bounded watch for the replacement transcript (the band opens at 1 s).
@@ -365,22 +544,52 @@ async function runProvider429({ session, state, identity, router, facts, parentT
   while (turns < MAX_BACKOFF_TURNS && transcripts.length < 2) {
     turns += 1
     await prompt(session, MEMORIES.rollout.prompt)
-    transcripts = await watchUntil(failed.lineage.dir, () => {
-      const current = childTranscripts(failed.lineage.dir)
-      return current.length >= 2 && current[1].users.length > 0 ? current : undefined
-    }, { timeoutMs: BACKOFF_PROBE_MS, description: `provider-429 recovery turn ${turns}` }).catch(() => childTranscripts(failed.lineage.dir))
+    transcripts = await watchUntil(
+      failed.lineage.dir,
+      () => {
+        const current = childTranscripts(failed.lineage.dir)
+        return current.length >= 2 && current[1].users.length > 0 ? current : undefined
+      },
+      { timeoutMs: BACKOFF_PROBE_MS, description: `provider-429 recovery turn ${turns}` },
+    ).catch(() => childTranscripts(failed.lineage.dir))
   }
-  record("replacement-child-after-backoff", transcripts.length === 2 && sidecarDirs(identity).length === 1, `turnsUntilRecreate=${turns} generations=${transcripts.length} lineages=${sidecarDirs(identity).length}`)
+  record(
+    "replacement-child-after-backoff",
+    transcripts.length === 2 && sidecarDirs(identity).length === 1,
+    `turnsUntilRecreate=${turns} generations=${transcripts.length} lineages=${sidecarDirs(identity).length}`,
+  )
   const seed2 = messageText(transcripts[1]?.users[0])
   const span1 = envelopeCursors(seed1)
   const span2 = envelopeCursors(seed2)
-  record("replacement-seed-spans-buffered-events", seed2.startsWith("<kibitzer-seed ") && span1 !== undefined && span2 !== undefined && span2.from === span1.from && span2.to > span1.to && candidatePathsOf(seed2).includes(MEMORIES.rollout.path) && seed2.includes(MEMORIES.rollout.prompt), `seed1=${JSON.stringify(span1)} seed2=${JSON.stringify(span2)} candidates=${candidatePathsOf(seed2).join(",")}`)
-  const held = await waitForAccepted(identity, state, MEMORIES.rollout, { description: "provider-429 wake 2: accepted nudge" })
-  record("recovered-wake-accepted", held.nudges.length === 1 && held.nudges[0].path === MEMORIES.rollout.path && router.state.sidecar === 2, `held=${JSON.stringify(held)} sidecarRequests=${router.state.sidecar}`)
+  record(
+    "replacement-seed-spans-buffered-events",
+    seed2.startsWith("<kibitzer-seed ") &&
+      span1 !== undefined &&
+      span2 !== undefined &&
+      span2.from === span1.from &&
+      span2.to > span1.to &&
+      candidatePathsOf(seed2).includes(MEMORIES.rollout.path) &&
+      seed2.includes(MEMORIES.rollout.prompt),
+    `seed1=${JSON.stringify(span1)} seed2=${JSON.stringify(span2)} candidates=${candidatePathsOf(seed2).join(",")}`,
+  )
+  const held = await waitForAccepted(identity, state, MEMORIES.rollout, {
+    description: "provider-429 wake 2: accepted nudge",
+  })
+  record(
+    "recovered-wake-accepted",
+    held.nudges.length === 1 && held.nudges[0].path === MEMORIES.rollout.path && router.state.sidecar === 2,
+    `held=${JSON.stringify(held)} sidecarRequests=${router.state.sidecar}`,
+  )
   await prompt(session, MEMORIES.rollout.prompt)
   const entries = readEntries(state.sessionFile)
   transcripts = childTranscripts(failed.lineage.dir)
-  record("nudge-reached-parent-after-recovery", nudgedPaths(entries).join(",") === MEMORIES.rollout.path && entries.filter(isRecall).length === 1 && transcripts.length === 2, `paths=${nudgedPaths(entries).join(",")} via=${entries.filter(isNudged)[0]?.data?.via} generations=${transcripts.length}`)
+  record(
+    "nudge-reached-parent-after-recovery",
+    nudgedPaths(entries).join(",") === MEMORIES.rollout.path &&
+      entries.filter(isRecall).length === 1 &&
+      transcripts.length === 2,
+    `paths=${nudgedPaths(entries).join(",")} via=${entries.filter(isNudged)[0]?.data?.via} generations=${transcripts.length}`,
+  )
   facts.result = {
     resident: sidecarDirs(identity).length === 1,
     childSessions: sidecarDirs(identity).length,
@@ -397,41 +606,92 @@ async function runProvider429({ session, state, identity, router, facts, parentT
 // ---- context-reseed --------------------------------------------------------------------------------------------
 
 async function runContextReseed({ session, state, identity, router, facts, parentTurns, record }) {
-  router.setParentSteps([{ type: "text", text: "Checking." }, { type: "text", text: "Done." }, { type: "text", text: "Noted." }])
+  router.setParentSteps([
+    { type: "text", text: "Checking." },
+    { type: "text", text: "Done." },
+    { type: "text", text: "Noted." },
+  ])
   router.setSidecarSteps([nudgeStep(MEMORIES.rollout, { usage: RESEED_USAGE })])
 
   // Wake 1 delivers the first nudge and reports a context estimate past 60% of the budget.
   await prompt(session, MEMORIES.rollout.prompt)
-  const first = await waitForAccepted(identity, state, MEMORIES.rollout, { description: "context-reseed wake 1: accepted nudge" })
+  const first = await waitForAccepted(identity, state, MEMORIES.rollout, {
+    description: "context-reseed wake 1: accepted nudge",
+  })
   const lineage = sidecarDirs(identity)[0]
-  record("first-wake-accepted", first.nudges.length === 1 && first.nudges[0].path === MEMORIES.rollout.path && sidecarDirs(identity).length === 1 && lineage !== undefined, `held=${JSON.stringify(first)} lineages=${sidecarDirs(identity).length}`)
+  record(
+    "first-wake-accepted",
+    first.nudges.length === 1 &&
+      first.nudges[0].path === MEMORIES.rollout.path &&
+      sidecarDirs(identity).length === 1 &&
+      lineage !== undefined,
+    `held=${JSON.stringify(first)} lineages=${sidecarDirs(identity).length}`,
+  )
   if (lineage === undefined) return
   let transcripts = childTranscripts(lineage.dir)
   const usage = transcripts[0]?.assistants.at(-1)?.usage
-  record("usage-reported-past-threshold", transcripts.length === 1 && usage?.input === RESEED_USAGE.prompt_tokens, `generations=${transcripts.length} usage=${JSON.stringify(usage)}`)
+  record(
+    "usage-reported-past-threshold",
+    transcripts.length === 1 && usage?.input === RESEED_USAGE.prompt_tokens,
+    `generations=${transcripts.length} usage=${JSON.stringify(usage)}`,
+  )
 
   // Turn 2: the next fresh candidate seeds the replacement child with the reseed envelope first.
   router.setSidecarSteps([nudgeStep(MEMORIES.helm)])
   await prompt(session, MEMORIES.helm.prompt)
   // The replacement child is created with the reseed envelope; its settlement is the second pending nudge below.
-  const reseeded = await watchUntil(lineage.dir, () => {
-    const current = childTranscripts(lineage.dir)
-    return messageText(current[1]?.users[0]).includes("</kibitzer-reseed>") ? current : undefined
-  }, { timeoutMs: WAKE_TIMEOUT_MS, description: "context-reseed wake 2: replacement child seeded with the reseed envelope" })
+  const reseeded = await watchUntil(
+    lineage.dir,
+    () => {
+      const current = childTranscripts(lineage.dir)
+      return messageText(current[1]?.users[0]).includes("</kibitzer-reseed>") ? current : undefined
+    },
+    {
+      timeoutMs: WAKE_TIMEOUT_MS,
+      description: "context-reseed wake 2: replacement child seeded with the reseed envelope",
+    },
+  )
   const opening = messageText(reseeded[1].users[0])
   const [reseedPart, wakePart = ""] = opening.split("</kibitzer-reseed>")
   const deliveredList = /<delivered count="(\d+)"[^>]*>([\s\S]*?)<\/delivered>/u.exec(reseedPart)
-  record("replacement-child-reseeded", reseeded.length === 2 && opening.startsWith("<kibitzer-reseed ") && reseedPart.includes(`session="${state.sessionId}"`) && deliveredList?.[1] === "1" && (deliveredList?.[2] ?? "").includes(`<path>${MEMORIES.rollout.path}</path>`), `generations=${reseeded.length} head=${JSON.stringify(opening.slice(0, 100))} delivered=${JSON.stringify(deliveredList?.[2]?.trim())}`)
-  record("reseed-followed-by-wake", wakePart.trimStart().startsWith("<kibitzer-wake ") && candidatePathsOf(wakePart).join(",") === MEMORIES.helm.path && !candidatePathsOf(wakePart).includes(MEMORIES.rollout.path), `wakeCandidates=${candidatePathsOf(wakePart).join(",")}`)
-  const second = await waitForAccepted(identity, state, MEMORIES.helm, { description: "context-reseed wake 2: accepted nudge for the second candidate" })
-  record("second-wake-accepted", second.nudges.length === 1 && second.nudges[0].path === MEMORIES.helm.path && router.state.sidecar === 2, `held=${JSON.stringify(second)} sidecarRequests=${router.state.sidecar}`)
+  record(
+    "replacement-child-reseeded",
+    reseeded.length === 2 &&
+      opening.startsWith("<kibitzer-reseed ") &&
+      reseedPart.includes(`session="${state.sessionId}"`) &&
+      deliveredList?.[1] === "1" &&
+      (deliveredList?.[2] ?? "").includes(`<path>${MEMORIES.rollout.path}</path>`),
+    `generations=${reseeded.length} head=${JSON.stringify(opening.slice(0, 100))} delivered=${JSON.stringify(deliveredList?.[2]?.trim())}`,
+  )
+  record(
+    "reseed-followed-by-wake",
+    wakePart.trimStart().startsWith("<kibitzer-wake ") &&
+      candidatePathsOf(wakePart).join(",") === MEMORIES.helm.path &&
+      !candidatePathsOf(wakePart).includes(MEMORIES.rollout.path),
+    `wakeCandidates=${candidatePathsOf(wakePart).join(",")}`,
+  )
+  const second = await waitForAccepted(identity, state, MEMORIES.helm, {
+    description: "context-reseed wake 2: accepted nudge for the second candidate",
+  })
+  record(
+    "second-wake-accepted",
+    second.nudges.length === 1 && second.nudges[0].path === MEMORIES.helm.path && router.state.sidecar === 2,
+    `held=${JSON.stringify(second)} sidecarRequests=${router.state.sidecar}`,
+  )
   record("lease-released-after-reseed", leaseFiles(identity).length === 0, `leases=${leaseFiles(identity).length}`)
 
   // Turn 3 drains the second nudge; both paths have reached the parent through one lineage.
   await prompt(session, "thanks")
   const entries = readEntries(state.sessionFile)
   transcripts = childTranscripts(lineage.dir)
-  record("both-nudges-reached-parent", nudgedPaths(entries).sort().join(",") === [MEMORIES.helm.path, MEMORIES.rollout.path].sort().join(",") && entries.filter(isRecall).length === 2 && transcripts.length === 2 && sidecarDirs(identity).length === 1, `paths=${nudgedPaths(entries).join(",")} recallMessages=${entries.filter(isRecall).length} generations=${transcripts.length}`)
+  record(
+    "both-nudges-reached-parent",
+    nudgedPaths(entries).sort().join(",") === [MEMORIES.helm.path, MEMORIES.rollout.path].sort().join(",") &&
+      entries.filter(isRecall).length === 2 &&
+      transcripts.length === 2 &&
+      sidecarDirs(identity).length === 1,
+    `paths=${nudgedPaths(entries).join(",")} recallMessages=${entries.filter(isRecall).length} generations=${transcripts.length}`,
+  )
   facts.result = {
     resident: sidecarDirs(identity).length === 1,
     childSessions: sidecarDirs(identity).length,
@@ -462,16 +722,38 @@ async function runCategoryUnavailable({ session, state, identity, router, facts,
     turns += 1
     const lineage = sidecarDirs(identity)[0]
     if (lineage === undefined) continue
-    records = await watchUntil(lineage.dir, () => {
-      const current = wakeRecords(lineage.dir)
-      return current.length > records.length ? current : undefined
-    }, { timeoutMs: BACKOFF_PROBE_MS, description: `category-unavailable refusal ${records.length + 1}` }).catch(() => wakeRecords(lineage.dir))
+    records = await watchUntil(
+      lineage.dir,
+      () => {
+        const current = wakeRecords(lineage.dir)
+        return current.length > records.length ? current : undefined
+      },
+      { timeoutMs: BACKOFF_PROBE_MS, description: `category-unavailable refusal ${records.length + 1}` },
+    ).catch(() => wakeRecords(lineage.dir))
   }
   const lineage = sidecarDirs(identity)[0]
-  record("refusals-recorded", records.length >= REFUSALS_PROVING_NO_GATE, `refusals=${records.length} turns=${turns} lineages=${sidecarDirs(identity).length}`)
-  const configured = records.filter((entry) => entry.status === "failed" && entry.cause === "start_failed" && entry.diagnostic === false && entry.configuration?.category === "quick")
-  record("refusals-non-diagnostic", records.length > 0 && configured.length === records.length, `configuration=${JSON.stringify(records[0]?.configuration ?? null)} diagnostic=[${records.map((entry) => entry.diagnostic).join(",")}]`)
-  record("no-child-started", router.state.sidecar === 0 && (lineage === undefined || childTranscripts(lineage.dir).length === 0), `sidecarRequests=${router.state.sidecar} childTranscripts=${lineage === undefined ? 0 : childTranscripts(lineage.dir).length}`)
+  record(
+    "refusals-recorded",
+    records.length >= REFUSALS_PROVING_NO_GATE,
+    `refusals=${records.length} turns=${turns} lineages=${sidecarDirs(identity).length}`,
+  )
+  const configured = records.filter(
+    (entry) =>
+      entry.status === "failed" &&
+      entry.cause === "start_failed" &&
+      entry.diagnostic === false &&
+      entry.configuration?.category === "quick",
+  )
+  record(
+    "refusals-non-diagnostic",
+    records.length > 0 && configured.length === records.length,
+    `configuration=${JSON.stringify(records[0]?.configuration ?? null)} diagnostic=[${records.map((entry) => entry.diagnostic).join(",")}]`,
+  )
+  record(
+    "no-child-started",
+    router.state.sidecar === 0 && (lineage === undefined || childTranscripts(lineage.dir).length === 0),
+    `sidecarRequests=${router.state.sidecar} childTranscripts=${lineage === undefined ? 0 : childTranscripts(lineage.dir).length}`,
+  )
 
   // One actionable notice for the whole session, and never the red failure escalation.
   const entries = readEntries(state.sessionFile)
@@ -479,11 +761,22 @@ async function runCategoryUnavailable({ session, state, identity, router, facts,
   const notice = notices[0]?.data
   record(
     "one-unavailable-notice",
-    notices.length === 1 && notice?.version === 1 && notice?.category === "quick" && (notice?.cause === "category_unavailable" || notice?.cause === "beyond_category"),
+    notices.length === 1 &&
+      notice?.version === 1 &&
+      notice?.category === "quick" &&
+      (notice?.cause === "category_unavailable" || notice?.cause === "beyond_category"),
     `notices=${notices.length} data=${JSON.stringify(notice ?? null)}`,
   )
-  record("no-gate-escalation", entries.filter(isGate).length === 0, `gateEntries=${entries.filter(isGate).length} refusals=${records.length}`)
-  record("nothing-delivered", entries.filter(isNudged).length === 0 && entries.filter(isRecall).length === 0 && !existsSync(pending), `nudged=${entries.filter(isNudged).length} recall=${entries.filter(isRecall).length} pending=${existsSync(pending)}`)
+  record(
+    "no-gate-escalation",
+    entries.filter(isGate).length === 0,
+    `gateEntries=${entries.filter(isGate).length} refusals=${records.length}`,
+  )
+  record(
+    "nothing-delivered",
+    entries.filter(isNudged).length === 0 && entries.filter(isRecall).length === 0 && !existsSync(pending),
+    `nudged=${entries.filter(isNudged).length} recall=${entries.filter(isRecall).length} pending=${existsSync(pending)}`,
+  )
   record("lease-released-after-refusal", leaseFiles(identity).length === 0, `leases=${leaseFiles(identity).length}`)
   facts.result = {
     resident: sidecarDirs(identity).length === 1,
@@ -504,34 +797,82 @@ async function runCategoryUnavailable({ session, state, identity, router, facts,
 
 async function runRefusedPinnedModel({ session, state, identity, router, facts, parentTurns, record }) {
   const recallDir = join(identity, "runtime", "recall")
-  router.setParentSteps([{ type: "text", text: "Checking." }, { type: "text", text: "Done." }])
+  router.setParentSteps([
+    { type: "text", text: "Checking." },
+    { type: "text", text: "Done." },
+  ])
   // Only the fallback rung reaches this script: every request for the pinned model is answered by the refused lane.
   router.setSidecarSteps([nudgeStep(MEMORIES.rollout)])
 
   await prompt(session, MEMORIES.rollout.prompt)
-  const settled = await watchUntil(recallDir, () => {
-    const lineage = sidecarDirs(identity)[0]
-    const records = lineage === undefined ? [] : wakeRecords(lineage.dir)
-    return records.length === 0 ? undefined : { lineage, records }
-  }, { timeoutMs: WAKE_TIMEOUT_MS, description: "refused-pinned-model wake 1: the wake settled" })
+  const settled = await watchUntil(
+    recallDir,
+    () => {
+      const lineage = sidecarDirs(identity)[0]
+      const records = lineage === undefined ? [] : wakeRecords(lineage.dir)
+      return records.length === 0 ? undefined : { lineage, records }
+    },
+    { timeoutMs: WAKE_TIMEOUT_MS, description: "refused-pinned-model wake 1: the wake settled" },
+  )
   const wake = settled.records[0]
   const transcripts = childTranscripts(settled.lineage.dir)
   const answered = transcripts.flatMap((transcript) => transcript.assistants)
   const refusals = answered.filter((message) => message.stopReason === "error" && message.model === REFUSED_MODEL)
-  const fallback = answered.filter((message) => message.provider === BUILTIN_RUNG.provider && message.model === BUILTIN_RUNG.id)
-  record("pinned-model-refused", (router.state.refused ?? 0) >= 1 && refusals.length >= 1, `refusedRequests=${router.state.refused ?? 0} refusalMessages=${refusals.length} error=${JSON.stringify((refusals[0]?.errorMessage ?? "").slice(0, 160))}`)
-  record("fell-back-to-builtin-rung", fallback.length >= 1 && router.state.sidecar >= 1, `fallbackMessages=${fallback.length} sidecarScriptRequests=${router.state.sidecar} models=[${answered.map((message) => `${message.provider}/${message.model}:${message.stopReason}`).join(",")}]`)
-  record("wake-completed-on-fallback", wake?.status === "completed" && wake?.diagnostic === false && wake?.model === `${BUILTIN_RUNG.provider}/${BUILTIN_RUNG.id}` && transcripts.length === 1, `wake=${JSON.stringify({ status: wake?.status, cause: wake?.cause, model: wake?.model, diagnostic: wake?.diagnostic, reason: wake?.reason })} generations=${transcripts.length}`)
+  const fallback = answered.filter(
+    (message) => message.provider === BUILTIN_RUNG.provider && message.model === BUILTIN_RUNG.id,
+  )
+  record(
+    "pinned-model-refused",
+    (router.state.refused ?? 0) >= 1 && refusals.length >= 1,
+    `refusedRequests=${router.state.refused ?? 0} refusalMessages=${refusals.length} error=${JSON.stringify((refusals[0]?.errorMessage ?? "").slice(0, 160))}`,
+  )
+  record(
+    "fell-back-to-builtin-rung",
+    fallback.length >= 1 && router.state.sidecar >= 1,
+    `fallbackMessages=${fallback.length} sidecarScriptRequests=${router.state.sidecar} models=[${answered.map((message) => `${message.provider}/${message.model}:${message.stopReason}`).join(",")}]`,
+  )
+  record(
+    "wake-completed-on-fallback",
+    wake?.status === "completed" &&
+      wake?.diagnostic === false &&
+      wake?.model === `${BUILTIN_RUNG.provider}/${BUILTIN_RUNG.id}` &&
+      transcripts.length === 1,
+    `wake=${JSON.stringify({ status: wake?.status, cause: wake?.cause, model: wake?.model, diagnostic: wake?.diagnostic, reason: wake?.reason })} generations=${transcripts.length}`,
+  )
   if (wake?.status !== "completed") {
-    facts.result = { resident: sidecarDirs(identity).length === 1, childSessions: sidecarDirs(identity).length, wakeStatus: wake?.status, wakeCause: wake?.cause, wakeModel: wake?.model, refusedRequests: router.state.refused ?? 0, sidecarRequests: router.state.sidecar, nudged: 0, parentRequests: parentTurns() }
+    facts.result = {
+      resident: sidecarDirs(identity).length === 1,
+      childSessions: sidecarDirs(identity).length,
+      wakeStatus: wake?.status,
+      wakeCause: wake?.cause,
+      wakeModel: wake?.model,
+      refusedRequests: router.state.refused ?? 0,
+      sidecarRequests: router.state.sidecar,
+      nudged: 0,
+      parentRequests: parentTurns(),
+    }
     return
   }
-  const held = await waitForAccepted(identity, state, MEMORIES.rollout, { description: "refused-pinned-model: accepted nudge from the fallback rung" })
-  record("nudge-accepted", held.nudges.length === 1 && held.nudges[0].path === MEMORIES.rollout.path, `held=${JSON.stringify(held)}`)
+  const held = await waitForAccepted(identity, state, MEMORIES.rollout, {
+    description: "refused-pinned-model: accepted nudge from the fallback rung",
+  })
+  record(
+    "nudge-accepted",
+    held.nudges.length === 1 && held.nudges[0].path === MEMORIES.rollout.path,
+    `held=${JSON.stringify(held)}`,
+  )
   await prompt(session, MEMORIES.rollout.prompt)
   const entries = readEntries(state.sessionFile)
-  record("nudge-reached-parent", nudgedPaths(entries).join(",") === MEMORIES.rollout.path && entries.filter(isRecall).length === 1, `paths=${nudgedPaths(entries).join(",")} via=${entries.filter(isNudged)[0]?.data?.via}`)
-  record("no-gate-escalation", entries.filter(isGate).length === 0 && entries.filter(isUnavailable).length === 0, `gateEntries=${entries.filter(isGate).length} unavailable=${entries.filter(isUnavailable).length}`)
+  record(
+    "nudge-reached-parent",
+    nudgedPaths(entries).join(",") === MEMORIES.rollout.path && entries.filter(isRecall).length === 1,
+    `paths=${nudgedPaths(entries).join(",")} via=${entries.filter(isNudged)[0]?.data?.via}`,
+  )
+  record(
+    "no-gate-escalation",
+    entries.filter(isGate).length === 0 && entries.filter(isUnavailable).length === 0,
+    `gateEntries=${entries.filter(isGate).length} unavailable=${entries.filter(isUnavailable).length}`,
+  )
   facts.result = {
     resident: sidecarDirs(identity).length === 1,
     childSessions: sidecarDirs(identity).length,
@@ -549,41 +890,76 @@ async function runRefusedPinnedModel({ session, state, identity, router, facts, 
 
 async function runFastAliasConfig({ session, state, identity, router, facts, parentTurns, record }) {
   const recallDir = join(identity, "runtime", "recall")
-  router.setParentSteps([{ type: "text", text: "Checking." }, { type: "text", text: "Done." }])
+  router.setParentSteps([
+    { type: "text", text: "Checking." },
+    { type: "text", text: "Done." },
+  ])
 
   await prompt(session, MEMORIES.rollout.prompt)
-  const settled = await watchUntil(recallDir, () => {
-    const lineage = sidecarDirs(identity)[0]
-    const records = lineage === undefined ? [] : wakeRecords(lineage.dir)
-    return records.length === 0 ? undefined : { lineage, records }
-  }, { timeoutMs: WAKE_TIMEOUT_MS, description: "fast-alias-config wake 1: the wake settled" })
+  const settled = await watchUntil(
+    recallDir,
+    () => {
+      const lineage = sidecarDirs(identity)[0]
+      const records = lineage === undefined ? [] : wakeRecords(lineage.dir)
+      return records.length === 0 ? undefined : { lineage, records }
+    },
+    { timeoutMs: WAKE_TIMEOUT_MS, description: "fast-alias-config wake 1: the wake settled" },
+  )
   const wake = settled.records[0]
-  const refusedAsSubstitution = wake?.cause === "start_failed" && String(wake?.reason ?? "").includes("refusing the substitution")
+  const refusedAsSubstitution =
+    wake?.cause === "start_failed" && String(wake?.reason ?? "").includes("refusing the substitution")
   const children = childTranscripts(settled.lineage.dir)
-  const childModels = children.flatMap((transcript) => transcript.entries).filter((entry) => entry.type === "model_change").map((entry) => `${entry.provider}/${entry.modelId}`)
-  record("pin-accepted-alias-on-base", !refusedAsSubstitution && children.length >= 1, `wake=${JSON.stringify({ status: wake?.status, cause: wake?.cause, model: wake?.model, reason: wake?.reason })} childSessions=${children.length} childModelChanges=[${childModels.join(",")}]`)
-  facts.result = { wakeStatus: wake?.status, wakeCause: wake?.cause, wakeReason: wake?.reason, childSessions: children.length, childModelChanges: childModels, parentRequests: parentTurns() }
+  const childModels = children
+    .flatMap((transcript) => transcript.entries)
+    .filter((entry) => entry.type === "model_change")
+    .map((entry) => `${entry.provider}/${entry.modelId}`)
+  record(
+    "pin-accepted-alias-on-base",
+    !refusedAsSubstitution && children.length >= 1,
+    `wake=${JSON.stringify({ status: wake?.status, cause: wake?.cause, model: wake?.model, reason: wake?.reason })} childSessions=${children.length} childModelChanges=[${childModels.join(",")}]`,
+  )
+  facts.result = {
+    wakeStatus: wake?.status,
+    wakeCause: wake?.cause,
+    wakeReason: wake?.reason,
+    childSessions: children.length,
+    childModelChanges: childModels,
+    parentRequests: parentTurns(),
+  }
 }
 
 // ---- cjk-auto -----------------------------------------------------------------------------------------------------
 
 async function runCjkAuto({ session, state, identity, router, facts, parentTurns, record }) {
-  router.setParentSteps([{ type: "text", text: "Checking." }, { type: "text", text: "Done." }])
+  router.setParentSteps([
+    { type: "text", text: "Checking." },
+    { type: "text", text: "Done." },
+  ])
   router.setSidecarSteps([nudgeStep(KOREAN_PUBLISH)])
 
   // No recall setting: the inflected prompt must still offer the stem memory to the sidecar.
   await prompt(session, KOREAN_PUBLISH.prompt)
-  const held = await waitForAccepted(identity, state, KOREAN_PUBLISH, { description: "cjk-auto: inflected Korean prompt surfaced the stem memory" })
+  const held = await waitForAccepted(identity, state, KOREAN_PUBLISH, {
+    description: "cjk-auto: inflected Korean prompt surfaced the stem memory",
+  })
   const lineage = sidecarDirs(identity)[0]
   const seedText = lineage === undefined ? "" : messageText(childTranscripts(lineage.dir)[0]?.users[0])
   const candidates = candidatePathsOf(seedText)
   record("inflected-korean-candidate", candidates.includes(KOREAN_PUBLISH.path), `candidates=${candidates.join(",")}`)
-  record("nudge-accepted", held.nudges.some((nudge) => nudge.path === KOREAN_PUBLISH.path), `held=${JSON.stringify(held)}`)
+  record(
+    "nudge-accepted",
+    held.nudges.some((nudge) => nudge.path === KOREAN_PUBLISH.path),
+    `held=${JSON.stringify(held)}`,
+  )
 
   // The next turn drains the held nudge into the parent transcript.
   await prompt(session, KOREAN_PUBLISH.prompt)
   const entries = readEntries(state.sessionFile)
-  record("nudge-reached-parent", nudgedPaths(entries).includes(KOREAN_PUBLISH.path) && entries.some(isRecall), `paths=${nudgedPaths(entries).join(",")} recallMessages=${entries.filter(isRecall).length}`)
+  record(
+    "nudge-reached-parent",
+    nudgedPaths(entries).includes(KOREAN_PUBLISH.path) && entries.some(isRecall),
+    `paths=${nudgedPaths(entries).join(",")} recallMessages=${entries.filter(isRecall).length}`,
+  )
   facts.result = {
     resident: sidecarDirs(identity).length === 1,
     strategy: "auto",
@@ -598,29 +974,65 @@ async function runCjkAuto({ session, state, identity, router, facts, parentTurns
 // ---- query-expansion ----------------------------------------------------------------------------------------------
 
 async function runQueryExpansion({ session, state, identity, router, facts, parentTurns, record }) {
-  router.setParentSteps([{ type: "text", text: "Checking." }, { type: "text", text: "Done." }])
+  router.setParentSteps([
+    { type: "text", text: "Checking." },
+    { type: "text", text: "Done." },
+  ])
   router.setSidecarSteps([{ type: "tool_call", name: "memory", arguments: WIDENED_SEARCH }, nudgeStep(MEMORIES.helm)])
 
   // The rollout prompt wakes the sidecar with the rollout memory only; helm is reachable through the widened search alone.
   await prompt(session, MEMORIES.rollout.prompt)
-  const held = await waitForAccepted(identity, state, MEMORIES.helm, { description: "query-expansion: the memory found through added terms was nudged" })
+  const held = await waitForAccepted(identity, state, MEMORIES.helm, {
+    description: "query-expansion: the memory found through added terms was nudged",
+  })
   const lineage = sidecarDirs(identity)[0]
   const transcript = lineage === undefined ? undefined : childTranscripts(lineage.dir)[0]
   const candidates = candidatePathsOf(messageText(transcript?.users[0]))
   const memoryParameters = router.state.sidecarRequests[0]?.memoryParameters ?? []
-  record("schema-offers-added-terms", memoryParameters.length > 0 && ADDED_TERM_FIELDS.every((field) => memoryParameters.includes(field)), memoryParameters.length === 0 ? "memory parameters absent" : `memory parameters=[${memoryParameters.join(",")}]`)
+  record(
+    "schema-offers-added-terms",
+    memoryParameters.length > 0 && ADDED_TERM_FIELDS.every((field) => memoryParameters.includes(field)),
+    memoryParameters.length === 0 ? "memory parameters absent" : `memory parameters=[${memoryParameters.join(",")}]`,
+  )
   const searchCall = transcript?.assistants.flatMap(toolCallsOf).find((call) => call.name === "memory")
-  record("child-searched-with-added-terms", isDeepStrictEqual(searchCall?.arguments, WIDENED_SEARCH), `search=${JSON.stringify(searchCall?.arguments ?? null)}`)
-  const searchResult = transcript?.entries.find((entry) => entry.type === "message" && entry.message?.role === "toolResult" && entry.message.toolName === "memory" && entry.message.toolCallId === searchCall?.id)?.message
+  record(
+    "child-searched-with-added-terms",
+    isDeepStrictEqual(searchCall?.arguments, WIDENED_SEARCH),
+    `search=${JSON.stringify(searchCall?.arguments ?? null)}`,
+  )
+  const searchResult = transcript?.entries.find(
+    (entry) =>
+      entry.type === "message" &&
+      entry.message?.role === "toolResult" &&
+      entry.message.toolName === "memory" &&
+      entry.message.toolCallId === searchCall?.id,
+  )?.message
   const results = searchResult === undefined ? [] : JSON.parse(messageText(searchResult)).results
-  record("widened-search-found-memory", searchResult?.isError !== true && Array.isArray(results) && results.some((hit) => hit.path === MEMORIES.helm.path), `memory result=${searchResult === undefined ? "absent" : messageText(searchResult)}`)
-  record("found-memory-was-never-offered", candidates.length === 1 && candidates[0] === MEMORIES.rollout.path, `candidates=${candidates.join(",")}`)
-  record("nudge-accepted", held.nudges.some((nudge) => nudge.path === MEMORIES.helm.path), `held=${JSON.stringify(held)}`)
+  record(
+    "widened-search-found-memory",
+    searchResult?.isError !== true && Array.isArray(results) && results.some((hit) => hit.path === MEMORIES.helm.path),
+    `memory result=${searchResult === undefined ? "absent" : messageText(searchResult)}`,
+  )
+  record(
+    "found-memory-was-never-offered",
+    candidates.length === 1 && candidates[0] === MEMORIES.rollout.path,
+    `candidates=${candidates.join(",")}`,
+  )
+  record(
+    "nudge-accepted",
+    held.nudges.some((nudge) => nudge.path === MEMORIES.helm.path),
+    `held=${JSON.stringify(held)}`,
+  )
 
   // The next turn drains the held nudge into the parent transcript.
   await prompt(session, MEMORIES.rollout.prompt)
   const entries = readEntries(state.sessionFile)
-  record("nudge-reached-parent", nudgedPaths(entries).includes(MEMORIES.helm.path) && entries.filter(isRecall).some((entry) => (entry.content ?? "").includes(MEMORIES.helm.body)), `paths=${nudgedPaths(entries).join(",")} recallMessages=${entries.filter(isRecall).length}`)
+  record(
+    "nudge-reached-parent",
+    nudgedPaths(entries).includes(MEMORIES.helm.path) &&
+      entries.filter(isRecall).some((entry) => (entry.content ?? "").includes(MEMORIES.helm.body)),
+    `paths=${nudgedPaths(entries).join(",")} recallMessages=${entries.filter(isRecall).length}`,
+  )
   facts.result = {
     resident: sidecarDirs(identity).length === 1,
     childSessions: sidecarDirs(identity).length,
@@ -634,13 +1046,23 @@ async function runQueryExpansion({ session, state, identity, router, facts, pare
   }
 }
 
-const RUNNERS = { happy: runHappy, "provider-429": runProvider429, "context-reseed": runContextReseed, "category-unavailable": runCategoryUnavailable, "refused-pinned-model": runRefusedPinnedModel, "fast-alias-config": runFastAliasConfig, "cjk-auto": runCjkAuto, "query-expansion": runQueryExpansion }
+const RUNNERS = {
+  happy: runHappy,
+  "provider-429": runProvider429,
+  "context-reseed": runContextReseed,
+  "category-unavailable": runCategoryUnavailable,
+  "refused-pinned-model": runRefusedPinnedModel,
+  "fast-alias-config": runFastAliasConfig,
+  "cjk-auto": runCjkAuto,
+  "query-expansion": runQueryExpansion,
+}
 
 // ---- main --------------------------------------------------------------------------------------------------------
 
 async function main() {
   const options = parseArgs(process.argv.slice(2), { scenarios: SCENARIOS })
-  if (!existsSync(join(options.pluginRoot, "extensions", "omo.js"))) throw new Error(`plugin bundle not built at ${options.pluginRoot}/extensions/omo.js`)
+  if (!existsSync(join(options.pluginRoot, "extensions", "omo.js")))
+    throw new Error(`plugin bundle not built at ${options.pluginRoot}/extensions/omo.js`)
   const command = resolveCommand(options)
   console.log(`plugin-root: ${options.pluginRoot}`)
   console.log(`command: ${command.display} (${command.source})`)
@@ -654,7 +1076,9 @@ async function main() {
   }
 
   const failures = checks.filter((check) => !check.ok)
-  const observed = Object.values(results).map((facts) => facts.result).filter((result) => result !== undefined)
+  const observed = Object.values(results)
+    .map((facts) => facts.result)
+    .filter((result) => result !== undefined)
   const summary = {
     ok: failures.length === 0 && observed.length === scenarios.length,
     driver: "kibitzer-sidecar-e2e",
@@ -663,12 +1087,18 @@ async function main() {
     resident: observed.length === scenarios.length && observed.every((result) => result.resident === true),
     childSessions: observed.reduce((max, result) => Math.max(max, result.childSessions ?? 0), 0),
     nudgedTotal: observed.reduce((sum, result) => sum + (result.nudged ?? 0), 0),
-    results: Object.fromEntries(Object.entries(results).map(([scenario, facts]) => [scenario, facts.result ?? { resident: false }])),
+    results: Object.fromEntries(
+      Object.entries(results).map(([scenario, facts]) => [scenario, facts.result ?? { resident: false }]),
+    ),
     checks: checks.length,
     failures: failures.map((check) => check.name),
   }
   if (options.evidenceDir !== undefined) {
-    summary.evidence = writeEvidence(options.evidenceDir, "kibitzer-sidecar-e2e.json", { ...summary, checks, facts: results })
+    summary.evidence = writeEvidence(options.evidenceDir, "kibitzer-sidecar-e2e.json", {
+      ...summary,
+      checks,
+      facts: results,
+    })
     console.log(`evidence: ${summary.evidence}`)
   }
   console.log(JSON.stringify(summary))
@@ -676,39 +1106,77 @@ async function main() {
 }
 
 function runSelfTest() {
-  const sidecarBody = { tools: SIDECAR_TOOL_NAMES.map((name) => ({ type: "function", function: { name } })), messages: [{ role: "system", content: "# Kibitzer — resident memory advisor" }] }
-  if (!isSidecarRequest(sidecarBody)) throw new Error("self-test: the five tools plus the persona must route to the sidecar")
-  if (isSidecarRequest({ tools: [{ type: "function", function: { name: "read" } }], messages: [{ role: "system", content: "# Kibitzer" }] })) throw new Error("self-test: a request without the nudge tool must route to the parent")
-  if (isSidecarRequest({ tools: [{ type: "function", function: { name: "nudge" } }], messages: [{ role: "system", content: "you are a helpful agent" }] })) throw new Error("self-test: the nudge tool without the persona must route to the parent")
+  const sidecarBody = {
+    tools: SIDECAR_TOOL_NAMES.map((name) => ({ type: "function", function: { name } })),
+    messages: [{ role: "system", content: "# Kibitzer — resident memory advisor" }],
+  }
+  if (!isSidecarRequest(sidecarBody))
+    throw new Error("self-test: the five tools plus the persona must route to the sidecar")
+  if (
+    isSidecarRequest({
+      tools: [{ type: "function", function: { name: "read" } }],
+      messages: [{ role: "system", content: "# Kibitzer" }],
+    })
+  )
+    throw new Error("self-test: a request without the nudge tool must route to the parent")
+  if (
+    isSidecarRequest({
+      tools: [{ type: "function", function: { name: "nudge" } }],
+      messages: [{ role: "system", content: "you are a helpful agent" }],
+    })
+  )
+    throw new Error("self-test: the nudge tool without the persona must route to the parent")
 
   const router = createRouter()
-  router.setParentSteps([{ type: "text", text: "p1" }, { type: "text", text: "p2" }])
+  router.setParentSteps([
+    { type: "text", text: "p1" },
+    { type: "text", text: "p2" },
+  ])
   router.setSidecarSteps([nudgeStep(MEMORIES.rollout)])
   const first = router.steps({ messages: [] })
-  if (first.length !== 1 || first[0]?.text !== "p1") throw new Error("self-test: the first request reads the first parent step at cursor 0")
+  if (first.length !== 1 || first[0]?.text !== "p1")
+    throw new Error("self-test: the first request reads the first parent step at cursor 0")
   const second = router.steps(sidecarBody)
-  if (second.length !== 2 || second[1]?.name !== "nudge") throw new Error("self-test: a routed step lands at the server's global cursor")
+  if (second.length !== 2 || second[1]?.name !== "nudge")
+    throw new Error("self-test: a routed step lands at the server's global cursor")
   const third = router.steps({ messages: [] })
-  if (third.length !== 3 || third[2]?.text !== "p2") throw new Error("self-test: parent and sidecar cursors advance independently")
+  if (third.length !== 3 || third[2]?.text !== "p2")
+    throw new Error("self-test: parent and sidecar cursors advance independently")
   const exhausted = router.steps(sidecarBody)
-  if (exhausted[3]?.type !== "text") throw new Error("self-test: an exhausted sidecar script must close the turn with text, never repeat a tool call")
-  if (router.state.sidecar !== 2 || router.state.parent !== 2 || !sameNames(router.state.sidecarRequests[0].toolNames, SIDECAR_TOOL_NAMES)) throw new Error("self-test: request accounting is wrong")
+  if (exhausted[3]?.type !== "text")
+    throw new Error("self-test: an exhausted sidecar script must close the turn with text, never repeat a tool call")
+  if (
+    router.state.sidecar !== 2 ||
+    router.state.parent !== 2 ||
+    !sameNames(router.state.sidecarRequests[0].toolNames, SIDECAR_TOOL_NAMES)
+  )
+    throw new Error("self-test: request accounting is wrong")
 
   const id = "01a09203-650f-7933-b216-aaf19bfc00c2"
-  if (decodeSidecarDirName(encodeSidecarDirName(id)) !== id || encodeSidecarDirName(id).includes("=")) throw new Error("self-test: the sidecar directory name must be unpadded base64url of the session id")
+  if (decodeSidecarDirName(encodeSidecarDirName(id)) !== id || encodeSidecarDirName(id).includes("="))
+    throw new Error("self-test: the sidecar directory name must be unpadded base64url of the session id")
   const envelope = `<kibitzer-seed version="1" session="${id}" max-items="1" tool-budget="8" cursor-from="7" cursor-to="12">\n<candidates count="1" max-items="1">\n<candidate path="reference/a.md">\n</candidate>\n</candidates>\n</kibitzer-seed>\n`
-  if (JSON.stringify(envelopeCursors(envelope)) !== JSON.stringify({ from: 7, to: 12 })) throw new Error("self-test: envelope cursor range parsing")
+  if (JSON.stringify(envelopeCursors(envelope)) !== JSON.stringify({ from: 7, to: 12 }))
+    throw new Error("self-test: envelope cursor range parsing")
   if (candidatePathsOf(envelope).join() !== "reference/a.md") throw new Error("self-test: candidate path parsing")
-  const transcript = { entries: [
-    { type: "message", message: { role: "user", content: [{ type: "text", text: "<kibitzer-wake x>" }] } },
-    { type: "message", message: { role: "assistant", content: [], stopReason: "error" } },
-    { type: "message", message: { role: "assistant", content: [{ type: "text", text: "ok" }], stopReason: "stop" } },
-  ] }
-  if (settledAfter(transcript, (text) => text.startsWith("<kibitzer-wake "))?.stopReason !== "stop") throw new Error("self-test: settledAfter must find the stop after the matching user message")
-  if (settledAfter(transcript, (text) => text.startsWith("<kibitzer-seed ")) !== undefined) throw new Error("self-test: settledAfter without the user message is undefined")
+  const transcript = {
+    entries: [
+      { type: "message", message: { role: "user", content: [{ type: "text", text: "<kibitzer-wake x>" }] } },
+      { type: "message", message: { role: "assistant", content: [], stopReason: "error" } },
+      { type: "message", message: { role: "assistant", content: [{ type: "text", text: "ok" }], stopReason: "stop" } },
+    ],
+  }
+  if (settledAfter(transcript, (text) => text.startsWith("<kibitzer-wake "))?.stopReason !== "stop")
+    throw new Error("self-test: settledAfter must find the stop after the matching user message")
+  if (settledAfter(transcript, (text) => text.startsWith("<kibitzer-seed ")) !== undefined)
+    throw new Error("self-test: settledAfter without the user message is undefined")
 
   const sandbox = { root: "/tmp/x", agentDir: "/tmp/x/agent", memoryHome: "/tmp/x/memory", homeDir: "/tmp/x/home" }
-  const lanes = { OMO_CODING_AGENT_DIR: "/tmp/x/agent", SENPI_CODING_AGENT_DIR: "/tmp/x/agent", PI_CODING_AGENT_DIR: "/tmp/x/agent" }
+  const lanes = {
+    OMO_CODING_AGENT_DIR: "/tmp/x/agent",
+    SENPI_CODING_AGENT_DIR: "/tmp/x/agent",
+    PI_CODING_AGENT_DIR: "/tmp/x/agent",
+  }
   const good = { ...lanes, OMO_MEMORY_HOME: "/tmp/x/memory", HOME: "/tmp/x/home", PI_OFFLINE: "1" }
   assertSandboxEnv(sandbox, good)
   const { OMO_CODING_AGENT_DIR: _dropped, ...omoLaneMissing } = good
@@ -720,7 +1188,11 @@ function runSelfTest() {
     { ...lanes, OMO_MEMORY_HOME: "/tmp/x/memory", HOME: "/tmp/x/home" },
   ]) {
     let rejected = false
-    try { assertSandboxEnv(sandbox, bad) } catch { rejected = true }
+    try {
+      assertSandboxEnv(sandbox, bad)
+    } catch {
+      rejected = true
+    }
     if (!rejected) throw new Error(`self-test: the sandbox assertion must reject ${JSON.stringify(bad)}`)
   }
   console.log(JSON.stringify({ ok: true, driver: "kibitzer-sidecar-e2e", selfTest: true }))

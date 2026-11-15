@@ -15,10 +15,17 @@ export async function stoppedChild(receipt: InputEffectStatus) {
   const project = tempProject()
   const host = await reconciliationHarness.fakeHost({ transcripts: true })
   const runner = reconciliationHarness.runnerOver(host)
-  const initial = createTaskRecord({
-    parent_session_id: "parent", root_session_id: "parent", depth: 1,
-    execution_mode: "process", model: "anthropic/claude-sonnet-4-5", notify_on_terminal: false,
-  }, 0)
+  const initial = createTaskRecord(
+    {
+      parent_session_id: "parent",
+      root_session_id: "parent",
+      depth: 1,
+      execution_mode: "process",
+      model: "anthropic/claude-sonnet-4-5",
+      notify_on_terminal: false,
+    },
+    0,
+  )
   // Production wiring (manager/runner.ts, manager-respawn.ts): the task record exists in the task store before the
   // first input, so input ids come from its persisted effect_seq and the respawned continuation gets the next one.
   const inputStore = createTaskRecordStore({ project_dir: project, task: { state_dir: project } })
@@ -35,9 +42,17 @@ export async function stoppedChild(receipt: InputEffectStatus) {
   if (sent?.last_effect_id === undefined) throw new Error("the first input carried no effect id")
   appendFileSync(session.sessionPath, `${JSON.stringify(admissionEntry(sent.last_effect_id, receipt))}\n`)
   const record = {
-    ...initial, status: "running" as const, host_pid: process.pid, runner_kind: "host-session" as const,
+    ...initial,
+    status: "running" as const,
+    host_pid: process.pid,
+    runner_kind: "host-session" as const,
     spawn_spec: { version: 1 as const, cwd: project, prompt: spec.prompt },
-    host_session: { socket: host.socketPath, routing_id: session.routingId, session_path: session.sessionPath, instance_id: session.instanceId },
+    host_session: {
+      socket: host.socketPath,
+      routing_id: session.routingId,
+      session_path: session.sessionPath,
+      instance_id: session.instanceId,
+    },
   }
   const baseStore = createTaskRecordStore({ project_dir: project })
   const resumed = Promise.withResolvers<void>()
@@ -54,8 +69,22 @@ export async function stoppedChild(receipt: InputEffectStatus) {
   store.save(record)
   const { manager } = makeManager({ project, store })
   const result = await respawnManagedTask({
-    beforeLaunch: () => undefined, record, sessionPath: session.sessionPath, stateDir: project,
-    runners: { "in-process": { start: async () => { throw new Error("unused") } }, process: { start: async () => { throw new Error("unused") } } },
+    beforeLaunch: () => undefined,
+    record,
+    sessionPath: session.sessionPath,
+    stateDir: project,
+    runners: {
+      "in-process": {
+        start: async () => {
+          throw new Error("unused")
+        },
+      },
+      process: {
+        start: async () => {
+          throw new Error("unused")
+        },
+      },
+    },
     rpcRunner: runner,
   })
   if (!result.ok) throw new Error(result.reason)
@@ -70,10 +99,20 @@ export async function stoppedChild(receipt: InputEffectStatus) {
 /** senpi's `rpc_client_message_admission` entry for one input receipt (admission states map queued/running/completed). */
 function admissionEntry(clientMessageId: string, receipt: InputEffectStatus): Record<string, unknown> {
   const base = { clientMessageId, durableSessionId: "durable", fingerprint: "fp", disposition: "started" }
-  const data = receipt.state === "accepted"
-    ? { ...base, state: "queued", prepared: { clientMessageId, text: "queued input", mode: "steer", enqueueOrder: 1 } }
-    : receipt.state === "applied"
-      ? { ...base, state: "running" }
-      : { ...base, state: "completed", outcome: receipt.state === "failed" ? { kind: "dropped_by_replace" } : receipt.outcome ?? { kind: "completed" } }
+  const data =
+    receipt.state === "accepted"
+      ? {
+          ...base,
+          state: "queued",
+          prepared: { clientMessageId, text: "queued input", mode: "steer", enqueueOrder: 1 },
+        }
+      : receipt.state === "applied"
+        ? { ...base, state: "running" }
+        : {
+            ...base,
+            state: "completed",
+            outcome:
+              receipt.state === "failed" ? { kind: "dropped_by_replace" } : (receipt.outcome ?? { kind: "completed" }),
+          }
   return { type: "custom", customType: "rpc_client_message_admission", id: `admission-${clientMessageId}`, data }
 }

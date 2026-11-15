@@ -7,7 +7,11 @@ export interface ProjectRecallCorpus {
   readonly touchedPath?: string
 }
 
-export type RankCorpus = (documents: readonly RecallDocument[], extraQueries: readonly string[], identityId?: string) => readonly RecallCandidate[]
+export type RankCorpus = (
+  documents: readonly RecallDocument[],
+  extraQueries: readonly string[],
+  identityId?: string,
+) => readonly RecallCandidate[]
 
 /**
  * The session's own notes and each touched project's notes are ranked separately (#10044). Merging
@@ -23,9 +27,17 @@ export function selectWithProjectSeats(
 ): RecallCandidate[] {
   const ownRanked = own.length === 0 ? [] : rank(own, [])
   if (projects.length === 0 || maxItems <= 0) return ownRanked.slice(0, Math.max(0, maxItems))
-  const projectRanked = interleave(projects.map((project) =>
-    project.documents.length === 0 ? [] : rank(project.documents, project.touchedPath === undefined ? [] : [project.touchedPath], project.identityId)
-      .map((candidate) => ({ ...candidate, path: `@project/${project.identityId}/${candidate.path}` }))))
+  const projectRanked = interleave(
+    projects.map((project) =>
+      project.documents.length === 0
+        ? []
+        : rank(
+            project.documents,
+            project.touchedPath === undefined ? [] : [project.touchedPath],
+            project.identityId,
+          ).map((candidate) => ({ ...candidate, path: `@project/${project.identityId}/${candidate.path}` })),
+    ),
+  )
   const projectSeats = Math.min(Math.ceil(maxItems / 2), projectRanked.length)
   const ownTaken = ownRanked.slice(0, maxItems - projectSeats)
   const projectTaken = projectRanked.slice(0, maxItems - ownTaken.length)

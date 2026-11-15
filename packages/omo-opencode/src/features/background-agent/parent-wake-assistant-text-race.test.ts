@@ -67,12 +67,7 @@ describe("ParentWakeNotifier — assistant text dispatch race", () => {
         userMessageInProgressWindowMs: 2_000,
       },
     )
-    notifier.queuePendingParentWake(
-      "parent-stale-then-fresh-text",
-      "task complete",
-      { agent: "sisyphus" },
-      true,
-    )
+    notifier.queuePendingParentWake("parent-stale-then-fresh-text", "task complete", { agent: "sisyphus" }, true)
     const pendingWake = notifier.getPendingParentWakes().get("parent-stale-then-fresh-text")
     expect(pendingWake).toBeDefined()
     if (!pendingWake) {

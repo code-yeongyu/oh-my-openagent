@@ -519,5 +519,190 @@
     "title": "ページが見つかりません。",
     "body": "リンクが古いか、ページが移動した可能性があります。",
     "home": "ホームに戻る"
+  },
+  "home": {
+    "metaTitle": "OmO: Your tool for real work. But it's an agent.",
+    "nav": {
+      "primary": "メインメニュー",
+      "skip": "本文へスキップ",
+      "ultrawork": "Ultrawork",
+      "massUlw": "Mass ulw",
+      "models": "モデル",
+      "skills": "スキル",
+      "docs": "ドキュメント",
+      "install": "インストール",
+      "stars": "GitHubスター {count}",
+      "theme": "テーマ",
+      "system": "システムのテーマを使用",
+      "light": "ライトテーマを使用",
+      "dark": "ダークテーマを使用",
+      "manifesto": "マニフェスト",
+      "openMenu": "メニューを開く",
+      "closeMenu": "メニューを閉じる"
+    },
+    "hero": {
+      "title": "Your tool for real work.",
+      "accent": "But it's an agent.",
+      "sub": "あなたのトークンを、現実に価値のある成果へ。1万を超えるソースのリサーチ、すっと理解できる資料、バックエンド、フロントエンド、コーディング。",
+      "start": "はじめる",
+      "beta": "デスクトップ版ベータをダウンロード",
+      "download": "デスクトップアプリをダウンロード",
+      "makers": "<dori>Dori</dori> と <term>doriterm</term> をつくった <team>Sisyphus Labs</team> から。"
+    },
+    "stats": {
+      "label": "ライブ指標",
+      "stars": "GitHub スター",
+      "total": "累計ダウンロード",
+      "monthly": "過去1か月のダウンロード"
+    },
+    "index": {
+      "label": "このページの内容",
+      "ultrawork": "難しい仕事にひと言",
+      "massUlw": "エージェントのグラフ",
+      "models": "モデルごとに調整されたプロンプト",
+      "kibitzer": "エージェントの隣にメモリを",
+      "skills": "仕事に必要なときだけ読み込み",
+      "crafted": "目に見えない部分"
+    },
+    "ultrawork": {
+      "eyebrow": "Ultrawork",
+      "title": "難しい仕事に、ひと言添えるだけ。",
+      "soft": "あとはエージェントが進めます。",
+      "body": "この先を学ばなくても大丈夫。難しそうな仕事なら、プロンプトに ultrawork と添えてください。エージェントが自ら判断し、最善の成果まで進めます。",
+      "prompt": "四半期レポートを本当に読めるものに直して",
+      "keyword": "ultrawork",
+      "step1": "1行を触る前にコードベース全体を読む",
+      "step2": "計画を立て、各ステップを証明してから進む",
+      "step3": "実際の画面で結果を検証してから止まる",
+      "frame": "omo · ~/reports"
+    },
+    "massUlw": {
+      "eyebrow": "Mass ulw",
+      "title": "キーワードひとつで、何百ものエージェント。",
+      "soft": "部分ごとに合うモデルで。",
+      "body": "mass ulw と入力すると、仕事全体がエージェントのグラフになります。数千のソースを読むディープリサーチ、機械学習パイプラインの構築、誰もやりたくないマイグレーションまで。部分ごとに合うモデルが並列で動き、完了と言う前に検証します。"
+    },
+    "models": {
+      "eyebrow": "モデル",
+      "title": "フロンティアモデルと安価なモデルを、一緒に。",
+      "soft": "それぞれに調整済みのプロンプト付き。",
+      "body": "お気に入りのフロンティアモデルと、安価なモデルを混ぜて使えます。ログインするだけ。モデルごとに調整されたシステムプロンプトが付いてくるので、選び間違えることがありません。",
+      "caption": "OmOに同梱された調整済みプロファイル"
+    },
+    "kibitzer": {
+      "eyebrow": "Kibitzer",
+      "title": "あなたのエージェントは、あなたの仕事を覚えています。",
+      "soft": "小さなモデルがメモリを保ちます。",
+      "body": "小さく安価なモデルが高価なメインエージェントの隣に座り、あなたがしてきたことを記憶から確かめ、メインが同じ失敗を繰り返す前にそっと促します。高価なモデルは切れ味を保ち、あなたは同じ説明を繰り返さなくなります。",
+      "sidecar": "Kibitzer · 小さなモデル",
+      "main": "メインエージェント · フロンティアモデル",
+      "cheapLoop": "小さく安価なモデル · 独立ループ",
+      "expensiveLoop": "高価なフロンティアモデル · メインループ",
+      "watch": "監視",
+      "read": "メモリ確認",
+      "judge": "判断",
+      "memory": "メモリ",
+      "memoryNote": "前回のマイグレーション：テストを省略し、本番で障害が発生。",
+      "nudge": "ナッジ",
+      "plan": "計画 · スキーマ変更",
+      "act": "実行 · マイグレーションを作成",
+      "testFirst": "検証 · まずマイグレーションテストを実行",
+      "ship": "検証済みの変更をリリース",
+      "reason": "前回は本番で障害が出ました。まずマイグレーションテストを実行してください。",
+      "figure": "小さく安価なKibitzerが高価なメインエージェントとは独立して監視とメモリ確認を繰り返し、リリース前にマイグレーションテストを実行するようメインループにナッジを挿入します。"
+    },
+    "skills": {
+      "eyebrow": "スキル",
+      "title": "現実の知見を、スキルとして。",
+      "soft": "仕事に必要なときだけ読み込みます。",
+      "body": "あなたのモデルは賢いけれど、現実の問題を解くには知らないことがまだ多い。OmOはその欠けた知識をスキルとして届け、いまの仕事に必要なものだけを読み込みます。",
+      "more": "すべてのスキルはドキュメントで"
+    },
+    "crafted": {
+      "eyebrow": "Crafted",
+      "title": "それ以外も、すべて crafted。",
+      "soft": "ほとんどは目に見えません。",
+      "body": "それが狙いです。どれもすべてのセッションの裏で動いています。",
+      "docs": "詳しくはドキュメントで",
+      "item1Name": "コードモードのツール呼び出し",
+      "item1Desc": "独立したツール呼び出しを、遅い往復ではなく小さなプログラムひとつでまとめて実行します。",
+      "item2Name": "ツール呼び出しの吸収",
+      "item2Desc": "数十の読み取り・検索・参照が1ステップに畳まれます。ターンが減り、待ち時間が減り、トークンが減ります。",
+      "item3Name": "ツール呼び出しの補正",
+      "item3Desc": "壊れた引数は実行前に修復されます。タイプミスひとつでターンを無駄にしません。",
+      "item4Name": "チームモード",
+      "item4Desc": "分割に値する大きさの仕事なら、リードエージェントが専門家チームを並列で運営します。",
+      "item5Name": "ポーリングではなくモニター",
+      "item5Desc": "ビルド、デプロイ、ファイルを待つことは購読です。エージェントは働き続け、到着したら目を覚まします。",
+      "item6Name": "生き残るゴール",
+      "item6Desc": "長い作業は証拠と共にチェックポイントされ、セッションが再開しても止まった場所から続きます。",
+      "item7Name": "すべてホットリロード",
+      "item7Desc": "設定、スキル、プロンプトがライブで再読み込みされます。試すために再起動は不要です。",
+      "item8Name": "コンピュータ操作",
+      "item8Desc": "macOS、Linux、Windows のネイティブアプリで画面とアクセシビリティツリーを読み取り、バックグラウンドでクリックと入力を行います。あなたのフォーカスとカーソルはそのまま。停止ショートカットで止まり、再開できるのはあなただけです。"
+    },
+    "everywhere": {
+      "eyebrow": "動く場所",
+      "title": "今日はターミナルで。",
+      "soft": "次はチャットアプリで。",
+      "terminalTitle": "ターミナルで",
+      "terminalBody": "コマンドひとつで OmO をインストール。あとはどのプロジェクトでも omo を実行するだけ。",
+      "terminalMeta": "macOS、Linux、WSL、Windows",
+      "desktopTitle": "デスクトップアプリで",
+      "desktopBody": "Mac、Windows PC、Linux で使える OmO のデスクトップアプリです。",
+      "desktopMeta": "ベータ",
+      "chatTitle": "チャットアプリから",
+      "chatBody": "いつもいる場所でエージェントと話してください。ボットではなくあなたとして、使っているすべてのプラットフォームでメッセージを送ります。",
+      "chatMeta": "近日対応予定。メッセージングプラットフォームを順次つないでいます。"
+    },
+    "voices": {
+      "eyebrow": "ユーザーの声",
+      "title": "ユーザーの声。",
+      "q1": "It made me cancel my Cursor subscription. Unbelievable things are happening in the open source community.",
+      "a1": "Arthur Guiot",
+      "q2": "If Claude Code does in 7 days what a human does in 3 months, OmO does it in 1 hour.",
+      "a2": "B, Quant Researcher",
+      "q3": "You guys should pull this into core and recruit him. Seriously. It's really, really, really good.",
+      "a3": "Henning Kilset"
+    },
+    "makers": {
+      "title": "つくったのは Sisyphus Labs。",
+      "soft": "Dori と doriterm をつくったチームです。",
+      "dori": "チャットに住むエンジニア。Slack、Discord、Telegram でやることを伝えると、仕事ごとに専用のコーディングエージェントセッションを立ち上げ、マージされたら報告します。",
+      "doriterm": "あなたのすべてのマシンを、エンドツーエンド暗号化されたメッシュでつなぎ、ひとつのターミナルに。自宅の mac mini で OmO を起動し、スマートフォンから応答できます。"
+    },
+    "closing": {
+      "title": "コマンドひとつ。",
+      "soft": "そして仕事へ戻る。",
+      "body": "OmOをインストールし、プロジェクトを開いて、やることを伝える。セットアップはそれだけです。",
+      "docs": "ドキュメントを読む",
+      "manifesto": "マニフェストを読む"
+    },
+    "install": {
+      "label": "お使いのシステム向けのインストールコマンド",
+      "unix": "macOS, Linux, WSL",
+      "powershell": "PowerShell",
+      "cmd": "CMD",
+      "next": "新しいターミナルを開いて omo を実行します。",
+      "copy": "コピー",
+      "copied": "コピーしました",
+      "copyAria": "インストールコマンドをコピー",
+      "copiedStatus": "インストールコマンドをコピーしました",
+      "windows": "Windows",
+      "onComputer": "Mac、Linux、Windows のコンピューターで実行してください。"
+    },
+    "footer": {
+      "copyright": "© {year} Sisyphus Labs · SUL-1.0 ソースアベイラブル",
+      "docs": "ドキュメント",
+      "manifesto": "マニフェスト",
+      "releases": "リリース",
+      "github": "GitHub",
+      "discord": "Discord",
+      "x": "X @justsisyphus",
+      "privacy": "プライバシーポリシー",
+      "terms": "利用規約",
+      "language": "言語",
+      "label": "フッター"
+    }
   }
 }

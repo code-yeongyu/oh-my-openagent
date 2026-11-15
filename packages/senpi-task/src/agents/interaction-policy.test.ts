@@ -1,10 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  AGENT_INTERACTION_POLICIES,
-  ONE_SHOT_AGENT_NAMES,
-  interactionPolicyForAgent,
-} from "./interaction-policy"
+import { AGENT_INTERACTION_POLICIES, ONE_SHOT_AGENT_NAMES, interactionPolicyForAgent } from "./interaction-policy"
 
 describe("AGENT_INTERACTION_POLICIES", () => {
   test("#given the registry #when inspected #then plan-reviewer is the sole one-shot entry with the plan-review contract", () => {

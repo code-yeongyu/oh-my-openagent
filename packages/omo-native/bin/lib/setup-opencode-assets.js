@@ -40,7 +40,8 @@ export function opencodeConfigSources(home, env) {
   const files = GLOBAL_CONFIG_FILES.map((name) => join(globalDir, name))
   const explicitFile = env.OPENCODE_CONFIG?.trim()
   if (explicitFile) files.push(resolve(explicitFile))
-  for (const directory of directories.slice(1)) files.push(...DIRECTORY_CONFIG_FILES.map((name) => join(directory, name)))
+  for (const directory of directories.slice(1))
+    files.push(...DIRECTORY_CONFIG_FILES.map((name) => join(directory, name)))
   return { files, directories }
 }
 
@@ -111,7 +112,9 @@ export function unconvertedPlaceholder(value) {
 function convertRecord(record) {
   if (record === null || typeof record !== "object" || Array.isArray(record)) return undefined
   const entries = Object.entries(record).filter(([, value]) => typeof value === "string")
-  return entries.length > 0 ? Object.fromEntries(entries.map(([key, value]) => [key, convertPlaceholders(value)])) : undefined
+  return entries.length > 0
+    ? Object.fromEntries(entries.map(([key, value]) => [key, convertPlaceholders(value)]))
+    : undefined
 }
 
 function disabled(entry) {
@@ -140,13 +143,19 @@ function convertOauth(name, oauth, notices) {
   if (oauth === null || typeof oauth !== "object" || Array.isArray(oauth)) return undefined
   const scopes = typeof oauth.scope === "string" ? oauth.scope.split(/\s+/).filter(Boolean) : []
   const converted = {
-    ...(typeof oauth.clientId === "string" && oauth.clientId !== "" ? { clientId: convertPlaceholders(oauth.clientId) } : {}),
-    ...(Number.isInteger(oauth.callbackPort) && oauth.callbackPort >= 0 && oauth.callbackPort <= 65_535 ? { callbackPort: oauth.callbackPort } : {}),
+    ...(typeof oauth.clientId === "string" && oauth.clientId !== ""
+      ? { clientId: convertPlaceholders(oauth.clientId) }
+      : {}),
+    ...(Number.isInteger(oauth.callbackPort) && oauth.callbackPort >= 0 && oauth.callbackPort <= 65_535
+      ? { callbackPort: oauth.callbackPort }
+      : {}),
     ...(scopes.length > 0 ? { scopes } : {}),
   }
   const dropped = ["clientSecret", "redirectUri"].filter((key) => oauth[key] !== undefined)
   if (dropped.length > 0) {
-    notices.push(`NOTICE opencode: mcp server ${name} oauth ${dropped.join(" and ")} has no omo equivalent and was not carried over; start omo and run /mcp auth ${name} to sign in`)
+    notices.push(
+      `NOTICE opencode: mcp server ${name} oauth ${dropped.join(" and ")} has no omo equivalent and was not carried over; start omo and run /mcp auth ${name} to sign in`,
+    )
   }
   return Object.keys(converted).length > 0 ? converted : undefined
 }
@@ -176,12 +185,16 @@ function convertServer(name, entry, notices, refused) {
     return undefined
   }
   if (rejectedByEngine(config)) {
-    notices.push(`NOTICE opencode: mcp server ${name} uses command substitution ($(...) or a leading !), which omo refuses to run; not imported - resolve it to a fixed value or a \${NAME} environment reference and add the server to mcp.json by hand`)
+    notices.push(
+      `NOTICE opencode: mcp server ${name} uses command substitution ($(...) or a leading !), which omo refuses to run; not imported - resolve it to a fixed value or a \${NAME} environment reference and add the server to mcp.json by hand`,
+    )
     refused.push({ name, reason: "uses $(...) or a leading !" })
     return undefined
   }
   if (unconvertedPlaceholder(config)) {
-    notices.push(`NOTICE opencode: mcp server ${name} uses a {file:...} or {env:...} placeholder omo cannot express; not imported - put the value in an environment variable and reference it as \${NAME} in mcp.json`)
+    notices.push(
+      `NOTICE opencode: mcp server ${name} uses a {file:...} or {env:...} placeholder omo cannot express; not imported - put the value in an environment variable and reference it as \${NAME} in mcp.json`,
+    )
     refused.push({ name, reason: "uses a {file:...} or {env:...} placeholder" })
     return undefined
   }
@@ -205,12 +218,16 @@ function readSkills(configDirs, notices, skipped) {
       const source = join(root, entry.name)
       const skillFile = join(source, "SKILL.md")
       if (!existsSync(skillFile)) {
-        notices.push(`NOTICE opencode: skill ${entry.name} has no SKILL.md at its top level; not imported - copy it into the omo skills dir by hand if it holds nested skills`)
+        notices.push(
+          `NOTICE opencode: skill ${entry.name} has no SKILL.md at its top level; not imported - copy it into the omo skills dir by hand if it holds nested skills`,
+        )
         skipped.push({ name: entry.name, reason: "no SKILL.md" })
         continue
       }
       if (!hasDescription(skillFile)) {
-        notices.push(`NOTICE opencode: skill ${entry.name} has no description in its SKILL.md frontmatter, so omo would not load it; not imported`)
+        notices.push(
+          `NOTICE opencode: skill ${entry.name} has no description in its SKILL.md frontmatter, so omo would not load it; not imported`,
+        )
         skipped.push({ name: entry.name, reason: "no description in SKILL.md" })
         continue
       }

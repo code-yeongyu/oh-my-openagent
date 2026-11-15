@@ -12,7 +12,13 @@ import { withDevices } from "./test-support"
 // one-line string edited on two devices keeps both whole values, a list changed to a string is
 // a whole-value replacement, and a value already written to disk is replaced cleanly.
 
-async function fire(device: ItemDevice, doc: LoroDoc, base: string, frontier: ItemFrontier, working: string): Promise<void> {
+async function fire(
+  device: ItemDevice,
+  doc: LoroDoc,
+  base: string,
+  frontier: ItemFrontier,
+  working: string,
+): Promise<void> {
   const update = await captureOnDevice(device, "item.md", doc, base, frontier, working)
   if (update !== null) doc.import(update)
 }
@@ -27,7 +33,9 @@ function fieldValue(rendered: string, key: string): unknown {
   if (!rendered.startsWith("---\n")) return undefined
   const end = rendered.indexOf("\n---", 4)
   const header: unknown = parseYaml(rendered.slice(4, end))
-  return typeof header === "object" && header !== null ? Object.entries(header).find(([k]) => k === key)?.[1] : undefined
+  return typeof header === "object" && header !== null
+    ? Object.entries(header).find(([k]) => k === key)?.[1]
+    : undefined
 }
 
 function fieldParts(rendered: string, key: string): string[] {
@@ -89,7 +97,8 @@ describe("reviews r5/r6: field kinds through the device entry point", () => {
       const rendered = renderItem(docB) ?? ""
       expect(renderItem(docA)).toBe(rendered)
       expect(renderItem(docC)).toBe(rendered)
-      for (const part of fieldParts(rendered, "n")) expect(["2", "3", "hello"], `spliced register part ${part}`).toContain(part)
+      for (const part of fieldParts(rendered, "n"))
+        expect(["2", "3", "hello"], `spliced register part ${part}`).toContain(part)
       expect(rendered.split("<X>").length - 1).toBe(1)
       docA.free()
       docB.free()
@@ -158,5 +167,4 @@ describe("reviews r5/r6: field kinds through the device entry point", () => {
       docB.free()
     })
   })
-
 })

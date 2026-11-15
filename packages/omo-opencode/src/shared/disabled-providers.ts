@@ -13,10 +13,7 @@ export function getModelProvider(model: string): string | undefined {
   return provider || undefined
 }
 
-export function isProviderDisabled(
-  model: string | undefined,
-  disabled: readonly string[],
-): boolean {
+export function isProviderDisabled(model: string | undefined, disabled: readonly string[]): boolean {
   if (!model || disabled.length === 0) return false
   const provider = getModelProvider(model)
   if (provider === undefined) return false
@@ -69,10 +66,7 @@ function applyToHolder(label: string, holder: ModelHolder, disabled: readonly st
   }
 
   if (typeof holder.model === "string" && isProviderDisabled(holder.model, disabled)) {
-    const replacement = findFirstAllowedReplacement(
-      normalizeFallbackModels(holder.fallback_models),
-      disabled,
-    )
+    const replacement = findFirstAllowedReplacement(normalizeFallbackModels(holder.fallback_models), disabled)
     if (replacement) {
       log(`[${HOOK_NAME}] Substituted primary model from fallback chain`, {
         label,

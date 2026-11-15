@@ -2,7 +2,20 @@
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import { constants } from "node:fs"
-import { access, chmod, copyFile, cp, mkdir, mkdtemp, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises"
+import {
+  access,
+  chmod,
+  copyFile,
+  cp,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
@@ -12,7 +25,8 @@ const pluginRoot = dirname(scriptDir)
 const packageRoot = dirname(pluginRoot)
 const repoRoot = resolve(packageRoot, "..", "..")
 const codexPluginRoot = join(repoRoot, "packages", "omo-codex", "plugin")
-const defaultSourceEntry = process.env.OMO_AGENT_TOOLKIT_SOURCE_ENTRY ?? join(codexPluginRoot, "components", "ulw-loop", "dist", "cli.js")
+const defaultSourceEntry =
+  process.env.OMO_AGENT_TOOLKIT_SOURCE_ENTRY ?? join(codexPluginRoot, "components", "ulw-loop", "dist", "cli.js")
 const defaultDirectiveEntry = join(codexPluginRoot, "components", "ulw-loop", "directive.md")
 const defaultTargetDir = process.env.OMO_AGENT_TOOLKIT_TARGET ?? join(pluginRoot, "runtime", "agent-toolkit")
 
@@ -34,14 +48,21 @@ const result = spawnSync(process.execPath, [entry, ...args], { stdio: "inherit" 
 if (result.error !== undefined) throw result.error
 process.exit(result.status ?? 1)
 `
-const posixShim = "#!/bin/sh\nexec node \"$(dirname \"$0\")/cli.js\" \"$@\"\n"
-const windowsShim = "@echo off\r\nnode \"%~dp0cli.js\" %*\r\n"
+const posixShim = '#!/bin/sh\nexec node "$(dirname "$0")/cli.js" "$@"\n'
+const windowsShim = '@echo off\r\nnode "%~dp0cli.js" %*\r\n'
 // The staged bundle serves the omo-senpi surface; the marker switches the ulw-loop quality gate to
 // the omo-senpi reviewer identities (the unmarked Codex layout defaults to lazycodex-*).
 const surfaceMarker = `${JSON.stringify({ surface: "omo-senpi" })}\n`
 const stagedTopLevelEntries = ["cli.js", "directive.md", "omo-agent-toolkit", "omo-agent-toolkit.cmd", "ulw-loop"]
 const stagedUlwLoopEntries = ["cli.js", "surface.json"]
-const stagedArtifactPaths = ["cli.js", "directive.md", join("ulw-loop", "cli.js"), join("ulw-loop", "surface.json"), "omo-agent-toolkit", "omo-agent-toolkit.cmd"]
+const stagedArtifactPaths = [
+  "cli.js",
+  "directive.md",
+  join("ulw-loop", "cli.js"),
+  join("ulw-loop", "surface.json"),
+  "omo-agent-toolkit",
+  "omo-agent-toolkit.cmd",
+]
 
 export async function stageAgentToolkit(options = {}) {
   const sourceEntry = resolve(options.sourceEntry ?? defaultSourceEntry)
@@ -142,17 +163,24 @@ export async function checkAgentToolkitFresh(options = {}) {
   await validateFile(sourceEntry, "aggregate ulw-loop bundle")
   await validateFile(directiveEntry, "ulw-loop directive")
   await Promise.all(Object.values(paths).map((path) => validateFile(path, "staged agent-toolkit artifact")))
-  if (!(await readFile(paths.directive)).equals(await readFile(directiveEntry))) throw new Error(`agent-toolkit runtime stale: directive content differs: ${paths.directive}`)
-  if (await readFile(paths.dispatcher, "utf8") !== dispatcher) throw new Error(`agent-toolkit runtime stale: dispatcher content differs: ${paths.dispatcher}`)
-  if (await readFile(paths.surface, "utf8") !== surfaceMarker) throw new Error(`agent-toolkit runtime stale: surface marker differs: ${paths.surface}`)
-  if (await readFile(paths.posix, "utf8") !== posixShim) throw new Error(`agent-toolkit runtime stale: POSIX shim content differs: ${paths.posix}`)
-  if (await readFile(paths.windows, "utf8") !== windowsShim) throw new Error(`agent-toolkit runtime stale: Windows shim content differs: ${paths.windows}`)
+  if (!(await readFile(paths.directive)).equals(await readFile(directiveEntry)))
+    throw new Error(`agent-toolkit runtime stale: directive content differs: ${paths.directive}`)
+  if ((await readFile(paths.dispatcher, "utf8")) !== dispatcher)
+    throw new Error(`agent-toolkit runtime stale: dispatcher content differs: ${paths.dispatcher}`)
+  if ((await readFile(paths.surface, "utf8")) !== surfaceMarker)
+    throw new Error(`agent-toolkit runtime stale: surface marker differs: ${paths.surface}`)
+  if ((await readFile(paths.posix, "utf8")) !== posixShim)
+    throw new Error(`agent-toolkit runtime stale: POSIX shim content differs: ${paths.posix}`)
+  if ((await readFile(paths.windows, "utf8")) !== windowsShim)
+    throw new Error(`agent-toolkit runtime stale: Windows shim content differs: ${paths.windows}`)
   if (process.platform !== "win32" && ((await stat(paths.posix)).mode & 0o777) !== 0o755) {
     throw new Error(`agent-toolkit runtime stale: POSIX shim is not mode 755: ${paths.posix}`)
   }
   const [sourceSha256, stagedSha256] = await Promise.all([sha256(sourceEntry), sha256(paths.bundle)])
   if (sourceSha256 !== stagedSha256) {
-    throw new Error(`agent-toolkit runtime stale: staged ulw-loop sha256 ${stagedSha256} does not match built sha256 ${sourceSha256}`)
+    throw new Error(
+      `agent-toolkit runtime stale: staged ulw-loop sha256 ${stagedSha256} does not match built sha256 ${sourceSha256}`,
+    )
   }
   return { ok: true, sourceEntry, directiveEntry, targetDir, sha256: sourceSha256 }
 }
@@ -187,7 +215,8 @@ async function probeSelfContainment(targetDir) {
     if (result.stdout.length > 0) process.stdout.write(result.stdout)
     if (result.stderr.length > 0) process.stderr.write(result.stderr)
     if (result.error !== undefined) throw result.error
-    if (result.status !== 0) throw new Error(`Self-containment probe failed for ${artifact} with exit code ${result.status ?? 1}`)
+    if (result.status !== 0)
+      throw new Error(`Self-containment probe failed for ${artifact} with exit code ${result.status ?? 1}`)
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }
@@ -221,7 +250,9 @@ async function validateFile(path, label) {
 }
 
 async function sha256(path) {
-  return createHash("sha256").update(await readFile(path)).digest("hex")
+  return createHash("sha256")
+    .update(await readFile(path))
+    .digest("hex")
 }
 
 async function fileExists(path) {

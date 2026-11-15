@@ -8,7 +8,9 @@ export class ResumeCapacity {
   readonly #parked = new Map<string, ParkedLease>()
   readonly #concurrency: TaskConcurrency
 
-  constructor(concurrency: TaskConcurrency) { this.#concurrency = concurrency }
+  constructor(concurrency: TaskConcurrency) {
+    this.#concurrency = concurrency
+  }
 
   park(taskId: string, epoch: number): void {
     const lease = this.#concurrency.park(taskId, epoch)
@@ -44,9 +46,17 @@ export class ResumeCapacity {
     signal.addEventListener("abort", cancel, { once: true })
     try {
       if (allocation === undefined) this.#concurrency.enqueue(model, taskId, epoch, () => granted.resolve())
-      else this.#concurrency.requeue({
-        taskId, runEpoch: epoch, model, laneKey: allocation.laneKey, sequence: allocation.sequence,
-      }, () => granted.resolve())
+      else
+        this.#concurrency.requeue(
+          {
+            taskId,
+            runEpoch: epoch,
+            model,
+            laneKey: allocation.laneKey,
+            sequence: allocation.sequence,
+          },
+          () => granted.resolve(),
+        )
       this.#concurrency.drain()
       await granted.promise
       return !signal.aborted && this.#concurrency.leaseState(taskId, epoch) === "held"
@@ -55,5 +65,7 @@ export class ResumeCapacity {
     }
   }
 
-  forget(taskId: string): void { this.#parked.delete(taskId) }
+  forget(taskId: string): void {
+    this.#parked.delete(taskId)
+  }
 }

@@ -23,11 +23,7 @@ export const DEFAULT_DISCOVERY_FILE_SYSTEM: ConfigMigrationDiscoveryFileSystem =
 }
 
 export type LegacyConfigSourceKind =
-  | "config-jsonc"
-  | "migration-sidecar"
-  | "profile-config"
-  | "project-config"
-  | "user-config"
+  "config-jsonc" | "migration-sidecar" | "profile-config" | "project-config" | "user-config"
 
 export type DiscoveredLegacyConfigSource = {
   readonly baseRoot?: string

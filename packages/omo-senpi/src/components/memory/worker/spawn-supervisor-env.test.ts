@@ -23,44 +23,47 @@ describe("supervisor spawn environment", () => {
 
     try {
       // when
-      const run = runReflectionChild({
-        runId: "run-env-probe",
-        kind: "reflection",
-        trigger: "step-count",
-        origin: "manual",
-        attempt: 1,
-        hardDeadlineAt: Date.now() + 10_000,
-        category: "quick",
-        conversationIds: ["conversation-a"],
-        model: "fixture/model",
-        command: process.execPath,
-        args: [],
-        cwd: runDir,
-        env: {},
-        detached: true,
-        paths: {
-          sessionDir: runDir,
-          worktree: runDir,
-          gitCommonDir: runDir,
-          transcript: join(payloadDir, "transcript.jsonl"),
-          persona: join(payloadDir, "persona.md"),
-          prompt: join(payloadDir, "prompt.md"),
+      const run = runReflectionChild(
+        {
+          runId: "run-env-probe",
+          kind: "reflection",
+          trigger: "step-count",
+          origin: "manual",
+          attempt: 1,
+          hardDeadlineAt: Date.now() + 10_000,
+          category: "quick",
+          conversationIds: ["conversation-a"],
+          model: "fixture/model",
+          command: process.execPath,
+          args: [],
+          cwd: runDir,
+          env: {},
+          detached: true,
+          paths: {
+            sessionDir: runDir,
+            worktree: runDir,
+            gitCommonDir: runDir,
+            transcript: join(payloadDir, "transcript.jsonl"),
+            persona: join(payloadDir, "persona.md"),
+            prompt: join(payloadDir, "prompt.md"),
+          },
+          mergePolicy: "auto",
+          worktree: {
+            parent: new GitMemoryRepo({ dir: runDir, agentId: "agent-test", exec }),
+            dir: runDir,
+            branch: "reflection/run-env-probe",
+            baseSha: "base-sha",
+            gitFilePath: join(runDir, ".git"),
+            gitFileSnapshot: "gitdir: original\n",
+            commonConfigPath: join(runDir, "config"),
+            commonConfigSnapshot: null,
+            exec,
+          },
         },
-        mergePolicy: "auto",
-        worktree: {
-          parent: new GitMemoryRepo({ dir: runDir, agentId: "agent-test", exec }),
-          dir: runDir,
-          branch: "reflection/run-env-probe",
-          baseSha: "base-sha",
-          gitFilePath: join(runDir, ".git"),
-          gitFileSnapshot: "gitdir: original\n",
-          commonConfigPath: join(runDir, "config"),
-          commonConfigSnapshot: null,
-          exec,
+        {
+          supervisorPath: join(import.meta.dir, "__fixtures__", "supervisor-env-probe.ts"),
         },
-      }, {
-        supervisorPath: join(import.meta.dir, "__fixtures__", "supervisor-env-probe.ts"),
-      })
+      )
 
       // then: the probe supervisor exits 0 without an outcome, and the probe file proves the env
       await expect(run).rejects.toThrow("memory run supervisor exited with 0")

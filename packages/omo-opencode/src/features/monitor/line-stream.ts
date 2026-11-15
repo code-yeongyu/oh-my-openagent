@@ -13,11 +13,7 @@ export type LineStreamResult = {
 const DEFAULT_BINARY_THRESHOLD = 0.3
 
 const ANSI_PATTERN = new RegExp(
-  [
-    "\\x1b\\[[0-?]*[ -/]*[@-~]",
-    "\\x1b\\][^\\x07]*(?:\\x07|\\x1b\\\\)",
-    "\\x1b[@-_]",
-  ].join("|"),
+  ["\\x1b\\[[0-?]*[ -/]*[@-~]", "\\x1b\\][^\\x07]*(?:\\x07|\\x1b\\\\)", "\\x1b[@-_]"].join("|"),
   "g",
 )
 
@@ -44,7 +40,10 @@ function replacementRatio(text: string): number {
   return replacements / text.length
 }
 
-function appendBytes(left: Uint8Array<ArrayBufferLike>, right: Uint8Array<ArrayBufferLike>): Uint8Array<ArrayBufferLike> {
+function appendBytes(
+  left: Uint8Array<ArrayBufferLike>,
+  right: Uint8Array<ArrayBufferLike>,
+): Uint8Array<ArrayBufferLike> {
   if (left.length === 0) {
     return right.slice()
   }
