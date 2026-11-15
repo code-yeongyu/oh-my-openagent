@@ -2,7 +2,7 @@ import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import type { ThreadResolveResult } from "../addressing"
 import { relayAddressBook, type RelayAddressBook } from "../remote/address-book"
 import type { RemoteSessionRow } from "../remote/ports"
-import type { ThreadActivity } from "../contracts/results"
+import { THREAD_ACTIVITIES, type ThreadActivity } from "../contracts/results"
 import {
   assembleAddressBook,
   findDiskSessions,
@@ -68,6 +68,12 @@ export type ThreadToolSummary = Omit<
   /** Deprecated beside `state`: `resumable` when no engine holds the thread, else `live`. */
   readonly status: "live" | "resumable"
   readonly state: ThreadState
+  /** The engine's finer activity of a held thread (senpi#6688); `state` folds it. */
+  readonly activity?: ThreadActivity
+  /** With `errored`: the failed turn's category. */
+  readonly error_code?: string
+  /** The current or most recent turn's id. */
+  readonly turn_id?: string
   readonly model?: ThreadModel
   readonly created_at: string
   readonly updated_at: string | null
@@ -95,7 +101,7 @@ function threadState(facts: {
     : "idle"
 }
 
-const ACTIVITIES: ReadonlySet<unknown> = new Set(["idle", "running", "awaiting_approval", "queued", "errored"])
+const ACTIVITIES: ReadonlySet<unknown> = new Set(THREAD_ACTIVITIES)
 
 /** A held thread's activity detail as its engine reports it; nothing for an older engine or a thread no engine holds. */
 function activityDetail(

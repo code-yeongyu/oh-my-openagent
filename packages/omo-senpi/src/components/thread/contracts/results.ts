@@ -18,7 +18,8 @@ export type ThreadStatus = "live" | "resumable"
 export type ThreadState = "running" | "idle" | "inactive" | "archived"
 
 /** The engine's finer activity of a held thread (senpi#6688); `state` folds it to running or idle. */
-export type ThreadActivity = "idle" | "running" | "awaiting_approval" | "queued" | "errored"
+export const THREAD_ACTIVITIES = ["idle", "running", "awaiting_approval", "queued", "errored"] as const
+export type ThreadActivity = (typeof THREAD_ACTIVITIES)[number]
 
 export const THREAD_STATES: readonly ThreadState[] = ["running", "idle", "inactive", "archived"]
 
