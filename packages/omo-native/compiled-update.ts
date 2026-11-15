@@ -13,7 +13,7 @@ export { releaseVersionOf } from "./compiled-update-install"
 
 export const RELEASES_URL = "https://github.com/code-yeongyu/oh-my-openagent/releases"
 const RELEASES_API = "https://api.github.com/repos/code-yeongyu/oh-my-openagent/releases?per_page=100"
-export const RELEASE_VERSION = /^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$/
+import { RELEASE_VERSION } from "./release-version"
 const RELEASE_TARGET = /^(?:darwin|linux|windows)-(?:x64|arm64)(?:-musl)?(?:-baseline)?$/
 
 export type FetchReleases = () => Promise<unknown>
