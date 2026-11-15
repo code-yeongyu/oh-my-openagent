@@ -243,7 +243,11 @@ test("#given non-bootstrap aggregate hook manifests #when hook arguments are rea
   }
 
   // then
-  assert.deepEqual(offenders, [], "hook arguments must be single tokens: cmd /c breaks a commandWindows line that quotes one")
+  assert.deepEqual(
+    offenders,
+    [],
+    "hook arguments must be single tokens: cmd /c breaks a commandWindows line that quotes one",
+  )
 })
 
 test(
