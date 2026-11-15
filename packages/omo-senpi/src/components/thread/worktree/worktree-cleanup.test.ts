@@ -227,6 +227,50 @@ describe("the remove request another device sends removes only a worktree OmO ma
     expect([existsSync(work), branchExists(repo, "in-use"), worktreeCount(repo)]).toEqual([true, true, 2])
   })
 
+  // #13450 re-review: work git status --porcelain does not show is still work; none of it is removed.
+  test.each([
+    [
+      "work committed only on the thread branch",
+      (repo: string, wt: string) => {
+        writeFileSync(join(wt, "done.txt"), "committed\n")
+        kit.git(wt, "add", "done.txt")
+        kit.git(wt, "commit", "-q", "-m", "work")
+        return join(wt, "done.txt")
+      },
+    ],
+    [
+      "an ignored file",
+      (repo: string, wt: string) => {
+        writeFileSync(join(repo, ".git", "info", "exclude"), "*.local\n")
+        writeFileSync(join(wt, "notes.local"), "ignored work\n")
+        return join(wt, "notes.local")
+      },
+    ],
+    [
+      "an untracked file with status.showUntrackedFiles=no",
+      (repo: string, wt: string) => {
+        kit.git(repo, "config", "status.showUntrackedFiles", "no")
+        writeFileSync(join(wt, "hidden.txt"), "untracked work\n")
+        return join(wt, "hidden.txt")
+      },
+    ],
+  ] as const)(
+    "#given a linked worktree top with %s #when a remote remove names it #then it is refused worktree_left_behind and the work stays",
+    async (_label, addWork) => {
+      const repo = kit.repository()
+      const root = kit.folder("thread-wt-root-")
+      const made = await createThreadWorktree({ repository: repo, request: { branch: "kept" }, root })
+      if (made.kind !== "ok") throw new Error(JSON.stringify(made))
+      const work = addWork(repo, made.worktree.path)
+      const outcome = await answerWorktreeRequest({ remove: { path: made.worktree.path, branch: "kept" } }, root)
+      expect(errorOf(outcome)).toMatchObject({
+        code: "partial_commit",
+        details: { reason: "worktree_left_behind", path: made.worktree.path },
+      })
+      expect([existsSync(work), branchExists(repo, "kept"), worktreeCount(repo)]).toEqual([true, true, 2])
+    },
+  )
+
   test("#given the worktree a failed open left #when removal is requested with its path and branch #then it and its branch are removed", async () => {
     const repo = kit.repository()
     const root = kit.folder("thread-wt-root-")
