@@ -8,6 +8,7 @@ import {
   SyncHttpError,
   SyncNetworkError,
 } from "./http-transport"
+import { SYNC_CAPABILITIES, SYNC_CONTRACT_VERSION } from "../../contract-version"
 import { startWireServer, type WireServer } from "./wire-server.test-support"
 
 const servers: WireServer[] = []
@@ -188,4 +189,52 @@ test("#given a subscribed device #when another device is signed out through the 
   expect(server.freeze.pending).toBe(true)
   expect(await pushOne(a, new TextEncoder().encode("frozen"), 0)).toMatchObject({ ok: false, error: "stale_base" })
   await expect(b.pull(0, 500)).rejects.toMatchObject({ code: "device_revoked", status: 401 })
+})
+
+// The service refuses every sync route 426 client_update_required for an account whose keyring holds a
+// phrase key unless the request declares the phrase capability; after phrase genesis no engine synced (#13691).
+test("every request the engine sends, the event stream included, carries the contract version and the phrase capability, so a phrase account's floor admits it (#13691)", async () => {
+  const server = startWireServer({ token: "tok", devices: { a: "dev-a", b: "dev-b" }, phraseFloor: true })
+  servers.push(server)
+  const a = createHttpTransport({ baseUrl: server.url, token: () => server.tokenOf("a") })
+  const b = createHttpTransport({ baseUrl: server.url, token: () => server.tokenOf("b") })
+  let stop: () => void = () => undefined
+  const advanced = new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error("waited 10s for sync.advanced over the floor, never fired")),
+      10_000,
+    )
+    stop = b.subscribe({
+      onAdvanced: () => {
+        clearTimeout(timer)
+        resolve()
+      },
+      onConnected: (up) => {
+        if (up) void pushOne(a, new TextEncoder().encode("over the floor"), 0)
+      },
+      onStateChanged: () => undefined,
+    })
+  })
+
+  await advanced
+  const page = await b.pull(0, 500)
+  await b.download(page.entries[0]?.objectId ?? "")
+  stop()
+
+  const routes = new Set(
+    server.requests.map(
+      ({ method, path }) => `${method} ${path.replace(/^(\/v1\/sync\/(?:objects|uploads))\/.+$/, "$1/:id")}`,
+    ),
+  )
+  expect([...routes].sort()).toEqual([
+    "GET /v1/me/events",
+    "GET /v1/sync/batches",
+    "GET /v1/sync/objects/:id",
+    "GET /v1/sync/state",
+    "POST /v1/sync/batches",
+    "POST /v1/sync/uploads",
+    "PUT /v1/sync/uploads/:id",
+  ])
+  for (const request of server.requests)
+    expect(request).toMatchObject({ version: SYNC_CONTRACT_VERSION, capabilities: SYNC_CAPABILITIES })
 })

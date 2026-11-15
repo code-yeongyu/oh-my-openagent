@@ -18,10 +18,24 @@ export interface WireServerOptions {
   /** device name -> device id, one bearer token each. */
   readonly devices: Readonly<Record<string, string>>
   readonly port?: number
+  /**
+   * Mirror the service's client floor for an account whose keyring holds a recovery-phrase key: every
+   * request that does not declare the `phrase` sync capability is refused 426 client_update_required (#13691).
+   */
+  readonly phraseFloor?: boolean
+}
+
+/** The contract headers one request carried, as the service floor reads them. */
+export interface WireRequest {
+  readonly method: string
+  readonly path: string
+  readonly version: string | null
+  readonly capabilities: string | null
 }
 
 export interface WireServer {
   readonly url: string
+  readonly requests: readonly WireRequest[]
   pageSize: number
   refuseNext: string | null
   failNext: number | null
@@ -56,6 +70,7 @@ export function startWireServer(options: WireServerOptions): WireServer {
   >()
   const tokens = new Map(Object.entries(options.devices).map(([name, id]) => [`${options.token}.${name}`, id]))
   const streams = new Set<ReadableStreamDefaultController<Uint8Array>>()
+  const requests: WireRequest[] = []
   let snapshot: { covers: number; chunks: readonly string[] } | null = null
   let closedWaiters: (() => void)[] = []
   const broadcast = (event: Record<string, unknown>) => {
@@ -79,8 +94,23 @@ export function startWireServer(options: WireServerOptions): WireServer {
     idleTimeout: 0,
     async fetch(req) {
       const url = new URL(req.url)
+      const capabilities = req.headers.get("omo-sync-capabilities")
+      requests.push({
+        method: req.method,
+        path: url.pathname,
+        version: req.headers.get("omo-contract-version"),
+        capabilities,
+      })
       const device = tokens.get((req.headers.get("authorization") ?? "").replace(/^Bearer /, ""))
       if (device === undefined) return refusal("unauthorized")
+      if (
+        options.phraseFloor === true &&
+        !(capabilities ?? "")
+          .split(",")
+          .map((c) => c.trim())
+          .includes("phrase")
+      )
+        return refusal("client_update_required")
       if (freeze.isRevokedDevice(device)) return freeze.revokedRefusal()
       if (state.failNext !== null) {
         const status = state.failNext
@@ -229,6 +259,7 @@ export function startWireServer(options: WireServerOptions): WireServer {
       state.failNext = status
     },
     tokenOf: (name) => `${options.token}.${name}`,
+    requests,
     freeze,
     compactTo(coversSeq, chunkIds) {
       snapshot = { covers: coversSeq, chunks: chunkIds }

@@ -7,7 +7,13 @@
 export const SYNC_CONTRACT_VERSION = "1.44.0"
 export const SYNC_CAPABILITIES = "phrase"
 
-export const syncHeaders = (): Readonly<Record<string, string>> => ({
+/**
+ * The headers of every sync-path request: the contract headers and the device's bearer token, built only
+ * here so no client can send one without the other. The service's floor refuses a request from a phrase
+ * account 426 when it lacks the phrase capability (#13691).
+ */
+export const syncRequestHeaders = (token: string): Record<string, string> => ({
   "omo-contract-version": SYNC_CONTRACT_VERSION,
   "omo-sync-capabilities": SYNC_CAPABILITIES,
+  authorization: `Bearer ${token}`,
 })
