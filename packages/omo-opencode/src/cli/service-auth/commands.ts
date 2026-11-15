@@ -5,6 +5,7 @@ import { isClosedBareLogin, isClosedDeviceLogin, withClosedDeviceLoginOptions } 
 import { openSignInBrowser } from "./browser"
 import { deviceName, devicePlatform } from "./device-name"
 import { loginDevice } from "./device-flow"
+import { machineBindingAfterRefresh } from "./machine-binding"
 import { advertisesMachineIdentity, readMachineDigest } from "./machine-digest"
 import { refuseSecondMachineDevice } from "./machine-device"
 import { createCredentialStore, INTERACTIVE_READ_WAIT } from "./keystore"
@@ -105,6 +106,7 @@ async function run(
       store,
       signal: controller.signal,
       ...(deviceService === undefined ? {} : { deviceService }),
+      machineBinding: machineBindingAfterRefresh({ api, log: (line) => console.error(line) }),
       beforeKeysDiscarded: retireSyncPinOnDiscard({
         pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())),
         log: (line) => console.error(line),

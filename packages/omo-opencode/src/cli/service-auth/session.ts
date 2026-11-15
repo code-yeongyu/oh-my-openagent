@@ -25,6 +25,7 @@ import {
   SignInError,
   tokenSchema,
 } from "./protocol"
+import type { MachineBinding } from "./machine-binding"
 import { requestApi } from "./protocol-request"
 import {
   clearSignedOutMarker,
@@ -107,6 +108,8 @@ export function createSession(options: {
   readonly beforeKeysDiscarded: BeforeKeysDiscarded
   /** This machine's device service; absent, no device service is told anything. */
   readonly deviceService?: DeviceServiceHandoff
+  /** Binds a refreshed device to this machine (#6503), after the credential lock is released; absent, nothing is bound. */
+  readonly machineBinding?: MachineBinding
 }) {
   const api = serviceOrigin(options.api)
   const deviceService = options.deviceService
@@ -128,6 +131,17 @@ export function createSession(options: {
     )
   }
   const request = (path: string, init: RequestInit) => requestApi(api, path, init, signal)
+  // A token read that refreshed binds the stored successor once its locked section has released the lock.
+  async function refreshThenBind<T>(section: (refresh: typeof refreshed) => Promise<T>): Promise<T> {
+    let successor: Credentials | undefined
+    const value = await section(async (current) => {
+      const next = await refreshed(current)
+      if (next !== current) successor = next
+      return next
+    })
+    if (successor !== undefined) await options.machineBinding?.(successor, request)
+    return value
+  }
   /** The account a token's sign-in belongs to; undefined when the service does not say (never blocks logout). */
   const accountOf = async (access: string): Promise<string | undefined> => {
     const body = await request("/v1/me", { headers: { authorization: `Bearer ${access}` } }).catch(() => null)
@@ -196,12 +210,14 @@ export function createSession(options: {
     }
   }
   async function snapshot(): Promise<Credentials | null> {
-    return locked(async (view) => {
-      const current = await store.read()
-      if (current === null) return null
-      await view?.settle()
-      return refreshed(current)
-    })
+    return refreshThenBind((refresh) =>
+      locked(async (view) => {
+        const current = await store.read()
+        if (current === null) return null
+        await view?.settle()
+        return refresh(current)
+      }),
+    )
   }
   // #13265: the signed-in account's email through the session's own token; undefined when the service does not say.
   async function emailOf(access: string): Promise<string | undefined> {
@@ -228,13 +244,15 @@ export function createSession(options: {
       !(await store.migrationPending?.())
     )
       return snapshot.accessToken
-    return locked(async (view) => {
-      const current = await store.readAuthoritative()
-      if (current === null) throw new SignInError(`Not signed in. ${signInHint("first")}`)
-      if (expect !== undefined && !expect(current)) throw new CredentialIdentityChanged()
-      await view?.settle()
-      return (await refreshed(current)).accessToken
-    })
+    return refreshThenBind((refresh) =>
+      locked(async (view) => {
+        const current = await store.readAuthoritative()
+        if (current === null) throw new SignInError(`Not signed in. ${signInHint("first")}`)
+        if (expect !== undefined && !expect(current)) throw new CredentialIdentityChanged()
+        await view?.settle()
+        return (await refresh(current)).accessToken
+      }),
+    )
   }
   return {
     request,

@@ -28,6 +28,7 @@ import {
 import { retireSyncPinOnDiscard } from "../omo-opencode/src/cli/service-auth/sync-pin-retire"
 import { retireSyncDevice } from "../memory-core/src/sync/device-retire"
 import { RecoveryExhausted, RecoveryPending } from "../omo-opencode/src/cli/service-auth/owned-refresh"
+import { machineBindingAfterRefresh } from "../omo-opencode/src/cli/service-auth/machine-binding"
 import { ACCOUNT_EXIT, accountStoreFailure, showAccount } from "./account-show"
 import { cliDeviceServiceHandoff } from "./device-service-handoff"
 
@@ -68,6 +69,13 @@ const sessionOf = (dependencies: AccountCommandDependencies): Session =>
     beforeKeysDiscarded: retireHook(dependencies),
     ...(dependencies.home === undefined ? {} : { home: dependencies.home }),
     ...(dependencies.deviceService === undefined ? {} : { deviceService: dependencies.deviceService }),
+    // The desktop app reads the machine's token here (`omo account token`), so a refresh on this path binds the shared
+    // sign-in's device to this machine for both clients (#6503).
+    machineBinding: machineBindingAfterRefresh({
+      api: dependencies.api,
+      log: dependencies.error,
+      ...(dependencies.home === undefined ? {} : { home: dependencies.home }),
+    }),
   })
 
 async function signedOut(dependencies: AccountCommandDependencies, session: Session): Promise<number> {
