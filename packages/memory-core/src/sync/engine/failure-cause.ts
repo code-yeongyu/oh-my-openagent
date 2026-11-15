@@ -30,20 +30,14 @@ const NAMED_CLASSES: ReadonlyArray<readonly [new (...args: never[]) => Error, st
   [GitTimeoutError, "GitTimeoutError"],
   [GitNotFoundError, "GitNotFoundError"],
   [GitError, "GitError"],
+  [TypeError, "TypeError"],
+  [RangeError, "RangeError"],
+  [SyntaxError, "SyntaxError"],
+  [ReferenceError, "ReferenceError"],
+  [EvalError, "EvalError"],
+  [URIError, "URIError"],
+  [AggregateError, "AggregateError"],
 ]
-
-const BUILT_IN_CLASSES: ReadonlySet<string> = new Set([
-  "Error",
-  "TypeError",
-  "RangeError",
-  "SyntaxError",
-  "ReferenceError",
-  "EvalError",
-  "URIError",
-  "AggregateError",
-  "AbortError",
-  "TimeoutError",
-])
 
 const ERRNO_CODE = /^E[A-Z0-9_]{1,63}$/
 const SERVICE_CODE = /^[a-z][a-z0-9_]{0,63}$/
@@ -53,8 +47,7 @@ const CAUSE_DEPTH = 4
 function errorClassOf(error: unknown): string {
   if (!(error instanceof Error)) return "NonError"
   const named = NAMED_CLASSES.find(([type]) => error instanceof type)
-  if (named !== undefined) return named[1]
-  return BUILT_IN_CLASSES.has(error.name) ? error.name : "Error"
+  return named === undefined ? "Error" : named[1]
 }
 
 function ownCode(error: Error): string | undefined {
@@ -86,13 +79,31 @@ export function causeOf(error: unknown, stage: SyncStage): SyncFailureCause {
   }
 }
 
+/** One thrown value as text, never throwing: a value with no usable string form (a null-prototype object) is named by its type. */
+function printable(value: unknown): string {
+  try {
+    return value instanceof Error ? (value.stack ?? `${value.name}: ${value.message}`) : String(value)
+  } catch {
+    return `a thrown ${typeof value} with no string form`
+  }
+}
+
 /** The whole error for the local memory log: every stack down the cause chain. */
-export function errorForLog(error: unknown): string {
+function errorForLog(error: unknown): string {
   const parts: string[] = []
   let current = error
   for (let depth = 0; depth < CAUSE_DEPTH && current !== undefined; depth += 1) {
-    parts.push(current instanceof Error ? (current.stack ?? `${current.name}: ${current.message}`) : String(current))
+    parts.push(printable(current))
     current = current instanceof Error ? current.cause : undefined
   }
   return parts.join("\ncaused by: ")
+}
+
+/** Logs a failed cycle with its whole error, after the engine settled it; it never throws into the engine. */
+export function logCycleFailure(log: ((line: string) => void) | undefined, stage: SyncStage, error: unknown): void {
+  try {
+    log?.(`sync cycle failed during ${stage}: ${errorForLog(error)}`)
+  } catch {
+    // A logger that throws has no channel left to report on; the status already carries the failure.
+  }
 }

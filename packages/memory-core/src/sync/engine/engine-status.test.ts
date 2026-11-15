@@ -131,6 +131,34 @@ test(
 )
 
 test(
+  "a failed cycle whose logger throws, on a thrown value with no string form, still settles: it is shown, stop returns and the next cycle runs (#13635)",
+  async () => {
+    const b = await makeDevice(new FakeSyncServer(), "b", undefined, {
+      log: () => {
+        throw new Error("log sink gone")
+      },
+    })
+    devices.push(b)
+    const unprintable: unknown = Object.create(null)
+    const load = spyOn(b.store, "load").mockImplementation(async () => {
+      throw unprintable
+    })
+
+    expect(await failedCycle(b)).toBe(unprintable)
+
+    expect(await b.engine.status()).toMatchObject({
+      kind: "failing",
+      failure: { kind: "unknown", cause: { errorClass: "NonError", stage: "load" } },
+    })
+    await b.engine.stop()
+    load.mockRestore()
+    await b.engine.runCycle()
+    expect(await b.engine.status()).toMatchObject({ kind: "synced" })
+  },
+  GIT_TEST_TIMEOUT,
+)
+
+test(
   "an unexpected cycle error reports failing with a generic reason, never the raw error text",
   async () => {
     const { b } = await pair()

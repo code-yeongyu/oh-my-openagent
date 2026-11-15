@@ -42,7 +42,7 @@ test("a non-transient service refusal names the service code and HTTP status", (
 
   expect(failure).toEqual({
     kind: "service_refused",
-    reason: expect.stringContaining("payload_too_large"),
+    reason: expect.any(String),
     action: expect.any(String),
     cause: { errorClass: "SyncHttpError", code: "payload_too_large", httpStatus: 413, stage: "push" },
   })
@@ -51,6 +51,11 @@ test("a non-transient service refusal names the service code and HTTP status", (
 test.each([
   ["a plain Error", new Error(RAW), { errorClass: "Error" }],
   ["a TypeError", new TypeError(RAW), { errorClass: "TypeError" }],
+  [
+    "an Error renamed after a built-in class",
+    Object.assign(new Error(RAW), { name: "RangeError" }),
+    { errorClass: "Error" },
+  ],
   [
     "a failed git command",
     new GitCommandError(["commit", "-m", RAW], 128, "", `fatal: ${RAW}`),

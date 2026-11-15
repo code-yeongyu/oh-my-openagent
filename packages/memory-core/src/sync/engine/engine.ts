@@ -7,7 +7,7 @@
 import { advance, applyVerified } from "./apply"
 import type { EngineDeps } from "./engine-deps"
 import type { SyncFailure } from "./failure"
-import { errorForLog, type SyncStage } from "./failure-cause"
+import { logCycleFailure, type SyncStage } from "./failure-cause"
 import { batchBound, heldShown, recordHeld } from "./held"
 import { type EngineState, SyncJournal } from "./journal"
 import { type CaptureHolds, capture } from "./local-capture"
@@ -170,8 +170,8 @@ export class SyncEngine {
         if (rerun) this.request()
       },
       (error: unknown) => {
-        this.deps.log?.(`sync cycle failed during ${this.stage}: ${errorForLog(error)}`)
-        this.tracker.failed(error, this.stage)
+        const stage = this.stage
+        this.tracker.failed(error, stage)
         this.announceIfChanged(keyAtStart)
         for (const w of waiters) w.reject(error)
         if (this.running === run) this.running = null
@@ -180,6 +180,8 @@ export class SyncEngine {
         this.rerun = false
         this.rerunOnEvent = false
         if (rerun) this.request()
+        // Logged last, once the cycle is settled: nothing the log does can leave it running.
+        logCycleFailure(this.deps.log, stage, error)
       },
     )
     return run

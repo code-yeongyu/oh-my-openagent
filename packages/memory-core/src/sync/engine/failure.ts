@@ -97,7 +97,7 @@ function describeCausedFailure(error: unknown, stage: SyncStage): SyncFailure {
   if (error instanceof SyncHttpError)
     return {
       kind: "service_refused",
-      reason: `The OmO sync service refused a request from this device${cause.code === undefined ? "" : ` (${cause.code})`}.`,
+      reason: "The OmO sync service refused a request from this device.",
       action: "Sync retries on its own. If this stays, update OmO on this device; the memory log has the detail.",
       cause,
     }
