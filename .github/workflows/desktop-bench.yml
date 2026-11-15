@@ -38,7 +38,7 @@ jobs:
           ref="${BASE_REF_INPUT:-}"
           if test -z "$ref"; then
             ref=$(git ls-remote --tags --refs "https://github.com/${GITHUB_REPOSITORY}.git" 'refs/tags/v*' \
-              | awk '{print $2}' | sed 's#^refs/tags/##' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+              | awk '{print $2}' | sed 's#^refs/tags/##' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1 || true)
           fi
           if test -z "$ref"; then
             echo "::error::no base_ref given and no v* release tag found"
