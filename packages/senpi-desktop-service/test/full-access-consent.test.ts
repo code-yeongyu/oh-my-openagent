@@ -13,12 +13,17 @@ describe("full access as the consent for desktop input (#10788)", HANG_GUARD, ()
   it("re-grants once after a stop the user resumed, and the input is admitted exactly once", async () => {
     // Given: the engine dropped the full-access grant at the stop
     const desktop = await openGated({ value: true })
-    await runCode(desktop.service, `await desktop.screenshot(); await desktop.click(10, 10);`)
+    await runCode(desktop.service, async ({ desktop }) => {
+      await desktop.screenshot()
+      await desktop.click(10, 10)
+    })
     await desktop.service.stop()
     await desktop.service.resume()
 
     // When
-    await runCode(desktop.service, `await desktop.click(10, 10);`)
+    await runCode(desktop.service, async ({ desktop }) => {
+      await desktop.click(10, 10)
+    })
 
     // Then: one refused attempt, one re-grant, one admitted retry
     expect(requested(desktop.log, "control.grant")).toBe(2)
@@ -34,7 +39,10 @@ describe("full access as the consent for desktop input (#10788)", HANG_GUARD, ()
 
     // When
     const error = await rejectionOf(
-      runCode(desktop.service, `await desktop.screenshot(); await desktop.click(10, 10);`),
+      runCode(desktop.service, async ({ desktop }) => {
+        await desktop.screenshot()
+        await desktop.click(10, 10)
+      }),
     )
 
     // Then
@@ -46,7 +54,10 @@ describe("full access as the consent for desktop input (#10788)", HANG_GUARD, ()
   it("does not retry when a stop lands between the grant and the input", async () => {
     // Given: granted, then the user stops
     const desktop = await openGated({ value: true })
-    await runCode(desktop.service, `await desktop.screenshot(); await desktop.click(10, 10);`)
+    await runCode(desktop.service, async ({ desktop }) => {
+      await desktop.screenshot()
+      await desktop.click(10, 10)
+    })
     await desktop.service.stop()
 
     // When
@@ -82,15 +93,24 @@ describe("full access as the consent for desktop input (#10788)", HANG_GUARD, ()
     // Given
     const preset = { value: true }
     const desktop = await openGated(preset)
-    await runCode(desktop.service, `await desktop.screenshot(); await desktop.click(10, 10);`)
+    await runCode(desktop.service, async ({ desktop }) => {
+      await desktop.screenshot()
+      await desktop.click(10, 10)
+    })
 
     // When: the preset is switched down within the same turn
     preset.value = false
     let asked = 0
-    const state = await runCode(desktop.service, `return await desktop.control.acquire({ reason: "again" });`, () => {
-      asked += 1
-      return Promise.resolve(false)
-    })
+    const state = await runCode(
+      desktop.service,
+      async ({ desktop }) => {
+        return await desktop.control.acquire({ reason: "again" })
+      },
+      () => {
+        asked += 1
+        return Promise.resolve(false)
+      },
+    )
 
     // Then: the automatic grant is gone and the human is asked
     expect(requested(desktop.log, "control.revoke")).toBe(1)
@@ -108,7 +128,10 @@ describe("full access as the consent for desktop input (#10788)", HANG_GUARD, ()
       },
     }
     const desktop = await openGated(preset)
-    await runCode(desktop.service, `await desktop.screenshot(); await desktop.click(10, 10);`)
+    await runCode(desktop.service, async ({ desktop }) => {
+      await desktop.screenshot()
+      await desktop.click(10, 10)
+    })
     reads = 1
 
     // When: the caller's fence still sees full access, the send does not
@@ -123,7 +146,10 @@ describe("full access as the consent for desktop input (#10788)", HANG_GUARD, ()
   it("does not re-grant when the request was cancelled by the time the engine refused", async () => {
     // Given: the engine's grant was dropped by a resumed stop
     const desktop = await openGated({ value: true })
-    await runCode(desktop.service, `await desktop.screenshot(); await desktop.click(10, 10);`)
+    await runCode(desktop.service, async ({ desktop }) => {
+      await desktop.screenshot()
+      await desktop.click(10, 10)
+    })
     await desktop.service.stop()
     await desktop.service.resume()
     const controller = new AbortController()
@@ -145,7 +171,10 @@ describe("full access as the consent for desktop input (#10788)", HANG_GUARD, ()
 
     // When
     const error = await rejectionOf(
-      runCode(desktop.service, `await desktop.screenshot(); await desktop.click(10, 10);`),
+      runCode(desktop.service, async ({ desktop }) => {
+        await desktop.screenshot()
+        await desktop.click(10, 10)
+      }),
     )
 
     // Then

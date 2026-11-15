@@ -61,7 +61,7 @@ impl EngineCode {
 
 closed_names! {
     /// The model-facing failure codes.
-    ComputerCode [56] {
+    ComputerCode [55] {
         Suspended = "COMPUTER_SUSPENDED",
         SupervisorNotLive = "COMPUTER_SUPERVISOR_NOT_LIVE",
         PermissionRequired = "COMPUTER_PERMISSION_REQUIRED",
@@ -113,7 +113,6 @@ closed_names! {
         SecureFocus = "COMPUTER_SECURE_FOCUS",
         AuditUnavailable = "COMPUTER_AUDIT_UNAVAILABLE",
         LaunchContextRequired = "COMPUTER_LAUNCH_CONTEXT_REQUIRED",
-        RunLimit = "COMPUTER_RUN_LIMIT",
         Unavailable = "COMPUTER_UNAVAILABLE",
         Internal = "COMPUTER_INTERNAL",
         SessionInactive = "COMPUTER_SESSION_INACTIVE",

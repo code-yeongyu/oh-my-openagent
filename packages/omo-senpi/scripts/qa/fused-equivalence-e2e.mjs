@@ -156,14 +156,16 @@ function childPath(lspDir) {
 const SETTINGS = { packages: [pluginRoot], defaultProjectTrust: "ask" }
 const E24_WARM_BARRIER = "eq-e24-lsp-warm"
 
-/** E21: a successful `computer` run's result must carry the click's audit record (see E21's comment). */
+/** E21: a successful click call's result must carry the click's audit record (see E21's comment). */
 function assertClickAudited(run) {
-  const end = run.client.events.find((event) => event.type === "tool_execution_end" && event.toolName === "computer")
-  if (!end) throw new Error("E21: the computer tool never finished")
+  const end = run.client.events.find(
+    (event) => event.type === "tool_execution_end" && event.toolCallId === "call_cu_click",
+  )
+  if (!end) throw new Error("E21: the click call never finished")
   if (end.isError) return
   const audit = end.result?.details?.audit ?? []
   if (!audit.some((record) => record.action === "click"))
-    throw new Error(`E21: the computer run's audit has no click record: ${JSON.stringify(audit).slice(0, 400)}`)
+    throw new Error(`E21: the click call's audit has no click record: ${JSON.stringify(audit).slice(0, 400)}`)
 }
 /** The fake provider's model, as a category model reference. */
 const FAKE_MODEL = "mock/mock-model"
@@ -203,24 +205,29 @@ const cases = [
     title: "computer-use per-call marker",
     observables: ALL_OBSERVABLES,
     needsDesktopEngine: true,
-    // The run ends with a screenshot after the click. The engine writes a request's audit notification right after that
-    // request's reply and before any later reply (senpi-desktop-engine/src/outbox.rs:1-7), and the run's audit list is
-    // copied when its code settles (senpi-desktop-service/src/run/runtime.ts:186-191). The trailing screenshot's reply is
-    // therefore the protocol event after which the click's audit has been delivered; drive() asserts it was.
+    // One chain call per step; the click call is followed by a screenshot call. The engine writes a request's audit
+    // notification right after that request's reply and before any later reply (senpi-desktop-engine/src/outbox.rs:1-7),
+    // so the click's audit reaches the click call's result; drive() asserts it was.
     spec: () => ({
       settings: SETTINGS,
       turns: [
         {
           toolCalls: [
-            {
-              id: "call_cu",
-              name: "computer",
-              args: {
-                action: "run",
-                code: "const all = await desktop.display('all'); const two = await desktop.display('2'); const a = await all.screenshot({ silent: true }); const b = await two.screenshot({ silent: true }); await two.click(20, 10); await two.screenshot({ silent: true }); return JSON.stringify({ all: [a.width, a.height], two: [b.width, b.height] })",
-              },
+            ["call_cu_all", "all", "screenshot", [{ silent: true }]],
+            ["call_cu_two", "2", "screenshot", [{ silent: true }]],
+            ["call_cu_click", "2", "click", [20, 10]],
+            ["call_cu_after", "2", "screenshot", [{ silent: true }]],
+          ].map(([id, display, method, args]) => ({
+            id,
+            name: "computer",
+            args: {
+              action: "call",
+              chain: [
+                { method: "display", args: [display] },
+                { method, args },
+              ],
             },
-          ],
+          })),
         },
         { text: "E21-DONE" },
       ],

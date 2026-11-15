@@ -13,7 +13,9 @@ describe("desktop.control facade (#9651 B5b)", HANG_GUARD, () => {
     const { service, log } = await openDesktop()
 
     // When
-    const result = await run(service, `return await desktop.control.acquire({ reason: "click Run" });`)
+    const result = await run(service, async ({ desktop }) => {
+      return await desktop.control.acquire({ reason: "click Run" })
+    })
 
     // Then
     expect(result.returnValue).toEqual({ active: false })
@@ -25,9 +27,15 @@ describe("desktop.control facade (#9651 B5b)", HANG_GUARD, () => {
     const { service, log } = await openDesktop()
 
     // When
-    const result = await run(service, `return await desktop.control.acquire({ reason: "click Run" });`, {
-      confirmControl: () => Promise.resolve(false),
-    })
+    const result = await run(
+      service,
+      async ({ desktop }) => {
+        return await desktop.control.acquire({ reason: "click Run" })
+      },
+      {
+        confirmControl: () => Promise.resolve(false),
+      },
+    )
 
     // Then
     expect(result.returnValue).toEqual({ active: false })
@@ -40,12 +48,18 @@ describe("desktop.control facade (#9651 B5b)", HANG_GUARD, () => {
     const reasons: string[] = []
 
     // When
-    const result = await run(service, `return await desktop.control.acquire({ reason: "click Run" });`, {
-      confirmControl: (reason) => {
-        reasons.push(reason)
-        return Promise.resolve(true)
+    const result = await run(
+      service,
+      async ({ desktop }) => {
+        return await desktop.control.acquire({ reason: "click Run" })
       },
-    })
+      {
+        confirmControl: (reason) => {
+          reasons.push(reason)
+          return Promise.resolve(true)
+        },
+      },
+    )
 
     // Then
     expect(result.returnValue).toMatchObject({ active: true, reason: "click Run" })
@@ -62,10 +76,22 @@ describe("desktop.control facade (#9651 B5b)", HANG_GUARD, () => {
       confirmations += 1
       return Promise.resolve(true)
     }
-    await run(service, `await desktop.control.acquire({ reason: "first" });`, { confirmControl })
+    await run(
+      service,
+      async ({ desktop }) => {
+        await desktop.control.acquire({ reason: "first" })
+      },
+      { confirmControl },
+    )
 
     // When
-    const again = await run(service, `return await desktop.control.acquire({ reason: "second" });`, { confirmControl })
+    const again = await run(
+      service,
+      async ({ desktop }) => {
+        return await desktop.control.acquire({ reason: "second" })
+      },
+      { confirmControl },
+    )
 
     // Then
     expect(again.returnValue).toMatchObject({ active: true })
@@ -77,9 +103,16 @@ describe("desktop.control facade (#9651 B5b)", HANG_GUARD, () => {
     const { service, log } = await openDesktop()
 
     // When
-    await run(service, `await desktop.control.acquire({ reason: "click Run" }); await desktop.control.release();`, {
-      confirmControl: () => Promise.resolve(true),
-    })
+    await run(
+      service,
+      async ({ desktop }) => {
+        await desktop.control.acquire({ reason: "click Run" })
+        await desktop.control.release()
+      },
+      {
+        confirmControl: () => Promise.resolve(true),
+      },
+    )
 
     // Then
     expect(methods(log).filter((method) => method.startsWith("control."))).toEqual([
@@ -94,7 +127,13 @@ describe("desktop.control facade (#9651 B5b)", HANG_GUARD, () => {
     const { service } = await openDesktop()
 
     // When
-    const result = await run(service, `return await desktop.control.state();`, { readOnly: true })
+    const result = await run(
+      service,
+      async ({ desktop }) => {
+        return await desktop.control.state()
+      },
+      { readOnly: true },
+    )
 
     // Then
     expect(result.returnValue).toEqual({ active: false })
@@ -106,10 +145,16 @@ describe("desktop.control facade (#9651 B5b)", HANG_GUARD, () => {
 
     // When
     const error = await rejectionOf(
-      run(service, `await desktop.control.acquire({ reason: "click Run" });`, {
-        readOnly: true,
-        confirmControl: () => Promise.resolve(true),
-      }),
+      run(
+        service,
+        async ({ desktop }) => {
+          await desktop.control.acquire({ reason: "click Run" })
+        },
+        {
+          readOnly: true,
+          confirmControl: () => Promise.resolve(true),
+        },
+      ),
     )
 
     // Then
@@ -123,9 +168,15 @@ describe("desktop.control facade (#9651 B5b)", HANG_GUARD, () => {
 
     // When
     const error = await rejectionOf(
-      run(service, `await desktop.control.acquire({ reason: "  " });`, {
-        confirmControl: () => Promise.resolve(true),
-      }),
+      run(
+        service,
+        async ({ desktop }) => {
+          await desktop.control.acquire({ reason: "  " })
+        },
+        {
+          confirmControl: () => Promise.resolve(true),
+        },
+      ),
     )
 
     // Then
@@ -146,10 +197,16 @@ describe("desktop.control facade (#9651 B5b)", HANG_GUARD, () => {
         signal.addEventListener("abort", () => resolve(true), { once: true })
       })
     }
-    const promise = run(service, `return await desktop.control.acquire({ reason: "click Run" });`, {
-      signal: controller.signal,
-      confirmControl,
-    })
+    const promise = run(
+      service,
+      async ({ desktop }) => {
+        return await desktop.control.acquire({ reason: "click Run" })
+      },
+      {
+        signal: controller.signal,
+        confirmControl,
+      },
+    )
     await started.promise
 
     // When
@@ -167,13 +224,19 @@ describe("desktop.control facade (#9651 B5b)", HANG_GUARD, () => {
     const budgets: number[] = []
 
     // When
-    await run(service, `return await desktop.control.acquire({ reason: "click Run" });`, {
-      timeoutMs: 20_000,
-      confirmControl: (_reason, _signal, budgetMs) => {
-        budgets.push(budgetMs)
-        return Promise.resolve(false)
+    await run(
+      service,
+      async ({ desktop }) => {
+        return await desktop.control.acquire({ reason: "click Run" })
       },
-    })
+      {
+        timeoutMs: 20_000,
+        confirmControl: (_reason, _signal, budgetMs) => {
+          budgets.push(budgetMs)
+          return Promise.resolve(false)
+        },
+      },
+    )
 
     // Then
     expect(budgets).toHaveLength(1)
@@ -187,25 +250,45 @@ describe("desktop.control facade (#9651 B5b)", HANG_GUARD, () => {
 
     // When
     const error = await rejectionOf(
-      run(service, `await desktop.control.acquire({ reason: "click Run" }); throw new Error("boom");`, {
-        confirmControl: () => Promise.resolve(true),
-      }),
+      run(
+        service,
+        async ({ desktop }) => {
+          await desktop.control.acquire({ reason: "click Run" })
+          throw new Error("boom")
+        },
+        {
+          confirmControl: () => Promise.resolve(true),
+        },
+      ),
     )
 
     // Then
     expect(error).toMatchObject({ message: "boom" })
     // The revoke is not awaited by the run (it settles at its own deadline); it is already on the wire.
     await log.nthRequest("control.revoke", 1)
-    expect((await run(service, `return await desktop.control.state();`)).returnValue).toEqual({ active: false })
+    expect(
+      (
+        await run(service, async ({ desktop }) => {
+          return await desktop.control.state()
+        })
+      ).returnValue,
+    ).toEqual({ active: false })
   })
 
   it("sends the revoke again after one that failed, so the grant is never forgotten as revoked", async () => {
     // Given: the engine refuses the first revoke (#9651 B5b review round 2, R2-M1)
     const { service, log } = await openDesktop({ FAKE_ENGINE_REVOKE_ERROR: "Internal" })
     await rejectionOf(
-      run(service, `await desktop.control.acquire({ reason: "click Run" }); throw new Error("boom");`, {
-        confirmControl: () => Promise.resolve(true),
-      }),
+      run(
+        service,
+        async ({ desktop }) => {
+          await desktop.control.acquire({ reason: "click Run" })
+          throw new Error("boom")
+        },
+        {
+          confirmControl: () => Promise.resolve(true),
+        },
+      ),
     )
     await log.nthRequest("control.revoke", 1)
 
@@ -223,13 +306,19 @@ describe("desktop.control facade (#9651 B5b)", HANG_GUARD, () => {
 
     // When
     const error = await rejectionOf(
-      run(service, `await desktop.control.acquire({ reason: "click Run" });`, {
-        timeoutMs: 6_000,
-        confirmControl: () => {
-          prompts += 1
-          return Promise.resolve(true)
+      run(
+        service,
+        async ({ desktop }) => {
+          await desktop.control.acquire({ reason: "click Run" })
         },
-      }),
+        {
+          timeoutMs: 6_000,
+          confirmControl: () => {
+            prompts += 1
+            return Promise.resolve(true)
+          },
+        },
+      ),
     )
 
     // Then
@@ -241,9 +330,16 @@ describe("desktop.control facade (#9651 B5b)", HANG_GUARD, () => {
   it("does not send a revoke again once one succeeded", async () => {
     // Given: a grant released by a revoke that succeeded
     const { service, log } = await openDesktop()
-    await run(service, `await desktop.control.acquire({ reason: "click Run" }); await desktop.control.release();`, {
-      confirmControl: () => Promise.resolve(true),
-    })
+    await run(
+      service,
+      async ({ desktop }) => {
+        await desktop.control.acquire({ reason: "click Run" })
+        await desktop.control.release()
+      },
+      {
+        confirmControl: () => Promise.resolve(true),
+      },
+    )
 
     // When: the turn ends
     await service.revokeControl()
@@ -259,7 +355,11 @@ describe("desktop.control facade (#9651 B5b)", HANG_GUARD, () => {
     const { service, log } = await openDesktop()
 
     // When
-    await rejectionOf(run(service, `throw new Error("boom");`))
+    await rejectionOf(
+      run(service, async () => {
+        throw new Error("boom")
+      }),
+    )
     // One engine round trip: a revoke the failed run sent would be logged before this reply.
     await service.call("control.state", {})
 
@@ -278,10 +378,16 @@ describe("desktop.control facade (#9651 B5b)", HANG_GUARD, () => {
       started.resolve()
       return answer.promise
     }
-    const promise = run(service, `return await desktop.control.acquire({ reason: "click Run" });`, {
-      signal: controller.signal,
-      confirmControl,
-    })
+    const promise = run(
+      service,
+      async ({ desktop }) => {
+        return await desktop.control.acquire({ reason: "click Run" })
+      },
+      {
+        signal: controller.signal,
+        confirmControl,
+      },
+    )
     await started.promise
 
     // When

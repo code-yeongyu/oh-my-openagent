@@ -1,5 +1,5 @@
 import { expect, it } from "vitest"
-import { DesktopService, runComputerCode } from "@oh-my-opencode/senpi-desktop-service"
+import { DesktopService, runComputerSteps } from "@oh-my-opencode/senpi-desktop-service"
 import { refusalChild } from "../../senpi-desktop-engine/test/refusal-child"
 import { ComputerHandle } from "../src/activation"
 import { runComputerCommand } from "../src/command"
@@ -30,11 +30,7 @@ function fixture() {
   return { service, settings, handle, deps, launches: () => launches, hostTools: () => hostTools }
 }
 
-for (const input of [
-  { action: "call", chain: [{ method: "windows" }] },
-  { action: "run", code: "return await desktop.windows();", read_only: true },
-  { action: "capabilities" },
-]) {
+for (const input of [{ action: "call", chain: [{ method: "windows" }] }, { action: "capabilities" }]) {
   it(`maps actual startup refusal for computer ${input.action} without permission metadata`, async () => {
     const f = fixture()
     try {
@@ -110,13 +106,10 @@ it("propagates a restart refusal through the eval-facing real service facade", a
       if (!(error instanceof Error)) throw error
     })
     await expect(
-      runComputerCode(
-        {
-          code: "return await desktop.windows();",
-          snapshot: runSnapshot(f.settings, hostContext(), true),
-          timeoutMs: 5_000,
-        },
-        { service: f.service, executeTool: f.deps.executeTool },
+      runComputerSteps(
+        { toolCallId: "launch", snapshot: runSnapshot(f.settings, hostContext(), true), timeoutMs: 5_000 },
+        { service: f.service },
+        ({ desktop }) => desktop.windows(),
       ),
     ).rejects.toMatchObject({
       code: "launch-context-unavailable",

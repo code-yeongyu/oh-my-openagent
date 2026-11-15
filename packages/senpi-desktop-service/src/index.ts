@@ -11,7 +11,16 @@ export {
 export type { AxNode, CaptureRegion, CaptureResult, DesktopDisplay, DesktopWindow } from "./run/engine-results"
 export { type ControlState, createDesktopFacade, type DesktopFacade, type WindowFilter } from "./run/facade"
 export { ElementHandle, WindowHandle } from "./run/handles"
-export { type ComputerRunHost, type ComputerRunRequest, type ExecuteTool, runComputerCode } from "./run/runtime"
+export {
+  type ComputerCallHost,
+  type ComputerCallRequest,
+  type ExecuteTool,
+  runComputerSteps,
+  type StepProgram,
+  type StepScope,
+} from "./run/runtime"
+export { interpretChain } from "./run/steps"
+export { DesktopCallBudgetError } from "./service/call-budget"
 export type { ScreenshotOptions, ScreenshotResult } from "./run/screenshot"
 export type { ObserveOptions, ObservationResult } from "./run/observe"
 export type { HoldOptions, HoldMouseOptions } from "./run/input-target"

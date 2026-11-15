@@ -30,26 +30,15 @@ describe("computerPermissionParser tiers", () => {
     expect(patterns).toEqual(["exec"])
   })
 
-  it("classifies run without read_only as exec", () => {
-    // Given
-    const input = { action: "run", code: "return 1" }
-
-    // When
-    const patterns = patternsOf(input)
-
-    // Then
-    expect(patterns).toEqual(["exec"])
-  })
-
-  it("classifies run with read_only true as read", () => {
-    // Given
+  it("classifies the removed run action as exec even when it claims read_only", () => {
+    // Given: what an outdated facade would still send; it never earns the read tier
     const input = { action: "run", code: "return 1", read_only: true }
 
     // When
     const patterns = patternsOf(input)
 
     // Then
-    expect(patterns).toEqual(["read"])
+    expect(patterns).toEqual(["exec"])
   })
 
   it("classifies capabilities as read", () => {

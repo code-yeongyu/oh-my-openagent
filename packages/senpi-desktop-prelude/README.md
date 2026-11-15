@@ -19,10 +19,11 @@ Holds the eval-kernel facades and the model documentation for the `computer` too
 Every facade helper is one ordinary `tool.computer(args)` call, so tool activation and the permission-system preflight apply to it. The `computer` tool must accept these `args`:
 
 - `{ action: "call", chain }`: `chain` holds at most two `{ method, args }` steps: a desktop root method, optionally followed by one window (`window` root) or element (`ref` root) method. Handles re-resolve on every call.
-- `{ action: "run", code, read_only?, timeout? }`: `code` is an async function body. `computer.run(fn, { args })` serializes `fn` and each argument (JSON data, functions, and `RegExp`) into `return await (fn)({ desktop, wait, assert }, ...args);`. `timeout` is in seconds.
 - `{ action: "capabilities" }` and `{ action: "close" }`.
 
-The facades read the kernel result `{ text, details?, images?, hasError? }` this way: `hasError` throws with `text`, each `images[i]` goes to `display()`, and `details.value` is the return value.
+There is no code-carrying action: a multi-step task is an eval cell that awaits one helper per step, so the eval kernel is the only executor of model code.
+
+The facades read the kernel result `{ text, details?, images?, hasError? }` this way: `hasError` throws with `text`, each `images[i]` goes to `display()`, and `details.value` is the return value. When `details.report` is present (the call sent input), the helper returns `{ value, report, reports, auditIds, toolCallId }` from `details` instead.
 
 ## Settings
 

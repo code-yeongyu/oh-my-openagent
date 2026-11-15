@@ -7,6 +7,7 @@ import {
   PROTOCOL_VERSION,
   type StopPathStatus,
 } from "@oh-my-opencode/senpi-desktop-protocol"
+import { CallBudget, DEFAULT_CALL_BUDGET } from "./call-budget"
 import { type ChildFactory, engineChildFactory } from "./child"
 import { ControlGrants } from "./control-grants"
 import { deadline } from "./deadline"
@@ -28,6 +29,8 @@ export interface DesktopServiceOptions {
   readonly createChild?: ChildFactory
   /** The session's live full-access decision (#10022); absent counts as not full access. */
   readonly fullAccess?: () => boolean
+  /** Desktop requests this session may send through `call` (default `DEFAULT_CALL_BUDGET`). */
+  readonly callBudget?: number
 }
 
 /**
@@ -42,12 +45,14 @@ export class DesktopService {
   #desired: DesiredSession | undefined
   readonly #grants = new ControlGrants()
   readonly #consent: FullAccessConsent
+  readonly #budget: CallBudget
   /** The user's stop, held by the host: only a stop sets it and only a successful resume clears it (#10788). */
   #stopLatched = false
 
   constructor(options: DesktopServiceOptions = {}) {
     this.#createChild = options.createChild ?? engineChildFactory()
     this.#consent = new FullAccessConsent(this.#grants, options.fullAccess ?? (() => false))
+    this.#budget = new CallBudget(options.callBudget ?? DEFAULT_CALL_BUDGET)
     this.#hub.onStopPathChange((status) => {
       if (status.suspended) this.#stopLatched = true
     })
@@ -93,7 +98,9 @@ export class DesktopService {
     })
   }
 
+  /** One desktop request; past the session's call budget it throws `DesktopCallBudgetError` before anything starts. */
   async call(method: EngineMethod, params: unknown, options: CallOptions = {}): Promise<unknown> {
+    this.#budget.admit()
     const connection = await this.#live()
     await this.#consent.fence(connection)
     const request = () => connection.rpc.request(method, params, options)

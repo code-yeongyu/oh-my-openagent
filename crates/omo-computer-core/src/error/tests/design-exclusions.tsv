@@ -57,12 +57,6 @@ BackgroundUnavailable	drop-matrix	design/d-sdk-skill.md:499	6fd00f8c528e9d40c033
 BackgroundUnavailable	family	design/d-sdk-skill.md:499	6fd00f8c528e9d40c03332a958d2d0e050d9d18825e3f59982eba4d723092685	data member carried beside the reason, not a data.reason
 BackgroundUnavailable	refusal	design/d-sdk-skill.md:499	6fd00f8c528e9d40c03332a958d2d0e050d9d18825e3f59982eba4d723092685	placeholder word for the reasons listed or named elsewhere; each has its row
 UserIntervened	delivered	design/d-sdk-skill.md:521	9b25acea631bbb120623c62bdea38da6b4df898dbb706a174f7cb556c35ed973	data member carried beside the reason, not a data.reason
-RunFailed	name	design/d-sdk-skill.md:543	98905b0e220824688e5574de957f821673dd1174b9b6459309c088021e32f635	data member carried beside the reason, not a data.reason
-RunFailed	message	design/d-sdk-skill.md:543	98905b0e220824688e5574de957f821673dd1174b9b6459309c088021e32f635	data member carried beside the reason, not a data.reason
-RunLimit	limit	design/d-sdk-skill.md:558	b3488074b894f10f5e0dd6567e26fe5a5de0ee658037715b5d1f2582f0ca6c74	data member carried beside the reason, not a data.reason
-RunLimit	value	design/d-sdk-skill.md:558	b3488074b894f10f5e0dd6567e26fe5a5de0ee658037715b5d1f2582f0ca6c74	data member carried beside the reason, not a data.reason
-RunLimit	max	design/d-sdk-skill.md:558	b3488074b894f10f5e0dd6567e26fe5a5de0ee658037715b5d1f2582f0ca6c74	data member carried beside the reason, not a data.reason
-RunLimit	name	design/d-sdk-skill.md:558	b3488074b894f10f5e0dd6567e26fe5a5de0ee658037715b5d1f2582f0ca6c74	data member carried beside the reason, not a data.reason
 BackgroundUnavailable	qt_xcb	design/d-sdk-skill.md:946	77271bc7bb886a536c4aa32d027cf655e5dbb185c35d91b481ea074acc452c46	toolkit value; its reason QT_CORE_KEYBOARD has the row
 COMPUTER_PERMISSION_DENIED	reason	design/d-sdk-skill.md:966	41ba5c7d55339066b795d4e71e21a6dc231996be96b853fa2d18ab93d503202f	placeholder word for the reasons listed or named elsewhere; each has its row
 InvalidCoordinateFrame	reason	design/d-vision.md:210	394e35e61819f80d618e96fee6bb8ab07a724d057d62fe101de235bc41764d11	placeholder word for the reasons listed or named elsewhere; each has its row

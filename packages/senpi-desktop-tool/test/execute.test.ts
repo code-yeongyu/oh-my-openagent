@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { rejectionOf } from "../../senpi-desktop-service/test/harness"
 import type { ComputerHandle } from "../src/activation"
 import { AUDIT_FILE_NAME, type ComputerModel } from "../src/session"
+import { createComputerActionsTool } from "../src/cua-adapter"
 import { createComputerTool } from "../src/tool"
 import { closeDesktops, desktopFixture, hostContext, methodsOf } from "./fixtures"
 
@@ -60,8 +61,8 @@ describe("computer tool execute", HANG_GUARD, () => {
     // Given
     const { handle } = desktopFixture()
     const params = {
-      action: "run" as const,
-      code: "const win = await desktop.window('101'); return await win.observe();",
+      action: "call" as const,
+      chain: [{ method: "window", args: ["101"] }, { method: "observe" }],
     }
 
     // When
@@ -72,19 +73,6 @@ describe("computer tool execute", HANG_GUARD, () => {
     expect(texts.filter((text) => text.includes("button Run [ref=e1]"))).toEqual(["button Run [ref=e1]"])
     expect(texts.at(-1)).toContain('"ax": "[shown above]"')
     expect(result.details.value).toMatchObject({ ax: "button Run [ref=e1]" })
-  })
-
-  it("keeps a short printed string in the returned value", async () => {
-    // Given
-    const { handle } = desktopFixture()
-    const params = { action: "run" as const, code: "console.log('Terminal'); return { title: 'Terminal' };" }
-
-    // When
-    const result = await toolFor(handle).execute("call-print", params, undefined, undefined, hostContext())
-
-    // Then
-    const texts = result.content.flatMap((part) => (part.type === "text" ? [part.text] : []))
-    expect(texts.at(-1)).toContain('"title": "Terminal"')
   })
 
   it("rejects a userReset chain as an unknown method before any engine is started", async () => {
@@ -100,34 +88,6 @@ describe("computer tool execute", HANG_GUARD, () => {
       reason: error instanceof ComputerCallError ? error.reason : error,
       spawned: log.children.length,
     }).toEqual({ reason: "unknownMethod", spawned: 0 })
-  })
-
-  it("refuses input inside a read_only run before it reaches the engine", async () => {
-    // Given: a read_only run whose code clicks.
-    const { handle, log } = desktopFixture()
-    const params = { action: "run" as const, code: "await desktop.click(1, 1);", read_only: true }
-
-    // When
-    const error = await rejectionOf(toolFor(handle).execute("call-1", params, undefined, undefined, hostContext()))
-
-    // Then
-    expect({
-      message: error instanceof Error ? error.message : error,
-      clicks: methodsOf(log).filter((m) => m === "click"),
-    }).toEqual({ message: "read-only run: 'click' requires read_only: false", clicks: [] })
-  })
-
-  it("reaches host tools from run code through the injected executeTool", async () => {
-    // Given
-    const { handle } = desktopFixture()
-    const executeTool = (name: string, params: unknown) => Promise.resolve({ name, params })
-    const params = { action: "run" as const, code: 'return await tool.read({ path: "a.txt" });' }
-
-    // When
-    const result = await toolFor(handle, executeTool).execute("call-1", params, undefined, undefined, hostContext())
-
-    // Then
-    expect(result.details.value).toEqual({ name: "read", params: { path: "a.txt" } })
   })
 
   it("returns live capabilities as the facade value", async () => {
@@ -321,14 +281,26 @@ describe("computer tool execute", HANG_GUARD, () => {
     }).toMatchObject({ reportMode, report, reports: undefined })
   })
 
-  it("lists every input action's report in send order and leaves a read-only run without one", async () => {
+  it("lists every input action's report in send order and leaves a read-only call without one", async () => {
     // Given
     const { handle } = desktopFixture({}, { FAKE_ENGINE_FEATURES: '["action-report"]' })
     const tool = toolFor(handle)
-    const code = "const win = await desktop.window('101'); await win.type('a'); await win.press('enter');"
+    const batch = {
+      action: "batch",
+      actions: [
+        { action: "type", text: "a" },
+        { action: "keypress", keys: ["enter"] },
+      ],
+    }
 
     // When
-    const sent = await tool.execute("call-run", { action: "run", code }, undefined, undefined, hostContext())
+    const sent = await createComputerActionsTool({ handle, executeTool: noTools }).execute(
+      "call-batch",
+      batch,
+      undefined,
+      undefined,
+      hostContext(),
+    )
     const read = await tool.execute(
       "call-read",
       { action: "call", chain: [{ method: "windows" }] },

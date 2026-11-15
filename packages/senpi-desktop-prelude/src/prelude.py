@@ -27,7 +27,8 @@ def _make_computer():
 
     def _invoke(arguments):
         # The tool result is {text, details?, images?, hasError?}: images display, details.value is the return value.
-        # A failed call's details.value.code (COMPUTER_*) rides on the raised RuntimeError as `error.code`.
+        # A failed call's details.value.code (COMPUTER_*) rides on the raised RuntimeError as `error.code`. A call that sent
+        # input carries the engine's report: the helper then returns {value, report, reports, auditIds, toolCallId}.
         result = tool.computer(**arguments)
         if result.get("hasError"):
             details = result.get("details")
@@ -39,7 +40,18 @@ def _make_computer():
         for image in result.get("images") or []:
             display(image)
         details = result.get("details")
-        return details.get("value") if isinstance(details, dict) else None
+        if not isinstance(details, dict):
+            return None
+        report = details.get("report")
+        if report is None:
+            return details.get("value")
+        return {
+            "value": details.get("value"),
+            "report": report,
+            "reports": details.get("reports") or [report],
+            "auditIds": details.get("auditIds") or [],
+            "toolCallId": details.get("toolCallId"),
+        }
 
     def _call(chain):
         return _invoke({"action": "call", "chain": chain})
@@ -259,13 +271,6 @@ def _make_computer():
         def ref(self, ref):
             """Resolve a live accessibility element by its `[ref=eN]` tag."""
             return _element(self._method("ref", (ref,), {}))
-
-        def run(self, code, *, read_only=None, timeout=None):
-            """Run a JavaScript function body in the persistent desktop session and return its value."""
-            if not isinstance(code, str):
-                raise TypeError("computer.run() expects a JavaScript code string")
-            options = {"read_only": read_only, "timeout": timeout}
-            return _invoke({"action": "run", "code": code, **{k: v for k, v in options.items() if v is not None}})
 
         def verify(self, expectation, *, timeoutMs=2000, intervalMs=100):
             """Poll read calls until `expectation` holds or the deadline passes; never sends input."""

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest"
-import { runComputerCode } from "../src/run/runtime"
+import { runComputerSteps, type StepProgram } from "../src/run/runtime"
+import { interpretChain } from "../src/run/steps"
 import { DesktopService } from "../src/service/service"
 import { fakeEngineFactory } from "./harness"
 
@@ -13,10 +14,10 @@ async function open() {
   const service = new DesktopService({ createChild: log.factory })
   services.push(service)
   await service.open({})
-  const run = (code: string, readOnly = false) =>
-    runComputerCode(
+  const run = (program: StepProgram, readOnly = false) =>
+    runComputerSteps(
       {
-        code,
+        toolCallId: "tool-call-1",
         timeoutMs: 5_000,
         snapshot: {
           cwd: "/work",
@@ -30,7 +31,8 @@ async function open() {
           allowHostRelayOnlyStop: false,
         },
       },
-      { service, executeTool: async () => undefined },
+      { service },
+      program,
     )
   return { log, run }
 }
@@ -42,13 +44,13 @@ describe("display handles", { timeout: 30_000 }, () => {
       // Given
       const { log, run } = await open()
       // When
-      const result = await run(`
-			const display = await desktop.display(${JSON.stringify(selector)});
-			await display.screenshot({ silent: true });
-			await display.click(20, 10);
-			await desktop.screenshot({ silent: true });
-			return display.id;
-		`)
+      const result = await run(async ({ desktop }) => {
+        const display = await desktop.display(selector)
+        await display.screenshot({ silent: true })
+        await display.click(20, 10)
+        await desktop.screenshot({ silent: true })
+        return display.id
+      })
       // Then
       expect(result.returnValue).toBe(selector)
       expect(log.requests.filter((request) => request.method === "capture").map((request) => request.params)).toEqual([
@@ -69,7 +71,10 @@ describe("display handles", { timeout: 30_000 }, () => {
     // Given
     const { log, run } = await open()
     // When
-    const result = run(`const display = await desktop.display("DP-1"); await display.screenshot({ silent: true });`)
+    const result = run(async ({ desktop }) => {
+      const display = await desktop.display("DP-1")
+      await display.screenshot({ silent: true })
+    })
     // Then
     await expect(result).rejects.toThrow("no display DP-1")
     expect(log.requests.some((request) => request.method === "displays")).toBe(false)
@@ -82,7 +87,7 @@ describe("display handles", { timeout: 30_000 }, () => {
     // Given
     const { run } = await open()
     // When
-    const result = run(`await desktop.display(${JSON.stringify(selector)});`)
+    const result = run(({ desktop }) => interpretChain(desktop, [{ method: "display", args: [selector] }]))
     // Then
     await expect(result).rejects.toThrow("display requires an id, 'active', or 'all'")
   })
@@ -91,7 +96,9 @@ describe("display handles", { timeout: 30_000 }, () => {
     // Given
     const { run } = await open()
     // When
-    const result = await run(`return (await (await desktop.display("all")).screenshot({ silent: true })).target;`, true)
+    const result = await run(async ({ desktop }) => {
+      return (await (await desktop.display("all")).screenshot({ silent: true })).target
+    }, true)
     // Then
     expect(result.returnValue).toBe("display:all")
   })
@@ -100,7 +107,9 @@ describe("display handles", { timeout: 30_000 }, () => {
     // Given
     const { log, run } = await open()
     // When
-    const result = run(`await (await desktop.display("active")).click(1, 1);`, true)
+    const result = run(async ({ desktop }) => {
+      await (await desktop.display("active")).click(1, 1)
+    }, true)
     // Then
     await expect(result).rejects.toThrow("read-only run: 'click'")
     expect(log.requests.some((request) => request.method === "click")).toBe(false)

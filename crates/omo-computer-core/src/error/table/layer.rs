@@ -5,7 +5,7 @@ use super::{
     make, ComputerCode, ErrorRow, LayerFailure, NextCall, NothingSent, Reason, Source,
     NOTHING_FOLLOWS,
 };
-use super::{ASK, DUU, INSPECT, NDAU, NDS, RUN, UNK};
+use super::{ASK, DUU, INSPECT, NDAU, NDS, UNK};
 
 pub(super) static ROWS: &[ErrorRow] = &[
     l!(PermissionRuleDenied, _ => PermissionDenied, NDAU, Yes, ASK, none),
@@ -36,8 +36,4 @@ pub(super) static ROWS: &[ErrorRow] = &[
     l!(SecureFocus, _ => SecureFocus, NDAU, Yes, ASK, "win.type(text)"),
     l!(SecureFocus, ConcealedClipboard => SecureFocus, NDAU, Yes, ASK, "win.type(text)"),
     l!(LaunchContextRequired, _ => LaunchContextRequired, NDAU, Yes, ASK, "computer.diagnose()"),
-    l!(RunLimit, _ => RunLimit, RUN, Depends, None, "a smaller body"),
-    l!(RunLimit, HostGlobal => RunLimit, RUN, Depends, None, "a smaller body"),
-    l!(RunFailed, _ => RunLimit, RUN, Depends, None, "the fixed body, with cell values in args"),
-    l!(RunFailed, BodyThrew => RunLimit, RUN, Depends, None, "the fixed body, with cell values in args"),
 ];

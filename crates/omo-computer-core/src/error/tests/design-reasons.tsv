@@ -197,10 +197,6 @@ SafetyCheckDeclined	layer	SafetyCheckDeclined	-	COMPUTER_SAFETY_CHECK_DECLINED	d
 Disabled	layer	Disabled	-	COMPUTER_DISABLED	design/d-sdk-skill.md:554	fcb098d93430cd66e4cee4fb28fa6c131662888863f82e88823866c5a4132ac8	-
 SecureFocus	layer	SecureFocus	-	COMPUTER_SECURE_FOCUS	interpretation:I-10	-	design spelling at design/d-sdk-skill.md:555
 LaunchContextRequired	layer	LaunchContextRequired	-	COMPUTER_LAUNCH_CONTEXT_REQUIRED	design/d-sdk-skill.md:557	c1601c09d8355fa9d223a40973de6a20c6baa906144801834faec7ad8088070e	-
-RunLimit	layer	RunLimit	-	COMPUTER_RUN_LIMIT	design/d-sdk-skill.md:558	b3488074b894f10f5e0dd6567e26fe5a5de0ee658037715b5d1f2582f0ca6c74	-
-RunLimit{host_global}	layer	RunLimit	host_global	COMPUTER_RUN_LIMIT	design/d-sdk-skill.md:558	b3488074b894f10f5e0dd6567e26fe5a5de0ee658037715b5d1f2582f0ca6c74	-
-RunFailed	layer	RunFailed	-	COMPUTER_RUN_LIMIT	design/d-sdk-skill.md:543	98905b0e220824688e5574de957f821673dd1174b9b6459309c088021e32f635	-
-RunFailed{body_threw}	layer	RunFailed	body_threw	COMPUTER_RUN_LIMIT	design/d-sdk-skill.md:543	98905b0e220824688e5574de957f821673dd1174b9b6459309c088021e32f635	-
 refused{concealed_clipboard}	layer	SecureFocus	concealed_clipboard	COMPUTER_SECURE_FOCUS	design/d-safety.md:761	560109e6789ff8607bb036aaae11c3b25522d4b565c219f6b2a70444eb35f970	interpretation I-19: keyed under the SecureFocus layer failure, following secure_focus
 refused{secret_no_clipboard_route}	engine	Internal	secret_no_clipboard_route	COMPUTER_UNAVAILABLE	design/d-sdk-skill.md:526	7818d3cb380e0b87109544e07373efbb90d25d0264fdce7623a900ff10651745	interpretation I-20: keyed under Internal like the other Unavailable reasons of the same row (I-5)
 HandOffline{unmeasured}	layer	HandOffline	unmeasured	COMPUTER_HAND_OFFLINE	design/d-sdk-skill.md:540	505843ea05baaa977aedf43285cfd89cf16348a32b1d0ca932d2a6d84ca7801a	the lan pipe still unmeasured on the roster

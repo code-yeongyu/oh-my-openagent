@@ -34,8 +34,6 @@ pub enum DispositionRule {
     },
     /// The pair of the refusal named inside the failure (a gated drag point).
     OfInnerCode,
-    /// The pair of the last report of the run.
-    LastReport,
 }
 
 impl DispositionRule {
@@ -50,7 +48,7 @@ impl DispositionRule {
             } => {
                 matches!(disposition.retry(), Retry::Safe)
             }
-            Self::OfInnerCode | Self::LastReport => false,
+            Self::OfInnerCode => false,
         }
     }
 }

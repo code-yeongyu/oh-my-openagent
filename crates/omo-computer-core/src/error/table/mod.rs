@@ -26,7 +26,6 @@ const PREFIX: DispositionRule = DispositionRule::BySent {
     some: Disposition::DELIVERED_UNVERIFIED,
 };
 const INNER: DispositionRule = DispositionRule::OfInnerCode;
-const RUN: DispositionRule = DispositionRule::LastReport;
 
 /// Where the design says nothing follows: its code table's `nextCall` column reads `-`.
 const NOTHING_FOLLOWS: &str =

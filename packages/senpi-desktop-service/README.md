@@ -1,6 +1,6 @@
 # @oh-my-opencode/senpi-desktop-service
 
-Runs one `senpi-desktop-engine` child process per agent session and talks JSON-RPC to it over stdio. It also hosts the `computer.run` runtime: model-written JavaScript that drives the desktop through that engine.
+Runs one `senpi-desktop-engine` child process per agent session and talks JSON-RPC to it over stdio. It also runs each `computer` tool call's steps against the desktop facade over that engine. It executes no model-written code: model code lives in the eval kernel, which calls the tool once per helper.
 
 ## `DesktopService`
 
@@ -12,17 +12,20 @@ Runs one `senpi-desktop-engine` child process per agent session and talks JSON-R
 - Notifications: `onAudit(cb)` receives `audit` and `onStopPathChange(cb)` receives `stopPath.changed`. `onError(cb)` receives heartbeat failures and malformed notifications. The engine persists audit records and enforces every policy (capture budget, stop policy). The service only forwards them.
 - Tests inject a `ChildFactory` that runs `test/fake-engine.mjs` through `node`.
 
-## `runComputerCode`
+## `runComputerSteps`
 
-- `runComputerCode({code, snapshot, timeoutMs, signal}, {service, executeTool})` runs `code` (an async function body; `return` sets the value) in a fresh `node:vm` context inside the coding-agent process. No Node child and no worker. It resolves to `ComputerRunOk {displays, returnValue, screenshots, audit}`.
-- The context's globals are `desktop` (the facade), `wait(ms | predicate, {timeout, interval})`, `assert(condition, message)`, `console`, and `tool.<name>(params)`. `tool` goes to the injected `executeTool`, so validation, permissions, and lazy activation stay in the host pipeline. The engine never calls host tools.
-- The vm is not a security boundary. It scopes the run's globals and bounds its CPU time. With `microtaskMode: "afterEvaluate"` every synchronous stretch of user code, including each continuation after an `await`, runs inside a `runInContext` call bounded by the remaining budget, so `while (true) {}` fails the run with a `timeout` error. That microtask queue drains only inside `runInContext`, so every promise a facade method, `wait`, or `tool` hands to the code resumes the vm from `setImmediate` once it settles. After the run ends, nothing resumes it.
-- The run signal aborts on the caller's `signal`, on `timeoutMs`, or when the run ends. Every engine request carries it, so an aborted or timed-out run sends `$/cancel` for its in-flight request and rejects at once with `ComputerRunError` (`aborted` or `timeout`).
-- Facade methods on the desktop root, window handles, and element handles pass through `guardRun`. In a read-only run, a method tagged `exec` in the `-protocol` tier tables (`DESKTOP_METHODS`, `WINDOW_METHODS`, `ELEMENT_METHODS`) throws `read-only run: '<method>' requires read_only: false` before any request is sent. A method missing from the tables counts as `exec`.
-- Window and element handles keep a snapshot of their identity fields and send every call by window id or AX ref. Coordinate frames live in the engine: input sent before the target's first capture rejects with the engine's `InvalidCoordinateFrame` error, unchanged.
+- `runComputerSteps({toolCallId, snapshot, timeoutMs, signal}, {service, confirmControl?}, program)` runs one tool call's `program` against a desktop facade bound to that call and resolves to `ComputerRunOk {displays, returnValue, screenshots, audit}`. `program` is host-written data interpretation, never model code: `interpretChain(desktop, chain)` for a `call` chain, the `computer_actions` step interpreter for a CUA batch. It receives `{desktop, sleep}`.
+- `interpretChain` executes the chain as data: the first step on the facade, each next step on the handle the previous one resolved to. A dotted method (`clipboard.read`, `menu.select`) is a member path, and arguments cross as JSON. A name that is no facade function throws `<method> is not a function`; the tool classified every name against the tier tables before.
+- The call's signal aborts on the caller's `signal`, on `timeoutMs`, or when the call ends. Every engine request carries it, so an aborted or timed-out call sends `$/cancel` for its in-flight request and rejects at once with `ComputerRunError` (`aborted` or `timeout`). A failed or aborted call revokes the control grant.
+- Facade methods on the desktop root, window handles, and element handles pass through `guardRun`. In a read-only call, a method tagged `exec` in the `-protocol` tier tables (`DESKTOP_METHODS`, `WINDOW_METHODS`, `ELEMENT_METHODS`) throws `read-only run: '<method>' requires read_only: false` before any request is sent. A method missing from the tables counts as `exec`.
+- Window and element handles keep a snapshot of their identity fields and send every call by window id or AX ref. Coordinate frames live in the engine: input sent before the target's first capture rejects with the engine's `InvalidCoordinateFrame` error, unchanged. The return value is detached from the facade (structured clone, else JSON), so a handle comes back as its identity fields.
 - `screenshot()` sends `capture {target, caps}`, with the caps taken from the snapshot. An inline result is displayed as a caption plus the image. An artifact-only result is displayed as the caption with its path plus the engine's note. Artifacts are listed in `screenshots`. The engine owns the byte budget.
-- `audit` holds the engine `audit` notifications received while the run was active, projected to `AuditRecord`s with the run's `sessionId` and a fresh `runId`. The engine persists them itself.
-- Each run owns its vm context and a facade bound to its `RunContext` (`signal`, `readOnly`, `snapshot`, `output`, `screenshots`). Async work leaked from an ended run therefore keeps that run's aborted signal instead of borrowing the next run's. oh-my-pi used an `AsyncLocalStorage` run context for the same guarantee.
+- `audit` holds the engine `audit` notifications received during the call, projected to `AuditRecord`s with the call's `sessionId` and its `toolCallId`. The engine persists its own audit lines.
+- Each call owns a facade bound to its `RunContext` (`signal`, `readOnly`, `snapshot`, `output`, `screenshots`). Async work leaked from an ended call therefore keeps that call's aborted signal instead of borrowing the next call's.
+
+## Call budget
+
+- `DesktopService` counts the requests sent through `call` and refuses the first one past `callBudget` (option, default 20,000 per session) with `DesktopCallBudgetError` (`reason: "CallBudgetExceeded"`, `limit`) before an engine starts or anything is sent.
 
 ## Engine spawn contract
 

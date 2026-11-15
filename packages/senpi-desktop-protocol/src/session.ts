@@ -1,7 +1,7 @@
 import type { AuditRecord } from "./audit"
 import type { DesktopCapabilities } from "./wire"
 
-/** Frozen run settings the host hands to the desktop runtime for one `computer` run. */
+/** Frozen settings the host hands to the desktop runtime for one `computer` tool call. */
 export interface ComputerSessionSnapshot {
   readonly cwd: string
   readonly sessionId: string
@@ -29,7 +29,7 @@ export interface ComputerImageDisplay {
 
 export type ComputerDisplay = ComputerTextDisplay | ComputerImageDisplay
 
-/** Full-resolution screenshot artifact written during one computer run. */
+/** Full-resolution screenshot artifact written during one computer tool call. */
 export interface ComputerScreenshot {
   readonly path: string
   readonly width: number
@@ -39,7 +39,7 @@ export interface ComputerScreenshot {
   readonly target: string
 }
 
-/** Successful computer run output returned to the tool. */
+/** Successful output of one computer tool call's steps, returned to the tool. */
 export interface ComputerRunOk {
   readonly displays: readonly ComputerDisplay[]
   readonly returnValue: unknown

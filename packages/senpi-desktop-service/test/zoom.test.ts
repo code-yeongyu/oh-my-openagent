@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest"
-import { runComputerCode } from "../src/run/runtime"
+import { runComputerSteps, type StepProgram } from "../src/run/runtime"
 import { DesktopService } from "../src/service/service"
 import { fakeEngineFactory } from "./harness"
 
@@ -13,10 +13,10 @@ async function open(env: Readonly<Record<string, string>> = {}) {
   const service = new DesktopService({ createChild: log.factory })
   services.push(service)
   await service.open({})
-  const run = (code: string, readOnly = true) =>
-    runComputerCode(
+  const run = (program: StepProgram, readOnly = true) =>
+    runComputerSteps(
       {
-        code,
+        toolCallId: "tool-call-1",
         timeoutMs: 5_000,
         snapshot: {
           cwd: "/work",
@@ -30,7 +30,8 @@ async function open(env: Readonly<Record<string, string>> = {}) {
           allowHostRelayOnlyStop: false,
         },
       },
-      { service, executeTool: async () => undefined },
+      { service },
+      program,
     )
   return { log, run }
 }
@@ -42,12 +43,17 @@ describe("native region zoom", { timeout: 30_000 }, () => {
       // Given
       const { log, run } = await open()
       // When
-      const result = await run(`
-				const target = ${target};
-				const full = await target.screenshot({ silent: true });
-				const shot = await target.zoom({ x: 8, y: 6, width: 8, height: 6 }, { frameId: full.frameId });
-				return { full, shot };
-			`)
+      const result = await run(async ({ desktop }) => {
+        const handle =
+          target === "desktop"
+            ? desktop
+            : target.includes("window")
+              ? await desktop.window("101")
+              : await desktop.display("active")
+        const full = await handle.screenshot({ silent: true })
+        const shot = await handle.zoom({ x: 8, y: 6, width: 8, height: 6 }, { frameId: full.frameId })
+        return { full, shot }
+      })
       // Then
       expect(result.returnValue).toMatchObject({
         full: { frameId: expect.any(String) },
@@ -73,15 +79,12 @@ describe("native region zoom", { timeout: 30_000 }, () => {
     // Given
     const { run } = await open()
     // When
-    const result = await run(
-      `
-			const full = await desktop.screenshot({ silent: true });
-			const shot = await desktop.zoom({ x: 8, y: 6, width: 8, height: 6 }, { silent: true });
-			await desktop.click(300, 200);
-			return { fullId: full.frameId, zoomId: shot.frameId };
-		`,
-      false,
-    )
+    const result = await run(async ({ desktop }) => {
+      const full = await desktop.screenshot({ silent: true })
+      const shot = await desktop.zoom({ x: 8, y: 6, width: 8, height: 6 }, { silent: true })
+      await desktop.click(300, 200)
+      return { fullId: full.frameId, zoomId: shot.frameId }
+    }, false)
     // Then
     expect(result.returnValue).toEqual({ fullId: "desktop-1", zoomId: "desktop-1" })
     expect(result.audit[0]).toMatchObject({ frameId: "desktop-1", action: "click" })
@@ -94,9 +97,10 @@ describe("native region zoom", { timeout: 30_000 }, () => {
       // Given
       const { run } = await open({ [broken]: "1" })
       // When
-      const zoom = run(
-        `const full = await desktop.screenshot({ silent: true }); return await desktop.zoom({ x: 0, y: 0, width: 8, height: 6 }, { frameId: full.frameId });`,
-      )
+      const zoom = run(async ({ desktop }) => {
+        const full = await desktop.screenshot({ silent: true })
+        return await desktop.zoom({ x: 0, y: 0, width: 8, height: 6 }, { frameId: full.frameId })
+      })
       // Then
       await expect(zoom).rejects.toThrow("malformed captureRegion result")
     },
@@ -106,10 +110,13 @@ describe("native region zoom", { timeout: 30_000 }, () => {
     // Given: an engine on the same ABI without coordinate fields or captureRegion
     const { log, run } = await open({ FAKE_ENGINE_PRE_ZOOM: "1" })
     // When
-    const shot = await run(`return await desktop.screenshot({ silent: true });`)
-    const zoom = run(
-      `const full = await desktop.screenshot({ silent: true }); return await desktop.zoom({ x: 0, y: 0, width: 8, height: 6 });`,
-    )
+    const shot = await run(async ({ desktop }) => {
+      return await desktop.screenshot({ silent: true })
+    })
+    const zoom = run(async ({ desktop }) => {
+      const full = await desktop.screenshot({ silent: true })
+      return await desktop.zoom({ x: 0, y: 0, width: 8, height: 6 })
+    })
     // Then: the full frame falls back to the capture's own size
     expect(shot.returnValue).toMatchObject({ width: 1280, height: 800, coordinateWidth: 1280, coordinateHeight: 800 })
     await expect(zoom).rejects.toThrow("Method not found")

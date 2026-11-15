@@ -1,7 +1,7 @@
 import type { AuditEvent } from "@oh-my-opencode/senpi-desktop-protocol"
 import { afterEach, describe, expect, it } from "vitest"
 import { isExecResult } from "../src/run/engine-results"
-import { runComputerCode } from "../src/run/runtime"
+import { runComputerSteps } from "../src/run/runtime"
 import { NotificationHub } from "../src/service/notifications"
 import { isDesktopCapabilities, parseErrorData } from "../src/service/parse"
 import { DesktopService } from "../src/service/service"
@@ -118,12 +118,9 @@ async function openWith(
 }
 
 function clickRun(service: DesktopService) {
-  return runComputerCode(
+  return runComputerSteps(
     {
-      code: `const editor = await desktop.window({ app: "Code" });
-				await editor.screenshot({ silent: true });
-				await editor.click(3, 4);
-				return "clicked";`,
+      toolCallId: "tool-call-1",
       snapshot: {
         cwd: "/work",
         sessionId: "forward-compat",
@@ -137,7 +134,13 @@ function clickRun(service: DesktopService) {
       },
       timeoutMs: 5_000,
     },
-    { service, executeTool: (name) => Promise.reject(new Error(`unexpected tool ${name}`)) },
+    { service },
+    async ({ desktop }) => {
+      const editor = await desktop.window({ app: "Code" })
+      await editor.screenshot({ silent: true })
+      await editor.click(3, 4)
+      return "clicked"
+    },
   )
 }
 

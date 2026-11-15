@@ -80,36 +80,34 @@ describe("computer ToolDefinition", () => {
       type: "object",
       anyOf: undefined,
       oneOf: undefined,
-      action: expect.objectContaining({ type: "string", enum: ["call", "run", "capabilities", "close"] }),
+      action: expect.objectContaining({ type: "string", enum: ["call", "capabilities", "close"] }),
     })
   })
 
-  it.each([
-    { action: "call", chain: [{ method: "screenshot" }] },
-    { action: "run", code: "return 1", read_only: true, timeout: 5 },
-    { action: "capabilities" },
-    { action: "close" },
-  ])("accepts the model-facing action %j", (params) => {
-    // Given: a parameter object the prelude facade emits.
-    // When
-    const parsed = parseComputerParams(params)
+  it.each([{ action: "call", chain: [{ method: "screenshot" }] }, { action: "capabilities" }, { action: "close" }])(
+    "accepts the model-facing action %j",
+    (params) => {
+      // Given: a parameter object the prelude facade emits.
+      // When
+      const parsed = parseComputerParams(params)
 
-    // Then
-    expect({ published: Check(ComputerParams, params), parsed }).toEqual({ published: true, parsed: params })
-  })
+      // Then
+      expect({ published: Check(ComputerParams, params), parsed }).toEqual({ published: true, parsed: params })
+    },
+  )
 
   it.each([
     {
       params: { action: "resume" },
-      reason: 'computer: unknown action "resume"; expected one of call, run, capabilities, close',
+      reason: 'computer: unknown action "resume"; expected one of call, capabilities, close',
     },
     {
       params: { action: "capabilities", token: "stolen" },
       reason: 'computer: action "capabilities" does not take token',
     },
     {
-      params: { action: "run", code: "return 1", timeout: 0 },
-      reason: 'computer: action "run" at /timeout: must be >= 1',
+      params: { action: "run", code: "return 1" },
+      reason: 'computer: unknown action "run"; expected one of call, capabilities, close',
     },
     { params: { action: "call" }, reason: 'computer: action "call": must have required properties chain' },
     { params: { action: "close", code: "x" }, reason: 'computer: action "close" does not take code' },

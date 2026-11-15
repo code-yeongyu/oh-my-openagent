@@ -1,6 +1,6 @@
 import { type Static, Type } from "typebox"
 
-/** Default and maximum budget of one `call` or `run`, in seconds. */
+/** Default and maximum budget of one tool call, in seconds. */
 export const DEFAULT_TIMEOUT_SECONDS = 60
 export const MAX_TIMEOUT_SECONDS = 600
 
@@ -12,15 +12,9 @@ const CallStep = Type.Object(
   { additionalProperties: false },
 )
 
-const RunTimeout = Type.Number({
-  minimum: 1,
-  maximum: MAX_TIMEOUT_SECONDS,
-  description: `run: budget in seconds (default ${DEFAULT_TIMEOUT_SECONDS})`,
-})
-
 /**
- * Each `computer` action's exact shape (oh-my-pi `ComputerParams` minus `fn`/`args`: the prelude serializes
- * functions into `code`). There is deliberately no `resume`: only the user resumes, through `/computer resume`.
+ * Each `computer` action's exact shape. There is no code-carrying action: desktop control is one helper chain per
+ * call, sequenced by the eval cell. There is deliberately no `resume`: only the user resumes, through `/computer resume`.
  * `execute` checks calls against these; the model sees the flat {@link ComputerParams}.
  */
 export const ComputerActionBranches = [
@@ -30,20 +24,6 @@ export const ComputerActionBranches = [
       chain: Type.Array(CallStep, {
         description: "one desktop helper call, optionally followed by one call on the window/element it returns",
       }),
-    },
-    { additionalProperties: false },
-  ),
-  Type.Object(
-    {
-      action: Type.Literal("run"),
-      code: Type.String({
-        description:
-          "JavaScript async function body; `desktop`, `wait`, `assert`, `tool` in scope; `return` sets the value",
-      }),
-      read_only: Type.Optional(
-        Type.Boolean({ description: "true = inspection only: screenshots and AX reads, input/mutation blocked" }),
-      ),
-      timeout: Type.Optional(RunTimeout),
     },
     { additionalProperties: false },
   ),
@@ -61,10 +41,9 @@ export type ComputerToolParams = Static<typeof ComputerActionShape>
  */
 export const ComputerParams = Type.Object(
   {
-    action: Type.Enum(["call", "run", "capabilities", "close"], {
+    action: Type.Enum(["call", "capabilities", "close"], {
       type: "string",
-      description:
-        "call: one desktop helper chain; run: a JavaScript body; capabilities: host report; close: end the session",
+      description: "call: one desktop helper chain; capabilities: host report; close: end the session",
     }),
     chain: Type.Optional(
       Type.Array(CallStep, {
@@ -72,16 +51,6 @@ export const ComputerParams = Type.Object(
           "call (required): one desktop helper call, optionally followed by one call on the window/element it returns",
       }),
     ),
-    code: Type.Optional(
-      Type.String({
-        description:
-          "run (required): JavaScript async function body; `desktop`, `wait`, `assert`, `tool` in scope; `return` sets the value",
-      }),
-    ),
-    read_only: Type.Optional(
-      Type.Boolean({ description: "run: true = inspection only: screenshots and AX reads, input/mutation blocked" }),
-    ),
-    timeout: Type.Optional(RunTimeout),
   },
   { additionalProperties: false },
 )

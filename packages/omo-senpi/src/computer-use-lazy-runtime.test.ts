@@ -19,7 +19,7 @@ const DRIVER_TIMEOUT_MS = 60_000
 // execute); terser mangles identifiers, but string literals survive it.
 const IMPLEMENTATION_MARKERS = [
   "Timed out starting desktop engine",
-  "computer run was aborted",
+  "computer call was aborted",
   "is quarantined by macOS Gatekeeper",
   "Desktop engine unavailable (",
   "Computer use is off for this session",
@@ -31,23 +31,23 @@ const IMPLEMENTATION_MARKERS = [
 const PRELUDE_ASSET_FIELDS: readonly (readonly [field: string, marker: string, sha256: string])[] = [
   [
     "COMPUTER_PRELUDE_JAVASCRIPT",
-    "computer.run() expects a function or code string",
-    "7963947945cb137f8d069dd1e70c03b044857e0a7f643655fd0baafec1a1872d",
+    "computer helpers take plain data",
+    "243caee36ef32746346fa801b50da711376ae6a8eae13fa993ac25ed56c8a15f",
   ],
   [
     "COMPUTER_PRELUDE_PYTHON",
     "Positional args with trailing Nones dropped",
-    "db75c3498604c0ee87fa4e28a0b669bd8baa7860794978dd515f5c89636c7e7d",
+    "c4c3f877079112fea7c60a96380331e1a27aae179a5d56a4a783ad1d07480db6",
   ],
   [
     "COMPUTER_DECLARATIONS",
     "interface ComputerClickOptions extends ComputerDeliveryOptions",
-    "0b02aaffd28d14a2d189c3810719fe7ebe3975e9cadf4ef49db6af156ef4b0a8",
+    "80f44187285703450b6932022ae89be652332336269a1cfe8a3079eb5f8589e8",
   ],
   [
     "COMPUTER_DOCUMENTATION",
     "host desktop facade, experimental (present while the `computer` tool is active)",
-    "c6e5e38fcdf18803d39d227dbd29cd1f5342cc4423c7fbbfb7b5c0b2fac2277d",
+    "2428ac6cd05c4d03a6c3b4ea04ed81c026ef339f4f6ad1dcb208351da0595e90",
   ],
   ["COMPUTER_SAFETY", "<critical>", "bd44e5231c66f4b65c9ac41f8e37234bf6ec70dea6242042ec7246b1a8658db2"],
 ]

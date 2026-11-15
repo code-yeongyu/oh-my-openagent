@@ -130,7 +130,7 @@ function classifyComputerCall(chain: readonly ComputerCallStep[]): ComputerCallP
   if (rest.length > 0) {
     throw new ComputerCallError(
       "tooLong",
-      "Call chains support one handle hop at most; use computer.run(fn) for longer sequences.",
+      "Call chains support one handle hop at most; make one call per hop (eval: await each computer helper in turn).",
     )
   }
   const rootPolicy = policyOf(DESKTOP_METHODS, root.method)

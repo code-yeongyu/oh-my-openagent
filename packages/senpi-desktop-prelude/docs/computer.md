@@ -1,7 +1,8 @@
 computer → host desktop facade, experimental (present while the `computer` tool is active)
     Drives the REAL desktop: windows, screenshots, native input, OS accessibility (AX), clipboard. Not a browser; no DOM.
     Find it with tool_search ("computer") or call `computer` by name; the global appears in the NEXT cell. The user controls it with `/computer on|off|status|stop|resume` and `/computer cursor on|off` (default on, display-only).
-    Every helper is one `tool.computer({ action: "call", chain })` call. Permission tiers: inspection needs `computer:read`, input and mutation need `computer:exec`; a denied call throws.
+    Every helper is one `tool.computer({ action: "call", chain })` call; a multi-step task is one cell that awaits a helper per step. Permission tiers: inspection needs `computer:read`, input and mutation need `computer:exec`; a denied call throws.
+    Input helpers (marked → Action) resolve to `{ value, report, reports, auditIds, toolCallId }`: `report.disposition` says whether the input was delivered and `report.disposition.retry` whether sending it again is safe; read helpers resolve to their value.
     JS: `await` every helper. Python: sync, same names, keyword args become the trailing options object, `win.raise_()` stands in for `raise`.
 computer.displays() → ComputerDisplay[]
     All known monitors; pixel rectangles describe the all-display composite, not the default active screenshot.
@@ -16,20 +17,20 @@ computer.screenshot({ silent? }?) / win.screenshot({ silent? }?) → { target, f
     The root captures the focused monitor by default (primary fallback), not the all-display composite. Auto-displays the image unless `silent: true`. Wayland uses the first display the portal reports, not a known compositor primary.
 computer.zoom({ x, y, width, height }, { silent?, frameId? }?) / win.zoom(...) → { target, frameId, width, height, sourceWidth, sourceHeight, coordinateWidth, coordinateHeight, region, scale, path? }
     Fresh native-detail crop of a region in the SAME target's last full screenshot. Desktop/display zoom pins the displays that full frame captured, even after focus moves. Zoom pixels are NOT input coordinates: later clicks still use the last full screenshot's coordinateWidth/coordinateHeight and frameId. A missing/stale full frame or invalid rectangle throws InvalidCoordinateFrame; take a new full screenshot. Same helper on display handles.
-computer.click(x, y, { button?, count?, modifiers?, delivery? }?) / win.click(...) → None
-computer.doubleClick(x, y, opts?) / computer.move(x, y) / computer.drag([[x, y], …], { modifiers?, delivery? }?) / computer.scroll(x, y, { dx?, dy?, delivery? }?) → None
+computer.click(x, y, { button?, count?, modifiers?, delivery? }?) / win.click(...) → Action
+computer.doubleClick(x, y, opts?) / computer.move(x, y) / computer.drag([[x, y], …], { modifiers?, delivery? }?) / computer.scroll(x, y, { dx?, dy?, delivery? }?) → Action
     Same helpers on a window handle: win.doubleClick, win.move, win.drag, win.scroll.
     dx/dy are pixels, the same unit on every OS; one mouse-wheel notch is about 40 px, so dy: 120 scrolls about three notches.
     Scroll direction is semantic and the same on every OS: positive dy moves the view toward the end of the content (negative toward the start), positive dx toward the right edge; the natural-scrolling setting does not change it.
-computer.type(text, { delivery? }?) / computer.press("cmd+shift+p" | keys[], { delivery? }?) → None
+computer.type(text, { delivery? }?) / computer.press("cmd+shift+p" | keys[], { delivery? }?) → Action
     Same helpers on a window handle: win.type, win.press.
-computer.holdKeys(keys[], { duration, delivery? }) / computer.holdMouse(x, y, { duration, button?, keys?, delivery?, frameId? }) → None
-    Exec tier, also available on window and display handles and the desktop object inside computer.run. Duration is finite seconds in 0..=100; holdKeys refuses an empty list. Mouse coordinates use the latest full screenshot, never a zoom. Input is always released before the call settles, including errors, cancellation, deadlines and the user's safety stop; keys release in reverse order. Foreground delivery still needs the human-confirmed control grant. Existing run and engine deadlines can interrupt a hold early; give long holds an adequate run budget. Older engines refuse unsupported hold methods without affecting press/click.
-win.raise() → None
+computer.holdKeys(keys[], { duration, delivery? }) / computer.holdMouse(x, y, { duration, button?, keys?, delivery?, frameId? }) → Action
+    Exec tier, also available on window and display handles. Duration is finite seconds in 0..=100; holdKeys refuses an empty list. Mouse coordinates use the latest full screenshot, never a zoom. Input is always released before the call settles, including errors, cancellation, deadlines and the user's safety stop; keys release in reverse order. Foreground delivery still needs the human-confirmed control grant. The call's 60 s budget and engine deadlines can interrupt a hold early. Older engines refuse unsupported hold methods without affecting press/click.
+win.raise() → Action
     Brings the window to the front (exec tier). Unavailable on Wayland.
 win.menu.items(path?) → ComputerMenuItem[]
     Read-only (read tier): lists the immediate children of the window's menu at `path`; no argument lists the menu bar. Item fields: title, path (native labels, ellipses included), enabled, checked, hasSubmenu, shortcut.
-win.menu.select(path, { delivery? }?) → None
+win.menu.select(path, { delivery? }?) → Action
     Exec tier: invokes the leaf command `path` names. Matching prefers a case-insensitive exact title, otherwise compares titles ignoring a trailing `...` or `…`; each tier must match exactly one item. An ambiguous label, a disabled item anywhere in the path, a submenu as the leaf, or an untitled separator is refused and NOTHING is dispatched; the engine revalidates the command before the press. Background delivery (the default) refuses an app that has several windows, because the command would act on whichever window that app treats as key; pass `{ delivery: "foreground" }` (Python: `delivery='foreground'`) to raise and key this window first, which needs the human-confirmed grant (`computer.control.acquire`).
 win.ax({ all?, maxDepth? }?) → str
     One formatted TEXT tree, one node per line with `[ref=eN]` tags; NEVER iterate or `.map` it.
@@ -40,19 +41,17 @@ win.ref("e5") / computer.ref("e5") → ComputerElement | null
 computer.elementAt(x, y) / computer.focusedElement() → ComputerElement | null
     `elementAt` takes GLOBAL desktop coordinates, not screenshot pixels.
 el.value() / el.bounds() / el.attributes() / el.actions() / el.parent() / el.children() → reads
-el.setValue(text) / el.perform(action) / el.press() / el.click({ delivery? }?) / el.focus() → mutations
-el.type(text, { delivery? }?) → { method: "inserted" | "keys" }
+el.setValue(text) / el.perform(action) / el.press() / el.click({ delivery? }?) / el.focus() → Action
+el.type(text, { delivery? }?) → Action with value { method: "inserted" | "keys" }
     Types into THAT element without taking the user's focus (macOS). A native text field takes the text through its own selection and the value is read back exactly (`inserted`: no key sent, no focus moved, works in a multi-window app); any other element is given app-local focus and takes keys only once the app confirms it has focus (`keys`). An element that never takes focus throws `BackgroundUnavailable` (`InputFailed` in the foreground) naming where the focus is, with a ref; nothing was typed. A secure field's text never appears in an error. Foreground delivery raises the window first and needs the grant.
     Element fields: ref, role, nativeRole, title, description, enabled, focused, childCount. AX actions need no screenshot.
 computer.clipboard.read() → str
-computer.clipboard.write(text) → None
+computer.clipboard.write(text) → Action
 computer.control.acquire({ reason }) → { active, reason?, grantedAt? }
     Ask the human for the foreground-control grant (exec tier). Headless, refusal, timeout, or interrupt returns { active: false }; a latched stop refuses Suspended. Foreground delivery and win.raise() are refused ControlRequired until this returns { active: true }.
 computer.control.release() → None
-    Release the grant; belongs in `finally`. Interrupts, task completion, session shutdown, and a failed run also revoke it.
+    Release the grant; belongs in `finally`. Interrupts, task completion, session shutdown, and a failed call also revoke it.
 computer.control.state() → { active, reason?, grantedAt? }
-computer.run(fnOrCode, { args?, read_only?, timeout? }?) → value
-    One multi-step JS run in the persistent desktop session. Functions receive `{ desktop, wait, assert }` (`desktop` = same helpers) and cannot capture cell closures; `args` pass JSON data, functions, RegExp. Python passes a JS code string only. `read_only: true` needs `computer:read` and blocks mutation; `timeout` is seconds. Not sandboxed.
 computer.capabilities() → { backend, capture, input, ax, backgroundWindowInput, cursorOverlay, deliveryModes, *Permission, stopPath, stopReason?, focusGuard, screenLocked, displayAsleep, … }
     `stopPath` is `global` when the user's stop chord is armed; with `none`, input is refused. `focusGuard` says whether foreground delivery restores the previous front window and cursor. `displayAsleep` (macOS) is true when every display of the session sleeps; the engine keeps the display awake while you act, and a failure that ends `(the screen is locked)` or `(the display is asleep)` needs the user to unlock or wake the Mac, not a retry.
 computer.close() → None
@@ -68,5 +67,5 @@ Rules:
     REMOTE SCREENS (macOS): a window that shows another computer or device (Screen Sharing, iPhone Mirroring) receives key codes, not typed text, so `type()` into it sends the keys of the current keyboard layout: every character is mapped before anything is sent, and a character no key types throws `InvalidKey` with nothing typed; `el.type()` never inserts there. In the background, Screen Sharing takes Shift, Option, Control and Command from the physical keyboard, so text that needs them throws `BackgroundUnavailable` before the first key and a modifier the user holds stops the keys (use foreground delivery); iPhone Mirroring takes them as keys. A layout without key data throws `InputFailed`.
     Background keyboard input goes only to an app's SOLE window: typing or pressing keys into a process with several windows throws `BackgroundUnavailable`; use `el.type()` (inserted text needs no key window), AX `setValue`, or foreground delivery. With macOS key priming on, the target window is first made and proven the app's key window instead; reason `key_route_unproven` means that failed and nothing was sent.
     The user's stop chord suspends all input. `Suspended` or `StopPathUnavailable` → stop acting and tell the user; only the user resumes (`/computer resume`).
-    FOREGROUND CONTROL: input defaults to background and needs no grant. `delivery: "foreground"` and `win.raise()` (raising always takes the user's foreground) require the human-confirmed grant: call `await computer.control.acquire({ reason })` first (early in the run: it throws with under 8 s of the run's budget left), and act only when it returns `{ active: true }`; `ControlRequired` means acquire first, `InputBusy` means another session holds the grant (never stolen — continue in the background or retry after release). A failed run revokes the grant, so re-acquire after any error. Release with `computer.control.release()` in `finally`.
+    FOREGROUND CONTROL: input defaults to background and needs no grant. `delivery: "foreground"` and `win.raise()` (raising always takes the user's foreground) require the human-confirmed grant: call `await computer.control.acquire({ reason })` first (the human has that call's 60 s budget, less a few seconds, to answer), and act only when it returns `{ active: true }`; `ControlRequired` means acquire first, `InputBusy` means another session holds the grant (never stolen — continue in the background or retry after release). A failed call revokes the grant, so re-acquire after any error. Release with `computer.control.release()` in `finally`.
     Wayland: no per-window input and no `raise()`; use AX, or desktop input after the user focuses the target.

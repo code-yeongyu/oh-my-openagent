@@ -64,16 +64,18 @@ describe("computer tool control (#9651 B5b)", HANG_GUARD, () => {
     expect(methodsOf(log)).not.toContain("control.grant")
   })
 
-  it("sends control.revoke when a computer run errors while granted", async () => {
-    // Given
+  it("sends control.revoke when a computer call errors while granted", async () => {
+    // Given: a granted session
     const { handle, log } = desktopFixture()
     const tool = createComputerTool({ handle, executeTool: noTools, confirmControl: () => Promise.resolve(true) })
+    const acquire = { action: "call", chain: [{ method: "control.acquire", args: [{ reason: "click Run" }] }] }
+    await tool.execute("call-1", acquire, undefined, undefined, hostContext())
 
-    // When
+    // When: the next call fails
     const error = await rejectionOf(
       tool.execute(
-        "call-1",
-        { action: "run", code: "await desktop.control.acquire({ reason: 'click Run' }); throw new Error('boom');" },
+        "call-2",
+        { action: "call", chain: [{ method: "window", args: ["no-such-window"] }] },
         undefined,
         undefined,
         hostContext(),
@@ -81,21 +83,20 @@ describe("computer tool control (#9651 B5b)", HANG_GUARD, () => {
     )
 
     // Then
-    expect(error).toMatchObject({ message: expect.stringContaining("boom") })
+    expect(error).toMatchObject({ message: expect.stringContaining("no window matches") })
     await log.nthRequest("control.revoke", 1)
   })
 
-  it("sends control.revoke when the tool call is aborted mid-run while granted", async () => {
-    // Given
-    const { handle, log } = desktopFixture()
+  it("sends control.revoke when the tool call is aborted mid-call while granted", async () => {
+    // Given: a granted session whose next windows request stalls
+    const { handle, log } = desktopFixture({}, { FAKE_ENGINE_STALL: "windows" })
     const tool = createComputerTool({ handle, executeTool: noTools, confirmControl: () => Promise.resolve(true) })
+    const acquire = { action: "call", chain: [{ method: "control.acquire", args: [{ reason: "click Run" }] }] }
+    await tool.execute("call-1", acquire, undefined, undefined, hostContext())
     const controller = new AbortController()
     const promise = tool.execute(
-      "call-1",
-      {
-        action: "run",
-        code: "await desktop.control.acquire({ reason: 'click Run' }); await desktop.windows(); await wait(() => false, { timeout: 4000, interval: 50 });",
-      },
+      "call-2",
+      { action: "call", chain: [{ method: "windows" }] },
       controller.signal,
       undefined,
       hostContext(),
