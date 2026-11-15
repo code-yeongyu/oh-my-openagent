@@ -10,6 +10,7 @@ import { randomBytes } from "node:crypto"
 import { writeFile } from "node:fs/promises"
 
 import { FreezeModel } from "../../account/testing/freeze-model.test-support.ts"
+import { missesSyncContract } from "../../contract-version"
 
 type Row = { seq: number; digest: string; objectId: string; author: string; batchId: string }
 
@@ -18,11 +19,6 @@ export interface WireServerOptions {
   /** device name -> device id, one bearer token each. */
   readonly devices: Readonly<Record<string, string>>
   readonly port?: number
-  /**
-   * Mirror the service's client floor for an account whose keyring holds a recovery-phrase key: every
-   * request that does not declare the `phrase` sync capability is refused 426 client_update_required (#13691).
-   */
-  readonly phraseFloor?: boolean
 }
 
 /** The contract headers one request carried, as the service floor reads them. */
@@ -94,23 +90,17 @@ export function startWireServer(options: WireServerOptions): WireServer {
     idleTimeout: 0,
     async fetch(req) {
       const url = new URL(req.url)
-      const capabilities = req.headers.get("omo-sync-capabilities")
       requests.push({
         method: req.method,
         path: url.pathname,
         version: req.headers.get("omo-contract-version"),
-        capabilities,
+        capabilities: req.headers.get("omo-sync-capabilities"),
       })
       const device = tokens.get((req.headers.get("authorization") ?? "").replace(/^Bearer /, ""))
       if (device === undefined) return refusal("unauthorized")
-      if (
-        options.phraseFloor === true &&
-        !(capabilities ?? "")
-          .split(",")
-          .map((c) => c.trim())
-          .includes("phrase")
-      )
-        return refusal("client_update_required")
+      // The service's client floor for a phrase account (#13691), on every request: a client that drops the
+      // contract headers fails every test that drives it through this server.
+      if (missesSyncContract(url.pathname, req.headers)) return refusal("client_update_required")
       if (freeze.isRevokedDevice(device)) return freeze.revokedRefusal()
       if (state.failNext !== null) {
         const status = state.failNext

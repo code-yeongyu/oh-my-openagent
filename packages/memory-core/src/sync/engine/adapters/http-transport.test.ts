@@ -194,32 +194,32 @@ test("#given a subscribed device #when another device is signed out through the 
 // The service refuses every sync route 426 client_update_required for an account whose keyring holds a
 // phrase key unless the request declares the phrase capability; after phrase genesis no engine synced (#13691).
 test("every request the engine sends, the event stream included, carries the contract version and the phrase capability, so a phrase account's floor admits it (#13691)", async () => {
-  const server = startWireServer({ token: "tok", devices: { a: "dev-a", b: "dev-b" }, phraseFloor: true })
-  servers.push(server)
-  const a = createHttpTransport({ baseUrl: server.url, token: () => server.tokenOf("a") })
-  const b = createHttpTransport({ baseUrl: server.url, token: () => server.tokenOf("b") })
+  const { server, a, b } = await pair()
   let stop: () => void = () => undefined
-  const advanced = new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error("waited 10s for sync.advanced over the floor, never fired")),
-      10_000,
-    )
-    stop = b.subscribe({
-      onAdvanced: () => {
-        clearTimeout(timer)
-        resolve()
-      },
-      onConnected: (up) => {
-        if (up) void pushOne(a, new TextEncoder().encode("over the floor"), 0)
-      },
-      onStateChanged: () => undefined,
+  try {
+    const advanced = new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error("waited 5s for sync.advanced over the floor, never fired")),
+        5_000,
+      )
+      stop = b.subscribe({
+        onAdvanced: () => {
+          clearTimeout(timer)
+          resolve()
+        },
+        onConnected: (up) => {
+          if (up) void pushOne(a, new TextEncoder().encode("over the floor"), 0)
+        },
+        onStateChanged: () => undefined,
+      })
     })
-  })
 
-  await advanced
-  const page = await b.pull(0, 500)
-  await b.download(page.entries[0]?.objectId ?? "")
-  stop()
+    await advanced
+    const page = await b.pull(0, 500)
+    await b.download(page.entries[0]?.objectId ?? "")
+  } finally {
+    stop()
+  }
 
   const routes = new Set(
     server.requests.map(
@@ -237,4 +237,4 @@ test("every request the engine sends, the event stream included, carries the con
   ])
   for (const request of server.requests)
     expect(request).toMatchObject({ version: SYNC_CONTRACT_VERSION, capabilities: SYNC_CAPABILITIES })
-})
+}, 15_000)
