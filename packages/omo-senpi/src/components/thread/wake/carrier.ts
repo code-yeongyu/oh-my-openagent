@@ -1,6 +1,7 @@
 import { statSync } from "node:fs"
 
 import { WAKE_LEASE_MS } from "../gateway/constants"
+import type { IntakeAdmission } from "../gateway/intake-admission"
 import type { GatewayStore } from "../gateway/store"
 import type { RpcObject } from "@oh-my-opencode/senpi-task/rpc-socket-client"
 import type { CarrierHostConnection } from "./carrier-connection"
@@ -61,6 +62,12 @@ export type CarrierOptions = {
   readonly sameDevice?: (cwd: string) => boolean
   /** The gate for a row from another device: production allows it while this process's delivery consumer serves. */
   readonly remoteWake?: () => boolean
+  /**
+   * The device service's answer to whether a row's sender is still admitted (5.6), asked at the moment of every open
+   * of a row from another device (#13456's noted follow-up): `unknown` and `refused` fail closed, so a sender that
+   * lost admission between the accept check and the retry or lease takeover starts nothing.
+   */
+  readonly admitIntake?: (device: string) => Promise<IntakeAdmission>
   readonly schedule: (run: () => void, ms: number) => () => void
   readonly onEvent?: (event: CarrierEvent) => void
 }
@@ -105,6 +112,12 @@ function fileSize(path: string): number {
   } catch {
     return -1
   }
+}
+
+/** The sender's device as the intake's ledger id names it (`device:<device>/<id>`), when it does. */
+function deviceOfLedger(ledgerId: string): string | undefined {
+  const cut = ledgerId.indexOf("/")
+  return ledgerId.startsWith("device:") && cut > "device:".length ? ledgerId.slice("device:".length, cut) : undefined
 }
 
 /**
@@ -397,6 +410,13 @@ export function createCarrier(options: CarrierOptions): Carrier {
       await store.woken.end({ durable_id: durableId, generation: taken.row.generation })
       return
     }
+    // A takeover opens only what a wake would open (the switches and the sender's admission included); with nothing
+    // to open for, or a row that no longer allows it, the record ends and the queued rows wait for the next wake.
+    const allowance = await openAllowance(durableId, target.cwd)
+    if (allowance !== "open") {
+      await store.woken.end({ durable_id: durableId, generation: taken.row.generation })
+      return
+    }
     const opened = await open(target.session_path, target.cwd)
     if (opened.kind !== "opened") return
     carry(durableId, opened.connection, opened.sessionId, taken.row.generation)
@@ -408,8 +428,9 @@ export function createCarrier(options: CarrierOptions): Carrier {
   /**
    * The one rule of A7.2.3 (A7R-10), the reviewer's LOW and A7's row-from-another-device rule in one place: a carrier
    * opens a session only when the session holds a queued row whose own switch allows the open. A row from another
-   * device (it carries the intake's ledger id) reads the wake the consumer was told; a same-device row reads
-   * `session_wake.same_device` for the TARGET session's cwd. Both are read here, at the moment of the open.
+   * device (it carries the intake's ledger id) reads the wake the consumer was told and its sender's admission NOW,
+   * failing closed when the answer is unknown or refused (#13456's noted follow-up); a same-device row reads
+   * `session_wake.same_device` for the TARGET session's cwd. All are read here, at the moment of the open.
    */
   const openAllowance = async (durableId: string, cwd: string): Promise<"open" | "switched_off" | "nothing_queued"> => {
     const sameDevice = options.sameDevice?.(cwd) ?? false
@@ -418,7 +439,16 @@ export function createCarrier(options: CarrierOptions): Carrier {
     for (const row of await store.list({ target_durable_id: durableId })) {
       if (row.state !== "queued") continue
       queued = true
-      if (typeof row.ledger_id === "string" ? remoteWake : sameDevice) return "open"
+      if (typeof row.ledger_id !== "string") {
+        if (sameDevice) return "open"
+        continue
+      }
+      if (!remoteWake) continue
+      const device = deviceOfLedger(row.ledger_id)
+      if (device === undefined) continue
+      if (options.admitIntake === undefined) return "open"
+      const admission = await options.admitIntake(device).catch((): IntakeAdmission => "unknown")
+      if (admission === "admitted") return "open"
     }
     return queued ? "switched_off" : "nothing_queued"
   }
