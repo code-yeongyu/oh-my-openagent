@@ -22,7 +22,7 @@ describe("OS credential storage", () => {
       const error = await store[read]().catch((error) => error)
       expect(error).toBeInstanceOf(InvalidCredentialState)
       expect(error.message).toBe(
-        "The OmO sign-in saved on this computer can't be read. Run omo account forget to remove it, then sign in again in the desktop app.",
+        "The OmO sign-in saved on this computer can't be read. Run omo account forget to remove it, then sign in again from the OmO desktop app on this computer, or with omo login in a terminal.",
       )
     },
   )

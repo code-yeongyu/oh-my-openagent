@@ -107,6 +107,16 @@ describe("SessionHost: a new thread starts in its creator's approval mode on bot
     expect(localOpenFrames(openSession)).toEqual([expect.not.objectContaining({ permissionPreset: expect.anything() })])
     expect(openFrames(a.sent)).toEqual([expect.not.objectContaining({ permissionPreset: expect.anything() })])
   })
+
+  test("#given a creator working in its own folder #when it creates here and on b with no cwd #then only the open here starts in the creator's folder", async () => {
+    const a = account()
+    const { run, openSession } = surface(a.remote)
+    await run("thread_create", {})
+    await run("thread_create", { device: "studio" })
+    // b never sees this device's folders: its engine picks its own.
+    expect(localOpenFrames(openSession)).toEqual([expect.objectContaining({ cwd: process.cwd() })])
+    expect(openFrames(a.sent)).toEqual([expect.not.objectContaining({ cwd: expect.anything() })])
+  })
 })
 
 describe("SessionHost: opening an existing thread on both legs", () => {

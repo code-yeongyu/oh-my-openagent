@@ -10,7 +10,14 @@ import {
   type DiskSession,
   type ThreadSurface,
 } from "../address-book"
-import { resolveTarget, workspaceDirectories, type ThreadAddressEntry } from "../addressing"
+import {
+  fuzzyContenders,
+  fuzzyMatch,
+  resolveTarget,
+  workspaceDirectories,
+  workspaceEntries,
+  type ThreadAddressEntry,
+} from "../addressing"
 import type { ThreadToolName, ThreadToolResult, ThreadTranscriptItem } from "../contracts"
 import { threadToolFailure, type ThreadErrorCode } from "../errors"
 import { THREAD_TOOL_EXPOSURE, THREAD_TOOL_METADATA } from "../metadata"
@@ -259,8 +266,11 @@ export function targetSession(view: ThreadHostView, durableId: string): ThreadHo
 
 /**
  * Decision 0027: ONE resolver over this device's entries and the relay transport's address book. A local hit never needs
- * the relay; a local miss answers the relay's typed unavailability (plan, sign-in) or the alias holder's typed failure
- * before any not_found. An alias or an entry on another device is account-wide: the local scope no longer applies to it.
+ * the relay. A fuzzy handoff first tries the exact ladder (id, alias, name) over every row, ended remote rows included, so
+ * it never lands on a different session than the exact path would; otherwise local, live remote and the ended remote rows
+ * that can contend are ranked in ONE comparison, so the runner-up rule covers every candidate. Absent remote setup leaves a local miss unchanged; a configured relay's failed lookup, failing
+ * transport state (anything but connected once set up), plan refusal or alias holder's typed failure answers before not_found. An alias or entry on another
+ * device is account-wide: the local scope no longer applies to it.
  */
 export async function resolveAcross(
   options: ThreadToolSurfaceOptions,
@@ -268,21 +278,77 @@ export async function resolveAcross(
   address: string,
   callerId: string,
   allScope: boolean | undefined,
+  match: "exact" | "fuzzy" = "exact",
 ): Promise<ThreadResolveResult & { readonly all_scope?: boolean | undefined }> {
-  const here = resolution(options, local, address, callerId, allScope)
+  if (match === "fuzzy" && allScope !== true && options.callerWorkspaceRoot().trim() === "")
+    return {
+      kind: "error",
+      ...threadToolFailure(
+        "caller_context_missing",
+        "Scoping a fuzzy handoff needs the caller's workspace root, which this call did not provide.",
+        "Set all_scope to search every workspace, or hand off from a session that knows its workspace.",
+      ),
+    }
+  const resolve = (
+    entries: readonly ThreadAddressEntry[],
+    ranked: readonly ThreadAddressEntry[] = entries,
+  ): ThreadResolveResult => {
+    const exact = resolution(options, entries, address, callerId, allScope)
+    if (match === "exact") return exact
+    // Exact first (#13141): an id, alias or name the exact path resolves is the answer, so fuzzy only ranks what exact
+    // cannot reach. The caller stays excluded, as the fuzzy scan excludes it: a handoff never targets its own sender.
+    if (exact.kind === "ok" && exact.entry.thread_id !== callerId) return exact
+    const visible =
+      allScope === true
+        ? ranked
+        : [
+            ...workspaceEntries(
+              ranked.filter((entry) => entry.transport === undefined),
+              options.callerWorkspaceRoot(),
+            ),
+            ...ranked.filter((entry) => entry.transport !== undefined),
+          ]
+    const found = fuzzyMatch(
+      visible.filter((entry) => entry.thread_id !== callerId),
+      address,
+    )
+    return found.kind === "ok" ? { ...found, resolution: "name" } : found
+  }
+  const here = resolve(local)
   if (options.remote === undefined || (here.kind === "ok" && here.resolution === "id")) return here
-  const book = await relayAddressBook(options.remote, address).catch((): RelayAddressBook => ({ entries: [] }))
+  const book = await relayAddressBook(options.remote, address).catch((error: unknown): RelayAddressBook => ({
+    entries: [],
+    unavailable: threadToolFailure(
+      "host_unavailable",
+      "The account's session listing could not be reached.",
+      "Retry when the device service is reachable.",
+      { reason: error instanceof Error ? error.message : String(error) },
+    ),
+  }))
   if (book.entries.length === 0 && here.kind === "ok") return here
-  const across = resolution(options, [...local, ...book.entries], address, callerId, allScope)
+  // An ended session on another device is resumable: the exact ladder sees every row, and fuzzy ranks it in the same
+  // comparison as local and live candidates. Only the ended rows that can contend join that comparison (`fuzzyContenders`):
+  // the rest can change no outcome, so a large account's history cannot push a unique match over the 500-candidate cap.
+  const all = [...local, ...book.entries]
+  const ranked =
+    match === "fuzzy"
+      ? [
+          ...local,
+          ...book.entries.filter((entry) => entry.status === "live"),
+          ...fuzzyContenders(
+            book.entries.filter((entry) => entry.status !== "live"),
+            address,
+          ),
+        ]
+      : all
+  const across = resolve(all, ranked)
   if (across.kind === "ok")
     return {
       ...across,
       all_scope: across.resolution === "alias" || across.entry.transport !== undefined ? true : allScope,
     }
   if (book.aliasFailure !== undefined) return { kind: "error", ...book.aliasFailure } as ThreadResolveResult
-  // A5: the paid-plan refusal is the answer when other devices would have been needed; any other unavailability leaves
-  // the local answer as it is (not_found), exactly as without a device service.
-  if (book.unavailable?.code === "relay_requires_paid_plan" && here.kind === "error" && here.code === "not_found")
+  if (book.unavailable !== undefined && here.kind === "error" && here.code === "not_found")
     return { kind: "error", ...book.unavailable } as ThreadResolveResult
   return across
 }
