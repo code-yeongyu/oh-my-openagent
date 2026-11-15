@@ -180,6 +180,8 @@ export async function advance(
     )
     deps.fault?.(point)
   }
+  // Each key's latest render record, which carries the spelling staging uses (inv. 7).
+  let rendered: Map<string, RenderRecord> | undefined
   if (cycle.stage === "merged") {
     const records = await journal.renders(cycle.id)
     const latest = latestByKey(records)
@@ -226,16 +228,19 @@ export async function advance(
       if (text !== null) await writeAtomic(journal.stagedPath(cycle.id, record.seq), text)
       deps.fault?.("staged")
       await journal.appendRender(cycle.id, record)
+      latest.set(key, record)
       deps.fault?.("render-intent")
       await land(journal, deps.repo.root, cycle.id, record, landing.path)
       deps.fault?.("render-key")
     }
-    const landed = latestByKey(await journal.renders(cycle.id))
-    const treeId = await deps.repo.stageTree(cycle.keys.map((key) => stagedPath(landed, key)))
+    rendered = latest
+    const treeId = await deps.repo.stageTree(cycle.keys.map((key) => stagedPath(latest, key)))
     await save({ ...cycle, stage: "rendered", treeId }, "rendered")
   }
-  const rendered = latestByKey(await journal.renders(cycle.id))
-  const onDisk = (keys: readonly string[]): string[] => keys.map((key) => stagedPath(rendered, key))
+  // Only a cycle resumed past `merged` reads its records here; the render loop above kept them in
+  // memory, so a fresh cycle reads each record a bounded number of times (#12285).
+  const recorded = rendered ?? latestByKey(await journal.renders(cycle.id))
+  const onDisk = (keys: readonly string[]): string[] => keys.map((key) => stagedPath(recorded, key))
   if (cycle.stage === "rendered") {
     // A render-only cycle covers no new seq: its marker is its own id, so it never matches another commit's.
     const range = cycle.batches.length === 0 ? `render-${cycle.id}` : `${cycle.first}-${cycle.last}`
