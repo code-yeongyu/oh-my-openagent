@@ -18,6 +18,8 @@ export interface MemorySessionStateLike {
   readonly context?: MemoryIdentityContext
   /** Set once the status footer has been attempted for this session, so it shows at most once. */
   memoryStatusAttempted?: boolean
+  /** Set right before the shutdown clear; from then on the session publishes no memory status (#13695). */
+  shuttingDown?: boolean
 }
 
 export interface MemoryWiringOptions {

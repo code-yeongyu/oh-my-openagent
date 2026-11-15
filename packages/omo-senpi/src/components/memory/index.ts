@@ -231,7 +231,10 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
           syncSessionId = undefined
         }
         // The clear goes out before the drain: a host may exit as soon as this bounded handler returns, so a
-        // clear sent after a slow drain can be lost (#13695).
+        // clear sent after a slow drain can be lost (#13695). The flag set first keeps work that settles during
+        // the drain from repainting the footer after it.
+        const closing = sessions.get(sessionId)
+        if (closing !== undefined) closing.shuttingDown = true
         wiring.clearStatus(eventCtx)
         // The drain runs BEFORE the session is released: its steps read the bound identity.
         await wiring.onSessionShutdown({

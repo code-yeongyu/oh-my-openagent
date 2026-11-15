@@ -1,6 +1,6 @@
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { refreshMemoryStatus } from "./status"
-import { isRecord, readUi, sessionIdFrom } from "./wiring-context"
+import { isRecord, readStatusUi, sessionIdFrom } from "./wiring-context"
 import type { MemoryWiringOptions } from "./wiring-types"
 import { MEMORY_TOOL_NAME } from "./tools"
 
@@ -19,7 +19,7 @@ export function registerMemoryWriteListener(
     // The rpc snapshot follows every successful write; only the footer honors the once-only latch.
     await onMemoryWrite?.(sessionId)
     if (state.memoryStatusAttempted === true) return
-    const ui = readUi(eventCtx)
+    const ui = readStatusUi(eventCtx, options.sessions)
     if (ui === undefined) return
     state.memoryStatusAttempted = true
     const settings = options.loadConfig({ cwd: options.cwd() }).config.memory

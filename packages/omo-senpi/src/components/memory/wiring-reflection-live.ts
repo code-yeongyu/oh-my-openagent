@@ -23,7 +23,7 @@ import {
   type ReflectionLiveSession,
 } from "./worker"
 import { describeReflectionLauncher } from "./worker/launcher-identity"
-import { readUi } from "./wiring-context"
+import { readStatusUi, readUi } from "./wiring-context"
 import type { MemoryWiringOptions, StatusUi } from "./wiring-types"
 
 export interface MemoryReflectionLiveWiring {
@@ -102,13 +102,13 @@ export function createMemoryReflectionLiveWiring(
 
   async function onReflectionLaunched(identity: string, run: ReservedRun): Promise<void> {
     activeRuns.start(identity, run.runId, launchDetails(options, identity, run))
-    footerLive.syncActive(activeSession.current, readUi(lastEventCtx.current))
+    footerLive.syncActive(activeSession.current, readStatusUi(lastEventCtx.current, options.sessions))
     await rpcBridge.current?.sync()
   }
 
   async function onLiveReflectionCompleted(identity: string, runId: string): Promise<void> {
     activeRuns.settle(identity, runId)
-    const ui = readUi(lastEventCtx.current)
+    const ui = readStatusUi(lastEventCtx.current, options.sessions)
     footerLive.syncActive(activeSession.current, ui)
     await footerLive.refresh(activeSession.current, ui)
     await rpcBridge.current?.sync()
@@ -128,7 +128,7 @@ export function createMemoryReflectionLiveWiring(
       rpcBridge.current?.attach(sessionId)
     },
     async bind(pi, sessionId, identity, eventCtx, requestPressureDream): Promise<void> {
-      const ui = readUi(eventCtx)
+      const ui = readStatusUi(eventCtx, options.sessions)
       // The engine emits transitions only; a failure may have started before this session became active.
       await syncNotifier?.changed(identity.identityPaths.repo, ui)
       const api = createReflectionCompletionApi(pi)
@@ -170,7 +170,7 @@ export function createMemoryReflectionLiveWiring(
     onLiveReflectionCompleted,
     async onSettled(sessionId, eventCtx, signal): Promise<void> {
       signal?.throwIfAborted()
-      const ui = readUi(eventCtx)
+      const ui = readStatusUi(eventCtx, options.sessions)
       const identity = options.sessions.get(sessionId)?.context
       track(
         footerLive.refresh(
@@ -208,7 +208,7 @@ export function createMemoryReflectionLiveWiring(
     async onSyncStatusChanged(repo): Promise<void> {
       const sessionId = activeSession.current
       const context = sessionId === undefined ? undefined : options.sessions.get(sessionId)?.context
-      const ui = readUi(lastEventCtx.current)
+      const ui = readStatusUi(lastEventCtx.current, options.sessions)
       await deliverSyncStatusChange({
         repo,
         isActiveRepo: sessionId !== undefined && context?.identityPaths.repo === repo,

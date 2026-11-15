@@ -51,6 +51,8 @@ export type SessionState = {
   /** Where this session's identity storage lives; finalized (transient root reclaimed) at shutdown. */
   run?: IdentityRunPaths
   memoryStatusAttempted: boolean
+  /** Set right before the shutdown clear; from then on the session publishes no memory status (#13695). */
+  shuttingDown?: boolean
   /** The repository this session holds the sync runner for; released with the binding. */
   syncRepo?: string
   restartNotified: boolean
