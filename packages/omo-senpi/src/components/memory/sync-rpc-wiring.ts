@@ -15,13 +15,21 @@ export function wireSyncRpc(options: {
   readonly syncStatus: () => Promise<MemoryRpcSync | undefined>
   readonly env: Readonly<Record<string, string | undefined>>
   readonly logger: { error(message: string, fields?: Record<string, unknown>): void }
+  readonly warn?: (message: string, fields: Record<string, unknown>) => void
 }) {
+  let warnedLegacy = false
   return registerSyncRpc(options.rpc, {
     source: async () => {
       const account = await options.source()
       // Legacy CLI sources cannot prove a captured generation. Only the selected source's
       // operation-capable branch may be used; there is deliberately no credential fallback.
-      return account !== null && "descriptor" in account && "forOperation" in account ? account : null
+      if (account !== null && "descriptor" in account && "forOperation" in account) return account
+      // Say once why sync has no account when a source did answer (#13153).
+      if (account !== null && !warnedLegacy) {
+        warnedLegacy = true
+        options.warn?.("memory sync source has no operation-capable account", { code: "legacy_source" })
+      }
+      return null
     },
     runtime: {
       enableSync: async (input) => (await import("#omo-memory-sync-runtime")).enableSync(input),
@@ -35,5 +43,6 @@ export function wireSyncRpc(options: {
     signal: options.signal,
     syncStatus: options.syncStatus,
     phraseGate: phraseGateFrom(options.env, options.logger),
+    ...(options.warn === undefined ? {} : { warn: options.warn }),
   })
 }

@@ -8,6 +8,9 @@ import {
   installDeviceService,
 } from "../device-service-core/src/index.ts"
 import packageJson from "./package.json" with { type: "json" }
+import { applyColdWake, type ColdWake } from "./remote-cold-wake"
+import type { RemoteOptOut } from "./remote-opt-out"
+import { REMOTE_EXIT } from "./remote-exit"
 import { statusLines } from "./remote-render"
 
 // `omo remote bootstrap`: the device service bootstrap every interactive omo start runs in the background (the
@@ -65,27 +68,144 @@ export function omoBinaryPath(env: Readonly<Record<string, string | undefined>> 
   return resolve(process.argv[1] ?? process.execPath)
 }
 
-export async function runBootstrapVerb(
-  io: BootstrapIo,
-  setup: BootstrapSetup,
-  json: boolean,
-): Promise<"connected" | "stopped"> {
+// `quietSuppressed`: the setup after `omo login` says nothing when the install changed nothing because this machine has
+// no reachable service manager; login succeeded, and `omo remote enable` / `omo remote status` still say why.
+const bootstrap = async (io: BootstrapIo, setup: BootstrapSetup, json: boolean, quietSuppressed = false) => {
   const outcome = await bootstrapDeviceService({
     accountShow: io.accountShow,
     stateDir: io.stateDir,
     connect: io.connect,
     ...setup,
   })
-  if (outcome.kind === "stopped") {
+  if (outcome.kind === "stopped" && !(quietSuppressed && outcome.suppressed === true)) {
     if (json) io.output(JSON.stringify({ state: outcome.state, notice: outcome.notice }))
     else io.error(outcome.notice)
-    return "stopped"
   }
+  return outcome
+}
+
+/**
+ * Hands the signed-in session's device keys to the running service through the handoff a fresh `omo login` uses;
+ * "signed_out" when there is no signed-in session to hand over.
+ */
+export type DeviceLink = () => Promise<"linked" | "signed_out">
+
+const NOT_LINKED = "This device is not linked to the OmO device service yet. Run omo login to link it."
+
+/** What turns remote sessions on for this device beyond the bootstrap itself (omo#13602). */
+export type RemoteSetup = {
+  readonly coldWake: ColdWake
+  readonly linkDevice: DeviceLink
+  readonly optOut: RemoteOptOut
+}
+
+/**
+ * `omo remote enable`: the bootstrap (install the pinned service when none runs, connect, register the refresher and
+ * this agent dir), then the switch on, the device link and the always-on session host unit, and it clears a recorded
+ * opt-out (omo#13594, omo#13602). Every step is idempotent, so running it again changes nothing already in place.
+ */
+export async function runEnableVerb(
+  io: BootstrapIo,
+  setup: BootstrapSetup,
+  remote: RemoteSetup,
+  json: boolean,
+): Promise<number> {
+  const enabled = await enableRemote(io, setup, remote, json, (on) =>
+    io.output(json ? JSON.stringify({ enabled: on }) : `Remote sessions are ${on ? "on" : "off"} for this device.`),
+  )
+  return enabled === "stopped" ? REMOTE_EXIT.unavailable : REMOTE_EXIT.ok
+}
+
+async function enableRemote(
+  io: BootstrapIo,
+  setup: BootstrapSetup,
+  remote: RemoteSetup,
+  json: boolean,
+  report: (enabled: boolean) => void,
+  quietSuppressed = false,
+): Promise<boolean | "stopped"> {
+  const outcome = await bootstrap(io, setup, json, quietSuppressed)
+  if (outcome.kind === "stopped") return "stopped"
+  let enabled: boolean
   try {
-    if (json) io.output(JSON.stringify({ state: "connected", status: outcome.status }))
-    else for (const line of statusLines(outcome.status, outcome.service.serviceVersion)) io.output(line)
+    enabled = await outcome.service.setEnabled(true)
   } finally {
     outcome.service.close()
   }
+  if (enabled) remote.optOut.clear()
+  report(enabled)
+  if (outcome.status.device === null && (await remote.linkDevice()) === "signed_out") io.error(NOT_LINKED)
+  await applyColdWake(remote.coldWake, enabled, io.error)
+  return enabled
+}
+
+/** What `omo login` prints, and the desktop app shows after sign-in, once remote sessions are on (Q, omo#13602). */
+export const REMOTE_ON_AFTER_SIGN_IN =
+  "Remote is on for this device: other signed-in devices can reach it. Turn off: omo remote disable"
+export const REMOTE_KEPT_OFF_AFTER_SIGN_IN =
+  "Remote is off for this device, as you set it with omo remote disable. Turn on: omo remote enable"
+
+/**
+ * Right after a successful `omo login` (Q, omo#13602): remote sessions switch on, as `omo remote enable` turns them on,
+ * and the user is told so in one line. A user who turned them off with `omo remote disable` keeps them off and is told
+ * how to turn them on. A setup that stops (no device service for this platform, say) prints its notice instead.
+ */
+export async function runLoginSetup(
+  io: BootstrapIo,
+  setup: BootstrapSetup,
+  remote: RemoteSetup,
+): Promise<"on" | "kept_off" | "not_on"> {
+  if (remote.optOut.read()) {
+    // Enforced now, not at the next omo start (#13602 security review M1): a switch that came back on is turned off and
+    // the unit removed, as the bootstrap does for an opt-out. A setup that stops still leaves the record in charge.
+    const outcome = await bootstrap(io, setup, false, true)
+    if (outcome.kind === "connected") {
+      try {
+        if (outcome.status.enabled) await outcome.service.setEnabled(false)
+      } finally {
+        outcome.service.close()
+      }
+      await applyColdWake(remote.coldWake, false, io.error)
+    }
+    io.output(REMOTE_KEPT_OFF_AFTER_SIGN_IN)
+    return "kept_off"
+  }
+  const enabled = await enableRemote(io, setup, remote, false, () => {}, true)
+  if (enabled !== true) return "not_on"
+  io.output(REMOTE_ON_AFTER_SIGN_IN)
+  return "on"
+}
+
+/**
+ * `omo remote bootstrap`, which every omo start and every `omo login` run: remote sessions are ON BY DEFAULT for a
+ * signed-in device (Q, omo#13602). Unless this user recorded an opt-out, it links a sign-in the service has not seen and
+ * installs the session host unit; a recorded opt-out turns the service's switch off again if it came back on, and
+ * removes the unit. It never turns the switch on itself: an off set elsewhere (the desktop app) is respected.
+ *
+ * Design D r9 section 3 exception, extended from `enable` to the bootstrap (LEAD/Q ruling on omo#13602): the link reads
+ * this OS user's stored credential, the store the bootstrap's own account check (`omo account show`) already reads, and
+ * only while the service holds no device; it hands it over through the handoff a fresh `omo login` uses.
+ */
+export async function runBootstrapVerb(
+  io: BootstrapIo,
+  setup: BootstrapSetup,
+  remote: RemoteSetup,
+  json: boolean,
+): Promise<"connected" | "stopped"> {
+  const outcome = await bootstrap(io, setup, json)
+  if (outcome.kind === "stopped") return "stopped"
+  const optedOut = remote.optOut.read()
+  let status = outcome.status
+  try {
+    if (optedOut && status.enabled) await outcome.service.setEnabled(false)
+    if (!optedOut && status.enabled && status.device === null) await remote.linkDevice()
+    if (optedOut || status.device === null) status = await outcome.service.status()
+    if (json) io.output(JSON.stringify({ state: "connected", status }))
+    else for (const line of statusLines(status, outcome.service.serviceVersion)) io.output(line)
+  } finally {
+    outcome.service.close()
+  }
+  // After the connection is closed: a changed table restarts the device service, which would cut it.
+  await applyColdWake(remote.coldWake, !optedOut && status.state !== "disabled", io.error)
   return "connected"
 }

@@ -50,6 +50,13 @@ async function open(args: readonly string[], localMode: () => string = () => "wo
         refresher: { binaryPath: "/x", version: "0" },
         agentDir: "/x",
       },
+      coldWake: {
+        install: async () => ({ kind: "installed", serviceRestarted: false }),
+        uninstall: async () => ({ kind: "removed", serviceRestarted: false }),
+        status: async () => undefined,
+      },
+      linkDevice: async () => "linked",
+      optOut: { read: () => false, record: () => {}, clear: () => {} },
       remote: () => a.remote,
       localPermissionPreset: localMode,
     },

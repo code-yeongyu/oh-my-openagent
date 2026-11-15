@@ -7,6 +7,7 @@ import type {
   SyncApproveResponse,
   SyncEnableResponse,
   SyncRpcProblem,
+  SyncUnavailableCode,
   SyncStatusResponse,
 } from "./sync-rpc-contract"
 import type {
@@ -22,12 +23,26 @@ import {
   RetiredSyncOperation,
   runSyncRpcOperation,
   serviceProblem,
+  syncErrorFields,
   unavailable,
   type CeremonyOperation,
   type Operation,
 } from "./sync-rpc-operation"
 
 export function createSyncRpcCoordinator(options: SyncRpcOptions) {
+  // The desktop polls status and the pending/devices reads, so a cause is logged once when it starts, not on every poll.
+  const lastUnavailable = new Map<"status" | "read", SyncUnavailableCode>()
+  const reportUnavailable = (
+    path: "status" | "read",
+    code: SyncUnavailableCode,
+    fields: Record<string, unknown> = {},
+  ): SyncRpcProblem => {
+    if (lastUnavailable.get(path) !== code) {
+      lastUnavailable.set(path, code)
+      options.warn?.(`memory sync ${path} unavailable`, { path, code, ...fields })
+    }
+    return unavailable(code)
+  }
   let lifetime = new AbortController()
   let enable: Operation | undefined
   const approvals = new Map<string, Operation>()
@@ -63,7 +78,9 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
     check(context)
     const account = await options.source()
     check(context)
-    if (account === null || account.signal.aborted || !(await account.isCurrent())) throw new RetiredSyncOperation()
+    if (account === null) throw new RetiredSyncOperation("no_account")
+    if (account.signal.aborted) throw new RetiredSyncOperation("account_aborted")
+    if (!(await account.isCurrent())) throw new RetiredSyncOperation("account_not_current")
     check(context)
     if (account.signal.aborted) throw new RetiredSyncOperation()
     return account
@@ -216,14 +233,20 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
     },
     async status(owner: SyncRpcContext): Promise<SyncStatusResponse> {
       const binding = lifetime.signal
+      let step: "account" | "identity" | "sync_status" | "recheck" = "account"
       try {
         const account = await current(owner)
+        step = "identity"
         const identity = identityOf(account)
+        step = "sync_status"
         const sync = await options.syncStatus()
+        step = "recheck"
         check(owner)
         binding.throwIfAborted()
-        if (account.signal.aborted || !(await account.isCurrent())) return unavailable()
+        if (account.signal.aborted || !(await account.isCurrent()))
+          return reportUnavailable("status", "account_not_current", { step })
         check(owner)
+        lastUnavailable.delete("status")
         const visible = records().filter((record) => ensureOwned(record, owner) && record.identity === identity)
         let notice = await phraseNotice(account)
         check(owner)
@@ -258,8 +281,11 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
               outcome: record.approval,
             })),
         }
-      } catch {
-        return unavailable()
+      } catch (error) {
+        return reportUnavailable("status", error instanceof RetiredSyncOperation ? error.code : "status_read_failed", {
+          step,
+          ...syncErrorFields(error),
+        })
       }
     },
     async acknowledge(owner: SyncRpcContext, request: SyncAcknowledgeRequest): Promise<SyncAcknowledgeResponse> {
@@ -297,11 +323,17 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
           auth.admit(() => undefined)
           const result = await use(ports, record.account, auth)
           auth.admit(() => undefined)
-          if (!(await record.account.isCurrent())) return unavailable()
+          if (!(await record.account.isCurrent())) return reportUnavailable("read", "account_not_current")
           auth.admit(() => undefined)
+          lastUnavailable.delete("read")
           return result
         } catch (error) {
-          return serviceProblem(error)
+          const problem = serviceProblem(error)
+          // A refusal means the service answered, so an earlier unavailable cause has ended and its recurrence logs again.
+          if (problem.kind === "refused") lastUnavailable.delete("read")
+          return problem.kind === "unavailable" && problem.code !== undefined
+            ? reportUnavailable("read", problem.code, syncErrorFields(error))
+            : problem
         } finally {
           try {
             await ports?.close()
