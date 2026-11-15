@@ -50,4 +50,26 @@ describe("audit records of a call's own requests", () => {
     // Then
     expect(result.audit).toEqual([expect.objectContaining({ action: "click", toolCallId: "call-click" })])
   })
+
+  it.each(["abort", "deadline"] as const)("rejects at once on %s while the barrier never answers", async (end) => {
+    // Given: an engine that never answers the barrier
+    const service = { ...engineAuditingAfterReply(), auditBarrier: () => new Promise<void>(() => undefined) }
+    const controller = new AbortController()
+    const running = runComputerSteps(
+      {
+        toolCallId: "call-hang",
+        snapshot: snapshot(false),
+        timeoutMs: end === "deadline" ? 50 : 60_000,
+        signal: controller.signal,
+      },
+      { service },
+      ({ desktop }) => desktop.click(1, 1),
+    )
+
+    // When
+    if (end === "abort") controller.abort()
+
+    // Then
+    await expect(running).rejects.toMatchObject({ reason: end === "abort" ? "aborted" : "timeout" })
+  })
 })

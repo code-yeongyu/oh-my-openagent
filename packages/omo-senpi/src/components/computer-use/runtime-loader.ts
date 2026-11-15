@@ -11,12 +11,9 @@ import type { TrackedDesktopServiceOptions } from "./engine-status"
 export type ComputerUseRuntimeModule = typeof import("#omo-computer-use-runtime")
 export type ComputerUseRuntime = import("#omo-computer-use-runtime").ComputerUseRuntime
 
-type ExecuteTool = (toolName: string, params: unknown, options: { readonly signal: AbortSignal }) => Promise<unknown>
-
 export interface ComputerHostApi {
   getActiveTools(): string[]
   setActiveTools(names: string[]): void
-  executeTool: ExecuteTool
 }
 
 export interface ComputerRuntimeLoader {

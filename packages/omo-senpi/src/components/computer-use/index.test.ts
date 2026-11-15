@@ -219,7 +219,7 @@ describe("computer-use component", () => {
     expect(tool(without, "computer_actions")).toBeUndefined()
   })
 
-  test("#given a host without getActiveTools/setActiveTools/executeTool #when registered #then it warns and registers nothing", async () => {
+  test("#given a host without getActiveTools/setActiveTools #when registered #then it warns and registers nothing", async () => {
     // given / when
     const { pi, log } = register({ pi: new FakeExtensionAPI() })
 

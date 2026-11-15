@@ -110,7 +110,7 @@ describe("limits at the computer tool boundary", HANG_GUARD, () => {
     expect(methodsOf(log)).not.toContain("capture")
   })
 
-  it("gives the budget refusal a way back, and /computer off then on restores the budget", async () => {
+  it("keeps the budget spent across the model's close, and only the user's /computer off restores it", async () => {
     // Given: a spent budget
     const { handle } = desktopFixture({}, {}, 1)
     const tool = createComputerTool({ handle })
@@ -119,6 +119,8 @@ describe("limits at the computer tool boundary", HANG_GUARD, () => {
     const refused = await tool.execute("call-2", windows, undefined, undefined, hostContext())
 
     // When
+    await tool.execute("call-close", { action: "close" }, undefined, undefined, hostContext())
+    const afterClose = await tool.execute("call-3a", windows, undefined, undefined, hostContext())
     await runComputerCommand("off", handle, hostContext())
     await runComputerCommand("on", handle, hostContext())
     const after = await tool.execute("call-3", windows, undefined, undefined, hostContext())
@@ -128,6 +130,8 @@ describe("limits at the computer tool boundary", HANG_GUARD, () => {
       code: "COMPUTER_CALL_BUDGET_EXCEEDED",
       message: expect.stringContaining("/computer off"),
     })
+    expect(refused.details.value).not.toMatchObject({ message: expect.stringContaining("computer.close") })
+    expect(afterClose.details.value).toMatchObject({ code: "COMPUTER_CALL_BUDGET_EXCEEDED" })
     expect(after.isError).not.toBe(true)
   })
 })

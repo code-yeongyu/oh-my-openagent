@@ -1,4 +1,7 @@
-/** Desktop requests one agent session may send through `DesktopService.call` unless the host sets its own. */
+/**
+ * Desktop requests one `DesktopService` (one per agent session) may send through `call` unless the host sets its own;
+ * only the user's `/computer off` resets the count, never the model's `close`.
+ */
 export const DEFAULT_CALL_BUDGET = 20_000
 
 /** The typed refusal of a request past the session's call budget; nothing was sent to the engine. */
@@ -21,7 +24,6 @@ export class CallBudget {
     this.#limit = limit
   }
 
-  /** A closed session starts the next one with the whole budget. */
   reset(): void {
     this.#used = 0
   }

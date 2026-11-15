@@ -146,18 +146,18 @@ export class DesktopService {
     return { ...result, cursorOverlay: result.cursorOverlay ?? false }
   }
 
-  /** Reads the live stop-path state; it never arms or latches anything. */
   /**
    * Resolves once the audit notifications of every request already answered have arrived: the engine writes a
    * request's audit right after its reply and before any later reply, so one more reply is the barrier. It starts no
    * engine and counts against no call budget.
    */
-  async auditBarrier(): Promise<void> {
+  async auditBarrier(options: CallOptions = {}): Promise<void> {
     const connection = this.#connection
     if (connection === undefined || !connection.rpc.alive) return
-    await this.#stopPath(connection, "stopPath.status", {})
+    await connection.rpc.request("stopPath.status", {}, options)
   }
 
+  /** Reads the live stop-path state; it never arms or latches anything. */
   async stopPathStatus(): Promise<StopPathStatus> {
     return this.#stopPath(await this.#live(), "stopPath.status", {})
   }
@@ -173,14 +173,15 @@ export class DesktopService {
     return status
   }
 
-  /**
-   * Closes the session and lets the engine exit at EOF; kills it after `CLOSE_TIMEOUT_MS`. The next session starts
-   * with the whole call budget.
-   */
+  /** The user ended computer use (`/computer off`): the next requests get the whole call budget again. */
+  resetCallBudget(): void {
+    this.#budget.reset()
+  }
+
+  /** Closes the session and lets the engine exit at EOF; kills it after `CLOSE_TIMEOUT_MS`. The call budget stays spent. */
   close(): Promise<void> {
     return this.#serialize(async () => {
       this.#desired = undefined
-      this.#budget.reset()
       const connection = this.#connection
       if (connection === undefined) return
       this.#drop(connection)

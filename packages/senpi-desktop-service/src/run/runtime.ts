@@ -115,10 +115,14 @@ export async function runComputerSteps(
     signal.throwIfAborted()
     const returnValue = await new Promise((resolve, reject) => {
       signal.addEventListener("abort", () => reject(signal.reason), { once: true })
-      program({ desktop, sleep: (ms) => sleep(ms, signal) }).then(resolve, reject)
+      // The audit of the call's last request arrives after that request's reply; collect it before settling.
+      program({ desktop, sleep: (ms) => sleep(ms, signal) })
+        .then(async (value) => {
+          if (sent) await host.service.auditBarrier({ signal, timeoutMs: Math.max(1, context.deadline - Date.now()) })
+          return value
+        })
+        .then(resolve, reject)
     })
-    // The audit of the call's last request arrives after that request's reply; collect it before settling.
-    if (sent) await host.service.auditBarrier()
     return {
       displays: context.output.finish(),
       returnValue: cloneSafe(returnValue),
