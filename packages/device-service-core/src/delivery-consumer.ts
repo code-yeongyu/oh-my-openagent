@@ -1,11 +1,5 @@
 import { type ConnectOptions, connectLocalApi, type LocalApiClient } from "./local-api/client.ts"
-import type {
-  DeliveryHolds,
-  DeliveryInbound,
-  DrainedData,
-  JsonObject,
-  PendingPair,
-} from "./local-api/protocol.ts"
+import type { DeliveryHolds, DeliveryInbound, DrainedData, JsonObject, PendingPair } from "./local-api/protocol.ts"
 import { connectLocal } from "./local-api/transport.ts"
 import { deviceServiceStateDir } from "./device-service.ts"
 
@@ -15,6 +9,8 @@ import { deviceServiceStateDir } from "./device-service.ts"
  * declaration ends with it. A refusal rejects with the service's LocalApiError, whose `code` names it.
  */
 export type DeliveryConsumerClient = {
+  /** The service's own version, from its welcome. */
+  readonly serviceVersion: string
   readonly serve: (request: { readonly agent_dir: string; readonly v: number }) => Promise<{ readonly wake: boolean }>
   readonly answer: (
     delivery: { readonly sender_device: string; readonly command_id: string },
@@ -40,7 +36,9 @@ export type ConnectDeliveryConsumerOptions = {
 }
 
 /** Opens the consumer's own proven connection; it never keeps the engine process alive. */
-export async function connectDeliveryConsumer(options: ConnectDeliveryConsumerOptions): Promise<DeliveryConsumerClient> {
+export async function connectDeliveryConsumer(
+  options: ConnectDeliveryConsumerOptions,
+): Promise<DeliveryConsumerClient> {
   const stateDir = options.stateDir ?? deviceServiceStateDir()
   const client = await (options.connect ?? connectLocalApi)({
     stateDir,
@@ -48,6 +46,7 @@ export async function connectDeliveryConsumer(options: ConnectDeliveryConsumerOp
     transport: () => connectLocal(stateDir, { background: true }),
   })
   return {
+    serviceVersion: client.welcome.service_version,
     serve: (request) => client.request("deliveries.serve", request),
     answer: async (delivery, reply) => {
       await client.request("delivery.answer", { ...delivery, reply })

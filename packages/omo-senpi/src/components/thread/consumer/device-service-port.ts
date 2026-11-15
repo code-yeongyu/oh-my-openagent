@@ -1,10 +1,17 @@
-import { connectDeliveryConsumer, deviceServiceStateDir } from "@oh-my-opencode/device-service-core"
+import {
+  connectDeliveryConsumer,
+  deviceServiceStateDir,
+  servesDeliveries,
+  WAKE_MARK_MIN_SERVICE_VERSION,
+} from "@oh-my-opencode/device-service-core"
 
 import type { DeliveryServicePort } from "./port"
 
 /**
  * The production delivery port (#13037 design 5.4): this device's service through device-service-core's own client,
- * the one module that speaks to the relay daemon. No device service answering means no port, so no consumer.
+ * the one module that speaks to the relay daemon. No device service answering means no port, so no consumer. A service
+ * older than the delivery protocol gives no port either, and no retry: it would answer every ask the same way, so the
+ * consumer starts with the engine that first meets a newer service.
  */
 export async function connectDeliveryServicePort(options: {
   readonly version: string
@@ -21,8 +28,17 @@ export async function connectDeliveryServicePort(options: {
       stateDir: options.stateDir ?? deviceServiceStateDir(),
     })
   } catch (error) {
-    options.log?.(`thread wake: the device service answered no delivery connection: ${error instanceof Error ? error.message : String(error)}`)
+    options.log?.(
+      `thread wake: the device service answered no delivery connection: ${error instanceof Error ? error.message : String(error)}`,
+    )
     options.onUnavailable?.()
+    return undefined
+  }
+  if (!servesDeliveries(client.serviceVersion)) {
+    client.close()
+    options.log?.(
+      `thread wake: the device service ${client.serviceVersion} serves no deliveries (it needs ${WAKE_MARK_MIN_SERVICE_VERSION}); a wake from another device starts nothing here until it is updated`,
+    )
     return undefined
   }
   return {

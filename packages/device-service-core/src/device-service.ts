@@ -259,6 +259,13 @@ export const LOCATE_SINGLE_MIN_SERVICE_VERSION: string | null = "0.1.13"
 const serviceAtLeast = (serviceVersion: string, minimum: string | null): boolean =>
   minimum !== null && compareVersions(serviceVersion, minimum) >= 0
 
+/**
+ * Whether a service at `serviceVersion` serves the #13037 delivery protocol (`deliveries.serve` and its family), which
+ * arrived with the wake mark (omo-relay-daemon #1076). An older one answers `unknown_type`, and asking again changes nothing.
+ */
+export const servesDeliveries = (serviceVersion: string): boolean =>
+  serviceAtLeast(serviceVersion, WAKE_MARK_MIN_SERVICE_VERSION)
+
 /** The mark this client puts on a peer delivery when its own service carries it. */
 export const WAKE_ACCEPTS: readonly "session-wake:v1"[] = ["session-wake:v1"]
 

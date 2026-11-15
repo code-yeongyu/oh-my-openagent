@@ -3,10 +3,7 @@ import { chmodSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import {
-  startFakeOwner,
-  type FakeOwner,
-} from "@oh-my-opencode/device-service-core/conformance/fake-owner"
+import { startFakeOwner, type FakeOwner } from "@oh-my-opencode/device-service-core/conformance/fake-owner"
 import { defaultWorld } from "@oh-my-opencode/device-service-core/conformance/world"
 import { FakeExtensionAPI } from "../../../../test-support/fake-extension-api"
 import { connectDeliveryServicePort } from "./device-service-port"
@@ -122,7 +119,10 @@ test("#given an engine at the wake minimum and no delivery port injected #when i
         if (durableId === TARGET) woken(value)
       },
     },
-  }).register(pi as never, { logger: { info() {}, error() {}, warn() {} }, config: { getFlag: () => undefined } } as never)
+  }).register(
+    pi as never,
+    { logger: { info() {}, error() {}, warn() {} }, config: { getFlag: () => undefined } } as never,
+  )
   await pi.dispatch("session_start", { type: "session_start" }, { mode: "rpc", agentDir: h.agentDir })
   await latch.running?.get(h.agentDir)?.ready
 
@@ -157,4 +157,31 @@ test("#given a state directory no device service answers #when the production po
   expect(port).toBeUndefined()
   expect(lines).toHaveLength(1)
   expect(unavailable).toHaveLength(1)
+})
+
+// The train's review M1: this build pins device service 0.1.27, older than the delivery protocol (0.1.31). Such a service
+// answers deliveries.serve unknown_type, and a port that let the consumer ask would make every engine reconnect and ask
+// again every 20 s for its whole life. Below the protocol there is no port and no retry.
+test("#given a device service older than the delivery protocol #when the production port connects #then it gives no port, asks nothing, says why once, and arms no retry", async () => {
+  const stateDir = mkdtempSync(join(tmpdir(), "consumer-port-old-"))
+  chmodSync(stateDir, 0o700)
+  cleanups.push(() => rmSync(stateDir, { recursive: true, force: true }))
+  const owner = await startFakeOwner({ stateDir, world: { ...defaultWorld(), service_version: "0.1.27" } })
+  cleanups.push(() => owner.stop())
+  const lines: string[] = []
+  const unavailable: number[] = []
+  const port = await connectDeliveryServicePort({
+    version: "5.1.70",
+    stateDir,
+    log: (line) => {
+      lines.push(line)
+    },
+    onUnavailable: () => {
+      unavailable.push(1)
+    },
+  })
+  expect(port).toBeUndefined()
+  expect(lines).toEqual([expect.stringContaining("0.1.27")])
+  expect(unavailable).toEqual([])
+  expect(owner.state.log.filter((type) => type.startsWith("deliver"))).toEqual([])
 })
