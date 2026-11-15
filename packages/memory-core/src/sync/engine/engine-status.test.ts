@@ -98,6 +98,56 @@ test(
 )
 
 test(
+  "a stranded lock that moves to another path is a new failure with its own action: fresh since, attempts 1 (#11759)",
+  async () => {
+    const { b } = await pair()
+    let lockPath = "/memory/.git/index.lock"
+    const load = spyOn(b.store, "load").mockImplementation(async () => {
+      throw new StrandedGitLockError([{ path: lockPath, reason: "owner-not-proven-dead" }])
+    })
+    const firstAt = b.clock.now()
+    await failedCycle(b)
+    b.clock.advance(10_000)
+    await failedCycle(b)
+    expect(await b.engine.status()).toMatchObject({ kind: "failing", since: firstAt, attempts: 2 })
+    lockPath = "/memory/.git/HEAD.lock"
+    b.clock.advance(10_000)
+    const movedAt = b.clock.now()
+    await failedCycle(b)
+    expect(await b.engine.status()).toMatchObject({
+      kind: "failing",
+      since: movedAt,
+      attempts: 1,
+      failure: { kind: "stranded_lock", paths: [lockPath] },
+    })
+    b.clock.advance(10_000)
+    await failedCycle(b)
+    expect(await b.engine.status()).toMatchObject({ kind: "failing", since: movedAt, attempts: 2 })
+    load.mockRestore()
+  },
+  GIT_TEST_TIMEOUT,
+)
+
+test(
+  "a caller that changes a returned failing status does not change the engine's next status",
+  async () => {
+    const { b } = await pair()
+    const load = spyOn(b.store, "load").mockImplementation(async () => {
+      throw new StrandedGitLockError([{ path: "/memory/.git/index.lock", reason: "owner-not-proven-dead" }])
+    })
+    await failedCycle(b)
+    const first = await b.engine.status()
+    if (first.kind !== "failing" || first.failure.kind !== "stranded_lock") throw new Error("expected a stranded lock")
+    const expected = structuredClone(first)
+    Reflect.set(first.failure, "action", "tampered")
+    Reflect.set(first.failure.paths, 0, "/elsewhere.lock")
+    expect(await b.engine.status()).toEqual(expected)
+    load.mockRestore()
+  },
+  GIT_TEST_TIMEOUT,
+)
+
+test(
   "an unexpected cycle error reports failing with a generic reason, never the raw error text",
   async () => {
     const { b } = await pair()
