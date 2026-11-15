@@ -206,7 +206,15 @@ describe.skipIf(process.platform === "win32")("omo remote attach: a raiser-only 
     const [session] = base.sessions
     if (session === undefined) throw new Error("the default world has a session")
     const secret = { id: "sec-9", type: "extension_ui_request", method: "input", title: "Token", secret: true }
-    const state = { ...session.snapshot.state, pendingDialogs: [secret] }
+    const grant = { id: "g-9", type: "extension_ui_request", method: "select", title: "Grant", grantSelect: true }
+    const question = {
+      id: "q-9",
+      type: "extension_ui_request",
+      method: "input",
+      title: "Secret question",
+      secret: true,
+    }
+    const state = { ...session.snapshot.state, pendingDialogs: [secret, grant], pendingQuestions: [question] }
     const endpoint = await endpointFor({
       ...base,
       sessions: [{ ...session, snapshot: { ...session.snapshot, state }, records: [MARKER] }],
@@ -217,6 +225,9 @@ describe.skipIf(process.platform === "win32")("omo remote attach: a raiser-only 
     expect(dialogs(tui)).toEqual([])
     // The state the TUI reads must not carry it either: the TUI runs every pending frame through its own dialog path.
     const replyState = await tui.request({ type: "get_state" })
-    expect(JSON.stringify(replyState)).not.toContain("sec-9")
+    const reply = JSON.stringify(replyState)
+    expect(reply).not.toContain("sec-9")
+    expect(reply).not.toContain("g-9")
+    expect(reply).not.toContain("q-9")
   })
 })
