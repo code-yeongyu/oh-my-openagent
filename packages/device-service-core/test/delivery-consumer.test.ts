@@ -43,11 +43,16 @@ describe("the delivery consumer client", () => {
     const inbound = new Promise<DeliveryInbound>((resolve) => client.onInbound(resolve))
     expect(await client.serve({ agent_dir: "/agents/a", v: 1 })).toEqual({ wake: false })
     expect(await inbound).toEqual({ type: "event", kind: "delivery.inbound", ...HANDED })
-    await client.answer({ sender_device: PEER, command_id: "Y29tbWFuZC1pZC0wMDAwMQ" }, { type: "response", success: true, data: {} })
+    await client.answer(
+      { sender_device: PEER, command_id: "Y29tbWFuZC1pZC0wMDAwMQ" },
+      { type: "response", success: true, data: {} },
+    )
     expect(await client.peerAdmitted(PEER)).toBe(true)
     expect(await client.peerAdmitted("dev-other")).toBe(false)
     await client.pending([{ sender_device: PEER, session_id: "dur-1", last_command_id: "Y29tbWFuZC1pZC0wMDAwMQ" }])
-    expect(await client.drained({ sender_device: PEER, session_id: "dur-1", last_command_id: "Y29tbWFuZC1pZC0wMDAwMQ" })).toEqual({
+    expect(
+      await client.drained({ sender_device: PEER, session_id: "dur-1", last_command_id: "Y29tbWFuZC1pZC0wMDAwMQ" }),
+    ).toEqual({
       kept: false,
     })
   })
@@ -56,7 +61,9 @@ describe("the delivery consumer client", () => {
     const client = await consumerOn({ agent_dirs: ["/agents/a"], handed: [HANDED] })
     await client.serve({ agent_dir: "/agents/a", v: 1 })
     await client.answer({ sender_device: PEER, command_id: "Y29tbWFuZC1pZC0wMDAwMQ" }, {})
-    const refused = await client.answer({ sender_device: PEER, command_id: "Y29tbWFuZC1pZC0wMDAwMQ" }, {}).catch((error: unknown) => error)
+    const refused = await client
+      .answer({ sender_device: PEER, command_id: "Y29tbWFuZC1pZC0wMDAwMQ" }, {})
+      .catch((error: unknown) => error)
     expect(refused).toBeInstanceOf(LocalApiError)
     expect((refused as LocalApiError).code).toBe("unknown_delivery")
   })
@@ -69,7 +76,9 @@ describe("the delivery consumer client", () => {
 
   test("#given the service asks whether this agent dir holds a session #when the consumer answers #then the question is closed", async () => {
     const client = await consumerOn({ agent_dirs: ["/agents/a"], asked: ["dur-9"] })
-    const asked = new Promise<{ readonly ask_id: string; readonly durable_id: string }>((resolve) => client.onHolds(resolve))
+    const asked = new Promise<{ readonly ask_id: string; readonly durable_id: string }>((resolve) =>
+      client.onHolds(resolve),
+    )
     await client.serve({ agent_dir: "/agents/a", v: 1 })
     const question = await asked
     expect(question.durable_id).toBe("dur-9")

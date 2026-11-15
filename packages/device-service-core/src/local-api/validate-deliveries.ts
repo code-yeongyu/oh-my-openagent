@@ -1,6 +1,17 @@
 import type { DeliveriesResponseData, PendingPair } from "./protocol-deliveries.ts"
 import { requestFields, type RequestValidators } from "./validate-command.ts"
-import { absolutePath, bool, commandId, exactly, fail, type Fields, jsonObject, known, localId, uint } from "./validate-fields.ts"
+import {
+  absolutePath,
+  bool,
+  commandId,
+  exactly,
+  fail,
+  type Fields,
+  jsonObject,
+  known,
+  localId,
+  uint,
+} from "./validate-fields.ts"
 import { deviceId, durableId } from "./validate-shapes.ts"
 import { eventFields, type EventValidators } from "./validate-stream-events.ts"
 
@@ -72,7 +83,11 @@ export const DELIVERIES_DATA: { readonly [T in DeliveriesRequestType]: (v: unkno
 }
 
 export const DELIVERIES_EVENT_VALIDATORS: EventValidators<"delivery.inbound" | "delivery.holds" | "delivery.wake"> = {
-  "delivery.wake": (v) => ({ type: "event", kind: "delivery.wake", enabled: bool(eventFields(v, ["enabled"])["enabled"], "enabled") }),
+  "delivery.wake": (v) => ({
+    type: "event",
+    kind: "delivery.wake",
+    enabled: bool(eventFields(v, ["enabled"])["enabled"], "enabled"),
+  }),
   "delivery.inbound": (v) => {
     const m = eventFields(v, ["command_id", "sender_device", "durable_id", "record"])
     return {

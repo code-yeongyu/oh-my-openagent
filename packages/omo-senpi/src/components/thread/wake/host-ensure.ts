@@ -81,7 +81,8 @@ export function engineHostEnsure(options: EngineHostEnsureOptions): () => Promis
           maxBuffer: 1024 * 1024,
           windowsHide: true,
         },
-        (error, stdout) => done(error === null ? undefined : `${String(error.code ?? error.message)} ${String(stdout).trim()}`),
+        (error, stdout) =>
+          done(error === null ? undefined : `${String(error.code ?? error.message)} ${String(stdout).trim()}`),
       )
     })
     if (failure !== undefined) options.warn(`thread wake: the engine did not ensure the operator host: ${failure}`)

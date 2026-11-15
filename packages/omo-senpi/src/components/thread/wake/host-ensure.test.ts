@@ -60,7 +60,9 @@ async function engineCliControl(): Promise<{
   let host: FakeEngineHost | undefined
   const server: Server = createServer((socket) => {
     socket.once("data", (chunk) => {
-      calls.push(JSON.parse(chunk.toString("utf8").trim()) as { readonly argv: string[]; readonly env: Record<string, string> })
+      calls.push(
+        JSON.parse(chunk.toString("utf8").trim()) as { readonly argv: string[]; readonly env: Record<string, string> },
+      )
       void (async () => {
         host ??= await startFakeEngineHost()
         socket.end(`${JSON.stringify({ line: { action: "start", reused: false }, exit: 0 })}\n`)
@@ -122,7 +124,10 @@ test("#given a pure-TUI engine and no operator host running #when its thread_sen
         if (durableId === TARGET) woken(value)
       },
     },
-  }).register(pi as never, { logger: { info() {}, error() {}, warn() {} }, config: { getFlag: () => undefined } } as never)
+  }).register(
+    pi as never,
+    { logger: { info() {}, error() {}, warn() {} }, config: { getFlag: () => undefined } } as never,
+  )
   await pi.dispatch("session_start", { type: "session_start" }, { mode: "tui", agentDir: h.agentDir })
   expect(control.host()).toBeUndefined()
 

@@ -45,12 +45,7 @@ export type DeliveryDrained = { readonly id: string; readonly type: "delivery.dr
 export type DrainedData = { readonly kept: false } | { readonly kept: true; readonly expecting: string }
 export type PeerAdmitted = { readonly id: string; readonly type: "peer.admitted"; readonly device: string }
 export type DeliveriesRequest =
-  | DeliveriesServe
-  | DeliveryAnswer
-  | DeliveryHeld
-  | DeliveryPending
-  | DeliveryDrained
-  | PeerAdmitted
+  DeliveriesServe | DeliveryAnswer | DeliveryHeld | DeliveryPending | DeliveryDrained | PeerAdmitted
 export type DeliveriesResponseData = {
   /** A7.2.3: the wake switch's effective value at the acknowledgement. */
   readonly "deliveries.serve": { readonly wake: boolean }

@@ -161,9 +161,9 @@ describe("startDeliveryConsumer", () => {
     h.phantom("t-on")
     h.phantom("t-off")
     for (const target of ["t-on", "t-off"])
-      expect(await sender.engine.deliver({ sender: { kind: "session", durable_id: "a" }, target, text: "hi" })).toMatchObject(
-        { kind: "ok", delivery: { kind: "queued_offline" } },
-      )
+      expect(
+        await sender.engine.deliver({ sender: { kind: "session", durable_id: "a" }, target, text: "hi" }),
+      ).toMatchObject({ kind: "ok", delivery: { kind: "queued_offline" } })
     const woken: string[] = []
     const service = createFakeDeliveryService({ admitted: true })
     service.ackServe({})

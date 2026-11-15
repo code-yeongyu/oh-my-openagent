@@ -12,7 +12,11 @@ const ok = (v: unknown): boolean => validateRequest(v).ok
 describe("delivery consumer requests", () => {
   test.each([
     ["deliveries.serve", { agent_dir: "/agents/a", v: 1 }, { agent_dir: "agents/a", v: 1 }],
-    ["delivery.answer", { sender_device: "dev-peer-1", command_id: "Y29tbWFuZC1pZC0wMDAwMQ", reply: { kind: "queued" } }, { sender_device: "dev-peer-1", command_id: "Y29tbWFuZC1pZC0wMDAwMQ", reply: "queued" }],
+    [
+      "delivery.answer",
+      { sender_device: "dev-peer-1", command_id: "Y29tbWFuZC1pZC0wMDAwMQ", reply: { kind: "queued" } },
+      { sender_device: "dev-peer-1", command_id: "Y29tbWFuZC1pZC0wMDAwMQ", reply: "queued" },
+    ],
     ["delivery.held", { ask_id: "ask-1", holds: true }, { ask_id: "ask-1", holds: "yes" }],
     ["delivery.pending", { pairs: [PAIR] }, { pairs: [{ ...PAIR, extra: 1 }] }],
     ["delivery.drained", PAIR, { sender_device: "dev-peer-1", session_id: "dur-1" }],
@@ -30,15 +34,27 @@ describe("delivery consumer answers", () => {
     ["delivery.answer", { newer: 1 }, {}, "x"],
     ["delivery.held", {}, {}, "x"],
     ["delivery.pending", {}, {}, "x"],
-    ["delivery.drained", { kept: true, expecting: "Y29tbWFuZC1pZC0wMDAwMg" }, { kept: true, expecting: "Y29tbWFuZC1pZC0wMDAwMg" }, { kept: false, expecting: "Y29tbWFuZC1pZC0wMDAwMg" }],
+    [
+      "delivery.drained",
+      { kept: true, expecting: "Y29tbWFuZC1pZC0wMDAwMg" },
+      { kept: true, expecting: "Y29tbWFuZC1pZC0wMDAwMg" },
+      { kept: false, expecting: "Y29tbWFuZC1pZC0wMDAwMg" },
+    ],
     ["peer.admitted", { admitted: false }, { admitted: false }, { admitted: "no" }],
-  ] as const)("#given the answer to %s #when it is decoded #then the data reads back without fields this version does not define, and a malformed one is a violation", (type, data, read, bad) => {
-    expect(validateResponse(response(data), type)).toEqual({ id: "r1", ok: true, data: read })
-    expect(() => validateResponse(response(bad), type)).toThrow()
-  })
+  ] as const)(
+    "#given the answer to %s #when it is decoded #then the data reads back without fields this version does not define, and a malformed one is a violation",
+    (type, data, read, bad) => {
+      expect(validateResponse(response(data), type)).toEqual({ id: "r1", ok: true, data: read })
+      expect(() => validateResponse(response(bad), type)).toThrow()
+    },
+  )
 
   test("#given a drained answer that keeps nothing #when it is decoded #then it is kept false with no command", () => {
-    expect(validateResponse(response({ kept: false }), "delivery.drained")).toEqual({ id: "r1", ok: true, data: { kept: false } })
+    expect(validateResponse(response({ kept: false }), "delivery.drained")).toEqual({
+      id: "r1",
+      ok: true,
+      data: { kept: false },
+    })
   })
 })
 
@@ -46,15 +62,23 @@ describe("delivery consumer events", () => {
   test.each([
     [
       "delivery.inbound",
-      { command_id: "Y29tbWFuZC1pZC0wMDAwMQ", sender_device: "dev-peer-1", durable_id: "dur-1", record: { type: "admit_external_message" } },
+      {
+        command_id: "Y29tbWFuZC1pZC0wMDAwMQ",
+        sender_device: "dev-peer-1",
+        durable_id: "dur-1",
+        record: { type: "admit_external_message" },
+      },
       { record: "not an object" },
     ],
     ["delivery.holds", { ask_id: "ask-1", durable_id: "dur-1" }, { durable_id: 5 }],
     ["delivery.wake", { enabled: true }, { enabled: "on" }],
-  ])("#given the %s event #when it is decoded #then it reads back and a malformed one is refused", (kind, body, bad) => {
-    const wire: unknown = { type: "event", kind, ...body }
-    expect(validateEvent(wire)).toEqual(wire as never)
-    const malformed: unknown = { type: "event", kind, ...body, ...bad }
-    expect(() => validateEvent(malformed)).toThrow()
-  })
+  ])(
+    "#given the %s event #when it is decoded #then it reads back and a malformed one is refused",
+    (kind, body, bad) => {
+      const wire: unknown = { type: "event", kind, ...body }
+      expect(validateEvent(wire)).toEqual(wire as never)
+      const malformed: unknown = { type: "event", kind, ...body, ...bad }
+      expect(() => validateEvent(malformed)).toThrow()
+    },
+  )
 })

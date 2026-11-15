@@ -26,7 +26,8 @@ export const deliveryHandler = (state: OwnerState, conn: Conn, request: Deliveri
   switch (request.type) {
     case "deliveries.serve":
       if (conn.client()?.name !== "omo") return refuse("forbidden", "only omo serves deliveries")
-      if (request.v !== DELIVERIES_PROTOCOL) return refuse("unsupported", "this owner serves deliveries protocol 1 only")
+      if (request.v !== DELIVERIES_PROTOCOL)
+        return refuse("unsupported", "this owner serves deliveries protocol 1 only")
       if (!world.agent_dirs.includes(request.agent_dir)) return refuse("forbidden", "that agent dir is not registered")
       // A7.2.3: the acknowledgement carries the wake switch's value (the fake owner has none: off).
       return ok({ wake: false }, () => declared(state, conn, request.agent_dir))

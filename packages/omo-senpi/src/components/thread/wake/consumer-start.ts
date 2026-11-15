@@ -64,7 +64,9 @@ export async function startDeliveryConsumer(input: ConsumerStartInput): Promise<
     consumer.stop()
     port.close?.()
     input.onDied?.()
-    input.log(`thread wake: the delivery consumer did not start: ${error instanceof Error ? error.message : String(error)}`)
+    input.log(
+      `thread wake: the delivery consumer did not start: ${error instanceof Error ? error.message : String(error)}`,
+    )
     return undefined
   }
   if (started !== "serving") {

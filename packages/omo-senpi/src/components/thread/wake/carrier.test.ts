@@ -405,7 +405,10 @@ describe("the lease (A3.1.3)", () => {
     let tookOver: () => void = () => undefined
     const settled = new Promise<void>((resolve, reject) => {
       tookOver = resolve
-      const timer = setTimeout(() => reject(new Error("waited 5s for the successor to take the row over at its start")), 5_000)
+      const timer = setTimeout(
+        () => reject(new Error("waited 5s for the successor to take the row over at its start")),
+        5_000,
+      )
       timer.unref?.()
       const original = tookOver
       tookOver = () => {
@@ -735,7 +738,11 @@ describe("the switches at the open (A7.2.3)", () => {
 function successorOf(
   h: GatewayHarness,
   fake: FakeEngineHost,
-  options: { readonly sameDevice?: () => boolean; readonly remoteWake?: () => boolean; readonly admitIntake?: (device: string) => Promise<IntakeAdmission> } = {},
+  options: {
+    readonly sameDevice?: () => boolean
+    readonly remoteWake?: () => boolean
+    readonly admitIntake?: (device: string) => Promise<IntakeAdmission>
+  } = {},
 ): Carrier {
   const successor = createCarrier({
     store: h.store(),

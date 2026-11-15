@@ -85,10 +85,14 @@ describe("the pending sweep", () => {
     })
     expect(outcome.kind).toBe("queued")
     let asked = 0
-    const woken = await sweep(h, () => "admitted", () => {
-      asked += 1
-      return true
-    })
+    const woken = await sweep(
+      h,
+      () => "admitted",
+      () => {
+        asked += 1
+        return true
+      },
+    )
     expect(woken).toEqual(["t-remote"])
     expect(asked).toBe(0)
   })
@@ -100,6 +104,12 @@ describe("the pending sweep", () => {
     const sent = await sender.engine.deliver({ sender: { kind: "session", durable_id: "a" }, target: "t", text: "hi" })
     expect(sent).toMatchObject({ kind: "ok", delivery: { kind: "queued_offline" } })
     expect(await sweep(h, () => "admitted")).toEqual([])
-    expect(await sweep(h, () => "admitted", () => true)).toEqual(["t"])
+    expect(
+      await sweep(
+        h,
+        () => "admitted",
+        () => true,
+      ),
+    ).toEqual(["t"])
   })
 })
