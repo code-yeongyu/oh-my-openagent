@@ -8,7 +8,7 @@ import type { JsonObject, RemoteThreadSurface } from "../remote/ports"
 import { replyData } from "../remote/remote-ops"
 import type { ThreadWorktree, WorktreeOutcome, WorktreeRequest } from "./thread-worktree"
 import { folderFailure } from "./failures"
-import { THREAD_WORKTREE_RPC } from "./worktree-rpc"
+import { THREAD_WORKTREE_RPC } from "./worktree-rpc-name"
 
 const isObject = (value: unknown): value is JsonObject =>
   typeof value === "object" && value !== null && !Array.isArray(value)
