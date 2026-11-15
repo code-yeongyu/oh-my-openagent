@@ -1,13 +1,16 @@
 import { execFileSync } from "node:child_process"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-/** Temporary folders and a one-commit git repository for worktree tests; `cleanup` removes everything made. */
+/**
+ * Temporary folders and a one-commit git repository for worktree tests; `cleanup` removes everything made. Folders are
+ * returned canonical (macOS's tmpdir is under the /var -> /private/var symlink, and git reports real paths).
+ */
 export function gitRepoKit() {
   const made: string[] = []
   const folder = (prefix: string): string => {
-    const path = mkdtempSync(join(tmpdir(), prefix))
+    const path = realpathSync(mkdtempSync(join(tmpdir(), prefix)))
     made.push(path)
     return path
   }
