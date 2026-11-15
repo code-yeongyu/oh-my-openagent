@@ -306,7 +306,9 @@ describe("createModelProfileComponent", () => {
       MODEL_PROFILE_APPLIED_TYPE,
       MODEL_PROFILE_APPLIED_TYPE,
     ])
-    expect(recordedOutcome(pi)).toMatchObject({ details: { profile: "daily-normal", model: "moonshotai/kimi-k3.1-pro" } })
+    expect(recordedOutcome(pi)).toMatchObject({
+      details: { profile: "daily-normal", model: "moonshotai/kimi-k3.1-pro" },
+    })
     expect(logs.filter((line) => line.includes('model_profile "recommended" is retired'))).toHaveLength(1)
   })
 
@@ -371,7 +373,9 @@ describe("createModelProfileComponent", () => {
       },
     })
     expect(appliedContent(pi)).toContain("moonshotai/kimi-k3.1-pro max")
-    expect(appliedContent(pi)).toContain("skipped: anthropic-subscription/claude-opus-5-5, anthropic-subscription/claude-fable-5-2")
+    expect(appliedContent(pi)).toContain(
+      "skipped: anthropic-subscription/claude-opus-5-5, anthropic-subscription/claude-fable-5-2",
+    )
     expect(existsSync(join(agentDir, "settings.json"))).toBe(false)
   })
 
