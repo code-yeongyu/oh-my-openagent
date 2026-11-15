@@ -32,8 +32,6 @@
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/memfs/memory-hook-cli.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "src/sync/crypto/vendor/sync-format/index.ts",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/sync/engine/adapters/qa-device.test-support.ts",
       ],
       "ignoreIssues": {
@@ -139,20 +137,26 @@
     "packages/memory-core/src/reminders/index.ts": ["createRemindersState", "generateReminders", "reminderKindFor"],
     // pre-existing at origin dev 4686e425b5: unused export(s) SOUL_NOTICE_WATERMARK_FILENAME
     "packages/memory-core/src/soul/watermark.ts": ["SOUL_NOTICE_WATERMARK_FILENAME"],
+    // A3 recovery-phrase stack (#13335): isPhraseIntent is used only inside enable-phrase.ts; nothing imports the export
+    "packages/memory-core/src/sync/account/enable-phrase.ts": ["isPhraseIntent"],
     // pre-existing at origin dev 4686e425b5: unused export(s) AccountHttpError
     "packages/memory-core/src/sync/account/index.ts": ["AccountHttpError"],
     // pre-existing at origin dev 4686e425b5: unused export(s) hexOfB64url, spaceItems
     "packages/memory-core/src/sync/account/verifier.ts": ["hexOfB64url", "spaceItems"],
     // pre-existing at origin dev 4686e425b5: unused export(s) MAX_CANONICAL_DEPTH
     "packages/memory-core/src/sync/canonical-json.ts": ["MAX_CANONICAL_DEPTH"],
+    // A3 recovery-phrase stack (#13335): SYNC_CONTRACT_VERSION is used inside contract-version.ts and re-exported by sync/engine/index.ts; nothing imports it from here
+    "packages/memory-core/src/sync/contract-version.ts": ["SYNC_CONTRACT_VERSION"],
     // pre-existing at origin dev 4686e425b5: unused export(s) sealToPort, keyMaterial
     "packages/memory-core/src/sync/crypto/testing/hpke-seal.ts": ["sealToPort", "keyMaterial"],
     // pre-existing at origin dev 4686e425b5: unused export(s) strictEd25519Key, strictEd25519Precheck, strictEd25519Verify, strictX25519Key, checkSharedSecret
     "packages/memory-core/src/sync/crypto/testing/strict-ed25519-oracle.test-support.ts": ["strictEd25519Key", "strictEd25519Precheck", "strictEd25519Verify", "strictX25519Key", "checkSharedSecret"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) FIXTURES, headOf, digestOf
-    "packages/memory-core/src/sync/crypto/testing/sync-v1.test-support.ts": ["FIXTURES", "headOf", "digestOf"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) headOf, digestOf
+    "packages/memory-core/src/sync/crypto/testing/sync-v1.test-support.ts": ["headOf", "digestOf"],
     // pre-existing at origin dev 4686e425b5: unused export(s) recordPreimage, entryAuthorKey, b64url
     "packages/memory-core/src/sync/crypto/vendor/sync-format/chain.ts": ["recordPreimage", "entryAuthorKey", "b64url"],
+    // A3 recovery-phrase stack (#13336): phrase-chain-fixture.test.ts now imports this vendored barrel (it was an unused file), so the re-exports nothing imports are named here
+    "packages/memory-core/src/sync/crypto/vendor/sync-format/index.ts": ["asciiCompare", "assertCanonicalOrder", "compareMembers", "compareRecoveryKeys", "compareWrapEntries", "entryAuthorKey", "recordPreimage", "verifyEntrySignature", "compareRecordRef", "forkSetMatchesEvidence", "asciiBytes", "b64urlDecode", "b64urlEncode", "concatBytes", "jcsBytes", "jcsCanonical", "SyncFormatError", "sha256", "sha256B64", "deriveDeviceId", "ed25519PublicKey", "framedPreimage", "hkdfSha256", "signFramed", "verifyFramed", "decodeObject", "OBJECT_MAGIC", "verifyObject", "createKeyringReceiver", "importSnapshot", "snapshotPreimage", "verifySnapshot"],
     // pre-existing at origin dev 4686e425b5: unused export(s) framedPreimage, deriveDeviceId
     "packages/memory-core/src/sync/crypto/vendor/sync-format/keys.ts": ["framedPreimage", "deriveDeviceId"],
     // pre-existing at origin dev 4686e425b5: unused export(s) OBJECT_MAGIC
@@ -168,10 +172,14 @@
     // pre-existing at origin dev 4686e425b5: unused export(s) POLL_MS
     "packages/memory-core/src/sync/engine/engine.ts": ["POLL_MS"],
     // pre-existing at origin dev 4686e425b5: unused export(s) createHttpTransport, SyncHttpError, SyncEngine
+    // A3 recovery-phrase stack (#13335): readServiceFloor, SYNC_CAPABILITIES and SYNC_CONTRACT_VERSION are re-exported here with no importer yet (the host wires readServiceFloor in #13646)
     "packages/memory-core/src/sync/engine/index.ts": ["createHttpTransport", "SyncHttpError", "SyncEngine", "readServiceFloor", "SYNC_CAPABILITIES", "SYNC_CONTRACT_VERSION"],
     // pre-existing at origin dev 4686e425b5: unused export(s) MAX_RECEIPTS
     "packages/memory-core/src/sync/item/capture-receipts.ts": ["MAX_RECEIPTS"],
+    // A3 recovery-phrase stack (#13336): chainFactsOf is used only inside enroll-phrase.ts; PhraseAcknowledgeUnverifiedError is used inside it and re-exported by recovery/index.ts, and nothing imports either export
+    "packages/memory-core/src/sync/recovery/enroll-phrase.ts": ["chainFactsOf", "PhraseAcknowledgeUnverifiedError"],
     // pre-existing at origin dev 4686e425b5: unused export(s) VETO_WINDOW_MS
+    // A3 recovery-phrase stack (#13336): enrollPhraseRecoveryKey, PhraseAcknowledgeUnverifiedError and rotateRecoveryPhrase are re-exported by this barrel; enroll-phrase.test.ts imports them from enroll-phrase.ts directly
     "packages/memory-core/src/sync/recovery/index.ts": ["VETO_WINDOW_MS", "enrollPhraseRecoveryKey", "PhraseAcknowledgeUnverifiedError", "rotateRecoveryPhrase"],
     // pre-existing at origin dev 4686e425b5: unused export(s) VETO_WINDOW_MS
     "packages/memory-core/src/sync/recovery/join-notice.ts": ["VETO_WINDOW_MS"],
@@ -186,14 +194,6 @@
     // pre-existing at origin dev 4686e425b5: unused export(s) toLf, linesOf
     "packages/memory-core/src/sync/space/read-back.ts": ["toLf", "linesOf"],
     // pre-existing at origin dev 4686e425b5: unused export(s) MemoryApplyPatchError
-    // A3 recovery-phrase stack (#13330-#13336): exported for the engine and desktop phrase flows, not consumed inside the repo yet
-    "packages/memory-core/src/sync/account/enable-phrase.ts": ["isPhraseIntent"],
-    // A3 recovery-phrase stack: the contract version is re-exported by engine/index.ts for hosts; the only in-repo use is the header builder
-    "packages/memory-core/src/sync/contract-version.ts": ["SYNC_CONTRACT_VERSION"],
-    // A3 recovery-phrase stack: the vendored sync-format barrel is now imported (no longer an unused file), so its unused re-exports are listed by name
-    "packages/memory-core/src/sync/crypto/vendor/sync-format/index.ts": ["asciiCompare", "assertCanonicalOrder", "compareMembers", "compareRecoveryKeys", "compareWrapEntries", "entryAuthorKey", "recordPreimage", "verifyEntrySignature", "compareRecordRef", "forkSetMatchesEvidence", "asciiBytes", "b64urlDecode", "b64urlEncode", "concatBytes", "jcsBytes", "jcsCanonical", "SyncFormatError", "sha256", "sha256B64", "deriveDeviceId", "ed25519PublicKey", "framedPreimage", "hkdfSha256", "signFramed", "verifyFramed", "decodeObject", "OBJECT_MAGIC", "verifyObject", "createKeyringReceiver", "importSnapshot", "snapshotPreimage", "verifySnapshot"],
-    // A3 recovery-phrase stack: enrollment helpers exported for the recovery barrel and its tests
-    "packages/memory-core/src/sync/recovery/enroll-phrase.ts": ["chainFactsOf", "PhraseAcknowledgeUnverifiedError"],
     "packages/memory-core/src/tools/memory-apply-patch.ts": ["MemoryApplyPatchError"]
   }
 }
