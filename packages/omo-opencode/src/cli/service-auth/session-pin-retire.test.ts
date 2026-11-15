@@ -191,7 +191,12 @@ describe("the credential write seam retires the sync pin (#12280)", () => {
   test("#given an unreadable stored item #when it is forgotten #then it is still deleted, its pin is kept, and one line is logged", async () => {
     const h = await pinnedHome()
     const s = memoryStore(stored, true)
-    await createSession({ api: "https://api.omo.dev", store: s.store, home: h.home, beforeKeysDiscarded: h.hook }).forget()
+    await createSession({
+      api: "https://api.omo.dev",
+      store: s.store,
+      home: h.home,
+      beforeKeysDiscarded: h.hook,
+    }).forget()
     expect(s.current()).toBeNull()
     expect(await h.pins()).toEqual({ live: 1, retired: 0 })
     expect(h.logs).toHaveLength(1)

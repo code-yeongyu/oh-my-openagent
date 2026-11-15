@@ -20,7 +20,7 @@ export function retireSyncPinOnDiscard(options: {
   const hook = async (discarded: DiscardedCredential) => {
     if (discarded.kind === "unreadable") {
       options.log(
-        "memory sync: a stored sign-in could not be read while it was replaced; its sync pin was left in place",
+        "memory sync: a stored sign-in could not be read when its keys were discarded; its sync pin was left in place",
       )
       return
     }
@@ -33,6 +33,6 @@ export function retireSyncPinOnDiscard(options: {
       options.log(`memory sync: the sync pin could not be retired (${reason(error)}); it was left in place`)
     }
   }
-  // A pin earned before the account was stamped on the credential: logout reads the account first.
+  // A pin earned before the account was stamped on the credential: every discard reads the account from the service first.
   return Object.assign(hook, { wantsAccount: () => hasLiveTrustAnchor(options.pinDir()).catch(() => false) })
 }

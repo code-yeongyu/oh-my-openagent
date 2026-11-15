@@ -61,7 +61,7 @@ export type DiscardedCredential =
   | { readonly kind: "unreadable" }
 
 export type BeforeKeysDiscarded = ((discarded: DiscardedCredential) => Promise<void>) & {
-  /** Whether a sign-in that names no account should have it read before logout revokes the device. */
+  /** Whether a sign-in that names no account should have it read from the service before its keys are discarded. */
   readonly wantsAccount?: () => Promise<boolean>
 }
 
@@ -142,6 +142,21 @@ export function createSession(options: {
         : undefined
     return typeof id === "string" && id !== "" ? id : undefined
   }
+  /**
+   * The account of a sign-in that names none, for a pin it earned before `omo sync` stamped the account on it (#12383):
+   * asked of the service with `access` only while a live pin exists. Every discard route reads it the same way.
+   */
+  const unstampedAccount = async (current: Credentials, access: string): Promise<string | undefined> =>
+    current.accountId === undefined &&
+    current.owner === undefined &&
+    (await beforeKeysDiscarded.wantsAccount?.()) === true
+      ? accountOf(access)
+      : undefined
+  /** Runs the hook for a principal whose keys are about to be discarded, naming its account when the service can. */
+  async function discard(current: Credentials, cause: "refused" | "forget" | "replaced"): Promise<void> {
+    const account = await unstampedAccount(current, current.accessToken)
+    await beforeKeysDiscarded(discardedOf(account === undefined ? current : { ...current, accountId: account }, cause))
+  }
   async function refreshed(current: Credentials): Promise<Credentials> {
     // Legacy state cannot prove the original key, identity and age. Only protocol-2's owned
     // transaction can recover; neither a draft key nor a new key authorizes a legacy resend.
@@ -170,7 +185,7 @@ export function createSession(options: {
         error.status < 500 &&
         ["unauthorized", "account_deleted", "reauth_required", "invalid_grant", "device_revoked"].includes(error.code)
       ) {
-        await beforeKeysDiscarded(discardedOf(current, "refused"))
+        await discard(current, "refused")
         await store.clear()
         await deviceService?.forget()
         throw new SessionEnded(
@@ -253,8 +268,7 @@ export function createSession(options: {
           await beforeKeysDiscarded({ kind: "unreadable" })
           stored = null
         }
-        if (stored !== null && stored.device.id !== value.device.id)
-          await beforeKeysDiscarded(discardedOf(stored, "replaced"))
+        if (stored !== null && stored.device.id !== value.device.id) await discard(stored, "replaced")
         // An item nobody here can read reads as missing above; row 8b moving it aside is still a discard, reported first.
         await store.write(value, "fresh-sign-in", () => beforeKeysDiscarded({ kind: "unreadable" }))
         await clearSignedOutMarker(markerPath)
@@ -282,13 +296,25 @@ export function createSession(options: {
         return action(current)
       })
     },
+    /** The hook for a principal a caller discards inside `update` (`omo account forget --device`, `adopt --replace`). */
+    discard,
     /**
-     * Deletes the item without reading it (a corrupt or locked item must still be removable, with one
-     * native call), so it cannot name the account whose pin to retire: `omo account forget --device`
-     * and `logout` read first and retire; this one leaves the pin (a stale pin is harmless for keys).
+     * Every sign-out retires the pin of the account it signs out of (#12308): the item is read first to name it. An item
+     * that cannot be read (corrupt, or a store that fails the read) is still deleted, and its pin is left with one line.
      */
     async forget(): Promise<void> {
-      await locked(() => store.clear())
+      await locked(async () => {
+        let current: Credentials | null
+        try {
+          current = await store.readAuthoritative()
+        } catch (error) {
+          if (!(error instanceof InvalidCredentialState || error instanceof CredentialStoreError)) throw error
+          await beforeKeysDiscarded({ kind: "unreadable" })
+          current = null
+        }
+        if (current !== null) await discard(current, "forget")
+        await store.clear()
+      })
       await deviceService?.forget()
     },
     accessSnapshot: snapshot,
@@ -308,13 +334,8 @@ export function createSession(options: {
                 Date.parse(current.accessTokenExpiresAt) <= now()
                   ? (await refreshed(current)).accessToken
                   : current.accessToken
-              if (
-                current.accountId === undefined &&
-                current.owner === undefined &&
-                (await beforeKeysDiscarded.wantsAccount?.()) === true
-              ) {
-                account = await accountOf(access)
-              }
+              // Before the revoke, while `access` still works.
+              account = await unstampedAccount(current, access)
               await request(`/v1/devices/${encodeURIComponent(current.device.id)}`, {
                 method: "DELETE",
                 headers: { authorization: `Bearer ${access}` },

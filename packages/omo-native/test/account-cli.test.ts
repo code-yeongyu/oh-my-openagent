@@ -90,7 +90,8 @@ function fakeService(answer: (body: Record<string, unknown>) => Response) {
 
 describe("omo account", () => {
   test.each(["{", JSON.stringify({ accessToken: "synthetic-invalid" })])(
-    "#given corrupt stored data %s #when forgotten #then deletion needs no credential read",
+    // #12308: forget reads the item once to name the pin it retires; an item that does not parse is still deleted.
+    "#given corrupt stored data %s #when forgotten #then one read, then the delete",
     async (initial) => {
       let value: string | null = initial
       const calls: string[] = []
@@ -116,7 +117,7 @@ describe("omo account", () => {
       expect({ code: result.code, out: result.out, calls }).toEqual({
         code: ACCOUNT_EXIT.ok,
         out: [{ forgotten: true }],
-        calls: ["delete"],
+        calls: ["get", "delete"],
       })
       expect(value).toBeNull()
     },
@@ -427,7 +428,7 @@ describe("omo account on a locked OS credential store (desktop#3509)", () => {
 })
 
 describe("omo account storage failures do not trigger another store call", () => {
-  test("#given a native delete failure #when forgetting #then it reports the store failure without a read", async () => {
+  test("#given a native delete failure #when forgetting #then it reports the store failure with no read after it", async () => {
     const calls: string[] = []
     const store = createCredentialStore("http://127.0.0.1:1", {
       platform: "darwin",
@@ -449,7 +450,7 @@ describe("omo account storage failures do not trigger another store call", () =>
     expect({ code: result.code, out: result.out, calls }).toEqual({
       code: ACCOUNT_EXIT.storeUnavailable,
       out: [{ error: "store-unavailable" }],
-      calls: ["delete"],
+      calls: ["get", "delete"],
     })
   })
 

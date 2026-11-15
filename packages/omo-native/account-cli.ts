@@ -21,7 +21,6 @@ import {
   type BeforeKeysDiscarded,
   createSession,
   type DeviceServiceHandoff,
-  discardedOf,
   type Session,
   SessionEnded,
 } from "../omo-opencode/src/cli/service-auth/session"
@@ -108,8 +107,7 @@ async function adopt(dependencies: AccountCommandDependencies, replace: boolean)
         current.device.id === incoming.device.id &&
         current.refreshState !== "uncertain" &&
         Date.parse(current.accessTokenExpiresAt) > Date.parse(incoming.accessTokenExpiresAt)
-      if (current !== null && current.device.id !== incoming.device.id)
-        await retireHook(dependencies)(discardedOf(current, "replaced"))
+      if (current !== null && current.device.id !== incoming.device.id) await session.discard(current, "replaced")
       if (!keepCurrent) await dependencies.store.write(incoming)
       await session.clearSignedOutMarker()
       adopted = keepCurrent ? current : incoming
@@ -188,7 +186,7 @@ async function runVerb(dependencies: AccountCommandDependencies, args: readonly 
             if (current !== null && current.device.id !== device) {
               return reply(dependencies, { forgotten: false, device: deviceOf(current) }, ACCOUNT_EXIT.conflict)
             }
-            if (current !== null) await retireHook(dependencies)(discardedOf(current, "forget"))
+            if (current !== null) await session.discard(current, "forget")
             await dependencies.store.clear()
             forgotten = true
             return reply(dependencies, { forgotten: true })
