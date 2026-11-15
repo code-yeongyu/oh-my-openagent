@@ -12,6 +12,9 @@ import { resolveWakeTarget, type WakeSessionKind } from "./session-target"
 const PERSON_WAIT_CLOSE_MS = 30 * 60_000
 /** How often a carrier renews its leases and sweeps (A3.1.3). */
 const CARRIER_RENEW_MS = 20_000
+// How long a finished-looking session refused for a queued delivery is kept for that delivery to run (#13708): a wake
+// admitted during the restore starts within seconds; past this the delivery is taken as held and dropped as before.
+const QUEUED_DELIVERY_GRACE_MS = 2 * 60_000
 
 export type CarrierWakeOutcome =
   | { readonly kind: "open"; readonly session_id: string; readonly generation: number }
@@ -86,6 +89,8 @@ type Carried = {
   readonly sessionId: string
   generation: number
   readonly off: () => void
+  /** When the release was first refused for a delivery this carry (#13708); cleared by a release that is not. */
+  deliveryRefusedSince?: number
 }
 
 const HELD_ELSEWHERE = new Set(["session_held", "session_path_in_use"])
@@ -168,7 +173,8 @@ export function createCarrier(options: CarrierOptions): Carrier {
   /**
    * The quiet hand-back (A3.2.4). On a held session a refusal naming a held delivery is retried once with interrupt,
    * which drops it. A finished session refused for a delivery has one queued to run (a wake admitted while the engine
-   * was still restoring it): it is kept, never interrupted, since an interrupt parks that delivery for a person's turn.
+   * was still restoring it): it is kept, not interrupted, since an interrupt parks that delivery for a person's turn,
+   * for up to QUEUED_DELIVERY_GRACE_MS; a delivery still refused after that is held, and the interrupt drops it.
    */
   const quietRelease = async (
     entry: Carried,
@@ -245,7 +251,10 @@ export function createCarrier(options: CarrierOptions): Carrier {
     }
     if (renewed.row.first_waiting_at !== null) await store.woken.clearWaiting(fence)
     if (!view.finished) return { kind: "kept", reason: "working" }
-    const released = await quietRelease(entry, false)
+    const refusedSince = entry.deliveryRefusedSince
+    const graceOver = refusedSince !== undefined && store.now() - refusedSince >= QUEUED_DELIVERY_GRACE_MS
+    const released = await quietRelease(entry, graceOver)
+    if (!released.ok && released.code === "turn_active") entry.deliveryRefusedSince ??= store.now()
     if (!released.ok) {
       if (released.code === "turn_active" || released.code === "session_busy")
         return { kind: "kept", reason: "working" }
