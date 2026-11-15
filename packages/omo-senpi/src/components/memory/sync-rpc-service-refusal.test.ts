@@ -19,7 +19,9 @@ const KNOWN = [
 for (const [code, status, reason] of KNOWN) {
   test(`#given the service refuses enable with ${code} #when enable settles #then it reports that code with its own copy`, async () => {
     const f = await setup()
-    f.runtime.enableSync = async () => { throw new AccountHttpError(code, status) }
+    f.runtime.enableSync = async () => {
+      throw new AccountHttpError(code, status)
+    }
     const result = await f.call("enable", owner("a").context)
     expect(result).toEqual({ kind: "refused", reason, code })
   })
@@ -29,7 +31,15 @@ for (const [code, status, reason] of KNOWN) {
     const original = f.account.forOperation
     f.account.forOperation = async (authority) => {
       const ports = await original(authority)
-      return { ...ports, pairing: { ...ports.pairing, listPending: async () => { throw new AccountHttpError(code, status) } } }
+      return {
+        ...ports,
+        pairing: {
+          ...ports.pairing,
+          listPending: async () => {
+            throw new AccountHttpError(code, status)
+          },
+        },
+      }
     }
     expect(await f.call("pending", owner("a").context)).toEqual({ kind: "refused", reason, code })
   })
@@ -37,7 +47,9 @@ for (const [code, status, reason] of KNOWN) {
 
 test("#given a service code outside the contract #when enable settles #then the generic refusal carries no code or service text", async () => {
   const f = await setup()
-  f.runtime.enableSync = async () => { throw new AccountHttpError("private-detail", 403) }
+  f.runtime.enableSync = async () => {
+    throw new AccountHttpError("private-detail", 403)
+  }
   const result = await f.call("enable", owner("a").context)
   expect(result).toEqual({ kind: "refused", reason: GENERIC })
   expect(JSON.stringify(result)).not.toContain("private-detail")

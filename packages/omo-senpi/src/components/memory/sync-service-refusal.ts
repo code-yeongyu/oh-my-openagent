@@ -17,7 +17,9 @@ const REFUSAL_COPY = {
  */
 export function serviceRefusal(serviceCode: string): Extract<SyncRpcProblem, { readonly kind: "refused" }> {
   const name =
-    serviceCode === "client_upgrade_required" || serviceCode === "update_required" ? "client_update_required" : serviceCode
+    serviceCode === "client_upgrade_required" || serviceCode === "update_required"
+      ? "client_update_required"
+      : serviceCode
   if (!Object.hasOwn(REFUSAL_COPY, name)) return { kind: "refused", reason: "The service refused this sync request." }
   const code = name as SyncServiceCode
   return { kind: "refused", reason: REFUSAL_COPY[code], code }
