@@ -49,8 +49,9 @@ export async function attachDesktopSyncChannel(stream: Duplex | undefined): Prom
       if (typeof packet === "object" && packet !== null && "event" in packet) {
         const event = desktopSyncEvent.parse(packet)
         if (child === undefined || event.child !== child) throw new DesktopSyncUnavailable()
+        // `retired` ends main's current account, not the channel: the account source ends that account and the
+        // next resolve opens main's next one (#13325). Only a closed stream ends the channel.
         for (const listener of listeners) listener(event)
-        if (event.event === "retired") close()
         return
       }
       const reply = desktopSyncReply.parse(packet)
