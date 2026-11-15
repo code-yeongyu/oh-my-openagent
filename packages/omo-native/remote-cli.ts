@@ -4,6 +4,7 @@ import { type DeviceService, deviceServiceEndpointPath } from "../device-service
 import { serveRemoteAttach } from "./remote-attach"
 import { type BootstrapSetup, type DeviceLink, runBootstrapVerb, runEnableVerb } from "./remote-bootstrap"
 import { applyColdWake, type ColdWake } from "./remote-cold-wake"
+import type { RemoteOptOut } from "./remote-opt-out"
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
 import {
   accountNotice,
@@ -27,8 +28,10 @@ export interface RemoteVerbDependencies extends RemoteCommandDependencies {
   readonly bootstrap: BootstrapSetup
   /** The session host unit `bootstrap` and `enable` install, `disable` removes and `status` reads back (omo#13594). */
   readonly coldWake: ColdWake
-  /** `enable` only: hands the signed-in session's device to a service that holds none (omo#13602). */
+  /** `enable` and `bootstrap`: hands the signed-in session's device to a service that holds none (omo#13602). */
   readonly linkDevice: DeviceLink
+  /** This user's recorded `omo remote disable`, which keeps the default-on bootstrap off (omo#13602). */
+  readonly optOut: RemoteOptOut
 }
 
 export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: readonly string[]): Promise<number> {
@@ -60,20 +63,13 @@ export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: 
   // switch, the device link and the session host unit. It reaches the network, so it is not a local-only verb.
   if (parsed.command === "enable") {
     try {
-      return await runEnableVerb(
-        dependencies,
-        dependencies.bootstrap,
-        dependencies.coldWake,
-        dependencies.linkDevice,
-        parsed.json,
-      )
+      return await runEnableVerb(dependencies, dependencies.bootstrap, dependencies, parsed.json)
     } catch (error) {
       return reportFailure(dependencies, error)
     }
   }
   if (parsed.command === "bootstrap")
-    return (await runBootstrapVerb(dependencies, dependencies.bootstrap, dependencies.coldWake, parsed.json)) ===
-      "connected"
+    return (await runBootstrapVerb(dependencies, dependencies.bootstrap, dependencies, parsed.json)) === "connected"
       ? REMOTE_EXIT.ok
       : REMOTE_EXIT.unavailable
   // The service manager's view of this device's units is read here, outside remote-local's graph (omo#13440), and
@@ -84,8 +80,11 @@ export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: 
     parsed,
   )
   // After the verb's connection is closed: a changed table restarts the device service, which would cut it.
-  if (code === REMOTE_EXIT.ok && parsed.command === "disable")
+  // The opt-out is recorded first, so the default-on bootstrap keeps it off even if removing the unit fails here.
+  if (code === REMOTE_EXIT.ok && parsed.command === "disable") {
+    dependencies.optOut.record()
     await applyColdWake(dependencies.coldWake, false, dependencies.error)
+  }
   return code
 }
 

@@ -3,9 +3,10 @@ import { createCredentialStore, SESSION_READ_WAIT } from "../omo-opencode/src/cl
 import { accountServiceApi } from "./account-show"
 import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { cliDeviceServiceHandoff } from "./device-service-handoff"
-import { deviceServiceBootstrapSetup, omoBinaryPath } from "./remote-bootstrap"
+import { deviceServiceBootstrapSetup, omoBinaryPath, runLoginSetup } from "./remote-bootstrap"
 import { prepareRemoteAttach, type RemoteVerbDependencies, runRemoteVerb } from "./remote-cli"
 import { coldWakeSetup } from "./remote-cold-wake"
+import { remoteOptOut } from "./remote-opt-out"
 import { localRemoteDependencies } from "./remote-local"
 
 // The launchers' `omo remote` entries: the verbs in remote-cli.ts over this device's real service, sign-in and binary.
@@ -18,7 +19,8 @@ function remoteDependencies(packageRoot?: string): RemoteVerbDependencies {
     ...localRemoteDependencies(packageRoot),
     bootstrap: deviceServiceBootstrapSetup({ stateDir, binaryPath, agentDir }),
     coldWake: coldWakeSetup({ binaryPath, agentDir }),
-    // Reads the stored credential only when `omo remote enable` finds a service that holds no device (omo#13602).
+    optOut: remoteOptOut(),
+    // Reads the stored credential only when enable or the bootstrap finds a service that holds no device (omo#13602).
     linkDevice: async () => {
       const api = accountServiceApi()
       const credentials = await createCredentialStore(api, { wait: SESSION_READ_WAIT }).read()
@@ -39,6 +41,12 @@ export async function runRemoteAttachCommand(args: readonly string[]): Promise<r
     return undefined
   }
   return prepared.engineArgs
+}
+
+/** Right after a successful `omo login`: remote sessions switch on and the user is told (omo#13602). */
+export async function setUpRemoteAfterLogin(): Promise<void> {
+  const dependencies = remoteDependencies()
+  await runLoginSetup(dependencies, dependencies.bootstrap, dependencies)
 }
 
 /** `packageRoot`: the compiled binary's provisioned runtime directory (its staged `plugin/`); the npm launcher passes nothing. */
