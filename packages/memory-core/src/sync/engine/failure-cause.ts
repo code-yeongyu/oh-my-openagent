@@ -89,21 +89,49 @@ function printable(value: unknown): string {
   }
 }
 
-/** The whole error for the local memory log: every stack down the cause chain. */
-function errorForLog(error: unknown): string {
+const GIT_SUBCOMMAND = /^[a-z][a-z0-9-]{0,31}$/
+
+/** A git error on a warning names its class, subcommand and exit code only: argv, stdout and stderr can hold memory paths and file text. */
+function printableAtWarn(value: unknown): string {
+  if (!(value instanceof GitError)) return printable(value)
+  const argv: unknown = "argv" in value ? value.argv : undefined
+  const subcommand = Array.isArray(argv)
+    ? argv.find((arg): arg is string => typeof arg === "string" && GIT_SUBCOMMAND.test(arg))
+    : undefined
+  const exit = value instanceof GitCommandError ? ` exited ${value.code}` : ""
+  return `${errorClassOf(value)}: git ${subcommand ?? "command"}${exit}`
+}
+
+/** The error down its cause chain, each one printed by `print`. */
+function errorForLog(error: unknown, print: (value: unknown) => string): string {
   const parts: string[] = []
   let current = error
   for (let depth = 0; depth < CAUSE_DEPTH && current !== undefined; depth += 1) {
-    parts.push(printable(current))
+    parts.push(print(current))
     current = current instanceof Error ? current.cause : undefined
   }
   return parts.join("\ncaused by: ")
 }
 
-/** Logs a failed cycle at warn with its whole error, after the engine settled it; it never throws into the engine. */
-export function logCycleFailure(log: SyncLog | undefined, stage: SyncStage, error: unknown): void {
+/**
+ * Logs a failed cycle after the engine settled it, never throwing into the engine. A warning only when
+ * the shown failure appeared or changed, so a cycle that keeps failing the same way does not repeat it;
+ * the whole error, git detail included, is always at info.
+ */
+export function logCycleFailure(
+  log: SyncLog | undefined,
+  stage: SyncStage,
+  error: unknown,
+  shownChanged: boolean,
+): void {
   try {
-    log?.(`sync cycle failed during ${stage}: ${errorForLog(error)}`, "warn")
+    const full = errorForLog(error, printable)
+    if (shownChanged) {
+      const brief = errorForLog(error, printableAtWarn)
+      log?.(`sync cycle failed during ${stage}: ${brief}`, "warn")
+      if (brief === full) return
+    }
+    log?.(`sync cycle failed during ${stage}: ${full}`)
   } catch {
     // A logger that throws has no channel left to report on; the status already carries the failure.
   }

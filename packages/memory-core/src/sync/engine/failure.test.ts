@@ -4,6 +4,7 @@ import { GitCommandError } from "../../git/errors"
 import { SyncFormatError } from "../crypto/vendor/sync-format/jcs"
 import { SyncHttpError } from "./adapters/http-transport"
 import { describeSyncFailure } from "./failure"
+import { logCycleFailure } from "./failure-cause"
 
 // Every raw string an error carries (message, path, stderr, a forged name or code) holds this marker:
 // none of it may reach the status, which the TUI, the RPC and the desktop all read (#13635).
@@ -88,4 +89,20 @@ test.each([
 
   expect(JSON.stringify(failure)).not.toContain("secret-value")
   expect(JSON.stringify(failure)).not.toContain("/home/")
+})
+
+test("a failed git command on the warning names its class, subcommand and exit code only; the whole error stays at info", () => {
+  const lines: { readonly line: string; readonly level: string }[] = []
+  const error = new Error("commit failed", {
+    cause: new GitCommandError(["--literal-pathspecs", "commit", "-m", RAW], 128, RAW, `fatal: ${RAW}`),
+  })
+
+  logCycleFailure((line, level = "info") => lines.push({ line, level }), "apply", error, true)
+
+  const warnings = lines.filter(({ level }) => level === "warn").map(({ line }) => line)
+  expect(warnings).toEqual([expect.stringContaining("GitCommandError: git commit exited 128")])
+  expect(warnings[0]).not.toContain("secret-value")
+  expect(lines.filter(({ level }) => level === "info").map(({ line }) => line)).toEqual([
+    expect.stringContaining("secret-value"),
+  ])
 })

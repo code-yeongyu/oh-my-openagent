@@ -133,6 +133,37 @@ test(
 )
 
 test(
+  "a cycle that keeps failing warns once when its failure is shown and once when it changes, every other attempt at info (#13635)",
+  async () => {
+    const lines: { readonly line: string; readonly level: string }[] = []
+    const b = await makeDevice(new FakeSyncServer(), "b", undefined, {
+      log: (line, level = "info") => lines.push({ line, level }),
+    })
+    devices.push(b)
+    let error: Error = new SyncNetworkError(new TypeError("fetch failed"))
+    const load = spyOn(b.store, "load").mockImplementation(async () => {
+      throw error
+    })
+    const failures = () => lines.filter(({ line }) => line.startsWith("sync cycle failed"))
+    const warnings = () => failures().filter(({ level }) => level === "warn")
+
+    for (let poll = 0; poll < 6; poll += 1) expect(await failedCycle(b)).toBe(error)
+
+    expect(warnings()).toHaveLength(1)
+    expect(failures()).toHaveLength(6)
+
+    error = new SyncHttpError("payload_too_large", 413, false)
+    expect(await failedCycle(b)).toBe(error)
+    expect(await failedCycle(b)).toBe(error)
+
+    expect(warnings()).toHaveLength(2)
+    expect(warnings()[1]?.line).toContain("SyncHttpError")
+    load.mockRestore()
+  },
+  GIT_TEST_TIMEOUT,
+)
+
+test(
   "a failed cycle whose logger throws, on a thrown value with no string form, still settles: it is shown, stop returns and the next cycle runs (#13635)",
   async () => {
     const b = await makeDevice(new FakeSyncServer(), "b", undefined, {

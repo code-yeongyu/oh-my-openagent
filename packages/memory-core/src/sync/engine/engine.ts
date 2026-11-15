@@ -171,7 +171,7 @@ export class SyncEngine {
       },
       (error: unknown) => {
         const stage = this.stage
-        this.tracker.failed(error, stage)
+        const shownChanged = this.tracker.failed(error, stage)
         this.announceIfChanged(keyAtStart)
         for (const w of waiters) w.reject(error)
         if (this.running === run) this.running = null
@@ -181,7 +181,7 @@ export class SyncEngine {
         this.rerunOnEvent = false
         if (rerun) this.request()
         // Logged last, once the cycle is settled: nothing the log does can leave it running.
-        logCycleFailure(this.deps.log, stage, error)
+        logCycleFailure(this.deps.log, stage, error, shownChanged)
       },
     )
     return run
