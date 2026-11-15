@@ -174,6 +174,8 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // 1,547,852 B (the committed artifact predates the train); splitting the session wake into the lazy
 // #omo-wake-runtime sidecar brings it to 1,476,860 B, so the ceiling covers the measured need with a
 // 1,140-byte margin instead of failing it by 860 bytes.
+// Train omo-5173 (#13627, 22 members) on dev 71cc3ecf70 (1,481,163 B): the train-top regen measures 1,485,337 B (+4,174);
+// budget = measured + 4 KiB (lead rule) = 1,489,433.
 const BUDGET_BYTES = bundleBudget.omoJsBytes
 
 describe("omo-senpi bundle size budget", () => {
