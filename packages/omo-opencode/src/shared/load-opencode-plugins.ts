@@ -15,10 +15,7 @@ function getConfigPaths(directory: string): string[] {
   return [
     path.join(directory, ".opencode", "opencode.json"),
     path.join(directory, ".opencode", "opencode.jsonc"),
-    ...configDirs.flatMap((dir) => [
-      path.join(dir, "opencode.json"),
-      path.join(dir, "opencode.jsonc"),
-    ]),
+    ...configDirs.flatMap((dir) => [path.join(dir, "opencode.json"), path.join(dir, "opencode.jsonc")]),
   ]
 }
 

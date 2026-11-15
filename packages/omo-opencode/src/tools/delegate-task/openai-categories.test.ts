@@ -16,7 +16,7 @@ import {
 } from "./openai-categories"
 
 const ASTRA_IDS = ["gpt-6-astra", "openai/gpt-6-astra", "openai-codex/gpt-6-astra-fast", "github-copilot/gpt-6-astra"]
-const GPT_5_IDS = ["openai/gpt-5.5", "openai/gpt-5.5 high", "openai/gpt-5-5", "openai/gpt-5.6-sol"]
+const GPT_5_IDS = ["openai/gpt-5.5", "openai/gpt-5.5 medium", "openai/gpt-5-5", "openai/gpt-5.6-sol"]
 const NON_GPT_IDS = ["openai/gpt-5.4", "anthropic/claude-opus-4-7", undefined]
 
 describe("deep lane prompt append resolvers", () => {
@@ -90,11 +90,11 @@ describe("OPENAI_CATEGORIES deep lanes", () => {
     const highCat = OPENAI_CATEGORIES.find((c) => c.name === "unspecified-high")
 
     //#then
-    expect(low?.config).toEqual({ model: "openai/gpt-6.1-sol", variant: "high" })
+    expect(low?.config).toEqual({ model: "openai/gpt-6.1-sol", variant: "medium" })
     expect(low?.requiresModel).toEqual(["gpt-6.1-sol", "gpt-6.1-sol-fast", "gpt-5.6-sol-fast", "gpt-5.6-sol"])
     expect(high?.config).toEqual({ model: "openai/gpt-6-astra", variant: "high" })
     expect(high?.requiresModel).toBe("gpt-6-astra")
-    expect(highCat?.config).toEqual({ model: "anthropic/claude-opus-5-5", variant: "high" })
+    expect(highCat?.config).toEqual({ model: "anthropic/claude-opus-5-5", variant: "medium" })
     expect(highCat?.resolvePromptAppend).toBe(resolveUnspecifiedHighCategoryPromptAppend)
   })
 
@@ -111,14 +111,18 @@ describe("OPENAI_CATEGORIES deep lanes", () => {
 describe("GPT-6 Astra category prompt appends", () => {
   test("ultrabrain resolves the Astra append for GPT-6 ids and the generic one otherwise", () => {
     const generic = OPENAI_CATEGORIES.find((c) => c.name === "ultrabrain")?.promptAppend
-    for (const id of ASTRA_IDS) expect(resolveUltrabrainCategoryPromptAppend(id)).toBe(ULTRABRAIN_CATEGORY_PROMPT_APPEND_GPT_6_ASTRA)
-    for (const id of ["openai/gpt-5.6-sol", "openai/gpt-5.5", "anthropic/claude-opus-5-5", undefined]) expect(resolveUltrabrainCategoryPromptAppend(id)).toBe(generic)
+    for (const id of ASTRA_IDS)
+      expect(resolveUltrabrainCategoryPromptAppend(id)).toBe(ULTRABRAIN_CATEGORY_PROMPT_APPEND_GPT_6_ASTRA)
+    for (const id of ["openai/gpt-5.6-sol", "openai/gpt-5.5", "anthropic/claude-opus-5-5", undefined])
+      expect(resolveUltrabrainCategoryPromptAppend(id)).toBe(generic)
   })
 
   test("unspecified-high resolves the Astra append for GPT-6 ids and the generic one otherwise", () => {
     const generic = OPENAI_CATEGORIES.find((c) => c.name === "unspecified-high")?.promptAppend
-    for (const id of ASTRA_IDS) expect(resolveUnspecifiedHighCategoryPromptAppend(id)).toBe(UNSPECIFIED_HIGH_CATEGORY_PROMPT_APPEND_GPT_6_ASTRA)
-    for (const id of ["openai/gpt-5.6-sol", "anthropic/claude-opus-5-5", "zai-coding-plan/glm-5.3", undefined]) expect(resolveUnspecifiedHighCategoryPromptAppend(id)).toBe(generic)
+    for (const id of ASTRA_IDS)
+      expect(resolveUnspecifiedHighCategoryPromptAppend(id)).toBe(UNSPECIFIED_HIGH_CATEGORY_PROMPT_APPEND_GPT_6_ASTRA)
+    for (const id of ["openai/gpt-5.6-sol", "anthropic/claude-opus-5-5", "zai-coding-plan/glm-5.3", undefined])
+      expect(resolveUnspecifiedHighCategoryPromptAppend(id)).toBe(generic)
   })
 
   test("the model-specific appends are distinct Category_Context blocks named after their category", () => {

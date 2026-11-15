@@ -48,15 +48,20 @@ describe("OpenCode config migration transform", () => {
       })
       const opencodeGroup = groups.find((group) => group.id === OPENCODE_CONFIG_MIGRATION_ID)
       const configJsoncGroup = groups.find((group) => group.id === CONFIG_JSONC_MIGRATION_ID)
-      if (opencodeGroup === undefined || configJsoncGroup === undefined) throw new Error("Expected both migration groups")
+      if (opencodeGroup === undefined || configJsoncGroup === undefined)
+        throw new Error("Expected both migration groups")
       const root = opencodeGroup.sources.find((source) => source.kind === "user-config")
       const focused = opencodeGroup.sources.find((source) => source.profile === "focused")
       const kimi = opencodeGroup.sources.find((source) => source.profile === "kimi")
       const project = opencodeGroup.sources.find((source) => source.kind === "project-config")
       const configJsonc = configJsoncGroup.sources.find((source) => source.kind === "config-jsonc")
       if (
-        root === undefined || focused === undefined || kimi === undefined || project === undefined
-        || project.projectRoot === undefined || configJsonc === undefined
+        root === undefined ||
+        focused === undefined ||
+        kimi === undefined ||
+        project === undefined ||
+        project.projectRoot === undefined ||
+        configJsonc === undefined
       ) {
         throw new Error("Expected fixture sources")
       }
@@ -79,12 +84,14 @@ describe("OpenCode config migration transform", () => {
       })
       const configJsoncDocument = transformConfigJsoncSources({
         discovered: configJsoncGroup.sources,
-        sources: [loaded(configJsonc, {
-          $schema: "https://legacy.example/config.schema.json",
-          "[opencode]": { background_task: { enabled: true } },
-          "[codex]": { telemetry: { enabled: false } },
-          "[omo]": { agents: { oracle: { model: "senpi-model" } } },
-        })],
+        sources: [
+          loaded(configJsonc, {
+            $schema: "https://legacy.example/config.schema.json",
+            "[opencode]": { background_task: { enabled: true } },
+            "[codex]": { telemetry: { enabled: false } },
+            "[omo]": { agents: { oracle: { model: "senpi-model" } } },
+          }),
+        ],
       })
       const projectDocument = transformOpenCodeSources({
         discovered: opencodeGroup.sources,
@@ -177,18 +184,20 @@ describe("OpenCode config migration transform", () => {
     const result = transformOpenCodeSources({
       discovered: [root],
       scope: { kind: "user" },
-      sources: [loaded(root, {
-        agents: {
-          OmO: { model: "anthropic/claude-opus-4-4" },
-          oracle: { model: "anthropic/claude-opus-4-4" },
-        },
-        categories: { deep: { model: "anthropic/claude-opus-4-4" } },
-        disabled_agents: ["OmO"],
-        disabled_hooks: ["anthropic-auto-compact", "empty-message-sanitizer"],
-        experimental: { hashline_edit: { enabled: true } },
-        lsp: { typescript: { command: ["typescript-language-server", "--stdio"] } },
-        omo_agent: { model: "provider/sisyphus" },
-      })],
+      sources: [
+        loaded(root, {
+          agents: {
+            OmO: { model: "anthropic/claude-opus-4-4" },
+            oracle: { model: "anthropic/claude-opus-4-4" },
+          },
+          categories: { deep: { model: "anthropic/claude-opus-4-4" } },
+          disabled_agents: ["OmO"],
+          disabled_hooks: ["anthropic-auto-compact", "empty-message-sanitizer"],
+          experimental: { hashline_edit: { enabled: true } },
+          lsp: { typescript: { command: ["typescript-language-server", "--stdio"] } },
+          omo_agent: { model: "provider/sisyphus" },
+        }),
+      ],
     })
 
     expect(result.document["[opencode]"]).toEqual({
@@ -211,16 +220,18 @@ describe("OpenCode config migration transform", () => {
     const result = transformOpenCodeSources({
       discovered: [root],
       scope: { kind: "user" },
-      sources: [loaded(root, {
-        agents: {
-          oracle: { model: "anthropic/claude-opus-4-4" },
-          OmO: { model: "anthropic/claude-opus-4-4" },
-        },
-        categories: { deep: { model: "anthropic/claude-opus-4-4" } },
-        disabled_providers: ["github-copilot", "openrouter"],
-        model_fallback: true,
-        omo_agent: { model: "provider/sisyphus" },
-      })],
+      sources: [
+        loaded(root, {
+          agents: {
+            oracle: { model: "anthropic/claude-opus-4-4" },
+            OmO: { model: "anthropic/claude-opus-4-4" },
+          },
+          categories: { deep: { model: "anthropic/claude-opus-4-4" } },
+          disabled_providers: ["github-copilot", "openrouter"],
+          model_fallback: true,
+          omo_agent: { model: "provider/sisyphus" },
+        }),
+      ],
     })
     const parsed = OmoConfigSchema.safeParse(result.document)
 
@@ -250,10 +261,13 @@ describe("OpenCode config migration transform", () => {
     const cases: ReadonlyArray<{ readonly label: string; readonly value: unknown }> = [
       { label: "empty", value: {} },
       { label: "malformed-agents", value: { agents: "not-a-record", categories: null } },
-      { label: "agents-categories-only", value: {
-        agents: { oracle: { model: "anthropic/claude-opus-4-4" } },
-        categories: { deep: { model: "openai/gpt-5.6-sol" } },
-      } },
+      {
+        label: "agents-categories-only",
+        value: {
+          agents: { oracle: { model: "anthropic/claude-opus-4-4" } },
+          categories: { deep: { model: "openai/gpt-5.6-sol" } },
+        },
+      },
     ]
 
     for (const { label, value } of cases) {

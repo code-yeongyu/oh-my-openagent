@@ -14,16 +14,29 @@ import type { RunnerOutcome } from "../../runners/in-process/child-handle"
 import { createTaskRecordStore } from "../../store"
 import type { WorkpoolCreate, WorkpoolEvent } from "../types"
 import { NO_HOST_ENDPOINT } from "../../lifecycle/host-session"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
-export const poolInput: WorkpoolCreate = { name: "batch", agent: { category: "quick", prompt: "Process input" }, mode: "fresh" }
+export const poolInput: WorkpoolCreate = {
+  name: "batch",
+  agent: { category: "quick", prompt: "Process input" },
+  mode: "fresh",
+}
 export function deferred<T>() {
-  let resolve: (value: T) => void = () => { throw new Error("Deferred was not initialized") }
-  let reject: (error: unknown) => void = () => { throw new Error("Deferred was not initialized") }
-  const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no })
+  let resolve: (value: T) => void = () => {
+    throw new Error("Deferred was not initialized")
+  }
+  let reject: (error: unknown) => void = () => {
+    throw new Error("Deferred was not initialized")
+  }
+  const promise = new Promise<T>((yes, no) => {
+    resolve = yes
+    reject = no
+  })
   return { promise, resolve, reject }
 }
+/** Awaits a workpool event within the test's remaining budget, not a fixed 5 s stopwatch (#10814). */
 export function bounded<T>(promise: Promise<T>): Promise<T> {
-  const signal = AbortSignal.timeout(5000)
+  const signal = AbortSignal.timeout(remainingTestTime())
   return new Promise<T>((resolve, reject) => {
     const abort = (): void => reject(signal.reason)
     signal.addEventListener("abort", abort, { once: true })
@@ -33,59 +46,108 @@ export function bounded<T>(promise: Promise<T>): Promise<T> {
 export function fixtureHandle(taskId: string) {
   let cycle = deferred<RunnerOutcome>()
   const followUps: string[] = []
-  const settle = (value: RunnerOutcome): void => { const prior = cycle; cycle = deferred<RunnerOutcome>(); prior.resolve(value) }
+  const settle = (value: RunnerOutcome): void => {
+    const prior = cycle
+    cycle = deferred<RunnerOutcome>()
+    prior.resolve(value)
+  }
   const handle: ManagedChildHandle = {
-    task_id: taskId, sessionId: `worker-${taskId}`, pid: undefined,
-    waitForOutcome: () => cycle.promise, followUp: async message => { followUps.push(message) }, steer: async () => undefined,
-    abort: async () => settle({ status: "cancelled" }), dispose: async () => undefined,
-    subscribe: () => () => undefined, lastAssistantText: () => undefined,
+    task_id: taskId,
+    sessionId: `worker-${taskId}`,
+    pid: undefined,
+    waitForOutcome: () => cycle.promise,
+    followUp: async (message) => {
+      followUps.push(message)
+    },
+    steer: async () => undefined,
+    abort: async () => settle({ status: "cancelled" }),
+    dispose: async () => undefined,
+    subscribe: () => () => undefined,
+    lastAssistantText: () => undefined,
   }
   return { handle, settle, followUps }
 }
-export function fixture(options: {
-  readonly concurrency?: TaskConcurrency
-  readonly config?: Record<string, unknown>
-  readonly admit?: AdmitResident
-  readonly planner?: ChildPlanner
-  readonly runner?: ManagedRunner
-  // The engine's runtime parent kernel-tool map, so a test can watch a pool binding appear and go.
-  readonly kernelToolBindings?: KernelToolBindingRegistry
-} = {}) {
+export function fixture(
+  options: {
+    readonly concurrency?: TaskConcurrency
+    readonly config?: Record<string, unknown>
+    readonly admit?: AdmitResident
+    readonly planner?: ChildPlanner
+    readonly runner?: ManagedRunner
+    // The engine's runtime parent kernel-tool map, so a test can watch a pool binding appear and go.
+    readonly kernelToolBindings?: KernelToolBindingRegistry
+  } = {},
+) {
   const root = mkdtempSync(join(tmpdir(), "workpool-admission-"))
   const store = createTaskRecordStore({ project_dir: root })
-  const config = OmoTaskSettingsSchema.parse({ default_concurrency: 1, global_concurrency: 1, residency_max_children: 4, ...options.config })
+  const config = OmoTaskSettingsSchema.parse({
+    default_concurrency: 1,
+    global_concurrency: 1,
+    residency_max_children: 4,
+    ...options.config,
+  })
   const concurrency = options.concurrency ?? new TaskConcurrency(config)
   const starts: ManagedStartSpec[] = []
   const handles = new Map<string, ReturnType<typeof fixtureHandle>>()
-  const runner: ManagedRunner = options.runner ?? { start: async spec => {
-    starts.push(spec)
-    const child = fixtureHandle(spec.taskId)
-    handles.set(spec.taskId, child)
-    return child.handle
-  } }
-  const registry: ResidencyRegistry = {
-    get: taskId => {
-      const child = manager.getResidentHandle(taskId)
-      return child === undefined ? undefined : { task_id: taskId, kind: "in-process", pid: undefined,
-        abort: () => child.abort(), dispose: () => child.dispose(), terminate: async () => undefined }
+  const runner: ManagedRunner = options.runner ?? {
+    start: async (spec) => {
+      starts.push(spec)
+      const child = fixtureHandle(spec.taskId)
+      handles.set(spec.taskId, child)
+      return child.handle
     },
-    entries: () => manager.residentTaskIds().flatMap(id => { const child = registry.get(id); return child === undefined ? [] : [child] }),
-    forget: (taskId, options) => manager.forget(taskId, options), hasPendingSends: taskId => manager.hasPendingSends?.(taskId) ?? false,
-    tryClaimEviction: taskId => manager.tryClaimEviction?.(taskId) ?? false,
-    releaseEviction: taskId => manager.releaseEviction?.(taskId),
+  }
+  const registry: ResidencyRegistry = {
+    get: (taskId) => {
+      const child = manager.getResidentHandle(taskId)
+      return child === undefined
+        ? undefined
+        : {
+            task_id: taskId,
+            kind: "in-process",
+            pid: undefined,
+            abort: () => child.abort(),
+            dispose: () => child.dispose(),
+            terminate: async () => undefined,
+          }
+    },
+    entries: () =>
+      manager.residentTaskIds().flatMap((id) => {
+        const child = registry.get(id)
+        return child === undefined ? [] : [child]
+      }),
+    forget: (taskId, options) => manager.forget(taskId, options),
+    hasPendingSends: (taskId) => manager.hasPendingSends?.(taskId) ?? false,
+    tryClaimEviction: (taskId) => manager.tryClaimEviction?.(taskId) ?? false,
+    releaseEviction: (taskId) => manager.releaseEviction?.(taskId),
   }
   const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config })
-  const manager = createTaskManager({ store, concurrency, runners: { "in-process": runner, process: runner }, config, cwd: root,
+  const manager = createTaskManager({
+    store,
+    concurrency,
+    runners: { "in-process": runner, process: runner },
+    config,
+    cwd: root,
     ...(options.kernelToolBindings === undefined ? {} : { kernelToolBindings: options.kernelToolBindings }),
-    planner: options.planner ?? (spec => ({ kind: "resolved", plan: { model: spec.model ?? "test/model", ...(spec.subagent_type === undefined ? {} : { agentType: spec.subagent_type }) } })),
+    planner:
+      options.planner ??
+      ((spec) => ({
+        kind: "resolved",
+        plan: {
+          model: spec.model ?? "test/model",
+          ...(spec.subagent_type === undefined ? {} : { agentType: spec.subagent_type }),
+        },
+      })),
     destruction: lifecycle,
-    admit: options.admit ?? (async parent => {
-      const result = await lifecycle.admitResident(parent)
-      return result.kind === "rejected" ? { kind: "rejected", message: result.error.message } : result
-    }),
+    admit:
+      options.admit ??
+      (async (parent) => {
+        const result = await lifecycle.admitResident(parent)
+        return result.kind === "rejected" ? { kind: "rejected", message: result.error.message } : result
+      }),
   })
   const events: WorkpoolEvent[] = []
-  manager.workpools.subscribe(event => events.push(event))
+  manager.workpools.subscribe((event) => events.push(event))
   onTestFinished(async () => {
     manager.workpools.dispose()
     lifecycle.dispose?.()
@@ -99,5 +161,8 @@ export function evidence(name: string, data: unknown): void {
   const root = process.env.WORKPOOL_EVIDENCE_DIR
   if (root === undefined) return
   mkdirSync(root, { recursive: true })
-  writeFileSync(join(root, `${name}.json`), JSON.stringify({ at: new Date().toISOString(), source: process.env.WORKPOOL_SOURCE_SHA, data }, null, 2))
+  writeFileSync(
+    join(root, `${name}.json`),
+    JSON.stringify({ at: new Date().toISOString(), source: process.env.WORKPOOL_SOURCE_SHA, data }, null, 2),
+  )
 }

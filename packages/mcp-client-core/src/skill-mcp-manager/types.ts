@@ -28,11 +28,14 @@ export interface SkillMcpClientInfo {
     readonly projectRoot?: string
   }
   hostUserTrusted?: boolean
-  revalidateDeclaration?: () => Promise<{
-    config: ClaudeCodeMcpServer
-    sourcePath: string
-    sourceKind: "frontmatter" | "sidecar"
-  } | undefined>
+  revalidateDeclaration?: () => Promise<
+    | {
+        config: ClaudeCodeMcpServer
+        sourcePath: string
+        sourceKind: "frontmatter" | "sidecar"
+      }
+    | undefined
+  >
   serverName: string
   skillName: string
   sessionID: string
@@ -76,10 +79,7 @@ export interface ProcessCleanupHandler {
   listener: () => void
 }
 
-export type OAuthProviderLike = Pick<
-  McpOAuthProvider,
-  "tokens" | "login" | "refresh"
->
+export type OAuthProviderLike = Pick<McpOAuthProvider, "tokens" | "login" | "refresh">
 
 export type OAuthProviderFactory = (options: {
   serverUrl: string

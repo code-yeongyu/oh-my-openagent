@@ -22,6 +22,7 @@ import {
   seedTerminalRun,
 } from "./facts-run-prune.test-support"
 import { writeRunJsonAtomic } from "./worker/run-artifacts"
+import { useTestTimeout } from "../../../../../test-support/test-deadline"
 
 describe("terminal facts run pruning", () => {
   test("#given 25 terminal runs #when pruning keeps the last 20 #then the newest 20 survive deterministically", async () => {
@@ -37,9 +38,7 @@ describe("terminal facts run pruning", () => {
     // #then
     const remaining = await runNames(factsDir)
     expect(remaining).toHaveLength(20)
-    expect([...result.pruned].sort()).toEqual(
-      Array.from({ length: 5 }, (_, index) => `facts-aaaa-${index}`).sort(),
-    )
+    expect([...result.pruned].sort()).toEqual(Array.from({ length: 5 }, (_, index) => `facts-aaaa-${index}`).sort())
     expect(remaining).toContain("facts-aaaa-24")
     expect(remaining).not.toContain("facts-aaaa-4")
   }, 30_000)
@@ -125,6 +124,7 @@ describe("terminal facts run pruning", () => {
   }, 30_000)
 
   test("#given a live process holding a run's finalize lock #when pruning runs #then that run survives", async () => {
+    useTestTimeout(30_000)
     // #given: a real child process owns finalize-<runId>.lock, so the lock cannot be recovered.
     const { factsDir, locksDir } = await fixture()
     await seedTerminalRun({ factsDir, runId: "facts-gggg-1", finishedAt: instant(1) })
@@ -163,7 +163,10 @@ describe("terminal facts run pruning", () => {
     await finalizeReserved(first, instant(1))
     const second = await reserveRun(factsDir, locksDir, instant(2))
     await finalizeReserved(second, instant(2))
-    expect([runName(first), runName(second)]).toEqual(["facts-" + digestOf(first) + "-1", "facts-" + digestOf(first) + "-2"])
+    expect([runName(first), runName(second)]).toEqual([
+      "facts-" + digestOf(first) + "-1",
+      "facts-" + digestOf(first) + "-2",
+    ])
 
     // #when: pruning removes attempt 1, then the same digest reserves again.
     const result = await pruneTerminalFactsRuns({ factsDir, locksDir, keepLast: 1 })
@@ -194,6 +197,7 @@ describe("terminal facts run pruning", () => {
   }, 30_000)
 
   test("#given the facts-runs lock held by a live process #when a reservation runs #then it waits rather than racing the scan", async () => {
+    useTestTimeout(30_000)
     // #given
     const { factsDir, locksDir } = await fixture()
     await holdLock(factsRunsLockPath(locksDir))

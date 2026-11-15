@@ -45,33 +45,49 @@ async function repoWithPipeHoldingHook(): Promise<{ readonly repo: string; reado
 }
 
 describe("a git whose hook leaves a child holding its pipe (omo #10199 review LOW 1)", () => {
-  test.skipIf(process.platform === "win32")("#given a post-commit hook that backgrounds a pipe holder #when the commit finishes normally #then the write settles with git's own result, without waiting for the holder", async () => {
-    // #given
-    const { repo, holderPid } = await repoWithPipeHoldingHook()
-    const exec = createNodeGitExec()
+  test.skipIf(process.platform === "win32")(
+    "#given a post-commit hook that backgrounds a pipe holder #when the commit finishes normally #then the write settles with git's own result, without waiting for the holder",
+    async () => {
+      // #given
+      const { repo, holderPid } = await repoWithPipeHoldingHook()
+      const exec = createNodeGitExec()
 
-    // #when
-    const outcome = exec.run(["commit", "--allow-empty", "-q", "-m", "first"], { cwd: repo, timeoutMs: 10_000, exitDrainMs: 500 })
-    expect(await probeUntil(() => existsSync(holderPid), 20_000)).toBe(true)
-    holders.push(Number((await readFile(holderPid, "utf8")).trim()))
-    const settled = await settlesWithin(outcome, 20_000)
+      // #when
+      const outcome = exec.run(["commit", "--allow-empty", "-q", "-m", "first"], {
+        cwd: repo,
+        timeoutMs: 10_000,
+        exitDrainMs: 500,
+      })
+      expect(await probeUntil(() => existsSync(holderPid), 20_000)).toBe(true)
+      holders.push(Number((await readFile(holderPid, "utf8")).trim()))
+      const settled = await settlesWithin(outcome, 20_000)
 
-    // #then
-    expect(settled.kind).toBe("settled")
-    if (settled.kind === "settled") expect(settled.value.code).toBe(0)
-    expect(execFileSync("git", ["-C", repo, "rev-list", "--count", "HEAD"], { encoding: "utf8" }).trim()).toBe("1")
-  }, 60_000)
+      // #then
+      expect(settled.kind).toBe("settled")
+      if (settled.kind === "settled") expect(settled.value.code).toBe(0)
+      expect(execFileSync("git", ["-C", repo, "rev-list", "--count", "HEAD"], { encoding: "utf8" }).trim()).toBe("1")
+    },
+    60_000,
+  )
 
-  test.skipIf(process.platform === "win32")("#given a git that exits normally and closes its pipes #when it finishes #then its full output is returned as before", async () => {
-    // #given
-    const { repo } = await repoWithPipeHoldingHook()
-    const exec = createNodeGitExec()
+  test.skipIf(process.platform === "win32")(
+    "#given a git that exits normally and closes its pipes #when it finishes #then its full output is returned as before",
+    async () => {
+      // #given
+      const { repo } = await repoWithPipeHoldingHook()
+      const exec = createNodeGitExec()
 
-    // #when
-    const result = await exec.run(["rev-parse", "--show-toplevel"], { cwd: repo, timeoutMs: 10_000, exitDrainMs: 500 })
+      // #when
+      const result = await exec.run(["rev-parse", "--show-toplevel"], {
+        cwd: repo,
+        timeoutMs: 10_000,
+        exitDrainMs: 500,
+      })
 
-    // #then
-    expect(result.code).toBe(0)
-    expect(result.stdout.trim()).toBe(repo)
-  }, 60_000)
+      // #then
+      expect(result.code).toBe(0)
+      expect(result.stdout.trim()).toBe(repo)
+    },
+    60_000,
+  )
 })

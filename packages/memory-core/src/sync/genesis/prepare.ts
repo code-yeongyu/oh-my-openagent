@@ -19,17 +19,38 @@ export const prepareGenesis = async (
   const device = Object.freeze({ account, epoch: 1, id: `device:${bootstrap.first_device.id}` })
   const recovery = Object.freeze({ account, epoch: 1, id: `recovery:${bootstrap.recovery_key.credential_id}` })
   const wraps = Object.freeze([
-    Object.freeze({ epoch: 1, id: device.id, wrap: await capabilities.seal(device, bootstrap.first_device.sealing_public_key) }),
-    Object.freeze({ epoch: 1, id: recovery.id, wrap: await capabilities.seal(recovery, bootstrap.recovery_key.sealing_public_key) }),
+    Object.freeze({
+      epoch: 1,
+      id: device.id,
+      wrap: await capabilities.seal(device, bootstrap.first_device.sealing_public_key),
+    }),
+    Object.freeze({
+      epoch: 1,
+      id: recovery.id,
+      wrap: await capabilities.seal(recovery, bootstrap.recovery_key.sealing_public_key),
+    }),
   ] as const)
   // Genesis countersigns ALL wraps, not merely the recovery recipient's entry.
   const wrapsDigest = await sha256B64(jcsBytes(wraps))
-  const countersign = await capabilities.countersign(Object.freeze({
-    t: "omo-sync/v1/recovery-countersign",
-    account, custody_root: custodyRoot, predecessor: "", wraps_digest: wrapsDigest,
-  }))
+  const countersign = await capabilities.countersign(
+    Object.freeze({
+      t: "omo-sync/v1/recovery-countersign",
+      account,
+      custody_root: custodyRoot,
+      predecessor: "",
+      wraps_digest: wrapsDigest,
+    }),
+  )
   const prepared: GenesisPrepared = {
-    body: { kind: "genesis", account, epoch: 1, bootstrap, custody_root: custodyRoot, countersign, wraps_digest: wrapsDigest },
+    body: {
+      kind: "genesis",
+      account,
+      epoch: 1,
+      bootstrap,
+      custody_root: custodyRoot,
+      countersign,
+      wraps_digest: wrapsDigest,
+    },
     wraps,
   }
   await validatePrepared(prepared)

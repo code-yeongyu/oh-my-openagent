@@ -15,8 +15,16 @@ export type HttpProviders = {
 }
 
 const ERRORS = {
-  quota: { status: 403, message: "You've reached your usage limit for this billing cycle. Your limit resets 3:20am.", type: "access_terminated_error" },
-  refusal: { status: 400, message: "This request was flagged as a possible cybersecurity risk and refused under the content policy.", type: "invalid_request_error" },
+  quota: {
+    status: 403,
+    message: "You've reached your usage limit for this billing cycle. Your limit resets 3:20am.",
+    type: "access_terminated_error",
+  },
+  refusal: {
+    status: 400,
+    message: "This request was flagged as a possible cybersecurity risk and refused under the content policy.",
+    type: "invalid_request_error",
+  },
   auth: { status: 401, message: "Unauthorized - invalid api key", type: "authentication_error" },
 } as const
 
@@ -35,18 +43,22 @@ export function startHttpProviders(scripts: Readonly<Record<string, readonly Ste
     fetch: async (request) => {
       const provider = new URL(request.url).pathname.split("/")[1] ?? ""
       const body: unknown = await request.json()
-      const model = typeof body === "object" && body !== null && "model" in body && typeof body.model === "string" ? body.model : ""
+      const model =
+        typeof body === "object" && body !== null && "model" in body && typeof body.model === "string" ? body.model : ""
       const key = `${provider}/${model}`
       calls.push(key)
-      if (provider === "anthropic") return Response.json({ type: "error", error: { type: "api_error", message: "unscripted" } }, { status: 500 })
+      if (provider === "anthropic")
+        return Response.json({ type: "error", error: { type: "api_error", message: "unscripted" } }, { status: 500 })
       return respond(key, remaining.get(key)?.shift() ?? "complete")
     },
   })
   const base = `http://127.0.0.1:${server.port}`
-  const providers = Object.fromEntries(Object.keys(ENGINE_MODELS).map((provider) => [
-    provider,
-    { baseUrl: provider === "anthropic" ? `${base}/anthropic` : `${base}/${provider}/v1`, apiKey: "test-key" },
-  ]))
+  const providers = Object.fromEntries(
+    Object.keys(ENGINE_MODELS).map((provider) => [
+      provider,
+      { baseUrl: provider === "anthropic" ? `${base}/anthropic` : `${base}/${provider}/v1`, apiKey: "test-key" },
+    ]),
+  )
   return {
     calls,
     modelsJson: JSON.stringify({ providers }, null, 2),

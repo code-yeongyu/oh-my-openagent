@@ -54,7 +54,7 @@ export async function runNotificationCommand(
   commandPath: string,
   args: readonly string[],
   shellCommand: (shell: ShellRunner) => ShellCommand,
-  shellFailureMode: ShellFailureMode = "nothrow"
+  shellFailureMode: ShellFailureMode = "nothrow",
 ): Promise<void> {
   const shell = getShellRunner(ctx)
   if (shell) {

@@ -18,7 +18,9 @@ import { join } from "node:path"
 
 const workflowPath = new URL("../.github/workflows/publish.yml", import.meta.url)
 const workflowText = readFileSync(workflowPath, "utf8").replace(/\r\n/g, "\n")
-const workflow = Bun.YAML.parse(workflowText) as { jobs: Record<string, { steps: Array<{ name?: string; run?: string }> }> }
+const workflow = Bun.YAML.parse(workflowText) as {
+  jobs: Record<string, { steps: Array<{ name?: string; run?: string }> }>
+}
 
 function smokeRunBlock(): string {
   const step = workflow.jobs["post-publish-verify"].steps.find((s) => s.name === "Smoke test published lazycodex-ai")
@@ -26,7 +28,12 @@ function smokeRunBlock(): string {
   return step.run
 }
 
-interface Outcome { readonly status: number; readonly output: string; readonly npmViews: number; readonly sleptSeconds: number }
+interface Outcome {
+  readonly status: number
+  readonly output: string
+  readonly npmViews: number
+  readonly sleptSeconds: number
+}
 
 function runSmoke(readyAfterViews: number): Outcome {
   const root = mkdtempSync(join(tmpdir(), "publish-lazycodex-smoke-"))
@@ -50,11 +57,29 @@ function runSmoke(readyAfterViews: number): Outcome {
     writeFileSync(script, preamble + smokeRunBlock())
     const result = spawnSync("bash", [script], {
       encoding: "utf8",
-      env: { ...process.env, COUNTER: counter, SLEEPS: sleeps, READY_AFTER: String(readyAfterViews), OMO_VERSION: "5.0.0-beta.57", DIST_TAG: "beta", GITHUB_WORKSPACE: root },
+      env: {
+        ...process.env,
+        COUNTER: counter,
+        SLEEPS: sleeps,
+        READY_AFTER: String(readyAfterViews),
+        OMO_VERSION: "5.0.0-beta.57",
+        DIST_TAG: "beta",
+        GITHUB_WORKSPACE: root,
+      },
     })
-    const sleptSeconds = readFileSync(sleeps, "utf8").split("\n").filter(Boolean).reduce((sum, line) => sum + Number(line), 0)
-    return { status: result.status ?? -1, output: result.stdout + result.stderr, npmViews: Number(readFileSync(counter, "utf8").trim()), sleptSeconds }
-  } finally { rmSync(root, { recursive: true, force: true }) }
+    const sleptSeconds = readFileSync(sleeps, "utf8")
+      .split("\n")
+      .filter(Boolean)
+      .reduce((sum, line) => sum + Number(line), 0)
+    return {
+      status: result.status ?? -1,
+      output: result.stdout + result.stderr,
+      npmViews: Number(readFileSync(counter, "utf8").trim()),
+      sleptSeconds,
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 }
 
 describe("publish.yml post-publish-verify LazyCodex smoke readiness", () => {

@@ -62,8 +62,12 @@ export async function realColdReviveHostSession(): Promise<HostColdReviveResult>
     const revived = parent.store.load(taskId)
     assert(revived !== null)
     const commands = world.host.commands
-    const runningAt = commands.findIndex((command) => command.type === "set_session_context" && taskStatusOf(command.payload.patch) === "running")
-    const sendAt = commands.findIndex((command) => command.type === "prompt" && command.payload.message === "CONTINUE_HOST_SENTINEL")
+    const runningAt = commands.findIndex(
+      (command) => command.type === "set_session_context" && taskStatusOf(command.payload.patch) === "running",
+    )
+    const sendAt = commands.findIndex(
+      (command) => command.type === "prompt" && command.payload.message === "CONTINUE_HOST_SENTINEL",
+    )
     return {
       parkedResidency: parked.residency_state,
       revivedResidency: revived.residency_state,

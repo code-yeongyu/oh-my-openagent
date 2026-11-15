@@ -1,5 +1,5 @@
-import { realpathSync } from "node:fs";
-import { pathToFileURL } from "node:url";
+import { realpathSync } from "node:fs"
+import { pathToFileURL } from "node:url"
 
 /**
  * True when the module identified by `importMetaUrl` is the process CLI
@@ -15,12 +15,12 @@ import { pathToFileURL } from "node:url";
  * @param {string} importMetaUrl the caller's `import.meta.url`
  */
 export function isCliEntry(importMetaUrl) {
-	const argv1 = process.argv[1];
-	if (argv1 === undefined) return false;
-	if (importMetaUrl === pathToFileURL(argv1).href) return true;
-	try {
-		return importMetaUrl === pathToFileURL(realpathSync(argv1)).href;
-	} catch {
-		return false;
-	}
+  const argv1 = process.argv[1]
+  if (argv1 === undefined) return false
+  if (importMetaUrl === pathToFileURL(argv1).href) return true
+  try {
+    return importMetaUrl === pathToFileURL(realpathSync(argv1)).href
+  } catch {
+    return false
+  }
 }

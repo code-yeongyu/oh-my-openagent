@@ -20,21 +20,27 @@ describe("compiled memory block expiry", () => {
     ["a block with an unreadable expiry", "soon", EXPIRES_AT + 86_400_000, true],
   ]
 
-  test.each(cases)("#given %s #when compiled #then it is projected only while unexpired", async (_name, expires, asOfMs, projected) => {
-    // given
-    const { repo } = await repoWith([
-      { relativePath: "system/persona.md", content: memory("Persona", "steady") },
-      { relativePath: "system/temporary.md", content: expiring("Temporary outage note", expires, "provider X is down") },
-    ])
+  test.each(cases)(
+    "#given %s #when compiled #then it is projected only while unexpired",
+    async (_name, expires, asOfMs, projected) => {
+      // given
+      const { repo } = await repoWith([
+        { relativePath: "system/persona.md", content: memory("Persona", "steady") },
+        {
+          relativePath: "system/temporary.md",
+          content: expiring("Temporary outage note", expires, "provider X is down"),
+        },
+      ])
 
-    // when
-    const block = await compileMemoryBlockAtRevision(repo, await repo.head(), { agentId: "expiry-agent" }, asOfMs)
+      // when
+      const block = await compileMemoryBlockAtRevision(repo, await repo.head(), { agentId: "expiry-agent" }, asOfMs)
 
-    // then
-    expect(parseCompiledBlock(block).projectionPaths.includes("system/temporary.md")).toBe(projected)
-    expect(block.includes("provider X is down")).toBe(projected)
-    expect(parseCompiledBlock(block).projectionPaths).toContain("system/persona.md")
-  })
+      // then
+      expect(parseCompiledBlock(block).projectionPaths.includes("system/temporary.md")).toBe(projected)
+      expect(block.includes("provider X is down")).toBe(projected)
+      expect(parseCompiledBlock(block).projectionPaths).toContain("system/persona.md")
+    },
+  )
 
   test("#given an expired persona #when compiled #then <self> is left out like any other expired system file and the file is untouched", async () => {
     // given

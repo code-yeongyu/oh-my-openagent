@@ -6,7 +6,9 @@ import { createWorkpoolStore } from "./store"
 import type { WorkpoolSpec } from "./types"
 
 const roots: string[] = []
-afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
+afterEach(() => {
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
+})
 
 function setup() {
   const root = mkdtempSync(join(tmpdir(), "senpi-workpool-reuse-"))
@@ -16,7 +18,15 @@ function setup() {
   const agent = { category: "quick", prompt: "Process input" }
   const spec: WorkpoolSpec = {
     plan: { model: "test/model" },
-    start: { prompt: "Process input", parent_session_id: "parent", root_session_id: "parent", depth: 1, cwd: root, category: "quick", execution_mode: "in-process" },
+    start: {
+      prompt: "Process input",
+      parent_session_id: "parent",
+      root_session_id: "parent",
+      depth: 1,
+      cwd: root,
+      category: "quick",
+      execution_mode: "in-process",
+    },
   }
   const create = (tools?: readonly string[]) =>
     store.create(caller, { name: "batch", agent, mode: "fresh", ...(tools === undefined ? {} : { tools }) }, spec)
@@ -36,7 +46,11 @@ describe("a pool name reused by the same parent session", () => {
     create(["secret_tool"])
 
     let message = ""
-    try { create(["other"]) } catch (error) { message = error instanceof Error ? error.message : String(error) }
+    try {
+      create(["other"])
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error)
+    }
 
     expect(message).not.toBe("")
     expect(message).not.toContain("secret_tool")

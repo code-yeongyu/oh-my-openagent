@@ -23,7 +23,8 @@ export const PENDING_NUDGES_VERSION = 1
 export const NUDGE_HINT_MAX_CHARS = 200
 
 /** Decision commentary is not a memory fact. Internal, deliberately not a config knob. */
-const NUDGE_DECISION_LANGUAGE_PATTERN = /\b(?:no\s+stored\s+memory|clears\s+the\s+bar|not?\s+relevant|memor(?:y|ies)\s+(?:(?:is|are)\s+(?:unrelated\s+to|not\s+about)|(?:does|do)\s+not\s+(?:cover|address|pertain))|memor(?:y|ies)\s+covers?\s+.*\s+not\s+the)\b/i
+const NUDGE_DECISION_LANGUAGE_PATTERN =
+  /\b(?:no\s+stored\s+memory|clears\s+the\s+bar|not?\s+relevant|memor(?:y|ies)\s+(?:(?:is|are)\s+(?:unrelated\s+to|not\s+about)|(?:does|do)\s+not\s+(?:cover|address|pertain))|memor(?:y|ies)\s+covers?\s+.*\s+not\s+the)\b/i
 
 // The nudge block is reference material about a stored note, never a line of instruction: the
 // primary agent's own task stands and it decides what to do with the note. A hint that speaks TO
@@ -32,7 +33,8 @@ const NUDGE_DECISION_LANGUAGE_PATTERN = /\b(?:no\s+stored\s+memory|clears\s+the\
 // ending. Only the OPENING is scanned for imperative verbs, so an observation that quotes a rule
 // mid-sentence ("the note records that publish must follow the guard") stays valid.
 const NUDGE_SECOND_PERSON_PATTERN = /\b(?:you|your|yours|yourself)\b/i
-const NUDGE_IMPERATIVE_OPENING_PATTERN = /^[\s"'`\u00ab\u2018\u2019\u201c\u201d]*(?:do\s+not|don['\u2019]t|never|always|make\s+sure|ensure|verify|check|run|use|read|stop|avoid|remember|keep|prefer|skip|consider)\b/i
+const NUDGE_IMPERATIVE_OPENING_PATTERN =
+  /^[\s"'`\u00ab\u2018\u2019\u201c\u201d]*(?:do\s+not|don['\u2019]t|never|always|make\s+sure|ensure|verify|check|run|use|read|stop|avoid|remember|keep|prefer|skip|consider)\b/i
 /** 세요/십시오 (and the 십시요 misspelling), 하라/해라, 합니다 and a trailing ...지 마(라); the plain form a note is
  * written in (...한다 / ...이다) is untouched. */
 const NUDGE_KOREAN_REQUEST_ENDING_PATTERN = /(?:세요|십시오|십시요|하라|해라|합니다|지\s*마(?:라)?)\s*[.!]?$/
@@ -102,10 +104,12 @@ function describeHintShape(hint: string): Exclude<InvalidHintReason, "addresses-
 
 function addressesAgent(hint: string): boolean {
   const trimmed = hint.trim()
-  return NUDGE_SECOND_PERSON_PATTERN.test(trimmed)
-    || NUDGE_IMPERATIVE_OPENING_PATTERN.test(trimmed)
-    || NUDGE_KOREAN_REQUEST_ENDING_PATTERN.test(trimmed)
-    || NUDGE_KOREAN_PROHIBITION_PATTERN.test(trimmed)
+  return (
+    NUDGE_SECOND_PERSON_PATTERN.test(trimmed) ||
+    NUDGE_IMPERATIVE_OPENING_PATTERN.test(trimmed) ||
+    NUDGE_KOREAN_REQUEST_ENDING_PATTERN.test(trimmed) ||
+    NUDGE_KOREAN_PROHIBITION_PATTERN.test(trimmed)
+  )
 }
 
 /**
@@ -117,10 +121,7 @@ function addressesAgent(hint: string): boolean {
  * Parent-side validation of sidecar output, against the full admission contract
  * (`describeInvalidHint`). Order is preserved so the cap keeps the sidecar's own priority.
  */
-export function validateNudges(
-  nudges: readonly RecallNudge[],
-  options: ValidateNudgesOptions,
-): RecallNudge[] {
+export function validateNudges(nudges: readonly RecallNudge[], options: ValidateNudgesOptions): RecallNudge[] {
   const maxItems = Math.max(0, options.maxItems)
   if (maxItems === 0) return []
 

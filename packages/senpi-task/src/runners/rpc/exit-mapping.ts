@@ -75,9 +75,12 @@ export function mapExitOutcomeToError(
         killed: false,
         // A process exit (an exit code) gets the unexpected-exit lead line; a daemon session has no exit
         // code and carries the host's own reason in the tail, which stays the whole message.
-        error_message: exit.code === null
-          ? exit.stderrTail.trim() || "RPC child ended unexpectedly"
-          : [`RPC child exited unexpectedly (exit code ${exit.code})`, exit.stderrTail.trim()].filter(Boolean).join("\n"),
+        error_message:
+          exit.code === null
+            ? exit.stderrTail.trim() || "RPC child ended unexpectedly"
+            : [`RPC child exited unexpectedly (exit code ${exit.code})`, exit.stderrTail.trim()]
+                .filter(Boolean)
+                .join("\n"),
         exit,
       }
     case "spawn_error":

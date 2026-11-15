@@ -27,15 +27,17 @@ describe("a revived process child's persisted fallback chain honors exclude_mode
       })
 
       // when
-      await expect(runner.start({
-        task_id: "st_revived",
-        cwd: "/project",
-        state_dir: "/state",
-        prompt: "",
-        model: "openai/gpt-5.6-sol",
-        fallbackModels: ["anthropic/claude-fable-5-1:high", "openrouter/anthropic/claude-fable-5-1", "zai/glm-5.3"],
-        extensions: [],
-      })).rejects.toBe(stopped)
+      await expect(
+        runner.start({
+          task_id: "st_revived",
+          cwd: "/project",
+          state_dir: "/state",
+          prompt: "",
+          model: "openai/gpt-5.6-sol",
+          fallbackModels: ["anthropic/claude-fable-5-1:high", "openrouter/anthropic/claude-fable-5-1", "zai/glm-5.3"],
+          extensions: [],
+        }),
+      ).rejects.toBe(stopped)
 
       // then
       expect(chains).toEqual([["zai/glm-5.3"]])

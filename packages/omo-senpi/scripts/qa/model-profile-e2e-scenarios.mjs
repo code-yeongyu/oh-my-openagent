@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs"
-
 export const APPLIED_TYPE = "omo-model-profile:applied"
 export const UNKNOWN_TYPE = "omo-model-profile:unknown"
 export const UNAVAILABLE_TYPE = "omo-model-profile:unavailable"
@@ -15,12 +13,6 @@ export const KNOWN_PROFILES = "daily-heavy, daily-normal, geeky-heavy, geeky-nor
 // exchange (kept literal on both sides: the mock runs inside the senpi process, this file in node).
 export const REJECTED_REFRESH_TOKEN = "rejected-refresh"
 export const FLAKY_REFRESH_TOKEN = "flaky-refresh"
-
-// Mirrors FABLE_55_RELEASED in packages/model-core/src/fable-55-launch.ts (this file runs in plain
-// node): while it is false the Daily · Heavy 5.5 rung is absent, so 5.1 runs even when 5.5 is served.
-const FABLE_55_RELEASED = /export const FABLE_55_RELEASED = true\b/.test(
-  readFileSync(new URL("../../../model-core/src/fable-55-launch.ts", import.meta.url), "utf8"),
-)
 
 export const SCENARIOS = {
   "geeky-normal-api-sol": {
@@ -55,15 +47,15 @@ export const SCENARIOS = {
     registerProviders: ["anthropic"],
     expect: { model: "claude-fable-5-1", provider: "anthropic", notice: APPLIED_TYPE, thinking: "xhigh" },
   },
-  "daily-heavy-fable55": {
+  "daily-heavy-fable52": {
     omoConfig: { model_profile: "daily-heavy" },
-    mockModels: ["mock-1", "claude-fable-5-1", "claude-fable-5-5"],
+    mockModels: ["mock-1", "claude-fable-5-1", "claude-fable-5-2"],
     registerProviders: ["anthropic", "opencode"],
-    expect: { model: FABLE_55_RELEASED ? "claude-fable-5-5" : "claude-fable-5-1", provider: "anthropic", notice: APPLIED_TYPE, thinking: "xhigh" },
+    expect: { model: "claude-fable-5-2", provider: "anthropic", notice: APPLIED_TYPE, thinking: "xhigh" },
   },
-  "daily-heavy-fable55-gateway-unavailable": {
+  "daily-heavy-fable52-gateway-unavailable": {
     omoConfig: { model_profile: "daily-heavy" },
-    mockModels: ["mock-1", "anthropic/claude-fable-5-5"],
+    mockModels: ["mock-1", "anthropic/claude-fable-5-2"],
     registerProviders: ["opengateway"],
     expect: { model: "mock-1", notice: UNAVAILABLE_TYPE },
   },
@@ -246,10 +238,30 @@ export const SCENARIOS = {
   // The exact chain the desktop Settings editor saved after removing Daily · Normal's Claude
   // candidates: Opus is served (Claude connected) but must not run, and the lane keeps its name.
   "custom-daily-normal-desktop-chain": {
-    omoConfig: { model_profile: "daily-normal", model_profiles: { "daily-normal": { models: [{"model":"kimi-coding/kimi-k3","reasoning":"max"},{"model":"kimi-for-coding/kimi-k3","reasoning":"max"},{"model":"moonshotai/kimi-k3","reasoning":"max"},{"model":"opencode-go/kimi-k3","reasoning":"max"},{"model":"zai-coding-plan/glm-5.3","reasoning":"max"},{"model":"opencode-go/glm-5.3","reasoning":"max"}] } } },
+    omoConfig: {
+      model_profile: "daily-normal",
+      model_profiles: {
+        "daily-normal": {
+          models: [
+            { model: "kimi-coding/kimi-k3", reasoning: "max" },
+            { model: "kimi-for-coding/kimi-k3", reasoning: "max" },
+            { model: "moonshotai/kimi-k3", reasoning: "max" },
+            { model: "opencode-go/kimi-k3", reasoning: "max" },
+            { model: "zai-coding-plan/glm-5.3", reasoning: "max" },
+            { model: "opencode-go/glm-5.3", reasoning: "max" },
+          ],
+        },
+      },
+    },
     mockModels: ["mock-1", "claude-opus-5-5", "kimi-k3"],
     registerProviders: ["anthropic-subscription", "kimi-coding"],
-    expect: { model: "kimi-k3", provider: "kimi-coding", notice: APPLIED_TYPE, thinking: "max", label: "(Daily · Normal)" },
+    expect: {
+      model: "kimi-k3",
+      provider: "kimi-coding",
+      notice: APPLIED_TYPE,
+      thinking: "max",
+      label: "(Daily · Normal)",
+    },
   },
   "cli-model-wins": {
     omoConfig: { model_profile: "daily-normal" },
@@ -304,8 +316,16 @@ export const SCENARIOS = {
     mockModels: ["mock-1", "gpt-6-astra"],
     registerProviders: ["chatgpt-subscription", "openai"],
     oauthProviders: ["chatgpt-subscription"],
-    authJson: { "chatgpt-subscription": { type: "oauth", access: "stale-access", refresh: FLAKY_REFRESH_TOKEN, expires: 0 } },
-    expect: { model: "gpt-6-astra", provider: "chatgpt-subscription", notice: APPLIED_TYPE, thinking: "medium", authFailedAbsent: true },
+    authJson: {
+      "chatgpt-subscription": { type: "oauth", access: "stale-access", refresh: FLAKY_REFRESH_TOKEN, expires: 0 },
+    },
+    expect: {
+      model: "gpt-6-astra",
+      provider: "chatgpt-subscription",
+      notice: APPLIED_TYPE,
+      thinking: "medium",
+      authFailedAbsent: true,
+    },
   },
   // A credential pool whose flat (default) account is rejected but whose sibling account is valid:
   // the provider stays selected, and the engine's first turn rotates onto the sibling (the fixture
@@ -327,6 +347,12 @@ export const SCENARIOS = {
         ],
       },
     },
-    expect: { model: "claude-opus-5-5", provider: "anthropic", notice: APPLIED_TYPE, thinking: "medium", authFailedAbsent: true },
+    expect: {
+      model: "claude-opus-5-5",
+      provider: "anthropic",
+      notice: APPLIED_TYPE,
+      thinking: "medium",
+      authFailedAbsent: true,
+    },
   },
 }

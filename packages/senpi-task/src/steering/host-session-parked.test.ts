@@ -25,7 +25,11 @@ type ParkedHarness = {
 
 // The parked child the daemon reopens on demand: `reviveDetached` is the lifecycle seam that does
 // `open_session { sessionPath }` and hands back a live handle, which the engine then delivers to.
-function parkedHarness(input: { readonly status: TaskStatus; readonly killed?: boolean; readonly daemonAlive: boolean }): ParkedHarness {
+function parkedHarness(input: {
+  readonly status: TaskStatus
+  readonly killed?: boolean
+  readonly daemonAlive: boolean
+}): ParkedHarness {
   const store = createTaskRecordStore({ project_dir: tempProject() })
   const seeded = createTaskRecord({
     parent_session_id: "parent-1",

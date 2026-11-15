@@ -38,7 +38,9 @@ function matrixValues(job: Job, key: string): readonly unknown[] | "unresolved" 
   if (matrix === undefined) return "unresolved"
   const listed = matrix[key]
   const included = Array.isArray(matrix.include)
-    ? matrix.include.flatMap((entry) => (typeof entry === "object" && entry !== null && key in entry ? [(entry as Record<string, unknown>)[key]] : []))
+    ? matrix.include.flatMap((entry) =>
+        typeof entry === "object" && entry !== null && key in entry ? [(entry as Record<string, unknown>)[key]] : [],
+      )
     : []
   if (listed !== undefined && !Array.isArray(listed)) return "unresolved"
   return [...(listed ?? []), ...included]
@@ -74,7 +76,9 @@ function floatingJobs(): string[] {
 
 describe("Ubuntu runner pin policy (#9928)", () => {
   test("#given macOS status matrices #when required contexts are preserved #then their physical runner stays pinned to Ubuntu", () => {
-    const workflow = Bun.YAML.parse(readFileSync(join(WORKFLOWS_DIR, "ci.yml"), "utf8")) as { jobs: Record<string, Job> }
+    const workflow = Bun.YAML.parse(readFileSync(join(WORKFLOWS_DIR, "ci.yml"), "utf8")) as {
+      jobs: Record<string, Job>
+    }
     for (const id of ["macos-test-1-status", "macos-test-2-status", "macos-codex-status", "macos-senpi-status"]) {
       expect(workflow.jobs[id]?.["runs-on"]).toBe("ubuntu-26.04")
     }
@@ -90,8 +94,15 @@ describe("Ubuntu runner pin policy (#9928)", () => {
     expect(floats({ "runs-on": "ubuntu-24.04" })).toBe(false)
     expect(floats({ ...os(["ubuntu-latest"]), "runs-on": "${{ matrix.os }}" })).toBe(true)
     expect(floats({ ...os(["ubuntu-22.04", "macos-14"]), "runs-on": "${{ matrix.os }}" })).toBe(false)
-    expect(floats({ ...os(["ubuntu-latest"]), "runs-on": "${{ matrix.os == 'ubuntu-latest' && 'ubuntu-26.04' || matrix.os }}" })).toBe(false)
-    expect(floats({ "runs-on": "${{ startsWith(matrix.platform, 'darwin-') && 'macos-latest' || 'ubuntu-latest' }}" })).toBe(true)
+    expect(
+      floats({
+        ...os(["ubuntu-latest"]),
+        "runs-on": "${{ matrix.os == 'ubuntu-latest' && 'ubuntu-26.04' || matrix.os }}",
+      }),
+    ).toBe(false)
+    expect(
+      floats({ "runs-on": "${{ startsWith(matrix.platform, 'darwin-') && 'macos-latest' || 'ubuntu-latest' }}" }),
+    ).toBe(true)
     expect(floats({ "runs-on": "${{ matrix.os }}" })).toBe(true)
   })
 })

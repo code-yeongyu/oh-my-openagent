@@ -2,11 +2,7 @@ import { open, readFile, stat, unlink, writeHandleAll } from "../fs/resilient"
 
 import { getPidLiveness, getProcessStartIdentity } from "../locks"
 
-export type JournalLock = <T>(
-  lockPath: string,
-  task: () => Promise<T>,
-  signal?: AbortSignal,
-) => Promise<T>
+export type JournalLock = <T>(lockPath: string, task: () => Promise<T>, signal?: AbortSignal) => Promise<T>
 
 /**
  * Thrown when acquiring a transcript journal lock takes longer than the acquisition wait.
@@ -32,8 +28,7 @@ function delay(milliseconds: number, signal?: AbortSignal): Promise<void> {
   signal?.throwIfAborted()
   return new Promise((resolve, reject) => {
     const timer = setTimeout(finish, milliseconds)
-    const onAbort = (): void =>
-      finish(signal?.reason ?? new DOMException("The operation was aborted", "AbortError"))
+    const onAbort = (): void => finish(signal?.reason ?? new DOMException("The operation was aborted", "AbortError"))
     signal?.addEventListener("abort", onAbort, { once: true })
     function finish(error?: unknown): void {
       clearTimeout(timer)
@@ -97,11 +92,7 @@ async function tryReclaimStaleLock(lockPath: string): Promise<void> {
   })
 }
 
-async function acquireAndRun<T>(
-  lockPath: string,
-  task: () => Promise<T>,
-  signal: AbortSignal | undefined,
-): Promise<T> {
+async function acquireAndRun<T>(lockPath: string, task: () => Promise<T>, signal: AbortSignal | undefined): Promise<T> {
   // The acquisition wait is measured from when THIS contender actually gets its turn, so a
   // same-process holder that ran before us on the queue never eats our cross-process budget.
   const deadline = Date.now() + ACQUISITION_WAIT_MS

@@ -19,10 +19,12 @@ let cachedCli: ResolvedCli | null = null
 let autoInstallAttempted = false
 
 function getFirstExecutablePath(stdout: string): string | null {
-  return stdout
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .find(Boolean) ?? null
+  return (
+    stdout
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .find(Boolean) ?? null
+  )
 }
 
 function findExecutable(name: string): string | null {

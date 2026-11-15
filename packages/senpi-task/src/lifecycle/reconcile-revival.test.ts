@@ -45,8 +45,12 @@ function managedHandle(taskId: string, calls: string[] = []): ManagedChildHandle
     task_id: taskId,
     sessionId: `session:${taskId}`,
     pid: undefined,
-    steer: async (message) => { calls.push(`steer:${message}`) },
-    followUp: async (message) => { calls.push(`followUp:${message}`) },
+    steer: async (message) => {
+      calls.push(`steer:${message}`)
+    },
+    followUp: async (message) => {
+      calls.push(`followUp:${message}`)
+    },
     abort: async () => undefined,
     subscribe: () => () => undefined,
     waitForOutcome: () => new Promise(() => undefined),
@@ -55,12 +59,14 @@ function managedHandle(taskId: string, calls: string[] = []): ManagedChildHandle
   }
 }
 
-function injectedHarness(options: {
-  readonly store?: TaskRecordStore
-  readonly config?: Record<string, unknown>
-  readonly alive?: Set<number>
-  readonly onRespawn?: (record: TaskRecord, sessionPath: string | undefined) => Promise<RespawnResult>
-} = {}) {
+function injectedHarness(
+  options: {
+    readonly store?: TaskRecordStore
+    readonly config?: Record<string, unknown>
+    readonly alive?: Set<number>
+    readonly onRespawn?: (record: TaskRecord, sessionPath: string | undefined) => Promise<RespawnResult>
+  } = {},
+) {
   const store = options.store ?? tempStore()
   const registry = new FakeRegistry()
   const launches: Launch[] = []
@@ -109,17 +115,27 @@ describe("reconcileOnSessionStart scoped revival", () => {
   test("#given a suspended in-process child of the resumed session #when session start reconciles #then it resumes through the in-process port", async () => {
     // given
     const harness = injectedHarness()
-    const record = withV1(harness.store, seedRecord(harness.store, {
-      task_id: "st_10000001", parent_session_id: parentSessionId, status: "running",
-      residency_state: "persisted_only", execution_mode: "in-process",
-    }))
+    const record = withV1(
+      harness.store,
+      seedRecord(harness.store, {
+        task_id: "st_10000001",
+        parent_session_id: parentSessionId,
+        status: "running",
+        residency_state: "persisted_only",
+        execution_mode: "in-process",
+      }),
+    )
     const sessionPath = persistSession(harness.store, record.task_id)
 
     // when
     const result = await harness.lifecycle.reconcileOnSessionStart(parentSessionId)
 
     // then
-    expect(result.outcomes).toContainEqual({ task_id: record.task_id, kind: "resumed", reason: "respawned and reattached" })
+    expect(result.outcomes).toContainEqual({
+      task_id: record.task_id,
+      kind: "resumed",
+      reason: "respawned and reattached",
+    })
     expect(harness.launches).toEqual([{ taskId: record.task_id, sessionPath }])
     expect(harness.store.load(record.task_id)?.residency_state).toBe("resident")
     expect(harness.store.load(record.task_id)?.host_pid).toBe(hostPid)
@@ -128,10 +144,18 @@ describe("reconcileOnSessionStart scoped revival", () => {
   test("#given a legacy crash orphan of another session #when this session resumes #then the global process reattach still runs", async () => {
     // given
     const harness = injectedHarness()
-    const other = withV1(harness.store, seedRecord(harness.store, {
-      task_id: "st_10000015", parent_session_id: "session-other", status: "running",
-      residency_state: "resident", execution_mode: "process", pid: 7400, host_pid: 9999,
-    }))
+    const other = withV1(
+      harness.store,
+      seedRecord(harness.store, {
+        task_id: "st_10000015",
+        parent_session_id: "session-other",
+        status: "running",
+        residency_state: "resident",
+        execution_mode: "process",
+        pid: 7400,
+        host_pid: 9999,
+      }),
+    )
     const sessionPath = persistSession(harness.store, other.task_id)
 
     // when
@@ -146,8 +170,13 @@ describe("reconcileOnSessionStart scoped revival", () => {
     // given
     const store = tempStore()
     const record = seedRecord(store, {
-      task_id: "st_10000016", parent_session_id: parentSessionId, status: "completed",
-      residency_state: "resident", execution_mode: "process", pid: 7401, host_pid: 3333,
+      task_id: "st_10000016",
+      parent_session_id: parentSessionId,
+      status: "completed",
+      residency_state: "resident",
+      execution_mode: "process",
+      pid: 7401,
+      host_pid: 3333,
     })
     const harness = injectedHarness({ store, alive: new Set([3333, 7401]) })
 
@@ -191,10 +220,16 @@ describe("reconcileOnSessionStart scoped revival", () => {
   test("#given a suspended child of another session #when this session resumes #then the other child is untouched", async () => {
     // given
     const harness = injectedHarness()
-    const other = withV1(harness.store, seedRecord(harness.store, {
-      task_id: "st_10000002", parent_session_id: "session-other", status: "running",
-      residency_state: "persisted_only", execution_mode: "in-process",
-    }))
+    const other = withV1(
+      harness.store,
+      seedRecord(harness.store, {
+        task_id: "st_10000002",
+        parent_session_id: "session-other",
+        status: "running",
+        residency_state: "persisted_only",
+        execution_mode: "in-process",
+      }),
+    )
 
     // when
     await harness.lifecycle.reconcileOnSessionStart(parentSessionId)
@@ -207,10 +242,16 @@ describe("reconcileOnSessionStart scoped revival", () => {
   test("#given two managers racing one suspended child #when both reconcile #then one claims and the other defers", async () => {
     // given
     const store = tempStore()
-    const record = withV1(store, seedRecord(store, {
-      task_id: "st_10000003", parent_session_id: parentSessionId, status: "running",
-      residency_state: "persisted_only", execution_mode: "in-process",
-    }))
+    const record = withV1(
+      store,
+      seedRecord(store, {
+        task_id: "st_10000003",
+        parent_session_id: parentSessionId,
+        status: "running",
+        residency_state: "persisted_only",
+        execution_mode: "in-process",
+      }),
+    )
     persistSession(store, record.task_id)
     const first = injectedHarness({ store })
     const second = injectedHarness({ store })
@@ -223,24 +264,48 @@ describe("reconcileOnSessionStart scoped revival", () => {
 
     // then
     expect(first.launches.length + second.launches.length).toBe(1)
-    expect(results.flatMap((entry) => entry.outcomes).map((entry) => entry.kind).sort()).toEqual(["deferred", "resumed"])
+    expect(
+      results
+        .flatMap((entry) => entry.outcomes)
+        .map((entry) => entry.kind)
+        .sort(),
+    ).toEqual(["deferred", "resumed"])
   })
 
   test("#given one in-process and one rpc child of this session plus another-session child #when reconciled #then only this session revives end to end", async () => {
     // given
     const harness = injectedHarness()
-    const ownInProcess = withV1(harness.store, seedRecord(harness.store, {
-      task_id: "st_10000017", parent_session_id: parentSessionId, status: "running",
-      residency_state: "persisted_only", execution_mode: "in-process",
-    }))
-    const ownRpc = withV1(harness.store, seedRecord(harness.store, {
-      task_id: "st_10000018", parent_session_id: parentSessionId, status: "running",
-      residency_state: "rpc_detached", execution_mode: "process", pid: 7402,
-    }))
-    withV1(harness.store, seedRecord(harness.store, {
-      task_id: "st_10000019", parent_session_id: "session-other", status: "running",
-      residency_state: "persisted_only", execution_mode: "in-process",
-    }))
+    const ownInProcess = withV1(
+      harness.store,
+      seedRecord(harness.store, {
+        task_id: "st_10000017",
+        parent_session_id: parentSessionId,
+        status: "running",
+        residency_state: "persisted_only",
+        execution_mode: "in-process",
+      }),
+    )
+    const ownRpc = withV1(
+      harness.store,
+      seedRecord(harness.store, {
+        task_id: "st_10000018",
+        parent_session_id: parentSessionId,
+        status: "running",
+        residency_state: "rpc_detached",
+        execution_mode: "process",
+        pid: 7402,
+      }),
+    )
+    withV1(
+      harness.store,
+      seedRecord(harness.store, {
+        task_id: "st_10000019",
+        parent_session_id: "session-other",
+        status: "running",
+        residency_state: "persisted_only",
+        execution_mode: "in-process",
+      }),
+    )
     persistSession(harness.store, ownInProcess.task_id)
     persistSession(harness.store, ownRpc.task_id)
 
@@ -256,10 +321,16 @@ describe("reconcileOnSessionStart scoped revival", () => {
   test("#given terminal no-transcript disposal contends once #when admission follows #then the prompt is never relaunched and disposal defers", async () => {
     // given
     const backing = tempStore()
-    const record = withV1(backing, seedRecord(backing, {
-      task_id: "st_1000001a", parent_session_id: parentSessionId, status: "completed",
-      residency_state: "persisted_only", execution_mode: "in-process",
-    }))
+    const record = withV1(
+      backing,
+      seedRecord(backing, {
+        task_id: "st_1000001a",
+        parent_session_id: parentSessionId,
+        status: "completed",
+        residency_state: "persisted_only",
+        execution_mode: "in-process",
+      }),
+    )
     let mutations = 0
     const store: TaskRecordStore = {
       ...backing,
@@ -283,13 +354,22 @@ describe("reconcileOnSessionStart scoped revival", () => {
     // given
     const harness = injectedHarness({
       onRespawn: async () => ({
-        ok: false, disposition: "retryable", code: "model_unavailable", reason: "model registry is cold",
+        ok: false,
+        disposition: "retryable",
+        code: "model_unavailable",
+        reason: "model registry is cold",
       }),
     })
-    const record = withV1(harness.store, seedRecord(harness.store, {
-      task_id: "st_10000004", parent_session_id: parentSessionId, status: "running",
-      residency_state: "persisted_only", execution_mode: "in-process",
-    }))
+    const record = withV1(
+      harness.store,
+      seedRecord(harness.store, {
+        task_id: "st_10000004",
+        parent_session_id: parentSessionId,
+        status: "running",
+        residency_state: "persisted_only",
+        execution_mode: "in-process",
+      }),
+    )
     persistSession(harness.store, record.task_id)
 
     // when
@@ -305,13 +385,22 @@ describe("reconcileOnSessionStart scoped revival", () => {
     // given
     const harness = injectedHarness({
       onRespawn: async () => ({
-        ok: false, disposition: "retryable", code: "model_unavailable", reason: "model registry is cold",
+        ok: false,
+        disposition: "retryable",
+        code: "model_unavailable",
+        reason: "model registry is cold",
       }),
     })
-    const record = withV1(harness.store, seedRecord(harness.store, {
-      task_id: "st_10000099", parent_session_id: parentSessionId, status: "running",
-      residency_state: "persisted_only", execution_mode: "in-process",
-    }))
+    const record = withV1(
+      harness.store,
+      seedRecord(harness.store, {
+        task_id: "st_10000099",
+        parent_session_id: parentSessionId,
+        status: "running",
+        residency_state: "persisted_only",
+        execution_mode: "in-process",
+      }),
+    )
     persistSession(harness.store, record.task_id)
 
     // when
@@ -328,13 +417,22 @@ describe("reconcileOnSessionStart scoped revival", () => {
     // given
     const harness = injectedHarness({
       onRespawn: async () => ({
-        ok: false, disposition: "retryable", code: "model_unavailable", reason: "model registry is cold",
+        ok: false,
+        disposition: "retryable",
+        code: "model_unavailable",
+        reason: "model registry is cold",
       }),
     })
-    const record = withV1(harness.store, seedRecord(harness.store, {
-      task_id: "st_1000009b", parent_session_id: parentSessionId, status: "running",
-      residency_state: "persisted_only", execution_mode: "in-process",
-    }))
+    const record = withV1(
+      harness.store,
+      seedRecord(harness.store, {
+        task_id: "st_1000009b",
+        parent_session_id: parentSessionId,
+        status: "running",
+        residency_state: "persisted_only",
+        execution_mode: "in-process",
+      }),
+    )
     harness.store.mutate(record.task_id, (fresh) => ({ ...fresh, suspension_reason: "session_quit" }))
     persistSession(harness.store, record.task_id)
 
@@ -351,10 +449,16 @@ describe("reconcileOnSessionStart scoped revival", () => {
   test("#given retryable respawn failure and rollback lock failure #when reconciled #then the outcome loudly names the failed rollback", async () => {
     // given
     const backing = tempStore()
-    const record = withV1(backing, seedRecord(backing, {
-      task_id: "st_1000001b", parent_session_id: parentSessionId, status: "running",
-      residency_state: "persisted_only", execution_mode: "in-process",
-    }))
+    const record = withV1(
+      backing,
+      seedRecord(backing, {
+        task_id: "st_1000001b",
+        parent_session_id: parentSessionId,
+        status: "running",
+        residency_state: "persisted_only",
+        execution_mode: "in-process",
+      }),
+    )
     persistSession(backing, record.task_id)
     let mutations = 0
     const store: TaskRecordStore = {
@@ -367,7 +471,10 @@ describe("reconcileOnSessionStart scoped revival", () => {
     const harness = injectedHarness({
       store,
       onRespawn: async () => ({
-        ok: false, disposition: "retryable", code: "model_unavailable", reason: "model registry is cold",
+        ok: false,
+        disposition: "retryable",
+        code: "model_unavailable",
+        reason: "model registry is cold",
       }),
     })
 
@@ -383,14 +490,26 @@ describe("reconcileOnSessionStart scoped revival", () => {
   test("#given one record lock throws #when a batch reconciles #then only that record defers and the other revives", async () => {
     // given
     const backing = tempStore()
-    const blocked = withV1(backing, seedRecord(backing, {
-      task_id: "st_10000005", parent_session_id: parentSessionId, status: "running",
-      residency_state: "persisted_only", execution_mode: "in-process",
-    }))
-    const healthy = withV1(backing, seedRecord(backing, {
-      task_id: "st_10000006", parent_session_id: parentSessionId, status: "running",
-      residency_state: "persisted_only", execution_mode: "in-process",
-    }))
+    const blocked = withV1(
+      backing,
+      seedRecord(backing, {
+        task_id: "st_10000005",
+        parent_session_id: parentSessionId,
+        status: "running",
+        residency_state: "persisted_only",
+        execution_mode: "in-process",
+      }),
+    )
+    const healthy = withV1(
+      backing,
+      seedRecord(backing, {
+        task_id: "st_10000006",
+        parent_session_id: parentSessionId,
+        status: "running",
+        residency_state: "persisted_only",
+        execution_mode: "in-process",
+      }),
+    )
     persistSession(backing, blocked.task_id)
     persistSession(backing, healthy.task_id)
     const store: TaskRecordStore = {
@@ -414,12 +533,19 @@ describe("reconcileOnSessionStart scoped revival", () => {
     // given
     const harness = injectedHarness()
     seedRecord(harness.store, {
-      task_id: "st_10000007", parent_session_id: parentSessionId, status: "cancelled",
-      residency_state: "persisted_only", execution_mode: "in-process",
+      task_id: "st_10000007",
+      parent_session_id: parentSessionId,
+      status: "cancelled",
+      residency_state: "persisted_only",
+      execution_mode: "in-process",
     })
     seedRecord(harness.store, {
-      task_id: "st_10000008", parent_session_id: parentSessionId, status: "error", killed: true,
-      residency_state: "persisted_only", execution_mode: "in-process",
+      task_id: "st_10000008",
+      parent_session_id: parentSessionId,
+      status: "error",
+      killed: true,
+      residency_state: "persisted_only",
+      execution_mode: "in-process",
     })
 
     // when
@@ -446,25 +572,35 @@ describe("reconcileOnSessionStart scoped revival", () => {
       { id: "two", message: "second", deliver_as: "followUp" },
     ]
     const seeded = seedRecord(store, {
-      task_id: "st_10000009", parent_session_id: parentSessionId, status: "pending",
-      residency_state: "persisted_only", execution_mode: "in-process",
+      task_id: "st_10000009",
+      parent_session_id: parentSessionId,
+      status: "pending",
+      residency_state: "persisted_only",
+      execution_mode: "in-process",
     })
     store.replace({ ...withV1(store, seeded, "persisted effective prompt"), pending_steering: queue })
     const lifecycle = createTaskLifecycle({
       hostEndpoint: NO_HOST_ENDPOINT,
       store,
       registry: {
-        get: (taskId) => manager.getResidentHandle(taskId) === undefined ? undefined : {
-          task_id: taskId, kind: "in-process", pid: undefined,
-          abort: () => manager.getResidentHandle(taskId)?.abort() ?? Promise.resolve(),
-          dispose: () => manager.getResidentHandle(taskId)?.dispose() ?? Promise.resolve(),
-          terminate: async () => undefined,
-        },
+        get: (taskId) =>
+          manager.getResidentHandle(taskId) === undefined
+            ? undefined
+            : {
+                task_id: taskId,
+                kind: "in-process",
+                pid: undefined,
+                abort: () => manager.getResidentHandle(taskId)?.abort() ?? Promise.resolve(),
+                dispose: () => manager.getResidentHandle(taskId)?.dispose() ?? Promise.resolve(),
+                terminate: async () => undefined,
+              },
         entries: () => [],
         forget: (taskId, options) => manager.forget(taskId, options),
         hasPendingSends: () => false,
       },
-      config: settings(), hostPid, now,
+      config: settings(),
+      hostPid,
+      now,
     })
 
     // when
@@ -485,12 +621,18 @@ describe("reconcileOnSessionStart scoped revival", () => {
     // given
     const harness = injectedHarness()
     const running = seedRecord(harness.store, {
-      task_id: "st_1000000a", parent_session_id: parentSessionId, status: "running",
-      residency_state: "persisted_only", execution_mode: "in-process",
+      task_id: "st_1000000a",
+      parent_session_id: parentSessionId,
+      status: "running",
+      residency_state: "persisted_only",
+      execution_mode: "in-process",
     })
     const terminal = seedRecord(harness.store, {
-      task_id: "st_1000000b", parent_session_id: parentSessionId, status: "completed",
-      residency_state: "persisted_only", execution_mode: "in-process",
+      task_id: "st_1000000b",
+      parent_session_id: parentSessionId,
+      status: "completed",
+      residency_state: "persisted_only",
+      execution_mode: "in-process",
     })
     harness.store.replace({ ...terminal, final_response: "durable result" })
 
@@ -507,10 +649,16 @@ describe("reconcileOnSessionStart scoped revival", () => {
   test("#given a terminal v1 record without transcript #when resumed #then it is disposed without rerunning its prompt", async () => {
     // given
     const harness = injectedHarness()
-    const record = withV1(harness.store, seedRecord(harness.store, {
-      task_id: "st_1000000c", parent_session_id: parentSessionId, status: "completed",
-      residency_state: "persisted_only", execution_mode: "in-process",
-    }))
+    const record = withV1(
+      harness.store,
+      seedRecord(harness.store, {
+        task_id: "st_1000000c",
+        parent_session_id: parentSessionId,
+        status: "completed",
+        residency_state: "persisted_only",
+        execution_mode: "in-process",
+      }),
+    )
     harness.store.replace({ ...record, final_response: "finished" })
 
     // when
@@ -520,7 +668,9 @@ describe("reconcileOnSessionStart scoped revival", () => {
     expect(harness.launches).toHaveLength(0)
     expect(harness.store.load(record.task_id)?.final_response).toBe("finished")
     expect(harness.store.load(record.task_id)?.residency_state).toBe("disposed")
-    expect(result.outcomes.find((entry) => entry.task_id === record.task_id)?.reason).toContain("terminal without transcript")
+    expect(result.outcomes.find((entry) => entry.task_id === record.task_id)?.reason).toContain(
+      "terminal without transcript",
+    )
   })
 
   test("#given an orphaned rpc child still alive #when reclaimed #then the old pid is proven dead before replacement spawn", async () => {
@@ -534,10 +684,18 @@ describe("reconcileOnSessionStart scoped revival", () => {
         return success(record.task_id)
       },
     })
-    const record = withV1(harness.store, seedRecord(harness.store, {
-      task_id: "st_1000000d", parent_session_id: parentSessionId, status: "running",
-      residency_state: "resident", execution_mode: "process", pid: 7331, host_pid: 9999,
-    }))
+    const record = withV1(
+      harness.store,
+      seedRecord(harness.store, {
+        task_id: "st_1000000d",
+        parent_session_id: parentSessionId,
+        status: "running",
+        residency_state: "resident",
+        execution_mode: "process",
+        pid: 7331,
+        host_pid: 9999,
+      }),
+    )
     persistSession(harness.store, record.task_id)
 
     // when
@@ -553,13 +711,24 @@ describe("reconcileOnSessionStart scoped revival", () => {
     // given
     const harness = injectedHarness({ config: { residency_max_children: 1 } })
     seedRecord(harness.store, {
-      task_id: "st_1000000e", parent_session_id: parentSessionId, status: "error", killed: true,
-      residency_state: "resident", execution_mode: "in-process", host_pid: 9999,
+      task_id: "st_1000000e",
+      parent_session_id: parentSessionId,
+      status: "error",
+      killed: true,
+      residency_state: "resident",
+      execution_mode: "in-process",
+      host_pid: 9999,
     })
-    const waiting = withV1(harness.store, seedRecord(harness.store, {
-      task_id: "st_1000000f", parent_session_id: parentSessionId, status: "running",
-      residency_state: "persisted_only", execution_mode: "in-process",
-    }))
+    const waiting = withV1(
+      harness.store,
+      seedRecord(harness.store, {
+        task_id: "st_1000000f",
+        parent_session_id: parentSessionId,
+        status: "running",
+        residency_state: "persisted_only",
+        execution_mode: "in-process",
+      }),
+    )
     persistSession(harness.store, waiting.task_id)
 
     // when
@@ -573,10 +742,17 @@ describe("reconcileOnSessionStart scoped revival", () => {
   test("#given a same-process orphan and a full cap #when its session resumes #then reclamation bypasses capacity and revives it", async () => {
     // given
     const harness = injectedHarness({ config: { residency_max_children: 1 } })
-    const orphan = withV1(harness.store, seedRecord(harness.store, {
-      task_id: "st_10000010", parent_session_id: parentSessionId, status: "running",
-      residency_state: "resident", execution_mode: "in-process", host_pid: hostPid,
-    }))
+    const orphan = withV1(
+      harness.store,
+      seedRecord(harness.store, {
+        task_id: "st_10000010",
+        parent_session_id: parentSessionId,
+        status: "running",
+        residency_state: "resident",
+        execution_mode: "in-process",
+        host_pid: hostPid,
+      }),
+    )
     persistSession(harness.store, orphan.task_id)
 
     // when
@@ -590,22 +766,38 @@ describe("reconcileOnSessionStart scoped revival", () => {
   test("#given reattach and child resume are disabled #when suspended records exist #then they remain suspended with deferred outcomes", async () => {
     // given
     const disabledReattach = injectedHarness({ config: { reattach_on_reconcile: false } })
-    const first = withV1(disabledReattach.store, seedRecord(disabledReattach.store, {
-      task_id: "st_10000011", parent_session_id: parentSessionId, status: "running",
-      residency_state: "persisted_only", execution_mode: "in-process",
-    }))
+    const first = withV1(
+      disabledReattach.store,
+      seedRecord(disabledReattach.store, {
+        task_id: "st_10000011",
+        parent_session_id: parentSessionId,
+        status: "running",
+        residency_state: "persisted_only",
+        execution_mode: "in-process",
+      }),
+    )
     const disabledResume = injectedHarness({ config: { resume_children: false } })
-    const second = withV1(disabledResume.store, seedRecord(disabledResume.store, {
-      task_id: "st_10000012", parent_session_id: parentSessionId, status: "running",
-      residency_state: "persisted_only", execution_mode: "in-process",
-    }))
+    const second = withV1(
+      disabledResume.store,
+      seedRecord(disabledResume.store, {
+        task_id: "st_10000012",
+        parent_session_id: parentSessionId,
+        status: "running",
+        residency_state: "persisted_only",
+        execution_mode: "in-process",
+      }),
+    )
 
     // when
     const reattachResult = await disabledReattach.lifecycle.reconcileOnSessionStart(parentSessionId)
     await disabledResume.lifecycle.reconcileOnSessionStart(parentSessionId)
 
     // then
-    expect(reattachResult.outcomes).toContainEqual({ task_id: first.task_id, kind: "deferred", reason: "reattach_disabled" })
+    expect(reattachResult.outcomes).toContainEqual({
+      task_id: first.task_id,
+      kind: "deferred",
+      reason: "reattach_disabled",
+    })
     expect(disabledReattach.store.load(first.task_id)?.residency_state).toBe("persisted_only")
     expect(disabledResume.store.load(second.task_id)?.residency_state).toBe("persisted_only")
     expect(disabledResume.launches).toHaveLength(0)
@@ -616,10 +808,16 @@ describe("reconcileOnSessionStart scoped revival", () => {
     const harness = injectedHarness({ config: { residency_max_children: 8 } })
     for (let index = 0; index < 10; index += 1) {
       const id = `st_100001${index.toString().padStart(2, "0")}`
-      const record = withV1(harness.store, seedRecord(harness.store, {
-        task_id: id, parent_session_id: parentSessionId, status: "running",
-        residency_state: "persisted_only", execution_mode: "in-process",
-      }))
+      const record = withV1(
+        harness.store,
+        seedRecord(harness.store, {
+          task_id: id,
+          parent_session_id: parentSessionId,
+          status: "running",
+          residency_state: "persisted_only",
+          execution_mode: "in-process",
+        }),
+      )
       persistSession(harness.store, record.task_id)
     }
 
@@ -635,19 +833,30 @@ describe("reconcileOnSessionStart scoped revival", () => {
   test("#given the admission lease is held past the bounded wait #when the session resumes #then the batch defers without throwing", async () => {
     // given
     const harness = injectedHarness()
-    const record = withV1(harness.store, seedRecord(harness.store, {
-      task_id: "st_10000013", parent_session_id: parentSessionId, status: "running",
-      residency_state: "persisted_only", execution_mode: "in-process",
-    }))
+    const record = withV1(
+      harness.store,
+      seedRecord(harness.store, {
+        task_id: "st_10000013",
+        parent_session_id: parentSessionId,
+        status: "running",
+        residency_state: "persisted_only",
+        execution_mode: "in-process",
+      }),
+    )
     const held = await acquireSessionAdmissionLease(harness.store.stateDir, parentSessionId, {
-      renewMs: 10, staleMs: 100, acquireTimeoutMs: 20, retryMs: 2,
+      renewMs: 10,
+      staleMs: 100,
+      acquireTimeoutMs: 20,
+      retryMs: 2,
     })
     if (held.kind !== "acquired") throw new Error("expected held admission lease")
     const contended = createTaskLifecycle({
       hostEndpoint: NO_HOST_ENDPOINT,
       store: harness.store,
       registry: new FakeRegistry(),
-      config: settings(), hostPid, now,
+      config: settings(),
+      hostPid,
+      now,
       reconcileAdmission: { timing: { acquireTimeoutMs: 20, retryMs: 2 } },
       respawn: async (fresh) => success(fresh.task_id),
       reattach: async () => ({ ok: true }),

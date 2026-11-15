@@ -40,15 +40,19 @@ describe("quick category on a single-provider machine", () => {
     })
   })
 
-  test("#given Z.ai and a Claude login #when quick is resolved #then Haiku 5.5 high wins from the second rung before GLM", () => {
-    const result = resolveCategory("quick", {}, registry([
-      ...ZAI_MODELS.map((id) => ({ provider: "zai", id })),
-      { provider: "anthropic", id: "claude-haiku-5-5" },
-    ]))
+  test("#given Z.ai and a Claude login #when quick is resolved #then Haiku 5.5 medium wins from the second rung before GLM", () => {
+    const result = resolveCategory(
+      "quick",
+      {},
+      registry([
+        ...ZAI_MODELS.map((id) => ({ provider: "zai", id })),
+        { provider: "anthropic", id: "claude-haiku-5-5" },
+      ]),
+    )
 
     expect(result.kind).toBe("resolved")
     if (result.kind !== "resolved") throw new Error(`expected resolved, got ${result.kind}`)
     expect(`${result.spec.provider}/${result.spec.modelId}`).toBe("anthropic/claude-haiku-5-5")
-    expect(result.spec.variant).toBe("high")
+    expect(result.spec.variant).toBe("medium")
   })
 })

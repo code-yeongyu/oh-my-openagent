@@ -19,8 +19,13 @@ afterEach(cleanupReconciliationFixtures)
 const STARTED_AT = "2026-08-10T00:00:00.000Z"
 const HARD_DEADLINE_AT = Date.parse("2026-08-10T00:10:00.000Z")
 const CLEAN_EXIT = {
-  version: 1, runId: "run-orphan", attempt: 1, code: 0, signal: null,
-  finishedAt: "2026-08-10T00:05:00.000Z", timedOut: false,
+  version: 1,
+  runId: "run-orphan",
+  attempt: 1,
+  code: 0,
+  signal: null,
+  finishedAt: "2026-08-10T00:05:00.000Z",
+  timedOut: false,
 }
 
 type Item = Awaited<ReturnType<typeof fixture>>
@@ -29,9 +34,16 @@ async function deadSupervisorRun(childExit: unknown): Promise<Item> {
   const item = await fixture()
   await commitOrphanWorktree(item)
   await writeRunJsonAtomic(join(item.runDir, "ledger.json"), {
-    ...item.ledger, attempt: 1, startedAt: STARTED_AT, launching: false,
-    hardDeadlineAt: HARD_DEADLINE_AT, deadlineAt: HARD_DEADLINE_AT + 100,
-    pid: 222, processStart: "supervisor-start", childPid: 333, childProcessStart: "child-start",
+    ...item.ledger,
+    attempt: 1,
+    startedAt: STARTED_AT,
+    launching: false,
+    hardDeadlineAt: HARD_DEADLINE_AT,
+    deadlineAt: HARD_DEADLINE_AT + 100,
+    pid: 222,
+    processStart: "supervisor-start",
+    childPid: 333,
+    childProcessStart: "child-start",
   })
   if (childExit !== undefined) await writeFile(join(item.runDir, "child-exit.json"), JSON.stringify(childExit))
   return item
@@ -48,7 +60,10 @@ async function reconcile(item: Item) {
 
 async function events(item: Item): Promise<string[]> {
   const { receipts } = await readMemoryReceipts(item.identity.paths.runtime, {})
-  return [...receipts].reverse().filter((receipt) => receipt.kind !== "facts" && receipt.runId === "run-orphan").map((receipt) => receipt.event)
+  return [...receipts]
+    .reverse()
+    .filter((receipt) => receipt.kind !== "facts" && receipt.runId === "run-orphan")
+    .map((receipt) => receipt.event)
 }
 
 describe("tip recovery after a dead supervisor", () => {
@@ -56,7 +71,9 @@ describe("tip recovery after a dead supervisor", () => {
     const item = await deadSupervisorRun({ ...CLEAN_EXIT, finishedAt: "2026-08-10T00:15:00.000Z" })
     const ledger = await readRunJson<ReservationRunLedger>(join(item.runDir, "ledger.json"))
     await writeRunJsonAtomic(join(item.runDir, "ledger.json"), {
-      ...ledger, queued: false, hardDeadlineAt: HARD_DEADLINE_AT + 600_000,
+      ...ledger,
+      queued: false,
+      hardDeadlineAt: HARD_DEADLINE_AT + 600_000,
       deadlineAt: HARD_DEADLINE_AT + 600_100,
     })
     expect(await reconcile(item)).toEqual([{ runId: "run-orphan", outcome: "merged" }])
@@ -86,17 +103,21 @@ describe("tip recovery after a dead supervisor", () => {
     ["a finish time before the run started", { ...CLEAN_EXIT, finishedAt: "2000-01-01T00:00:00.000Z" }],
     ["a numeric finish time", { ...CLEAN_EXIT, finishedAt: 5 }],
     ["a non-zero exit", { ...CLEAN_EXIT, code: 1 }],
-  ] as const)("#given %s #when reconciled #then nothing is recovered and the run fails without merging", async (_label, childExit) => {
-    // given
-    const item = await deadSupervisorRun(childExit)
+  ] as const)(
+    "#given %s #when reconciled #then nothing is recovered and the run fails without merging",
+    async (_label, childExit) => {
+      // given
+      const item = await deadSupervisorRun(childExit)
 
-    // when
-    const results = await reconcile(item)
+      // when
+      const results = await reconcile(item)
 
-    // then
-    expect(results).toEqual([{ runId: "run-orphan", outcome: "failed" }])
-    expect(existsSync(join(item.identity.paths.repo, "system", "orphan.md"))).toBe(false)
-    expect(await events(item)).toEqual(["failed"])
-    expect((await item.store.readState()).active).toBeUndefined()
-  }, 30_000)
+      // then
+      expect(results).toEqual([{ runId: "run-orphan", outcome: "failed" }])
+      expect(existsSync(join(item.identity.paths.repo, "system", "orphan.md"))).toBe(false)
+      expect(await events(item)).toEqual(["failed"])
+      expect((await item.store.readState()).active).toBeUndefined()
+    },
+    30_000,
+  )
 })

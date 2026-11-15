@@ -44,9 +44,11 @@ function createManager(state: { status: string; messages: SessionMessage[] }, se
       messages: async () => ({ data: state.messages }),
     },
   }
-  return new BackgroundManager(
-    { pluginContext: createPluginContext(client), config: undefined, enableParentSessionNotifications: false },
-  )
+  return new BackgroundManager({
+    pluginContext: createPluginContext(client),
+    config: undefined,
+    enableParentSessionNotifications: false,
+  })
 }
 
 function createRunningTask(sessionId: string): BackgroundTask {

@@ -1,13 +1,16 @@
 import type { BackgroundManager } from "../../features/background-agent"
 import type { OhMyOpenCodeConfig } from "../../config"
-import type { CategoriesConfig, GitMasterConfig, BrowserAutomationProvider, AgentOverrides, SisyphusAgentConfig } from "../../config/schema"
+import type {
+  CategoriesConfig,
+  GitMasterConfig,
+  BrowserAutomationProvider,
+  AgentOverrides,
+  SisyphusAgentConfig,
+} from "../../config/schema"
 import type { ModelFallbackControllerAccessor } from "../../hooks/model-fallback"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 import type { SessionPromptAsyncData, SessionPromptData, SessionStatusData } from "@opencode-ai/sdk"
-import type {
-  AvailableCategory,
-  AvailableSkill,
-} from "../../agents/dynamic-agent-prompt-builder"
+import type { AvailableCategory, AvailableSkill } from "../../agents/dynamic-agent-prompt-builder"
 
 type SessionPathInput = { readonly path: { readonly id: string } }
 type SessionMessagesQuery = { readonly directory?: string; readonly limit?: number }
@@ -44,7 +47,9 @@ export interface OmoAgentClient {
       readonly query?: { readonly directory?: string }
     }) => Promise<SessionCreateResult>
     readonly get: (input: SessionPathInput) => Promise<SessionGetResult>
-    readonly messages: (input: SessionPathInput | (SessionPathInput & { readonly query?: SessionMessagesQuery })) => Promise<unknown>
+    readonly messages: (
+      input: SessionPathInput | (SessionPathInput & { readonly query?: SessionMessagesQuery }),
+    ) => Promise<unknown>
     readonly prompt?: (input: SessionPromptInput) => Promise<unknown>
     readonly promptAsync?: (input: SessionPromptInput) => Promise<unknown>
     readonly status: (input?: SessionStatusInput) => Promise<unknown>
@@ -122,8 +127,15 @@ export interface DelegateTaskToolOptions {
   taskCleanupDelayMs?: number
   /** OpenCode native skill accessor for skills registered via config.skills.paths. Same shape as SkillLoadOptions.nativeSkills. */
   nativeSkills?: {
-    all(): { name: string; description: string; location: string; content: string }[] | Promise<{ name: string; description: string; location: string; content: string }[]>
-    get(name: string): { name: string; description: string; location: string; content: string } | undefined | Promise<{ name: string; description: string; location: string; content: string } | undefined>
+    all():
+      | { name: string; description: string; location: string; content: string }[]
+      | Promise<{ name: string; description: string; location: string; content: string }[]>
+    get(
+      name: string,
+    ):
+      | { name: string; description: string; location: string; content: string }
+      | undefined
+      | Promise<{ name: string; description: string; location: string; content: string } | undefined>
     dirs(): string[] | Promise<string[]>
   }
   getLoadedSkills?: () => Promise<LoadedSkill[]>

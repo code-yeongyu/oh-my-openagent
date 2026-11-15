@@ -59,7 +59,12 @@ function requireMember(state: RuntimeState, teamRunId: string, memberName: strin
 function requirePendingRequestIndex(state: RuntimeState, teamRunId: string, memberName: string): number {
   const index = findLatestShutdownRequestIndex(state, memberName)
   if (index < 0 || !isUnresolvedRequest(state.shutdownRequests[index])) {
-    throw new SenpiShutdownError(`no pending shutdown request for '${memberName}'`, "no_pending_request", teamRunId, memberName)
+    throw new SenpiShutdownError(
+      `no pending shutdown request for '${memberName}'`,
+      "no_pending_request",
+      teamRunId,
+      memberName,
+    )
   }
   return index
 }

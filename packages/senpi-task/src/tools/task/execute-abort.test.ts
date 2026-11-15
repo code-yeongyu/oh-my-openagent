@@ -68,7 +68,13 @@ describe("buildTaskExecute abort handling", () => {
       },
     })
     const execute = buildTaskExecute(makeDeps(manager))
-    const execution = execute("call-mid-abort", { prompt: "work", category: "quick" }, controller.signal, undefined, CTX)
+    const execution = execute(
+      "call-mid-abort",
+      { prompt: "work", category: "quick" },
+      controller.signal,
+      undefined,
+      CTX,
+    )
     await waiting
 
     // when
@@ -106,7 +112,13 @@ describe("buildTaskExecute abort handling", () => {
       },
     })
     const execute = buildTaskExecute(makeDeps(manager))
-    const execution = execute("call-terminal-race", { prompt: "work", category: "quick" }, controller.signal, undefined, CTX)
+    const execution = execute(
+      "call-terminal-race",
+      { prompt: "work", category: "quick" },
+      controller.signal,
+      undefined,
+      CTX,
+    )
     await waiting
 
     // when

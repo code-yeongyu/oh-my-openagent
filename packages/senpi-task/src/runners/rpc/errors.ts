@@ -19,7 +19,8 @@ export class RpcCommandError extends Error {
     this.name = "RpcCommandError"
     this.command = command
     this.detail = detail
-    if (typeof refusal.errorCode === "string" && ERROR_CODE_SHAPE.test(refusal.errorCode)) this.errorCode = refusal.errorCode
+    if (typeof refusal.errorCode === "string" && ERROR_CODE_SHAPE.test(refusal.errorCode))
+      this.errorCode = refusal.errorCode
     const data = refusal.errorData
     const provider = typeof data === "object" && data !== null && "provider" in data ? data.provider : undefined
     if (typeof provider === "string" && PROVIDER_SHAPE.test(provider)) this.errorData = { provider }
@@ -28,8 +29,13 @@ export class RpcCommandError extends Error {
 
 /** The request may have reached the child; a timeout is not proof an input was refused. */
 export class RpcRequestTimeout extends Error {
-  constructor(readonly command: string, readonly deadlineMs: number) {
-    super(`The child did not answer ${command} within ${deadlineMs} ms. Action: inspect task_output; do not resend an input until its delivery is resolved.`)
+  constructor(
+    readonly command: string,
+    readonly deadlineMs: number,
+  ) {
+    super(
+      `The child did not answer ${command} within ${deadlineMs} ms. Action: inspect task_output; do not resend an input until its delivery is resolved.`,
+    )
     this.name = "RpcRequestTimeout"
   }
 }

@@ -35,6 +35,7 @@ pub(crate) fn windows<B: AtSpiBus>(bus: &mut B) -> CoreResult<Vec<DesktopWindow>
                 .state(&frame)
                 .is_ok_and(|states| states.contains(State::Focused) || states.contains(State::Active));
             windows.push(DesktopWindow {
+                identity: None,
                 id: bus.object_id(&frame),
                 title: bus.name(&frame).unwrap_or_default(),
                 app: app_name.clone(),

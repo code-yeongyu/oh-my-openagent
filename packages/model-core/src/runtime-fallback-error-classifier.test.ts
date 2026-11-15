@@ -37,8 +37,12 @@ describe("runtime fallback error classifier", () => {
       },
     ]
 
-    expect(errors.map((error) => isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES)))
-      .toEqual([true, true, false, false])
+    expect(errors.map((error) => isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES))).toEqual([
+      true,
+      true,
+      false,
+      false,
+    ])
   })
 
   test("classifies representative Anthropic provider payloads without adapter state", () => {
@@ -143,9 +147,14 @@ describe("runtime fallback error classifier", () => {
     expect(results).toEqual([
       { message: "", statusCode: undefined, type: undefined, retryable: false },
       { message: "", statusCode: undefined, type: undefined, retryable: false },
-      { message: "{\"statuscode\":\"429\",\"message\":429}", statusCode: 429, type: undefined, retryable: true },
-      { message: "{\"data\":{\"error\":{\"name\":7,\"message\":false}}}", statusCode: undefined, type: undefined, retryable: false },
-      { message: "{\"data\":{\"error\":null},\"error\":\"broken\"}", statusCode: undefined, type: undefined, retryable: false },
+      { message: '{"statuscode":"429","message":429}', statusCode: 429, type: undefined, retryable: true },
+      {
+        message: '{"data":{"error":{"name":7,"message":false}}}',
+        statusCode: undefined,
+        type: undefined,
+        retryable: false,
+      },
+      { message: '{"data":{"error":null},"error":"broken"}', statusCode: undefined, type: undefined, retryable: false },
     ])
   })
 
@@ -167,9 +176,7 @@ describe("runtime fallback error classifier", () => {
     ] as const
 
     //#when
-    const retryable = cases.map(({ error }) =>
-      isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES),
-    )
+    const retryable = cases.map(({ error }) => isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES))
 
     //#then
     expect(retryable).toEqual(cases.map(({ expected }) => expected))
@@ -274,24 +281,24 @@ describe("runtime fallback error classifier", () => {
     expect(retryable).toBe(false)
   })
 
-  test.each([
-    "non-terminal quota exceeded",
-    "non-terminal billing limit reached",
-  ])("#given %s #when classified #then remains retryable", (message) => {
-    // given
-    const error = {
-      name: "QuotaExceededError",
-      message,
-    }
+  test.each(["non-terminal quota exceeded", "non-terminal billing limit reached"])(
+    "#given %s #when classified #then remains retryable",
+    (message) => {
+      // given
+      const error = {
+        name: "QuotaExceededError",
+        message,
+      }
 
-    // when
-    const type = classifyRuntimeFallbackError(error)
-    const retryable = isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES)
+      // when
+      const type = classifyRuntimeFallbackError(error)
+      const retryable = isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES)
 
-    // then
-    expect(type).toBe("quota_exceeded")
-    expect(retryable).toBe(true)
-  })
+      // then
+      expect(type).toBe("quota_exceeded")
+      expect(retryable).toBe(true)
+    },
+  )
 
   test("#given a throwing detail getter #when classified #then property access failure is conservative", () => {
     // given

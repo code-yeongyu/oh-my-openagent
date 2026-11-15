@@ -12,7 +12,8 @@ import type { OwnerProbe } from "./owner"
 export const getProcessStartIdentity = createProcessStartIdentityReader(async (pid) => {
   if (!process.versions.bun) return null
   switch (process.platform) {
-    case "linux": return readSharedIdentity(pid)
+    case "linux":
+      return readSharedIdentity(pid)
     case "darwin": {
       const seconds = await readDarwinProcessStartSeconds(pid)
       return seconds === null ? null : `proc-start-epoch:${seconds}`
@@ -21,7 +22,8 @@ export const getProcessStartIdentity = createProcessStartIdentityReader(async (p
       const filetime = await readWin32ProcessCreationFiletime(pid)
       return filetime === null ? null : `win32-creation-filetime:${filetime}`
     }
-    default: return null
+    default:
+      return null
   }
 }, process.pid)
 
@@ -35,6 +37,7 @@ export const processOwnerProbe: OwnerProbe = {
     }
     const current = await getProcessStartIdentity(pid)
     return startIdentity !== null && current !== null && startIdentitiesConflict(startIdentity, current)
-      ? "dead" : "alive"
+      ? "dead"
+      : "alive"
   },
 }

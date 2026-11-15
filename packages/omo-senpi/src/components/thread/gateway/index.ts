@@ -1,6 +1,5 @@
 export * from "./adapter"
 export * from "./bindings"
-export * from "./causal"
 export * from "./completion"
 export * from "./constants"
 export * from "./decision"

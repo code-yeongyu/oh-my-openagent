@@ -6,18 +6,35 @@
 
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { runBlock, sliceWorkflowSection } from "./release-workflow-test-steps"
 
-const workflow = readFileSync(new URL("../.github/workflows/publish-platform.yml", import.meta.url), "utf8").replace(/\r\n/g, "\n")
+const workflow = readFileSync(new URL("../.github/workflows/publish-platform.yml", import.meta.url), "utf8").replace(
+  /\r\n/g,
+  "\n",
+)
 const signingScript = new URL("../.github/scripts/macos-sign-and-notarize.sh", import.meta.url)
 const engine = sliceWorkflowSection(workflow, "  desktop-engine:\n", "  build:\n")
 const platformBuild = sliceWorkflowSection(workflow, "  build:\n", "  publish:\n")
 const ciWorkflow = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8").replace(/\r\n/g, "\n")
-const parity = sliceWorkflowSection(ciWorkflow, "  native-binary-parity:\n", "      - name: Compare the binary with the npm launcher\n")
+const parity = sliceWorkflowSection(
+  ciWorkflow,
+  "  native-binary-parity:\n",
+  "      - name: Compare the binary with the npm launcher\n",
+)
 const parityEngineMarker = "      - name: Build the desktop engine the binary embeds\n"
 const parityBinaryMarker = "      - name: Build the standalone binary and the npm launcher payload\n"
 const buildMarker = "      - name: Build engine trust helper\n"
@@ -60,19 +77,36 @@ describe("engine trust helper release build", () => {
       const bin = join(root, "bin")
       mkdirSync(bin)
       const calls = join(root, "calls")
-      stub(bin, "cargo", `echo "cargo $*" >> "${calls}"\nmkdir -p "target/$RUST_TARGET/release"\nprintf 'pe-image' > "target/$RUST_TARGET/release/omo-engine-trust-helper.exe"`)
+      stub(
+        bin,
+        "cargo",
+        `echo "cargo $*" >> "${calls}"\nmkdir -p "target/$RUST_TARGET/release"\nprintf 'pe-image' > "target/$RUST_TARGET/release/omo-engine-trust-helper.exe"`,
+      )
       stub(bin, "codesign", `echo "codesign $*" >> "${calls}"`)
 
       const result = spawnSync("bash", ["-e", "-c", runBlock(engine, buildMarker, signMarker)], {
         cwd: root,
-        env: { ...process.env, PATH: `${bin}:${process.env.PATH ?? ""}`, HOST: "win32-arm64", RUST_TARGET: "aarch64-pc-windows-msvc" },
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH ?? ""}`,
+          HOST: "win32-arm64",
+          RUST_TARGET: "aarch64-pc-windows-msvc",
+        },
         encoding: "utf8",
       })
 
       expect(result.status, result.stderr).toBe(0)
-      const staged = join(root, ".omo", "desktop-engine-assets", "engine-trust-helper-win32-arm64", "omo-engine-trust-helper.exe")
+      const staged = join(
+        root,
+        ".omo",
+        "desktop-engine-assets",
+        "engine-trust-helper-win32-arm64",
+        "omo-engine-trust-helper.exe",
+      )
       expect(readFileSync(staged, "utf8")).toBe("pe-image")
-      expect(readFileSync(calls, "utf8")).toBe("cargo build --release -p omo-engine-trust-helper --locked --target aarch64-pc-windows-msvc\n")
+      expect(readFileSync(calls, "utf8")).toBe(
+        "cargo build --release -p omo-engine-trust-helper --locked --target aarch64-pc-windows-msvc\n",
+      )
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
@@ -88,7 +122,9 @@ describe("Darwin engine trust helper signing", () => {
     for (const name of material) expect(step).toContain(`${name}: \${{ secrets.${name} }}`)
     expect(step).toContain("MACOS_SIGNING_REQUIRED: ${{ vars.MACOS_SIGNING_REQUIRED }}")
     expect(run).toContain("set -euo pipefail")
-    expect(run).toMatch(new RegExp(`--sign-only \\\\\\n\\s*--identifier ${identifier.replaceAll(".", "\\.")} "\\$HELPER"`))
+    expect(run).toMatch(
+      new RegExp(`--sign-only \\\\\\n\\s*--identifier ${identifier.replaceAll(".", "\\.")} "\\$HELPER"`),
+    )
     const sign = run.indexOf("bash .github/scripts/macos-sign-and-notarize.sh")
     const verify = run.indexOf('codesign -dv --verbose=2 "$HELPER"')
     expect(sign).toBeGreaterThanOrEqual(0)
@@ -110,11 +146,20 @@ describe("Darwin engine trust helper signing", () => {
         mkdirSync(bin)
         const calls = join(root, "codesign-calls")
         stub(bin, "codesign", `echo "$*" >> "${calls}"`)
-        const env: NodeJS.ProcessEnv = { ...process.env, PATH: `${bin}:${process.env.PATH ?? ""}`, MACOS_SIGNING_REQUIRED: "true", HOST: "darwin-arm64" }
+        const env: NodeJS.ProcessEnv = {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH ?? ""}`,
+          MACOS_SIGNING_REQUIRED: "true",
+          HOST: "darwin-arm64",
+        }
         for (const name of material) env[name] = "synthetic"
         delete env[missing]
 
-        const result = spawnSync("bash", ["-e", "-c", runBlock(engine, signMarker, afterSignMarker)], { cwd: root, env, encoding: "utf8" })
+        const result = spawnSync("bash", ["-e", "-c", runBlock(engine, signMarker, afterSignMarker)], {
+          cwd: root,
+          env,
+          encoding: "utf8",
+        })
 
         expect(result.status).toBe(1)
         expect(result.stderr).toContain(`signing material is missing: ${missing}`)
@@ -131,7 +176,10 @@ describe("Darwin engine trust helper signing", () => {
 describe("signed Darwin engine trust helper smoke", () => {
   const sources = ["trust-settings-user", "trust-settings-admin", "trust-settings-system", "keychain-search-list"]
   const minimalDocument = JSON.stringify({
-    schema: 1, os: "macos", complete: true, certificates: [],
+    schema: 1,
+    os: "macos",
+    complete: true,
+    certificates: [],
     sources: sources.map((name) => ({ name, outcome: "read", status: 0 })),
   })
 
@@ -163,32 +211,46 @@ describe("signed Darwin engine trust helper smoke", () => {
         encoding: "utf8",
         timeout: 20_000,
       })
-      return { status: result.status, stderr: result.stderr, archCalls: existsSync(archLog) ? readFileSync(archLog, "utf8") : "" }
+      return {
+        status: result.status,
+        stderr: result.stderr,
+        archCalls: existsSync(archLog) ? readFileSync(archLog, "utf8") : "",
+      }
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
   }
 
-  posixBashTest("passes output the strict decoder accepts, natively on arm64 and under Rosetta on x64", () => {
-    const helper = `cat > /dev/null\nprintf '%s' '${minimalDocument}'`
+  posixBashTest(
+    "passes output the strict decoder accepts, natively on arm64 and under Rosetta on x64",
+    () => {
+      const helper = `cat > /dev/null\nprintf '%s' '${minimalDocument}'`
 
-    const arm64 = smoke("darwin-arm64", helper)
-    expect(arm64.status, arm64.stderr).toBe(0)
-    expect(arm64.archCalls).toBe("")
+      const arm64 = smoke("darwin-arm64", helper)
+      expect(arm64.status, arm64.stderr).toBe(0)
+      expect(arm64.archCalls).toBe("")
 
-    const x64 = smoke("darwin-x64", helper)
-    expect(x64.status, x64.stderr).toBe(0)
-    expect(x64.archCalls).toEndWith("-x86_64 .omo/desktop-engine-assets/engine-trust-helper-darwin-x64/omo-engine-trust-helper\n")
-  }, 60_000)
+      const x64 = smoke("darwin-x64", helper)
+      expect(x64.status, x64.stderr).toBe(0)
+      expect(x64.archCalls).toEndWith(
+        "-x86_64 .omo/desktop-engine-assets/engine-trust-helper-darwin-x64/omo-engine-trust-helper\n",
+      )
+    },
+    60_000,
+  )
 
-  posixBashTest("fails on malformed output or a non-zero helper exit", () => {
-    const wrongSchema = smoke("darwin-arm64", `printf '%s' '${minimalDocument.replace('"schema":1', '"schema":2')}'`)
-    expect(wrongSchema.status).not.toBe(0)
-    expect(wrongSchema.stderr).toContain("invalid-value at $.schema")
+  posixBashTest(
+    "fails on malformed output or a non-zero helper exit",
+    () => {
+      const wrongSchema = smoke("darwin-arm64", `printf '%s' '${minimalDocument.replace('"schema":1', '"schema":2')}'`)
+      expect(wrongSchema.status).not.toBe(0)
+      expect(wrongSchema.stderr).toContain("invalid-value at $.schema")
 
-    expect(smoke("darwin-arm64", "printf 'not json'").status).not.toBe(0)
-    expect(smoke("darwin-arm64", `printf '%s' '${minimalDocument}'\nexit 75`).status).not.toBe(0)
-  }, 60_000)
+      expect(smoke("darwin-arm64", "printf 'not json'").status).not.toBe(0)
+      expect(smoke("darwin-arm64", `printf '%s' '${minimalDocument}'\nexit 75`).status).not.toBe(0)
+    },
+    60_000,
+  )
 })
 
 describe("engine trust helper transport into the compiled payload", () => {
@@ -200,61 +262,72 @@ describe("engine trust helper transport into the compiled payload", () => {
     expect(upload).toContain(".omo/desktop-engine-assets/engine-trust-helper-*/omo-engine-trust-helper*\n")
   })
 
-  posixBashTest("resolves the helper for Darwin and Windows targets and nothing for Linux", () => {
-    const run = runBlock(platformBuild, resolveMarker, afterResolveMarker)
-    const resolve = (platform: string): string => {
-      const root = mkdtempSync(join(tmpdir(), "omo-trust-helper-resolve-"))
+  posixBashTest(
+    "resolves the helper for Darwin and Windows targets and nothing for Linux",
+    () => {
+      const run = runBlock(platformBuild, resolveMarker, afterResolveMarker)
+      const resolve = (platform: string): string => {
+        const root = mkdtempSync(join(tmpdir(), "omo-trust-helper-resolve-"))
+        try {
+          const output = join(root, "output")
+          const result = spawnSync("bash", ["-e", "-c", run], {
+            cwd: new URL("..", import.meta.url),
+            env: { ...process.env, PLATFORM: platform, GITHUB_OUTPUT: output },
+            encoding: "utf8",
+            timeout: 20_000,
+          })
+          expect(result.status, result.stderr).toBe(0)
+          return readFileSync(output, "utf8")
+        } finally {
+          rmSync(root, { recursive: true, force: true })
+        }
+      }
+
+      expect(resolve("darwin-x64-baseline")).toBe(
+        [
+          "host=darwin-x64",
+          "asset=engine-trust-helper-darwin-x64/omo-engine-trust-helper",
+          "source=target/x86_64-apple-darwin/release/omo-engine-trust-helper",
+          "",
+        ].join("\n"),
+      )
+      expect(resolve("windows-arm64")).toBe(
+        [
+          "host=win32-arm64",
+          "asset=engine-trust-helper-win32-arm64/omo-engine-trust-helper.exe",
+          "source=target/aarch64-pc-windows-msvc/release/omo-engine-trust-helper.exe",
+          "",
+        ].join("\n"),
+      )
+      expect(resolve("linux-x64")).toBe("host=\nasset=\nsource=\n")
+    },
+    60_000,
+  )
+
+  posixBashTest(
+    "copies the downloaded helper into its Rust source path, and fails when the promised helper is absent",
+    () => {
+      const root = mkdtempSync(join(tmpdir(), "omo-trust-helper-stage-"))
       try {
-        const output = join(root, "output")
-        const result = spawnSync("bash", ["-e", "-c", run], {
-          cwd: new URL("..", import.meta.url),
-          env: { ...process.env, PLATFORM: platform, GITHUB_OUTPUT: output },
-          encoding: "utf8",
-          timeout: 20_000,
-        })
-        expect(result.status, result.stderr).toBe(0)
-        return readFileSync(output, "utf8")
+        const run = runBlock(platformBuild, stageMarker, afterStageMarker)
+        const asset = "engine-trust-helper-darwin-arm64/omo-engine-trust-helper"
+        const source = "target/aarch64-apple-darwin/release/omo-engine-trust-helper"
+        const env = { ...process.env, HELPER_ASSET: asset, HELPER_SOURCE: source }
+
+        const missing = spawnSync("bash", ["-e", "-c", run], { cwd: root, env, encoding: "utf8" })
+        expect(missing.status).not.toBe(0)
+        expect(existsSync(join(root, source))).toBe(false)
+
+        mkdirSync(join(root, ".omo", "desktop-engine-assets", "engine-trust-helper-darwin-arm64"), { recursive: true })
+        writeFileSync(join(root, ".omo", "desktop-engine-assets", asset), "signed helper")
+        const staged = spawnSync("bash", ["-e", "-c", run], { cwd: root, env, encoding: "utf8" })
+        expect(staged.status, staged.stderr).toBe(0)
+        expect(readFileSync(join(root, source), "utf8")).toBe("signed helper")
       } finally {
         rmSync(root, { recursive: true, force: true })
       }
-    }
-
-    expect(resolve("darwin-x64-baseline")).toBe([
-      "host=darwin-x64",
-      "asset=engine-trust-helper-darwin-x64/omo-engine-trust-helper",
-      "source=target/x86_64-apple-darwin/release/omo-engine-trust-helper",
-      "",
-    ].join("\n"))
-    expect(resolve("windows-arm64")).toBe([
-      "host=win32-arm64",
-      "asset=engine-trust-helper-win32-arm64/omo-engine-trust-helper.exe",
-      "source=target/aarch64-pc-windows-msvc/release/omo-engine-trust-helper.exe",
-      "",
-    ].join("\n"))
-    expect(resolve("linux-x64")).toBe("host=\nasset=\nsource=\n")
-  }, 60_000)
-
-  posixBashTest("copies the downloaded helper into its Rust source path, and fails when the promised helper is absent", () => {
-    const root = mkdtempSync(join(tmpdir(), "omo-trust-helper-stage-"))
-    try {
-      const run = runBlock(platformBuild, stageMarker, afterStageMarker)
-      const asset = "engine-trust-helper-darwin-arm64/omo-engine-trust-helper"
-      const source = "target/aarch64-apple-darwin/release/omo-engine-trust-helper"
-      const env = { ...process.env, HELPER_ASSET: asset, HELPER_SOURCE: source }
-
-      const missing = spawnSync("bash", ["-e", "-c", run], { cwd: root, env, encoding: "utf8" })
-      expect(missing.status).not.toBe(0)
-      expect(existsSync(join(root, source))).toBe(false)
-
-      mkdirSync(join(root, ".omo", "desktop-engine-assets", "engine-trust-helper-darwin-arm64"), { recursive: true })
-      writeFileSync(join(root, ".omo", "desktop-engine-assets", asset), "signed helper")
-      const staged = spawnSync("bash", ["-e", "-c", run], { cwd: root, env, encoding: "utf8" })
-      expect(staged.status, staged.stderr).toBe(0)
-      expect(readFileSync(join(root, source), "utf8")).toBe("signed helper")
-    } finally {
-      rmSync(root, { recursive: true, force: true })
-    }
-  })
+    },
+  )
 })
 
 // ci.yml's native-binary-parity job compiles the release binary for darwin-arm64 and windows-x64, where
@@ -263,8 +336,12 @@ describe("engine trust helper transport into the compiled payload", () => {
 describe("native binary parity job", () => {
   test("builds the engine trust helper for the parity binary in a separate cargo call", () => {
     const run = runBlock(parity, parityEngineMarker, parityBinaryMarker)
-    const engine = run.indexOf("cargo build --release -p senpi-desktop-engine --locked --target ${{ matrix.rust-target }}")
-    const helper = run.indexOf("cargo build --release -p omo-engine-trust-helper --locked --target ${{ matrix.rust-target }}")
+    const engine = run.indexOf(
+      "cargo build --release -p senpi-desktop-engine --locked --target ${{ matrix.rust-target }}",
+    )
+    const helper = run.indexOf(
+      "cargo build --release -p omo-engine-trust-helper --locked --target ${{ matrix.rust-target }}",
+    )
 
     expect(engine).toBeGreaterThanOrEqual(0)
     expect(helper).toBeGreaterThan(engine)

@@ -32,9 +32,7 @@ describe("sessionTailContinuationBlocker (senpi#3266)", () => {
 
   test("#given a tail ending on an unanswered user prompt #then the blocker is the unfinished turn", async () => {
     // given
-    const path = transcript(tempProject(), [
-      { type: "message", message: { role: "user", content: "do the work" } },
-    ])
+    const path = transcript(tempProject(), [{ type: "message", message: { role: "user", content: "do the work" } }])
 
     // when / then
     await expect(sessionTailContinuationBlocker(path)).resolves.toBe("unfinished")
@@ -44,8 +42,18 @@ describe("sessionTailContinuationBlocker (senpi#3266)", () => {
     // given
     const path = transcript(tempProject(), [
       { type: "message", message: { role: "user", content: "do the work" } },
-      { type: "message", message: { role: "assistant", content: [{ type: "toolCall", id: "call-1", name: "eval", arguments: {} }], stopReason: "toolUse" } },
-      { type: "message", message: { role: "toolResult", toolCallId: "call-1", content: [{ type: "text", text: "partial" }] } },
+      {
+        type: "message",
+        message: {
+          role: "assistant",
+          content: [{ type: "toolCall", id: "call-1", name: "eval", arguments: {} }],
+          stopReason: "toolUse",
+        },
+      },
+      {
+        type: "message",
+        message: { role: "toolResult", toolCallId: "call-1", content: [{ type: "text", text: "partial" }] },
+      },
     ])
 
     // when / then
@@ -56,7 +64,10 @@ describe("sessionTailContinuationBlocker (senpi#3266)", () => {
     // given
     const path = transcript(tempProject(), [
       { type: "message", message: { role: "user", content: "do the work" } },
-      { type: "message", message: { role: "assistant", content: [{ type: "text", text: "done" }], stopReason: "stop" } },
+      {
+        type: "message",
+        message: { role: "assistant", content: [{ type: "text", text: "done" }], stopReason: "stop" },
+      },
     ])
 
     // when / then

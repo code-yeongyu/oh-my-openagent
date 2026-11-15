@@ -1,10 +1,19 @@
 import { spawnSync } from "node:child_process"
 import { realpathSync } from "node:fs"
-import { updateUsageAnswer } from "./bin/lib/update-args.js"
+import { isPrintOnlyUpdate, updateUsageAnswer } from "./bin/lib/update-args.js"
+import { isProvisionedExecutable } from "./compile-runtime"
+import {
+  BinaryUpdateError,
+  installReleaseBinary,
+  releaseVersionOf,
+  type BinaryInstallRequest,
+  type BinaryUpdateCode,
+} from "./compiled-update-install"
+export { releaseVersionOf } from "./compiled-update-install"
 
 export const RELEASES_URL = "https://github.com/code-yeongyu/oh-my-openagent/releases"
 const RELEASES_API = "https://api.github.com/repos/code-yeongyu/oh-my-openagent/releases?per_page=100"
-const RELEASE_VERSION = /^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$/
+export const RELEASE_VERSION = /^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$/
 const RELEASE_TARGET = /^(?:darwin|linux|windows)-(?:x64|arm64)(?:-musl)?(?:-baseline)?$/
 
 export type FetchReleases = () => Promise<unknown>
@@ -12,17 +21,18 @@ export type PackageOwner = { readonly manager: "pacman" | "dpkg" | "rpm" | "brew
 export type ProbeOwner = (path: string, platform: NodeJS.Platform) => PackageOwner | undefined
 /** Runs one ownership query; undefined when the tool is missing, fails, or prints nothing. */
 export type RunOwnerQuery = (command: string, args: readonly string[]) => string | undefined
-export type CompiledUpdateResult = { readonly output: string; readonly exitCode: number; readonly stream?: "stdout" | "stderr" }
-
-// omo-ai publishes betas as `5.0.0-0.beta.90` while the GitHub release is tagged `v5.0.0-beta.90`.
-export function releaseVersionOf(omoAiVersion: string): string {
-  return omoAiVersion.replace(/^(\d+\.\d+\.\d+)-0\.(.+)$/, "$1-$2")
+export type CompiledUpdateResult = {
+  readonly output: string
+  readonly exitCode: number
+  readonly stream?: "stdout" | "stderr"
+  readonly errorCode?: BinaryUpdateCode
 }
 
 export function releaseAssetName(releaseTarget: unknown, platform: NodeJS.Platform, arch: string): string {
-  const flavor = typeof releaseTarget === "string" && RELEASE_TARGET.test(releaseTarget)
-    ? releaseTarget
-    : `${platform === "win32" ? "windows" : platform}-${arch}`
+  const flavor =
+    typeof releaseTarget === "string" && RELEASE_TARGET.test(releaseTarget)
+      ? releaseTarget
+      : `${platform === "win32" ? "windows" : platform}-${arch}`
   return flavor.startsWith("windows-") ? `omo-${flavor}.exe` : `omo-${flavor}`
 }
 
@@ -33,7 +43,12 @@ function readRelease(release: unknown): { readonly version: string; readonly ass
   if (typeof tag !== "string" || !Array.isArray(assets)) throw new Error("GitHub release has no tag_name or assets")
   const version = tag.replace(/^v/, "")
   if (!RELEASE_VERSION.test(version)) return undefined
-  return { version, assets: assets.map((asset) => (typeof asset === "object" && asset !== null ? String(Reflect.get(asset, "name")) : "")) }
+  return {
+    version,
+    assets: assets.map((asset) =>
+      typeof asset === "object" && asset !== null ? String(Reflect.get(asset, "name")) : "",
+    ),
+  }
 }
 
 /**
@@ -53,6 +68,13 @@ export function pickUpdateVersion(currentVersion: string, releases: unknown, ass
   }
   if (newest === undefined) throw new Error(`no ${stableOnly ? "stable " : ""}release ships ${asset}`)
   return Bun.semver.order(newest, currentVersion) > 0 ? newest : undefined
+}
+
+// The documented installer. It replaces the launcher in its install dir (OMO_INSTALL_DIR, default ~/.local/bin).
+export function installCommand(platform: NodeJS.Platform): string {
+  return platform === "win32"
+    ? "irm https://get.omo.dev/install.ps1 | iex"
+    : "curl -fsSL https://get.omo.dev/install.sh | bash"
 }
 
 const posixQuote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`
@@ -79,9 +101,17 @@ const runOwnerQuery: RunOwnerQuery = (command, args) => {
  * The system package manager that owns `path`, or undefined. Fails open: a missing tool, a failed or slow
  * query, or an unowned path all fall back to the plain replace command (#9585).
  */
-export function probePackageOwner(path: string, platform: NodeJS.Platform, run: RunOwnerQuery = runOwnerQuery): PackageOwner | undefined {
+export function probePackageOwner(
+  path: string,
+  platform: NodeJS.Platform,
+  run: RunOwnerQuery = runOwnerQuery,
+): PackageOwner | undefined {
   let resolved = path
-  try { resolved = realpathSync(path) } catch { /* keep the given path */ }
+  try {
+    resolved = realpathSync(path)
+  } catch {
+    /* keep the given path */
+  }
   const nix = /^\/nix\/store\/[0-9a-z]{32}-([^/]+)\//.exec(resolved)
   if (nix !== null) return { manager: "nix", pkg: nix[1] }
   const cellar = /\/Cellar\/([^/]+)\//.exec(resolved)
@@ -120,11 +150,14 @@ export async function compiledUpdate(options: {
   readonly omoAiVersion: string
   readonly releaseTarget: unknown
   readonly destination: string
+  /** The provisioned runtime executable under ~/.omo/binary-runtime/<version>/. */
+  readonly provisioned?: string
   readonly platform: NodeJS.Platform
   readonly arch: string
   readonly fetchReleases: FetchReleases
   readonly args?: readonly string[]
   readonly probeOwner?: ProbeOwner
+  readonly install?: (request: BinaryInstallRequest) => Promise<void>
 }): Promise<CompiledUpdateResult> {
   const usage = options.args === undefined ? undefined : updateUsageAnswer(options.args)
   if (usage !== undefined) return { output: usage.text, exitCode: usage.exitCode, stream: usage.stream }
@@ -139,9 +172,42 @@ export async function compiledUpdate(options: {
     target = pickUpdateVersion(current, await options.fetchReleases(), asset)
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error)
-    return { output: `omo update could not resolve a release (${reason}). Download ${asset} from ${RELEASES_URL}`, exitCode: 1 }
+    return {
+      output: `omo update could not resolve a release (${reason}). Download ${asset} from ${RELEASES_URL}`,
+      exitCode: 1,
+    }
   }
-  if (target === undefined) return { output: `omo ${current} is the newest ${current.includes("-") ? "beta" : "stable"} release`, exitCode: 0 }
+  if (target === undefined)
+    return { output: `omo ${current} is the newest ${current.includes("-") ? "beta" : "stable"} release`, exitCode: 0 }
+  // The launcher rewrites its runtime copy on every launch, so a replace command aimed there is undone
+  // by the next run. Reached only when the runtime copy was started directly, without a launcher.
+  if (options.provisioned !== undefined && isProvisionedExecutable(options.destination, options.provisioned)) {
+    return {
+      output: `omo ${target} is available (running ${current}), but ${options.destination} is the provisioned runtime copy, not the installed omo. Update the installed omo with:\n${installCommand(options.platform)}`,
+      exitCode: 1,
+      stream: "stderr",
+    }
+  }
   const command = replaceCommand(`${RELEASES_URL}/download/v${target}/${asset}`, options.destination, options.platform)
-  return { output: `omo ${target} is available (running ${current}). Replace this binary with:\n${command}`, exitCode: 0 }
+  if (isPrintOnlyUpdate(options.args ?? [])) {
+    return {
+      output: `omo ${target} is available (running ${current}). Replace this binary with:\n${command}`,
+      exitCode: 0,
+    }
+  }
+  try {
+    await (options.install ?? installReleaseBinary)({
+      destination: options.destination,
+      asset,
+      version: target,
+      platform: options.platform,
+    })
+    return { output: `omo updated ${current} -> ${target}`, exitCode: 0 }
+  } catch (error) {
+    const errorCode = error instanceof BinaryUpdateError ? error.code : "install_failed"
+    const reason = (error instanceof Error ? error.message : String(error))
+      .replace(/[\r\n\x00-\x1f\x7f-\x9f]/g, " ")
+      .slice(0, 500)
+    return { output: `omo update: ${errorCode}: ${reason}`, exitCode: 1, stream: "stderr", errorCode }
+  }
 }

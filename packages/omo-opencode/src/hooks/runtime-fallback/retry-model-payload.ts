@@ -10,12 +10,10 @@ export function buildRetryModelPayload(
     return undefined
   }
 
-  const loweredReasoning = parsedModel.variant
-    ? {}
-    : lowerReasoningForModel(agentSettings?.reasoning, parsedModel)
+  const loweredReasoning = parsedModel.variant ? {} : lowerReasoningForModel(agentSettings?.reasoning, parsedModel)
   const variant = parsedModel.variant ?? agentSettings?.variant ?? loweredReasoning.variant
-  const reasoningEffort = agentSettings?.reasoningEffort
-    ?? (parsedModel.variant ? undefined : loweredReasoning.reasoningEffort)
+  const reasoningEffort =
+    agentSettings?.reasoningEffort ?? (parsedModel.variant ? undefined : loweredReasoning.reasoningEffort)
 
   const payload: { model: { providerID: string; modelID: string }; variant?: string; reasoningEffort?: string } = {
     model: {

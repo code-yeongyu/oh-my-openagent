@@ -102,8 +102,7 @@ function homeWith(config: Record<string, unknown>): string {
 function discoveredSkillPaths(pi: FakePi): unknown[] {
   return (pi.handlers.get("resources_discover") ?? []).flatMap((handler) => {
     const result = handler({ type: "resources_discover", cwd: tmpdir(), reason: "startup" }) as
-      | { skillPaths?: unknown[] }
-      | undefined
+      { skillPaths?: unknown[] } | undefined
     return result?.skillPaths ?? []
   })
 }
@@ -256,7 +255,10 @@ describe("createXSearchComponent registration gate", () => {
 
   it("#given an invalid auth.json #when registering #then nothing registers", () => {
     const pi = fakePi()
-    const component = createXSearchComponent({ agentDir: agentDirWith("{ not json"), env: { XAI_API_KEY: "env-token" } })
+    const component = createXSearchComponent({
+      agentDir: agentDirWith("{ not json"),
+      env: { XAI_API_KEY: "env-token" },
+    })
 
     component.register(pi, fakeCtx())
 
@@ -301,7 +303,13 @@ describe("createXSearchComponent registered tool execution", () => {
         new Response(JSON.stringify(probeFixture), { status: 200, headers: { "content-type": "application/json" } }),
     )
 
-    const result = await tool.execute("call-1", { query: "Grok CLI", from_date: "2026-09-01" }, undefined, undefined, fakeEctx({ type: "oauth" }))
+    const result = await tool.execute(
+      "call-1",
+      { query: "Grok CLI", from_date: "2026-09-01" },
+      undefined,
+      undefined,
+      fakeEctx({ type: "oauth" }),
+    )
 
     expect(result.content[0].text?.startsWith("x_search results:")).toBe(true)
     expect((result.details as { queries: string[] }).queries[0]).toContain("since:")

@@ -145,6 +145,7 @@ impl Window {
 
     pub fn desktop(&self) -> DesktopWindow {
         DesktopWindow {
+            identity: None,
             id: self.hwnd.to_string(),
             pid: Some(std::process::id()),
             title: "menu fixture".into(),

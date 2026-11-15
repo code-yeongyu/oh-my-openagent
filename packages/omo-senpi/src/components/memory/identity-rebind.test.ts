@@ -10,13 +10,20 @@ import { join } from "node:path"
 import { resolveMemoryIdentity } from "@oh-my-opencode/memory-core"
 import { createMemoryBinding } from "./binding"
 import { MEMORY_BINDING_CUSTOM_TYPE, createMemoryComponent, memoryModuleSupervisor } from "./index"
-import { componentContext, loadedMemoryConfig, memorySettings, MemoryFakeExtensionAPI, sessionContext } from "./memory.test-support"
+import {
+  componentContext,
+  loadedMemoryConfig,
+  memorySettings,
+  MemoryFakeExtensionAPI,
+  sessionContext,
+} from "./memory.test-support"
 import type { SyncRunner } from "./sync-runner"
 import { rmSyncEfaultTolerant } from "./teardown.test-support"
 
 const roots: string[] = []
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0))
+    rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 function workspace(): string {
@@ -38,10 +45,14 @@ function linkedWorktree(): { readonly main: string; readonly worktree: string } 
   const worktree = join(root, "project-feature")
   mkdirSync(main)
   const git = (args: readonly string[]): void => {
-    execFileSync("git", ["-c", "user.name=qa", "-c", "user.email=qa@example.invalid", "-c", "commit.gpgsign=false", ...args], {
-      cwd: main,
-      stdio: "ignore",
-    })
+    execFileSync(
+      "git",
+      ["-c", "user.name=qa", "-c", "user.email=qa@example.invalid", "-c", "commit.gpgsign=false", ...args],
+      {
+        cwd: main,
+        stdio: "ignore",
+      },
+    )
   }
   git(["init", "--quiet", "--initial-branch=main"])
   git(["commit", "--quiet", "--allow-empty", "-m", "init"])
@@ -82,11 +93,17 @@ describe("memory identity rebind", () => {
     await pi.dispatch("before_agent_start", {}, sessionContext({ entries: [recorded], notifications, cwd: sessionCwd }))
 
     expect(notifications).toEqual([])
-    expect(pi.entries).toEqual([{
-      customType: MEMORY_BINDING_CUSTOM_TYPE,
-      data: { identity: sessionIdentity.id, repoPathHash: (recorded.data as { repoPathHash: string }).repoPathHash, boundAt: 456 },
-      options: { startupBookkeeping: true },
-    }])
+    expect(pi.entries).toEqual([
+      {
+        customType: MEMORY_BINDING_CUSTOM_TYPE,
+        data: {
+          identity: sessionIdentity.id,
+          repoPathHash: (recorded.data as { repoPathHash: string }).repoPathHash,
+          boundAt: 456,
+        },
+        options: { startupBookkeeping: true },
+      },
+    ])
     expect(memoryModuleSupervisor.refCount).toBe(before + 1)
     memoryModuleSupervisor.release()
   })
@@ -114,11 +131,17 @@ describe("memory identity rebind", () => {
     await pi.dispatch("before_agent_start", {}, sessionContext({ entries: [recorded], notifications }))
 
     expect(notifications).toEqual([])
-    expect(pi.entries).toEqual([{
-      customType: MEMORY_BINDING_CUSTOM_TYPE,
-      data: { identity: boundIdentity.id, repoPathHash: (recorded.data as { repoPathHash: string }).repoPathHash, boundAt: 456 },
-      options: { startupBookkeeping: true },
-    }])
+    expect(pi.entries).toEqual([
+      {
+        customType: MEMORY_BINDING_CUSTOM_TYPE,
+        data: {
+          identity: boundIdentity.id,
+          repoPathHash: (recorded.data as { repoPathHash: string }).repoPathHash,
+          boundAt: 456,
+        },
+        options: { startupBookkeeping: true },
+      },
+    ])
     expect(ctx.logs.filter((entry) => entry.level === "info" && entry.message.includes("rebound"))).toHaveLength(1)
     expect(memoryModuleSupervisor.refCount).toBe(before + 1)
     memoryModuleSupervisor.release()
@@ -137,16 +160,28 @@ describe("memory identity rebind", () => {
       resolveCwd: () => sessionCwd,
     }).register(pi, ctx)
 
-    await pi.dispatch("before_agent_start", {}, sessionContext({
-      entries: [{ type: "custom", customType: MEMORY_BINDING_CUSTOM_TYPE, data: { identity: "different-identity", repoPathHash: "hash", boundAt: 1 } }],
-      notifications,
-      cwd: sessionCwd,
-    }))
+    await pi.dispatch(
+      "before_agent_start",
+      {},
+      sessionContext({
+        entries: [
+          {
+            type: "custom",
+            customType: MEMORY_BINDING_CUSTOM_TYPE,
+            data: { identity: "different-identity", repoPathHash: "hash", boundAt: 1 },
+          },
+        ],
+        notifications,
+        cwd: sessionCwd,
+      }),
+    )
 
     expect(pi.entries).toEqual([])
     expect(memoryModuleSupervisor.refCount).toBe(before)
     expect(notifications).toEqual([{ message: expect.stringContaining("memory identity conflict"), level: "error" }])
-    expect(ctx.logs.filter((entry) => entry.level === "warn" && entry.message.includes("failed closed"))).toHaveLength(1)
+    expect(ctx.logs.filter((entry) => entry.level === "warn" && entry.message.includes("failed closed"))).toHaveLength(
+      1,
+    )
   })
 })
 
@@ -186,11 +221,13 @@ describe("memory identity with auto_identity git (#9659)", () => {
 
     // then
     expect(notifications).toEqual([])
-    expect(pi.entries).toEqual([{
-      customType: MEMORY_BINDING_CUSTOM_TYPE,
-      data: createMemoryBinding({ identity: mainIdentity.id, repoPath: mainIdentity.paths.repo, boundAt: 789 }),
-      options: { startupBookkeeping: true },
-    }])
+    expect(pi.entries).toEqual([
+      {
+        customType: MEMORY_BINDING_CUSTOM_TYPE,
+        data: createMemoryBinding({ identity: mainIdentity.id, repoPath: mainIdentity.paths.repo, boundAt: 789 }),
+        options: { startupBookkeeping: true },
+      },
+    ])
     expect(syncAcquired).toEqual([{ identity: mainIdentity.id, repo: mainIdentity.paths.repo }])
     expect(memoryModuleSupervisor.refCount).toBe(before + 1)
     memoryModuleSupervisor.release()
@@ -217,11 +254,13 @@ describe("memory identity with auto_identity git (#9659)", () => {
     await pi.dispatch("session_start", {}, sessionContext({ cwd: worktree }))
 
     // then
-    expect(pi.entries).toEqual([{
-      customType: MEMORY_BINDING_CUSTOM_TYPE,
-      data: createMemoryBinding({ identity: explicit.id, repoPath: explicit.paths.repo, boundAt: 791 }),
-      options: { startupBookkeeping: true },
-    }])
+    expect(pi.entries).toEqual([
+      {
+        customType: MEMORY_BINDING_CUSTOM_TYPE,
+        data: createMemoryBinding({ identity: explicit.id, repoPath: explicit.paths.repo, boundAt: 791 }),
+        options: { startupBookkeeping: true },
+      },
+    ])
     memoryModuleSupervisor.release()
     expect(memoryModuleSupervisor.refCount).toBe(before)
   })
@@ -250,11 +289,17 @@ describe("memory identity with auto_identity git (#9659)", () => {
 
     // then
     expect(notifications).toEqual([])
-    expect(pi.entries).toEqual([{
-      customType: MEMORY_BINDING_CUSTOM_TYPE,
-      data: { identity: perWorktree.id, repoPathHash: (recorded.data as { repoPathHash: string }).repoPathHash, boundAt: 790 },
-      options: { startupBookkeeping: true },
-    }])
+    expect(pi.entries).toEqual([
+      {
+        customType: MEMORY_BINDING_CUSTOM_TYPE,
+        data: {
+          identity: perWorktree.id,
+          repoPathHash: (recorded.data as { repoPathHash: string }).repoPathHash,
+          boundAt: 790,
+        },
+        options: { startupBookkeeping: true },
+      },
+    ])
     expect(memoryModuleSupervisor.refCount).toBe(before + 1)
     memoryModuleSupervisor.release()
   })

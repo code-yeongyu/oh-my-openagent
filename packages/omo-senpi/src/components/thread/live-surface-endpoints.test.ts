@@ -8,6 +8,7 @@ import type { ThreadToolName, ThreadToolResult } from "./contracts"
 import { createLiveThreadSurface, HOST_ENDPOINTS_CACHE_TTL_MS, parseHostStatusAll, type HostEndpointReport } from "./live-surface"
 import { createGatewayStore } from "./gateway/store"
 import { createThreadTools } from "./tools"
+import { testBudgetSignal } from "../../../../../test-support/test-deadline"
 
 type Frame = Record<string, unknown>
 type Answer = (frame: Frame) => Record<string, unknown>
@@ -44,7 +45,7 @@ async function endpoint(socketPath: string, answer: Answer): Promise<{ readonly 
       socket.write(`${JSON.stringify({ id: frame.id, type: "response", command: frame.type, success: true, ...answer(frame) })}\n`)
     })
   }))
-  const listening = once(server, "listening", { signal: AbortSignal.timeout(2000) })
+  const listening = once(server, "listening", { signal: testBudgetSignal("the live-surface endpoint server to listen") })
   server.listen(transport.listenAddress)
   await listening
   cleanups.push(async () => {
@@ -90,7 +91,7 @@ type World = {
   readonly run: (name: ThreadToolName, args: unknown) => Promise<ThreadToolResult>
 }
 
-function world(options: { readonly reports: () => readonly HostEndpointReport[] | undefined; readonly legacy: string; readonly shard: string; readonly now?: () => number }): World {
+function world(options: { readonly reports: () => readonly HostEndpointReport[] | undefined; readonly legacy: string; readonly shard: string; readonly now?: () => number; readonly callerWorkspaceRoot?: string }): World {
   const dialed: string[] = []
   const statusCalls = { count: 0 }
   const surface = createLiveThreadSurface({} as never, {
@@ -104,7 +105,7 @@ function world(options: { readonly reports: () => readonly HostEndpointReport[] 
   // closed before its directory is removed: win32 cannot delete the open database
   const store = createGatewayStore({ agentDir: stateDirectory })
   cleanups.push(() => store.dispose())
-  const tools = createThreadTools({ host: surface, store, stateDirectory, callerSessionId: () => "caller", callerWorkspaceRoot: () => process.cwd() })
+  const tools = createThreadTools({ host: surface, store, stateDirectory, callerSessionId: () => "caller", callerWorkspaceRoot: () => options.callerWorkspaceRoot ?? process.cwd() })
   let calls = 0
   return {
     legacy: options.legacy,
@@ -155,7 +156,8 @@ describe("thread tools across host endpoints", () => {
     const read = await w.run("thread_read", { thread: "dur-desktop" })
 
     // then
-    expect(sent).toMatchObject({ kind: "ok", thread_id: "dur-desktop", delivery: { kind: "queued" }, endpoint: { kind: "rpc_host" } })
+    // The fake host answers the wake with nothing admitted and runs no drain, so nothing will start the message (#12486).
+    expect(sent).toMatchObject({ kind: "ok", thread_id: "dur-desktop", delivery: { kind: "queued_offline" }, endpoint: { kind: "rpc_host" } })
     expect(read).toMatchObject({ kind: "ok", source: "live_host", items: [{ role: "assistant", content: JSON.stringify("from dur-desktop") }] })
     const perSession = new Set(["wake", "get_messages"])
     const shardPerSession = shardHost.frames.filter((frame) => perSession.has(String(frame.type)))
@@ -181,6 +183,30 @@ describe("thread tools across host endpoints", () => {
     expect(created).toMatchObject({ kind: "ok", thread: { sessionId: "rpc-2", socket: legacy } })
     expect(legacyHost.frames.some((frame) => frame.type === "open_session")).toBe(true)
     expect(shardHost.frames.some((frame) => frame.type === "open_session")).toBe(false)
+  })
+
+  test("#given a desktop thread with no project, working in its own scratch folder, and an engine started in the user's home #when it runs thread_create with no cwd and no alias #then the child opens in the caller's folder, not the engine's", async () => {
+    // given: the desktop backs a thread with no project with a folder of its own under its scratch root, and its
+    // engine runs from the user's home. The engine opens a session with no cwd in its own folder
+    // (`command.cwd ?? host.defaults.cwd`), which is where the packaged-app QA child landed.
+    const dir = tempDir("thr-ep-")
+    const legacy = join(dir, "rpc.sock")
+    const shard = join(dir, "i-0123456789abcdef.sock")
+    const engineHome = join(dir, "home")
+    const scratchFolder = join(engineHome, ".omo", "desktop", "scratch", "2026-11-11-qa-thread-chip-check-use-01a1ca0d")
+    const terminal = hostWith("dur-terminal", "terminal", join(dir, "terminal.jsonl"))
+    const legacyHost = await endpoint(legacy, (frame) => frame.type === "open_session"
+      ? { data: { sessionId: "rpc-2", state: { cwd: typeof frame.cwd === "string" ? frame.cwd : engineHome } } }
+      : terminal(frame))
+    await endpoint(shard, hostWith("dur-desktop", "desktop", join(dir, "desktop.jsonl")))
+    const w = world({ legacy, shard, reports: () => [report(legacy, true), report(shard, true)], callerWorkspaceRoot: scratchFolder })
+
+    // when
+    const created = await w.run("thread_create", { name: "QA chip check" })
+
+    // then
+    expect(legacyHost.frames.filter((frame) => frame.type === "open_session").map((frame) => frame.cwd)).toEqual([scratchFolder])
+    expect(created).toMatchObject({ kind: "ok", thread: { cwd: scratchFolder } })
   })
 
   test("#given the i-* endpoint stopped answering after it claimed a session file #when the tools run #then its thread comes from disk with error_note, reads from JSONL, and the legacy thread still takes sends", async () => {

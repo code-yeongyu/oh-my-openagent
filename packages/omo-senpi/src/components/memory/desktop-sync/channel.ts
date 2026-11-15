@@ -1,8 +1,13 @@
 import type { Duplex } from "node:stream"
 import { readFrames, writeFrame } from "./framing"
 import {
-  desktopSyncChild, desktopSyncEvent, desktopSyncReply, desktopSyncRequest, DesktopSyncUnavailable,
-  type DesktopSyncEvent, type DesktopSyncRequest,
+  desktopSyncChild,
+  desktopSyncEvent,
+  desktopSyncReply,
+  desktopSyncRequest,
+  DesktopSyncUnavailable,
+  type DesktopSyncEvent,
+  type DesktopSyncRequest,
 } from "./protocol"
 
 export type { DesktopSyncEvent, DesktopSyncRequest } from "./protocol"
@@ -16,14 +21,14 @@ export interface DesktopSyncChannel {
 
 export type DesktopSyncAttachment =
   | { readonly kind: "connected"; readonly channel: DesktopSyncChannel }
-  | { readonly kind: "unavailable"; readonly reason: "private_channel_unavailable" | "platform_not_supported" }
+  | { readonly kind: "unavailable"; readonly reason: "private_channel_unavailable" }
 
-/** Registration owns the supplied stream. No endpoint lookup or alternate account source exists here. */
+/**
+ * Registration owns the supplied stream. No endpoint lookup or alternate account source exists here.
+ * On every platform the stream is the one senpi's takeInheritedPrivateChannel hands over; on win32 senpi
+ * builds it over two one-way pipes and clears their inherit flag first, so nothing here is platform-specific.
+ */
 export async function attachDesktopSyncChannel(stream: Duplex | undefined): Promise<DesktopSyncAttachment> {
-  if (process.platform === "win32") {
-    stream?.destroy()
-    return { kind: "unavailable", reason: "platform_not_supported" }
-  }
   if (stream === undefined) return { kind: "unavailable", reason: "private_channel_unavailable" }
   const lifetime = new AbortController()
   const waiting = new Map<number, ReturnType<typeof Promise.withResolvers<unknown>>>()
@@ -38,24 +43,29 @@ export async function attachDesktopSyncChannel(stream: Duplex | undefined): Prom
     waiting.clear()
     listeners.clear()
   }
-  readFrames(stream, (packet) => {
-    if (typeof packet === "object" && packet !== null && "event" in packet) {
-      const event = desktopSyncEvent.parse(packet)
-      if (child === undefined || event.child !== child) throw new DesktopSyncUnavailable()
-      for (const listener of listeners) listener(event)
-      if (event.event === "retired") close()
-      return
-    }
-    const reply = desktopSyncReply.parse(packet)
-    const pending = waiting.get(reply.id)
-    if (pending === undefined) throw new DesktopSyncUnavailable()
-    waiting.delete(reply.id)
-    if (reply.ok) pending.resolve(reply.value)
-    else pending.reject(new DesktopSyncUnavailable())
-  }, close)
+  readFrames(
+    stream,
+    (packet) => {
+      if (typeof packet === "object" && packet !== null && "event" in packet) {
+        const event = desktopSyncEvent.parse(packet)
+        if (child === undefined || event.child !== child) throw new DesktopSyncUnavailable()
+        for (const listener of listeners) listener(event)
+        if (event.event === "retired") close()
+        return
+      }
+      const reply = desktopSyncReply.parse(packet)
+      const pending = waiting.get(reply.id)
+      if (pending === undefined) throw new DesktopSyncUnavailable()
+      waiting.delete(reply.id)
+      if (reply.ok) pending.resolve(reply.value)
+      else pending.reject(new DesktopSyncUnavailable())
+    },
+    close,
+  )
   // Not async: the authority's admission callback must enclose the immediate write.
   const request = (packet: Readonly<Record<string, unknown>>): Promise<unknown> => {
-    if (lifetime.signal.aborted || waiting.size >= 64 || nextId >= 0x7fffffff) return Promise.reject(new DesktopSyncUnavailable())
+    if (lifetime.signal.aborted || waiting.size >= 64 || nextId >= 0x7fffffff)
+      return Promise.reject(new DesktopSyncUnavailable())
     const id = ++nextId
     const pending = Promise.withResolvers<unknown>()
     waiting.set(id, pending)
@@ -78,7 +88,9 @@ export async function attachDesktopSyncChannel(stream: Duplex | undefined): Prom
         close,
         onEvent(listener) {
           if (!lifetime.signal.aborted) listeners.add(listener)
-          return () => { listeners.delete(listener) }
+          return () => {
+            listeners.delete(listener)
+          }
         },
         request(packet) {
           const parsed = desktopSyncRequest.safeParse(packet)

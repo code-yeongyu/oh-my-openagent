@@ -7,7 +7,13 @@ import type { KernelToolGrant } from "../../kernel-tools/resolve"
 import { buildStartSpec } from "./execute-spec"
 import type { ForegroundWaitOptions } from "./foreground-wait"
 import { waitForForegroundTask } from "./foreground-wait"
-import { partialDetails, recordDetails, startedDetails, withLiveSpawnFacts, type SingleSpawnParams } from "./result-details"
+import {
+  partialDetails,
+  recordDetails,
+  startedDetails,
+  withLiveSpawnFacts,
+  type SingleSpawnParams,
+} from "./result-details"
 import { appendMissingSkills } from "./skill-result"
 import { evaluateSpawnPolicy } from "./spawn-policy"
 import { backgroundConversionText, backgroundStartText, type StartLabels } from "./start-presentation"
@@ -37,16 +43,13 @@ function syncResult(
   skills: ReturnType<typeof buildStartSpec>["skills"],
 ): AgentToolResult<TaskToolDetails> {
   const body = record.final_response ?? record.error_message ?? `Task ${record.status}`
-  return result(
-    appendMissingSkills(body + continuationFooter(record.task_id), skills),
-    { ...recordDetails(record, mode), ...(skills === undefined ? {} : { skills }) },
-  )
+  return result(appendMissingSkills(body + continuationFooter(record.task_id), skills), {
+    ...recordDetails(record, mode),
+    ...(skills === undefined ? {} : { skills }),
+  })
 }
 
-export async function runSpawn(
-  deps: TaskToolDeps,
-  input: RunSpawnInput,
-): Promise<AgentToolResult<TaskToolDetails>> {
+export async function runSpawn(deps: TaskToolDeps, input: RunSpawnInput): Promise<AgentToolResult<TaskToolDetails>> {
   const { params, signal, onUpdate, ctx, env, scheduleDeadline } = input
   if (signal?.aborted) {
     const reason = "Parent aborted before spawn"
@@ -61,14 +64,16 @@ export async function runSpawn(
       reason: selection.error.message,
     })
   }
-  const policy = selection.kind === "subagent_type"
-    ? evaluateSpawnPolicy(deps, selection.subagentType, params.prompt, ctx.sessionManager.getSessionId())
-    : undefined
+  const policy =
+    selection.kind === "subagent_type"
+      ? evaluateSpawnPolicy(deps, selection.subagentType, params.prompt, ctx.sessionManager.getSessionId())
+      : undefined
   if (policy?.kind === "deny") {
     return result(policy.message, { task_id: "", status: "denied", mode: "spawn", reason: policy.message })
   }
   const effectiveParams = policy?.kind === "force" ? { ...params, prompt: policy.prompt, load_skills: [] } : params
-  const target = selection.kind === "category" ? { category: selection.category } : { subagentType: selection.subagentType }
+  const target =
+    selection.kind === "category" ? { category: selection.category } : { subagentType: selection.subagentType }
   const startLabels: StartLabels = {
     taskSummary: params.task_summary,
     description: params.description,
@@ -76,17 +81,25 @@ export async function runSpawn(
   // The default skill discovery inside buildStartSpec reads the senpi barrel synchronously, so the
   // barrel is warmed here (memoized: a cache hit once the engine barrel is loaded).
   await loadSenpiBarrel()
-  const spec = buildStartSpec(effectiveParams, target, ctx.sessionManager.getSessionId(), deps, ctx.cwd, input.kernelTools)
+  const spec = buildStartSpec(
+    effectiveParams,
+    target,
+    ctx.sessionManager.getSessionId(),
+    deps,
+    ctx.cwd,
+    input.kernelTools,
+  )
   const started = await deps.manager.start(spec)
   if (started.kind === "plan_unresolved") {
     const agents = started.error.availableAgents
     const categories = started.error.availableCategories
     const agentSuffix = agents && agents.length > 0 ? ` Available agents: ${agents.join(", ")}.` : ""
-    const categorySuffix = categories && categories.length > 0
-      ? started.error.code === "model_unavailable"
-        ? ` Valid category names: ${categories.join(", ")}. Retry one of these, or configure categories.<name>.models in omo.json: model overrides cannot be combined with category.`
-        : ` Available categories: ${categories.join(", ")}.`
-      : ""
+    const categorySuffix =
+      categories && categories.length > 0
+        ? started.error.code === "model_unavailable"
+          ? ` Valid category names: ${categories.join(", ")}. Retry one of these, or configure categories.<name>.models in omo.json: model overrides cannot be combined with category.`
+          : ` Available categories: ${categories.join(", ")}.`
+        : ""
     return result(started.error.message + agentSuffix + categorySuffix, {
       task_id: "",
       status: "plan_error",
@@ -94,9 +107,13 @@ export async function runSpawn(
       reason: started.error.message,
     })
   }
-  if (started.kind === "held") return result("Task admission is held by your Stop. Resume the run to continue.", {
-    task_id: started.task_id, status: "paused", mode: "spawn", pause_seq: started.pauseSeq,
-  })
+  if (started.kind === "held")
+    return result("Task admission is held by your Stop. Resume the run to continue.", {
+      task_id: started.task_id,
+      status: "paused",
+      mode: "spawn",
+      pause_seq: started.pauseSeq,
+    })
   if (started.kind === "depth_denied") {
     return result(started.reason, { task_id: "", status: "denied", mode: "spawn", reason: started.reason })
   }
@@ -156,7 +173,13 @@ export async function runSpawn(
     emittedAt = Date.now()
     onUpdate({
       content: [{ type: "text", text: progress.contentText() }],
-      details: partialDetails(withLiveSpawnFacts(started, deps.manager.get(started.task_id)), params, executionMode, progress.details(), spec.skills),
+      details: partialDetails(
+        withLiveSpawnFacts(started, deps.manager.get(started.task_id)),
+        params,
+        executionMode,
+        progress.details(),
+        spec.skills,
+      ),
     })
   }
   const schedule = (): void => {
@@ -183,11 +206,17 @@ export async function runSpawn(
   if (started.status === "pending") {
     onUpdate?.({
       content: [{ type: "text", text: "" }],
-      details: partialDetails(withLiveSpawnFacts(started, deps.manager.get(started.task_id)), params, executionMode, {
-        progress: { activity: "queued · waiting for slot", startedAt },
-        childId: started.task_id,
-        turns: 0,
-      }, spec.skills),
+      details: partialDetails(
+        withLiveSpawnFacts(started, deps.manager.get(started.task_id)),
+        params,
+        executionMode,
+        {
+          progress: { activity: "queued · waiting for slot", startedAt },
+          childId: started.task_id,
+          turns: 0,
+        },
+        spec.skills,
+      ),
     })
   } else {
     emit()
@@ -202,7 +231,8 @@ export async function runSpawn(
     void launch.then(launchSettled, launchSettled)
   }
   const parent = deps.manager.findTaskByChildSession?.(ctx.sessionManager.getSessionId())
-  const parked = parent === undefined ? undefined : deps.manager.concurrency?.park(parent.task_id, parent.notification.run_epoch)
+  const parked =
+    parent === undefined ? undefined : deps.manager.concurrency?.park(parent.task_id, parent.notification.run_epoch)
   let promoted = false
   try {
     const waited = await waitForForegroundTask({
@@ -215,13 +245,13 @@ export async function runSpawn(
     })
     if (waited.kind === "promoted") {
       promoted = true
-      return result(appendMissingSkills(
-        backgroundConversionText(started, startLabels, waited.budgetSeconds),
-        spec.skills,
-      ), {
-        ...startedDetails(started, params, executionMode, spec.skills),
-        run_in_background: true,
-      })
+      return result(
+        appendMissingSkills(backgroundConversionText(started, startLabels, waited.budgetSeconds), spec.skills),
+        {
+          ...startedDetails(started, params, executionMode, spec.skills),
+          run_in_background: true,
+        },
+      )
     }
     if (timer !== undefined) {
       clearTimeout(timer)

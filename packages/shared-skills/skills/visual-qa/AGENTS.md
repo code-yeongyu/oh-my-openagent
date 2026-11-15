@@ -55,4 +55,4 @@ node scripts/visual-qa.mjs tui-check <capture.txt> --cols 80
 bun test scripts/*.test.ts
 ```
 
-- Parent: [`packages/shared-skills/AGENTS.md`](../../AGENTS.md).
+- Parent (source checkout only; not shipped with the skill): `packages/shared-skills/AGENTS.md`.

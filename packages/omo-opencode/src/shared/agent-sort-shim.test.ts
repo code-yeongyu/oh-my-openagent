@@ -119,9 +119,7 @@ describe("agent-sort-shim", () => {
         const input = [oracle, librarian, sisyphus, explore]
 
         // when
-        const result = input.toSorted((a, b) =>
-          a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
-        )
+        const result = input.toSorted((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
 
         // then
         expect(result).toEqual([sisyphus, explore, librarian, oracle])

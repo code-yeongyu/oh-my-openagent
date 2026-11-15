@@ -6,7 +6,7 @@ import { resolveFactsModel } from "./facts-model"
 const FALLBACK: SenpiModelPort = { provider: "openai", id: "fallback" }
 const registry: SenpiModelRegistryPort<SenpiModelPort> = {
   getAvailable: () => [FALLBACK],
-  find: (provider, model) => provider === FALLBACK.provider && model === FALLBACK.id ? FALLBACK : undefined,
+  find: (provider, model) => (provider === FALLBACK.provider && model === FALLBACK.id ? FALLBACK : undefined),
 }
 
 test("#given an object-form explicit quick fallback #when the primary is unavailable #then facts use the declared fallback", () => {

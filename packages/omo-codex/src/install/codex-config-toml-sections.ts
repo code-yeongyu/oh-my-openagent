@@ -5,7 +5,10 @@ export interface TomlSection {
   readonly text: string
 }
 
-export function removeTomlSections(config: string, shouldRemove: (header: string, section: TomlSection) => boolean): string {
+export function removeTomlSections(
+  config: string,
+  shouldRemove: (header: string, section: TomlSection) => boolean,
+): string {
   return splitTomlSections(config)
     .filter((section) => section.header === null || !shouldRemove(section.header, section))
     .map((section) => section.text)

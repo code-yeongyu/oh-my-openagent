@@ -27,11 +27,11 @@ export interface KibitzerCandidateOrderInput {
 export type KibitzerCandidateOrder =
   | { readonly kind: "availability_unknown" }
   | {
-    readonly kind: "ordered"
-    readonly model: string
-    readonly thinking?: ReflectionThinkingLevel
-    readonly fallbacks: readonly ReflectionModelCandidate[]
-  }
+      readonly kind: "ordered"
+      readonly model: string
+      readonly thinking?: ReflectionThinkingLevel
+      readonly fallbacks: readonly ReflectionModelCandidate[]
+    }
   | { readonly kind: "none_connected"; readonly missingProviders: readonly string[] }
 
 export function orderKibitzerCandidatesByConnection(input: KibitzerCandidateOrderInput): KibitzerCandidateOrder {
@@ -58,7 +58,10 @@ export function orderKibitzerCandidatesByConnection(input: KibitzerCandidateOrde
 
 // The providers a `/login` would revive: the unconnected pins' own providers in pin order, then the
 // builtin chain's (asked without the user's pin, which otherwise short-circuits the chain report).
-function missingProviders(input: KibitzerCandidateOrderInput, unconnected: readonly ReflectionModelCandidate[]): readonly string[] {
+function missingProviders(
+  input: KibitzerCandidateOrderInput,
+  unconnected: readonly ReflectionModelCandidate[],
+): readonly string[] {
   const providers = unconnected.map((candidate) => candidate.model.slice(0, candidate.model.indexOf("/")))
   const { [input.category]: _pin, ...otherCategories } = input.config.categories ?? {}
   const chain = resolveCategory(input.category, { ...input.config, categories: otherCategories }, input.registry)

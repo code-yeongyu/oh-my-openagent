@@ -1,10 +1,17 @@
 import type { ToolDefinition } from "@code-yeongyu/senpi"
 import type { OmoConfig, OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
-import { createHostGenerationView, createTaskLifecycle, type LifecycleDeps, type TaskLifecycle, type TaskRecordStore } from "@oh-my-opencode/senpi-task"
+import {
+  createHostGenerationView,
+  createTaskLifecycle,
+  type LifecycleDeps,
+  type TaskLifecycle,
+  type TaskRecordStore,
+} from "@oh-my-opencode/senpi-task"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import type { CategoryConfigGenerations } from "./category-config-generation"
 import { createInheritedExtensionsResolver, type RunnerBuildContext } from "./engine-runners"
+import { createChildParentWiring } from "./child-parent-wiring"
 import { createEngineHostRuntime, type EngineHostRuntime } from "./host-execution-mode"
 import type { TaskRuntimeContext } from "./runtime-context"
 
@@ -38,27 +45,59 @@ export interface EngineHostWiring {
 export function composeEngineHostWiring(input: EngineHostWiringInput): EngineHostWiring {
   const { pi, omoConfig, settings, runtime, baseStore, generations } = input
   const host = input.host ?? createEngineHostRuntime(settings, runtime, pi, { storeDir: baseStore.stateDir })
-  const lifecycle = createTaskLifecycle({ ...input.lifecycle, config: settings,
+  const lifecycle = createTaskLifecycle({
+    ...input.lifecycle,
+    config: settings,
     hostEndpoint: host.hostEndpoint,
     // A cancel reads the daemon state of the generation a record names (omo#11765).
     ...(host.agentDir === undefined ? {} : { hostGenerationView: createHostGenerationView(host.agentDir) }),
     revivePolicy: {
       currentGeneration: () => {
         const modelRegistry = runtime.modelRegistry()
-        return modelRegistry === undefined ? generations.current()?.generation
+        return modelRegistry === undefined
+          ? generations.current()?.generation
           : generations.observe({ omoConfig, registry: modelRegistry }).generation
       },
       warn: (warning) => {
         baseStore.appendEvent(warning.task_id, { type: "config_generation_mismatch", payload: warning })
-        pi.sendMessage({ customType: "senpi-task.config-generation-mismatch", content: "Resuming the recorded task configuration.", display: true, details: warning }, {})
+        pi.sendMessage(
+          {
+            customType: "senpi-task.config-generation-mismatch",
+            content: "Resuming the recorded task configuration.",
+            display: true,
+            details: warning,
+          },
+          {},
+        )
       },
     },
   })
 
   const hostRouting = { ...host.routing, storeDir: baseStore.stateDir }
-  const baseRunnerContext: RunnerBuildContext = { runtime, sharedParentTools: input.sharedParentTools, settings, kernelToolBindings: input.lifecycle.kernelToolBindings, agentDir: host.agentDir, onHostWarning: host.notices.add, hostRouting, ...(input.omoConfig.exclude_models === undefined ? {} : { excludeModels: input.omoConfig.exclude_models }) }
+  const parentLink = createChildParentWiring({ pi, runtime, labelOf: (taskId) => childLabel(baseStore, taskId) })
+  const baseRunnerContext: RunnerBuildContext = {
+    runtime,
+    sharedParentTools: input.sharedParentTools,
+    settings,
+    kernelToolBindings: input.lifecycle.kernelToolBindings,
+    agentDir: host.agentDir,
+    onHostWarning: host.notices.add,
+    hostRouting,
+    ...parentLink,
+    ...(input.omoConfig.exclude_models === undefined ? {} : { excludeModels: input.omoConfig.exclude_models }),
+  }
   // One resolver for the whole session, so an ordinary spawn, a revival, a team member and a
   // workpool worker all inherit the SAME package-aware extension list (#8492).
   const resolveInheritedExtensions = createInheritedExtensionsResolver(baseRunnerContext)
-  return { host, lifecycle, resolveInheritedExtensions, runnerContext: { ...baseRunnerContext, resolveInheritedExtensions } }
+  return {
+    host,
+    lifecycle,
+    resolveInheritedExtensions,
+    runnerContext: { ...baseRunnerContext, resolveInheritedExtensions },
+  }
+}
+
+function childLabel(store: TaskRecordStore, taskId: string): string {
+  const record = store.load(taskId)
+  return record?.name ?? record?.task_summary ?? record?.description ?? taskId
 }

@@ -1,6 +1,28 @@
-import type { ApprovalProgress, SyncApproveRequest, SyncApproveResponse, SyncEnableResponse, SyncRpcProblem, SyncStatusResponse } from "./sync-rpc-contract"
-import type { SyncRpcAccount, SyncRpcAuthority, SyncRpcContext, SyncRpcOperation, SyncRpcOptions } from "./sync-rpc-ports"
-import { identityOf, refused, RetiredSyncOperation, runSyncRpcOperation, serviceProblem, unavailable, type CeremonyOperation, type Operation } from "./sync-rpc-operation"
+import type {
+  ApprovalProgress,
+  SyncApproveRequest,
+  SyncApproveResponse,
+  SyncEnableResponse,
+  SyncRpcProblem,
+  SyncStatusResponse,
+} from "./sync-rpc-contract"
+import type {
+  SyncRpcAccount,
+  SyncRpcAuthority,
+  SyncRpcContext,
+  SyncRpcOperation,
+  SyncRpcOptions,
+} from "./sync-rpc-ports"
+import {
+  identityOf,
+  refused,
+  RetiredSyncOperation,
+  runSyncRpcOperation,
+  serviceProblem,
+  unavailable,
+  type CeremonyOperation,
+  type Operation,
+} from "./sync-rpc-operation"
 
 export function createSyncRpcCoordinator(options: SyncRpcOptions) {
   let lifetime = new AbortController()
@@ -26,7 +48,10 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
     if (record.timer !== undefined) clearTimeout(record.timer)
   }
   const subscribe = (record: Operation, signal: AbortSignal): void => {
-    const listener = () => { record.expired = false; cancel(record) }
+    const listener = () => {
+      record.expired = false
+      cancel(record)
+    }
     signal.addEventListener("abort", listener, { once: true })
     record.disposeListeners.push(() => signal.removeEventListener("abort", listener))
     if (signal.aborted) listener()
@@ -57,13 +82,31 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
       return account.boundary(() => authority(record).admit(dispatch))
     },
   })
-  const newRecord = <K extends Operation["kind"]>(owner: SyncRpcContext, kind: K, pendingId?: string): Operation & { readonly kind: K } => {
+  const newRecord = <K extends Operation["kind"]>(
+    owner: SyncRpcContext,
+    kind: K,
+    pendingId?: string,
+  ): Operation & { readonly kind: K } => {
     const record: Operation & { readonly kind: K } = {
-      kind, owner, pendingId, controller: new AbortController(),
-      ready: Promise.withResolvers<void>(), confirmation: Promise.withResolvers<boolean>(),
-      disposeListeners: [], account: undefined, identity: undefined, active: true,
-      expired: false, expiresAt: undefined, code: null, confirmed: false,
-      enable: null, approval: null, problem: undefined, timer: undefined, done: Promise.resolve(),
+      kind,
+      owner,
+      pendingId,
+      controller: new AbortController(),
+      ready: Promise.withResolvers<void>(),
+      confirmation: Promise.withResolvers<boolean>(),
+      disposeListeners: [],
+      account: undefined,
+      identity: undefined,
+      active: true,
+      expired: false,
+      expiresAt: undefined,
+      code: null,
+      confirmed: false,
+      enable: null,
+      approval: null,
+      problem: undefined,
+      timer: undefined,
+      done: Promise.resolve(),
     }
     subscribe(record, owner.disconnectSignal)
     subscribe(record, options.signal)
@@ -74,21 +117,23 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
     if (record.timer !== undefined) clearTimeout(record.timer)
     for (const dispose of record.disposeListeners.splice(0)) dispose()
   }
-  const progress = (record: Operation): SyncApproveResponse => record.expiresAt === undefined
-    ? record.problem ?? refused()
-    : { pendingId: record.pendingId ?? "", expiresAt: record.expiresAt, code: record.code, outcome: record.approval }
+  const progress = (record: Operation): SyncApproveResponse =>
+    record.expiresAt === undefined
+      ? (record.problem ?? refused())
+      : { pendingId: record.pendingId ?? "", expiresAt: record.expiresAt, code: record.code, outcome: record.approval }
   const readEnable = (record: Operation): SyncEnableResponse => record.enable ?? unavailable()
 
   const start = (record: CeremonyOperation): void => {
     operations.add(record)
-    record.done = runSyncRpcOperation(record, options, { current, authority, subscribe, cancel })
-      .finally(() => operations.delete(record))
+    record.done = runSyncRpcOperation(record, options, { current, authority, subscribe, cancel }).finally(() =>
+      operations.delete(record),
+    )
   }
   // Only ownerId is compared here. A reconnect that reuses an ownerId is a new connection incarnation, and it is
   // fenced indirectly: the old connection's disconnect aborts the record's controller (so the check below fails),
   // and identityOf keys every operation by the account descriptor's incarnation.
-  const ensureOwned = (record: Operation, owner: SyncRpcContext): boolean => record.owner.ownerId === owner.ownerId
-    && (!record.controller.signal.aborted || record.expired)
+  const ensureOwned = (record: Operation, owner: SyncRpcContext): boolean =>
+    record.owner.ownerId === owner.ownerId && (!record.controller.signal.aborted || record.expired)
   const currentRecord = async (record: Operation, owner: SyncRpcContext): Promise<boolean> => {
     if (!ensureOwned(record, owner)) return false
     if (record.account !== undefined && (record.account.signal.aborted || !(await record.account.isCurrent()))) {
@@ -103,14 +148,19 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
   return {
     check(context: SyncRpcContext | undefined): context is SyncRpcContext {
       if (context === undefined) return false
-      try { check(context); return true } catch { return false }
+      try {
+        check(context)
+        return true
+      } catch {
+        return false
+      }
     },
     async enable(owner: SyncRpcContext): Promise<SyncEnableResponse> {
       if (enable?.active) {
         if (!ensureOwned(enable, owner)) return refused()
         const record = enable
         await record.ready.promise
-        return await currentRecord(record, owner) ? readEnable(record) : refused()
+        return (await currentRecord(record, owner)) ? readEnable(record) : refused()
       }
       if (enable !== undefined) disposeRecord(enable)
       const record = newRecord(owner, "enable")
@@ -125,7 +175,10 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
       if (previous !== undefined && !ensureOwned(previous, owner)) return refused()
       if (previous !== undefined && !(await currentRecord(previous, owner))) return refused()
       if (request.action === "begin") {
-        if (previous !== undefined && wasActive) { await previous.ready.promise; return progress(previous) }
+        if (previous !== undefined && wasActive) {
+          await previous.ready.promise
+          return progress(previous)
+        }
         if (previous !== undefined) disposeRecord(previous)
         const record = newRecord(owner, "approve", request.pendingId)
         approvals.set(request.pendingId, record)
@@ -157,11 +210,18 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
         return {
           ...(sync === undefined ? {} : { sync }),
           enable: visible.find((record) => record.kind === "enable")?.enable ?? null,
-          approvals: visible.filter((record) => record.kind === "approve" && record.expiresAt !== undefined).map((record): ApprovalProgress => ({
-            pendingId: record.pendingId ?? "", expiresAt: record.expiresAt ?? 0, code: record.code, outcome: record.approval,
-          })),
+          approvals: visible
+            .filter((record) => record.kind === "approve" && record.expiresAt !== undefined)
+            .map((record): ApprovalProgress => ({
+              pendingId: record.pendingId ?? "",
+              expiresAt: record.expiresAt ?? 0,
+              code: record.code,
+              outcome: record.approval,
+            })),
         }
-      } catch { return unavailable() }
+      } catch {
+        return unavailable()
+      }
     },
     async read<T>(owner: SyncRpcContext, use: (ports: SyncRpcOperation) => Promise<T>): Promise<T | SyncRpcProblem> {
       const record = newRecord(owner, "read")
@@ -179,10 +239,22 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
           if (!(await record.account.isCurrent())) return unavailable()
           auth.admit(() => undefined)
           return result
-        } catch (error) { return serviceProblem(error) } finally { try { await ports?.close() } finally { disposeRecord(record) } }
+        } catch (error) {
+          return serviceProblem(error)
+        } finally {
+          try {
+            await ports?.close()
+          } finally {
+            disposeRecord(record)
+          }
+        }
       })()
       reads.add(task)
-      try { return await task } finally { reads.delete(task) }
+      try {
+        return await task
+      } finally {
+        reads.delete(task)
+      }
     },
     async dispose(): Promise<void> {
       lifetime.abort()

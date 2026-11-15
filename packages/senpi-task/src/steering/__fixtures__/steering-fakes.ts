@@ -141,7 +141,9 @@ export function makeHarness(): SteeringHarness {
     reserveForRevive: (taskId) => ({
       ok: true,
       release: () => undefined,
-      commit: () => { reviveCalls.push(taskId) },
+      commit: () => {
+        reviveCalls.push(taskId)
+      },
     }),
     dequeuePending: (taskId) => {
       dequeueCalls.push(taskId)

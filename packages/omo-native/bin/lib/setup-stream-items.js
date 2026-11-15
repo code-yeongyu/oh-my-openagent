@@ -12,13 +12,23 @@ function rows(ids, kind, state) {
 function detectItems(inventory) {
   return inventory.harnesses
     .filter((harness) => harness.installed)
-    .map((harness) => ({ id: harness.id, kind: "harness", state: "found", detail: `${harness.entryCount} login(s), ${harness.importableCount} importable` }))
+    .map((harness) => ({
+      id: harness.id,
+      kind: "harness",
+      state: "found",
+      detail: `${harness.entryCount} login(s), ${harness.importableCount} importable`,
+    }))
 }
 
 function providerItems(plan) {
   const { result } = plan
   return [
-    ...result.added.map((provider) => ({ id: provider.id, kind: "provider", state: "import", detail: `${provider.config.models.length} model(s)` })),
+    ...result.added.map((provider) => ({
+      id: provider.id,
+      kind: "provider",
+      state: "import",
+      detail: `${provider.config.models.length} model(s)`,
+    })),
     ...rows(result.skippedExisting, "provider", "exists"),
     ...rows(result.blocked, "provider", "blocked"),
     ...rows(plan.skipped, "provider", "skipped"),
@@ -29,9 +39,19 @@ function credentialItems(plan) {
   if (plan.malformed) return []
   const { result, guidance } = plan
   return [
-    ...result.additions.map((item) => ({ id: item.provider, kind: "api-key", state: "import", detail: `from ${item.source}` })),
+    ...result.additions.map((item) => ({
+      id: item.provider,
+      kind: "api-key",
+      state: "import",
+      detail: `from ${item.source}`,
+    })),
     ...rows(result.skippedExisting, "api-key", "exists"),
-    ...guidance.logins.map((login) => ({ id: login.provider, kind: "oauth", state: login.state, ...(login.target === undefined ? {} : { detail: `/login ${login.target}` }) })),
+    ...guidance.logins.map((login) => ({
+      id: login.provider,
+      kind: "oauth",
+      state: login.state,
+      ...(login.target === undefined ? {} : { detail: `/login ${login.target}` }),
+    })),
     ...rows(result.skippedUnmapped, "api-key", "unmapped"),
   ]
 }
@@ -48,7 +68,11 @@ function assetItems({ result }) {
 }
 
 function modelChoiceItems(plan) {
-  return plan.items.map((item) => ({ id: item.label, kind: item.kind, state: MODEL_CHOICE_STATES[item.state] ?? item.state }))
+  return plan.items.map((item) => ({
+    id: item.label,
+    kind: item.kind,
+    state: MODEL_CHOICE_STATES[item.state] ?? item.state,
+  }))
 }
 
 const ITEMS_BY_SOURCE = {

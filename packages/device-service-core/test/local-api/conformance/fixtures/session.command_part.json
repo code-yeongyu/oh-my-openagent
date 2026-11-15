@@ -47,7 +47,7 @@
             "upload_id": "dXBsb2FkLTE",
             "index": 0,
             "count": 1,
-            "b": "aGVsbG8="
+            "b": "eyJ0eXBlIjoicHJvbXB0IiwibWVzc2FnZSI6ImhlbGxvIn0="
           }
         },
         {
@@ -65,8 +65,7 @@
             "id": "3",
             "type": "session.command",
             "attach": "<ref:a>",
-            "upload_id": "dXBsb2FkLTE",
-            "op": "prompt"
+            "upload_id": "dXBsb2FkLTE"
           }
         },
         {
@@ -154,7 +153,7 @@
             "upload_id": "dXBsb2FkLTE",
             "index": 1,
             "count": 1,
-            "b": "aGVsbG8="
+            "b": "eyJ0eXBlIjoicHJvbXB0IiwibWVzc2FnZSI6ImhlbGxvIn0="
           }
         },
         {
@@ -215,7 +214,7 @@
             "upload_id": "dXBsb2FkLTE",
             "index": 0,
             "count": 1,
-            "b": "aGVsbG8="
+            "b": "eyJ0eXBlIjoicHJvbXB0IiwibWVzc2FnZSI6ImhlbGxvIn0="
           }
         },
         {

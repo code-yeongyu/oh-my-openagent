@@ -5,11 +5,18 @@ export function resolveReleaseVersion(version, lazycodexOnly) {
   const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*))?$/.exec(version)
   if (!match) throw new Error(`Invalid version: ${version}`)
   const identifiers = match[4]?.split(".") ?? []
-  if (identifiers.some((part) => /^0\d+$/.test(part))) throw new Error(`Invalid numeric prerelease identifier: ${version}`)
+  if (identifiers.some((part) => /^0\d+$/.test(part)))
+    throw new Error(`Invalid numeric prerelease identifier: ${version}`)
   const reserved = identifiers.includes("lazycodex")
   if (lazycodexOnly) {
-    if (!reserved || !/^(?:[0-9A-Za-z]+\.)*lazycodex\.[1-9]\d*$/.test(match[4] ?? "") || identifiers.filter((part) => part === "lazycodex").length !== 1) {
-      throw new Error("LazyCodex-only version must end in lazycodex.N (N >= 1), e.g. 5.0.0-beta.62.lazycodex.1 or 5.0.0-lazycodex.1")
+    if (
+      !reserved ||
+      !/^(?:[0-9A-Za-z]+\.)*lazycodex\.[1-9]\d*$/.test(match[4] ?? "") ||
+      identifiers.filter((part) => part === "lazycodex").length !== 1
+    ) {
+      throw new Error(
+        "LazyCodex-only version must end in lazycodex.N (N >= 1), e.g. 5.0.0-beta.62.lazycodex.1 or 5.0.0-lazycodex.1",
+      )
     }
   } else if (reserved) {
     throw new Error("The lazycodex prerelease identifier is reserved for LazyCodex-only releases")

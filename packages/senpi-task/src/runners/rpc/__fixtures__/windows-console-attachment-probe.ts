@@ -38,12 +38,9 @@ try {
   const errorCode = Number(kernel32.symbols.GetLastError())
   const windowHandle = kernel32.symbols.GetConsoleWindow()
   const windowHandleValue = windowHandle === null ? 0 : Number(windowHandle)
-  const windowVisible =
-    windowHandleValue !== 0 && Boolean(user32.symbols.IsWindowVisible(windowHandle))
+  const windowVisible = windowHandleValue !== 0 && Boolean(user32.symbols.IsWindowVisible(windowHandle))
   if (attached) kernel32.symbols.FreeConsole()
-  process.stdout.write(
-    JSON.stringify({ attached, errorCode, windowHandle: windowHandleValue, windowVisible }),
-  )
+  process.stdout.write(JSON.stringify({ attached, errorCode, windowHandle: windowHandleValue, windowVisible }))
 } finally {
   user32.close()
   kernel32.close()

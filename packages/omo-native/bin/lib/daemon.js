@@ -103,7 +103,13 @@ async function adopt(args, options) {
     return await runAdoptCommand(args, { sdk: loaded.sdk, stdout: options.stdout, stderr: options.stderr })
   } finally {
     // The release already happened; a store that fails to close is logged, never a new outcome.
-    await loaded.sdk.dispose().catch((error) => options.stderr.write(`omo daemon adopt: closing the gateway store failed: ${error instanceof Error ? error.message : String(error)}\n`))
+    await loaded.sdk
+      .dispose()
+      .catch((error) =>
+        options.stderr.write(
+          `omo daemon adopt: closing the gateway store failed: ${error instanceof Error ? error.message : String(error)}\n`,
+        ),
+      )
   }
 }
 
@@ -126,7 +132,10 @@ export function runDaemonCommand(args, options) {
   }
   if (!SUBCOMMANDS.has(subcommand)) {
     // Scripts written for the removed shared-host join get a pointer to what replaced it.
-    const removed = subcommand === "attach" ? "omo daemon: 'attach' was removed; to continue a host session in this terminal, run omo daemon adopt <session>\n" : ""
+    const removed =
+      subcommand === "attach"
+        ? "omo daemon: 'attach' was removed; to continue a host session in this terminal, run omo daemon adopt <session>\n"
+        : ""
     stderr.write(`omo daemon: unknown subcommand '${subcommand}'\n${removed}${USAGE}\n`)
     return DAEMON_EXIT.usage
   }
@@ -151,7 +160,13 @@ export function runDaemonCommand(args, options) {
     return DAEMON_EXIT.engineRefused
   }
 
-  const { config } = readDaemonConfig({ pluginRoot, agentDir, env, cwd: options.cwd, loadRuntime: options.loadTaskConfig })
+  const { config } = readDaemonConfig({
+    pluginRoot,
+    agentDir,
+    env,
+    cwd: options.cwd,
+    loadRuntime: options.loadTaskConfig,
+  })
   if (subcommand === "status") {
     const status = runStatus({
       engine,

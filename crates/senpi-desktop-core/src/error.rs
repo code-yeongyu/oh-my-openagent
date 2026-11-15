@@ -1,6 +1,8 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::report::{Delivered, Disposition, FocusRestoration, NextCall};
+
 /// Desktop error vocabulary shared by the engine, the wire, and the host.
 ///
 /// FROZEN: oh-my-pi's codes plus the stop-path, suspension, lock-screen,
@@ -10,6 +12,9 @@ use serde::{Deserialize, Serialize};
 /// numeric code moves. Amendment 1 (macOS shared-screen parity, #11459 /
 /// #11461) appended `UserIntervened`, `AxUnconfirmed`, `SpaceUnsupported` and
 /// `SpaceMoveDenied` (-32024..-32027) without a protocol version change.
+/// Amendment 2 (computer-use v2 P1a) appended `AmbiguousTarget`,
+/// `CaptureConsentRequired` and `ProtectedProcess` (-32028..-32030), also
+/// without a protocol version change.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub enum ErrorCode {
     PermissionDenied,
@@ -58,6 +63,13 @@ pub enum ErrorCode {
     /// The window server refused the Space move, or the move could not be
     /// verified.
     SpaceMoveDenied,
+    /// A target description matched more than one window or element; the
+    /// caller must name one of the candidates.
+    AmbiguousTarget,
+    /// Capturing this target needs the user's consent first.
+    CaptureConsentRequired,
+    /// The target process is protected: the engine never sends it input.
+    ProtectedProcess,
 }
 
 impl ErrorCode {
@@ -91,6 +103,9 @@ impl ErrorCode {
             Self::AxUnconfirmed => "AxUnconfirmed",
             Self::SpaceUnsupported => "SpaceUnsupported",
             Self::SpaceMoveDenied => "SpaceMoveDenied",
+            Self::AmbiguousTarget => "AmbiguousTarget",
+            Self::CaptureConsentRequired => "CaptureConsentRequired",
+            Self::ProtectedProcess => "ProtectedProcess",
         }
     }
 }
@@ -112,11 +127,29 @@ pub struct PermissionDeniedData {
 }
 
 /// Why a `CaptureUnavailable` capture was refused. `reason` is an open token
-/// set: B9 introduces `"minimized"` and later waves add more.
+/// set: B9 introduces `"minimized"`; P8 adds `"off-space"` and `"off-screen"`; later waves add more.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CaptureUnavailableData {
     pub reason: String,
+}
+
+/// What an error adds in a session opened with `reportMode: "object"`:
+/// why it happened and whether input reached the target. Never set in a
+/// `reportMode: "null"` session.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ErrorReport {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub disposition: Option<Disposition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delivered: Option<Delivered>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub focus_restoration: Option<FocusRestoration>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_call: Option<NextCall>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize, JsonSchema)]
@@ -129,6 +162,9 @@ pub struct DesktopError {
     pub permission: Option<PermissionDeniedData>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub capture_unavailable: Option<Box<CaptureUnavailableData>>,
+    /// Object-mode additions, mirrored on the wire's `EngineErrorData`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub report: Option<Box<ErrorReport>>,
 }
 
 impl DesktopError {
@@ -138,7 +174,28 @@ impl DesktopError {
             message: message.into(),
             permission: None,
             capture_unavailable: None,
+            report: None,
         }
+    }
+
+    /// Attaches the object-mode report.
+    #[must_use]
+    pub fn with_report(mut self, report: ErrorReport) -> Self {
+        self.report = Some(Box::new(report));
+        self
+    }
+
+    /// Attaches an object-mode report carrying only `disposition`, unless the
+    /// error already carries the worker's report.
+    #[must_use]
+    pub fn with_fallback_disposition(self, disposition: Disposition) -> Self {
+        if self.report.is_some() {
+            return self;
+        }
+        self.with_report(ErrorReport {
+            disposition: Some(disposition),
+            ..ErrorReport::default()
+        })
     }
 
     pub fn permission_denied(message: impl Into<String>) -> Self {

@@ -206,9 +206,7 @@ describe("BackgroundManager parent wake empty-turn recovery", () => {
 
     // then
     expect(internals.parentWakeNotifier.getDispatchedParentWakes().has(sessionID)).toBe(false)
-    expect(internals.parentWakeNotifier.getPendingParentWakes().get(sessionID)?.notifications).toEqual([
-      notification,
-    ])
+    expect(internals.parentWakeNotifier.getPendingParentWakes().get(sessionID)?.notifications).toEqual([notification])
   })
 
   test("#given dispatched parent wake has coalesced notifications #when OpenCode records an empty assistant turn #then notification slots are preserved", async () => {

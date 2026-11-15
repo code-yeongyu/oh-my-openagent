@@ -14,7 +14,13 @@ export function createAtlasHook(ctx: PluginInput, options?: AtlasHookOptions) {
   }
 
   return {
-    handler: createAtlasEventHandler({ ctx, options, sessions: lifecycle.sessions, getState, cleanupSession: (sessionID) => lifecycle.cleanupSession(sessionID) }),
+    handler: createAtlasEventHandler({
+      ctx,
+      options,
+      sessions: lifecycle.sessions,
+      getState,
+      cleanupSession: (sessionID) => lifecycle.cleanupSession(sessionID),
+    }),
     "tool.execute.before": createToolExecuteBeforeHandler({
       ctx,
       pendingFilePaths: lifecycle.pendingFilePaths,

@@ -57,7 +57,9 @@ export const AGENT_DIR_ENV_NAMES = ["OMO_CODING_AGENT_DIR", "SENPI_CODING_AGENT_
  * agent-dir lane to the scenario's agent dir, and the engine resolves the state dir from that env.
  */
 export function scenarioStateDir(cwd, agentDir) {
-  return resolveProjectStateDirectory(cwd, "senpi-task", { env: Object.fromEntries(AGENT_DIR_ENV_NAMES.map((name) => [name, agentDir])) })
+  return resolveProjectStateDirectory(cwd, "senpi-task", {
+    env: Object.fromEntries(AGENT_DIR_ENV_NAMES.map((name) => [name, agentDir])),
+  })
 }
 
 /**
@@ -84,16 +86,22 @@ export function credentialDigest(root, files = CREDENTIAL_FILES) {
 }
 
 export function realAgentDigests() {
-  return Object.fromEntries(REAL_AGENT_DIRS.map((dir) => [dir, {
-    credentials: credentialDigest(dir),
-    files: Object.fromEntries(WATCHED_FILES.map((name) => [name, credentialDigest(dir, [name])])),
-  }]))
+  return Object.fromEntries(
+    REAL_AGENT_DIRS.map((dir) => [
+      dir,
+      {
+        credentials: credentialDigest(dir),
+        files: Object.fromEntries(WATCHED_FILES.map((name) => [name, credentialDigest(dir, [name])])),
+      },
+    ]),
+  )
 }
 
 /** Which watched files moved across a run, named so a reviewer can attribute each one. */
 export function changedRealAgentFiles(before, after) {
   return REAL_AGENT_DIRS.flatMap((dir) =>
-    WATCHED_FILES.filter((name) => before[dir]?.files[name] !== after[dir]?.files[name]).map((name) => join(dir, name)))
+    WATCHED_FILES.filter((name) => before[dir]?.files[name] !== after[dir]?.files[name]).map((name) => join(dir, name)),
+  )
 }
 
 export function createRunRoot() {
@@ -182,7 +190,14 @@ export function createScenarioSandbox(run, name, { omoConfig, script }) {
   const xdgConfigHome = join(root, "xdg")
   const sessionDir = join(root, "sessions")
   const stateDir = scenarioStateDir(cwd, agentDir)
-  for (const dir of [agentDir, cwd, xdgConfigHome, sessionDir, join(cwd, ".omo"), join(agentDir, "omo-senpi", "omo-native")]) {
+  for (const dir of [
+    agentDir,
+    cwd,
+    xdgConfigHome,
+    sessionDir,
+    join(cwd, ".omo"),
+    join(agentDir, "omo-senpi", "omo-native"),
+  ]) {
     mkdirSync(dir, { recursive: true })
   }
   writeFileSync(join(agentDir, "settings.json"), `${JSON.stringify({ defaultProjectTrust: "ask" }, null, 2)}\n`)

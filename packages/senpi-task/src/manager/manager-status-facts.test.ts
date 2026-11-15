@@ -2,8 +2,6 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import { baseSpec, cleanupProjects, makeManager } from "./__fixtures__/manager-fakes"
 
-
-
 afterEach(cleanupProjects)
 
 describe("manager status facts", () => {
@@ -28,7 +26,11 @@ describe("manager status facts", () => {
     if (fake === undefined) throw new Error("fake handle missing")
     fake.emit({
       type: "message_end",
-      message: { role: "assistant", content: [{ type: "text", text: "working" }], usage: { output: 120, totalTokens: 300 } },
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "working" }],
+        usage: { output: 120, totalTokens: 300 },
+      },
     })
     fake.emit({ type: "tool_execution_start", toolName: "read", args: { path: "a.ts" } })
 

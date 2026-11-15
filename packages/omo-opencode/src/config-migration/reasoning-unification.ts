@@ -84,7 +84,8 @@ function normalizeDefinition(
   if (Array.isArray(normalized["models"])) normalized["models"] = normalizedList(normalized["models"])
 
   const fallbackModels = value["fallback_models"]
-  const shouldCombine = fallbackModels !== undefined || (kind === "agent" && value["model"] !== undefined && value["models"] !== undefined)
+  const shouldCombine =
+    fallbackModels !== undefined || (kind === "agent" && value["model"] !== undefined && value["models"] !== undefined)
   if (!shouldCombine) return normalized
 
   const primary = primaryModelRef(value, opencode)
@@ -101,7 +102,8 @@ function normalizeDefinition(
     "providerOptions",
     "thinking",
     "textVerbosity",
-  ]) delete normalized[key]
+  ])
+    delete normalized[key]
   return normalized
 }
 
@@ -156,7 +158,8 @@ function normalizeTypedBlock(
   }
   if (result["models"] !== undefined) result["models"] = normalizeCatalog(result["models"])
   for (const harness of ["[senpi]", "[native]", "[codex]"] as const) {
-    if (result[harness] !== undefined) result[harness] = normalizeTypedBlock(result[harness], [...path, harness], diagnostics, false)
+    if (result[harness] !== undefined)
+      result[harness] = normalizeTypedBlock(result[harness], [...path, harness], diagnostics, false)
   }
   if (result["[opencode]"] !== undefined) {
     result["[opencode]"] = normalizeOpenCodeBlock(result["[opencode]"], [...path, "[opencode]"], diagnostics)
@@ -171,15 +174,16 @@ function normalizeTypedBlock(
   return result
 }
 
-function normalizeOpenCodeBlock(
-  value: unknown,
-  path: readonly string[],
-  diagnostics: string[],
-): unknown {
+function normalizeOpenCodeBlock(value: unknown, path: readonly string[], diagnostics: string[]): unknown {
   if (!isPlainRecord(value)) return value
   const result = copyRecord(value)
   if (result["categories"] !== undefined) {
-    result["categories"] = normalizeOpenCodeDefinitions(result["categories"], "category", [...path, "categories"], diagnostics)
+    result["categories"] = normalizeOpenCodeDefinitions(
+      result["categories"],
+      "category",
+      [...path, "categories"],
+      diagnostics,
+    )
   }
   if (result["agents"] !== undefined) {
     result["agents"] = normalizeOpenCodeDefinitions(result["agents"], "agent", [...path, "agents"], diagnostics)
@@ -192,7 +196,7 @@ export function transformReasoningUnification(document: unknown): ConfigMigratio
   return {
     diagnostics,
     document: isPlainRecord(document)
-      ? normalizeTypedBlock(document, [], diagnostics, true) as Record<string, unknown>
+      ? (normalizeTypedBlock(document, [], diagnostics, true) as Record<string, unknown>)
       : {},
   }
 }

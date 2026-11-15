@@ -69,25 +69,29 @@ export function inspectOtlpRequest(
 ): { readonly logs: InspectedLogRecord[]; readonly spans: InspectedSpan[] } {
   if (signal === "logs") {
     const request = fromBinary(ExportLogsServiceRequestSchema, body)
-    const logs = request.resourceLogs.flatMap((rl) => rl.scopeLogs.flatMap((sl) => sl.logRecords)).map((record) => ({
-      eventName: record.eventName,
-      traceId: hex(record.traceId),
-      spanId: hex(record.spanId),
-      attributes: attributes(record.attributes),
-    }))
+    const logs = request.resourceLogs
+      .flatMap((rl) => rl.scopeLogs.flatMap((sl) => sl.logRecords))
+      .map((record) => ({
+        eventName: record.eventName,
+        traceId: hex(record.traceId),
+        spanId: hex(record.spanId),
+        attributes: attributes(record.attributes),
+      }))
     return { logs, spans: [] }
   }
   const request = fromBinary(ExportTraceServiceRequestSchema, body)
-  const spans = request.resourceSpans.flatMap((rs) => rs.scopeSpans.flatMap((ss) => ss.spans)).map((span) => ({
-    name: span.name,
-    kind: KINDS[span.kind],
-    traceId: hex(span.traceId) ?? "",
-    spanId: hex(span.spanId) ?? "",
-    parentSpanId: hex(span.parentSpanId),
-    status: STATUSES[span.status?.code ?? Status_StatusCode.UNSET],
-    startTimeUnixNano: span.startTimeUnixNano,
-    endTimeUnixNano: span.endTimeUnixNano,
-    attributes: attributes(span.attributes),
-  }))
+  const spans = request.resourceSpans
+    .flatMap((rs) => rs.scopeSpans.flatMap((ss) => ss.spans))
+    .map((span) => ({
+      name: span.name,
+      kind: KINDS[span.kind],
+      traceId: hex(span.traceId) ?? "",
+      spanId: hex(span.spanId) ?? "",
+      parentSpanId: hex(span.parentSpanId),
+      status: STATUSES[span.status?.code ?? Status_StatusCode.UNSET],
+      startTimeUnixNano: span.startTimeUnixNano,
+      endTimeUnixNano: span.endTimeUnixNano,
+      attributes: attributes(span.attributes),
+    }))
   return { logs: [], spans }
 }

@@ -209,4 +209,28 @@ describe("resolveSpaceInRepo / git-backed config", () => {
     expect(second.bindingKey).toBe(first.bindingKey)
     expect(second.wrote).toEqual({})
   })
+
+  test("an inherited GIT_DIR / GIT_WORK_TREE pair cannot point the space read, write or remote list at another repository (#12354)", () => {
+    const foreign = tmpRepo()
+    git(foreign, ["remote", "add", "origin", "git@github.com:foreign/elsewhere.git"])
+    git(foreign, ["config", "--local", "omo.sync.space", "f".repeat(64)])
+    const dir = tmpRepo()
+    git(dir, ["remote", "add", "origin", "git@github.com:a/b.git"])
+    // The pair must be in the environment the process started with: that is what a host exports, and
+    // what a git child inherits when no env is passed.
+    const child = Bun.spawnSync(
+      [
+        process.execPath,
+        "-e",
+        `const { resolveSpaceInRepo } = await import(${JSON.stringify(join(import.meta.dir, "space.ts"))}); console.log(JSON.stringify(resolveSpaceInRepo(${JSON.stringify(dir)}, {})))`,
+      ],
+      { env: { ...process.env, GIT_DIR: join(foreign, ".git"), GIT_WORK_TREE: foreign } },
+    )
+    expect(child.stderr.toString()).toBe("")
+    const resolved: unknown = JSON.parse(child.stdout.toString())
+    expect(resolved).toMatchObject({ bindingKey: "repo:github.com/a/b", wrote: { space: expect.any(String) } })
+    const stored = git(dir, ["config", "--local", "--get", "omo.sync.space"]).trim()
+    expect(resolved).toMatchObject({ spaceId: stored })
+    expect(git(foreign, ["config", "--local", "--get", "omo.sync.space"]).trim()).toBe("f".repeat(64))
+  })
 })

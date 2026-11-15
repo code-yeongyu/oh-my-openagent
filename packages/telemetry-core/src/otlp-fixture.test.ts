@@ -7,7 +7,9 @@ import { produceFixtureBodies } from "./otlp-fixture-support"
 import type { AnyValue, KeyValue } from "./otlp-proto/opentelemetry/proto/common/v1/common_pb.js"
 import { createSpoolRoot, decodeLogs } from "./otlp-test-support"
 
-const FIXTURE = JSON.parse(readFileSync(join(import.meta.dir, "../test-fixtures/otlp/shared-logs-fixture.json"), "utf8"))
+const FIXTURE = JSON.parse(
+  readFileSync(join(import.meta.dir, "../test-fixtures/otlp/shared-logs-fixture.json"), "utf8"),
+)
 const roots: (() => void)[] = []
 afterEach(() => {
   for (const cleanup of roots.splice(0)) cleanup()
@@ -41,7 +43,9 @@ const attrs = (list: readonly KeyValue[]) => list.map((kv) => ({ key: kv.key, va
 const id = (bytes: Uint8Array, length: number) =>
   bytes.length === 0 || bytes.every((b) => b === 0)
     ? { kind: "none" }
-    : bytes.length === length ? { kind: "hex", hex: Buffer.from(bytes).toString("hex") } : { kind: "bad" }
+    : bytes.length === length
+      ? { kind: "hex", hex: Buffer.from(bytes).toString("hex") }
+      : { kind: "bad" }
 
 function workerRows(body: Uint8Array): unknown {
   return {
@@ -103,7 +107,11 @@ describe("shared OTLP fixture with the collector", () => {
     expect(pinned.length).toBe(6)
     for (const line of pinned) {
       const [digest, file] = line.split(/\s+/)
-      expect(createHash("sha256").update(readFileSync(join(dir, file ?? ""))).digest("hex")).toBe(digest ?? "")
+      expect(
+        createHash("sha256")
+          .update(readFileSync(join(dir, file ?? "")))
+          .digest("hex"),
+      ).toBe(digest ?? "")
     }
     expect(readFileSync(join(dir, "PROTO_TAG"), "utf8").trim()).toBe("v1.7.0")
   })

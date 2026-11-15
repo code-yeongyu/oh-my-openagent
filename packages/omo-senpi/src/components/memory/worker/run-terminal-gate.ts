@@ -1,11 +1,6 @@
 import { join } from "node:path"
 
-import {
-  createLockRecord,
-  withLock,
-  type AcquireLockOptions,
-  type LockRecord,
-} from "@oh-my-opencode/memory-core"
+import { createLockRecord, withLock, type AcquireLockOptions, type LockRecord } from "@oh-my-opencode/memory-core"
 
 type TerminalLock = <T>(
   lockPath: string,

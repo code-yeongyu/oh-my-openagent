@@ -11,14 +11,14 @@ type InstalledLspServersOptions = {
 }
 
 function isLspMcpDisabled(options: InstalledLspServersOptions): boolean {
-  const environment = options.homeDir === undefined
-    ? process.env
-    : { ...process.env, HOME: options.homeDir }
+  const environment = options.homeDir === undefined ? process.env : { ...process.env, HOME: options.homeDir }
   const config: OmoConfigForDoctor = validatePluginConfig(options.cwd ?? process.cwd(), environment).config
   return config.disabled_mcps?.includes("lsp") ?? false
 }
 
-export function getInstalledLspServers(options: InstalledLspServersOptions = {}): Array<{ id: string; extensions: string[] }> {
+export function getInstalledLspServers(
+  options: InstalledLspServersOptions = {},
+): Array<{ id: string; extensions: string[] }> {
   if (isLspMcpDisabled(options)) {
     return []
   }

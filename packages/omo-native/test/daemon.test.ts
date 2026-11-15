@@ -83,7 +83,13 @@ describe("omo daemon", () => {
     const stdout = capture()
 
     runDaemonCommand(["run", "--json"], {
-      engine, pluginRoot, agentDir, env: {}, stdout, stderr: capture(), platform: "darwin",
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout,
+      stderr: capture(),
+      platform: "darwin",
     })
 
     expect(stdout.text().trim()).toBe(line)
@@ -94,7 +100,13 @@ describe("omo daemon", () => {
     const engine = fakeEngine({ exitCode: 0, stdout: JSON.stringify({ action: "reuse", pid: 1 }) })
 
     runDaemonCommand(["run", "--no-upgrade"], {
-      engine, pluginRoot, agentDir, env: {}, stdout: capture(), stderr: capture(), platform: "darwin",
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout: capture(),
+      stderr: capture(),
+      platform: "darwin",
     })
 
     expect(engine.calls[0]?.args).toContain("never")
@@ -105,7 +117,13 @@ describe("omo daemon", () => {
     const engine = fakeEngine({ exitCode: 0, stdout: JSON.stringify({ action: "start", pid: 9 }) })
 
     runDaemonCommand(["run"], {
-      engine, pluginRoot, agentDir, env: {}, stdout: capture(), stderr: capture(), platform: "darwin",
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout: capture(),
+      stderr: capture(),
+      platform: "darwin",
     })
 
     expect(engine.calls[0]?.args).toContain("fallback")
@@ -116,7 +134,13 @@ describe("omo daemon", () => {
     const engine = fakeEngine({ exitCode: 0, stdout: JSON.stringify({ action: "start", pid: 9 }) })
 
     runDaemonCommand(["run"], {
-      engine, pluginRoot, agentDir, env: {}, stdout: capture(), stderr: capture(), platform: "darwin",
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout: capture(),
+      stderr: capture(),
+      platform: "darwin",
     })
 
     expect(engine.calls[0]?.args).not.toContain("--idle-exit-ms")
@@ -128,7 +152,13 @@ describe("omo daemon", () => {
     const engine = fakeEngine({ exitCode: 0, stdout: JSON.stringify({ action: "start", pid: 9 }) })
 
     const exitCode = runDaemonCommand(["run", "--persistent"], {
-      engine, pluginRoot, agentDir, env: {}, stdout: capture(), stderr: capture(), platform: "darwin",
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout: capture(),
+      stderr: capture(),
+      platform: "darwin",
     })
 
     expect(exitCode).toBe(0)
@@ -141,7 +171,13 @@ describe("omo daemon", () => {
     const stderr = capture()
 
     const exitCode = runDaemonCommand(["run", "--foreground"], {
-      engine, pluginRoot, agentDir, env: {}, stdout: capture(), stderr, platform: "darwin",
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout: capture(),
+      stderr,
+      platform: "darwin",
     })
 
     expect(exitCode).toBe(2)
@@ -156,7 +192,13 @@ describe("omo daemon", () => {
     const stderr = capture()
 
     const exitCode = runDaemonCommand(["attach", "--model", "x"], {
-      engine, pluginRoot, agentDir, env: {}, stdout, stderr, platform: "darwin",
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout,
+      stderr,
+      platform: "darwin",
     })
 
     expect(exitCode).toBe(2)
@@ -173,7 +215,13 @@ describe("omo daemon", () => {
     const stdout = capture()
 
     const exitCode = runDaemonCommand(["status"], {
-      engine, pluginRoot, agentDir, env: {}, stdout, stderr: capture(), platform: "darwin",
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout,
+      stderr: capture(),
+      platform: "darwin",
     })
 
     expect(exitCode).toBe(3)
@@ -186,7 +234,13 @@ describe("omo daemon", () => {
     const stderr = capture()
 
     const exitCode = runDaemonCommand(["run"], {
-      engine, pluginRoot, agentDir, env: {}, stdout: capture(), stderr, platform: "win32",
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout: capture(),
+      stderr,
+      platform: "win32",
     })
 
     expect(exitCode).toBe(4)
@@ -215,7 +269,13 @@ describe("omo daemon", () => {
     const stderr = capture()
 
     const exitCode = runDaemonCommand(["frobnicate"], {
-      engine, pluginRoot, agentDir, env: {}, stdout: capture(), stderr, platform: "darwin",
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout: capture(),
+      stderr,
+      platform: "darwin",
     })
 
     expect(exitCode).toBe(2)
@@ -225,10 +285,19 @@ describe("omo daemon", () => {
 
   test("stop and handoff reach the engine as their own subcommands", () => {
     const { pluginRoot, agentDir } = workspace()
-    for (const [command, expected] of [["stop", "stop"], ["handoff", "handoff"]] as const) {
+    for (const [command, expected] of [
+      ["stop", "stop"],
+      ["handoff", "handoff"],
+    ] as const) {
       const engine = fakeEngine({ exitCode: 0, stdout: JSON.stringify({ action: expected }) })
       runDaemonCommand([command], {
-        engine, pluginRoot, agentDir, env: {}, stdout: capture(), stderr: capture(), platform: "darwin",
+        engine,
+        pluginRoot,
+        agentDir,
+        env: {},
+        stdout: capture(),
+        stderr: capture(),
+        platform: "darwin",
       })
       expect(engine.calls.at(-1)?.args.slice(0, 2)).toEqual(["host", expected])
     }
@@ -240,12 +309,17 @@ describe("omo daemon", () => {
     const stdout = capture()
 
     const exitCode = runDaemonCommand(["--help"], {
-      engine, pluginRoot, agentDir, env: {}, stdout, stderr: capture(), platform: "darwin",
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout,
+      stderr: capture(),
+      platform: "darwin",
     })
 
     expect(exitCode).toBe(0)
     expect(engine.calls).toHaveLength(0)
     expect(stdout.text()).toContain("usage: omo daemon")
   })
-
 })

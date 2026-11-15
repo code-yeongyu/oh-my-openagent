@@ -19,24 +19,28 @@ function createPluginInput(agents: AgentEntry[]) {
 }
 
 function createBackgroundManager() {
-  const launch = mock(() => Promise.resolve({
-    id: "task-id",
-    sessionId: "session-id",
-    description: "Test task",
-    agent: "explore",
-    status: "pending",
-  }))
+  const launch = mock(() =>
+    Promise.resolve({
+      id: "task-id",
+      sessionId: "session-id",
+      description: "Test task",
+      agent: "explore",
+      status: "pending",
+    }),
+  )
 
   return {
     manager: {
       launch,
       getTask: mock(() => undefined),
-      reserveSubagentSpawn: mock(() => Promise.resolve({
-        spawnContext: { rootSessionID: "root", parentDepth: 0, childDepth: 1 },
-        descendantCount: 1,
-        commit: mock(() => undefined),
-        rollback: mock(() => undefined),
-      })),
+      reserveSubagentSpawn: mock(() =>
+        Promise.resolve({
+          spawnContext: { rootSessionID: "root", parentDepth: 0, childDepth: 1 },
+          descendantCount: 1,
+          commit: mock(() => undefined),
+          rollback: mock(() => undefined),
+        }),
+      ),
     },
     launch,
   }

@@ -17,15 +17,27 @@ afterEach(() => {
 })
 
 const PARENT = "parent"
-const stopped = (pauseSeq: number): EnginePauseState => ({ pauseSeq, holds: [{ kind: "session_hold", key: `session_hold:${pauseSeq}` }] })
+const stopped = (pauseSeq: number): EnginePauseState => ({
+  pauseSeq,
+  holds: [{ kind: "session_hold", key: `session_hold:${pauseSeq}` }],
+})
 const released = (pauseSeq: number): EnginePauseState => ({ pauseSeq, holds: [] })
 const child: PauseParticipant = {
-  key: "st_b", kind: "task", taskId: "st_b", runEpoch: 0, runRef: { kind: "task", id: "st_b" },
-  state: "pending", at: "2026-01-01T00:00:00.000Z",
+  key: "st_b",
+  kind: "task",
+  taskId: "st_b",
+  runEpoch: 0,
+  runRef: { kind: "task", id: "st_b" },
+  state: "pending",
+  at: "2026-01-01T00:00:00.000Z",
 }
 const queued: PauseParticipant = {
-  key: "st_q", kind: "held_admission", taskId: "st_q", runRef: { kind: "task", id: "st_q" },
-  state: "pending", at: "2026-01-01T00:00:00.000Z",
+  key: "st_q",
+  kind: "held_admission",
+  taskId: "st_q",
+  runRef: { kind: "task", id: "st_q" },
+  state: "pending",
+  at: "2026-01-01T00:00:00.000Z",
 }
 
 function hostOver(participants: readonly PauseParticipant[], overrides: Partial<RunPauseEffects>) {
@@ -40,7 +52,10 @@ function hostOver(participants: readonly PauseParticipant[], overrides: Partial<
     addFences: async () => undefined,
     pause: async () => ({ kind: "held", childSeq: 8 }),
     dispatchGuidance: async () => undefined,
-    resume: async participant => { resumed.push(participant.key); return { kind: "resumed" } },
+    resume: async (participant) => {
+      resumed.push(participant.key)
+      return { kind: "resumed" }
+    },
     install: async () => undefined,
     acknowledgeInstalled: async () => undefined,
     cancel: async () => undefined,
@@ -48,7 +63,15 @@ function hostOver(participants: readonly PauseParticipant[], overrides: Partial<
   }
   let live: EnginePauseState = stopped(7)
   const bridge = new EngineRunPauseBridge(new RunPauseController(registry, effects), { getPauseState: () => live })
-  return { barrier, registry, bridge, resumed, setState: (next: EnginePauseState) => { live = next } }
+  return {
+    barrier,
+    registry,
+    bridge,
+    resumed,
+    setState: (next: EnginePauseState) => {
+      live = next
+    },
+  }
 }
 
 test("delta-2 HIGH: a lost child still held whose resume fails reopens admission, surfaces the error, and is retried by the next Resume", async () => {
@@ -56,9 +79,11 @@ test("delta-2 HIGH: a lost child still held whose resume fails reopens admission
   let resumeFails = true
   const resumed: string[] = []
   const h = hostOver([child], {
-    pause: async () => { throw new Error("pause_for_run timed out") },
+    pause: async () => {
+      throw new Error("pause_for_run timed out")
+    },
     observeHold: async () => observed,
-    resume: async participant => {
+    resume: async (participant) => {
       if (resumeFails) throw new Error("resume_for_run timed out")
       resumed.push(participant.key)
       return { kind: "resumed", turnId: "turn-b" }
@@ -89,10 +114,14 @@ test("delta-2 HIGH: the Resume caller's result names each participant whose resu
     snapshot: () => [child],
     quiesce: () => undefined,
     addFences: async () => undefined,
-    pause: async () => { throw new Error("pause_for_run timed out") },
+    pause: async () => {
+      throw new Error("pause_for_run timed out")
+    },
     observeHold: async () => ({ held: true, childSeq: 9 }),
     dispatchGuidance: async () => undefined,
-    resume: async () => { throw new Error("resume_for_run timed out") },
+    resume: async () => {
+      throw new Error("resume_for_run timed out")
+    },
     install: async () => undefined,
     acknowledgeInstalled: async () => undefined,
     cancel: async () => undefined,
@@ -107,7 +136,9 @@ test("delta-2 HIGH: the Resume caller's result names each participant whose resu
 
 test("delta-2 MEDIUM: a queued admission lost to a failed propagation is still re-admitted by Resume", async () => {
   const h = hostOver([queued], {
-    addFences: async () => { throw new Error("fence write failed") },
+    addFences: async () => {
+      throw new Error("fence write failed")
+    },
     observeHold: async () => undefined,
   })
   await expect(h.bridge.changed(PARENT, { ...stopped(7), change: "paused" })).rejects.toThrow("fence write failed")
@@ -124,13 +155,21 @@ test("delta-2 MEDIUM: the engine effect re-admits a lost queued admission throug
     list: () => [],
     get: () => undefined,
     observeTaskHold: async () => undefined,
-    resumeLostTask: async (taskId: string) => { lostResumes.push(taskId); return { notHeld: true } },
+    resumeLostTask: async (taskId: string) => {
+      lostResumes.push(taskId)
+      return { notHeld: true }
+    },
   } as unknown as Parameters<typeof createEngineRunPause>[0]["manager"]
   const barrier = new AdmissionBarrier()
   const graph = createEngineRunPause({
-    stateDir: tempProject(), barrier, manager,
+    stateDir: tempProject(),
+    barrier,
+    manager,
     runtime: { getPauseState: () => released(7), fenceRun: () => undefined },
-    resumeAdmission: async participant => { admitted.push(participant.key); return { kind: "resumed" } },
+    resumeAdmission: async (participant) => {
+      admitted.push(participant.key)
+      return { kind: "resumed" }
+    },
   })
   graph.registry.begin(PARENT, 7, [{ ...queued, state: "lost", lostReason: "the Stop's propagation failed" }])
   graph.registry.phase(PARENT, 7, "applied")

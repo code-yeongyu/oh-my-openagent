@@ -1,10 +1,6 @@
 import type { SenpiModelPort, SenpiModelRegistryPort } from "@oh-my-opencode/senpi-task"
 
-import type {
-  MemoryLaunchRouteInput,
-  MemoryLaunchSurface,
-  MemoryRouteCandidate,
-} from "./fork-cost"
+import type { MemoryLaunchRouteInput, MemoryLaunchSurface, MemoryRouteCandidate } from "./fork-cost"
 import { MEMORY_WORKLOAD_PROFILES } from "./fork-cost"
 import { readModelContextWindow, readModelPricing } from "./registry-fallback"
 import type { ReflectionSessionModel } from "./resolve-model"
@@ -50,9 +46,10 @@ export function memoryLaunchRouteInput(input: {
     ...(quickWindow === undefined ? {} : { contextWindow: quickWindow }),
   }
   const sessionModel = input.sessionModel
-  const sessionEntry = sessionModel === undefined || input.registry === undefined
-    ? undefined
-    : input.registry.find(sessionModel.provider, sessionModel.id)
+  const sessionEntry =
+    sessionModel === undefined || input.registry === undefined
+      ? undefined
+      : input.registry.find(sessionModel.provider, sessionModel.id)
   const sessionCost = readModelPricing(sessionEntry)
   const sessionWindow = readModelContextWindow(sessionEntry)
   return {
@@ -81,4 +78,3 @@ function findRegistryEntry(registry: Registry, model: string): unknown {
   if (separator <= 0) return undefined
   return registry.find(model.slice(0, separator), model.slice(separator + 1))
 }
-
