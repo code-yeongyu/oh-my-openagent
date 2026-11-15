@@ -1,5 +1,6 @@
 import { afterEach, expect, spyOn, test } from "bun:test"
 
+import { awaitWithinTestBudget, useTestTimeout } from "../../../../../test-support/test-deadline"
 import * as resilient from "../../fs/resilient"
 import { CrashInjected } from "./engine"
 import { type Device, GIT_TEST_TIMEOUT, makeDevice } from "./engine-harness.test-support"
@@ -9,10 +10,18 @@ import { FakeSyncServer } from "./fake-server.test-support"
 // and re-write one journal file holding every pending item's ops plus the sealed batch, several
 // times per batch, so the pushing device's peak memory grew with the size of the set.
 
+// #13680: the case does a fixed amount of work (about 9 s on an idle host), so its timeout is only a hang
+// guard far above that; each cycle is a named step that fails before it. A case that fails mid-cycle leaves
+// that cycle running, and stop() waits for it, so a device directory is removed only once nothing writes there.
+const HANG_GUARD_MS = GIT_TEST_TIMEOUT * 4
+
 const devices: Device[] = []
 afterEach(async () => {
-  for (const d of devices.splice(0)) await d.dispose()
-}, GIT_TEST_TIMEOUT)
+  for (const d of devices.splice(0)) {
+    await d.engine.stop()
+    await d.dispose()
+  }
+}, HANG_GUARD_MS)
 
 const BATCH_BYTES = 16 * 1024
 const ITEMS = 40
@@ -35,6 +44,7 @@ const bytesRead = (result: unknown): number =>
 test(
   "pushing a backlog of many batches never reads or writes a journal file larger than one batch plus an index, and reads only the ops of the batch it seals",
   async () => {
+    useTestTimeout(HANG_GUARD_MS)
     const server = new FakeSyncServer()
     const a = await makeDevice(
       server,
@@ -48,7 +58,14 @@ test(
     const keys = Array.from({ length: ITEMS }, (_, n) => `notes/n-${String(n).padStart(2, "0")}.md`)
     for (const [n, key] of keys.entries()) await a.write(key, body(n))
     // The capture is journaled first; the cycle that resumes from it only pushes.
-    await expect(a.engine.runCycle()).rejects.toBeInstanceOf(CrashInjected)
+    const crashed = await awaitWithinTestBudget(
+      a.engine.runCycle().then(
+        () => null,
+        (error: unknown) => error,
+      ),
+      "the capture cycle",
+    )
+    expect(crashed).toBeInstanceOf(CrashInjected)
     await a.restart()
 
     // Ops are read through file handles (open + read), which readFile does not see. Their bytes are
@@ -82,7 +99,7 @@ test(
     })
     const sizes: { path: string; bytes: number }[] = []
     try {
-      expect(await a.engine.runCycle()).toMatchObject({ pushed: true })
+      expect(await awaitWithinTestBudget(a.engine.runCycle(), "the backlog push cycle")).toMatchObject({ pushed: true })
       for (const [i, call] of reads.mock.calls.entries()) {
         // A read of a file that is not there yet rejects (the caller falls back); it allocated nothing.
         const data: unknown = await Promise.resolve(reads.mock.results[i]?.value).catch(() => null)
@@ -109,8 +126,8 @@ test(
 
     const b = await makeDevice(server, "b")
     devices.push(b)
-    await b.engine.runCycle()
+    await awaitWithinTestBudget(b.engine.runCycle(), "the receiving device's cycle")
     for (const [n, key] of keys.entries()) expect(await b.read(key)).toBe(body(n))
   },
-  GIT_TEST_TIMEOUT,
+  HANG_GUARD_MS,
 )
