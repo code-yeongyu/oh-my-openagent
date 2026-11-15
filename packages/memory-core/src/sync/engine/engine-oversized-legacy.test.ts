@@ -100,8 +100,8 @@ for (const realStore of [true, false]) {
       expect(await pendingKeys(a)).toEqual([])
       expect(await a.read("legacy.md")).toBe(t.bigger)
       expect(await a.engine.status()).toMatchObject({
-        kind: "failing",
-        failure: { kind: "oversized_item", keys: ["legacy.md"] },
+        kind: "held",
+        held: { failure: { kind: "oversized_item", keys: ["legacy.md"] } },
       })
       await b.engine.runCycle()
       expect(await b.read("legacy.md")).toBe(t.synced)
@@ -179,8 +179,8 @@ test(
     expect(await a.engine.runCycle()).toMatchObject({ held: ["foreign.md"] })
     await expectOnlyPending(a, foreign)
     expect(await a.engine.status()).toMatchObject({
-      kind: "failing",
-      failure: { kind: "oversized_item", keys: ["foreign.md"], stuck: ["foreign.md"] },
+      kind: "held",
+      held: { failure: { kind: "oversized_item", keys: ["foreign.md"], stuck: ["foreign.md"] } },
     })
     expect(lines.filter((line) => line.startsWith("sync.item.stuck"))).toEqual([
       `sync.item.stuck len=${Buffer.byteLength("foreign.md")} ops=1`,

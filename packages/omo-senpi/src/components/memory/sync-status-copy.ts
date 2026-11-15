@@ -56,12 +56,10 @@ export function failureRpcSync(status: Failing | Frozen | Paused | Held): Memory
 }
 
 function rpcHeld({ failure, since, attempts }: Held["held"]): NonNullable<MemoryRpcSync["held"]> {
-  // The engine describes every hold as an oversized item; the narrowing only satisfies the shared failure type.
-  const oversized = failure.kind === "oversized_item" ? failure : { keys: [], stuck: [], limitBytes: 0 }
   return {
-    keys: oversized.keys,
-    stuckKeys: oversized.stuck,
-    limitBytes: oversized.limitBytes,
+    keys: failure.keys,
+    stuckKeys: failure.stuck,
+    limitBytes: failure.limitBytes,
     reason: failure.reason,
     action: failure.action,
     sinceISO: new Date(since).toISOString(),

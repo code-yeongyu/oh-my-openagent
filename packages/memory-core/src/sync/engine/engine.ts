@@ -7,7 +7,7 @@
 import { advance, applyVerified } from "./apply"
 import type { EngineDeps } from "./engine-deps"
 import type { SyncFailure } from "./failure"
-import { batchBound, heldShown, recordHeld } from "./held"
+import { batchBound, type HeldShown, heldShown, recordHeld } from "./held"
 import { type EngineState, SyncJournal } from "./journal"
 import { type CaptureHolds, capture } from "./local-capture"
 import { pushCycle } from "./push-cycle"
@@ -24,7 +24,7 @@ export const LOCAL_DEBOUNCE_MS = 2_000
 export type EngineStatus =
   | { readonly kind: "never_synced" }
   | { readonly kind: "synced"; readonly at: number; readonly updatedWhileOffline: number }
-  | { readonly kind: "paused"; readonly seq: number; readonly code: RefusalCode; readonly held?: Failing }
+  | { readonly kind: "paused"; readonly seq: number; readonly code: RefusalCode; readonly held?: HeldShown }
   /** Pushes are frozen by the service until a key rotation lands (sync-design section 7). */
   | { readonly kind: "frozen"; readonly reason: FreezeReason; readonly since: number }
   | { readonly kind: "failing"; readonly failure: SyncFailure; readonly since: number; readonly attempts: number }
@@ -32,13 +32,7 @@ export type EngineStatus =
    * Files held out of the push (#12284) while everything else syncs: not a failure (#12392). `at` is the last
    * successful sync, as in `synced`; null only before any cycle completed.
    */
-  | { readonly kind: "held"; readonly at: number | null; readonly held: Failing }
-
-export interface Failing {
-  readonly failure: SyncFailure
-  readonly since: number
-  readonly attempts: number
-}
+  | { readonly kind: "held"; readonly at: number | null; readonly held: HeldShown }
 
 export interface CycleReport {
   readonly applied: number

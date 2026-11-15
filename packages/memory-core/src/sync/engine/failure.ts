@@ -71,7 +71,7 @@ export function describeOversizedItems(
   keys: readonly string[],
   limitBytes: number,
   stuck: readonly string[] = [],
-): SyncFailure {
+): Extract<SyncFailure, { readonly kind: "oversized_item" }> {
   const limit = sizeText(limitBytes)
   const fixable = keys.filter((key) => !stuck.includes(key))
   const shrink =

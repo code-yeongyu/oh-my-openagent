@@ -14,11 +14,14 @@ import type { HeldItems, OwedRender, SyncJournal } from "./journal"
 
 export const batchBound = (deps: EngineDeps): number => deps.batchBytes ?? MAX_BATCH_BYTES
 
-/** The held items as the failure a UI shows, with the cycle the hold began and how many cycles it has lasted. */
-export const heldShown = (
-  held: HeldItems,
-  limitBytes: number,
-): { readonly failure: SyncFailure; readonly since: number; readonly attempts: number } => ({
+/** The held items as a UI shows them: the oversized-item failure naming them, when the hold began, how many cycles it lasted. */
+export interface HeldShown {
+  readonly failure: Extract<SyncFailure, { readonly kind: "oversized_item" }>
+  readonly since: number
+  readonly attempts: number
+}
+
+export const heldShown = (held: HeldItems, limitBytes: number): HeldShown => ({
   failure: describeOversizedItems(held.keys, limitBytes, held.stuck ?? []),
   since: held.since,
   attempts: held.cycles,

@@ -106,8 +106,8 @@ test(
     expect(await a.store.version("x.md")).toBe(versionBefore)
     await expectOnlyPending(a, item)
     expect(await a.engine.status()).toMatchObject({
-      kind: "failing",
-      failure: { kind: "oversized_item", stuck: ["x.md"] },
+      kind: "held",
+      held: { failure: { kind: "oversized_item", stuck: ["x.md"] } },
     })
     await b.engine.runCycle()
     expect(await b.read("x.md")).toBe(note("mine\n"))
@@ -137,8 +137,8 @@ test(
     expect(await a.store.version("dep.md")).toBe(versionBefore)
     await expectOnlyPending(a, item)
     expect(await a.engine.status()).toMatchObject({
-      kind: "failing",
-      failure: { kind: "oversized_item", stuck: ["dep.md"] },
+      kind: "held",
+      held: { failure: { kind: "oversized_item", stuck: ["dep.md"] } },
     })
     await b.engine.runCycle()
     expect(await b.read("dep.md")).toBeNull()
