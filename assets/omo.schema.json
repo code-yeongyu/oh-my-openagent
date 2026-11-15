@@ -44,6 +44,20 @@
       },
       "additionalProperties": false
     },
+    "session_wake": {
+      "type": "object",
+      "properties": {
+        "same_device": {
+          "type": "boolean"
+        },
+        "wake_limit": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false
+    },
     "formatOnMutation": {
       "type": "object",
       "properties": {
@@ -2753,6 +2767,20 @@
           },
           "additionalProperties": false
         },
+        "session_wake": {
+          "type": "object",
+          "properties": {
+            "same_device": {
+              "type": "boolean"
+            },
+            "wake_limit": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
         "formatOnMutation": {
           "type": "object",
           "properties": {
@@ -5226,6 +5254,20 @@
           },
           "additionalProperties": false
         },
+        "session_wake": {
+          "type": "object",
+          "properties": {
+            "same_device": {
+              "type": "boolean"
+            },
+            "wake_limit": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
         "formatOnMutation": {
           "type": "object",
           "properties": {
@@ -7695,6 +7737,20 @@
                 ],
                 "additionalProperties": false
               }
+            }
+          },
+          "additionalProperties": false
+        },
+        "session_wake": {
+          "type": "object",
+          "properties": {
+            "same_device": {
+              "type": "boolean"
+            },
+            "wake_limit": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
             }
           },
           "additionalProperties": false
@@ -10178,6 +10234,20 @@
             },
             "additionalProperties": false
           },
+          "session_wake": {
+            "type": "object",
+            "properties": {
+              "same_device": {
+                "type": "boolean"
+              },
+              "wake_limit": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "additionalProperties": false
+          },
           "formatOnMutation": {
             "type": "object",
             "properties": {
@@ -12647,6 +12717,20 @@
                       ],
                       "additionalProperties": false
                     }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "session_wake": {
+                "type": "object",
+                "properties": {
+                  "same_device": {
+                    "type": "boolean"
+                  },
+                  "wake_limit": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
                   }
                 },
                 "additionalProperties": false
@@ -15124,6 +15208,20 @@
                 },
                 "additionalProperties": false
               },
+              "session_wake": {
+                "type": "object",
+                "properties": {
+                  "same_device": {
+                    "type": "boolean"
+                  },
+                  "wake_limit": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
               "formatOnMutation": {
                 "type": "object",
                 "properties": {
@@ -17593,6 +17691,20 @@
                       ],
                       "additionalProperties": false
                     }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "session_wake": {
+                "type": "object",
+                "properties": {
+                  "same_device": {
+                    "type": "boolean"
+                  },
+                  "wake_limit": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
                   }
                 },
                 "additionalProperties": false
