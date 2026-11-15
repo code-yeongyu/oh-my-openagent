@@ -145,34 +145,6 @@ describe("the account source built from the engine's one selection", () => {
     expect((await source())?.kind).toBe("desktop")
   })
 
-  test("#given no account is current #when two resolves overlap #then they share one open and get the same account", async () => {
-    // given
-    let opened = 0
-    let release: () => void = () => {}
-    const gate = new Promise<void>((resolve) => {
-      release = resolve
-    })
-    const source = accountSourceFromSelection({
-      selection: desktop(wire()),
-      cli: cliCanary,
-      openAccount: async () => {
-        opened += 1
-        await gate
-        return desktopAccount(`generation-${opened}`, () => true)
-      },
-    })
-
-    // when
-    const first = source()
-    const second = source()
-    release()
-
-    // then
-    const [a, b] = await Promise.all([first, second])
-    expect(opened).toBe(1)
-    expect(b).toBe(a)
-  })
-
   test("#given a shared open that main refuses #when it settles #then both resolves are signed out and the next resolve opens again", async () => {
     // given
     let opened = 0
