@@ -8,7 +8,7 @@ import {
   SyncHttpError,
   SyncNetworkError,
 } from "./http-transport"
-import { SYNC_CAPABILITIES, SYNC_CONTRACT_VERSION } from "../../contract-version"
+import { SYNC_CAPABILITIES, SYNC_CONTRACT_VERSION, syncRequestHeaders } from "../../contract-version"
 import { startWireServer, type WireServer } from "./wire-server.test-support"
 
 const servers: WireServer[] = []
@@ -175,7 +175,7 @@ test("#given a subscribed device #when another device is signed out through the 
         if (up)
           void fetch(`${server.url}/v1/session/sign-out`, {
             method: "POST",
-            headers: { authorization: `Bearer ${server.tokenOf("b")}` },
+            headers: syncRequestHeaders(server.tokenOf("b")),
           })
       },
       onStateChanged: () => {
