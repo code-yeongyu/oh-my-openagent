@@ -208,11 +208,11 @@ export function startThreadWakeAtSession(eventCtx: unknown, input: ThreadWakeSta
     })()
   running.set(
     agentDir,
-    scope.runInAsyncScope(() => startRunning(agentDir, env, input)),
+    scope.runInAsyncScope(() => startRunning(agentDir, env, input, scope)),
   )
 }
 
-function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): RunningThreadWake {
+function startRunning(agentDir: string, env: Env, input: ThreadWakeStart, scope: ProcessScope): RunningThreadWake {
   const { options } = input
   const store = options.store ?? createGatewayStore({ agentDir })
   const sessionsDirectory = input.sessionsDirectory()
@@ -254,11 +254,14 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): Runni
         void serving?.consumer.reportDrained().catch((error: unknown) => input.warn(`thread wake: drained marks not reported: ${String(error)}`))
     },
   })
-  const wake = async (durableId: string): Promise<void> => {
-    const outcome = await carrier.wake(durableId)
-    if (outcome.kind === "failed") input.warn(`thread wake: ${durableId} was not started after ${outcome.attempts} attempts`)
-    options.onWake?.(durableId, outcome)
-  }
+  // A send calls this from the sending session's handler: the renewal timer and the woken session's connection the
+  // carrier creates must still belong to the process scope, or that session's shutdown reclaims them (#13456 M1).
+  const wake = (durableId: string): Promise<void> =>
+    scope.runInAsyncScope(async () => {
+      const outcome = await carrier.wake(durableId)
+      if (outcome.kind === "failed") input.warn(`thread wake: ${durableId} was not started after ${outcome.attempts} attempts`)
+      options.onWake?.(durableId, outcome)
+    })
   const ready = startDeliveryConsumer({
     store,
     agentDir,
