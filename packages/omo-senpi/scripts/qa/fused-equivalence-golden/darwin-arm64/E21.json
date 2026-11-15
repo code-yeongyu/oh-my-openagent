@@ -17626,7 +17626,7 @@
      "sessionFile": "<sandbox>/sessions/<ts:headless.sessionFile:1>_<uuid:1>.jsonl",
      "sessionId": "<uuid:1>",
      "cwd": "/private<sandbox>/work",
-     "projectTrusted": false,
+     "projectTrusted": true,
      "steering": [],
      "followUp": [],
      "ordered": [],
