@@ -43,6 +43,9 @@ export type DeliveryServicePort = {
   readonly onHolds: (listener: (event: DeliveryHoldsEvent) => void) => () => void
   /** `delivery.wake { enabled }` on this serving connection: the device's wake switch changed (A7.2.3). */
   readonly onWake: (listener: (enabled: unknown) => void) => () => void
+  /** Settles when the serving connection ends; the declaration ends with it. */
+  readonly closed?: Promise<void>
+  readonly close?: () => void
 }
 
 /**

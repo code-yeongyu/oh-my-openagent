@@ -267,8 +267,9 @@ export type GatewayDeliveryDelivery =
   | { readonly kind: "queued_offline"; readonly queue_position: number; readonly reason?: "wake_unavailable" }
 
 /**
- * What the receiver is parked on while the delivery waits: an approval (a tool permission or question) a human must answer on
- * that device. `device` is the account device it waits on; absent when this install has no device identity (#13014).
+ * What the receiver is parked on while the delivery waits (omo#13037 5.1): an approval (a tool permission or question) a
+ * human must answer on that device, a hold on the session, or the wake of a session no engine runs. `device` is the account
+ * device it waits on; absent when this install has no device identity (#13014).
  */
 export type DeliveryWait = { readonly kind: "approval" | "hold" | "wake"; readonly device?: string }
 

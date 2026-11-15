@@ -8,11 +8,24 @@ import {
   resolveSessionWakeSettings,
 } from "../index"
 
-// Config contract (#13037 design 5.3, A2.18, A3.5.3): the same-device switch is off and the bound on woken turns is 0
-// (off) unless the machine's omo configuration sets them.
+// Config contract (#13037 design 5.3, A2.18, A3.5.3; owner ruling 2026-11-14): waking a session that is not running needs no
+// setting, so the same-device wake is on and the bound on woken turns is 0 (none) unless the configuration says otherwise.
 
-test("#given no session_wake table #when the settings are resolved #then the same-device switch is off and the wake limit is 0", () => {
-  expect(resolveSessionWakeSettings(OmoConfigSchema.parse({}))).toEqual({ sameDevice: false, wakeLimit: 0 })
+test("#given no session_wake table #when the settings are resolved #then the same-device wake is on and the wake limit is 0", () => {
+  expect(resolveSessionWakeSettings(OmoConfigSchema.parse({}))).toEqual({ sameDevice: true, wakeLimit: 0 })
+})
+
+test("#given a session_wake table that sets only the limit #when the settings are resolved #then the same-device wake stays on", () => {
+  expect(resolveSessionWakeSettings(OmoConfigSchema.parse({ session_wake: { wake_limit: 3 } }))).toEqual({
+    sameDevice: true,
+    wakeLimit: 3,
+  })
+})
+
+test("#given an explicit same_device false #when the settings are resolved #then the same-device wake is off", () => {
+  expect(resolveSessionWakeSettings(OmoConfigSchema.parse({ session_wake: { same_device: false } })).sameDevice).toBe(
+    false,
+  )
 })
 
 test("#given a session_wake table on every config layer #when it is parsed and resolved #then both values survive", () => {

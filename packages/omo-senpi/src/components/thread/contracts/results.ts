@@ -46,7 +46,11 @@ export type ThreadResultSummary = ThreadSummary & { readonly link: string }
 export type ThreadDelivery =
   | { readonly kind: "steered"; readonly turn_id: string }
   | { readonly kind: "started"; readonly turn_id: string }
-  /** `waiting_on`: the receiver is parked on an approval a human must answer on that device (`device`, absent when this install has no device identity); the message runs after it. */
+  /**
+   * `waiting_on`: what the message waits on, on that device (`device`, absent when this install has no device identity):
+   * an `approval` a human must answer, a `hold` on the session (a Stop, a pause), or the `wake` of a session no engine runs
+   * (omo#13037); the message runs after it.
+   */
   | {
       readonly kind: "queued"
       readonly queue_position: number

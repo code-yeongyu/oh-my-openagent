@@ -95,6 +95,8 @@ export type FakeEngineOptions = {
   /** Answers `release_session` as an unknown command (a host without the verb). */
   readonly releaseUnknown?: boolean
   readonly openRefusal?: (path: string) => Reply | undefined
+  /** Answers `warm`; absent, the host warms its default profile. */
+  readonly warm?: () => Reply
 }
 
 /**
@@ -170,6 +172,8 @@ export async function startFakeEngineHost(options: FakeEngineOptions = {}): Prom
               })),
           },
         }
+      case "warm":
+        return options.warm?.() ?? { success: true, data: { state: "warmed" } }
       case "wake":
         return pathOf(frame) === undefined ? refuse("unknown_session") : { success: true, data: { admitted: [] } }
       case "release_session": {

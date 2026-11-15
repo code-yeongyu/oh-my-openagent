@@ -1,6 +1,7 @@
 import { statSync } from "node:fs"
 
 import { WAKE_LEASE_MS } from "../gateway/constants"
+import type { IntakeAdmission } from "../gateway/intake-admission"
 import type { GatewayStore } from "../gateway/store"
 import type { RpcObject } from "@oh-my-opencode/senpi-task/rpc-socket-client"
 import type { CarrierHostConnection } from "./carrier-connection"
@@ -54,13 +55,19 @@ export type CarrierOptions = {
   readonly connect: () => Promise<CarrierHostConnection>
   /** `session_wake.wake_limit`; 0 means no bound (A3.5.3). */
   readonly wakeLimit?: () => number
-  /** `session_wake.same_device`, read at the moment of the open; off unless the machine's configuration turns it on. */
-  readonly sameDevice?: () => boolean
   /**
-   * The receiving device's wake switch as the consumer was told it on its own serving connection (A7.2.3): the gate
-   * for a row from another device. Off unless a consumer is serving and was told on.
+   * `session_wake.same_device`, read at the moment of the open for the TARGET session's cwd (its project's
+   * configuration); the caller passes the resolved setting (on by default).
    */
+  readonly sameDevice?: (cwd: string) => boolean
+  /** The gate for a row from another device: production allows it while this process's delivery consumer serves. */
   readonly remoteWake?: () => boolean
+  /**
+   * The device service's answer to whether a row's sender is still admitted (5.6), asked at the moment of every open
+   * of a row from another device (#13456's noted follow-up): `unknown` and `refused` fail closed, so a sender that
+   * lost admission between the accept check and the retry or lease takeover starts nothing.
+   */
+  readonly admitIntake?: (device: string) => Promise<IntakeAdmission>
   readonly schedule: (run: () => void, ms: number) => () => void
   readonly onEvent?: (event: CarrierEvent) => void
 }
@@ -105,6 +112,12 @@ function fileSize(path: string): number {
   } catch {
     return -1
   }
+}
+
+/** The sender's device as the intake's ledger id names it (`device:<device>/<id>`), when it does. */
+function deviceOfLedger(ledgerId: string): string | undefined {
+  const cut = ledgerId.indexOf("/")
+  return ledgerId.startsWith("device:") && cut > "device:".length ? ledgerId.slice("device:".length, cut) : undefined
 }
 
 /**
@@ -320,7 +333,7 @@ export function createCarrier(options: CarrierOptions): Carrier {
     if (target.session_kind !== "interactive") return { kind: "not_wakeable", session_kind: target.session_kind }
     const wait = await store.sessionWait.read({ durable_id: durableId })
     if (wait?.wait === "held" && wait.file_size === fileSize(target.session_path)) return { kind: "held" }
-    const allowance = await openAllowance(durableId)
+    const allowance = await openAllowance(durableId, target.cwd)
     if (allowance !== "open") {
       if (allowance === "nothing_queued") {
         // Only a record that is still `requested` is ended, compared on its generation: another carrier's record that
@@ -397,6 +410,13 @@ export function createCarrier(options: CarrierOptions): Carrier {
       await store.woken.end({ durable_id: durableId, generation: taken.row.generation })
       return
     }
+    // A takeover opens only what a wake would open (the switches and the sender's admission included); with nothing
+    // to open for, or a row that no longer allows it, the record ends and the queued rows wait for the next wake.
+    const allowance = await openAllowance(durableId, target.cwd)
+    if (allowance !== "open") {
+      await store.woken.end({ durable_id: durableId, generation: taken.row.generation })
+      return
+    }
     const opened = await open(target.session_path, target.cwd)
     if (opened.kind !== "opened") return
     carry(durableId, opened.connection, opened.sessionId, taken.row.generation)
@@ -408,25 +428,41 @@ export function createCarrier(options: CarrierOptions): Carrier {
   /**
    * The one rule of A7.2.3 (A7R-10), the reviewer's LOW and A7's row-from-another-device rule in one place: a carrier
    * opens a session only when the session holds a queued row whose own switch allows the open. A row from another
-   * device (it carries the intake's ledger id) reads the wake the consumer was told; a same-device row reads
-   * `session_wake.same_device`. Both are read here, at the moment of the open.
+   * device (it carries the intake's ledger id) reads the wake the consumer was told and its sender's admission NOW,
+   * failing closed when the answer is unknown or refused (#13456's noted follow-up); a same-device row reads
+   * `session_wake.same_device` for the TARGET session's cwd. All are read here, at the moment of the open.
    */
-  const openAllowance = async (durableId: string): Promise<"open" | "switched_off" | "nothing_queued"> => {
-    const sameDevice = options.sameDevice?.() ?? false
+  const openAllowance = async (durableId: string, cwd: string): Promise<"open" | "switched_off" | "nothing_queued"> => {
+    const sameDevice = options.sameDevice?.(cwd) ?? false
     const remoteWake = options.remoteWake?.() ?? false
     let queued = false
     for (const row of await store.list({ target_durable_id: durableId })) {
       if (row.state !== "queued") continue
       queued = true
-      if (typeof row.ledger_id === "string" ? remoteWake : sameDevice) return "open"
+      if (typeof row.ledger_id !== "string") {
+        if (sameDevice) return "open"
+        continue
+      }
+      if (!remoteWake) continue
+      const device = deviceOfLedger(row.ledger_id)
+      if (device === undefined) continue
+      if (options.admitIntake === undefined) return "open"
+      const admission = await options.admitIntake(device).catch((): IntakeAdmission => "unknown")
+      if (admission === "admitted") return "open"
     }
     return queued ? "switched_off" : "nothing_queued"
   }
 
   const sweep = async (): Promise<void> => {
-    if (stopped) return
+    await sweepNow()
+  }
+
+  /** Whether the timer still has work to tend: a woken row or a carried session (A3.1.4). */
+  const sweepNow = async (): Promise<boolean> => {
+    if (stopped) return false
     const now = store.now()
-    for (const row of await store.woken.list()) {
+    const rows = await store.woken.list()
+    for (const row of rows) {
       if (carried.has(row.durable_id)) {
         await evaluate(row.durable_id).catch(() => undefined)
         continue
@@ -439,21 +475,50 @@ export function createCarrier(options: CarrierOptions): Carrier {
       if (row.lease_expires_at !== null && row.lease_expires_at <= now)
         await serial(row.durable_id, () => takeOver(row.durable_id)).catch(() => undefined)
     }
+    return rows.length > 0 || carried.size > 0
   }
 
+  let timerArmed = false
   const arm = (): void => {
-    if (stopped) return
+    if (stopped || timerArmed) return
+    timerArmed = true
     cancelTimer = options.schedule(
       () => {
-        void sweep().finally(arm)
+        timerArmed = false
+        void sweepNow().then(
+          (hasWork) => {
+            if (hasWork) arm()
+          },
+          // A sweep that threw still had work to tend: the timer stays armed for the next tick (A3.1.4).
+          () => arm(),
+        )
       },
       Math.min(CARRIER_RENEW_MS, WAKE_LEASE_MS / 3),
     )
   }
-  arm()
+
+  // A3.1.4: every carrier runs a sweep when it starts, so rows a dead process left requested and leases that ran
+  // out are taken over by the successor without a wake of its own. With an empty table there is no timer: the one
+  // read that decided that arms nothing (#13455's delta review).
+  void store.woken
+    .list()
+    .then((rows) => {
+      if (rows.length > 0)
+        void sweepNow()
+          .then((hasWork) => {
+            if (hasWork) arm()
+          })
+          .catch(() => undefined)
+    })
+    .catch(() => undefined)
 
   return {
-    wake: (durableId) => serial(durableId, () => wakeNow(durableId)),
+    wake: (durableId) =>
+      serial(durableId, async () => {
+        // A wake leaves a row the timer must tend (a retry, a carried session's lease); an empty table disarms it again.
+        arm()
+        return await wakeNow(durableId)
+      }),
     evaluate,
     sweep,
     stop: async () => {

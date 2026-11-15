@@ -87,79 +87,12 @@ describe("declaring", () => {
 // A7.2.3: the consumer is told the receiving device's wake switch on its own serving connection. An acknowledgement
 // without the field, no acknowledgement, and a dropped connection all read off, and only an explicit `true` reads on.
 describe("the wake the consumer is told (A7.2.3)", () => {
-  test.each([
-    [{}, false],
-    [{ wake: false }, false],
-    [{ wake: true }, true],
-  ])(
-    "#given the serve acknowledgement %j #when the consumer starts #then the wake it holds is %p",
-    async (ack, held) => {
-      const { service, consumer } = setup()
-      service.ackServe(ack)
-      expect(await consumer.start()).toBe("serving")
-      expect(consumer.wakeAllowed()).toBe(held)
-    },
-  )
-
-  test("#given an acknowledgement carrying a field the decoder does not know #when the consumer starts #then it serves nothing and holds the wake off", async () => {
+  test("#given an acknowledgement carrying a field the decoder does not know #when the consumer starts #then it serves nothing", async () => {
     const { service, consumer } = setup()
     service.ackServe({ wake: true, surprise: 1 })
     expect(await consumer.start()).toBe("unsupported")
-    expect(consumer.wakeAllowed()).toBe(false)
     expect(service.calls).toEqual([{ type: "deliveries.serve", agent_dir: expect.any(String), v: 1 }])
   })
-
-  test("#given a serving consumer told on #when the service pushes the event in each direction #then the held value follows it, and a value that is not a boolean reads off", async () => {
-    const { service, consumer } = setup()
-    service.ackServe({ wake: true })
-    await consumer.start()
-    service.pushWake(false)
-    expect(consumer.wakeAllowed()).toBe(false)
-    service.pushWake(true)
-    expect(consumer.wakeAllowed()).toBe(true)
-    service.pushWake("yes")
-    expect(consumer.wakeAllowed()).toBe(false)
-  })
-
-  test("#given a consumer told on #when its connection drops #then the wake reads off until its own next acknowledgement, and an event in between changes nothing", async () => {
-    const { service, consumer } = setup()
-    service.ackServe({ wake: true })
-    await consumer.start()
-    expect(consumer.wakeAllowed()).toBe(true)
-    service.drop()
-    consumer.stop()
-    expect(consumer.wakeAllowed()).toBe(false)
-    service.pushWake(true)
-    expect(consumer.wakeAllowed()).toBe(false)
-    expect(await consumer.start()).toBe("serving")
-    expect(consumer.wakeAllowed()).toBe(true)
-  })
-})
-
-// Delta review of #13220 at da331c654d, LOW 1: a restart that does not get a fresh acknowledgement reads off at once,
-// with no stop() in between, so the old `true` is never kept by a start that throws or serves nothing.
-describe("a restart that is not acknowledged reads the wake off", () => {
-  test.each([
-    ["throws", (service: FakeDeliveryService) => service.refuseServe("internal_error"), "throws"],
-    ["is refused as unknown", (service: FakeDeliveryService) => service.refuseServe("unknown_type"), "unsupported"],
-    [
-      "gets an acknowledgement it cannot decode",
-      (service: FakeDeliveryService) => service.ackServe({ wake: true, surprise: 1 }),
-      "unsupported",
-    ],
-  ] as const)(
-    "#given a consumer told on #when a second start %s, with no stop() before it #then the wake reads off",
-    async (_case, fail, answer) => {
-      const { service, consumer } = setup()
-      service.ackServe({ wake: true })
-      await consumer.start()
-      expect(consumer.wakeAllowed()).toBe(true)
-      fail(service)
-      if (answer === "throws") await expect(consumer.start()).rejects.toThrow()
-      else expect(await consumer.start()).toBe(answer)
-      expect(consumer.wakeAllowed()).toBe(false)
-    },
-  )
 })
 
 describe("a handed delivery", () => {
