@@ -165,9 +165,14 @@ export function createCarrier(options: CarrierOptions): Carrier {
     })
   }
 
-  /** The quiet hand-back (A3.2.4): a refusal naming a held delivery is retried once with interrupt, which drops it. */
+  /**
+   * The quiet hand-back (A3.2.4). On a held session a refusal naming a held delivery is retried once with interrupt,
+   * which drops it. A finished session refused for a delivery has one queued to run (a wake admitted while the engine
+   * was still restoring it): it is kept, never interrupted, since an interrupt parks that delivery for a person's turn.
+   */
   const quietRelease = async (
     entry: Carried,
+    dropHeldDelivery = true,
   ): Promise<{ readonly ok: true } | { readonly ok: false; readonly code: string }> => {
     const first = await entry.connection.request({
       type: "release_session",
@@ -175,7 +180,7 @@ export function createCarrier(options: CarrierOptions): Carrier {
       reason: "takeover",
     })
     if (first.success === true) return { ok: true }
-    if (codeOf(first) === "turn_active" && busyList(first).includes("delivery")) {
+    if (dropHeldDelivery && codeOf(first) === "turn_active" && busyList(first).includes("delivery")) {
       const second = await entry.connection.request({
         type: "release_session",
         sessionId: entry.sessionId,
@@ -240,7 +245,7 @@ export function createCarrier(options: CarrierOptions): Carrier {
     }
     if (renewed.row.first_waiting_at !== null) await store.woken.clearWaiting(fence)
     if (!view.finished) return { kind: "kept", reason: "working" }
-    const released = await quietRelease(entry)
+    const released = await quietRelease(entry, false)
     if (!released.ok) {
       if (released.code === "turn_active" || released.code === "session_busy")
         return { kind: "kept", reason: "working" }

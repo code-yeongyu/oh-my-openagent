@@ -208,6 +208,21 @@ describe("the carrier lifts, reads finished, and hands back", () => {
     expect(await carrier.evaluate("s1")).toEqual({ kind: "released" })
   })
 
+  // 6e (two-device cold wake): a wake admitted while the engine was still restoring the session sat queued; the session
+  // read finished, the release was refused for that delivery, and the interrupt retry parked it for a person's turn.
+  test("#given a finished-looking session with a queued delivery #when the release is refused for it #then the carrier keeps the session without an interrupt, and releases once the delivery ran", async () => {
+    const { fake, store, carrier, path } = await setup()
+    fake.setSnapshot(path("s1"), FINISHED)
+    await carrier.wake("s1")
+    fake.session(path("s1")).heldDeliveries = ["d-queued"]
+    expect(await carrier.evaluate("s1")).toEqual({ kind: "kept", reason: "working" })
+    expect(sent(fake, "release_session").filter((frame) => frame.interrupt === true)).toEqual([])
+    expect(await store.woken.list()).toHaveLength(1)
+
+    fake.session(path("s1")).heldDeliveries = []
+    expect(await carrier.evaluate("s1")).toEqual({ kind: "released" })
+  })
+
   test("#given background work the engine would not refuse #when the carrier looks #then it never sends the release", async () => {
     const { fake, carrier, path } = await setup()
     path("s1")
