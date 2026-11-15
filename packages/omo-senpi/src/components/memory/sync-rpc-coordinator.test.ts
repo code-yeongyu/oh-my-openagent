@@ -332,8 +332,12 @@ test("#given the sync status read throws #when status is read #then it names sta
   })
   expect(await f.call("status", owner("a").context)).toMatchObject({ kind: "unavailable", code: "status_read_failed" })
   expect(warnings).toHaveLength(1)
-  expect(warnings[0]?.fields).toMatchObject({ code: "status_read_failed", step: "sync_status" })
-  expect(JSON.stringify(warnings[0]?.fields)).toContain("status store unreadable")
+  expect(warnings[0]?.fields).toEqual({
+    path: "status",
+    code: "status_read_failed",
+    step: "sync_status",
+    error: "Error",
+  })
 })
 
 test("#given the device list read fails #when devices is read twice #then it names operation_failed and warns once", async () => {
@@ -350,8 +354,7 @@ test("#given the device list read fails #when devices is read twice #then it nam
   expect(await f.call("devices", a.context)).toMatchObject({ kind: "unavailable", code: "operation_failed" })
   expect(await f.call("devices", a.context)).toMatchObject({ kind: "unavailable", code: "operation_failed" })
   expect(warnings).toHaveLength(1)
-  expect(warnings[0]?.fields).toMatchObject({ path: "read", code: "operation_failed" })
-  expect(JSON.stringify(warnings[0]?.fields)).toContain("device list unreadable")
+  expect(warnings[0]?.fields).toEqual({ path: "read", code: "operation_failed", error: "Error" })
 })
 
 test("#given no sync account #when devices is read #then it names no_account", async () => {
@@ -367,8 +370,112 @@ test("#given enabling sync throws #when enable is called #then it names operatio
   }
   expect(await f.call("enable", owner("a").context)).toMatchObject({ kind: "unavailable", code: "operation_failed" })
   expect(warnings).toHaveLength(1)
-  expect(warnings[0]?.fields).toMatchObject({ path: "enable", code: "operation_failed" })
-  expect(JSON.stringify(warnings[0]?.fields)).toContain("enable store unreadable")
+  expect(warnings[0]?.fields).toEqual({ path: "enable", code: "operation_failed", error: "Error" })
+})
+
+test("#given the operation ports fail to close #when enable finishes #then it names close_failed and warns", async () => {
+  const warnings: { message: string; fields: Record<string, unknown> }[] = []
+  const f = await setup({ warn: (message, fields) => warnings.push({ message, fields }) })
+  f.runtime.enableSync = async () => ({ kind: "joined" })
+  const original = f.account.forOperation
+  f.account.forOperation = async (authority) => ({
+    ...(await original(authority)),
+    close: async () => {
+      throw new Error("close failed")
+    },
+  })
+  expect(await f.call("enable", owner("a").context)).toMatchObject({ kind: "unavailable", code: "close_failed" })
+  expect(warnings.map((warning) => warning.fields)).toEqual([{ path: "enable", code: "close_failed", error: "Error" }])
+})
+
+test("#given the ceremony claim fails to release #when enable finishes #then it names release_failed and warns", async () => {
+  const warnings: { message: string; fields: Record<string, unknown> }[] = []
+  const f = await setup({
+    warn: (message, fields) => warnings.push({ message, fields }),
+    claims: {
+      acquire: async () => ({
+        expiresAt: async () => undefined,
+        release: async () => {
+          throw new Error("release failed")
+        },
+      }),
+    },
+  })
+  f.runtime.enableSync = async () => ({ kind: "joined" })
+  expect(await f.call("enable", owner("a").context)).toMatchObject({ kind: "unavailable", code: "release_failed" })
+  expect(warnings.map((warning) => warning.fields)).toEqual([
+    { path: "enable", code: "release_failed", error: "Error" },
+  ])
+})
+
+test("#given a read whose ports fail to close #when devices is read #then the handler names handler_failed and warns", async () => {
+  const warnings: { message: string; fields: Record<string, unknown> }[] = []
+  const f = await setup({ warn: (message, fields) => warnings.push({ message, fields }) })
+  const original = f.account.forOperation
+  f.account.forOperation = async (authority) => ({
+    ...(await original(authority)),
+    close: async () => {
+      throw new Error("close failed")
+    },
+  })
+  expect(await f.call("devices", owner("a").context)).toMatchObject({ kind: "unavailable", code: "handler_failed" })
+  expect(warnings.map((warning) => warning.fields)).toEqual([
+    { path: "devices", code: "handler_failed", error: "Error" },
+  ])
+})
+
+test("#given an error message carrying memory content #when enable fails #then the warning logs the error name, not the message", async () => {
+  const warnings: { message: string; fields: Record<string, unknown> }[] = []
+  const f = await setup({ warn: (message, fields) => warnings.push({ message, fields }) })
+  f.runtime.enableSync = async () => {
+    throw Object.assign(new TypeError('invalid canonical source: {"body":"private memory text"}'), { code: "EINVAL" })
+  }
+  expect(await f.call("enable", owner("a").context)).toMatchObject({ kind: "unavailable", code: "operation_failed" })
+  expect(warnings.map((warning) => warning.fields)).toEqual([
+    { path: "enable", code: "operation_failed", error: "TypeError (EINVAL)" },
+  ])
+})
+
+test("#given an error whose code holds free text #when enable fails #then the warning logs the error name without that code", async () => {
+  const warnings: { message: string; fields: Record<string, unknown> }[] = []
+  const f = await setup({ warn: (message, fields) => warnings.push({ message, fields }) })
+  f.runtime.enableSync = async () => {
+    throw Object.assign(new Error("third-party failure"), { code: "private memory text: buy milk" })
+  }
+  expect(await f.call("enable", owner("a").context)).toMatchObject({ kind: "unavailable", code: "operation_failed" })
+  expect(warnings.map((warning) => warning.fields)).toEqual([
+    { path: "enable", code: "operation_failed", error: "Error" },
+  ])
+})
+
+test("#given a service error #when enable fails #then the warning keeps the service code and status", async () => {
+  const warnings: { message: string; fields: Record<string, unknown> }[] = []
+  const f = await setup({ warn: (message, fields) => warnings.push({ message, fields }) })
+  f.runtime.enableSync = async () => {
+    throw new AccountHttpError("chain_unavailable", 503)
+  }
+  expect(await f.call("enable", owner("a").context)).toMatchObject({ kind: "unavailable", code: "operation_failed" })
+  expect(JSON.stringify(warnings[0]?.fields)).toContain("chain_unavailable")
+})
+
+test("#given a failing read, then a refused read #when the same failure recurs #then it is logged again", async () => {
+  const warnings: { message: string; fields: Record<string, unknown> }[] = []
+  const f = await setup({ warn: (message, fields) => warnings.push({ message, fields }) })
+  const original = f.account.forOperation
+  let failure: Error = new Error("device list unreadable")
+  f.account.forOperation = async (authority) => ({
+    ...(await original(authority)),
+    devices: async () => {
+      throw failure
+    },
+  })
+  const a = owner("a")
+  expect(await f.call("devices", a.context)).toMatchObject({ kind: "unavailable", code: "operation_failed" })
+  failure = new AccountHttpError("forbidden", 403)
+  expect(await f.call("devices", a.context)).toMatchObject({ kind: "refused" })
+  failure = new Error("device list unreadable")
+  expect(await f.call("devices", a.context)).toMatchObject({ kind: "unavailable", code: "operation_failed" })
+  expect(warnings).toHaveLength(2)
 })
 
 test("#given a working account #when status is read #then no unavailable warning is logged", async () => {

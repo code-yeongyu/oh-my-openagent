@@ -29,10 +29,21 @@ export function serviceProblem(error: unknown): SyncRpcProblem {
     : unavailable(error instanceof RetiredSyncOperation ? error.code : "operation_failed")
 }
 
-/** Log fields for the error behind an unavailable problem; a RetiredSyncOperation says all it knows in its code. */
+const LOGGABLE_CODE = /^[A-Z0-9_]{1,32}$/i
+
+/**
+ * Log fields for the error behind an unavailable problem; a RetiredSyncOperation says all it knows in its code.
+ * Only an AccountHttpError's message is logged (service code and HTTP status). Other messages can quote memory
+ * content (an invalid canonical source, an outbox item), so they log as the error name plus a `code` shaped like an identifier.
+ */
 export function syncErrorFields(error: unknown): { readonly error?: string } {
   if (error instanceof RetiredSyncOperation) return {}
-  return { error: error instanceof Error ? `${error.name}: ${error.message}` : String(error) }
+  if (!(error instanceof Error)) return { error: typeof error }
+  if (error.name === "AccountHttpError") return { error: `${error.name}: ${error.message}` }
+  // Only an identifier-shaped code is logged (Node errno, memory-core codes); a free-text code could quote memory content.
+  const code =
+    "code" in error && typeof error.code === "string" && LOGGABLE_CODE.test(error.code) ? ` (${error.code})` : ""
+  return { error: `${error.name}${code}` }
 }
 
 export class RetiredSyncOperation extends Error {
@@ -261,16 +272,20 @@ export async function runSyncRpcOperation(
     if (record.enable?.kind === "join_required")
       record.enable = record.controller.signal.aborted ? refused() : record.enable
     await observed
+    const failed = (code: "close_failed" | "release_failed", error: unknown): void => {
+      record.enable = unavailable(code)
+      options.warn?.(`memory sync ${record.kind} unavailable`, { path: record.kind, code, ...syncErrorFields(error) })
+    }
     try {
       await ports?.close()
-    } catch {
-      record.enable = unavailable()
+    } catch (error) {
+      failed("close_failed", error)
       record.approval = { kind: "refused", reason: "The sync operation could not be closed." }
     } finally {
       try {
         await claim?.release()
-      } catch {
-        record.enable = unavailable()
+      } catch (error) {
+        failed("release_failed", error)
         record.approval = { kind: "refused", reason: "The sync claim could not be released." }
       } finally {
         record.active = false

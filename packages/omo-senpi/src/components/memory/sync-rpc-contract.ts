@@ -11,7 +11,15 @@ export type PairingCode = string
 
 /** Why sync authority is unavailable: machine-readable, so a field report names its cause (#13153). */
 export type SyncUnavailableCode =
-  "no_account" | "account_aborted" | "account_not_current" | "status_read_failed" | "operation_failed" | "retired"
+  | "no_account"
+  | "account_aborted"
+  | "account_not_current"
+  | "status_read_failed"
+  | "operation_failed"
+  | "close_failed"
+  | "release_failed"
+  | "handler_failed"
+  | "retired"
 
 export type SyncRpcProblem =
   | { readonly kind: "refused"; readonly reason: string }
