@@ -89,10 +89,8 @@ async function pushOne(
     for (const key of new Set(plan.held.map((item) => item.key)))
       deps.log?.(`sync.item.held side=push len=${Buffer.byteLength(key, "utf8")}`)
     const first = plan.batches[0]
-    if (first === undefined) {
-      await journal.outbox.sweep(pending)
-      return "idle"
-    }
+    // Nothing to send: pushCycle sweeps the outbox once the freeze is known.
+    if (first === undefined) return "idle"
     out = await seal(deps, journal, first, randomBytes(16).toString("base64url"))
   }
   const bytes = await journal.outbox.readBatch(out)

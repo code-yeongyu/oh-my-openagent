@@ -4,6 +4,7 @@ import { join } from "node:path"
 
 import { type Device, GIT_TEST_TIMEOUT, makeDevice } from "./engine-harness.test-support"
 import { FakeSyncServer } from "./fake-server.test-support"
+import type { FreezeOutcome } from "./ports"
 
 // #12506 (review of #12828): a `pending/` the outbox cannot list must surface through the engine's
 // status, and must not hide a service freeze. Mode 0o300 keeps writes working, so only the sweep's
@@ -65,6 +66,30 @@ test.skipIf(!canDenyRead)(
     })
     await a.write("one.md", "one\n")
     server.frozen = true
+    expect(await a.engine.runCycle()).toMatchObject({ pushed: false })
+    expect(await a.engine.status()).toMatchObject({ kind: "frozen", reason: "unverified" })
+    expect(logged.filter((line) => line.includes("cannot clean the outbox"))).toHaveLength(1)
+  },
+  GIT_TEST_TIMEOUT,
+)
+
+test.skipIf(!canDenyRead)(
+  "a device frozen at startup with nothing to push and an outbox it cannot clean still shows the freeze",
+  async () => {
+    const server = new FakeSyncServer()
+    const logged: string[] = []
+    let outcome: FreezeOutcome = { kind: "clear" }
+    const a = await makeDevice(server, "a", undefined, {
+      log: (line) => logged.push(line),
+      freeze: { settle: async () => outcome },
+    })
+    devices.push(a)
+    await a.write("one.md", "one\n")
+    expect(await a.engine.runCycle()).toMatchObject({ pushed: true })
+    chmodSync(pendingDir(a), 0o300)
+    outcome = { kind: "frozen", reason: "unverified" }
+    server.frozen = true
+    await a.restart()
     expect(await a.engine.runCycle()).toMatchObject({ pushed: false })
     expect(await a.engine.status()).toMatchObject({ kind: "frozen", reason: "unverified" })
     expect(logged.filter((line) => line.includes("cannot clean the outbox"))).toHaveLength(1)
