@@ -1,9 +1,9 @@
 @echo off
 rem Windows hook dispatcher: runs a plugin-relative Node target with the Node that Codex resolves.
 rem Usage: node-dispatch.cmd <plugin-relative target> [args...]
-rem Manifests wrap the whole line for cmd /s /c (""<this file>" <target> <args>"), so the arguments reach
-rem the final Node line with their quotes and a quoted argument holding a space arrives as one argv entry.
-rem Not forwarded as written: cmd metacharacters (& | < > ^) and runs of spaces inside an argument.
+rem Hook arguments must be single tokens (no spaces, quotes or cmd metacharacters); bootstrap-hooks.test.mjs
+rem enforces it. A quoted argument puts more than two quotes on the cmd /c line, so cmd strips the outer pair
+rem and breaks it, and wrapping the line for cmd /s /c breaks hosts that run commandWindows through PowerShell.
 rem cmd.exe starts in milliseconds; a Windows PowerShell hop cost about a second per hook and pushed
 rem concurrent 5 s hooks past their timeout. Resolution order matches the former node-dispatch.ps1.
 rem No labels or goto, so the file runs the same with LF or CRLF line endings.

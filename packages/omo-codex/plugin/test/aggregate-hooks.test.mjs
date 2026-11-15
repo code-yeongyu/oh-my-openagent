@@ -169,7 +169,7 @@ test("#given aggregate OMO plugin is enabled #when hooks are inspected #then she
     .filter((group) => group.hooks.some((hook) => hook.command.endsWith(" hook post-tool-use-spawn")))
   assert.equal(admissionGroups.length, 1)
   assert.equal(admissionGroups[0].matcher, preToolUseGroups[2].matcher)
-  assert.match(admissionGroups[0].hooks[0].commandWindows, /hook post-tool-use-spawn"$/)
+  assert.match(admissionGroups[0].hooks[0].commandWindows, /hook post-tool-use-spawn$/)
 })
 
 test("#given aggregate OMO plugin has a dedicated ultrawork trigger #when hooks are inspected #then ulw-loop does not duplicate ultrawork injection", async () => {

@@ -18,8 +18,9 @@ const SKIPPED_DIRECTORY_NAMES = new Set([".git", "node_modules"])
 const EXPECTED_BOOTSTRAP_COMMAND = 'node "${PLUGIN_ROOT}/components/bootstrap/dist/cli.js" hook session-start'
 const EXPECTED_BOOTSTRAP_COMMAND_WINDOWS =
   'powershell -NoProfile -ExecutionPolicy Bypass -File "${PLUGIN_ROOT}\\components\\bootstrap\\scripts\\bootstrap.ps1"'
-const EXPECTED_NODE_DISPATCH_PREFIX = 'cmd /d /s /c ""${PLUGIN_ROOT}\\components\\bootstrap\\scripts\\node-dispatch.cmd" '
+const EXPECTED_NODE_DISPATCH_PREFIX = 'cmd /d /c "${PLUGIN_ROOT}\\components\\bootstrap\\scripts\\node-dispatch.cmd" '
 const POSIX_NODE_COMMAND = /^node "\$\{PLUGIN_ROOT\}\/([^"]+)"(.*)$/
+const TOKEN_SHAPED_ARGUMENTS = /^( [\w.:-]+)*$/
 
 async function pathExists(absolutePath) {
   try {
@@ -218,13 +219,31 @@ test("#given non-bootstrap aggregate hook manifests #when both platform commands
       if (handler.command === EXPECTED_BOOTSTRAP_COMMAND) continue
       const posix = POSIX_NODE_COMMAND.exec(handler.command)
       const expected =
-        posix === null ? null : `${EXPECTED_NODE_DISPATCH_PREFIX}${posix[1].replaceAll("/", "\\")}${posix[2]}"`
+        posix === null ? null : `${EXPECTED_NODE_DISPATCH_PREFIX}${posix[1].replaceAll("/", "\\")}${posix[2]}`
       if (handler.commandWindows !== expected) mismatches.push(`${manifest.source}: ${handler.commandWindows}`)
     }
   }
 
   // then
   assert.deepEqual(mismatches, [], "commandWindows must dispatch the target the POSIX command runs, with its arguments")
+})
+
+test("#given non-bootstrap aggregate hook manifests #when hook arguments are read #then each is one token node-dispatch.cmd forwards as written", async () => {
+  // given
+  const aggregateHooks = await readAggregateHookManifests()
+
+  // when
+  const offenders = []
+  for (const manifest of aggregateHooks) {
+    for (const { handler } of collectCommandHooks(manifest.hooks, manifest.source)) {
+      if (handler.command === EXPECTED_BOOTSTRAP_COMMAND) continue
+      const posix = POSIX_NODE_COMMAND.exec(handler.command)
+      if (posix !== null && !TOKEN_SHAPED_ARGUMENTS.test(posix[2])) offenders.push(`${manifest.source}: ${posix[2]}`)
+    }
+  }
+
+  // then
+  assert.deepEqual(offenders, [], "hook arguments must be single tokens: cmd /c breaks a commandWindows line that quotes one")
 })
 
 test(
@@ -245,7 +264,7 @@ test(
         join(pluginRoot, "components", "probe", "cli.js"),
         'let input = ""\nprocess.stdin.on("data", (chunk) => { input += chunk })\nprocess.stdin.on("end", () => { console.log(JSON.stringify({ node: process.execPath, args: process.argv.slice(2), input })); process.exit(7) })\n',
       )
-      const commandWindows = `${EXPECTED_NODE_DISPATCH_PREFIX.replace("${PLUGIN_ROOT}", pluginRoot)}components\\probe\\cli.js hook pre-tool-use "two words""`
+      const commandWindows = `${EXPECTED_NODE_DISPATCH_PREFIX.replace("${PLUGIN_ROOT}", pluginRoot)}components\\probe\\cli.js hook pre-tool-use`
 
       // when
       const result = spawnSync(process.env.ComSpec ?? "cmd.exe", ["/C", `"${commandWindows}"`], {
@@ -260,7 +279,7 @@ test(
       assert.equal(result.status, 7, result.stderr)
       assert.deepEqual(JSON.parse(result.stdout), {
         node: process.execPath,
-        args: ["hook", "pre-tool-use", "two words"],
+        args: ["hook", "pre-tool-use"],
         input: '{"hook_event_name":"PreToolUse"}',
       })
     } finally {
