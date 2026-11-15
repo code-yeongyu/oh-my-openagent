@@ -138,16 +138,13 @@ async function identify(dir: string): Promise<RegistryEndpoint> {
  */
 export async function claimedSessionPaths(dir: string): Promise<readonly string[]> {
   const names = await readdir(join(dir, "reservations")).catch(() => [] as string[])
-  const claims = await Promise.all(
-    names
-      .filter((name) => name.endsWith(".json"))
-      .sort()
-      .map(async (name) => {
-        const path = (await readRecord(join(dir, "reservations", name)))?.sessionPath
-        return typeof path === "string" && path !== "" ? [path] : []
-      }),
-  )
-  return claims.flat()
+  // One claim file open at a time, so a pile of stale claims can never run the process out of descriptors (#13579).
+  const paths: string[] = []
+  for (const name of names.filter((entry) => entry.endsWith(".json")).sort()) {
+    const path = (await readRecord(join(dir, "reservations", name)))?.sessionPath
+    if (typeof path === "string" && path !== "") paths.push(path)
+  }
+  return paths
 }
 
 /** Every endpoint directory under `agentDir`, sorted by directory name; `[]` before layout 2. */
