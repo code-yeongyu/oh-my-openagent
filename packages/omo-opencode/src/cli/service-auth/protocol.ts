@@ -101,6 +101,7 @@ const REFUSAL_CODES = [
   "service_upgrade_required",
   "refresh_recovery_expired",
   "machine_exists",
+  "clock_skew",
 ] as const
 export type RefusalCode = (typeof REFUSAL_CODES)[number] | "unknown"
 const isKnownRefusal = (code: string): code is (typeof REFUSAL_CODES)[number] =>
@@ -140,6 +141,7 @@ export function refusalGuidance(code: RefusalCode, status: number): RefusalGuida
     case "writer_floor_mismatch":
     case "service_upgrade_required":
     case "refresh_recovery_expired":
+    case "clock_skew":
     case "unknown":
       if (status === 401) return "sign_in_again"
       if (status === 429) return "wait"
@@ -171,11 +173,16 @@ export class ApiRefusal extends SignInError {
   readonly code: RefusalCode
   readonly #detail: z.infer<typeof limitSchema> | undefined
   readonly #retryAfter: string | null
+  /** With machine_exists: the account's live device for this machine (#6503). */
+  readonly existingDevice: string | undefined
+  /** With clock_skew: the service's clock, in Unix seconds, to sign again with. */
+  readonly serverTime: number | undefined
   constructor(
     code: string,
     readonly status: number,
     detail?: z.infer<typeof limitSchema>,
     retryAfter: string | null = null,
+    facts: { readonly existingDevice?: string; readonly serverTime?: number } = {},
   ) {
     const known: RefusalCode = isKnownRefusal(code) ? code : "unknown"
     // Server messages and unknown codes can contain credentials; never echo either.
@@ -183,6 +190,8 @@ export class ApiRefusal extends SignInError {
     this.code = known
     this.#detail = detail
     this.#retryAfter = retryAfter
+    this.existingDevice = facts.existingDevice
+    this.serverTime = facts.serverTime
   }
   get detail() {
     return this.#detail

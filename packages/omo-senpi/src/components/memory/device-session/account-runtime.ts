@@ -17,6 +17,7 @@ import { resolveMemoryRoot, syncPinDir } from "@oh-my-opencode/memory-core"
 import {
   createCredentialStore,
   createSession,
+  machineBindingAfterRefresh,
   quietNotice,
   retireSyncPinOnDiscard,
   serviceOrigin,
@@ -98,6 +99,9 @@ export function cliServiceAccess(options: {
           pinDir: () => syncPinDir(resolveMemoryRoot({ ...options.env }, options.cwd)),
           log: warn,
         }),
+        // Its refreshes bind the device to this machine like the sync source's do (#6503), over the same global fetch
+        // this session's own requests use.
+        machineBinding: machineBindingAfterRefresh({ api: origin, log: warn }),
         deviceService: {
           adopt: async () => undefined,
           forget: () =>

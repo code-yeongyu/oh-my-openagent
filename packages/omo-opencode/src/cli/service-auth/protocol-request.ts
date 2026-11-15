@@ -21,12 +21,21 @@ const envelopeSchema = z.object({
   }),
 })
 
-export async function requestApi(api: string, path: string, init: RequestInit, signal?: AbortSignal): Promise<unknown> {
+const machineExistsDetail = z.object({ deviceId: nonempty })
+const clockSkewDetail = z.object({ serverTime: z.number().int().nonnegative() })
+
+export async function requestApi(
+  api: string,
+  path: string,
+  init: RequestInit,
+  signal?: AbortSignal,
+  fetchImpl: typeof fetch = fetch,
+): Promise<unknown> {
   refuseIfLocalOnly("service-auth/protocol-request.ts requestApi")
   let response: Response
   let body: unknown
   try {
-    response = await fetch(`${api}${path}`, {
+    response = await fetchImpl(`${api}${path}`, {
       ...init,
       redirect: "error",
       signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(30_000)]) : AbortSignal.timeout(30_000),
@@ -75,10 +84,16 @@ export async function requestApi(api: string, path: string, init: RequestInit, s
   if (!envelope.success) throw new InvalidApiResponse(response.status)
   const error = envelope.data.error
   const detail = limitSchema.safeParse(error.detail)
+  const existing = machineExistsDetail.safeParse(error.detail)
+  const skew = clockSkewDetail.safeParse(error.detail)
   throw new ApiRefusal(
     error.code,
     response.status,
     error.code === "entitlement_required" && detail.success ? detail.data : undefined,
     response.headers.get("retry-after"),
+    {
+      ...(error.code === "machine_exists" && existing.success ? { existingDevice: existing.data.deviceId } : {}),
+      ...(error.code === "clock_skew" && skew.success ? { serverTime: skew.data.serverTime } : {}),
+    },
   )
 }
