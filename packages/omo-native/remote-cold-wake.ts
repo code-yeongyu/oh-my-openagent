@@ -4,9 +4,11 @@ import {
   type ColdWakeOutcome,
   ColdWakeUnitError,
   installColdWake,
+  readColdWake,
   runCommand,
   SessionHostLaunch,
   uninstallColdWake,
+  type UnitState,
 } from "../device-service-core/src/index.ts"
 
 // omo#13594: the cold-wake unit of this device. `omo remote bootstrap` and `enable` install it, `disable` removes it, and a
@@ -15,6 +17,21 @@ import {
 export type ColdWake = {
   readonly install: () => Promise<ColdWakeOutcome>
   readonly uninstall: () => Promise<ColdWakeOutcome>
+  /** What this device's service manager reports about both units; undefined where there is no session host unit. */
+  readonly status: () => Promise<LocalStatus | undefined>
+}
+
+/** The `local` part of `omo remote status --json`. */
+export type LocalStatus = {
+  readonly session_host: {
+    readonly unit: string
+    readonly state: UnitState
+    readonly enabled: boolean
+    readonly pinned: boolean | "unknown"
+  }
+  readonly device_service: { readonly unit: string; readonly state: UnitState }
+  readonly cold_wake_entry: boolean | "unknown"
+  readonly agent_dir: string
 }
 
 const UNSUPPORTED: ColdWakeOutcome = { kind: "unsupported" }
@@ -31,14 +48,11 @@ export function coldWakeSetup(options: {
   const platform = options.platform ?? process.platform
   const uid = typeof process.getuid === "function" ? process.getuid() : undefined
   if ((platform !== "linux" && platform !== "darwin") || uid === undefined)
-    return { install: async () => UNSUPPORTED, uninstall: async () => UNSUPPORTED }
+    return { install: async () => UNSUPPORTED, uninstall: async () => UNSUPPORTED, status: async () => undefined }
   const host = { platform, home: homedir(), uid, run: runCommand, pause }
-  const withLaunch = async (
-    apply: (launch: SessionHostLaunch) => Promise<ColdWakeOutcome>,
-  ): Promise<ColdWakeOutcome> => {
-    let launch: SessionHostLaunch
+  const launchOf = (): SessionHostLaunch | ColdWakeOutcome => {
     try {
-      launch = SessionHostLaunch.from({
+      return SessionHostLaunch.from({
         omoBin: options.binaryPath,
         execPath: process.execPath,
         agentDir: options.agentDir,
@@ -48,11 +62,25 @@ export function coldWakeSetup(options: {
       if (error instanceof ColdWakeUnitError) return { kind: "failed", step: "unit", detail: error.message }
       throw error
     }
-    return apply(launch)
+  }
+  const withLaunch = async (apply: (launch: SessionHostLaunch) => Promise<ColdWakeOutcome>) => {
+    const launch = launchOf()
+    return launch instanceof SessionHostLaunch ? apply(launch) : launch
   }
   return {
     install: () => withLaunch((launch) => installColdWake(host, launch)),
     uninstall: () => withLaunch((launch) => uninstallColdWake(host, launch)),
+    status: async () => {
+      const launch = launchOf()
+      if (!(launch instanceof SessionHostLaunch)) return undefined
+      const read = await readColdWake(host, launch)
+      return {
+        session_host: { ...read.sessionHost, pinned: read.pinnedHost },
+        device_service: read.deviceService,
+        cold_wake_entry: read.coldWakeEntry,
+        agent_dir: options.agentDir,
+      }
+    },
   }
 }
 

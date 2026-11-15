@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { connectDeviceService, DEVICE_SERVICE_VERSION } from "../../device-service-core/src/index.ts"
 import { deviceServiceAssetName } from "../../device-service-core/src/release/acquire.ts"
-import { startFakeOwner, type FakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
+import { startFakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
 import {
   buildRelease,
   RELEASE_ORIGIN,
@@ -23,85 +23,23 @@ import { createCredentialStore } from "../../omo-opencode/src/cli/service-auth/k
 import type { RemoteSessionsPort, RemoteThreadSurface } from "../../omo-senpi/src/components/thread/remote/ports"
 import { createRemoteThreadFixture, ENGINE } from "../../omo-senpi/src/components/thread/thread-remote-fixture"
 import { runAccountVerb } from "../account-cli"
-import { type BootstrapSetup, deviceServiceBootstrapSetup } from "../remote-bootstrap"
-import { prepareRemoteAttach, REMOTE_EXIT, runRemoteVerb } from "../remote-cli"
-import type { ColdWake } from "../remote-cold-wake"
+import { deviceServiceBootstrapSetup } from "../remote-bootstrap"
+import { prepareRemoteAttach, REMOTE_EXIT } from "../remote-cli"
 import { gatewayWorkerAnchor } from "../remote-session-verbs"
 import { ago } from "../remote-render"
+import {
+  AGENT_DIR,
+  NOW,
+  OMO_BINARY,
+  owners,
+  privateDir,
+  run,
+  SIGNED_IN,
+  testBootstrap,
+  useRemoteCliCleanup,
+} from "./remote-cli-harness"
 
-const NOW = 1_790_000_400_000
-const owners: FakeOwner[] = []
-const dirs: string[] = []
-
-afterEach(async () => {
-  for (const owner of owners.splice(0)) await owner.stop()
-  for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
-})
-
-const privateDir = (): string => {
-  const dir = mkdtempSync(join(tmpdir(), "rcli-"))
-  chmodSync(dir, 0o700)
-  dirs.push(dir)
-  return dir
-}
-
-const SIGNED_IN = {
-  exitCode: 0,
-  stdout: JSON.stringify({ signedIn: true, device: { id: "dev-self", name: "This Mac" }, refreshState: "ok" }),
-}
-
-const AGENT_DIR = "/home/user/.omo/agent"
-const OMO_BINARY = "/opt/omo/bin/omo"
-
-// The fake owner serves service_version 1.4.0, so pinning 1.4.0 makes a running owner current.
-const testBootstrap = (overrides: Partial<BootstrapSetup> = {}): BootstrapSetup => ({
-  pinVersion: "1.4.0",
-  install: async () => ({ ok: false, state: "service_degraded", action: "This test installs nothing." }),
-  refresher: { binaryPath: OMO_BINARY, version: "5.1.58" },
-  agentDir: AGENT_DIR,
-  ...overrides,
-})
-
-async function run(
-  args: readonly string[],
-  stateDir?: string,
-  account = SIGNED_IN,
-  bootstrap = testBootstrap(),
-  remote?: RemoteThreadSurface,
-  extra: { readonly packageRoot?: string; readonly coldWake?: ColdWake } = {},
-) {
-  let dir = stateDir
-  if (dir === undefined) {
-    const owner = await startFakeOwner({ stateDir: privateDir(), world: defaultWorld() })
-    owners.push(owner)
-    dir = owner.stateDir
-  }
-  const out: string[] = []
-  const err: string[] = []
-  const written: string[] = []
-  const coldWake: string[] = []
-  const target = dir
-  const code = await runRemoteVerb(
-    {
-      accountShow: async () => account,
-      stateDir: target,
-      connect: () => connectDeviceService({ version: "5.1.52", stateDir: target }),
-      now: () => NOW,
-      output: (line) => out.push(line),
-      write: (text) => written.push(text),
-      error: (line) => err.push(line),
-      bootstrap,
-      coldWake: {
-        install: async () => (coldWake.push("install"), { kind: "installed", serviceRestarted: false }),
-        uninstall: async () => (coldWake.push("uninstall"), { kind: "removed", serviceRestarted: false }),
-      },
-      ...(remote === undefined ? {} : { remote: () => remote }),
-      ...extra,
-    },
-    args,
-  )
-  return { code, out, err, written, coldWake }
-}
+useRemoteCliCleanup()
 
 describe("omo remote", () => {
   test("status prints the connection state, and --json prints the service's Status", async () => {
@@ -308,46 +246,6 @@ describe("omo remote bootstrap", () => {
     expect(code).toBe(REMOTE_EXIT.unavailable)
     expect(JSON.parse(out.join(""))).toMatchObject({ state: "store_unavailable" })
     expect(owner.state.log).toEqual([])
-  })
-})
-
-// omo#13594: the cold-wake unit follows the device's remote-sessions switch. It is installed or removed only after the
-// verb succeeded and its connection is closed, and a cold wake that fails is a notice, never the verb's outcome.
-describe("omo remote and the cold-wake unit", () => {
-  test("bootstrap installs it on a device with remote sessions on, after reporting connected", async () => {
-    const { code, out, coldWake } = await run(["bootstrap", "--json"])
-    expect(code).toBe(REMOTE_EXIT.ok)
-    expect(JSON.parse(out.join(""))).toMatchObject({ state: "connected" })
-    expect(coldWake).toEqual(["install"])
-  })
-
-  test("bootstrap removes it on a device with remote sessions off, so it does not come back", async () => {
-    const owner = await startFakeOwner({ stateDir: privateDir(), world: defaultWorld() })
-    owners.push(owner)
-    expect((await run(["disable"], owner.stateDir)).coldWake).toEqual(["uninstall"])
-    expect((await run(["bootstrap", "--json"], owner.stateDir)).coldWake).toEqual(["uninstall"])
-    expect((await run(["enable"], owner.stateDir)).coldWake).toEqual(["install"])
-  })
-
-  test("a stopped bootstrap or a verb that failed touches nothing", async () => {
-    const signedOut = await run(["bootstrap", "--json"], undefined, { exitCode: 4, stdout: '{"signedIn":false}' })
-    expect([signedOut.code, signedOut.coldWake]).toEqual([REMOTE_EXIT.unavailable, []])
-    const stopped = await run(["enable"], privateDir())
-    expect([stopped.code, stopped.coldWake]).toEqual([REMOTE_EXIT.unavailable, []])
-    expect((await run(["status"])).coldWake).toEqual([])
-  })
-
-  test("a cold wake that fails prints one notice and keeps the verb's exit code and output", async () => {
-    const failing: ColdWake = {
-      install: async () => ({ kind: "failed", step: "service_restart", detail: "Failed to restart" }),
-      uninstall: async () => ({ kind: "removed", serviceRestarted: false }),
-    }
-    const { code, out, err } = await run(["enable", "--json"], undefined, SIGNED_IN, testBootstrap(), undefined, {
-      coldWake: failing,
-    })
-    expect(code).toBe(REMOTE_EXIT.ok)
-    expect(JSON.parse(out.join(""))).toEqual({ enabled: true })
-    expect(err).toHaveLength(1)
   })
 })
 

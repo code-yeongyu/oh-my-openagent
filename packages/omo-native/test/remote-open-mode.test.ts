@@ -53,6 +53,7 @@ async function open(args: readonly string[], localMode: () => string = () => "wo
       coldWake: {
         install: async () => ({ kind: "installed", serviceRestarted: false }),
         uninstall: async () => ({ kind: "removed", serviceRestarted: false }),
+        status: async () => undefined,
       },
       remote: () => a.remote,
       localPermissionPreset: localMode,

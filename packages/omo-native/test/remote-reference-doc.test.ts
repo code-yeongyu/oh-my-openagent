@@ -26,7 +26,7 @@ async function printedUsage(): Promise<string> {
       write: () => {},
       error: (line) => err.push(line),
       bootstrap: {} as BootstrapSetup,
-      coldWake: { install: untouched, uninstall: untouched },
+      coldWake: { install: untouched, uninstall: untouched, status: untouched },
     },
     [],
   )

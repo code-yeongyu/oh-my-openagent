@@ -15,7 +15,7 @@ remote operation's typed result as one JSON line (`packages/omo-native/remote-se
 omo remote status [--json]       # the device service's connection state
 omo remote devices [--json]      # the devices on this account
 omo remote sessions [--device D] [--project P] [--state running|idle|ended] [--json]
-omo remote enable | disable [--json]   # turn remote sessions on or off for this device
+omo remote enable | disable [--json]   # set this device up and turn remote sessions on, or turn them off
 omo remote control [on|off]      # whether your other devices may view and command this device's sessions
 omo remote bootstrap [--json]    # set up the device service for your sign-in (every omo start runs it)
 omo remote attach <device>/<session>   # open a session on another device in the terminal UI, to watch and type
@@ -35,6 +35,41 @@ instead of printing the answer.
 Exit codes: `0` done, `1` the operation failed, `2` usage error, `3` unavailable (signed out, the
 device service is not set up or not running, or it lacks the feature). `omo remote bootstrap` exits `3`
 for every stop, including a failed verification or install.
+
+## Set up a device
+
+After `omo login`, one command sets the device up:
+
+```bash
+omo remote enable
+```
+
+It runs the bootstrap first (`packages/omo-native/remote-bootstrap.ts`): it installs the pinned device service when
+none runs, connects, and registers this omo's agent dir with it (the service only creates endpoints and delivery
+consumers for agent dirs it knows). It then turns remote sessions on, and installs and starts the always-on session host
+unit (see [Session host unit and cold wake](#session-host-unit-and-cold-wake)). Each step is idempotent, so running it
+again changes nothing that is already in place. Signed out, it stops before anything is installed, with exit `3`.
+
+`omo remote status` reads the result back. Besides the service's own state it shows this device's two units as the
+service manager reports them (the session host unit: running or not, enabled, and whether its host is pinned; the
+device service's unit; whether the device service's table names the session host for a cold wake) and the agent dir
+omo registers. The service has no read for registered agent dirs yet, so that line is the dir every omo start and
+`enable` register, not a confirmation from the service. With `--json` these are the `local` object next to the
+service's `Status` fields:
+
+```json
+{
+  "local": {
+    "session_host": { "unit": "omo-session-host.service", "state": "running", "enabled": true, "pinned": true },
+    "device_service": { "unit": "omo-relay-daemon.service", "state": "running" },
+    "cold_wake_entry": true,
+    "agent_dir": "/home/me/.omo/agent"
+  }
+}
+```
+
+A unit `state` is `running`, `stopped`, `not_installed` or `unknown`; `pinned` and `cold_wake_entry` are `unknown` when
+they could not be read. Windows has no session host unit, so `local` is absent there.
 
 ## What you need
 

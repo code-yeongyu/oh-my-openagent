@@ -10,8 +10,11 @@ export { handDeviceKeys, type HeldDeviceCredential } from "./hand-device-keys.ts
 export {
   type ColdWakeHost,
   type ColdWakeOutcome,
+  type ColdWakeStatus,
   ColdWakeUnitError,
   installColdWake,
+  readColdWake,
+  type UnitState,
   SessionHostLaunch,
   uninstallColdWake,
 } from "./cold-wake/index.ts"

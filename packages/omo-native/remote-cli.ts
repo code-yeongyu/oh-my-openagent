@@ -8,17 +8,15 @@ import {
   deviceServiceEndpointPath,
   LocalApiError,
   SESSION_ROW_STATES,
-  type SessionFilter,
   type SessionRowState,
 } from "../device-service-core/src/index.ts"
 import type { RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
 import { serveRemoteAttach } from "./remote-attach"
-import { type BootstrapSetup, runBootstrapVerb } from "./remote-bootstrap"
+import { type BootstrapSetup, runBootstrapVerb, runEnableVerb } from "./remote-bootstrap"
 import { applyColdWake, type ColdWake } from "./remote-cold-wake"
+import { type ControlValue, type ParsedVerb, runConnectedVerb } from "./remote-connected-verbs"
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
-import { controlLines, deviceLines, sessionLines, statusLines } from "./remote-render"
-import { isSessionVerb, parseSession, SESSION_VERBS, type SessionArgs } from "./remote-session-args"
-import { runSession } from "./remote-session-verbs"
+import { isSessionVerb, parseSession, SESSION_VERBS } from "./remote-session-args"
 import { isHelpFlag, REMOTE_USAGE, verbUsage } from "./remote-usage"
 
 // `omo remote`: the sessions on this account's other devices, through this device's service. A thin CLI over the
@@ -50,22 +48,15 @@ export interface RemoteCommandDependencies {
 /** `omo remote` verbs; `bootstrap` also needs the pinned install, the stored keys and this omo binary. */
 export interface RemoteVerbDependencies extends RemoteCommandDependencies {
   readonly bootstrap: BootstrapSetup
-  /** The cold-wake unit `bootstrap` and `enable` install and `disable` removes (omo#13594). */
+  /** The session host unit `bootstrap` and `enable` install, `disable` removes and `status` reads back (omo#13594). */
   readonly coldWake: ColdWake
 }
 
 const VERBS = ["status", "devices", "sessions", "enable", "disable", "control", "bootstrap", ...SESSION_VERBS] as const
-const CONTROL_VALUES = ["on", "off"] as const
-type ControlValue = (typeof CONTROL_VALUES)[number]
+const CONTROL_VALUES: readonly ControlValue[] = ["on", "off"]
 const isControlValue = (value: string | undefined): value is ControlValue => CONTROL_VALUES.some((v) => v === value)
 
-type Parsed = {
-  readonly command: string
-  readonly json: boolean
-  readonly filter: SessionFilter
-  readonly control: ControlValue | undefined
-  readonly session?: SessionArgs
-}
+type Parsed = ParsedVerb
 
 const isRowState = (value: string): value is SessionRowState =>
   (SESSION_ROW_STATES as readonly string[]).includes(value)
@@ -100,58 +91,6 @@ function parse(args: readonly string[]): Parsed {
   return { command, json, filter, control }
 }
 
-async function runOn(service: DeviceService, parsed: Parsed, dependencies: RemoteCommandDependencies): Promise<number> {
-  const print = (value: unknown, human: () => readonly string[]) => {
-    if (parsed.json) dependencies.output(JSON.stringify(value))
-    else for (const line of human()) dependencies.output(line)
-    return REMOTE_EXIT.ok
-  }
-  switch (parsed.command) {
-    case "status": {
-      const status = await service.status()
-      return print(status, () => statusLines(status, service.serviceVersion))
-    }
-    case "devices": {
-      const devices = await service.devices()
-      return print(devices, () => deviceLines(devices, dependencies.now()))
-    }
-    case "sessions": {
-      const [result, devices] = await Promise.all([service.sessions(parsed.filter), service.devices()])
-      const labels = new Map(devices.map((device) => [device.device, device.label]))
-      return print(result, () => sessionLines(result, labels, dependencies.now()))
-    }
-    case "enable":
-    case "disable": {
-      const enabled = await service.setEnabled(parsed.command === "enable")
-      return print({ enabled }, () => [`Remote sessions are ${enabled ? "on" : "off"} for this device.`])
-    }
-    case "control": {
-      if (!service.capabilities.includes("control")) {
-        dependencies.error(
-          "The OmO device service on this device does not have remote control yet. Update OmO, then try again.",
-        )
-        return REMOTE_EXIT.unavailable
-      }
-      const state =
-        parsed.control === undefined
-          ? await service.attachControl()
-          : await service.setAttachControl(parsed.control === "on")
-      return print(state, () => controlLines(state, dependencies.now()))
-    }
-    case "open":
-    case "send":
-    case "model":
-    case "interrupt":
-    case "close":
-      if (parsed.session !== undefined) return runSession(service, parsed.session, parsed.json, dependencies)
-      throw new UsageError(`omo remote ${parsed.command}: arguments were not parsed`)
-    default:
-      throw new UsageError(
-        parsed.command === "" ? "omo remote: a command is required" : `omo remote: unknown command ${parsed.command}`,
-      )
-  }
-}
-
 // A stopped service: its socket is gone (POSIX) or its TCP endpoint refuses (Windows keeps endpoint.json).
 const isServiceStopped = (error: unknown): boolean =>
   (error instanceof Error &&
@@ -184,6 +123,15 @@ export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: 
     dependencies.error(REMOTE_USAGE)
     return REMOTE_EXIT.usage
   }
+  // `enable` is the one command after `omo login`: the bootstrap (install, connect, register this agent dir), the
+  // switch, then the session host unit.
+  if (parsed.command === "enable") {
+    try {
+      return await runEnableVerb(dependencies, dependencies.bootstrap, dependencies.coldWake, parsed.json)
+    } catch (error) {
+      return reportFailure(dependencies, error)
+    }
+  }
   if (parsed.command === "bootstrap")
     return (await runBootstrapVerb(dependencies, dependencies.bootstrap, dependencies.coldWake, parsed.json)) ===
       "connected"
@@ -211,15 +159,15 @@ export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: 
   }
   let code: number
   try {
-    code = await runOn(service, parsed, dependencies)
+    code = await runConnectedVerb(service, parsed, dependencies, dependencies.coldWake)
   } catch (error) {
     return reportFailure(dependencies, error)
   } finally {
     service.close()
   }
   // After the connection is closed: a changed table restarts the device service, which would cut it.
-  if (code === REMOTE_EXIT.ok && (parsed.command === "enable" || parsed.command === "disable"))
-    await applyColdWake(dependencies.coldWake, parsed.command === "enable", dependencies.error)
+  if (code === REMOTE_EXIT.ok && parsed.command === "disable")
+    await applyColdWake(dependencies.coldWake, false, dependencies.error)
   return code
 }
 

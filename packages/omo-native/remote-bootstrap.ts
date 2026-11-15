@@ -9,6 +9,7 @@ import {
 } from "../device-service-core/src/index.ts"
 import packageJson from "./package.json" with { type: "json" }
 import { applyColdWake, type ColdWake } from "./remote-cold-wake"
+import { REMOTE_EXIT } from "./remote-exit"
 import { statusLines } from "./remote-render"
 
 // `omo remote bootstrap`: the device service bootstrap every interactive omo start runs in the background (the
@@ -66,12 +67,7 @@ export function omoBinaryPath(env: Readonly<Record<string, string | undefined>> 
   return resolve(process.argv[1] ?? process.execPath)
 }
 
-export async function runBootstrapVerb(
-  io: BootstrapIo,
-  setup: BootstrapSetup,
-  coldWake: ColdWake,
-  json: boolean,
-): Promise<"connected" | "stopped"> {
+const bootstrap = async (io: BootstrapIo, setup: BootstrapSetup, json: boolean) => {
   const outcome = await bootstrapDeviceService({
     accountShow: io.accountShow,
     stateDir: io.stateDir,
@@ -81,8 +77,43 @@ export async function runBootstrapVerb(
   if (outcome.kind === "stopped") {
     if (json) io.output(JSON.stringify({ state: outcome.state, notice: outcome.notice }))
     else io.error(outcome.notice)
-    return "stopped"
   }
+  return outcome
+}
+
+/**
+ * `omo remote enable`, the one command after `omo login` (omo#13594): the bootstrap (install the pinned service when none
+ * runs, connect, register the refresher and this agent dir), then the switch on, then the always-on session host unit.
+ * Every step is idempotent, so running it again changes nothing that is already in place.
+ */
+export async function runEnableVerb(
+  io: BootstrapIo,
+  setup: BootstrapSetup,
+  coldWake: ColdWake,
+  json: boolean,
+): Promise<number> {
+  const outcome = await bootstrap(io, setup, json)
+  if (outcome.kind === "stopped") return REMOTE_EXIT.unavailable
+  let enabled: boolean
+  try {
+    enabled = await outcome.service.setEnabled(true)
+  } finally {
+    outcome.service.close()
+  }
+  if (json) io.output(JSON.stringify({ enabled }))
+  else io.output(`Remote sessions are ${enabled ? "on" : "off"} for this device.`)
+  await applyColdWake(coldWake, enabled, io.error)
+  return REMOTE_EXIT.ok
+}
+
+export async function runBootstrapVerb(
+  io: BootstrapIo,
+  setup: BootstrapSetup,
+  coldWake: ColdWake,
+  json: boolean,
+): Promise<"connected" | "stopped"> {
+  const outcome = await bootstrap(io, setup, json)
+  if (outcome.kind === "stopped") return "stopped"
   try {
     if (json) io.output(JSON.stringify({ state: "connected", status: outcome.status }))
     else for (const line of statusLines(outcome.status, outcome.service.serviceVersion)) io.output(line)
