@@ -1,4 +1,5 @@
-import { closeSync, openSync } from "node:fs"
+import { closeSync, constants, openSync } from "node:fs"
+import { Readable } from "node:stream"
 import { ReadStream, WriteStream } from "node:tty"
 
 import type { PhraseSurface } from "../memory-core/src/sync/genesis/phrase-bridge.ts"
@@ -40,24 +41,42 @@ export function openControllingTerminal(): PhraseTerminal | null {
   // Checker LOW (#13337 @ e6ac0bca): each stream owns its own descriptor, so release closes each exactly once
   // (one shared fd was closed by both streams, and the second close could hit a reused fd number).
   const opened: number[] = []
-  let input: ReadStream
-  let output: WriteStream
   try {
-    const [inPath, outPath] = process.platform === "win32" ? ["CONIN$", "CONOUT$"] : ["/dev/tty", "/dev/tty"]
-    opened.push(openSync(inPath, "r"))
-    opened.push(openSync(outPath, "w"))
-    input = new ReadStream(opened[0] ?? -1)
-    output = new WriteStream(opened[1] ?? -1)
-    input.setRawMode(true)
+    if (process.platform === "win32") {
+      opened.push(openSync("CONIN$", "r"))
+      opened.push(openSync("CONOUT$", "w"))
+      const input = new ReadStream(opened[0] ?? -1)
+      const output = new WriteStream(opened[1] ?? -1)
+      input.setRawMode(true)
+      return terminalFromStreams(input, output, () => {
+        input.setRawMode(false)
+        input.destroy()
+        output.end()
+      })
+    }
+    // #13696: Bun's tty.ReadStream leaves a blocking read in flight on /dev/tty after destroy(), so the command
+    // never exits until another key arrives. Words are read through a non-blocking descriptor whose reader is
+    // cancelled on release; a second tty handle that never reads only switches raw mode.
+    opened.push(openSync("/dev/tty", "r"))
+    opened.push(openSync("/dev/tty", constants.O_RDONLY | constants.O_NONBLOCK))
+    opened.push(openSync("/dev/tty", "w"))
+    const mode = new ReadStream(opened[0] ?? -1)
+    const readFd = opened[1] ?? -1
+    const input = Readable.fromWeb(Bun.file(readFd).stream())
+    // Bun.file does not own the descriptor; it is closed once the cancelled reader has let go of it.
+    input.once("close", () => closeSync(readFd))
+    const output = new WriteStream(opened[2] ?? -1)
+    mode.setRawMode(true)
+    return terminalFromStreams(input, output, () => {
+      mode.setRawMode(false)
+      mode.destroy()
+      input.destroy()
+      output.end()
+    })
   } catch {
     for (const fd of opened) closeSync(fd)
     return null
   }
-  return terminalFromStreams(input, output, () => {
-    input.setRawMode(false)
-    input.destroy()
-    output.end()
-  })
 }
 
 /**

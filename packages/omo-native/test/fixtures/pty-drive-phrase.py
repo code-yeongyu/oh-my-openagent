@@ -3,7 +3,8 @@
 
 argv: <fixture.ts> <stdout file> <stderr file> <transcript file>. The child's stdout and stderr go to files, its
 controlling terminal is the pty. The driver answers the prompts it sees on the pty and records the transcript.
-Exit 0 when the child exited 0, else the child's code (or 90 on a stuck prompt).
+Exit 0 when the child exited 0, else the child's code (90 on a stuck prompt, 91 when the child printed its success
+line but did not exit within PTY_EXIT_SECONDS with no further key pressed, #13696).
 """
 import os
 import pty
@@ -25,6 +26,8 @@ screen = b""
 answered = set()
 deadline = time.monotonic() + float(os.environ.get("PTY_DRIVE_SECONDS", "50"))
 status = None
+exit_bound = float(os.environ.get("PTY_EXIT_SECONDS", "10"))
+succeeded_at = None
 while time.monotonic() < deadline:
     ready, _, _ = select.select([fd], [], [], 0.5)
     if ready:
@@ -54,6 +57,15 @@ while time.monotonic() < deadline:
     done, code = os.waitpid(pid, os.WNOHANG)
     if done:
         status = os.waitstatus_to_exitcode(code)
+        break
+    if succeeded_at is None:
+        with open(out_path, "rb") as handle:
+            if b"Memory sync is on for this device." in handle.read():
+                succeeded_at = time.monotonic()
+    elif time.monotonic() - succeeded_at > exit_bound:
+        os.kill(pid, 9)
+        os.waitpid(pid, 0)
+        status = 91
         break
 with open(transcript_path, "wb") as handle:
     handle.write(screen)

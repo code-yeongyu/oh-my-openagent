@@ -4,7 +4,8 @@ import { fixture } from "../../../memory-core/src/sync/account/testing/genesis-e
 import { configureSyncCommands, PHRASE_GENESIS_FLAG } from "../../sync-cli"
 
 // Runs `omo sync enable` against an in-process chain server with the REAL controlling terminal. The driver gives
-// this process a pty as its terminal and redirects stdout and stderr to files; words may only reach the pty.
+// this process a pty as its terminal and redirects stdout and stderr to files; words may only reach the pty. The
+// process must then exit on its own, with no further key pressed (#13696).
 const f = await fixture()
 const { genesis: _genesis, method: _method, rpId: _rp, userName: _user, roaming: _roaming, ...base } = f.input
 const program = new Command("omo").exitOverride()
@@ -23,4 +24,5 @@ try {
 } finally {
   await f.close()
 }
-process.exit(process.exitCode ?? 0)
+// #13696: no process.exit here. The real CLI ends when nothing keeps the event loop alive, so this fixture must too;
+// a terminal read left in flight after the ceremony would keep it running and the driver reports a hang.

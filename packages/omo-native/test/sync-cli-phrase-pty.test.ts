@@ -18,9 +18,10 @@ const shownIn = (screen: string): ReadonlyArray<string> =>
 const tokensOf = (text: string): ReadonlySet<string> => new Set(text.toLowerCase().split(/[^a-z]+/u))
 
 // Contract sec 7 / review F5: on a real controlling terminal with stdout and stderr redirected to files, the phrase
-// genesis completes and neither file holds a single wordlist word; the words reach only the terminal.
+// genesis completes and neither file holds a single wordlist word; the words reach only the terminal. #13696: after the
+// success line the command exits by itself with no further key (the driver answers 91 when it does not).
 test.skipIf(process.platform === "win32")(
-  "#given stdout and stderr redirected to files and a real pty as the terminal #when a phrase genesis runs #then no word reaches either file",
+  "#given stdout and stderr redirected to files and a real pty as the terminal #when a phrase genesis runs #then no word reaches either file and the command exits on its own",
   async () => {
     const dir = await mkdtemp(join(tmpdir(), "omo-phrase-pty-"))
     dirs.push(dir)
