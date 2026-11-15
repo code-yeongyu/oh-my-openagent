@@ -2,6 +2,7 @@ import { writeFileSync } from "node:fs"
 import { join } from "node:path"
 import type { DeviceRef, LocalRequest, Status } from "../../../src/local-api/protocol.ts"
 import { assertNever } from "../../../src/local-api/validate-fields.ts"
+import { deliveryHandler } from "./fake-owner-deliveries.ts"
 import { sessionHandler } from "./fake-owner-sessions.ts"
 import { type Conn, eventOf, ok, type Outcome, type OwnerState, refuse } from "./fake-owner-state.ts"
 
@@ -64,6 +65,19 @@ export const dispatch = (state: OwnerState, conn: Conn, request: LocalRequest): 
       state.reports.push(report)
       return ok()
     }
+    case "control.session_wake.get":
+    case "control.session_wake.set": {
+      if (role !== "desktop" && role !== "omo")
+        return refuse("forbidden", "only the desktop and the CLI read or set the wake switch")
+      if (request.type === "control.session_wake.set")
+        state.sessionWake = {
+          enabled: request.enabled === true,
+          stored: request.enabled,
+          changedAt: new Date(state.now()).toISOString(),
+          overridden: state.sessionWake.overridden,
+        }
+      return ok(state.sessionWake)
+    }
     case "control.attach.get":
     case "control.attach.set":
       if (role !== "desktop" && role !== "omo")
@@ -95,6 +109,13 @@ export const dispatch = (state: OwnerState, conn: Conn, request: LocalRequest): 
         ? refuse("session_not_found", "no session of that device has that engine id")
         : ok({ device: request.device, key, session: `${request.device}.${key}` })
     }
+    case "deliveries.serve":
+    case "delivery.answer":
+    case "delivery.held":
+    case "delivery.pending":
+    case "delivery.drained":
+    case "peer.admitted":
+      return deliveryHandler(state, conn, request)
     default:
       return assertNever(request)
   }

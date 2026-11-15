@@ -22,6 +22,8 @@ export type CarrierHostConnection = {
 export async function connectCarrierHost(options: {
   readonly socket: string
   readonly keyRoot: () => string
+  /** The connection never keeps the engine process alive: a woken session is retained on its host. */
+  readonly background?: boolean
 }): Promise<CarrierHostConnection> {
   const transport = await resolveRpcSocketTransport(options.socket)
   if (transport === undefined) throw new Error(`host_unavailable:${options.socket}`)
@@ -45,6 +47,7 @@ export async function connectCarrierHost(options: {
     socket.once("connect", resolve)
     socket.once("error", reject)
   })
+  if (options.background === true) socket.unref()
   socket.on("error", (error) => fail(error))
   socket.on("close", () => fail(new Error("the engine host closed the carrier's connection")))
   socket.on("data", (chunk: Buffer) => {

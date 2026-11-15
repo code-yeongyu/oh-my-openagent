@@ -8,6 +8,7 @@ export const VERBS = [
   "enable",
   "disable",
   "control",
+  "wake",
   "bootstrap",
   ...SESSION_VERBS,
 ] as const
@@ -22,6 +23,7 @@ export const LOCAL_ONLY_REMOTE_VERBS = [
   "sessions",
   "disable",
   "control",
+  "wake",
   "open",
   "send",
   "model",

@@ -63,6 +63,10 @@ export function createFakeDeliveryService(options: { readonly admitted: boolean 
   let holdsListener: ((event: DeliveryHoldsEvent) => void) | undefined
   const answers = new Map<string, (reply: AnswerEnvelope) => void>()
   const helds = new Map<string, (holds: boolean) => void>()
+  let markClosed: () => void = () => undefined
+  const closed = new Promise<void>((resolve) => {
+    markClosed = resolve
+  })
 
   const port: DeliveryServicePort = {
     serve: async (request) => {
@@ -120,6 +124,13 @@ export function createFakeDeliveryService(options: { readonly admitted: boolean 
         wakeListener = undefined
       }
     },
+    closed,
+    close: () => {
+      inboundListener = undefined
+      holdsListener = undefined
+      wakeListener = undefined
+      markClosed()
+    },
   }
 
   return {
@@ -135,9 +146,7 @@ export function createFakeDeliveryService(options: { readonly admitted: boolean 
       wakeListener?.(enabled)
     },
     drop: () => {
-      inboundListener = undefined
-      holdsListener = undefined
-      wakeListener = undefined
+      port.close?.()
     },
     refuseMarks: (code) => {
       marksRefusal = code

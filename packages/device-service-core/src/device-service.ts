@@ -6,6 +6,7 @@ import type { ListingResult, ListingRevision } from "./local-api/client-assembly
 import type {
   Capability,
   ControlAttachState,
+  ControlSessionWakeState,
   DeviceRef,
   DeviceRow,
   SessionFilter,
@@ -18,6 +19,7 @@ import { newestRowsListing } from "./listing-rows.ts"
 import type { CommandRpc } from "./local-api/protocol.ts"
 import type { SessionCandidate } from "./local-api/protocol-delegated.ts"
 import { randomBytes } from "node:crypto"
+import { minimumInEffect, type MinimumsOption } from "./minimum-in-effect.ts"
 import { compareVersions } from "./release/version.ts"
 import { deviceServiceStateDir } from "./state-dir.ts"
 
@@ -31,6 +33,29 @@ function sendToEndpoint(
   endpoint: string,
   rpc: CommandRpc,
   locate: boolean,
+): Promise<CommandResult> {
+  // A service before decision 0018's 2026-11-06 amendment refuses the unknown `locate` field with invalid_request
+  // before routing anything, so the command id is still unbound and the same command goes again without it; its
+  // reply then names no `located` and the caller locates as before.
+  return followDelegatedCommand(client, device, (commandId) => {
+    const send = (asked: boolean): Promise<unknown> =>
+      client.endpointCommand(device, endpoint, rpc, commandId, { locate: asked })
+    return send(locate).catch((error: unknown) =>
+      locate && error instanceof LocalApiError && error.code === "invalid_request"
+        ? send(false)
+        : Promise.reject(error),
+    )
+  })
+}
+
+/**
+ * Sends one delegated command toward `device` (its id minted first, so a state that arrives ahead of the answer is not
+ * missed) and settles with its first command state that is not a progress state, plus the engine's reply.
+ */
+function followDelegatedCommand(
+  client: LocalApiClient,
+  device: string,
+  send: (commandId: string) => Promise<unknown>,
 ): Promise<CommandResult> {
   return new Promise<CommandResult>((resolve, reject) => {
     // Minted before sending, so a state that arrives ahead of the answer is not missed.
@@ -67,16 +92,7 @@ function sendToEndpoint(
     )
     timer.unref?.()
     void client.closed.then(() => fail(new Error("the connection closed before the endpoint command settled")))
-    const send = (asked: boolean): Promise<unknown> =>
-      client.endpointCommand(device, endpoint, rpc, commandId, { locate: asked })
-    // A service before decision 0018's 2026-11-06 amendment refuses the unknown `locate` field with invalid_request
-    // before routing anything, so the command id is still unbound and the same command goes again without it; its
-    // reply then names no `located` and the caller locates as before.
-    send(locate).catch((error: unknown) =>
-      locate && error instanceof LocalApiError && error.code === "invalid_request"
-        ? send(false).catch(fail)
-        : fail(error),
-    )
+    send(commandId).catch(fail)
   })
 }
 
@@ -97,6 +113,7 @@ export type {
   CommandRpc,
   CommandStateEvent,
   ControlAttachState,
+  ControlSessionWakeState,
   DetachReason,
   DeviceRef,
   DeviceRow,
@@ -121,6 +138,12 @@ export function deviceServiceEndpointPath(stateDir: string, platform: NodeJS.Pla
 
 export type DeviceService = {
   readonly serviceVersion: string
+  /** omo#13037: this service carries the wake mark and the `wake` target (WAKE_MARK_MIN_SERVICE_VERSION). */
+  readonly carriesWakeMark: boolean
+  /** The service version the mark (and the wake switch) needs on this build; null while this build carries neither. */
+  readonly wakeMarkMinimum: string | null
+  /** omo#13037: this service takes `session.locate {single: true}` (LOCATE_SINGLE_MIN_SERVICE_VERSION). */
+  readonly takesSingleLocate: boolean
   /** What the service advertised in its welcome; `control` means it has the host attach setting. */
   readonly capabilities: readonly Capability[]
   /** The status the service sent in its welcome. */
@@ -132,6 +155,9 @@ export type DeviceService = {
   /** Whether this account's other devices may view and command this device's sessions (the per-device opt-out). */
   readonly attachControl: () => Promise<ControlAttachState>
   readonly setAttachControl: (attached: boolean) => Promise<ControlAttachState>
+  /** omo#13037 A7.2.5: the wake switch, read and set through the owner's own local API (never a capability word). */
+  readonly sessionWake: () => Promise<ControlSessionWakeState>
+  readonly setSessionWake: (enabled: boolean | null) => Promise<ControlSessionWakeState>
   /** The binary the service runs to refresh its access token (absolute path) and that binary's version. */
   readonly registerRefresher: (binaryPath: string, version: string) => Promise<void>
   /** Hands the signed-in device and its keys (base64 PKCS#8 DER) to the service; never logged or echoed. */
@@ -168,7 +194,18 @@ export type DeviceService = {
    * found by the durable engine session id in the create reply. `key` is the session's id in the device's listing,
    * the one `attach` takes; the engine id itself is in no listing row.
    */
-  readonly locate: (device: string, engineId: string) => Promise<SessionCandidate>
+  readonly locate: (
+    device: string,
+    engineId: string,
+    options?: { readonly single?: boolean },
+  ) => Promise<SessionCandidate>
+  /**
+   * omo#13037: `session.command {wake: {device, durable_id}, rpc}` for a session of `device` that no listing maps; the
+   * device service answers it with the receiving consumer's reply or its own refusal (wake_unavailable, session_gone,
+   * ambiguous_session) in the outcome's receipt. Rejects `unsupported` before sending toward a device that lacks the
+   * feature. Settles like `endpointCommand`.
+   */
+  readonly wakeCommand: (device: string, durableId: string, rpc: CommandRpc) => Promise<CommandResult>
 }
 
 /**
@@ -196,6 +233,31 @@ export const ADOPT_ACCOUNT_MIN_SERVICE_VERSION = "0.1.3"
 const acceptsAdoptAccount = (serviceVersion: string): boolean =>
   compareVersions(serviceVersion, ADOPT_ACCOUNT_MIN_SERVICE_VERSION) >= 0
 
+/**
+ * omo#13037 A6 (addenda 1 and 2): the first device service that carries the wake mark (`accepts` on session.command)
+ * and the `wake` command target: device-service-v0.1.31 (omo-relay-daemon #1076). Below it neither is ever sent, so
+ * every command keeps its bytes. Gated on welcome.service_version, never on a capability word; null would turn both off.
+ */
+export const WAKE_MARK_MIN_SERVICE_VERSION: string | null = "0.1.31"
+/**
+ * omo#13037 A4.3.3: the first device service that takes `session.locate {single: true}`: device-service-v0.1.13
+ * (omo-relay-daemon #393 part B and #692).
+ */
+export const LOCATE_SINGLE_MIN_SERVICE_VERSION: string | null = "0.1.13"
+
+const serviceAtLeast = (serviceVersion: string, minimum: string | null): boolean =>
+  minimum !== null && compareVersions(serviceVersion, minimum) >= 0
+
+/**
+ * Whether a service at `serviceVersion` serves the #13037 delivery protocol (`deliveries.serve` and its family), which
+ * arrived with the wake mark (omo-relay-daemon #1076). An older one answers `unknown_type`, and asking again changes nothing.
+ */
+export const servesDeliveries = (serviceVersion: string): boolean =>
+  serviceAtLeast(serviceVersion, WAKE_MARK_MIN_SERVICE_VERSION)
+
+/** The mark this client puts on a peer delivery when its own service carries it. */
+export const WAKE_ACCEPTS: readonly "session-wake:v1"[] = ["session-wake:v1"]
+
 export type ConnectDeviceServiceOptions = {
   /** The version of this omo build, reported to the service in its hello. */
   readonly version: string
@@ -204,6 +266,8 @@ export type ConnectDeviceServiceOptions = {
   readonly background?: boolean
   /** Test seam: the local API connection (the vendored v1 client by default). */
   readonly connect?: (options: ConnectOptions) => Promise<LocalApiClient>
+  /** Test seam: the two omo#13037 minimum versions (WAKE_MARK_MIN_SERVICE_VERSION, LOCATE_SINGLE_MIN_SERVICE_VERSION). */
+  readonly minimums?: MinimumsOption
 }
 
 /** Opens a proven connection to this device's service (mutual proof before any request) and returns the typed SDK. */
@@ -214,8 +278,17 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
     client: { name: "omo", version: options.version },
     ...(options.background === true ? { transport: () => connectLocal(stateDir, { background: true }) } : {}),
   })
+  const wakeMarkMinimum = minimumInEffect(options.minimums, "wakeMark", WAKE_MARK_MIN_SERVICE_VERSION)
+  const carriesWakeMark = serviceAtLeast(client.welcome.service_version, wakeMarkMinimum)
+  const takesSingleLocate = serviceAtLeast(
+    client.welcome.service_version,
+    minimumInEffect(options.minimums, "singleLocate", LOCATE_SINGLE_MIN_SERVICE_VERSION),
+  )
   return {
     serviceVersion: client.welcome.service_version,
+    carriesWakeMark,
+    wakeMarkMinimum,
+    takesSingleLocate,
     capabilities: client.welcome.capabilities,
     initialStatus: client.welcome.state,
     status: () => client.request("status.get", {}),
@@ -232,6 +305,8 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
       return stop
     },
     setEnabled: async (enabled) => (await client.request("service.set_enabled", { enabled })).enabled,
+    sessionWake: () => client.request("control.session_wake.get", {}),
+    setSessionWake: (enabled) => client.request("control.session_wake.set", { enabled }),
     attachControl: () => client.request("control.attach.get", {}),
     setAttachControl: (attached) => client.request("control.attach.set", { attached }),
     registerRefresher: async (binaryPath, version) => {
@@ -255,7 +330,11 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
     thisDevice: async () => (await client.request("device.info", {})).device,
     devices: async () => (await client.request("devices.list", {})).devices,
     sessions: newestRowsListing(client),
-    attach: (device, sessionId) => openAttach(client, device, sessionId),
+    // The mark rides only to a service that carries it; below that, every command keeps today's bytes.
+    attach: async (device, sessionId) => {
+      const attached = await openAttach(client, device, sessionId)
+      return carriesWakeMark ? attached : { ...attached, command: (rpc) => attached.command(rpc) }
+    },
     endpointCommand: async (device, rpc, options) => {
       // The endpoint lookup runs before any session.command is written, so whatever fails it (a timeout, a closed
       // connection, a refusal) dispatched nothing: it is marked not_sent, unlike a timeout after sending.
@@ -271,6 +350,20 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
     },
     close: () => client.close(),
     closed: client.closed,
-    locate: (device, engineId) => client.request("session.locate", { device, engine_id: engineId }),
+    locate: (device, engineId, options) =>
+      client.request("session.locate", {
+        device,
+        engine_id: engineId,
+        ...(options?.single === true && takesSingleLocate ? { single: true as const } : {}),
+      }),
+    wakeCommand: async (device, durableId, rpc) => {
+      if (!carriesWakeMark)
+        throw new LocalApiError("unsupported", "this device service does not carry the wake target", { not_sent: true })
+      return await followDelegatedCommand(client, device, (commandId) =>
+        client.wakeCommand(device, durableId, rpc, commandId).catch((error: unknown) => {
+          throw error instanceof LocalApiError && error.command_id === undefined ? markNotSent(error) : error
+        }),
+      )
+    },
   }
 }

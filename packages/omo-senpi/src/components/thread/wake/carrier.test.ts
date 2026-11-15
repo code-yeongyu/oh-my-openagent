@@ -3,6 +3,7 @@ import { appendFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { WAKE_LEASE_MS } from "../gateway/constants"
+import type { IntakeAdmission } from "../gateway/intake-admission"
 import type { GatewayStore } from "../gateway/store"
 import { createGatewayHarness, type GatewayHarness } from "../gateway/testing/harness"
 import { createCarrier, type Carrier, type CarrierEvent } from "./carrier"
@@ -58,11 +59,14 @@ async function setup(
     readonly wakeLimit?: number
     readonly sameDevice?: () => boolean
     readonly remoteWake?: () => boolean
+    readonly admitIntake?: (device: string) => Promise<IntakeAdmission>
+    readonly storeWrap?: (store: GatewayStore) => GatewayStore
+    readonly schedule?: (run: () => void, ms: number) => () => void
   } = {},
 ): Promise<Setup> {
   const h = (harness = createGatewayHarness())
   const fake = (host = await startFakeEngineHost(options))
-  const store = h.store()
+  const store = options.storeWrap === undefined ? h.store() : options.storeWrap(h.store())
   const sessions = join(h.agentDir, "sessions")
   const events: CarrierEvent[] = []
   const waiters: {
@@ -88,7 +92,8 @@ async function setup(
     wakeLimit: () => options.wakeLimit ?? 0,
     sameDevice: options.sameDevice ?? (() => true),
     ...(options.remoteWake === undefined ? {} : { remoteWake: options.remoteWake }),
-    schedule: () => () => undefined,
+    ...(options.admitIntake === undefined ? {} : { admitIntake: options.admitIntake }),
+    schedule: options.schedule ?? (() => () => undefined),
     onEvent: (event) => {
       events.push(event)
       for (const waiter of waiters.splice(0)) {
@@ -380,12 +385,95 @@ describe("the lease (A3.1.3)", () => {
       sessionsDirectory: join(h.agentDir, "sessions"),
       ensureHost: async () => undefined,
       connect: () => connectCarrierHost({ socket: fake.socketPath, keyRoot: () => h.agentDir }),
+      sameDevice: () => true,
       schedule: () => () => undefined,
     })
     carriers.push(successor)
     await successor.sweep()
     expect(await store.woken.list()).toEqual([])
     expect(sent(fake, "release_session")).toHaveLength(1)
+  })
+
+  // The #13455 delta review's MEDIUM: the sweep a carrier runs AT ITS START takes over rows a dead process left,
+  // with no wake of its own and no hand-called sweep; the timer still arms only while the table holds a row.
+  test("#given a table holding a row whose lease ran out #when a successor carrier starts with no wake of its own #then it takes the row over at its start", async () => {
+    const { h, fake, store, carrier, path } = await setup()
+    path("s1")
+    await carrier.wake("s1")
+    await carrier.stop()
+    h.clock.now += WAKE_LEASE_MS + 1
+    let tookOver: () => void = () => undefined
+    const settled = new Promise<void>((resolve, reject) => {
+      tookOver = resolve
+      const timer = setTimeout(
+        () => reject(new Error("waited 5s for the successor to take the row over at its start")),
+        5_000,
+      )
+      timer.unref?.()
+      const original = tookOver
+      tookOver = () => {
+        clearTimeout(timer)
+        original()
+      }
+    })
+    const successor = createCarrier({
+      store: h.store(),
+      sessionsDirectory: join(h.agentDir, "sessions"),
+      ensureHost: async () => undefined,
+      connect: () => connectCarrierHost({ socket: fake.socketPath, keyRoot: () => h.agentDir }),
+      sameDevice: () => true,
+      schedule: () => () => undefined,
+      onEvent: (event) => {
+        if (event.kind === "evaluated" && event.durable_id === "s1") tookOver()
+      },
+    })
+    carriers.push(successor)
+    await settled
+    expect(await store.woken.list()).toEqual([])
+    expect(sent(fake, "release_session")).toHaveLength(1)
+  })
+
+  // The #13455 delta review's LOW: a sweep whose store read throws once still has work to tend, so the timer is
+  // re-armed for the next tick instead of left disarmed while rows exist.
+  test("#given a sweep whose store read throws once #when the timer fires #then the sweep is scheduled again for the next tick", async () => {
+    let reads = 0
+    const timers: (() => void)[] = []
+    let secondArm: () => void = () => undefined
+    const reArmed = new Promise<void>((resolve, reject) => {
+      secondArm = resolve
+      const timer = setTimeout(() => reject(new Error("waited 5s for the sweep to be scheduled again")), 5_000)
+      timer.unref?.()
+      const original = secondArm
+      secondArm = () => {
+        clearTimeout(timer)
+        original()
+      }
+    })
+    const { carrier, path } = await setup({
+      storeWrap: (real) => ({
+        ...real,
+        woken: {
+          ...real.woken,
+          list: async () => {
+            reads += 1
+            if (reads === 2) throw new Error("the store read failed once")
+            return await real.woken.list()
+          },
+        },
+      }),
+      schedule: (run) => {
+        timers.push(run)
+        if (timers.length === 2) secondArm()
+        return () => undefined
+      },
+    })
+    path("t")
+    expect(await carrier.wake("t")).toMatchObject({ kind: "open" })
+    expect(timers).toHaveLength(1)
+    timers[0]?.()
+    await reArmed
+    expect(timers).toHaveLength(2)
+    await carrier.stop()
   })
 
   // Review of #13220 (MEDIUM): a successor must reopen the session in the session's own directory, never its own, or an
@@ -514,6 +602,59 @@ describe("a wake with nothing queued and another carrier's live record", () => {
   })
 })
 
+// #13456's noted follow-up: the retry and lease-takeover paths re-check the sender's peer admission before any start,
+// failing closed when the answer is unknown (the accept-time check of consumer.ts and the before-turn check of
+// intake-admission.ts bracket them; nothing else did).
+describe("the sender's admission at the retry and the takeover", () => {
+  test("#given a remote row deferred by a failed open #when the sweep retries it and the sender's admission answers unknown #then nothing opens, and it opens once the sender is admitted", async () => {
+    let refuse = true
+    let admission: IntakeAdmission = "admitted"
+    const { h, fake, store, carrier, file, intakeRow } = await setup({
+      remoteWake: () => true,
+      admitIntake: async () => admission,
+      openRefusal: () => (refuse ? { success: false, error: "host_stopping", errorCode: "host_stopping" } : undefined),
+    })
+    file("t")
+    await intakeRow("t", "d-remote")
+    expect(await carrier.wake("t")).toMatchObject({ kind: "deferred" })
+    expect(sent(fake, "open_session")).toHaveLength(1)
+    refuse = false
+    admission = "unknown"
+    const [row] = await store.woken.list()
+    h.clock.now = (row?.next_attempt_at ?? h.clock.now) + 1
+    await carrier.sweep()
+    expect(sent(fake, "open_session")).toHaveLength(1)
+    expect(await store.woken.list()).toMatchObject([{ durable_id: "t", state: "requested" }])
+    admission = "admitted"
+    const [again] = await store.woken.list()
+    h.clock.now = (again?.next_attempt_at ?? h.clock.now) + 1
+    await carrier.sweep()
+    expect(sent(fake, "open_session")).toHaveLength(2)
+    expect(sent(fake, "wake")).toHaveLength(1)
+  })
+
+  test("#given a carrier that died after opening for a remote row #when its successor sweeps past the lease and the sender's admission answers unknown #then nothing is reopened and the row ends, and a later admitted row opens again", async () => {
+    let admission: IntakeAdmission = "admitted"
+    const { h, fake, carrier, file, intakeRow, store } = await setup({
+      remoteWake: () => true,
+      admitIntake: async () => admission,
+    })
+    file("t")
+    await intakeRow("t", "d-remote")
+    expect(await carrier.wake("t")).toMatchObject({ kind: "open" })
+    await carrier.stop()
+    admission = "refused"
+    h.clock.now += WAKE_LEASE_MS + 1
+    await successorOf(h, fake, { remoteWake: () => true, admitIntake: async () => admission }).sweep()
+    expect(sent(fake, "open_session")).toHaveLength(1)
+    expect(await store.woken.list()).toEqual([])
+    admission = "admitted"
+    const successor = successorOf(h, fake, { remoteWake: () => true, admitIntake: async () => admission })
+    expect(await successor.wake("t")).toMatchObject({ kind: "open" })
+    expect(sent(fake, "open_session")).toHaveLength(2)
+  })
+})
+
 // Review of #13220 (LOW) and A7.2.3 (A7R-10), one rule: a carrier opens a session only when the session holds a
 // queued row whose own switch allows the open. A same-device row reads `session_wake.same_device` at the open; a row
 // from another device reads the wake the consumer was told on its own connection.
@@ -594,12 +735,23 @@ describe("the switches at the open (A7.2.3)", () => {
   })
 })
 
-function successorOf(h: GatewayHarness, fake: FakeEngineHost): Carrier {
+function successorOf(
+  h: GatewayHarness,
+  fake: FakeEngineHost,
+  options: {
+    readonly sameDevice?: () => boolean
+    readonly remoteWake?: () => boolean
+    readonly admitIntake?: (device: string) => Promise<IntakeAdmission>
+  } = {},
+): Carrier {
   const successor = createCarrier({
     store: h.store(),
     sessionsDirectory: join(h.agentDir, "sessions"),
     ensureHost: async () => undefined,
     connect: () => connectCarrierHost({ socket: fake.socketPath, keyRoot: () => h.agentDir }),
+    sameDevice: options.sameDevice ?? (() => true),
+    ...(options.remoteWake === undefined ? {} : { remoteWake: options.remoteWake }),
+    ...(options.admitIntake === undefined ? {} : { admitIntake: options.admitIntake }),
     schedule: () => () => undefined,
   })
   carriers.push(successor)
