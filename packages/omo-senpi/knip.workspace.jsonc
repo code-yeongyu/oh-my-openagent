@@ -26,6 +26,9 @@
         // compiled by path with `bun build --compile` in channel-compiled.test.ts
         "src/components/memory/desktop-sync/channel-compiled.fixture.ts",
         "src/components/memory/desktop-sync/hostSelection.fixture.ts",
+        // spawned by path from account-runtime-loader.test.ts (the host fixture imports the report fixture)
+        "src/components/memory/device-session/account-runtime-loader.fixture.ts",
+        "src/components/memory/device-session/account-runtime-loader.host.fixture.ts",
         "src/components/memory/device-session/sibling-writer.fixture.ts",
         "src/components/memory/index-engine.fixture.ts",
         "src/components/memory/index-observer.fixture.ts",
