@@ -5,7 +5,31 @@ import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
-const constantsSnapshot = { ...(await import("./constants")) }
+// Named, not a namespace spread: a spread counts every export as used and hides dead ones from knip.
+// satisfies flags a missing or extra key in the editor; no gate typechecks test files, so the export-list test below is
+// the enforced check that the restore set matches the module.
+const {
+  MESSAGE_STORAGE,
+  PART_STORAGE,
+  SESSION_STORAGE,
+  TODO_DIR,
+  TRANSCRIPT_DIR,
+  SESSION_LIST_DESCRIPTION,
+  SESSION_READ_DESCRIPTION,
+  SESSION_SEARCH_DESCRIPTION,
+  SESSION_INFO_DESCRIPTION,
+} = await import("./constants")
+const realConstants = {
+  MESSAGE_STORAGE,
+  PART_STORAGE,
+  SESSION_STORAGE,
+  TODO_DIR,
+  TRANSCRIPT_DIR,
+  SESSION_LIST_DESCRIPTION,
+  SESSION_READ_DESCRIPTION,
+  SESSION_SEARCH_DESCRIPTION,
+  SESSION_INFO_DESCRIPTION,
+} satisfies Record<keyof typeof import("./constants"), unknown>
 
 const TEST_DIR = join(tmpdir(), `omo-test-session-manager-${randomUUID()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_DIR, "message")
@@ -16,7 +40,6 @@ const TEST_TRANSCRIPT_DIR = join(TEST_DIR, "transcripts")
 let sqliteBackend = false
 
 mock.module("./constants", () => ({
-  OPENCODE_STORAGE: TEST_DIR,
   MESSAGE_STORAGE: TEST_MESSAGE_STORAGE,
   PART_STORAGE: TEST_PART_STORAGE,
   SESSION_STORAGE: TEST_SESSION_STORAGE,
@@ -26,8 +49,6 @@ mock.module("./constants", () => ({
   SESSION_READ_DESCRIPTION: "test",
   SESSION_SEARCH_DESCRIPTION: "test",
   SESSION_INFO_DESCRIPTION: "test",
-  SESSION_DELETE_DESCRIPTION: "test",
-  TOOL_NAME_PREFIX: "session_",
 }))
 
 mock.module("../../shared/opencode-storage-detection", () => ({
@@ -57,11 +78,21 @@ mock.module("../../shared/opencode-message-dir", () => ({
   },
 }))
 
+test("#given the ./constants restore set #then it names every export the real module declares", async () => {
+  // Bun's parser lists the names constants.ts exports, its own declarations and its `export { ... } from` names. Reading
+  // them is not a use for knip, but passing this check is: every name must also be destructured into the restore set
+  // above, so a dead export added later stops being reported by knip once it is named there. When this fails on a new
+  // export, confirm production reads it before adding it to the restore set.
+  const source = await Bun.file(join(import.meta.dir, "constants.ts")).text()
+  const declared = new Bun.Transpiler({ loader: "ts" }).scan(source).exports
+  expect(Object.keys(realConstants).sort()).toEqual([...declared].sort())
+})
+
 afterAll(async () => {
   // ./constants re-exports the storage roots from ../../shared, so this restore also puts the real paths back
   // into shared/opencode-storage-paths. That module is not mocked directly: a direct mock keeps its own
   // namespace on the deleted fixture for every later test file, even after a re-mock.
-  mock.module("./constants", () => constantsSnapshot)
+  mock.module("./constants", () => realConstants)
   mock.restore()
   // Boundary: later test files import these modules fresh, and the compaction-marker fixture writes under
   // PART_STORAGE. None of them may still name this file's fixture.
@@ -73,8 +104,10 @@ afterAll(async () => {
     ...["OPENCODE_STORAGE", "MESSAGE_STORAGE", "PART_STORAGE", "SESSION_STORAGE"].flatMap((name) => [
       `opencode-storage-paths.${name}=${String(Reflect.get(storagePaths, name))}`,
       `shared.${name}=${String(Reflect.get(shared, name))}`,
-      `constants.${name}=${String(Reflect.get(constants, name))}`,
     ]),
+    `constants.MESSAGE_STORAGE=${constants.MESSAGE_STORAGE}`,
+    `constants.PART_STORAGE=${constants.PART_STORAGE}`,
+    `constants.SESSION_STORAGE=${constants.SESSION_STORAGE}`,
     `constants.TODO_DIR=${constants.TODO_DIR}`,
     `constants.TRANSCRIPT_DIR=${constants.TRANSCRIPT_DIR}`,
     `compaction-marker.part=${getCompactionPartStorageDir("msg_boundary")}`,
