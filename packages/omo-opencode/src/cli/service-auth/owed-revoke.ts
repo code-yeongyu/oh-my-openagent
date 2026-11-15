@@ -16,7 +16,7 @@ export const owedRevokePath = (home: string, credential: string): string =>
   join(home, ".omo", "account-state", `${credential}.revoke-owed.json`)
 
 export const accountOfCredentials = (credentials: Credentials): string | undefined =>
-  credentials.accountId ?? credentials.owner?.accountId
+  credentials.owner?.accountId ?? credentials.accountId
 
 // A missing, unreadable or malformed file owes nothing: the owe is a best-effort follow-up, never a sign-in gate.
 async function readOwed(path: string): Promise<OwedRevoke[]> {
