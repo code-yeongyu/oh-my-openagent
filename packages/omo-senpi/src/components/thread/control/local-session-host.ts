@@ -1,8 +1,25 @@
 import { join } from "node:path"
 import { resolveAgentHome } from "../../agent-home/resolve-agent-home"
-import type { ThreadSummary } from "../contracts"
+import { workspaceEntries } from "../addressing"
+import type { ThreadSummary, ThreadWorkspaceNote } from "../contracts"
 import type { ThreadHost } from "../tools/ports"
-import type { SessionHost } from "./session-host"
+import type { HostedThread, SessionHost } from "./session-host"
+
+/**
+ * A thread this device opened in a folder outside the caller's workspace is `scope_denied` to the caller (its
+ * creator included) unless `all_scope` is set, judged as `resolveTarget` judges it; the result says so. A thread on
+ * another device belongs to the account, so it never carries the note.
+ */
+export function workspaceNote(thread: HostedThread, callerWorkspaceRoot: string): ThreadWorkspaceNote {
+  if (thread.device !== undefined) return {}
+  const { thread_id, name, status, cwd, created_at, updated_at } = thread
+  const entry = { thread_id, name, status, cwd, created_at, updated_at }
+  if (workspaceEntries([entry], callerWorkspaceRoot).length > 0) return {}
+  return {
+    workspace_scope: "outside",
+    scope_next_action: `Thread ${thread_id} is in ${cwd}, outside this session's workspace: pass all_scope: true when you address it, and to see it in thread_list.`,
+  }
+}
 
 export const defaultWorktreeRoot = (): string => join(resolveAgentHome({ env: process.env }), "worktrees")
 
