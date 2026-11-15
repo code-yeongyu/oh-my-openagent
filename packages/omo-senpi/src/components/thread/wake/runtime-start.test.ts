@@ -90,6 +90,10 @@ describe("the wake's process scope", () => {
     const running = latch.running?.get(agentDir)
     expect(running).toBeDefined()
     expect(runs.length).toBe(1)
+    // A send-triggered wake reaches the same closure from the sending session's context, so the closure itself must
+    // re-enter the scope (#13456 review M1).
+    await running?.wake("durable-1")
+    expect(runs.length).toBe(2)
     await running?.stop()
   })
 })
