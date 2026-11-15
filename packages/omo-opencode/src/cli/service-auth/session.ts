@@ -108,7 +108,10 @@ export function createSession(options: {
   readonly beforeKeysDiscarded: BeforeKeysDiscarded
   /** This machine's device service; absent, no device service is told anything. */
   readonly deviceService?: DeviceServiceHandoff
-  /** Binds a refreshed device to this machine (#6503), after the credential lock is released; absent, nothing is bound. */
+  /**
+   * Binds a refreshed device to this machine (#6503), started after the credential lock is released and never awaited by
+   * the token read; absent, nothing is bound.
+   */
   readonly machineBinding?: MachineBinding
 }) {
   const api = serviceOrigin(options.api)
@@ -131,7 +134,8 @@ export function createSession(options: {
     )
   }
   const request = (path: string, init: RequestInit) => requestApi(api, path, init, signal)
-  // A token read that refreshed binds the stored successor once its locked section has released the lock.
+  // A token read that refreshed starts binding the stored successor once its locked section has released the lock, and
+  // answers without waiting for it: the binding never fails and a process that exits waits on machineBinding.settled().
   async function refreshThenBind<T>(section: (refresh: typeof refreshed) => Promise<T>): Promise<T> {
     let successor: Credentials | undefined
     const value = await section(async (current) => {
@@ -139,7 +143,7 @@ export function createSession(options: {
       if (next !== current) successor = next
       return next
     })
-    if (successor !== undefined) await options.machineBinding?.(successor)
+    if (successor !== undefined) void options.machineBinding?.(successor)
     return value
   }
   /** The account a token's sign-in belongs to; undefined when the service does not say (never blocks logout). */

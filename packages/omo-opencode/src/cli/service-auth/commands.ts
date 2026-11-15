@@ -5,7 +5,7 @@ import { isClosedBareLogin, isClosedDeviceLogin, withClosedDeviceLoginOptions } 
 import { openSignInBrowser } from "./browser"
 import { deviceName, devicePlatform } from "./device-name"
 import { loginDevice } from "./device-flow"
-import { machineBindingAfterRefresh } from "./machine-binding"
+import { type MachineBinding, machineBindingAfterRefresh } from "./machine-binding"
 import { advertisesMachineIdentity, readMachineDigest } from "./machine-digest"
 import { refuseSecondMachineDevice } from "./machine-device"
 import { createCredentialStore, INTERACTIVE_READ_WAIT } from "./keystore"
@@ -97,20 +97,22 @@ async function run(
   const cancel = () => controller.abort()
   process.once("SIGINT", cancel)
   process.once("SIGTERM", cancel)
+  let machineBinding: MachineBinding | undefined
   try {
     const api = serviceOrigin(options.api ?? process.env.OMO_SERVICE_API_URL ?? DEFAULT_API_ORIGIN)
     const store = createCredentialStore(api, { wait: INTERACTIVE_READ_WAIT })
     const deviceService = hooks.deviceService?.(api)
+    machineBinding = machineBindingAfterRefresh({
+      api,
+      signal: controller.signal,
+      log: (line) => console.error(line),
+    })
     const session = createSession({
       api,
       store,
       signal: controller.signal,
       ...(deviceService === undefined ? {} : { deviceService }),
-      machineBinding: machineBindingAfterRefresh({
-        api,
-        signal: controller.signal,
-        log: (line) => console.error(line),
-      }),
+      machineBinding,
       beforeKeysDiscarded: retireSyncPinOnDiscard({
         pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())),
         log: (line) => console.error(line),
@@ -193,6 +195,9 @@ async function run(
     )
     process.exitCode = 1
   } finally {
+    // A token read answers without waiting for the binding it started; the command's output is out, so the binding
+    // (bounded by its own time limit, cut short by Ctrl-C) finishes before the process exits.
+    await machineBinding?.settled()
     process.removeListener("SIGINT", cancel)
     process.removeListener("SIGTERM", cancel)
   }

@@ -28,7 +28,7 @@ import {
 import { retireSyncPinOnDiscard } from "../omo-opencode/src/cli/service-auth/sync-pin-retire"
 import { retireSyncDevice } from "../memory-core/src/sync/device-retire"
 import { RecoveryExhausted, RecoveryPending } from "../omo-opencode/src/cli/service-auth/owned-refresh"
-import { machineBindingAfterRefresh } from "../omo-opencode/src/cli/service-auth/machine-binding"
+import { type MachineBinding, machineBindingAfterRefresh } from "../omo-opencode/src/cli/service-auth/machine-binding"
 import { ACCOUNT_EXIT, accountStoreFailure, showAccount } from "./account-show"
 import { cliDeviceServiceHandoff } from "./device-service-handoff"
 
@@ -62,20 +62,14 @@ const reply = (dependencies: AccountCommandDependencies, value: unknown, code: n
 const retireHook = (dependencies: AccountCommandDependencies): BeforeKeysDiscarded =>
   dependencies.beforeKeysDiscarded ?? (async () => undefined)
 
-const sessionOf = (dependencies: AccountCommandDependencies): Session =>
+const sessionOf = (dependencies: AccountCommandDependencies, machineBinding?: MachineBinding): Session =>
   createSession({
     api: dependencies.api,
     store: dependencies.store,
     beforeKeysDiscarded: retireHook(dependencies),
     ...(dependencies.home === undefined ? {} : { home: dependencies.home }),
     ...(dependencies.deviceService === undefined ? {} : { deviceService: dependencies.deviceService }),
-    // The desktop app reads the machine's token here (`omo account token`), so a refresh on this path binds the shared
-    // sign-in's device to this machine for both clients (#6503).
-    machineBinding: machineBindingAfterRefresh({
-      api: dependencies.api,
-      log: dependencies.error,
-      ...(dependencies.home === undefined ? {} : { home: dependencies.home }),
-    }),
+    ...(machineBinding === undefined ? {} : { machineBinding }),
   })
 
 async function signedOut(dependencies: AccountCommandDependencies, session: Session): Promise<number> {
@@ -131,7 +125,22 @@ async function adopt(dependencies: AccountCommandDependencies, replace: boolean)
 }
 
 async function token(dependencies: AccountCommandDependencies): Promise<number> {
-  const session = sessionOf(dependencies)
+  // The desktop app reads the machine's token here, so a refresh on this path binds the shared sign-in's device to this
+  // machine for both clients (#6503). The answer is written first; the process then waits for the binding, which its
+  // own time limit bounds, so the exit comes at most that much later.
+  const machineBinding = machineBindingAfterRefresh({
+    api: dependencies.api,
+    log: dependencies.error,
+    ...(dependencies.home === undefined ? {} : { home: dependencies.home }),
+  })
+  try {
+    return await answerToken(dependencies, sessionOf(dependencies, machineBinding))
+  } finally {
+    await machineBinding.settled()
+  }
+}
+
+async function answerToken(dependencies: AccountCommandDependencies, session: Session): Promise<number> {
   try {
     const current = await session.accessSnapshot()
     if (current === null) return signedOut(dependencies, session)
