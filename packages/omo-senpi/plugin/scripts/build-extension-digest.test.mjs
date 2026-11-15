@@ -11,17 +11,18 @@ describe("bundle marker digest settings", () => {
   const node26 = ["ffi", "fs", "path", "node:ffi", "node:fs", "node:path"]
 
   test("a newer node's extra builtins do not change the digest", () => {
-    expect(digestSettingsFor([...sourceExternals, ...node24], ["fs", "path"]))
-      .toBe(digestSettingsFor([...sourceExternals, ...node26], ["ffi", "fs", "path"]))
+    expect(digestSettingsFor([...sourceExternals, ...node24], ["fs", "path"])).toBe(
+      digestSettingsFor([...sourceExternals, ...node26], ["ffi", "fs", "path"]),
+    )
   })
 
   test("a source-derived external still changes the digest", () => {
-    expect(digestSettingsFor([...sourceExternals, ...node24], ["fs", "path"]))
-      .not.toBe(digestSettingsFor([...sourceExternals, "#omo-new-runtime", ...node24], ["fs", "path"]))
+    expect(digestSettingsFor([...sourceExternals, ...node24], ["fs", "path"])).not.toBe(
+      digestSettingsFor([...sourceExternals, "#omo-new-runtime", ...node24], ["fs", "path"]),
+    )
   })
 
   test("the builtin family is recorded as one stable token", () => {
-    expect(digestSettingsFor([...sourceExternals, ...node24], ["fs", "path"]))
-      .toContain("<node-builtins>")
+    expect(digestSettingsFor([...sourceExternals, ...node24], ["fs", "path"])).toContain("<node-builtins>")
   })
 })
