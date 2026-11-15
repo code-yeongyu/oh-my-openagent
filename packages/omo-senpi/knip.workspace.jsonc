@@ -1,0 +1,898 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/omo-senpi": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "scripts/qa/fused-equivalence-e2e.mjs",
+        // run by path as the bunshin-ts eval SDK's live QA driver (scripts/qa/AGENTS.md)
+        "scripts/qa/bunshin-ts-eval-sdk-qa.mjs",
+        // run by path as computer-use v2 row 9's live macOS capture-consent and SkyLight measurement
+        "scripts/qa/capture-consent-probe-macos.mjs",
+        "src/components/claim-receipt/runtime.ts",
+        "src/components/computer-use/runtime.ts",
+        "src/components/device-service/runtime.ts",
+        "src/components/feedback/runtime.ts",
+        "src/components/memory/commands/runtime.ts",
+        "src/components/memory/device-session/account-runtime.ts",
+        // spawned by path from tests: a child process or Worker entry, never imported
+        // compiled by path with `bun build --compile` in channel-compiled.test.ts
+        "src/components/memory/desktop-sync/channel-compiled.fixture.ts",
+        "src/components/memory/desktop-sync/hostSelection.fixture.ts",
+        "src/components/memory/device-session/sibling-writer.fixture.ts",
+        "src/components/memory/index-engine.fixture.ts",
+        "src/components/memory/index-observer.fixture.ts",
+        "src/components/memory/index-selection.fixture.ts",
+        "src/components/memory/kibitzer/tools/test-support.ts",
+        "src/components/memory/palace/runtime.ts",
+        "src/components/memory/recall-store-runtime.ts",
+        "src/components/memory/sync-runtime.ts",
+        "src/components/onboarding/session-history/runtime.ts",
+        "src/components/onboarding/session-history/test-support.ts",
+        "src/components/onboarding/test-harness.ts",
+        "src/components/skill-pointers/test-support.ts",
+        "src/components/telemetry/otlp-runtime.ts",
+        "src/components/telemetry/posthog-runtime.ts",
+        "src/components/telemetry/session-summary-recovery.ts",
+        "src/components/thread/live-surface.ts",
+        "src/extension/omo-task.ts",
+      ],
+      "ignoreFiles": [
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/expect-exit.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/agent-toolkit-catalog-qa.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/agent-toolkit-eval-sdk-docs.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/agent-toolkit-eval-sdk-qa-support.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/agent-toolkit-eval-sdk-qa.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/agent-toolkit-sdk-plan-audit.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/ast-grep-mcp-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/claim-receipt-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/claim-receipt-extension.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/claim-receipt-replay.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/computer-control-live-macos-desktop.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/computer-control-live-macos.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/computer-control-rpc-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/computer-use-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/curated-agents-e2e-mock-provider.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/curated-agents-e2e-scenarios.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/curated-agents-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/dag-cross-run-residency-qa.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/dag-gate-proof.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/dag-lease-handoff-qa.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/dag-node-projection-qa.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/dag-paused-header-qa.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/dag-wait-detach-qa.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/desktop-toolkit-rpc-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/environment-receipt.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/fallback-architect-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/fallback-architect-mock-provider.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/fixtures/policy-continuation-extension.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/gateway-acceptance-trace.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/git-master-attribution-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/isolation-e2e-scenarios.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/isolation-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/kernel-tools-python-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/kibitzer-legacy-absence-probe.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/kibitzer-sidecar-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/kibitzer-sidecar-manifest-check.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/kibitzer-sidecar-package-probe.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/kibitzer-sidecar-recovery-probe.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/kibitzer-sidecar-support.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/kibitzer-sidecar-tui-qa.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/lsp-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/mass-ulw-prompts-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/memory-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/memory-model-fallback-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/memory-skill-startup-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/memory-write-visual-qa.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/mock-completions-server.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/model-profile-e2e-mock-provider.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/model-profile-e2e-observations.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/model-profile-e2e-scenarios.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/model-profile-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/no-todo-continuity-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/onboarding-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/onboarding-extension.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/package-dir-hygiene-probe.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/parallelism-eval-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/plan-gated-agents-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/probe-continuation.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/probe-cross-session.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/recall-collect-bench.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/recall-ranker-bench.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/reflection-recap-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/reflection-recap-retained-provider.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/reflection-recap-runtime.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/session-dag-resume-extension.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/session-dag-resume-qa.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/session-dag-selector-pty.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/skill-pointers-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-14/common.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-14/kill-mid-turn.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-14/run-all.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-14/version-capability.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-category-unavailable-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-category-unavailable-mock-provider.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-depth-e2e-mock-provider.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-depth-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-e2e-process.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-e2e-scenarios.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-fallback-notification.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-baseline.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-cancel-cascade.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-engine-probe.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-gated.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-gates.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-gateway-cost.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-mock-selftest.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-ops.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-reattach.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-resume-evidence.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-resume-selftest.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-resume.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-scenarios.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-selftest.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-shard-cost-idle-exit.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-shard-cost-latency.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-shard-cost-memory.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-shard-cost-observe.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-shard-cost-user-latency.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-shard-cost.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-shards-contracts.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-shards-handoff-successors-interactive.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-shards-handoff-successors-live.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-shards-handoff-successors-resume.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-shards-handoff-successors.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-shards-handoff.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-shards-index-live.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-shards-nested.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-shards-retain-live-incompatibility.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-shards-retain-live-migration.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-shards-retain-live-resume.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-shards-retain-live-support.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-shards-retain-live.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-shards-rollback-live-support.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-shards-rollback-live.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-shards.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-storm.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-stranded.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-team.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e-threads.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-host-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-id-race-mock-provider.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-id-race-qa.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-lane-spill-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-lane-spill-mock-provider.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-load-skills-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-openai-lane-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-openai-lane-mock-provider.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-parent-restart-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-parent-restart-runtime.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-rpc-e2e-mock-provider.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-runtime-fallback-mock-provider.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-shutdown-process.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-stats-renderer.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-summary-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-terminal-provider-error-mock-provider.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-terminal-provider-error-qa.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-tui-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/task-tui-scenarios.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/team-delete-6413-qa.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/team-e2e-mock-provider.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/telemetry-attribution-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/telemetry-opt-out-env.d.mts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/telemetry-optout-purge-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/thread-tools/adopt.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/thread-tools/binding-author.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/thread-tools/cli-surface.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/thread-tools/desktop-client.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/thread-tools/desktop-to-cli.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/thread-tools/draft-preservation.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/thread-tools/held-then-exit.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/thread-tools/host-to-tui.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/thread-tools/lib/desktop-shell.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/thread-tools/lib/engine-version.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/thread-tools/lib/gateway.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/thread-tools/lib/harness.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/thread-tools/loop-guard.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/thread-tools/lost-ack.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/thread-tools/offline-queue.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/thread-tools/plugin-surface.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/thread-tools/receiver-crash.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/thread-tools/repeated-wake.mjs",
+        // a QA scenario that run-all.mjs runs by name (#13396), like its siblings
+        "scripts/qa/thread-tools/report-origin-auto-steer.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/thread-tools/report-origin-steer.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/thread-tools/report-origin.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/thread-tools/run-all.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/thread-tools/sender-death.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/thread-tools/session-control-qa.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/thread-tools/stopped-target.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/thread-tools/terminal-to-ui.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/thread-tools/tui-to-tui.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/todo-fanout-reminder-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/ultrawork-receiver-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/ulw-goal-footer-tui.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/ulw-prompts-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/variant-thinking-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/variant-thinking-mock-provider.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/x-search-backtest.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/telemetry-schema-artifact.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/ulw-plan/scripts/plan-templates.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/ulw-plan/scripts/scaffold-plan.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/computer-use/permission-child.test-fixture.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/computer-use/permission-engine.test-fixture.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/computer-use/permission-registry.test-fixture.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/init-deep-advisor/qa-rpc-driver.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/init-deep-advisor/qa-rpc-support.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/lsp/adapter/renderers.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/memory/facts-applied-reconcile-child.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/memory/worker/__fixtures__/crash-driver.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/memory/worker/__fixtures__/dream-audit-child.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/memory/worker/__fixtures__/dream-child.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/memory/worker/__fixtures__/hold-lock.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/memory/worker/__fixtures__/reflection-child.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/memory/worker/__fixtures__/supervisor-child.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/memory/worker/__fixtures__/supervisor-env-probe.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/memory/worker/__fixtures__/supervisor-finished-child.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/memory/worker/__fixtures__/supervisor-incomplete-outcome-then-fail.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/memory/worker/__fixtures__/supervisor-keepalive.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/memory/worker/__fixtures__/supervisor-never-publishes.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/memory/worker/__fixtures__/supervisor-outcome-then-fail.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/memory/worker/__fixtures__/supervisor-outcome-then-linger.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/memory/worker/__fixtures__/supervisor-parent.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/memory/worker/__fixtures__/supervisor-runtime-env.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/memory/worker/__fixtures__/supervisor-slot-child.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/memory/worker/__fixtures__/supervisor-taskkill.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/onboarding/claim-race-child.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/telemetry/omo-native-crash.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/telemetry/process-crash-records.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/telemetry/session-summary-process.test-support.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/thread/gateway/index.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/thread/gateway/store-worker.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/components/thread/gateway/testing/extension-sdk-smoke.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/extension/__fixtures__/cold-pi-tui-probe.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/extension/bundled-index.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/extension/rollback-migrate-runtime.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/extension/thread-sdk.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/install/cli-local.ts",
+      ],
+      "ignoreDependencies": [
+        // pre-existing at origin dev 4686e425b5: a declared dependency nothing imports
+        "@code-yeongyu/lsp-daemon",
+        // pre-existing at origin dev 4686e425b5: a declared dependency nothing imports
+        "@oh-my-opencode/ast-grep-mcp",
+        // pre-existing at origin dev 4686e425b5: a declared dependency nothing imports
+        "@oh-my-opencode/prompts-core",
+      ],
+      // pre-existing at origin dev 4686e425b5: executables this package runs that it does not declare
+      // plutil, screencapture: macOS tools run by scripts/qa/capture-consent-probe-macos.mjs
+      "ignoreBinaries": ["icacls", "pgrep", "plutil", "screencapture", "taskkill.exe", "vmmap"],
+      "ignoreIssues": {
+        // pre-existing at origin dev 4686e425b5: imports of undeclared packages @code-yeongyu/comment-checker
+        "scripts/qa/drive.mjs": ["unlisted"],
+      },
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) REASON, TARGET_TITLE, jsonLines, auditActions, sessionFiles, toolResults
+    "packages/omo-senpi/scripts/qa/computer-control-live-macos-scenarios.mjs": ["REASON", "TARGET_TITLE", "jsonLines", "auditActions", "sessionFiles", "toolResults"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) EXPECTED_EXPLORE_TOOL_ALLOW, EXPLORE_PERSONA_SENTINEL, EXPLORE_TASK_SENTINEL, analyzeCuratedSandboxFiles
+    "packages/omo-senpi/scripts/qa/curated-agents-e2e-analysis.mjs": ["EXPECTED_EXPLORE_TOOL_ALLOW", "EXPLORE_PERSONA_SENTINEL", "EXPLORE_TASK_SENTINEL", "analyzeCuratedSandboxFiles"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) registerFixture
+    "packages/omo-senpi/scripts/qa/dag-owner-scope-fixture.mjs": ["registerFixture"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) parseArgs, signalTree, isAlive, scanSurvivors, seedSession, run
+    "packages/omo-senpi/scripts/qa/dag-owner-scope.mjs": ["parseArgs", "signalTree", "isAlive", "scanSurvivors", "seedSession", "run"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DRIVER, parseArgs, git, diffEntries, compareFile
+    "packages/omo-senpi/scripts/qa/dependency-diff-check.mjs": ["DRIVER", "parseArgs", "git", "diffEntries", "compareFile"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MANIFEST_KINDS, packageJsonEntries, bunLockEntries, npmLockEntries, yarnLockEntries, pnpmLockEntries, nameOfSelector, splitPackageKey
+    "packages/omo-senpi/scripts/qa/dependency-diff-parsers.mjs": ["MANIFEST_KINDS", "packageJsonEntries", "bunLockEntries", "npmLockEntries", "yarnLockEntries", "pnpmLockEntries", "nameOfSelector", "splitPackageKey"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) resolveCommentCheckerBin
+    "packages/omo-senpi/scripts/qa/drive.mjs": ["resolveCommentCheckerBin"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) OutDirArgError
+    "packages/omo-senpi/scripts/qa/out-dir-arg.ts": ["OutDirArgError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) QA_CONTEXT_WINDOW, QA_COMPACTION_CONTEXT_WINDOW, HOST_OWNED_FAILURES, run
+    "packages/omo-senpi/scripts/qa/policy-continuation-e2e.mjs": ["QA_CONTEXT_WINDOW", "QA_COMPACTION_CONTEXT_WINDOW", "HOST_OWNED_FAILURES", "run"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) parseEvents
+    "packages/omo-senpi/scripts/qa/resume-e2e-runtime.mjs": ["parseEvents"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) HOST_ROUTING_ENV_NAMES, SESSION_IDENTITY_ENV_NAMES, sandboxAgentDirEnv
+    "packages/omo-senpi/scripts/qa/sandbox-child-env.mjs": ["HOST_ROUTING_ENV_NAMES", "SESSION_IDENTITY_ENV_NAMES", "sandboxAgentDirEnv"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) SHARED_SENPI_LOG, findBatchFanout, findTaskIds, findWakeNotification, findRevived, findTranscript, findInlineFinal, findCategoryListingError, jsonlSignature, jsonlSignatures and 2 more
+    "packages/omo-senpi/scripts/qa/task-e2e-analysis.mjs": ["SHARED_SENPI_LOG", "findBatchFanout", "findTaskIds", "findWakeNotification", "findRevived", "findTranscript", "findInlineFinal", "findCategoryListingError", "jsonlSignature", "jsonlSignatures", "matchesOrderedSubsequence", "MAIN_FLOW_EXPECTED_SEQUENCE"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) generationHostPid, zombieChildCount
+    "packages/omo-senpi/scripts/qa/task-host-e2e-daemon-state.mjs": ["generationHostPid", "zombieChildCount"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) STATE_DEADLINE_MS
+    "packages/omo-senpi/scripts/qa/task-host-e2e-events.mjs": ["STATE_DEADLINE_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) daemonStatus, observeDaemon, parentArgv, readTaskRecords, psSnapshot, perChildRpcProcesses, globalModeRpcCount, childPids, socketInode, cleanupScenario
+    "packages/omo-senpi/scripts/qa/task-host-e2e-process.mjs": ["daemonStatus", "observeDaemon", "parentArgv", "readTaskRecords", "psSnapshot", "perChildRpcProcesses", "globalModeRpcCount", "childPids", "socketInode", "cleanupScenario"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DELETED_CHILD_ENV, CREDENTIAL_FILES, WATCHED_FILES, credentialDigest, realAgentDigests, changedRealAgentFiles, createRunRoot, writeOmoConfig, writeMockScript
+    "packages/omo-senpi/scripts/qa/task-host-e2e-sandbox.mjs": ["DELETED_CHILD_ENV", "CREDENTIAL_FILES", "WATCHED_FILES", "credentialDigest", "realAgentDigests", "changedRealAgentFiles", "createRunRoot", "writeOmoConfig", "writeMockScript"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) SECTIONS, REQUIRED_SAMPLES, CONTROL_ONLY_ROWS, nullCells
+    "packages/omo-senpi/scripts/qa/task-host-e2e-shard-cost-eval.mjs": ["SECTIONS", "REQUIRED_SAMPLES", "CONTROL_ONLY_ROWS", "nullCells"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) STATUS_ALL_FIELDS, footprintMb, sampleEndpoint, totalOf, settle
+    "packages/omo-senpi/scripts/qa/task-host-e2e-shard-cost-process.mjs": ["STATUS_ALL_FIELDS", "footprintMb", "sampleEndpoint", "totalOf", "settle"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MOCK_ENTRY, CHILD_TEXT, heldChild, provisionConfig, holdStep, taskStep, childTask, release, awaitParent, stepsKey and 7 more
+    "packages/omo-senpi/scripts/qa/task-host-e2e-shard-cost-support.mjs": ["MOCK_ENTRY", "CHILD_TEXT", "heldChild", "provisionConfig", "holdStep", "taskStep", "childTask", "release", "awaitParent", "stepsKey", "mockEvents", "STATUS_ALL_FIELDS", "footprintMb", "sampleEndpoint", "settle", "totalOf", "pidAlive"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) runCrashMatrix, controlRowForReport
+    "packages/omo-senpi/scripts/qa/task-host-e2e-shards-crash.mjs": ["runCrashMatrix", "controlRowForReport"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) SCENARIO_GROUPS
+    "packages/omo-senpi/scripts/qa/task-host-e2e-shards-eval.mjs": ["SCENARIO_GROUPS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) runAltRootSuccessorScenario
+    "packages/omo-senpi/scripts/qa/task-host-e2e-shards-handoff-successors-alt.mjs": ["runAltRootSuccessorScenario"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MOCK_ENTRY, scenarioConfig, requestView, batchTaskStep, heldTaskStep, writeParentScript, handoff, sessionRow, privateHostSocket, supervisorCount and 2 more
+    "packages/omo-senpi/scripts/qa/task-host-e2e-shards-handoff-successors-support.mjs": ["MOCK_ENTRY", "scenarioConfig", "requestView", "batchTaskStep", "heldTaskStep", "writeParentScript", "handoff", "sessionRow", "privateHostSocket", "supervisorCount", "nextSockets", "sessionFile"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) taskScript, writeScript, writeHttpModels, captureAtomicWriteFailure, observeRegistrationBeforeEndpoint, crossEndpointHazardPassed, idleGcIndexResumePassed, finishRow
+    "packages/omo-senpi/scripts/qa/task-host-e2e-shards-index-live-support.mjs": ["taskScript", "writeScript", "writeHttpModels", "captureAtomicWriteFailure", "observeRegistrationBeforeEndpoint", "crossEndpointHazardPassed", "idleGcIndexResumePassed", "finishRow"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) REATTACH_TAG, requestCount, fail
+    "packages/omo-senpi/scripts/qa/task-host-e2e-shards-support.mjs": ["REATTACH_TAG", "requestCount", "fail"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) CHILD_PROMPT, hostConfig, spawnScript, holdParent, CHILD_BUSY, CHILD_DONE, TERMINAL_STATUSES, childrenSettled, toolDetails, transcriptSizes and 3 more
+    "packages/omo-senpi/scripts/qa/task-host-e2e-support.mjs": ["CHILD_PROMPT", "hostConfig", "spawnScript", "holdParent", "CHILD_BUSY", "CHILD_DONE", "TERMINAL_STATUSES", "childrenSettled", "toolDetails", "transcriptSizes", "failureTokens", "recordFailureTokens", "childStartDiagnosis"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) FINISHED_CHILD_TOKEN, CANCEL_CHILD_TOKEN, LRU_CHILD_TOKEN, TTL_CHILD_TOKEN, default
+    "packages/omo-senpi/scripts/qa/task-resume-e2e-mock-provider.ts": ["FINISHED_CHILD_TOKEN", "CANCEL_CHILD_TOKEN", "LRU_CHILD_TOKEN", "TTL_CHILD_TOKEN", "default"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) FINISHED_CHILD_TOKEN, RESUME_OMO_CONFIG
+    "packages/omo-senpi/scripts/qa/task-resume-e2e-scenarios.mjs": ["FINISHED_CHILD_TOKEN", "RESUME_OMO_CONFIG"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) runTaskResumeScenarios
+    "packages/omo-senpi/scripts/qa/task-resume-e2e.mjs": ["runTaskResumeScenarios"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) CREDENTIAL_FILES, digestCredentialFiles, childSessionJsonlExists, analyzeRpcRouting, analyzeSpawn, eventsMentionSteerAck, statusSnapshots, recordRpcChildPids, liveRecordRpcChildPids
+    "packages/omo-senpi/scripts/qa/task-rpc-e2e-helpers.mjs": ["CREDENTIAL_FILES", "digestCredentialFiles", "childSessionJsonlExists", "analyzeRpcRouting", "analyzeSpawn", "eventsMentionSteerAck", "statusSnapshots", "recordRpcChildPids", "liveRecordRpcChildPids"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) runOne
+    "packages/omo-senpi/scripts/qa/task-rpc-reconcile-batch.mjs": ["runOne"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) toolResults, runtimeRootDir, taskEventText, buildMessage
+    "packages/omo-senpi/scripts/qa/team-e2e-support.mjs": ["toolResults", "runtimeRootDir", "taskEventText", "buildMessage"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) TELEMETRY_OPT_OUT_ENV
+    "packages/omo-senpi/scripts/qa/telemetry-opt-out-env.mjs": ["TELEMETRY_OPT_OUT_ENV"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) RUNTIME, RUNTIME_ENTRY
+    "packages/omo-senpi/scripts/qa/telemetry-opt-out-env.scan.mjs": ["RUNTIME", "RUNTIME_ENTRY"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) shippedName
+    "packages/omo-senpi/scripts/qa/telemetry-opt-out-env.test.mjs": ["shippedName"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) spawnSenpi, observedToolCalls, observeTaskAgentType
+    "packages/omo-senpi/scripts/qa/x-search-live-e2e.mjs": ["spawnSenpi", "observedToolCalls", "observeTaskAgentType"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) BUNDLED_SKILLS_COMPONENT_NAME
+    "packages/omo-senpi/src/components/bundled-skills/index.ts": ["BUNDLED_SKILLS_COMPONENT_NAME"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) maskQuotedProse, splitSentences
+    "packages/omo-senpi/src/components/claim-receipt/classify.ts": ["maskQuotedProse", "splitSentences"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) CLAIM_RECEIPT_RUNTIME_ARTIFACT
+    "packages/omo-senpi/src/components/claim-receipt/runtime-loader.ts": ["CLAIM_RECEIPT_RUNTIME_ARTIFACT"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) executableName, offlineMessage
+    "packages/omo-senpi/src/components/claude-code/acquire.ts": ["executableName", "offlineMessage"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) CLAUDE_CODE_PROVIDER, claudeCodeRuntimeDir, claudeCodeProgressLine
+    "packages/omo-senpi/src/components/claude-code/index.ts": ["CLAUDE_CODE_PROVIDER", "claudeCodeRuntimeDir", "claudeCodeProgressLine"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) commentCheckerFailureNotice
+    "packages/omo-senpi/src/components/comment-checker/failure-notice.ts": ["commentCheckerFailureNotice"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) downloadSenpiCommentCheckerBinary, defaultCommentCheckerCacheDir
+    "packages/omo-senpi/src/components/comment-checker/index.ts": ["downloadSenpiCommentCheckerBinary", "defaultCommentCheckerCacheDir"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) COMPUTER_USE_COMPONENT_NAME
+    "packages/omo-senpi/src/components/computer-use/index.ts": ["COMPUTER_USE_COMPONENT_NAME"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) toComputerSettingsInput
+    "packages/omo-senpi/src/components/computer-use/settings.ts": ["toComputerSettingsInput"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) OPENCODE_ROUTING_NOTICE_MIGRATION_ID
+    "packages/omo-senpi/src/components/config-startup/opencode-routing-notice.ts": ["OPENCODE_ROUTING_NOTICE_MIGRATION_ID"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) PLAN9_FILE_SYSTEM_TYPE, OMO_CONFIG_FILE_FILTER_GLOBS, OMO_CONFIG_DIRECTORY_FILTER_GLOBS
+    "packages/omo-senpi/src/components/config-watch/paths.ts": ["PLAN9_FILE_SYSTEM_TYPE", "OMO_CONFIG_FILE_FILTER_GLOBS", "OMO_CONFIG_DIRECTORY_FILTER_GLOBS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MERGED_OMO_CONFIG_DIAGNOSTIC_PATH
+    "packages/omo-senpi/src/components/config-watch/validate.ts": ["MERGED_OMO_CONFIG_DIAGNOSTIC_PATH"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) FABLE_FIVE_ID_PREFIX, isDemotedEmptyToolUse
+    "packages/omo-senpi/src/components/fallback-architect/detection.ts": ["FABLE_FIVE_ID_PREFIX", "isDemotedEmptyToolUse"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) TRANSCRIPT_MESSAGE_LIMIT, LOG_WINDOW_MS
+    "packages/omo-senpi/src/components/feedback/collect.ts": ["TRANSCRIPT_MESSAGE_LIMIT", "LOG_WINDOW_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) REPORT_RETENTION_DAYS, byteLength
+    "packages/omo-senpi/src/components/feedback/draft.ts": ["REPORT_RETENTION_DAYS", "byteLength"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) REPORT_SECTION_IDS, REPORT_KINDS, REPORT_MAX_BYTES, ANONYMOUS_REPORT_MAX_BYTES, REPORT_IDEMPOTENCY_HEADER, REPORT_IDEMPOTENCY_KEY, REPORT_DELETE_TOKEN_HEADER, readCreateReportRequest, createReportResponseSchema, reportListSchema and 1 more
+    "packages/omo-senpi/src/components/feedback/fixtures/service-contract/reports.ts": ["REPORT_SECTION_IDS", "REPORT_KINDS", "REPORT_MAX_BYTES", "ANONYMOUS_REPORT_MAX_BYTES", "REPORT_IDEMPOTENCY_HEADER", "REPORT_IDEMPOTENCY_KEY", "REPORT_DELETE_TOKEN_HEADER", "readCreateReportRequest", "createReportResponseSchema", "reportListSchema", "compareReportVersions"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ContractError, isRecord, readBoolean, readTrue, readNullable, HTTP_URL, HOSTNAME, ENVIRONMENT_NAME
+    "packages/omo-senpi/src/components/feedback/fixtures/service-contract/schema.ts": ["ContractError", "isRecord", "readBoolean", "readTrue", "readNullable", "HTTP_URL", "HOSTNAME", "ENVIRONMENT_NAME"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) FEEDBACK_UNAVAILABLE
+    "packages/omo-senpi/src/components/feedback/index.ts": ["FEEDBACK_UNAVAILABLE"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) FEEDBACK_RUNTIME_ARTIFACT, createFeedbackRuntimeLoader
+    "packages/omo-senpi/src/components/feedback/runtime-loader.ts": ["FEEDBACK_RUNTIME_ARTIFACT", "createFeedbackRuntimeLoader"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) FEEDBACK_REDACTOR_VERSION, FEEDBACK_IDEMPOTENCY_KEY
+    "packages/omo-senpi/src/components/feedback/submit.ts": ["FEEDBACK_REDACTOR_VERSION", "FEEDBACK_IDEMPOTENCY_KEY"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_COMMIT_FOOTER
+    "packages/omo-senpi/src/components/git-master/directive.ts": ["DEFAULT_COMMIT_FOOTER"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) AdvisorFakeExtensionAPI
+    "packages/omo-senpi/src/components/init-deep-advisor/component.test-support.ts": ["AdvisorFakeExtensionAPI"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) SEVERITY_MAP, EXT_TO_LANG, getLanguageId
+    "packages/omo-senpi/src/components/lsp/adapter/language-mappings.ts": ["SEVERITY_MAP", "EXT_TO_LANG", "getLanguageId"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) matchesKey
+    "packages/omo-senpi/src/components/lsp/adapter/rendering.ts": ["matchesKey"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) createLspDiagnosticsRunner
+    "packages/omo-senpi/src/components/lsp/index.ts": ["createLspDiagnosticsRunner"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) extractMutatedFilePaths
+    "packages/omo-senpi/src/components/lsp/post-edit-diagnostics.ts": ["extractMutatedFilePaths"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) BACKUP_PREFIX
+    "packages/omo-senpi/src/components/memory/commands/backup.ts": ["BACKUP_PREFIX"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) noRepoText
+    "packages/omo-senpi/src/components/memory/commands/memfs-shared.ts": ["noRepoText"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) buildAskPrompt
+    "packages/omo-senpi/src/components/memory/commands/people-ask.ts": ["buildAskPrompt"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) REMEMBER_INSTRUCTION
+    "packages/omo-senpi/src/components/memory/commands/remember.ts": ["REMEMBER_INSTRUCTION"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) SLEEPTIME_OVERRIDE_MARK
+    "packages/omo-senpi/src/components/memory/commands/sleeptime.ts": ["SLEEPTIME_OVERRIDE_MARK"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) identityFor
+    "packages/omo-senpi/src/components/memory/commands/types.ts": ["identityFor"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) getMemoryRepo
+    "packages/omo-senpi/src/components/memory/context.ts": ["getMemoryRepo"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) FakeScheduler
+    "packages/omo-senpi/src/components/memory/dream-trigger.test-support.ts": ["FakeScheduler"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) factsAgreementContract
+    "packages/omo-senpi/src/components/memory/facts-agreement-tool.ts": ["factsAgreementContract"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) conversationFrontiers
+    "packages/omo-senpi/src/components/memory/facts-oversize.ts": ["conversationFrontiers"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) removeRunArtifact, isTerminalRunDir
+    "packages/omo-senpi/src/components/memory/facts-run-cleanup.ts": ["removeRunArtifact", "isTerminalRunDir"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) FACTS_RUN_KEEP_LAST, FACTS_RUN_MAX_TOTAL_BYTES
+    "packages/omo-senpi/src/components/memory/facts-run-prune.ts": ["FACTS_RUN_KEEP_LAST", "FACTS_RUN_MAX_TOTAL_BYTES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) AVAILABLE_MODEL
+    "packages/omo-senpi/src/components/memory/facts-runner.test-support.ts": ["AVAILABLE_MODEL"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) getMemoryRepo
+    // the senpi engine loads this extension's default export by path (`senpi -e <file>` in index-engine.test.ts)
+    "packages/omo-senpi/src/components/memory/index-engine.fixture.ts": ["default"],
+    "packages/omo-senpi/src/components/memory/index.ts": ["getMemoryRepo"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) UNAVAILABLE_CATEGORY_MAX_CHARS, GATE_MODEL_MAX_CHARS
+    "packages/omo-senpi/src/components/memory/kibitzer/notice.ts": ["UNAVAILABLE_CATEGORY_MAX_CHARS", "GATE_MODEL_MAX_CHARS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) encodeKibitzerSessionId, kibitzerSidecarsRoot, kibitzerWakeRecord, redactKibitzerWakeReason
+    "packages/omo-senpi/src/components/memory/kibitzer/observe.ts": ["encodeKibitzerSessionId", "kibitzerSidecarsRoot", "kibitzerWakeRecord", "redactKibitzerWakeReason"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) branchOf, manualTimers
+    "packages/omo-senpi/src/components/memory/kibitzer/sidecar.test-support.ts": ["branchOf", "manualTimers"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) KIBITZER_REJECTED_AFTER_WAKES
+    "packages/omo-senpi/src/components/memory/kibitzer/sidecar.ts": ["KIBITZER_REJECTED_AFTER_WAKES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_KIBITZER_TOOL_CAPS, createSessionBranchSnapshot, HIDDEN_SESSION_CUSTOM_TYPES
+    "packages/omo-senpi/src/components/memory/kibitzer/tools/index.ts": ["DEFAULT_KIBITZER_TOOL_CAPS", "createSessionBranchSnapshot", "HIDDEN_SESSION_CUSTOM_TYPES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) IDENTITY, AUTHOR
+    "packages/omo-senpi/src/components/memory/kibitzer/tools/test-support.ts": ["IDENTITY", "AUTHOR"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) KIBITZER_TELEMETRY_OBSERVERS_KEY
+    "packages/omo-senpi/src/components/memory/kibitzer/wake-observers.ts": ["KIBITZER_TELEMETRY_OBSERVERS_KEY"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isSystemMemoryPath
+    "packages/omo-senpi/src/components/memory/kibitzer/wake-policy.ts": ["isSystemMemoryPath"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MEMORY_CHILD_SAME_MODEL_RETRIES
+    "packages/omo-senpi/src/components/memory/memory-child-model-chain.ts": ["MEMORY_CHILD_SAME_MODEL_RETRIES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) REMEMBERED_TITLE, LET_GO_TITLE, ordinal, formatBytes
+    "packages/omo-senpi/src/components/memory/memory-notice-spec.ts": ["REMEMBERED_TITLE", "LET_GO_TITLE", "ordinal", "formatBytes"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MEMORY_REFLECTIONS_RPC_METHOD
+    "packages/omo-senpi/src/components/memory/memory-rpc-bridge.ts": ["MEMORY_REFLECTIONS_RPC_METHOD"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) readMemoryRpcRepoState, readMemoryRpcHealth
+    "packages/omo-senpi/src/components/memory/memory-rpc-snapshot-state.ts": ["readMemoryRpcRepoState", "readMemoryRpcHealth"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) IDENTITY
+    "packages/omo-senpi/src/components/memory/memory-usage.test-support.ts": ["IDENTITY"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) incrementMemoryUsage, readMemoryUsageLedger, extractMemoryUsagePath
+    "packages/omo-senpi/src/components/memory/memory-usage.ts": ["incrementMemoryUsage", "readMemoryUsageLedger", "extractMemoryUsagePath"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) HISTORY_MAX_COMMITS, HISTORY_PER_DIFF_CAP, HISTORY_RECENT_DIFFS, HISTORY_TOTAL_PAYLOAD_CAP, REFLECTION_COMMIT_PATTERN
+    "packages/omo-senpi/src/components/memory/palace/collectors.ts": ["HISTORY_MAX_COMMITS", "HISTORY_PER_DIFF_CAP", "HISTORY_RECENT_DIFFS", "HISTORY_TOTAL_PAYLOAD_CAP", "REFLECTION_COMMIT_PATTERN"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) collectPalaceData, renderPalaceHtml, encodePalaceData
+    "packages/omo-senpi/src/components/memory/palace/generator.ts": ["collectPalaceData", "renderPalaceHtml", "encodePalaceData"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) HISTORY_RECENT_DIFFS
+    "packages/omo-senpi/src/components/memory/palace/history-collector.ts": ["HISTORY_RECENT_DIFFS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) registerPalaceCommand, runPalaceCommand, HISTORY_MAX_COMMITS, HISTORY_PER_DIFF_CAP, HISTORY_RECENT_DIFFS, HISTORY_TOTAL_PAYLOAD_CAP, REFLECTION_COMMIT_PATTERN, UNCOMMITTED_LABEL, collectCore, collectExternal and 14 more
+    "packages/omo-senpi/src/components/memory/palace/index.ts": ["registerPalaceCommand", "runPalaceCommand", "HISTORY_MAX_COMMITS", "HISTORY_PER_DIFF_CAP", "HISTORY_RECENT_DIFFS", "HISTORY_TOTAL_PAYLOAD_CAP", "REFLECTION_COMMIT_PATTERN", "UNCOMMITTED_LABEL", "collectCore", "collectExternal", "collectHistory", "collectReflection", "collectPalaceData", "encodePalaceData", "generatePalaceHtml", "renderPalaceHtml", "PRIMARY_HUMAN_CARD_PATH", "PRIMARY_HUMAN_SLUG", "collectPeople", "PALACE_DATA_ELEMENT_ID", "PALACE_DATA_PLACEHOLDER", "PALACE_PEOPLE_PANEL", "PALACE_PEOPLE_TAB", "PALACE_TEMPLATE"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) PRIMARY_HUMAN_SLUG, PRIMARY_HUMAN_CARD_PATH
+    "packages/omo-senpi/src/components/memory/palace/people.ts": ["PRIMARY_HUMAN_SLUG", "PRIMARY_HUMAN_CARD_PATH"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) PALACE_DATA_ELEMENT_ID
+    "packages/omo-senpi/src/components/memory/palace/template.ts": ["PALACE_DATA_ELEMENT_ID"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) PolicyCapturingFakeExtensionAPI
+    "packages/omo-senpi/src/components/memory/policy-guard.test-support.ts": ["PolicyCapturingFakeExtensionAPI"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) PROJECT_MEMORY_RECALL_MAX_PROJECTS, formatProjectMemoryNudge
+    "packages/omo-senpi/src/components/memory/project-memory-nudge.ts": ["PROJECT_MEMORY_RECALL_MAX_PROJECTS", "formatProjectMemoryNudge"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) RECALL_TEXT_WINDOW, userText
+    "packages/omo-senpi/src/components/memory/recall-session-read.ts": ["RECALL_TEXT_WINDOW", "userText"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ROLLOUTS_DESCRIPTION, ROLLOUTS_BODY
+    "packages/omo-senpi/src/components/memory/recall-wiring.test-support.ts": ["ROLLOUTS_DESCRIPTION", "ROLLOUTS_BODY"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_RECEIPTS_PORT
+    "packages/omo-senpi/src/components/memory/receipts-port.ts": ["DEFAULT_RECEIPTS_PORT"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) staleReflectionLockNotice
+    "packages/omo-senpi/src/components/memory/reflection-stale-active.ts": ["staleReflectionLockNotice"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) classifyBwrapSmoke, probeBwrapUsability
+    "packages/omo-senpi/src/components/memory/sandbox-platform.ts": ["classifyBwrapSmoke", "probeBwrapUsability"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) IDENTITY
+    "packages/omo-senpi/src/components/memory/skills-usage.test-support.ts": ["IDENTITY"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MEMORY_STATUS_MAX_WIDTH
+    "packages/omo-senpi/src/components/memory/status.ts": ["MEMORY_STATUS_MAX_WIDTH"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) noAccountSession
+    "packages/omo-senpi/src/components/memory/sync-runner.ts": ["noAccountSession"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) parseNumstat
+    "packages/omo-senpi/src/components/memory/tools.ts": ["parseNumstat"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MAX_AGE_DEPTH, nodeAgeProbeFs
+    "packages/omo-senpi/src/components/memory/transient-age.ts": ["MAX_AGE_DEPTH", "nodeAgeProbeFs"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) reflectionHeadline
+    "packages/omo-senpi/src/components/memory/worker/completion-renderers.ts": ["reflectionHeadline"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) FIELD_SEPARATOR, fit, runLabel, joinRendererTokens
+    "packages/omo-senpi/src/components/memory/worker/entry-renderers.ts": ["FIELD_SEPARATOR", "fit", "runLabel", "joinRendererTokens"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MODEL_UNREACHABLE_MARKER
+    "packages/omo-senpi/src/components/memory/worker/memory-model-attempts.ts": ["MODEL_UNREACHABLE_MARKER"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) estimateFreshCost, estimateInheritCost
+    "packages/omo-senpi/src/components/memory/worker/model-cost.ts": ["estimateFreshCost", "estimateInheritCost"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) renderReflectionParkedEntry
+    "packages/omo-senpi/src/components/memory/worker/park-alert.ts": ["renderReflectionParkedEntry"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) probeUntil
+    "packages/omo-senpi/src/components/memory/worker/process-liveness.test-support.ts": ["probeUntil"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) REFLECTION_REPORT_MAX_BYTES
+    "packages/omo-senpi/src/components/memory/worker/reflection-recap.ts": ["REFLECTION_REPORT_MAX_BYTES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) recoverUnpublishedWorktreeTip
+    "packages/omo-senpi/src/components/memory/worker/run-finalization.ts": ["recoverUnpublishedWorktreeTip"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) RESERVATION_GENERATION_SLACK_MS
+    "packages/omo-senpi/src/components/memory/worker/run-ghost-active.ts": ["RESERVATION_GENERATION_SLACK_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) authFailureNote
+    "packages/omo-senpi/src/components/model-profile/notice.ts": ["authFailureNote"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) NATIVE_BADGE_DEV_BUILD_TEXT, NATIVE_BADGE_STATUS_KEY, NATIVE_BADGE_TEXT, createNativeBadgeStatus, resolveNativeBadgeText
+    "packages/omo-senpi/src/components/native-badge/index.ts": ["NATIVE_BADGE_DEV_BUILD_TEXT", "NATIVE_BADGE_STATUS_KEY", "NATIVE_BADGE_TEXT", "createNativeBadgeStatus", "resolveNativeBadgeText"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) OWNERLESS_CLAIM_STALE_MS
+    "packages/omo-senpi/src/components/onboarding/claim-owner.ts": ["OWNERLESS_CLAIM_STALE_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ONBOARDING_SCAN_RUNTIME_FILE
+    "packages/omo-senpi/src/components/onboarding/scan-component.ts": ["ONBOARDING_SCAN_RUNTIME_FILE"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) sessionHistoryRuntimeLoadFailure
+    "packages/omo-senpi/src/components/onboarding/session-history-runtime-loader.ts": ["sessionHistoryRuntimeLoadFailure"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) normalizeGitRemoteUrl, parseOriginUrlFromGitConfig, parseGitHubRepositoryNameWithOwnerFromRemoteUrl
+    "packages/omo-senpi/src/components/onboarding/session-history/git-identity.ts": ["normalizeGitRemoteUrl", "parseOriginUrlFromGitConfig", "parseGitHubRepositoryNameWithOwnerFromRemoteUrl"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_RECENT_WINDOW_MS, MAX_DISCOVERY_OPERATIONS_PER_SOURCE, MAX_IMPORT_TRANSCRIPTS, MAX_METADATA_BYTES_PER_SOURCE, MAX_SESSION_DIGEST_BYTES, createSessionDigestStore, parseAgentSessionTranscript
+    "packages/omo-senpi/src/components/onboarding/session-history/index.ts": ["DEFAULT_RECENT_WINDOW_MS", "MAX_DISCOVERY_OPERATIONS_PER_SOURCE", "MAX_IMPORT_TRANSCRIPTS", "MAX_METADATA_BYTES_PER_SOURCE", "MAX_SESSION_DIGEST_BYTES", "createSessionDigestStore", "parseAgentSessionTranscript"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) abortableSessionHistoryFs
+    "packages/omo-senpi/src/components/onboarding/session-history/newest-sessions.ts": ["abortableSessionHistoryFs"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) readTranscriptCwd
+    "packages/omo-senpi/src/components/onboarding/session-history/transcript-cwd.ts": ["readTranscriptCwd"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) filesFromApplyPatch, decodeTranscriptRecord
+    "packages/omo-senpi/src/components/onboarding/session-history/transcript-records.ts": ["filesFromApplyPatch", "decodeTranscriptRecord"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) COMPLETION_MARKER
+    "packages/omo-senpi/src/components/onboarding/state.ts": ["COMPLETION_MARKER"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ONBOARDING_UNDERSTAND_TOOL_NAME, ONBOARDING_MEMORY_APPLY_TOOL_NAME
+    "packages/omo-senpi/src/components/onboarding/tui-memory-tools.ts": ["ONBOARDING_UNDERSTAND_TOOL_NAME", "ONBOARDING_MEMORY_APPLY_TOOL_NAME"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) SIDE_PANEL_FLAG
+    "packages/omo-senpi/src/components/side-panel/index.ts": ["SIDE_PANEL_FLAG"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) POPUP_CHROME_ROWS
+    "packages/omo-senpi/src/components/side-panel/popups/text-popup.ts": ["POPUP_CHROME_ROWS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) spacer
+    "packages/omo-senpi/src/components/side-panel/sections/layout.ts": ["spacer"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) parseBareSkillCommand
+    "packages/omo-senpi/src/components/skill-commands/bare-skill-command.ts": ["parseBareSkillCommand"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) SKILL_COMMANDS_COMPONENT_NAME
+    "packages/omo-senpi/src/components/skill-commands/index.ts": ["SKILL_COMMANDS_COMPONENT_NAME"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) categoryUnavailableText
+    "packages/omo-senpi/src/components/task/category-unavailable-warning.ts": ["categoryUnavailableText"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) admitAdapter
+    "packages/omo-senpi/src/components/task/engine.ts": ["admitAdapter"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) toolCallStart
+    "packages/omo-senpi/src/components/task/host-prewarm.test-support.ts": ["toolCallStart"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) livenessDeliveryKeys, livenessDeliveryKeysFromSessionText, livenessContent
+    "packages/omo-senpi/src/components/task/member-liveness.ts": ["livenessDeliveryKeys", "livenessDeliveryKeysFromSessionText", "livenessContent"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) INHERITED_SHARD_OWNER, sessionShardIdentity
+    "packages/omo-senpi/src/components/task/shard-routing.ts": ["INHERITED_SHARD_OWNER", "sessionShardIdentity"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) buildWidgetRows
+    "packages/omo-senpi/src/components/task/status-ui.ts": ["buildWidgetRows"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isTerminalStatus
+    "packages/omo-senpi/src/components/task/store-status-edge.ts": ["isTerminalStatus"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) CATEGORY_CONFIG_SOURCES, CATEGORY_CONFIG_PROPERTY_NAMES
+    "packages/omo-senpi/src/components/telemetry/category-config-schema.ts": ["CATEGORY_CONFIG_SOURCES", "CATEGORY_CONFIG_PROPERTY_NAMES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isEmitterSite
+    "packages/omo-senpi/src/components/telemetry/consent-gate-routes.test-support.ts": ["isEmitterSite"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) findUngatedWriters, sourceName, telemetrySources
+    "packages/omo-senpi/src/components/telemetry/consent-gate.audit.test.ts": ["findUngatedWriters", "sourceName", "telemetrySources"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) PROCESS_KINDS, CRASH_DETECTIONS, CRASH_SIGNALS, UPTIME_BUCKETS, SHARD_KINDS
+    "packages/omo-senpi/src/components/telemetry/crash-schema.ts": ["PROCESS_KINDS", "CRASH_DETECTIONS", "CRASH_SIGNALS", "UPTIME_BUCKETS", "SHARD_KINDS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DELEGATION_STATUSES, DELEGATION_OWNER_KINDS, DELEGATION_BACKGROUND_MODES, DELEGATION_MODEL_SOURCES, DELEGATION_COVERAGE_STATUSES, DELEGATION_COST_STATUSES, DELEGATION_DURATION_STATUSES
+    "packages/omo-senpi/src/components/telemetry/delegation-schema.ts": ["DELEGATION_STATUSES", "DELEGATION_OWNER_KINDS", "DELEGATION_BACKGROUND_MODES", "DELEGATION_MODEL_SOURCES", "DELEGATION_COVERAGE_STATUSES", "DELEGATION_COST_STATUSES", "DELEGATION_DURATION_STATUSES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) bareOsVersion, DAY_UTC_PATTERN, COMBO_FINGERPRINT_PATTERN, SUMMARY_EPOCH_PATTERN, SESSIONLESS_EVENTS, numberConstraint
+    "packages/omo-senpi/src/components/telemetry/event-schema-constraints.ts": ["bareOsVersion", "DAY_UTC_PATTERN", "COMBO_FINGERPRINT_PATTERN", "SUMMARY_EPOCH_PATTERN", "SESSIONLESS_EVENTS", "numberConstraint"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) maskKibitzerModel
+    "packages/omo-senpi/src/components/telemetry/omo-native-kibitzer-summary.ts": ["maskKibitzerModel"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) buildParallelismSummary
+    "packages/omo-senpi/src/components/telemetry/omo-native-parallel-summary.ts": ["buildParallelismSummary"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) RAW_TURN_SAMPLE_RATE
+    "packages/omo-senpi/src/components/telemetry/omo-native-session-summary.ts": ["RAW_TURN_SAMPLE_RATE"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) loadSummaryRuntime
+    "packages/omo-senpi/src/components/telemetry/omo-native-summary-wiring.ts": ["loadSummaryRuntime"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DEAD_PID
+    "packages/omo-senpi/src/components/telemetry/optout-purge.test-support.ts": ["DEAD_PID"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) toWireValue
+    "packages/omo-senpi/src/components/telemetry/semconv-map.ts": ["toWireValue"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) readJson
+    "packages/omo-senpi/src/components/telemetry/session-summary-files.ts": ["readJson"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) LEGACY_ROLLUP_REMOVE_LIMIT
+    "packages/omo-senpi/src/components/telemetry/session-summary-legacy-rollups.ts": ["LEGACY_ROLLUP_REMOVE_LIMIT"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) PROCESS_BOOT_ID
+    "packages/omo-senpi/src/components/telemetry/session-summary-owner.ts": ["PROCESS_BOOT_ID"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) hasQueuedSummaryFiles
+    "packages/omo-senpi/src/components/telemetry/session-summary-purge.ts": ["hasQueuedSummaryFiles"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) purgeUnconsentedQueue
+    "packages/omo-senpi/src/components/telemetry/session-summary-storage.ts": ["purgeUnconsentedQueue"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) PROTO_TAG, SEMCONV_MAP_SHA256, wireKeyOf, TELEMETRY_SDK_NAMES
+    "packages/omo-senpi/src/components/telemetry/telemetry-artifact.ts": ["PROTO_TAG", "SEMCONV_MAP_SHA256", "wireKeyOf", "TELEMETRY_SDK_NAMES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) THREAD_MESSAGE_MAX_BYTES, THREAD_SUMMARY_MAX_LENGTH
+    "packages/omo-senpi/src/components/thread/contracts/fields.ts": ["THREAD_MESSAGE_MAX_BYTES", "THREAD_SUMMARY_MAX_LENGTH"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) THREAD_MESSAGE_MAX_BYTES, THREAD_SUMMARY_MAX_LENGTH
+    "packages/omo-senpi/src/components/thread/contracts/index.ts": ["THREAD_MESSAGE_MAX_BYTES", "THREAD_SUMMARY_MAX_LENGTH"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ThreadListParams, ThreadReadParams, ThreadInterruptParams, ThreadHandoffParams, ThreadRenameParams, ThreadSetModelParams, ThreadSetReasoningParams, ThreadBindParams, ThreadUnbindParams, ThreadRebindParams and 5 more
+    "packages/omo-senpi/src/components/thread/contracts/params.ts": ["ThreadListParams", "ThreadReadParams", "ThreadInterruptParams", "ThreadHandoffParams", "ThreadRenameParams", "ThreadSetModelParams", "ThreadSetReasoningParams", "ThreadBindParams", "ThreadUnbindParams", "ThreadRebindParams", "ThreadBindingsParams", "ThreadReportParams", "ThreadOutboxParams", "ThreadOutboxAckParams", "ThreadAnswerParams"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ENDPOINT_REGISTRY_LAYOUT, canonicalEndpointPath, socketNamesDirectory
+    "packages/omo-senpi/src/components/thread/endpoint-registry.ts": ["ENDPOINT_REGISTRY_LAYOUT", "canonicalEndpointPath", "socketNamesDirectory"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isBlankAnswer
+    "packages/omo-senpi/src/components/thread/gateway/answer-shape.ts": ["isBlankAnswer"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) AUTHOR_ID_MAX_LENGTH, AUTHOR_DISPLAY_MAX_LENGTH
+    "packages/omo-senpi/src/components/thread/gateway/author.ts": ["AUTHOR_ID_MAX_LENGTH", "AUTHOR_DISPLAY_MAX_LENGTH"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) BINDING_SCHEMA_VERSION, BINDING_PLATFORMS, BINDING_STATUSES, COMPLETION_OUTCOMES, BINDING_MAX_TTL_SECONDS, BINDING_DEFAULT_POLICY_ID
+    "packages/omo-senpi/src/components/thread/gateway/bindings.ts": ["BINDING_SCHEMA_VERSION", "BINDING_PLATFORMS", "BINDING_STATUSES", "COMPLETION_OUTCOMES", "BINDING_MAX_TTL_SECONDS", "BINDING_DEFAULT_POLICY_ID"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) completionOutcome
+    "packages/omo-senpi/src/components/thread/gateway/completion.ts": ["completionOutcome"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) GATEWAY_SCHEMA_VERSION
+    "packages/omo-senpi/src/components/thread/gateway/constants.ts": ["GATEWAY_SCHEMA_VERSION"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) queuedNotice
+    "packages/omo-senpi/src/components/thread/gateway/drain.ts": ["queuedNotice"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) AWAIT_TIMEOUT_MAX_MS, REGISTERED_TOOL_NAME_MAX, registeredToolName, listSessionOps
+    "packages/omo-senpi/src/components/thread/gateway/extension-registrations.ts": ["AWAIT_TIMEOUT_MAX_MS", "REGISTERED_TOOL_NAME_MAX", "registeredToolName", "listSessionOps"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) WAKE_FILE_RECHECK_MS
+    "packages/omo-senpi/src/components/thread/gateway/extension-session-await.ts": ["WAKE_FILE_RECHECK_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ExtensionTransactionEndedError, ExtensionTransactionBusyError
+    "packages/omo-senpi/src/components/thread/gateway/extension-transaction.ts": ["ExtensionTransactionEndedError", "ExtensionTransactionBusyError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) LOCK_WAIT_EXCEEDED_CODE
+    "packages/omo-senpi/src/components/thread/gateway/lock-wait.ts": ["LOCK_WAIT_EXCEEDED_CODE"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) GATEWAY_TABLES
+    "packages/omo-senpi/src/components/thread/gateway/schema.ts": ["GATEWAY_TABLES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) recordThreadCreation, sessionCall
+    "packages/omo-senpi/src/components/thread/gateway/store-extension-session-ops.ts": ["recordThreadCreation", "sessionCall"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) GatewayMigrationError, migrate, reconcile, claim, recordOutcome, refuseQueued, listDeliveries, isReferenced, journalMode, stats and 1 more
+    "packages/omo-senpi/src/components/thread/gateway/store-ops.ts": ["GatewayMigrationError", "migrate", "reconcile", "claim", "recordOutcome", "refuseQueued", "listDeliveries", "isReferenced", "journalMode", "stats", "migrateLegacyMailboxes"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) registerIncarnation, clearEndpoint, sessionOwner
+    "packages/omo-senpi/src/components/thread/gateway/store-ownership.ts": ["registerIncarnation", "clearEndpoint", "sessionOwner"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) toolReceiptBegin, toolReceiptSettle, registerIncarnation, pendingCompletionArms, latestCompletionArm, closeQuestion
+    "packages/omo-senpi/src/components/thread/gateway/store-relay-ops.ts": ["toolReceiptBegin", "toolReceiptSettle", "toolReceiptRevise", "registerIncarnation", "pendingCompletionArms", "latestCompletionArm", "closeQuestion"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) sweepRetention
+    "packages/omo-senpi/src/components/thread/gateway/store-retention.ts": ["sweepRetention"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) matcherAwaits
+    "packages/omo-senpi/src/components/thread/gateway/worker-reply-matchers.test.ts": ["matcherAwaits"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) messageText, parseSessionLines, summarizeSessionEntries
+    "packages/omo-senpi/src/components/thread/session-facts.ts": ["messageText", "parseSessionLines", "summarizeSessionEntries"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) THREAD_LINK_SCHEME
+    "packages/omo-senpi/src/components/thread/thread-link.ts": ["THREAD_LINK_SCHEME"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) resolveCallerDurableId
+    "packages/omo-senpi/src/components/thread/tools/extension-tools.ts": ["resolveCallerDurableId"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) canContinueAfterAgentEnd
+    "packages/omo-senpi/src/components/ulw-execute-continuation/agent-end-eligibility.ts": ["canContinueAfterAgentEnd"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) __testInternals
+    "packages/omo-senpi/src/components/ulw-execute-continuation/index.ts": ["__testInternals"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) goalPathsFromContext
+    "packages/omo-senpi/src/components/ulw-loop/footer-status.ts": ["goalPathsFromContext"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) SESSION_HELP_USAGE
+    "packages/omo-senpi/src/components/ulw-loop/sdk/session-toolkit.ts": ["SESSION_HELP_USAGE"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) withEnv, withEnvAsync
+    "packages/omo-senpi/src/components/ulw-loop/ulw-loop.test-support.ts": ["withEnv", "withEnvAsync"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) X_SEARCH_ENDPOINT, X_SEARCH_MAX_OUTPUT_TOKENS
+    "packages/omo-senpi/src/components/x-search/client.ts": ["X_SEARCH_ENDPOINT", "X_SEARCH_MAX_OUTPUT_TOKENS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) createXSearchTool, X_SEARCH_TOOL_NAME, X_SEARCH_TOOL_DESCRIPTION, X_SEARCH_COMPONENT_NAME
+    "packages/omo-senpi/src/components/x-search/index.ts": ["createXSearchTool", "X_SEARCH_TOOL_NAME", "X_SEARCH_TOOL_DESCRIPTION", "X_SEARCH_COMPONENT_NAME"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) X_SEARCH_TOOL_NAME, X_SEARCH_MODEL_ENV, X_SEARCH_TOOL_DESCRIPTION
+    "packages/omo-senpi/src/components/x-search/tool.ts": ["X_SEARCH_TOOL_NAME", "X_SEARCH_MODEL_ENV", "X_SEARCH_TOOL_DESCRIPTION"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) agentToolkit, toolkitContextFromEnv, ULW_LOOP_MANIFEST, ULW_LOOP_OPERATIONS, SDK_VERSION
+    "packages/omo-senpi/src/extension/agent-toolkit-sdk.ts": ["agentToolkit", "toolkitContextFromEnv", "ULW_LOOP_MANIFEST", "ULW_LOOP_OPERATIONS", "SDK_VERSION"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) FIRST_PAINT_BACKSTOP_MS
+    "packages/omo-senpi/src/extension/startup-deferral.ts": ["FIRST_PAINT_BACKSTOP_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) WAKE_QUEUE_STATE_EVENT
+    "packages/omo-senpi/src/extension/wake-queue-source.ts": ["WAKE_QUEUE_STATE_EVENT"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) omoSenpiAdapterPackageName
+    "packages/omo-senpi/src/index.ts": ["omoSenpiAdapterPackageName"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) localLauncherCmdPath
+    "packages/omo-senpi/src/install/local-launcher.ts": ["localLauncherCmdPath"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) findDirectNativeCaptureViolations
+    "packages/omo-senpi/src/omo-native-capture-path.audit.test.ts": ["findDirectNativeCaptureViolations"]
+  }
+}
