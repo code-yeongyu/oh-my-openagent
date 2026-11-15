@@ -429,8 +429,9 @@ test("#given the caller creates a child with thread_create #when it opens a thre
 test("#given a store at the previous schema version with data #when it opens #then it migrates to the new tables and keeps every existing row", async () => {
   const agentDir = tempDir("extension-tools-migrate-")
   const path = gatewayDatabasePath(agentDir)
-  // Back to the store before v10 (toolkit_replay_receipts) and v11 (deliveries.wait_kind): both re-run on open.
-  const previous = GATEWAY_MIGRATIONS.length - 2
+  // Back to the store before v10 (toolkit_replay_receipts), v11 (deliveries.wait_kind), v12 (the intake columns), v13
+  // (woken_sessions) and v14 (the wake state tables; v13 and v14 are idempotent so their tables can stay): all re-run.
+  const previous = GATEWAY_MIGRATIONS.length - 5
   {
     const seed = storeAt(agentDir)
     await seed.identity()
@@ -442,6 +443,11 @@ test("#given a store at the previous schema version with data #when it opens #th
     db.exec("DROP TABLE IF EXISTS toolkit_replay_receipts;")
     db.exec("DELETE FROM extension_objects WHERE name = 'toolkit_replay_receipts'")
     db.exec("ALTER TABLE deliveries DROP COLUMN wait_kind")
+    db.exec("DROP INDEX deliveries_ledger")
+    db.exec("DELETE FROM extension_objects WHERE name = 'deliveries_ledger'")
+    db.exec("ALTER TABLE deliveries DROP COLUMN ledger_id")
+    db.exec("ALTER TABLE deliveries DROP COLUMN verbatim_text")
+    db.exec("ALTER TABLE deliveries DROP COLUMN verbatim_display_text")
     db.exec(`PRAGMA user_version = ${previous}`)
     db.query("INSERT INTO gateway_meta (key, value) VALUES ('fixture-keep', 'kept')").run()
   } finally {

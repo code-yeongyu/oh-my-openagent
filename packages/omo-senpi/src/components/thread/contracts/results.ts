@@ -57,7 +57,7 @@ export type ThreadDelivery =
       readonly waiting_on?: { readonly kind: "approval" | "hold" | "wake"; readonly device?: string }
     }
   /** Gateway only: the target has no answering endpoint; the message is durable and its drain takes it on the next start. */
-  | { readonly kind: "queued_offline"; readonly queue_position: number }
+  | { readonly kind: "queued_offline"; readonly queue_position: number; readonly reason?: "wake_unavailable" }
 
 /**
  * What a send through the session gateway adds to a delivery result: the durable `delivery_id`, the
