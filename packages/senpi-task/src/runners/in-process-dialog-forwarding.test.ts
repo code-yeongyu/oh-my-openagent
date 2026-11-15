@@ -3,6 +3,8 @@ import { existsSync } from "node:fs"
 import * as fs from "node:fs/promises"
 import { basename, dirname } from "node:path"
 
+import { awaitWithinTestBudget, useTestTimeout } from "../../../../test-support/test-deadline"
+
 import type { ChildDialogForwarder } from "./child-dialogs/forwarder"
 import type { ForwardableDialog } from "./child-dialogs/forwardable-dialog"
 import { InProcessRunner } from "./in-process"
@@ -141,6 +143,7 @@ describe("InProcessRunner with a parent session", () => {
 
 describe("child session teardown (#13520)", () => {
   test("#given a child whose engine first-start writer is still pending #when its handle is disposed #then the writer cannot outlive the machine root", async () => {
+    useTestTimeout(30_000)
     const machine = await createGatedChildMachine({ settingsPreset: "ask" })
     machines.push(machine)
     const root = dirname(machine.spec("st_6189w").cwd)
@@ -161,11 +164,7 @@ describe("child session teardown (#13520)", () => {
         machine.spec("st_6189w"),
       )
       await handle.waitForIdle()
-      const reached = await Promise.race([
-        started.promise.then(() => true),
-        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 15_000)),
-      ])
-      expect(reached).toBe(true)
+      await awaitWithinTestBudget(started.promise, "the child's first-start step to reach .fallback-log-v2")
 
       disposing = Promise.resolve(handle.dispose()).finally(() => {
         disposeSettled = true
