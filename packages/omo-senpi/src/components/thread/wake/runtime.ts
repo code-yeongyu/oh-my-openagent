@@ -178,11 +178,11 @@ export function startThreadWakeAtSession(eventCtx: unknown, input: ThreadWakeSta
     })()
   running.set(
     agentDir,
-    scope.runInAsyncScope(() => startRunning(agentDir, env, input, scope)),
+    scope.runInAsyncScope(() => startRunning(agentDir, env, input)),
   )
 }
 
-function startRunning(agentDir: string, env: Env, input: ThreadWakeStart, scope: ProcessScope): RunningThreadWake {
+function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): RunningThreadWake {
   const { options } = input
   const store = options.store ?? createGatewayStore({ agentDir })
   const sessionsDirectory = input.sessionsDirectory()
@@ -209,10 +209,7 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart, scope:
     },
   })
   const wake = async (durableId: string): Promise<void> => {
-    // A send-triggered wake reaches this closure from the sending session's context (processSameDeviceWake ->
-    // carrier.wake), so the carrier's renewal timer and its long-lived connection must be created inside the
-    // extension's process scope, or that session's shutdown reclaims them (#13456 review M1).
-    const outcome = await scope.runInAsyncScope(() => carrier.wake(durableId))
+    const outcome = await carrier.wake(durableId)
     if (outcome.kind === "failed") input.warn(`thread wake: ${durableId} was not started after ${outcome.attempts} attempts`)
     options.onWake?.(durableId, outcome)
   }
