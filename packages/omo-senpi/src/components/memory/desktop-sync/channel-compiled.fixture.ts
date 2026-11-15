@@ -3,12 +3,9 @@
 // descriptor handoff is proven in a Bun-compiled executable rather than a source runtime.
 import { claimInheritedDesktopSync } from "./desktopClaim"
 import { selectHostMemorySyncSource } from "./hostSelection"
-import { deferUncapturedPrivateFdDeclaration, launchCarriedPrivateTable } from "./launchClassification"
+import { launchCarriedPrivateTable } from "./launchClassification"
 import { serveWorkerPort } from "./workerPort"
 
-// No senpi CLI captured the table here, so this is the fallback path: the declaration leaves the env at registration
-// and the claim's capture module puts it back in the compiled bundle's module order.
-deferUncapturedPrivateFdDeclaration()
 const selection = await selectHostMemorySyncSource({
   declared: launchCarriedPrivateTable,
   sidecar: async () => ({ claimInheritedDesktopSync, serveWorkerPort }),
