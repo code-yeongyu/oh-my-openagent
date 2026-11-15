@@ -89,7 +89,7 @@ type Carried = {
   readonly sessionId: string
   generation: number
   readonly off: () => void
-  /** When the release was first refused for a delivery this carry (#13708); cleared by a release that is not. */
+  /** When the release was first refused for a delivery since the session last worked or was refused otherwise (#13708). */
   deliveryRefusedSince?: number
 }
 
@@ -179,14 +179,16 @@ export function createCarrier(options: CarrierOptions): Carrier {
   const quietRelease = async (
     entry: Carried,
     dropHeldDelivery = true,
-  ): Promise<{ readonly ok: true } | { readonly ok: false; readonly code: string }> => {
+  ): Promise<{ readonly ok: true } | { readonly ok: false; readonly code: string; readonly forDelivery?: true }> => {
     const first = await entry.connection.request({
       type: "release_session",
       sessionId: entry.sessionId,
       reason: "takeover",
     })
     if (first.success === true) return { ok: true }
-    if (dropHeldDelivery && codeOf(first) === "turn_active" && busyList(first).includes("delivery")) {
+    const forDelivery = codeOf(first) === "turn_active" && busyList(first).includes("delivery")
+    if (!dropHeldDelivery && forDelivery) return { ok: false, code: "turn_active", forDelivery: true }
+    if (forDelivery) {
       const second = await entry.connection.request({
         type: "release_session",
         sessionId: entry.sessionId,
@@ -250,11 +252,16 @@ export function createCarrier(options: CarrierOptions): Carrier {
       return { kind: "closed_waiting" }
     }
     if (renewed.row.first_waiting_at !== null) await store.woken.clearWaiting(fence)
-    if (!view.finished) return { kind: "kept", reason: "working" }
+    if (!view.finished) {
+      // Working again: a later refusal for a delivery gets its own full grace (#13709 review M1).
+      entry.deliveryRefusedSince = undefined
+      return { kind: "kept", reason: "working" }
+    }
     const refusedSince = entry.deliveryRefusedSince
     const graceOver = refusedSince !== undefined && store.now() - refusedSince >= QUEUED_DELIVERY_GRACE_MS
     const released = await quietRelease(entry, graceOver)
-    if (!released.ok && released.code === "turn_active") entry.deliveryRefusedSince ??= store.now()
+    if (!released.ok && released.forDelivery === true) entry.deliveryRefusedSince ??= store.now()
+    else entry.deliveryRefusedSince = undefined
     if (!released.ok) {
       if (released.code === "turn_active" || released.code === "session_busy")
         return { kind: "kept", reason: "working" }

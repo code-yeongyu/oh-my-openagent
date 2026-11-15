@@ -239,6 +239,23 @@ describe("the carrier lifts, reads finished, and hands back", () => {
     expect(await store.woken.list()).toEqual([])
   })
 
+  // #13709 review M1: the grace counts from the latest refusal streak; a session that worked in between gets it again.
+  test("#given a delivery refused, then a working session, then a new refusal #when 2 minutes pass from the first refusal #then the carrier still keeps it without an interrupt", async () => {
+    const { h, fake, carrier, path } = await setup()
+    fake.setSnapshot(path("s1"), FINISHED)
+    await carrier.wake("s1")
+    fake.session(path("s1")).heldDeliveries = ["d-1"]
+    expect(await carrier.evaluate("s1")).toEqual({ kind: "kept", reason: "working" })
+    h.clock.now += 90_000
+    fake.setSnapshot(path("s1"), STREAMING)
+    expect(await carrier.evaluate("s1")).toEqual({ kind: "kept", reason: "working" })
+    fake.setSnapshot(path("s1"), FINISHED)
+    expect(await carrier.evaluate("s1")).toEqual({ kind: "kept", reason: "working" })
+    h.clock.now += 60_000
+    expect(await carrier.evaluate("s1")).toEqual({ kind: "kept", reason: "working" })
+    expect(sent(fake, "release_session").filter((frame) => frame.interrupt === true)).toEqual([])
+  })
+
   test("#given background work the engine would not refuse #when the carrier looks #then it never sends the release", async () => {
     const { fake, carrier, path } = await setup()
     path("s1")
