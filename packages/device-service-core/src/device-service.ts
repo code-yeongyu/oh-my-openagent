@@ -1,4 +1,3 @@
-import { homedir } from "node:os"
 import { join } from "node:path"
 import { SOCKET_FILE } from "./local-api/access.ts"
 import { connectLocalApi, type ConnectOptions, type LocalApiClient } from "./local-api/client.ts"
@@ -20,6 +19,7 @@ import type { CommandRpc } from "./local-api/protocol.ts"
 import type { SessionCandidate } from "./local-api/protocol-delegated.ts"
 import { randomBytes } from "node:crypto"
 import { compareVersions } from "./release/version.ts"
+import { deviceServiceStateDir } from "./state-dir.ts"
 
 // A host sends no command state at all for a route it does not list toward a sender it does not grant (docs/local-api.md
 // "Delegated commands"), so the client bounds its own wait.
@@ -112,18 +112,7 @@ export type {
 export { SESSION_ROW_STATES } from "./local-api/protocol.ts"
 export type { AttachEnd, CommandResult, RemoteAttach, RemoteAttachEvent } from "./remote-attach.ts"
 
-type Env = Readonly<Record<string, string | undefined>>
-
-/** `~/.omo/device-service` (POSIX) or `%LOCALAPPDATA%\OmO\device-service` (Windows): where the service's endpoint and per-boot token live. */
-export function deviceServiceStateDir(
-  platform: NodeJS.Platform = process.platform,
-  env: Env = process.env,
-  home: string = homedir(),
-): string {
-  if (platform !== "win32") return join(home, ".omo", "device-service")
-  const localAppData = env.LOCALAPPDATA ?? join(home, "AppData", "Local")
-  return join(localAppData, "OmO", "device-service")
-}
+export { DEVICE_SERVICE_STATE_DIR_ENV, deviceServiceStateDir } from "./state-dir.ts"
 
 /** The file a running service publishes in its state dir: the socket on POSIX, the port file on Windows. */
 export function deviceServiceEndpointPath(stateDir: string, platform: NodeJS.Platform = process.platform): string {
