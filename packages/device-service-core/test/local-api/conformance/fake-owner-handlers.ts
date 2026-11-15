@@ -64,6 +64,19 @@ export const dispatch = (state: OwnerState, conn: Conn, request: LocalRequest): 
       state.reports.push(report)
       return ok()
     }
+    case "control.session_wake.get":
+    case "control.session_wake.set": {
+      if (role !== "desktop" && role !== "omo")
+        return refuse("forbidden", "only the desktop and the CLI read or set the wake switch")
+      if (request.type === "control.session_wake.set")
+        state.sessionWake = {
+          enabled: request.enabled === true,
+          stored: request.enabled,
+          changedAt: new Date(state.now()).toISOString(),
+          overridden: state.sessionWake.overridden,
+        }
+      return ok(state.sessionWake)
+    }
     case "control.attach.get":
     case "control.attach.set":
       if (role !== "desktop" && role !== "omo")

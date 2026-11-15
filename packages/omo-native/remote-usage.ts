@@ -27,6 +27,11 @@ const USAGE_ENTRIES: readonly { readonly verbs: readonly string[]; readonly text
                                            device's sessions (on unless you turn it off)`,
   },
   {
+    verbs: ["wake"],
+    text: `  wake [on|off|default]                    whether sessions on this device that are not running may be started
+                                           by a message from your other signed-in devices; off unless turned on`,
+  },
+  {
     verbs: ["bootstrap"],
     text: "  bootstrap                                set up this device's service for your sign-in (every omo start runs it)",
   },

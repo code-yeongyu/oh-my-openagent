@@ -225,7 +225,8 @@ export type GatewayDeliveryDelivery =
  * What the receiver is parked on while the delivery waits: an approval (a tool permission or question) a human must answer on
  * that device. `device` is the account device it waits on; absent when this install has no device identity (#13014).
  */
-export type DeliveryWait = { readonly kind: "approval"; readonly device?: string }
+/** What a queued delivery waits on (omo#13037 5.1): a person's approval, a hold on the session, or the wake of a session no engine runs. */
+export type DeliveryWait = { readonly kind: "approval" | "hold" | "wake"; readonly device?: string }
 
 export type GatewayDeliverySuccess = {
   readonly kind: "ok"

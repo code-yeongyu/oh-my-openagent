@@ -88,6 +88,7 @@ export const startFakeOwner = async (options: FakeOwnerOptions): Promise<FakeOwn
     reports: [],
     refresher: null,
     attach: { attached: true, changedAt: "" },
+    sessionWake: { enabled: false, stored: null, changedAt: "", overridden: options.world.wake_overridden === true },
     now: options.now ?? Date.now,
     mint: mintId,
     stop: async () => {},

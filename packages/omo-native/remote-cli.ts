@@ -15,7 +15,7 @@ import type { RemoteThreadSurface } from "../omo-senpi/src/components/thread/rem
 import { serveRemoteAttach } from "./remote-attach"
 import { type BootstrapSetup, runBootstrapVerb } from "./remote-bootstrap"
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
-import { controlLines, deviceLines, sessionLines, statusLines } from "./remote-render"
+import { controlLines, deviceLines, sessionLines, statusLines, wakeLines } from "./remote-render"
 import { isSessionVerb, parseSession, SESSION_VERBS, type SessionArgs } from "./remote-session-args"
 import { runSession } from "./remote-session-verbs"
 import { isHelpFlag, REMOTE_USAGE, verbUsage } from "./remote-usage"
@@ -51,16 +51,32 @@ export interface RemoteVerbDependencies extends RemoteCommandDependencies {
   readonly bootstrap: BootstrapSetup
 }
 
-const VERBS = ["status", "devices", "sessions", "enable", "disable", "control", "bootstrap", ...SESSION_VERBS] as const
+const VERBS = [
+  "status",
+  "devices",
+  "sessions",
+  "enable",
+  "disable",
+  "control",
+  "wake",
+  "bootstrap",
+  ...SESSION_VERBS,
+] as const
 const CONTROL_VALUES = ["on", "off"] as const
 type ControlValue = (typeof CONTROL_VALUES)[number]
 const isControlValue = (value: string | undefined): value is ControlValue => CONTROL_VALUES.some((v) => v === value)
+// omo#13037 A7.2.5: the wake switch also takes "default", which removes the stored value.
+const WAKE_VALUES = ["on", "off", "default"] as const
+type WakeValue = (typeof WAKE_VALUES)[number]
+const isWakeValue = (value: string | undefined): value is WakeValue => WAKE_VALUES.some((v) => v === value)
+const storedWake = (value: WakeValue): boolean | null => (value === "default" ? null : value === "on")
 
 type Parsed = {
   readonly command: string
   readonly json: boolean
   readonly filter: SessionFilter
   readonly control: ControlValue | undefined
+  readonly wake?: WakeValue
   readonly session?: SessionArgs
 }
 
@@ -73,6 +89,7 @@ function parse(args: readonly string[]): Parsed {
   let json = false
   const filter: { device?: string; project?: string; state?: SessionRowState } = {}
   let control: ControlValue | undefined
+  let wake: WakeValue | undefined
   for (let index = 0; index < rest.length; index++) {
     const flag = rest[index]
     if (flag === "--json") {
@@ -85,6 +102,12 @@ function parse(args: readonly string[]): Parsed {
       control = flag
       continue
     }
+    if (command === "wake") {
+      if (wake !== undefined || !isWakeValue(flag))
+        throw new UsageError("omo remote wake: the value is on, off or default")
+      wake = flag
+      continue
+    }
     if (command !== "sessions" || (flag !== "--device" && flag !== "--project" && flag !== "--state"))
       throw new UsageError(`omo remote ${command}: unknown argument ${flag}`)
     const value = rest[++index]
@@ -94,7 +117,7 @@ function parse(args: readonly string[]): Parsed {
     else if (isRowState(value)) filter.state = value
     else throw new UsageError(`omo remote sessions: --state is one of ${SESSION_ROW_STATES.join(", ")}`)
   }
-  return { command, json, filter, control }
+  return { command, json, filter, control, ...(wake === undefined ? {} : { wake }) }
 }
 
 async function runOn(service: DeviceService, parsed: Parsed, dependencies: RemoteCommandDependencies): Promise<number> {
@@ -134,6 +157,22 @@ async function runOn(service: DeviceService, parsed: Parsed, dependencies: Remot
           ? await service.attachControl()
           : await service.setAttachControl(parsed.control === "on")
       return print(state, () => controlLines(state, dependencies.now()))
+    }
+    case "wake": {
+      // The gate is this connection's own welcome.service_version (A7R-11), never a capability word.
+      if (!service.carriesWakeMark) {
+        // Two causes, two answers: this build carries no wake switch yet (no update of the service enables it), or the
+        // device service is older than the release that carries it (updating does).
+        dependencies.error(
+          service.wakeMarkMinimum === null
+            ? "This build of OmO does not carry the wake switch yet."
+            : "The OmO device service on this device cannot wake sessions for other devices yet. Update OmO, then try again.",
+        )
+        return REMOTE_EXIT.unavailable
+      }
+      const state =
+        parsed.wake === undefined ? await service.sessionWake() : await service.setSessionWake(storedWake(parsed.wake))
+      return print(state, () => wakeLines(state))
     }
     case "open":
     case "send":
