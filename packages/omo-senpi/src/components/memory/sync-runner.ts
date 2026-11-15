@@ -27,7 +27,8 @@ export const SYNC_IDLE_NO_DEVICE_SESSION = "sync idle: no device session"
 /** The error code a runner logs when a previous engine for the repo did not close within the bound. */
 export const SYNC_CLOSE_WAIT_EXCEEDED = "sync-close-wait-exceeded"
 const CLOSE_WAIT_MS = 10_000
-// Deferred passes join any native read still parked behind the dialog; retries back off to five minutes.
+// Deferred passes join any native read still parked behind the keychain dialog or find the memory repository's first
+// commit; retries back off to five minutes.
 const DEFERRED_RETRY_MS = 15_000
 const DEFERRED_RETRY_MAX_MS = 300_000
 const DEFERRED_RETRY_MIN_MS = 1_000
@@ -131,7 +132,7 @@ export interface SyncRunnerOptions {
   readonly onStatusChange?: (repo: string) => void
   /** How long an acquire waits for the repo's previous engine to close; default 10 s. */
   readonly closeWaitMs?: number
-  /** Initial retry delay for a deferred credential read; default 15 s, doubling to a five-minute cap. */
+  /** Initial retry delay for a deferred session (keychain dialog, memory repo not created); default 15 s, doubling to a five-minute cap. */
   readonly deferredRetryMs?: number
 }
 

@@ -13,7 +13,7 @@ afterAll(() => {
   for (const root of memoryRoots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
-// The resolver binds a space only once the memory repository exists (#13486).
+// The resolver binds a space only once the memory repository exists and has its first commit (#13486).
 function existingMemoryRepo() {
   const root = mkdtempSync(join(tmpdir(), "omo-desktop-account-"))
   memoryRoots.push(root)
@@ -104,6 +104,7 @@ function fixture() {
   const runtime: DeviceSessionRuntime = {
     ...syncRuntime,
     listRemotes: () => [],
+    repoHasCommit: () => true,
     resolveSpace: () => syncRuntime.resolveSpace({ get: () => null, set: () => undefined }, { profile: "personal" }),
     deviceKeyringFromMaterial: async () => {
       factoryCalls++

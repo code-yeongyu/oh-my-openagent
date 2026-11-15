@@ -4,13 +4,12 @@
 // session that later loses its sign-in (sign-out, revoked device) tells the runner, which closes
 // the engine and goes idle.
 
-import { existsSync } from "node:fs"
-import { join } from "node:path"
 import type {
   AccountSessionOutcome,
   AccountSessionOptions,
   GitSpaceConfig,
   listRemotes,
+  repoHasCommit,
   resolveSpace,
 } from "@oh-my-opencode/memory-core/sync-engine"
 import type { DeviceKeyMaterial, DeviceKeyring } from "@oh-my-opencode/memory-core/keyring"
@@ -26,6 +25,7 @@ export interface DeviceSessionRuntime {
   readonly deviceKeyringFromMaterial: (material: DeviceKeyMaterial) => Promise<DeviceKeyring>
   readonly GitSpaceConfig: typeof GitSpaceConfig
   readonly listRemotes: typeof listRemotes
+  readonly repoHasCommit: typeof repoHasCommit
   readonly resolveSpace: typeof resolveSpace
 }
 
@@ -36,15 +36,26 @@ export function createDeviceSessionResolver(options: {
   readonly loadRuntime: () => Promise<DeviceSessionRuntime>
   readonly fetch?: typeof fetch
 }): (request: SyncSessionRequest) => Promise<SyncSessionResolution> {
+  // Repos whose last pass deferred because the memory repository had no first commit yet.
+  const awaitingRepo = new Set<string>()
   return async ({ paths, space }) => {
+    // The account was resolved on the pass that deferred; while the repository is still missing, a retry asks no
+    // credential and makes no request (a keychain "Allow", not "Always Allow", would otherwise prompt every time).
+    if (awaitingRepo.has(paths.repo) && !(await options.loadRuntime()).repoHasCommit(paths.repo))
+      throw new SyncSessionDeferredError(REPO_NOT_CREATED, undefined)
+    awaitingRepo.delete(paths.repo)
     const account = await options.source()
     if (account === null) return null
     if (account.kind === "unavailable") return { idle: account.reason }
     const runtime = await options.loadRuntime()
     if (account.kind === "desktop" && (account.signal.aborted || !(await account.isCurrent()))) return null
     // The space binding lives in the repository's git config, and the repository is created at the first memory write,
-    // never by a read or a session start (#13486). Until then the session is deferred and the runner retries it.
-    if (!existsSync(join(paths.repo, ".git"))) throw new SyncSessionDeferredError(REPO_NOT_CREATED, undefined)
+    // never by a read or a session start (#13486). Until its first commit lands, the creation may still be writing that
+    // config, so the session is deferred and the runner retries it.
+    if (!runtime.repoHasCommit(paths.repo)) {
+      awaitingRepo.add(paths.repo)
+      throw new SyncSessionDeferredError(REPO_NOT_CREATED, undefined)
+    }
     const resolved = runtime.resolveSpace(new runtime.GitSpaceConfig(paths.repo), {
       profile: space.profile,
       remotes: runtime.listRemotes(space.projectDir),

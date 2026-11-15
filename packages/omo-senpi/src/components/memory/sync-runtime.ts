@@ -6,6 +6,7 @@ export {
   listRemotes,
   openAccountSession,
   openDeviceSync,
+  repoHasCommit,
   resolveSpace,
 } from "@oh-my-opencode/memory-core/sync-engine"
 export { enableSync, joinAccount, approveDevice } from "@oh-my-opencode/memory-core/sync-engine"

@@ -6,7 +6,7 @@ import { join } from "node:path"
 
 import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
 import type { DeviceKeyring } from "@oh-my-opencode/memory-core/keyring"
-import { GitSpaceConfig, listRemotes, resolveSpace } from "@oh-my-opencode/memory-core/sync-engine"
+import { GitSpaceConfig, listRemotes, repoHasCommit, resolveSpace } from "@oh-my-opencode/memory-core/sync-engine"
 
 import { createSyncRunner } from "../sync-runner"
 import { isSyncSessionDeferred } from "../sync-session-deferred"
@@ -28,6 +28,24 @@ async function freshDevice() {
   return { paths: buildIdentityPaths(root, "agent"), projectDir: root }
 }
 
+function git(repo: string, ...args: string[]) {
+  expect(spawnSync("git", ["-C", repo, ...args]).status).toBe(0)
+}
+
+function firstCommit(repo: string) {
+  git(repo, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "--allow-empty", "-m", "first")
+}
+
+// Counts account-source passes: a pass reads the OS keychain and calls the account service.
+function countingSource() {
+  let passes = 0
+  const source = async () => {
+    passes++
+    return signedInCli()
+  }
+  return { source, passes: () => passes }
+}
+
 function signedInCli(): CliDeviceAccount {
   return {
     kind: "cli",
@@ -44,6 +62,7 @@ function realSpaceRuntime(opened: string[]): DeviceSessionRuntime {
   return {
     GitSpaceConfig,
     listRemotes,
+    repoHasCommit,
     resolveSpace,
     deviceKeyringFromMaterial: async () => ({}) as DeviceKeyring,
     openAccountSession: async (options) => {
@@ -54,11 +73,37 @@ function realSpaceRuntime(opened: string[]): DeviceSessionRuntime {
 }
 
 describe("the first session on a new device (#13486)", () => {
-  test("a resolver asked before the memory repository exists defers instead of failing", async () => {
+  test("a resolver asked before the memory repository exists defers, and its retries ask the account nothing", async () => {
     const { paths, projectDir } = await freshDevice()
     const opened: string[] = []
+    const account = countingSource()
     const resolve = createDeviceSessionResolver({
-      source: async () => signedInCli(),
+      source: account.source,
+      pinDir: join(projectDir, "pins"),
+      loadRuntime: async () => realSpaceRuntime(opened),
+    })
+
+    const pass = () =>
+      resolve({ identity: "agent", paths, space: { profile: null, projectDir } }).then(
+        () => null,
+        (rejection: unknown) => rejection,
+      )
+
+    expect(isSyncSessionDeferred(await pass())).toBe(true)
+    expect(isSyncSessionDeferred(await pass())).toBe(true)
+    expect(opened).toEqual([])
+    // Only the first pass reads the account. A retry that read it again would hit the OS keychain and the account
+    // service every time; on macOS an "Allow" (not "Always Allow") answer would prompt on every retry.
+    expect(account.passes()).toBe(1)
+  })
+
+  test("a repository that is initialised but has no first commit yet defers and gets no space binding", async () => {
+    const { paths, projectDir } = await freshDevice()
+    git(projectDir, "init", "-q", paths.repo)
+    const opened: string[] = []
+    const account = countingSource()
+    const resolve = createDeviceSessionResolver({
+      source: account.source,
       pinDir: join(projectDir, "pins"),
       loadRuntime: async () => realSpaceRuntime(opened),
     })
@@ -68,7 +113,10 @@ describe("the first session on a new device (#13486)", () => {
       (rejection: unknown) => rejection,
     )
 
+    // The memory repo's creation writes its own config between `git init` and the first commit; a binding written in
+    // that window can collide with it and stop sync for good.
     expect(isSyncSessionDeferred(error)).toBe(true)
+    expect(new GitSpaceConfig(paths.repo).get("omo.sync.space")).toBeNull()
     expect(opened).toEqual([])
   })
 
@@ -77,6 +125,7 @@ describe("the first session on a new device (#13486)", () => {
     const opened: string[] = []
     const errors: string[] = []
     const warnings: string[] = []
+    const account = countingSource()
     const runner = createSyncRunner({
       logger: {
         info: () => undefined,
@@ -84,7 +133,7 @@ describe("the first session on a new device (#13486)", () => {
         error: (message) => errors.push(message),
       },
       resolveSession: createDeviceSessionResolver({
-        source: async () => signedInCli(),
+        source: account.source,
         pinDir: join(projectDir, "pins"),
         loadRuntime: async () => realSpaceRuntime(opened),
       }),
@@ -97,11 +146,18 @@ describe("the first session on a new device (#13486)", () => {
       expect(warnings).toHaveLength(1)
       expect(opened).toEqual([])
 
-      expect(spawnSync("git", ["init", "-q", paths.repo]).status).toBe(0)
+      git(projectDir, "init", "-q", paths.repo)
       jest.advanceTimersByTime(15_000)
+      await runner.status(paths.repo)
+      expect(opened).toEqual([])
+      expect(account.passes()).toBe(1)
+
+      firstCommit(paths.repo)
+      jest.advanceTimersByTime(30_000)
       await runner.status(paths.repo)
 
       expect(opened).toHaveLength(1)
+      expect(account.passes()).toBe(2)
       expect(errors).toEqual([])
     } finally {
       jest.useRealTimers()

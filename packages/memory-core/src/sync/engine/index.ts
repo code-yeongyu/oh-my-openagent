@@ -27,4 +27,4 @@ export type {
 } from "../account/source-types"
 export type { GenesisBridge, GenesisBridgeResult } from "../genesis/bridge.ts"
 export type { DeviceKeyMaterial } from "../keyring-port"
-export { GitSpaceConfig, listRemotes, resolveSpace } from "../space/space"
+export { GitSpaceConfig, listRemotes, repoHasCommit, resolveSpace } from "../space/space"
