@@ -14,6 +14,7 @@ import {
   cleanupStack,
   closedAfterPublications,
   reap,
+  resolvable,
   StepStalled,
   stepsWithin,
   writerState,
@@ -96,15 +97,15 @@ for (const change of ["replacement", "aba", "refresh", "signing", "sealing"] as 
         credentials,
         JSON.stringify({ identity: "A", generation: 1, token: 1, signingKey: "signing-1", sealingKey: "sealing-1" }),
       )
-      const locked = Promise.withResolvers<void>()
-      const written = Promise.withResolvers<void>()
+      const locked = resolvable()
+      const written = resolvable()
       const writer = spawnWriter(credentials, change, (message) => {
         if (message === "locked") locked.resolve()
         if (message === "written") written.resolve()
       })
       child = writer
       await step("writer locked", Promise.race([locked.promise, exitedEarly(writer)]))
-      const entered = Promise.withResolvers<void>()
+      const entered = resolvable()
       const controller = new AbortController()
       let boundaries = 0
       const authority = {
@@ -166,8 +167,8 @@ test(
     cleanup.push(f.close)
     const credentials = join(f.input.pinDir, "synthetic-credentials.json")
     writeFileSync(credentials, JSON.stringify({ identity: "A", generation: 1, token: 1 }))
-    const locked = Promise.withResolvers<void>()
-    const written = Promise.withResolvers<void>()
+    const locked = resolvable()
+    const written = resolvable()
     const writer = spawnWriter(credentials, "hang", (message) => {
       if (message === "locked") locked.resolve()
       if (message === "written") written.resolve()
@@ -262,13 +263,13 @@ test(
     const credentials = join(f.input.pinDir, "synthetic-credentials.json")
     writeFileSync(credentials, JSON.stringify({ identity: "A", generation: 1, token: 1 }))
     const order: string[] = []
-    const held = Promise.withResolvers<void>()
-    const trying = Promise.withResolvers<void>()
+    const held = resolvable()
+    const trying = resolvable()
     // The publication parks on this gate while it holds the lock; cleanup opens it, so a failed step
     // cannot leave the publication parked when the fixture closes.
     cleanup.push(() => trying.resolve())
-    const locked = Promise.withResolvers<void>()
-    const written = Promise.withResolvers<void>()
+    const locked = resolvable()
+    const written = resolvable()
     const { authority, entries } = lockedBoundary(credentials, async () => {
       held.resolve()
       await trying.promise
@@ -368,13 +369,13 @@ test(
     if (!verified.ok || verified.state.pin === null) throw new Error("fixture pin")
     const credentials = join(f.input.pinDir, "synthetic-credentials.json")
     writeFileSync(credentials, JSON.stringify({ identity: "A", generation: 1, token: 1 }))
-    const locked = Promise.withResolvers<void>()
+    const locked = resolvable()
     const writer = spawnWriter(credentials, "hang", (message) => {
       if (message === "locked") locked.resolve()
     })
     child = writer
     await step("writer locked", Promise.race([locked.promise, exitedEarly(writer)]))
-    const entered = Promise.withResolvers<void>()
+    const entered = resolvable()
     const { authority } = lockedBoundary(credentials, async () => undefined)
     const waiting = {
       ...authority,

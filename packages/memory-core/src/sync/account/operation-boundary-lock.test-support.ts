@@ -10,6 +10,12 @@ const SETTLE_BOUND_MS = 5_000
 
 type Closer = () => void | Promise<void>
 
+/** A promise the test resolves itself, for a writer message or a gate it opens. */
+export const resolvable = () => {
+  const { promise, resolve } = Promise.withResolvers<undefined>()
+  return { promise, resolve: () => resolve(undefined) }
+}
+
 /**
  * Closers run in reverse registration order. Each one runs even after an earlier one throws (a writer that
  * survives SIGKILL must not leak the fixture close behind it); their errors are thrown together once all ran.
