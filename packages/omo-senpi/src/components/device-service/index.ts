@@ -2,6 +2,9 @@ import { AsyncResource } from "node:async_hooks"
 
 import { deferUntilAfterFirstPaint } from "../../extension/startup-deferral"
 import type { OmoSenpiComponent } from "../../extension/types"
+import { resolveAgentHome } from "../agent-home/resolve-agent-home"
+import { hostSocketOf } from "../thread/gateway/registration"
+import { isThreadSocket } from "../thread/live-surface-paths"
 import type { DeviceServiceRuntimeOptions } from "./runtime"
 
 // The device service at engine start (#12051, #12379): every interactive omo start makes sure this device's OmO device
@@ -26,12 +29,28 @@ export function createDeviceServiceComponent(options: DeviceServiceComponentOpti
   return {
     name: "device-service",
     register(pi, ctx): void {
+      const loadRuntime = options.loadRuntime ?? (() => import("#omo-device-service-runtime"))
+      // The operator daemon registers its agent dir as soon as it loads omo - a `warm` (`omo daemon run` sends one) or
+      // its first open - so a daemon the device service cold-starts has an engine endpoint before any session runs and
+      // can be handed the delivery it was started for (#13037 cold wake). Its later sessions find the latch claimed.
+      const env = options.env ?? process.env
+      const hostSocket = hostSocketOf(pi)
+      if (hostSocket !== undefined && isThreadSocket(hostSocket, env)) {
+        const atLoad = { mode: "rpc", agentDir: resolveAgentHome({ env }), cwd: pi.cwd ?? process.cwd() }
+        void loadRuntime()
+          .then((runtime) => runtime.startAtSession(atLoad, ctx.logger, { scope: processScope, ...options }))
+          .catch((error: unknown) =>
+            ctx.logger.warn("device service runtime could not be loaded", {
+              reason: error instanceof Error ? error.message : String(error),
+            }),
+          )
+      }
       pi.on("session_start", (_payload, eventCtx) => {
         // senpi's run mode: the TUI and RPC engines (the desktop's) publish endpoints; print, json and app-server do not.
         const mode = Reflect.get(Object(eventCtx), "mode")
         if (mode !== "tui" && mode !== "rpc") return undefined
         deferUntilAfterFirstPaint(ctx, "device service start", () =>
-          (options.loadRuntime ?? (() => import("#omo-device-service-runtime")))().then((runtime) =>
+          loadRuntime().then((runtime) =>
             runtime.startAtSession(eventCtx, ctx.logger, { scope: processScope, ...options }),
           ),
         )

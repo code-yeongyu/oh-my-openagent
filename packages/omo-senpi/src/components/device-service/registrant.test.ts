@@ -132,3 +132,48 @@ describe("device-service agent dir registrant start (#12379)", () => {
     expect(h.started).toEqual([{ agentDir: AGENT_DIR, sessionStore: undefined }])
   })
 })
+
+// #13037 cold wake: the device service cold-starts the operator daemon and `omo daemon run` warms it, so omo loads with
+// no session_start. The daemon's agent dir must be registered then, or the service has no endpoint and no consumer to
+// hand the delivery it started the daemon for. Any other host still waits for a session.
+describe("the operator daemon registers its agent dir when it loads omo", () => {
+  test.each([
+    ["the operator daemon", true],
+    ["a desktop thread host", false],
+  ])(
+    "#given %s loads the component with no session open #when the component registers #then a registrant starts only on the operator daemon",
+    async (_what, operatorDaemon) => {
+      const daemonSocket = "/tmp/omo-daemon-registrant/rpc/rpc.sock"
+      const started: Started[] = []
+      const pi = new FakeExtensionAPI()
+      pi.cwd = "/work/project"
+      Object.assign(pi, {
+        sessionContext: {
+          host_socket: operatorDaemon ? daemonSocket : "/tmp/omo-daemon-registrant/rpc/i-0123456789abcdef.sock",
+          host_instance: "generation-1",
+        },
+      })
+      const loaded = new Promise<void>((resolve) => {
+        const component = createDeviceServiceComponent({
+          env: { OMO_RPC_SOCKET_PATH: daemonSocket, OMO_CODING_AGENT_DIR: AGENT_DIR },
+          latch: { claimed: true },
+          registrantLatch: { claimed: false },
+          loadConfig: () => ({ config: {} }),
+          startRegistrant: ({ agentDir }) => {
+            started.push({ agentDir, sessionStore: sessionOwner.getStore() })
+            resolve()
+          },
+        })
+        component.register(pi, {
+          logger: { info() {}, warn() {}, error() {} },
+          config: { getFlag: () => undefined },
+          deferStartupWork: () => undefined,
+        })
+        if (!operatorDaemon) resolve()
+      })
+      await loaded
+      await import("#omo-device-service-runtime")
+      expect(started).toEqual(operatorDaemon ? [{ agentDir: AGENT_DIR, sessionStore: undefined }] : [])
+    },
+  )
+})
