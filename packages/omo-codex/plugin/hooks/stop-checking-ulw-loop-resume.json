@@ -8,7 +8,7 @@
 						"command": "node \"${PLUGIN_ROOT}/components/ulw-loop/dist/cli.js\" hook stop",
 						"timeout": 10,
 						"statusMessage": "(OmO 5.1.78) Checking Ulw-Loop Resume",
-						"commandWindows": "cmd /d /c \"${PLUGIN_ROOT}\\components\\bootstrap\\scripts\\node-dispatch.cmd\" components\\ulw-loop\\dist\\cli.js hook stop"
+						"commandWindows": "cmd /d /s /c \"\"${PLUGIN_ROOT}\\components\\bootstrap\\scripts\\node-dispatch.cmd\" components\\ulw-loop\\dist\\cli.js hook stop\""
 					}
 				]
 			}
