@@ -5,15 +5,22 @@ import * as fs from "node:fs"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { isAbsolute, join, relative } from "node:path"
-import { settlesWithin } from "../../git/settles-within.test-support.ts"
 import { withLock } from "../../locks/acquire.ts"
 import { createLockRecord } from "../../locks/lock-record.ts"
 import { pidAlive } from "../../locks/process-liveness.test-support.ts"
 import { pinTrustAnchor } from "../crypto/trust-pin.ts"
 import { walk } from "../genesis/vector.test-support.ts"
+import {
+  cleanupStack,
+  closedAfterPublications,
+  reap,
+  StepStalled,
+  stepsWithin,
+  writerState,
+} from "./operation-boundary-lock.test-support.ts"
 import { ACCOUNT, fixture } from "./testing/genesis-enable.test-support.ts"
 
-const cleanup: (() => void | Promise<void>)[] = []
+const cleanup = cleanupStack()
 
 // fs is process-global: a renameSync spy also sees other files' writes in this bun process (#11963),
 // so the spies below only count, or interfere with, renames that land inside the pin directory.
@@ -30,77 +37,11 @@ const landsIn = (dir: string, to: fs.PathLike): boolean => {
 // it even when the file runs without `--timeout 20000`.
 const TEST_TIMEOUT_MS = 20_000
 const STEP_BUDGET_MS = 16_000
-const REAP_BOUND_MS = 2_000
 // Cleanup waits at most once for a reap and once for a publication to settle. The hook's own timeout is
 // stated above their sum: without `--timeout 20000` the runner would give it 5 s, less than those bounds.
-const SETTLE_BOUND_MS = 5_000
 const CLEANUP_TIMEOUT_MS = 10_000
 
-const closeAll = async (): Promise<void> => {
-  for (const close of cleanup.splice(0).reverse()) await close()
-}
-afterEach(closeAll, CLEANUP_TIMEOUT_MS)
-
-class StepStalled extends Error {
-  constructor(
-    readonly step: string,
-    state: string,
-  ) {
-    super(`step '${step}' did not settle before the test's step deadline (${state})`)
-  }
-}
-
-const stepsWithin = (budgetMs: number, state: () => string) => {
-  const deadline = Date.now() + budgetMs
-  return async <T>(step: string, promise: Promise<T>): Promise<T> => {
-    const settled = await settlesWithin(promise, Math.max(0, deadline - Date.now()))
-    if (settled.kind === "still-waiting") throw new StepStalled(step, state())
-    return settled.value
-  }
-}
-
-type Outcome = { readonly ok: true } | { readonly ok: false; readonly error: unknown }
-// Handled from creation, so a promise the test stops waiting on can never surface as unhandled.
-const outcomeOf = (promise: Promise<unknown>): Promise<Outcome> =>
-  promise.then(
-    (): Outcome => ({ ok: true }),
-    (error: unknown): Outcome => ({ ok: false, error }),
-  )
-
-// A publication still running when a step fails keeps polling the credential lock inside the fixture
-// directory, and that poll's recursive mkdir brings the directory back after the fixture is closed: an
-// empty `genesis-enable-*` entry that the run's temp-root check then reports on top of the real failure.
-// A fixture a publication writes into is therefore closed only once every such publication has settled.
-// Closers run in reverse, so this one, registered first, runs after the writer is reaped and its lock is free.
-const closedAfterPublications = (f: { readonly close: () => Promise<void> }) => {
-  const publications: Promise<Outcome>[] = []
-  cleanup.push(async () => {
-    const step = stepsWithin(SETTLE_BOUND_MS, () => "fixture closed regardless")
-    try {
-      await step("publication settled", Promise.all(publications))
-    } finally {
-      await f.close()
-    }
-  })
-  return (publication: Promise<unknown>): Promise<Outcome> => {
-    const outcome = outcomeOf(publication)
-    publications.push(outcome)
-    return outcome
-  }
-}
-
-const writerState = (child: Subprocess | undefined) => () =>
-  child === undefined
-    ? "writer not spawned"
-    : `writer pid ${child.pid} exitCode ${String(child.exitCode)} signal ${String(child.signalCode)} alive ${String(pidAlive(child.pid))}`
-
-// Bounded even when the exit notification is lost: a pid that is gone counts as reaped.
-const reap = async (child: Subprocess): Promise<void> => {
-  if (child.exitCode !== null || child.signalCode !== null) return
-  child.kill("SIGKILL")
-  if ((await settlesWithin(child.exited, REAP_BOUND_MS)).kind === "settled" || !pidAlive(child.pid)) return
-  throw new Error(`writer ${child.pid} survived SIGKILL for ${REAP_BOUND_MS} ms`)
-}
+afterEach(cleanup.closeAll, CLEANUP_TIMEOUT_MS)
 
 const spawnWriter = (credentials: string, mode: string, onMessage: (message: unknown) => void): Subprocess => {
   const child = Bun.spawn(
@@ -147,7 +88,7 @@ for (const change of ["replacement", "aba", "refresh", "signing", "sealing"] as 
       let child: Subprocess | undefined
       const step = stepsWithin(STEP_BUDGET_MS, () => writerState(child)())
       const f = await step("fixture", fixture())
-      const published = closedAfterPublications(f)
+      const published = closedAfterPublications(cleanup, f)
       const verified = await step("bootstrap walk", walk(f.built.request, f.keyring))
       if (!verified.ok || verified.state.pin === null) throw new Error("fixture pin")
       const credentials = join(f.input.pinDir, "synthetic-credentials.json")
@@ -244,11 +185,40 @@ test(
     // then: the case fails with that step's name, and reaping leaves no writer process behind
     expect(stalled).toBeInstanceOf(StepStalled)
     expect(stalled).toMatchObject({ step: "writer wrote" })
+    expect(writer.exitCode).toBeNull()
     await reap(writer)
     expect(pidAlive(writer.pid)).toBe(false)
   },
   TEST_TIMEOUT_MS,
 )
+
+test("#given a closer that throws #when the cleanup runs #then every other closer still runs and the failure is reported after them", async () => {
+  // given: three closers, the middle one failing like a writer that survives SIGKILL
+  const stack = cleanupStack()
+  const ran: string[] = []
+  const failure = new Error("writer survived SIGKILL")
+  stack.push(() => {
+    ran.push("fixture close")
+  })
+  stack.push(() => {
+    ran.push("reap")
+    throw failure
+  })
+  stack.push(async () => {
+    ran.push("spy restore")
+  })
+
+  // when
+  const thrown = await stack.closeAll().then(
+    () => null,
+    (error: unknown) => error,
+  )
+
+  // then: all three ran in reverse order, and the one failure comes back as an AggregateError after them
+  expect(ran).toEqual(["spy restore", "reap", "fixture close"])
+  expect(thrown).toBeInstanceOf(AggregateError)
+  expect(thrown).toMatchObject({ errors: [failure] })
+})
 
 const lockedBoundary = (credentials: string, onHeld: () => Promise<void>) => {
   const controller = new AbortController()
@@ -286,7 +256,7 @@ test(
     let child: Subprocess | undefined
     const step = stepsWithin(STEP_BUDGET_MS, () => writerState(child)())
     const f = await step("fixture", fixture())
-    const published = closedAfterPublications(f)
+    const published = closedAfterPublications(cleanup, f)
     const verified = await step("bootstrap walk", walk(f.built.request, f.keyring))
     if (!verified.ok || verified.state.pin === null) throw new Error("fixture pin")
     const credentials = join(f.input.pinDir, "synthetic-credentials.json")
@@ -355,7 +325,7 @@ test(
   async () => {
     const step = stepsWithin(STEP_BUDGET_MS, () => "no writer")
     const f = await step("fixture", fixture())
-    const published = closedAfterPublications(f)
+    const published = closedAfterPublications(cleanup, f)
     const verified = await step("bootstrap walk", walk(f.built.request, f.keyring))
     if (!verified.ok || verified.state.pin === null) throw new Error("fixture pin")
     const credentials = join(f.input.pinDir, "synthetic-credentials.json")
@@ -393,7 +363,7 @@ test(
     let child: Subprocess | undefined
     const step = stepsWithin(STEP_BUDGET_MS, () => writerState(child)())
     const f = await step("fixture", fixture())
-    const published = closedAfterPublications(f)
+    const published = closedAfterPublications(cleanup, f)
     const verified = await step("bootstrap walk", walk(f.built.request, f.keyring))
     if (!verified.ok || verified.state.pin === null) throw new Error("fixture pin")
     const credentials = join(f.input.pinDir, "synthetic-credentials.json")
@@ -423,7 +393,7 @@ test(
     expect(first).toBe("boundary")
 
     // when: a step fails at this point, so the test's cleanup runs, as afterEach runs it
-    await step("cleanup", closeAll())
+    await step("cleanup", cleanup.closeAll())
 
     // then: the publication settled before its directory was removed, so nothing brought the directory back
     await step("pin result", result)
