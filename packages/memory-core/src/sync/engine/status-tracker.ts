@@ -16,9 +16,12 @@ export type TrackedStatus =
   | { readonly kind: "failing"; readonly failure: SyncFailure; readonly since: number; readonly attempts: number }
   | ({ readonly kind: "frozen" } & Frozen)
 
-/** What a failure says caused it (class, code, stage); a failure without a cause has none to change. */
-const causeKey = (failure: SyncFailure): string =>
-  "cause" in failure ? `${failure.cause.errorClass}\n${failure.cause.code ?? ""}\n${failure.cause.stage}` : ""
+/** Every field of what a failure says caused it; a failure without a cause has none to change. */
+const causeKey = (failure: SyncFailure): string => {
+  if (!("cause" in failure)) return ""
+  const { errorClass, code, httpStatus, exitCode, stage } = failure.cause
+  return JSON.stringify([errorClass, code ?? null, httpStatus ?? null, exitCode ?? null, stage])
+}
 
 export class StatusTracker {
   private failing: Failing | null = null
@@ -47,7 +50,7 @@ export class StatusTracker {
 
   /**
    * Records a failed cycle; true when the shown failure appeared or changed (#13635), or kept its kind and
-   * action but names another cause (#13689): the only times it is worth a warning.
+   * action but names another cause, any cause field included (#13689): the only times it is worth a warning.
    */
   failed(error: unknown, stage: SyncStage): boolean {
     const failure = describeSyncFailure(error, stage)
