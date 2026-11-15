@@ -84,7 +84,11 @@ export const FIRST_PAINT_BACKSTOP_MS = 750
 export type ExtensionPlacement = "fused" | "hand"
 
 export interface FirstPaintSchedulerOptions {
-  readonly on: (event: string, handler: (payload?: unknown) => void, options?: { previewSafe?: boolean; runs?: "brain" }) => void
+  readonly on: (
+    event: string,
+    handler: (payload?: unknown) => void,
+    options?: { previewSafe?: boolean; runs?: "brain" },
+  ) => void
   readonly backstopMs?: number
   readonly placement?: ExtensionPlacement
 }
@@ -114,7 +118,11 @@ export function createFirstPaintScheduler(options: FirstPaintSchedulerOptions): 
   }
   for (const event of FIRST_PAINT_EVENTS) {
     // The edges are loop events: declared for the brain, so the hand's generation of a split session never registers them.
-    options.on(event, openOnPaint, event === "before_agent_start" ? { previewSafe: true, runs: "brain" } : { runs: "brain" })
+    options.on(
+      event,
+      openOnPaint,
+      event === "before_agent_start" ? { previewSafe: true, runs: "brain" } : { runs: "brain" },
+    )
   }
 
   return (run) => {

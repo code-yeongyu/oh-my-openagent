@@ -37,14 +37,23 @@ interface SenpiLoader {
 
 const senpiDistDir = dirname(fileURLToPath(import.meta.resolve("@code-yeongyu/senpi")))
 const loader = (await import(pathToFileURL(join(senpiDistDir, "core", "extensions", "loader.js")).href)) as SenpiLoader
-const eventBus = (await import(pathToFileURL(join(senpiDistDir, "core", "event-bus.js")).href)) as { createEventBus(): unknown }
+const eventBus = (await import(pathToFileURL(join(senpiDistDir, "core", "event-bus.js")).href)) as {
+  createEventBus(): unknown
+}
 
 function loadFor(factory: (pi: unknown) => Promise<void>, side: ExtensionSide | undefined): Promise<LoadedExtension> {
-  return loader.loadExtensionFromFactory(factory, process.cwd(), eventBus.createEventBus(), loader.createExtensionRuntime(), "<omo-senpi>", {
-    sessionKind: "interactive",
-    sessionContext: {},
-    ...(side === undefined ? {} : { side }),
-  })
+  return loader.loadExtensionFromFactory(
+    factory,
+    process.cwd(),
+    eventBus.createEventBus(),
+    loader.createExtensionRuntime(),
+    "<omo-senpi>",
+    {
+      sessionKind: "interactive",
+      sessionContext: {},
+      ...(side === undefined ? {} : { side }),
+    },
+  )
 }
 
 // One component that defers startup work, so composition builds its first-paint gate and nothing else does.
@@ -57,9 +66,15 @@ const deferringComponent: OmoSenpiComponent = {
 
 const handExtension = composeOmoSenpiExtension(omoSenpiComponents, { placement: () => "hand" })
 
-function catalog(loaded: LoadedExtension): { tools: Array<{ name: string; parameters: unknown }>; commands: string[]; flags: string[] } {
+function catalog(loaded: LoadedExtension): {
+  tools: Array<{ name: string; parameters: unknown }>
+  commands: string[]
+  flags: string[]
+} {
   return {
-    tools: [...loaded.tools.values()].map(({ definition }) => ({ name: definition.name, parameters: definition.parameters })).sort((a, b) => a.name.localeCompare(b.name)),
+    tools: [...loaded.tools.values()]
+      .map(({ definition }) => ({ name: definition.name, parameters: definition.parameters }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
     commands: [...loaded.commands.keys()].sort(),
     flags: [...loaded.flags.keys()].sort(),
   }
@@ -97,7 +112,13 @@ describe("omo-senpi composition on the hand side of a split session", () => {
   it("#given a hand placement #when composition defers startup work #then the work runs on the next tick with no paint edge", async () => {
     // given
     let ran = 0
-    const probe: OmoSenpiComponent = { name: "hand-placement-probe", register: (_pi, ctx) => ctx.deferStartupWork?.("probe", () => { ran += 1 }) }
+    const probe: OmoSenpiComponent = {
+      name: "hand-placement-probe",
+      register: (_pi, ctx) =>
+        ctx.deferStartupWork?.("probe", () => {
+          ran += 1
+        }),
+    }
 
     // when
     await loadFor(composeOmoSenpiExtension([probe], { placement: () => "hand" }), "hand")
@@ -144,6 +165,8 @@ describe("omo-senpi composition on the hand side under the win32 profile", () =>
     }
 
     // then
-    expect(calls.filter((call) => (call.options as { windowsHide?: unknown } | undefined)?.windowsHide !== true)).toEqual([])
+    expect(
+      calls.filter((call) => (call.options as { windowsHide?: unknown } | undefined)?.windowsHide !== true),
+    ).toEqual([])
   })
 })

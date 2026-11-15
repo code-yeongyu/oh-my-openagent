@@ -18,18 +18,45 @@ afterEach(() => {
 })
 
 /** Runs the fixture with HOME and every agent-dir variable inside `scratch`, bounded so a hung hand fails the test. */
-function runFixture(scratch: string, handRoot: string): Promise<{ readonly code: number | null; readonly stdout: string; readonly stderr: string }> {
+function runFixture(
+  scratch: string,
+  handRoot: string,
+): Promise<{ readonly code: number | null; readonly stdout: string; readonly stderr: string }> {
   const agentDir = join(scratch, "agent")
-  const env = { ...process.env, HOME: join(scratch, "home"), SENPI_CODING_AGENT_DIR: agentDir, OMO_CODING_AGENT_DIR: agentDir, PI_CODING_AGENT_DIR: agentDir }
+  const env = {
+    ...process.env,
+    HOME: join(scratch, "home"),
+    SENPI_CODING_AGENT_DIR: agentDir,
+    OMO_CODING_AGENT_DIR: agentDir,
+    PI_CODING_AGENT_DIR: agentDir,
+  }
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [FIXTURE, handRoot, agentDir], { cwd: import.meta.dir, env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true })
+    const child = spawn(process.execPath, [FIXTURE, handRoot, agentDir], {
+      cwd: import.meta.dir,
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+    })
     let stdout = ""
     let stderr = ""
-    child.stdout.on("data", (chunk: Buffer) => { stdout += chunk.toString() })
-    child.stderr.on("data", (chunk: Buffer) => { stderr += chunk.toString() })
-    const timer = setTimeout(() => { child.kill("SIGKILL"); reject(new Error(`hand fixture did not finish within 60 s: ${stderr.slice(-800)}`)) }, 60_000)
-    child.on("error", (error) => { clearTimeout(timer); reject(error) })
-    child.on("close", (code) => { clearTimeout(timer); resolve({ code, stdout, stderr }) })
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString()
+    })
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString()
+    })
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL")
+      reject(new Error(`hand fixture did not finish within 60 s: ${stderr.slice(-800)}`))
+    }, 60_000)
+    child.on("error", (error) => {
+      clearTimeout(timer)
+      reject(error)
+    })
+    child.on("close", (code) => {
+      clearTimeout(timer)
+      resolve({ code, stdout, stderr })
+    })
   })
 }
 

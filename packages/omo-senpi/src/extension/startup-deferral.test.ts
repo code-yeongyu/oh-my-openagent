@@ -234,7 +234,10 @@ describe("createFirstPaintScheduler", () => {
     const subscriptions: Array<{ event: string; options: unknown }> = []
 
     // when
-    createFirstPaintScheduler({ on: (event, _handler, options) => subscriptions.push({ event, options }), backstopMs: 60_000 })
+    createFirstPaintScheduler({
+      on: (event, _handler, options) => subscriptions.push({ event, options }),
+      backstopMs: 60_000,
+    })
 
     // then
     expect(subscriptions).toEqual([
@@ -246,11 +249,17 @@ describe("createFirstPaintScheduler", () => {
   it("#given a hand placement #when work is queued #then it runs on the next tick without waiting for a paint edge or the backstop", async () => {
     // given
     const subscriptions: string[] = []
-    const schedule = createFirstPaintScheduler({ on: (event) => subscriptions.push(event), backstopMs: 60_000, placement: "hand" })
+    const schedule = createFirstPaintScheduler({
+      on: (event) => subscriptions.push(event),
+      backstopMs: 60_000,
+      placement: "hand",
+    })
     let ran = 0
 
     // when
-    schedule(() => { ran += 1 })
+    schedule(() => {
+      ran += 1
+    })
 
     // then
     expect(subscriptions).toEqual([])

@@ -10,7 +10,12 @@ import { AGENT_TOOLKIT_SDK_ROOT_ENV, BUNSHIN_TS_SDK_ROOT_ENV, createSdkRootProvi
 import { IdleInjectionCoordinator } from "./idle-injection-coordinator"
 import { deliverItems } from "./deliver-items"
 import { publishWakeQueueBaselineOnSessionStart, publishWakeQueueChildWork } from "./wake-queue-source"
-import { createFirstPaintScheduler, createStartupDeferral, type ExtensionPlacement, type StartupWorkScheduler } from "./startup-deferral"
+import {
+  createFirstPaintScheduler,
+  createStartupDeferral,
+  type ExtensionPlacement,
+  type StartupWorkScheduler,
+} from "./startup-deferral"
 import { installToolCaptureRegistry } from "./tool-capture-registry"
 import { createPrewarmDiagnostics } from "./prewarm-diagnostics"
 import { absentSenpiSeamsNotice, installRemoteWakeRefusal } from "./senpi-seams"
