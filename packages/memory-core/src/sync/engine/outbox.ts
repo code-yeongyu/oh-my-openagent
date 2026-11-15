@@ -67,9 +67,10 @@ interface InlineItem {
  * journal (a rollback, or two versions taking turns on one repo) still captures: it writes the
  * index entries it read back untouched and appends its own captures inline, so one journal can hold
  * both kinds. Its push does not work on it: it reads every pending item's ops and an outgoing
- * batch's bytes inline, so each of its push cycles fails while an item captured by a build with the
- * outbox is still waiting to be sent, and nothing is sent until a build with the outbox runs again.
- * The entries stay pending meanwhile. With nothing of that kind pending, its push works as before.
+ * batch's bytes inline. The first read by a build with the outbox converts every pending item to an
+ * index entry, whoever captured it, so the older build's push fails every cycle while any item that
+ * was pending when a build with the outbox last ran is still unsent, and nothing is sent until a build
+ * with the outbox runs again. The entries stay pending meanwhile; once none is left, it pushes as before.
  */
 type StoredItem = PendingItem | InlineItem
 type StoredOutgoing = Omit<OutgoingBatch, "items"> & { readonly bytes?: string; readonly items: readonly StoredItem[] }
