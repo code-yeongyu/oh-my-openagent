@@ -69,11 +69,28 @@ async function removeRequested(record: Record<string, unknown>, root: string, gi
         branch,
       },
     )
-  // Nothing ties a far request to the worktree its create made, so a worktree with work in it (a hand-made one, or one
-  // a thread is using) is never removed: the one a failed open left is fresh and clean (#13450 re-review L2).
-  const status = await git(["status", "--porcelain"], path)
+  // Nothing ties a far request to the worktree its create made, so this refuses one with work git can see: changed,
+  // untracked (whatever status.showUntrackedFiles says) or ignored files, and commits made on the thread branch, which
+  // `branch -D` would drop. The reflog of a branch a create just made holds only its creation entry, so a second entry
+  // means work happened on the branch; a branch without a reflog is treated the same way (#13450 re-review L2). The
+  // one a failed open left is fresh and has neither. Work outside git's view (an excluded folder elsewhere) is not
+  // covered.
+  const status = await git(["status", "--porcelain", "--ignored", "--untracked-files=all"], path)
   if (status.exit !== 0 || status.stdout.trim() !== "")
     return folderFailure("worktree_left_behind", `${path} has uncommitted work; it was not removed.`, { path, branch })
+  const own = await git(["reflog", "show", "--format=%H", `refs/heads/${branch}`], path)
+  const ownCommits =
+    own.exit === 0
+      ? own.stdout
+          .trim()
+          .split("\n")
+          .filter((line) => line !== "").length
+      : Infinity
+  if (ownCommits > 1)
+    return folderFailure("worktree_left_behind", `Branch ${branch} has commits of its own; it was not removed.`, {
+      path,
+      branch,
+    })
   const commonDir = common.stdout.trim()
   const repository = basename(commonDir) === ".git" ? dirname(commonDir) : commonDir
   return (await discardWorktree({ repository, path, branch, root, git })) ?? { kind: "removed" }
