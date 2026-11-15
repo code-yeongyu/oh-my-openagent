@@ -20,7 +20,10 @@ import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createComputerUseComponent } from "./index"
 import type { ComputerLifecycleSource } from "./registration-support"
 
-const FAKE_ENGINE = join(dirname(fileURLToPath(import.meta.url)), "../../../../senpi-desktop-service/test/fake-engine.mjs")
+const FAKE_ENGINE = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../../../senpi-desktop-service/test/fake-engine.mjs",
+)
 const RECEIVED = "recv "
 
 class HostApi extends FakeExtensionAPI {
@@ -74,7 +77,10 @@ function session(id: string, lifecycle?: ScopeLifecycle) {
   const pi = new HostApi()
   const wire: string[] = []
   const factory: ChildFactory = () => {
-    const child = spawn(process.execPath, [FAKE_ENGINE, "--stdio"], { env: { ...process.env, FAKE_ENGINE_DESKTOP: "1" }, stdio: "pipe" })
+    const child = spawn(process.execPath, [FAKE_ENGINE, "--stdio"], {
+      env: { ...process.env, FAKE_ENGINE_DESKTOP: "1" },
+      stdio: "pipe",
+    })
     children.push(child)
     createInterface({ input: child.stdout }).on("line", (line) => {
       const method = wireMethod(line)
@@ -86,7 +92,10 @@ function session(id: string, lifecycle?: ScopeLifecycle) {
   tempDirs.push(home)
   mkdirSync(join(home, ".omo"), { recursive: true })
   writeFileSync(join(home, ".omo", "omo.jsonc"), "{}")
-  const context: ComponentContext = { logger: { info() {}, warn() {}, error() {} }, config: { getFlag: () => undefined } }
+  const context: ComponentContext = {
+    logger: { info() {}, warn() {}, error() {} },
+    config: { getFlag: () => undefined },
+  }
   createComputerUseComponent({
     platform: "linux",
     env: { HOME: home },
@@ -105,7 +114,13 @@ function session(id: string, lifecycle?: ScopeLifecycle) {
     await pi.dispatch("tool_activated", { type: "tool_activated", toolNames: ["computer"] }, hostContext)
     const execute = pi.tools.find((tool) => tool.name === "computer")?.execute
     if (typeof execute !== "function") throw new Error("the computer tool is not registered")
-    const result = (await execute("call-1", { action: "call", chain: [{ method: "control.acquire", args: [{ reason: "click Run" }] }] }, undefined, undefined, hostContext)) as { details?: { value?: unknown } }
+    const result = (await execute(
+      "call-1",
+      { action: "call", chain: [{ method: "control.acquire", args: [{ reason: "click Run" }] }] },
+      undefined,
+      undefined,
+      hostContext,
+    )) as { details?: { value?: unknown } }
     return result.details?.value
   }
   const count = (method: string) => wire.filter((name) => name === method).length
