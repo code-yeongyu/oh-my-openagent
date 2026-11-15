@@ -6,8 +6,9 @@ import { collectPluginState } from "./fused-equivalence-plugin-state.mjs"
  * Id namespaces the plugin generates per run, by the key that carries them (plan §6.2: one-to-one first-occurrence token
  * maps per id namespace). The harness normalizer maps its own id keys; these are the plugin's: task ids are
  * time-derived, a memory identity and its binding hash are derived from the sandbox path, and a memory commit sha
- * hashes its date, and the desktop engine mints an `ActionReport`'s audit ids as ULIDs. A short sha (a 7+ character
- * prefix of a mapped sha) maps to the same token with `:short`.
+ * hashes its date, and the desktop engine mints an `ActionReport`'s audit ids as ULIDs and its capture frame ids as
+ * `frame-<session ULID>-<n>`. A short sha (a 7+ character prefix of a mapped sha) maps to the same token with `:short`;
+ * a frame id maps by its session part, found by its shape inside any string, so `frame-<ULID>-2` reads `<frame:1>-2`.
  */
 const PLUGIN_ID_KEYS = {
   task_id: ["task", /^st_[0-9a-f]{8}$/],
@@ -19,6 +20,9 @@ const PLUGIN_ID_KEYS = {
   auditIds: ["audit", /^[0-9A-HJKMNP-TV-Z]{26}$/],
 }
 
+/** A desktop engine capture frame id, `frame-<session ULID>-<n>`; its session part is mapped wherever it appears. */
+const FRAME_SESSION = /frame-[0-9a-z]{26}(?=-\d)/g
+
 /** Literal roots for every plugin id the raw observations carry under a PLUGIN_ID_KEYS key, in first-occurrence order. */
 function pluginIdRoots(raw) {
   const seen = new Map()
@@ -26,6 +30,7 @@ function pluginIdRoots(raw) {
     if (typeof node === "string") {
       const [namespace, shape] = (key !== undefined && Object.hasOwn(PLUGIN_ID_KEYS, key) && PLUGIN_ID_KEYS[key]) || []
       if (namespace && shape.test(node) && !seen.has(node)) seen.set(node, namespace)
+      for (const [session] of node.matchAll(FRAME_SESSION)) if (!seen.has(session)) seen.set(session, "frame")
     } else if (Array.isArray(node)) node.forEach((item) => walk(item, key))
     else if (node && typeof node === "object") for (const [k, v] of Object.entries(node)) walk(v, k)
   }

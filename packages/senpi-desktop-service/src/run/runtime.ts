@@ -9,13 +9,6 @@ import { ComputerRunError, type ConfirmControl, type EngineCall, type RunContext
 import { createDesktopFacade, type DesktopFacade } from "./facade"
 import { sleep } from "./wait"
 
-/** The host's tool pipeline (senpi `executeTool`): validation, permission, and lazy activation stay host-side. */
-export type ExecuteTool = (
-  toolName: string,
-  params: unknown,
-  options: { readonly signal: AbortSignal },
-) => Promise<unknown>
-
 export interface ComputerCallRequest {
   /** The tool call this work belongs to; every audit record it produces is tagged with it. */
   readonly toolCallId: string
@@ -26,7 +19,7 @@ export interface ComputerCallRequest {
 
 /** `DesktopService` surface used by the facade; `control.grant`/`revoke` stay host-only. */
 export interface ComputerCallHost {
-  readonly service: Pick<DesktopService, "call" | "onAudit" | "revokeControl" | "reportError">
+  readonly service: Pick<DesktopService, "call" | "auditBarrier" | "onAudit" | "revokeControl" | "reportError">
   /** Human confirmation behind `desktop.control.acquire`; absent: headless, never grants (#9651 B5b). */
   readonly confirmControl?: ConfirmControl
 }
@@ -108,7 +101,11 @@ export async function runComputerSteps(
     screenshots: [],
     deadline: Date.now() + timeoutMs,
   }
-  const call: EngineCall = (method, params) => host.service.call(method, params, { signal })
+  let sent = false
+  const call: EngineCall = (method, params) => {
+    sent = true
+    return host.service.call(method, params, { signal })
+  }
   const desktop = createDesktopFacade({
     context,
     call,
@@ -120,6 +117,8 @@ export async function runComputerSteps(
       signal.addEventListener("abort", () => reject(signal.reason), { once: true })
       program({ desktop, sleep: (ms) => sleep(ms, signal) }).then(resolve, reject)
     })
+    // The audit of the call's last request arrives after that request's reply; collect it before settling.
+    if (sent) await host.service.auditBarrier()
     return {
       displays: context.output.finish(),
       returnValue: cloneSafe(returnValue),

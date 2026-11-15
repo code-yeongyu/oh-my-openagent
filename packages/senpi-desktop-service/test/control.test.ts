@@ -158,7 +158,7 @@ describe("desktop.control facade (#9651 B5b)", HANG_GUARD, () => {
     )
 
     // Then
-    expect(error).toMatchObject({ message: "read-only run: 'control.acquire' requires read_only: false" })
+    expect(error).toMatchObject({ message: "read-only call: 'control.acquire' sends input, which needs the exec tier" })
     expect(methods(log)).not.toContain("control.grant")
   })
 

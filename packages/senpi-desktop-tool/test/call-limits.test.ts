@@ -1,5 +1,5 @@
-import type { ExecuteTool } from "@oh-my-opencode/senpi-desktop-service"
 import { afterEach, describe, expect, it, vi } from "vitest"
+import { runComputerCommand } from "../src/command"
 import { createComputerActionsTool } from "../src/cua-adapter"
 import { MAX_ARGUMENT_BYTES, MAX_RESULT_BYTES } from "../src/payload-caps"
 import { createComputerTool } from "../src/tool"
@@ -10,8 +10,6 @@ const HANG_GUARD = { timeout: 30_000 }
 
 afterEach(closeDesktops)
 
-const noTools: ExecuteTool = () => Promise.reject(new Error("no tools"))
-
 describe("limits at the computer tool boundary", HANG_GUARD, () => {
   it("refuses computer arguments over the byte cap before any engine starts", async () => {
     // Given: one byte of text past the cap
@@ -20,13 +18,7 @@ describe("limits at the computer tool boundary", HANG_GUARD, () => {
     const params = { action: "call", chain: [{ method: "clipboard.write", args: [text] }] }
 
     // When
-    const result = await createComputerTool({ handle, executeTool: noTools }).execute(
-      "call-big",
-      params,
-      undefined,
-      undefined,
-      hostContext(),
-    )
+    const result = await createComputerTool({ handle }).execute("call-big", params, undefined, undefined, hostContext())
 
     // Then
     expect(result).toMatchObject({ isError: true, details: { value: { code: "COMPUTER_ARGUMENTS_TOO_LARGE" } } })
@@ -39,7 +31,7 @@ describe("limits at the computer tool boundary", HANG_GUARD, () => {
     const params = { action: "type", text: "x".repeat(MAX_ARGUMENT_BYTES) }
 
     // When
-    const result = await createComputerActionsTool({ handle, executeTool: noTools }).execute(
+    const result = await createComputerActionsTool({ handle }).execute(
       "call-big",
       params,
       undefined,
@@ -61,7 +53,7 @@ describe("limits at the computer tool boundary", HANG_GUARD, () => {
     )
 
     // When
-    const result = await createComputerTool({ handle, executeTool: noTools }).execute(
+    const result = await createComputerTool({ handle }).execute(
       "call-read",
       { action: "call", chain: [{ method: "clipboard.read" }] },
       undefined,
@@ -80,7 +72,7 @@ describe("limits at the computer tool boundary", HANG_GUARD, () => {
   it("answers a call past the session's call budget with a structured refusal and sends nothing", async () => {
     // Given: a session whose one allowed request went to the capabilities query
     const { handle, log } = desktopFixture({}, {}, 1)
-    const tool = createComputerTool({ handle, executeTool: noTools })
+    const tool = createComputerTool({ handle })
     await tool.execute("call-1", { action: "capabilities" }, undefined, undefined, hostContext())
 
     // When
@@ -102,7 +94,7 @@ describe("limits at the computer tool boundary", HANG_GUARD, () => {
     const { handle, log } = desktopFixture({}, {}, 0)
 
     // When
-    const result = await createComputerActionsTool({ handle, executeTool: noTools }).execute(
+    const result = await createComputerActionsTool({ handle }).execute(
       "call-batch",
       { action: "screenshot" },
       undefined,
@@ -116,5 +108,26 @@ describe("limits at the computer tool boundary", HANG_GUARD, () => {
       details: { value: { failedIndex: 0, failure: { code: "COMPUTER_CALL_BUDGET_EXCEEDED" } } },
     })
     expect(methodsOf(log)).not.toContain("capture")
+  })
+
+  it("gives the budget refusal a way back, and /computer off then on restores the budget", async () => {
+    // Given: a spent budget
+    const { handle } = desktopFixture({}, {}, 1)
+    const tool = createComputerTool({ handle })
+    const windows = { action: "call", chain: [{ method: "windows" }] }
+    await tool.execute("call-1", { action: "capabilities" }, undefined, undefined, hostContext())
+    const refused = await tool.execute("call-2", windows, undefined, undefined, hostContext())
+
+    // When
+    await runComputerCommand("off", handle, hostContext())
+    await runComputerCommand("on", handle, hostContext())
+    const after = await tool.execute("call-3", windows, undefined, undefined, hostContext())
+
+    // Then
+    expect(refused.details.value).toMatchObject({
+      code: "COMPUTER_CALL_BUDGET_EXCEEDED",
+      message: expect.stringContaining("/computer off"),
+    })
+    expect(after.isError).not.toBe(true)
   })
 })

@@ -12,6 +12,7 @@ export function closedService(): ComputerService {
     open: unreachable,
     ensureStopPath: unreachable,
     call: unreachable,
+    auditBarrier: unreachable,
     onAudit: () => () => undefined,
     capabilities: unreachable,
     stopPathStatus: unreachable,

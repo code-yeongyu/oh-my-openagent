@@ -16,7 +16,7 @@ const srcDir = join(dirname(fileURLToPath(import.meta.url)), "..", "src")
 
 function tool() {
   const handle = new ComputerHandle({ service: closedService(), settings: () => resolveComputerSettings({}) })
-  return createComputerTool({ handle, executeTool: () => Promise.reject(new Error("no tools")) })
+  return createComputerTool({ handle })
 }
 
 describe("computer ToolDefinition", () => {
@@ -104,10 +104,6 @@ describe("computer ToolDefinition", () => {
     {
       params: { action: "capabilities", token: "stolen" },
       reason: 'computer: action "capabilities" does not take token',
-    },
-    {
-      params: { action: "run", code: "return 1" },
-      reason: 'computer: unknown action "run"; expected one of call, capabilities, close',
     },
     { params: { action: "call" }, reason: 'computer: action "call": must have required properties chain' },
     { params: { action: "close", code: "x" }, reason: 'computer: action "close" does not take code' },

@@ -156,16 +156,14 @@ function childPath(lspDir) {
 const SETTINGS = { packages: [pluginRoot], defaultProjectTrust: "ask" }
 const E24_WARM_BARRIER = "eq-e24-lsp-warm"
 
-/** E21: a successful click call's result must carry the click's audit record (see E21's comment). */
+/** E21: the cell's click must have reported an engine audit id (see E21's comment). */
 function assertClickAudited(run) {
-  const end = run.client.events.find(
-    (event) => event.type === "tool_execution_end" && event.toolCallId === "call_cu_click",
-  )
-  if (!end) throw new Error("E21: the click call never finished")
+  const end = run.client.events.find((event) => event.type === "tool_execution_end" && event.toolCallId === "call_cu")
+  if (!end) throw new Error("E21: the eval cell never finished")
   if (end.isError) return
-  const audit = end.result?.details?.audit ?? []
-  if (!audit.some((record) => record.action === "click"))
-    throw new Error(`E21: the click call's audit has no click record: ${JSON.stringify(audit).slice(0, 400)}`)
+  const text = (end.result?.content ?? []).map((part) => part?.text ?? "").join("")
+  if (!text.includes('clickAudited\\":true') && !text.includes('"clickAudited":true'))
+    throw new Error(`E21: the cell's click carried no audit id: ${text.slice(0, 400)}`)
 }
 /** The fake provider's model, as a category model reference. */
 const FAKE_MODEL = "mock/mock-model"
@@ -205,29 +203,34 @@ const cases = [
     title: "computer-use per-call marker",
     observables: ALL_OBSERVABLES,
     needsDesktopEngine: true,
-    // One chain call per step; the click call is followed by a screenshot call. The engine writes a request's audit
-    // notification right after that request's reply and before any later reply (senpi-desktop-engine/src/outbox.rs:1-7),
-    // so the click's audit reaches the click call's result; drive() asserts it was.
+    // The steps the old run cell took, as one eval cell of computer helpers (computer use has no code cell of its own).
+    // A read of the grant state activates the computer global for the next cell. The cell returns sizes and whether the
+    // click's report carried an engine audit id, never frame ids, which change per engine session; drive() asserts the
+    // click was audited.
     spec: () => ({
       settings: SETTINGS,
       turns: [
         {
           toolCalls: [
-            ["call_cu_all", "all", "screenshot", [{ silent: true }]],
-            ["call_cu_two", "2", "screenshot", [{ silent: true }]],
-            ["call_cu_click", "2", "click", [20, 10]],
-            ["call_cu_after", "2", "screenshot", [{ silent: true }]],
-          ].map(([id, display, method, args]) => ({
-            id,
-            name: "computer",
-            args: {
-              action: "call",
-              chain: [
-                { method: "display", args: [display] },
-                { method, args },
-              ],
+            {
+              id: "call_cu_activate",
+              name: "computer",
+              args: { action: "call", chain: [{ method: "control.state" }] },
             },
-          })),
+          ],
+        },
+        {
+          toolCalls: [
+            {
+              id: "call_cu",
+              name: "eval",
+              args: {
+                language: "js",
+                summary: "drive display 2",
+                code: "const all = await computer.display('all'); const two = await computer.display('2'); const a = await all.screenshot({ silent: true }); const b = await two.screenshot({ silent: true }); const click = await two.click(20, 10); await two.screenshot({ silent: true }); return JSON.stringify({ all: [a.width, a.height], two: [b.width, b.height], clickAudited: click.auditIds.length > 0 })",
+              },
+            },
+          ],
         },
         { text: "E21-DONE" },
       ],

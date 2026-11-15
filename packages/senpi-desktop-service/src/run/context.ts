@@ -11,7 +11,7 @@ import { DesktopServiceError } from "../service/rpc-client"
 
 /** Why a computer call failed inside the runtime; engine failures surface as `DesktopEngineRpcError`. */
 export type ComputerRunErrorReason =
-  "readOnly" | "timeout" | "aborted" | "ended" | "assertion" | "window" | "wait" | "unavailable"
+  "readOnly" | "timeout" | "aborted" | "ended" | "assertion" | "window" | "unavailable"
 
 export class ComputerRunError extends Error {
   readonly reason: ComputerRunErrorReason
@@ -83,7 +83,7 @@ export type MethodTiers = Readonly<Record<string, ComputerCallPolicy>>
 export function guardRun(context: RunContext, tiers: MethodTiers, method: string): void {
   const tier = Object.hasOwn(tiers, method) ? tiers[method] : "exec"
   if (context.readOnly && tier === "exec") {
-    throw new ComputerRunError("readOnly", `read-only run: '${method}' requires read_only: false`)
+    throw new ComputerRunError("readOnly", `read-only call: '${method}' sends input, which needs the exec tier`)
   }
   context.signal.throwIfAborted()
 }

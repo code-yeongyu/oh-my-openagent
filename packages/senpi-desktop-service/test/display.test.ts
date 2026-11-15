@@ -111,7 +111,7 @@ describe("display handles", { timeout: 30_000 }, () => {
       await (await desktop.display("active")).click(1, 1)
     }, true)
     // Then
-    await expect(result).rejects.toThrow("read-only run: 'click'")
+    await expect(result).rejects.toThrow("read-only call: 'click'")
     expect(log.requests.some((request) => request.method === "click")).toBe(false)
   })
 })

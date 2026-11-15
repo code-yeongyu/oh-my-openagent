@@ -21,6 +21,11 @@ export class CallBudget {
     this.#limit = limit
   }
 
+  /** A closed session starts the next one with the whole budget. */
+  reset(): void {
+    this.#used = 0
+  }
+
   admit(): void {
     if (this.#used >= this.#limit) throw new DesktopCallBudgetError(this.#limit)
     this.#used += 1

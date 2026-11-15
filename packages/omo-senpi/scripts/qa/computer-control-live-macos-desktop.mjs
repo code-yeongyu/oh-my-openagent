@@ -3,13 +3,15 @@
 // click aims at the OK button of the driver's own dialog, so an admitted click is observed by the dialog itself
 // (`button returned:OK`); a refused click must leave the dialog open.
 import { CONFIRM_TITLE, REASON, TARGET_TITLE } from "./computer-control-live-macos-scenarios.mjs"
+import { cell, chain } from "./computer-control-live-macos-steps.mjs"
 
-const run = (code) => ({ type: "tool_call", name: "computer", arguments: { action: "run", code } })
-const acquire = `const state = await desktop.control.acquire({ reason: ${JSON.stringify(REASON)} });`
+const acquire = chain({ method: "control.acquire", args: [{ reason: REASON }] })
+// A read of the grant state activates the computer global for the cell after it.
+const activate = chain({ method: "control.state" })
 
 // Finds the dialog's OK button through the engine's own accessibility tree (a read), maps its center into the
-// "all" composite capture and clicks it there. The run refuses to click when the capture and the display
-// rectangles disagree, so a mapping mistake never clicks anywhere else.
+// "all" composite capture and clicks it there, as one eval cell. The cell refuses to click when the capture and the
+// display rectangles disagree, so a mapping mistake never clicks anywhere else.
 const clickButton = `
 const dialog = await desktop.window({ title: ${JSON.stringify(TARGET_TITLE)} });
 const [ok] = (await dialog.find({ role: "button", title: "OK" }));
@@ -25,7 +27,7 @@ if (d === undefined || composite !== shot.width) throw new Error("QA: refusing t
 await all.click(d.pixelX + (x - d.x) * d.pixelWidth / d.width, d.pixelY + (y - d.y) * d.pixelHeight / d.height);
 `
 
-const refusedClick = `await desktop.screenshot(); await desktop.click(5, 5); return "clicked"`
+const refusedClick = [chain({ method: "screenshot" }), chain({ method: "click", args: [5, 5] })]
 
 function answerConfirms(session, answer) {
   const answered = new Set()
@@ -52,12 +54,12 @@ const promptOnce = (message, answer) => async (session) => {
 export const desktopScenarios = {
   "desktop-refused-without-grant": {
     preset: "ask",
-    steps: () => [run(refusedClick), { type: "text", text: "done" }],
+    steps: () => [...refusedClick, { type: "text", text: "done" }],
     drive: promptOnce("control QA: desktop click without a grant"),
     verify: ({ audits, results, confirms, target }) => [
       [
         "the desktop click was refused COMPUTER_CONTROL_REQUIRED",
-        results[0]?.includes("COMPUTER_CONTROL_REQUIRED") === true,
+        results.at(-1)?.includes("COMPUTER_CONTROL_REQUIRED") === true,
       ],
       ["the engine audited the refused click", audits.includes("click:error")],
       ["no click reached the engine", !audits.includes("click:success")],
@@ -67,11 +69,11 @@ export const desktopScenarios = {
   },
   "display-click-after-approval": {
     preset: "ask",
-    steps: () => [run(`${acquire} ${clickButton} return JSON.stringify(state)`), { type: "text", text: "done" }],
+    steps: () => [acquire, cell(`${clickButton} return "clicked"`), { type: "text", text: "done" }],
     drive: promptOnce("control QA: approve, then click on the display", true),
     verify: ({ audits, results, confirms, target }) => [
       ["the human was asked", confirms.includes(CONFIRM_TITLE)],
-      ["the run reported an active grant", results[0]?.includes('"active":true') === true],
+      ["the acquire reported an active grant", /"active":\s*true/.test(results[0] ?? "")],
       [
         "the engine audited control.grant, then the click",
         audits.indexOf("control.grant:success") !== -1 &&
@@ -82,11 +84,11 @@ export const desktopScenarios = {
   },
   "full-access-click-without-prompt": {
     preset: "full-access",
-    steps: () => [run(`${clickButton} return "clicked"`), { type: "text", text: "done" }],
+    steps: () => [activate, cell(`${clickButton} return "clicked"`), { type: "text", text: "done" }],
     drive: promptOnce("control QA: full access clicks the display"),
     verify: ({ audits, results, confirms, target }) => [
       ["no confirm was shown", confirms.length === 0],
-      ["the run finished", results[0]?.includes("clicked") === true],
+      ["the cell finished", results.at(-1)?.includes("clicked") === true],
       [
         "the host granted without asking, before the click",
         audits.indexOf("control.grant:success") !== -1 &&
@@ -99,9 +101,9 @@ export const desktopScenarios = {
   "full-access-headless-click": {
     preset: "full-access",
     print: "control QA: headless full access clicks the display",
-    steps: () => [run(`${clickButton} return "clicked"`), { type: "text", text: "done" }],
+    steps: () => [activate, cell(`${clickButton} return "clicked"`), { type: "text", text: "done" }],
     verify: ({ audits, results, target }) => [
-      ["the headless run finished", results[0]?.includes("clicked") === true],
+      ["the headless cell finished", results.at(-1)?.includes("clicked") === true],
       [
         "the host granted without a UI, before the click",
         audits.indexOf("control.grant:success") !== -1 &&

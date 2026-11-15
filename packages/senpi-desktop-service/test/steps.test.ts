@@ -1,3 +1,4 @@
+import { ComputerCallError } from "@oh-my-opencode/senpi-desktop-protocol"
 import { afterEach, describe, expect, it } from "vitest"
 import { interpretChain } from "../src/run/steps"
 import { closeDesktops, methods, openDesktop, run } from "./control-harness"
@@ -28,17 +29,26 @@ describe("call chain step interpreter", { timeout: 30_000 }, () => {
     expect(methods(log)).toEqual(expect.arrayContaining(["clipboard.write", "clipboard.read", "capture"]))
   })
 
-  it("refuses a step that names no facade function before anything is sent for it", async () => {
-    // Given
+  it.each([
+    [
+      "a prototype path",
+      [{ method: "constructor.constructor", args: ["return process"] }, { method: "call" }],
+      "unknownMethod",
+    ],
+    ["a method outside the tables", [{ method: "clipboard.erase", args: [] }], "unknownMethod"],
+    ["a hop on an unchainable root", [{ method: "windows" }, { method: "click", args: [1, 1] }], "notChainable"],
+    ["a second hop", [{ method: "window", args: ["101"] }, { method: "screenshot" }, { method: "click" }], "tooLong"],
+  ] as const)("refuses %s by itself, before anything is sent", async (_label, chain, reason) => {
+    // Given: a caller that skipped the tool's classification
     const { service, log } = await openDesktop()
+    const sent = log.requests.length
 
     // When
-    const error = await rejectionOf(
-      run(service, ({ desktop }) => interpretChain(desktop, [{ method: "clipboard.erase", args: [] }])),
-    )
+    const error = await rejectionOf(run(service, ({ desktop }) => interpretChain(desktop, chain)))
 
     // Then
-    expect(error).toMatchObject({ message: "clipboard.erase is not a function" })
-    expect(methods(log).some((method) => method.startsWith("clipboard."))).toBe(false)
+    expect(error).toBeInstanceOf(ComputerCallError)
+    expect(error).toMatchObject({ reason })
+    expect(log.requests.length).toBe(sent)
   })
 })

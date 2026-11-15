@@ -11,7 +11,6 @@ import { hostContext } from "./fixtures"
 
 function fixture() {
   let launches = 0
-  let hostTools = 0
   const service = new DesktopService({
     createChild: () => {
       launches += 1
@@ -20,14 +19,8 @@ function fixture() {
   })
   const settings = resolveComputerSettings({ auditLog: { enabled: false } }, "darwin")
   const handle = new ComputerHandle({ service, settings: () => settings })
-  const deps = {
-    handle,
-    executeTool: async () => {
-      hostTools += 1
-      return undefined
-    },
-  }
-  return { service, settings, handle, deps, launches: () => launches, hostTools: () => hostTools }
+  const deps = { handle }
+  return { service, settings, handle, deps, launches: () => launches }
 }
 
 for (const input of [{ action: "call", chain: [{ method: "windows" }] }, { action: "capabilities" }]) {
@@ -48,7 +41,6 @@ for (const input of [{ action: "call", chain: [{ method: "windows" }] }, { actio
       expect(result.details.value).not.toHaveProperty("permission")
       expect(result.details.value).not.toHaveProperty("settingsUrl")
       expect(f.launches()).toBe(1)
-      expect(f.hostTools()).toBe(0)
     } finally {
       await f.service.close()
     }
@@ -78,7 +70,6 @@ it("maps actual startup refusal for computer_actions", async () => {
       },
     })
     expect(f.launches()).toBe(1)
-    expect(f.hostTools()).toBe(0)
   } finally {
     await f.service.close()
   }

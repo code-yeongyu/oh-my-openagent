@@ -90,7 +90,7 @@ function hint(code: string, stopHotkey: string): string | undefined {
     case "COMPUTER_RESULT_TOO_LARGE":
       return "Ask for less: one window instead of all, a subtree with drill(ref), or a zoom region."
     case "COMPUTER_CALL_BUDGET_EXCEEDED":
-      return "This session can send no more desktop requests; stop and tell the user."
+      return "This desktop session has used its request budget; tell the user. Closing the session (/computer off then /computer on, or computer.close()) starts a fresh budget."
     case "COMPUTER_PROTECTED_PROCESS":
       return "This app is protected from automation; do not retry it, and ask the user to act in it."
     default:

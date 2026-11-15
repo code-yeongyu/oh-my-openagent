@@ -47,7 +47,6 @@ export function createComputerRuntimeLoader(options: {
   const build = (module: ComputerUseRuntimeModule): ComputerUseRuntime => {
     const runtime = module.createComputerUseRuntime({
       settings,
-      executeTool: host.executeTool,
       ...(options.engineChild === undefined ? {} : { engineChild: options.engineChild }),
       onEngineError: options.onEngineError,
       onPermissionRequired: options.onPermissionRequired,

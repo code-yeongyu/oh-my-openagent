@@ -59,15 +59,15 @@ try {
 
 ## Tool boundary
 
-The desktop service executes no model-written code. A `call` chain and a `computer_actions` batch run as data: each step names a facade method, the chain's methods are classified before anything starts, and an unknown or unchainable method is refused. Arguments cross as JSON; a helper refuses a function or `RegExp` argument instead of letting it vanish. The boundary also enforces three limits:
+The desktop service executes no model-written code. A `call` chain and a `computer_actions` batch run as data: each step names a facade method, the chain's methods are classified before anything starts, and an unknown or unchainable method is refused. Arguments cross as JSON; a helper refuses a function or `RegExp` argument instead of letting it vanish. A call classified `computer:read` can send no input: a method that would is refused with `read-only call: '<method>' sends input, which needs the exec tier` before any request is sent. The boundary also enforces three limits:
 
 | Limit | What happens past it |
 |-------|----------------------|
 | Input of a `computer` or `computer_actions` call: 1 MiB of UTF-8 JSON | Refused with `COMPUTER_ARGUMENTS_TOO_LARGE` before anything starts; send the data in smaller calls |
 | A helper's return value: 8 MiB of UTF-8 JSON | The value is replaced by a `COMPUTER_RESULT_TOO_LARGE` failure. The call has already run: its screenshots still display, and any input it sent is not undone |
-| 20,000 desktop requests per session | Every further request is refused with `COMPUTER_CALL_BUDGET_EXCEEDED` and nothing is sent. The service raises the typed `DesktopCallBudgetError` (`reason: "CallBudgetExceeded"`, `limit`); the tool turns it into that code. One helper can send more than one request (a window lookup, then a click), `capabilities` counts too, and closing the desktop session does not reset the budget |
+| 20,000 desktop requests per desktop session | Every further request is refused with `COMPUTER_CALL_BUDGET_EXCEEDED` and nothing is sent. The service raises the typed `DesktopCallBudgetError` (`reason: "CallBudgetExceeded"`, `limit`); the tool turns it into that code, with the hint that closing the session starts a fresh budget. One helper can send more than one request (a window lookup, then a click), and `capabilities` counts too. Closing the desktop session, with `computer.close()` or `/computer off`, resets the budget, so the next session starts with all 20,000 |
 
-Every audit record a call returns carries the session id and the call's `toolCallId`. A call that fails or is interrupted revokes the foreground control grant, so the next foreground action asks the human again.
+Every audit record a call returns carries the session id and the call's `toolCallId`. A call that completes waits until the audit records of every request it sent have arrived before it returns, so its `details.audit` always includes its own last action. A call that fails or is interrupted revokes the foreground control grant, so the next foreground action asks the human again.
 
 ## Result envelope
 

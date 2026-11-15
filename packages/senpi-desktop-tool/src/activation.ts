@@ -9,6 +9,7 @@ export type ComputerService = Pick<
   | "open"
   | "ensureStopPath"
   | "call"
+  | "auditBarrier"
   | "onAudit"
   | "capabilities"
   | "stopPathStatus"

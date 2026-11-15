@@ -30,8 +30,8 @@ describe("foreground-control grant boundaries (#9967)", HANG_GUARD, () => {
     // Then
     expect(methods(log)).not.toContain("control.grant")
     expect(surface.returnValue).toEqual(["undefined", "undefined"])
-    expect(methodError).toMatchObject({ message: expect.stringContaining("method is not a function") })
-    expect(sendError).toMatchObject({ message: expect.stringContaining("send is not a function") })
+    expect(methodError).toMatchObject({ name: "ComputerCallError", reason: "unknownMethod" })
+    expect(sendError).toMatchObject({ name: "ComputerCallError", reason: "unknownMethod" })
   })
 
   it("sends no revoke after a grant the engine refused", async () => {
@@ -119,6 +119,7 @@ describe("foreground-control grant boundaries (#9967)", HANG_GUARD, () => {
     let revoke: Promise<void> | undefined
     const service = {
       call: () => Promise.resolve({}),
+      auditBarrier: () => Promise.resolve(),
       onAudit: () => () => undefined,
       // Created on the call, so the runtime attaches its handler before the rejection is observed.
       revokeControl: () => {
