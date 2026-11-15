@@ -284,12 +284,12 @@ missed durable events and the overflow event itself. Then resume buffered live d
 any event whose seq was already applied. Do not subtract one from `recoverAfterSeq`, and do not infer
 a recovery cursor from `droppedCount` or the overflow event's own seq.
 
-## omo-desktop-app integration
+## Desktop app integration
 
 Deferred follow-up. The wiring described here is NOT shipped; this section only maps the contract
 onto the app's existing pattern so the follow-up is mechanical.
 
-omo-desktop-app already consumes `omo.task.updated`: it registers one `extension_event` name and
+The desktop app already consumes `omo.task.updated`: it registers one `extension_event` name and
 runs a wholesale-replace reducer that swaps the stored task list on every payload. This protocol
 was shaped so `omo.dag.updated` slots into that exact pattern:
 
