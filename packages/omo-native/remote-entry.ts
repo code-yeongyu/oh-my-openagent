@@ -1,72 +1,26 @@
-import {
-  type AccountShowResult,
-  connectDeviceService,
-  deviceServiceStateDir,
-} from "../device-service-core/src/index.ts"
-import { resolveMemoryRoot } from "../memory-core/src/identity/layout"
-import { syncPinDir } from "../memory-core/src/sync/pin-dir"
-import {
-  createCredentialStore,
-  type CredentialStore,
-  SESSION_READ_WAIT,
-} from "../omo-opencode/src/cli/service-auth/keystore"
-import { serviceOrigin } from "../omo-opencode/src/cli/service-auth/protocol"
-import { retireSyncPinOnDiscard } from "../omo-opencode/src/cli/service-auth/sync-pin-retire"
-import { runAccountVerb } from "./account-cli"
+import { deviceServiceStateDir } from "../device-service-core/src/device-service.ts"
+import { createCredentialStore, SESSION_READ_WAIT } from "../omo-opencode/src/cli/service-auth/keystore"
+import { accountServiceApi } from "./account-show"
 import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
-import packageJson from "./package.json" with { type: "json" }
-import { deviceServiceBootstrapSetup, omoBinaryPath } from "./remote-bootstrap"
 import { cliDeviceServiceHandoff } from "./device-service-handoff"
+import { deviceServiceBootstrapSetup, omoBinaryPath } from "./remote-bootstrap"
 import { prepareRemoteAttach, type RemoteVerbDependencies, runRemoteVerb } from "./remote-cli"
 import { coldWakeSetup } from "./remote-cold-wake"
+import { localRemoteDependencies } from "./remote-local"
 
 // The launchers' `omo remote` entries: the verbs in remote-cli.ts over this device's real service, sign-in and binary.
-
-const serviceApi = (): string => serviceOrigin(process.env.OMO_SERVICE_API_URL ?? "https://api.omo.dev")
-
-async function inProcessAccountShow(): Promise<AccountShowResult> {
-  const api = serviceApi()
-  const lines: string[] = []
-  let store: CredentialStore | undefined
-  const exitCode = await runAccountVerb(
-    {
-      api,
-      get store() {
-        store ??= createCredentialStore(api, { wait: SESSION_READ_WAIT })
-        return store
-      },
-      pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())),
-      beforeKeysDiscarded: retireSyncPinOnDiscard({
-        pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())),
-        log: () => {},
-      }),
-      readStdin: async () => "",
-      output: (line) => lines.push(line),
-      error: () => {},
-    },
-    ["show"],
-  )
-  return { exitCode, stdout: lines.join("\n") }
-}
 
 function remoteDependencies(packageRoot?: string): RemoteVerbDependencies {
   const stateDir = deviceServiceStateDir()
   const binaryPath = omoBinaryPath()
   const agentDir = canonicalAgentDir()
   return {
-    accountShow: inProcessAccountShow,
-    stateDir,
-    ...(packageRoot === undefined ? {} : { packageRoot }),
-    connect: () => connectDeviceService({ version: packageJson.version, stateDir }),
-    now: () => Date.now(),
-    output: (line) => process.stdout.write(`${line}\n`),
-    write: (text) => process.stdout.write(text),
-    error: (line) => process.stderr.write(`${line}\n`),
+    ...localRemoteDependencies(packageRoot),
     bootstrap: deviceServiceBootstrapSetup({ stateDir, binaryPath, agentDir }),
     coldWake: coldWakeSetup({ binaryPath, agentDir }),
     // Reads the stored credential only when `omo remote enable` finds a service that holds no device (omo#13602).
     linkDevice: async () => {
-      const api = serviceApi()
+      const api = accountServiceApi()
       const credentials = await createCredentialStore(api, { wait: SESSION_READ_WAIT }).read()
       if (credentials === null) return "signed_out"
       await cliDeviceServiceHandoff({ api, stateDir, log: (line) => process.stderr.write(`${line}\n`) }).adopt(

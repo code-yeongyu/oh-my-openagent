@@ -484,7 +484,13 @@ export function createRelayTransport(
       row.device,
       row.session_id,
       remote.chain.stamp(
-        { type: "prompt", sessionId: row.session_id, message: delivery.text, streamingBehavior: "followUp" },
+        {
+          type: "prompt",
+          sessionId: row.session_id,
+          message: delivery.text,
+          streamingBehavior: "followUp",
+          ...(delivery.client_message_id === undefined ? {} : { clientMessageId: delivery.client_message_id }),
+        },
         1,
       ),
     )
