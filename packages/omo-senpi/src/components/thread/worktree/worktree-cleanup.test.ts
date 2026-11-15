@@ -23,7 +23,8 @@ afterEach(async () => {
   kit.cleanup()
 })
 
-const errorOf = (outcome: unknown) => (outcome as { error?: { code: string; details?: Record<string, unknown> } }).error
+const errorOf = (outcome: unknown) =>
+  (outcome as { error?: { code: string; message?: string; details?: Record<string, unknown> } }).error
 const branchExists = (repo: string, branch: string): boolean => kit.git(repo, "branch", "--list", branch).length > 0
 const worktreeCount = (repo: string): number => kit.git(repo, "worktree", "list").split("\n").length
 
@@ -300,6 +301,9 @@ describe("the remove request another device sends removes only a worktree OmO ma
       code: "partial_commit",
       details: { reason: "worktree_left_behind", path: made.worktree.path },
     })
+    // The refusal names the branch the guard took: no reflog entry, not commits the branch never had.
+    expect(errorOf(outcome)?.message).toContain("no reflog entry")
+    expect(errorOf(outcome)?.message).not.toContain("commits of its own")
     expect([existsSync(made.worktree.path), branchExists(repo, "silent"), worktreeCount(repo)]).toEqual([true, true, 2])
   })
 

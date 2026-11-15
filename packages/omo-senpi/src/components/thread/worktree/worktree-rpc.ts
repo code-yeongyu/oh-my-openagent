@@ -88,11 +88,15 @@ async function removeRequested(record: Record<string, unknown>, root: string, gi
           .split("\n")
           .filter((line) => line !== "").length
       : Infinity
-  if (ownCommits !== 1)
-    return folderFailure("worktree_left_behind", `Branch ${branch} has commits of its own; it was not removed.`, {
-      path,
-      branch,
-    })
+  if (ownCommits !== 1) {
+    const why =
+      ownCommits === Infinity
+        ? `the reflog of branch ${branch} could not be read, so its work cannot be ruled out`
+        : ownCommits === 0
+          ? `branch ${branch} has no reflog entry (reflogs are off in this repository), so its work cannot be ruled out`
+          : `branch ${branch} has commits of its own`
+    return folderFailure("worktree_left_behind", `${path} was not removed: ${why}.`, { path, branch })
+  }
   const commonDir = common.stdout.trim()
   const repository = basename(commonDir) === ".git" ? dirname(commonDir) : commonDir
   return (await discardWorktree({ repository, path, branch, root, git })) ?? { kind: "removed" }
