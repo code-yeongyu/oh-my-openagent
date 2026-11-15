@@ -76,7 +76,16 @@ export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: 
   // handed to `status` as data.
   // `disable` records the user's off before anything that can fail (#13602 review M1): a service that is not running,
   // or a signed-out account, must not let the default-on bootstrap turn remote back on at the next start.
-  if (parsed.command === "disable") dependencies.optOut.record()
+  // A record that cannot be saved never stops disable from turning remote off (#13602 review M2); it is reported and the
+  // command fails, so the user knows the next omo login would turn remote on again.
+  let recordFailure: string | undefined
+  if (parsed.command === "disable") {
+    try {
+      dependencies.optOut.record()
+    } catch (error) {
+      recordFailure = error instanceof Error ? error.message : String(error)
+    }
+  }
   const localUnits = parsed.command === "status" ? await dependencies.coldWake.status() : undefined
   const code = await runLocalRemoteVerb(
     localUnits === undefined ? dependencies : { ...dependencies, localUnits },
@@ -85,6 +94,12 @@ export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: 
   // After the verb's connection is closed (a changed table restarts the device service, which would cut it), and whatever
   // the verb's exit code: the unit goes even when the service could not be reached.
   if (parsed.command === "disable") await applyColdWake(dependencies.coldWake, false, dependencies.error)
+  if (recordFailure !== undefined) {
+    dependencies.error(
+      `omo remote disable: remote is off now, but the choice could not be saved (${recordFailure}); the next omo login will turn it on again.`,
+    )
+    return REMOTE_EXIT.failed
+  }
   return code
 }
 

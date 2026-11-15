@@ -45,13 +45,25 @@ describe("the remote sessions opt-out record", () => {
     expect([lstatSync(path).isSymbolicLink(), lstatSync(path).isFile()]).toEqual([false, true])
   })
 
-  test("a ~/.omo that is a symlink makes the write refuse instead of writing through it", () => {
+  // #13602 security review M2: a ~/.omo the user links to a directory they own (dotfiles, a relocated home) is theirs;
+  // the record goes into that directory, still without following a link at the record's own path.
+  test("a ~/.omo linked to a directory this user owns gets the record in that directory", () => {
     const root = home()
-    const elsewhere = join(root, "elsewhere")
-    mkdirSync(elsewhere)
-    symlinkSync(elsewhere, join(root, ".omo"))
+    const dotfiles = join(root, "dotfiles-omo")
+    mkdirSync(dotfiles)
+    symlinkSync(dotfiles, join(root, ".omo"))
+    const optOut = remoteOptOut(join(root, ".omo", "remote-sessions.json"))
+    optOut.record()
+    expect([lstatSync(join(dotfiles, "remote-sessions.json")).isFile(), optOut.read()]).toEqual([true, true])
+  })
+
+  test("a ~/.omo linked to something that is not a directory makes the write refuse", () => {
+    const root = home()
+    const file = join(root, "not-a-dir")
+    writeFileSync(file, "x\n")
+    symlinkSync(file, join(root, ".omo"))
     expect(() => remoteOptOut(join(root, ".omo", "remote-sessions.json")).record()).toThrow()
-    expect(() => lstatSync(join(elsewhere, "remote-sessions.json"))).toThrow()
+    expect(readFileSync(file, "utf8")).toBe("x\n")
   })
 
   test("clear on a planted symlink removes the link, never its target", () => {

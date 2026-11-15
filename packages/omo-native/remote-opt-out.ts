@@ -7,11 +7,13 @@ import {
   mkdirSync,
   openSync,
   readFileSync,
+  realpathSync,
   renameSync,
   rmSync,
+  statSync,
   writeSync,
 } from "node:fs"
-import { dirname, join } from "node:path"
+import { basename, dirname, join } from "node:path"
 
 import { runtimeHome } from "./bin/lib/agent-dir.js"
 
@@ -38,19 +40,27 @@ const errorCode = (error: unknown): string | undefined =>
 // The record never follows a link (omo#13602 security review): a symlink planted at the path or as ~/.omo must not
 // redirect the write onto another file. The write goes to a fresh file in the same directory, opened without following
 // links, and is renamed over the path; a rename replaces a symlink there instead of writing through it.
-function writeRecord(path: string, text: string): void {
-  const dir = dirname(path)
+// A ~/.omo the user links to a directory they own (dotfiles, a relocated home) is theirs (#13602 review M2): the record
+// goes into the directory it resolves to, which must be a directory this user owns.
+function ownedDirectory(dir: string): string {
   mkdirSync(dir, { recursive: true, mode: 0o700 })
-  const parent = lstatSync(dir)
-  if (!parent.isDirectory() || (typeof process.getuid === "function" && parent.uid !== process.getuid()))
+  const resolved = realpathSync(dir)
+  const target = statSync(resolved)
+  if (!target.isDirectory() || (typeof process.getuid === "function" && target.uid !== process.getuid()))
     throw new Error(`${dir} is not a directory this user owns`)
+  return resolved
+}
+
+function writeRecord(path: string, text: string): void {
+  const dir = ownedDirectory(dirname(path))
+  const target = join(dir, basename(path))
   const temp = join(dir, `.remote-sessions.${randomBytes(6).toString("hex")}.tmp`)
   const fd = openSync(temp, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW, 0o600)
   try {
     writeSync(fd, text)
     fsyncSync(fd)
     closeSync(fd)
-    renameSync(temp, path)
+    renameSync(temp, target)
   } catch (error) {
     rmSync(temp, { force: true })
     throw error

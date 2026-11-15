@@ -84,6 +84,23 @@ describe("remote sessions on by default", () => {
     expect([code, record.off, coldWake]).toEqual([REMOTE_EXIT.unavailable, true, ["uninstall"]])
   })
 
+  // #13602 security review M2: a record that cannot be saved must not stop disable from turning remote off.
+  test("disable still turns the switch off and removes the unit when the opt-out cannot be saved, and says so", async () => {
+    const { owner, remote } = await device(true)
+    const failing = {
+      ...remote.optOut,
+      record: () => {
+        throw new Error("~/.omo is not writable")
+      },
+    }
+    const { code, err, coldWake } = await run(["disable"], owner.stateDir, SIGNED_IN, testBootstrap(), undefined, {
+      ...remote,
+      optOut: failing,
+    })
+    expect([code, owner.state.status.enabled, coldWake]).toEqual([REMOTE_EXIT.failed, false, ["uninstall"]])
+    expect(err).toHaveLength(1)
+  })
+
   test("enable after disable clears the opt-out, and the bootstrap keeps it on again", async () => {
     const { owner, record, remote } = await device(true)
     await run(["disable"], owner.stateDir, SIGNED_IN, testBootstrap(), undefined, remote)
