@@ -18,19 +18,47 @@ export interface RepoGitRunner {
 }
 
 export async function ensureRepoConfigDefaults(
-  port: RepoConfigTarget, run: RepoGitRunner, authorName: string,
+  port: RepoConfigTarget,
+  run: RepoGitRunner,
+  authorName: string,
 ): Promise<void> {
-  if ((await port.configGet("omo.agentId")) !== port.agentId) await port.configSet("omo.agentId", port.agentId)
-  if (!(await port.configGet("user.email"))) await port.configSet("user.email", `${port.agentId}@omo.local`)
-  if (!(await port.configGet("user.name"))) await port.configSet("user.name", authorName)
-  if ((await port.configGet("commit.gpgsign")) === null) await port.configSet("commit.gpgsign", "false")
-  if ((await port.configGet("gc.auto")) === null) await port.configSet("gc.auto", "0")
+  // Every open runs this, so the six keys come from one `git config --list` instead of one git process
+  // per key: each process costs tens of ms on an idle host and hundreds on a loaded one (#12103).
+  const local = await readLocalConfig(run)
+  const configGet = (key: string): Promise<string | null> =>
+    local === null ? port.configGet(key) : Promise.resolve(local.get(key.toLowerCase()) ?? null)
+  if ((await configGet("omo.agentId")) !== port.agentId) await port.configSet("omo.agentId", port.agentId)
+  if (!(await configGet("user.email"))) await port.configSet("user.email", `${port.agentId}@omo.local`)
+  if (!(await configGet("user.name"))) await port.configSet("user.name", authorName)
+  if ((await configGet("commit.gpgsign")) === null) await port.configSet("commit.gpgsign", "false")
+  if ((await configGet("gc.auto")) === null) await port.configSet("gc.auto", "0")
   // Forced, not defaulted: a memory repository is machine-owned and must keep note bytes exactly.
   // The repair never fails init(); an incomplete repair leaves the key unset so the next open retries.
   // The single guard for the whole repair: a rejected git call (spawn error, timeout, abort) counts as incomplete.
-  if ((await port.configGet("core.autocrlf")) !== "false" && (await restoreConvertedCheckouts(port.dir, run).catch(() => false))) {
+  if (
+    (await configGet("core.autocrlf")) !== "false" &&
+    (await restoreConvertedCheckouts(port.dir, run).catch(() => false))
+  ) {
     await port.configSet("core.autocrlf", "false")
   }
+}
+
+// The values `git config --local --get <key>` would return, keyed by lower-cased name: the last value
+// wins and an empty one reads as unset. Null when the listing fails (a repository whose config file is
+// missing), so the caller falls back to per-key reads that treat such a key as unset.
+async function readLocalConfig(run: RepoGitRunner): Promise<ReadonlyMap<string, string> | null> {
+  const listing = await run.result(["config", "--local", "--list", "-z"])
+  if (listing.code !== 0) return null
+  const values = new Map<string, string>()
+  for (const entry of listing.stdout.split("\0")) {
+    if (entry.length === 0) continue
+    const newline = entry.indexOf("\n")
+    const key = (newline < 0 ? entry : entry.slice(0, newline)).toLowerCase()
+    const value = newline < 0 ? "" : entry.slice(newline + 1).trim()
+    if (value.length > 0) values.set(key, value)
+    else values.delete(key)
+  }
+  return values
 }
 
 // A repository opened before the pin may hold working copies a converting checkout rewrote to CRLF,
@@ -41,6 +69,8 @@ export async function ensureRepoConfigDefaults(
 async function restoreConvertedCheckouts(dir: string, run: RepoGitRunner): Promise<boolean> {
   const listing = await run.result(["ls-files", "--eol", "-z"])
   if (listing.code !== 0) return false
+  // Nothing tracked (a repository created by this open): no checkout to restore and no index entry to refresh.
+  if (listing.stdout.length === 0) return true
   try {
     for (const record of listing.stdout.split("\0")) {
       const tab = record.indexOf("\t")

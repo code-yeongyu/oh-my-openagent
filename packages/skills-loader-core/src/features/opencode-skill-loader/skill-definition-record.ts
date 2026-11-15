@@ -11,9 +11,7 @@ export function skillsToCommandDefinitionRecord(skills: LoadedSkill[]): Record<s
   return result
 }
 
-export function builtinSkillsToCommandDefinitionRecord(
-  skills: BuiltinSkill[],
-): Record<string, CommandDefinition> {
+export function builtinSkillsToCommandDefinitionRecord(skills: BuiltinSkill[]): Record<string, CommandDefinition> {
   const result: Record<string, CommandDefinition> = {}
   for (const skill of skills) {
     result[skill.name] = {

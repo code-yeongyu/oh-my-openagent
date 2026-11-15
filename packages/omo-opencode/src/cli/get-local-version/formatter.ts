@@ -38,7 +38,9 @@ export function formatVersionOutput(info: VersionInfo): string {
       break
     case "outdated":
       lines.push(`  ${SYMBOLS.warn} ${color.yellow("Update available")}`)
-      lines.push(`  ${color.dim("Run:")} ${color.cyan(`cd ~/.config/opencode && bun update ${PUBLISHED_PACKAGE_NAME}`)}`)
+      lines.push(
+        `  ${color.dim("Run:")} ${color.cyan(`cd ~/.config/opencode && bun update ${PUBLISHED_PACKAGE_NAME}`)}`,
+      )
       break
     case "local-dev":
       lines.push(`  ${SYMBOLS.dev} ${color.cyan("Running in local development mode")}`)
@@ -53,8 +55,12 @@ export function formatVersionOutput(info: VersionInfo): string {
       lines.push(`  ${color.dim("Update check skipped for pinned versions")}`)
       break
     case "pinned-mismatch":
-      lines.push(`  ${SYMBOLS.warn} ${color.yellow(`Version pinned to ${info.pinnedVersion} but running ${info.currentVersion}`)}`)
-      lines.push(`  ${color.dim("The pin only skips the update check; it does not control which version OpenCode loads")}`)
+      lines.push(
+        `  ${SYMBOLS.warn} ${color.yellow(`Version pinned to ${info.pinnedVersion} but running ${info.currentVersion}`)}`,
+      )
+      lines.push(
+        `  ${color.dim("The pin only skips the update check; it does not control which version OpenCode loads")}`,
+      )
       break
     case "error":
       lines.push(`  ${SYMBOLS.cross} ${color.red("Unable to check for updates")}`)

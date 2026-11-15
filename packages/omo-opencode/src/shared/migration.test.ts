@@ -1,11 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  migrateAgentConfigToCategory,
-  migrateAgentNames,
-  migrateHookNames,
-  migrateModelVersions,
-} from "./migration"
+import { migrateAgentConfigToCategory, migrateAgentNames, migrateHookNames, migrateModelVersions } from "./migration"
 
 describe("legacy migration maps", () => {
   test("#given renamed agents and hooks #when transforming #then current identifiers replace legacy identifiers", () => {

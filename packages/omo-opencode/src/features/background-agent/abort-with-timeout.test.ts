@@ -59,10 +59,10 @@ describe("abortWithTimeout", () => {
 
     // then
     expect(result).toBe(false)
-    expect(logMock).toHaveBeenCalledWith(
-      "[background-agent] Session abort returned an error response:",
-      { sessionID: "session-error-response", error },
-    )
+    expect(logMock).toHaveBeenCalledWith("[background-agent] Session abort returned an error response:", {
+      sessionID: "session-error-response",
+      error,
+    })
   })
 
   test("#given abort hangs indefinitely #when abortWithTimeout runs #then it logs warning and continues", async () => {
@@ -79,9 +79,9 @@ describe("abortWithTimeout", () => {
 
     // then
     expect(result).toBe(false)
-    expect(logMock).toHaveBeenCalledWith(
-      "[background-agent] Session abort timed out; continuing cleanup:",
-      { sessionID: "session-2", timeoutMs: 1 },
-    )
+    expect(logMock).toHaveBeenCalledWith("[background-agent] Session abort timed out; continuing cleanup:", {
+      sessionID: "session-2",
+      timeoutMs: 1,
+    })
   })
 })

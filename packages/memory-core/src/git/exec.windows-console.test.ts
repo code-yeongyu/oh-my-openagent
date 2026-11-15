@@ -1,5 +1,9 @@
-import { afterEach, describe, expect, mock, test } from "bun:test"
+import { afterAll, afterEach, describe, expect, mock, test } from "bun:test"
 import { tmpdir } from "node:os"
+
+// mock.module on a builtin is process-global and mock.restore() does not undo it, so the real
+// module is captured before any stub and put back explicitly: later files must spawn real git (#12765).
+const realChildProcess = { ...(await import("node:child_process")) }
 
 // Every git command the memory engine runs - the auto-commit behind the `memory` tool, the
 // post-turn sync, every rev-parse/status probe - goes through this one spawn. git.exe is a
@@ -51,6 +55,7 @@ function missingBinaryChild(): SpawnedChildStub {
 function captureSpawns(child: (executable: string) => SpawnedChildStub): CapturedSpawn[] {
   const captured: CapturedSpawn[] = []
   mock.module("node:child_process", () => ({
+    ...realChildProcess,
     spawn: (executable: string, argv: readonly string[], options: Record<string, unknown>) => {
       captured.push({ executable, argv, options })
       return child(executable)
@@ -62,6 +67,10 @@ function captureSpawns(child: (executable: string) => SpawnedChildStub): Capture
 describe("memory git exec win32 console suppression", () => {
   afterEach(() => {
     mock.restore()
+  })
+
+  afterAll(() => {
+    mock.module("node:child_process", () => realChildProcess)
   })
 
   describe("#given the memory engine running a git command", () => {
@@ -84,9 +93,7 @@ describe("memory git exec win32 console suppression", () => {
 
     describe("#when git is absent from PATH and the windows install fallbacks are tried", () => {
       test("#then every fallback executable is spawned with windowsHide: true", async () => {
-        const captured = captureSpawns((executable) =>
-          executable === "git" ? missingBinaryChild() : closingChild(),
-        )
+        const captured = captureSpawns((executable) => (executable === "git" ? missingBinaryChild() : closingChild()))
         const { createNodeGitExec } = await import("./exec")
 
         await createNodeGitExec({ platform: "win32" }).run(["status", "--porcelain"], {

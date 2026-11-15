@@ -52,7 +52,9 @@ export function assertAllowlistCoverage(allowlists) {
   const missing = [...expectedNativeEvents].filter((name) => !actual.has(name)).sort()
   const extra = [...actual].filter((name) => !expectedNativeEvents.has(name)).sort()
   if (missing.length > 0 || extra.length > 0) {
-    throw new Error(`OmO Native QA allowlist event coverage diverged: missing=${missing.join(",") || "none"}; extra=${extra.join(",") || "none"}`)
+    throw new Error(
+      `OmO Native QA allowlist event coverage diverged: missing=${missing.join(",") || "none"}; extra=${extra.join(",") || "none"}`,
+    )
   }
 }
 
@@ -67,7 +69,11 @@ export function parseCapturedEvents(requests) {
   const events = []
   for (const request of requests) {
     let body
-    try { body = JSON.parse(request.raw) } catch { continue }
+    try {
+      body = JSON.parse(request.raw)
+    } catch {
+      continue
+    }
     collectEvents(body, request.path, events)
   }
   return events
@@ -80,7 +86,13 @@ function collectEvents(value, path, output) {
   }
   if (!isRecord(value)) return
   if (typeof value.event === "string" && isRecord(value.properties)) {
-    output.push({ event: value.event, properties: value.properties, timestamp: value.timestamp, distinct_id: value.distinct_id, path })
+    output.push({
+      event: value.event,
+      properties: value.properties,
+      timestamp: value.timestamp,
+      distinct_id: value.distinct_id,
+      path,
+    })
   }
   if (Array.isArray(value.batch)) collectEvents(value.batch, path, output)
 }
@@ -92,19 +104,53 @@ export function assertEnabled(events) {
     checks.push({ name, result: "PASS", detail })
   }
   const native = events.filter((event) => nativeEvents.has(event.event))
-  const realPrompts = native.filter((event) => event.event === "prompt_submitted" && event.properties.is_real_user_prompt === true)
-  check("exactly-three-real-prompts", realPrompts.length === 3, `observed ${realPrompts.length}; events=${events.map((event) => event.event).join(",")}`)
+  const realPrompts = native.filter(
+    (event) => event.event === "prompt_submitted" && event.properties.is_real_user_prompt === true,
+  )
+  check(
+    "exactly-three-real-prompts",
+    realPrompts.length === 3,
+    `observed ${realPrompts.length}; events=${events.map((event) => event.event).join(",")}`,
+  )
   const first = realPrompts.find((event) => event.properties.real_prompt_ordinal_bucket === "1")
-  check("first-prompt-ulw-classification", first !== undefined && first.properties.is_effective_ultrawork_invocation === true && first.properties.keyword_variant === "ulw" && first.properties.keyword_occurrence_bucket === "1" && first.properties.invocation_stage === "first_arm", JSON.stringify(first?.properties ?? null))
+  check(
+    "first-prompt-ulw-classification",
+    first !== undefined &&
+      first.properties.is_effective_ultrawork_invocation === true &&
+      first.properties.keyword_variant === "ulw" &&
+      first.properties.keyword_occurrence_bucket === "1" &&
+      first.properties.invocation_stage === "first_arm",
+    JSON.stringify(first?.properties ?? null),
+  )
   const controls = realPrompts.filter((event) => event !== first)
-  check("two-keyword-negative-controls", controls.length === 2 && controls.every((event) => event.properties.keyword_any === false), controls.map((event) => JSON.stringify(event.properties)).join(" | "))
+  check(
+    "two-keyword-negative-controls",
+    controls.length === 2 && controls.every((event) => event.properties.keyword_any === false),
+    controls.map((event) => JSON.stringify(event.properties)).join(" | "),
+  )
   for (const name of nativeEvents) {
     if (conditionalNativeEvents.has(name)) continue
-    check(`event-present-${name}`, native.some((event) => event.event === name), `captured ${name}`)
+    check(
+      `event-present-${name}`,
+      native.some((event) => event.event === name),
+      `captured ${name}`,
+    )
   }
-  check("turn-completed-positive-tokens", native.some((event) => event.event === "turn_completed" && Number(event.properties.total_tokens) > 0), "at least one turn_completed has total_tokens > 0")
-  check("feature-goal-tool", native.some((event) => event.event === "feature_used" && event.properties.feature === "goal_tool"), "captured feature_used goal_tool")
-  check("legacy-dual-emit-presence-only", events.some((event) => event.event === "omo_senpi_daily_active"), "legacy event present and excluded from all scans")
+  check(
+    "turn-completed-positive-tokens",
+    native.some((event) => event.event === "turn_completed" && Number(event.properties.total_tokens) > 0),
+    "at least one turn_completed has total_tokens > 0",
+  )
+  check(
+    "feature-goal-tool",
+    native.some((event) => event.event === "feature_used" && event.properties.feature === "goal_tool"),
+    "captured feature_used goal_tool",
+  )
+  check(
+    "legacy-dual-emit-presence-only",
+    events.some((event) => event.event === "omo_senpi_daily_active"),
+    "legacy event present and excluded from all scans",
+  )
   privacyScan(native, checks)
   return checks
 }
@@ -112,15 +158,29 @@ export function assertEnabled(events) {
 export function privacyScan(events, checks) {
   const addPass = (name, detail) => checks.push({ name, result: "PASS", detail })
   for (const event of events) {
-    const allowed = new Set([...OMO_NATIVE_PROPERTY_ALLOWLISTS[event.event], ...sharedKeys, ...sdkAddedKeys, ...sdkWireKeys])
-    if ("$is_server" in event.properties && event.properties.$is_server !== true) throw new Error("invalid SDK server attribution")
-    if (event.properties.surface !== "cli" && event.properties.surface !== "desktop") throw new Error("invalid attribution surface")
-    if (typeof event.properties.install_hash !== "string" || !/^[a-f0-9]{64}$/.test(event.properties.install_hash)) throw new Error("invalid attribution install_hash")
+    const allowed = new Set([
+      ...OMO_NATIVE_PROPERTY_ALLOWLISTS[event.event],
+      ...sharedKeys,
+      ...sdkAddedKeys,
+      ...sdkWireKeys,
+    ])
+    if ("$is_server" in event.properties && event.properties.$is_server !== true)
+      throw new Error("invalid SDK server attribution")
+    if (event.properties.surface !== "cli" && event.properties.surface !== "desktop")
+      throw new Error("invalid attribution surface")
+    if (typeof event.properties.install_hash !== "string" || !/^[a-f0-9]{64}$/.test(event.properties.install_hash))
+      throw new Error("invalid attribution install_hash")
     if ("install_id" in event.properties) throw new Error("raw install_id must never ship")
-    if (event.distinct_id !== undefined && event.distinct_id !== event.properties.install_hash) throw new Error("distinct_id must equal install_hash")
+    if (event.distinct_id !== undefined && event.distinct_id !== event.properties.install_hash)
+      throw new Error("distinct_id must equal install_hash")
     for (const key of Object.keys(event.properties)) {
       if (!allowed.has(key)) throw new Error(`property-allowlist: ${event.event}.${key} is not documented or SDK-added`)
-      if (key.startsWith("$") && !OMO_NATIVE_PROPERTY_ALLOWLISTS[event.event].includes(key) && !sharedKeys.has(key) && !sdkAddedKeys.has(key)) {
+      if (
+        key.startsWith("$") &&
+        !OMO_NATIVE_PROPERTY_ALLOWLISTS[event.event].includes(key) &&
+        !sharedKeys.has(key) &&
+        !sdkAddedKeys.has(key)
+      ) {
         throw new Error(`dollar-property-allowlist: ${event.event}.${key} is not permitted`)
       }
     }
@@ -131,24 +191,30 @@ export function privacyScan(events, checks) {
         continue
       }
       if (key === "provider" || key === "default_provider") {
-        if (value !== "custom" && !knownProviders.has(value)) throw new Error(`known-provider-allowlist: ${key}=${value}`)
+        if (value !== "custom" && !knownProviders.has(value))
+          throw new Error(`known-provider-allowlist: ${key}=${value}`)
         continue
       }
       if (key === "providers") {
         const providers = value === "" ? [] : value.split(",")
-        if (providers.some((provider) => !knownProviders.has(provider))) throw new Error(`known-provider-allowlist: ${key}=${value}`)
+        if (providers.some((provider) => !knownProviders.has(provider)))
+          throw new Error(`known-provider-allowlist: ${key}=${value}`)
         continue
       }
       if (/(^|\s)(\/|~\/|[A-Za-z]:\\)/.test(value)) throw new Error(`path-privacy: ${event.event}.${key}=${value}`)
       for (const prompt of prompts) {
         for (const fragment of promptFragments(prompt)) {
-          if (value.toLowerCase().includes(fragment)) throw new Error(`prompt-fragment-privacy: ${event.event}.${key} contains ${JSON.stringify(fragment)}`)
+          if (value.toLowerCase().includes(fragment))
+            throw new Error(`prompt-fragment-privacy: ${event.event}.${key} contains ${JSON.stringify(fragment)}`)
         }
       }
     }
   }
   addPass("native-event-property-allowlists", `all ${events.length} OmO Native events use documented or SDK-added keys`)
-  addPass("native-event-path-privacy", "no scanned value contains an absolute/home path pattern; model fields use known-model or custom masking")
+  addPass(
+    "native-event-path-privacy",
+    "no scanned value contains an absolute/home path pattern; model fields use known-model or custom masking",
+  )
   addPass("native-event-prompt-fragment-privacy", "no scanned value contains any 8+ character driven-prompt substring")
   addPass("legacy-event-scan-exclusion", "omo_senpi_daily_active was presence-checked only")
 }

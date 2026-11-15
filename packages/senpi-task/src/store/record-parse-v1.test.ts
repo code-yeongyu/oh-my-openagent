@@ -350,8 +350,14 @@ describe("record-parse cancel_requested (omo#9403)", () => {
     // given
     const project = tempProject()
     const store = createTaskRecordStore({ project_dir: project })
-    writePersistedRecord(project, "st_02000100", { status: "running", cancel_requested: { requested_at: "2026-07-06T00:01:00.000Z", reason: "no longer needed" } })
-    writePersistedRecord(project, "st_02000101", { status: "running", cancel_requested: { requested_at: "2026-07-06T00:02:00.000Z" } })
+    writePersistedRecord(project, "st_02000100", {
+      status: "running",
+      cancel_requested: { requested_at: "2026-07-06T00:01:00.000Z", reason: "no longer needed" },
+    })
+    writePersistedRecord(project, "st_02000101", {
+      status: "running",
+      cancel_requested: { requested_at: "2026-07-06T00:02:00.000Z" },
+    })
 
     // when
     const result = store.list()
@@ -359,7 +365,10 @@ describe("record-parse cancel_requested (omo#9403)", () => {
     // then
     expect(result.diagnostics).toEqual([])
     const byId = new Map(result.records.map((record) => [record.task_id, record]))
-    expect(byId.get("st_02000100")?.cancel_requested).toEqual({ requested_at: "2026-07-06T00:01:00.000Z", reason: "no longer needed" })
+    expect(byId.get("st_02000100")?.cancel_requested).toEqual({
+      requested_at: "2026-07-06T00:01:00.000Z",
+      reason: "no longer needed",
+    })
     expect(byId.get("st_02000101")?.cancel_requested).toEqual({ requested_at: "2026-07-06T00:02:00.000Z" })
   })
 
@@ -380,17 +389,20 @@ describe("record-parse cancel_requested (omo#9403)", () => {
   test.each([
     ["not an object", "cancel"],
     ["missing requested_at", { reason: "no longer needed" }],
-  ])("#given a cancel_requested that is %s #when listed #then the record is rejected with a diagnostic", (_label, value) => {
-    // given
-    const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
-    writePersistedRecord(project, "st_02000103", { status: "running", cancel_requested: value })
+  ])(
+    "#given a cancel_requested that is %s #when listed #then the record is rejected with a diagnostic",
+    (_label, value) => {
+      // given
+      const project = tempProject()
+      const store = createTaskRecordStore({ project_dir: project })
+      writePersistedRecord(project, "st_02000103", { status: "running", cancel_requested: value })
 
-    // when
-    const result = store.list()
+      // when
+      const result = store.list()
 
-    // then
-    expect(result.records.map((record) => record.task_id)).not.toContain("st_02000103")
-    expect(result.diagnostics.length).toBeGreaterThan(0)
-  })
+      // then
+      expect(result.records.map((record) => record.task_id)).not.toContain("st_02000103")
+      expect(result.diagnostics.length).toBeGreaterThan(0)
+    },
+  )
 })

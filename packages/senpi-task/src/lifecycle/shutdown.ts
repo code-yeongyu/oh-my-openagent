@@ -105,7 +105,9 @@ export async function suspendHandle(
   if (owns()) context.registry.forget(handle.task_id, { path: "park" })
   const target = { taskId: handle.task_id, pid: handle.pid }
   if (handle.kind !== "host-session") {
-    await bestEffort(handle.task_id, "abort", () => withinTeardownBudget(context.teardownStepDeadline, target, "abort", () => handle.abort()))
+    await bestEffort(handle.task_id, "abort", () =>
+      withinTeardownBudget(context.teardownStepDeadline, target, "abort", () => handle.abort()),
+    )
   }
   // A finished child's session stays loaded on the daemon after the detach: its terminal status goes
   // out first, over the attachment, so a successor host drops the park instead of reopening it (omo#10778).
@@ -113,9 +115,13 @@ export async function suspendHandle(
   const publish = handle.publishTaskStatus?.bind(handle)
   if (status !== undefined && TERMINAL_STATUSES.has(status) && publish !== undefined) {
     await bestEffort(handle.task_id, "publish_task_status", () =>
-      withinTeardownBudget(context.teardownStepDeadline, target, "publish_task_status", () => publish(status)))
+      withinTeardownBudget(context.teardownStepDeadline, target, "publish_task_status", () => publish(status)),
+    )
   }
-  if (handle.kind === "rpc") await bestEffort(handle.task_id, "terminate", () => withinTeardownBudget(context.teardownStepDeadline, target, "terminate", () => handle.terminate()))
+  if (handle.kind === "rpc")
+    await bestEffort(handle.task_id, "terminate", () =>
+      withinTeardownBudget(context.teardownStepDeadline, target, "terminate", () => handle.terminate()),
+    )
   try {
     await withinTeardownBudget(context.teardownStepDeadline, target, "dispose", () => handle.dispose())
   } catch (error) {

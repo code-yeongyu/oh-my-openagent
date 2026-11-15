@@ -1,32 +1,28 @@
 // postinstall.mjs
 // Runs after npm install to verify platform binary is available
 
-import { readFileSync, readdirSync, rmSync } from "node:fs";
-import { createRequire } from "node:module";
-import { homedir } from "node:os";
-import { join } from "node:path";
-import {
-  getPlatformPackageCandidates,
-  getBinaryPath,
-  resolvePlatformPackageBaseName,
-} from "./bin/platform.js";
-import { detectPlatformBinaryMismatch } from "./bin/version-mismatch.js";
+import { readFileSync, readdirSync, rmSync } from "node:fs"
+import { createRequire } from "node:module"
+import { homedir } from "node:os"
+import { join } from "node:path"
+import { getPlatformPackageCandidates, getBinaryPath, resolvePlatformPackageBaseName } from "./bin/platform.js"
+import { detectPlatformBinaryMismatch } from "./bin/version-mismatch.js"
 
-const require = createRequire(import.meta.url);
+const require = createRequire(import.meta.url)
 
-const MIN_OPENCODE_VERSION = "1.4.0";
-const OPENCODE_VERSION_PROBE_TIMEOUT_MS = 3_000;
-const OPENCODE_PLUGIN_PACKAGES = ["oh-my-opencode", "oh-my-openagent"];
+const MIN_OPENCODE_VERSION = "1.4.0"
+const OPENCODE_VERSION_PROBE_TIMEOUT_MS = 3_000
+const OPENCODE_PLUGIN_PACKAGES = ["oh-my-opencode", "oh-my-openagent"]
 const RENAME_NOTICE =
-  "oh-my-openagent: the 'omo' command is now 'omo-agent-toolkit' (the old name was removed in this major release).";
+  "oh-my-openagent: the 'omo' command is now 'omo-agent-toolkit' (the old name was removed in this major release)."
 /**
  * The OmO Native install line on this package's channel: a prerelease build points at
  * `omo-ai@beta`, a stable build at the bare `omo-ai` that resolves to latest.
  * @param {string | null} version
  */
 export function nativeNotice(version) {
-  const spec = typeof version === "string" && version.includes("-") ? "omo-ai@beta" : "omo-ai";
-  return `oh-my-openagent: OmO Native is the same omo as one 'omo' command, with no OpenCode host: bun add -g ${spec}`;
+  const spec = typeof version === "string" && version.includes("-") ? "omo-ai@beta" : "omo-ai"
+  return `oh-my-openagent: OmO Native is the same omo as one 'omo' command, with no OpenCode host: bun add -g ${spec}`
 }
 
 /**
@@ -39,7 +35,7 @@ function parseVersion(version) {
     .replace(/^v/, "")
     .split("-")[0]
     .split(".")
-    .map((part) => Number.parseInt(part, 10) || 0);
+    .map((part) => Number.parseInt(part, 10) || 0)
 }
 
 /**
@@ -49,18 +45,18 @@ function parseVersion(version) {
  * @returns {boolean} true if current >= minimum
  */
 function compareVersions(current, minimum) {
-  const currentParts = parseVersion(current);
-  const minimumParts = parseVersion(minimum);
-  const length = Math.max(currentParts.length, minimumParts.length);
+  const currentParts = parseVersion(current)
+  const minimumParts = parseVersion(minimum)
+  const length = Math.max(currentParts.length, minimumParts.length)
 
   for (let index = 0; index < length; index++) {
-    const currentPart = currentParts[index] ?? 0;
-    const minimumPart = minimumParts[index] ?? 0;
-    if (currentPart > minimumPart) return true;
-    if (currentPart < minimumPart) return false;
+    const currentPart = currentParts[index] ?? 0
+    const minimumPart = minimumParts[index] ?? 0
+    if (currentPart > minimumPart) return true
+    if (currentPart < minimumPart) return false
   }
 
-  return true;
+  return true
 }
 
 /**
@@ -73,12 +69,12 @@ function checkOpenCodeVersion() {
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "ignore"],
       timeout: OPENCODE_VERSION_PROBE_TIMEOUT_MS,
-    });
-    const version = result.trim();
-    const ok = compareVersions(version, MIN_OPENCODE_VERSION);
-    return { ok, version };
+    })
+    const version = result.trim()
+    const ok = compareVersions(version, MIN_OPENCODE_VERSION)
+    return { ok, version }
   } catch {
-    return { ok: true, version: null };
+    return { ok: true, version: null }
   }
 }
 
@@ -87,45 +83,45 @@ function checkOpenCodeVersion() {
  */
 function getLibcFamily() {
   if (process.platform !== "linux") {
-    return undefined;
+    return undefined
   }
-  
+
   try {
-    const detectLibc = require("detect-libc");
-    return detectLibc.familySync();
+    const detectLibc = require("detect-libc")
+    return detectLibc.familySync()
   } catch {
-    return null;
+    return null
   }
 }
 
 function readMainPackageJson() {
   try {
-    return JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
+    return JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"))
   } catch {
-    return null;
+    return null
   }
 }
 
 function getPackageBaseName() {
-  const packageJson = readMainPackageJson();
-  return resolvePlatformPackageBaseName(packageJson?.name || "oh-my-opencode");
+  const packageJson = readMainPackageJson()
+  return resolvePlatformPackageBaseName(packageJson?.name || "oh-my-opencode")
 }
 
 function getMainPackageVersion() {
-  const packageJson = readMainPackageJson();
-  return packageJson?.version ?? null;
+  const packageJson = readMainPackageJson()
+  return packageJson?.version ?? null
 }
 
 function invalidateOpenCodePluginCache() {
-  const cacheDir = join(process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache"), "opencode");
-  const parentDirs = [cacheDir, join(cacheDir, "packages")];
-  const prefixes = OPENCODE_PLUGIN_PACKAGES.map((packageName) => `${packageName}@`);
+  const cacheDir = join(process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache"), "opencode")
+  const parentDirs = [cacheDir, join(cacheDir, "packages")]
+  const prefixes = OPENCODE_PLUGIN_PACKAGES.map((packageName) => `${packageName}@`)
 
   for (const parentDir of parentDirs) {
     try {
       for (const entry of readdirSync(parentDir, { withFileTypes: true })) {
         if (entry.isDirectory() && prefixes.some((prefix) => entry.name.startsWith(prefix))) {
-          rmSync(join(parentDir, entry.name), { recursive: true, force: true });
+          rmSync(join(parentDir, entry.name), { recursive: true, force: true })
         }
       }
     } catch {
@@ -136,32 +132,32 @@ function invalidateOpenCodePluginCache() {
 
 function readPlatformPackageVersion(pkg) {
   try {
-    const platformPackageJsonPath = require.resolve(`${pkg}/package.json`);
-    const packageJson = JSON.parse(readFileSync(platformPackageJsonPath, "utf8"));
-    return packageJson.version ?? null;
+    const platformPackageJsonPath = require.resolve(`${pkg}/package.json`)
+    const packageJson = JSON.parse(readFileSync(platformPackageJsonPath, "utf8"))
+    return packageJson.version ?? null
   } catch {
-    return null;
+    return null
   }
 }
 
 function main() {
-  const { platform, arch } = process;
-  const libcFamily = getLibcFamily();
-  const packageBaseName = getPackageBaseName();
+  const { platform, arch } = process
+  const libcFamily = getLibcFamily()
+  const packageBaseName = getPackageBaseName()
 
   // npm >= 7 hides lifecycle output unless --foreground-scripts, so this notice is
   // best-effort: the reliable migration surfaces are the CHANGELOG, docs, and README.
-  console.log(RENAME_NOTICE);
-  console.log(nativeNotice(getMainPackageVersion()));
+  console.log(RENAME_NOTICE)
+  console.log(nativeNotice(getMainPackageVersion()))
 
-  invalidateOpenCodePluginCache();
+  invalidateOpenCodePluginCache()
 
   // Check opencode version requirement
-  const versionCheck = checkOpenCodeVersion();
+  const versionCheck = checkOpenCodeVersion()
   if (versionCheck.version && !versionCheck.ok) {
-    console.warn(`⚠ oh-my-opencode requires OpenCode >= ${MIN_OPENCODE_VERSION}`);
-    console.warn(`  Detected: ${versionCheck.version}`);
-    console.warn(`  Please update OpenCode to avoid compatibility issues.`);
+    console.warn(`⚠ oh-my-opencode requires OpenCode >= ${MIN_OPENCODE_VERSION}`)
+    console.warn(`  Detected: ${versionCheck.version}`)
+    console.warn(`  Please update OpenCode to avoid compatibility issues.`)
   }
 
   try {
@@ -170,42 +166,42 @@ function main() {
       arch,
       libcFamily,
       packageBaseName,
-    });
+    })
 
     const resolvedPackage = packageCandidates.find((pkg) => {
       try {
-        require.resolve(getBinaryPath(pkg, platform));
-        return true;
+        require.resolve(getBinaryPath(pkg, platform))
+        return true
       } catch {
-        return false;
+        return false
       }
-    });
+    })
 
     if (!resolvedPackage) {
-      throw new Error(
-        `No platform binary package installed. Tried: ${packageCandidates.join(", ")}`
-      );
+      throw new Error(`No platform binary package installed. Tried: ${packageCandidates.join(", ")}`)
     }
 
     const mismatch = detectPlatformBinaryMismatch({
       mainVersion: getMainPackageVersion(),
       platformVersion: readPlatformPackageVersion(resolvedPackage),
       platformPackage: resolvedPackage,
-    });
+    })
     if (mismatch) {
-      console.warn(`⚠ oh-my-opencode platform binary version mismatch detected`);
-      console.warn(`  ${packageBaseName}: ${mismatch.mainVersion}`);
-      console.warn(`  ${mismatch.platformPackage}: ${mismatch.platformVersion}`);
-      console.warn(`  The startup banner may show the stale version until the platform binary is updated.`);
-      console.warn(`  Fix: npm install -g ${packageBaseName}@${mismatch.mainVersion} ${mismatch.platformPackage}@${mismatch.mainVersion}`);
+      console.warn(`⚠ oh-my-opencode platform binary version mismatch detected`)
+      console.warn(`  ${packageBaseName}: ${mismatch.mainVersion}`)
+      console.warn(`  ${mismatch.platformPackage}: ${mismatch.platformVersion}`)
+      console.warn(`  The startup banner may show the stale version until the platform binary is updated.`)
+      console.warn(
+        `  Fix: npm install -g ${packageBaseName}@${mismatch.mainVersion} ${mismatch.platformPackage}@${mismatch.mainVersion}`,
+      )
     }
 
-    console.log(`✓ oh-my-opencode binary installed for ${platform}-${arch} (${resolvedPackage})`);
+    console.log(`✓ oh-my-opencode binary installed for ${platform}-${arch} (${resolvedPackage})`)
   } catch (error) {
-    console.warn(`⚠ oh-my-opencode: ${error.message}`);
-    console.warn(`  The CLI may not work on this platform.`);
+    console.warn(`⚠ oh-my-opencode: ${error.message}`)
+    console.warn(`  The CLI may not work on this platform.`)
     // Don't fail installation - let user try anyway
   }
 }
 
-main();
+main()

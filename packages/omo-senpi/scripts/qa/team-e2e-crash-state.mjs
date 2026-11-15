@@ -108,7 +108,8 @@ function readPostCrashMailbox(sandbox, target) {
 
 function readMemberTerminal(sandbox, target, processAlive) {
   const record = target.taskId === undefined ? undefined : taskRecord(sandbox, target.taskId)
-  if (record !== undefined && ABNORMAL_MEMBER_STATES.has(record.status)) return { kind: "record", status: record.status }
+  if (record !== undefined && ABNORMAL_MEMBER_STATES.has(record.status))
+    return { kind: "record", status: record.status }
   if (target.pid !== undefined && !processAlive(target.pid)) return { kind: "exit" }
   return { kind: undefined }
 }
@@ -130,7 +131,12 @@ function readCrashTarget(sandbox, markerPath) {
   const pid = typeof record?.pid === "number" ? record.pid : undefined
   const leadSessionId = typeof record?.parent_session_id === "string" ? record.parent_session_id : undefined
   return {
-    ready: messageId !== undefined && runId !== undefined && taskId !== undefined && pid !== undefined && leadSessionId !== undefined,
+    ready:
+      messageId !== undefined &&
+      runId !== undefined &&
+      taskId !== undefined &&
+      pid !== undefined &&
+      leadSessionId !== undefined,
     markerPath,
     messageId,
     runId,

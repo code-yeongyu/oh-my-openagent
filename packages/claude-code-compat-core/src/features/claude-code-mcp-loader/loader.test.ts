@@ -40,7 +40,6 @@ describe("getSystemMcpServerNames", () => {
       expect(names).toBeInstanceOf(Set)
       expect(names.size).toBe(0)
     } finally {
-
     }
   })
 
@@ -70,24 +69,25 @@ describe("getSystemMcpServerNames", () => {
       expect(names.has("sqlite")).toBe(true)
       expect(names.size).toBe(2)
     } finally {
-
     }
   })
 
   it("uses the default ambient context when called without options", async () => {
-    writeFileSync(join(TEST_DIR, ".mcp.json"), JSON.stringify({
-      mcpServers: {
-        ambient: { command: "npx", args: ["ambient-mcp"] },
-      },
-    }))
+    writeFileSync(
+      join(TEST_DIR, ".mcp.json"),
+      JSON.stringify({
+        mcpServers: {
+          ambient: { command: "npx", args: ["ambient-mcp"] },
+        },
+      }),
+    )
 
     const loader = await import("./loader")
-    const resolveContext = spyOn(loader.mcpLoaderInternals, "resolveMcpLoaderContext")
-      .mockReturnValue({
-        cwd: TEST_DIR,
-        homeDir: TEST_HOME,
-        claudeConfigDir: join(TEST_HOME, ".claude"),
-      })
+    const resolveContext = spyOn(loader.mcpLoaderInternals, "resolveMcpLoaderContext").mockReturnValue({
+      cwd: TEST_DIR,
+      homeDir: TEST_HOME,
+      claudeConfigDir: join(TEST_HOME, ".claude"),
+    })
 
     const names = loader.getSystemMcpServerNames()
 
@@ -127,7 +127,6 @@ describe("getSystemMcpServerNames", () => {
       // then
       expect(names.has("memory")).toBe(true)
     } finally {
-
     }
   })
 
@@ -157,29 +156,34 @@ describe("getSystemMcpServerNames", () => {
       expect(names.has("playwright")).toBe(false)
       expect(names.has("active")).toBe(true)
     } finally {
-
     }
   })
 
   it("removes a server name when a higher-precedence config disables it", async () => {
     // given
-    writeFileSync(join(TEST_HOME, ".claude.json"), JSON.stringify({
-      mcpServers: {
-        playwright: {
-          command: "npx",
-          args: ["@playwright/mcp@latest"],
+    writeFileSync(
+      join(TEST_HOME, ".claude.json"),
+      JSON.stringify({
+        mcpServers: {
+          playwright: {
+            command: "npx",
+            args: ["@playwright/mcp@latest"],
+          },
         },
-      },
-    }))
-    writeFileSync(join(TEST_DIR, ".mcp.json"), JSON.stringify({
-      mcpServers: {
-        playwright: {
-          command: "npx",
-          args: ["@playwright/mcp@latest"],
-          disabled: true,
+      }),
+    )
+    writeFileSync(
+      join(TEST_DIR, ".mcp.json"),
+      JSON.stringify({
+        mcpServers: {
+          playwright: {
+            command: "npx",
+            args: ["@playwright/mcp@latest"],
+            disabled: true,
+          },
         },
-      },
-    }))
+      }),
+    )
 
     try {
       // when
@@ -189,104 +193,108 @@ describe("getSystemMcpServerNames", () => {
       // then
       expect(names.has("playwright")).toBe(false)
     } finally {
-
     }
   })
 
-   it("merges server names from multiple .mcp.json files", async () => {
-     // given
-     mkdirSync(join(TEST_DIR, ".claude"), { recursive: true })
+  it("merges server names from multiple .mcp.json files", async () => {
+    // given
+    mkdirSync(join(TEST_DIR, ".claude"), { recursive: true })
 
-     const projectMcp = {
-       mcpServers: {
-         playwright: { command: "npx", args: ["@playwright/mcp@latest"] },
-       },
-     }
-     const localMcp = {
-       mcpServers: {
-         memory: { command: "npx", args: ["-y", "@anthropic-ai/mcp-server-memory"] },
-       },
-     }
+    const projectMcp = {
+      mcpServers: {
+        playwright: { command: "npx", args: ["@playwright/mcp@latest"] },
+      },
+    }
+    const localMcp = {
+      mcpServers: {
+        memory: { command: "npx", args: ["-y", "@anthropic-ai/mcp-server-memory"] },
+      },
+    }
 
-     writeFileSync(join(TEST_DIR, ".mcp.json"), JSON.stringify(projectMcp))
-     writeFileSync(join(TEST_DIR, ".claude", ".mcp.json"), JSON.stringify(localMcp))
+    writeFileSync(join(TEST_DIR, ".mcp.json"), JSON.stringify(projectMcp))
+    writeFileSync(join(TEST_DIR, ".claude", ".mcp.json"), JSON.stringify(localMcp))
 
-     try {
-       // when
-       const { getSystemMcpServerNames } = await import("./loader")
-       const names = getSystemMcpServerNames(loaderOptions())
+    try {
+      // when
+      const { getSystemMcpServerNames } = await import("./loader")
+      const names = getSystemMcpServerNames(loaderOptions())
 
-       // then
-       expect(names.has("playwright")).toBe(true)
-       expect(names.has("memory")).toBe(true)
-     } finally {
+      // then
+      expect(names.has("playwright")).toBe(true)
+      expect(names.has("memory")).toBe(true)
+    } finally {
+    }
+  })
 
-     }
-   })
-
-    it("reads user-level MCP config from ~/.claude.json", async () => {
-      // given
-      const userConfigPath = join(TEST_HOME, ".claude.json")
-      const userMcpConfig = {
-        mcpServers: {
-          "user-server": {
-            command: "npx",
-            args: ["user-mcp-server"],
-          },
+  it("reads user-level MCP config from ~/.claude.json", async () => {
+    // given
+    const userConfigPath = join(TEST_HOME, ".claude.json")
+    const userMcpConfig = {
+      mcpServers: {
+        "user-server": {
+          command: "npx",
+          args: ["user-mcp-server"],
         },
-      }
-      writeFileSync(userConfigPath, JSON.stringify(userMcpConfig))
+      },
+    }
+    writeFileSync(userConfigPath, JSON.stringify(userMcpConfig))
 
-      try {
-        // when
-        const { getSystemMcpServerNames } = await import("./loader")
-        const names = getSystemMcpServerNames(loaderOptions())
+    try {
+      // when
+      const { getSystemMcpServerNames } = await import("./loader")
+      const names = getSystemMcpServerNames(loaderOptions())
 
-        // then
-        expect(names.has("user-server")).toBe(true)
-      } finally {
+      // then
+      expect(names.has("user-server")).toBe(true)
+    } finally {
+    }
+  })
 
-      }
-    })
+  it("reads both ~/.claude.json and ~/.claude/.mcp.json for user scope", async () => {
+    // given
+    const claudeDir = join(TEST_HOME, ".claude")
+    mkdirSync(claudeDir, { recursive: true })
 
-     it("reads both ~/.claude.json and ~/.claude/.mcp.json for user scope", async () => {
-       // given
-       const claudeDir = join(TEST_HOME, ".claude")
-       mkdirSync(claudeDir, { recursive: true })
-
-      writeFileSync(join(TEST_HOME, ".claude.json"), JSON.stringify({
+    writeFileSync(
+      join(TEST_HOME, ".claude.json"),
+      JSON.stringify({
         mcpServers: {
           "server-from-claude-json": { command: "npx", args: ["server-a"] },
         },
-      }))
+      }),
+    )
 
-      writeFileSync(join(claudeDir, ".mcp.json"), JSON.stringify({
+    writeFileSync(
+      join(claudeDir, ".mcp.json"),
+      JSON.stringify({
         mcpServers: {
           "server-from-mcp-json": { command: "npx", args: ["server-b"] },
         },
-      }))
+      }),
+    )
 
-      try {
-        // when
-        const { getSystemMcpServerNames } = await import("./loader")
-        const names = getSystemMcpServerNames(loaderOptions())
+    try {
+      // when
+      const { getSystemMcpServerNames } = await import("./loader")
+      const names = getSystemMcpServerNames(loaderOptions())
 
-        // then
-        expect(names.has("server-from-claude-json")).toBe(true)
-        expect(names.has("server-from-mcp-json")).toBe(true)
-       } finally {
+      // then
+      expect(names.has("server-from-claude-json")).toBe(true)
+      expect(names.has("server-from-mcp-json")).toBe(true)
+    } finally {
+    }
+  })
 
-       }
-      })
+  it("ignores local-scope user MCP entries for other projects", async () => {
+    //#given
+    const otherProjectDir = join(TEST_DIR, "project-a")
+    const currentProjectDir = join(TEST_DIR, "project-b")
+    mkdirSync(otherProjectDir, { recursive: true })
+    mkdirSync(currentProjectDir, { recursive: true })
 
-    it("ignores local-scope user MCP entries for other projects", async () => {
-      //#given
-      const otherProjectDir = join(TEST_DIR, "project-a")
-      const currentProjectDir = join(TEST_DIR, "project-b")
-      mkdirSync(otherProjectDir, { recursive: true })
-      mkdirSync(currentProjectDir, { recursive: true })
-
-      writeFileSync(join(TEST_HOME, ".claude.json"), JSON.stringify({
+    writeFileSync(
+      join(TEST_HOME, ".claude.json"),
+      JSON.stringify({
         mcpServers: {
           playwright: {
             command: "npx",
@@ -305,21 +313,21 @@ describe("getSystemMcpServerNames", () => {
             args: ["memory-mcp"],
           },
         },
-      }))
+      }),
+    )
 
-      try {
-        //#when
-        const { getSystemMcpServerNames } = await import("./loader")
-        const names = getSystemMcpServerNames(loaderOptions(currentProjectDir))
+    try {
+      //#when
+      const { getSystemMcpServerNames } = await import("./loader")
+      const names = getSystemMcpServerNames(loaderOptions(currentProjectDir))
 
-        //#then
-        expect(names.has("playwright")).toBe(false)
-        expect(names.has("sqlite")).toBe(true)
-        expect(names.has("memory")).toBe(true)
-      } finally {
-
-      }
-    })
+      //#then
+      expect(names.has("playwright")).toBe(false)
+      expect(names.has("sqlite")).toBe(true)
+      expect(names.has("memory")).toBe(true)
+    } finally {
+    }
+  })
 })
 
 describe("loadMcpConfigs", () => {
@@ -360,7 +368,6 @@ describe("loadMcpConfigs", () => {
       expect(result.loadedServers.find((s) => s.name === "sqlite")).toBeUndefined()
       expect(result.loadedServers.find((s) => s.name === "active")).toBeDefined()
     } finally {
-
     }
   })
 
@@ -383,7 +390,6 @@ describe("loadMcpConfigs", () => {
       expect(result.servers).toHaveProperty("playwright")
       expect(result.servers).toHaveProperty("active")
     } finally {
-
     }
   })
 
@@ -404,7 +410,6 @@ describe("loadMcpConfigs", () => {
       //#then
       expect(result.servers).toHaveProperty("playwright")
     } finally {
-
     }
   })
 })

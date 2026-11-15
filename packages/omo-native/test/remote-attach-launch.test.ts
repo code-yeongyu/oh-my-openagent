@@ -3,7 +3,10 @@ import { runRemoteAttachLaunch } from "../bin/lib/remote-attach-launch.js"
 
 type Outcome = { exits: number; errors: string[] }
 
-async function launch(overrides: { prepare?: () => Promise<readonly string[] | undefined>; runTui?: (args: readonly string[]) => Promise<void> }): Promise<Outcome> {
+async function launch(overrides: {
+  prepare?: () => Promise<readonly string[] | undefined>
+  runTui?: (args: readonly string[]) => Promise<void>
+}): Promise<Outcome> {
   const outcome: Outcome = { exits: 0, errors: [] }
   await runRemoteAttachLaunch({
     prepare: overrides.prepare ?? (async () => ["--attach", "sock", "--session", "ref", "--no-extensions"]),
@@ -40,7 +43,7 @@ describe("omo remote attach launcher", () => {
   test("#given the TUI ends normally #when the launch runs #then it exits once with no error", async () => {
     let tuiArgs: readonly string[] = []
     const outcome = await launch({
-      runTui: async args => {
+      runTui: async (args) => {
         tuiArgs = args
       },
     })

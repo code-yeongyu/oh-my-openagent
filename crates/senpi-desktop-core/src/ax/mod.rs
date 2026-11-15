@@ -10,11 +10,16 @@ mod registry;
 mod render;
 mod roles;
 mod walk;
+mod wrapper;
 
-pub use ops::{ax_press, element_at_node, query, register_node};
+pub use ops::{ax_press, element_at_node, node_to_wire, observe, query, register_node};
 pub use registry::AxRegistry;
 pub use render::snapshot;
 pub use roles::{normalize_role_atspi, normalize_role_macos, normalize_role_uia};
+
+/// How long an object-mode `ax.snapshot` reads before it returns what it has
+/// (`AxSnapshotOptions.timeoutMs` overrides it).
+pub const DEFAULT_DEADLINE_MS: u64 = 3_000;
 
 /// One accessibility element as the backend that produced it addresses it.
 ///
@@ -55,6 +60,27 @@ pub struct AxProps {
     pub bounds: Option<AxBounds>,
     pub actions: Vec<String>,
     pub child_count: u32,
+}
+
+/// One element as an object-mode read sees it: its props, how each field was
+/// read, and whether it is a secure text field (whose value is never read).
+#[derive(Debug, Clone, PartialEq)]
+pub struct AxObserved {
+    pub props: AxProps,
+    pub evidence: Option<crate::types::AxEvidence>,
+    pub secure: bool,
+}
+
+impl AxObserved {
+    /// Props from a backend that cannot say how it read them.
+    #[must_use]
+    pub const fn plain(props: AxProps) -> Self {
+        Self {
+            props,
+            evidence: None,
+            secure: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

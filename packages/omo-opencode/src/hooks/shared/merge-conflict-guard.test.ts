@@ -10,7 +10,10 @@ function* walk(dir: string): Generator<string> {
         continue
       }
       yield* walk(path)
-    } else if (entry.isFile() && (entry.name.endsWith(".ts") || entry.name.endsWith(".tsx") || entry.name.endsWith(".json"))) {
+    } else if (
+      entry.isFile() &&
+      (entry.name.endsWith(".ts") || entry.name.endsWith(".tsx") || entry.name.endsWith(".json"))
+    ) {
       yield path
     }
   }
@@ -18,11 +21,7 @@ function* walk(dir: string): Generator<string> {
 
 function hasConflictMarkers(content: string): boolean {
   const lines = content.split("\n")
-  return lines.some((line) =>
-    line.startsWith("<<<<<<< ") ||
-    line === "=======" ||
-    line.startsWith(">>>>>>> ")
-  )
+  return lines.some((line) => line.startsWith("<<<<<<< ") || line === "=======" || line.startsWith(">>>>>>> "))
 }
 
 describe("#given source files in src/", () => {

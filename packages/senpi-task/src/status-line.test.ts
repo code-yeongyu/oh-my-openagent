@@ -17,12 +17,16 @@ describe("taskIdentityLabel", () => {
 
   test("#given a blank task summary #when labelled #then it falls back to the description", () => {
     // given / when / then
-    expect(taskIdentityLabel({ taskId: "st_00000001", description: "Audit renderers", taskSummary: "  " })).toBe("Audit renderers")
+    expect(taskIdentityLabel({ taskId: "st_00000001", description: "Audit renderers", taskSummary: "  " })).toBe(
+      "Audit renderers",
+    )
   })
 
   test("#given a description #when labelled #then the human description wins over name and id", () => {
     // given / when / then
-    expect(taskIdentityLabel({ taskId: "st_00000001", name: "task-1", description: "Audit renderers" })).toBe("Audit renderers")
+    expect(taskIdentityLabel({ taskId: "st_00000001", name: "task-1", description: "Audit renderers" })).toBe(
+      "Audit renderers",
+    )
   })
 
   test("#given no description #when labelled #then the stable name is used", () => {
@@ -121,7 +125,6 @@ describe("formatStatusTarget", () => {
       "agent:frontend-worker\u2192category:visual-engineering",
     )
   })
-
 
   test("#given resolved model metadata with effort and variant #when formatted #then reasoning effort wins in the status target", () => {
     // given / when / then
@@ -229,7 +232,9 @@ describe("composeStatusLine", () => {
     })
 
     // then
-    expect(line).toBe("Audit renderers · quick (kimi-coding/kimi-k3:max) · turn 3 (7 tools) · running read src/foo.ts · 62 tok/s")
+    expect(line).toBe(
+      "Audit renderers · quick (kimi-coding/kimi-k3:max) · turn 3 (7 tools) · running read src/foo.ts · 62 tok/s",
+    )
   })
 
   test("#given cost and cache facts #when composed #then only cost sits immediately before tps", () => {
@@ -260,7 +265,14 @@ describe("composeStatusLine", () => {
     expect(
       composeStatusLine({
         identity: "t",
-        stats: { runtime_ms: 0, turns: 1, tool_calls: 0, tokens_per_second: 8, cache_hit_rate_last: 0.5, cache_hit_rate_run: 0.1 },
+        stats: {
+          runtime_ms: 0,
+          turns: 1,
+          tool_calls: 0,
+          tokens_per_second: 8,
+          cache_hit_rate_last: 0.5,
+          cache_hit_rate_run: 0.1,
+        },
       }),
     ).toBe("t · turn 1 · 8 tok/s")
   })
@@ -320,7 +332,11 @@ describe("composeStatusLine not-yet-started grammar", () => {
   test("#given a successful turn with a genuine zero cost #when composed #then the cost token still reports the zero", () => {
     // given / when / then
     expect(
-      composeStatusLine({ identity: "t", stats: { runtime_ms: 0, turns: 1, tool_calls: 0, cost_usd: 0 }, verb: "running" }),
+      composeStatusLine({
+        identity: "t",
+        stats: { runtime_ms: 0, turns: 1, tool_calls: 0, cost_usd: 0 },
+        verb: "running",
+      }),
     ).toBe("t · turn 1 · running · $0.0000")
   })
 

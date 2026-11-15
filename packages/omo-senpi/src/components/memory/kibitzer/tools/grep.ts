@@ -10,11 +10,16 @@ import { boundedText, budgeted, okJson, rejection, type KibitzerSidecarTool } fr
 
 export const KIBITZER_GREP_TOOL_NAME = "grep"
 
-export const KibitzerGrepParams = Type.Object({
-  pattern: Type.String({ description: "JavaScript regular expression matched against each line." }),
-  path: Type.Optional(Type.String({ description: "File or directory relative to the workspace root; defaults to the root." })),
-  ignore_case: Type.Optional(Type.Boolean({ description: "Case-insensitive match." })),
-}, { additionalProperties: false })
+export const KibitzerGrepParams = Type.Object(
+  {
+    pattern: Type.String({ description: "JavaScript regular expression matched against each line." }),
+    path: Type.Optional(
+      Type.String({ description: "File or directory relative to the workspace root; defaults to the root." }),
+    ),
+    ignore_case: Type.Optional(Type.Boolean({ description: "Case-insensitive match." })),
+  },
+  { additionalProperties: false },
+)
 
 export interface KibitzerGrepToolInput {
   readonly workspaceRoot: string
@@ -138,7 +143,12 @@ export function createKibitzerGrepTool(input: KibitzerGrepToolInput): KibitzerSi
   }
 }
 
-async function collectCandidates(root: string, target: string, git: GitExec, context: ScanContext): Promise<Candidates> {
+async function collectCandidates(
+  root: string,
+  target: string,
+  git: GitExec,
+  context: ScanContext,
+): Promise<Candidates> {
   if (context.signal?.aborted === true) return { files: [], stopped: "aborted" }
   const tracked = await gitCandidates(root, target, git, context)
   return tracked ?? (await walk(target, context))
@@ -151,7 +161,12 @@ async function collectCandidates(root: string, target: string, git: GitExec, con
  * root is a subdirectory of the work tree. Returns undefined for anything that is not a clean
  * success - no repo, a git failure, a spawn error - so the caller falls back to the plain walk.
  */
-async function gitCandidates(root: string, target: string, git: GitExec, context: ScanContext): Promise<Candidates | undefined> {
+async function gitCandidates(
+  root: string,
+  target: string,
+  git: GitExec,
+  context: ScanContext,
+): Promise<Candidates | undefined> {
   const options = { cwd: root, timeoutMs: GIT_LIST_TIMEOUT_MS }
   try {
     const toplevel = await git.run(["rev-parse", "--show-toplevel"], options)
@@ -244,7 +259,11 @@ async function grepFile(
     const line = lines[index] as string
     if (!pattern.test(line)) continue
     if (matches.length >= caps.grepMatches) return { bytes: outcome.bytes, capped: true }
-    matches.push({ path: displayPath.split("\\").join("/"), line: index + 1, text: boundedText(line, caps.grepLineChars) })
+    matches.push({
+      path: displayPath.split("\\").join("/"),
+      line: index + 1,
+      text: boundedText(line, caps.grepLineChars),
+    })
   }
   return outcome
 }

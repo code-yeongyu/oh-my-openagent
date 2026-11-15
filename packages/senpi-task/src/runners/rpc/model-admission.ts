@@ -3,17 +3,14 @@ import { log } from "@oh-my-opencode/utils"
 
 import { RunnerError } from "../in-process/runner-error"
 import type { RunnerFailureReason } from "../in-process/child-handle"
+import type { ExcludedModelPatterns } from "../../manager/exclude-fallbacks"
 import { splitModelDecorators } from "../../senpi/explicit-pin"
 import type { RpcRunnerSpec } from "../types"
 import { type ModelCatalogProbeResult, parseModelCatalog, probeModelCatalog } from "./model-catalog-probe"
 import { buildRpcModelCatalogSpawn, type RpcSpawnDescriptor } from "./spawn"
 
 export { parseModelCatalog, probeModelCatalog, PROBE_TIMEOUT_MS } from "./model-catalog-probe"
-export type {
-  ModelCatalogProbeOptions,
-  ModelCatalogProbeResult,
-  ModelCatalogSpawnOptions,
-} from "./model-catalog-probe"
+export type { ModelCatalogProbeOptions, ModelCatalogProbeResult, ModelCatalogSpawnOptions } from "./model-catalog-probe"
 
 /**
  * A successful catalog is cached only briefly: `senpi auth login` or an edit to the child-visible
@@ -49,8 +46,9 @@ export type RpcModelAdmissionVerdict =
 export type RpcModelAdmission = (spec: RpcRunnerSpec) => Promise<void>
 
 export type RpcModelAdmissionOptions = {
-  // omo.json exclude_models: a spawn or revival on an excluded model fails before any probe.
-  readonly excludeModels?: readonly string[]
+  // omo.json exclude_models: a spawn or revival on an excluded model fails before any probe. A getter
+  // is read at every admission, so a mid-session omo.json edit applies to the next launch.
+  readonly excludeModels?: ExcludedModelPatterns
   readonly buildSpawn?: (spec: RpcRunnerSpec) => RpcSpawnDescriptor
   readonly probe?: (descriptor: RpcSpawnDescriptor) => Promise<ModelCatalogProbeResult>
   readonly now?: () => number
@@ -63,9 +61,7 @@ type ProbedCatalog = {
   readonly stderrTail: string
 }
 
-type ProbeOutcome =
-  | { readonly kind: "catalog"; readonly catalog: ProbedCatalog }
-  | { readonly kind: "inconclusive" }
+type ProbeOutcome = { readonly kind: "catalog"; readonly catalog: ProbedCatalog } | { readonly kind: "inconclusive" }
 
 type CachedCatalog = {
   readonly catalog: Promise<ProbeOutcome>
@@ -91,12 +87,7 @@ function profileKey(descriptor: RpcSpawnDescriptor): string {
   ])
 }
 
-function admissionFailure(
-  model: string,
-  reason: RunnerFailureReason,
-  message: string,
-  cause?: unknown,
-): RunnerError {
+function admissionFailure(model: string, reason: RunnerFailureReason, message: string, cause?: unknown): RunnerError {
   return new RunnerError({
     kind: "model_unavailable",
     reason,
@@ -193,7 +184,8 @@ export function createRpcModelAdmission(options: RpcModelAdmissionOptions = {}):
   return async (spec) => {
     const model = spec.model?.trim()
     if (model === undefined || model.length === 0) return
-    const excludedBy = excludedModelPattern(splitModelDecorators(model).base, options.excludeModels)
+    const excludeModels = typeof options.excludeModels === "function" ? options.excludeModels() : options.excludeModels
+    const excludedBy = excludedModelPattern(splitModelDecorators(model).base, excludeModels)
     if (excludedBy !== undefined) {
       throw new RunnerError({
         kind: "model_unavailable",
@@ -205,7 +197,8 @@ export function createRpcModelAdmission(options: RpcModelAdmissionOptions = {}):
     const key = profileKey(descriptor)
     const cached = catalogs.get(key)
     // Concurrent starts for one profile share the in-flight probe: it is cached before it settles.
-    let catalog = cached !== undefined && now() - cached.cachedAt < MODEL_CATALOG_CACHE_TTL_MS ? cached.catalog : undefined
+    let catalog =
+      cached !== undefined && now() - cached.cachedAt < MODEL_CATALOG_CACHE_TTL_MS ? cached.catalog : undefined
     if (catalog === undefined) {
       catalog = probeCatalog(descriptor, model, key)
       catalogs.set(key, { catalog, cachedAt: now() })

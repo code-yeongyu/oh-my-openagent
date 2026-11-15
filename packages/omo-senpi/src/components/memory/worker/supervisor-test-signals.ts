@@ -45,7 +45,9 @@ export function waitForTestState<T>(
         checking = false
       }
     }
-    unsubscribe = subscribe(() => { void check() })
+    unsubscribe = subscribe(() => {
+      void check()
+    })
     timeout = setTimeout(() => finish(new Error(`waited ${timeoutMs}ms for ${description}`)), timeoutMs)
     void check()
   })
@@ -57,12 +59,20 @@ export function waitForFilesystemState<T>(
   timeoutMs: number,
   description: string,
 ): Promise<T> {
-  return waitForTestState((check) => {
-    const watcher = watch(directory, check)
-    // The macOS watcher can lose an event immediately after registration.
-    const recheck = setInterval(check, 25)
-    return () => { watcher.close(); clearInterval(recheck) }
-  }, probe, timeoutMs, description)
+  return waitForTestState(
+    (check) => {
+      const watcher = watch(directory, check)
+      // The macOS watcher can lose an event immediately after registration.
+      const recheck = setInterval(check, 25)
+      return () => {
+        watcher.close()
+        clearInterval(recheck)
+      }
+    },
+    probe,
+    timeoutMs,
+    description,
+  )
 }
 
 export async function createTestClock(runDir: string, initial: number): Promise<string> {

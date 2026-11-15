@@ -142,7 +142,7 @@ function buildCodexIssues(summary: CodexDoctorSummary): DoctorIssue[] {
   if (!summary.config.marketplaceConfigured) {
     issues.push({
       title: "LazyCodex marketplace is not configured",
-      description: 'Expected [marketplaces.sisyphuslabs] in Codex config.',
+      description: "Expected [marketplaces.sisyphuslabs] in Codex config.",
       fix: "Run: npx lazycodex-ai install",
       severity: "error",
       affects: ["plugin loading"],
@@ -176,7 +176,10 @@ async function resolveInstalledPluginRoot(codexHome: string): Promise<string | n
   const pluginRoot = join(codexHome, "plugins", "cache", MARKETPLACE_NAME, PLUGIN_NAME)
   if (!existsSync(pluginRoot)) return null
   const versions = await readdir(pluginRoot, { withFileTypes: true })
-  const candidates = versions.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort(compareVersionsDescending)
+  const candidates = versions
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort(compareVersionsDescending)
   return candidates.length === 0 ? null : join(pluginRoot, candidates[0] ?? DEFAULT_PLUGIN_VERSION)
 }
 
@@ -199,7 +202,10 @@ async function readCodexConfigSummary(configPath: string): Promise<CodexConfigSu
     pluginEnabled: settingEnabled(sectionBody(content, 'plugins."omo@sisyphuslabs"'), "enabled"),
     pluginsFeatureEnabled: featureEnabled(content, "plugins"),
     pluginHooksFeatureEnabled: featureEnabled(content, "plugin_hooks"),
-    companionPluginEnabled: settingEnabled(sectionBody(content, `plugins.${JSON.stringify(COMPANION_PLUGIN_KEY)}`), "enabled"),
+    companionPluginEnabled: settingEnabled(
+      sectionBody(content, `plugins.${JSON.stringify(COMPANION_PLUGIN_KEY)}`),
+      "enabled",
+    ),
     companionLifecycleHookStateEvents: readCompanionLifecycleHookStateEvents(content),
   }
 }
@@ -216,7 +222,10 @@ async function readLinkedAgents(codexHome: string): Promise<readonly string[]> {
   const agentsDir = join(codexHome, "agents")
   if (!existsSync(agentsDir)) return []
   const entries = await readdir(agentsDir, { withFileTypes: true })
-  return entries.filter((entry) => entry.isFile() || entry.isSymbolicLink()).map((entry) => basename(entry.name, ".toml")).sort()
+  return entries
+    .filter((entry) => entry.isFile() || entry.isSymbolicLink())
+    .map((entry) => basename(entry.name, ".toml"))
+    .sort()
 }
 
 async function readJson(path: string): Promise<JsonRecord | null> {
@@ -249,18 +258,22 @@ function hasCompanionLifecycleSurface(config: CodexConfigSummary): boolean {
 
 function companionLifecycleSurfaceDescription(config: CodexConfigSummary): string {
   const states = config.companionLifecycleHookStateEvents
-  const stateText = states.length > 0
-    ? `trusted ${formatCompanionLifecycleEvents(states)} hook state`
-    : "no trusted SessionStart/Stop hook state detected"
-  const pluginText = config.companionPluginEnabled ? `${COMPANION_PLUGIN_KEY} is enabled` : `${COMPANION_PLUGIN_KEY} appears disabled`
+  const stateText =
+    states.length > 0
+      ? `trusted ${formatCompanionLifecycleEvents(states)} hook state`
+      : "no trusted SessionStart/Stop hook state detected"
+  const pluginText = config.companionPluginEnabled
+    ? `${COMPANION_PLUGIN_KEY} is enabled`
+    : `${COMPANION_PLUGIN_KEY} appears disabled`
   return `${pluginText}, with ${stateText}.`
 }
 
 function formatCompanionPluginStatus(config: CodexConfigSummary): string {
   if (config.companionPluginEnabled) {
-    const suffix = config.companionLifecycleHookStateEvents.length > 0
-      ? ` (${formatCompanionLifecycleEvents(config.companionLifecycleHookStateEvents)} hook trust)`
-      : ""
+    const suffix =
+      config.companionLifecycleHookStateEvents.length > 0
+        ? ` (${formatCompanionLifecycleEvents(config.companionLifecycleHookStateEvents)} hook trust)`
+        : ""
     return `${COMPANION_PLUGIN_KEY} enabled${suffix}`
   }
   if (config.companionLifecycleHookStateEvents.length > 0) {
@@ -326,8 +339,6 @@ function compareVersionsDescending(left: string, right: string): number {
   }
   return right.localeCompare(left)
 }
-
-
 
 async function pathExists(path: string): Promise<boolean> {
   try {

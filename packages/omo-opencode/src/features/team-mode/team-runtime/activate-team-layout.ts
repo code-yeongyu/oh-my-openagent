@@ -23,14 +23,18 @@ export async function activateTeamLayout(
 
   const layout = await createTeamLayout(
     runtimeState.teamRunId,
-    runtimeState.members.flatMap((member) => member.sessionId && member.agentType !== "leader"
-      ? [{
-          name: member.name,
-          sessionId: member.sessionId,
-          color: member.color,
-          worktreePath: member.worktreePath ?? projectRoot,
-        }]
-      : []),
+    runtimeState.members.flatMap((member) =>
+      member.sessionId && member.agentType !== "leader"
+        ? [
+            {
+              name: member.name,
+              sessionId: member.sessionId,
+              color: member.color,
+              worktreePath: member.worktreePath ?? projectRoot,
+            },
+          ]
+        : [],
+    ),
     tmuxMgr,
   )
   if (!layout) return false
@@ -40,20 +44,24 @@ export async function activateTeamLayout(
     ...Object.values(normalizedLayout.gridPanesByMember),
   ]
 
-  await transitionRuntimeState(runtimeState.teamRunId, (currentState) => ({
-    ...currentState,
-    tmuxLayout: {
-      ownedSession: normalizedLayout.ownedSession,
-      targetSessionId: normalizedLayout.targetSessionId,
-      focusWindowId: normalizedLayout.focusWindowId,
-      gridWindowId: normalizedLayout.gridWindowId,
-      ...(paneIds.length > 0 ? { paneIds } : {}),
-    },
-    members: currentState.members.map((member) => ({
-      ...member,
-      tmuxPaneId: normalizedLayout.focusPanesByMember[member.name] ?? member.tmuxPaneId,
-      tmuxGridPaneId: normalizedLayout.gridPanesByMember[member.name] ?? member.tmuxGridPaneId,
-    })),
-  }), config)
+  await transitionRuntimeState(
+    runtimeState.teamRunId,
+    (currentState) => ({
+      ...currentState,
+      tmuxLayout: {
+        ownedSession: normalizedLayout.ownedSession,
+        targetSessionId: normalizedLayout.targetSessionId,
+        focusWindowId: normalizedLayout.focusWindowId,
+        gridWindowId: normalizedLayout.gridWindowId,
+        ...(paneIds.length > 0 ? { paneIds } : {}),
+      },
+      members: currentState.members.map((member) => ({
+        ...member,
+        tmuxPaneId: normalizedLayout.focusPanesByMember[member.name] ?? member.tmuxPaneId,
+        tmuxGridPaneId: normalizedLayout.gridPanesByMember[member.name] ?? member.tmuxGridPaneId,
+      })),
+    }),
+    config,
+  )
   return true
 }

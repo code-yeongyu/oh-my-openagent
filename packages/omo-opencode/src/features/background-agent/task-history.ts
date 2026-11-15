@@ -63,7 +63,7 @@ export class TaskHistory {
       if (entry) this.record(parentSessionID, entry)
       return
     }
-    const index = list.findIndex(current => current.id === taskID)
+    const index = list.findIndex((current) => current.id === taskID)
     if (index !== -1) {
       if (entry) list[index] = { ...entry }
       else list.splice(index, 1)
@@ -123,7 +123,11 @@ function formatCompactionEntry(entry: TaskHistoryEntry): string {
 }
 
 function compactInline(value: string, maxChars: number): string {
-  const normalized = value.replace(/[\n\r]+/g, " ").replace(/\s+/g, " ").replace(/`/g, "'").trim()
+  const normalized = value
+    .replace(/[\n\r]+/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/`/g, "'")
+    .trim()
   if (normalized.length <= maxChars) {
     return normalized
   }

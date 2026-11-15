@@ -15,15 +15,22 @@ describe("OAuth metadata issuer validation", () => {
   for (const metadataIssuer of [undefined, "https://other.example.com", `${issuer}/`]) {
     it(`rejects metadata issuer ${metadataIssuer}`, async () => {
       // given
-      Object.defineProperty(globalThis, "fetch", { configurable: true, writable: true, value: async (input: RequestInfo | URL) => new Response(JSON.stringify(
-        input.toString().includes("oauth-protected-resource")
-          ? { authorization_servers: [issuer] }
-          : {
-              issuer: metadataIssuer,
-              authorization_endpoint: `${issuer}/authorize`,
-              token_endpoint: `${issuer}/token`,
-            },
-      )) })
+      Object.defineProperty(globalThis, "fetch", {
+        configurable: true,
+        writable: true,
+        value: async (input: RequestInfo | URL) =>
+          new Response(
+            JSON.stringify(
+              input.toString().includes("oauth-protected-resource")
+                ? { authorization_servers: [issuer] }
+                : {
+                    issuer: metadataIssuer,
+                    authorization_endpoint: `${issuer}/authorize`,
+                    token_endpoint: `${issuer}/token`,
+                  },
+            ),
+          ),
+      })
 
       // when
       const discovery = discoverOAuthServerMetadata("https://resource.example.com/mcp")
@@ -35,16 +42,23 @@ describe("OAuth metadata issuer validation", () => {
 
   it("retains the exact validated issuer and response advertisement", async () => {
     // given
-    Object.defineProperty(globalThis, "fetch", { configurable: true, writable: true, value: async (input: RequestInfo | URL) => new Response(JSON.stringify(
-      input.toString().includes("oauth-protected-resource")
-        ? { authorization_servers: [issuer] }
-        : {
-            issuer,
-            authorization_endpoint: `${issuer}/authorize`,
-            token_endpoint: `${issuer}/token`,
-            authorization_response_iss_parameter_supported: true,
-          },
-    )) })
+    Object.defineProperty(globalThis, "fetch", {
+      configurable: true,
+      writable: true,
+      value: async (input: RequestInfo | URL) =>
+        new Response(
+          JSON.stringify(
+            input.toString().includes("oauth-protected-resource")
+              ? { authorization_servers: [issuer] }
+              : {
+                  issuer,
+                  authorization_endpoint: `${issuer}/authorize`,
+                  token_endpoint: `${issuer}/token`,
+                  authorization_response_iss_parameter_supported: true,
+                },
+          ),
+        ),
+    })
 
     // when
     const metadata = await discoverOAuthServerMetadata("https://resource.example.com/mcp")
@@ -56,7 +70,12 @@ describe("OAuth metadata issuer validation", () => {
 })
 
 describe("OAuth callback issuer validation before redemption", () => {
-  for (const receivedIssuer of ["https://attacker.example.com", `${issuer}/`, "", "https://AUTH.example.com:8443/tenant"]) {
+  for (const receivedIssuer of [
+    "https://attacker.example.com",
+    `${issuer}/`,
+    "",
+    "https://AUTH.example.com:8443/tenant",
+  ]) {
     it(`rejects a present issuer ${receivedIssuer} before returning the code`, async () => {
       // given
       const port = await findAvailablePort()
@@ -107,7 +126,11 @@ describe("OAuth callback issuer validation before redemption", () => {
     const port = await findAvailablePort()
     const callback = startCallbackServer(port, { issuer })
     const outcome = callback.catch((error: unknown) => error)
-    const params = new URLSearchParams({ error: "access_denied", error_description: "untrusted detail", iss: "https://attacker.example.com" })
+    const params = new URLSearchParams({
+      error: "access_denied",
+      error_description: "untrusted detail",
+      iss: "https://attacker.example.com",
+    })
 
     // when
     const response = await fetch(`http://127.0.0.1:${port}/callback?${params}`)

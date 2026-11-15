@@ -19,8 +19,7 @@ export function findPrometheusPlans(directory: string): string[] {
       return readdirSync(plansDir)
         .filter((file) => file.endsWith(".md"))
         .map((file) => join(plansDir, file))
-    })
-      .sort((left, right) => statSync(right).mtimeMs - statSync(left).mtimeMs)
+    }).sort((left, right) => statSync(right).mtimeMs - statSync(left).mtimeMs)
   } catch {
     return []
   }

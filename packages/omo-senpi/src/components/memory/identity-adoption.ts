@@ -35,12 +35,19 @@ export function adoptSessionIdentity(input: {
     return { kind: "resolved", identity: resolved }
   }
   if (!isAutoAgentValue(input.configAgentValue)) return { kind: "conflict" }
-  const adopted: BoundIdentity = { id: recorded.identity, paths: buildIdentityPaths(input.memoryRoot, recorded.identity) }
+  const adopted: BoundIdentity = {
+    id: recorded.identity,
+    paths: buildIdentityPaths(input.memoryRoot, recorded.identity),
+  }
   if (!repositoryMatches(recorded, adopted)) return { kind: "conflict" }
   return { kind: "rebound", identity: adopted }
 }
 
 function repositoryMatches(recorded: MemorySessionBinding, identity: BoundIdentity): boolean {
-  const rebuilt = createMemoryBinding({ identity: identity.id, repoPath: identity.paths.repo, boundAt: recorded.boundAt })
+  const rebuilt = createMemoryBinding({
+    identity: identity.id,
+    repoPath: identity.paths.repo,
+    boundAt: recorded.boundAt,
+  })
   return rebuilt.repoPathHash === recorded.repoPathHash
 }

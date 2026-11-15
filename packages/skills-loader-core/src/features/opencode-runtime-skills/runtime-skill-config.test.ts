@@ -42,10 +42,7 @@ describe("OpenCode runtime skill source config", () => {
     })
 
     // then
-    expect(config.skills?.urls).toEqual([
-      "https://example.com/skills",
-      "http://127.0.0.1:49152/",
-    ])
+    expect(config.skills?.urls).toEqual(["https://example.com/skills", "http://127.0.0.1:49152/"])
     expect(config.skills?.paths).toEqual(["/keep/user/path"])
   })
 

@@ -3,6 +3,9 @@
 use crate::backend::Modifiers;
 use crate::error::{CoreResult, DesktopError};
 
+mod dangerous;
+pub use dangerous::{dangerous_chord, ChordHost};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeyName {
     Ctrl,

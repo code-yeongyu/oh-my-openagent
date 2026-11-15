@@ -18,10 +18,7 @@ function ensureTranscriptDir(): void {
   }
 }
 
-export function appendTranscriptEntry(
-  sessionId: string,
-  entry: TranscriptEntry
-): void {
+export function appendTranscriptEntry(sessionId: string, entry: TranscriptEntry): void {
   ensureTranscriptDir()
   const path = getTranscriptPath(sessionId)
   const line = JSON.stringify(entry) + "\n"
@@ -198,7 +195,7 @@ export async function buildTranscriptFromSession(
   sessionId: string,
   directory: string,
   currentToolName: string,
-  currentToolInput: Record<string, unknown>
+  currentToolInput: Record<string, unknown>,
 ): Promise<string | null> {
   try {
     let baseEntries: string[]
@@ -214,13 +211,12 @@ export async function buildTranscriptFromSession(
         query: { directory },
       })
 
-      const messages = (response as { "200"?: unknown[]; data?: unknown[] })["200"]
-        ?? (response as { data?: unknown[] }).data
-        ?? (Array.isArray(response) ? response : [])
+      const messages =
+        (response as { "200"?: unknown[]; data?: unknown[] })["200"] ??
+        (response as { data?: unknown[] }).data ??
+        (Array.isArray(response) ? response : [])
 
-      baseEntries = Array.isArray(messages)
-        ? parseMessagesToEntries(messages as OpenCodeMessage[])
-        : []
+      baseEntries = Array.isArray(messages) ? parseMessagesToEntries(messages as OpenCodeMessage[]) : []
 
       if (cached?.tempPath) {
         try {
@@ -256,10 +252,7 @@ export async function buildTranscriptFromSession(
       }
     }
 
-    const tempPath = join(
-      tmpdir(),
-      `opencode-transcript-${sessionId}-${randomUUID()}.jsonl`
-    )
+    const tempPath = join(tmpdir(), `opencode-transcript-${sessionId}-${randomUUID()}.jsonl`)
     writeFileSync(tempPath, allEntries.join("\n") + "\n")
 
     const cacheEntry = transcriptCache.get(sessionId)
@@ -283,10 +276,7 @@ export async function buildTranscriptFromSession(
       logTranscriptError("[transcript] failed to build transcript from session", { thrown: error })
     }
     try {
-      const tempPath = join(
-        tmpdir(),
-        `opencode-transcript-${sessionId}-${randomUUID()}.jsonl`
-      )
+      const tempPath = join(tmpdir(), `opencode-transcript-${sessionId}-${randomUUID()}.jsonl`)
       writeFileSync(tempPath, buildCurrentEntry(currentToolName, currentToolInput) + "\n")
       return tempPath
     } catch (fallbackError) {

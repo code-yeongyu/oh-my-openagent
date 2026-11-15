@@ -2,7 +2,13 @@ import { expect, test } from "bun:test"
 
 import type { EngineStatus } from "@oh-my-opencode/memory-core/sync-engine"
 
-import { SYNC_RECOVERED_NOTICE, createSyncStatusNotifier, deliverSyncStatusChange } from "./sync-status-surface"
+import {
+  SYNC_BLOCKED_NOTICE_PREFIX,
+  SYNC_HELD_NOTICE_PREFIX,
+  SYNC_RECOVERED_NOTICE,
+  createSyncStatusNotifier,
+  deliverSyncStatusChange,
+} from "./sync-status-surface"
 
 const failing = (kind: "offline" | "auth_expired", reason: string, action: string): EngineStatus => ({
   kind: "failing",
@@ -13,11 +19,17 @@ const failing = (kind: "offline" | "auth_expired", reason: string, action: strin
 
 test("#given a failure starts in the background #when its repo becomes active #then its unseen failure is announced once (#11059)", async () => {
   const notices: Array<{ message: string; level: string }> = []
-  const notifier = createSyncStatusNotifier(async () => failing("offline", "Cannot reach the service.", "Check your connection."))
+  const notifier = createSyncStatusNotifier(async () =>
+    failing("offline", "Cannot reach the service.", "Check your connection."),
+  )
   const ui = { notify: (message: string, level: "info" | "warning" | "error") => notices.push({ message, level }) }
   await deliverSyncStatusChange({
-    repo: "/repo", isActiveRepo: false, notifier, ui,
-    refreshFooter: () => {}, pushRpc: async () => {},
+    repo: "/repo",
+    isActiveRepo: false,
+    notifier,
+    ui,
+    refreshFooter: () => {},
+    pushRpc: async () => {},
   })
   expect(notices).toEqual([])
 
@@ -59,7 +71,12 @@ test("#given a stranded lock that moves to another path #when the notifier hears
     kind: "failing",
     since: 0,
     attempts: 1,
-    failure: { kind: "stranded_lock", paths: [path], reason: "A git lock blocks sync.", action: `Run /memory unlock ${path}.` },
+    failure: {
+      kind: "stranded_lock",
+      paths: [path],
+      reason: "A git lock blocks sync.",
+      action: `Run /memory unlock ${path}.`,
+    },
   })
   let status: EngineStatus = lockAt("/m/.git/index.lock")
   const notices: string[] = []
@@ -98,7 +115,14 @@ test("#given sync recovers while another session is active #when the repo goes o
   const notifier = createSyncStatusNotifier(async () => status)
   const ui = { notify: (message: string) => notices.push(message) }
   const deliver = (active: boolean) =>
-    deliverSyncStatusChange({ repo: "/repo", isActiveRepo: active, notifier, ui, refreshFooter: () => {}, pushRpc: async () => {} })
+    deliverSyncStatusChange({
+      repo: "/repo",
+      isActiveRepo: active,
+      notifier,
+      ui,
+      refreshFooter: () => {},
+      pushRpc: async () => {},
+    })
 
   await deliver(true)
   status = { kind: "synced", at: 1, updatedWhileOffline: 0 }
@@ -134,3 +158,50 @@ test("#given a change for the active repo #when it is delivered #then the footer
   await deliver(true)
   expect(calls).toEqual(["footer", "rpc"])
 })
+
+test.each([
+  [
+    "files held for being too large (#12284)",
+    {
+      kind: "failing",
+      since: 0,
+      attempts: 1,
+      failure: { kind: "oversized_item", keys: ["big.md"], stuck: [], limitBytes: 8388608, reason: "r", action: "a" },
+    } as const,
+    SYNC_HELD_NOTICE_PREFIX,
+  ],
+  [
+    "files held while a refused entry pauses sync (#12284)",
+    {
+      kind: "paused",
+      seq: 1,
+      code: "signature",
+      held: {
+        since: 0,
+        attempts: 1,
+        failure: { kind: "oversized_item", keys: ["big.md"], stuck: [], limitBytes: 8388608, reason: "r", action: "a" },
+      },
+    } as const,
+    SYNC_HELD_NOTICE_PREFIX,
+  ],
+  [
+    "a stranded lock",
+    {
+      kind: "failing",
+      since: 0,
+      attempts: 1,
+      failure: { kind: "stranded_lock", paths: ["/m/.git/index.lock"], reason: "r", action: "a" },
+    } as const,
+    SYNC_BLOCKED_NOTICE_PREFIX,
+  ],
+  ["an expired sign-in", failing("auth_expired", "r", "a"), SYNC_BLOCKED_NOTICE_PREFIX],
+])(
+  "#given %s #when the status changes #then the notice opens with the prefix for its kind",
+  async (_name, status, prefix) => {
+    const notices: string[] = []
+    const notifier = createSyncStatusNotifier(async () => status)
+    await notifier.changed("/repo", { notify: (message) => notices.push(message) })
+    expect(notices).toHaveLength(1)
+    expect(notices[0]?.startsWith(`${prefix} `)).toBe(true)
+  },
+)

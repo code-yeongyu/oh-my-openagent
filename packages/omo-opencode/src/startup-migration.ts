@@ -51,18 +51,21 @@ function homeDirectory(options: OpenCodeStartupMigrationOptions): string {
 }
 
 function uniqueSources(results: readonly MigrationRunResult[]): readonly string[] {
-  return [...new Set(results.flatMap((result) => result.status === "migrated"
-    ? result.preview?.backupMoves.map((move) => move.from) ?? []
-    : []))].sort()
+  return [
+    ...new Set(
+      results.flatMap((result) =>
+        result.status === "migrated" ? (result.preview?.backupMoves.map((move) => move.from) ?? []) : [],
+      ),
+    ),
+  ].sort()
 }
 
 function skippedConflictCount(results: readonly MigrationRunResult[]): number {
-  return results.flatMap((result) => result.diagnostics).filter((diagnostic) => diagnostic.startsWith("skipped:")).length
+  return results.flatMap((result) => result.diagnostics).filter((diagnostic) => diagnostic.startsWith("skipped:"))
+    .length
 }
 
-export function runOpenCodeStartupMigration(
-  options: OpenCodeStartupMigrationOptions,
-): OpenCodeStartupMigrationResult {
+export function runOpenCodeStartupMigration(options: OpenCodeStartupMigrationOptions): OpenCodeStartupMigrationResult {
   const homeDir = homeDirectory(options)
   if (homeDir.length === 0) {
     return {
@@ -86,20 +89,21 @@ export function runOpenCodeStartupMigration(
       ...(options.isProcessAlive === undefined ? {} : { isProcessAlive: options.isProcessAlive }),
       ...(options.onBoundary === undefined ? {} : { onBoundary: options.onBoundary }),
       ...(options.pid === undefined ? {} : { pid: options.pid }),
-      discover: () => createLegacyConfigMigrationPlans({
-        ...(options.backupTimestamp === undefined ? {} : { backupTimestamp: options.backupTimestamp }),
-        cwd: options.cwd,
-        ...(options.discoveryFileSystem === undefined ? {} : { fileSystem: options.discoveryFileSystem }),
-        environment: options.environment ?? process.env,
-        homeDir,
-        pathOperations: options.pathOperations ?? posix,
-        ...(options.platform === undefined ? {} : { platform: options.platform }),
-      }),
+      discover: () =>
+        createLegacyConfigMigrationPlans({
+          ...(options.backupTimestamp === undefined ? {} : { backupTimestamp: options.backupTimestamp }),
+          cwd: options.cwd,
+          ...(options.discoveryFileSystem === undefined ? {} : { fileSystem: options.discoveryFileSystem }),
+          environment: options.environment ?? process.env,
+          homeDir,
+          pathOperations: options.pathOperations ?? posix,
+          ...(options.platform === undefined ? {} : { platform: options.platform }),
+        }),
     })
     const migratedFrom = uniqueSources(batch.results)
     const targetBackupPaths = [
       ...(batch.resumedTargetBackupPath === undefined ? [] : [batch.resumedTargetBackupPath]),
-      ...batch.results.flatMap((result) => result.targetBackupPath === undefined ? [] : [result.targetBackupPath]),
+      ...batch.results.flatMap((result) => (result.targetBackupPath === undefined ? [] : [result.targetBackupPath])),
     ]
     return {
       journalResumed: batch.journalResumed,
@@ -108,7 +112,9 @@ export function runOpenCodeStartupMigration(
       results: batch.results,
       skippedConflictCount: skippedConflictCount(batch.results),
       targetBackupPaths,
-      ...(batch.resumedTargetBackupPath === undefined ? {} : { resumedTargetBackupPath: batch.resumedTargetBackupPath }),
+      ...(batch.resumedTargetBackupPath === undefined
+        ? {}
+        : { resumedTargetBackupPath: batch.resumedTargetBackupPath }),
       ...(batch.status === "locked" ? { error: "Configuration migration is already running" } : {}),
     }
   } catch (error) {

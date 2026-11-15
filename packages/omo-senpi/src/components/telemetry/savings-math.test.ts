@@ -2,12 +2,7 @@
 
 import { describe, expect, test } from "bun:test"
 
-import {
-  modeledWallClockSavedMs,
-  savedRoundTrips,
-  upperBoundSavedMs,
-  type MeasurableWave,
-} from "./savings-math"
+import { modeledWallClockSavedMs, savedRoundTrips, upperBoundSavedMs, type MeasurableWave } from "./savings-math"
 
 function waveOf(intervals: readonly (readonly [number, number])[]): MeasurableWave {
   const calls = intervals.map(([startMs, endMs]) => ({ startMs, endMs }))

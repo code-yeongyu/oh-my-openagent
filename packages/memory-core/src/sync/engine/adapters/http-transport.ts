@@ -5,7 +5,15 @@
 // (#463 contract 1.17.0; null on keyring rows); the engine checks it against the sealed header. Refusals arrive as
 // `{ error: { code } }`; `stale_base` is answered with the head read back from the state route.
 
-import type { AppendRequest, AppendResult, PulledEntry, PullPage, SnapshotRef, StreamHandlers, Transport } from "../ports"
+import type {
+  AppendRequest,
+  AppendResult,
+  PulledEntry,
+  PullPage,
+  SnapshotRef,
+  StreamHandlers,
+  Transport,
+} from "../ports"
 
 export const b64urlOfHex = (hex: string): string => Buffer.from(hex, "hex").toString("base64url")
 export const hexOfB64url = (b64url: string): string => Buffer.from(b64url, "base64url").toString("hex")
@@ -74,7 +82,11 @@ export function createHttpTransport(options: HttpTransportOptions): Transport {
   const request = async (method: string, path: string, body?: string | Uint8Array, json = true): Promise<Response> => {
     const headers: Record<string, string> = { authorization: `Bearer ${await bearer(options)}` }
     if (body !== undefined && json) headers["content-type"] = "application/json"
-    const response = await doFetch(`${options.baseUrl}${path}`, { method, headers, ...(body === undefined ? {} : { body }) }).catch((error: unknown) => {
+    const response = await doFetch(`${options.baseUrl}${path}`, {
+      method,
+      headers,
+      ...(body === undefined ? {} : { body }),
+    }).catch((error: unknown) => {
       throw new SyncNetworkError(error)
     })
     if (response.ok) return response
@@ -84,7 +96,8 @@ export function createHttpTransport(options: HttpTransportOptions): Transport {
     )
     throw new SyncHttpError(response.status >= 500 ? "unavailable" : code, response.status, response.status >= 500)
   }
-  const readState = async (): Promise<WireState> => (await request("GET", "/v1/sync/state")).json() as Promise<WireState>
+  const readState = async (): Promise<WireState> =>
+    (await request("GET", "/v1/sync/state")).json() as Promise<WireState>
   const entryOf = (row: WireRow): PulledEntry => ({
     seq: row.seq,
     kind: row.kind,
@@ -98,9 +111,13 @@ export function createHttpTransport(options: HttpTransportOptions): Transport {
       const state = await readState()
       const s = state.snapshot
       const snapshot: SnapshotRef | null =
-        s !== null && after < state.oldest_retained_seq - 1 ? { coversSeq: s.covers_seq, objectIds: s.chunk_object_ids, digest: null } : null
+        s !== null && after < state.oldest_retained_seq - 1
+          ? { coversSeq: s.covers_seq, objectIds: s.chunk_object_ids, digest: null }
+          : null
       const from = snapshot === null ? after : Math.max(after, snapshot.coversSeq)
-      const page = (await (await request("GET", `/v1/sync/batches?after=${from}`)).json()) as { entries: readonly WireRow[] }
+      const page = (await (await request("GET", `/v1/sync/batches?after=${from}`)).json()) as {
+        entries: readonly WireRow[]
+      }
       const rows = page.entries.slice(0, limit)
       const last = rows.at(-1)?.seq ?? from
       return { snapshot, entries: rows.map(entryOf), head: Math.max(state.head.seq, last), more: last < state.head.seq }
@@ -126,7 +143,10 @@ export function createHttpTransport(options: HttpTransportOptions): Transport {
         record_sig: req.recordSig,
       })
       try {
-        return { ok: true, seq: ((await (await request("POST", "/v1/sync/batches", body)).json()) as { seq: number }).seq }
+        return {
+          ok: true,
+          seq: ((await (await request("POST", "/v1/sync/batches", body)).json()) as { seq: number }).seq,
+        }
       } catch (error) {
         if (!(error instanceof SyncHttpError && error.code === "stale_base")) throw error
         return { ok: false, error: "stale_base", head: (await readState()).head.seq }
@@ -140,7 +160,12 @@ export function createHttpTransport(options: HttpTransportOptions): Transport {
   }
 }
 
-async function streamLoop(options: HttpTransportOptions, doFetch: typeof fetch, handlers: StreamHandlers, signal: AbortSignal): Promise<void> {
+async function streamLoop(
+  options: HttpTransportOptions,
+  doFetch: typeof fetch,
+  handlers: StreamHandlers,
+  signal: AbortSignal,
+): Promise<void> {
   while (!signal.aborted) {
     let up = false
     try {

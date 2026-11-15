@@ -43,9 +43,9 @@ foo === foo.bar
 
 Useful for finding redundant comparisons, double assignments, etc.
 
-### `$$$` is greedy
+### `$$$` is lazy
 
-When you write `foo($$$A, b, $$$C)`, the matcher does **not** backtrack or try every possible split. It greedily fills `$$$A` until the pattern can match `b`, then everything left goes into `$$$C`.
+When you write `foo($$$A, b, $$$C)`, the matcher does **not** backtrack or try every possible split. It fills `$$$A` only until the rest of the pattern can match — the first `b` here — then everything left goes into `$$$C`. On `foo(a, c, b, b, c)` that is `A=[a, c]` and `C=[b, c]`, never the longer `A=[a, c, b]`.
 
 ```ts
 // Pattern
@@ -116,11 +116,11 @@ Two tools help you confirm a pattern parses the way you expect:
 # Print the AST of the pattern itself
 sg run -p 'console.log($MSG)' --lang ts --debug-query=ast
 
-# Print the parsed CST of a file (great for figuring out kind names)
-sg run -p '$_' --lang ts --debug-query=cst src/example.ts | head -40
+# Print the CST of code copied from a file (great for figuring out kind names)
+sg run -p 'function f(x: number) { return x + 1 }' --lang ts --debug-query=cst src/example.ts 2>&1 >/dev/null | head -40
 ```
 
-`--debug-query=ast` shows the named AST nodes only (cleaner). `--debug-query=cst` shows everything including punctuation. Both go to stderr, so they don't interfere with stdout JSON.
+`--debug-query=ast` shows the named AST nodes only (cleaner). `--debug-query=cst` shows everything including punctuation. Both dump the tree of the **pattern** (not of the searched files) to stderr, so they don't interfere with stdout JSON; redirect `2>&1 >/dev/null` to pipe the dump. To learn a file's node kinds, paste that file's code as the pattern.
 
 The web playground is also fast: <https://ast-grep.github.io/playground.html>.
 

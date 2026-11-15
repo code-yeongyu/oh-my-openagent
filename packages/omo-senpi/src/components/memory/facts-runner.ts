@@ -27,7 +27,12 @@ import { resolveFactsModel } from "./facts-model"
 import { readRunJson } from "./worker/run-artifacts"
 
 export type { FactsExtractorRunnerOptions, FactsLaunchResult } from "./facts-runner-types"
-import type { FactsExtractorRunnerOptions, FactsLaunchResult, FactsModelSelection, FactsRunLedger } from "./facts-runner-types"
+import type {
+  FactsExtractorRunnerOptions,
+  FactsLaunchResult,
+  FactsModelSelection,
+  FactsRunLedger,
+} from "./facts-runner-types"
 import { describe, FACTS_DEADLINE_MS, queueKeys, reserveFactsRunDir } from "./facts-run-storage"
 import { createFactsRunMaintenance } from "./facts-run-maintenance"
 
@@ -37,7 +42,8 @@ export class FactsExtractorRunner {
   private readonly terminal: FactsTerminalWrites
   private readonly failureReader: FactsFailureReadPort
   private readonly maintenance: ReturnType<typeof createFactsRunMaintenance>
-  private activeLaunch: Promise<FactsLaunchResult> | undefined; private activeCancel: (() => void) | undefined
+  private activeLaunch: Promise<FactsLaunchResult> | undefined
+  private activeCancel: (() => void) | undefined
   private readonly activeReconciles = new Map<Promise<FactsLaunchResult>, AbortController>()
 
   constructor(private readonly options: FactsExtractorRunnerOptions) {
@@ -64,14 +70,18 @@ export class FactsExtractorRunner {
     if (signal?.aborted === true) return { status: "skipped" }
     if (this.activeLaunch !== undefined) return { status: "active" }
     const captured = selection ?? {
-      registry: this.options.resolveModelRegistry(), sessionModel: this.options.resolveSessionModel?.(),
+      registry: this.options.resolveModelRegistry(),
+      sessionModel: this.options.resolveSessionModel?.(),
     }
     const operation = drainFactsLaunches(() => this.launchPendingOnce(captured, signal), signal)
     this.activeLaunch = operation
     try {
       return await operation
     } finally {
-      if (this.activeLaunch === operation) { this.activeLaunch = undefined; this.activeCancel = undefined }
+      if (this.activeLaunch === operation) {
+        this.activeLaunch = undefined
+        this.activeCancel = undefined
+      }
     }
   }
 
@@ -89,7 +99,9 @@ export class FactsExtractorRunner {
 
   async reconcilePending(signal?: AbortSignal): Promise<FactsLaunchResult> {
     const abort = new AbortController()
-    const operation = this.reconcilePendingOnce(signal === undefined ? abort.signal : AbortSignal.any([signal, abort.signal]))
+    const operation = this.reconcilePendingOnce(
+      signal === undefined ? abort.signal : AbortSignal.any([signal, abort.signal]),
+    )
     this.activeReconciles.set(operation, abort)
     try {
       return await operation
@@ -105,7 +117,10 @@ export class FactsExtractorRunner {
     return { status: "empty" }
   }
 
-  private async launchPendingOnce(modelSelection: FactsModelSelection, signal?: AbortSignal): Promise<FactsLaunchResult> {
+  private async launchPendingOnce(
+    modelSelection: FactsModelSelection,
+    signal?: AbortSignal,
+  ): Promise<FactsLaunchResult> {
     const isAborted = (): boolean => signal?.aborted === true
     if (isAborted()) return { status: "skipped" }
     if (await this.maintenance.reconcile()) return { status: "active" }
@@ -122,12 +137,21 @@ export class FactsExtractorRunner {
     const entries = await this.queue.claim(selection.selected, claimId)
     if (entries.length === 0) return { status: "active" }
     const releaseClaim = async (): Promise<void> => this.queue.releaseClaim(entries, claimId)
-    const loaded = this.options.loadConfig(); const deadlineMs = this.options.deadlineMs ?? FACTS_DEADLINE_MS
-    const modelRegistry = modelSelection.registry; const resolution = resolveFactsModel(
-      loaded.config, modelRegistry, modelSelection.sessionModel, this.options.identity.id,
+    const loaded = this.options.loadConfig()
+    const deadlineMs = this.options.deadlineMs ?? FACTS_DEADLINE_MS
+    const modelRegistry = modelSelection.registry
+    const resolution = resolveFactsModel(
+      loaded.config,
+      modelRegistry,
+      modelSelection.sessionModel,
+      this.options.identity.id,
     )
     const childModelRegistry = isChildModelRegistry(modelRegistry) ? modelRegistry : undefined
-    if (childModelRegistry === undefined || resolution.kind === "category_unavailable" || resolution.source !== undefined) {
+    if (
+      childModelRegistry === undefined ||
+      resolution.kind === "category_unavailable" ||
+      resolution.source !== undefined
+    ) {
       const cause = resolution.kind === "category_unavailable" ? resolution.cause : resolution.source
       this.options.logger?.warn("facts extraction skipped: no usable user-selected model", { cause })
       await releaseClaim()
@@ -143,14 +167,26 @@ export class FactsExtractorRunner {
       throw error
     }
     const people = await readFactsPeoplePayload(repo.dir)
-    const agreements = await readFactsAgreementsPayload(repo.dir, resolveFactsAgreements(loaded.config, this.options.identity.id))
-    const envelope = { version: 1, agreementEventVersion: 1, identity: this.options.identity.id, today: this.now().toISOString().slice(0, 10), ...people, ...agreements } as const
-    const capped = selectCappedFactsBatch({ entries, envelope, now: this.now() })
-    const oversizedModel = capped.oversized.length === 0 ? undefined
-      : (await import("#omo-task-runtime")).findModelReference(childModelRegistry, resolution.model)
-    const admitted = capped.envelopeOversized ? [] : capped.oversized.filter((entry) =>
-      admitOversizedFacts({ ...envelope, entries: [entry] }, oversizedModel),
+    const agreements = await readFactsAgreementsPayload(
+      repo.dir,
+      resolveFactsAgreements(loaded.config, this.options.identity.id),
     )
+    const envelope = {
+      version: 1,
+      agreementEventVersion: 1,
+      identity: this.options.identity.id,
+      today: this.now().toISOString().slice(0, 10),
+      ...people,
+      ...agreements,
+    } as const
+    const capped = selectCappedFactsBatch({ entries, envelope, now: this.now() })
+    const oversizedModel =
+      capped.oversized.length === 0
+        ? undefined
+        : (await import("#omo-task-runtime")).findModelReference(childModelRegistry, resolution.model)
+    const admitted = capped.envelopeOversized
+      ? []
+      : capped.oversized.filter((entry) => admitOversizedFacts({ ...envelope, entries: [entry] }, oversizedModel))
     const envelopeRefused = await classifyOversizePayload({
       terminal: this.terminal,
       envelope,
@@ -173,9 +209,13 @@ export class FactsExtractorRunner {
       await releaseClaim()
       return { status: "empty" }
     }
-    await this.queue.releaseClaim(entries.filter((entry) => !batch.includes(entry)), claimId)
+    await this.queue.releaseClaim(
+      entries.filter((entry) => !batch.includes(entry)),
+      claimId,
+    )
     const batchId = (this.options.createBatchId ?? randomUUID)()
-    const launchedAt = this.now().getTime(); if (isAborted()) {
+    const launchedAt = this.now().getTime()
+    if (isAborted()) {
       await this.queue.releaseClaim(batch, claimId)
       return { status: "skipped" }
     }
@@ -200,7 +240,8 @@ export class FactsExtractorRunner {
       await this.queue.releaseClaim(batch, claimId)
       return { status: "active" }
     }
-    const runId = basename(runDir); const payload: FactsPayload = { ...envelope, entries: batch }
+    const runId = basename(runDir)
+    const payload: FactsPayload = { ...envelope, entries: batch }
     if (isAborted()) {
       await this.queue.releaseClaim(batch, claimId)
       return { status: "skipped" }
@@ -220,7 +261,9 @@ export class FactsExtractorRunner {
         queued: queueKeys(batch),
         launchedAt,
         deadlineMs,
-        onState: (state) => { this.activeCancel = state.cancel }
+        onState: (state) => {
+          this.activeCancel = state.cancel
+        },
       })
       if (cancelled) {
         return await this.abandonCancelledRun(runDir, runId)
@@ -255,10 +298,13 @@ export class FactsExtractorRunner {
     await this.terminal.abandon(runDir, ledger, "session_shutdown")
     return { status: "failed", runId }
   }
-
 }
 
 function isChildModelRegistry(value: unknown): value is ChildModelRegistry {
-  return value !== null && typeof value === "object" && "getProviderAuth" in value
-    && typeof value.getProviderAuth === "function"
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    "getProviderAuth" in value &&
+    typeof value.getProviderAuth === "function"
+  )
 }

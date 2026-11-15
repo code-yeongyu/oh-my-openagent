@@ -16,9 +16,13 @@ function startLegacySseServer(options: { advertiseEndpoint: boolean }) {
   const streamOpened = Promise.withResolvers<void>()
   const streamClosed = Promise.withResolvers<void>()
   let stream: ReadableStreamDefaultController<Uint8Array> | undefined
-  const record = (request: Request, method: string, path: string) => received.push({
-    method, path, header: request.headers.get("X-Skill-Header"), protocolVersion: request.headers.get("mcp-protocol-version"),
-  })
+  const record = (request: Request, method: string, path: string) =>
+    received.push({
+      method,
+      path,
+      header: request.headers.get("X-Skill-Header"),
+      protocolVersion: request.headers.get("mcp-protocol-version"),
+    })
   const server = Bun.serve({
     port: 0,
     idleTimeout: 0,
@@ -27,28 +31,36 @@ function startLegacySseServer(options: { advertiseEndpoint: boolean }) {
       if (url.pathname === "/sse" && request.method === "GET") {
         record(request, "GET", url.pathname)
         request.signal.addEventListener("abort", () => streamClosed.resolve(), { once: true })
-        return new Response(new ReadableStream<Uint8Array>({
-          start(controller) {
-            stream = controller
-            if (options.advertiseEndpoint) {
-              controller.enqueue(encoder.encode("event: endpoint\ndata: /messages?sessionId=legacy\n\n"))
-            }
-            streamOpened.resolve()
-          },
-        }), { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } })
+        return new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              stream = controller
+              if (options.advertiseEndpoint) {
+                controller.enqueue(encoder.encode("event: endpoint\ndata: /messages?sessionId=legacy\n\n"))
+              }
+              streamOpened.resolve()
+            },
+          }),
+          { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } },
+        )
       }
       if (url.pathname !== "/messages" || request.method !== "POST") {
         record(request, request.method, url.pathname)
         return new Response("Method Not Allowed", { status: 405 })
       }
-      const message = await request.json() as JsonRpcMessage
+      const message = (await request.json()) as JsonRpcMessage
       record(request, message.method, url.pathname)
       if (message.id !== undefined) {
-        const result = message.method === "initialize"
-          ? { protocolVersion: LEGACY_PROTOCOL_VERSION, capabilities: { tools: {} }, serverInfo: { name: "legacy-sse", version: "1" } }
-          : message.method === "tools/list"
-            ? { tools: [{ name: "echo", inputSchema: { type: "object" } }] }
-            : undefined
+        const result =
+          message.method === "initialize"
+            ? {
+                protocolVersion: LEGACY_PROTOCOL_VERSION,
+                capabilities: { tools: {} },
+                serverInfo: { name: "legacy-sse", version: "1" },
+              }
+            : message.method === "tools/list"
+              ? { tools: [{ name: "echo", inputSchema: { type: "object" } }] }
+              : undefined
         const reply = result
           ? { jsonrpc: "2.0", id: message.id, result }
           : { jsonrpc: "2.0", id: message.id, error: { code: -32601, message: "Method not found" } }
@@ -110,10 +122,15 @@ test("#given a type sse server that never advertises its endpoint #when connecti
 
   try {
     // when
-    const outcome = manager.listTools(
-      { serverName: "silent-sse", skillName: "test", sessionID: "sse-timeout" },
-      { skillName: "test", config: sseConfig(server) },
-    ).then(() => undefined, (error: unknown) => error)
+    const outcome = manager
+      .listTools(
+        { serverName: "silent-sse", skillName: "test", sessionID: "sse-timeout" },
+        { skillName: "test", config: sseConfig(server) },
+      )
+      .then(
+        () => undefined,
+        (error: unknown) => error,
+      )
     await settlesWithin(streamOpened, "the GET event stream to open")
     jest.advanceTimersByTime(DEFAULT_REQUEST_TIMEOUT_MSEC)
     jest.useRealTimers()

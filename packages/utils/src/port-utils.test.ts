@@ -134,7 +134,7 @@ async function getReleasedPort(hostname: string = DEFAULT_HOSTNAME): Promise<num
 async function canBindContiguousPorts(
   startPort: number,
   portCount: number,
-  hostname: string = DEFAULT_HOSTNAME
+  hostname: string = DEFAULT_HOSTNAME,
 ): Promise<boolean> {
   const servers: Server[] = []
 
@@ -154,10 +154,7 @@ async function canBindContiguousPorts(
   }
 }
 
-async function findContiguousAvailableStart(
-  portCount: number,
-  hostname: string = DEFAULT_HOSTNAME
-): Promise<number> {
+async function findContiguousAvailableStart(portCount: number, hostname: string = DEFAULT_HOSTNAME): Promise<number> {
   for (let seedAttempt = 0; seedAttempt < CONTIGUOUS_SEARCH_SEEDS; seedAttempt++) {
     const seedPort = await getReleasedPort(hostname)
     const maxStartPort = Math.min(65_535 - portCount + 1, seedPort + CONTIGUOUS_SEARCH_WINDOW)
@@ -299,7 +296,10 @@ async function runAvailabilityProbe<Result>(
       probedPorts.push(requestedPort)
       if (requestedPort < startPort + unavailableProbeCount) {
         queueMicrotask(() => {
-          this.emit("error", Object.assign(new Error(`mocked port ${requestedPort} unavailable`), { code: "EADDRINUSE" }))
+          this.emit(
+            "error",
+            Object.assign(new Error(`mocked port ${requestedPort} unavailable`), { code: "EADDRINUSE" }),
+          )
         })
         return this
       }
@@ -434,11 +434,11 @@ describe("port-utils", () => {
     test("#when the first three ports are blocked #then returns the next free port", async () => {
       const startPort = 40_000
 
-      const { errorMessage, probedPorts, selectedResult: selectedPort } = await runAvailabilityProbe(
-        startPort,
-        3,
-        () => findAvailablePort(startPort),
-      )
+      const {
+        errorMessage,
+        probedPorts,
+        selectedResult: selectedPort,
+      } = await runAvailabilityProbe(startPort, 3, () => findAvailablePort(startPort))
 
       expect(selectedPort).toBe(startPort + 3)
       expect(errorMessage).toBeUndefined()
@@ -448,11 +448,11 @@ describe("port-utils", () => {
     test("#when every attempted port is blocked #then throws", async () => {
       const startPort = 40_000
 
-      const { errorMessage, probedPorts, selectedResult: selectedPort } = await runAvailabilityProbe(
-        startPort,
-        MAX_PORT_ATTEMPTS,
-        () => findAvailablePort(startPort),
-      )
+      const {
+        errorMessage,
+        probedPorts,
+        selectedResult: selectedPort,
+      } = await runAvailabilityProbe(startPort, MAX_PORT_ATTEMPTS, () => findAvailablePort(startPort))
 
       expect(selectedPort).toBeUndefined()
       expect(errorMessage).toBe(`No available port found in range ${startPort}-${startPort + MAX_PORT_ATTEMPTS - 1}`)
@@ -472,10 +472,8 @@ describe("port-utils", () => {
     test("#when the preferred port is blocked #then returns the next port with auto-selection", async () => {
       const preferredPort = 40_000
 
-      const { errorMessage, probedPorts, selectedResult } = await runAvailabilityProbe(
-        preferredPort,
-        1,
-        () => getAvailableServerPort(preferredPort),
+      const { errorMessage, probedPorts, selectedResult } = await runAvailabilityProbe(preferredPort, 1, () =>
+        getAvailableServerPort(preferredPort),
       )
 
       expect(selectedResult).toEqual({ port: preferredPort + 1, wasAutoSelected: true })

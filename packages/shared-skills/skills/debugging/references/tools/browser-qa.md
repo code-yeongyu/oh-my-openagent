@@ -25,8 +25,6 @@ const profile = mkdtempSync(join(tmpdir(), "debug-repro-"))
 const browser = await omowright.connectPipe({ browserPath, browserArgs: ["--headless", `--user-data-dir=${profile}`], storageRoot: profile })
 const page = await browser.newTab("about:blank")
 const trace = omowright.createTrace(page, { dir: traceDir })          // trace.jsonl + trace.har + before/after screenshots
-const consoleErrors = []
-page.on("console", (entry) => { if (entry.type === "error") consoleErrors.push(entry.text) })
 try {
   await trace.step("open", () => page.goto(url, { waitUntil: "load" }))
   await trace.step("submit", async () => {
@@ -36,6 +34,7 @@ try {
     await page.waitForURL(/\/done/, { timeout: 10_000 })
   })
   await Bun.write(pngPath, await page.screenshot())
+  const consoleErrors = (await page.console.logs({ levels: ["error"] })).map((entry) => entry.message)
 } finally {
   await trace.stop()
   await browser.close()
@@ -63,10 +62,11 @@ When the bug only happens signed in:
 
 ```js
 const session = await omowright.connectBrowserSkill({ name: "debug repro", focused: false })
+const sync = async () => (await session.cooperate("sync")).context_id   // BrowserSkill 0.4: one context per page action
 try {
-  await session.navigate(url)
-  const { tree, css } = await omowright.bskSnapshot(session, { interactive: true })
-  await session.click({ selector: css.e7 })
+  await session.navigate(url, { context: await sync() })
+  const { tree, css } = await omowright.bskSnapshot(session, { interactive: true, context: await sync() })
+  await session.click({ selector: css.e7 }, { context: await sync() })
   const errors = await session.console({ since: 0 })
   const shot = await session.screenshot()
 } finally {

@@ -2,7 +2,13 @@ import type { NotifyResult, ParentState } from "../completion"
 import type { TaskRecord } from "../state"
 import { CHAOS_MODEL, CHAOS_SESSION } from "./chaos-harness"
 import type { ChaosHarness } from "./chaos-harness"
-import { crashMidSuspend, massReviveAtCap, resumeSession, siblingReconcileRace, suspendSession } from "./chaos-lifecycle-actions"
+import {
+  crashMidSuspend,
+  massReviveAtCap,
+  resumeSession,
+  siblingReconcileRace,
+  suspendSession,
+} from "./chaos-lifecycle-actions"
 import { isTerminalStatus } from "./observing-store"
 import type { RandomSource } from "./prng"
 
@@ -36,8 +42,11 @@ function load(state: ChaosState, taskId: string): TaskRecord | null {
 }
 
 function runningWithHandle(state: ChaosState): string[] {
-  return state.taskIds.filter((id) => load(state, id)?.status === "running" &&
-    state.harness.engines.some((engine) => engine.manager.getResidentHandle(id) !== undefined))
+  return state.taskIds.filter(
+    (id) =>
+      load(state, id)?.status === "running" &&
+      state.harness.engines.some((engine) => engine.manager.getResidentHandle(id) !== undefined),
+  )
 }
 
 function ownerFor(state: ChaosState, taskId: string) {
@@ -91,30 +100,46 @@ async function settleWith(state: ChaosState, outcome: "clean" | "signal"): Promi
   const handle = fakeHandleFor(state, id)
   if (handle === undefined) return
   if (outcome === "clean") handle.settle({ status: "completed", finalResponse: "clean exit" })
-  else handle.settle({ status: "error", failure: { kind: "child-prompt-failed", message: "terminated by signal SIGKILL" } })
+  else
+    handle.settle({
+      status: "error",
+      failure: { kind: "child-prompt-failed", message: "terminated by signal SIGKILL" },
+    })
   await flushMicrotasks()
 }
 
 async function actSteer(state: ChaosState): Promise<void> {
-  const id = pick(state, byStatus(state, (record) => record.status === "running" && record.residency_state === "resident"))
+  const id = pick(
+    state,
+    byStatus(state, (record) => record.status === "running" && record.residency_state === "resident"),
+  )
   if (id === undefined) return
   await ownerFor(state, id)?.manager.continueTask(id, "keep going", "steer")
 }
 
 async function actInterrupt(state: ChaosState): Promise<void> {
-  const id = pick(state, byStatus(state, (record) => record.status === "running"))
+  const id = pick(
+    state,
+    byStatus(state, (record) => record.status === "running"),
+  )
   if (id === undefined) return
   await ownerFor(state, id)?.manager.interruptTask(id)
 }
 
 async function actCancel(state: ChaosState): Promise<void> {
-  const id = pick(state, byStatus(state, (record) => record.status === "running"))
+  const id = pick(
+    state,
+    byStatus(state, (record) => record.status === "running"),
+  )
   if (id === undefined) return
   await ownerFor(state, id)?.manager.cancelTask(id, state.rng.bool() ? "user aborted" : undefined)
 }
 
 async function actCancelPending(state: ChaosState): Promise<void> {
-  const id = pick(state, byStatus(state, (record) => record.status === "pending"))
+  const id = pick(
+    state,
+    byStatus(state, (record) => record.status === "pending"),
+  )
   if (id === undefined) return
   await state.harness.manager.cancelTask(id, state.rng.bool() ? "cancelled while queued" : undefined)
 }
@@ -126,7 +151,10 @@ async function actAbortParentWait(state: ChaosState): Promise<void> {
 }
 
 async function actRevive(state: ChaosState): Promise<void> {
-  const id = pick(state, byStatus(state, (record) => REVIVABLE.has(record.status) && record.residency_state === "resident"))
+  const id = pick(
+    state,
+    byStatus(state, (record) => REVIVABLE.has(record.status) && record.residency_state === "resident"),
+  )
   if (id === undefined) return
   await ownerFor(state, id)?.manager.continueTask(id, "revive please")
 }
@@ -138,7 +166,9 @@ function expectedDelta(result: NotifyResult): number {
 function checkDelta(state: ChaosState, before: number, result: NotifyResult): void {
   const delta = state.harness.parentNotifier.calls.length - before
   if (delta !== expectedDelta(result)) {
-    state.seamBreaches.push(`notify result ${result.kind} produced ${delta} enqueue(s), expected ${expectedDelta(result)}`)
+    state.seamBreaches.push(
+      `notify result ${result.kind} produced ${delta} enqueue(s), expected ${expectedDelta(result)}`,
+    )
   }
 }
 
@@ -186,7 +216,9 @@ async function actReplayNotify(state: ChaosState): Promise<void> {
   const result = state.harness.notifier.notifyTerminal({ record, parentState: { kind: "idle" }, runInBackground: true })
   checkDelta(state, before, result)
   if (result.kind !== "skipped") {
-    state.seamBreaches.push(`replay of already-notified ${id} epoch ${record.notification.run_epoch} was ${result.kind}, expected skipped`)
+    state.seamBreaches.push(
+      `replay of already-notified ${id} epoch ${record.notification.run_epoch} was ${result.kind}, expected skipped`,
+    )
   }
 }
 
@@ -195,7 +227,8 @@ async function actFlush(state: ChaosState): Promise<void> {
   const result = state.harness.notifier.flushBuffered({ sessionId: CHAOS_SESSION, replaced: state.rng.bool(0.3) })
   const delta = state.harness.parentNotifier.calls.length - before
   const expected = result.kind === "flushed" ? 1 : 0
-  if (delta !== expected) state.seamBreaches.push(`flush result ${result.kind} produced ${delta} enqueue(s), expected ${expected}`)
+  if (delta !== expected)
+    state.seamBreaches.push(`flush result ${result.kind} produced ${delta} enqueue(s), expected ${expected}`)
 }
 
 async function actEvict(state: ChaosState): Promise<void> {

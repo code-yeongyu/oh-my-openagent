@@ -43,7 +43,13 @@ function matchesShape(schema: Schema, value: unknown): boolean {
   if (def.type === "object" || def.type === "record") return isPlainRecord(value)
   if (def.type === "array" || def.type === "tuple") return Array.isArray(value)
   if (def.type === "union") return def.options?.some((option) => matchesShape(option, value)) ?? false
-  if (def.type === "intersection") return def.left !== undefined && def.right !== undefined && matchesShape(def.left, value) && matchesShape(def.right, value)
+  if (def.type === "intersection")
+    return (
+      def.left !== undefined &&
+      def.right !== undefined &&
+      matchesShape(def.left, value) &&
+      matchesShape(def.right, value)
+    )
   if (def.type === "string") return typeof value === "string"
   if (def.type === "number") return typeof value === "number"
   if (def.type === "boolean") return typeof value === "boolean"
@@ -87,9 +93,12 @@ function unknownPaths(schema: Schema, value: unknown, path: UnknownKeyPath): rea
     const candidates = (def.options ?? [])
       .filter((option) => matchesShape(option, value))
       .map((option) => unknownPaths(option, value, path))
-    return candidates.reduce<readonly UnknownKeyPath[] | undefined>((best, candidate) => (
-      best === undefined || candidate.length < best.length ? candidate : best
-    ), undefined) ?? []
+    return (
+      candidates.reduce<readonly UnknownKeyPath[] | undefined>(
+        (best, candidate) => (best === undefined || candidate.length < best.length ? candidate : best),
+        undefined,
+      ) ?? []
+    )
   }
 
   if (def.type === "intersection" && def.left !== undefined && def.right !== undefined) {

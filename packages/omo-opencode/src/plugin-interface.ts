@@ -36,8 +36,7 @@ export function createPluginInterface(args: {
   hooks: CreatedHooks
   tools: ToolsRecord
 }): PluginInterface {
-  const { ctx, pluginConfig, firstMessageVariantGate, managers, hooks, tools } =
-    args
+  const { ctx, pluginConfig, firstMessageVariantGate, managers, hooks, tools } = args
   const toolSnippets = Object.fromEntries(
     Object.entries(tools).map(([name, definition]) => [name, toolPromptSnippet(definition.description)]),
   )
@@ -59,10 +58,7 @@ export function createPluginInterface(args: {
         model?: { providerID?: unknown; modelID?: unknown; id?: unknown }
         message?: { variant?: string }
       }
-      const agentName =
-        typeof chatParamsInput.agent === "string"
-          ? chatParamsInput.agent
-          : chatParamsInput.agent?.name
+      const agentName = typeof chatParamsInput.agent === "string" ? chatParamsInput.agent : chatParamsInput.agent?.name
       const providerID = chatParamsInput.model?.providerID
       const rawModelID = chatParamsInput.model?.modelID ?? chatParamsInput.model?.id
       const modelID = typeof rawModelID === "string" ? rawModelID : undefined

@@ -1,103 +1,106 @@
-import assert from "node:assert/strict";
-import { readdir } from "node:fs/promises";
-import { join } from "node:path";
+import assert from "node:assert/strict"
+import { readdir } from "node:fs/promises"
+import { join } from "node:path"
 
-export const CONTEXT_PRESSURE_SKILL_BUDGET_BYTES = 25_000;
+export const CONTEXT_PRESSURE_SKILL_BUDGET_BYTES = 25_000
 
 export const expectedSkills = [
-	"ast-grep",
-	"browser",
-	"coding-agent-sessions",
-	"comment-checker",
-	"data-scientist",
-	"debugging",
-	"eval-integrity",
-	"frontend",
-	"git-master",
-	"init-deep",
-	"lcx-contribute-bug-fix",
-	"lcx-doctor",
-	"lcx-report-bug",
-	"lsp",
-	"lsp-setup",
-	"programming",
-	"refactor",
-	"remove-ai-slops",
-	"review-work",
-	"rules",
-	"teammode",
-	"ultimate-browsing",
-	"ultrawork",
-	"ulw-execute",
-	"ulw-loop",
-	"ulw-plan",
-	"ulw-research",
-	"visual-qa",
-];
+  "ast-grep",
+  "browser",
+  "coding-agent-sessions",
+  "comment-checker",
+  "data-scientist",
+  "debugging",
+  "eval-integrity",
+  "frontend",
+  "git-master",
+  "init-deep",
+  "lcx-contribute-bug-fix",
+  "lcx-doctor",
+  "lcx-report-bug",
+  "lsp",
+  "lsp-setup",
+  "programming",
+  "refactor",
+  "remove-ai-slops",
+  "review-work",
+  "rules",
+  "teammode",
+  "ultimate-browsing",
+  "ultrawork",
+  "ulw-execute",
+  "ulw-loop",
+  "ulw-plan",
+  "ulw-research",
+  "visual-qa",
+]
 
 // `ultrawork` is intentionally absent: its skill body is composed by sync-skills.mjs directly from
 // the canonical packages/prompts-core/prompts/ultrawork/codex.md, so it has no component skill
 // source directory to diff against. Its composition is asserted separately in sync-skills.test.mjs.
 export const componentSkillSources = [
-	["comment-checker", "components/comment-checker/skills/comment-checker"],
-	["lcx-contribute-bug-fix", "components/lcx/skills/lcx-contribute-bug-fix"],
-	["lcx-doctor", "components/lcx/skills/lcx-doctor"],
-	["lcx-report-bug", "components/lcx/skills/lcx-report-bug"],
-	["lsp", "components/lsp/skills/lsp"],
-	["rules", "components/rules/skills/rules"],
-	["teammode", "components/teammode/skills/teammode"],
-	["ulw-loop", "components/ulw-loop/skills/ulw-loop"],
-	["ulw-plan", "components/ultrawork/skills/ulw-plan"],
-];
+  ["comment-checker", "components/comment-checker/skills/comment-checker"],
+  ["lcx-contribute-bug-fix", "components/lcx/skills/lcx-contribute-bug-fix"],
+  ["lcx-doctor", "components/lcx/skills/lcx-doctor"],
+  ["lcx-report-bug", "components/lcx/skills/lcx-report-bug"],
+  ["lsp", "components/lsp/skills/lsp"],
+  ["rules", "components/rules/skills/rules"],
+  ["teammode", "components/teammode/skills/teammode"],
+  ["ulw-loop", "components/ulw-loop/skills/ulw-loop"],
+  ["ulw-plan", "components/ultrawork/skills/ulw-plan"],
+]
 
 export const canonicalUltraworkDirectiveRelativePath = join(
-	"packages",
-	"prompts-core",
-	"prompts",
-	"ultrawork",
-	"codex.md",
-);
+  "packages",
+  "prompts-core",
+  "prompts",
+  "ultrawork",
+  "codex.md",
+)
 
 const codexCompatibilityEndMarkers = [
-	"Omit optional keys you do not set. Never send `items: []`, `message: \"\"`, `model: \"\"`, `reasoning_effort: \"\"`, or `service_tier: \"\"`. Codex rejects them (`Items can't be empty`, `reasoning_effort must not be empty`).\n\nFor work likely to exceed one wait cycle, require the child to send `WORKING: <task> - <current phase>` before long passes and `BLOCKED: <reason>` only when progress stops. A `multi_agent_v1.wait_agent` timeout only means no new mailbox update arrived; back off between waits (double the timeout up to ~5 minutes) instead of spinning short cycles. Treat a running child as alive. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly `BLOCKED:`, or no longer running.\n\n",
-	"On the v2 surface `agent_type` may be ABSENT from the spawn schema (verified 2026-07-11: only `fork_turns`/`message`/`task_name`). When absent, omit it and describe the role inside `message`; installed role TOMLs cannot be selected on that surface. If a code block below conflicts with this section, this section wins. `fork_context` is rejected on `multi_agent_v2` (`fork_context is not supported in MultiAgentV2; use fork_turns instead`).\n\n",
-	"For work likely to exceed one wait cycle, require the child to send `WORKING: <task> - <current phase>` before long passes and `BLOCKED: <reason>` only when progress stops. A `multi_agent_v1.wait_agent` timeout only means no new mailbox update arrived. Treat a running child as alive. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly `BLOCKED:`, or no longer running.\n\n",
-	"On `multi_agent_v2` sessions the same `agent_type` applies (the OMO installer exposes it) with `fork_turns` instead of `fork_context`. If a code block below conflicts with this section, this section wins.\n\n",
-	"Role-specific behavior must be described in a self-contained `message`. Use `fork_context: false` to start the child with only the initial prompt (no parent history); use `fork_context: true` only when full parent history is truly required. Include any required conversation context, files, diffs, constraints, and requested skill names directly in the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
-	"When translating `load_skills=[...]`, include the requested skill names in the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
-	"When translating `load_skills=[...]`, name the skills inside the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
-];
+  'Omit optional keys you do not set. Never send `items: []`, `message: ""`, `model: ""`, `reasoning_effort: ""`, or `service_tier: ""`. Codex rejects them (`Items can\'t be empty`, `reasoning_effort must not be empty`).\n\nFor work likely to exceed one wait cycle, require the child to send `WORKING: <task> - <current phase>` before long passes and `BLOCKED: <reason>` only when progress stops. A `multi_agent_v1.wait_agent` timeout only means no new mailbox update arrived; back off between waits (double the timeout up to ~5 minutes) instead of spinning short cycles. Treat a running child as alive. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly `BLOCKED:`, or no longer running.\n\n',
+  "On the v2 surface `agent_type` may be ABSENT from the spawn schema (verified 2026-07-11: only `fork_turns`/`message`/`task_name`). When absent, omit it and describe the role inside `message`; installed role TOMLs cannot be selected on that surface. If a code block below conflicts with this section, this section wins. `fork_context` is rejected on `multi_agent_v2` (`fork_context is not supported in MultiAgentV2; use fork_turns instead`).\n\n",
+  "For work likely to exceed one wait cycle, require the child to send `WORKING: <task> - <current phase>` before long passes and `BLOCKED: <reason>` only when progress stops. A `multi_agent_v1.wait_agent` timeout only means no new mailbox update arrived. Treat a running child as alive. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly `BLOCKED:`, or no longer running.\n\n",
+  "On `multi_agent_v2` sessions the same `agent_type` applies (the OMO installer exposes it) with `fork_turns` instead of `fork_context`. If a code block below conflicts with this section, this section wins.\n\n",
+  "Role-specific behavior must be described in a self-contained `message`. Use `fork_context: false` to start the child with only the initial prompt (no parent history); use `fork_context: true` only when full parent history is truly required. Include any required conversation context, files, diffs, constraints, and requested skill names directly in the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
+  "When translating `load_skills=[...]`, include the requested skill names in the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
+  "When translating `load_skills=[...]`, name the skills inside the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
+]
 
 export function removeCodexCompatibilityGuidance(content) {
-	const start = content.indexOf("## Codex Harness Tool Compatibility\n\n");
-	if (start === -1) return content;
-	const structuralEndPattern = /\n(?:---|export\s+const\s+|#{1,6}\s)/g;
-	structuralEndPattern.lastIndex = start + "## Codex Harness Tool Compatibility\n\n".length;
-	const structuralEnd = structuralEndPattern.exec(content);
-	if (structuralEnd) return `${content.slice(0, start)}${content.slice(structuralEnd.index + 1)}`;
+  const start = content.indexOf("## Codex Harness Tool Compatibility\n\n")
+  if (start === -1) return content
+  const structuralEndPattern = /\n(?:---|export\s+const\s+|#{1,6}\s)/g
+  structuralEndPattern.lastIndex = start + "## Codex Harness Tool Compatibility\n\n".length
+  const structuralEnd = structuralEndPattern.exec(content)
+  if (structuralEnd) return `${content.slice(0, start)}${content.slice(structuralEnd.index + 1)}`
 
-	const endMarker = codexCompatibilityEndMarkers.find((marker) => content.indexOf(marker, start) !== -1);
-	assert.notEqual(endMarker, undefined, "Codex compatibility guidance block is missing its terminator");
-	const end = content.indexOf(endMarker, start);
-	assert.notEqual(end, -1, "Codex compatibility guidance block is missing its terminator");
-	return `${content.slice(0, start)}${content.slice(end + endMarker.length)}`;
+  const endMarker = codexCompatibilityEndMarkers.find((marker) => content.indexOf(marker, start) !== -1)
+  assert.notEqual(endMarker, undefined, "Codex compatibility guidance block is missing its terminator")
+  const end = content.indexOf(endMarker, start)
+  assert.notEqual(end, -1, "Codex compatibility guidance block is missing its terminator")
+  return `${content.slice(0, start)}${content.slice(end + endMarker.length)}`
 }
 
 const ulwExecuteOriginalCompletion = `When all top-level checkboxes in \`## TODOs\` and \`## Final Verification Wave\` are complete:
 
 1. Run the plan's final verification commands.
-2. For PR/branch work, finish the lifecycle from the last phase's worktree: sync \`.omo/\` state back to the main repo, create or update the PR, wait for review/verification gates, merge by default unless explicitly opted out, and remove the worktree only after successful merge or explicit handoff. Finish directory teardown per Task resources and record its receipts.
+2. Under \`--make-pr\` or \`--ship\`, finish the lifecycle from the last phase's worktree: sync \`.omo/\` state back to the main repo, create or update the PR, and wait for review/verification gates. Then follow the delivery mode: \`--ship\` merges per the repository's merge policy; \`--make-pr\` hands off with the PR URL and merges only if the user asks. Remove the worktree only after a successful merge or that explicit handoff. Finish directory teardown per Task resources and record its receipts.
 3. Remove or mark the Boulder work as completed.
-4. Print an \`ORCHESTRATION COMPLETE\` block with the plan path, verification commands, artifacts, and cleanup receipts.`;
+4. Print an \`ORCHESTRATION COMPLETE\` block with the plan path, verification commands, artifacts, and cleanup receipts.`
 
 const ulwExecuteCodexCompletion = `When all top-level checkboxes in \`## TODOs\` and \`## Final Verification Wave\` are complete:
 
 1. Run the plan's final verification commands.
 2. Record a self-review in the notepad: re-read the diff, run diagnostics, and capture evidence for every acceptance criterion. Run your own manual QA on the real surface.
 3. Only when the user demanded strict, rigorous, or high-accuracy review, spawn ONE \`lazycodex-gate-reviewer\`; otherwise your self-review is the final verification.
-4. Finish the PR/branch lifecycle from its task-owned worktree: sync \`.omo/\` state back to the main repo, create or update the PR, wait for review/verification gates, merge by default unless explicitly opted out, and remove the worktree only after successful merge or explicit handoff. Finish directory teardown per Task resources and record its receipts.
+4. Finish the PR/branch lifecycle from its task-owned worktree: sync \`.omo/\` state back to the main repo, create or update the PR, wait for review/verification gates; \`--ship\` merges per the repository's merge policy, \`--make-pr\` hands off with the PR URL and merges only if the user asks; remove the worktree only after a successful merge or that explicit handoff. Finish directory teardown per Task resources and record its receipts.
 5. Remove or mark the Boulder work as completed.
-6. Print an \`ORCHESTRATION COMPLETE\` block with the plan path, verification commands, artifacts, and cleanup receipts.`;
+6. Print an \`ORCHESTRATION COMPLETE\` block with the plan path, verification commands, artifacts, and cleanup receipts.`
+
+const ulwExecuteOriginalRootScope = `This rule binds the root of a ulw-execute run, including its Final Verification Wave and any \`review-work\` pass run inside it: a worker runs every QA scenario, and you judge the artifacts it captured. Outside a ulw-execute run (a bare ultrawork run, a ulw-loop final gate, a standalone \`review-work\`), the session that owns the run runs the final real-surface QA itself.`
+const ulwExecuteCodexRootScope = `This rule binds the root of a ulw-execute run: a worker runs every implementation and per-task QA scenario, and you judge the artifacts it captured. The Codex edition's one exception is the final verification in the Completion section below, where the root runs its own manual QA on the real surface and records a self-review. Outside a ulw-execute run (a bare ultrawork run, a ulw-loop final gate, a standalone \`review-work\`), the session that owns the run runs the final real-surface QA itself.`
 
 const ulwExecuteOriginalHardRule = `- No production change before the tests covering that behavior were read and a bug's reproduction captured; existing tests are green on the unchanged code first, and one that contradicts the intent is a FINDING, never edited green.
 - No \`--dry-run\` as completion evidence.
@@ -106,7 +109,7 @@ const ulwExecuteOriginalHardRule = `- No production change before the tests cove
 - No completion claim while an applicable ultraqa adversarial class was never probed. Each applicable class needs a captured observable result; each skipped class needs a one-line not-applicable reason in the ledger.
 - No implementation, review, or merge in the main checkout; every phase works in its task-owned worktree.
 - No unprefixed session ids in Boulder state. Sessions are always recorded as \`codex:<session_id>\`.
-- No stale-memory execution. The plan and ledger are the durable source of truth.`;
+- No stale-memory execution. The plan and ledger are the durable source of truth.`
 
 const ulwExecuteCodexHardRule = `- No production change before the tests covering that behavior were read and a bug's reproduction captured; existing tests are green on the unchanged code first, and one that contradicts the intent is a FINDING, never edited green.
 - No \`--dry-run\` as completion evidence.
@@ -116,7 +119,7 @@ const ulwExecuteCodexHardRule = `- No production change before the tests coverin
 - No implementation, review, or merge in the main checkout; every phase works in a task-owned worktree.
 - No unprefixed session ids in Boulder state. Sessions are always recorded as \`codex:<session_id>\`.
 - No stale-memory execution. The plan and ledger are the durable source of truth.
-- Codex final verification is the exception to the delegated-QA-only rule above: perform your own manual QA on the real surface and record a self-review before completion.`;
+- Codex final verification is the exception to the delegated-QA-only rule above: perform your own manual QA on the real surface and record a self-review before completion.`
 
 const reviewWorkCodexGate = `
 On Codex, use \`review-work\` only when the user asks for a review or demands
@@ -156,47 +159,49 @@ user data before including evidence in logs, PR bodies, or handoffs. Never
 include raw tokens, credentials, auth headers, cookies, API keys, env dumps,
 private logs, or PII; summarize with lengths, hashes, and short non-sensitive
 prefixes when identity is needed.
-`;
-const reviewWorkCodexGatePattern = new RegExp(reviewWorkCodexGate.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+`
+const reviewWorkCodexGatePattern = new RegExp(reviewWorkCodexGate.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
 
-const ulwResearchProofreadGate = "**Proofread gate: `task(category=\"writing\", ...)`.** Hand the final text to a dedicated `writing` worker whose only job is language: grammar, spelling, punctuation, terminology consistency, and whether the prose reads NATIVELY in the report's own language. It proofreads only and never composes, and it never edits the file: it returns `$SESSION_DIR/polish-edits.json`, an array of `{\"before\": ..., \"after\": ..., \"reason\": ...}` where `before` is the exact current text of one or more adjacent sentences. Edits change text only; an edit whose before/after would alter any tag, attribute, comment, or script/style content is rejected, and markup changes go through the full fidelity gates instead. Apply it with `node \"$SKILL_DIR/scripts/report-tools.mjs\" fact polish-apply \"$SESSION_DIR/report.html\" --edits \"$SESSION_DIR/polish-edits.json\" --out \"$SESSION_DIR/report.polished.html\" --session-dir \"$SESSION_DIR\"`: each edit is applied alone, and an edit that changes a fact span, a numeral, a link, or a claim id, or drops a hedge or qualifier the source carries, is `polish_edit_rejected` (a `before` not found exactly once is `polish_edit_unlocated`) and leaves its text unchanged. Send the rejected and unlocated edits back to the same worker with their reasons, plus `$SESSION_DIR/polish-defects.json` and the pre-polish `report.html` the backstop compared against, so the worker sees why each edit was refused; it returns either a rewritten sentence or a new edit list, and the repair round re-runs `fact polish-apply` with `\"$SESSION_DIR/report.polished.html\"` as both input and output, within the repair budget. Then run the backstop `fact polish-diff --before \"$SESSION_DIR/report.html\" --after \"$SESSION_DIR/report.polished.html\" --session-dir \"$SESSION_DIR\"` (exit `1` on `polish_diff_fail`), `fact verify` on `report.polished.html`, and `fact pairs \"$SESSION_DIR/report.polished.html\" --changed-since \"$SESSION_DIR/report.html.fill-map.json\" --session-dir \"$SESSION_DIR\"`, which keeps only the quote and claim pairs whose sentence text changed during polish; run the meaning readers above (cheap, then strong on the flagged pairs) on exactly those pairs and `fact meaning-check` before recording `outcome gate fidelity`. A rewording that keeps every number, hedge, qualifier, and link but swaps who did what to whom therefore still reaches a meaning reader on the delivered text. `report.polished.html` is the report that is delivered. Deliver only on a clean pass. This gate runs BEFORE the first delivery, not after the user finds the typo. Edits must not span entities (such as &amp; or &lt;) or markup; narrow the edit to the surrounding words instead, and a rejected edit comes back with the reason to act on.";
+const ulwResearchProofreadGate =
+  '**Proofread gate: `task(category="writing", ...)`.** Hand the final text to a dedicated `writing` worker whose only job is language: grammar, spelling, punctuation, terminology consistency, and whether the prose reads NATIVELY in the report\'s own language. It proofreads only and never composes, and it never edits the file: it returns `$SESSION_DIR/polish-edits.json`, an array of `{"before": ..., "after": ..., "reason": ...}` where `before` is the exact current text of one or more adjacent sentences. Edits change text only; an edit whose before/after would alter any tag, attribute, comment, or script/style content is rejected, and markup changes go through the full fidelity gates instead. Apply it with `node "$SKILL_DIR/scripts/report-tools.mjs" fact polish-apply "$SESSION_DIR/report.html" --edits "$SESSION_DIR/polish-edits.json" --out "$SESSION_DIR/report.polished.html" --session-dir "$SESSION_DIR"`: each edit is applied alone, and an edit that changes a fact span, a numeral, a link, or a claim id, or drops a hedge or qualifier the source carries, is `polish_edit_rejected` (a `before` not found exactly once is `polish_edit_unlocated`) and leaves its text unchanged. Send the rejected and unlocated edits back to the same worker with their reasons, plus `$SESSION_DIR/polish-defects.json` and the pre-polish `report.html` the backstop compared against, so the worker sees why each edit was refused; it returns either a rewritten sentence or a new edit list, and the repair round re-runs `fact polish-apply` with `"$SESSION_DIR/report.polished.html"` as both input and output, within the repair budget. Then run the backstop `fact polish-diff --before "$SESSION_DIR/report.html" --after "$SESSION_DIR/report.polished.html" --session-dir "$SESSION_DIR"` (exit `1` on `polish_diff_fail`), `fact verify` on `report.polished.html`, and `fact pairs "$SESSION_DIR/report.polished.html" --changed-since "$SESSION_DIR/report.html.fill-map.json" --session-dir "$SESSION_DIR"`, which keeps only the quote and claim pairs whose sentence text changed during polish; run the meaning readers above (cheap, then strong on the flagged pairs) on exactly those pairs and `fact meaning-check` before recording `outcome gate fidelity`. A rewording that keeps every number, hedge, qualifier, and link but swaps who did what to whom therefore still reaches a meaning reader on the delivered text. `report.polished.html` is the report that is delivered; polish can change line wrapping, so re-run the layout gates and visual QA on `report.polished.html` and record `layout` and `visual` again. Deliver only on a clean pass. This gate runs BEFORE the first delivery, not after the user finds the typo. Edits must not span entities (such as &amp; or &lt;) or markup; narrow the edit to the surrounding words instead, and a rejected edit comes back with the reason to act on.'
 // The shared skill numbers the proofread gate right after the Visual QA item the Codex edition ends on.
-const ulwResearchVisualQaItemPattern = /^(\d+)\. \*\*Visual QA\.\*\*[^\n]*inspect the pixels\.$/m;
+const ulwResearchVisualQaItemPattern = /^(\d+)\. \*\*Visual QA\.\*\*[^\n]*inspect the pixels\.$/m
 
 export function removeCodexSkillOverlays(skillName, content) {
-	if (skillName === "ulw-research") {
-		return content.replace(
-			ulwResearchVisualQaItemPattern,
-			(item, numeral) => `${item}\n${Number(numeral) + 1}. ${ulwResearchProofreadGate}`,
-		);
-	}
-	if (skillName === "ulw-execute") {
-		return content
-			.replace(ulwExecuteCodexCompletion, ulwExecuteOriginalCompletion)
-			.replace(ulwExecuteCodexHardRule, ulwExecuteOriginalHardRule);
-	}
-	if (skillName === "review-work") {
-		return content.replace(reviewWorkCodexGatePattern, "");
-	}
-	return content;
+  if (skillName === "ulw-research") {
+    return content.replace(
+      ulwResearchVisualQaItemPattern,
+      (item, numeral) => `${item}\n${Number(numeral) + 1}. ${ulwResearchProofreadGate}`,
+    )
+  }
+  if (skillName === "ulw-execute") {
+    return content
+      .replace(ulwExecuteCodexRootScope, ulwExecuteOriginalRootScope)
+      .replace(ulwExecuteCodexCompletion, ulwExecuteOriginalCompletion)
+      .replace(ulwExecuteCodexHardRule, ulwExecuteOriginalHardRule)
+  }
+  if (skillName === "review-work") {
+    return content.replace(reviewWorkCodexGatePattern, "")
+  }
+  return content
 }
 
 export async function listSkillFiles(dir) {
-	const entries = await readdir(dir, { withFileTypes: true });
-	const files = [];
-	for (const entry of entries) {
-		if (entry.isDirectory()) {
-			const nested = await listSkillFiles(join(dir, entry.name));
-			for (const nestedPath of nested) files.push(join(entry.name, nestedPath));
-		} else {
-			files.push(entry.name);
-		}
-	}
-	return files.sort();
+  const entries = await readdir(dir, { withFileTypes: true })
+  const files = []
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      const nested = await listSkillFiles(join(dir, entry.name))
+      for (const nestedPath of nested) files.push(join(entry.name, nestedPath))
+    } else {
+      files.push(entry.name)
+    }
+  }
+  return files.sort()
 }
 
 export function assertPackagedContentMatches({ path, content }, requirements) {
-	for (const [label, pattern] of requirements) {
-		assert.match(content, pattern, `${path} missing packaged skill contract: ${label}`);
-	}
+  for (const [label, pattern] of requirements) {
+    assert.match(content, pattern, `${path} missing packaged skill contract: ${label}`)
+  }
 }

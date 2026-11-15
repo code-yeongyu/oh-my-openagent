@@ -29,7 +29,7 @@ function parkedState(): Record<string, unknown> {
     lastFailure: {
       runId: "reflection-run-3",
       at: PARKED_AT,
-      fingerprint: "spawn_failed:Error: Model \"x\" not found",
+      fingerprint: 'spawn_failed:Error: Model "x" not found',
       retryable: false,
       reason: "spawn_failed",
       detail: 'Error: Model "x" not found. Use --list-models to see available models.',

@@ -137,7 +137,11 @@ describe("manager run stats wiring", () => {
     // when
     fake.emit({
       type: "message_end",
-      message: { role: "assistant", content: [{ type: "text", text: "partial" }], usage: { output: 10, totalTokens: 20 } },
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "partial" }],
+        usage: { output: 10, totalTokens: 20 },
+      },
     })
     fake.settle({ status: "cancelled" })
     const final = await manager.waitFor(started.task_id)

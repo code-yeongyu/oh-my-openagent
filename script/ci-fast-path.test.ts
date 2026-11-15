@@ -62,11 +62,7 @@ function classify(
   const generatedReleasePush = parsed["generatedReleasePush"]
   const webOnly = parsed["webOnly"]
   const runHeavy = parsed["runHeavy"]
-  if (
-    typeof generatedReleasePush !== "boolean" ||
-    typeof webOnly !== "boolean" ||
-    typeof runHeavy !== "boolean"
-  ) {
+  if (typeof generatedReleasePush !== "boolean" || typeof webOnly !== "boolean" || typeof runHeavy !== "boolean") {
     throw new Error("classifier output must contain boolean CI mode fields")
   }
   return { generatedReleasePush, webOnly, runHeavy }
@@ -162,8 +158,15 @@ describe("CI fast-path workflow wiring", () => {
     const jobs = workflowJobs(ciWorkflowPath)
     const contexts: string[] = []
     for (const id of [
-      "test", "typecheck", "build", "codex-compatibility", "senpi-compatibility",
-      "macos-test-1-status", "macos-test-2-status", "macos-codex-status", "macos-senpi-status",
+      "test",
+      "typecheck",
+      "build",
+      "codex-compatibility",
+      "senpi-compatibility",
+      "macos-test-1-status",
+      "macos-test-2-status",
+      "macos-codex-status",
+      "macos-senpi-status",
     ]) {
       const job = jobs[id]
       if (!isRecord(job)) throw new Error(`CI must define ${id}`)
@@ -196,14 +199,20 @@ describe("CI fast-path workflow wiring", () => {
     expect(gate["permissions"]).toEqual({ contents: "read", "pull-requests": "read" })
     contexts.push(String(gate["name"]))
     for (const required of [
-      "test (windows-latest, 1/2)", "test (windows-latest, 2/2)",
-      "test (ubuntu-latest, 1/2)", "test (ubuntu-latest, 2/2)",
-      "test (macos-latest, 1/2)", "test (macos-latest, 2/2)",
-      "typecheck", "build",
+      "test (windows-latest, 1/2)",
+      "test (windows-latest, 2/2)",
+      "test (ubuntu-latest, 1/2)",
+      "test (ubuntu-latest, 2/2)",
+      "test (macos-latest, 1/2)",
+      "test (macos-latest, 2/2)",
+      "typecheck",
+      "build",
       "codex-compatibility (ubuntu-latest, full)",
       "codex-compatibility (macos-latest, platform)",
       "codex-compatibility (windows-latest, platform)",
-      "senpi-compatibility (ubuntu-latest)", "senpi-compatibility (macos-latest)", "Review claim gate",
+      "senpi-compatibility (ubuntu-latest)",
+      "senpi-compatibility (macos-latest)",
+      "Review claim gate",
     ]) {
       expect(contexts).toContain(required)
     }
@@ -261,10 +270,6 @@ describe("CI fast-path workflow wiring", () => {
     const pullRequest = triggers["pull_request"]
     if (!isRecord(pullRequest)) throw new Error("Web CI must define pull_request")
 
-    expect(pullRequest["paths"]).toEqual([
-      "packages/web/**",
-      "docs/**",
-      ".github/workflows/web-ci.yml",
-    ])
+    expect(pullRequest["paths"]).toEqual(["packages/web/**", "docs/**", ".github/workflows/web-ci.yml"])
   })
 })

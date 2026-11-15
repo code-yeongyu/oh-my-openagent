@@ -30,7 +30,11 @@ const engine = createGatewayEngine({
   },
   resolve: async () => ({ kind: "ok", target: { durable_id: config.target, endpoint: null, liveness: "dead" } }),
 })
-const result = await engine.deliver({ sender: { kind: "session", durable_id: config.sender }, target: config.target, text: config.text })
+const result = await engine.deliver({
+  sender: { kind: "session", durable_id: config.sender },
+  target: config.target,
+  text: config.text,
+})
 process.stdout.write(`DONE ${JSON.stringify(result)}\n`)
 await store.dispose()
 process.exit(0)

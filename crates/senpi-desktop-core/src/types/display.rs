@@ -134,6 +134,20 @@ pub struct DesktopCapabilities {
     /// session works in; absent on backends without one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub intervention_watch: Option<InterventionWatch>,
+    /// Whether window-addressed input works here, and why not (object mode).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub window_input: Option<WindowInput>,
+}
+
+/// Window-addressed input availability; `reason` is an open token set
+/// (`no_eis`, `portal_missing`, `kwin_dbus_missing`,
+/// `gnome_extension_missing`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct WindowInput {
+    pub available: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
 }
 
 /// The state of the backend's watch of the user's own input (macOS: a
@@ -174,6 +188,7 @@ impl DesktopCapabilities {
             display_asleep: false,
             legacy_capture: false,
             intervention_watch: None,
+            window_input: None,
         }
     }
 }

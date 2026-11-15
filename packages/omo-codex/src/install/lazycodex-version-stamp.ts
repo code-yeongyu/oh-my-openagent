@@ -10,7 +10,8 @@ export interface DistributionManifest {
 export async function readDistributionManifest(repoRoot: string): Promise<DistributionManifest | undefined> {
   try {
     const parsed: unknown = JSON.parse(await readFile(join(repoRoot, "package.json"), "utf8"))
-    if (!isPlainRecord(parsed) || typeof parsed.version !== "string" || parsed.version.trim().length === 0) return undefined
+    if (!isPlainRecord(parsed) || typeof parsed.version !== "string" || parsed.version.trim().length === 0)
+      return undefined
     return {
       name: typeof parsed.name === "string" && parsed.name.trim().length > 0 ? parsed.name.trim() : "lazycodex-ai",
       version: parsed.version.trim(),
@@ -32,13 +33,20 @@ export function resolveLazyCodexPluginVersion(input: {
   if (override !== undefined && override.length > 0) {
     return override
   }
-  if (input.marketplaceName === "sisyphuslabs" && input.pluginName === "omo" && input.distributionManifest !== undefined) {
+  if (
+    input.marketplaceName === "sisyphuslabs" &&
+    input.pluginName === "omo" &&
+    input.distributionManifest !== undefined
+  ) {
     return input.distributionManifest.version
   }
   return input.manifestVersion ?? "local"
 }
 
-export async function stampLazyCodexPluginVersion(input: { readonly pluginRoot: string; readonly version: string }): Promise<void> {
+export async function stampLazyCodexPluginVersion(input: {
+  readonly pluginRoot: string
+  readonly version: string
+}): Promise<void> {
   const manifestPath = join(input.pluginRoot, ".codex-plugin", "plugin.json")
   const hookPaths = await readPluginHookPaths(manifestPath)
   await stampJsonVersion(manifestPath, input.version)

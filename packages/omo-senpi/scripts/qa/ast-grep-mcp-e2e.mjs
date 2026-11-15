@@ -89,7 +89,8 @@ function isolatedEnv(workRoot, homeDir, agentDir) {
     env.XDG_DATA_HOME,
     env.XDG_STATE_HOME,
     env.XDG_CACHE_HOME,
-  ]) mkdirSync(path, { recursive: true })
+  ])
+    mkdirSync(path, { recursive: true })
   return env
 }
 
@@ -150,10 +151,13 @@ function parseJsonLines(text) {
 
 function runHandshake(transcript) {
   transcript.push(`\n## HANDSHAKE @ ${timestamp()}`)
-  const input = [
-    { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2024-11-05" } },
-    { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} },
-  ].map((request) => JSON.stringify(request)).join("\n") + "\n"
+  const input =
+    [
+      { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2024-11-05" } },
+      { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} },
+    ]
+      .map((request) => JSON.stringify(request))
+      .join("\n") + "\n"
   const run = runCommand(process.execPath, [stagedRuntimeEntry], { input, timeout: 10_000 })
   transcript.push(renderRun(run))
   assert(run.status === 0, `handshake server exited ${run.status}: ${run.stderr}`)
@@ -161,13 +165,28 @@ function runHandshake(transcript) {
   assert(responses.length === 2, `handshake expected 2 responses, got ${responses.length}`)
   const initialize = responses.find((response) => response.id === 1)?.result
   const tools = responses.find((response) => response.id === 2)?.result?.tools
-  assert(initialize?.serverInfo?.name === "ast_grep", `unexpected server name: ${JSON.stringify(initialize?.serverInfo)}`)
-  assert(initialize?.serverInfo?.version === "0.1.0", `unexpected server version: ${JSON.stringify(initialize?.serverInfo)}`)
+  assert(
+    initialize?.serverInfo?.name === "ast_grep",
+    `unexpected server name: ${JSON.stringify(initialize?.serverInfo)}`,
+  )
+  assert(
+    initialize?.serverInfo?.version === "0.1.0",
+    `unexpected server version: ${JSON.stringify(initialize?.serverInfo)}`,
+  )
   assert(Array.isArray(tools), "tools/list did not return a tools array")
   const names = tools.map((tool) => tool.name)
-  assert(JSON.stringify(names) === JSON.stringify(expectedRawTools), `unexpected raw tool order: ${JSON.stringify(names)}`)
+  assert(
+    JSON.stringify(names) === JSON.stringify(expectedRawTools),
+    `unexpected raw tool order: ${JSON.stringify(names)}`,
+  )
   transcript.push(`HANDSHAKE PASS serverInfo=ast_grep/0.1.0 rawTools=${JSON.stringify(names)}`)
-  return [`# 2026-08-03 ast-grep MCP handshake`, `timestamp=${timestamp()}`, renderRun(run), `PASS serverInfo=ast_grep/0.1.0 rawTools=${JSON.stringify(names)}`, ""].join("\n")
+  return [
+    `# 2026-08-03 ast-grep MCP handshake`,
+    `timestamp=${timestamp()}`,
+    renderRun(run),
+    `PASS serverInfo=ast_grep/0.1.0 rawTools=${JSON.stringify(names)}`,
+    "",
+  ].join("\n")
 }
 
 function verifyCurrentStagedRuntime(transcript) {
@@ -180,7 +199,9 @@ function verifyCurrentStagedRuntime(transcript) {
   const manifest = JSON.parse(readFileSync(stagedRuntimeManifest, "utf8"))
   assert(builtSha === stagedSha, `staged sha ${stagedSha} != built sha ${builtSha}`)
   assert(manifest.sha256 === stagedSha, `manifest sha ${manifest.sha256} != staged sha ${stagedSha}`)
-  transcript.push(`STALE-STATE GUARD PASS builtSha256=${builtSha} stagedSha256=${stagedSha} manifestSha256=${manifest.sha256}`)
+  transcript.push(
+    `STALE-STATE GUARD PASS builtSha256=${builtSha} stagedSha256=${stagedSha} manifestSha256=${manifest.sha256}`,
+  )
   return { builtSha, stagedSha }
 }
 
@@ -199,12 +220,17 @@ function packAndExtract(workRoot, transcript) {
   transcript.push(renderRun(extract))
   assert(extract.status === 0, `tar extraction failed: ${extract.stderr || extract.stdout}`)
   const extractedPlugin = join(extractDir, "package")
-  assert(existsSync(join(extractedPlugin, "package.json")), `extracted plugin is missing package.json: ${extractedPlugin}`)
+  assert(
+    existsSync(join(extractedPlugin, "package.json")),
+    `extracted plugin is missing package.json: ${extractedPlugin}`,
+  )
   return { tarball, extractedPlugin }
 }
 
 function writeCaptureProvider(path) {
-  writeFileSync(path, `
+  writeFileSync(
+    path,
+    `
 import { writeFileSync } from "node:fs"
 import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 const capturePath = process.env.OMO_AST_GREP_QA_CAPTURE
@@ -227,7 +253,8 @@ export default function(pi) {
     },
   })
 }
-`)
+`,
+  )
 }
 
 function runInstaller(extractedPlugin, projectDir, env) {
@@ -256,17 +283,26 @@ function runPackedBoot(workRoot, extractedPlugin, senpiBin, transcript) {
   const installResult = JSON.parse(install.stdout.trim())
   assert(installResult.agentDir === agentDir, `packed install escaped isolated agent dir: ${installResult.agentDir}`)
   assert(existsSync(join(agentDir, "settings.json")), `isolated settings were not written under ${agentDir}`)
-  const boot = runCommand(senpiBin, [
-    "-e", providerPath,
-    "-p",
-    "--mode", "json",
-    "--provider", "omo-ast-grep-qa",
-    "--model", "mock-1",
-    "--session-dir", sessionDir,
-    "--no-skills",
-    "--no-context-files",
-    "packed ast-grep MCP boot proof",
-  ], { cwd: projectDir, env, timeout: 90_000 })
+  const boot = runCommand(
+    senpiBin,
+    [
+      "-e",
+      providerPath,
+      "-p",
+      "--mode",
+      "json",
+      "--provider",
+      "omo-ast-grep-qa",
+      "--model",
+      "mock-1",
+      "--session-dir",
+      sessionDir,
+      "--no-skills",
+      "--no-context-files",
+      "packed ast-grep MCP boot proof",
+    ],
+    { cwd: projectDir, env, timeout: 90_000 },
+  )
   transcript.push(renderRun(boot))
   assert(boot.status === 0, `packed Senpi boot failed: ${boot.stderr || boot.stdout}`)
   assert(existsSync(capturePath), `mock provider did not capture the Senpi tool surface: ${capturePath}`)
@@ -275,7 +311,10 @@ function runPackedBoot(workRoot, extractedPlugin, senpiBin, transcript) {
   const missing = expectedSenpiTools.filter((name) => !toolNames.includes(name))
   const retiredToolMarker = ["code", "graph"].join("")
   const retiredTools = toolNames.filter((name) => name.toLowerCase().includes(retiredToolMarker))
-  assert(missing.length === 0, `packed Senpi boot is missing ast_grep tools: ${JSON.stringify(missing)}; visible=${JSON.stringify(toolNames)}`)
+  assert(
+    missing.length === 0,
+    `packed Senpi boot is missing ast_grep tools: ${JSON.stringify(missing)}; visible=${JSON.stringify(toolNames)}`,
+  )
   assert(retiredTools.length === 0, `packed Senpi boot exposed retired graph tools: ${JSON.stringify(retiredTools)}`)
   transcript.push(`PROVIDER CAPTURE RAW\n${readFileSync(capturePath, "utf8").trimEnd()}`)
   transcript.push(`PACKED BOOT PASS astGrepTools=${JSON.stringify(expectedSenpiTools)} retiredGraphTools=[]`)
@@ -309,7 +348,10 @@ function runPackedInstallerFailureScenarios(workRoot, extractedPlugin, transcrip
   const missingRestored = runInstaller(extractedPlugin, missingProjectDir, missingEnv)
   transcript.push("--- C1 restored runtime verification ---")
   transcript.push(renderRun(missingRestored))
-  assert(missingRestored.status === 0, `C1 restored runtime did not install: ${missingRestored.stderr || missingRestored.stdout}`)
+  assert(
+    missingRestored.status === 0,
+    `C1 restored runtime did not install: ${missingRestored.stderr || missingRestored.stdout}`,
+  )
   transcript.push(`PACKED INSTALLER C1 PASS deleted=${runtimeEntry} loudMissingFailure=true restored=true`)
 
   transcript.push(`\n## PACKED INSTALLER C2 — CORRUPTED PRESENT RUNTIME @ ${timestamp()}`)
@@ -328,19 +370,34 @@ function runPackedInstallerFailureScenarios(workRoot, extractedPlugin, transcrip
     corruptOutput.includes("ast-grep MCP runtime integrity error") && corruptOutput.includes("sha256 mismatch"),
     `packed installer corruption failure was not an explicit integrity error: ${corruptOutput}`,
   )
-  assert(!existsSync(join(corruptAgentDir, "settings.json")), "corrupted packed runtime was registered despite integrity failure")
+  assert(
+    !existsSync(join(corruptAgentDir, "settings.json")),
+    "corrupted packed runtime was registered despite integrity failure",
+  )
   writeFileSync(runtimeEntry, original)
   chmodSync(runtimeEntry, originalMode)
   const corruptRestored = runInstaller(extractedPlugin, corruptProjectDir, corruptEnv)
   transcript.push("--- C2 restored runtime verification ---")
   transcript.push(renderRun(corruptRestored))
-  assert(corruptRestored.status === 0, `C2 restored runtime did not install: ${corruptRestored.stderr || corruptRestored.stdout}`)
-  transcript.push(`PACKED INSTALLER C2 PASS corrupted=${runtimeEntry} manifestPresent=true integrityFailure=true restored=true`)
+  assert(
+    corruptRestored.status === 0,
+    `C2 restored runtime did not install: ${corruptRestored.stderr || corruptRestored.stdout}`,
+  )
+  transcript.push(
+    `PACKED INSTALLER C2 PASS corrupted=${runtimeEntry} manifestPresent=true integrityFailure=true restored=true`,
+  )
 }
 
 function createRuntimeCheckFixture(workRoot) {
   const fixtureRoot = join(workRoot, "runtime-check-fixture")
-  const fixtureScript = join(fixtureRoot, "packages", "omo-senpi", "plugin", "scripts", "stage-ast-grep-mcp-runtime.mjs")
+  const fixtureScript = join(
+    fixtureRoot,
+    "packages",
+    "omo-senpi",
+    "plugin",
+    "scripts",
+    "stage-ast-grep-mcp-runtime.mjs",
+  )
   const sourceEntry = join(fixtureRoot, "packages", "ast-grep-mcp", "dist", "cli.js")
   const targetEntry = join(fixtureRoot, "packages", "omo-senpi", "plugin", "runtime", "ast-grep-mcp", "cli.js")
   mkdirSync(dirname(fixtureScript), { recursive: true })
@@ -348,7 +405,13 @@ function createRuntimeCheckFixture(workRoot) {
   copyFileSync(stageScript, fixtureScript)
   writeFileSync(sourceEntry, "#!/usr/bin/env node\nconsole.log('fixture')\n")
   chmodSync(sourceEntry, 0o755)
-  return { fixtureRoot, fixtureScript, sourceEntry, targetEntry, manifestPath: join(dirname(targetEntry), "manifest.json") }
+  return {
+    fixtureRoot,
+    fixtureScript,
+    sourceEntry,
+    targetEntry,
+    manifestPath: join(dirname(targetEntry), "manifest.json"),
+  }
 }
 
 function runRuntimeCheckRegressions(workRoot, transcript) {
@@ -356,13 +419,19 @@ function runRuntimeCheckRegressions(workRoot, transcript) {
   const fixture = createRuntimeCheckFixture(workRoot)
   const cases = []
   const invoke = (name) => {
-    const run = runCommand(process.execPath, [realpathSync(fixture.fixtureScript), "--check"], { cwd: fixture.fixtureRoot, timeout: 15_000 })
+    const run = runCommand(process.execPath, [realpathSync(fixture.fixtureScript), "--check"], {
+      cwd: fixture.fixtureRoot,
+      timeout: 15_000,
+    })
     cases.push({ name, run })
     transcript.push(`\n### ${name}\n${renderRun(run)}`)
     return run
   }
 
-  const staged = runCommand(process.execPath, [realpathSync(fixture.fixtureScript)], { cwd: fixture.fixtureRoot, timeout: 15_000 })
+  const staged = runCommand(process.execPath, [realpathSync(fixture.fixtureScript)], {
+    cwd: fixture.fixtureRoot,
+    timeout: 15_000,
+  })
   transcript.push(`\n### stage-fixture\n${renderRun(staged)}`)
   assert(staged.status === 0, `fixture staging failed: ${staged.stderr || staged.stdout}`)
   assert(existsSync(fixture.manifestPath), `fixture staging did not create manifest: ${fixture.manifestPath}`)
@@ -373,20 +442,31 @@ function runRuntimeCheckRegressions(workRoot, transcript) {
   writeFileSync(fixture.targetEntry, "#!/usr/bin/env node\nconsole.log('corrupted')\n")
   chmodSync(fixture.targetEntry, 0o755)
   const corrupted = invoke("corrupted-sha")
-  assert(corrupted.status === 1 && corrupted.stderr.includes("does not match built sha256"), "corrupted sha --check did not fail clearly")
+  assert(
+    corrupted.status === 1 && corrupted.stderr.includes("does not match built sha256"),
+    "corrupted sha --check did not fail clearly",
+  )
 
   rmSync(fixture.targetEntry)
   const missing = invoke("missing")
-  assert(missing.status === 1 && missing.stderr.includes("staged CLI is missing"), "missing runtime --check did not fail clearly")
+  assert(
+    missing.status === 1 && missing.stderr.includes("staged CLI is missing"),
+    "missing runtime --check did not fail clearly",
+  )
 
   copyFileSync(fixture.sourceEntry, fixture.targetEntry)
   chmodSync(fixture.targetEntry, 0o644)
   const nonExecutable = invoke("non-executable")
-  assert(nonExecutable.status === 1 && nonExecutable.stderr.includes("staged CLI is not executable"), "non-executable runtime --check did not fail clearly")
+  assert(
+    nonExecutable.status === 1 && nonExecutable.stderr.includes("staged CLI is not executable"),
+    "non-executable runtime --check did not fail clearly",
+  )
 
   copyFileSync(fixture.sourceEntry, fixture.targetEntry)
   chmodSync(fixture.targetEntry, 0o755)
-  transcript.push("STAGE-SCRIPT FIXTURE REGRESSION PASS manifestCreated=true fresh=0 corrupted=1 missing=1 nonExecutable=1")
+  transcript.push(
+    "STAGE-SCRIPT FIXTURE REGRESSION PASS manifestCreated=true fresh=0 corrupted=1 missing=1 nonExecutable=1",
+  )
   return cases
 }
 
@@ -431,7 +511,7 @@ async function main() {
     runRuntimeCheckRegressions(workRoot, transcript)
     result = "PASS"
   } catch (error) {
-    failure = error instanceof Error ? error.stack ?? error.message : String(error)
+    failure = error instanceof Error ? (error.stack ?? error.message) : String(error)
     transcript.push(`\nFAILURE @ ${timestamp()}\n${failure}`)
   } finally {
     const liveBeforeCleanup = findWorkRootProcesses(workRoot)
@@ -442,15 +522,21 @@ async function main() {
         process.kill(processEntry.pid, "SIGTERM")
         transcript.push(`sent SIGTERM pid=${processEntry.pid} command=${processEntry.command}`)
       } catch (error) {
-        transcript.push(`SIGTERM pid=${processEntry.pid} result=${error instanceof Error ? error.message : String(error)}`)
+        transcript.push(
+          `SIGTERM pid=${processEntry.pid} result=${error instanceof Error ? error.message : String(error)}`,
+        )
       }
     }
     rmSync(workRoot, { recursive: true, force: true })
     transcript.push(`rm -rf ${workRoot} confirmed=${!existsSync(workRoot)}`)
     const liveAfterCleanup = findWorkRootProcesses(workRoot)
     transcript.push(`processesReferencingWorkRootAfterCleanup=${JSON.stringify(liveAfterCleanup)}`)
-    transcript.push(`realSenpiCredentialDigestObservedUnchanged=${credentialDigest(realAgentDir) === beforeRealCredentials}`)
-    transcript.push("realSenpiCredentialDigestIsInformational=true (concurrent user sessions may write there; isolation is gated by explicit HOME/XDG/SENPI_CODING_AGENT_DIR paths under workRoot)")
+    transcript.push(
+      `realSenpiCredentialDigestObservedUnchanged=${credentialDigest(realAgentDir) === beforeRealCredentials}`,
+    )
+    transcript.push(
+      "realSenpiCredentialDigestIsInformational=true (concurrent user sessions may write there; isolation is gated by explicit HOME/XDG/SENPI_CODING_AGENT_DIR paths under workRoot)",
+    )
     transcript.push(`finishedAt=${timestamp()}`)
     transcript.push(`RESULT=${result}`)
     writeEvidence(args.evidenceDir, "task-15-handshake.txt", handshakeEvidence)

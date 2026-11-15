@@ -171,7 +171,7 @@ for each background task ID (`bg_...`): background_output(task_id="bg_...")
 ```
 AGENTS_LOCATIONS = [
   { path: ".", type: "root" },
-  { path: "src/hooks", score: 18, reason: "high complexity" },
+  { path: "src/hooks", score: 16, reason: "high complexity" },
   { path: "src/api", score: 12, reason: "distinct domain" }
 ]
 ```

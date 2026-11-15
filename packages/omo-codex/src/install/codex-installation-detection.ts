@@ -10,21 +10,21 @@ type CodexInstallationPathSource = Exclude<CodexInstallationSource, "windows-sta
 
 export type CodexInstallationDetection =
   | {
-    readonly found: true
-    readonly source: CodexInstallationPathSource
-    readonly path: string
-  }
+      readonly found: true
+      readonly source: CodexInstallationPathSource
+      readonly path: string
+    }
   | {
-    readonly found: true
-    readonly source: "windows-start-app"
-    readonly appId: string
-  }
+      readonly found: true
+      readonly source: "windows-start-app"
+      readonly appId: string
+    }
   | {
-    readonly found: false
-    readonly checkedPaths: readonly string[]
-    readonly hint: string
-    readonly downloadedInstallerPath?: string
-  }
+      readonly found: false
+      readonly checkedPaths: readonly string[]
+      readonly hint: string
+      readonly downloadedInstallerPath?: string
+    }
 
 export interface CodexInstallationCommandResult {
   readonly success: boolean
@@ -37,10 +37,7 @@ export interface CodexInstallationDetectorInput {
   readonly homeDir?: string
   readonly exists?: (path: string) => boolean
   readonly which?: (command: "codex") => string | null | undefined
-  readonly runCommand?: (
-    command: string,
-    args: readonly string[],
-  ) => Promise<CodexInstallationCommandResult>
+  readonly runCommand?: (command: string, args: readonly string[]) => Promise<CodexInstallationCommandResult>
 }
 
 const CODEX_PATH_CHECK_LABEL = "codex (PATH)"
@@ -78,7 +75,9 @@ export async function detectCodexInstallation(
   return missingCodexInstallation(checkedPaths, "Install OpenAI Codex CLI and make sure `codex` is on PATH.")
 }
 
-export function formatCodexInstallationWarning(detection: Extract<CodexInstallationDetection, { readonly found: false }>): string {
+export function formatCodexInstallationWarning(
+  detection: Extract<CodexInstallationDetection, { readonly found: false }>,
+): string {
   return [
     "Codex CLI or desktop app was not detected. LazyCodex will still install the Codex plugin, but Codex itself must be installed to use it.",
     detection.hint,
@@ -107,20 +106,14 @@ function detectMacCodexInstallation(input: {
     }
   }
 
-  return missingCodexInstallation(
-    input.checkedPaths,
-    "Install OpenAI Codex CLI, or install Codex Desktop for macOS.",
-  )
+  return missingCodexInstallation(input.checkedPaths, "Install OpenAI Codex CLI, or install Codex Desktop for macOS.")
 }
 
 async function detectWindowsCodexInstallation(input: {
   readonly env: { readonly [key: string]: string | undefined }
   readonly exists: (path: string) => boolean
   readonly checkedPaths: string[]
-  readonly runCommand: (
-    command: string,
-    args: readonly string[],
-  ) => Promise<CodexInstallationCommandResult>
+  readonly runCommand: (command: string, args: readonly string[]) => Promise<CodexInstallationCommandResult>
 }): Promise<CodexInstallationDetection> {
   for (const candidate of windowsCodexCliPaths(input.env)) {
     input.checkedPaths.push(candidate)
@@ -138,10 +131,7 @@ async function detectWindowsCodexInstallation(input: {
 }
 
 async function findWindowsCodexStartApp(
-  runCommand: (
-    command: string,
-    args: readonly string[],
-  ) => Promise<CodexInstallationCommandResult>,
+  runCommand: (command: string, args: readonly string[]) => Promise<CodexInstallationCommandResult>,
 ): Promise<string | null> {
   try {
     const result = await runCommand("powershell.exe", WINDOWS_START_APPS_ARGS)
@@ -203,10 +193,7 @@ function dedupe(values: readonly string[]): readonly string[] {
   return deduped
 }
 
-function defaultRunCommand(
-  command: string,
-  args: readonly string[],
-): Promise<CodexInstallationCommandResult> {
+function defaultRunCommand(command: string, args: readonly string[]): Promise<CodexInstallationCommandResult> {
   return new Promise((resolve) => {
     execFile(command, [...args], { encoding: "utf8", windowsHide: true }, (error, stdout) => {
       resolve({ success: error === null, stdout })

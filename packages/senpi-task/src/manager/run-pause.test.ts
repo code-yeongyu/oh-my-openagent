@@ -2,7 +2,15 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { createTaskRecordStore } from "../store"
 import type { ChildPausePort } from "../pause/ports"
 import { createTaskManager } from "./manager"
-import { baseSpec, categoryPlanner, cleanupProjects, FakeRunner, makeManager, settings, tempProject } from "./__fixtures__/manager-fakes"
+import {
+  baseSpec,
+  categoryPlanner,
+  cleanupProjects,
+  FakeRunner,
+  makeManager,
+  settings,
+  tempProject,
+} from "./__fixtures__/manager-fakes"
 
 afterEach(cleanupProjects)
 
@@ -13,7 +21,10 @@ describe("manager run pause capacity and turn ownership", () => {
     const runner = new FakeRunner()
     const refusal = Promise.withResolvers<{ readonly refused: "wrong_parent" }>()
     const manager = createTaskManager({
-      cwd, store, config: settings(), planner: categoryPlanner(),
+      cwd,
+      store,
+      config: settings(),
+      planner: categoryPlanner(),
       runners: { "in-process": runner, process: runner },
       childPausePort: {
         pauseForRun: () => refusal.promise,
@@ -25,7 +36,9 @@ describe("manager run pause capacity and turn ownership", () => {
     if (started.kind !== "started") throw new Error("expected started")
     const terminal = manager.waitFor(started.task_id)
     const pausing = manager.pauseTask(started.task_id, {
-      parentSessionId: "wrong-parent", parentPauseSeq: 1, runRef: { kind: "task", id: started.task_id },
+      parentSessionId: "wrong-parent",
+      parentPauseSeq: 1,
+      runRef: { kind: "task", id: started.task_id },
     })
     runner.handles.get(started.task_id)?.settle({ status: "completed", finalResponse: "finished normally" })
     refusal.resolve({ refused: "wrong_parent" })
@@ -51,9 +64,10 @@ describe("manager run pause capacity and turn ownership", () => {
     const runner = new FakeRunner()
     let resumes = 0
     const childPausePort: ChildPausePort = {
-      pauseForRun: async child => {
+      pauseForRun: async (child) => {
         runner.handles.get(child.task_id)?.settle({
-          status: "error", failure: { kind: "child-turn-failed", message: "aborted" },
+          status: "error",
+          failure: { kind: "child-turn-failed", message: "aborted" },
         })
         return { childSeq: 9 }
       },
@@ -64,13 +78,21 @@ describe("manager run pause capacity and turn ownership", () => {
       holdInput: async () => ({ kind: "held", entryId: "held", duplicate: false }),
     }
     const manager = createTaskManager({
-      store, cwd, config: settings(), planner: categoryPlanner(),
-      runners: { "in-process": runner, process: runner }, childPausePort,
+      store,
+      cwd,
+      config: settings(),
+      planner: categoryPlanner(),
+      runners: { "in-process": runner, process: runner },
+      childPausePort,
     })
     const result = await manager.start(baseSpec())
     if (result.kind !== "started") throw new Error("expected started")
     const before = manager.get(result.task_id)
-    const owner = { parentSessionId: "parent-1", parentPauseSeq: 1, runRef: { kind: "task" as const, id: result.task_id } }
+    const owner = {
+      parentSessionId: "parent-1",
+      parentPauseSeq: 1,
+      runRef: { kind: "task" as const, id: result.task_id },
+    }
     expect(typeof manager.pauseTask).toBe("function")
     const ack = await manager.pauseTask(result.task_id, owner)
     if ("refused" in ack) throw new Error("expected the task parent to own this child")
@@ -90,7 +112,7 @@ describe("manager run pause capacity and turn ownership", () => {
     const store = createTaskRecordStore({ project_dir: cwd })
     const runner = new FakeRunner()
     const childPausePort: ChildPausePort = {
-      pauseForRun: async child => {
+      pauseForRun: async (child) => {
         runner.handles.get(child.task_id)?.settle({ status: "cancelled" })
         return { childSeq: 8 }
       },
@@ -98,15 +120,24 @@ describe("manager run pause capacity and turn ownership", () => {
       holdInput: async () => ({ kind: "held", entryId: "held", duplicate: false }),
     }
     const manager = createTaskManager({
-      store, cwd, config: settings(), planner: categoryPlanner(),
-      runners: { "in-process": runner, process: runner }, childPausePort,
+      store,
+      cwd,
+      config: settings(),
+      planner: categoryPlanner(),
+      runners: { "in-process": runner, process: runner },
+      childPausePort,
     })
     const result = await manager.start(baseSpec())
     if (result.kind !== "started") throw new Error("expected started")
-    const owner = { parentSessionId: "parent-1", parentPauseSeq: 1, runRef: { kind: "task" as const, id: result.task_id } }
+    const owner = {
+      parentSessionId: "parent-1",
+      parentPauseSeq: 1,
+      runRef: { kind: "task" as const, id: result.task_id },
+    }
     await manager.pauseTask(result.task_id, owner)
-    expect(await manager.resumePausedTask(result.task_id, { ...owner, resumeId: "resume-1", childSeqCutoff: 8 }))
-      .toEqual({ otherHoldLive: true, childSeq: 9 })
+    expect(
+      await manager.resumePausedTask(result.task_id, { ...owner, resumeId: "resume-1", childSeqCutoff: 8 }),
+    ).toEqual({ otherHoldLive: true, childSeq: 9 })
     expect(manager.get(result.task_id)?.status).toBe("paused")
     expect(manager.concurrency?.leaseState(result.task_id, 0)).toBe("parked")
   })

@@ -82,9 +82,7 @@ export async function pollLoop(): Promise<void> {
           lastPruneAt = Date.now()
           logReplyListenerMessage("Pruned stale registry entries")
         } catch (error) {
-          logReplyListenerMessage(
-            `WARN: Prune failed: ${error instanceof Error ? error.message : String(error)}`,
-          )
+          logReplyListenerMessage(`WARN: Prune failed: ${error instanceof Error ? error.message : String(error)}`)
         }
       }
 

@@ -8,7 +8,7 @@ describe("auto-update-checker constants", () => {
 
     expect(CACHE_DIR).toBe(join(getOpenCodeCacheDir(), "packages"))
     expect(INSTALLED_PACKAGE_JSON).toBe(
-      join(getOpenCodeCacheDir(), "packages", "node_modules", PACKAGE_NAME, "package.json")
+      join(getOpenCodeCacheDir(), "packages", "node_modules", PACKAGE_NAME, "package.json"),
     )
   })
 
@@ -36,9 +36,7 @@ describe("auto-update-checker constants", () => {
 
     expect(INSTALLED_PACKAGE_JSON_CANDIDATES).toHaveLength(ACCEPTED_PACKAGE_NAMES.length)
     for (const name of ACCEPTED_PACKAGE_NAMES) {
-      expect(INSTALLED_PACKAGE_JSON_CANDIDATES).toContain(
-        join(CACHE_DIR, "node_modules", name, "package.json")
-      )
+      expect(INSTALLED_PACKAGE_JSON_CANDIDATES).toContain(join(CACHE_DIR, "node_modules", name, "package.json"))
     }
   })
 })

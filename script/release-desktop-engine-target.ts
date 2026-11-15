@@ -5,10 +5,18 @@ import { desktopEngineReleaseAssetName } from "../packages/senpi-desktop-engine/
 import fixture from "./release-desktop-engine-fixture.json"
 
 const TARGETS = [
-  "darwin-arm64", "darwin-x64", "darwin-x64-baseline",
-  "linux-x64", "linux-x64-baseline", "linux-arm64",
-  "linux-x64-musl", "linux-x64-musl-baseline", "linux-arm64-musl",
-  "windows-x64", "windows-x64-baseline", "windows-arm64",
+  "darwin-arm64",
+  "darwin-x64",
+  "darwin-x64-baseline",
+  "linux-x64",
+  "linux-x64-baseline",
+  "linux-arm64",
+  "linux-x64-musl",
+  "linux-x64-musl-baseline",
+  "linux-arm64-musl",
+  "windows-x64",
+  "windows-x64-baseline",
+  "windows-arm64",
 ] as const
 
 const HOST_TARGETS = {
@@ -22,10 +30,13 @@ const HOST_TARGETS = {
 const hostSchema = z.enum(["darwin-arm64", "darwin-x64", "linux-x64", "linux-arm64", "win32-x64", "win32-arm64"])
 
 const fixtureSchema = z.object({
-  targets: z.record(z.string(), z.object({
-    available: z.boolean(),
-    host: z.string().nullable(),
-  })),
+  targets: z.record(
+    z.string(),
+    z.object({
+      available: z.boolean(),
+      host: z.string().nullable(),
+    }),
+  ),
 })
 
 export type DesktopEngineTarget = {
@@ -59,7 +70,10 @@ export function loadDesktopEngineTargets(input: unknown): readonly DesktopEngine
     const rustTarget = HOST_TARGETS[hostSchema.parse(host)]
     const binary = host.startsWith("win32-") ? "senpi-desktop-engine.exe" : "senpi-desktop-engine"
     return {
-      target, available: true, host, asset,
+      target,
+      available: true,
+      host,
+      asset,
       source: `target/${rustTarget}/release/${binary}`,
       payload: `native/prebuilds/${host}/${binary}`,
     }
@@ -102,10 +116,33 @@ export function engineTrustHelperTarget(target: string): EngineTrustHelperTarget
   }
   const binary = host.startsWith("win32-") ? `${ENGINE_TRUST_HELPER}.exe` : ENGINE_TRUST_HELPER
   return {
-    target, available: true, host,
+    target,
+    available: true,
+    host,
     asset: `engine-trust-helper-${host}/${binary}`,
     source: `target/${desktopEngineRustTarget(host)}/release/${binary}`,
     payload: `native/prebuilds/${host}/${binary}`,
+  }
+}
+
+const GIT_JOB_HELPER = "omo-git-job-helper.exe"
+
+/**
+ * The memory-core git floor-job helper (omo#10391) ships beside the desktop engine on the Windows hosts only; it is a
+ * Windows job-object mechanism. Baseline targets reuse their x64 host build, like the engine.
+ */
+export function gitJobHelperTarget(target: string): EngineTrustHelperTarget {
+  const { host } = desktopEngineTarget(target)
+  if (host === null || !host.startsWith("win32-")) {
+    return { target, available: false, host: null, asset: null, source: null, payload: null }
+  }
+  return {
+    target,
+    available: true,
+    host,
+    asset: `git-job-helper-${host}/${GIT_JOB_HELPER}`,
+    source: `target/${desktopEngineRustTarget(host)}/release/${GIT_JOB_HELPER}`,
+    payload: `native/prebuilds/${host}/${GIT_JOB_HELPER}`,
   }
 }
 
@@ -153,14 +190,32 @@ export function stageCompiledEngineTrustHelper(
   return stageCompiledExecutable("engine trust helper", target, engineTrustHelperTarget(target), stageDir, sourceRoot)
 }
 
+/** Same fail-closed contract for the git job helper on the Windows targets. */
+export function stageCompiledGitJobHelper(
+  target: string,
+  stageDir: string,
+  sourceRoot: string = resolve(dirname(import.meta.dir)),
+): string | null {
+  return stageCompiledExecutable("git job helper", target, gitJobHelperTarget(target), stageDir, sourceRoot)
+}
+
+const RESOLVERS: Readonly<Record<string, (target: string) => unknown>> = {
+  "--target": desktopEngineTarget,
+  "--trust-helper-target": engineTrustHelperTarget,
+  "--git-job-helper-target": gitJobHelperTarget,
+}
+
 if (import.meta.main) {
   const [flag, target, extra] = process.argv.slice(2)
-  if ((flag !== "--target" && flag !== "--trust-helper-target") || target === undefined || extra !== undefined) {
-    console.error("usage: bun script/release-desktop-engine-target.ts --target <platform> | --trust-helper-target <platform>")
+  const resolveTarget = flag === undefined ? undefined : RESOLVERS[flag]
+  if (resolveTarget === undefined || target === undefined || extra !== undefined) {
+    console.error(
+      "usage: bun script/release-desktop-engine-target.ts --target <platform> | --trust-helper-target <platform> | --git-job-helper-target <platform>",
+    )
     process.exitCode = 2
   } else {
     try {
-      console.log(JSON.stringify(flag === "--target" ? desktopEngineTarget(target) : engineTrustHelperTarget(target)))
+      console.log(JSON.stringify(resolveTarget(target)))
     } catch (error) {
       console.error(error instanceof Error ? error.message : String(error))
       process.exitCode = 1

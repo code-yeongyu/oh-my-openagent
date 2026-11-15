@@ -90,7 +90,6 @@ Quick audit via the cross-platform Python CLI (macOS, Linux, Windows):
 
 ```bash
 uv run $SKILL_DIR/scripts/perfection/lighthouse-audit.py https://localhost:3000
-uv run $SKILL_DIR/scripts/perfection/lighthouse-audit.py https://localhost:3000 --threshold 95
 uv run $SKILL_DIR/scripts/perfection/lighthouse-audit.py https://localhost:3000 --desktop-only
 bun $SKILL_DIR/scripts/perfection/check-draft-guard.ts src/   # exit 1 = accent stripe or outline, promo copy, emoji icon, hype badge, or vanity stat
 ```

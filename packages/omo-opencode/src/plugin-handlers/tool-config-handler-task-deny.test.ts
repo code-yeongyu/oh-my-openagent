@@ -9,21 +9,9 @@ type TestAgent = {
   permission?: Record<string, unknown>
 }
 
-const TASK_DENIED_SUBAGENTS = [
-  "librarian",
-  "explore",
-  "oracle",
-  "multimodal-looker",
-  "metis",
-  "momus",
-] as const
+const TASK_DENIED_SUBAGENTS = ["librarian", "explore", "oracle", "multimodal-looker", "metis", "momus"] as const
 
-const TASK_ALLOWED_AGENT_NAMES = [
-  "sisyphus",
-  "atlas",
-  "hephaestus",
-  "prometheus",
-] as const
+const TASK_ALLOWED_AGENT_NAMES = ["sisyphus", "atlas", "hephaestus", "prometheus"] as const
 
 function createParams(agentNames: readonly string[]): {
   readonly config: Record<string, unknown>
@@ -42,10 +30,7 @@ function createParams(agentNames: readonly string[]): {
   }
 }
 
-function requirePermission(
-  agentResult: Record<string, TestAgent>,
-  agentName: string,
-): Record<string, unknown> {
+function requirePermission(agentResult: Record<string, TestAgent>, agentName: string): Record<string, unknown> {
   const permission = agentResult[agentName]?.permission
   if (!permission) {
     throw new Error(`Missing permission for ${agentName}`)

@@ -2,13 +2,24 @@ import { moveMigrationBackup } from "./backup-move"
 import { prepareTargetReplacement, prepareTargetWrite, targetDocument, writePreparedTarget } from "./commit"
 import { readMigrationJournal, removeMigrationJournal, writeMigrationJournal } from "./journal"
 import { hasMigrationMarker } from "./predicate"
-import { MigrationTransactionError, type MigrationClock, type MigrationEnvironment, type MigrationFileSystem, type MigrationProcess, type MigrationTargetWriter } from "./types"
+import {
+  MigrationTransactionError,
+  type MigrationClock,
+  type MigrationEnvironment,
+  type MigrationFileSystem,
+  type MigrationProcess,
+  type MigrationTargetWriter,
+} from "./types"
 
 /**
  * The planned name is kept when it is free or already holds this target's bytes (a crashed run's copy).
  * A foreign file there is left alone and the next free `<planned>.N` name is used instead (#8187).
  */
-function backupPathForResume(planned: string | undefined, targetPath: string, fileSystem: MigrationFileSystem): string | undefined {
+function backupPathForResume(
+  planned: string | undefined,
+  targetPath: string,
+  fileSystem: MigrationFileSystem,
+): string | undefined {
   if (planned === undefined || !fileSystem.existsSync(planned) || !fileSystem.existsSync(targetPath)) return planned
   if (fileSystem.readFileSync(planned, "utf-8") === fileSystem.readFileSync(targetPath, "utf-8")) return planned
   let attempt = 1
@@ -32,19 +43,20 @@ export function resumeMigrationJournal(input: {
   const target = targetDocument(journal.targetPath, input.fileSystem)
   let writtenBackupPath: string | undefined
   if (!hasMigrationMarker(target, journal.migrationId)) {
-    const prepared = journal.targetWrite.mode === "replace-target"
-      ? prepareTargetReplacement({
-        document: journal.targetWrite.additions,
-        migrationId: journal.migrationId,
-        target,
-        targetPath: journal.targetPath,
-      })
-      : prepareTargetWrite({
-        additions: journal.targetWrite.additions,
-        migrationId: journal.migrationId,
-        target,
-        targetPath: journal.targetPath,
-      })
+    const prepared =
+      journal.targetWrite.mode === "replace-target"
+        ? prepareTargetReplacement({
+            document: journal.targetWrite.additions,
+            migrationId: journal.migrationId,
+            target,
+            targetPath: journal.targetPath,
+          })
+        : prepareTargetWrite({
+            additions: journal.targetWrite.additions,
+            migrationId: journal.migrationId,
+            target,
+            targetPath: journal.targetPath,
+          })
     const backupPath = backupPathForResume(journal.targetBackupPath, journal.targetPath, input.fileSystem)
     if (backupPath !== journal.targetBackupPath && backupPath !== undefined) {
       // Record the name before writing it, so a crash after the target write still names the right file.
@@ -79,7 +91,10 @@ export function resumeMigrationJournal(input: {
   }
   removeMigrationJournal(input.fileSystem, input.env)
   // Named whether this resume wrote the target or the crashed run already had: the path was fixed in the journal.
-  const targetBackupPath = writtenBackupPath
-    ?? (journal.targetBackupPath !== undefined && input.fileSystem.existsSync(journal.targetBackupPath) ? journal.targetBackupPath : undefined)
+  const targetBackupPath =
+    writtenBackupPath ??
+    (journal.targetBackupPath !== undefined && input.fileSystem.existsSync(journal.targetBackupPath)
+      ? journal.targetBackupPath
+      : undefined)
   return targetBackupPath === undefined ? { resumed: true } : { resumed: true, targetBackupPath }
 }

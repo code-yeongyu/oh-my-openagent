@@ -80,10 +80,10 @@ export function buildParallelismSummary(
 
   const buckets = summarizeWaveBuckets(classifiable)
   if (
-    buckets.nonEval.wavesTotal === 0
-    && buckets.evalOnlyWaves === 0
-    && buckets.mixedWaves === 0
-    && snapshot.evalExecution.eventCount === 0
+    buckets.nonEval.wavesTotal === 0 &&
+    buckets.evalOnlyWaves === 0 &&
+    buckets.mixedWaves === 0 &&
+    snapshot.evalExecution.eventCount === 0
   ) {
     return undefined
   }

@@ -1,10 +1,5 @@
 import { spawn, type SpawnOptions, type SpawnedProcess } from "../../shared/bun-spawn-shim"
-import {
-  resolveGrepCli,
-  type ResolvedCli,
-  type GrepBackend,
-  DEFAULT_RG_THREADS,
-} from "../../shared/ripgrep-cli"
+import { resolveGrepCli, type ResolvedCli, type GrepBackend, DEFAULT_RG_THREADS } from "../../shared/ripgrep-cli"
 import {
   DEFAULT_MAX_DEPTH,
   DEFAULT_MAX_FILESIZE,
@@ -160,7 +155,7 @@ function parseCountOutput(output: string): CountResult[] {
 export async function runRg(
   options: GrepOptions,
   resolvedCli?: ResolvedCli,
-  processSpawner: SearchProcessSpawner = spawn
+  processSpawner: SearchProcessSpawner = spawn,
 ): Promise<GrepResult> {
   await rgSemaphore.acquire()
   try {
@@ -173,7 +168,7 @@ export async function runRg(
 async function runRgInternal(
   options: GrepOptions,
   resolvedCli?: ResolvedCli,
-  processSpawner: SearchProcessSpawner = spawn
+  processSpawner: SearchProcessSpawner = spawn,
 ): Promise<GrepResult> {
   const cli = resolvedCli ?? resolveGrepCli()
   const args = buildArgs(options, cli.backend)
@@ -197,7 +192,7 @@ async function runRgInternal(
     const { stdout, stderr, exitCode } = await collectSearchProcessOutput(
       proc,
       timeout,
-      `Search timeout after ${timeout}ms`
+      `Search timeout after ${timeout}ms`,
     )
 
     const truncated = stdout.length >= DEFAULT_MAX_OUTPUT_BYTES
@@ -214,9 +209,7 @@ async function runRgInternal(
     }
 
     const matches = parseOutput(outputToProcess, options.outputMode === "files_with_matches")
-    const limited = options.headLimit && options.headLimit > 0
-      ? matches.slice(0, options.headLimit)
-      : matches
+    const limited = options.headLimit && options.headLimit > 0 ? matches.slice(0, options.headLimit) : matches
     const filesSearched = new Set(limited.map((m) => m.file)).size
 
     return {
@@ -239,7 +232,7 @@ async function runRgInternal(
 export async function runRgCount(
   options: Omit<GrepOptions, "context">,
   resolvedCli?: ResolvedCli,
-  processSpawner: SearchProcessSpawner = spawn
+  processSpawner: SearchProcessSpawner = spawn,
 ): Promise<CountResult[]> {
   await rgSemaphore.acquire()
   try {
@@ -252,7 +245,7 @@ export async function runRgCount(
 async function runRgCountInternal(
   options: Omit<GrepOptions, "context">,
   resolvedCli?: ResolvedCli,
-  processSpawner: SearchProcessSpawner = spawn
+  processSpawner: SearchProcessSpawner = spawn,
 ): Promise<CountResult[]> {
   const cli = resolvedCli ?? resolveGrepCli()
   const args = buildArgs({ ...options, context: 0 }, cli.backend)
@@ -277,7 +270,7 @@ async function runRgCountInternal(
     const { stdout, stderr, exitCode } = await collectSearchProcessOutput(
       proc,
       timeout,
-      `Search timeout after ${timeout}ms`
+      `Search timeout after ${timeout}ms`,
     )
     if (exitCode > 1 && stderr.trim()) {
       throw new Error(stderr.trim())

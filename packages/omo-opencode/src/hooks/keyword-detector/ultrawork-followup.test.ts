@@ -4,7 +4,12 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
-import { _resetForTesting, setMainSession, subagentSessions, updateSessionAgent } from "../../features/claude-code-session-state"
+import {
+  _resetForTesting,
+  setMainSession,
+  subagentSessions,
+  updateSessionAgent,
+} from "../../features/claude-code-session-state"
 import { resolveUltraworkOverride } from "../../plugin/ultrawork-model-override"
 import { stopContinuation } from "../../plugin/stop-continuation"
 import { createEventHookDispatcher, createEventHookRunner } from "../../plugin/event-hook-dispatcher"
@@ -18,14 +23,17 @@ const marker = { type: "text", text: "<ultrawork-mode>active</ultrawork-mode>", 
 
 function userOutput(text: string, synthetic = false, sessionID = "main-session") {
   const messageID = `msg_test_${++messageNumber}`
-  return { message: { id: messageID }, parts: [{ id: `prt_input_${messageNumber}`, sessionID, messageID, type: "text", text, synthetic }] }
+  return {
+    message: { id: messageID },
+    parts: [{ id: `prt_input_${messageNumber}`, sessionID, messageID, type: "text", text, synthetic }],
+  }
 }
 
 async function send(text: string, sessionID = "main-session", agent = "sisyphus", synthetic = false) {
   const output = userOutput(text, synthetic, sessionID)
   await hook["chat.message"]({ sessionID, agent }, output)
   return {
-    active: output.parts.some(part => part.text.includes("<ultrawork-mode>")),
+    active: output.parts.some((part) => part.text.includes("<ultrawork-mode>")),
     override: resolveUltraworkOverride(config, agent, output, sessionID),
   }
 }
@@ -34,9 +42,11 @@ beforeEach(() => {
   _resetForTesting()
   messageNumber = 0
   setMainSession("main-session")
-  hook = createKeywordDetectorHook(unsafeTestValue<PluginInput>({
-    client: { tui: { showToast: async () => {} } },
-  }))
+  hook = createKeywordDetectorHook(
+    unsafeTestValue<PluginInput>({
+      client: { tui: { showToast: async () => {} } },
+    }),
+  )
 })
 afterEach(() => {
   hook.dispose()
@@ -44,21 +54,27 @@ afterEach(() => {
 })
 
 describe("explicit ULW session follow-ups", () => {
-  test.each(["prometheus", "builder"])("#given pending restoration #when switching to %s #then its agent guard still applies", async (agent) => {
-    await send("ulw initial")
-    hook.event({ event: { type: "session.compacted", properties: { sessionID: "main-session" } } })
-    updateSessionAgent("main-session", agent)
-    await send("continue", "main-session", agent)
-    expect(hook.getSystemTransformGuidance("main-session") === undefined).toBe(true)
-    updateSessionAgent("main-session", "sisyphus")
-    expect(hook.getSystemTransformGuidance("main-session") === getUltraworkMessage("sisyphus")).toBe(true)
-  })
+  test.each(["prometheus", "builder"])(
+    "#given pending restoration #when switching to %s #then its agent guard still applies",
+    async (agent) => {
+      await send("ulw initial")
+      hook.event({ event: { type: "session.compacted", properties: { sessionID: "main-session" } } })
+      updateSessionAgent("main-session", agent)
+      await send("continue", "main-session", agent)
+      expect(hook.getSystemTransformGuidance("main-session") === undefined).toBe(true)
+      updateSessionAgent("main-session", "sisyphus")
+      expect(hook.getSystemTransformGuidance("main-session") === getUltraworkMessage("sisyphus")).toBe(true)
+    },
+  )
 
   test("#given active GPT mode #when fallback selects Gemini #then its output model refreshes guidance", async () => {
     const input = { sessionID: "main-session", agent: "sisyphus", model: { providerID: "test", modelID: "gpt-5" } }
     await hook["chat.message"](input, userOutput("ulw initial"))
     const original = userOutput("continue")
-    const output = { ...original, message: { ...original.message, model: { providerID: "test", modelID: "gemini-3-pro" } } }
+    const output = {
+      ...original,
+      message: { ...original.message, model: { providerID: "test", modelID: "gemini-3-pro" } },
+    }
     await hook["chat.message"](input, output)
     const expected = getUltraworkMessage("sisyphus", "gemini-3-pro")
     expect({
@@ -74,9 +90,15 @@ describe("explicit ULW session follow-ups", () => {
     const input = { sessionID: "main-session", agent: "sisyphus" }
     await hook["chat.message"](input, output)
     expect(output.parts).toHaveLength(2)
-    expect(output.parts).toEqual([original, {
-      ...marker, id: expect.stringMatching(/^prt_/), sessionID: original.sessionID, messageID: original.messageID,
-    }])
+    expect(output.parts).toEqual([
+      original,
+      {
+        ...marker,
+        id: expect.stringMatching(/^prt_/),
+        sessionID: original.sessionID,
+        messageID: original.messageID,
+      },
+    ])
     expect(output.parts[1].id).not.toBe(original.id)
     const savedMarker = { ...output.parts[1] }
     await hook["chat.message"](input, output)
@@ -104,9 +126,15 @@ describe("explicit ULW session follow-ups", () => {
     const later = userOutput("later")
     const original = { ...later.parts[0] }
     await hook["chat.message"](input, later)
-    expect(later.parts).toEqual([original, {
-      ...marker, id: expect.stringMatching(/^prt_/), sessionID: original.sessionID, messageID: original.messageID,
-    }])
+    expect(later.parts).toEqual([
+      original,
+      {
+        ...marker,
+        id: expect.stringMatching(/^prt_/),
+        sessionID: original.sessionID,
+        messageID: original.messageID,
+      },
+    ])
   })
 
   test("#given combo-only expansions #when ULW state replays #then the marker and model selection persist", async () => {
@@ -171,9 +199,11 @@ describe("explicit ULW session follow-ups", () => {
     expect(restoredImage.parts).toHaveLength(2)
     expect({
       durableIdentity: restoredImage.parts[1].id !== restoredImage.parts[0].id,
-      durableModelOverride: resolveUltraworkOverride(config, "sisyphus", restoredImage, "main-session")?.modelID === "ulw-model",
-      sourceByteEquality: restoredImage.parts[1].text === expectedGuidance
-        && Buffer.byteLength(restoredImage.parts[1].text ?? "") === Buffer.byteLength(expectedGuidance),
+      durableModelOverride:
+        resolveUltraworkOverride(config, "sisyphus", restoredImage, "main-session")?.modelID === "ulw-model",
+      sourceByteEquality:
+        restoredImage.parts[1].text === expectedGuidance &&
+        Buffer.byteLength(restoredImage.parts[1].text ?? "") === Buffer.byteLength(expectedGuidance),
       synthetic: restoredImage.parts[1].synthetic === true,
     }).toEqual({ durableIdentity: true, durableModelOverride: true, sourceByteEquality: true, synthetic: true })
 
@@ -182,7 +212,11 @@ describe("explicit ULW session follow-ups", () => {
       parts: [{ id: "prt_compact_image", sessionID: "main-session", messageID: "msg_compact_image", type: "image" }],
     }
     await hook["chat.message"](geminiInput, compactImage)
-    expect(compactImage.parts[1]).toMatchObject({ ...marker, sessionID: "main-session", messageID: "msg_compact_image" })
+    expect(compactImage.parts[1]).toMatchObject({
+      ...marker,
+      sessionID: "main-session",
+      messageID: "msg_compact_image",
+    })
   })
 
   test("#given active mode #when model family changes #then its full guidance is refreshed", async () => {
@@ -201,32 +235,36 @@ describe("explicit ULW session follow-ups", () => {
   test("#given explicit activation #when a follow-up has no keyword #then injection and model selection persist only in that session", async () => {
     expect((await send("ulw implement auth")).active).toBe(true)
     expect(await send("and add error handling")).toEqual({
-      active: true, override: { providerID: "test", modelID: "ulw-model", variant: undefined },
+      active: true,
+      override: { providerID: "test", modelID: "ulw-model", variant: undefined },
     })
     expect(await send("unrelated request", "other-session")).toEqual({ active: false, override: null })
   })
 
-  test.each(["command", "owner", "deleted", "disposed"])("#given activation #when cleared by %s #then follow-ups are ordinary", async (reason) => {
-    await send("ulw implement auth")
-    if (reason === "command") await send("/stop-continuation")
-    if (reason === "owner") {
-      const directory = mkdtempSync(join(tmpdir(), "ulw-followup-"))
-      try {
-        stopContinuation({ directory, hooks: { keywordDetector: hook }, sessionID: "main-session" })
-      } finally {
-        rmSync(directory, { recursive: true, force: true })
+  test.each(["command", "owner", "deleted", "disposed"])(
+    "#given activation #when cleared by %s #then follow-ups are ordinary",
+    async (reason) => {
+      await send("ulw implement auth")
+      if (reason === "command") await send("/stop-continuation")
+      if (reason === "owner") {
+        const directory = mkdtempSync(join(tmpdir(), "ulw-followup-"))
+        try {
+          stopContinuation({ directory, hooks: { keywordDetector: hook }, sessionID: "main-session" })
+        } finally {
+          rmSync(directory, { recursive: true, force: true })
+        }
       }
-    }
-    if (reason === "deleted") {
-      const dispatch = createEventHookDispatcher(
-        unsafeTestValue<Parameters<typeof createEventHookDispatcher>[0]>({ keywordDetector: hook }),
-        createEventHookRunner(),
-      )
-      await dispatch({ event: { type: "session.deleted", properties: { info: { id: "main-session" } } } })
-    }
-    if (reason === "disposed") hook.dispose()
-    expect(await send("next request")).toEqual({ active: false, override: null })
-  })
+      if (reason === "deleted") {
+        const dispatch = createEventHookDispatcher(
+          unsafeTestValue<Parameters<typeof createEventHookDispatcher>[0]>({ keywordDetector: hook }),
+          createEventHookRunner(),
+        )
+        await dispatch({ event: { type: "session.deleted", properties: { info: { id: "main-session" } } } })
+      }
+      if (reason === "disposed") hook.dispose()
+      expect(await send("next request")).toEqual({ active: false, override: null })
+    },
+  )
 
   test("#given activation #when a follow-up is guarded #then no ULW is injected", async () => {
     await send("ulw implement auth")

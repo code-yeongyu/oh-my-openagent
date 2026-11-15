@@ -50,10 +50,36 @@ function mulberry32(seed) {
 // where every document matches every query would spend the benchmark inside excerpt building, which
 // this change does not touch, and would flatter both sides equally.
 const WORDS = [
-  "service", "cluster", "pipeline", "review", "summary", "update", "owner", "window", "branch",
-  "policy", "record", "session", "vendor", "contract", "channel", "weekly", "budgeting", "roster",
-  "handoff", "glossary", "interview", "onboarding", "payroll", "travel", "catalogue", "designer",
-  "proposal", "timeline", "workshop", "retrospective",
+  "service",
+  "cluster",
+  "pipeline",
+  "review",
+  "summary",
+  "update",
+  "owner",
+  "window",
+  "branch",
+  "policy",
+  "record",
+  "session",
+  "vendor",
+  "contract",
+  "channel",
+  "weekly",
+  "budgeting",
+  "roster",
+  "handoff",
+  "glossary",
+  "interview",
+  "onboarding",
+  "payroll",
+  "travel",
+  "catalogue",
+  "designer",
+  "proposal",
+  "timeline",
+  "workshop",
+  "retrospective",
 ]
 
 /** One planted match per 20 documents, mirroring how rarely a real corpus AND-matches a query. */
@@ -247,7 +273,9 @@ console.log(
   `per-trigger total             ${ms(totalBefore).padEnd(17)} ${ms(totalAfter).padEnd(16)} ${(totalBefore / totalAfter).toFixed(1)}x`,
 )
 console.log("")
-console.log(`first collect of a session (cold caches): exclusion ${ms(exclusionAfterCold)}, selection ${ms(selectionAfterCold)}`)
+console.log(
+  `first collect of a session (cold caches): exclusion ${ms(exclusionAfterCold)}, selection ${ms(selectionAfterCold)}`,
+)
 console.log(
   `per-trigger after: min ${ms(Math.min(...exclusionAfter) + Math.min(...selectionAfter))}, max ${ms(Math.max(...exclusionAfter) + Math.max(...selectionAfter))}`,
 )

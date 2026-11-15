@@ -26,7 +26,10 @@ export function configurePromptDispatchRouteResolver(resolver: PromptDispatchRou
   routeResolver = resolver ?? {}
 }
 
-export function tryResolveDispatchClientSync(client: unknown, sessionID: string): PromptDispatchRouteResult | undefined {
+export function tryResolveDispatchClientSync(
+  client: unknown,
+  sessionID: string,
+): PromptDispatchRouteResult | undefined {
   if (!routeResolver.tryResolveDispatchClientSync) {
     return identityRoute(client)
   }

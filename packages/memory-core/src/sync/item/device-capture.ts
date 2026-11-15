@@ -48,7 +48,13 @@ export async function captureOnDevice(
     const receipts = await readReceipts(device.stateDir, itemKey)
     const unchanged = isLive(doc) && workingText === renderDocContent(doc)
     if (unchanged && registerValuesWritten(doc, registerValues)) {
-      await receipt(device, itemKey, receipts, { base: baseFrontier, text: workingText, landed: doc, seen: mapTags(doc), span: null })
+      await receipt(device, itemKey, receipts, {
+        base: baseFrontier,
+        text: workingText,
+        landed: doc,
+        seen: mapTags(doc),
+        span: null,
+      })
       return null
     }
     const prior = receipts.find((r) => sameFrontier(r.base, baseFrontier) && receiptLanded(doc, r))
@@ -61,7 +67,11 @@ export async function captureOnDevice(
         : await captureDrift(doc, prior, workingText, message)
     const update = withRegisterValues(doc, captured, registerValues, message)
     if (update === null) return null
-    const seenBefore = unchanged ? mapTags(doc) : prior === undefined ? viewTags(doc, baseFrontier) : new Set(prior.seen)
+    const seenBefore = unchanged
+      ? mapTags(doc)
+      : prior === undefined
+        ? viewTags(doc, baseFrontier)
+        : new Set(prior.seen)
     const before = mapTags(doc)
     const start = doc.oplogVersion().get(doc.peerIdStr) ?? 0
     const after = doc.fork()
@@ -89,11 +99,22 @@ export async function recordMaterialized(
   assertDeviceDoc(device, doc)
   await serialized(`${device.stateDir}\0${itemKey}`, async () => {
     const receipts = await readReceipts(device.stateDir, itemKey)
-    await receipt(device, itemKey, receipts, { base: baseFrontier, text: writtenText, landed: doc, seen: mapTags(doc), span: null })
+    await receipt(device, itemKey, receipts, {
+      base: baseFrontier,
+      text: writtenText,
+      landed: doc,
+      seen: mapTags(doc),
+      span: null,
+    })
   })
 }
 
-async function captureDrift(doc: LoroDoc, prior: CaptureReceipt, workingText: string, message: string): Promise<Uint8Array | null> {
+async function captureDrift(
+  doc: LoroDoc,
+  prior: CaptureReceipt,
+  workingText: string,
+  message: string,
+): Promise<Uint8Array | null> {
   const target = doc.fork()
   try {
     target.setPeerId(doc.peerId)
@@ -137,10 +158,22 @@ interface ReceiptInput {
   readonly span: OpSpan | null
 }
 
-function receipt(device: ItemDevice, itemKey: string, receipts: readonly CaptureReceipt[], input: ReceiptInput): Promise<void> {
+function receipt(
+  device: ItemDevice,
+  itemKey: string,
+  receipts: readonly CaptureReceipt[],
+  input: ReceiptInput,
+): Promise<void> {
   const kept = receipts.filter((r) => !sameFrontier(r.base, input.base))
   const at = input.landed.frontiers()
-  const next: CaptureReceipt = { base: input.base, text: input.text, at, stamps: stampsOf(input.landed, at), seen: [...input.seen], span: input.span }
+  const next: CaptureReceipt = {
+    base: input.base,
+    text: input.text,
+    at,
+    stamps: stampsOf(input.landed, at),
+    seen: [...input.seen],
+    span: input.span,
+  }
   return writeReceipts(device.stateDir, itemKey, [...kept, next])
 }
 

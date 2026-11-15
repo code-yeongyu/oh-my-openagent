@@ -149,7 +149,6 @@ describe("ralph-loop continuation prompt injector", () => {
     expect(promptCalls).toBe(0)
   })
 
-
   test("#given inherited message agent has ZWSP prefix #when injecting continuation prompt #then promptAsync receives registered display agent", async () => {
     // given
     let promptBody: { agent?: string; noReply?: boolean } | undefined

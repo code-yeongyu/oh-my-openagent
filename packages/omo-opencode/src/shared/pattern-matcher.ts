@@ -34,7 +34,7 @@ export function matchesToolMatcher(toolName: string, matcher: string): boolean {
 export function findMatchingHooks(
   config: ClaudeHooksConfig,
   eventName: keyof ClaudeHooksConfig,
-  toolName?: string
+  toolName?: string,
 ): HookMatcher[] {
   const hookMatchers = config[eventName]
   if (!hookMatchers) return []

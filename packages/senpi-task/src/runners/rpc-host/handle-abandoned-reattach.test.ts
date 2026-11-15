@@ -74,13 +74,23 @@ describe("a reattach abandoned by its recovery bound", () => {
           firstOpenAsked.resolve()
           return stalledOpen.promise
         }
-        return Promise.resolve({ sessionId: "routing-3", attached: false, instanceId: "inst-1", engineVersion: "2026.9.18" })
+        return Promise.resolve({
+          sessionId: "routing-3",
+          attached: false,
+          instanceId: "inst-1",
+          engineVersion: "2026.9.18",
+        })
       },
     })
     const attempts: Array<Promise<HostSessionReattached | HostSessionReattachRefused | undefined>> = []
     const handle = createHostSessionHandle({
-      client: original, session: FAKE_SESSION, taskId: "st_10925",
-      heartbeatIntervalMs: 60_000, now: () => 0, closeGraceMs: 0, openDisposition: "attached",
+      client: original,
+      session: FAKE_SESSION,
+      taskId: "st_10925",
+      heartbeatIntervalMs: 60_000,
+      now: () => 0,
+      closeGraceMs: 0,
+      openDisposition: "attached",
       transportRecovery: { clock },
       // Pass-through: the suite only keeps the attempt so it can await its end.
       reattach: (lost, abandoned) => {
@@ -132,13 +142,23 @@ describe("a reattach abandoned by its recovery bound", () => {
       createClient: () => fakeSessionPort(),
       open: () => {
         opens += 1
-        return Promise.resolve({ sessionId: "routing-3", attached: false, instanceId: "inst-1", engineVersion: "2026.9.18" })
+        return Promise.resolve({
+          sessionId: "routing-3",
+          attached: false,
+          instanceId: "inst-1",
+          engineVersion: "2026.9.18",
+        })
       },
     })
     const attempts: Array<Promise<HostSessionReattached | HostSessionReattachRefused | undefined>> = []
     const handle = createHostSessionHandle({
-      client: original, session: FAKE_SESSION, taskId: "st_10925_ensure",
-      heartbeatIntervalMs: 60_000, now: () => 0, closeGraceMs: 0, openDisposition: "attached",
+      client: original,
+      session: FAKE_SESSION,
+      taskId: "st_10925_ensure",
+      heartbeatIntervalMs: 60_000,
+      now: () => 0,
+      closeGraceMs: 0,
+      openDisposition: "attached",
       transportRecovery: { clock },
       // Pass-through: the suite only keeps the attempt so it can await its end.
       reattach: (lost, abandoned) => {

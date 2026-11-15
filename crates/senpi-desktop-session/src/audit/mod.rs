@@ -48,6 +48,7 @@ pub(crate) fn audit_event(
         text_delivered: mutation.text.map(|_| mutation.text_delivered.get()),
         text_sha256: mutation.text.map(text_sha256_prefix),
         keys: mutation.keys.map(<[String]>::to_vec),
+        id: None,
     }
 }
 
@@ -66,6 +67,7 @@ pub(crate) fn control_audit(action: Method, reason: Option<&str>, code: Option<E
         text_delivered: None,
         text_sha256: reason.map(text_sha256_prefix),
         keys: None,
+        id: None,
     }
 }
 

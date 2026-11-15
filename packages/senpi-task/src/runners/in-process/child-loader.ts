@@ -7,6 +7,9 @@ export type ChildResourceLoaderOptions = {
   readonly agentDir?: string
   readonly settingsManager: SettingsManager
   readonly systemPrompt?: string
+  // Tools an engine-owned worker may run without asking (its own task tools); the preset itself is left to the
+  // permission system's resolver.
+  readonly allowTools?: readonly string[]
 }
 
 // Use senpi's own loader as the single source of truth for builtin extensions, but suppress every
@@ -28,6 +31,9 @@ export function createChildResourceLoader(options: ChildResourceLoaderOptions): 
       // Process children are launched with --no-ask-user. Set the same builtin flag before the
       // AgentSession consumes the loaded extension set so ask_user remains parent-only.
       loaded.runtime.flagValues.set("no-ask-user", true)
+      if (options.allowTools !== undefined && options.allowTools.length > 0) {
+        loaded.runtime.flagValues.set("permission", options.allowTools.map((tool) => `${tool}=allow`).join(","))
+      }
       return loaded
     },
   })

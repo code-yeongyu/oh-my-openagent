@@ -1,0 +1,144 @@
+{
+  "recorded_from": "omo-relay-daemon device-service-v0.1.27 (43e7d051f0bca5a925d949ab582b4eed2653eca9, packages/relayd version 0.1.27): its local API server (startLocalApiServer) on a Unix socket with a viewer for a peer that serves environments, frames read off the client's socket; welcome.service_version and welcome.state come from the recorder's owner port",
+  "client": {
+    "name": "omo",
+    "version": "5.1.66"
+  },
+  "client_frames": [
+    {
+      "type": "hello",
+      "v": 1,
+      "client": {
+        "name": "omo",
+        "version": "5.1.66"
+      },
+      "client_nonce": "PWF5JMLCriHwbXvQtfdq_e-YQsp8wfbbk36AjEpHgS8"
+    },
+    {
+      "id": "1",
+      "type": "authenticate",
+      "client_proof": "I8o1E1GRhPEcN3nKwKizw31UiR0eOn64eFQ2WrXRK00"
+    },
+    {
+      "id": "2",
+      "type": "session.endpoints",
+      "device": "dev-a"
+    }
+  ],
+  "service_frames": [
+    {
+      "type": "welcome",
+      "v": 1,
+      "service_version": "0.1.27",
+      "owner": "service",
+      "server_proof": "JyZsEjUxRPvaOTNE0vDsXY6L5kIcTjB4SVnTu3D8YVM",
+      "server_nonce": "C2mZDS7nYpJp5WX5Y-5O6Hv301PAGcAmaRTugN22qz0",
+      "capabilities": [
+        "sessions",
+        "devices",
+        "enforcement",
+        "upgrade",
+        "control"
+      ],
+      "state": {
+        "state": "connected",
+        "since_ms": 1800000000000,
+        "device": {
+          "id": "dev-self",
+          "name": "This Mac"
+        },
+        "origin_configured": true,
+        "enabled": true
+      }
+    },
+    {
+      "id": "1",
+      "type": "response",
+      "ok": true,
+      "data": {}
+    },
+    {
+      "id": "2",
+      "type": "response",
+      "ok": true,
+      "data": {
+        "endpoints": [
+          "RVBFUEVQRVBFUEVQRVBFUA"
+        ]
+      }
+    }
+  ],
+  "current_hello": {
+    "client": {
+      "name": "omo",
+      "version": "5.1.67"
+    },
+    "client_frames": [
+      {
+        "type": "hello",
+        "v": 1,
+        "client": {
+          "name": "omo",
+          "version": "5.1.67"
+        },
+        "client_nonce": "BzQNIervGeAF5Fo1gTYcbv_zckrfqWUY1aIVNmXMpRw"
+      },
+      {
+        "id": "1",
+        "type": "authenticate",
+        "client_proof": "ZgVAPINTIjmOH6zFiYmtLEz-i3OmvbQJJTjanDOzHVI"
+      },
+      {
+        "id": "2",
+        "type": "session.endpoints",
+        "device": "dev-a"
+      }
+    ],
+    "service_frames": [
+      {
+        "type": "welcome",
+        "v": 1,
+        "service_version": "0.1.27",
+        "owner": "service",
+        "server_proof": "JJod7vNN1wNpao9_88RUAl5oHBXrLiepzGJ2EGNHYC0",
+        "server_nonce": "AGdTfqqD8t1QL3qpLxThZ-Gvo-LJD0MrtOg6eTbZu-g",
+        "capabilities": [
+          "sessions",
+          "devices",
+          "enforcement",
+          "upgrade",
+          "control"
+        ],
+        "state": {
+          "state": "connected",
+          "since_ms": 1800000000000,
+          "device": {
+            "id": "dev-self",
+            "name": "This Mac"
+          },
+          "origin_configured": true,
+          "enabled": true
+        }
+      },
+      {
+        "id": "1",
+        "type": "response",
+        "ok": true,
+        "data": {}
+      },
+      {
+        "id": "2",
+        "type": "response",
+        "ok": true,
+        "data": {
+          "endpoints": [
+            "RVBFUEVQRVBFUEVQRVBFUA"
+          ],
+          "environments": [
+            "RU5WRU5WRU5WRU5WRU5WRQ"
+          ]
+        }
+      }
+    ]
+  }
+}

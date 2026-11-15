@@ -13,7 +13,8 @@ import { createKeyringReceiver, receiveKeyringChain } from "./vendor/sync-format
  * The entries cross as their wire JSON: the receiver reads the transport shape and validates
  * every field it uses itself.
  */
-export const wire = (entries: ReadonlyArray<SyncEntry>): ReadonlyArray<ChainEntry> => JSON.parse(JSON.stringify(entries))
+export const wire = (entries: ReadonlyArray<SyncEntry>): ReadonlyArray<ChainEntry> =>
+  JSON.parse(JSON.stringify(entries))
 
 const wired = new WeakMap<SyncEntry, ChainEntry>()
 
@@ -128,7 +129,10 @@ export const holdReceiver = (owner: object, receiver: HistoryReceiver): void => 
  * keyring `history`, by folding the whole list; null only when the receiver accepts the whole list. A refusal at any other seq means the verified history and the
  * receiver disagree, which must never happen, so it refuses this entry too.
  */
-export const receiverRefusal = async (history: ReadonlyArray<SyncEntry>, entry: SyncEntry): Promise<ReceiverCheck | null> => {
+export const receiverRefusal = async (
+  history: ReadonlyArray<SyncEntry>,
+  entry: SyncEntry,
+): Promise<ReceiverCheck | null> => {
   const list = [...history.map(wireOnce), ...wire([entry])]
   const isFork = entry.kind === "keyring" && entry.body.kind === "fork-resolution"
   return firstRefusalAt(isFork ? await receiveKeyringChain(list) : foldRefusal(list), entry, new Set([entry.seq]))

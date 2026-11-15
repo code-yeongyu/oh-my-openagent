@@ -7,6 +7,7 @@ import { join, sep, win32 } from "node:path"
 import { pathToFileURL } from "node:url"
 
 import * as bundleInputs from "./bundle-inputs.mjs"
+import { spawnTimeout } from "../../test-support/spawn-timeout"
 
 const { BUNDLE_INPUTS_PATH, mapFromTrace, renderBundleInputs } = bundleInputs
 const repoRoot = join(import.meta.dir, "..", "..", "..", "..")
@@ -23,9 +24,18 @@ const traceScript = (runtime, files, entry) => {
     const log = join(dir, "trace.jsonl")
     const preload = runtime === "bun" ? ["--preload", tracer] : [`--import=${pathToFileURL(tracer).href}`]
     const target = typeof entry === "string" ? [join(dir, entry)] : ["-e", entry.eval(dir)]
-    const result = spawnSync(runtime, [...preload, ...target], { cwd: dir, env: { ...process.env, OMO_BUNDLE_INPUTS_TRACE: log, OMO_BUNDLE_INPUTS_TMP: dir }, encoding: "utf8" })
+    const result = spawnSync(runtime, [...preload, ...target], {
+      cwd: dir,
+      env: { ...process.env, OMO_BUNDLE_INPUTS_TRACE: log, OMO_BUNDLE_INPUTS_TMP: dir },
+      encoding: "utf8",
+    })
     if (result.status !== 0) throw new Error(`${runtime} exited ${result.status}: ${result.stderr}`)
-    const rows = existsSync(log) ? readFileSync(log, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line)) : []
+    const rows = existsSync(log)
+      ? readFileSync(log, "utf8")
+          .split("\n")
+          .filter(Boolean)
+          .map((line) => JSON.parse(line))
+      : []
     return { rows }
   } finally {
     rmSync(dir, { recursive: true, force: true })
@@ -48,7 +58,13 @@ const row = (kind, path) => ({ kind, path })
 
 describe("mapFromTrace", () => {
   test("keeps every traced repo file and adds the manifests that steer resolution", () => {
-    const map = mapFromTrace([row("bundle", "/repo/packages/memory-core/src/a.ts"), row("read", "/repo/packages/omo-senpi/plugin/scripts/build-artifact.mjs")], deps)
+    const map = mapFromTrace(
+      [
+        row("bundle", "/repo/packages/memory-core/src/a.ts"),
+        row("read", "/repo/packages/omo-senpi/plugin/scripts/build-artifact.mjs"),
+      ],
+      deps,
+    )
     expect(map.files).toEqual([
       "package.json",
       "packages/memory-core/package.json",
@@ -60,7 +76,14 @@ describe("mapFromTrace", () => {
   })
 
   test("collapses dependency files to the lockfile and drops paths outside the repo", () => {
-    const map = mapFromTrace([row("bundle", "/repo/node_modules/zod/v4/index.js"), row("read", "/tmp/omo-senpi-check/omo.js"), row("read", "/repo/.git/HEAD")], deps)
+    const map = mapFromTrace(
+      [
+        row("bundle", "/repo/node_modules/zod/v4/index.js"),
+        row("read", "/tmp/omo-senpi-check/omo.js"),
+        row("read", "/repo/.git/HEAD"),
+      ],
+      deps,
+    )
     expect(map.files).toEqual(["bun.lock", "package.json"])
   })
 
@@ -87,23 +110,35 @@ describe("mapFromTrace", () => {
 // so a POSIX-only join, relative or separator in mapFromTrace fails here on every host.
 describe("mapFromTrace on win32 paths", () => {
   const winRoot = "C:\\repo"
-  const winExisting = new Set(["package.json", "bun.lock", "packages/memory-core/package.json", "packages/memory-core/tsconfig.json"].map((p) => win32.join(winRoot, p)))
+  const winExisting = new Set(
+    ["package.json", "bun.lock", "packages/memory-core/package.json", "packages/memory-core/tsconfig.json"].map((p) =>
+      win32.join(winRoot, p),
+    ),
+  )
   const winDeps = { repoRoot: winRoot, path: win32, exists: (path) => winExisting.has(path), realpath: (path) => path }
 
   test("keeps backslash repo paths as portable files and finds the manifests by their backslash paths", () => {
     const map = mapFromTrace([row("bundle", win32.join(winRoot, "packages", "memory-core", "src", "a.ts"))], winDeps)
-    expect(map.files).toEqual(["package.json", "packages/memory-core/package.json", "packages/memory-core/src/a.ts", "packages/memory-core/tsconfig.json"])
+    expect(map.files).toEqual([
+      "package.json",
+      "packages/memory-core/package.json",
+      "packages/memory-core/src/a.ts",
+      "packages/memory-core/tsconfig.json",
+    ])
   })
 
   test("collapses node_modules to the lockfile and drops .git, the parent dir and another drive", () => {
-    const map = mapFromTrace([
-      row("read", win32.join(winRoot, "node_modules", "zod", "index.js")),
-      row("read", win32.join(winRoot, ".git", "HEAD")),
-      row("read", "C:\\elsewhere\\x.js"),
-      row("read", "D:\\Temp\\omo-bundle-inputs-1\\codex\\install-local.mjs"),
-      row("list", win32.join(winRoot, "packages", "omo-codex", "src", "install")),
-      row("list", "D:\\Temp"),
-    ], winDeps)
+    const map = mapFromTrace(
+      [
+        row("read", win32.join(winRoot, "node_modules", "zod", "index.js")),
+        row("read", win32.join(winRoot, ".git", "HEAD")),
+        row("read", "C:\\elsewhere\\x.js"),
+        row("read", "D:\\Temp\\omo-bundle-inputs-1\\codex\\install-local.mjs"),
+        row("list", win32.join(winRoot, "packages", "omo-codex", "src", "install")),
+        row("list", "D:\\Temp"),
+      ],
+      winDeps,
+    )
     expect(map.files).toEqual(["bun.lock", "package.json"])
     expect(map.directories).toEqual(["packages/omo-codex/src/install"])
   })
@@ -113,7 +148,9 @@ describe("mapFromTrace on win32 paths", () => {
 // silently lose the bundler's whole source list.
 describe("bundling steps", () => {
   test("every recipe step is marked as bundling", () => {
-    expect(bundleInputs.RECIPE.map((step) => [step.name, step.bundles])).toEqual(bundleInputs.RECIPE.map((step) => [step.name, true]))
+    expect(bundleInputs.RECIPE.map((step) => [step.name, step.bundles])).toEqual(
+      bundleInputs.RECIPE.map((step) => [step.name, true]),
+    )
   })
 
   test("a bundling step that recorded no bundle rows fails the trace, naming the step", () => {
@@ -148,7 +185,14 @@ describe("package.json build scripts", () => {
   }
 
   test("no script reachable from an install, build or test chain runs the trace", () => {
-    const names = reachable(["prepare", "build", "build:senpi-plugin", "build:senpi-plugin:stage", "build:senpi-plugin:native", "test:senpi"])
+    const names = reachable([
+      "prepare",
+      "build",
+      "build:senpi-plugin",
+      "build:senpi-plugin:stage",
+      "build:senpi-plugin:native",
+      "test:senpi",
+    ])
     expect(names).toContain("build:senpi-plugin:stage")
     expect(names.filter((name) => scripts[name].includes("bundle-inputs.mjs"))).toEqual([])
   })
@@ -181,7 +225,7 @@ describe("under an install lifecycle", () => {
           cwd: repoRoot,
           env: { ...process.env, npm_lifecycle_event: lifecycle, TMPDIR: tmp, TMP: tmp, TEMP: tmp },
           encoding: "utf8",
-          timeout: 20000,
+          timeout: spawnTimeout(),
         })
         expect(result.status).not.toBe(0)
         expect(result.status).not.toBeNull()
@@ -198,11 +242,19 @@ describe("under an install lifecycle", () => {
 // not steer the traced generators at a staged copy outside the repo: those reads would drop out of the map.
 describe("the recipe environment", () => {
   const scripts = readdirSync(import.meta.dir).filter((name) => name.endsWith(".mjs") && !name.includes(".test"))
-  const knobs = new Set(scripts.flatMap((name) => readFileSync(join(import.meta.dir, name), "utf8").match(/\bOMO_[A-Z0-9_]*(?:OUTPUT|TARGET|ENTRY|DIST)\b/g) ?? []))
+  const knobs = new Set(
+    scripts.flatMap(
+      (name) =>
+        readFileSync(join(import.meta.dir, name), "utf8").match(/\bOMO_[A-Z0-9_]*(?:OUTPUT|TARGET|ENTRY|DIST)\b/g) ??
+        [],
+    ),
+  )
 
   test("drops every output-steering knob the recipe scripts read", () => {
     const scratch = join(tmpdir(), "omo-bundle-inputs-scratch")
-    const base = Object.fromEntries([...knobs, "OMO_SENPI_STAGE_FAIL_AFTER_BACKUP"].map((key) => [key, "/elsewhere/plugin"]))
+    const base = Object.fromEntries(
+      [...knobs, "OMO_SENPI_STAGE_FAIL_AFTER_BACKUP"].map((key) => [key, "/elsewhere/plugin"]),
+    )
     const env = bundleInputs.recipeEnv(scratch, { ...base, PATH: "/bin" })
     expect(bundleInputs.SCRUBBED_ENV).toContain("OMO_SENPI_PLUGIN_OUTPUT")
     for (const key of bundleInputs.SCRUBBED_ENV) expect(env[key]).toBeUndefined()
@@ -214,28 +266,43 @@ describe("the recipe environment", () => {
 
 describe("the trace preload", () => {
   test("records a recursive cp source as a listed directory", () => {
-    const { rows } = traceScript("node", {
-      "src/a.txt": "a",
-      "main.mjs": `import { cpSync } from "node:fs"\ncpSync(new URL("./src", import.meta.url), new URL("./out", import.meta.url), { recursive: true })\n`,
-    }, "main.mjs")
+    const { rows } = traceScript(
+      "node",
+      {
+        "src/a.txt": "a",
+        "main.mjs": `import { cpSync } from "node:fs"\ncpSync(new URL("./src", import.meta.url), new URL("./out", import.meta.url), { recursive: true })\n`,
+      },
+      "main.mjs",
+    )
     const src = rows.filter((r) => portable(r.path).endsWith("/src"))
     expect(src.map((r) => r.kind)).toEqual(["list"])
   })
 
   test("under bun, which has no module hooks, a module importing another module fails the trace", () => {
-    const { rows } = traceScript("bun", {
-      "dep.mjs": "export const x = 1\n",
-      "lib.mjs": `import { x } from "./dep.mjs"\nexport const y = x\n`,
-      "main.mjs": `import { y } from "./lib.mjs"\nif (y !== 1) process.exit(1)\n`,
-    }, "main.mjs")
+    const { rows } = traceScript(
+      "bun",
+      {
+        "dep.mjs": "export const x = 1\n",
+        "lib.mjs": `import { x } from "./dep.mjs"\nexport const y = x\n`,
+        "main.mjs": `import { y } from "./lib.mjs"\nif (y !== 1) process.exit(1)\n`,
+      },
+      "main.mjs",
+    )
     expect(rows.some((r) => r.kind === "missing-module-hooks")).toBe(true)
   })
 
   // The Codex step's shape: `bun -e` importing the generator, which imports builtins only.
   test("under bun -e, the entry's own import is recorded as a module, not a failure", () => {
-    const { rows } = traceScript("bun", {
-      "gen.mjs": `import { readFile } from "node:fs/promises"\nexport const run = () => readFile(new URL(import.meta.url))\n`,
-    }, { eval: (dir) => `const m = await import(${JSON.stringify(pathToFileURL(join(dir, "gen.mjs")).href)}); await m.run()` })
+    const { rows } = traceScript(
+      "bun",
+      {
+        "gen.mjs": `import { readFile } from "node:fs/promises"\nexport const run = () => readFile(new URL(import.meta.url))\n`,
+      },
+      {
+        eval: (dir) =>
+          `const m = await import(${JSON.stringify(pathToFileURL(join(dir, "gen.mjs")).href)}); await m.run()`,
+      },
+    )
     expect(rows.filter((r) => r.kind === "missing-module-hooks")).toEqual([])
     expect(rows.some((r) => r.kind === "module" && portable(r.path).endsWith("/gen.mjs"))).toBe(true)
   })
@@ -247,11 +314,21 @@ describe("the trace preload", () => {
       const scratch = join(dir, "with space")
       mkdirSync(scratch)
       writeFileSync(join(dir, "entry.mjs"), "export const x = 1\n")
-      writeFileSync(join(dir, "main.mjs"), `import { spawnSync } from "node:child_process"\nconst r = spawnSync("bun", ["build", "entry.mjs", "--outfile", "out.js"], { shell: true, stdio: "ignore" })\nprocess.exit(r.status ?? 1)\n`)
+      writeFileSync(
+        join(dir, "main.mjs"),
+        `import { spawnSync } from "node:child_process"\nconst r = spawnSync("bun", ["build", "entry.mjs", "--outfile", "out.js"], { shell: true, stdio: "ignore" })\nprocess.exit(r.status ?? 1)\n`,
+      )
       const log = join(dir, "trace.jsonl")
-      const result = spawnSync("node", [`--import=${pathToFileURL(tracer).href}`, join(dir, "main.mjs")], { cwd: dir, env: { ...process.env, OMO_BUNDLE_INPUTS_TRACE: log, OMO_BUNDLE_INPUTS_TMP: scratch }, encoding: "utf8" })
+      const result = spawnSync("node", [`--import=${pathToFileURL(tracer).href}`, join(dir, "main.mjs")], {
+        cwd: dir,
+        env: { ...process.env, OMO_BUNDLE_INPUTS_TRACE: log, OMO_BUNDLE_INPUTS_TMP: scratch },
+        encoding: "utf8",
+      })
       expect(result.status).toBe(0)
-      const rows = readFileSync(log, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line))
+      const rows = readFileSync(log, "utf8")
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => JSON.parse(line))
       expect(rows.filter((r) => r.kind === "missing-metafile")).toEqual([])
       expect(rows.some((r) => r.kind === "bundle" && r.path.endsWith("entry.mjs"))).toBe(true)
     } finally {
@@ -260,7 +337,11 @@ describe("the trace preload", () => {
   })
 
   test("under bun, a step that imports only builtins traces cleanly", () => {
-    const { rows } = traceScript("bun", { "main.mjs": `import { readFile } from "node:fs/promises"\nawait readFile(new URL(import.meta.url))\n` }, "main.mjs")
+    const { rows } = traceScript(
+      "bun",
+      { "main.mjs": `import { readFile } from "node:fs/promises"\nawait readFile(new URL(import.meta.url))\n` },
+      "main.mjs",
+    )
     expect(rows.filter((r) => r.kind === "missing-module-hooks")).toEqual([])
     expect(rows.some((r) => r.kind === "read" && r.path.endsWith("main.mjs"))).toBe(true)
   })
@@ -270,7 +351,9 @@ describe("the trace preload", () => {
 // The map is complete only while the Codex script imports builtins alone and reads through fs/promises.
 describe("script/build-codex-install.ts", () => {
   const source = readFileSync(join(repoRoot, "script", "build-codex-install.ts"), "utf8")
-  const imports = [...source.matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*|^\s*import\s+)["']([^"']+)["']/gm)].map((m) => m[1])
+  const imports = [...source.matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*|^\s*import\s+)["']([^"']+)["']/gm)].map(
+    (m) => m[1],
+  )
 
   // guards: the Codex step's trace completeness (bun has no load hooks, so only builtin imports are safe).
   test("imports builtins only, so the bun trace sees every file it reads", () => {
@@ -286,7 +369,9 @@ describe("the committed map", () => {
   const committed = JSON.parse(readFileSync(join(import.meta.dir, "..", "..", "..", "..", BUNDLE_INPUTS_PATH), "utf8"))
 
   test("is rendered in canonical form", () => {
-    expect(readFileSync(join(import.meta.dir, "..", "..", "..", "..", BUNDLE_INPUTS_PATH), "utf8")).toBe(renderBundleInputs(committed))
+    expect(readFileSync(join(import.meta.dir, "..", "..", "..", "..", BUNDLE_INPUTS_PATH), "utf8")).toBe(
+      renderBundleInputs(committed),
+    )
   })
 
   // The bundle marker hashes the build scripts next to the sources (build-artifact.mjs digestBuildSources),
@@ -299,6 +384,7 @@ describe("the committed map", () => {
       "packages/omo-senpi/src/extension/bundled-index.ts",
       "packages/omo-senpi/src/install/cli-local.ts",
       "script/build-codex-install.ts",
-    ]) expect(committed.files).toContain(path)
+    ])
+      expect(committed.files).toContain(path)
   })
 })

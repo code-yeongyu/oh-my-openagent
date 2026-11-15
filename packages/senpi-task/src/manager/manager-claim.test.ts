@@ -8,7 +8,16 @@ import type { TaskRecord, TaskTransition, TaskTransitionResult } from "../state"
 import { TaskRecordCollisionError, createTaskRecordStore } from "../store"
 import type { PersistedTaskEvent, TaskRecordStore } from "../store"
 import { collisionStore } from "./__fixtures__/collision-store"
-import { FakeRunner, baseSpec, categoryPlanner, cleanupProjects, flush, makeManager, settings, tempProject } from "./__fixtures__/manager-fakes"
+import {
+  FakeRunner,
+  baseSpec,
+  categoryPlanner,
+  cleanupProjects,
+  flush,
+  makeManager,
+  settings,
+  tempProject,
+} from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
 import { SUBPROCESS_DEADLINE_MS, describeChild, runSignalledChild } from "./__fixtures__/signalled-child"
 
@@ -76,7 +85,10 @@ const seedFloorChildFixturePath = resolve(import.meta.dir, "__fixtures__", "seed
 async function expectSeedFloorChildModeToSucceed(mode: string): Promise<void> {
   const result = await runSignalledChild([seedFloorChildFixturePath, mode])
 
-  expect({ phase: result.phase, exitCode: result.exitCode }, describeChild(result)).toEqual({ phase: "exited", exitCode: 0 })
+  expect({ phase: result.phase, exitCode: result.exitCode }, describeChild(result)).toEqual({
+    phase: "exited",
+    exitCode: 0,
+  })
 }
 
 afterEach(cleanupProjects)
@@ -130,7 +142,12 @@ describe("TaskManager claim characterization", () => {
     // when sibling test files seeded higher fixture ids (e.g. st_deadbeef) in this process, so the
     // first id cannot be pinned to the clock. Probe the allocator, then assert the RELATIONSHIP the
     // test is about: an id-shaped requested name forces the unnamed sibling past it, names unique.
-    const probe = await managerWithStore(createTaskRecordStore({ project_dir: tempProject() }), new FakeRunner(), new FakeRunner(), clock).manager.start(baseSpec())
+    const probe = await managerWithStore(
+      createTaskRecordStore({ project_dir: tempProject() }),
+      new FakeRunner(),
+      new FakeRunner(),
+      clock,
+    ).manager.start(baseSpec())
     if (probe.kind !== "started") throw new Error("expected probe to start")
     const firstTaskId = bumpTaskId(probe.task_id as `st_${string}`)
     const { manager } = managerWithStore(invariantStore, new FakeRunner(), new FakeRunner(), clock)
@@ -191,18 +208,21 @@ describe("TaskManager claim characterization", () => {
     expect(store.load(result.task_id)?.spawn_spec).toBeDefined()
   })
 
-  test.each(["", "   "])("#given a blank requested name %p #when started #then it falls back to the task id", async (name) => {
-    // given
-    const { manager } = makeManager()
+  test.each(["", "   "])(
+    "#given a blank requested name %p #when started #then it falls back to the task id",
+    async (name) => {
+      // given
+      const { manager } = makeManager()
 
-    // when
-    const result = await manager.start(baseSpec({ name }))
+      // when
+      const result = await manager.start(baseSpec({ name }))
 
-    // then
-    if (result.kind !== "started") throw new Error("expected started")
-    expect(result.name).toMatch(/^st_[0-9a-f]{8}$/)
-    expect(result.name).toBe(result.task_id)
-  })
+      // then
+      if (result.kind !== "started") throw new Error("expected started")
+      expect(result.name).toMatch(/^st_[0-9a-f]{8}$/)
+      expect(result.name).toBe(result.task_id)
+    },
+  )
 
   test.each(["seed", "warm-cache", "diagnostics"])(
     "#given an isolated manager process #when %s seeds from disk #then it succeeds",

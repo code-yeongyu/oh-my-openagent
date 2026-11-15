@@ -61,8 +61,7 @@ export function shouldProposeRefresh(
   if (Date.now() < cooldownUntil) return false
   if (drift.kind === "stale") return true
   return (
-    (drift.commitsSince >= COMMIT_DISTANCE_THRESHOLD &&
-      drift.touchedRatio >= TOUCHED_RATIO_THRESHOLD) ||
+    (drift.commitsSince >= COMMIT_DISTANCE_THRESHOLD && drift.touchedRatio >= TOUCHED_RATIO_THRESHOLD) ||
     drift.churnLocRatio >= CHURN_LOC_RATIO_THRESHOLD ||
     drift.daysSince >= DAYS_SINCE_THRESHOLD
   )

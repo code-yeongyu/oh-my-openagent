@@ -19,7 +19,7 @@ function createMockCtx(agents: Array<{ name: string; mode?: string }> = []): Plu
       },
     } as unknown as OpencodeClient,
     directory: "/test",
-    }
+  }
 }
 
 function createFailingMockCtx(error: Error = new Error("API unavailable")): PluginInput {
@@ -30,7 +30,7 @@ function createFailingMockCtx(error: Error = new Error("API unavailable")): Plug
       },
     } as unknown as OpencodeClient,
     directory: "/test",
-    }
+  }
 }
 
 const DEFAULT_AGENTS = [
@@ -41,23 +41,27 @@ const DEFAULT_AGENTS = [
 const assertCanSpawnMock = mock(() => Promise.resolve(undefined))
 const reserveCommitMock = mock(() => 1)
 const reserveRollbackMock = mock(() => {})
-const reserveSubagentSpawnMock = mock(() => Promise.resolve({
-  spawnContext: { rootSessionID: "root-session", parentDepth: 0, childDepth: 1 },
-  descendantCount: 1,
-  commit: reserveCommitMock,
-  rollback: reserveRollbackMock,
-}))
+const reserveSubagentSpawnMock = mock(() =>
+  Promise.resolve({
+    spawnContext: { rootSessionID: "root-session", parentDepth: 0, childDepth: 1 },
+    descendantCount: 1,
+    commit: reserveCommitMock,
+    rollback: reserveRollbackMock,
+  }),
+)
 
 const mockBackgroundManager = {
   assertCanSpawn: assertCanSpawnMock,
   reserveSubagentSpawn: reserveSubagentSpawnMock,
-  launch: mock(() => Promise.resolve({
-    id: "test-task-id",
-    sessionId: null,
-    description: "Test task",
-    agent: "test-agent",
-    status: "pending",
-  })),
+  launch: mock(() =>
+    Promise.resolve({
+      id: "test-task-id",
+      sessionId: null,
+      description: "Test task",
+      agent: "test-agent",
+      status: "pending",
+    }),
+  ),
   getTask: mock(() => ({ status: "pending", sessionId: "ses-123" })),
 } as BackgroundManager
 
@@ -85,7 +89,7 @@ describe("createCallOmoAgent", () => {
 
       const result = await executeFunc(
         { description: "Test", prompt: "Test prompt", subagent_type: "explore", run_in_background: true },
-        toolCtx
+        toolCtx,
       )
 
       expect(result).toContain("disabled via disabled_agents")
@@ -98,7 +102,7 @@ describe("createCallOmoAgent", () => {
 
       const result = await executeFunc(
         { description: "Test", prompt: "Test prompt", subagent_type: "explore", run_in_background: true },
-        toolCtx
+        toolCtx,
       )
 
       expect(result).toContain("disabled via disabled_agents")
@@ -111,7 +115,7 @@ describe("createCallOmoAgent", () => {
 
       const result = await executeFunc(
         { description: "Test", prompt: "Test prompt", subagent_type: "explore", run_in_background: true },
-        toolCtx
+        toolCtx,
       )
 
       expect(result).not.toContain("disabled via disabled_agents")
@@ -124,7 +128,7 @@ describe("createCallOmoAgent", () => {
 
       const result = await executeFunc(
         { description: "Test", prompt: "Test prompt", subagent_type: "explore", run_in_background: true },
-        toolCtx
+        toolCtx,
       )
 
       expect(result).not.toContain("disabled via disabled_agents")
@@ -137,10 +141,7 @@ describe("createCallOmoAgent", () => {
       const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, [])
       const executeFunc = toolDef.execute as Function
 
-      const result = await executeFunc(
-        { description: "Test", prompt: "Fix bug", run_in_background: true },
-        toolCtx
-      )
+      const result = await executeFunc({ description: "Test", prompt: "Fix bug", run_in_background: true }, toolCtx)
 
       expect(result).toContain("subagent_type is required")
     })
@@ -153,7 +154,7 @@ describe("createCallOmoAgent", () => {
 
       const result = await executeFunc(
         { description: "Test", prompt: "Fix bug", subagent_type: "general", run_in_background: true },
-        toolCtx
+        toolCtx,
       )
 
       expect(result).toContain("Invalid agent type")
@@ -167,7 +168,7 @@ describe("createCallOmoAgent", () => {
 
       const result = await executeFunc(
         { description: "Test", prompt: "Fix bug", subagent_type: "nonexistent-agent", run_in_background: true },
-        toolCtx
+        toolCtx,
       )
 
       expect(result).toContain("Invalid agent type")
@@ -180,24 +181,21 @@ describe("createCallOmoAgent", () => {
 
       const result = await executeFunc(
         { description: "Test", prompt: "Explore", subagent_type: "EXPLORE", run_in_background: true },
-        toolCtx
+        toolCtx,
       )
 
       expect(result).not.toContain("Invalid agent type")
     })
 
     test("should exclude primary-mode agents from callable list", async () => {
-      const agents = [
-        ...DEFAULT_AGENTS,
-        { name: "sisyphus", mode: "primary" },
-      ]
+      const agents = [...DEFAULT_AGENTS, { name: "sisyphus", mode: "primary" }]
       const mockCtx = createMockCtx(agents)
       const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, [])
       const executeFunc = toolDef.execute as Function
 
       const result = await executeFunc(
         { description: "Test", prompt: "Orchestrate", subagent_type: "sisyphus", run_in_background: true },
-        toolCtx
+        toolCtx,
       )
 
       expect(result).toContain("Invalid agent type")
@@ -210,7 +208,7 @@ describe("createCallOmoAgent", () => {
 
       const result = await executeFunc(
         { description: "Test", prompt: "Explore codebase", subagent_type: "explore", run_in_background: true },
-        toolCtx
+        toolCtx,
       )
 
       expect(result).not.toContain("Invalid agent type")
@@ -223,7 +221,7 @@ describe("createCallOmoAgent", () => {
 
       const result = await executeFunc(
         { description: "Test", prompt: "Fix bug", subagent_type: "custom-agent", run_in_background: true },
-        toolCtx
+        toolCtx,
       )
 
       expect(result).toContain("Invalid agent type")
@@ -237,7 +235,7 @@ describe("createCallOmoAgent", () => {
 
       const result = await executeFunc(
         { description: "Test", prompt: "Fix bug", subagent_type: "bug-fixer", run_in_background: true },
-        toolCtx
+        toolCtx,
       )
 
       expect(result).toContain("Invalid agent type")
@@ -247,28 +245,25 @@ describe("createCallOmoAgent", () => {
 
   test("uses agent override fallback_models when launching background subagent", async () => {
     //#given
-    const launch = mock((_input: { fallbackChain?: Array<{ providers: string[]; model: string; variant?: string }> }) => Promise.resolve({
-      id: "task-fallback",
-      sessionId: "sub-session",
-      description: "Test task",
-      agent: "explore",
-      status: "pending",
-    }))
+    const launch = mock((_input: { fallbackChain?: Array<{ providers: string[]; model: string; variant?: string }> }) =>
+      Promise.resolve({
+        id: "task-fallback",
+        sessionId: "sub-session",
+        description: "Test task",
+        agent: "explore",
+        status: "pending",
+      }),
+    )
     const managerWithLaunch = {
       launch,
       getTask: mock(() => undefined),
     }
     const mockCtx = createMockCtx(DEFAULT_AGENTS)
-    const toolDef = createCallOmoAgent(
-      mockCtx,
-      managerWithLaunch,
-      [],
-      {
-        explore: {
-          fallback_models: ["quotio/kimi-k2.5", "openai/gpt-5.5(high)"],
-        },
+    const toolDef = createCallOmoAgent(mockCtx, managerWithLaunch, [], {
+      explore: {
+        fallback_models: ["quotio/kimi-k2.5", "openai/gpt-5.5(high)"],
       },
-    )
+    })
     const executeFunc = toolDef.execute as Function
 
     //#when
@@ -279,7 +274,7 @@ describe("createCallOmoAgent", () => {
         subagent_type: "explore",
         run_in_background: true,
       },
-      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal }
+      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal },
     )
 
     //#then
@@ -297,27 +292,24 @@ describe("createCallOmoAgent", () => {
 
   test("forwards model override from agent config to background executor (#2852)", async () => {
     //#given
-    const launch = mock((_input: { model?: { providerID: string; modelID: string }; fallbackChain?: unknown[] }) => Promise.resolve({
-      id: "task-model",
-      sessionId: "sub-session",
-      description: "Test task",
-      agent: "explore",
-      status: "pending",
-    }))
+    const launch = mock((_input: { model?: { providerID: string; modelID: string }; fallbackChain?: unknown[] }) =>
+      Promise.resolve({
+        id: "task-model",
+        sessionId: "sub-session",
+        description: "Test task",
+        agent: "explore",
+        status: "pending",
+      }),
+    )
     const managerWithLaunch = {
       launch,
       getTask: mock(() => undefined),
     }
-    const toolDef = createCallOmoAgent(
-      createMockCtx(DEFAULT_AGENTS),
-      managerWithLaunch,
-      [],
-      {
-        explore: {
-          model: "aws/anthropic/claude-sonnet-4",
-        },
+    const toolDef = createCallOmoAgent(createMockCtx(DEFAULT_AGENTS), managerWithLaunch, [], {
+      explore: {
+        model: "aws/anthropic/claude-sonnet-4",
       },
-    )
+    })
     const executeFunc = toolDef.execute as Function
 
     //#when
@@ -328,7 +320,7 @@ describe("createCallOmoAgent", () => {
         subagent_type: "explore",
         run_in_background: true,
       },
-      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal }
+      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal },
     )
 
     //#then
@@ -346,28 +338,25 @@ describe("createCallOmoAgent", () => {
 
   test("forwards model variant from agent config to background executor (#2852)", async () => {
     //#given
-    const launch = mock((_input: { model?: { providerID: string; modelID: string; variant?: string } }) => Promise.resolve({
-      id: "task-variant",
-      sessionId: "sub-session",
-      description: "Test task",
-      agent: "explore",
-      status: "pending",
-    }))
+    const launch = mock((_input: { model?: { providerID: string; modelID: string; variant?: string } }) =>
+      Promise.resolve({
+        id: "task-variant",
+        sessionId: "sub-session",
+        description: "Test task",
+        agent: "explore",
+        status: "pending",
+      }),
+    )
     const managerWithLaunch = {
       launch,
       getTask: mock(() => undefined),
     }
-    const toolDef = createCallOmoAgent(
-      createMockCtx(DEFAULT_AGENTS),
-      managerWithLaunch,
-      [],
-      {
-        explore: {
-          model: "openai/gpt-5.4",
-          variant: "high",
-        },
+    const toolDef = createCallOmoAgent(createMockCtx(DEFAULT_AGENTS), managerWithLaunch, [], {
+      explore: {
+        model: "openai/gpt-5.4",
+        variant: "high",
       },
-    )
+    })
     const executeFunc = toolDef.execute as Function
 
     //#when
@@ -378,7 +367,7 @@ describe("createCallOmoAgent", () => {
         subagent_type: "explore",
         run_in_background: true,
       },
-      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal }
+      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal },
     )
 
     //#then
@@ -397,27 +386,24 @@ describe("createCallOmoAgent", () => {
 
   test("parses inline model variant from agent config override", async () => {
     //#given
-    const launch = mock((_input: { model?: { providerID: string; modelID: string; variant?: string } }) => Promise.resolve({
-      id: "task-inline-variant",
-      sessionId: "sub-session",
-      description: "Test task",
-      agent: "explore",
-      status: "pending",
-    }))
+    const launch = mock((_input: { model?: { providerID: string; modelID: string; variant?: string } }) =>
+      Promise.resolve({
+        id: "task-inline-variant",
+        sessionId: "sub-session",
+        description: "Test task",
+        agent: "explore",
+        status: "pending",
+      }),
+    )
     const managerWithLaunch = {
       launch,
       getTask: mock(() => undefined),
     }
-    const toolDef = createCallOmoAgent(
-      createMockCtx(DEFAULT_AGENTS),
-      managerWithLaunch,
-      [],
-      {
-        explore: {
-          model: "openai/gpt-5.4 high",
-        },
+    const toolDef = createCallOmoAgent(createMockCtx(DEFAULT_AGENTS), managerWithLaunch, [], {
+      explore: {
+        model: "openai/gpt-5.4 high",
       },
-    )
+    })
     const executeFunc = toolDef.execute as Function
 
     //#when
@@ -428,7 +414,7 @@ describe("createCallOmoAgent", () => {
         subagent_type: "explore",
         run_in_background: true,
       },
-      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal }
+      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal },
     )
 
     //#then
@@ -447,13 +433,15 @@ describe("createCallOmoAgent", () => {
 
   test("forwards category-derived model override to background executor", async () => {
     //#given
-    const launch = mock((_input: { model?: { providerID: string; modelID: string } }) => Promise.resolve({
-      id: "task-category-model",
-      sessionId: "sub-session",
-      description: "Test task",
-      agent: "explore",
-      status: "pending",
-    }))
+    const launch = mock((_input: { model?: { providerID: string; modelID: string } }) =>
+      Promise.resolve({
+        id: "task-category-model",
+        sessionId: "sub-session",
+        description: "Test task",
+        agent: "explore",
+        status: "pending",
+      }),
+    )
     const managerWithLaunch = {
       launch,
       getTask: mock(() => undefined),
@@ -483,7 +471,7 @@ describe("createCallOmoAgent", () => {
         subagent_type: "explore",
         run_in_background: true,
       },
-      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal }
+      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal },
     )
 
     //#then
@@ -501,23 +489,21 @@ describe("createCallOmoAgent", () => {
 
   test("falls back to first entry in agent's fallbackChain when no override is configured (#5301)", async () => {
     //#given
-    const launch = mock((_input: { model?: { providerID: string; modelID: string }; fallbackChain?: unknown[] }) => Promise.resolve({
-      id: "task-default-model",
-      sessionId: "sub-session",
-      description: "Test task",
-      agent: "explore",
-      status: "pending",
-    }))
+    const launch = mock((_input: { model?: { providerID: string; modelID: string }; fallbackChain?: unknown[] }) =>
+      Promise.resolve({
+        id: "task-default-model",
+        sessionId: "sub-session",
+        description: "Test task",
+        agent: "explore",
+        status: "pending",
+      }),
+    )
     const managerWithLaunch = {
       launch,
       getTask: mock(() => undefined),
     }
     // no agentOverrides, no userCategories — the default fallback path
-    const toolDef = createCallOmoAgent(
-      createMockCtx(DEFAULT_AGENTS),
-      managerWithLaunch,
-      [],
-    )
+    const toolDef = createCallOmoAgent(createMockCtx(DEFAULT_AGENTS), managerWithLaunch, [])
     const executeFunc = toolDef.execute as Function
 
     //#when
@@ -528,7 +514,7 @@ describe("createCallOmoAgent", () => {
         subagent_type: "explore",
         run_in_background: true,
       },
-      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal }
+      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal },
     )
 
     //#then
@@ -548,7 +534,9 @@ describe("createCallOmoAgent", () => {
   test("should return a tool error when sync spawn depth validation fails", async () => {
     //#given
     const mockCtx = createMockCtx(DEFAULT_AGENTS)
-    reserveSubagentSpawnMock.mockRejectedValueOnce(new Error("Subagent spawn blocked: child depth 4 exceeds background_task.maxDepth=3."))
+    reserveSubagentSpawnMock.mockRejectedValueOnce(
+      new Error("Subagent spawn blocked: child depth 4 exceeds background_task.maxDepth=3."),
+    )
     const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, [])
     const executeFunc = toolDef.execute as Function
 

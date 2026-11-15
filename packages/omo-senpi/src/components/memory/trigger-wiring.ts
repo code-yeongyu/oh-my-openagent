@@ -79,7 +79,11 @@ export function createReflectionTriggerWiring(options: ReflectionTriggerWiringOp
     inFlight.add(promise)
   }
 
-  async function evaluateAndLaunch(session: ReflectionTriggerSession, event: ReflectionEvent, signal?: AbortSignal): Promise<void> {
+  async function evaluateAndLaunch(
+    session: ReflectionTriggerSession,
+    event: ReflectionEvent,
+    signal?: AbortSignal,
+  ): Promise<void> {
     signal?.throwIfAborted()
     const result = await session.engine.evaluate(session.conversationId, event, signal)
     signal?.throwIfAborted()
@@ -105,32 +109,36 @@ export function createReflectionTriggerWiring(options: ReflectionTriggerWiringOp
         outcomes.set(session.conversationId, readOutcome(payload))
       })
 
-      pi.on("agent_settled", async (_payload, eventCtx, observer) => {
-        const session = options.resolveSession(eventCtx)
-        if (!session) return
-        const outcome = outcomes.get(session.conversationId)
-        outcomes.delete(session.conversationId)
-        if (outcome === undefined || outcome.aborted || outcome.willRetry) return
-        if (session.enabled === false) {
-          session.ledger.pendingCompaction = false
-          return
-        }
-
-        // Not tracked through whenIdle: the host already awaits this handler.
-        try {
-          if (session.ledger.pendingCompaction) {
-            observer?.phase("reflection.compaction.evaluate")
-            await session.engine.evaluate(session.conversationId, { kind: "compaction_accepted" }, observer?.signal)
-            observer?.signal.throwIfAborted()
+      pi.on(
+        "agent_settled",
+        async (_payload, eventCtx, observer) => {
+          const session = options.resolveSession(eventCtx)
+          if (!session) return
+          const outcome = outcomes.get(session.conversationId)
+          outcomes.delete(session.conversationId)
+          if (outcome === undefined || outcome.aborted || outcome.willRetry) return
+          if (session.enabled === false) {
             session.ledger.pendingCompaction = false
+            return
           }
-          observer?.phase("reflection.settled.evaluate")
-          await evaluateAndLaunch(session, { kind: "settled", success: true }, observer?.signal)
-        } catch (error: unknown) {
-          if (observer?.signal.aborted) return
-          options.logger?.warn("omo-senpi memory reflection trigger failed", { error: describe(error) })
-        }
-      }, { hookLabel: "reflection.evaluate" })
+
+          // Not tracked through whenIdle: the host already awaits this handler.
+          try {
+            if (session.ledger.pendingCompaction) {
+              observer?.phase("reflection.compaction.evaluate")
+              await session.engine.evaluate(session.conversationId, { kind: "compaction_accepted" }, observer?.signal)
+              observer?.signal.throwIfAborted()
+              session.ledger.pendingCompaction = false
+            }
+            observer?.phase("reflection.settled.evaluate")
+            await evaluateAndLaunch(session, { kind: "settled", success: true }, observer?.signal)
+          } catch (error: unknown) {
+            if (observer?.signal.aborted) return
+            options.logger?.warn("omo-senpi memory reflection trigger failed", { error: describe(error) })
+          }
+        },
+        { hookLabel: "reflection.evaluate" },
+      )
 
       pi.on("session_compact", (payload, eventCtx) => {
         if (!isAcceptedCompaction(payload)) return
@@ -172,9 +180,7 @@ export function createReflectionTriggerWiring(options: ReflectionTriggerWiringOp
  * `enabled` false short-circuits trigger evaluation before any reservation is made.
  */
 export function resolveReflectionTriggerConfig(settings: OmoMemorySettings, agentName?: string): ResolvedTriggerConfig {
-  const reflection = agentName === undefined
-    ? settings.reflection
-    : resolveAgentReflectionSettings(settings, agentName)
+  const reflection = agentName === undefined ? settings.reflection : resolveAgentReflectionSettings(settings, agentName)
   return {
     enabled: reflection.enabled,
     stepCount: reflection.trigger.step_count,

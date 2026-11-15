@@ -52,6 +52,7 @@ const gateway = [
   ["binding-author", "binding-author.mjs"],
   ["report-origin", "report-origin.mjs"],
   ["report-origin-steer", "report-origin-steer.mjs"],
+  ["report-origin-auto-steer", "report-origin-auto-steer.mjs"],
 ]
 
 const legacy = [
@@ -92,14 +93,20 @@ function legacyMissing() {
   const needed = [
     [join(senpiRoot, "packages", "coding-agent", "scripts", "qa-shared", "lib", "env.mjs"), "senpi source checkout"],
     [join(senpiRoot, "node_modules"), "senpi checkout not installed: bun install"],
-    ...["ai", "agent", "tui"].map((pkg) => [join(senpiRoot, "packages", pkg, "dist", "index.js"), "senpi checkout not built: bun run build"]),
+    ...["ai", "agent", "tui"].map((pkg) => [
+      join(senpiRoot, "packages", pkg, "dist", "index.js"),
+      "senpi checkout not built: bun run build",
+    ]),
     [desktopRoot, "desktop checkout"],
     [join(omoRoot, "node_modules"), "omo checkout not installed: bun install"],
   ]
   const missing = needed.filter(([path]) => !existsSync(path)).map(([path, why]) => `${path} (${why})`)
   // Checked on disk rather than through `require.resolve`: bun resolves a missing package from its
   // global install cache, so resolution succeeds even for a checkout that was never installed.
-  const desktopEffect = [join(desktopRoot, "node_modules", "effect"), join(desktopRoot, "apps", "server", "node_modules", "effect")]
+  const desktopEffect = [
+    join(desktopRoot, "node_modules", "effect"),
+    join(desktopRoot, "apps", "server", "node_modules", "effect"),
+  ]
   if (existsSync(desktopRoot) && !desktopEffect.some((path) => existsSync(join(path, "package.json")))) {
     missing.push(`${join(desktopRoot, "node_modules")} (desktop checkout not installed: bun install)`)
   }
@@ -122,7 +129,13 @@ function runOne(name, file, extraArgs = [], reportDir = outDir) {
     }
   }
   const count = (pattern) => (text.match(pattern) ?? []).length
-  const result = { name, code: child.exitCode, skipped: count(/^SKIP /gm), defects: count(/^DEFECT /gm), receipt: /PASS \S+\/cleanup-no-leftovers/.test(text) }
+  const result = {
+    name,
+    code: child.exitCode,
+    skipped: count(/^SKIP /gm),
+    defects: count(/^DEFECT /gm),
+    receipt: /PASS \S+\/cleanup-no-leftovers/.test(text),
+  }
   results.push(result)
   process.stdout.write(`----- ${name} exit=${result.code} skipped=${result.skipped} defects=${result.defects} -----\n`)
   return result
@@ -143,7 +156,10 @@ if (suite === "gateway" || suite === "all") {
     const crashed = /^FAIL loop-guard\/scenario-completed /m.test(text)
     mutant.code = mutant.code !== 0 && cycleFailed && !crashed ? 0 : 1
     mutant.expectedFailure = true
-    if (mutant.code !== 0) process.stdout.write(`FAIL loop-guard-mutant did not fail the cycle check: exit=${mutant.code} cycle_check_failed=${cycleFailed} scenario_crashed=${crashed}\n`)
+    if (mutant.code !== 0)
+      process.stdout.write(
+        `FAIL loop-guard-mutant did not fail the cycle check: exit=${mutant.code} cycle_check_failed=${cycleFailed} scenario_crashed=${crashed}\n`,
+      )
     if (outDir === undefined) rmSync(mutantDir, { recursive: true, force: true })
   }
   if (!process.argv.includes("--keep-kit")) rmSync(kitDir, { recursive: true, force: true })
@@ -163,10 +179,14 @@ if (suite === "legacy" || suite === "all") {
 process.stdout.write("\n===== summary =====\n")
 for (const result of results) {
   const status = result.skippedScenario ? "SKIP" : result.code === 0 ? "PASS" : "FAIL"
-  process.stdout.write(`${status} ${result.name} exit=${result.code} skipped=${result.skipped} defects=${result.defects}${result.expectedFailure ? " (mutant: failing is the pass)" : ""}\n`)
+  process.stdout.write(
+    `${status} ${result.name} exit=${result.code} skipped=${result.skipped} defects=${result.defects}${result.expectedFailure ? " (mutant: failing is the pass)" : ""}\n`,
+  )
 }
 const failed = results.filter((result) => result.code !== 0)
 const skippedScenarios = results.filter((result) => result.skippedScenario).length
 const defects = results.reduce((sum, result) => sum + result.defects, 0)
-process.stdout.write(`${failed.length === 0 ? "PASS" : "FAIL"} run-all failed_scenarios=${failed.length} skipped_scenarios=${skippedScenarios} skipped_checks=${results.reduce((sum, result) => sum + result.skipped, 0)} product_defects=${defects}\n`)
+process.stdout.write(
+  `${failed.length === 0 ? "PASS" : "FAIL"} run-all failed_scenarios=${failed.length} skipped_scenarios=${skippedScenarios} skipped_checks=${results.reduce((sum, result) => sum + result.skipped, 0)} product_defects=${defects}\n`,
+)
 process.exit(failed.length === 0 ? 0 : 1)

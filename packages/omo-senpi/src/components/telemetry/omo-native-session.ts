@@ -16,7 +16,11 @@ import {
 } from "@oh-my-opencode/telemetry-core/injected"
 import { createSenpiTelemetryTransportFactory } from "./otlp"
 import { isOmoTelemetryEnabled, type OmoConfig } from "@oh-my-opencode/omo-config-core"
-import { isDarwinAutomountTriggerPath, isPathInside, type PathContainmentOptions } from "@oh-my-opencode/utils/path-containment"
+import {
+  isDarwinAutomountTriggerPath,
+  isPathInside,
+  type PathContainmentOptions,
+} from "@oh-my-opencode/utils/path-containment"
 
 import { deferUntilAfterFirstPaint } from "../../extension/startup-deferral"
 import type { OmoSenpiComponent } from "../../extension/types"
@@ -88,12 +92,14 @@ export function createOmoNativeSessionComponent(options: OmoNativeSessionOptions
           schemaVersion: OMO_NATIVE_SCHEMA_VERSION,
           setTimeoutFn: options.setTimeoutFn,
           source: SOURCE,
-          transportFactory: options.transportFactory ?? createSenpiTelemetryTransportFactory({
-            env,
-            consent: () => isOmoNativeTelemetryEnabled(options, eventCtx, env),
-            diagnostics: options.diagnostics,
-            source: SOURCE,
-          }),
+          transportFactory:
+            options.transportFactory ??
+            createSenpiTelemetryTransportFactory({
+              env,
+              consent: () => isOmoNativeTelemetryEnabled(options, eventCtx, env),
+              diagnostics: options.diagnostics,
+              source: SOURCE,
+            }),
         })
         if (!client.enabled) return
 
@@ -251,7 +257,8 @@ export function automatedRunReason(
   env: TelemetryEnv,
   deps: TempDirDeps = {},
 ): "ci" | "test_runner" | "ephemeral_home" | undefined {
-  if (ALLOW_AUTOMATION_VALUES.includes(env["OMO_TELEMETRY_ALLOW_AUTOMATION"]?.trim().toLowerCase() ?? "")) return undefined
+  if (ALLOW_AUTOMATION_VALUES.includes(env["OMO_TELEMETRY_ALLOW_AUTOMATION"]?.trim().toLowerCase() ?? ""))
+    return undefined
   const ci = env["CI"]?.trim().toLowerCase() ?? ""
   if (ci !== "" && ci !== "0" && ci !== "false") return "ci"
   if (env["NODE_ENV"]?.trim() === "test" || env["VITEST"] || env["JEST_WORKER_ID"]) return "test_runner"
@@ -290,7 +297,10 @@ const POSIX_ROOT_HOMES = ["/root", "/var/root"]
 function isInsideTempDir(path: string, env: TelemetryEnv, deps: TempDirDeps): boolean {
   const windows = (deps.platform ?? process.platform) === "win32"
   const paths = windows ? win32 : posix
-  const options: PathContainmentOptions = { platform: windows ? "win32" : (deps.platform ?? process.platform), ...(deps.realpath === undefined ? {} : { realpath: deps.realpath }) }
+  const options: PathContainmentOptions = {
+    platform: windows ? "win32" : (deps.platform ?? process.platform),
+    ...(deps.realpath === undefined ? {} : { realpath: deps.realpath }),
+  }
   const realpath = deps.realpath ?? realpathSync.native
   const resolve = (candidate: string): string | undefined => {
     try {
@@ -316,7 +326,10 @@ function isInsideTempDir(path: string, env: TelemetryEnv, deps: TempDirDeps): bo
     !windows && isDarwinAutomountTriggerPath(candidate, { platform: deps.platform ?? process.platform, homeDir: path })
   const lexicallyInside = (candidate: string): boolean => {
     const root = paths.resolve(candidate)
-    return paths.dirname(root) !== root && [paths.resolve(path), target].some((home) => home === root || home.startsWith(`${root}${paths.sep}`))
+    return (
+      paths.dirname(root) !== root &&
+      [paths.resolve(path), target].some((home) => home === root || home.startsWith(`${root}${paths.sep}`))
+    )
   }
   const usersDirs = windows ? [win32.join(`${env["SystemDrive"]?.trim() || "C:"}\\`, "Users")] : POSIX_USERS_DIRS
   const rootHomes = windows ? [] : POSIX_ROOT_HOMES
@@ -338,7 +351,6 @@ function isInsideTempDir(path: string, env: TelemetryEnv, deps: TempDirDeps): bo
     }
   })
 }
-
 
 /**
  * The persisted half of consent: the telemetry setting in the config files, for a scope's cwd. Environment
