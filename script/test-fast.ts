@@ -1,5 +1,9 @@
 import { spawn, type SpawnOptions } from "node:child_process"
-import { ROOT_TEST_SERIAL_QUARANTINE_PATHS, serialQuarantineArgs } from "./root-test-serial-quarantine.ts"
+import {
+  ROOT_TEST_SERIAL_QUARANTINE_PATHS,
+  serialQuarantineArgs,
+  testTimeoutArgs,
+} from "./root-test-serial-quarantine.ts"
 
 export interface TestFastGroup {
   readonly name: string
@@ -26,10 +30,10 @@ export function testFastGroups(): TestFastGroup[] {
   return [
     {
       name: "opencode-memory",
-      args: ["test", "packages/omo-opencode", "packages/memory-core"],
+      args: ["test", ...testTimeoutArgs(), "packages/omo-opencode", "packages/memory-core"],
     },
-    { name: "root-rest", args: ["--config=bunfig.win2.parallel.toml", "test"] },
-    { name: "senpi", args: ["test", "packages/omo-senpi"] },
+    { name: "root-rest", args: ["--config=bunfig.win2.parallel.toml", "test", ...testTimeoutArgs()] },
+    { name: "senpi", args: ["test", ...testTimeoutArgs(), "packages/omo-senpi"] },
   ]
 }
 
@@ -52,6 +56,8 @@ export type KillProcessGroup = (negatedPid: number, signal: NodeJS.Signals) => v
 export interface ChildRegistry {
   add(child: ChildHandle): void
   remove(child: ChildHandle): void
+  /** Drops the child AND its retained group: the group's work is finished, not merely leaderless. */
+  release(child: ChildHandle): void
   hasSignalTargets(): boolean
   killAll(signal: NodeJS.Signals, kill: KillProcessGroup): void
 }
@@ -98,14 +104,25 @@ export function createChildRegistry(platform: NodeJS.Platform): ChildRegistry {
   const live = new Set<ChildHandle>()
   const retainedGroups = new Set<number>()
   const isPosix = platform !== "win32"
+  let shuttingDown = false
   return {
     add: (child) => {
       live.add(child)
       if (isPosix && child.pid !== undefined) retainedGroups.add(child.pid)
     },
     remove: (child) => void live.delete(child),
+    release: (child) => {
+      live.delete(child)
+      if (child.pid === undefined) return
+      // A group is released when its phase finished normally. During a shutdown the leader's
+      // exit is the signal landing, not the work ending, so the PGID must survive for the
+      // SIGKILL escalation to reach a descendant that ignored it.
+      if (shuttingDown) return
+      retainedGroups.delete(child.pid)
+    },
     hasSignalTargets: () => (isPosix ? retainedGroups.size > 0 : live.size > 0),
     killAll: (signal, kill) => {
+      shuttingDown = true
       if (!isPosix) {
         for (const child of live) if (child.pid !== undefined) child.kill(signal)
         return
@@ -151,6 +168,7 @@ export function spawnInheritingStdio(
   registry: ChildRegistry,
   log: LogLine,
   spawnChild: SpawnChildProcess = spawnChildProcess,
+  releaseOnExit = false,
 ): SpawnTestGroup {
   return (group) =>
     new Promise((resolve, reject) => {
@@ -165,7 +183,8 @@ export function spawnInheritingStdio(
         reject(error)
       })
       child.once("exit", (code) => {
-        registry.remove(child)
+        if (releaseOnExit) registry.release(child)
+        else registry.remove(child)
         log(`[test-fast] ${group.name}: exit ${code ?? 1}`)
         resolve(code ?? 1)
       })
@@ -184,10 +203,11 @@ export async function runTestFast(
   spawnGroup: SpawnTestGroup,
   log: LogLine = console.log,
   shutdownSurvivors: () => void | Promise<void> = () => {},
+  spawnSerialGroup: SpawnTestGroup = spawnGroup,
 ): Promise<number> {
   const quarantine = testFastQuarantineGroup()
   log(`[test-fast] serial quarantine first: ${ROOT_TEST_SERIAL_QUARANTINE_PATHS.length} files`)
-  const quarantineExit = await spawnGroup(quarantine)
+  const quarantineExit = await spawnSerialGroup(quarantine)
   if (quarantineExit !== 0) {
     log(`[test-fast] ${quarantine.name}: exit ${quarantineExit}; no parallel group starts`)
     return quarantineExit
@@ -216,8 +236,13 @@ if (import.meta.main) {
       void shutdownChildren(registry, signal, killGroup).then(() => process.exit(signalExitCode(signal)))
     })
   }
-  process.exitCode = await runTestFast(spawnInheritingStdio(registry, console.log), console.log, () => {
-    console.error("[test-fast] group failed to start: terminating surviving groups")
-    return shutdownChildren(registry, "SIGTERM", killGroup)
-  })
+  process.exitCode = await runTestFast(
+    spawnInheritingStdio(registry, console.log),
+    console.log,
+    () => {
+      console.error("[test-fast] group failed to start: terminating surviving groups")
+      return shutdownChildren(registry, "SIGTERM", killGroup)
+    },
+    spawnInheritingStdio(registry, console.log, undefined, true),
+  )
 }

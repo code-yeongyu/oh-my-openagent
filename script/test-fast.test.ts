@@ -19,7 +19,7 @@ import {
   testFastQuarantineGroup,
   type TestFastGroup,
 } from "./test-fast"
-import { ROOT_TEST_SERIAL_QUARANTINE_PATHS } from "./root-test-serial-quarantine.ts"
+import { POSIX_TEST_TIMEOUT_MS, ROOT_TEST_SERIAL_QUARANTINE_PATHS } from "./root-test-serial-quarantine.ts"
 
 describe("isReentry", () => {
   it("#given an env without the active marker #when the guard is asked #then it reports no re-entry", () => {
@@ -128,6 +128,44 @@ describe("child registry", () => {
 
     // then
     expect(groupKills).toEqual([-101, -202])
+  })
+
+  it("#given a shutdown in progress #when the released child exits #then its group is still signalled on escalation", () => {
+    // given — a serial phase interrupted by a signal: the leader exits from that signal, and a
+    // descendant that ignored it must still be reachable by the SIGKILL escalation
+    const registry = createChildRegistry("linux")
+    const groupKills: number[] = []
+    const selfKills: string[] = []
+    const serial = fakeChild(777, selfKills)
+    registry.add(serial)
+
+    // when
+    registry.killAll("SIGINT", (pid) => groupKills.push(pid))
+    registry.release(serial)
+
+    // then
+    expect(registry.hasSignalTargets()).toBe(true)
+    registry.killAll("SIGKILL", (pid) => groupKills.push(pid))
+    expect(groupKills).toEqual([-777, -777])
+  })
+
+  it("#given a released POSIX group #when the registry kills all #then the finished group is not signalled", () => {
+    // given — a serial phase that completed has no descendant left to escalate to, and its
+    // PGID may already belong to an unrelated process by the time a later signal is sent
+    const registry = createChildRegistry("linux")
+    const groupKills: number[] = []
+    const selfKills: string[] = []
+    const serial = fakeChild(101, selfKills)
+    registry.add(serial)
+    registry.add(fakeChild(202, selfKills))
+    registry.release(serial)
+
+    // when
+    registry.killAll("SIGTERM", (pid) => groupKills.push(pid))
+
+    // then
+    expect(groupKills).toEqual([-202])
+    expect(registry.hasSignalTargets()).toBe(true)
   })
 
   it("#given a win32 child that already exited #when the registry kills all #then the reaped handle is not signalled", () => {
@@ -344,6 +382,17 @@ describe("partition tiling", () => {
     expect(paths).toEqual([...ROOT_TEST_SERIAL_QUARANTINE_PATHS])
   })
 
+  it("#given the quarantine list and the sibling group scopes #when the two are compared #then no quarantined file falls inside a sibling group", () => {
+    // given — the split is only disjoint if the serial phase owns nothing a group also runs
+    const scopes = groupScopes(testFastGroups()).map((scope) => scope.slice(0, -3) + "/")
+
+    // when
+    const inside = ROOT_TEST_SERIAL_QUARANTINE_PATHS.filter((path) => scopes.some((scope) => path.startsWith(scope)))
+
+    // then
+    expect(inside).toEqual([])
+  })
+
   it("#given each scope is owned by one group #when the sibling groups are listed #then no scope repeats", () => {
     // given
     const siblingScopes = groupScopes(testFastGroups())
@@ -384,13 +433,16 @@ describe("spawnInheritingStdio", () => {
   const trackingRegistry = () => {
     const added: ChildHandle[] = []
     const removed: ChildHandle[] = []
+    const released: ChildHandle[] = []
     return {
       added,
       removed,
+      released,
       registry: {
         add: (child: ChildHandle) => void added.push(child),
         remove: (child: ChildHandle) => void removed.push(child),
-        hasSignalTargets: () => added.length > removed.length,
+        release: (child: ChildHandle) => void released.push(child),
+        hasSignalTargets: () => added.length > removed.length + released.length,
         killAll: () => {},
       },
     }
@@ -422,6 +474,51 @@ describe("spawnInheritingStdio", () => {
     expect(spawnEnv[pathKey]).toBe(process.env[pathKey])
     expect(call?.options.detached).toBe(process.platform !== "win32")
     expect(call?.options.stdio).toBe("inherit")
+  })
+
+  it("#given a releasing spawner #when the child exits #then its group is released rather than retained", async () => {
+    // given — the serial phase is awaited to completion, so nothing is left to escalate to
+    const { listeners, spawner } = recordingSpawner()
+    const { added, removed, released, registry } = trackingRegistry()
+
+    // when
+    const exit = spawnInheritingStdio(
+      registry,
+      () => {},
+      spawner,
+      true,
+    )({
+      name: "serial-quarantine",
+      args: ["test"],
+    })
+    for (const notifyExit of listeners.exit) notifyExit(0)
+
+    // then
+    expect(await exit).toBe(0)
+    expect(added.map((child) => child.pid)).toEqual([4242])
+    expect(released.map((child) => child.pid)).toEqual([4242])
+    expect(removed).toEqual([])
+  })
+
+  it("#given every group #when it is spawned #then its argv carries the canonical timeout from the shared source in Bun's flag order", () => {
+    // given — the budget must come from the same definition the serial phase and the full
+    // command use, and it must sit where Bun accepts it for each invocation shape
+    const expected = ["--timeout", String(POSIX_TEST_TIMEOUT_MS)]
+
+    for (const group of testFastGroups()) {
+      const { calls, spawner } = recordingSpawner()
+      const { registry } = trackingRegistry()
+
+      // when
+      void spawnInheritingStdio(registry, () => {}, spawner)(group)
+
+      // then
+      const argv = calls[0]?.args ?? []
+      const at = argv.findIndex((arg) => arg === "--timeout")
+      expect(`${group.name}: ${argv.slice(at, at + 2).join(" ")}`).toBe(`${group.name}: ${expected.join(" ")}`)
+      expect(argv.indexOf("test")).toBeLessThan(at)
+      if (group.name === "root-rest") expect(argv[0]).toBe("--config=bunfig.win2.parallel.toml")
+    }
   })
 
   it("#given a spawned group #when the child starts #then it is registered and deregistered on exit", async () => {

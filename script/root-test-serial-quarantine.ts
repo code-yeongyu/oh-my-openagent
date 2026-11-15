@@ -99,9 +99,14 @@ export const ROOT_TEST_SERIAL_QUARANTINE_PATHS: readonly string[] = ROOT_TEST_SE
  */
 export const POSIX_TEST_TIMEOUT_MS = 20_000
 
+/** The per-file `bun test` budget, spelled once so every invocation reads the same value. */
+export function testTimeoutArgs(): readonly string[] {
+  return ["--timeout", String(POSIX_TEST_TIMEOUT_MS)]
+}
+
 /** The serial `bun test` argument list each parallel leg runs before its parallel pass. */
 export function serialQuarantineArgs(): readonly string[] {
-  return ["test", "--timeout", String(POSIX_TEST_TIMEOUT_MS), ...ROOT_TEST_SERIAL_QUARANTINE_PATHS]
+  return ["test", ...testTimeoutArgs(), ...ROOT_TEST_SERIAL_QUARANTINE_PATHS]
 }
 
 export function serialQuarantineCommand(): string {
