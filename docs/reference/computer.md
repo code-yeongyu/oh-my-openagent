@@ -28,7 +28,7 @@ The `computer` eval global offers the same operations as a fluent facade, one `c
 
 ## Tool boundary
 
-The desktop service executes no model-written code. A `call` chain and a `computer_actions` batch run as data: each step names a facade method, and its arguments cross as JSON. At the `computer` and `computer_actions` boundary, an input over 1 MiB of JSON is refused with `COMPUTER_ARGUMENTS_TOO_LARGE` before anything starts, and a helper value over 8 MiB of JSON is replaced by `COMPUTER_RESULT_TOO_LARGE`. Each session may send 20,000 desktop requests; past that every call is refused with `COMPUTER_CALL_BUDGET_EXCEEDED` and nothing is sent. Audit records returned with a result carry the session id and the tool call id.
+The desktop service executes no model-written code. A `call` chain and a `computer_actions` batch run as data: each step names a facade method, and its arguments cross as JSON. At the `computer` and `computer_actions` boundary, an input over 1 MiB of JSON is refused with `COMPUTER_ARGUMENTS_TOO_LARGE` before anything starts, and a helper value over 8 MiB of JSON is replaced by `COMPUTER_RESULT_TOO_LARGE`. Each session may send 20,000 desktop requests; past that every call is refused with `COMPUTER_CALL_BUDGET_EXCEEDED` and nothing is sent, until the session is closed (`computer.close()` or `/computer off`). Audit records returned with a result carry the session id and the tool call id.
 
 ## Permission classification
 

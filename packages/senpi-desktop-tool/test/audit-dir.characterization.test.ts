@@ -5,7 +5,6 @@
 // `DesktopService` whose engine child is the scripted fake desktop, and reads the wire requests it logged.
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { ExecuteTool } from "@oh-my-opencode/senpi-desktop-service"
 import { afterEach, describe, expect, it } from "vitest"
 import type { ComputerHandle } from "../src/activation"
 import {
@@ -24,10 +23,8 @@ const HANG_GUARD = { timeout: 30_000 }
 
 afterEach(closeDesktops)
 
-const noTools: ExecuteTool = () => Promise.reject(new Error("no tools"))
-
 function toolFor(handle: ComputerHandle) {
-  return createComputerTool({ handle, executeTool: noTools })
+  return createComputerTool({ handle })
 }
 
 /** A capture then a click on the Code window, one chain call each; resolves to the click call's result. */

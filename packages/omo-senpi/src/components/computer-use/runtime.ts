@@ -15,7 +15,6 @@ import { describeEnginePermissions } from "./permission-status"
 
 export interface ComputerUseRuntimeOptions {
   readonly settings: ComputerSettings
-  readonly executeTool: ComputerToolDeps["executeTool"]
   /** Starts the engine child; `enginePath` is `computer.engine_path` (`undefined`: the located binary). */
   readonly engineChild?: (enginePath: string | undefined) => ChildFactory
   readonly onEngineError: (code: ComputerUseEngineErrorCode) => void
@@ -42,7 +41,6 @@ export function createComputerUseRuntime(options: ComputerUseRuntimeOptions) {
   const handle = new ComputerHandle({ service, settings: () => options.settings })
   const deps: ComputerToolDeps = {
     handle,
-    executeTool: options.executeTool,
     confirmControl: (request) => confirmComputerControl(request, { fullAccess: options.fullAccess }),
   }
   return {

@@ -138,7 +138,7 @@ describe("runComputerSteps", HANG_GUARD, () => {
     // Then
     expect(error).toBeInstanceOf(ComputerRunError)
     expect(error).toHaveProperty("reason", "readOnly")
-    expect(error).toHaveProperty("message", "read-only run: 'click' requires read_only: false")
+    expect(error).toHaveProperty("message", "read-only call: 'click' sends input, which needs the exec tier")
     expect(methods(log)).not.toContain("click")
   })
 
@@ -156,7 +156,7 @@ describe("runComputerSteps", HANG_GUARD, () => {
     // Then
     expect(error).toBeInstanceOf(ComputerRunError)
     expect(error).toHaveProperty("reason", "readOnly")
-    expect(error).toHaveProperty("message", "read-only run: 'menu.select' requires read_only: false")
+    expect(error).toHaveProperty("message", "read-only call: 'menu.select' sends input, which needs the exec tier")
     expect(methods(log)).not.toContain("menus.select")
   })
 

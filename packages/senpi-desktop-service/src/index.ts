@@ -14,7 +14,6 @@ export { ElementHandle, WindowHandle } from "./run/handles"
 export {
   type ComputerCallHost,
   type ComputerCallRequest,
-  type ExecuteTool,
   runComputerSteps,
   type StepProgram,
   type StepScope,

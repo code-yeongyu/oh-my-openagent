@@ -1,6 +1,6 @@
 import { join } from "node:path"
 import { ComputerCallError } from "@oh-my-opencode/senpi-desktop-protocol"
-import { DesktopEngineRpcError, type ExecuteTool } from "@oh-my-opencode/senpi-desktop-service"
+import { DesktopEngineRpcError } from "@oh-my-opencode/senpi-desktop-service"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { rejectionOf } from "../../senpi-desktop-service/test/harness"
 import type { ComputerHandle } from "../src/activation"
@@ -17,10 +17,8 @@ const detailedModel: ComputerModel = { id: "gpt-5.6", provider: "openai", api: "
 
 afterEach(closeDesktops)
 
-const noTools: ExecuteTool = () => Promise.reject(new Error("no tools"))
-
-function toolFor(handle: ComputerHandle, executeTool: ExecuteTool = noTools) {
-  return createComputerTool({ handle, executeTool })
+function toolFor(handle: ComputerHandle) {
+  return createComputerTool({ handle })
 }
 
 describe("computer tool execute", HANG_GUARD, () => {
@@ -294,7 +292,7 @@ describe("computer tool execute", HANG_GUARD, () => {
     }
 
     // When
-    const sent = await createComputerActionsTool({ handle, executeTool: noTools }).execute(
+    const sent = await createComputerActionsTool({ handle }).execute(
       "call-batch",
       batch,
       undefined,

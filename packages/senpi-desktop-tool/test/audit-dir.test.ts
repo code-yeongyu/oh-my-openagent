@@ -3,7 +3,6 @@
 // sessions are pinned by audit-dir.characterization.test.ts (X17).
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { ExecuteTool } from "@oh-my-opencode/senpi-desktop-service"
 import { afterEach, describe, expect, it } from "vitest"
 import type { ComputerHandle } from "../src/activation"
 import {
@@ -22,10 +21,8 @@ const HANG_GUARD = { timeout: 30_000 }
 
 afterEach(closeDesktops)
 
-const noTools: ExecuteTool = () => Promise.reject(new Error("no tools"))
-
 function toolFor(handle: ComputerHandle) {
-  return createComputerTool({ handle, executeTool: noTools })
+  return createComputerTool({ handle })
 }
 
 function scope(sessionId: string, coordinateSafe = true): ComputerExecutionScope {

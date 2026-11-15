@@ -9,7 +9,6 @@ import {
   DesktopCallBudgetError,
   DesktopEngineRpcError,
   DesktopLaunchContextError,
-  type ExecuteTool,
   interpretChain,
   runComputerSteps,
   type StepProgram,
@@ -35,8 +34,6 @@ export interface ControlConfirmRequest {
 
 export interface ComputerToolDeps {
   readonly handle: ComputerHandle
-  /** The host tool pipeline (`pi.executeTool`). No computer path calls it since the run cell was removed (#13634). */
-  readonly executeTool: ExecuteTool
   /** The host component's human confirm for the foreground-control grant; absent: never grants. */
   readonly confirmControl?: (request: ControlConfirmRequest) => Promise<boolean>
 }

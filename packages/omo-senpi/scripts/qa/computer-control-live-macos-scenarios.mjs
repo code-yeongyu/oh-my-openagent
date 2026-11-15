@@ -3,6 +3,8 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 
+import { cell, chain } from "./computer-control-live-macos-steps.mjs"
+
 export const REASON = "QA: raise the QA target window"
 export const CONFIRM_TITLE = "Allow foreground computer control?"
 export const TARGET_TITLE = `omo-control-qa-${process.pid}`
@@ -43,21 +45,16 @@ export const sessionFiles = (agentDir) => {
     .map((name) => join(root, name))
 }
 
-// In file order: one entry per `computer` tool result, its text parts joined.
+// In file order: one entry per `computer` or `eval` tool result, its text parts joined.
 export const toolResults = (agentDir) =>
   sessionFiles(agentDir)
     .flatMap((path) => jsonLines(readFileSync(path, "utf8")))
     .map((entry) => entry.message ?? entry)
-    .filter((message) => message?.role === "toolResult" && message.toolName === "computer")
+    .filter((message) => message?.role === "toolResult" && ["computer", "eval"].includes(message.toolName))
     .map((message) => (message.content ?? []).map((part) => part?.text ?? "").join("\n"))
 
-const raiseCode = `const w = await desktop.window({ title: ${JSON.stringify(TARGET_TITLE)} }); await w.raise(); return "raised"`
-const run = (code) => ({
-  type: "tool_call",
-  name: "computer",
-  arguments: { action: "run", code },
-})
-const acquire = `const state = await desktop.control.acquire({ reason: ${JSON.stringify(REASON)} });`
+const acquire = chain({ method: "control.acquire", args: [{ reason: REASON }] })
+const raise = chain({ method: "window", args: [{ title: TARGET_TITLE }] }, { method: "raise" })
 
 function answerConfirms(session, answer) {
   const answered = new Set()
@@ -83,12 +80,7 @@ function answerConfirms(session, answer) {
 
 export const scenarios = {
   "approved-then-ended": {
-    steps: [
-      run(`${acquire} ${raiseCode.replace('return "raised"', "return JSON.stringify({ state, raised: true })")}`),
-      { type: "text", text: "done" },
-      run(raiseCode),
-      { type: "text", text: "done" },
-    ],
+    steps: [acquire, raise, { type: "text", text: "done" }, raise, { type: "text", text: "done" }],
     async drive(session) {
       const answer = answerConfirms(session, true)
       session.send({
@@ -106,8 +98,8 @@ export const scenarios = {
       await session.until("the second agent_end", () => session.agentEnds() >= 2)
     },
     verify: ({ audits, results }) => [
-      ["the first run reported an active grant", results[0]?.includes('"active":true') === true],
-      ["the first raise was admitted", results[0]?.includes('"raised":true') === true],
+      ["the acquire reported an active grant", /"active":\s*true/.test(results[0] ?? "")],
+      ["the first raise was admitted", results[1] !== undefined && !results[1].includes("COMPUTER_")],
       [
         "the engine audited control.grant, then raiseWindow",
         audits.indexOf("control.grant:success") !== -1 &&
@@ -116,16 +108,17 @@ export const scenarios = {
       ["the end of the task revoked the grant", audits.includes("control.revoke:success")],
       [
         "the raise after the task ended was refused COMPUTER_CONTROL_REQUIRED",
-        results[1]?.includes("COMPUTER_CONTROL_REQUIRED") === true,
+        results[2]?.includes("COMPUTER_CONTROL_REQUIRED") === true,
       ],
       ["the engine audited that refusal as an error", audits.at(-1) === "raiseWindow:error"],
     ],
   },
   interrupted: {
     steps: [
-      run(`${acquire} await wait(30000); return JSON.stringify(state)`),
-      // The abort ends the first turn before it asks the provider again.
-      run(raiseCode),
+      acquire,
+      // A cell holding the turn open while the grant is live; the abort ends the first turn inside it.
+      cell("await wait(30000); return 'waited'"),
+      raise,
       { type: "text", text: "done" },
     ],
     async drive(session) {
@@ -161,7 +154,7 @@ export const scenarios = {
     ],
   },
   declined: {
-    steps: [run(`${acquire} ${raiseCode}`), { type: "text", text: "done" }],
+    steps: [acquire, raise, { type: "text", text: "done" }],
     async drive(session) {
       const answer = answerConfirms(session, false)
       session.send({
@@ -178,7 +171,10 @@ export const scenarios = {
       ["the engine never saw control.grant", !audits.includes("control.grant:success")],
       ["the engine audited the refused raise", audits.includes("raiseWindow:error")],
       ["no raise reached the engine", !audits.includes("raiseWindow:success")],
-      ["the raise was refused COMPUTER_CONTROL_REQUIRED", results[0]?.includes("COMPUTER_CONTROL_REQUIRED") === true],
+      [
+        "the raise was refused COMPUTER_CONTROL_REQUIRED",
+        results.at(-1)?.includes("COMPUTER_CONTROL_REQUIRED") === true,
+      ],
     ],
   },
 }

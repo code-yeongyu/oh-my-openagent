@@ -122,7 +122,11 @@ function describe(methods: MethodPolicies): string {
   return Object.keys(methods).join(", ")
 }
 
-function classifyComputerCall(chain: readonly ComputerCallStep[]): ComputerCallPolicy {
+/**
+ * The approval tier of an allowlisted call chain. Throws `ComputerCallError` for an empty, over-long, unknown, or
+ * unchainable chain: every name must be an own key of the protocol method tables.
+ */
+export function classifyComputerCall(chain: readonly ComputerCallStep[]): ComputerCallPolicy {
   const [root, step, ...rest] = chain
   if (root === undefined) {
     throw new ComputerCallError("empty", "Action 'call' requires a non-empty 'chain'.")
