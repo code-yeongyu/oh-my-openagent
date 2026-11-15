@@ -75,3 +75,45 @@ describe("a running wake over an empty wake table", () => {
     await running?.stop()
   })
 })
+
+describe("the wake's process scope", () => {
+  // #13457's MEDIUM: the wake runtime loads through its sidecar from a session_start handler or a send, so a scope
+  // created inside the sidecar would inherit the first importing session's handle ledger. component.ts captures it at
+  // omo.js's module top level and passes it here; a direct caller's scope must be the one the carrier starts in.
+  test("#given a caller-supplied process scope #when the wake starts #then the carrier starts inside that scope", async () => {
+    const agentDir = mkdtempSync("/tmp/omo-wake-scope-")
+    const latch: ThreadWakeLatch = {}
+    latches.push(latch)
+    const store = createGatewayStore({ agentDir })
+    const runs: number[] = []
+    const scope = {
+      runInAsyncScope: <T>(fn: () => T): T => {
+        runs.push(1)
+        return fn()
+      },
+    }
+    const options: ThreadWakeOptions = {
+      env: { HOME: agentDir },
+      latch,
+      store,
+      engineVersion: "2026.12.1",
+      minimumEngine: "2026.12.1",
+      connect: () => Promise.reject(new Error("no carrier may open a session")),
+      schedule: () => () => undefined,
+    }
+    startThreadWakeAtSession({ mode: "tui" }, {
+      options,
+      agentDir: () => agentDir,
+      sessionsDirectory: () => join(agentDir, "sessions"),
+      settings: () => ({ sameDevice: true, wakeLimit: 0 }),
+      engineVersion: "2026.12.1",
+      ensureHost: undefined,
+      warn: () => undefined,
+      scope,
+    })
+    const running = latch.running?.get(agentDir)
+    expect(running).toBeDefined()
+    expect(runs.length).toBe(1)
+    await running?.stop()
+  })
+})
