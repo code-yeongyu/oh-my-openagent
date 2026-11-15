@@ -66,9 +66,10 @@ function processLatch(): ThreadWakeLatch {
   return latch
 }
 
-// Captured while senpi imports omo.js, so no session's handle ledger owns the carrier's sockets and timers (as the
-// device-service registrant does).
-const processScope = new AsyncResource("omo-thread-wake-carrier")
+/** The process-level async scope the carrier runs in; `AsyncResource` captured at omo.js's module top level. */
+export interface ProcessScope {
+  runInAsyncScope<T>(fn: () => T): T
+}
 
 const unrefSchedule = (run: () => void, ms: number): (() => void) => {
   const timer = setTimeout(run, ms)
@@ -140,6 +141,12 @@ export type ThreadWakeStart = {
   readonly engineVersion: string | undefined
   readonly ensureHost: (() => Promise<void>) | undefined
   readonly warn: (line: string) => void
+  /**
+   * The extension's process-level scope, captured while senpi imports omo.js (component.ts). This sidecar is first
+   * imported from a `session_start` handler or a send, so a scope created here would inherit that session's handle
+   * ledger and its shutdown would reclaim the carrier's sockets and timers (the device-service registrant's reason).
+   */
+  readonly scope?: ProcessScope
 }
 
 /**
@@ -161,9 +168,17 @@ export function startThreadWakeAtSession(eventCtx: unknown, input: ThreadWakeSta
   const latch = input.options.latch ?? processLatch()
   const running = (latch.running ??= new Map())
   if (running.has(agentDir)) return
+  // Production passes the main bundle's scope; a direct caller without one gets a fresh scope, which is only safe
+  // outside a session callback.
+  const scope: ProcessScope =
+    input.scope ??
+    (() => {
+      const resource = new AsyncResource("omo-thread-wake-carrier")
+      return { runInAsyncScope: (fn) => resource.runInAsyncScope(fn) }
+    })()
   running.set(
     agentDir,
-    processScope.runInAsyncScope(() => startRunning(agentDir, env, input)),
+    scope.runInAsyncScope(() => startRunning(agentDir, env, input)),
   )
 }
 

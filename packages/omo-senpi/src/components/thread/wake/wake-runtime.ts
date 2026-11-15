@@ -5,6 +5,7 @@ import {
   processSameDeviceWake,
   startThreadWakeAtSession,
   wakeSettingsReader,
+  type ProcessScope,
   type ThreadWakeOptions,
 } from "./runtime"
 
@@ -24,6 +25,8 @@ export type WakeAtSessionInput = {
   readonly engineVersion: string | undefined
   readonly ensureHost: (() => Promise<void>) | undefined
   readonly warn: (line: string) => void
+  /** The extension's process-level scope, captured at omo.js's module top level (component.ts). */
+  readonly scope?: ProcessScope
 }
 
 export function startWakeAtSession(eventCtx: unknown, input: WakeAtSessionInput): void {
@@ -35,6 +38,7 @@ export function startWakeAtSession(eventCtx: unknown, input: WakeAtSessionInput)
     engineVersion: input.engineVersion,
     ensureHost: input.ensureHost,
     warn: input.warn,
+    scope: input.scope,
   })
 }
 
