@@ -105,9 +105,20 @@ class Presentation {
 
   event(event: RemoteAttachEvent): void {
     switch (event.kind) {
-      case "snapshot":
+      case "snapshot": {
         this.snapshot = event.snapshot
+        // A dialog already pending when this attach starts (or after a re-attach) is shown from the snapshot's
+        // engine state, not only from records that arrive later (#13482).
+        const pending = event.snapshot.state["pendingDialogs"]
+        if (Array.isArray(pending))
+          for (const entry of pending) {
+            if (typeof entry !== "object" || entry === null) continue
+            const record = entry as JsonObject
+            const dialog = this.dialogs.present(record, LOCAL_SESSION_ID)
+            if (dialog !== null) this.send(dialog ?? { ...record, sessionId: LOCAL_SESSION_ID })
+          }
         return
+      }
       case "records":
         for (const record of event.records) {
           const dialog = this.dialogs.present(record, LOCAL_SESSION_ID)
