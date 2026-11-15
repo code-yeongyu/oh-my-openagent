@@ -273,7 +273,13 @@ export function createSession(options: {
           `A device this computer signed out of earlier is not revoked yet (${reason}). Remove it from the Devices page of your OmO account; the next omo login also tries again.`,
         )
       await settleOwedRevokes({ path: owedPath, signedIn: value, request, locked }).then(
-        (unsent) => (unsent > 0 ? unsettled("the service could not be reached") : undefined),
+        ({ unsent, refused }) => {
+          if (refused.length > 0)
+            log(
+              `The service refused to revoke a device this computer signed out of earlier (${refused.join(", ")}). Remove it from the Devices page of your OmO account; omo will not try again.`,
+            )
+          if (unsent > 0) unsettled("the service could not be reached")
+        },
         (error: unknown) => unsettled(error instanceof Error ? error.message : String(error)),
       )
     },

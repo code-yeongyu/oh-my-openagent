@@ -69,34 +69,46 @@ export async function oweRevoke(path: string, device: string, account: string | 
 type Listed = z.infer<typeof listedSchema>["devices"][number]
 
 // What a fresh sign-in does with one owe, judged from its own account's device list. A device the list does not hold
-// belongs to another account (kept for a sign-in there) unless the owe names this account (gone: settled). An owe can
-// only ever name a machine device of this computer's platform; one naming a browser, the caller itself, or another
-// platform is not this computer's sign-out, so it is dropped unsent.
+// belongs to another account (kept for a sign-in there) unless the owe names this account (gone: settled). An owe only
+// ever comes from an omo CLI logout, so it can only name a CLI device of this computer's platform; one naming the
+// desktop app's device, the caller itself, or another platform is not this computer's sign-out: dropped unsent.
+// (Browsers are listed apart, in `browsers`, so an owe naming one is never in `devices`.)
 function judge(entry: OwedRevoke, listed: Listed | undefined, account: string | undefined): "send" | "keep" | "drop" {
   if (listed === undefined) return entry.account !== undefined && entry.account === account ? "drop" : "keep"
-  if (listed.current || listed.kind === "browser" || listed.platform !== devicePlatform()) return "drop"
+  if (listed.current || listed.kind !== "cli" || listed.platform !== devicePlatform()) return "drop"
   return listed.revokedAt === null ? "send" : "drop"
 }
 
+// A refusal that can pass: no answer, a 5xx, or rate limiting. Anything else the service says is lasting.
+const transient = (error: SignInError): boolean =>
+  !(error instanceof ApiRefusal) || error.status >= 500 || error.status === 429
+
+export type OwedRevokeOutcome = {
+  /** Owes due here that could not be sent now (no answer, 5xx, 429); kept for the next sign-in. */
+  readonly unsent: number
+  /** The codes of lasting refusals; those owes are dropped, and only the Devices page can remove the device. */
+  readonly refused: readonly string[]
+}
+
 /**
- * Sends the owed revokes this fresh sign-in can settle and forgets the settled ones. Returns how many were due here
- * but could not be sent (offline, 5xx); those wait for the next sign-in. Anything else (the list read, a file write,
- * an abort) throws, and the caller reports it: the credential is already stored.
+ * Sends the owed revokes this fresh sign-in can settle and forgets the settled ones. Anything that is not a service
+ * answer (the list read, a file write, an abort) throws, and the caller reports it: the credential is already stored.
  */
 export async function settleOwedRevokes(options: {
   readonly path: string
   readonly signedIn: Credentials
   readonly request: (path: string, init: RequestInit) => Promise<unknown>
   readonly locked: <T>(action: () => Promise<T>) => Promise<T>
-}): Promise<number> {
+}): Promise<OwedRevokeOutcome> {
   const { path, signedIn } = options
   const owed = await readOwed(path)
-  if (owed.length === 0) return 0
+  if (owed.length === 0) return { unsent: 0, refused: [] }
   const authorization = { authorization: `Bearer ${signedIn.accessToken}` }
   const listed = parseReply(listedSchema, await options.request("/v1/devices", { headers: authorization })).devices
   const account = accountOfCredentials(signedIn)
   const settled = new Set<string>()
   let unsent = 0
+  const refused: string[] = []
   for (const entry of owed) {
     const verdict = judge(
       entry,
@@ -113,9 +125,14 @@ export async function settleOwedRevokes(options: {
       settled.add(entry.device)
     } catch (error) {
       if (!(error instanceof SignInError)) throw error
-      // The list just showed the device in this account, so not_found means it is gone since.
-      if (error instanceof ApiRefusal && error.code === "not_found") settled.add(entry.device)
-      else unsent++
+      if (transient(error)) {
+        unsent++
+        continue
+      }
+      settled.add(entry.device)
+      // The list just showed the device in this account, so not_found means it is gone since: nothing to report.
+      if (!(error instanceof ApiRefusal && error.code === "not_found"))
+        refused.push(error instanceof ApiRefusal ? error.code : "refused")
     }
   }
   if (settled.size > 0)
@@ -126,5 +143,5 @@ export async function settleOwedRevokes(options: {
         current.filter((entry) => !settled.has(entry.device)),
       )
     })
-  return unsent
+  return { unsent, refused }
 }
