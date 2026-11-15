@@ -9,11 +9,22 @@ import { createGatewayStore } from "./gateway/store"
 import type { RemoteSessionRow } from "./remote/ports"
 import { B_ROW, createRemoteThreadFixture } from "./thread-remote-fixture"
 import { createThreadTools } from "./tools"
+import { threadState } from "./tools/internals"
 import { listThreads } from "./tools/read-ops"
 import type { ThreadHost, ThreadHostSession, ThreadHostView, ThreadToolSurfaceOptions } from "./tools/ports"
 
 // A thread's state is one of running | idle | inactive | archived (#13403, #13407, #13411): `online` is a device's,
 // never a thread's, so no row carries `alive`.
+
+describe("threadState is the one state rule (thread_list and local control both derive from it)", () => {
+  test("#given a mid-turn activity #when the state is derived #then running, queued and awaiting_approval are all running", () => {
+    for (const activity of ["running", "queued", "awaiting_approval"]) expect(threadState({ held: true, activity })).toBe("running")
+    expect(threadState({ held: true, activity: "errored" })).toBe("idle")
+    expect(threadState({ held: true })).toBe("idle")
+    expect(threadState({ held: false, activity: "queued" })).toBe("inactive")
+    expect(threadState({ archived: true, held: true, activity: "running" })).toBe("archived")
+  })
+})
 
 const directories: string[] = []
 const remoteFixture = createRemoteThreadFixture()

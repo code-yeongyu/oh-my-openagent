@@ -88,7 +88,7 @@ export type ThreadToolSummary = Omit<
  * degraded, known only from disk) is `inactive`; otherwise the engine's activity. A field an older engine does not
  * report reads as not archived and idle.
  */
-function threadState(facts: {
+export function threadState(facts: {
   readonly archived?: unknown
   readonly held: boolean
   readonly activity?: unknown

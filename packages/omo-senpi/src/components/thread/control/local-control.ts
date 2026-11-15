@@ -1,5 +1,5 @@
 import { threadLink } from "../thread-link"
-import { routingId, sessionPort, summary } from "../tools/internals"
+import { routingId, sessionPort, summary, threadState } from "../tools/internals"
 import type { ThreadHostSession, ThreadToolSurfaceOptions } from "../tools/ports"
 import type { ThreadIdentity } from "../contracts"
 import { refuse, type SessionControl } from "./port"
@@ -67,7 +67,10 @@ export function createLocalControl(
       }
     },
     getMessages: () => port.getMessages(routing),
-    running: async () => session.activity === "running" || (await port.getState(routing)).isStreaming === true,
+    // The same rule thread_list applies: a queued or approval-waiting thread is mid-turn (internals.ts threadState).
+    running: async () =>
+      threadState({ archived: session.archived, held: true, activity: session.activity }) === "running" ||
+      (await port.getState(routing)).isStreaming === true,
     setArchived: async (archived) => {
       const unsupported = () =>
         refuse(
