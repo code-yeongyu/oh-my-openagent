@@ -68,14 +68,16 @@ export function omoBinaryPath(env: Readonly<Record<string, string | undefined>> 
   return resolve(process.argv[1] ?? process.execPath)
 }
 
-const bootstrap = async (io: BootstrapIo, setup: BootstrapSetup, json: boolean) => {
+// `quietSuppressed`: the setup after `omo login` says nothing when the install changed nothing because this machine has
+// no reachable service manager; login succeeded, and `omo remote enable` / `omo remote status` still say why.
+const bootstrap = async (io: BootstrapIo, setup: BootstrapSetup, json: boolean, quietSuppressed = false) => {
   const outcome = await bootstrapDeviceService({
     accountShow: io.accountShow,
     stateDir: io.stateDir,
     connect: io.connect,
     ...setup,
   })
-  if (outcome.kind === "stopped") {
+  if (outcome.kind === "stopped" && !(quietSuppressed && outcome.suppressed === true)) {
     if (json) io.output(JSON.stringify({ state: outcome.state, notice: outcome.notice }))
     else io.error(outcome.notice)
   }
@@ -120,8 +122,9 @@ async function enableRemote(
   remote: RemoteSetup,
   json: boolean,
   report: (enabled: boolean) => void,
+  quietSuppressed = false,
 ): Promise<boolean | "stopped"> {
-  const outcome = await bootstrap(io, setup, json)
+  const outcome = await bootstrap(io, setup, json, quietSuppressed)
   if (outcome.kind === "stopped") return "stopped"
   let enabled: boolean
   try {
@@ -155,7 +158,7 @@ export async function runLoginSetup(
   if (remote.optOut.read()) {
     // Enforced now, not at the next omo start (#13602 security review M1): a switch that came back on is turned off and
     // the unit removed, as the bootstrap does for an opt-out. A setup that stops still leaves the record in charge.
-    const outcome = await bootstrap(io, setup, false)
+    const outcome = await bootstrap(io, setup, false, true)
     if (outcome.kind === "connected") {
       try {
         if (outcome.status.enabled) await outcome.service.setEnabled(false)
@@ -167,7 +170,7 @@ export async function runLoginSetup(
     io.output(REMOTE_KEPT_OFF_AFTER_SIGN_IN)
     return "kept_off"
   }
-  const enabled = await enableRemote(io, setup, remote, false, () => {})
+  const enabled = await enableRemote(io, setup, remote, false, () => {}, true)
   if (enabled !== true) return "not_on"
   io.output(REMOTE_ON_AFTER_SIGN_IN)
   return "on"

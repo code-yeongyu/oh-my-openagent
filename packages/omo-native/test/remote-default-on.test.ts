@@ -4,7 +4,12 @@ import { connectDeviceService } from "../../device-service-core/src/index.ts"
 import { startFakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
 import { defaultWorld } from "../../device-service-core/test/local-api/conformance/world.ts"
 import { cliDeviceServiceHandoff } from "../device-service-handoff"
-import { REMOTE_KEPT_OFF_AFTER_SIGN_IN, REMOTE_ON_AFTER_SIGN_IN, runLoginSetup } from "../remote-bootstrap"
+import {
+  REMOTE_KEPT_OFF_AFTER_SIGN_IN,
+  REMOTE_ON_AFTER_SIGN_IN,
+  runEnableVerb,
+  runLoginSetup,
+} from "../remote-bootstrap"
 import { disableNotSavedNotice, REMOTE_EXIT } from "../remote-cli"
 import { afterServiceAuth } from "../service-auth-command"
 import {
@@ -200,6 +205,33 @@ describe("omo login switches remote sessions on and says so", () => {
     }
     return { owner, out, coldWake, io, remote }
   }
+
+  // 5.1.73 (#13602 follow-up): a machine with no reachable service manager (a container, a test) gets install_failed
+  // suppress_failed and nothing changed; login succeeded, so it stays quiet, while omo remote enable still says why.
+  test("an install the service manager could not confirm leaves login quiet, and enable still reports it", async () => {
+    const { io, remote } = await signedInDeviceWithSwitchOff(false)
+    const out: string[] = []
+    const noService = {
+      ...io,
+      stateDir: privateDir(),
+      connect: () => connectDeviceService({ version: "5.1.52", stateDir: privateDir() }),
+      output: (line: string) => out.push(line),
+      error: (line: string) => out.push(`stderr: ${line}`),
+    }
+    const setup = {
+      ...testBootstrap(),
+      install: async () => ({
+        ok: false as const,
+        state: "service_degraded" as const,
+        action: "The OmO device service could not be installed (install-service: suppress_failed).",
+        suppressed: true as const,
+      }),
+    }
+    expect(await runLoginSetup(noService, setup, remote)).toBe("not_on")
+    expect(out).toEqual([])
+    await runEnableVerb(noService, setup, remote, false)
+    expect(out).toEqual([expect.stringContaining("stderr: The OmO device service could not be installed")])
+  })
 
   test("switches the service on, links the device, installs the unit and prints the one line", async () => {
     const { owner, out, coldWake, io, remote } = await signedInDeviceWithSwitchOff(false)
