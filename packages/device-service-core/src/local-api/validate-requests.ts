@@ -2,6 +2,7 @@ import { SESSION_PROJECT_MAX_CHARS, SESSION_READ_TAIL_MAX } from "./spec-proto.t
 import type { EnvironmentReport, LocalRequest, RequestType, SessionFilter } from "./protocol.ts"
 import { COMMAND_REQUEST_VALIDATORS, requestFields, type RequestValidators } from "./validate-command.ts"
 import { DELEGATED_REQUEST_VALIDATORS } from "./validate-delegated.ts"
+import { DELIVERIES_REQUEST_VALIDATORS } from "./validate-deliveries.ts"
 import {
   absolutePath,
   base64Bytes,
@@ -20,13 +21,6 @@ import { deviceId, deviceRef, sessionId } from "./validate-shapes.ts"
 import { FILTER_KEYS, SESSION_ROW_STATES } from "./vocabulary.ts"
 
 const ENVIRONMENTS_MAX = 1024
-// omo-service#1016: the account's machine salt, canonical unpadded base64url of 16 to 64 bytes.
-const machineSalt = (v: unknown): string => {
-  const salt = text(v, 86, "machine_salt")
-  if (!/^[A-Za-z0-9_-]+$/.test(salt)) return fail("machine_salt")
-  const bytes = Buffer.from(salt, "base64url")
-  return bytes.length >= 16 && bytes.length <= 64 && bytes.toString("base64url") === salt ? salt : fail("machine_salt")
-}
 const PKCS8_KEY_BYTES = 48
 // PKCS#8 v1 DER of a raw 32-byte private key: SEQUENCE { version 0, AlgorithmIdentifier { OID }, OCTET STRING {
 // OCTET STRING (32) } }; the OID is 1.3.101.112 for Ed25519 and 1.3.101.110 for X25519.
@@ -72,6 +66,7 @@ const agentDir = (v: Fields): string => absolutePath(requestFields(v, ["agent_di
 const VALIDATORS: RequestValidators<RequestType> = {
   ...COMMAND_REQUEST_VALIDATORS,
   ...DELEGATED_REQUEST_VALIDATORS,
+  ...DELIVERIES_REQUEST_VALIDATORS,
   authenticate: (v, id) => {
     const m = requestFields(v, ["client_proof"])
     return { id, type: "authenticate", client_proof: text(m["client_proof"], 64, "client_proof") }
@@ -83,6 +78,15 @@ const VALIDATORS: RequestValidators<RequestType> = {
   "status.subscribe": (v, id) => {
     bare(v)
     return { id, type: "status.subscribe" }
+  },
+  "control.session_wake.get": (v, id) => {
+    bare(v)
+    return { id, type: "control.session_wake.get" }
+  },
+  "control.session_wake.set": (v, id) => {
+    const value = requestFields(v, ["enabled"])["enabled"]
+    const enabled = value === null || typeof value === "boolean" ? value : fail("enabled")
+    return { id, type: "control.session_wake.set", enabled }
   },
   "control.attach.get": (v, id) => {
     bare(v)
@@ -120,11 +124,6 @@ const VALIDATORS: RequestValidators<RequestType> = {
     bare(v)
     return { id, type: "device.forget" }
   },
-  "device.machine_binding": (v, id) => ({
-    id,
-    type: "device.machine_binding",
-    machine_salt: machineSalt(requestFields(v, ["machine_salt"])["machine_salt"]),
-  }),
   "device.info": (v, id) => {
     bare(v)
     return { id, type: "device.info" }
