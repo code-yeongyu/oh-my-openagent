@@ -30,12 +30,20 @@ const checked = (name: string, value: string, absolute: boolean): string => {
 /** The checked start of the session host: the argv and environment both unit renderers write. */
 export class SessionHostLaunch {
   private readonly checked = true
+  /** The omo program: the binary, or the runtime and the launcher script. */
+  private readonly program: readonly string[]
   readonly argv: readonly string[]
   readonly env: readonly (readonly [string, string])[]
 
-  private constructor(argv: readonly string[], env: readonly (readonly [string, string])[]) {
-    this.argv = argv
+  private constructor(program: readonly string[], env: readonly (readonly [string, string])[]) {
+    this.program = program
+    this.argv = [...program, "daemon", "run", "--pinned"]
     this.env = env
+  }
+
+  /** Another omo command for the same agent dir, run the way the unit runs it (through env, no shell). */
+  omoCommand(args: readonly string[]): readonly string[] {
+    return ["/usr/bin/env", ...this.env.map(([key, value]) => `${key}=${value}`), ...this.program, ...args]
   }
 
   /** An npm launcher script (`bin/omo.js`) runs under the runtime that ran it; a compiled omo runs directly. */
@@ -46,13 +54,10 @@ export class SessionHostLaunch {
     readonly path?: string | undefined
   }): SessionHostLaunch {
     const program = checked("omo binary", options.omoBin, true)
-    const command = ["daemon", "run", "--pinned"]
-    const argv = program.endsWith(".js")
-      ? [checked("runtime", options.execPath, true), program, ...command]
-      : [program, ...command]
+    const omo = program.endsWith(".js") ? [checked("runtime", options.execPath, true), program] : [program]
     const env: (readonly [string, string])[] = [["OMO_CODING_AGENT_DIR", checked("agent dir", options.agentDir, true)]]
     if (options.path !== undefined && options.path !== "") env.push(["PATH", checked("PATH", options.path, false)])
-    return new SessionHostLaunch(argv, env)
+    return new SessionHostLaunch(omo, env)
   }
 }
 

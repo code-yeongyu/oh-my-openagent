@@ -161,7 +161,9 @@ The device service's installer rewrites its macOS plist on every install and upd
 the next `omo remote bootstrap` (every omo start) writes it back. The Linux drop-in survives an install.
 
 `omo remote disable` disables and removes the unit and the entry, and while remote sessions are off,
-`omo remote bootstrap` removes them again instead of installing them. A unit that cannot be set up prints one
+`omo remote bootstrap` removes them again instead of installing them. Removing the unit also stops the host
+it pinned (`omo daemon stop --drain`, so a running turn finishes first), because that host never idle-exits;
+a host another omo started (no pin in its `env_keys`) is left to its own idle exit. A unit that cannot be set up prints one
 notice on stderr and never changes the command's exit code or output. Windows has no session host unit.
 
 ## Windows notes

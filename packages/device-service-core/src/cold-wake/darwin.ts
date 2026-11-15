@@ -2,6 +2,7 @@ import { existsSync } from "node:fs"
 import { join } from "node:path"
 
 import { type ColdWakeHost, type ColdWakeOutcome, failed, removeIfPresent, writeIfChanged } from "./host.ts"
+import { drainPinnedHost } from "./pinned-host.ts"
 import { SERVICE_TABLE_ENV, type TableEdit, withColdWake, withoutColdWake } from "./service-table.ts"
 import { launchdSessionHostPlist, SESSION_HOST_LAUNCHD_LABEL, type SessionHostLaunch } from "./session-host-unit.ts"
 
@@ -73,11 +74,14 @@ export async function installDarwin(host: ColdWakeHost, launch: SessionHostLaunc
   return applyTable(host, (raw) => withColdWake(raw, "darwin"), "installed")
 }
 
-export async function uninstallDarwin(host: ColdWakeHost): Promise<ColdWakeOutcome> {
+// The bootout leaves the host the job started (AbandonProcessGroup), so the pinned one is drained next.
+export async function uninstallDarwin(host: ColdWakeHost, launch: SessionHostLaunch): Promise<ColdWakeOutcome> {
   const plist = plistPath(host.home, SESSION_HOST_LAUNCHD_LABEL)
   if (existsSync(plist)) {
     await host.run(["launchctl", "bootout", `gui/${host.uid}/${SESSION_HOST_LAUNCHD_LABEL}`])
     removeIfPresent(plist)
   }
+  const drainFailure = await drainPinnedHost(host, launch)
+  if (drainFailure !== undefined) return drainFailure
   return applyTable(host, withoutColdWake, "removed")
 }

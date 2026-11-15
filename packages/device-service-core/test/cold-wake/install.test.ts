@@ -22,14 +22,35 @@ const DROP_IN = (home: string) => join(UNIT_DIR(home), "omo-relay-daemon.service
 
 const ok = (output = "") => ({ exitCode: 0, output })
 
+const OMO = "/usr/bin/env OMO_CODING_AGENT_DIR=/h/.omo/agent /opt/omo daemon"
+
+/** `omo daemon status/stop` for the agent dir: one operator host, launched with or without the cold-start pin. */
+function fakeOmoHost(pinned: boolean) {
+  const state = { running: true, pinned }
+  const answer = (argv: readonly string[]) => {
+    if (argv.includes("status")) {
+      const envKeys = ["HOME", "OMO_AGENT_DIR", ...(state.pinned ? ["SENPI_RPC_HOST_COLD_START"] : [])]
+      const endpoint = { socket: "/h/.omo/agent/rpc/rpc.sock", reachable: state.running, pid: 7, env_keys: envKeys }
+      return ok(JSON.stringify({ endpoints: state.running ? [endpoint] : [] }))
+    }
+    if (argv.includes("stop")) state.running = false
+    return ok(JSON.stringify({ action: "drained" }))
+  }
+  return { state, answer }
+}
+
 /** systemctl --user over the files under `home`: the effective Environment is the drop-in's, quoted the way systemd shows it. */
-function fakeSystemd(options: { readonly relayd?: boolean; readonly ownerTable?: string } = {}) {
+function fakeSystemd(
+  options: { readonly relayd?: boolean; readonly ownerTable?: string; readonly pinned?: boolean } = {},
+) {
   const home = mkdtempSync(join(tmpdir(), "cwl-"))
   dirs.push(home)
   const runs: string[] = []
   const unit = { enabled: false, active: false }
+  const omo = fakeOmoHost(options.pinned ?? true)
   const run: RunCommand = async (argv) => {
     runs.push(argv.join(" "))
+    if (argv[0] === "/usr/bin/env") return omo.answer(argv)
     const verb = argv[2]
     if (argv.includes("UnitFileState"))
       return ok(
@@ -52,8 +73,10 @@ function fakeSystemd(options: { readonly relayd?: boolean; readonly ownerTable?:
     return ok()
   }
   const host: ColdWakeHost = { platform: "linux", home, uid: 1000, run, pause: async () => {} }
-  return { host, home, runs, unit }
+  return { host, home, runs, unit, omo }
 }
+
+const actions = (runs: readonly string[]) => runs.filter((r) => !r.includes(" show ") && !r.endsWith(" status --json"))
 
 describe("cold wake on Linux", () => {
   test("installs, enables and starts the unit, adds the table entry and restarts the device service once", async () => {
@@ -111,22 +134,34 @@ describe("cold wake on Linux", () => {
     expect(existsSync(DROP_IN(home))).toBe(false)
   })
 
-  test("uninstall disables and removes the unit and the entry; a second uninstall does nothing", async () => {
-    const { host, home, runs, unit } = fakeSystemd()
+  // omo#13595 review M1: the unit's host never idle-exits, so once the unit is gone nothing else would ever end it.
+  test("uninstall disables the unit, drains the pinned host it started, and removes the unit and the entry", async () => {
+    const { host, home, runs, unit, omo } = fakeSystemd()
     await installColdWake(host, LAUNCH)
     runs.length = 0
-    expect(await uninstallColdWake(host)).toEqual({ kind: "removed", serviceRestarted: true })
+    expect(await uninstallColdWake(host, LAUNCH)).toEqual({ kind: "removed", serviceRestarted: true })
     expect(existsSync(join(UNIT_DIR(home), "omo-session-host.service"))).toBe(false)
     expect(existsSync(DROP_IN(home))).toBe(false)
     expect(unit).toEqual({ enabled: false, active: false })
-    expect(runs.filter((r) => !r.includes(" show "))).toEqual([
+    expect(omo.state.running).toBe(false)
+    expect(actions(runs)).toEqual([
       "systemctl --user disable --now omo-session-host.service",
+      `${OMO} stop --drain`,
       "systemctl --user daemon-reload",
       "systemctl --user restart omo-relay-daemon.service",
     ])
     runs.length = 0
-    expect(await uninstallColdWake(host)).toEqual({ kind: "removed", serviceRestarted: false })
-    expect(runs.filter((r) => !r.includes(" show "))).toEqual([])
+    expect(await uninstallColdWake(host, LAUNCH)).toEqual({ kind: "removed", serviceRestarted: false })
+    expect(actions(runs)).toEqual([])
+  })
+
+  test("uninstall leaves a host it did not pin to its own idle exit", async () => {
+    const { host, runs, omo } = fakeSystemd({ pinned: false })
+    await installColdWake(host, LAUNCH)
+    runs.length = 0
+    await uninstallColdWake(host, LAUNCH)
+    expect(omo.state.running).toBe(true)
+    expect(runs).not.toContain(`${OMO} stop --drain`)
   })
 
   test("a failed restart is reported with its step", async () => {
@@ -158,8 +193,10 @@ function fakeLaunchd(options: { readonly bootstrapFailures?: number } = {}) {
     failures: options.bootstrapFailures ?? 0,
   }
   const runs: string[] = []
+  const omo = fakeOmoHost(true)
   const run: RunCommand = async (argv) => {
     runs.push(argv.join(" "))
+    if (argv[0] === "/usr/bin/env") return omo.answer(argv)
     const [tool, verb, target, value] = argv
     if (tool === "plutil" && verb === "-extract")
       return target === "EnvironmentVariables" || state.table !== undefined
@@ -179,7 +216,7 @@ function fakeLaunchd(options: { readonly bootstrapFailures?: number } = {}) {
     return ok()
   }
   const host: ColdWakeHost = { platform: "darwin", home, uid: 501, run, pause: async () => {} }
-  return { host, home, runs, state, relayd }
+  return { host, home, runs, state, relayd, omo }
 }
 
 describe("cold wake on macOS", () => {
@@ -226,14 +263,18 @@ describe("cold wake on macOS", () => {
     expect(runs.filter((r) => r.includes("bootstrap gui/501") && r.includes("session-host"))).toHaveLength(3)
   })
 
-  test("uninstall unloads and removes the LaunchAgent and removes the entry", async () => {
-    const { host, home, state, runs } = fakeLaunchd()
+  test("uninstall unloads and removes the LaunchAgent, drains its pinned host and removes the entry", async () => {
+    const { host, home, state, runs, omo } = fakeLaunchd()
     await installColdWake(host, LAUNCH)
-    expect(await uninstallColdWake(host)).toEqual({ kind: "removed", serviceRestarted: true })
+    runs.length = 0
+    expect(await uninstallColdWake(host, LAUNCH)).toEqual({ kind: "removed", serviceRestarted: true })
     expect(existsSync(LABEL_PLIST(home, "ai.omo.session-host"))).toBe(false)
     expect(state.table).toBeUndefined()
+    expect(omo.state.running).toBe(false)
+    expect(runs.slice(0, 2)).toEqual(["launchctl bootout gui/501/ai.omo.session-host", `${OMO} status --json`])
+    expect(runs[2]).toBe(`${OMO} stop --drain`)
     runs.length = 0
-    expect(await uninstallColdWake(host)).toEqual({ kind: "removed", serviceRestarted: false })
-    expect(runs.filter((r) => !r.includes("-extract"))).toEqual([])
+    expect(await uninstallColdWake(host, LAUNCH)).toEqual({ kind: "removed", serviceRestarted: false })
+    expect(actions(runs).filter((r) => !r.includes("-extract"))).toEqual([])
   })
 })

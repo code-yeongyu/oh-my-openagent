@@ -33,23 +33,26 @@ export function coldWakeSetup(options: {
   if ((platform !== "linux" && platform !== "darwin") || uid === undefined)
     return { install: async () => UNSUPPORTED, uninstall: async () => UNSUPPORTED }
   const host = { platform, home: homedir(), uid, run: runCommand, pause }
+  const withLaunch = async (
+    apply: (launch: SessionHostLaunch) => Promise<ColdWakeOutcome>,
+  ): Promise<ColdWakeOutcome> => {
+    let launch: SessionHostLaunch
+    try {
+      launch = SessionHostLaunch.from({
+        omoBin: options.binaryPath,
+        execPath: process.execPath,
+        agentDir: options.agentDir,
+        path: (options.env ?? process.env).PATH,
+      })
+    } catch (error) {
+      if (error instanceof ColdWakeUnitError) return { kind: "failed", step: "unit", detail: error.message }
+      throw error
+    }
+    return apply(launch)
+  }
   return {
-    install: async () => {
-      let launch: SessionHostLaunch
-      try {
-        launch = SessionHostLaunch.from({
-          omoBin: options.binaryPath,
-          execPath: process.execPath,
-          agentDir: options.agentDir,
-          path: (options.env ?? process.env).PATH,
-        })
-      } catch (error) {
-        if (error instanceof ColdWakeUnitError) return { kind: "failed", step: "unit", detail: error.message }
-        throw error
-      }
-      return installColdWake(host, launch)
-    },
-    uninstall: () => uninstallColdWake(host),
+    install: () => withLaunch((launch) => installColdWake(host, launch)),
+    uninstall: () => withLaunch((launch) => uninstallColdWake(host, launch)),
   }
 }
 

@@ -2,6 +2,7 @@ import { existsSync } from "node:fs"
 import { join } from "node:path"
 
 import { type ColdWakeHost, type ColdWakeOutcome, failed, removeIfPresent, writeIfChanged } from "./host.ts"
+import { drainPinnedHost } from "./pinned-host.ts"
 import { SERVICE_TABLE_ENV, type TableEdit, withColdWake, withoutColdWake } from "./service-table.ts"
 import {
   SESSION_HOST_SYSTEMD_UNIT,
@@ -132,12 +133,14 @@ export async function installLinux(host: ColdWakeHost, launch: SessionHostLaunch
   return (await runSessionHost(host, unitChanged)) ?? outcome
 }
 
-// `disable --now` stops only the unit's own process (KillMode=process): a host it started keeps its sessions.
-export async function uninstallLinux(host: ColdWakeHost): Promise<ColdWakeOutcome> {
+// `disable --now` stops only the unit's own process (KillMode=process), so the pinned host it started is drained next.
+export async function uninstallLinux(host: ColdWakeHost, launch: SessionHostLaunch): Promise<ColdWakeOutcome> {
   const unitPath = join(unitDir(host.home), SESSION_HOST_SYSTEMD_UNIT)
   if (existsSync(unitPath)) {
     const disabled = await systemctl(host, "disable", "--now", SESSION_HOST_SYSTEMD_UNIT)
     if (disabled.exitCode !== 0) return failed("unit_disable", disabled.output)
   }
+  const drainFailure = await drainPinnedHost(host, launch)
+  if (drainFailure !== undefined) return drainFailure
   return applyTable(host, withoutColdWake, removeIfPresent(unitPath), "removed")
 }
