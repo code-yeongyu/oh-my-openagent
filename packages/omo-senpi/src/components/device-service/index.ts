@@ -1,5 +1,5 @@
 import { AsyncResource } from "node:async_hooks"
-import { basename, dirname } from "node:path"
+import { basename, dirname, isAbsolute } from "node:path"
 
 import { deferUntilAfterFirstPaint } from "../../extension/startup-deferral"
 import type { OmoSenpiComponent } from "../../extension/types"
@@ -29,7 +29,7 @@ const HOST_DAEMON_DIR_ENV = "SENPI_RPC_HOST_DAEMON_DIR"
 
 function daemonAgentDir(env: Readonly<Record<string, string | undefined>>): string | undefined {
   const daemonDir = env[HOST_DAEMON_DIR_ENV]?.trim()
-  if (!daemonDir) return undefined
+  if (!daemonDir || !isAbsolute(daemonDir)) return undefined
   const registry = dirname(daemonDir)
   return basename(registry) === "rpc-host-daemon" ? dirname(registry) : undefined
 }

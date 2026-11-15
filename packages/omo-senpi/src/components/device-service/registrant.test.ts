@@ -212,3 +212,36 @@ test("#given an operator daemon whose endpoint registry lives under another agen
   })
   expect(started.map(({ agentDir }) => agentDir)).toEqual([registryOwner])
 })
+
+// #13604 (L2): senpi always names an absolute registry dir; a relative one is unreadable, so the registrant falls back
+// to the launcher's agent dir instead of registering nothing.
+test("#given an operator daemon whose registry dir variable is relative #when it loads omo #then it registers the launcher's agent dir", async () => {
+  const daemonSocket = "/tmp/omo-daemon-registrant-c/rpc/rpc.sock"
+  const started: Started[] = []
+  const pi = new FakeExtensionAPI()
+  pi.cwd = "/work/project"
+  Object.assign(pi, { sessionContext: { host_socket: daemonSocket, host_instance: "generation-1" } })
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("waited 5s for the operator daemon's registrant to start")), 5_000)
+    createDeviceServiceComponent({
+      env: {
+        OMO_RPC_SOCKET_PATH: daemonSocket,
+        OMO_CODING_AGENT_DIR: AGENT_DIR,
+        SENPI_RPC_HOST_DAEMON_DIR: "rpc-host-daemon/0123456789abcdef",
+      },
+      latch: { claimed: true },
+      registrantLatch: { claimed: false },
+      loadConfig: () => ({ config: {} }),
+      startRegistrant: ({ agentDir }) => {
+        started.push({ agentDir, sessionStore: sessionOwner.getStore() })
+        clearTimeout(timer)
+        resolve()
+      },
+    }).register(pi, {
+      logger: { info() {}, warn() {}, error() {} },
+      config: { getFlag: () => undefined },
+      deferStartupWork: () => undefined,
+    })
+  })
+  expect(started.map(({ agentDir }) => agentDir)).toEqual([AGENT_DIR])
+})
