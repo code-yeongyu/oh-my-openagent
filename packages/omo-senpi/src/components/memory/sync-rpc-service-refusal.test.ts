@@ -76,11 +76,11 @@ for (const [code, status, reason] of KNOWN) {
 async function approvalRefusedAfterAnswer(error: Error) {
   const f = await setup()
   const a = owner("a")
-  const displayed = Promise.withResolvers<void>()
+  const displayed = Promise.withResolvers<undefined>()
   f.runtime.approveDevice = async (input) => {
     input.onAnswered({ id: input.pendingId, expires_at: Date.now() + 60_000 })
     const confirmation = input.confirmCode("012345")
-    displayed.resolve()
+    displayed.resolve(undefined)
     await confirmation
     throw error
   }
