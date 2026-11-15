@@ -57,6 +57,8 @@ pub(crate) struct Worker {
     pub(crate) report_extras: Rc<Cell<Option<crate::report::ReportExtras>>>,
     /// The coordinate epoch; moves supersede frames and expire refs.
     pub(crate) epochs: crate::epoch::Epochs,
+    /// The time the actionability battery waits on.
+    pub(crate) battery_clock: Box<dyn crate::actionability::BatteryClock>,
     /// The last activity, for the object-mode idle flush.
     pub(crate) idle: crate::idle::Idle,
 }
@@ -100,6 +102,7 @@ impl Worker {
             intervention: crate::intervention::Intervention::new(),
             report_extras: Rc::default(),
             epochs: crate::epoch::Epochs::default(),
+            battery_clock: Box::new(crate::actionability::HostClock::new()),
             idle: crate::idle::Idle::default(),
         };
         worker.install_screen_probe();
