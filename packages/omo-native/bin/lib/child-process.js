@@ -63,29 +63,8 @@ export function runChild(command, args, options = {}) {
   capturedStdio[2] = "pipe"
   return new Promise((resolve, reject) => {
     let child
-    try {
-      child = spawn(command, args, {
-        stdio: "inherit",
-        windowsHide: true,
-        ...spawnOptions,
-        ...(shellHandoff ? { env: shellHandoff.env, stdio: shellHandoff.stdio } : {}),
-        // A captured stderr is still shown live; the caller also gets its tail to classify the failure.
-        ...(captureStderr ? { stdio: capturedStdio } : {}),
-      })
-    } finally {
-      const closeOwned = onSpawn ?? shellHandoff?.onSpawn
-      closeOwned?.()
-    }
-    let stderr = ""
-    if (captureStderr) {
-      // The decoder keeps a multi-byte character split across chunks whole; the echo stays raw bytes.
-      const decoder = new StringDecoder("utf8")
-      child.stderr.on("data", (chunk) => {
-        process.stderr.write(chunk)
-        stderr = (stderr + decoder.write(chunk)).slice(-STDERR_TAIL_CHARS)
-      })
-    }
-
+    // Listen before the child exists: a signal that arrives the moment the engine starts must still reach it
+    // instead of killing this launcher. Bun and Node install the handler inside process.on (#13652 review).
     let settled = false
     let graceTimer
     const listeners = []
@@ -139,6 +118,33 @@ export function runChild(command, args, options = {}) {
         listeners.push([signal, listener])
         process.on(signal, listener)
       }
+    }
+
+    try {
+      child = spawn(command, args, {
+        stdio: "inherit",
+        windowsHide: true,
+        ...spawnOptions,
+        ...(shellHandoff ? { env: shellHandoff.env, stdio: shellHandoff.stdio } : {}),
+        // A captured stderr is still shown live; the caller also gets its tail to classify the failure.
+        ...(captureStderr ? { stdio: capturedStdio } : {}),
+      })
+    } catch (error) {
+      // Nothing was started, so nothing may keep listening for it.
+      cleanup()
+      throw error
+    } finally {
+      const closeOwned = onSpawn ?? shellHandoff?.onSpawn
+      closeOwned?.()
+    }
+    let stderr = ""
+    if (captureStderr) {
+      // The decoder keeps a multi-byte character split across chunks whole; the echo stays raw bytes.
+      const decoder = new StringDecoder("utf8")
+      child.stderr.on("data", (chunk) => {
+        process.stderr.write(chunk)
+        stderr = (stderr + decoder.write(chunk)).slice(-STDERR_TAIL_CHARS)
+      })
     }
 
     child.on("error", (error) => settle(() => reject(error)))
