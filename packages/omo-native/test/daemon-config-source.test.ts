@@ -62,6 +62,10 @@ function runEngine(ws: Workspace, options: RunOptions = {}): ReturnType<typeof f
     stdout: sink,
     stderr: sink,
     platform: "darwin",
+    // The warm `run` sends after its ensure is not what these tests read.
+    threadSdk: async () => ({
+      sdk: { warmDaemon: async () => ({ kind: "warm", state: "warmed" }), dispose: async () => undefined },
+    }),
   })
   return engine
 }
