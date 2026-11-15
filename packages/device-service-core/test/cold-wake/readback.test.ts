@@ -69,6 +69,30 @@ describe("reading back the units on Linux", () => {
     })
   })
 
+  // The unit is one ensure per start (oneshot), so between starts it reads inactive while the host it started runs.
+  test("an enabled oneshot session host after its ensure ran, with its pinned host up, is running", async () => {
+    const host = linuxHost({
+      sessionHost: "LoadState=loaded\nActiveState=inactive\nUnitFileState=enabled\n",
+      relayd: "LoadState=loaded\nActiveState=active\n",
+      table: ENTRY_LINUX,
+      pinned: true,
+    })
+    expect((await readColdWake(host, LAUNCH)).sessionHost).toEqual({
+      unit: "omo-session-host.service",
+      state: "running",
+      enabled: true,
+    })
+  })
+
+  test("an enabled oneshot session host with no host up is stopped", async () => {
+    const host = linuxHost({
+      sessionHost: "LoadState=loaded\nActiveState=inactive\nUnitFileState=enabled\n",
+      relayd: "LoadState=loaded\nActiveState=active\n",
+      table: ENTRY_LINUX,
+    })
+    expect((await readColdWake(host, LAUNCH)).sessionHost.state).toBe("stopped")
+  })
+
   test("nothing installed: no unit, no host, no entry", async () => {
     const host = linuxHost({
       sessionHost: "LoadState=not-found\nActiveState=inactive\nUnitFileState=\n",

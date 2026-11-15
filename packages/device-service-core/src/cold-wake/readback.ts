@@ -31,7 +31,7 @@ const fields = (output: string): Readonly<Record<string, string>> =>
       .map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1).trim()]),
   )
 
-// `activating` is the session host between two runs of its ensure (auto-restart): the unit is up.
+// `activating` is the session host's ensure running: the unit is up.
 const systemdState = (shown: Readonly<Record<string, string>>): UnitState => {
   if (shown["LoadState"] === "not-found") return "not_installed"
   if (shown["ActiveState"] === "active" || shown["ActiveState"] === "activating") return "running"
@@ -102,7 +102,7 @@ async function readDarwin(host: ColdWakeHost) {
   ])
   const raw = table.exitCode === 0 ? table.output.replace(/\n$/, "") : undefined
   return {
-    // A loaded KeepAlive job is between runs of its ensure while launchd waits out the throttle: it is up.
+    // A loaded job has run its ensure at load; the host it started keeps running after the job exits.
     sessionHost: {
       unit: SESSION_HOST_LAUNCHD_LABEL,
       state: sessionHost.loaded ? ("running" as const) : sessionHost.state,
@@ -116,5 +116,10 @@ async function readDarwin(host: ColdWakeHost) {
 export async function readColdWake(host: ColdWakeHost, launch: SessionHostLaunch): Promise<ColdWakeStatus> {
   const units = host.platform === "darwin" ? await readDarwin(host) : await readLinux(host)
   const pinned = await readPinnedHost(host, launch)
-  return { ...units, pinnedHost: typeof pinned === "string" ? pinned === "pinned" : "unknown" }
+  // The unit is one ensure per start, so between starts it is not active; the host it started is what runs.
+  const sessionHost =
+    units.sessionHost.state === "stopped" && units.sessionHost.enabled && pinned === "pinned"
+      ? { ...units.sessionHost, state: "running" as const }
+      : units.sessionHost
+  return { ...units, sessionHost, pinnedHost: typeof pinned === "string" ? pinned === "pinned" : "unknown" }
 }
