@@ -3,7 +3,8 @@
 // appends its items' ops to one segment file in `pending/` and makes it durable once (an fsync per
 // item would double a large capture's time); a sealed batch's bytes are a file of their own. So a
 // push reads and writes one batch's ops instead of the whole backlog's. The index itself is not
-// constant: it holds an entry per pending item (about 160 bytes plus the key) and every push step
+// constant: it holds an entry per pending item (about 150 bytes plus the key), and while a batch is
+// being sent a second copy of the entry of each item in it, under the outgoing batch. Every push step
 // rewrites it whole, so it grows with how many items are pending, never with their size. A file is durable before
 // the index names it and removed only after the index stops naming it: a crash leaves at most an
 // unnamed file, which `sweep` drops.
@@ -66,8 +67,9 @@ interface InlineItem {
  * journal (a rollback, or two versions taking turns on one repo) still captures: it writes the
  * index entries it read back untouched and appends its own captures inline, so one journal can hold
  * both kinds. Its push does not work on it: it reads every pending item's ops and an outgoing
- * batch's bytes inline, so while any index entry is pending each of its push cycles fails, and
- * nothing is sent until a build with the outbox runs again. The entries stay pending meanwhile.
+ * batch's bytes inline, so each of its push cycles fails while an item captured by a build with the
+ * outbox is still waiting to be sent, and nothing is sent until a build with the outbox runs again.
+ * The entries stay pending meanwhile. With nothing of that kind pending, its push works as before.
  */
 type StoredItem = PendingItem | InlineItem
 type StoredOutgoing = Omit<OutgoingBatch, "items"> & { readonly bytes?: string; readonly items: readonly StoredItem[] }
