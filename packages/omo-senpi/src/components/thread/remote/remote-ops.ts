@@ -458,7 +458,7 @@ export async function followRemote(
       // entry in the transcript says the matched prompt is an earlier send's (#13481 review M1, L1).
       if (storedByText && entries.some(showsStamping)) return
       // Nor is it an entry the transcript already held before the send: that is an earlier prompt with its own run,
-      // whatever settle the buffer holds after it (#13481 delta M1).
+      // whatever settle the buffer holds after it (#13481 delta M1). Entries stored between the send starting and its prompt landing are indistinguishable without ids (oh-my-openagent#13580).
       if (storedByText && storedBeforeSend === undefined) return
       const before = storedByText ? storedBeforeSend : undefined
       const matches = anchorMatches(entries, text).filter(
