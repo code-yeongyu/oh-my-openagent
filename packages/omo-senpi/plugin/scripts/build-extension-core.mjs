@@ -289,7 +289,7 @@ const BUILD_SETTINGS = JSON.stringify({
 // feeds the marker digest, so a byte-identical bundle built under another node read as stale. The digest
 // therefore records the builtin family as ONE stable token and digests only the source-derived
 // externals, which is what freshness must track.
-export const NODE_BUILTIN_SET_MARKER = "<node-builtins>"
+const NODE_BUILTIN_SET_MARKER = "<node-builtins>"
 export function digestSettingsFor(externals, builtinNames) {
   const builtins = new Set(builtinNames)
   const sourceDerived = externals.filter((specifier) => !builtins.has(specifier) && !specifier.startsWith("node:"))
