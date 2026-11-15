@@ -53,6 +53,13 @@ function resolvedOrUndefined(path: string): string | undefined {
   }
 }
 
+function nearestExistingRealpath(path: string): string {
+  for (let current = path; ; current = dirname(current)) {
+    const resolved = resolvedOrUndefined(current)
+    if (resolved !== undefined || dirname(current) === current) return resolved ?? current
+  }
+}
+
 /**
  * Copies the built engine to the root resolution and turns every other directory a resolution points at into a
  * link to it, so the bundler (which follows links to real paths) sees one module per engine file. Returns the root.
@@ -67,6 +74,8 @@ export function placeBuiltSenpi(omoDir: string, builtSenpiRoot: string): string 
   }
   const clone = realpathSync(omoDir) + sep
   const outside = [...others].filter((directory) => !directory.startsWith(clone))
+  const rootHome = nearestExistingRealpath(dirname(target)) + sep
+  if (!rootHome.startsWith(clone)) outside.push(target)
   if (outside.length > 0)
     throw new Error(`senpi resolves outside the clone ${omoDir}; refusing to replace: ${outside.join(", ")}`)
   rmSync(target, { recursive: true, force: true })

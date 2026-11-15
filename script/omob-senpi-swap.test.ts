@@ -75,6 +75,24 @@ describe("placeBuiltSenpi", () => {
     }
   })
 
+  test("#given a root node_modules linked outside the clone #when the built engine is placed #then it refuses and leaves the outside copy", () => {
+    const root = mkdtempSync(join(tmpdir(), "omob-senpi-swap-outside-root-"))
+    try {
+      const omoDir = join(root, "omo")
+      const outsideModules = join(root, "shared-node-modules")
+      writeEngine(join(outsideModules, "@code-yeongyu", "senpi"), "shared")
+      mkdirSync(omoDir, { recursive: true })
+      link(outsideModules, join(omoDir, "node_modules"))
+      const built = join(root, "built")
+      writeEngine(built, "source-build")
+      expect(() => placeBuiltSenpi(omoDir, built)).toThrow(/outside the clone/)
+      const shared = join(outsideModules, "@code-yeongyu", "senpi", "package.json")
+      expect(JSON.parse(readFileSync(shared, "utf8")).version).toBe("shared")
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   test("#given a clone whose root is the only senpi #when the built engine is placed twice #then the root holds the build and nothing else resolves", () => {
     const root = mkdtempSync(join(tmpdir(), "omob-senpi-swap-root-"))
     try {
