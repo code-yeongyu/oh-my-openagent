@@ -4,6 +4,7 @@
 
 import type { RefusalCode, SyncFailureKind } from "@oh-my-opencode/memory-core/sync-engine"
 
+import type { SyncConfigVariable } from "./sync-config-error"
 import type { SyncStatusReader } from "./sync-status-surface"
 
 /** The failure kinds the desktop's status schema accepts (omo-desktop-app contracts); any other kind fails its whole status call. */
@@ -21,8 +22,8 @@ export interface MemoryRpcSync {
   readonly unavailable?: {
     readonly code: "engine_unavailable" | "config_invalid"
     readonly reason: string
-    /** For `config_invalid`: the setting that is not valid. */
-    readonly variable?: string
+    /** For `config_invalid`: the name of the setting that is not valid, never its value. */
+    readonly variable?: SyncConfigVariable
   }
   /** For `failing`, and for `paused` while files are held out of the push too (#12284). */
   readonly failure?: {

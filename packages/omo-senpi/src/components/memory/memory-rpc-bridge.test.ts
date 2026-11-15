@@ -810,8 +810,11 @@ describe("memory rpc bridge sync field (omo #10637)", () => {
       { state: "paused", refused: { seq: 1, code: "signature" } },
     ],
     [
-      "unavailable on this device",
-      async () => ({ kind: "sync-unavailable", reason: "Another process holds the engine." }),
+      "unavailable because the sync engine would not load",
+      async () => ({
+        kind: "sync-unavailable",
+        reason: "the device account sidecar could not be loaded: Error: Cannot find module",
+      }),
       { state: "unavailable", unavailable: { code: "engine_unavailable", reason: expect.any(String) } },
     ],
     [
