@@ -28,6 +28,12 @@ export type FakeDevice = Readonly<{
   describeRefusal?: Readonly<{ code: string; reason: string }>
 }>
 
+// This device itself, as the service lists it since relay-daemon#1134 (the id status.get reports).
+export const FAKE_SELF_DEVICE: FakeDevice = { device: "fake-dev-self", label: "self", os: "linux", tags: [] }
+
+// A command the fake terminal runs: its output in the chunks it arrives in, then its exit code.
+export type FakeCommand = Readonly<{ chunks: readonly string[]; exitCode: number }>
+
 export const FAKE_DEVICES: readonly FakeDevice[] = [
   { device: "fake-dev-builder", label: "builder", os: "linux", tags: ["builder"] },
   { device: "fake-dev-laptop", label: "laptop", os: "darwin", tags: ["desk"] },
@@ -40,7 +46,7 @@ const STATUS = {
   origin_configured: true,
   enabled: true,
 } as const
-const OPS = ["shell", "fs.stat"] as const
+const OPS = ["shell", "fs.stat", "exec_command", "wait_for_command", "kill_terminal"] as const
 const OP_STATES = ["queued", "transport_confirmed", "host_dispatched", "host_applied"] as const
 
 type Message = Readonly<Record<string, unknown>>
@@ -62,6 +68,46 @@ const describeDevice = (device: FakeDevice): Message => ({
   features: ["machine:v1"],
 })
 
+type Terminal = Readonly<{
+  commands: Readonly<Record<string, FakeCommand>>
+  handles: Map<string, { command: FakeCommand; next: number; seq: number }>
+}>
+
+const terminalFrame = (handleId: string, run: { command: FakeCommand; next: number; seq: number }): Message => {
+  const output = run.command.chunks[run.next] ?? ""
+  run.next += 1
+  run.seq += Buffer.byteLength(output)
+  const done = run.next >= run.command.chunks.length
+  return {
+    handleId,
+    output,
+    state: done ? "completed" : "running",
+    lastSeq: run.seq,
+    ...(done ? { exitCode: run.command.exitCode } : {}),
+  }
+}
+
+const executeTerminal = (device: FakeDevice, op: OpRequest, terminal: Terminal): Message | undefined => {
+  if (op.op === "exec_command") {
+    const cmd = String(op.args?.["cmd"] ?? "")
+    const run = { command: terminal.commands[cmd] ?? { chunks: [`${device.label}: ${cmd}`], exitCode: 0 }, next: 0, seq: 0 }
+    const handleId = mintId()
+    terminal.handles.set(handleId, run)
+    return { state: "applied", response: terminalFrame(handleId, run) }
+  }
+  if (op.op === "wait_for_command") {
+    const handleId = String(op.args?.["handle_id"] ?? "")
+    const run = terminal.handles.get(handleId)
+    if (run === undefined) return { state: "refused", error: { code: "unknown_handle", message: `no handle ${handleId}` } }
+    return { state: "applied", response: terminalFrame(handleId, run) }
+  }
+  if (op.op === "kill_terminal") {
+    const handleId = String(op.args?.["handle_id"] ?? "")
+    return { state: "applied", response: { handleId, state: "task-failed", reason: "killed" } }
+  }
+  return undefined
+}
+
 const execute = (device: FakeDevice, op: OpRequest): Message => {
   if (op.op === "shell")
     return {
@@ -73,8 +119,11 @@ const execute = (device: FakeDevice, op: OpRequest): Message => {
   return { state: "refused", error: { code: "op_unknown", message: `${op.op} is not an op this device runs` } }
 }
 
-export async function startFakeDeviceService(options: { devices?: readonly FakeDevice[] } = {}) {
+export async function startFakeDeviceService(
+  options: { devices?: readonly FakeDevice[]; commands?: Readonly<Record<string, FakeCommand>> } = {},
+) {
   const devices = options.devices ?? FAKE_DEVICES
+  const terminal: Terminal = { commands: options.commands ?? {}, handles: new Map() }
   const stateDir = mkdtempSync(join(tmpdir(), "omo-bunshin-ts-fake-service-"))
   chmodSync(stateDir, 0o700)
   const token = await writeToken(stateDir, secure)
@@ -122,7 +171,10 @@ export async function startFakeDeviceService(options: { devices?: readonly FakeD
             after: () => {
               for (const op of ops) {
                 for (const state of OP_STATES) event("machine.op_state", { op_id: op.op_id, state })
-                event("machine.op_result", { op_id: op.op_id, response: execute(device, op) })
+                event("machine.op_result", {
+                  op_id: op.op_id,
+                  response: executeTerminal(device, op, terminal) ?? execute(device, op),
+                })
               }
             },
           }
