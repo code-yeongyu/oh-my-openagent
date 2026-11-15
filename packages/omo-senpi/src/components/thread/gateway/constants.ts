@@ -28,6 +28,11 @@ export const PAIR_BUCKET_REFILL_MS = 5_000
 
 export const MAX_FANOUT_PER_TURN = 16
 
+/** At most this many woken sessions past `requested` per store (one store per agent directory, #13037 A3.1.2). */
+export const WOKEN_SESSION_CAP = 4
+/** How long a carrier's lease on a woken session lasts (#13037 A3.1.3). */
+export const WAKE_LEASE_MS = 60_000
+
 export const QUEUED_TTL_MS = 24 * 60 * 60 * 1000
 
 export const ROOT_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000
