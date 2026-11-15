@@ -12,6 +12,7 @@
     "#omo-computer-use-runtime": "./src/components/computer-use/runtime.ts",
     "#omo-memory-doctor-runtime": "./src/components/memory/commands/doctor-runtime.ts",
     "#omo-thread-client-runtime": "./src/components/thread/live-surface.ts",
+    "#omo-wake-runtime": "./src/components/thread/wake/wake-runtime.ts",
     "#omo-memory-memfs-runtime": "./src/components/memory/commands/memfs-runtime.ts",
     "#omo-telemetry-recovery-runtime": "./src/components/telemetry/session-summary-recovery.ts",
     "#omo-feedback-runtime": "./src/components/feedback/runtime.ts",

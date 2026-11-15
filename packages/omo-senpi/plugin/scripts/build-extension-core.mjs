@@ -157,6 +157,7 @@ export function loroWasmSourcePath() {
   )
 }
 const threadClientEntryPath = join(packageRoot, "src", "components", "thread", "live-surface.ts")
+const wakeEntryPath = join(packageRoot, "src", "components", "thread", "wake", "wake-runtime.ts")
 const telemetryRecoveryEntryPath = join(packageRoot, "src", "components", "telemetry", "session-summary-recovery.ts")
 const feedbackEntryPath = join(packageRoot, "src", "components", "feedback", "runtime.ts")
 const desktopToolkitEntryPath = join(packageRoot, "src", "components", "desktop-toolkit", "runtime.ts")
@@ -217,6 +218,7 @@ const threadClientOutputPath = join(
   "extensions",
   "omo-thread-client.js",
 )
+const wakeOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-wake.js")
 const telemetryRecoveryOutputPath = join(
   process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot,
   "extensions",
@@ -264,6 +266,7 @@ const externalSpecifiers = [
   "#omo-telemetry-otlp-runtime",
   "#omo-memory-sync-runtime",
   "#omo-thread-client-runtime",
+  "#omo-wake-runtime",
   "#omo-telemetry-recovery-runtime",
   // telemetry-core loads its immediate sender through this import; the plugin manifest maps it to the recovery sidecar.
   "#telemetry-immediate-send",
@@ -315,6 +318,7 @@ export const extensionBuildPaths = {
   telemetryOtlpOutputPath,
   memorySyncOutputPath,
   threadClientOutputPath,
+  wakeOutputPath,
   telemetryRecoveryOutputPath,
   feedbackOutputPath,
   desktopToolkitOutputPath,
@@ -375,6 +379,7 @@ export function resolveOutputs(options) {
     telemetryOtlpOutput: sibling(options.telemetryOtlpOutputPath, telemetryOtlpOutputPath, "omo-telemetry-otlp.js"),
     memorySyncOutput: sibling(options.memorySyncOutputPath, memorySyncOutputPath, "omo-memory-sync.js"),
     threadClientOutput: sibling(options.threadClientOutputPath, threadClientOutputPath, "omo-thread-client.js"),
+    wakeOutput: sibling(options.wakeOutputPath, wakeOutputPath, "omo-wake.js"),
     telemetryRecoveryOutput: sibling(
       options.telemetryRecoveryOutputPath,
       telemetryRecoveryOutputPath,
@@ -426,6 +431,7 @@ export async function buildExtension(options = {}) {
     telemetryOtlpOutput,
     memorySyncOutput,
     threadClientOutput,
+    wakeOutput,
     telemetryRecoveryOutput,
     feedbackOutput,
     desktopToolkitOutput,
@@ -465,6 +471,7 @@ export async function buildExtension(options = {}) {
     assets: true,
   })
   const threadClientInputs = await buildEntry(threadClientEntryPath, threadClientOutput, buildDefines)
+  const wakeInputs = await buildEntry(wakeEntryPath, wakeOutput, buildDefines)
   const telemetryRecoveryInputs = await buildEntry(telemetryRecoveryEntryPath, telemetryRecoveryOutput, buildDefines)
   const feedbackInputs = await buildEntry(feedbackEntryPath, feedbackOutput, buildDefines)
   const desktopToolkitInputs = await buildEntry(desktopToolkitEntryPath, desktopToolkitOutput, buildDefines)
@@ -515,6 +522,7 @@ export async function buildExtension(options = {}) {
     telemetryOtlpInputs,
     memorySyncInputs,
     threadClientInputs,
+    wakeInputs,
     telemetryRecoveryInputs,
     feedbackInputs,
     desktopToolkitInputs,

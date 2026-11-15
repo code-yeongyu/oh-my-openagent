@@ -8,6 +8,7 @@ import type {
   ReleaseSessionRequest,
 } from "../gateway/adapter"
 import type { ProvenanceRuntime } from "../gateway/provenance-resolver"
+import type { SameDeviceWake } from "../gateway/same-device-wake"
 import type { GatewayStore } from "../gateway/store"
 import type { ThreadTranscriptEntry } from "../reader"
 import type { RemoteThreadSurface } from "../remote/ports"
@@ -162,6 +163,8 @@ export type ThreadToolSurfaceOptions = {
    */
   readonly sessionsDirectory?: () => string
   readonly ensureHost?: () => Promise<void>
+  /** A same-device send to a session that is not running becomes a wake (#13037 5.3); absent, it is queued offline. */
+  readonly sameDeviceWake?: SameDeviceWake
   /**
    * The gateway store: the tools' idempotency receipts, bindings and outbox. The component passes
    * the one store it shares with the session's control endpoint; the SDK passes the one it opened

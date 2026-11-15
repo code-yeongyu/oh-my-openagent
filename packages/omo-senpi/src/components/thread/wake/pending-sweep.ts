@@ -5,8 +5,11 @@ export type PendingSweepOptions = {
   readonly store: GatewayStore
   readonly admitIntake: (device: string) => Promise<IntakeAdmission>
   readonly wake: (durableId: string) => Promise<void>
-  /** `session_wake.same_device`: same-device rows wake their session only when it is on (5.3). */
-  readonly sameDevice: boolean
+  /**
+   * `session_wake.same_device` for the SESSION's own cwd (its project's configuration, 5.3): same-device rows wake
+   * their session only when it is on for that session.
+   */
+  readonly sameDevice: (durableId: string) => boolean
 }
 
 /**
@@ -26,7 +29,8 @@ export async function runPendingSweep(options: PendingSweepOptions): Promise<voi
     return answer
   }
   for (const session of await store.intakeMarks.openSessions()) {
-    let wake = options.sameDevice && session.local
+    // Local first: a session that is not local can never wake this way, so its project's setting is never read.
+    let wake = session.local && options.sameDevice(session.durable_id)
     for (const device of session.devices) {
       const answer = await admission(device)
       if (answer === "admitted") wake = true

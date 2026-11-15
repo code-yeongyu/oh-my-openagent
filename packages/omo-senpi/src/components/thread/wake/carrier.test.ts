@@ -58,11 +58,13 @@ async function setup(
     readonly wakeLimit?: number
     readonly sameDevice?: () => boolean
     readonly remoteWake?: () => boolean
+    readonly storeWrap?: (store: GatewayStore) => GatewayStore
+    readonly schedule?: (run: () => void, ms: number) => () => void
   } = {},
 ): Promise<Setup> {
   const h = (harness = createGatewayHarness())
   const fake = (host = await startFakeEngineHost(options))
-  const store = h.store()
+  const store = options.storeWrap === undefined ? h.store() : options.storeWrap(h.store())
   const sessions = join(h.agentDir, "sessions")
   const events: CarrierEvent[] = []
   const waiters: {
@@ -88,7 +90,7 @@ async function setup(
     wakeLimit: () => options.wakeLimit ?? 0,
     sameDevice: options.sameDevice ?? (() => true),
     ...(options.remoteWake === undefined ? {} : { remoteWake: options.remoteWake }),
-    schedule: () => () => undefined,
+    schedule: options.schedule ?? (() => () => undefined),
     onEvent: (event) => {
       events.push(event)
       for (const waiter of waiters.splice(0)) {
@@ -386,6 +388,85 @@ describe("the lease (A3.1.3)", () => {
     await successor.sweep()
     expect(await store.woken.list()).toEqual([])
     expect(sent(fake, "release_session")).toHaveLength(1)
+  })
+
+  // The #13455 delta review's MEDIUM: the sweep a carrier runs AT ITS START takes over rows a dead process left,
+  // with no wake of its own and no hand-called sweep; the timer still arms only while the table holds a row.
+  test("#given a table holding a row whose lease ran out #when a successor carrier starts with no wake of its own #then it takes the row over at its start", async () => {
+    const { h, fake, store, carrier, path } = await setup()
+    path("s1")
+    await carrier.wake("s1")
+    await carrier.stop()
+    h.clock.now += WAKE_LEASE_MS + 1
+    let tookOver: () => void = () => undefined
+    const settled = new Promise<void>((resolve, reject) => {
+      tookOver = resolve
+      const timer = setTimeout(() => reject(new Error("waited 5s for the successor to take the row over at its start")), 5_000)
+      timer.unref?.()
+      const original = tookOver
+      tookOver = () => {
+        clearTimeout(timer)
+        original()
+      }
+    })
+    const successor = createCarrier({
+      store: h.store(),
+      sessionsDirectory: join(h.agentDir, "sessions"),
+      ensureHost: async () => undefined,
+      connect: () => connectCarrierHost({ socket: fake.socketPath, keyRoot: () => h.agentDir }),
+      sameDevice: () => true,
+      schedule: () => () => undefined,
+      onEvent: (event) => {
+        if (event.kind === "evaluated" && event.durable_id === "s1") tookOver()
+      },
+    })
+    carriers.push(successor)
+    await settled
+    expect(await store.woken.list()).toEqual([])
+    expect(sent(fake, "release_session")).toHaveLength(1)
+  })
+
+  // The #13455 delta review's LOW: a sweep whose store read throws once still has work to tend, so the timer is
+  // re-armed for the next tick instead of left disarmed while rows exist.
+  test("#given a sweep whose store read throws once #when the timer fires #then the sweep is scheduled again for the next tick", async () => {
+    let reads = 0
+    const timers: (() => void)[] = []
+    let secondArm: () => void = () => undefined
+    const reArmed = new Promise<void>((resolve, reject) => {
+      secondArm = resolve
+      const timer = setTimeout(() => reject(new Error("waited 5s for the sweep to be scheduled again")), 5_000)
+      timer.unref?.()
+      const original = secondArm
+      secondArm = () => {
+        clearTimeout(timer)
+        original()
+      }
+    })
+    const { carrier, path } = await setup({
+      storeWrap: (real) => ({
+        ...real,
+        woken: {
+          ...real.woken,
+          list: async () => {
+            reads += 1
+            if (reads === 2) throw new Error("the store read failed once")
+            return await real.woken.list()
+          },
+        },
+      }),
+      schedule: (run) => {
+        timers.push(run)
+        if (timers.length === 2) secondArm()
+        return () => undefined
+      },
+    })
+    path("t")
+    expect(await carrier.wake("t")).toMatchObject({ kind: "open" })
+    expect(timers).toHaveLength(1)
+    timers[0]?.()
+    await reArmed
+    expect(timers).toHaveLength(2)
+    await carrier.stop()
   })
 
   // Review of #13220 (MEDIUM): a successor must reopen the session in the session's own directory, never its own, or an
