@@ -3,6 +3,7 @@
 
 import { afterEach, expect, spyOn, test } from "bun:test"
 
+import { framedRecordBytes } from "../crypto/build"
 import { MAX_BATCH_BYTES } from "./batches"
 import { type Device, makeDevice } from "./engine-harness.test-support"
 import { FakeSyncServer } from "./fake-server.test-support"
@@ -103,6 +104,43 @@ test(
     expect(await a.engine.runCycle()).toMatchObject({ held: ["big.md"] })
     expect(capturesOf()).toBe(2)
     captures.mockRestore()
+  },
+  SMALL_SET_TIMEOUT,
+)
+
+test(
+  "an edit whose ops fit the bound but whose framed record does not is held at capture, never journaled (#12306)",
+  async () => {
+    const key = "notes/framed-at-the-edge.md"
+    const text = `${"z".repeat(2048)}\n`
+    // The fake store's ops depend only on the text, so a probe device measures them.
+    const probe = await makeDevice(new FakeSyncServer(), "a")
+    devices.push(probe)
+    const captures = spyOn(probe.store, "capture")
+    await probe.write(key, text)
+    await probe.engine.runCycle()
+    const results = await Promise.all(
+      captures.mock.calls.map(([called], i) => (called === key ? captures.mock.results[i]?.value : null)),
+    )
+    const ops: unknown = results.find((result) => result instanceof Uint8Array)
+    captures.mockRestore()
+    if (!(ops instanceof Uint8Array)) throw new Error("the probe captured no ops")
+
+    const bound = ops.byteLength + framedRecordBytes(key, 0) - 1
+    const server = new FakeSyncServer()
+    const logged: string[] = []
+    const a = await makeDevice(server, "a", undefined, { batchBytes: bound, log: (line) => logged.push(line) })
+    devices.push(a)
+    await a.write(key, text)
+    expect(await a.engine.runCycle()).toMatchObject({ held: [key] })
+    expect(ops.byteLength).toBeLessThan(bound)
+    expect((await a.engine.journal.pending()).items).toEqual([])
+    expect(logged.filter((line) => /^sync\.item\.(rewound|stuck)/.test(line))).toEqual([])
+    expect(await a.engine.status()).toMatchObject({
+      kind: "failing",
+      failure: { kind: "oversized_item", keys: [key], stuck: [] },
+    })
+    expect(server.entries).toEqual([])
   },
   SMALL_SET_TIMEOUT,
 )
