@@ -86,7 +86,7 @@ export type DeviceServiceHandoff = {
   readonly machineDevice?: () => Promise<MachineDeviceState>
 }
 
-export const discardedOf = (
+const discardedOf = (
   credentials: Credentials,
   cause: "refused" | "forget" | "logout" | "replaced",
 ): DiscardedCredential => ({
