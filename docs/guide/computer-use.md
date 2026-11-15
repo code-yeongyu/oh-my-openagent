@@ -137,7 +137,7 @@ Wayland has no focused-window geometry and uses the first display the portal rep
 
 ## Act, then check
 
-Each input action now reports what happened. The `computer` tool's result carries `details.report` (and `details.reports` when a call sent several actions) with a `disposition` such as `{ "delivery": "not_delivered", "retry": "safe" }`: whether the input reached the app, and whether sending it again could duplicate it. A failed action carries the same pair in its error. The agent is told to resend only when `retry` is `safe`, to wait for you on `after_user`, and to read the screen again on anything else. The full table is in [Dispositions](../reference/computer.md#dispositions).
+Each input action now reports what happened. The `computer` tool's result carries `details.report` (and `details.reports` when a call sent several actions) with a `disposition` such as `{ "delivery": "not_delivered", "retry": "safe" }`: whether the input reached the app, and whether sending it again could duplicate it. A failed action carries the same pair in its error's `data.disposition`. These fields are for the host and for programs using the SDK: the model reads the tool's text and the value its `run` code returns, not `details.report`, and the computer-use skill does not teach it the disposition rule. What the model is told is per error code: after `AxUnconfirmed`, observe the window before any retry and never repeat the action blindly; after `UserIntervened`, read the window again and never repeat the action as it was; on `Suspended` or `StopPathUnavailable`, stop and report. The full table is in [Dispositions](../reference/computer.md#dispositions).
 
 ### Check the result with verify
 
@@ -148,7 +148,7 @@ const verdict = await computer.verify({ kind: "windowExists", window: { app: "Te
 if (verdict.status !== "satisfied") throw new Error(`window did not open: ${verdict.status}`)
 ```
 
-`verify` only reads; it never sends input, and it never runs past its deadline.
+`verify` only reads and never sends input. It never waits past its deadline, but it checks the deadline only between reads, so a read already in flight when the deadline passes finishes first and the answer can come a little late.
 
 ### Use a screenshot only once
 
@@ -170,7 +170,7 @@ By default (`computer.intervention: "continue"`), the agent's input in an app yo
 
 ### Run code in the QuickJS sandbox
 
-By default the agent's `run` code executes in a `node:vm` context of the OmO process with `desktop`, `wait`, `assert` and `tool` as globals; that context scopes the globals and bounds synchronous work but is not a security boundary. With `computer.run_sandbox: "quickjs"`, model-written `run` code executes in a QuickJS WebAssembly cell instead, whose only globals are `computer` (alias `desktop`), `assert` and `console`; `wait` and `tool` are not available there. Each run is limited to 64 MiB of memory, 1,000 desktop calls and 1 MiB of output and of return value, and the result's `details.sandbox` says where it ran. Code OmO builds itself, such as a `call` chain, always runs in `vm`. The sandbox narrows what model-written code can reach; the permission tiers and stop path still apply to every desktop call.
+By default the agent's `run` code executes in a `node:vm` context of the OmO process with `desktop`, `wait`, `assert` and `tool` as globals; that context scopes the globals and bounds synchronous work but is not a security boundary. With `computer.run_sandbox: "quickjs"`, model-written `run` code executes in a QuickJS WebAssembly cell instead, whose only globals are `computer` (alias `desktop`), `assert` and `console`; `wait` and `tool` are not available there. Each `computer` call there is one bridged call to the same run facade `vm` uses. Each run is limited to 64 MiB of memory, 1,000 `computer` calls and 1 MiB of output and of return value, and the result's `details.sandbox` says where it ran. Code OmO builds itself, such as a `call` chain, always runs in `vm`. In this release an eval kernel's `computer.run(fn)` hands the function `{ desktop, wait, assert }`, so under `quickjs` it fails with `ReferenceError` because `wait` is undefined there; pass the code as a string instead, or keep `vm`. The sandbox narrows what model-written code can reach; the permission tiers and stop path still apply to every desktop call.
 
 ## Safety model
 

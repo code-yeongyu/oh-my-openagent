@@ -53,11 +53,12 @@ An OmO Native session opens the engine with `reportMode: "object"` whenever the 
 | `hit` | The element under the point before sending (`role`, `label`); `label` is `null` for a secure field |
 | `focusRestoration` | `not_needed`, `restored`, `user_moved_on` or `not_confirmed` |
 | `openedSurfaces` | Sheets, dialogs, menus, popovers or windows the action opened; a title over 256 characters is cut and ends `[truncated]`, as is a long `hit` label |
-| `nextCall` | On a `BackgroundUnavailable` refusal, the next rung to try (an element action, the keyboard, foreground); never followed automatically |
 | `note`, `warning` | `warning` is an open token set, in this release only `secure_field` (the point is a secure field, whose label is withheld); `note` is reserved and always `null` in this release |
 | `auditIds` | Ids of the audit events the action emitted |
 | `timings` | Always `null` in this release; per-stage timings are written to the trace file when `computer.trace` is on |
 | `legacy` | `true` when the engine replied `null` (an engine without `action-report`); the report then reads `delivered_unverified` / `unsafe` with `effect: "unverifiable"` |
+
+`details.report` and `details.reports` hold the reports of actions that succeeded. A failed action has no entry there: its disposition, delivered count, focus restoration and next step arrive in the error's `data` (see [Error codes](#error-codes)).
 
 ### Dispositions
 
@@ -92,7 +93,7 @@ On macOS the engine keeps the display awake while the agent operates: the first 
 
 ## Error codes
 
-A failed call carries one engine error code (`crates/senpi-desktop-core/src/error.rs`), and some codes also carry a `data.reason` naming the cause (for example `consumed` for `InvalidCoordinateFrame`; the full list is under [Error reasons](#error-reasons)); the tool's recovery hint follows that reason when it knows it. In an object-mode session the error also carries `data.disposition`, `data.delivered` when part of the input was sent, `data.focusRestoration` and `data.nextCall`. The ones a user or model acts on:
+A failed call carries one engine error code (`crates/senpi-desktop-core/src/error.rs`), and some codes also carry a `data.reason` naming the cause (for example `consumed` for `InvalidCoordinateFrame`; the known tokens are under [Error reasons](#error-reasons)); the tool's recovery hint follows that reason when it knows it. In an object-mode session the error also carries `data.disposition`, `data.delivered` when part of the input was sent, `data.focusRestoration`, and on a `BackgroundUnavailable` refusal (other than `user_active_in_target`) `data.nextCall`: the next rung to try (an element action, the keyboard, foreground), never followed automatically. The ones a user or model acts on:
 
 | Code | Meaning | What to do |
 |------|---------|------------|
@@ -111,26 +112,38 @@ A failed call carries one engine error code (`crates/senpi-desktop-core/src/erro
 | `UserIntervened` | The user was using the target app, or brought another window forward, so the action stopped; the message says whether any input was sent | Read the window again once the user pauses; never repeat the action as it was |
 | `AxUnconfirmed` | An accessibility request was made but the app did not confirm it (no reply in time, or a modal dialog opened). On macOS, `ax.perform` (press and the other named actions), `ax.setValue` and `ax.focus` report it when the app answers `kAXErrorCannotComplete`; a refused request stays `AxFailed`, and so does a value the app answered but did not take | It may already have taken effect: read the element back before any retry |
 | `SpaceUnsupported`, `SpaceMoveDenied` | A window could not be moved to the current Space (macOS), because the platform lacks support or the window server refused or could not verify the move | Ask the user to bring the window to the current Space |
-| `AmbiguousTarget` | A target description matched more than one window or element. Reserved in the protocol; no backend returns it in this release, and a window filter that matches several windows still answers `InvalidTarget` with reason `ambiguous` | List them again and target one by its id or ref |
+| `AmbiguousTarget` | A target description matched more than one window or element. Reserved in the protocol; no backend returns it in this release, and the SDK's window lookup that matches several windows answers `InvalidTarget` with reason `ambiguous` instead | List them again and target one by its id or ref |
 | `CaptureConsentRequired` | The system needs the user to approve screen capture first. Reserved in the protocol; no backend returns it in this release | Ask the user once to approve capture, then capture again |
 | `ProtectedProcess` | The target process is protected and the engine never sends it input. Reserved in the protocol; no backend returns it in this release | Do not retry; pick another target or ask the user to act in that app |
 | `CaptureFailed`, `InputFailed`, `Timeout`, `Cancelled`, `Closed`, `TransactionFailed`, `Internal` | The platform call failed, took too long, was aborted, or the session ended. On macOS a `CaptureFailed`, `InputFailed` or `Timeout` message that ends `(the screen is locked)` or `(the display is asleep)` names the likely cause | Observe again before retrying; stop after repeated failures; for a lock or sleep note, ask the user to unlock or wake the Mac |
 
 ### Error reasons
 
-`data.reason` is an open set of tokens per code (`crates/senpi-desktop-core/src/protocol.rs`); a host that does not know a token falls back to the code's general hint.
+`data.reason` is an open set of tokens per code; a host that does not know a token falls back to the code's general hint. The engine's tokens are the ones `crates/senpi-desktop-core/src/protocol.rs` names, plus `superseded`:
 
-| Code | Reasons |
+| Code | Engine reasons |
 |------|---------|
 | `InvalidCoordinateFrame` | `resized` (the window changed size after the capture), `consumed` (the frame was used with `consume: true`), `zoom` (a zoomed crop is never an input frame), `superseded` (the desktop changed under the session, below; nothing was sent when it changed before the first input event, otherwise the disposition is `unknown`), `wrong_target`, `out_of_bounds` |
 | `WindowNotFound` | `identity_changed`: the window number is the same but its owning process differs from the captured one |
-| `InvalidTarget` | `ambiguous`: the filter matched several windows; `data.candidates` lists them |
 | `BackgroundUnavailable` | `key_route_unproven`, `user_active_in_target` (the user pressed a key or clicked in that frontmost app within the last 1.5 s; retry after they pause), `pointer_reading_toolkit`, `electron_select`, `wayland_window_targeting` |
 | `InvalidKey` | `dangerous_chord`: `cmd+q`, `alt+f4` or `win+l` without `force: true` on `keyChord` |
 | `AxUnsupported` | `disabled`, `action_unsupported`, `not_visible`, `unstable`, `occluded` (the actionability checks run before an accessibility action) |
 | `ControlRequired` | `headless_host`, `spawn_inside_session`, `lease_missing` |
 | `Suspended` | `stop_marker` (reserved for an engine that starts behind the persistent stop marker) |
 | `Internal` | `request_too_large`, `other` |
+
+`protocol.rs` also names `InvalidTarget` `ambiguous` and `ControlRequired` `spawn_inside_session`, but in this release only the SDK raises them. The SDK (`packages/senpi-desktop-sdk/src`) refuses some requests itself, before anything reaches an engine, with its own reasons:
+
+| Code | SDK reasons (source file) |
+|------|---------------------------|
+| `InvalidTarget` | `ambiguous`: a window selector, or `verify`'s `windowBounds`, matched several windows, and `data.candidates` lists them (`computer.ts`, `verify.ts`); `unsupported_transport`: an unknown transport kind, or `attach` on Windows (`connect.ts`, `transport/attach-uds.ts`); `missing_launch` (`transport/spawn.ts`); `invalid_timeout` (`verify.ts`); `empty_reason` (`control.ts`); `invalid_duration`, `invalid_delta` (`target.ts`) |
+| `WindowNotFound` | `no_match` (`computer.ts`) |
+| `InvalidCoordinateFrame` | `other_target`, `zoom_frame`, `invalid_point`, `mixed_frames` (`target.ts`) |
+| `InvalidKey` | `empty_chord` (`target.ts`) |
+| `ControlRequired` | `spawn_inside_session` (`transport/spawn.ts`), `attach_inside_session` (`transport/attach-uds.ts`), `no_confirm_channel`, `declined` (`control.ts`) |
+| `Closed` | `endpoint_refused`, `server_refused`, `unreachable` (`transport/attach-uds.ts`); `sdk_closed` (`link.ts`) |
+| `Cancelled` | `aborted` (`verify.ts`, `batch.ts`) |
+| `Internal` | `launch_failed` (`transport/spawn.ts`), `malformed_result` (`errors.ts`) |
 
 An object-mode session also announces `epoch.changed` when the desktop changes under it (display layout, lock, sleep, Space switch, engine restart); every frame and ref taken before it is superseded, so capture and read again. Input whose frame the change overtakes fails `InvalidCoordinateFrame` with reason `superseded`.
 
@@ -146,7 +159,7 @@ The `computer` block in `omo.jsonc` (OmO Native only) has four settings for the 
 
 | Key | Values (default first) | Engine feature | Effect |
 |-----|------------------------|----------------|--------|
-| `run_sandbox` | `"vm"`, `"quickjs"` | none (host side) | Where model-written `run` code executes. `quickjs` runs it in a QuickJS WebAssembly cell with `computer` (alias `desktop`), `assert` and `console` as its only globals and per-run limits (64 MiB memory, 1,000 bridged calls, 1 MiB output and return value); host-built code such as a `call` chain always runs on `vm` |
+| `run_sandbox` | `"vm"`, `"quickjs"` | none (host side) | Where model-written `run` code executes. `quickjs` runs it in a QuickJS WebAssembly cell with `computer` (alias `desktop`), `assert` and `console` as its only globals and per-run limits (64 MiB memory, 1,000 bridged calls, 1 MiB output and return value); host-built code such as a `call` chain always runs on `vm`. An eval kernel's function-form `computer.run(fn)` names `wait`, so it fails with `ReferenceError` under `quickjs` in this release |
 | `intervention` | `"continue"`, `"pause"` | `intervention-policy` | What a background action does while the user is using the target app. `continue` records the user's presses there but neither waits for them nor stops input already being sent; the 1.5 s `user_active_in_target` refusal still applies. `pause` waits for the user to stop and then fails `UserIntervened` with nothing sent, and stops input in progress at their first key or click. An engine without the feature is not sent the key and always pauses |
 | `macos_key_priming` | `"off"`, `"on"` | `key-priming` | On macOS, background keys into an app with several windows first make the target window the app's key window, then hand key focus inside the app back. It acts only in an object-mode session; with it off such keys answer `BackgroundUnavailable` |
 | `trace` | `false`, `true` | `trace` | With the audit log on, writes a redacted JSONL trace to `trace/<pid>-<start>.jsonl` beside it: ids, codes and per-stage durations; typed text by length and hash only, strings cut at 256 characters, secure-field content dropped |
