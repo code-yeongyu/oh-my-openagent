@@ -70,11 +70,13 @@ export async function showAccount(dependencies: AccountShowDependencies, flags: 
   }
   const sync = account === undefined ? {} : { sync: await syncStateOf(dependencies.pinDir(), account) }
   const marker = current === null ? await accountSignedOutMarker(dependencies) : null
+  // Where the shared sign-in lives, or would be kept (#7185b): the OS store, or Linux's private state file.
+  const storage = dependencies.store.storage === undefined ? {} : { storage: dependencies.store.storage() }
   return reply(
     dependencies,
     current === null
-      ? { signedIn: false, ...(marker === null ? {} : { signedOut: marker }), ...sync }
-      : { signedIn: true, device: deviceOf(current), refreshState: current.refreshState ?? "ok", ...sync },
+      ? { signedIn: false, ...(marker === null ? {} : { signedOut: marker }), ...sync, ...storage }
+      : { signedIn: true, device: deviceOf(current), refreshState: current.refreshState ?? "ok", ...sync, ...storage },
   )
 }
 

@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { parseLockedReply } from "./secret-service-lock"
+import { classifyProbeFailure, parseLockedReply } from "./secret-service-lock"
 
 const FAKE_SECRET_SERVICE = `
 import sys
@@ -15,7 +15,8 @@ info = Gio.DBusNodeInfo.new_for_xml(xml).interfaces[0]
 def get_property(conn, sender, path, iface, name):
     return GLib.Variant("b", locked)
 def on_bus(conn, name):
-    conn.register_object("/org/freedesktop/secrets/aliases/default", info, None, get_property, None)
+    if sys.argv[1] != "no-default-collection":
+        conn.register_object("/org/freedesktop/secrets/aliases/default", info, None, get_property, None)
 def on_name(conn, name):
     print("READY", flush=True)
 Gio.bus_own_name(Gio.BusType.SESSION, "org.freedesktop.secrets", Gio.BusNameOwnerFlags.NONE, on_bus, on_name, None)
@@ -45,6 +46,53 @@ describe("probeSecretServiceLock without gdbus", () => {
   })
 })
 
+// #7185b: only a Secret Service that does not exist sends the sign-in to the private state file, so every other
+// gdbus failure (a Secret Service with no default collection, a timeout) must stay "unknown" and keep libsecret.
+describe("classifyProbeFailure", () => {
+  test("no session bus, or nothing owning org.freedesktop.secrets, is absent; any other failure is unknown", () => {
+    expect(classifyProbeFailure("Error connecting: Could not connect: No such file or directory\n")).toBe("absent")
+    expect(
+      classifyProbeFailure(
+        'Error connecting: Failed to execute child process "dbus-launch" (No such file or directory)\n',
+      ),
+    ).toBe("absent")
+    expect(
+      classifyProbeFailure(
+        "Error: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.secrets was not provided by any .service files\n",
+      ),
+    ).toBe("absent")
+    expect(classifyProbeFailure("Error: GDBus.Error:org.freedesktop.DBus.Error.NameHasNoOwner: no owner\n")).toBe(
+      "absent",
+    )
+    expect(
+      classifyProbeFailure(
+        "Error: GDBus.Error:org.freedesktop.DBus.Error.UnknownObject: No such object path '/org/freedesktop/secrets/aliases/default'\n",
+      ),
+    ).toBe("unknown")
+    expect(classifyProbeFailure("Error: Timeout was reached\n")).toBe("unknown")
+    expect(classifyProbeFailure("")).toBe("unknown")
+  })
+})
+
+describe.skipIf(process.platform !== "linux" || !has("gdbus", ["help"]))(
+  "probeSecretServiceLock with no session bus",
+  () => {
+    test("is absent", async () => {
+      const dir = mkdtempSync(join(tmpdir(), "omo-no-bus-"))
+      const before = process.env.DBUS_SESSION_BUS_ADDRESS
+      process.env.DBUS_SESSION_BUS_ADDRESS = `unix:path=${join(dir, "missing-bus")}`
+      try {
+        const { probeSecretServiceLock } = await import("./secret-service-lock")
+        expect(await probeSecretServiceLock()).toBe("absent")
+      } finally {
+        if (before === undefined) delete process.env.DBUS_SESSION_BUS_ADDRESS
+        else process.env.DBUS_SESSION_BUS_ADDRESS = before
+        rmSync(dir, { recursive: true, force: true })
+      }
+    })
+  },
+)
+
 describe("parseLockedReply", () => {
   test("reads gdbus's Locked property reply", () => {
     expect(parseLockedReply("(<true>,)\n")).toBe("locked")
@@ -56,7 +104,7 @@ describe("parseLockedReply", () => {
 describe.skipIf(!canRun)(
   "probeSecretServiceLock against a fake Secret Service on a private D-Bus (desktop#3509)",
   () => {
-    const probeIn = (fake: "locked" | "unlocked" | "none"): string => {
+    const probeIn = (fake: "locked" | "unlocked" | "none" | "no-default-collection"): string => {
       const dir = mkdtempSync(join(tmpdir(), "omo-secret-service-"))
       try {
         const fakePath = join(dir, "fake.py")
@@ -90,6 +138,9 @@ describe.skipIf(!canRun)(
     })
     test("no Secret Service on the bus is absent", () => {
       expect(probeIn("none")).toBe("absent")
+    })
+    test("a Secret Service with no default collection is unknown, never absent (#7185b)", () => {
+      expect(probeIn("no-default-collection")).toBe("unknown")
     })
   },
 )
