@@ -275,7 +275,11 @@ async function warmAfterRun(options) {
   } catch (error) {
     report(error instanceof Error ? error.message : String(error))
   } finally {
-    await loaded.sdk.dispose().catch((error) => report(`closing the gateway store failed: ${error instanceof Error ? error.message : String(error)}`))
+    await loaded.sdk
+      .dispose()
+      .catch((error) =>
+        report(`closing the gateway store failed: ${error instanceof Error ? error.message : String(error)}`),
+      )
   }
   return DAEMON_EXIT.ok
 }

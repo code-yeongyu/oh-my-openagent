@@ -46,7 +46,8 @@ function capture() {
   return { chunks, write: (text: string) => void chunks.push(text), text: () => chunks.join("") }
 }
 
-type WarmAnswer = { kind: "warm"; state: "warmed" | "already_warm" } | { kind: "unsupported" } | { kind: "refused"; code: string }
+type WarmAnswer =
+  { kind: "warm"; state: "warmed" | "already_warm" } | { kind: "unsupported" } | { kind: "refused"; code: string }
 
 /** The thread SDK `omo daemon run` warms the daemon through after its ensure: records each warm and each dispose. */
 function warmingSdk(answer: WarmAnswer = { kind: "warm", state: "warmed" }) {

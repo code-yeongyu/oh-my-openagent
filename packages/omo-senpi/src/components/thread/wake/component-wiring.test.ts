@@ -204,7 +204,10 @@ function inboundRecord(deliveryId: string): Record<string, unknown> {
 
 describe("the same-device wake through the registered thread component", () => {
   test("#given an engine process with the thread component and the same-device switch on #when its thread_send names a session that is not running #then the carrier opens that session by path on the operator host and its drain admits the delivery once", async () => {
-    const w = await wire({ ...ENGINE_AT_MINIMUM, loadConfig: () => ({ config: { session_wake: { same_device: true } } }) })
+    const w = await wire({
+      ...ENGINE_AT_MINIMUM,
+      loadConfig: () => ({ config: { session_wake: { same_device: true } } }),
+    })
     const pi = await w.start()
     const woken = w.woken()
     expect(await w.send(pi, "wake up and answer")).toMatchObject({
@@ -241,7 +244,10 @@ describe("the same-device wake through the registered thread component", () => {
   })
 
   test("#given two sessions of one engine process register the thread component #when both start #then one carrier serves the agent directory", async () => {
-    const w = await wire({ ...ENGINE_AT_MINIMUM, loadConfig: () => ({ config: { session_wake: { same_device: true } } }) })
+    const w = await wire({
+      ...ENGINE_AT_MINIMUM,
+      loadConfig: () => ({ config: { session_wake: { same_device: true } } }),
+    })
     await w.start()
     const second = await w.start()
     expect(w.latch.running?.size).toBe(1)
@@ -320,7 +326,11 @@ describe("the same-device wake through the registered thread component", () => {
   ])(
     "#given %s #when its thread_send names a session that is not running #then no carrier starts and the answer says the wake is unavailable",
     async (_what, env) => {
-      const w = await wire({ ...ENGINE_AT_MINIMUM, env, loadConfig: () => ({ config: { session_wake: { same_device: true } } }) })
+      const w = await wire({
+        ...ENGINE_AT_MINIMUM,
+        env,
+        loadConfig: () => ({ config: { session_wake: { same_device: true } } }),
+      })
       const pi = await w.start()
       expect(w.latch.running?.size ?? 0).toBe(0)
       expect(await w.send(pi, "nobody carries this")).toMatchObject({
@@ -404,7 +414,10 @@ describe("the same-device wake through the registered thread component", () => {
 })
 
 describe("the delivery consumer through the registered thread component", () => {
-  const consumerWake = (service: FakeDeliveryService, engine: { readonly version: string; readonly minimum: string | null }) => ({
+  const consumerWake = (
+    service: FakeDeliveryService,
+    engine: { readonly version: string; readonly minimum: string | null },
+  ) => ({
     deliveries: async () => service.port,
     engineVersion: engine.version,
     minimumEngine: engine.minimum,
@@ -488,15 +501,18 @@ describe("the delivery consumer through the registered thread component", () => 
     ["the shipped minimum (none released)", { version: "2099.1.1", minimum: undefined }],
     ["an engine below the minimum", { version: "2026.11.13", minimum: "2026.12.1" }],
     ["an engine that reports no version", { version: undefined, minimum: "2026.12.1" }],
-  ])("#given %s #when the component starts #then no carrier starts and no consumer declares itself", async (_what, engine) => {
-    const service = createFakeDeliveryService({ admitted: true })
-    const w = await wire({
-      deliveries: async () => service.port,
-      ...(engine.version === undefined ? {} : { engineVersion: engine.version }),
-      ...(engine.minimum === undefined ? {} : { minimumEngine: engine.minimum }),
-    })
-    await w.start()
-    expect(w.latch.running?.size ?? 0).toBe(0)
-    expect(service.calls).toEqual([])
-  })
+  ])(
+    "#given %s #when the component starts #then no carrier starts and no consumer declares itself",
+    async (_what, engine) => {
+      const service = createFakeDeliveryService({ admitted: true })
+      const w = await wire({
+        deliveries: async () => service.port,
+        ...(engine.version === undefined ? {} : { engineVersion: engine.version }),
+        ...(engine.minimum === undefined ? {} : { minimumEngine: engine.minimum }),
+      })
+      await w.start()
+      expect(w.latch.running?.size ?? 0).toBe(0)
+      expect(service.calls).toEqual([])
+    },
+  )
 })

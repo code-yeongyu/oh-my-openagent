@@ -1,4 +1,3 @@
-import { AsyncResource } from "node:async_hooks"
 import { isAbsolute } from "node:path"
 
 import {
@@ -17,7 +16,7 @@ import type { IntakeAdmission } from "../gateway/intake-admission"
 import { createSameDeviceWake, type SameDeviceWake } from "../gateway/same-device-wake"
 import { createGatewayStore, type GatewayStore } from "../gateway/store"
 import { resolveThreadSocket } from "../live-surface-paths"
-import { createCarrier, type Carrier, type CarrierEvaluation, type CarrierWakeOutcome } from "./carrier"
+import { createCarrier, type CarrierEvaluation, type CarrierWakeOutcome } from "./carrier"
 import { connectCarrierHost, type CarrierHostConnection } from "./carrier-connection"
 import { createOmoNativeProductConfig } from "../../telemetry/product-identity"
 import { connectDeliveryServicePort } from "../consumer/device-service-port"
@@ -59,7 +58,6 @@ export type ThreadWakeOptions = {
 }
 
 export type RunningThreadWake = {
-  readonly carrier: Carrier
   readonly wake: (durableId: string) => Promise<void>
   /** Asked by a woken session's drain about a row from another device; `unknown` while no consumer serves. */
   readonly admitIntake: (device: string) => Promise<IntakeAdmission>
@@ -110,7 +108,9 @@ export function wakeSettingsReader(
     try {
       return resolveSessionWakeSettings(load({ cwd: at ?? cwd() }).config)
     } catch (error) {
-      warn(`thread wake: the session_wake settings were not read: ${error instanceof Error ? error.message : String(error)}`)
+      warn(
+        `thread wake: the session_wake settings were not read: ${error instanceof Error ? error.message : String(error)}`,
+      )
       return resolveSessionWakeSettings({})
     }
   }
@@ -182,7 +182,7 @@ export type ThreadWakeStart = {
    * imported from a `session_start` handler or a send, so a scope created here would inherit that session's handle
    * ledger and its shutdown would reclaim the carrier's sockets and timers (the device-service registrant's reason).
    */
-  readonly scope?: ProcessScope
+  readonly scope: ProcessScope
 }
 
 /**
@@ -204,17 +204,9 @@ export function startThreadWakeAtSession(eventCtx: unknown, input: ThreadWakeSta
   const latch = input.options.latch ?? processLatch()
   const running = (latch.running ??= new Map())
   if (running.has(agentDir)) return
-  // Production passes the main bundle's scope; a direct caller without one gets a fresh scope, which is only safe
-  // outside a session callback.
-  const scope: ProcessScope =
-    input.scope ??
-    (() => {
-      const resource = new AsyncResource("omo-thread-wake-carrier")
-      return { runInAsyncScope: (fn) => resource.runInAsyncScope(fn) }
-    })()
   running.set(
     agentDir,
-    scope.runInAsyncScope(() => startRunning(agentDir, env, input, scope)),
+    input.scope.runInAsyncScope(() => startRunning(agentDir, env, input, input.scope)),
   )
 }
 
@@ -269,7 +261,9 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart, scope:
     schedule: options.schedule ?? unrefSchedule,
     onEvent: (event) => {
       if (ENDED.has(event.outcome.kind))
-        void serving?.consumer.reportDrained().catch((error: unknown) => input.warn(`thread wake: drained marks not reported: ${String(error)}`))
+        void serving?.consumer
+          .reportDrained()
+          .catch((error: unknown) => input.warn(`thread wake: drained marks not reported: ${String(error)}`))
     },
   })
   // A send calls this from the sending session's handler: the renewal timer and the woken session's connection the
@@ -277,7 +271,8 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart, scope:
   const wake = (durableId: string): Promise<void> =>
     scope.runInAsyncScope(async () => {
       const outcome = await carrier.wake(durableId)
-      if (outcome.kind === "failed") input.warn(`thread wake: ${durableId} was not started after ${outcome.attempts} attempts`)
+      if (outcome.kind === "failed")
+        input.warn(`thread wake: ${durableId} was not started after ${outcome.attempts} attempts`)
       options.onWake?.(durableId, outcome)
     })
   // #13457's MEDIUM: the consumer is started again after every death - a connect failure, a refused declaration, a
@@ -311,14 +306,16 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart, scope:
       agentDir,
       sessionsDirectory,
       deliveries: async () => {
-        const port = await (options.deliveries ??
+        const port = await (
+          options.deliveries ??
           (() =>
             connectDeliveryServicePort({
               version: createOmoNativeProductConfig().packageVersion,
               ...(options.deviceServiceStateDir === undefined ? {} : { stateDir: options.deviceServiceStateDir }),
               log: reportConsumerFailure,
               onUnavailable: armConsumerRetry,
-            })))()
+            }))
+        )()
         livePort = port
         return port
       },
@@ -352,7 +349,6 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart, scope:
     () => undefined,
   )
   return {
-    carrier,
     wake,
     admitIntake: async (device) => {
       // The settled truth of this process's consumer: a restart in flight is awaited, so the answer is never a stale

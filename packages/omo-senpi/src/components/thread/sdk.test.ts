@@ -685,23 +685,24 @@ describe("thread SDK: the operator daemon's warm", () => {
     ["warms its default profile", undefined, { kind: "warm", state: "warmed" }],
     ["is draining", { success: false, error: "host_draining" }, { kind: "refused", code: "host_draining" }],
     ["predates warm", { success: false, error: "unknown_command" }, { kind: "unsupported" }],
-  ] as const)("#given an operator daemon that %s #when the SDK warms it #then one session-less warm reaches that host and its answer is classified", async (_what, reply, expected) => {
-    const host = await startFakeEngineHost(reply === undefined ? {} : { warm: () => reply })
-    try {
-      const warmSdk = createThreadSdk({
-        agentDir: mkdtempSync(join(tmpdir(), "thread-sdk-warm-")),
-        cwd: process.cwd(),
-        uid: 501,
-        user: "tester",
-        env: { OMO_RPC_SOCKET_PATH: host.socketPath },
-      })
-      sdks.push(warmSdk)
-      expect(await warmSdk.warmDaemon()).toEqual(expected)
-      expect(host.frames.filter((frame) => frame.type === "warm")).toEqual([
-        { id: expect.any(String), type: "warm" },
-      ])
-    } finally {
-      await host.close()
-    }
-  })
+  ] as const)(
+    "#given an operator daemon that %s #when the SDK warms it #then one session-less warm reaches that host and its answer is classified",
+    async (_what, reply, expected) => {
+      const host = await startFakeEngineHost(reply === undefined ? {} : { warm: () => reply })
+      try {
+        const warmSdk = createThreadSdk({
+          agentDir: mkdtempSync(join(tmpdir(), "thread-sdk-warm-")),
+          cwd: process.cwd(),
+          uid: 501,
+          user: "tester",
+          env: { OMO_RPC_SOCKET_PATH: host.socketPath },
+        })
+        sdks.push(warmSdk)
+        expect(await warmSdk.warmDaemon()).toEqual(expected)
+        expect(host.frames.filter((frame) => frame.type === "warm")).toEqual([{ id: expect.any(String), type: "warm" }])
+      } finally {
+        await host.close()
+      }
+    },
+  )
 })

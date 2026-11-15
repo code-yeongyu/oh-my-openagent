@@ -441,15 +441,28 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
       const sameDeviceWake: SameDeviceWake = {
         afterSend: async (result) => {
           sameDeviceBuilt ??= wakeRuntime().then((module) =>
-            module.createSameDeviceWake({ options: wakeOptions, store, agentDir, sessionsDirectory, cwd: callerWorkspaceRoot, warn }),
+            module.createSameDeviceWake({
+              options: wakeOptions,
+              store,
+              agentDir,
+              sessionsDirectory,
+              cwd: callerWorkspaceRoot,
+              warn,
+            }),
           )
-          return await sameDeviceBuilt.then((wake) => wake.afterSend(result), () => result)
+          return await sameDeviceBuilt.then(
+            (wake) => wake.afterSend(result),
+            () => result,
+          )
         },
       }
       let admissionBuilt: Promise<(device: string) => Promise<IntakeAdmission>> | undefined
       const wakeAdmission = async (device: string): Promise<IntakeAdmission> => {
         admissionBuilt ??= wakeRuntime().then((module) => module.intakeAdmission(wakeOptions, agentDir))
-        return await admissionBuilt.then((ask) => ask(device), () => "unknown")
+        return await admissionBuilt.then(
+          (ask) => ask(device),
+          () => "unknown",
+        )
       }
       const tools = registerThreadTools(
         pi,
@@ -591,7 +604,8 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
       // soon as it loads omo - a `warm` (`omo daemon run` sends one after its ensure) or its first open - so a host the
       // device service cold-starts declares its consumer with no session running (#13037 cold wake).
       const hostSocket = hostSocketOf(pi)
-      if (hostSocket !== undefined && isThreadSocket(hostSocket, wakeOptions.env ?? process.env)) startWake({ mode: "rpc" })
+      if (hostSocket !== undefined && isThreadSocket(hostSocket, wakeOptions.env ?? process.env))
+        startWake({ mode: "rpc" })
       pi.on("session_start", (_event, eventCtx) => {
         startWake(eventCtx)
         void importLegacyMailbox()
