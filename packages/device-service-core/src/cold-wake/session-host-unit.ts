@@ -24,11 +24,13 @@ const checked = (name: string, value: string, absolute: boolean): string => {
 /** The checked start of the session host: the argv and environment both unit renderers write. */
 export class SessionHostLaunch {
   private readonly checked = true
+  readonly argv: readonly string[]
+  readonly env: readonly (readonly [string, string])[]
 
-  private constructor(
-    readonly argv: readonly string[],
-    readonly env: readonly (readonly [string, string])[],
-  ) {}
+  private constructor(argv: readonly string[], env: readonly (readonly [string, string])[]) {
+    this.argv = argv
+    this.env = env
+  }
 
   /** An npm launcher script (`bin/omo.js`) runs under the runtime that ran it; a compiled omo runs directly. */
   static from(options: {
