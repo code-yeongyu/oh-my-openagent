@@ -7,12 +7,14 @@ import { lstatSync, mkdtempSync, realpathSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { judgeAncestor } from "../trust-generation"
+import { readUsernsView } from "../trust-userns"
 
 function judgedSafe(path: string): boolean {
+  const view = process.platform === "linux" ? readUsernsView(process.env) : null
   for (let current = path; ; current = dirname(current)) {
     const stat = lstatSync(current, { bigint: true })
     const verdict = judgeAncestor(
-      null,
+      view,
       current,
       {
         directory: stat.isDirectory(),
