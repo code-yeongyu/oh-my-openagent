@@ -48,6 +48,7 @@ const USAGE = [
   "",
   "  --json            print the engine's JSON line instead of a summary",
   "  --no-upgrade      never hand off, even from an older build",
+  "  --pinned          with run, the host it starts never idle-exits (the always-on session host unit)",
   "  --include-workers include subagent sessions in status",
   "  --all             apply stop to every discovered endpoint",
   "  --wait            with stop --drain --all, wait for generations and claims to end",
@@ -241,7 +242,10 @@ export function runDaemonCommand(args, options) {
     if (outcome !== undefined) return outcome
   }
   const engineArgs = buildArgs(subcommand, args, { specPath, policy: resolvePolicy(args, config) })
-  const result = engine.run(engineArgs, { env: hostCommandEnvironment(env, agentDir, config) })
+  const commandEnv = hostCommandEnvironment(env, agentDir, config)
+  // omo#13594: the session host unit's run. Only the host this ensure starts is pinned; task hosts drop the variable.
+  if (subcommand === "run" && args.includes("--pinned")) commandEnv.SENPI_RPC_HOST_COLD_START = "persistent"
+  const result = engine.run(engineArgs, { env: commandEnv })
   const parsed = parseEngineLine(result.stdout ?? "")
 
   if (result.stderr) stderr.write(result.stderr)

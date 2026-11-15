@@ -106,9 +106,12 @@ async function runAccountShow(dependencies: AccountShowDependencies, flags: read
   }
 }
 
+/** The account service origin this process signs in against: OMO_SERVICE_API_URL, else the production API. */
+export const accountServiceApi = (): string => serviceOrigin(process.env.OMO_SERVICE_API_URL ?? "https://api.omo.dev")
+
 /** `omo account show` run in this process with no arguments, for the remote verbs' first step: exit code and stdout. */
 export async function readAccountInProcess(): Promise<AccountShowResult> {
-  const api = serviceOrigin(process.env.OMO_SERVICE_API_URL ?? "https://api.omo.dev")
+  const api = accountServiceApi()
   const lines: string[] = []
   let store: CredentialStore | undefined
   const exitCode = await runAccountShow(

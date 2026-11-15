@@ -15,7 +15,7 @@ remote operation's typed result as one JSON line (`packages/omo-native/remote-se
 omo remote status [--json]       # the device service's connection state
 omo remote devices [--json]      # the devices on this account
 omo remote sessions [--device D] [--project P] [--state running|idle|ended] [--json]
-omo remote enable | disable [--json]   # turn remote sessions on or off for this device
+omo remote enable | disable [--json]   # set this device up and turn remote sessions on, or turn them off
 omo remote control [on|off]      # whether your other devices may view and command this device's sessions
 omo remote bootstrap [--json]    # set up the device service for your sign-in (every omo start runs it)
 omo remote attach <device>/<session>   # open a session on another device in the terminal UI, to watch and type
@@ -35,6 +35,41 @@ instead of printing the answer.
 Exit codes: `0` done, `1` the operation failed, `2` usage error, `3` unavailable (signed out, the
 device service is not set up or not running, or it lacks the feature). `omo remote bootstrap` exits `3`
 for every stop, including a failed verification or install.
+
+## Set up a device
+
+After `omo login`, one command sets the device up:
+
+```bash
+omo remote enable
+```
+
+It runs the bootstrap first (`packages/omo-native/remote-bootstrap.ts`): it installs the pinned device service when
+none runs, connects, and registers this omo's agent dir with it (the service only creates endpoints and delivery
+consumers for agent dirs it knows). It then turns remote sessions on, and installs and starts the always-on session host
+unit (see [Session host unit and cold wake](#session-host-unit-and-cold-wake)). Each step is idempotent, so running it
+again changes nothing that is already in place. Signed out, it stops before anything is installed, with exit `3`.
+
+`omo remote status` reads the result back. Besides the service's own state it shows this device's two units as the
+service manager reports them (the session host unit: running or not, enabled, and whether its host is pinned; the
+device service's unit; whether the device service's table names the session host for a cold wake) and the agent dir
+omo registers. The service has no read for registered agent dirs yet, so that line is the dir every omo start and
+`enable` register, not a confirmation from the service. With `--json` these are the `local` object next to the
+service's `Status` fields:
+
+```json
+{
+  "local": {
+    "session_host": { "unit": "omo-session-host.service", "state": "running", "enabled": true, "pinned": true },
+    "device_service": { "unit": "omo-relay-daemon.service", "state": "running" },
+    "cold_wake_entry": true,
+    "agent_dir": "/home/me/.omo/agent"
+  }
+}
+```
+
+A unit `state` is `running`, `stopped`, `not_installed` or `unknown`; `pinned` and `cold_wake_entry` are `unknown` when
+they could not be read. Windows has no session host unit, so `local` is absent there.
 
 ## What you need
 
@@ -129,6 +164,42 @@ binary's code signature must verify there; a failure removes the staging directo
 release moved into place as a whole under `<state dir>/bin/<version>/`. A download that
 fails verification is not installed and the command says so. The state dir is `~/.omo/device-service`
 (macOS and Linux) or `%LOCALAPPDATA%\OmO\device-service` (Windows).
+
+## Session host unit and cold wake
+
+`omo remote bootstrap` (every omo start) and `omo remote enable` install and start one fixed, always-on
+per-user unit that runs the omo session host next to the device service, and record it in the device service's
+service table as the only unit it may start for a cold wake: a message another device sends to a session that is
+not running (`packages/device-service-core/src/cold-wake/`).
+
+| | Linux | macOS |
+| --- | --- | --- |
+| Unit | systemd user unit `~/.config/systemd/user/omo-session-host.service`, enabled (`WantedBy=default.target`) | LaunchAgent `ai.omo.session-host`, `~/Library/LaunchAgents/ai.omo.session-host.plist` |
+| Runs | `<omo> daemon run --pinned` (an npm launcher script under the runtime that ran it), with `OMO_CODING_AGENT_DIR` set to the agent dir the bootstrap registers and `PATH` as it was at install | same |
+| Always on | `Restart=always`, `RestartSec=30`, `StartLimitIntervalSec=0`, `KillMode=process` | `RunAtLoad`, `KeepAlive`, `ThrottleInterval` 30, `AbandonProcessGroup` |
+| Table entry | `OMO_RELAYD_SERVICES` entry `"omo": {"systemd_user": "omo-session-host.service", "senders": []}` in the drop-in `~/.config/systemd/user/omo-relay-daemon.service.d/50-omo-cold-wake.conf` | entry `"omo": {"launchd": "ai.omo.session-host", "senders": []}` in the device service's plist `EnvironmentVariables` |
+
+`omo daemon run` ensures the host, which detaches, and exits; the service manager runs it again after every
+exit, at most every 30 seconds, so a host that ended is started again and a running one is reused. Stopping or
+restarting the unit never ends the host or its sessions. `--pinned` makes the host it starts never idle-exit
+(see [`omo daemon`](omo-daemon.md)); a host another omo already started is reused as it is, and once it
+idles out the next run starts a pinned one.
+
+The device service reads its table once, at start, so a changed table restarts it (Linux: `systemctl --user
+restart omo-relay-daemon.service`; macOS: `launchctl bootout`, then `bootstrap` of `ai.omo.relay-daemon`).
+Nothing is written and nothing restarts when the unit and the entry are already in place; a unit that is not
+running is started. Other entries of the table are kept; a table that does not parse is left as it is, and the
+command prints a notice instead. Nothing runs as root, and neither the unit's name nor its command can be
+configured.
+
+The device service's installer rewrites its macOS plist on every install and update, which drops the entry;
+the next `omo remote bootstrap` (every omo start) writes it back. The Linux drop-in survives an install.
+
+`omo remote disable` disables and removes the unit and the entry, and while remote sessions are off,
+`omo remote bootstrap` removes them again instead of installing them. Removing the unit also stops the host
+it pinned (`omo daemon stop --drain`, so a running turn finishes first), because that host never idle-exits;
+a host another omo started (no pin in its `env_keys`) is left to its own idle exit. A unit that cannot be set up prints one
+notice on stderr and never changes the command's exit code or output. Windows has no session host unit.
 
 ## Windows notes
 

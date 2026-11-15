@@ -20,7 +20,6 @@ export const LOCAL_ONLY_REMOTE_VERBS = [
   "status",
   "devices",
   "sessions",
-  "enable",
   "disable",
   "control",
   "open",
@@ -30,5 +29,8 @@ export const LOCAL_ONLY_REMOTE_VERBS = [
   "close",
 ] as const satisfies readonly (typeof VERBS)[number][]
 
-/** Verbs that reach the network themselves: `bootstrap` downloads and installs the pinned device service. */
-export const NETWORK_REMOTE_VERBS = ["bootstrap"] as const satisfies readonly (typeof VERBS)[number][]
+/**
+ * Verbs that reach the network themselves: `bootstrap` downloads and installs the pinned device service, and `enable`
+ * runs that bootstrap first (omo#13602).
+ */
+export const NETWORK_REMOTE_VERBS = ["bootstrap", "enable"] as const satisfies readonly (typeof VERBS)[number][]
