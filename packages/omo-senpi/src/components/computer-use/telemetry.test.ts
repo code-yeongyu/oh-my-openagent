@@ -175,7 +175,7 @@ describe("computer-use telemetry projection", () => {
       type: "tool_execution_start",
       toolCallId: "call-1",
       toolName: "computer",
-      args: { action: "run", code: "private typed text" },
+      args: { action: "call", chain: [{ method: "type", args: ["private typed text"] }] },
     })
     telemetry.permissionTierDenied(
       {
@@ -220,7 +220,7 @@ describe("computer-use telemetry projection", () => {
         type: "tool_execution_start",
         toolCallId: "call-1",
         toolName: "computer",
-        args: { action: "run", code: "private typed text" },
+        args: { action: "call", chain: [{ method: "type", args: ["private typed text"] }] },
       })
       telemetry.permissionTierDenied(
         {
@@ -249,7 +249,7 @@ describe("computer-use telemetry projection", () => {
       type: "tool_execution_start",
       toolCallId: "call-2",
       toolName: "computer",
-      args: { action: "run", code: "await desktop.click(1, 1)" },
+      args: { action: "call", chain: [{ method: "click", args: [1, 1] }] },
     })
     telemetry.permissionTierDenied(
       {

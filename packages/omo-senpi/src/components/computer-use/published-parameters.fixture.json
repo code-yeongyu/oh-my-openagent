@@ -8,12 +8,11 @@
       "action": {
         "enum": [
           "call",
-          "run",
           "capabilities",
           "close"
         ],
         "type": "string",
-        "description": "call: one desktop helper chain; run: a JavaScript body; capabilities: host report; close: end the session"
+        "description": "call: one desktop helper chain; capabilities: host report; close: end the session"
       },
       "chain": {
         "type": "array",
@@ -36,20 +35,6 @@
           "additionalProperties": false
         },
         "description": "call (required): one desktop helper call, optionally followed by one call on the window/element it returns"
-      },
-      "code": {
-        "type": "string",
-        "description": "run (required): JavaScript async function body; `desktop`, `wait`, `assert`, `tool` in scope; `return` sets the value"
-      },
-      "read_only": {
-        "type": "boolean",
-        "description": "run: true = inspection only: screenshots and AX reads, input/mutation blocked"
-      },
-      "timeout": {
-        "type": "number",
-        "minimum": 1,
-        "maximum": 600,
-        "description": "run: budget in seconds (default 60)"
       }
     },
     "additionalProperties": false
