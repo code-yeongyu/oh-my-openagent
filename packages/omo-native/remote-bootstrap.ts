@@ -153,6 +153,17 @@ export async function runLoginSetup(
   remote: RemoteSetup,
 ): Promise<"on" | "kept_off" | "not_on"> {
   if (remote.optOut.read()) {
+    // Enforced now, not at the next omo start (#13602 security review M1): a switch that came back on is turned off and
+    // the unit removed, as the bootstrap does for an opt-out. A setup that stops still leaves the record in charge.
+    const outcome = await bootstrap(io, setup, false)
+    if (outcome.kind === "connected") {
+      try {
+        if (outcome.status.enabled) await outcome.service.setEnabled(false)
+      } finally {
+        outcome.service.close()
+      }
+      await applyColdWake(remote.coldWake, false, io.error)
+    }
     io.output(REMOTE_KEPT_OFF_AFTER_SIGN_IN)
     return "kept_off"
   }

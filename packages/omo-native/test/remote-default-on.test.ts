@@ -125,7 +125,7 @@ describe("omo login sets remote sessions up", () => {
 // omo#13602 (Q: the moment login completes, remote switches on, and login says so): the setup after `omo login` turns the
 // switch on like enable does and prints the one line the desktop app also shows; a recorded opt-out keeps it off.
 describe("omo login switches remote sessions on and says so", () => {
-  async function signedInDeviceWithSwitchOff(optedOut: boolean) {
+  async function signedInDeviceWithSwitchOff(optedOut: boolean, switchOn = false) {
     const world = defaultWorld()
     const owner = await startFakeOwner({
       stateDir: privateDir(),
@@ -134,7 +134,7 @@ describe("omo login switches remote sessions on and says so", () => {
     owners.push(owner)
     const connect = () => connectDeviceService({ version: "5.1.52", stateDir: owner.stateDir })
     const off = await connect()
-    await off.setEnabled(false)
+    await off.setEnabled(switchOn)
     off.close()
     const out: string[] = []
     const coldWake: string[] = []
@@ -177,6 +177,15 @@ describe("omo login switches remote sessions on and says so", () => {
     const { owner, out, coldWake, io, remote } = await signedInDeviceWithSwitchOff(true)
     expect(await runLoginSetup(io, testBootstrap(), remote)).toBe("kept_off")
     expect(out).toEqual([REMOTE_KEPT_OFF_AFTER_SIGN_IN])
-    expect([owner.state.status.enabled, owner.state.adoptions, coldWake]).toEqual([false, 0, []])
+    expect([owner.state.status.enabled, owner.state.adoptions, coldWake]).toEqual([false, 0, ["uninstall"]])
+  })
+
+  // #13602 security re-review M1: a recorded opt-out is enforced at login, not only at the next omo start. A switch that
+  // came back on (a reinstall or a forget resets it) is turned off and the unit removed before the line is printed.
+  test("with an opt-out on record, turns a switch that came back on off again and removes the unit", async () => {
+    const { owner, out, coldWake, io, remote } = await signedInDeviceWithSwitchOff(true, true)
+    expect(await runLoginSetup(io, testBootstrap(), remote)).toBe("kept_off")
+    expect(out).toEqual([REMOTE_KEPT_OFF_AFTER_SIGN_IN])
+    expect([owner.state.status.enabled, owner.state.adoptions, coldWake]).toEqual([false, 0, ["uninstall"]])
   })
 })
