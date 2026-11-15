@@ -48,6 +48,7 @@ const REFUSAL_CODES = [
   "trust-path-unrepresentable",
   "trust-userns-unattested",
   "trust-kind-local-only",
+  "trust-tmpdir-unsafe",
 ] as const
 
 /** The section 4 importer modules own the codes they emit; their exported types are the source of truth. */

@@ -28,6 +28,7 @@ import {
   temporaryTrustDirectory,
   trustDirectory,
   TrustStorageError,
+  type UnsafeTrustAncestor,
   verifyTrustDefaults,
   verifyTrustGeneration,
   writeTrustGeneration,
@@ -41,6 +42,7 @@ type Refusal =
   | "trust-path-unrepresentable"
   | "trust-userns-unattested"
   | "trust-kind-local-only"
+  | "trust-tmpdir-unsafe"
 export type TrustStageResult =
   | { readonly action: "static" | "adopt" | "import-exec" | "ensure" | "usage" }
   | { readonly action: "refuse"; readonly code: Refusal; readonly check: Check | null }
@@ -188,8 +190,19 @@ export async function runTrustStage(options: TrustStageOptions): Promise<TrustSt
       await appendTrustDiagnostic(directory, { ...input, codes: unique })
     } catch {}
   }
+  let unsafe: UnsafeTrustAncestor | undefined
   const refuse = async (code: Refusal, check: Check | null = null): Promise<TrustStageResult> => {
     await record({ kind, action: "refuse", generation: addressed?.sha256 ?? null, codes: [...codes, { code }], check })
+    if (code === "trust-tmpdir-unsafe" && unsafe !== undefined) {
+      const remedy =
+        unsafe.problem === "group-writable" || unsafe.problem === "world-writable"
+          ? `run chmod go-w ${unsafe.path}, or set TMPDIR to a private directory, and start omo again`
+          : "set TMPDIR to a private directory you own and start omo again"
+      ;(options.stderr ?? ((line) => process.stderr.write(line)))(
+        `omo: ${code}: ${unsafe.path} is ${unsafe.problem}; ${remedy}\n`,
+      )
+      return { action: "refuse", code, check }
+    }
     const action =
       code === "trust-user-extras-unrecoverable"
         ? "point NODE_EXTRA_CA_CERTS at your own CA file, or unset it, and start omo again"
@@ -216,7 +229,10 @@ export async function runTrustStage(options: TrustStageOptions): Promise<TrustSt
       codes.push(...prepared.codes)
       return null
     } catch (error) {
-      if (error instanceof TrustStorageError) return error.code
+      if (error instanceof TrustStorageError) {
+        unsafe = error.unsafe
+        return error.code
+      }
       throw error
     }
   }
@@ -252,7 +268,13 @@ export async function runTrustStage(options: TrustStageOptions): Promise<TrustSt
           directory = await temporaryTrustDirectory(platform)
           codes.push({ code: "trust-dir-unsafe" })
           defaults = await createTrustDefaults(directory)
-        } catch {
+        } catch (fallback) {
+          // A temporary directory refused for an unsafe ancestor keeps its own typed refusal and its named
+          // directory; folding it into trust-path-unrepresentable would print the TMPDIR-separator remedy instead.
+          if (fallback instanceof TrustStorageError) {
+            unsafe = fallback.unsafe
+            return fallback.code
+          }
           return "trust-path-unrepresentable" as const
         }
       }
