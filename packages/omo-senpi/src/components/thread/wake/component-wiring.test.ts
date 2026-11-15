@@ -318,6 +318,8 @@ describe("the same-device wake through the registered thread component", () => {
     })
     expect(await woken).toMatchObject({ kind: "open" })
     expect(opens(w.fake)).toEqual([expect.objectContaining({ sessionPath: w.path })])
+    // Each component opened its own store; the second closes at its shutdown too, so no handle holds the agent dir open.
+    await second.dispatch("session_shutdown", { type: "session_shutdown" }, { mode: "tui", agentDir: w.h.agentDir })
   })
 
   test.each([

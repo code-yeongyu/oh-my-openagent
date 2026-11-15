@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { AsyncLocalStorage } from "node:async_hooks"
+import { resolve } from "node:path"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { ComponentContext } from "../../extension/types"
@@ -173,7 +174,9 @@ describe("the operator daemon registers its agent dir when it loads omo", () => 
       })
       await loaded
       await import("#omo-device-service-runtime")
-      expect(started).toEqual(operatorDaemon ? [{ agentDir: AGENT_DIR, sessionStore: undefined }] : [])
+      // The daemon's own agent dir comes from the launcher variable through resolveAgentHome, which resolves it for the
+      // platform (a drive-rooted path on win32).
+      expect(started).toEqual(operatorDaemon ? [{ agentDir: resolve(AGENT_DIR), sessionStore: undefined }] : [])
     },
   )
 })
