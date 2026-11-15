@@ -76,6 +76,7 @@ export function causeOf(error: unknown, stage: SyncStage): SyncFailureCause {
     ...(code === undefined ? {} : { code }),
     ...(error instanceof SyncHttpError ? { httpStatus: error.status } : {}),
     ...(error instanceof GitCommandError ? { exitCode: error.code } : {}),
+    ...(error instanceof SyncCommitError && error.git !== undefined ? { exitCode: error.git.exitCode } : {}),
     stage,
   }
 }
@@ -98,16 +99,22 @@ const GIT_SUBCOMMAND = /^[a-z][a-z0-9-]{0,31}$/
 function printableAtWarn(value: unknown): string {
   if (value instanceof SyncCommitError) {
     if (value.git === undefined) return errorClassOf(value)
-    const subcommand = GIT_SUBCOMMAND.test(value.git.subcommand) ? value.git.subcommand : "command"
-    return `${errorClassOf(value)}: git ${subcommand} exited ${value.git.exitCode}`
+    return `${errorClassOf(value)}: git ${gitSubcommandOf(value) ?? "command"} exited ${value.git.exitCode}`
   }
   if (!(value instanceof GitError)) return printable(value)
+  const exit = value instanceof GitCommandError ? ` exited ${value.code}` : ""
+  return `${errorClassOf(value)}: git ${gitSubcommandOf(value) ?? "command"}${exit}`
+}
+
+/** The git subcommand a failed git step names on the warning, when the error is one; never a path or other argv text. */
+export function gitSubcommandOf(value: unknown): string | undefined {
+  if (value instanceof SyncCommitError)
+    return value.git !== undefined && GIT_SUBCOMMAND.test(value.git.subcommand) ? value.git.subcommand : undefined
+  if (!(value instanceof GitError)) return undefined
   const argv: unknown = "argv" in value ? value.argv : undefined
-  const subcommand = Array.isArray(argv)
+  return Array.isArray(argv)
     ? argv.find((arg): arg is string => typeof arg === "string" && GIT_SUBCOMMAND.test(arg))
     : undefined
-  const exit = value instanceof GitCommandError ? ` exited ${value.code}` : ""
-  return `${errorClassOf(value)}: git ${subcommand ?? "command"}${exit}`
 }
 
 /** The error down its cause chain, each one printed by `print`. */

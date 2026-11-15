@@ -194,6 +194,42 @@ test(
 )
 
 test(
+  "a sync-repo git failure warns again when its subcommand or exit code changes, and its cause names the exit code (#13690 review)",
+  async () => {
+    const lines: { readonly line: string; readonly level: string }[] = []
+    const b = await makeDevice(new FakeSyncServer(), "b", undefined, {
+      log: (line, level = "info") => lines.push({ line, level }),
+    })
+    devices.push(b)
+    const gitFailure = (subcommand: string, exitCode: number) =>
+      new SyncCommitError(`git ${subcommand} failed (${exitCode}): fatal: x`, { subcommand, exitCode })
+    let error: Error = gitFailure("update-ref", 1)
+    const load = spyOn(b.store, "load").mockImplementation(async () => {
+      throw error
+    })
+    const warnings = () => lines.filter(({ line, level }) => line.startsWith("sync cycle failed") && level === "warn")
+
+    await failedCycle(b)
+    error = gitFailure("commit-tree", 128)
+    await failedCycle(b)
+    expect(await b.engine.status()).toMatchObject({
+      failure: { kind: "unknown", cause: { errorClass: "SyncCommitError", exitCode: 128 } },
+    })
+    error = gitFailure("write-tree", 128)
+    await failedCycle(b)
+    await failedCycle(b)
+
+    expect(warnings().map(({ line }) => line)).toEqual([
+      expect.stringContaining("git update-ref exited 1"),
+      expect.stringContaining("git commit-tree exited 128"),
+      expect.stringContaining("git write-tree exited 128"),
+    ])
+    load.mockRestore()
+  },
+  GIT_TEST_TIMEOUT,
+)
+
+test(
   "a git failure whose exit code changes at the same stage warns again, naming the new exit code (#13690 review)",
   async () => {
     const lines: { readonly line: string; readonly level: string }[] = []
