@@ -12,7 +12,7 @@ import {
 } from "../device-service-core/src/index.ts"
 import type { RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
 import { serveRemoteAttach } from "./remote-attach"
-import { type BootstrapSetup, runBootstrapVerb, runEnableVerb } from "./remote-bootstrap"
+import { type BootstrapSetup, type DeviceLink, runBootstrapVerb, runEnableVerb } from "./remote-bootstrap"
 import { applyColdWake, type ColdWake } from "./remote-cold-wake"
 import { type ControlValue, type ParsedVerb, runConnectedVerb } from "./remote-connected-verbs"
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
@@ -50,6 +50,8 @@ export interface RemoteVerbDependencies extends RemoteCommandDependencies {
   readonly bootstrap: BootstrapSetup
   /** The session host unit `bootstrap` and `enable` install, `disable` removes and `status` reads back (omo#13594). */
   readonly coldWake: ColdWake
+  /** `enable` only: hands the signed-in session's device to a service that holds none (omo#13602). */
+  readonly linkDevice: DeviceLink
 }
 
 const VERBS = ["status", "devices", "sessions", "enable", "disable", "control", "bootstrap", ...SESSION_VERBS] as const
@@ -127,7 +129,13 @@ export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: 
   // switch, then the session host unit.
   if (parsed.command === "enable") {
     try {
-      return await runEnableVerb(dependencies, dependencies.bootstrap, dependencies.coldWake, parsed.json)
+      return await runEnableVerb(
+        dependencies,
+        dependencies.bootstrap,
+        dependencies.coldWake,
+        dependencies.linkDevice,
+        parsed.json,
+      )
     } catch (error) {
       return reportFailure(dependencies, error)
     }

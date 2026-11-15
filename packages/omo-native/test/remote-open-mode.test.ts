@@ -55,6 +55,7 @@ async function open(args: readonly string[], localMode: () => string = () => "wo
         uninstall: async () => ({ kind: "removed", serviceRestarted: false }),
         status: async () => undefined,
       },
+      linkDevice: async () => "linked",
       remote: () => a.remote,
       localPermissionPreset: localMode,
     },

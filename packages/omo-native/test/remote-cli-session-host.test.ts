@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test"
 
+import { generateKeyPairSync } from "node:crypto"
+
+import { connectDeviceService } from "../../device-service-core/src/index.ts"
 import { startFakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
 import { defaultWorld } from "../../device-service-core/test/local-api/conformance/world.ts"
+import type { Credentials } from "../../omo-opencode/src/cli/service-auth/protocol"
+import { cliDeviceServiceHandoff } from "../device-service-handoff"
 import { REMOTE_EXIT } from "../remote-cli"
 import type { ColdWake, LocalStatus } from "../remote-cold-wake"
 import {
@@ -110,5 +115,64 @@ describe("omo remote enable: the one command after sign-in", () => {
     expect(JSON.parse(json.out.join(""))).toEqual({ ...defaultWorld().status, local })
     const human = await run(["status"], undefined, SIGNED_IN, testBootstrap(), undefined, { coldWake })
     expect(human.out.some((line) => line.startsWith("Session host") && line.includes("pinned"))).toBe(true)
+  })
+})
+
+// omo#13602 (LEAD ruling B): `omo login` then `omo remote enable` must end connected. A sign-in made before the service
+// was installed never reached it, so the explicit enable verb (never the background bootstrap) hands the signed-in
+// session's device keys to the service through the same handoff a fresh login uses, and only while it holds no device.
+describe("omo remote enable links a sign-in the service has not seen", () => {
+  const signedIn: Credentials = {
+    accessToken: "access-1",
+    accessTokenExpiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+    refreshToken: "refresh-1",
+    device: { id: "dev-self", name: "This Mac" },
+    accountId: "acct-1",
+    signingPrivateKey: generateKeyPairSync("ed25519")
+      .privateKey.export({ format: "der", type: "pkcs8" })
+      .toString("base64"),
+    sealingPrivateKey: generateKeyPairSync("x25519")
+      .privateKey.export({ format: "der", type: "pkcs8" })
+      .toString("base64"),
+  }
+
+  async function serviceWithoutDevice(hasDevice: boolean) {
+    const world = defaultWorld()
+    const status = hasDevice ? world.status : { ...world.status, state: "sign_in_required" as const, device: null }
+    const owner = await startFakeOwner({ stateDir: privateDir(), world: { ...world, status } })
+    owners.push(owner)
+    const reads: string[] = []
+    const linkDevice = async () => {
+      reads.push("credential")
+      await cliDeviceServiceHandoff({
+        api: "https://api.example",
+        log: () => {},
+        stateDir: owner.stateDir,
+        connect: () => connectDeviceService({ version: "5.1.52", stateDir: owner.stateDir }),
+      }).adopt(signedIn)
+      return "linked" as const
+    }
+    return { owner, reads, linkDevice }
+  }
+
+  test("hands the signed-in device to a service that holds none, so the device ends connected", async () => {
+    const { owner, reads, linkDevice } = await serviceWithoutDevice(false)
+    const { code } = await run(["enable"], owner.stateDir, SIGNED_IN, testBootstrap(), undefined, { linkDevice })
+    expect(code).toBe(REMOTE_EXIT.ok)
+    expect([reads, owner.state.adoptions, owner.state.status.device?.id]).toEqual([["credential"], 1, "dev-self"])
+  })
+
+  test("reads no credential when the service already holds a device", async () => {
+    const { owner, reads, linkDevice } = await serviceWithoutDevice(true)
+    await run(["enable"], owner.stateDir, SIGNED_IN, testBootstrap(), undefined, { linkDevice })
+    expect([reads, owner.state.adoptions]).toEqual([[], 0])
+  })
+
+  test("says to sign in when there is no signed-in session to hand over", async () => {
+    const { owner } = await serviceWithoutDevice(false)
+    const { code, err } = await run(["enable"], owner.stateDir, SIGNED_IN, testBootstrap(), undefined, {
+      linkDevice: async () => "signed_out",
+    })
+    expect([code, err.length, owner.state.adoptions]).toEqual([REMOTE_EXIT.ok, 1, 0])
   })
 })

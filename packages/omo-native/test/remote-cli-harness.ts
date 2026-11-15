@@ -7,7 +7,7 @@ import { connectDeviceService } from "../../device-service-core/src/index.ts"
 import { type FakeOwner, startFakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
 import { defaultWorld } from "../../device-service-core/test/local-api/conformance/world.ts"
 import type { RemoteThreadSurface } from "../../omo-senpi/src/components/thread/remote/ports"
-import type { BootstrapSetup } from "../remote-bootstrap"
+import type { BootstrapSetup, DeviceLink } from "../remote-bootstrap"
 import { runRemoteVerb } from "../remote-cli"
 import type { ColdWake } from "../remote-cold-wake"
 
@@ -56,7 +56,7 @@ export async function run(
   account = SIGNED_IN,
   bootstrap = testBootstrap(),
   remote?: RemoteThreadSurface,
-  extra: { readonly packageRoot?: string; readonly coldWake?: ColdWake } = {},
+  extra: { readonly packageRoot?: string; readonly coldWake?: ColdWake; readonly linkDevice?: DeviceLink } = {},
 ) {
   let dir = stateDir
   if (dir === undefined) {
@@ -83,6 +83,9 @@ export async function run(
         install: async () => (coldWake.push("install"), { kind: "installed", serviceRestarted: false }),
         uninstall: async () => (coldWake.push("uninstall"), { kind: "removed", serviceRestarted: false }),
         status: async () => undefined,
+      },
+      linkDevice: async () => {
+        throw new Error("this test links no device")
       },
       ...(remote === undefined ? {} : { remote: () => remote }),
       ...extra,

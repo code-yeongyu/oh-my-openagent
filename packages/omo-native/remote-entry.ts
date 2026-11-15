@@ -16,6 +16,7 @@ import { runAccountVerb } from "./account-cli"
 import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import packageJson from "./package.json" with { type: "json" }
 import { deviceServiceBootstrapSetup, omoBinaryPath } from "./remote-bootstrap"
+import { cliDeviceServiceHandoff } from "./device-service-handoff"
 import { prepareRemoteAttach, type RemoteVerbDependencies, runRemoteVerb } from "./remote-cli"
 import { coldWakeSetup } from "./remote-cold-wake"
 
@@ -63,6 +64,16 @@ function remoteDependencies(packageRoot?: string): RemoteVerbDependencies {
     error: (line) => process.stderr.write(`${line}\n`),
     bootstrap: deviceServiceBootstrapSetup({ stateDir, binaryPath, agentDir }),
     coldWake: coldWakeSetup({ binaryPath, agentDir }),
+    // Reads the stored credential only when `omo remote enable` finds a service that holds no device (omo#13602).
+    linkDevice: async () => {
+      const api = serviceApi()
+      const credentials = await createCredentialStore(api, { wait: SESSION_READ_WAIT }).read()
+      if (credentials === null) return "signed_out"
+      await cliDeviceServiceHandoff({ api, stateDir, log: (line) => process.stderr.write(`${line}\n`) }).adopt(
+        credentials,
+      )
+      return "linked"
+    },
   }
 }
 

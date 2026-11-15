@@ -36,6 +36,7 @@ function capture() {
       uninstall: untouched("the cold-wake unit"),
       status: untouched("the cold-wake unit"),
     },
+    linkDevice: untouched("the device link"),
   }
   return { out, err, dependencies }
 }
