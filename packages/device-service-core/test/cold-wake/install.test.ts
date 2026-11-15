@@ -7,8 +7,9 @@ import { type ColdWakeHost, installColdWake, uninstallColdWake } from "../../src
 import { SessionHostLaunch } from "../../src/cold-wake/session-host-unit.ts"
 import type { RunCommand } from "../../src/install.ts"
 
-// omo#13594: install and uninstall are idempotent, and the device service is restarted only when its table changed (a
-// restart drops every remote connection of the device). The fakes keep the state systemd and plutil would keep.
+// omo#13594: install leaves the session host unit enabled and running, uninstall disables it, both are idempotent, and the
+// device service is restarted only when its table changed (a restart drops every remote connection of the device). The
+// fakes keep the state systemd, launchd and plutil would keep.
 
 const dirs: string[] = []
 afterEach(() => {
@@ -26,8 +27,20 @@ function fakeSystemd(options: { readonly relayd?: boolean; readonly ownerTable?:
   const home = mkdtempSync(join(tmpdir(), "cwl-"))
   dirs.push(home)
   const runs: string[] = []
+  const unit = { enabled: false, active: false }
   const run: RunCommand = async (argv) => {
     runs.push(argv.join(" "))
+    const verb = argv[2]
+    if (argv.includes("UnitFileState"))
+      return ok(
+        `UnitFileState=${unit.enabled ? "enabled" : "disabled"}\nActiveState=${unit.active ? "active" : "inactive"}\n`,
+      )
+    if (argv.at(-1) === "omo-session-host.service") {
+      if (verb === "enable") unit.enabled = true
+      if (verb === "start" || verb === "restart") unit.active = true
+      if (verb === "disable") Object.assign(unit, { enabled: false, active: false })
+      return ok()
+    }
     if (argv.includes("LoadState")) return ok(options.relayd === false ? "not-found\n" : "loaded\n")
     if (argv.includes("Environment")) {
       const dropIn = existsSync(DROP_IN(home)) ? readFileSync(DROP_IN(home), "utf8") : ""
@@ -39,11 +52,11 @@ function fakeSystemd(options: { readonly relayd?: boolean; readonly ownerTable?:
     return ok()
   }
   const host: ColdWakeHost = { platform: "linux", home, uid: 1000, run, pause: async () => {} }
-  return { host, home, runs }
+  return { host, home, runs, unit }
 }
 
 describe("cold wake on Linux", () => {
-  test("installs the unit and the table entry, reloads once and restarts the device service once", async () => {
+  test("installs, enables and starts the unit, adds the table entry and restarts the device service once", async () => {
     const { host, home, runs } = fakeSystemd()
     expect(await installColdWake(host, LAUNCH)).toEqual({ kind: "installed", serviceRestarted: true })
     expect(readFileSync(join(UNIT_DIR(home), "omo-session-host.service"), "utf8")).toContain('ExecStart="/opt/omo"')
@@ -54,7 +67,18 @@ describe("cold wake on Linux", () => {
     expect(runs.filter((r) => !r.includes(" show "))).toEqual([
       "systemctl --user daemon-reload",
       "systemctl --user restart omo-relay-daemon.service",
+      "systemctl --user enable omo-session-host.service",
+      "systemctl --user restart omo-session-host.service",
     ])
+  })
+
+  test("starts a unit that is not running without rewriting anything else", async () => {
+    const { host, runs, unit } = fakeSystemd()
+    await installColdWake(host, LAUNCH)
+    unit.active = false
+    runs.length = 0
+    expect(await installColdWake(host, LAUNCH)).toEqual({ kind: "installed", serviceRestarted: false })
+    expect(runs.filter((r) => !r.includes(" show "))).toEqual(["systemctl --user start omo-session-host.service"])
   })
 
   test("a second install with nothing changed writes nothing, reloads nothing and restarts nothing", async () => {
@@ -87,14 +111,16 @@ describe("cold wake on Linux", () => {
     expect(existsSync(DROP_IN(home))).toBe(false)
   })
 
-  test("uninstall removes the unit and the entry and restarts the device service; a second uninstall does nothing", async () => {
-    const { host, home, runs } = fakeSystemd()
+  test("uninstall disables and removes the unit and the entry; a second uninstall does nothing", async () => {
+    const { host, home, runs, unit } = fakeSystemd()
     await installColdWake(host, LAUNCH)
     runs.length = 0
     expect(await uninstallColdWake(host)).toEqual({ kind: "removed", serviceRestarted: true })
     expect(existsSync(join(UNIT_DIR(home), "omo-session-host.service"))).toBe(false)
     expect(existsSync(DROP_IN(home))).toBe(false)
+    expect(unit).toEqual({ enabled: false, active: false })
     expect(runs.filter((r) => !r.includes(" show "))).toEqual([
+      "systemctl --user disable --now omo-session-host.service",
       "systemctl --user daemon-reload",
       "systemctl --user restart omo-relay-daemon.service",
     ])
@@ -157,7 +183,7 @@ function fakeLaunchd(options: { readonly bootstrapFailures?: number } = {}) {
 }
 
 describe("cold wake on macOS", () => {
-  test("loads the LaunchAgent idle, writes the entry into the device service's plist and reloads that job", async () => {
+  test("loads the LaunchAgent (it runs at load), writes the entry into the device service's plist and reloads that job", async () => {
     const { host, home, runs, state, relayd } = fakeLaunchd()
     expect(await installColdWake(host, LAUNCH)).toEqual({ kind: "installed", serviceRestarted: true })
     const plist = LABEL_PLIST(home, "ai.omo.session-host")
@@ -165,6 +191,7 @@ describe("cold wake on macOS", () => {
     expect(JSON.parse(state.table ?? "")).toEqual({ omo: { launchd: "ai.omo.session-host", senders: [] } })
     expect(runs).toEqual([
       "launchctl bootout gui/501/ai.omo.session-host",
+      "launchctl enable gui/501/ai.omo.session-host",
       `launchctl bootstrap gui/501 ${plist}`,
       `plutil -extract EnvironmentVariables.OMO_RELAYD_SERVICES raw -o - ${relayd}`,
       `plutil -extract EnvironmentVariables xml1 -o - ${relayd}`,

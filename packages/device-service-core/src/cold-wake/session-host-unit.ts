@@ -1,8 +1,14 @@
 import { isAbsolute } from "node:path"
 
-// omo#13594: the ONE cold-wake unit. The device service starts it only by the fixed name its launch-time table carries
-// (OMO_RELAYD_SERVICES entry "omo"), and it runs exactly `<omo> daemon run` for the agent dir the bootstrap registered,
-// so neither the name nor the command is something a caller can configure.
+// omo#13594: the ONE session host unit, always on beside the device service and its only cold-wake unit: the device
+// service starts it only by the fixed name its launch-time table carries (OMO_RELAYD_SERVICES entry "omo"), and it runs
+// exactly `<omo> daemon run --pinned` for the agent dir the bootstrap registered, so neither the name nor the command is
+// something a caller can configure. `--pinned`: the host it starts never idle-exits.
+//
+// `omo daemon run` ensures the host, which detaches, and exits. The service manager runs it again after every exit, at
+// most once per RERUN_SECONDS, so a host that died is ensured again; one that runs is reused and never killed (systemd
+// KillMode=process, launchd AbandonProcessGroup), so a restart or stop of the unit never ends a session.
+const RERUN_SECONDS = 30
 export const SESSION_HOST_SYSTEMD_UNIT = "omo-session-host.service"
 export const SESSION_HOST_LAUNCHD_LABEL = "ai.omo.session-host"
 
@@ -40,9 +46,10 @@ export class SessionHostLaunch {
     readonly path?: string | undefined
   }): SessionHostLaunch {
     const program = checked("omo binary", options.omoBin, true)
+    const command = ["daemon", "run", "--pinned"]
     const argv = program.endsWith(".js")
-      ? [checked("runtime", options.execPath, true), program, "daemon", "run"]
-      : [program, "daemon", "run"]
+      ? [checked("runtime", options.execPath, true), program, ...command]
+      : [program, ...command]
     const env: (readonly [string, string])[] = [["OMO_CODING_AGENT_DIR", checked("agent dir", options.agentDir, true)]]
     if (options.path !== undefined && options.path !== "") env.push(["PATH", checked("PATH", options.path, false)])
     return new SessionHostLaunch(argv, env)
@@ -55,31 +62,30 @@ export const systemdQuote = (value: string, dollars: boolean): string => {
   return `"${dollars ? escaped.replaceAll("$", () => "$$") : escaped}"`
 }
 
-/**
- * A oneshot: every start runs the ensure again (reusing a live host), and `KillMode=process` leaves the host it detached
- * running when the oneshot ends. No [Install] section: nothing starts it but a cold wake.
- */
+/** Started with the user's manager (`default.target`); `StartLimitIntervalSec=0` lets the reruns go on forever. */
 export const systemdSessionHostUnit = (launch: SessionHostLaunch): string =>
   [
     "[Unit]",
-    "Description=OmO session host (cold wake)",
+    "Description=OmO session host",
+    "StartLimitIntervalSec=0",
     "",
     "[Service]",
-    "Type=oneshot",
+    "Type=simple",
     `ExecStart=${launch.argv.map((arg) => systemdQuote(arg, true)).join(" ")}`,
     ...launch.env.map(([key, value]) => `Environment=${systemdQuote(`${key}=${value}`, false)}`),
+    "Restart=always",
+    `RestartSec=${RERUN_SECONDS}`,
     "KillMode=process",
-    "TimeoutStartSec=120",
+    "",
+    "[Install]",
+    "WantedBy=default.target",
     "",
   ].join("\n")
 
 const xml = (value: string): string =>
   value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;")
 
-/**
- * Loaded but idle: `launchctl kickstart` starts it, it never runs at load and is never kept alive, and
- * `AbandonProcessGroup` keeps launchd from ending the host the ensure detached when the job exits.
- */
+/** Runs at load and is kept alive; `ThrottleInterval` spaces the reruns. */
 export const launchdSessionHostPlist = (launch: SessionHostLaunch): string => {
   const argv = launch.argv.map((arg) => `    <string>${xml(arg)}</string>`).join("\n")
   const env = launch.env
@@ -100,9 +106,11 @@ ${argv}
 ${env}
   </dict>
   <key>RunAtLoad</key>
-  <false/>
+  <true/>
   <key>KeepAlive</key>
-  <false/>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>${RERUN_SECONDS}</integer>
   <key>AbandonProcessGroup</key>
   <true/>
   <key>ProcessType</key>

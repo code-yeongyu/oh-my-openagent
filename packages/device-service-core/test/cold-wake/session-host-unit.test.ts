@@ -9,8 +9,9 @@ import {
   systemdSessionHostUnit,
 } from "../../src/cold-wake/session-host-unit.ts"
 
-// omo#13594: the unit files are a platform contract. The device service starts the unit by these fixed names, and the unit
-// runs exactly the omo binary with `daemon run` for the registered agent dir, nothing a caller can widen.
+// omo#13594: the unit files are a platform contract. The unit is always on beside the device service, which also starts it
+// by these fixed names for a cold wake, and it runs exactly the omo binary with `daemon run --pinned` for the registered
+// agent dir, nothing a caller can widen.
 
 const AGENT_DIR = "/home/u/.omo/agent"
 
@@ -24,7 +25,7 @@ describe("the cold-wake unit names", () => {
 })
 
 describe("the systemd user unit", () => {
-  test("runs the compiled omo with daemon run for the agent dir, as a oneshot that leaves the host running", () => {
+  test("runs the compiled omo's pinned daemon run for the agent dir, always on, never killing the host it started", () => {
     const launch = SessionHostLaunch.from({
       omoBin: "/home/u/.local/bin/omo",
       execPath: "/home/u/.local/bin/omo",
@@ -34,15 +35,20 @@ describe("the systemd user unit", () => {
     expect(systemdSessionHostUnit(launch)).toBe(
       [
         "[Unit]",
-        "Description=OmO session host (cold wake)",
+        "Description=OmO session host",
+        "StartLimitIntervalSec=0",
         "",
         "[Service]",
-        "Type=oneshot",
-        'ExecStart="/home/u/.local/bin/omo" "daemon" "run"',
+        "Type=simple",
+        'ExecStart="/home/u/.local/bin/omo" "daemon" "run" "--pinned"',
         'Environment="OMO_CODING_AGENT_DIR=/home/u/.omo/agent"',
         'Environment="PATH=/home/u/.local/bin:/usr/bin"',
+        "Restart=always",
+        "RestartSec=30",
         "KillMode=process",
-        "TimeoutStartSec=120",
+        "",
+        "[Install]",
+        "WantedBy=default.target",
         "",
       ].join("\n"),
     )
@@ -54,7 +60,13 @@ describe("the systemd user unit", () => {
       execPath: "/usr/bin/node",
       agentDir: AGENT_DIR,
     })
-    expect(launch.argv).toEqual(["/usr/bin/node", "/usr/lib/node_modules/omo-ai/bin/omo.js", "daemon", "run"])
+    expect(launch.argv).toEqual([
+      "/usr/bin/node",
+      "/usr/lib/node_modules/omo-ai/bin/omo.js",
+      "daemon",
+      "run",
+      "--pinned",
+    ])
     expect(systemdSessionHostUnit(launch)).not.toContain("PATH=")
   })
 
@@ -65,13 +77,13 @@ describe("the systemd user unit", () => {
       agentDir: "/home/u/100%/$X",
     })
     const unit = systemdSessionHostUnit(launch)
-    expect(unit).toContain('ExecStart="/opt/a \\"b\\"\\\\c/%%h/$$HOME/omo" "daemon" "run"')
+    expect(unit).toContain('ExecStart="/opt/a \\"b\\"\\\\c/%%h/$$HOME/omo" "daemon" "run" "--pinned"')
     expect(unit).toContain('Environment="OMO_CODING_AGENT_DIR=/home/u/100%%/$X"')
   })
 })
 
 describe("the launchd LaunchAgent", () => {
-  test("is loaded idle, starts only on demand and abandons the detached host to keep running", () => {
+  test("runs at load, is kept alive with a throttle, and abandons the detached host to keep running", () => {
     const launch = SessionHostLaunch.from({
       omoBin: "/Users/u/.local/bin/omo",
       execPath: "/Users/u/.local/bin/omo",
@@ -89,6 +101,7 @@ describe("the launchd LaunchAgent", () => {
     <string>/Users/u/.local/bin/omo</string>
     <string>daemon</string>
     <string>run</string>
+    <string>--pinned</string>
   </array>
   <key>EnvironmentVariables</key>
   <dict>
@@ -98,9 +111,11 @@ describe("the launchd LaunchAgent", () => {
     <string>/opt/homebrew/bin:/usr/bin</string>
   </dict>
   <key>RunAtLoad</key>
-  <false/>
+  <true/>
   <key>KeepAlive</key>
-  <false/>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>30</integer>
   <key>AbandonProcessGroup</key>
   <true/>
   <key>ProcessType</key>

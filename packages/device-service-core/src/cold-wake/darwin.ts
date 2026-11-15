@@ -65,6 +65,8 @@ export async function installDarwin(host: ColdWakeHost, launch: SessionHostLaunc
   // A bootout fails when the job is not loaded, which is the state it is meant to reach.
   if (changed) await host.run(["launchctl", "bootout", job])
   if (changed || (await host.run(["launchctl", "print", job])).exitCode !== 0) {
+    // A job someone disabled refuses a bootstrap; RunAtLoad starts it once it is loaded.
+    await host.run(["launchctl", "enable", job])
     const loaded = await bootstrapJob(host, plist)
     if (loaded.exitCode !== 0) return failed("unit_load", loaded.output)
   }

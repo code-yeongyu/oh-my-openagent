@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs"
 import { join } from "node:path"
 
 import { type ColdWakeHost, type ColdWakeOutcome, failed, removeIfPresent, writeIfChanged } from "./host.ts"
@@ -98,13 +99,45 @@ async function applyTable(
   return { kind: done, serviceRestarted: true }
 }
 
-export const installLinux = (host: ColdWakeHost, launch: SessionHostLaunch): Promise<ColdWakeOutcome> =>
-  applyTable(
-    host,
-    (raw) => withColdWake(raw, "linux"),
-    writeIfChanged(join(unitDir(host.home), SESSION_HOST_SYSTEMD_UNIT), systemdSessionHostUnit(launch)),
-    "installed",
+const showFields = (output: string): Readonly<Record<string, string>> =>
+  Object.fromEntries(
+    output
+      .split("\n")
+      .filter((line) => line.includes("="))
+      .map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1).trim()]),
   )
 
-export const uninstallLinux = (host: ColdWakeHost): Promise<ColdWakeOutcome> =>
-  applyTable(host, withoutColdWake, removeIfPresent(join(unitDir(host.home), SESSION_HOST_SYSTEMD_UNIT)), "removed")
+// Always on: enabled for the user's manager and running. A changed unit is restarted onto its new text; between reruns
+// a running unit reads `activating` (auto-restart), which is running too.
+async function runSessionHost(host: ColdWakeHost, unitChanged: boolean): Promise<ColdWakeOutcome | undefined> {
+  const shown = await systemctl(host, "show", SESSION_HOST_SYSTEMD_UNIT, "-p", "UnitFileState", "-p", "ActiveState")
+  if (shown.exitCode !== 0) return failed("unit_show", shown.output)
+  const state = showFields(shown.output)
+  const steps: string[] = []
+  if (state["UnitFileState"] !== "enabled") steps.push("enable")
+  if (unitChanged) steps.push("restart")
+  else if (state["ActiveState"] !== "active" && state["ActiveState"] !== "activating") steps.push("start")
+  for (const step of steps) {
+    const result = await systemctl(host, step, SESSION_HOST_SYSTEMD_UNIT)
+    if (result.exitCode !== 0) return failed(`unit_${step}`, result.output)
+  }
+  return undefined
+}
+
+export async function installLinux(host: ColdWakeHost, launch: SessionHostLaunch): Promise<ColdWakeOutcome> {
+  const unitPath = join(unitDir(host.home), SESSION_HOST_SYSTEMD_UNIT)
+  const unitChanged = writeIfChanged(unitPath, systemdSessionHostUnit(launch))
+  const outcome = await applyTable(host, (raw) => withColdWake(raw, "linux"), unitChanged, "installed")
+  if (outcome.kind === "failed") return outcome
+  return (await runSessionHost(host, unitChanged)) ?? outcome
+}
+
+// `disable --now` stops only the unit's own process (KillMode=process): a host it started keeps its sessions.
+export async function uninstallLinux(host: ColdWakeHost): Promise<ColdWakeOutcome> {
+  const unitPath = join(unitDir(host.home), SESSION_HOST_SYSTEMD_UNIT)
+  if (existsSync(unitPath)) {
+    const disabled = await systemctl(host, "disable", "--now", SESSION_HOST_SYSTEMD_UNIT)
+    if (disabled.exitCode !== 0) return failed("unit_disable", disabled.output)
+  }
+  return applyTable(host, withoutColdWake, removeIfPresent(unitPath), "removed")
+}
