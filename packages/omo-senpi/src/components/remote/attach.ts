@@ -158,8 +158,10 @@ class MirroredDialogs {
     const uiRequestId = text(record["uiRequestId"])
     if (uiRequestId === undefined) return undefined
     if (record["type"] === "ui_request_settled") {
-      // Only a request this attach showed gets a frame_settled; any other settle goes on as a record.
-      if (this.#raiserOnly.delete(uiRequestId) || !this.#shown.delete(uiRequestId)) return undefined
+      // Forgotten in both sets (a secret raised on this connection's own channel is in both); only a request this attach
+      // showed gets a frame_settled, any other settle goes on as a record.
+      this.#raiserOnly.delete(uiRequestId)
+      if (!this.#shown.delete(uiRequestId)) return undefined
       const how = record["disposition"] === "answered" ? "answered" : "cancelled"
       return { kind: "frame_settled", request_id: uiRequestId, how }
     }
