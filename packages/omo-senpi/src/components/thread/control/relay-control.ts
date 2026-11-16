@@ -128,12 +128,21 @@ export function createRelayControl(
   }
 }
 
-// The engine statuses a turn is still in progress under; anything else (idle, waiting_input, closed, unloaded) ends a wait.
+// The engine statuses a turn is still in progress under; anything else (idle, waiting_input, closed, unloaded) ends one.
 const IN_PROGRESS: ReadonlySet<string> = new Set(["running", "compacting", "opening"])
 
+// How long a wait that has seen no run at all keeps listening before it settles on the session's idle status. A
+// snapshot's idle is not a turn end: a run a send just started read isStreaming false for 17 s on the relay, so the
+// wait gives the run's own records this long to show up before it believes the idle.
+const QUIET_MS = 3_000
+
+const turnOf = (record: JsonObject): string | undefined =>
+  typeof record["turnId"] === "string" && record["turnId"] !== "" ? record["turnId"] : undefined
+
 /**
- * #13417: until the session leaves its running states, on the watch's own events (a baseline `get_state`, then each
- * status change, and a resync after any relay or service gap), bounded by `timeoutMs` and the caller's abort.
+ * #13417: until a turn end is OBSERVED on the watch (the run's `agent_settled`, a running -> not-running status
+ * change, or a resync that reports a turn settled while the watch was away), bounded by `timeoutMs` and the caller's
+ * abort. A session that shows no run within QUIET_MS settles on its idle status, with no `turn_id`.
  */
 async function waitSettled(
   remote: RemoteThreadSurface,
@@ -143,43 +152,79 @@ async function waitSettled(
 ): Promise<ThreadWaitOutcome> {
   const started = Date.now()
   let status = "unknown"
-  let finish!: (outcome: ThreadWaitOutcome["outcome"], status: string) => void
+  let running = false
+  // A live event is newer than the baseline read: once one arrived, the baseline never overrides it.
+  let live = false
+  let turn: string | undefined
+  let finish!: (outcome: ThreadWaitOutcome["outcome"], status: string, turnId?: string) => void
   const done = new Promise<ThreadWaitOutcome>((resolve) => {
     let settled = false
-    finish = (outcome, at) => {
+    finish = (outcome, at, turnId) => {
       if (settled) return
       settled = true
-      resolve({ outcome, status: at, waited_ms: Date.now() - started })
+      resolve({
+        outcome,
+        status: at,
+        waited_ms: Date.now() - started,
+        ...(turnId === undefined ? {} : { turn_id: turnId }),
+      })
     }
   })
   if (signal?.aborted === true) return { outcome: "cancelled", status, waited_ms: 0 }
-  const observe = (next: string) => {
-    status = next
-    if (!IN_PROGRESS.has(next)) finish("settled", next)
+  let quiet: ReturnType<typeof setTimeout> | undefined
+  const runSeen = (turnId: string | undefined) => {
+    running = true
+    turn = turnId ?? turn
+    clearTimeout(quiet)
   }
   const watched = await remote.sessions.watch(
     row.device,
     row.session_id,
     {
-      record: () => {},
-      status: (change) => observe(change.to),
-      resynced: (resync) => observe(resync.state.status),
+      record: (record) => {
+        live = true
+        const type = record["type"]
+        if (type === "agent_start" || type === "turn_start") runSeen(turnOf(record))
+        if (type === "agent_settled") {
+          status = record["reason"] === "session_closed" ? "closed" : "idle"
+          finish("settled", status, turnOf(record) ?? turn)
+        }
+      },
+      status: (change) => {
+        live = true
+        status = change.to
+        if (IN_PROGRESS.has(change.to)) runSeen(undefined)
+        else if (running || (change.from !== undefined && IN_PROGRESS.has(change.from)))
+          finish("settled", change.to, turn)
+      },
+      resynced: (resync) => {
+        live = true
+        status = resync.state.status
+        const settledTurn = resync.settledTurns.at(-1)
+        if (settledTurn !== undefined) finish("settled", status, settledTurn)
+        else if (IN_PROGRESS.has(status)) runSeen(resync.state.currentTurnId)
+        else if (running) finish("settled", status, turn)
+      },
     },
     { baseline: true },
   )
   if (watched.kind !== "ok") throw new ControlRefusal(outcomeFailure(watched, row.device).error)
   const { watch } = watched
-  const onAbort = () => finish("cancelled", status)
+  const onAbort = () => finish("cancelled", status, turn)
   signal?.addEventListener("abort", onAbort, { once: true })
-  const timer = setTimeout(() => finish("timeout", status), timeoutMs)
+  const timer = setTimeout(() => finish("timeout", status, turn), timeoutMs)
   void watch.ended.then((end) =>
-    finish(end === "session_closed" ? "settled" : "ended", end === "session_closed" ? "closed" : end),
+    finish(end === "session_closed" ? "settled" : "ended", end === "session_closed" ? "closed" : end, turn),
   )
-  observe(watch.initial?.status ?? status)
+  const initial = live ? undefined : watch.initial
+  if (initial !== undefined) status = initial.status
+  if (initial !== undefined && IN_PROGRESS.has(initial.status)) runSeen(initial.currentTurnId)
+  else if (!running) quiet = setTimeout(() => finish("settled", status), QUIET_MS)
   try {
     return await done
   } finally {
     clearTimeout(timer)
+    clearTimeout(quiet)
     signal?.removeEventListener("abort", onAbort)
     watch.stop()
   }
