@@ -4,6 +4,7 @@
 mod click;
 mod exit_paths;
 mod pointer;
+mod review_4acc6ab;
 
 use omo_computer_backend_fake::{FakeBackend, FakeClock, FakeScenario, RecordingSink, StopPathScript};
 use omo_computer_core::backend::{
@@ -28,6 +29,11 @@ pub(super) struct Fixture {
 
 /// An object-mode session on the fake (`extra` adds scenario members), stop path armed.
 pub(super) fn fixture(extra: &str, refuse_at: Option<usize>) -> Fixture {
+    fixture_in("object", extra, refuse_at)
+}
+
+/// A session in report mode `mode` on the fake, stop path armed.
+pub(super) fn fixture_in(mode: &str, extra: &str, refuse_at: Option<usize>) -> Fixture {
     let sink = RecordingSink::default();
     let clock = FakeClock::default();
     let scenario = FakeScenario::from_json(&format!("{{{WINDOWS}{extra}}}")).expect("scenario");
@@ -37,7 +43,7 @@ pub(super) fn fixture(extra: &str, refuse_at: Option<usize>) -> Fixture {
         None => Box::new(fake),
     };
     let mut session = Session::new(backend);
-    session.open(serde_json::from_value(json!({"reportMode": "object"})).expect("open params")).expect("open");
+    session.open(serde_json::from_value(json!({"reportMode": mode})).expect("open params")).expect("open");
     session.stop_path_start(serde_json::from_value(json!({})).expect("start params"));
     Fixture { session, sink, clock }
 }
