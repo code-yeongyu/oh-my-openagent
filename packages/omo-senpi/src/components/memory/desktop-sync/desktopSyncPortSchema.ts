@@ -2,8 +2,10 @@
 // Chain parsing is not cryptographic verification; memory-core still verifies every record.
 import { z } from "zod"
 
-// listEntries is not paged and returns the whole chain, so the cap sits far above any real chain while still bounding
-// the memory an oversized reply can cost to validate (GHSA-mrhx-c7xc-m3w5: zod collects one issue per failing element).
+// Upper bound for every array in a sync-service reply (GHSA-mrhx-c7xc-m3w5: zod collects one issue per failing element, so an
+// uncapped array lets an oversized reply cost unbounded memory). listEntries is unpaged and returns the whole chain, one row per
+// push (pushes are debounced to one per 2 s), so a very long-lived busy account can eventually exceed this; paging listEntries is
+// tracked separately. Until then an over-cap chain fails validation instead of being read in full.
 export const SYNC_REPLY_MAX_ITEMS = 100_000
 
 export const SyncInteger = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER)

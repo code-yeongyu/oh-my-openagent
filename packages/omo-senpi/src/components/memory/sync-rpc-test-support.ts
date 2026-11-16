@@ -41,7 +41,7 @@ export function owner(id: string) {
   }
 }
 
-export async function setup() {
+export async function setup(overrides: Partial<SyncRpcOptions> = {}) {
   const device = await newDevice()
   const accountAbort = new AbortController()
   const hostAbort = new AbortController()
@@ -136,6 +136,7 @@ export async function setup() {
     pinDir: "/unused",
     signal: hostAbort.signal,
     syncStatus: async () => ({ state: "paused" }),
+    ...overrides,
   }
   const coordinator = registerSyncRpc(
     {
