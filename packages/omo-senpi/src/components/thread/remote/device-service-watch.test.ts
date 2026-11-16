@@ -10,6 +10,7 @@ import type { JsonObject, RemoteResync, RemoteSessionRow, RemoteThreadSurface } 
 import { followRemote } from "./remote-ops"
 
 type AttachEvent = Parameters<Parameters<RemoteAttach["onEvent"]>[0]>[0]
+type AttachRecord = Extract<AttachEvent, { readonly kind: "records" }>["records"][number]
 
 // The device service's account side for one remote session: each attach replays its history from its latest snapshot
 // to a new listener (as remote-attach.ts does), `get_state` answers the engine's current state, and closing the
@@ -30,7 +31,7 @@ function fakeDevice(
   let connects = 0
   const locate: { key?: string } = {}
   const missing = new Set<string>()
-  const connect = async (): Promise<DeviceService> => {
+  const dial = async (): Promise<DeviceService> => {
     connects += 1
     let close!: () => void
     const closed = new Promise<void>((resolve) => {
@@ -159,6 +160,7 @@ function fakeDevice(
     })
   const records = (attachId: number, records: readonly Readonly<Record<string, string>>[], seqs?: number[]) =>
     current().emit({ kind: "records", attach_id: attachId, records, ...(seqs === undefined ? {} : { seqs }) })
+  const connect = async () => ({ conn: await dial(), owned: true as const })
   return { connect, attaches, live, locate, missing, current, snapshot, records, connections, connects: () => connects }
 }
 
@@ -432,5 +434,100 @@ describe("watch v2 (#12719): a remote session followed across drops, restarts an
     ]).finally(() => clearTimeout(timer))
     follow.stop()
     expect(settled).toBe("peer_detached")
+  })
+})
+
+// A fake host for the #12777 duplicate: the engine writes each streamed delta to the attach stream, and, while the
+// delegated engine connection is attached to a live connection, once more to that connection.
+function delegatedHost() {
+  // The connection the host's delegated engine connection is attached to; null once that connection closes.
+  let delegatedOn: object | null = null
+  const listeners = new Set<(event: AttachEvent) => void>()
+  let end: (reason: string) => void = () => {}
+  const detached = new Promise<string>((resolve) => {
+    end = resolve
+  })
+  const attach = {
+    onEvent: (listener: (event: AttachEvent) => void) => {
+      listeners.add(listener)
+      return () => {
+        listeners.delete(listener)
+      }
+    },
+    detached,
+  } as unknown as RemoteAttach
+  const service = () => {
+    const entry = { closed: false }
+    const svc = {
+      attach: async () => attach,
+      endpointCommand: async (_device: string, rpc: unknown) => {
+        // open_session attaches the host's delegated engine connection to the connection it rode on.
+        if ((rpc as { readonly type?: unknown }).type === "open_session") delegatedOn = entry
+        return {
+          outcome: { type: "event", kind: "session.command_state", command_id: "c", state: "engine_applied" },
+          response: { type: "response", command: "open_session", success: true, data: { sessionId: "s-new" } },
+        }
+      },
+      close: () => {
+        entry.closed = true
+        if (delegatedOn === entry) delegatedOn = null
+      },
+      closed: new Promise(() => {}),
+    } as unknown as DeviceService
+    return { service: svc, entry }
+  }
+  // The engine writes one delta: one copy reaches the attach stream, and a second reaches it through the delegated
+  // channel when that channel is attached to the live connection the attach rides.
+  const writeDelta = (record: AttachRecord, live: { closed: boolean }) => {
+    const copies = delegatedOn === live && !live.closed ? 2 : 1
+    for (let i = 0; i < copies; i++)
+      for (const listener of [...listeners]) listener({ kind: "records", attach_id: 1, records: [record] })
+  }
+  // One record that rides the attach stream only: once it arrives, every copy written before it has arrived too.
+  const writeSentinel = () => {
+    for (const listener of [...listeners]) listener({ kind: "records", attach_id: 1, records: [{ type: "sentinel" }] })
+  }
+  return { service, writeDelta, writeSentinel, end }
+}
+
+describe("device-service adapter: the #12777 duplicate rides the connection open_session used", () => {
+  const opened = {
+    kind: "ok",
+    response: { type: "response", command: "open_session", success: true, data: { sessionId: "s-new" } },
+  } as const
+
+  test("#given open_session rides a per-call dialer #when the engine writes one delta #then the watch sees one copy", async () => {
+    const host = delegatedHost()
+    const live = host.service()
+    const port = createDeviceServiceSessions({
+      version: "0.0.0-test",
+      connect: async () => ({ conn: live.service, owned: false }),
+      dialEndpoint: async () => ({ conn: host.service().service, owned: true }),
+    })
+    expect(await port.endpointCommand("b", { type: "open_session" })).toEqual(opened)
+    const seen = recorder()
+    const watched = await port.watch("b", "s1", seen.handlers)
+    if (watched.kind !== "ok") throw new Error(`watch refused: ${watched.reason}`)
+    host.writeDelta({ type: "delta" }, live.entry)
+    host.writeSentinel()
+    await seen.until(2)
+    expect(seen.log).toEqual(["record delta", "record sentinel"])
+  })
+
+  test("#given open_session rides the shared connection with no per-call dialer #when the engine writes one delta #then the watch sees it twice, pinning that the CLI must use a per-call dialer", async () => {
+    const host = delegatedHost()
+    const live = host.service()
+    const port = createDeviceServiceSessions({
+      version: "0.0.0-test",
+      connect: async () => ({ conn: live.service, owned: false }),
+    })
+    expect(await port.endpointCommand("b", { type: "open_session" })).toEqual(opened)
+    const seen = recorder()
+    const watched = await port.watch("b", "s1", seen.handlers)
+    if (watched.kind !== "ok") throw new Error(`watch refused: ${watched.reason}`)
+    host.writeDelta({ type: "delta" }, live.entry)
+    host.writeSentinel()
+    await seen.until(3)
+    expect(seen.log).toEqual(["record delta", "record delta", "record sentinel"])
   })
 })

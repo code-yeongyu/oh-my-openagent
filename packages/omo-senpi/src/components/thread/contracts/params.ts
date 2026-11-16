@@ -77,8 +77,7 @@ export const ThreadReadParams = Type.Object({
     Type.Integer({
       minimum: 1,
       maximum: THREAD_READ_WAIT_MAX_MS,
-      description:
-        "Wait up to this many ms for a thread on another device to end its turn, then read; result.wait says how it ended.",
+      description: "Wait up to this many ms for a remote thread's turn to end, then read; see result.wait.",
     }),
   ),
   all_scope: AllScope,
@@ -189,7 +188,7 @@ export const ThreadSetReasoningParams = Type.Object({
   scope: Type.Optional(
     Type.Union([Type.Literal("session"), Type.Literal("turn")], {
       description:
-        "session (default) changes the thread's remembered level for its model; turn changes only the current session level without rewriting the model's remembered level.",
+        "session (default) or turn; either changes only this thread's level and never the level the device remembers for the model.",
     }),
   ),
   all_scope: AllScope,

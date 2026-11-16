@@ -6,7 +6,8 @@ import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 // returns; over the relay the previous turn's replay arrives exactly then, after the send's reply (#13267).
 type RecordListener = (record: JsonObject) => void
 
-function followSurface(transcript: JsonObject[]) {
+// `before`: the transcript as it stands before the send (a read made before the watch attaches).
+function followSurface(transcript: JsonObject[], before: JsonObject[] = []) {
   let listener: RecordListener | undefined
   const deliver = (records: readonly JsonObject[]): void => {
     if (listener !== undefined) for (const record of records) listener(record)
@@ -21,7 +22,10 @@ function followSurface(transcript: JsonObject[]) {
           watch: { ended: new Promise<string>(() => {}), stop: () => (listener = undefined) },
         }
       },
-      read: async () => ({ kind: "ok" as const, response: { entries: [...transcript] } }),
+      read: async () => ({
+        kind: "ok" as const,
+        response: { entries: [...(listener === undefined ? before : transcript)] },
+      }),
     },
     chain: { stamp: (record: JsonObject) => record },
   } as unknown as RemoteThreadSurface
@@ -49,6 +53,21 @@ const message = (id: string, role: string, text: string): JsonObject => ({
 const delta = (text: string): JsonObject => ({
   type: "message_update",
   assistantMessageEvent: { type: "text_delta", delta: text, contentIndex: 0 },
+})
+
+// The prompt's own user message as senpi streams it when the run starts (stamped with its client message id, if any).
+const prompted = (text: string, clientMessageId?: string): JsonObject => ({
+  type: "message_end",
+  message: {
+    role: "user",
+    content: [{ type: "text", text }],
+    ...(clientMessageId === undefined ? {} : { clientMessageId }),
+  },
+})
+
+const stampedUser = (id: string, text: string, clientMessageId: string): JsonObject => ({
+  ...message(id, "user", text),
+  message: { role: "user", content: [{ type: "text", text }], clientMessageId },
 })
 
 const flush = async (): Promise<void> => {
@@ -281,7 +300,13 @@ describe("#13267: a follow prints only the answer to its own send's message", ()
     const printed: string[] = []
     const follow = await followRemote(remote, ROW, (text) => printed.push(text), { text: "ping" })
     if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
-    deliver([{ type: "agent_start" }, delta("own answer\n"), { type: "agent_end" }, { type: "agent_settled" }])
+    deliver([
+      { type: "agent_start" },
+      prompted("ping"),
+      delta("own answer\n"),
+      { type: "agent_end" },
+      { type: "agent_settled" },
+    ])
     await flush()
     expect(printed).toEqual([])
     follow.aim("started")
@@ -347,7 +372,13 @@ describe("#13272 review: the anchor survives a rewritten send and never takes an
       clientMessageId: "cm-2",
     })
     if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
-    deliver([{ type: "agent_start" }, delta("new answer\n"), { type: "agent_end" }, { type: "agent_settled" }])
+    deliver([
+      { type: "agent_start" },
+      prompted("<context>\nping", "cm-2"),
+      delta("new answer\n"),
+      { type: "agent_end" },
+      { type: "agent_settled" },
+    ])
     await flush()
     follow.aim("started")
     await withTimeout(follow.settled, 5_000, "the started send never ended its wait")
@@ -510,6 +541,179 @@ describe("followRemote: an interrupted turn whose last message ended before the 
     deliver([{ type: "agent_settled" }])
     await flush()
     expect(await withTimeout(follow.settled, 2000, "the follow never settled")).toBe("interrupted")
+    follow.stop()
+  })
+})
+
+describe("followRemote: an earlier run's stop reason does not mark this send's run", () => {
+  const aborted: JsonObject = { type: "message_end", message: { role: "assistant", stopReason: "aborted" } }
+
+  test("#given an aborted run still open at the aim #when a new run starts after it and settles #then the new run carries no earlier stop reason (the agent_start reset)", async () => {
+    const { remote, deliver } = followSurface([message("u1", "user", "ping")])
+    const follow = await followRemote(remote, ROW, () => {}, { text: "ping" })
+    if ("kind" in follow) throw new Error("follow refused")
+    deliver([{ type: "agent_start" }, aborted])
+    follow.aim("started")
+    deliver([{ type: "agent_start" }, { type: "agent_settled" }])
+    await flush()
+    expect(await withTimeout(follow.settled, 2000, "the follow never settled")).toBe("settled")
+    follow.stop()
+  })
+
+  test("#given an aborted run the buffer already saw settle #when a settle arrives after the aim with no run start of its own #then the earlier run's stop reason marks nothing (the settled-run skip)", async () => {
+    const { remote, deliver } = followSurface([message("u1", "user", "ping")])
+    const follow = await followRemote(remote, ROW, () => {}, { text: "ping" })
+    if ("kind" in follow) throw new Error("follow refused")
+    deliver([{ type: "agent_start" }, aborted, { type: "agent_settled" }])
+    follow.aim("started")
+    deliver([{ type: "agent_settled" }])
+    await flush()
+    expect(await withTimeout(follow.settled, 2000, "the follow never settled")).toBe("settled")
+    follow.stop()
+  })
+})
+
+describe("#13481 review: a started send prints its own turn, never an earlier identical send's", () => {
+  // A prompt carrying another client message id is never this send's, whether this send has an id or not. An earlier
+  // prompt with no id (a send without --wait, text typed in the TUI) is not an id-carrying send's own on an engine
+  // that shows it stamps ids (#13481 review M1).
+  const cases: ReadonlyArray<{ name: string; earlierId?: string; ownId?: string; transcript: JsonObject[] }> = [
+    {
+      name: "with another client message id",
+      earlierId: "cm-old",
+      ownId: "cm-new",
+      transcript: [stampedUser("u1", "ping", "cm-old"), message("a1", "assistant", "EARLIER")],
+    },
+    {
+      name: "with no client message id, on an engine that stamps ids",
+      ownId: "cm-new",
+      transcript: [
+        stampedUser("u0", "hello", "cm-older"),
+        message("a0", "assistant", "hi"),
+        message("u1", "user", "ping"),
+        message("a1", "assistant", "EARLIER"),
+      ],
+    },
+    {
+      name: "with a client message id, before a send that has none",
+      earlierId: "cm-old",
+      transcript: [stampedUser("u1", "ping", "cm-old"), message("a1", "assistant", "EARLIER")],
+    },
+  ]
+  for (const { name, earlierId, ownId, transcript } of cases) {
+    test(`#given an earlier identical send ${name} whose whole run and settle reached the buffer before this send's reply #when this send's own turn streams after the aim #then only its answer prints, never the earlier one`, async () => {
+      const { remote, deliver } = followSurface(transcript)
+      const printed: string[] = []
+      const follow = await followRemote(remote, ROW, (text) => printed.push(text), {
+        text: "ping",
+        ...(ownId === undefined ? {} : { clientMessageId: ownId }),
+      })
+      if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
+      deliver([{ type: "agent_start" }, prompted("ping", earlierId), delta("EARLIER"), { type: "agent_settled" }])
+      follow.aim("started")
+      // The probe's transcript read completes before this send's own run streams.
+      await flush()
+      deliver([{ type: "agent_start" }, prompted("ping", ownId), delta("pong"), { type: "agent_settled" }])
+      expect(await withTimeout(follow.settled, 2000, "the follow never settled")).toBe("settled")
+      expect(printed).toEqual(["pong"])
+      follow.stop()
+    })
+  }
+
+  test("#given an earlier identical prompt typed with no id, already settled and stored, on an engine that stamps no id #when a first waiting send's reply arrives before its own prompt is stored #then only its own answer prints, never the earlier one", async () => {
+    // The earlier "ping" (typed in the TUI, or sent without --wait) is stored before this send goes out; nothing in the
+    // session carries a client message id, so only that pre-send transcript tells it from this send's (#13481 delta M1).
+    const earlier = [message("u1", "user", "ping"), message("a1", "assistant", "EARLIER")]
+    const { remote, deliver } = followSurface(earlier, earlier)
+    const printed: string[] = []
+    const follow = await followRemote(remote, ROW, (text) => printed.push(text), {
+      text: "ping",
+      clientMessageId: "cm-new",
+    })
+    if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
+    deliver([{ type: "agent_start" }, prompted("ping"), delta("EARLIER"), { type: "agent_settled" }])
+    follow.aim("started")
+    // The probe's transcript read completes before this send's own run streams.
+    await flush()
+    deliver([{ type: "agent_start" }, prompted("ping"), delta("pong"), { type: "agent_settled" }])
+    expect(await withTimeout(follow.settled, 2000, "the follow never settled")).toBe("settled")
+    expect(printed).toEqual(["pong"])
+    follow.stop()
+  })
+
+  // The stream printed all of the partial text, or only a prefix of it: the unprinted tail still prints (#13481 review L2).
+  for (const [streamedText, expected] of [
+    ["part", ["part"]],
+    ["pa", ["pa", "rt"]],
+  ] as const) {
+    test(`#given an interrupted turn whose partial text streamed ${streamedText === "part" ? "whole" : "only in part"} #when the probe finds it final in the transcript #then it ends interrupted with the text printed once, tail included`, async () => {
+      const transcript = [
+        stampedUser("u1", "ping", "cm-1"),
+        {
+          ...message("a1", "assistant", "part"),
+          message: { role: "assistant", content: "part", stopReason: "aborted" },
+        },
+        message("u2", "user", "later"),
+      ]
+      const { remote, deliver } = followSurface(transcript)
+      const printed: string[] = []
+      const follow = await followRemote(remote, ROW, (text) => printed.push(text), {
+        text: "ping",
+        clientMessageId: "cm-1",
+      })
+      if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
+      follow.aim("started")
+      deliver([delta(streamedText)])
+      expect(await withTimeout(follow.settled, 2000, "the follow never settled")).toBe("interrupted")
+      expect(printed).toEqual([...expected])
+      follow.stop()
+    })
+  }
+
+  // An interrupted turn keeps its partial answer too: the deltas that streamed are the later turn's (#13481 review L3).
+  for (const interrupted of [false, true]) {
+    test(`#given a superseded ${interrupted ? "interrupted " : ""}send whose streamed deltas belong to the later turn #when the probe reads the transcript #then this send's stored answer still prints, once`, async () => {
+      const ownAnswer = interrupted
+        ? {
+            ...message("a1", "assistant", "own answer"),
+            message: { role: "assistant", content: "own answer", stopReason: "aborted" },
+          }
+        : message("a1", "assistant", "own answer")
+      const transcript = [stampedUser("u1", "ping", "cm-1"), ownAnswer, message("u2", "user", "later")]
+      const { remote, deliver } = followSurface(transcript)
+      const printed: string[] = []
+      const follow = await followRemote(remote, ROW, (text) => printed.push(text), {
+        text: "ping",
+        clientMessageId: "cm-1",
+      })
+      if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
+      follow.aim("started")
+      deliver([delta("later answer")])
+      expect(await withTimeout(follow.settled, 2000, "the follow never settled")).toBe(
+        interrupted ? "interrupted" : "settled",
+      )
+      expect(printed.join("").split("own answer")).toHaveLength(2)
+      follow.stop()
+    })
+  }
+
+  test("#given a superseded send whose own answer already streamed #when the probe reads the transcript #then the answer is not printed a second time", async () => {
+    const transcript = [
+      stampedUser("u1", "ping", "cm-1"),
+      message("a1", "assistant", "own answer"),
+      message("u2", "user", "later"),
+    ]
+    const { remote, deliver } = followSurface(transcript)
+    const printed: string[] = []
+    const follow = await followRemote(remote, ROW, (text) => printed.push(text), {
+      text: "ping",
+      clientMessageId: "cm-1",
+    })
+    if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
+    follow.aim("started")
+    deliver([delta("own answer")])
+    expect(await withTimeout(follow.settled, 2000, "the follow never settled")).toBe("settled")
+    expect(printed).toEqual(["own answer"])
     follow.stop()
   })
 })

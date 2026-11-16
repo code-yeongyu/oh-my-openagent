@@ -34,6 +34,13 @@ export interface EngineDeps {
   readonly transport: Transport
   readonly verifier: Verifier
   readonly sealer: Sealer
+  /** The memory space (hex id) the verifier and sealer are bound to; the journal belongs to it. */
+  readonly space: string
+  /**
+   * The per-device space this repository synced before it moved to the account default space
+   * (#13720). A journal an older build wrote names no space; with this set it is that space's.
+   */
+  readonly legacySpace?: string
   readonly lock: WriterLock
   readonly clock: Clock
   readonly fault?: EngineFault

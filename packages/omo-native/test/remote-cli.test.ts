@@ -403,7 +403,7 @@ describe("omo remote attach", () => {
     expect(socket).toMatch(/[\\/]t-[0-9a-f]{16}\.sock$/)
   })
 
-  test.each([[[]], [["no-slash"]], [["/session"]], [["device/"]], [[`${PEER}/${SESSION_ID}`, "extra"]]])(
+  test.each([[[]], [["/session"]], [["device/"]], [[`${PEER}/${SESSION_ID}`, "extra"]]])(
     "refuses the target %p as usage",
     async (target) => {
       const { prepared, err } = await attach(target)
@@ -600,9 +600,9 @@ describe("omo remote session verbs", () => {
       thread: { thread_id: "dur-new-on-b", device: "b" },
       model: { provider: "openai", id: "gpt-6" },
     })
-    expect(types(a.sent, "set_model").map((entry) => [entry.session, entry.rpc?.["modelId"]])).toEqual([
-      ["dur-new-on-b", "gpt-6"],
-    ])
+    expect(
+      types(a.sent, "set_model").map((entry) => [entry.session, entry.rpc?.["modelId"], entry.rpc?.["scope"]]),
+    ).toEqual([["dur-new-on-b", "gpt-6", "session"]])
   })
 
   test("send streams the answer's text deltas in order and returns once the turn settles", async () => {
@@ -754,7 +754,8 @@ describe("omo remote session verbs", () => {
 
   test("a waiting send whose started turn was interrupted and finished before the send caught up fails with a typed line (probe)", async () => {
     const a = fixture.account({
-      records: [{ type: "agent_settled" }],
+      // The run's own prompt precedes its settle, so the settle is this send's turn and not an earlier run's.
+      records: [{ type: "message_end", message: { role: "user", content: "hi" } }, { type: "agent_settled" }],
       recordsBeforeReply: true,
       entriesAfterAnswer: [
         { role: "user", content: "hi" },
@@ -818,7 +819,7 @@ describe("omo remote session verbs", () => {
     expect([code, out, port.calls]).toEqual([
       REMOTE_EXIT.ok,
       ["Steered turn 3 on b/dur-on-b."],
-      ["status", "devices", "command:get_state", "command:prompt"],
+      ["status", "locate", "devices", "command:get_state", "command:prompt"],
     ])
   })
 
@@ -857,14 +858,18 @@ describe("omo remote session verbs", () => {
     [
       ["model", "b/dur-on-b", "anthropic/claude-opus"],
       "b/dur-on-b now uses anthropic/claude-opus.",
-      ["status", "devices", "command:get_available_models", "command:set_model"],
+      ["status", "locate", "devices", "command:get_available_models", "command:set_model"],
     ],
-    [["interrupt", "b/dur-on-b"], "Nothing was running on b/dur-on-b.", ["status", "devices", "command:interrupt"]],
-    [["close", "b/dur-on-b"], "Closed b/dur-on-b.", ["status", "devices", "command:unload_session"]],
+    [
+      ["interrupt", "b/dur-on-b"],
+      "Nothing was running on b/dur-on-b.",
+      ["status", "locate", "devices", "command:interrupt"],
+    ],
+    [["close", "b/dur-on-b"], "Closed b/dur-on-b.", ["status", "locate", "devices", "command:unload_session"]],
     [
       ["send", "b/dur-on-b", "hi", "--no-wait"],
       "Sent to b/dur-on-b: turn turn-b started.",
-      ["status", "devices", "command:prompt"],
+      ["status", "locate", "devices", "command:prompt"],
     ],
     [["open", "b"], "b/dur-new-on-b", ["status", "devices", "endpoint:open_session", "locate"]],
   ])("%p makes only its remote op's calls and reports the answer", async (args, line, calls) => {
@@ -887,7 +892,7 @@ describe("omo remote session verbs", () => {
 
   test.each([
     [
-      ["send", "no-slash", "hi"],
+      ["send", "/session", "hi"],
       "omo remote send: name the session as <device>/<session> (the SESSION column of omo remote sessions)",
     ],
     [["send", "b/dur-on-b"], "omo remote send: the message text is required"],

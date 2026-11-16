@@ -75,7 +75,7 @@ export async function readThread(
     if (control.waitSettled === undefined)
       return failure(
         "unsupported",
-        "wait_ms waits only on a thread on another device.",
+        "wait_ms needs a thread on another device.",
         `Use monitor({ type: "rpc", target: "${control.thread_id}" }).`,
       )
     try {
