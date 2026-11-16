@@ -164,9 +164,9 @@ export async function attachAddressed(
       .then(() => connected.locate(device, sessionId))
       .catch(() => undefined)
   if (DURABLE_ID.test(sessionId)) {
-    const located = await locate()
-    if (located === undefined)
-      throw new LocalApiError("session_not_found", `device ${device} names no session ${sessionId}`)
+    // Only a locate that answered "none" means the session is gone; any other failure (b not answering, a lost connection)
+    // is the refusal as it came, so a close never reports a running session not_live (review M1 of 6ce7397).
+    const located = await connected.locate(device, sessionId)
     return await connected.attach(device, located.key)
   }
   try {

@@ -134,8 +134,8 @@ export async function prepareRemoteAttach(
     return reportFailure(dependencies, error)
   }
   try {
-    // A bare durable id is found in the account listing; `<device>/<session>` attaches by the id as typed, located when
-    // that device's listing does not name it yet (omo#13707).
+    // A bare durable id is found in the account listing; for `<device>/<session>`, attachAddressed locates a durable id on
+    // that device and attaches on its key, and attaches a listing key directly (omo#13707).
     const remote = (
       dependencies.remote ??
       ((connected: DeviceService) => ({
