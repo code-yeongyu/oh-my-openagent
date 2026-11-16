@@ -84,3 +84,24 @@ fn exchange(stream: &UnixStream) -> Result<Value, String> {
         _ => Err("host_api_no_result".to_owned()),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::{Duration, Instant};
+
+    use super::{connect_within, BUDGET};
+
+    /// Review L2 of #13373: a connect that never completes (a squatter with a full backlog) is
+    /// cut at the budget and read as unanswered, never waited on.
+    #[test]
+    fn a_connect_that_stalls_is_cut_at_the_budget() {
+        let started = Instant::now();
+        let outcome = connect_within(BUDGET, || {
+            std::thread::sleep(Duration::from_secs(5));
+            Err(std::io::ErrorKind::ConnectionRefused.into())
+        });
+        let error = outcome.expect_err("cut at the budget");
+        assert_eq!(error.kind(), std::io::ErrorKind::TimedOut);
+        assert!(started.elapsed() < BUDGET + Duration::from_millis(500), "{:?}", started.elapsed());
+    }
+}
