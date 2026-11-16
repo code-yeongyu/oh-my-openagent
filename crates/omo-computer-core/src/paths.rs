@@ -241,4 +241,15 @@ mod tests {
             .state
             .ends_with(".local/state/omo/computer-control"));
     }
+
+    /// A-IS-65 L3: the Windows lock directory is `%LOCALAPPDATA%\\OmO\\ComputerControl\\run`,
+    /// per user and the same in every logon session; the STATE root stays its parent.
+    #[cfg(windows)]
+    #[test]
+    fn windows_runtime_root_is_the_run_directory_under_local_app_data() {
+        let roots = resolve(|name| (name == "LOCALAPPDATA").then(|| r"C:\Users\u\AppData\Local".to_owned()))
+            .expect("resolves");
+        assert_eq!(roots.state, Path::new(r"C:\Users\u\AppData\Local\OmO\ComputerControl"));
+        assert_eq!(roots.runtime, roots.state.join("run"));
+    }
 }
