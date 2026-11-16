@@ -85,6 +85,13 @@ impl Default for Consent {
 }
 
 impl Consent {
+    /// The hand's audit reads tampered (A-IS-62 R7-2): exec is refused, reads continue.
+    pub(crate) fn mark_tampered(&mut self) {
+        self.view.tampered = true;
+    }
+}
+
+impl Consent {
     #[must_use]
     pub fn new(view: ConsentView, hand: &str, os: Os) -> Self {
         Self {

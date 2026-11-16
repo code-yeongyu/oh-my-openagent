@@ -18,6 +18,7 @@ use serde_json::json;
 use super::line::{now_ms, AuditEvent};
 use super::handlock::HandLock;
 use super::mark::is_chord_refusal_event;
+use super::scan::{HandScan, Tamper};
 use super::segment::{anchor_event, chain_link, stamp, truncated, Segment};
 use super::sink::{AuditSink, AUDIT_UNAVAILABLE};
 
@@ -87,6 +88,9 @@ pub struct AuditWriter {
     degraded: bool,
     /// This segment already used its one chord-refusal line past the hard cap (R7-2).
     cap_refusal_written: bool,
+    audit_dir: PathBuf,
+    /// This process's reads of the hand (R7-2): whole once, then only what was appended.
+    scan: HandScan,
 }
 
 impl AuditWriter {
@@ -141,6 +145,8 @@ impl AuditWriter {
             authority,
             degraded: false,
             cap_refusal_written: false,
+            audit_dir: audit_dir.to_owned(),
+            scan: HandScan::default(),
         };
         let last = chain_link(&this.path);
         this.open_segment(last)?;
@@ -228,6 +234,11 @@ impl AuditSink for AuditWriter {
 
     fn path(&self) -> Option<&Path> {
         Some(&self.path)
+    }
+
+    fn read_mark(&mut self) -> Option<Tamper> {
+        let hand = self.segment.hand_id().to_owned();
+        self.scan.read(&self.audit_dir, &hand, self.limits).tampered
     }
 }
 

@@ -35,6 +35,10 @@ impl Segment {
         }
     }
 
+    pub(super) fn hand_id(&self) -> &str {
+        &self.hand_id
+    }
+
     pub(super) fn meta(&self) -> Value {
         json!({
             "kind": "audit.meta",

@@ -7,7 +7,7 @@ use serde_json::Value;
 use super::Funnel;
 
 impl Funnel {
-    pub(super) fn warn(&mut self, line: String) {
+    pub(crate) fn warn(&mut self, line: String) {
         eprintln!("omo-computer-engine: warn {line}");
         #[cfg(test)]
         self.warned.push(line);

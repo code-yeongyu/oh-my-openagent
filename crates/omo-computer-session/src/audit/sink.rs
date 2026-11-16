@@ -9,6 +9,7 @@ use omo_computer_core::backend::Refusal;
 use omo_computer_core::error::{EngineCode, Reason};
 
 use super::line::AuditEvent;
+use super::scan::Tamper;
 
 /// `Unavailable{reason:"audit_unavailable"}`: the `Internal` row keyed by its reason.
 pub const AUDIT_UNAVAILABLE: Refusal =
@@ -30,6 +31,12 @@ pub trait AuditSink: Send {
 
     /// The audit file, when there is one.
     fn path(&self) -> Option<&Path>;
+
+    /// Reads the hand's audit under its lock (A-IS-62 R7-2): `Some` when it reads tampered. A
+    /// sink with no file of its own reads nothing.
+    fn read_mark(&mut self) -> Option<Tamper> {
+        None
+    }
 }
 
 /// The audit of an engine whose per-hand file could not be opened: every exec refuses.

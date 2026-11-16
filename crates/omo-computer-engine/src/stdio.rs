@@ -26,7 +26,10 @@ pub fn run() -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    match serve(&mut Session::for_roots(backend, &roots), io::stdin().lock(), &mut io::stdout().lock()) {
+    let mut session = Session::for_roots(backend, &roots);
+    // A-IS-62 R7-2: the hand's audit is read at engine start, before any session opens.
+    session.read_audit_at_start();
+    match serve(&mut session, io::stdin().lock(), &mut io::stdout().lock()) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("omo-computer-engine: stdio: {error}");
