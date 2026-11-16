@@ -76,10 +76,10 @@ export function localRemoteDependencies(packageRoot?: string): RemoteCommandDepe
 }
 
 /** The person at this terminal, over this device's service: the one client every read verb uses. */
-const personClient = (stateDir: string): RemoteClient =>
+const personClient = (dependencies: RemoteCommandDependencies): RemoteClient =>
   createRemoteClient(
     { kind: "person", uid: String(process.getuid?.() ?? 0) },
-    { version: packageJson.version, stateDir },
+    { version: packageJson.version, stateDir: dependencies.stateDir, connect: () => dependencies.connect() },
   )
 
 const CONTROL_VALUES = ["on", "off"] as const
@@ -142,28 +142,7 @@ export function parse(args: readonly string[]): Parsed {
 }
 
 async function runOn(service: DeviceService, parsed: Parsed, dependencies: RemoteCommandDependencies): Promise<number> {
-  const print = (value: unknown, human: () => readonly string[]) => {
-    if (parsed.json) dependencies.output(JSON.stringify(value))
-    else for (const line of human()) dependencies.output(line)
-    return REMOTE_EXIT.ok
-  }
   switch (parsed.command) {
-    case "wake": {
-      // The gate is this connection's own welcome.service_version (A7R-11), never a capability word.
-      if (!service.carriesWakeMark) {
-        // Two causes, two answers: this build carries no wake switch yet (no update of the service enables it), or the
-        // device service is older than the release that carries it (updating does).
-        dependencies.error(
-          service.wakeMarkMinimum === null
-            ? "This build of OmO does not carry the wake switch yet."
-            : "The OmO device service on this device cannot wake sessions for other devices yet. Update OmO, then try again.",
-        )
-        return REMOTE_EXIT.unavailable
-      }
-      const state =
-        parsed.wake === undefined ? await service.sessionWake() : await service.setSessionWake(storedWake(parsed.wake))
-      return print(state, () => wakeLines(state))
-    }
     case "open":
     case "send":
     case "model":
@@ -189,7 +168,7 @@ type Answer<T> = { readonly kind: "ok"; readonly value: T } | RemoteFailure
 
 // The read verbs (design v8-core r2, 4c-1; Appendix A): each is ONE member call on the person client, and --json prints
 // that call's value as is.
-const READ_VERBS: ReadonlySet<string> = new Set(["status", "devices", "sessions", "disable", "control"])
+const READ_VERBS: ReadonlySet<string> = new Set(["status", "devices", "sessions", "disable", "control", "wake"])
 
 async function runRead(client: RemoteClient, parsed: Parsed, dependencies: RemoteCommandDependencies): Promise<number> {
   const show = <T>(
@@ -220,6 +199,11 @@ async function runRead(client: RemoteClient, parsed: Parsed, dependencies: Remot
       return show(await client.service.setEnabled(false), ({ enabled }) => [
         `Remote sessions are ${enabled ? "on" : "off"} for this device.`,
       ])
+    case "wake":
+      return show(
+        parsed.wake === undefined ? await client.service.wake() : await client.service.setWake(storedWake(parsed.wake)),
+        wakeLines,
+      )
     default:
       return show(
         parsed.control === undefined
@@ -259,6 +243,16 @@ function renderFailure(dependencies: RemoteCommandDependencies, failure: RemoteF
     dependencies.error(NOT_RUNNING)
     return REMOTE_EXIT.unavailable
   }
+  // Two wake causes, two answers: this build carries no wake switch yet (no update of the service enables it), or the
+  // device service is older than the release that carries it (updating does).
+  if (failure.code === "unsupported" && details["feature"] === "wake") {
+    dependencies.error(
+      details["reason"] === "not_in_build"
+        ? "This build of OmO does not carry the wake switch yet."
+        : "The OmO device service on this device cannot wake sessions for other devices yet. Update OmO, then try again.",
+    )
+    return REMOTE_EXIT.unavailable
+  }
   if (failure.code === "unsupported" && details["feature"] === "control") {
     dependencies.error(
       "The OmO device service on this device does not have remote control yet. Update OmO, then try again.",
@@ -277,7 +271,7 @@ export async function runLocalRemoteVerb(dependencies: RemoteCommandDependencies
   const signedOut = await accountNotice(dependencies)
   if (signedOut !== undefined) return signedOut
   if (READ_VERBS.has(parsed.command)) {
-    const client = (dependencies.client ?? (() => personClient(dependencies.stateDir)))()
+    const client = (dependencies.client ?? (() => personClient(dependencies)))()
     try {
       return await runRead(client, parsed, dependencies)
     } finally {

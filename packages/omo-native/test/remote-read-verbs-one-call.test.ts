@@ -31,6 +31,8 @@ const VALUES = {
   "service.setEnabled": { enabled: false },
   "service.control": { attached: true, changedAt: "" },
   "service.setControl": { attached: false, changedAt: "" },
+  "service.wake": { enabled: true, stored: null, overridden: false },
+  "service.setWake": { enabled: false, stored: false, overridden: false },
 } as const
 
 type Member = keyof typeof VALUES
@@ -60,6 +62,8 @@ describe("omo remote read verbs (G3: one person-client call per verb)", () => {
     [["disable"], "service.setEnabled"],
     [["control"], "service.control"],
     [["control", "off"], "service.setControl"],
+    [["wake"], "service.wake"],
+    [["wake", "off"], "service.setWake"],
   ])("#given %p --json #when it runs #then it calls %s once and prints its value", async (args, member) => {
     const calls: string[] = []
     const { code, out } = await run([...args, "--json"], privateDir(), undefined, undefined, undefined, {
