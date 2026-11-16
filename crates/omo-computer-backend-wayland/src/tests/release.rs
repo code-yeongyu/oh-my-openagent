@@ -21,7 +21,7 @@ const CHILD_SOCKET: &str = "OMO_WAYLAND_TEST_EIS_SOCKET";
 
 /// The child half of the SIGKILL leg: holds shift through libei, says so, and waits to die.
 #[test]
-#[ignore = "run only as the child of held_input_released_on_sigkill_wayland_leg"]
+#[ignore = "live: run only as the child of held_input_released_on_sigkill_wayland_leg"]
 fn sigkill_child_holds_shift() {
     let Some(socket) = std::env::var_os(CHILD_SOCKET) else {
         return;
