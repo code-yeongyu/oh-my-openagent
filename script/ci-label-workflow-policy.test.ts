@@ -101,4 +101,19 @@ describe("#given required CI and an optional full-matrix label run", () => {
     // One boolean is not worth a full clone: the decision reads the PR's files from the API.
     expect(record(steps[checkout]?.["with"])["fetch-depth"]).toBeUndefined()
   })
+
+  // Both callers of the classifier pass the event's file count, so they decide alike above the API cap (#13891).
+  test("#then ci-mode and the platform decision both pass the pull request's changed-file count", () => {
+    const steps = (job: Record<string, unknown>) =>
+      (job["steps"] as unknown[])
+        .map(record)
+        .map((step) => String(step["run"] ?? ""))
+        .join("\n")
+    const ciMode = steps(record(record(workflow("ci.yml")["jobs"])["ci-mode"]))
+    const decide = steps(record(record(workflow("pr-platform-decision.yml")["jobs"])["decide"]))
+    for (const run of [ciMode, decide]) {
+      expect(run).toContain("--changed-files")
+      expect(run).toContain(".pull_request.changed_files")
+    }
+  })
 })
