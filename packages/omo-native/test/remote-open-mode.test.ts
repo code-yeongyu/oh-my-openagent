@@ -62,6 +62,7 @@ async function open(
         status: async () => undefined,
       },
       linkDevice: async () => "linked",
+      optOut: { read: () => false, record: () => {}, clear: () => {} },
       remote: () => a.remote,
       localPermissionPreset: localMode,
     },
