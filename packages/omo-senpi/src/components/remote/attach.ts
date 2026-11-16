@@ -1,7 +1,7 @@
-import type { RemoteAttach } from "@oh-my-opencode/device-service-core/device-service"
+import { LocalApiError, type RemoteAttach } from "@oh-my-opencode/device-service-core/device-service"
 import { outcomeOf } from "../thread/remote/outcome"
 import { type ClientCore, ok, type Outcome, type RemoteClient } from "./client"
-import { engineCode, nextActionFor, remoteFailure } from "./codes"
+import { engineCode, nextActionFor, readFailureFromError, remoteFailure } from "./codes"
 import { DEADLINES, withinDeadline } from "./deadlines"
 import { attachAddressed } from "./port/device-service"
 import { canonicalizeThreadHandle } from "./seams"
@@ -330,7 +330,9 @@ function createAttachment(core: ClientCore, attached: RemoteAttach, thread: Thre
     events: events.stream,
     command,
     read: (page) =>
-      withinDeadline(core.timers, undefined, DEADLINES.observeRead, false, async () => ok(await attached.read(page))),
+      withinDeadline(core.timers, undefined, DEADLINES.observeRead, false, async () =>
+        attached.read(page).then(ok, readFailureFromError),
+      ),
     // The endpoint server is the caller's (RemoteClientDeps.serveAttach): it is a net server, and `omo remote`'s
     // local-only graph reaches no network but the local API transport (#13440).
     serveEndpoint: async () => {
@@ -414,8 +416,29 @@ export async function openAttachment(core: ClientCore, thread: ThreadHandle, opt
   let opened: RemoteAttach | undefined
   let abandoned = false
   const outcome = await core.member(opts, DEADLINES.attachOpen, false, async (svc): Promise<Outcome<Attachment>> => {
-    // A mistyped id or a durable id is located once, as the thread tools do, so it answers not_found, never unsupported.
-    const { attached } = await attachAddressed(svc, target.device, target.session)
+    // A session on this device: the device service cannot attach a device to itself, so its engine's operator endpoint
+    // serves it (RemoteClientDeps.localAttach), found by the durable id the listing names it by.
+    const self = await svc.thisDevice()
+    let attached: RemoteAttach
+    if (self !== null && self.id === target.device) {
+      const local = core.deps.localAttach
+      if (local === undefined)
+        return remoteFailure(
+          "unsupported",
+          "This client cannot attach to a session on its own device: it was built without a local attach.",
+          "Call attach on a client built with localAttach.",
+          { details: { feature: "local_attach" } },
+        )
+      const listed = await svc.sessions({ device: target.device })
+      const row = listed.rows.find((candidate) => candidate.session_id === target.session)
+      const durableId = row?.durable_id
+      if (durableId === undefined)
+        throw new LocalApiError("session_not_found", `this device lists no session ${target.session} with a durable id`)
+      attached = await local({ device: target.device, session: target.session, durableId })
+    } else {
+      // A mistyped id or a durable id is located once, as the thread tools do, so it answers not_found, never unsupported.
+      attached = (await attachAddressed(svc, target.device, target.session)).attached
+    }
     opened = attached
     if (abandoned) await attached.detach()
     await attached.snapshot

@@ -329,6 +329,12 @@ describe("sessions.send and sessions.read", () => {
     expect(page.next_before).toBeNull()
   })
 
+  test("#given the live session #when sessions.read asks for a page the service refuses #then invalid_arguments, as attach's read answers", async () => {
+    const { owner } = await onWorld()
+    const failure = failureOf(await clientOn(owner.stateDir, fakeClock()).sessions.read(LIVE, { tail: 0 }))
+    expect(failure).toMatchObject({ code: "invalid_arguments", details: { local_api_code: "invalid_request" } })
+  })
+
   test("#given an address that names no device #when a session member runs #then invalid_arguments points at sessions.resolve", async () => {
     const { owner } = await onWorld()
     const parsed = canonicalizeThreadHandle("review", {})

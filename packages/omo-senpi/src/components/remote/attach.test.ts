@@ -5,6 +5,7 @@ import { PEER, SESSION_ID } from "../../../../device-service-core/test/local-api
 import { pushDetached, pushFrame, pushRecords, pushSnapshot, reader, THREAD, worldWith } from "./attach.test-support"
 import { serveRemoteAttach } from "../../../../omo-native/remote-attach"
 import type { RemoteClientDeps } from "./client"
+import { nextActionFor } from "./codes"
 import { DEADLINES } from "./deadlines"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
 import { clientOn, closeClients, failureOf, fakeClock, startModeOwner, startOwner } from "./testing/fake-service"
@@ -257,6 +258,20 @@ describe("attach rows: events buffer", () => {
     for (let event = await events.next("a kept record"); event !== "done"; event = await events.next("a kept record"))
       kept.push(event.kind === "record" ? event.record["n"] : event)
     expect(kept).toEqual(Array.from({ length: KEPT }, (_, i) => sent - KEPT + i))
+  })
+})
+
+describe("attach rows: read", () => {
+  test("#given an attach over the device service #when a read asks for a page the service refuses #then invalid_arguments, as the same read of a session on this device answers", async () => {
+    const { handle } = await attached({ sessionId: "engine-1", isStreaming: false, pendingDialogs: [] })
+    // The service refuses a page size outside 1-200 invalid_request; session.read carries nothing else of the caller's.
+    for (const tail of [0, 201])
+      expect(failureOf(await handle.read({ tail }))).toMatchObject({
+        code: "invalid_arguments",
+        next_action: nextActionFor("invalid_arguments"),
+        details: { local_api_code: "invalid_request" },
+      })
+    await handle.detach()
   })
 })
 
