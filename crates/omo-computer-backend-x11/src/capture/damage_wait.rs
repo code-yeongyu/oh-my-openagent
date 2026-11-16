@@ -21,3 +21,23 @@ pub const fn after_notify(seen: usize) -> DamageWait {
         DamageWait::SubtractAndWait
     }
 }
+
+/// One Damage wait: the notifies of one `ClearArea` round, in arrival order.
+#[derive(Debug, Clone, Copy)]
+pub struct DamageWatch {
+    seen: usize,
+}
+
+impl DamageWatch {
+    /// A wait for the `ClearArea` request sent with `_clear_sequence` (low 16 bits).
+    #[must_use]
+    pub const fn new(_clear_sequence: u16) -> Self {
+        Self { seen: 0 }
+    }
+
+    /// The step after a notify that carries `_sequence`.
+    pub const fn after_notify(&mut self, _sequence: u16) -> DamageWait {
+        self.seen += 1;
+        after_notify(self.seen)
+    }
+}
