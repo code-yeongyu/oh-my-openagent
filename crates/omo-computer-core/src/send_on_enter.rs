@@ -46,7 +46,7 @@ impl Composer {
     /// `ConsequentialAction{reason:"send_on_enter"}`; its members go in [`Self::detail`].
     #[must_use]
     pub const fn refusal() -> Refusal {
-        Refusal::new(EngineCode::ConsequentialAction, Reason::SendOnEnter.wire())
+        Refusal::new(EngineCode::ConsequentialAction, Reason::SendOnEnter)
     }
 
     /// `app`, `composer:{role,label}` and `nextCall`, beside the code on the wire.

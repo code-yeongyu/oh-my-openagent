@@ -85,7 +85,7 @@ fn observe_on_a_denied_app_window_is_refused_with_no_tree_and_no_frame() {
     scenario["consent"] = json!({ "stopHotkey": null, "apps": { "deny": ["Notes"] } });
     let mut session = session(&scenario.to_string());
     let refused = session.observe(serde_json::from_value(json!({"target": "101"})).expect("params")).expect_err("denied");
-    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("ControlRequired", Some("denied_app")));
+    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("ControlRequired", Some(omo_computer_core::error::Reason::DeniedApp)));
     let text = format!("{refused:?}");
     assert!(!text.contains("cats") && !text.contains("hunter2"), "no tree content: {text}");
 }

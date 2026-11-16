@@ -23,8 +23,7 @@ fn host_relay_policy() -> Supervisor {
 }
 
 fn deaf() -> BackendResult<Box<dyn StopListener>> {
-    let wire = Reason::Deaf.wire();
-    Err(Refusal::new(EngineCode::StopPathUnavailable, wire))
+    Err(Refusal::new(EngineCode::StopPathUnavailable, Reason::Deaf))
 }
 
 fn gone() -> BackendResult<Box<dyn StopListener>> {
@@ -111,7 +110,7 @@ fn a_deaf_arm_still_admits_a_read() {
     assert!(gate(&read, &tables, Vec::new).is_ok(), "a read runs");
     let exec = GateFacts::clear(Tier::Exec, VerbKind::Pointer, supervisor.view(0));
     let refused = gate(&exec, &tables, Vec::new).expect_err("exec is refused");
-    assert_eq!(refused.refusal.reason, Some("deaf"));
+    assert_eq!(refused.refusal.reason, Some(Reason::Deaf));
 }
 
 /// No listener at all reads absent; a lost armed listener re-arms (stale) and a deaf one stays

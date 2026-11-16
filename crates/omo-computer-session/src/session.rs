@@ -149,6 +149,7 @@ impl Session {
             Some(ReportMode::Null) | None => CapabilitiesReply::Legacy(Box::new(legacy_capabilities(
                 &capabilities,
                 &self.backend.probe_permissions(),
+                &self.stop_path_status().stop_path,
             ))),
         }
     }
@@ -233,17 +234,13 @@ const fn permission(state: PermissionState) -> &'static str {
     }
 }
 
-fn live_listener(caps: &Capabilities) -> bool {
-    caps.stop_path.kind == omo_computer_core::capabilities::StopPathKind::Global && !caps.stop_path.deaf
-}
-
 const fn known_true(state: Tristate) -> bool {
     matches!(state, Tristate::Known(true))
 }
 
 /// The v1 record a null-mode session reads, projected from the object-mode capabilities.
 #[must_use]
-pub fn legacy_capabilities(caps: &Capabilities, probe: &PermissionProbe) -> LegacyCapabilities {
+pub fn legacy_capabilities(caps: &Capabilities, probe: &PermissionProbe, stop_path: &str) -> LegacyCapabilities {
     LegacyCapabilities {
         backend: caps.backend.clone(),
         display_server: None,
@@ -258,10 +255,10 @@ pub fn legacy_capabilities(caps: &Capabilities, probe: &PermissionProbe) -> Lega
         ax_permission: permission(probe.accessibility).to_owned(),
         display_count: caps.display_count,
         focus_guard: caps.background_window_input,
-        // The live global listener by name, as `diagnose` reports it; otherwise none (review L8
-        // of #13362, R70y(3)).
-        stop_path: if live_listener(caps) { caps.stop_path.listener.clone() } else { "none".to_owned() },
-        stop_reason: (!live_listener(caps)).then(|| NO_GLOBAL_LISTENER.to_owned()),
+        // The v1 vocabulary from the session's stop-path state (`none` | `global` |
+        // `host-relay`); the live listener's name is diagnose's alone (plan owner Q6).
+        stop_path: stop_path.to_owned(),
+        stop_reason: (stop_path == "none").then(|| NO_GLOBAL_LISTENER.to_owned()),
         integrity_level: None,
         screen_locked: known_true(caps.session.screen_locked),
         display_asleep: Some(known_true(caps.session.display_asleep)),

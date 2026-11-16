@@ -104,7 +104,7 @@ impl Unresolvable {
     /// `InvalidKey{reason:"unresolvable"}`; its `group` and `grapheme` go in [`Self::detail`].
     #[must_use]
     pub fn refusal(&self) -> Refusal {
-        Refusal::new(EngineCode::InvalidKey, Reason::Unresolvable.wire())
+        Refusal::new(EngineCode::InvalidKey, Reason::Unresolvable)
     }
 
     /// The refusal's members beside its code: `group` and `grapheme`.

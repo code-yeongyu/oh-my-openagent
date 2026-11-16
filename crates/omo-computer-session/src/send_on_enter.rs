@@ -173,7 +173,7 @@ mod tests {
     fn send_on_enter_newline_in_listed_composer_is_refused() {
         let (mut session, sink) = session(listed());
         let refused = press(&mut session, "return", false).expect_err("a bare Return sends");
-        assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("ConsequentialAction", Some("send_on_enter")));
+        assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("ConsequentialAction", Some(omo_computer_core::error::Reason::SendOnEnter)));
         let detail = refused.detail.expect("the refusal's members");
         assert_eq!(detail["app"], json!("Notes"));
         assert_eq!(detail["composer"]["role"], json!("AXTextArea"));
@@ -200,7 +200,7 @@ mod tests {
         let refused = session
             .type_text(serde_json::from_value(json!({ "target": "101", "text": "done\n" })).expect("typeText"))
             .expect_err("the newline is a Return");
-        assert_eq!(refused.refusal.reason, Some("send_on_enter"));
+        assert_eq!(refused.refusal.reason, Some(omo_computer_core::error::Reason::SendOnEnter));
         assert_eq!(refused.stamps.delivered, Some(omo_computer_core::backend::Delivered { count: 4, of: 5 }));
         let sent = posts(&sink);
         assert!(sent.iter().any(|line| line.ends_with(r#"text "done""#)) && !sent.iter().any(|line| line.contains("\\n")), "{sent:?}");
@@ -255,7 +255,7 @@ mod tests {
             .expect("open");
         session.stop_path_start(serde_json::from_value(json!({})).expect("start"));
         let refused = press(&mut session, "shift+return", false).expect_err("the scripted background refusal");
-        assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("BackgroundUnavailable", Some("posted_modifier_chord")));
+        assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("BackgroundUnavailable", Some(omo_computer_core::error::Reason::PostedModifierChord)));
         assert!(posts(&sink).is_empty(), "{:?}", posts(&sink));
         session.control_grant(serde_json::from_value(json!({ "reason": "test" })).expect("grant"));
         session
