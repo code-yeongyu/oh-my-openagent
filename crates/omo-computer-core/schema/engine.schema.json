@@ -2622,13 +2622,22 @@
       "description": "A cut container the skeleton did not open; `drill(ref)` opens it."
     },
     "DeafReason": {
-      "type": "string",
-      "enum": [
-        "secure-input-active",
-        "portal-unavailable",
-        "xi2-raw-unavailable",
-        "hook-install-failed",
-        "listener-parked"
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "secure-input-active",
+            "portal-unavailable",
+            "xi2-raw-unavailable",
+            "hook-install-failed",
+            "listener-parked"
+          ]
+        },
+        {
+          "type": "string",
+          "const": "chord-unarmable",
+          "description": "A-IS-62: the configured stop chord cannot be armed or read back (A-IS-63)."
+        }
       ]
     },
     "DefaultDelivery": {

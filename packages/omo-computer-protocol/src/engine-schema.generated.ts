@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "bed257e56802029001c365b491627a1a2b0524317569eb27a8bf3aa1a42b940f" as const
+export const SCHEMA_SHA256 = "43e5abfc6de370d22e12af6865f9dcf266732b86a9dc464ccada503396be4406" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -696,7 +696,7 @@ export type Cut = {
 	childCount: number
 }
 
-export type DeafReason = "secure-input-active" | "portal-unavailable" | "xi2-raw-unavailable" | "hook-install-failed" | "listener-parked"
+export type DeafReason = "secure-input-active" | "portal-unavailable" | "xi2-raw-unavailable" | "hook-install-failed" | "listener-parked" | "chord-unarmable"
 
 export type DefaultDelivery = "foreground_lease_first"
 
