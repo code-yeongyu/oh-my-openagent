@@ -7,6 +7,7 @@ mod events;
 mod invalid;
 mod records;
 mod references;
+mod session_timeline;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -17,11 +18,12 @@ use serde::Deserialize;
 use serde_json::Value;
 
 pub use additions::{
-    AxNotification, BusyMark, ClipboardScript, FrameAxis, FramePolicy, HandIdentity, SecureFocus,
-    TargetExit,
+    AxNotification, BusyMark, ClipboardScript, FrameAxis, FramePolicy, HandIdentity,
+    NotificationPost, SecureFocus, StopPress, TargetExit,
 };
 pub use events::{DisplaysChange, EpochEvent, EpochReason, IdentityChange};
 pub use invalid::{field_names, InvalidKind, ScenarioInvalid};
+pub use session_timeline::{state_at, SessionMark};
 pub use records::{
     DelayMs, FakeAxNode, FakeDisplay, FakeMenuNode, FakeWindow, FocusRead, FocusRecordKind,
     FocusRecordOutcome, RemoteForwarding, ScriptedFailure, ScriptedHit, TimedUserInput,
@@ -45,6 +47,9 @@ pub struct FakeScenario {
     pub ax_deadline_ms: Option<u64>,
     /// Pads a window's tree with leaves up to this many nodes in total.
     pub ax_node_count: BTreeMap<String, u32>,
+    /// Later versions of a window's tree: root read `k` (from 2) serves version `k - 1`, the
+    /// last one after that.
+    pub ax_versions: BTreeMap<String, Vec<FakeAxNode>>,
     pub cursor: Option<Point>,
     /// Fake-clock milliseconds a call costs before it runs.
     pub delay_ms: DelayMs,
@@ -70,6 +75,10 @@ pub struct FakeScenario {
     pub ax_notification_timeline: Vec<AxNotification>,
     /// Loading indicators by fake-clock time.
     pub busy_timeline: Vec<BusyMark>,
+    /// Stop-chord presses by fake-clock time.
+    pub stop_timeline: Vec<StopPress>,
+    /// Notifications by fake-clock time; absent scripts a host with no notification surface.
+    pub notification_timeline: Option<Vec<NotificationPost>>,
     pub secure_focus: Option<SecureFocus>,
     pub secure_input_on: bool,
     pub clipboard: Option<ClipboardScript>,
@@ -88,8 +97,18 @@ pub struct FakeScenario {
     pub window_reservation: BTreeMap<String, String>,
     /// Signed code identity per pid.
     pub code_identity: BTreeMap<u32, CodeIdentity>,
+    // --- Row 21 (review M3): the executable path per pid a path-only consent binds to. ---
+    pub executable_path: BTreeMap<u32, String>,
+    // --- Row 21 (R70av): chords the fake's set_stop_chord refuses (default: none). ---
+    pub unarmable_stop_chords: Vec<String>,
     /// The hand identity the fleet harness reads.
     pub hand: Option<HandIdentity>,
+    /// Session-state fields (lock, sleep, console, saver, Secure Input, suspend) by fake-clock time.
+    pub session_timeline: Vec<SessionMark>,
+    /// Fake-clock milliseconds between two typed Unicode scalars of one text.
+    pub typing_unit_ms: Option<u64>,
+    // --- Row 21: the fake host's consent view handed to the engine at `session.open`. ---
+    pub consent: Option<serde_json::Value>,
 }
 
 impl FakeScenario {

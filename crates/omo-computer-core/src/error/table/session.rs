@@ -24,6 +24,7 @@ pub(super) static ROWS: &[ErrorRow] = &[
     e!(Internal, SecretNoClipboardRoute => Unavailable, NDAU, Yes, ASK, nothing "design/d-sdk-skill.md '## The interface block', paste: a secret is refused with nothing typed (no next call; the user enters it)"),
     e!(Internal, WindowsUnsupported => Unavailable, NDS, Yes, INSPECT, "computer.capabilities()"),
     e!(Internal, DisplaysUnsupported => Unavailable, NDS, Yes, INSPECT, "computer.capabilities()"),
+    e!(Internal, NoDisplayServer => Unavailable, NDAU, Yes, ASK, "computer.diagnose({ hand })"),
     e!(Internal, InputUnsupported => Unavailable, NDS, Yes, INSPECT, "computer.capabilities()"),
     e!(Internal, EpochSourceUnsupported => Unavailable, NDS, Yes, INSPECT, "computer.capabilities()"),
     e!(Internal, AuditUnavailable => AuditUnavailable, NDS, Yes, INSPECT, "computer.diagnose({ hand })"),

@@ -1188,6 +1188,18 @@
           ],
           "default": null
         },
+        "settle": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObservationSettle"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The post-send settle: the regime picked and its outcome.",
+          "default": null
+        },
         "evidence": {
           "type": "array",
           "items": {
@@ -1197,6 +1209,38 @@
         "observation": {
           "$ref": "#/$defs/UntrustedText",
           "description": "Required on the wire: a report without `{untrustedText: true}` does not parse."
+        },
+        "paused": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Pause"
+          },
+          "description": "What the admission waited for before the send.",
+          "default": []
+        },
+        "session": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionState"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The session state sampled for this call (object mode).",
+          "default": null
+        },
+        "target": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TargetLiveness"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Present only when the target exited or stopped answering during the call.",
+          "default": null
         }
       },
       "required": [
@@ -2578,13 +2622,22 @@
       "description": "A cut container the skeleton did not open; `drill(ref)` opens it."
     },
     "DeafReason": {
-      "type": "string",
-      "enum": [
-        "secure-input-active",
-        "portal-unavailable",
-        "xi2-raw-unavailable",
-        "hook-install-failed",
-        "listener-parked"
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "secure-input-active",
+            "portal-unavailable",
+            "xi2-raw-unavailable",
+            "hook-install-failed",
+            "listener-parked"
+          ]
+        },
+        {
+          "type": "string",
+          "const": "chord-unarmable",
+          "description": "A-IS-62: the configured stop chord cannot be armed or read back (A-IS-63)."
+        }
       ]
     },
     "DefaultDelivery": {
@@ -2689,6 +2742,13 @@
         },
         "observation": {
           "$ref": "#/$defs/UntrustedText"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ProbeCheck"
+          },
+          "description": "R62: a backend's own doctor checks that are not permissions (an X11 display, the\naccessibility bus, MPX, the compositor). They never feed `ok`; absent when there are none."
         }
       },
       "required": [
@@ -2703,6 +2763,48 @@
         "stopPath",
         "observation"
       ]
+    },
+    "DiffFallback": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "baseline_incomplete",
+            "current_incomplete"
+          ]
+        },
+        {
+          "type": "string",
+          "const": "since_expired",
+          "description": "`since` names no generation in the window's 8-generation window."
+        },
+        {
+          "type": "string",
+          "const": "window_changed",
+          "description": "The window identity (pid, process start, window) changed since the baseline."
+        },
+        {
+          "type": "string",
+          "const": "menu_root",
+          "description": "The baseline or the current root is an open menu."
+        },
+        {
+          "type": "string",
+          "const": "reordered",
+          "description": "The surviving elements changed their relative order."
+        },
+        {
+          "type": "string",
+          "const": "not_shorter",
+          "description": "The diff text is not shorter than the full tree text."
+        },
+        {
+          "type": "string",
+          "const": "query_projection",
+          "description": "A `query` projection keeps its own baseline and never diffs."
+        }
+      ],
+      "description": "Why an `observe({since})` answered the full tree instead of a diff."
     },
     "DisplayAwake": {
       "type": "object",
@@ -3440,6 +3542,20 @@
               "type": "null"
             }
           ]
+        },
+        "occludersVisible": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "`true` when windows covering the target may show in the pixels (an X11 root crop);\nomitted otherwise."
+        },
+        "nextCall": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The call that gets a clean frame when `occludersVisible` is set."
         },
         "session": {
           "$ref": "#/$defs/SessionState"
@@ -4571,6 +4687,37 @@
         "y"
       ]
     },
+    "NotificationMatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "app": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "bodyHash": {
+          "type": "string"
+        },
+        "arrivedAt": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observation": {
+          "$ref": "#/$defs/UntrustedText"
+        }
+      },
+      "required": [
+        "app",
+        "title",
+        "bodyHash",
+        "arrivedAt",
+        "observation"
+      ],
+      "description": "The notification a `waitFor({notification})` matched: its fingerprint only, never the body."
+    },
     "NotificationPredicate": {
       "type": "object",
       "additionalProperties": false,
@@ -4614,6 +4761,26 @@
             "string",
             "null"
           ]
+        },
+        "diffFallback": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DiffFallback"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why a read that named `since` answered the full tree."
+        },
+        "baseline": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0,
+          "description": "The generation `diff` is against."
         },
         "focused": {
           "anyOf": [
@@ -4718,6 +4885,17 @@
           "type": "integer",
           "format": "uint64",
           "minimum": 0
+        },
+        "regime": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SettleRegime"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The regime of `settle_profile` the engine picked."
         }
       },
       "required": [
@@ -5082,6 +5260,47 @@
         "text"
       ]
     },
+    "Pause": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "$ref": "#/$defs/PauseReason"
+        },
+        "ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "description": "Milliseconds on the hand's clock the admission waited for this reason."
+        }
+      },
+      "required": [
+        "reason",
+        "ms"
+      ],
+      "description": "One pause: `ActionReport.paused[]` per call, `RunResult.pauses[]` per run."
+    },
+    "PauseReason": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "screen_locked"
+          ]
+        },
+        {
+          "type": "string",
+          "const": "user_active",
+          "description": "The user worked in the frontmost target within [`TAKEOVER_WINDOW_MS`]."
+        },
+        {
+          "type": "string",
+          "const": "system_suspended",
+          "description": "A local hand's system went to sleep."
+        }
+      ],
+      "description": "Why a call (or a run) waited before it was admitted."
+    },
     "PermissionReport": {
       "type": "object",
       "additionalProperties": false,
@@ -5222,6 +5441,37 @@
       },
       "required": [
         "chord"
+      ]
+    },
+    "ProbeCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/ProbeState"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "state"
+      ],
+      "description": "R62: one backend doctor check, e.g. `{name: \"ax_bus\", state: \"unavailable\", reason: \"unreachable\"}`."
+    },
+    "ProbeState": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "unavailable",
+        "unknown"
       ]
     },
     "RaiseWindowParams": {
@@ -6259,6 +6509,26 @@
         "timeout"
       ]
     },
+    "SettleRegime": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "changed",
+          "description": "After an input whose settle saw a change."
+        },
+        {
+          "type": "string",
+          "const": "unchanged",
+          "description": "After an input with no detected change."
+        },
+        {
+          "type": "string",
+          "const": "navigation",
+          "description": "After a navigation: a new window, app, Space or desktop, web-area URL or document."
+        }
+      ],
+      "description": "Which settle numbers an input's settle picked, from what it saw."
+    },
     "SpawnPath": {
       "type": "string",
       "enum": [
@@ -6527,6 +6797,55 @@
         "gone"
       ]
     },
+    "TargetLiveness": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/TargetState"
+        },
+        "pid": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "exitCode": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "signal": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        }
+      },
+      "required": [
+        "state",
+        "pid"
+      ],
+      "description": "`ActionReport.target`: present only when the target exited or stopped answering."
+    },
+    "TargetState": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "exited"
+          ]
+        },
+        {
+          "type": "string",
+          "const": "unresponsive",
+          "description": "The process stopped answering (AX / bus / message timeout)."
+        }
+      ],
+      "description": "The state of a target whose process stopped serving the call. A healthy target has no\n`target` member at all: `running` is never emitted."
+    },
     "TextRange": {
       "anyOf": [
         {
@@ -6580,7 +6899,8 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the element reference took to resolve."
         },
         "capture": {
           "type": [
@@ -6588,7 +6908,8 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the capture took."
         },
         "prime": {
           "type": [
@@ -6596,7 +6917,8 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the target took to prime."
         },
         "dispatch": {
           "type": [
@@ -6604,7 +6926,8 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the dispatch of the input took."
         },
         "verify": {
           "type": [
@@ -6612,7 +6935,8 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the verification read took."
         },
         "restore": {
           "type": [
@@ -6620,10 +6944,20 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the focus restore took."
+        },
+        "settleMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0,
+          "description": "Milliseconds the post-send settle waited (its `settle.waitedMs`)."
         }
       },
-      "description": "Stage timings in microseconds; a stage that did not run is absent."
+      "description": "How long each stage took; a stage that did not run is absent. Each field names its unit."
     },
     "ToolkitClass": {
       "type": "string",
@@ -6954,6 +7288,16 @@
         },
         "observation": {
           "$ref": "#/$defs/Observation"
+        },
+        "notification": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NotificationMatch"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
