@@ -282,6 +282,48 @@ describe("device-service adapter of the thread tools' account surface", () => {
     expect(closed).toBe(false)
   })
 
+  test("#given a shared connection and a per-call dialer #when a non-open endpoint command is sent #then it rides the shared connection and only open_session dials its own (#12777)", async () => {
+    const opened = state(
+      { state: "engine_applied" },
+      { type: "response", command: "open_session", success: true, data: { sessionId: "s-new" } },
+    )
+    const connection = () => {
+      const seen: string[] = []
+      let closed = false
+      const conn = {
+        ...fakeService([], []),
+        endpointCommand: async (_device: string, rpc: { readonly type: string }) => {
+          seen.push(rpc.type)
+          return opened
+        },
+        close: () => {
+          closed = true
+        },
+      } as unknown as DeviceService
+      return { conn, seen, isClosed: () => closed }
+    }
+    const shared = connection()
+    const dialed: ReturnType<typeof connection>[] = []
+    const port = createDeviceServiceSessions({
+      version: "0.0.0-test",
+      connect: async () => ({ conn: shared.conn, owned: true }),
+      dialEndpoint: async () => {
+        const next = connection()
+        dialed.push(next)
+        return { conn: next.conn, owned: true }
+      },
+    })
+    await port.endpointCommand("b", { type: "fork" })
+    await port.endpointCommand("b", { type: "list_sessions" })
+    expect(shared.seen).toEqual(["fork", "list_sessions"])
+    expect(dialed).toEqual([])
+    expect(shared.isClosed()).toBe(false)
+    await port.endpointCommand("b", { type: "open_session" })
+    expect(shared.seen).toEqual(["fork", "list_sessions"])
+    expect(dialed.map((connection) => [connection.seen, connection.isClosed()])).toEqual([[["open_session"], true]])
+    expect(shared.isClosed()).toBe(false)
+  })
+
   test("#given b's engine applied a command but its reply says success false #when the outcome maps to the port #then it is refused with the reply's errorCode, else its error, else engine_failed, never ok", async () => {
     const failed = (extra: Record<string, unknown>) =>
       state({ state: "engine_applied" }, { type: "response", command: "set_model", success: false, ...extra })
