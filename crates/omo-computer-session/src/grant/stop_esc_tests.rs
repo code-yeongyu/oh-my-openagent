@@ -181,7 +181,7 @@ fn a_view_without_the_stop_key_reads_deaf_chord_unarmable() {
     let refused = s
         .stop_path_start_checked(params(json!({})))
         .expect_err("nothing armed");
-    assert_eq!((refused.code.wire(), refused.reason), ("StopPathUnavailable", Some("deaf")));
+    assert_eq!((refused.code.wire(), refused.reason), ("StopPathUnavailable", Some(omo_computer_core::error::Reason::Deaf)));
     let capabilities = serde_json::to_string(&s.capabilities()).expect("capabilities");
     assert!(capabilities.contains(r#""deaf":true"#), "{capabilities}");
     assert!(capabilities.contains(r#""deafReason":"chord-unarmable""#), "{capabilities}");
