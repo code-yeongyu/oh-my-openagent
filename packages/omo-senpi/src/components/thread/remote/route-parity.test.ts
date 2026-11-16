@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { B_ROW, createRemoteThreadFixture } from "../thread-remote-fixture"
-import { createDeviceServiceSessions } from "./device-service"
-import { createLazyRemoteSurface } from "./lazy-remote"
+import { createDeviceServiceSessions } from "../../remote/port/device-service"
+import { createLazyRemoteSurface } from "../../remote/port/lazy-remote"
 
 const { account, surface, cleanup } = createRemoteThreadFixture()
 afterEach(cleanup)
@@ -242,7 +242,7 @@ describe("#13012 route parity", () => {
       const remote = createLazyRemoteSurface({
         version: "0.0.0",
         loadRuntime: async () => ({
-          createDeviceServiceSessions: () =>
+          remoteSessionsPort: () =>
             createDeviceServiceSessions({
               version: "0.0.0",
               connect: async () => {
