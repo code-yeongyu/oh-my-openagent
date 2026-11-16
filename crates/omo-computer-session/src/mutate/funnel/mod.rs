@@ -12,6 +12,7 @@ use serde_json::json;
 
 mod binding;
 mod delivered;
+mod held;
 mod lock;
 mod readmit;
 mod refusal;
@@ -24,17 +25,7 @@ use crate::budget::PermitKind;
 use crate::intervention::{Ended, MidSend, Stop};
 use crate::session_state::sample;
 use crate::{Session, NOT_OPEN};
-
-/// Row 22's admission outcome and per-call settings, and row 21's audit binding, carried into
-/// the send stages.
-struct Held {
-    admission: crate::intervention::Admission,
-    policy: omo_computer_core::settings::Intervention,
-    object: bool,
-    hold_limits: crate::intervention::HoldLimits,
-    target: Option<String>,
-    binding: Option<(bool, Option<Vec<u8>>)>,
-}
+use held::Held;
 
 impl Session {
     /// Runs one mutating call through the funnel.

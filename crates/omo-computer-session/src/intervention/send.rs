@@ -18,6 +18,11 @@ pub enum Stop {
     Refused(Refusal),
     Intervened,
     Exited(TargetLiveness),
+    /// Row 26: a newline into a listed composer (acceptance 80); the text before it went out.
+    Consequential {
+        refusal: Refusal,
+        detail: Box<serde_json::Value>,
+    },
 }
 
 /// `count` of `of` units went out; `stop` says why the rest did not.
@@ -68,6 +73,8 @@ pub struct Ended {
     /// The disposition put on the wire; `None` leaves the code's own row to say it.
     pub interrupted: Option<Disposition>,
     pub target: Option<TargetLiveness>,
+    /// The refusal's members beside its code (row 26's `app`, `composer`, `nextCall`).
+    pub detail: Option<Box<serde_json::Value>>,
 }
 
 impl Ended {
@@ -79,6 +86,7 @@ impl Ended {
                 disposition: Disposition::UNCERTAIN_UNSAFE,
                 interrupted: Some(Disposition::UNCERTAIN_UNSAFE),
                 target: None,
+                detail: None,
             },
             Stop::Intervened => Self {
                 refusal: Refusal::bare(EngineCode::UserIntervened),
@@ -89,12 +97,21 @@ impl Ended {
                 },
                 interrupted: None,
                 target: None,
+                detail: None,
             },
             Stop::Exited(target) => Self {
                 refusal: WINDOW_NOT_FOUND,
                 disposition: Disposition::UNCERTAIN_UNSAFE,
                 interrupted: Some(Disposition::UNCERTAIN_UNSAFE),
                 target: Some(target),
+                detail: None,
+            },
+            Stop::Consequential { refusal, detail } => Self {
+                refusal,
+                disposition: Disposition::DELIVERED_UNVERIFIED,
+                interrupted: Some(Disposition::DELIVERED_UNVERIFIED),
+                target: None,
+                detail: Some(detail),
             },
         }
     }

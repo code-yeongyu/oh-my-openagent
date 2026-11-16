@@ -30,6 +30,7 @@ pub mod results;
 pub mod routes;
 pub mod schema;
 pub mod secure;
+pub mod send_on_enter;
 pub mod session_state;
 pub mod settings;
 pub mod settle_profile;

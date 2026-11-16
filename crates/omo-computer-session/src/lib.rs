@@ -33,6 +33,7 @@ pub mod refs;
 pub mod route_ladder;
 pub mod reservation;
 pub mod surfaces;
+mod send_on_enter;
 mod session;
 pub mod session_state;
 pub mod settle;
