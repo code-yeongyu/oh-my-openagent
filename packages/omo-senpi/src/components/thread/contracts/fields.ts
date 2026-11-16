@@ -64,12 +64,7 @@ export const thinkingLevel = (description: string) =>
 
 export const BindingId = Type.String({
   minLength: 1,
-  description: "Binding id as returned by thread_bind or thread_bindings.",
-})
-
-export const ExpectedRevision = Type.Integer({
-  minimum: 1,
-  description: "Revision the caller last saw for this binding; a binding that moved since returns stale_revision.",
+  description: "Id of the chat binding the gateway keeps for the thread.",
 })
 
 // No schema maxLength: the cap is in UTF-8 bytes, and the relay enforces it as message_too_large

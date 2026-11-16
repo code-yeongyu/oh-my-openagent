@@ -1,8 +1,9 @@
 /**
  * The relay SDK: bindings, the outbox, reply tokens and connector inbound, over one gateway store.
- * The agent tools (`thread_bind` ... `thread_answer`) call it with the calling session's principal;
+ * The agent tools (`thread_report` ... `thread_answer`) call it with the calling session's principal;
  * the `omo thread` CLI (todo 14) calls the same functions with `cli:<uid>`, and a connector drives
- * only `outbox`, `ack`, `answer` and `inbound`. Every result is data: `{ kind: "ok", ... }` or
+ * only `outbox`, `ack`, `answer` and `inbound`. Binding is not a session tool: the gateway binds,
+ * rebinds and unbinds chat threads through these functions as its own principal. Every result is data: `{ kind: "ok", ... }` or
  * `{ kind: "error", error }` with a taxonomy code and a `next_action`.
  */
 import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "../errors"
@@ -156,10 +157,11 @@ export type GatewayRelayOptions = {
 
 const NEXT_ACTION: Partial<Record<ThreadErrorCode, string>> = {
   binding_conflict:
-    "Call thread_bindings to find the binding that holds this thread, then thread_rebind it with its revision, or thread_unbind it first.",
+    "Find the binding that holds this thread with `omo thread bindings`, then rebind it with its revision, or unbind it first.",
   binding_mismatch: "Answer through the binding that asked the question; the question stays pending.",
-  binding_inactive: "Bind the thread again with thread_bind.",
-  stale_revision: "Call thread_bindings for the current revision and retry with it.",
+  binding_inactive:
+    "The chat binding is closed: the gateway binds the chat again when its next message arrives, so report through that binding.",
+  stale_revision: "Read the binding's current revision with `omo thread bindings` and retry with it.",
   stale_token:
     "The question was asked under an earlier binding revision or session runtime; wait for the session to ask again.",
   already_answered: "Nothing to do: the question has its answer.",
@@ -167,10 +169,11 @@ const NEXT_ACTION: Partial<Record<ThreadErrorCode, string>> = {
     "Retry after a moment: another answer is still being handed to the session, and the question goes back to pending if that fails.",
   idempotency_conflict: "Retry with a new idempotency_key.",
   idempotency_uncertain:
-    "Call thread_bindings or thread_outbox to see the current state before retrying with a new key.",
-  scope_denied: "Report through a binding attached to this session; thread_bindings lists them.",
+    "Check the current state with `omo thread bindings` or thread_outbox before retrying with a new key.",
+  scope_denied:
+    "Report through the chat binding the gateway keeps for this session; `omo thread bindings --session <id>` lists them.",
   unsupported: "Report only the events the binding subscribes to, through a binding with an outbound direction.",
-  not_found: "Call thread_bindings for the binding ids that exist.",
+  not_found: "List the binding ids that exist with `omo thread bindings`.",
   cursor_invalid: "Read thread_outbox again and ack a cursor it returned.",
   host_unavailable: "Retry when the session is running; the question stays pending.",
   invalid_arguments: "Fix the arguments and call again.",
@@ -194,7 +197,7 @@ function failure(
     error: threadToolFailure(
       code,
       message,
-      nextAction ?? NEXT_ACTION[code] ?? "Call thread_bindings and retry after checking the binding.",
+      nextAction ?? NEXT_ACTION[code] ?? "Check the binding with `omo thread bindings` and retry.",
       details,
     ),
   }

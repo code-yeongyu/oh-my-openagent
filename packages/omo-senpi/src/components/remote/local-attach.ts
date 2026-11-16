@@ -155,11 +155,11 @@ export function createLocalAttach(
     const ended = Promise.withResolvers<AttachEnd>()
     let routing: string | undefined
     let snapshotted = false
-    let finished = false
+    let end: AttachEnd | undefined
     let failure: unknown
     const finish = (reason: AttachEnd): void => {
-      if (finished) return
-      finished = true
+      if (end !== undefined) return
+      end = reason
       listeners.clear()
       ended.resolve(reason)
     }
@@ -179,7 +179,7 @@ export function createLocalAttach(
     }
     // Only this session's lines: the host also broadcasts other sessions' lifecycle records on the connection.
     const onLine = (line: JsonObject): void => {
-      if (finished || routing === undefined || line["sessionId"] !== routing) return
+      if (end !== undefined || routing === undefined || line["sessionId"] !== routing) return
       const type = line["type"]
       // The engine takes its snapshot, then writes this marker, then the answer (get-snapshot.js): the records held
       // before it are already in the snapshot, so only the ones after it stream as new.
@@ -237,9 +237,12 @@ export function createLocalAttach(
     records(early.splice(0))
     const session = (): string => routing ?? target.session
     // Once the attach ended its socket is ended or gone, and close already failed what was pending: a request written
-    // now would wait out REQUEST_TIMEOUT_MS. read and command refuse it alike.
+    // now would wait out REQUEST_TIMEOUT_MS. read and command refuse it alike. A session the engine ended (closed, or
+    // released off this engine) is refused as the engine refuses a session it no longer has (unknown_session).
     const live = (): void => {
-      if (finished) throw new LocalApiError("closed", "the attach has ended")
+      if (end === "session_closed" || end === "peer_detached")
+        throw new LocalApiError("session_not_found", `the engine ended session ${target.durableId} (${end})`)
+      if (end !== undefined) throw new LocalApiError("closed", "the attach has ended")
     }
     return {
       device: target.device,
@@ -249,7 +252,7 @@ export function createLocalAttach(
       detached: ended.promise,
       onEvent: (listener) => {
         for (const event of history) listener(event)
-        if (!finished) listeners.add(listener)
+        if (end === undefined) listeners.add(listener)
         return () => listeners.delete(listener)
       },
       // The engine pages the history itself (`{before, tail}`, newest first; an unknown `before` is refused), so a page
@@ -292,7 +295,7 @@ export function createLocalAttach(
       // A local connection has no delegated channel to lose: its end is `detached`.
       onChannelLoss: () => () => undefined,
       detach: async () => {
-        if (!finished)
+        if (end === undefined)
           await connection.request({ type: "release_attachment", sessionId: session() }).catch(() => undefined)
         connection.close()
         finish("detached")
