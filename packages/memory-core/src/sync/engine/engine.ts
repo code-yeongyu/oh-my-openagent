@@ -268,7 +268,10 @@ export class SyncEngine {
       snapshot = got.snapshot ?? snapshot
       const done = await deps.lock.withLock(async () => {
         holds = await capture(deps, journal)
-        return applyVerified(deps, journal, notRenderedNow(holds))
+        const applied = await applyVerified(deps, journal, notRenderedNow(holds))
+        // A joining file adopts the space's state in this same cycle, so its edit goes out with this push.
+        if (holds.joining.size > 0) holds = await capture(deps, journal)
+        return applied
       })
       applied += done.batches
       memories += done.memories
