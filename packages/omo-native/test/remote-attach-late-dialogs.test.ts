@@ -140,4 +140,15 @@ describe.skipIf(process.platform === "win32")("omo remote attach: a dialog pendi
     await tui.answer({ type: "extension_ui_response", id: "dlg-2", sessionId: LOCAL_SESSION_ID, confirmed: false })
     expect(script.commands.at(-1)?.uiRequestId).toBe("dlg-2")
   })
+
+  test("#given a raiser-only dialog pending before a relay gap #when the re-attach snapshot no longer holds it #then the TUI that raised it dismisses it", async () => {
+    // The raiser's TUI got the secret input through its own delegated frame; only the snapshot tells this endpoint it is pending.
+    const script = new ScriptedAttach(snapshotOf(1, [secret]))
+    const { tui } = await attachTui(script)
+    script.emit({ kind: "snapshot", snapshot: snapshotOf(2, [later]) })
+    await tui.record((line) => line.type === "extension_ui_request" && line.id === "dlg-2", "the re-attach dialog")
+    expect(tui.records.filter((line) => line.type === "question_resolved")).toEqual([
+      { type: "question_resolved", id: "sec-1", outcome: "cancelled", sessionId: LOCAL_SESSION_ID },
+    ])
+  })
 })
