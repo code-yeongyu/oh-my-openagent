@@ -75,7 +75,7 @@ pub fn admit_leased(physical: &PhysicalChord, engine_held: &[u16]) -> Result<(),
         Err(UserModifierHeld {
             refusal: Refusal::new(
                 EngineCode::BackgroundUnavailable,
-                Reason::UserModifierHeld.wire(),
+                Reason::UserModifierHeld,
             ),
             keys,
         })
@@ -111,7 +111,7 @@ pub fn foreground_chord(
         Key::Char(c) if accelerator => {
             let vk = vk_for(c).ok_or(Refusal::new(
                 EngineCode::InvalidKey,
-                Reason::UnknownKey.wire(),
+                Reason::UnknownKey,
             ))?;
             vec![
                 KeyUnit::virtual_key(vk, true),

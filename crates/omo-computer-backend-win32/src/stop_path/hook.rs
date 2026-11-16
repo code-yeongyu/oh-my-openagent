@@ -264,7 +264,7 @@ impl HookListener {
 }
 
 /// The refusal of every exec while the listener cannot hear (d-windows.md, Deafness).
-pub const DEAF: Refusal = Refusal::new(EngineCode::StopPathUnavailable, Reason::Deaf.wire());
+pub const DEAF: Refusal = Refusal::new(EngineCode::StopPathUnavailable, Reason::Deaf);
 
 impl StopListener for HookListener {
     fn poll_stop(&mut self) -> BackendResult<bool> {

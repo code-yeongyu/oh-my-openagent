@@ -59,7 +59,7 @@ fn win_sendinput_press_while_the_user_holds_ctrl_is_refused() {
     assert_eq!(refusal.refusal.code, EngineCode::BackgroundUnavailable);
     assert_eq!(
         refusal.refusal.reason,
-        Some(Reason::UserModifierHeld.wire())
+        Some(Reason::UserModifierHeld)
     );
     assert_eq!(refusal.keys, vec!["ctrl"]);
     assert!(
@@ -163,7 +163,7 @@ fn a_modifier_chord_on_a_character_the_layout_lacks_is_refused() {
     };
     let refusal = foreground_chord(&chord_of(ctrl, 'é'), &letters).expect_err("no virtual key");
     assert_eq!(refusal.code, EngineCode::InvalidKey);
-    assert_eq!(refusal.reason, Some(Reason::UnknownKey.wire()));
+    assert_eq!(refusal.reason, Some(Reason::UnknownKey));
 }
 
 #[test]
