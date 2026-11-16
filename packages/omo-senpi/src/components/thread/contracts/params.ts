@@ -57,7 +57,7 @@ export const ThreadListParams = Type.Object({
 })
 
 /** The longest a `thread_read` waits for its thread to settle (#13417). */
-export const THREAD_READ_WAIT_MAX_MS = 600_000
+const THREAD_READ_WAIT_MAX_MS = 600_000
 
 export const ThreadReadParams = Type.Object({
   thread: ThreadAddress,
