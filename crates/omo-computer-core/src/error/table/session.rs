@@ -18,6 +18,8 @@ pub(super) static ROWS: &[ErrorRow] = &[
     e!(Internal, NoNotificationSurface => Unavailable, NDS, Yes, INSPECT, "computer.capabilities()"),
     e!(Internal, LaunchNeedsUser => Unavailable, NDAU, Yes, ASK, "computer.diagnose()"),
     e!(Internal, RequestTooLarge => InvalidArguments, NDS, Yes, INSPECT, "the same call with a smaller request"),
+    e!(Internal, HoldDuration => InvalidArguments, NDS, Yes, INSPECT, "the same call with the arguments the message names"),
+    e!(Internal, ScrollSteps => InvalidArguments, NDS, Yes, INSPECT, "the same call with the arguments the message names"),
     e!(Internal, WaylandActivationToken => Unavailable, NDS, Yes, INSPECT, "computer.apps.open(target)"),
     e!(Internal, Clipboard => Unavailable, NDS, Yes, INSPECT, "win.type(text)"),
     e!(Internal, NoClipboardRoute => Unavailable, NDS, Yes, INSPECT, "win.type(text)"),
@@ -62,6 +64,8 @@ pub(super) static ROWS: &[ErrorRow] = &[
     e!(CaptureUnavailable, OffscreenUnsupported => CaptureUnavailable, NDS, Yes, INSPECT, "win.observe()"),
     e!(CaptureUnavailable, CaptureUnsupported => CaptureUnavailable, NDS, Yes, INSPECT, "win.observe()"),
     e!(CaptureUnavailable, OtherDesktop => CaptureUnavailable, NDAU, Yes, ASK, "the user switches to the window's virtual desktop"),
+    // Row 55 (item 35, design lane ruling): an elevated window WGC cannot serve; the floor never runs.
+    e!(CaptureUnavailable, ElevatedTarget => CaptureUnavailable, NDAU, Yes, ASK, none),
     e!(CaptureUnavailable, Unmapped => CaptureUnavailable, NDS, Yes, INSPECT, "win.observe()"),
     e!(UserIntervened, _ => UserIntervened, PREFIX, Depends, ASK, "win.observe()"),
     e!(AxUnconfirmed, _ => AxUnconfirmed, DUU, No, None, "win.observe()"),

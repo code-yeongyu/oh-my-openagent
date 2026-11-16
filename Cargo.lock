@@ -2001,8 +2001,12 @@ dependencies = [
 name = "omo-computer-backend-win32"
 version = "0.0.0"
 dependencies = [
+ "image",
  "omo-computer-core",
  "omo-computer-safety",
+ "omo-computer-session",
+ "serde_json",
+ "windows 0.62.2",
 ]
 
 [[package]]
@@ -2018,6 +2022,7 @@ dependencies = [
 name = "omo-computer-core"
 version = "0.0.0"
 dependencies = [
+ "libc",
  "schemars",
  "serde",
  "serde_json",
@@ -2035,23 +2040,42 @@ dependencies = [
  "omo-computer-backend-wayland",
  "omo-computer-backend-win32",
  "omo-computer-backend-x11",
+ "omo-computer-core",
  "omo-computer-session",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
 ]
 
 [[package]]
 name = "omo-computer-safety"
 version = "0.0.0"
 dependencies = [
+ "libc",
+ "omo-computer-backend-fake",
  "omo-computer-core",
+ "omo-computer-session",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
 name = "omo-computer-session"
 version = "0.0.0"
 dependencies = [
+ "libc",
  "omo-computer-backend-fake",
  "omo-computer-core",
  "omo-computer-safety",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

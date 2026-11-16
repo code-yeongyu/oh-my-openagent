@@ -1,0 +1,193 @@
+{
+  "description": "A click on window 101 naming the frame of display 1 answers InvalidCoordinateFrame{wrong_target} and sends nothing.",
+  "transport": "stdio",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/v3-two-displays-one-window-consent.json",
+  "env": {
+    "OMO_COMPUTER_FAKE_STOP_PATH": "live"
+  },
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 2,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": null,
+                "integrityLevel": null,
+                "screenLocked": false,
+                "displayAsleep": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "stopPath.start",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "suspended": false,
+              "globalLive": true,
+              "hostRelayLive": false,
+              "heartbeatFresh": true,
+              "stopPath": "global",
+              "reason": null
+            }
+          },
+          "variable": []
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "capture",
+        "params": {
+          "target": "101"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": {
+              "mode": "inline-png",
+              "data": "png-base64",
+              "mimeType": "image/png",
+              "artifactPath": null,
+              "width": 800,
+              "height": 600,
+              "sourceWidth": 800,
+              "sourceHeight": 600,
+              "coordinateWidth": 800,
+              "coordinateHeight": 600,
+              "region": null,
+              "scale": 1.0,
+              "target": "101",
+              "frameId": "frame-1",
+              "note": null
+            }
+          },
+          "variable": [
+            "/result/data"
+          ]
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "capture",
+        "params": {
+          "target": "display:1"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "result": {
+              "mode": "inline-png",
+              "data": "png-base64",
+              "mimeType": "image/png",
+              "artifactPath": null,
+              "width": 1920,
+              "height": 1080,
+              "sourceWidth": 1920,
+              "sourceHeight": 1080,
+              "coordinateWidth": 1920,
+              "coordinateHeight": 1080,
+              "region": null,
+              "scale": 1.0,
+              "target": "display:1",
+              "frameId": "frame-2",
+              "note": null
+            }
+          },
+          "variable": [
+            "/result/data"
+          ]
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "click",
+        "params": {
+          "target": "101",
+          "x": 10,
+          "y": 10,
+          "frameId": "frame-2"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "error": {
+              "code": -32007,
+              "message": "InvalidCoordinateFrame",
+              "data": {
+                "code": "InvalidCoordinateFrame",
+                "hint": null,
+                "reason": "wrong_target"
+              }
+            }
+          },
+          "variable": []
+        }
+      ],
+      "sink": 0
+    }
+  ]
+}
