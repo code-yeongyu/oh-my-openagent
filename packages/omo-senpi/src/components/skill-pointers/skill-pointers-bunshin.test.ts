@@ -11,6 +11,7 @@ describe("omo-senpi skill-pointers bunshin pointer", () => {
       "list my fleet",
       "run uptime on our fleet",
       "restart the fleet hosts",
+      "reboot the fleet box",
       "check the machine mesh",
       "machine-mesh health",
     ] as const
