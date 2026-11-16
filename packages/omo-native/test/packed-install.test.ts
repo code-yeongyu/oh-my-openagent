@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { createRequire } from "node:module"
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, sep } from "node:path"
 
@@ -11,13 +11,21 @@ const packageRoot = join(import.meta.dir, "..")
  * installed files to its cache, so the trusted install's engine preparation, which rewrites
  * dist/modes/rpc/rpc-mode.js in place, would otherwise rewrite the host's shared cache entry too (#13819).
  */
+// Every `bun add` this file runs: the cache it used and how many top-level cache entries it added (#13974).
+const installs: { readonly cache: string; readonly added: number }[] = []
+const cacheEntries = (cache: string): number => (existsSync(cache) ? readdirSync(cache).length : 0)
+
 function bunAddInIsolatedCache(root: string, consumer: string, args: readonly string[]) {
-  return Bun.spawnSync(["bun", "add", ...args], {
+  const cache = join(root, "bun-install-cache")
+  const before = cacheEntries(cache)
+  const result = Bun.spawnSync(["bun", "add", ...args], {
     cwd: consumer,
-    env: { ...process.env, BUN_INSTALL_CACHE_DIR: join(root, "bun-install-cache") },
+    env: { ...process.env, BUN_INSTALL_CACHE_DIR: cache },
     stdout: "pipe",
     stderr: "pipe",
   })
+  installs.push({ cache, added: cacheEntries(cache) - before })
+  return result
 }
 
 describe("omo-ai packed install", () => {
@@ -131,4 +139,12 @@ describe("omo-ai packed install", () => {
       rmSync(root, { recursive: true, force: true })
     }
   }, 240_000)
+
+  // #13974: the dependency tree (~631 MB) is downloaded once per file; the second install reads the warm cache.
+  test("downloads the dependency tree once for both installs", () => {
+    expect(installs.length).toBe(2)
+    expect(new Set(installs.map((install) => install.cache)).size).toBe(1)
+    expect(installs[0]!.added).toBeGreaterThan(0)
+    expect(installs[1]!.added).toBe(0)
+  })
 })
