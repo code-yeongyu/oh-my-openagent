@@ -17,4 +17,5 @@ export function classifyCiMode(input: {
   readonly headRef?: string
   readonly labels?: readonly string[]
   readonly body?: string
+  readonly changedFiles?: number
 }): CiMode

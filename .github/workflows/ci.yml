@@ -105,6 +105,7 @@ jobs:
             --head-ref "$HEAD_REF" \
             --labels "${PR_LABELS:-[]}" \
             --body-file "$BODY_FILE" \
+            --changed-files "$(jq -r '.pull_request.changed_files // 0' "$GITHUB_EVENT_PATH")" \
             < "$PATHS_FILE")"
 
           jq -r '"generated_release_push=\(.generatedReleasePush)"' <<< "$MODE_JSON" >> "$GITHUB_OUTPUT"
