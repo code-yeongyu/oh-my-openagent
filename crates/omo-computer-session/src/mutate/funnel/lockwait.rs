@@ -14,7 +14,7 @@ use crate::Session;
 
 /// `InputBusy{reason:"interaction_lock"}`, an additive reason (A-IS-66 W3).
 const INTERACTION_LOCK_BUSY: Refusal =
-    Refusal::new(EngineCode::InputBusy, Reason::InteractionLock.wire());
+    Refusal::new(EngineCode::InputBusy, Reason::InteractionLock);
 
 impl Session {
     /// The interaction lock for this exec, waited for at most the budget. A session with no

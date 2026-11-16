@@ -77,7 +77,7 @@ impl Session {
         let binding = plan.audit_binding.clone();
         let result = self.admitted(mutation, record, (call_id, report_mode, tag), binding);
         // A-IS-66 W3: a call refused at the lock's bound releases what its own commit took.
-        if result.as_ref().is_err_and(|refused| refused.refusal.reason == Some("interaction_lock")) {
+        if result.as_ref().is_err_and(|refused| refused.refusal.reason == Some(Reason::InteractionLock)) {
             self.funnel.control.release_call(&plan);
             if took_slot {
                 self.end_lease(crate::presence::LeaseEnd::Release);
