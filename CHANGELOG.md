@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-**Resuming a finished background task runs the continuation again.** `task(task_id=...)` no longer re-completes the task on the previous run's output and aborts the session before the new prompt runs. ([#10686](https://github.com/code-yeongyu/oh-my-openagent/pull/10686))
-
 ## [5.1.75] - 2026-11-16
 
 ### Fixed
