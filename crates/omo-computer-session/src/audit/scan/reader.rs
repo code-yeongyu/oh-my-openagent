@@ -108,6 +108,8 @@ pub(super) fn read_lines(
         if buffer.len() + body > max {
             return Err(Tamper::LongLine);
         }
+        // Grown exactly, so the buffer never holds more than one bounded line.
+        buffer.reserve_exact(body);
         buffer.extend_from_slice(&available[..body]);
         stats.largest_line = stats.largest_line.max(buffer.capacity() as u64);
         reader.consume(take);

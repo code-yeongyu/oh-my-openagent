@@ -97,9 +97,11 @@ impl HandScan {
         if let Some(tamper) = self.latched {
             return ScanRead { tampered: Some(tamper), stats };
         }
+        // A broken file latches (its offsets mean nothing any more); a mark does not, so later
+        // reads still cover only the appended bytes (R7-7), and stay tampered (the chain keeps it).
         match self.advance(dir, hand, limits, &mut stats) {
             Err(tamper) => self.latch(tamper, stats),
-            Ok(()) if self.chain.marked => self.latch(Tamper::Marked, stats),
+            Ok(()) if self.chain.marked => ScanRead { tampered: Some(Tamper::Marked), stats },
             Ok(()) => ScanRead { tampered: None, stats },
         }
     }
