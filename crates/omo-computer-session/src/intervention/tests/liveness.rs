@@ -42,6 +42,15 @@ impl Backend for ExitsAt {
     fn intervention(&self) -> Option<&dyn InterventionSource> {
         Some(self)
     }
+    fn host_consent(&self) -> Option<serde_json::Value> {
+        self.inner.host_consent()
+    }
+    fn platform(&self) -> Option<omo_computer_core::report::Platform> {
+        self.inner.platform()
+    }
+    fn set_stop_chord(&mut self, chord: Option<&str>) -> omo_computer_core::backend::BackendResult<()> {
+        self.inner.set_stop_chord(chord)
+    }
     fn post_text(
         &mut self,
         text: &str,

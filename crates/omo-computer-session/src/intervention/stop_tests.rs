@@ -52,6 +52,14 @@ impl Backend for StopAfter {
     }
     fn intervention(&self) -> Option<&dyn InterventionSource> {
         self.inner.intervention()
+    }    fn host_consent(&self) -> Option<serde_json::Value> {
+        self.inner.host_consent()
+    }
+    fn platform(&self) -> Option<omo_computer_core::report::Platform> {
+        self.inner.platform()
+    }
+    fn set_stop_chord(&mut self, chord: Option<&str>) -> BackendResult<()> {
+        self.inner.set_stop_chord(chord)
     }
 }
 
@@ -98,6 +106,14 @@ impl Backend for StopAtTextStart {
     }
     fn intervention(&self) -> Option<&dyn InterventionSource> {
         self.inner.intervention()
+    }    fn host_consent(&self) -> Option<serde_json::Value> {
+        self.inner.host_consent()
+    }
+    fn platform(&self) -> Option<omo_computer_core::report::Platform> {
+        self.inner.platform()
+    }
+    fn set_stop_chord(&mut self, chord: Option<&str>) -> BackendResult<()> {
+        self.inner.set_stop_chord(chord)
     }
 }
 
