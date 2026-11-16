@@ -47,7 +47,7 @@ fn a_width_keeping_app_reports_partial_kept_width() {
 fn a_non_settable_window_is_window_immovable_with_an_empty_sink() {
     let (mut session, sink) = session(json!({"settable": false}));
     let refused = call(&mut session, Method::WindowSetFrame, json!({"target": "101", "x": 5, "y": 5})).expect_err("immovable");
-    assert!(refused.contains("window_immovable"), "{refused}");
+    assert!(refused.contains("WindowImmovable"), "{refused}");
     assert!(sink.lines().iter().all(|line| !line.starts_with("set_frame")), "nothing sent: {:?}", sink.lines());
 }
 
