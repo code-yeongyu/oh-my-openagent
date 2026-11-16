@@ -16,7 +16,7 @@ impl AxBackend for Bare {}
 fn no_display_server_is_unavailable_after_user_with_diagnose_next() {
     use super::super::{DispositionRule, NextCall, Reason, Recovery};
     use crate::report::Disposition;
-    let refusal = Refusal::new(EngineCode::Internal, Reason::NoDisplayServer.wire());
+    let refusal = Refusal::new(EngineCode::Internal, Reason::NoDisplayServer);
     let row = refusal.row().expect("no_display_server has a row");
     assert_eq!(row.computer.wire(), "COMPUTER_UNAVAILABLE");
     assert_eq!(
