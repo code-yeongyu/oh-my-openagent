@@ -75,6 +75,25 @@ describe("Apple notarization ticket lookup", () => {
   }
 })
 
+describe("Apple notarization ticket lookup bound", () => {
+  test("LOW-3: a lookup that never answers is refused within the bound, as a typed refusal", async () => {
+    // A fetch that hangs until its abort signal fires, like a stalled TLS connection.
+    const hanging = (_url: string, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(init.signal?.reason))
+      })
+    const started = performance.now()
+    const verdict = await Promise.race([
+      outcome(ticketLookup(hanging, 50)(CDHASH)),
+      Bun.sleep(5_000).then(() => "STILL WAITING after 5s"),
+    ])
+    expect(verdict).toBe(
+      `Refusal: Apple's notarization ticket service did not answer within 50 ms for cdhash ${CDHASH}`,
+    )
+    expect(performance.now() - started).toBeLessThan(5_000)
+  })
+})
+
 describe("GitHub collaborator role lookup", () => {
   test("returns role_name", async () => {
     expect(await outcome(roleLookup("o/r", "t", fetcher({ body: { role_name: "maintain" } }))("maintainer"))).toBe(

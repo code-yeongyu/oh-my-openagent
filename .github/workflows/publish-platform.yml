@@ -356,6 +356,8 @@ jobs:
   operator-darwin:
     if: github.repository == 'code-yeongyu/oh-my-openagent' && inputs.operator_darwin_artifacts != ''
     runs-on: ubuntu-24.04
+    # Every network lookup in the verifier is bounded; this caps the whole job well below the 6 h default.
+    timeout-minutes: 30
     permissions:
       # Draft releases are listed only to tokens with push access; nothing here writes.
       contents: write
