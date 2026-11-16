@@ -74,9 +74,12 @@ impl<S: UiaSource> UiaReader<S> {
         &mut self.source
     }
 
-    fn keep(&mut self, element: UiaElement) -> NodeRead {
+    fn keep(&mut self, mut element: UiaElement) -> NodeRead {
         let handle = AxHandle(u64::try_from(self.elements.len()).unwrap_or(u64::MAX));
         let read = node_read(&element, handle);
+        if element.is_password {
+            element.value = None;
+        }
         self.elements.push(element);
         read
     }

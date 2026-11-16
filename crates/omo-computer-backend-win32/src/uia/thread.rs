@@ -109,9 +109,9 @@ impl UiaSource for UiaThread {
             .map_or(Slice::Hung, Slice::Read)
     }
 
-    fn find_runtime_id(&mut self, _hwnd: isize, runtime_id: &[i32]) -> Vec<UiaElement> {
+    fn find_runtime_id(&mut self, hwnd: isize, runtime_id: &[i32]) -> Vec<UiaElement> {
         let runtime_id = runtime_id.to_vec();
-        self.call(move |client| client.find_runtime_id(&runtime_id))
+        self.call(move |client| client.find_runtime_id(hwnd, &runtime_id, &cache_request("")))
             .unwrap_or_default()
     }
 

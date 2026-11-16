@@ -15,9 +15,11 @@ use windows::Win32::System::Com::{
 };
 use windows::Win32::System::Variant::{VariantClear, VARIANT, VT_BSTR};
 use windows::Win32::System::Ole::{SafeArrayDestroy, SafeArrayGetElement, SafeArrayGetLBound, SafeArrayGetUBound};
+use windows::Win32::UI::WindowsAndMessaging::{GetAncestor, GA_ROOT};
 use windows::Win32::UI::Accessibility::{
     AutomationElementMode_Full, CUIAutomation8, IUIAutomation, IUIAutomationCacheRequest,
-    IUIAutomationElement, TreeScope_Children, TreeScope_Element, UIA_AutomationIdPropertyId,
+    IUIAutomationElement, TreeScope_Children, TreeScope_Element, TreeScope_Subtree,
+    UIA_AutomationIdPropertyId,
     UIA_BoundingRectanglePropertyId, UIA_ClassNamePropertyId, UIA_ControlTypePropertyId,
     UIA_HasKeyboardFocusPropertyId, UIA_IsEnabledPropertyId, UIA_IsPasswordPropertyId,
     UIA_NamePropertyId, UIA_NativeWindowHandlePropertyId, UIA_ProcessIdPropertyId,
@@ -94,18 +96,29 @@ fn cached_string(element: &IUIAutomationElement, property: UIA_PROPERTY_ID) -> O
     variant_text(unsafe { element.GetCachedPropertyValue(property) }.ok()?)
 }
 
+/// The top-level window `hwnd` lives in (`GetAncestor(GA_ROOT)`); 0 for no window.
+fn top_level_of(hwnd: isize) -> isize {
+    if hwnd == 0 {
+        return 0;
+    }
+    // SAFETY: a window handle read from UIA; a stale one answers a null HWND.
+    unsafe { GetAncestor(HWND(hwnd as *mut _), GA_ROOT) }.0 as isize
+}
+
 fn read(element: &IUIAutomationElement) -> UiaElement {
     // SAFETY: every Cached* getter reads a property the cache request carries.
     unsafe {
         let rect = element.CachedBoundingRectangle().ok();
+        let is_password = element.CachedIsPassword().is_ok_and(|b| b.as_bool());
+        let hwnd = element.CachedNativeWindowHandle().map_or(0, |h| h.0 as isize);
         UiaElement {
             runtime_id: runtime_id(element),
             control_type: name_of(element.CachedControlType().map_or(0, |id| id.0)).to_owned(),
             name: text(element.CachedName()),
             automation_id: text(element.CachedAutomationId()),
             class_name: text(element.CachedClassName()),
-            value: cached_string(element, UIA_ValueValuePropertyId),
-            is_password: element.CachedIsPassword().is_ok_and(|b| b.as_bool()),
+            value: if is_password { None } else { cached_string(element, UIA_ValueValuePropertyId) },
+            is_password,
             has_focus: element.CachedHasKeyboardFocus().is_ok_and(|b| b.as_bool()),
             enabled: element.CachedIsEnabled().is_ok_and(|b| b.as_bool()),
             bounds: rect.map(|r| Rect {
@@ -114,8 +127,8 @@ fn read(element: &IUIAutomationElement) -> UiaElement {
                 width: f64::from(r.right - r.left),
                 height: f64::from(r.bottom - r.top),
             }),
-            hwnd: element.CachedNativeWindowHandle().map_or(0, |h| h.0 as isize),
-            top_level: 0,
+            hwnd,
+            top_level: top_level_of(hwnd),
             pid: element.CachedProcessId().map_or(0, |pid| u32::try_from(pid).unwrap_or(0)),
             process_start: 0,
             child_count: 0,
@@ -231,11 +244,41 @@ impl ComUia {
         Some(self.keep(fresh))
     }
 
-    pub fn find_runtime_id(&self, runtime_id: &[i32]) -> Vec<UiaElement> {
-        self.kept
-            .iter()
-            .filter(|(id, _)| id.as_slice() == runtime_id)
-            .map(|(_, element)| read(element))
+    /// Every element under `hwnd` whose `RuntimeId` is `runtime_id`, searched in the window as it
+    /// is now (review M2 of #13837): 0 names the window the element was last seen in, else the
+    /// desktop. Matches are read fresh and kept for the next refresh.
+    pub fn find_runtime_id(&mut self, hwnd: isize, wanted: &[i32], request: &CacheRequest) -> Vec<UiaElement> {
+        let window = if hwnd != 0 {
+            hwnd
+        } else {
+            self.kept.get(wanted).map_or(0, |seen| top_level_of(read(seen).hwnd))
+        };
+        let Some(cache) = self.cache(request, false) else {
+            return Vec::new();
+        };
+        // SAFETY: a window handle UIA validates, a true condition and a cache request owned by
+        // this thread.
+        let found = unsafe {
+            let scope = if window != 0 {
+                self.automation.ElementFromHandle(HWND(window as *mut _))
+            } else {
+                self.automation.GetRootElement()
+            };
+            scope.and_then(|scope| {
+                self.automation
+                    .CreateTrueCondition()
+                    .and_then(|condition| scope.FindAllBuildCache(TreeScope_Subtree, &condition, &cache))
+            })
+        };
+        let Ok(found) = found else {
+            return Vec::new();
+        };
+        // SAFETY: indices below Length().
+        let length = unsafe { found.Length() }.unwrap_or(0);
+        (0..length)
+            .filter_map(|index| unsafe { found.GetElement(index) }.ok())
+            .filter(|element| runtime_id(element) == wanted)
+            .map(|element| self.keep(element))
             .collect()
     }
 
@@ -243,7 +286,34 @@ impl ComUia {
         let cache = self.cache(request, true)?;
         // SAFETY: a cache request owned by this thread.
         let element = unsafe { self.automation.GetFocusedElementBuildCache(&cache) }.ok()?;
-        Some(read(&element))
+        let mut focused = read(&element);
+        if focused.top_level == 0 {
+            focused.top_level = self.window_of_windowless(&element);
+        }
+        Some(focused)
+    }
+
+    /// The top-level window of an element without its own `HWND` (WPF, WinUI, web content): the
+    /// nearest ancestor that has one, at most 64 steps up.
+    fn window_of_windowless(&self, element: &IUIAutomationElement) -> isize {
+        // SAFETY: tree walks on live elements owned by this thread.
+        unsafe {
+            let Ok(walker) = self.automation.RawViewWalker() else {
+                return 0;
+            };
+            let mut current = element.clone();
+            for _ in 0..64 {
+                let Ok(parent) = walker.GetParentElement(&current) else {
+                    return 0;
+                };
+                let hwnd = parent.CurrentNativeWindowHandle().map_or(0, |h| h.0 as isize);
+                if hwnd != 0 {
+                    return top_level_of(hwnd);
+                }
+                current = parent;
+            }
+            0
+        }
     }
 
     /// The live client reads no toast list until row 60 lists `ShellExperienceHost.exe`'s windows.

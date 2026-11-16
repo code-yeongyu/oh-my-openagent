@@ -61,7 +61,7 @@ impl<S: UiaSource> UiaHost<S> {
     pub fn secure_focus(&mut self, window: Option<&str>) -> Option<bool> {
         let focused = self.reader().ok()?.source().focused()?;
         match window {
-            Some(window) if window.parse::<isize>().ok()? != focused.hwnd => Some(false),
+            Some(window) if window.parse::<isize>().ok()? != focused.top_level => Some(false),
             _ => Some(focused.is_password),
         }
     }
