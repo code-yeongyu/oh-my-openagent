@@ -118,6 +118,11 @@ describe("remote import guard G1 matcher", () => {
     'import { sessions } from "../omo-senpi/src/components/remote/sessions.ts"\n',
   )
   write("packages/omo-native/other.ts", 'import { sessions } from "../omo-senpi/src/components/remote/sessions.ts"\n')
+  // The SDK entry is the module exported: it may reach components/remote's files, but no other layer.
+  write(
+    "packages/omo-native/remote-sdk.ts",
+    'import { sessions } from "../omo-senpi/src/components/remote/sessions.ts"\nimport type { DeviceService } from "@oh-my-opencode/device-service-core"\n',
+  )
   write(
     `${senpi}/src/components/remote/tui/command.ts`,
     'import { sessions } from "../sessions.ts"\nimport { run } from "./run.ts"\n',
@@ -153,6 +158,7 @@ describe("remote import guard G1 matcher", () => {
       [`${senpi}/src/components/thread/tool-member.ts`]: ["packages/omo-senpi/src/components/remote/"],
       [`${senpi}/src/components/thread/tool-port.ts`]: ["packages/omo-senpi/src/components/remote/"],
       "packages/omo-native/remote-verb.ts": ["packages/omo-senpi/src/components/remote/"],
+      "packages/omo-native/remote-sdk.ts": ["packages/device-service-core/src/"],
       [`${senpi}/src/components/remote/tui/command.ts`]: ["packages/omo-senpi/src/components/remote/"],
       [`${senpi}/src/components/remote/tui/run.ts`]: ["packages/device-service-core/src/"],
     })
