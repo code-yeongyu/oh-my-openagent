@@ -12,7 +12,7 @@ import { answered, closeThread, interruptThread, setModelOn } from "../control/o
 import { createRelayControl } from "../control/relay-control"
 import { createLiveThreadSurface } from "../live-surface"
 import { liveReadResult } from "../tools/read-ops"
-import { createDeviceServiceSessions } from "./device-service"
+import { closingPorts } from "./closing-ports.test-fixture"
 import { createLazyRemoteSurface } from "./lazy-remote"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 import { createRelaySessionHost } from "../control/relay-session-host"
@@ -37,8 +37,14 @@ const readRemote = (surface: RemoteThreadSurface, row: RemoteSessionRow, view: T
     return liveReadResult(control.thread_id, control.title, await control.getMessages(), view)
   })
 
-// An attach whose session stream stays silent: no record, frame or channel loss ever arrives.
-const quietStream = { onEvent: () => () => {}, onFrame: () => () => {}, onChannelLoss: () => () => {} }
+// An attach whose session stream stays silent: no record, frame or channel loss ever arrives. Its detach answers as a
+// real attach's does: the pool detaches an attach nobody holds once its idle bound passes (#13873).
+const quietStream = {
+  onEvent: () => () => {},
+  onFrame: () => () => {},
+  onChannelLoss: () => () => {},
+  detach: async () => {},
+}
 
 function fakeService(results: CommandResult[], sent: unknown[]): DeviceService {
   const attach = {
@@ -92,10 +98,12 @@ const state = (outcome: Record<string, unknown>, response?: Record<string, unkno
     ...(response === undefined ? {} : { response }),
   }) as unknown as CommandResult
 
+const sessionsPort = closingPorts()
+
 describe("device-service adapter of the thread tools' account surface", () => {
   test("#given the device service #when the tools read the account and command b's session #then rows, devices and command outcomes map to the port, with undefined fields dropped from the record", async () => {
     const sent: unknown[] = []
-    const port = createDeviceServiceSessions({
+    const port = sessionsPort({
       version: "0.0.0-test",
       connect: async () => ({
         conn: fakeService(
@@ -160,7 +168,7 @@ describe("device-service adapter of the thread tools' account surface", () => {
         return await next()
       },
     } as unknown as DeviceService
-    const port = createDeviceServiceSessions({
+    const port = sessionsPort({
       version: "0.0.0-test",
       connect: async () => ({ conn: service, owned: true }),
     })
@@ -203,7 +211,7 @@ describe("device-service adapter of the thread tools' account surface", () => {
       opened.push(entry)
       return { conn: service, owned: true }
     }
-    const port = createDeviceServiceSessions({ version: "0.0.0-test", connect })
+    const port = sessionsPort({ version: "0.0.0-test", connect })
     expect(await port.endpointCommand("b", { type: "open_session" })).toEqual({
       kind: "ok",
       response: { type: "response", command: "open_session", success: true, data: { sessionId: "s-new" } },
@@ -266,7 +274,7 @@ describe("device-service adapter of the thread tools' account surface", () => {
       closed: new Promise(() => {}),
     } as unknown as DeviceService
     // A borrowed connection with no per-call dialer stays open. The CLI itself dials; that wiring is pinned in remote-session-verbs.test.ts.
-    const port = createDeviceServiceSessions({
+    const port = sessionsPort({
       version: "0.0.0-test",
       connect: async () => ({ conn: service, owned: false }),
     })
@@ -308,7 +316,7 @@ describe("device-service adapter of the thread tools' account surface", () => {
     }
     const shared = connection()
     const dialed: ReturnType<typeof connection>[] = []
-    const port = createDeviceServiceSessions({
+    const port = sessionsPort({
       version: "0.0.0-test",
       connect: async () => ({ conn: shared.conn, owned: true }),
       dialEndpoint: async () => {
@@ -331,7 +339,7 @@ describe("device-service adapter of the thread tools' account surface", () => {
   test("#given b's engine applied a command but its reply says success false #when the outcome maps to the port #then it is refused with the reply's errorCode, else its error, else engine_failed, never ok", async () => {
     const failed = (extra: Record<string, unknown>) =>
       state({ state: "engine_applied" }, { type: "response", command: "set_model", success: false, ...extra })
-    const port = createDeviceServiceSessions({
+    const port = sessionsPort({
       version: "0.0.0-test",
       connect: async () => ({
         conn: {
@@ -371,7 +379,7 @@ describe("device-service adapter of the thread tools' account surface", () => {
         if (loads === 1) throw new Error("sidecar missing")
         return {
           createDeviceServiceSessions: () =>
-            createDeviceServiceSessions({
+            sessionsPort({
               version: "0.0.0-test",
               connect: async () => ({ conn: fakeService([], []), owned: true }),
             }),
@@ -446,7 +454,7 @@ describe("device-service adapter: a session created on another device is address
         } as unknown as RemoteAttach
       },
     } as unknown as DeviceService
-    const port = createDeviceServiceSessions({
+    const port = sessionsPort({
       version: "0.0.0-test",
       connect: async () => ({ conn: service, owned: true }),
       retryDelay: async () => {},
@@ -481,7 +489,7 @@ describe("device-service adapter: a session created on another device is address
         throw new LocalApiError("session_not_found", "not expected")
       },
     } as unknown as DeviceService
-    const port = createDeviceServiceSessions({
+    const port = sessionsPort({
       version: "0.0.0-test",
       connect: async () => ({ conn: service, owned: true }),
       retryDelay: async () => {},
@@ -522,7 +530,7 @@ describe("device-service adapter: a session created on another device is address
         } as unknown as RemoteAttach
       },
     } as unknown as DeviceService
-    const port = createDeviceServiceSessions({
+    const port = sessionsPort({
       version: "0.0.0-test",
       connect: async () => ({ conn: service, owned: true }),
     })
@@ -550,7 +558,7 @@ describe("device-service adapter: a session created on another device is address
         } as unknown as RemoteAttach
       },
     } as unknown as DeviceService
-    const port = createDeviceServiceSessions({
+    const port = sessionsPort({
       version: "0.0.0-test",
       connect: async () => ({ conn: service, owned: true }),
     })
@@ -579,7 +587,7 @@ describe("device-service adapter: a session created on another device is address
           ...quietStream,
         }) as unknown as RemoteAttach,
     } as unknown as DeviceService
-    const port = createDeviceServiceSessions({
+    const port = sessionsPort({
       version: "0.0.0-test",
       connect: async () => ({ conn: service, owned: true }),
     })
@@ -599,7 +607,7 @@ describe("device-service adapter: a session created on another device is address
         throw new Error("a durable id must never reach attach")
       },
     } as unknown as DeviceService
-    const port = createDeviceServiceSessions({
+    const port = sessionsPort({
       version: "0.0.0-test",
       connect: async () => ({ conn: service, owned: true }),
     })
@@ -621,7 +629,7 @@ describe("device-service adapter: a session created on another device is address
         throw new LocalApiError("session_not_found", "no such session in that device's listing")
       },
     } as unknown as DeviceService
-    const port = createDeviceServiceSessions({
+    const port = sessionsPort({
       version: "0.0.0-test",
       connect: async () => ({ conn: service, owned: true }),
     })
@@ -856,7 +864,7 @@ describe("device-service adapter: relay round trips per thread op", () => {
         history_truncated: false,
         oldest_entry_id: null,
       })
-    const port = createDeviceServiceSessions({
+    const port = sessionsPort({
       version: "0.0.0-test",
       connect: () =>
         connectDeviceService({ version: "0.0.0-test", stateDir: "/unused", connect: async () => client as never }).then(
@@ -1170,11 +1178,13 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
               detachAttach = () => resolve("detached")
             }),
             ...quietStream,
+            detach: async () => detachAttach(),
           } as unknown as RemoteAttach
         },
         closed: new Promise<void>((resolve) => {
           closeService = resolve
         }),
+        close: () => closeService(),
       } as unknown as DeviceService
     }
     return {
@@ -1200,7 +1210,7 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
     async (_label, error, reason) => {
       const l = lifecycle()
       l.failAttach(error)
-      const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: l.connect })
+      const port = sessionsPort({ version: "0.0.0-test", connect: l.connect })
       expect(await port.sessionCommand("b", "s1", { type: "abort" })).toEqual({ kind: "refused", reason })
       expect(await port.read("b", "s1", 10)).toEqual({ kind: "refused", reason })
       expect(l.calls.sent).toBe(0)
@@ -1222,11 +1232,10 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
     })
     const l = lifecycle()
     l.failAttach(new LocalApiError("session_not_found", "no such session"))
-    const remote = await createDeviceServiceSessions({ version: "0.0.0-test", connect: l.connect }).sessionCommand(
-      "b",
-      "s1",
-      { type: "prompt", message: "hello" },
-    )
+    const remote = await sessionsPort({ version: "0.0.0-test", connect: l.connect }).sessionCommand("b", "s1", {
+      type: "prompt",
+      message: "hello",
+    })
     expect(local).toBe("unknown_session")
     expect(remote).toEqual({ kind: "refused", reason: String(local) })
   })
@@ -1261,14 +1270,14 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
     async (_label, type, reply, reason) => {
       const l = lifecycle()
       l.answer(reply)
-      const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: l.connect })
+      const port = sessionsPort({ version: "0.0.0-test", connect: l.connect })
       expect(await port.sessionCommand("b", "s1", { type, sessionId: "s1" })).toEqual({ kind: "refused", reason })
     },
   )
 
   test("#given a record that is not JSON #when it is commanded #then it is refused before any attach or send", async () => {
     const l = lifecycle()
-    const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: l.connect })
+    const port = sessionsPort({ version: "0.0.0-test", connect: l.connect })
     expect(await port.sessionCommand("b", "s1", { type: "prompt", message: Number.NaN })).toEqual({
       kind: "refused",
       reason: "invalid_record",
@@ -1298,7 +1307,7 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
     async (_label, reply) => {
       const l = lifecycle()
       l.answer(reply)
-      const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: l.connect })
+      const port = sessionsPort({ version: "0.0.0-test", connect: l.connect })
       expect(await port.sessionCommand("b", "s1", { type: "prompt", message: "x" })).toEqual({
         kind: "uncertain",
         reason: "reply_lost",
@@ -1312,14 +1321,14 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
     async (code) => {
       const l = lifecycle()
       l.answer(() => Promise.reject(new LocalApiError(code, "refused before dispatch")))
-      const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: l.connect })
+      const port = sessionsPort({ version: "0.0.0-test", connect: l.connect })
       expect(await port.sessionCommand("b", "s1", { type: "abort" })).toEqual({ kind: "refused", reason: code })
     },
   )
 
   test("#given the proven connection closes #when the next call runs #then a new connection is made", async () => {
     const l = lifecycle()
-    const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: l.connect })
+    const port = sessionsPort({ version: "0.0.0-test", connect: l.connect })
     await port.status()
     const closed = new Promise<void>((resolve) => queueMicrotask(resolve))
     l.close()
@@ -1331,7 +1340,7 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
 
   test("#given a session's attach ends #when the next command for that session runs #then a new attach is opened", async () => {
     const l = lifecycle()
-    const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: l.connect })
+    const port = sessionsPort({ version: "0.0.0-test", connect: l.connect })
     await port.sessionCommand("b", "s1", { type: "abort" })
     await port.sessionCommand("b", "s1", { type: "abort" })
     expect(l.calls.attach).toBe(1)
@@ -1352,7 +1361,7 @@ test("#given thread_list asks for this device's id and name together #when both 
     },
     closed: new Promise(() => {}),
   } as unknown as DeviceService
-  const port = createDeviceServiceSessions({
+  const port = sessionsPort({
     version: "0.0.0-test",
     connect: async () => ({ conn: service, owned: false }),
   })
@@ -1396,7 +1405,7 @@ describe("device-service adapter: an idle attach's detach timer", () => {
           return await conn.attach(device, sessionId)
         },
       } as unknown as DeviceService
-      const port = createDeviceServiceSessions({
+      const port = sessionsPort({
         version: "0.0.0-test",
         connect: async () => ({ conn: service, owned: true }),
         attachIdleMs: IDLE_MS,
@@ -1405,7 +1414,6 @@ describe("device-service adapter: an idle attach's detach timer", () => {
       jest.advanceTimersByTime(IDLE_MS)
       expect((await port.sessionCommand("b", "s1", { type: "get_state" })).kind).toBe("ok")
       expect(attaches).toBe(2)
-      await port.close?.()
     } finally {
       jest.useRealTimers()
     }
@@ -1416,7 +1424,7 @@ describe("device-service adapter: an idle attach's detach timer", () => {
     try {
       const detaches: string[] = []
       const counted = counting(detaches)
-      const port = createDeviceServiceSessions({
+      const port = sessionsPort({
         version: "0.0.0-test",
         connect: async () => ({ conn: counted.service, owned: true }),
         attachIdleMs: IDLE_MS,

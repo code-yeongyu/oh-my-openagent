@@ -5,7 +5,7 @@ import {
   type DeviceService,
   type RemoteAttach,
 } from "@oh-my-opencode/device-service-core/device-service"
-import { createDeviceServiceSessions } from "./device-service"
+import { closingPorts } from "./closing-ports.test-fixture"
 import type { JsonObject, RemoteResync, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 import { followRemote } from "./remote-ops"
 
@@ -200,8 +200,9 @@ function recorder() {
 
 const RUNNING = { isStreaming: true, currentTurnId: "7", durableSessionId: "dur-1" }
 const IDLE = { isStreaming: false, durableSessionId: "dur-1" }
+const sessionsPort = closingPorts()
 const portOver = (device: ReturnType<typeof fakeDevice>, attachIdleMs?: number, delays: number[] = []) =>
-  createDeviceServiceSessions({
+  sessionsPort({
     version: "0.0.0-test",
     connect: device.connect,
     retryDelay: async (ms) => {
@@ -455,6 +456,7 @@ function delegatedHost() {
       }
     },
     detached,
+    detach: async () => end("detached"),
   } as unknown as RemoteAttach
   const service = () => {
     const entry = { closed: false }
@@ -499,7 +501,7 @@ describe("device-service adapter: the #12777 duplicate rides the connection open
   test("#given open_session rides a per-call dialer #when the engine writes one delta #then the watch sees one copy", async () => {
     const host = delegatedHost()
     const live = host.service()
-    const port = createDeviceServiceSessions({
+    const port = sessionsPort({
       version: "0.0.0-test",
       connect: async () => ({ conn: live.service, owned: false }),
       dialEndpoint: async () => ({ conn: host.service().service, owned: true }),
@@ -517,7 +519,7 @@ describe("device-service adapter: the #12777 duplicate rides the connection open
   test("#given open_session rides the shared connection with no per-call dialer #when the engine writes one delta #then the watch sees it twice, pinning that the CLI must use a per-call dialer", async () => {
     const host = delegatedHost()
     const live = host.service()
-    const port = createDeviceServiceSessions({
+    const port = sessionsPort({
       version: "0.0.0-test",
       connect: async () => ({ conn: live.service, owned: false }),
     })
