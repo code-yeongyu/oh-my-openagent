@@ -433,7 +433,14 @@ export function createRemoteThreadFixture() {
         devices: () => devices,
         reads: accountReads,
         ...(options.devicesFail === true
-          ? { devicesFail: { kind: "error", code: "host_unavailable", message: "closed", next_action: "Retry." } as const }
+          ? {
+              devicesFail: {
+                kind: "error",
+                code: "host_unavailable",
+                message: "closed",
+                next_action: "Retry.",
+              } as const,
+            }
           : {}),
       }),
       sessions: {

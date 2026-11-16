@@ -3,7 +3,10 @@ import { chmodSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { ListingRow } from "@oh-my-opencode/device-service-core"
-import { startFakeOwner, type FakeOwner } from "../../../../device-service-core/test/local-api/conformance/fake-owner.ts"
+import {
+  startFakeOwner,
+  type FakeOwner,
+} from "../../../../device-service-core/test/local-api/conformance/fake-owner.ts"
 import { defaultWorld, OFFLINE_PEER, PEER } from "../../../../device-service-core/test/local-api/conformance/world.ts"
 import { clientOn, closeClients, failureOf, fakeClock } from "./testing/fake-service"
 

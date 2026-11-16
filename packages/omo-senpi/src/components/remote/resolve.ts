@@ -4,7 +4,8 @@ import { nextActionFor, remoteFailure } from "./codes"
 import { canonicalizeThreadHandle, handleOf, type CanonicalThread } from "./seams"
 import type { RemoteFailure, Scope, SessionRow } from "./types"
 
-type Match = { readonly kind: "one"; readonly row: SessionRow } | { readonly kind: "many"; readonly rows: readonly SessionRow[] }
+type Match =
+  { readonly kind: "one"; readonly row: SessionRow } | { readonly kind: "many"; readonly rows: readonly SessionRow[] }
 
 // A name match is held to the caller's workspace unless all_scope; an id or `<device>/<session>` names one session
 // account-wide, as on this device (thread/addressing.ts).
@@ -38,9 +39,14 @@ function match(rows: readonly SessionRow[], target: CanonicalThread): Match | un
 }
 
 const ambiguous = (address: string, rows: readonly SessionRow[]): RemoteFailure =>
-  remoteFailure("ambiguous_target", `${rows.length} sessions answer to ${address}.`, "Pass the thread handle of one of them.", {
-    details: { candidates: rows.map((row) => ({ thread: row.thread, name: row.name, device: row.device.name })) },
-  })
+  remoteFailure(
+    "ambiguous_target",
+    `${rows.length} sessions answer to ${address}.`,
+    "Pass the thread handle of one of them.",
+    {
+      details: { candidates: rows.map((row) => ({ thread: row.thread, name: row.name, device: row.device.name })) },
+    },
+  )
 
 /**
  * `sessions.resolve` (unit U5 of #13414): one address (durable id, name, `<device>/<session>`) to its row, served from
@@ -67,7 +73,10 @@ export function resolveMember(core: ClientCore): RemoteClient["sessions"]["resol
     if (found?.kind === "one") return { kind: "ok", value: found.row }
     if (found?.kind === "many") return ambiguous(address, found.rows)
     return remoteFailure("not_found", `No session of this account answers to ${address}.`, nextActionFor("not_found"), {
-      details: { kind: "session", ...(listed.value.unanswered.length === 0 ? {} : { unanswered: listed.value.unanswered.map((row) => row.id) }) },
+      details: {
+        kind: "session",
+        ...(listed.value.unanswered.length === 0 ? {} : { unanswered: listed.value.unanswered.map((row) => row.id) }),
+      },
     })
   }
 }

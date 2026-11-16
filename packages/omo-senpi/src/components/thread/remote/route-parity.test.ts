@@ -253,7 +253,10 @@ describe("#13012 route parity", () => {
         loadRuntime: async () => ({
           // A state dir with no device service endpoint in it: the client finds the service absent without connecting.
           remoteClient: (version, sender) =>
-            createRemoteClient(sender, { version, stateDir: join(tmpdir(), `omo-absent-device-service-${process.pid}`) }),
+            createRemoteClient(sender, {
+              version,
+              stateDir: join(tmpdir(), `omo-absent-device-service-${process.pid}`),
+            }),
           remoteSessionsPort: () =>
             createDeviceServiceSessions({
               version: "0.0.0",

@@ -69,7 +69,8 @@ const remoteNotSetUp = (state: unknown): boolean =>
 export async function relayAddressBook(remote: RemoteThreadSurface, address: string): Promise<RelayAddressBook> {
   const ready = await remoteReady(remote)
   if ("kind" in ready) {
-    if (ready.error.code === "host_unavailable" && remoteNotSetUp(ready.error.details?.["state"])) return { entries: [] }
+    if (ready.error.code === "host_unavailable" && remoteNotSetUp(ready.error.details?.["state"]))
+      return { entries: [] }
     return { entries: [], unavailable: ready.error }
   }
   const { here } = ready

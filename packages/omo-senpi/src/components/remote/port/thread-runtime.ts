@@ -11,7 +11,8 @@ import { createLazyRemoteSurface } from "./lazy-remote"
 
 export const remoteSessionsPort = (version: string): RemoteSessionsPort => createDeviceServiceSessions({ version })
 
-export const remoteClient = (version: string, sender: RemoteSender): RemoteClient => createRemoteClient(sender, { version })
+export const remoteClient = (version: string, sender: RemoteSender): RemoteClient =>
+  createRemoteClient(sender, { version })
 
 /**
  * The remote surface the `omo thread` CLI hands its SDK (#12833), from this sidecar's own device-service and alias clients;
