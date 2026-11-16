@@ -1,8 +1,10 @@
 import type { SentinelEvent } from "./events.ts"
 
 // An app whose window observer failed while it was not a regular app is not judged at that moment. If it activates
-// inside the recording it had a user interface, and from its failure until it registered again (observer_late) or
-// the recording stopped, a sheet it showed was invisible to every branch of the dialog detector.
+// before the recording stops (before start too: an earlier activation or an earlier segment) it had a user interface,
+// and from its failure until it registered again (observer_late, or never: its registration on activation failed
+// again) a sheet it showed was invisible to every branch of the dialog detector. Only the part of that gap inside the
+// recording is judged, here and only here: summary.ts skips this app's own registration facts.
 
 type Failure = { readonly since: number; readonly policy: string }
 
@@ -21,13 +23,7 @@ export function activatedGapFaults(
   for (const event of ordered) {
     if (event.kind === "observer_failed" && !event.regular && !targetPids.has(event.pid))
       failed.set(event.pid, { since: event.since, policy: event.policy })
-    else if (
-      event.kind === "activation" &&
-      failed.has(event.pid) &&
-      !activatedAt.has(event.pid) &&
-      event.t > from &&
-      event.t <= until
-    )
+    else if (event.kind === "activation" && failed.has(event.pid) && !activatedAt.has(event.pid) && event.t <= until)
       activatedAt.set(event.pid, event.t)
     else if (event.kind === "observer_late" && activatedAt.has(event.pid) && !reRegisteredAt.has(event.pid))
       reRegisteredAt.set(event.pid, event.t)

@@ -8,8 +8,9 @@ extension Recorder {
   // A just-launched app often refuses registration until its AX server is up. It is retried for up to 2 s while its
   // activation policy is regular or not yet decided (.prohibited, which a launching app can still leave); a
   // background agent (.accessory) is tried once. An app already running when the recorder arms (origin "arm") is past
-  // its launch and is tried once too, so a crowd of refusing background agents runs no retry chains on the main thread
-  // into the sampler's tick gap. The policy is re-read at every attempt.
+  // its launch: it is retried only while it is regular (a busy app's transient refusal), so a crowd of refusing
+  // background apps runs no retry chains on the main thread into the sampler's tick gap. The policy is re-read at every
+  // attempt.
   //
   // Every gap is reported with the moment it began (`since`): a registration that came late as observer_late, one that
   // never came as observer_failed. An app that failed while not regular keeps that moment in `failedSince`; when it
@@ -36,7 +37,8 @@ extension Recorder {
       }
       return
     }
-    if origin != "arm" && app.activationPolicy != .accessory && attempt < 10 {
+    let retries = origin == "arm" ? regular : app.activationPolicy != .accessory
+    if retries && attempt < 10 {
       registering.insert(pid)
       return after(0.2) { self.watchWindows(of: pid, origin: origin, attempt: attempt + 1, since: since) }
     }

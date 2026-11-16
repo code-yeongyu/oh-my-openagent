@@ -228,7 +228,9 @@ describe("arm-time registration of a background app is tried once", () => {
   test("a regular app found at arm time may retry a transient refusal", () => {
     expect(observerRetryProblems([failedAt(43, "arm", 10, true)])).toEqual([])
     expect(
-      observerRetryProblems([{ t: 400, kind: "observer_late", origin: "arm", pid: 44, attempts: 3, regular: true, since: 5 }]),
+      observerRetryProblems([
+        { t: 400, kind: "observer_late", origin: "arm", pid: 44, attempts: 3, regular: true, since: 5 },
+      ]),
     ).toEqual([])
   })
 

@@ -58,11 +58,15 @@ export function observerFailureLines(events: readonly SentinelEvent[]): string[]
   )
 }
 
-// An app already running when the recorder armed is past its launch, so its registration is tried once: a crowd of
-// refusing background agents must not run retry chains on the main thread into the sampler's tick gap.
+// A background app already running when the recorder armed is past its launch, so its registration is tried once: a
+// crowd of refusing background agents must not run retry chains on the main thread into the sampler's tick gap. A
+// regular app found at arm time still retries a transient refusal.
 export function observerRetryProblems(events: readonly SentinelEvent[]): string[] {
   return events.flatMap((event) =>
-    (event.kind === "observer_failed" || event.kind === "observer_late") && event.origin === "arm" && event.attempts > 1
+    (event.kind === "observer_failed" || event.kind === "observer_late") &&
+    event.origin === "arm" &&
+    !event.regular &&
+    event.attempts > 1
       ? [`window observer for pid ${event.pid} was retried ${event.attempts} times although it was found at arm time`]
       : [],
   )

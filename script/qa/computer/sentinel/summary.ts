@@ -200,8 +200,9 @@ export function summarize(events: readonly SentinelEvent[], options: { readonly 
         else if (event.axError !== undefined && AX_READ_ERRORS[event.axError] !== "ok")
           faults.push(`dialog: new window ${event.id} of pid ${event.ownerPid} was unreadable (AX ${event.axError})`)
         break
+      // An app that once failed while not regular is judged only by activatedGapFaults, so one gap is one fault.
       case "observer_failed":
-        if (event.since <= until && event.regular && !targetPids.has(event.pid))
+        if (event.since <= until && event.regular && !targetPids.has(event.pid) && !quiet.has(event.pid))
           faults.push(
             `dialog: window observer for pid ${event.pid} did not register after ${event.attempts} attempts (AX ${event.axError})`,
           )
