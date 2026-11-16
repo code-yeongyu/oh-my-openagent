@@ -1,5 +1,3 @@
-import type { InvocationCoverage } from "./ci-platform-invocations.mjs"
-
 export type CiMode = {
   readonly generatedReleasePush: boolean
   readonly webOnly: boolean
@@ -9,7 +7,6 @@ export type CiMode = {
 }
 
 export function isRuntimePath(path: string): boolean
-export function isPlatformSensitivePath(path: string, invocationCoverage: readonly InvocationCoverage[]): boolean
 export function classifyCiMode(input: {
   readonly eventName: string
   readonly headCommitMessage: string
@@ -18,5 +15,4 @@ export function classifyCiMode(input: {
   readonly mergeParentCount: number
   readonly headRef?: string
   readonly labels?: readonly string[]
-  readonly invocationCoverage?: readonly InvocationCoverage[]
 }): CiMode
