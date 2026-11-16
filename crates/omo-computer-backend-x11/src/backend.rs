@@ -19,7 +19,7 @@ use crate::capture::{failed, list_windows, png, process_facts, X11Capture, X11Co
 pub const X11_BACKEND: &str = "x11";
 
 fn no_display() -> Refusal {
-    Refusal::new(EngineCode::Internal, Reason::NoDisplayServer.wire())
+    Refusal::new(EngineCode::Internal, Reason::NoDisplayServer)
 }
 
 pub struct X11Backend<S = X11Connection> {
@@ -113,7 +113,7 @@ impl<S: XServer> Backend for X11Backend<S> {
     fn post_input(&mut self, input: &TaggedInput, route: Route) -> BackendResult<Delivered> {
         let _ = (input, route);
         self.capture.as_ref().ok_or_else(no_display)?;
-        Err(Refusal::new(EngineCode::Internal, Reason::InputUnsupported.wire()))
+        Err(Refusal::new(EngineCode::Internal, Reason::InputUnsupported))
     }
 
     fn capture(&mut self, target: &Target, options: &CaptureOptions) -> BackendResult<FrameBytes> {
@@ -191,7 +191,7 @@ mod tests {
     fn no_display_refuses_capture_and_displays_with_nothing_sent() {
         let mut backend = X11Backend::from_env(None, None);
         assert_eq!(backend.display_server(), "none");
-        let ruled = Refusal::new(EngineCode::Internal, "no_display_server");
+        let ruled = Refusal::new(EngineCode::Internal, Reason::NoDisplayServer);
         assert_eq!(backend.capture(&Target::Desktop, &options()).unwrap_err(), ruled);
         assert_eq!(backend.displays().unwrap_err(), ruled);
         assert_eq!(backend.windows(&WindowFilter::default()).unwrap_err(), ruled);

@@ -1,5 +1,6 @@
 //! Each field the v3 rows add changes the fake's behaviour against its null control.
 
+use omo_computer_core::error::Reason;
 use omo_computer_core::backend::{AxBackend, Backend, CaptureOptions, Target};
 use omo_computer_core::listing::Rect;
 
@@ -122,7 +123,7 @@ fn v3_fields_change_behaviour_against_their_null_control() {
         set.capture(&window, &NO_CROSSHAIR)
             .map(|_| ())
             .map_err(|r| (r.code, r.reason)),
-        Err((EngineCode::CaptureUnavailable, Some("unmapped")))
+        Err((EngineCode::CaptureUnavailable, Some(Reason::Unmapped)))
     );
     assert!(
         null.capture(&window, &NO_CROSSHAIR).is_ok()
