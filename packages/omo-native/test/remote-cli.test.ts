@@ -94,6 +94,22 @@ describe("omo remote", () => {
     })
   })
 
+  test("devices moves this device first when the roster already lists it, and marks it this device (#13774)", async () => {
+    const world = defaultWorld()
+    const self = { device: "dev-self", label: "This Mac", kind: "cli", platform: "linux", last_seen_ms: 1, online: true }
+    const owner = await startFakeOwner({ stateDir: privateDir(), world: { ...world, devices: [...world.devices, self] } })
+    owners.push(owner)
+    const { code, out } = await run(["devices"], owner.stateDir)
+    expect(code).toBe(REMOTE_EXIT.ok)
+    expect(out[1]).toMatch(/^dev-self\s+This Mac\s+this device\s+linux\s+online$/)
+    expect(out[2]).toMatch(new RegExp(`^${PEER}\\s`))
+    const json = await run(["devices", "--json"], owner.stateDir)
+    expect(JSON.parse(json.out.join(""))).toEqual([
+      { ...self, this_device: true },
+      ...world.devices.map((device) => ({ ...device, this_device: false })),
+    ])
+  })
+
   test("sessions shows attach targets, marks cached rows and names devices that did not answer", async () => {
     const { code, out } = await run(["sessions"])
     expect(code).toBe(REMOTE_EXIT.ok)
