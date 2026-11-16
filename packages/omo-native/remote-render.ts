@@ -102,7 +102,7 @@ export function deviceLines(devices: readonly DeviceRow[], now: number): string[
     devices.map((device) => [
       device.id,
       device.name,
-      device.kind,
+      device.kind ?? "this device",
       device.platform,
       device.online ? "online" : ago(device.last_seen_ms, now),
     ]),

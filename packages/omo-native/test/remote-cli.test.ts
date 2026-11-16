@@ -119,8 +119,8 @@ describe("omo remote", () => {
     const { code, out, err } = await run(["sessions", "--device", PEER, "--json"], owner.stateDir)
     expect(err).toEqual([])
     expect(code).toBe(REMOTE_EXIT.ok)
-    const result = JSON.parse(out.join("")) as { rows: { device: string }[] }
-    expect(result.rows.map((row) => row.device)).toEqual([PEER])
+    const result = JSON.parse(out.join("")) as { rows: { device: { id: string } }[] }
+    expect(result.rows.map((row) => row.device.id)).toEqual([PEER])
   })
 
   test("disable and enable report the switch the service answers with", async () => {
