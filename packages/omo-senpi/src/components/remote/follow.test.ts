@@ -88,6 +88,21 @@ describe("sessions.follow rows", () => {
     ])
   })
 
+  test("#given a running turn #when it settles while compacting and the session then goes idle #then the end is settled, not a hang", async () => {
+    const { owner, client } = await on(RUNNING)
+    const { events, first } = await following(client)
+    expect(first).toEqual({ kind: "waiting", state: "turn_running" })
+    pushRecords(owner, [
+      { type: "session_status", status: "compacting" },
+      { type: "agent_settled" },
+      { type: "session_status", status: "idle" },
+    ])
+    expect(await drain(events)).toEqual([
+      { kind: "waiting", state: "compacting" },
+      { kind: "end", outcome: { reason: "settled" } },
+    ])
+  })
+
   test("#given a running turn #when it is aborted #then the end is interrupted", async () => {
     const { owner, client } = await on(RUNNING)
     const { events, first } = await following(client)

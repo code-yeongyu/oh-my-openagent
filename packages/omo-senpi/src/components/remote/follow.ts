@@ -187,6 +187,11 @@ class SessionTurn {
   #compacting = false
   /** The engine (its run lease or its session_status) says it waits on a person, with no request this attach saw. */
   #asksElsewhere = false
+  /**
+   * An observed run end not yet reported: it arrived while the session still compacted or waited on a request, so it is
+   * reported once the status reaches idle. Cleared when a new run starts.
+   */
+  #endPending = false
   /** The requests the session waits on, shown ones and raiser-only ones alike (#13753 M2). */
   readonly #asked = new Map<string, Asked>()
 
@@ -324,6 +329,7 @@ class SessionTurn {
 
   #markRunning(): void {
     this.running = true
+    this.#endPending = false
   }
 
   /** An observed end of the run: the only way `running` goes false. Answers whether a run was in flight. */
@@ -346,7 +352,11 @@ class SessionTurn {
             : "idle"
     const changed = status !== this.status
     this.status = status
-    if (ended && status === "idle") return [{ kind: "run_ended" }]
+    if (ended) this.#endPending = true
+    if (this.#endPending && status === "idle") {
+      this.#endPending = false
+      return [{ kind: "run_ended" }]
+    }
     return changed || always ? [{ kind: "status", status }] : []
   }
 }
