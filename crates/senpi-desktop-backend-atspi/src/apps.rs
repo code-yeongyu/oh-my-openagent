@@ -3,7 +3,7 @@
 
 use std::cmp::Reverse;
 
-use atspi::{Role, State};
+use atspi::{Interface, Role, State};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::types::DesktopWindow;
 
@@ -161,26 +161,33 @@ pub(crate) fn element_at<B: AtSpiBus>(bus: &mut B, x: f64, y: f64) -> CoreResult
             if bus.is_null(&found) {
                 return Ok(None);
             }
-            return Ok(Some(deepest_at(bus, found, point)));
+            return deepest_at(bus, found, point).map(Some);
         }
     }
     Ok(None)
 }
 
-/// Descends from `node` through the child under `point` at each level. An
-/// object without a Component interface (a failed round trip), a null answer,
-/// or an answer naming the object itself ends the descent at the last object.
-fn deepest_at<B: AtSpiBus>(bus: &mut B, mut node: B::Node, point: ScreenPoint) -> B::Node {
+/// Descends from `node` through the child under `point` at each level. A
+/// null answer, an answer naming the object itself, or an object without a
+/// Component interface (whose call fails) ends the descent at the last
+/// object; any other failed round trip fails the read.
+fn deepest_at<B: AtSpiBus>(bus: &mut B, mut node: B::Node, point: ScreenPoint) -> CoreResult<B::Node> {
     for _ in 0..MAX_HIT_DEPTH {
-        let Ok(child) = bus.accessible_at_point(&node, point) else {
-            break;
+        let child = match bus.accessible_at_point(&node, point) {
+            Ok(child) => child,
+            Err(err) => {
+                let leaf = bus
+                    .interfaces(&node)
+                    .is_ok_and(|interfaces| !interfaces.contains(Interface::Component));
+                return if leaf { Ok(node) } else { Err(DesktopError::ax_failed(err)) };
+            }
         };
         if bus.is_null(&child) || bus.object_id(&child) == bus.object_id(&node) {
             break;
         }
         node = child;
     }
-    node
+    Ok(node)
 }
 
 /// The first element in depth-first order whose state holds `Focused`.

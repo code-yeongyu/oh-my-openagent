@@ -22,6 +22,8 @@ pub(crate) struct FakeNode {
     pub(crate) parent: u64,
     pub(crate) extents: Option<Extents>,
     pub(crate) hit: Option<u64>,
+    /// The hit-test round trip fails even though Component is implemented.
+    pub(crate) hit_fails: bool,
     pub(crate) actions: Vec<String>,
     pub(crate) action_succeeds: bool,
     pub(crate) key_binding: String,
@@ -48,6 +50,7 @@ impl FakeNode {
             parent: 0,
             extents: None,
             hit: None,
+            hit_fails: false,
             actions: Vec::new(),
             action_succeeds: true,
             key_binding: String::new(),
@@ -211,6 +214,9 @@ impl AtSpiBus for FakeBus {
         let found = self.get(*node)?;
         if !found.interfaces.contains(Interface::Component) {
             return Err("no Component".to_string());
+        }
+        if found.hit_fails {
+            return Err(format!("AT-SPI element at point: object {node} timed out"));
         }
         Ok(found.hit.unwrap_or(0))
     }

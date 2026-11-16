@@ -3,9 +3,10 @@
 
 use atspi::{Interface, Role};
 use senpi_desktop_core::ax::AxBackend;
+use senpi_desktop_core::error::ErrorCode;
 
 use crate::bus::Extents;
-use crate::fake::{editor, FakeBus, FakeNode};
+use crate::fake::{editor, node, FakeBus, FakeNode};
 use crate::AtSpiAx;
 
 const PANEL: Extents = Extents {
@@ -72,6 +73,24 @@ fn element_at_stops_at_an_element_without_a_component() {
 }
 
 #[test]
+fn element_at_stops_part_way_down_at_an_element_without_a_component() {
+    let mut bus = nested();
+    bus.nodes.get_mut(&21).unwrap().interfaces = FakeNode::new(Role::Panel, "").interfaces;
+    let mut ax = AtSpiAx::with_bus(bus);
+    assert_eq!(hit(&mut ax, 340.0, 75.0), Some(21));
+    assert_eq!(ax.bus.calls, ["hit 10 @340,75", "hit 20 @340,75", "hit 21 @340,75"]);
+}
+
+#[test]
+fn a_failed_round_trip_part_way_down_fails_the_read() {
+    let mut bus = nested();
+    bus.nodes.get_mut(&21).unwrap().hit_fails = true;
+    let error = AtSpiAx::with_bus(bus).element_at(340.0, 75.0).err().unwrap();
+    assert_eq!(error.code, ErrorCode::AxFailed);
+    assert!(error.message.contains("timed out"), "{}", error.message);
+}
+
+#[test]
 fn element_at_stops_at_an_element_that_answers_with_itself() {
     let mut bus = nested();
     answers(&mut bus, 22, 22);
@@ -85,4 +104,11 @@ fn element_at_is_none_when_the_frame_has_nothing_under_the_point() {
     let mut ax = AtSpiAx::with_bus(editor());
     assert_eq!(hit(&mut ax, 340.0, 75.0), None);
     assert_eq!(ax.bus.calls, ["hit 10 @340,75"]);
+}
+
+#[test]
+fn same_element_compares_the_bus_objects() {
+    let mut ax = AtSpiAx::with_bus(editor());
+    assert!(ax.same_element(&node(11), &node(11)));
+    assert!(!ax.same_element(&node(11), &node(12)));
 }
