@@ -25,6 +25,7 @@ const STATE_LABELS: Readonly<Record<StatusState, string>> = {
   service_degraded: "Needs attention",
   update_required: "Update required",
   signed_out: "Signed out",
+  fail_closed: "Needs repair",
 }
 
 function renderTable(header: readonly string[], rows: readonly (readonly string[])[]): string[] {
@@ -95,14 +96,17 @@ export function localRows(local: LocalStatus): (readonly [string, string])[] {
   ]
 }
 
-export function deviceLines(devices: readonly DeviceRow[], now: number): string[] {
+/** A device row as `omo remote devices` lists it: this device's own row carries no kind (the service reports none). */
+export type ListedDevice = Omit<DeviceRow, "kind"> & { readonly kind?: string; readonly this_device: boolean }
+
+export function deviceLines(devices: readonly ListedDevice[], now: number): string[] {
   if (devices.length === 0) return ["No devices on this account yet."]
   return renderTable(
     ["DEVICE", "NAME", "KIND", "PLATFORM", "SEEN"],
     devices.map((device) => [
       device.device,
       device.label,
-      device.kind,
+      device.kind ?? "this device",
       device.platform,
       device.online ? "online" : ago(device.last_seen_ms, now),
     ]),

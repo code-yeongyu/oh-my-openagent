@@ -101,21 +101,53 @@ export type ThreadLocalAliasNote = {
  */
 export type ThreadWorkspaceNote = { readonly workspace_scope?: "outside"; readonly scope_next_action?: string }
 
+/**
+ * The first message a `thread_create` with `prompt` delivered to the thread it made (#13410): the delivery as thread_send
+ * reports it, or the failure that stopped it. The thread exists either way.
+ */
+export type ThreadCreatePrompt =
+  | ({ readonly delivery: ThreadDelivery; readonly deduplicated: boolean } & ThreadGatewayDeliveryFacts)
+  | { readonly error: ThreadToolFailure }
+
 export type ThreadCreateResult =
   | ({
       readonly kind: "ok"
       readonly thread: ThreadResultSummary
       readonly deduplicated: boolean
+      readonly prompt?: ThreadCreatePrompt
     } & ThreadLocalAliasNote &
       ThreadWorkspaceNote)
   | ThreadDataError
+
+/**
+ * One of the account's devices as `thread_list` reports it. `online` is the device's, never a thread's. `listing`:
+ * `listed` when this listing holds the device's threads, `incomplete` when the device did not answer this round (its
+ * threads are missing, not gone), `offline` when the device is not connected. `threads` counts the threads this result
+ * lists on the device (this device's are the caller's scoped threads). This device's row is always present.
+ */
+export type ThreadDevice = {
+  readonly device: string
+  readonly name: string
+  readonly platform?: string
+  readonly kind?: string
+  readonly online: boolean
+  readonly last_seen: string | null
+  readonly this_device: boolean
+  readonly listing: "listed" | "incomplete" | "offline"
+  readonly threads: number
+}
 
 export type ThreadListResult =
   | {
       readonly kind: "ok"
       readonly threads: readonly ThreadResultSummary[]
       readonly scope: "workspace" | "all"
-      /** Set when the account's other devices could not be listed (A5: `relay_requires_paid_plan`, or the device service is unreachable). */
+      /** The account's devices, this one included, when the account's devices could be listed. */
+      readonly devices?: readonly ThreadDevice[]
+      /**
+       * Set when the account's other devices could not be listed (A5: `relay_requires_paid_plan`, or the device service is
+       * unreachable), or `devices_unavailable` when only the device roster failed (the threads are still merged).
+       */
       readonly remote_unavailable?: string
     }
   | ThreadDataError
@@ -133,8 +165,24 @@ export type ThreadReadResult =
       readonly source_incomplete?: boolean
       readonly error_note?: string
       readonly device?: string
+      /** Set when the read asked to wait (`wait_ms`): how the wait ended, read before the transcript. */
+      readonly wait?: ThreadWaitOutcome
     }
   | ThreadDataError
+
+/**
+ * A `thread_read` wait (#13417). `settled`: a turn end was observed (`turn_id`), or the thread showed no run for the
+ * quiet window and is idle (no `turn_id`); a snapshot's idle alone never settles it.
+ * `timeout`: `wait_ms` passed with the thread still running. `cancelled`: the call was aborted. `ended`: the watch
+ * could not continue (the session closed for good or the access ended; `status` names why).
+ */
+export type ThreadWaitOutcome = {
+  readonly outcome: "settled" | "timeout" | "cancelled" | "ended"
+  readonly status: string
+  readonly waited_ms: number
+  /** The turn whose observed end settled the wait; absent when the session showed no run and settled on its idle. */
+  readonly turn_id?: string
+}
 
 export type ThreadSendResult =
   | ({
