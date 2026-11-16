@@ -1,4 +1,4 @@
-import { LocalApiError } from "@oh-my-opencode/device-service-core"
+import { LocalApiError } from "@oh-my-opencode/device-service-core/device-service"
 import { THREAD_ERROR_CODES } from "../thread/errors"
 import type { RemoteFailure } from "./types"
 

@@ -10,7 +10,7 @@ import {
   type DeviceRow as WireDeviceRow,
   type ListingRow,
   type Timers,
-} from "@oh-my-opencode/device-service-core"
+} from "@oh-my-opencode/device-service-core/device-service"
 import { aliasMembers } from "./aliases"
 import { attachMember } from "./attach"
 import { failureFromError, nextActionFor, remoteFailure } from "./codes"
