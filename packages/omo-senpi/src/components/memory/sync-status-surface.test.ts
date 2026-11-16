@@ -205,3 +205,24 @@ test.each([
     expect(notices[0]?.startsWith(`${prefix} `)).toBe(true)
   },
 )
+
+test.each([
+  { errorClass: "GitCommandError", exitCode: 128, stage: "apply" },
+  { errorClass: "Error", code: "EMFILE", stage: "capture" },
+] as const)(
+  "#given sync stops on an error the engine cannot name #when the notice is shown #then it carries every safe cause field (%o, #13635)",
+  async (cause) => {
+    const notices: string[] = []
+    const notifier = createSyncStatusNotifier(async () => ({
+      kind: "failing",
+      since: 0,
+      attempts: 1,
+      failure: { kind: "unknown", reason: "r", action: "a", cause },
+    }))
+
+    await notifier.changed("/repo", { notify: (message) => notices.push(message) })
+
+    expect(notices).toHaveLength(1)
+    for (const value of Object.values(cause)) expect(notices[0]).toContain(String(value))
+  },
+)
