@@ -1,0 +1,78 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/telemetry-core": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "src/posthog-immediate-send.ts",
+      ],
+      "ignoreFiles": [
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/otlp-kill-child.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/otlp-silent-server.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/otlp-spool-child.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/otlp-timeout-child.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "test-fixtures/root-types/consumer.ts",
+      ],
+      // pre-existing at origin dev 4686e425b5: executables this package runs that it does not declare
+      "ignoreBinaries": ["mkfifo"],
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) createImmediateSender, TelemetryDeliveryError
+    "packages/telemetry-core/immediate-send.d.ts": ["createImmediateSender", "TelemetryDeliveryError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_POSTHOG_HOST, DEFAULT_POSTHOG_API_KEY, UNCONFIGURED_POSTHOG_API_KEY, createEventTelemetryClient, TelemetryDeliveryError, createImmediateSender, createDefaultPostHogTransport, isTelemetryClientEnabled, createConsentGatedFetch, createTelemetryClient and 20 more
+    // #11572 (origin dev 4c87d16a73) renamed getTelemetryDistinctId to getTelemetryInstallDistinctId and added TELEMETRY_INSTALL_ID_FILE_NAME: the new names are
+    // declared here for the package's own consumers, which import the implementation (src/index.ts) and never this declaration file, so knip reports them unused
+    // exactly as it did the old name. The exports stay; only their rows move.
+    "packages/telemetry-core/index.d.ts": ["DEFAULT_POSTHOG_HOST", "DEFAULT_POSTHOG_API_KEY", "UNCONFIGURED_POSTHOG_API_KEY", "createEventTelemetryClient", "TelemetryDeliveryError", "createImmediateSender", "createDefaultPostHogTransport", "isTelemetryClientEnabled", "createConsentGatedFetch", "createTelemetryClient", "shouldDisableTelemetry", "getTelemetryApiKey", "isConfiguredTelemetryApiKey", "createUuidV7Generator", "createEventId", "hasTelemetryApiKey", "getTelemetryHost", "getDefaultTelemetryOsProvider", "resolveTelemetryStateDir", "getTelemetryActivityStateFilePath", "getDailyActiveCaptureState", "getTelemetryDiagnosticsFilePath", "writeTelemetryDiagnostic", "cleanupTelemetryDiagnostics", "recordDailyActive", "isTraceparent", "publishTurnTraceparent", "clearTurnTraceparent", "readTurnTraceparent", "TELEMETRY_INSTALL_ID_FILE_NAME", "getTelemetryInstallDistinctId"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_POSTHOG_HOST, DEFAULT_POSTHOG_API_KEY, UNCONFIGURED_POSTHOG_API_KEY, isTelemetryClientEnabled, createConsentGatedFetch, shouldDisableTelemetry, getTelemetryApiKey, isConfiguredTelemetryApiKey, createUuidV7Generator, createEventId and 13 more
+    // #11572 (origin dev 4c87d16a73): the getTelemetryDistinctId row became TELEMETRY_INSTALL_ID_FILE_NAME and getTelemetryInstallDistinctId, as in index.d.ts above.
+    "packages/telemetry-core/injected.d.ts": ["DEFAULT_POSTHOG_HOST", "DEFAULT_POSTHOG_API_KEY", "UNCONFIGURED_POSTHOG_API_KEY", "isTelemetryClientEnabled", "createConsentGatedFetch", "shouldDisableTelemetry", "getTelemetryApiKey", "isConfiguredTelemetryApiKey", "createUuidV7Generator", "createEventId", "hasTelemetryApiKey", "getTelemetryHost", "getDefaultTelemetryOsProvider", "resolveTelemetryStateDir", "getTelemetryActivityStateFilePath", "getDailyActiveCaptureState", "getTelemetryDiagnosticsFilePath", "writeTelemetryDiagnostic", "cleanupTelemetryDiagnostics", "createTelemetryClient", "createEventTelemetryClient", "recordDailyActive", "TELEMETRY_INSTALL_ID_FILE_NAME", "getTelemetryInstallDistinctId"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) createDefaultPostHogTransport
+    "packages/telemetry-core/posthog-transport.d.ts": ["createDefaultPostHogTransport"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) getTelemetryDayClaimFilePath
+    "packages/telemetry-core/src/day-claim.ts": ["getTelemetryDayClaimFilePath"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) createBootId
+    "packages/telemetry-core/src/otel-providers.ts": ["createBootId"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) otelOsType, otelHostArch
+    "packages/telemetry-core/src/otel-resource.ts": ["otelOsType", "otelHostArch"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_OTLP_ENDPOINT
+    "packages/telemetry-core/src/otlp-config.ts": ["DEFAULT_OTLP_ENDPOINT"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) hexToBytes, keyValues
+    "packages/telemetry-core/src/otlp-encode.ts": ["hexToBytes", "keyValues"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_OTLP_ENDPOINT, isOtlpTelemetryEnabled, isWireAttributeKey, resolveOtlpEndpoint
+    "packages/telemetry-core/src/otlp-entry.ts": ["DEFAULT_OTLP_ENDPOINT", "isOtlpTelemetryEnabled", "isWireAttributeKey", "resolveOtlpEndpoint"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MAX_BODY_BYTES, GZIP_THRESHOLD_BYTES, BACKOFF_MS, MAX_RETRY_AFTER_MS
+    "packages/telemetry-core/src/otlp-http.ts": ["MAX_BODY_BYTES", "GZIP_THRESHOLD_BYTES", "BACKOFF_MS", "MAX_RETRY_AFTER_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) file_opentelemetry_proto_collector_logs_v1_logs_service, ExportLogsPartialSuccessSchema, LogsService
+    "packages/telemetry-core/src/otlp-proto/opentelemetry/proto/collector/logs/v1/logs_service_pb.ts": ["file_opentelemetry_proto_collector_logs_v1_logs_service", "ExportLogsPartialSuccessSchema", "LogsService"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) file_opentelemetry_proto_collector_trace_v1_trace_service, ExportTracePartialSuccessSchema, TraceService
+    "packages/telemetry-core/src/otlp-proto/opentelemetry/proto/collector/trace/v1/trace_service_pb.ts": ["file_opentelemetry_proto_collector_trace_v1_trace_service", "ExportTracePartialSuccessSchema", "TraceService"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ArrayValueSchema, KeyValueListSchema, EntityRefSchema
+    "packages/telemetry-core/src/otlp-proto/opentelemetry/proto/common/v1/common_pb.ts": ["ArrayValueSchema", "KeyValueListSchema", "EntityRefSchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) LogsDataSchema, ScopeLogsSchema, SeverityNumberSchema, LogRecordFlags, LogRecordFlagsSchema
+    "packages/telemetry-core/src/otlp-proto/opentelemetry/proto/logs/v1/logs_pb.ts": ["LogsDataSchema", "ScopeLogsSchema", "SeverityNumberSchema", "LogRecordFlags", "LogRecordFlagsSchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) TracesDataSchema, ScopeSpansSchema, Span_EventSchema, Span_LinkSchema, Span_SpanKindSchema, Status_StatusCodeSchema, SpanFlags, SpanFlagsSchema
+    "packages/telemetry-core/src/otlp-proto/opentelemetry/proto/trace/v1/trace_pb.ts": ["TracesDataSchema", "ScopeSpansSchema", "Span_EventSchema", "Span_LinkSchema", "Span_SpanKindSchema", "Status_StatusCodeSchema", "SpanFlags", "SpanFlagsSchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DEAD_OWNER_IDLE_MS, isSpoolFileName
+    "packages/telemetry-core/src/otlp-spool-dir.ts": ["DEAD_OWNER_IDLE_MS", "isSpoolFileName"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) SPOOL_FORMAT
+    "packages/telemetry-core/src/otlp-spool-file.ts": ["SPOOL_FORMAT"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) plain
+    "packages/telemetry-core/src/otlp-test-support.ts": ["plain"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) createImmediateSender
+    "packages/telemetry-core/src/posthog-client.ts": ["createImmediateSender"]
+  }
+}
