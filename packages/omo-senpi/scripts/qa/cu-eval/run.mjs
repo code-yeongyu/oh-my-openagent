@@ -46,7 +46,7 @@ if (process.versions.bun === undefined) {
   process.exit(child.status ?? 1)
 }
 
-const { connect } = await import(join(repoRoot, "packages", "senpi-desktop-sdk", "src", "index.ts"))
+const { connect } = await import("../../../../senpi-desktop-sdk/src/index.ts")
 const { engineLauncher } = await import("./engine-port.mjs")
 const core = await import("./eval-core.mjs")
 const { runModelTask } = await import("./model-arms.mjs")
