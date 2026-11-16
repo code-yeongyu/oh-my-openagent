@@ -34,6 +34,7 @@
 | Engine hosts per session, `omo daemon`, migration and rollback | [docs/reference/omo-daemon.md](reference/omo-daemon.md) |
 | `omo thread` CLI and thread SDK for scripts and connectors (JSON shapes, exit codes) | [docs/reference/omo-thread.md](reference/omo-thread.md) |
 | `omo remote`: sessions on your other devices (verbs, states, command outcomes, device service install) | [docs/reference/remote-sessions.md](reference/remote-sessions.md) |
+| `omo-ai/remote`: the importable remote SDK for scripts (members, typed errors, two-device check) | [docs/reference/omo-remote-sdk.md](reference/omo-remote-sdk.md) |
 | Engine trust under a user namespace (bwrap sandbox, inode attestation) | [docs/reference/engine-trust-user-namespaces.md](reference/engine-trust-user-namespaces.md) |
 | Desktop engine attach and `--serve` multi-connection threat model | [docs/reference/desktop-attach-threat-model.md](reference/desktop-attach-threat-model.md) |
 | Known issues & workarounds | [docs/reference/known-issues.md](reference/known-issues.md) |

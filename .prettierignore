@@ -33,6 +33,7 @@ packages/omo-codex/scripts/install-dist/
 packages/omo-codex/plugin/components/ultrawork/src/directive-content.ts
 packages/omo-senpi/plugin/runtime/
 packages/omo-senpi/plugin/scripts/install.mjs
+packages/omo-native/bin/lib/remote-sdk-types/
 # Byte-pinned or source-text-pinned by tests: formatting them breaks the pin, so they keep their bytes.
 packages/device-service-core/src/strict-ed25519/
 packages/memory-core/src/sync/crypto/strict-ed25519/

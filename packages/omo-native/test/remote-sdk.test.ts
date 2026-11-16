@@ -1,0 +1,88 @@
+import { afterEach, describe, expect, test } from "bun:test"
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { cleanup, startOwner } from "../../device-service-core/test/local-api/support.ts"
+import { OFFLINE_PEER, PEER } from "../../device-service-core/test/local-api/conformance/world.ts"
+import { openRemote, REMOTE_CODES, type Remote, type RemoteFailure } from "omo-ai/remote"
+
+// omo#13413: the importable remote SDK. A program imports `omo-ai/remote` by its package name and drives devices and
+// sessions through the one remote module (design v8-core r2, as amended by Q's W3 ruling: the SDK is that module
+// exported). Every member settles with data: `{ kind: "ok", value }` or a typed RemoteFailure, never a throw.
+
+const opened: Remote[] = []
+const dirs: string[] = []
+afterEach(async () => {
+  for (const remote of opened.splice(0)) remote.close()
+  for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
+  await cleanup()
+})
+
+const open = (stateDir: string): Remote => {
+  const remote = openRemote({ stateDir })
+  opened.push(remote)
+  return remote
+}
+
+const valueOf = async <T>(outcome: Promise<{ readonly kind: "ok"; readonly value: T } | RemoteFailure>): Promise<T> => {
+  const settled = await outcome
+  if (settled.kind !== "ok") throw new Error(`expected a value, got ${JSON.stringify(settled)}`)
+  return settled.value
+}
+
+const failureOf = async (outcome: Promise<{ readonly kind: "ok" } | RemoteFailure>): Promise<RemoteFailure> => {
+  const settled = await outcome
+  if (settled.kind !== "error") throw new Error(`expected a failure, got ${JSON.stringify(settled)}`)
+  return settled
+}
+
+describe("omo-ai/remote: devices", () => {
+  test("#given a signed-in device service #when a script lists devices #then it gets this device and its peers, online as a device property", async () => {
+    const remote = open((await startOwner()).stateDir)
+
+    const devices = await valueOf(remote.devices.list())
+
+    expect(devices.find((row) => row.self === true)).toBeDefined()
+    expect(devices.find((row) => row.id === PEER)).toMatchObject({ online: true })
+    expect(devices.find((row) => row.id === OFFLINE_PEER)).toMatchObject({ online: false })
+  })
+
+  test("#given no device service on this machine #when a script lists devices #then it gets the local self row, not a failure", async () => {
+    const empty = mkdtempSync(join(tmpdir(), "omo-remote-sdk-"))
+    dirs.push(empty)
+
+    const devices = await valueOf(open(empty).devices.list())
+
+    expect(devices).toEqual([expect.objectContaining({ id: "local", self: true, online: true })])
+  })
+
+  test("#given a device name nobody has #when a script resolves it #then the failure is typed: a known code and a next action", async () => {
+    const remote = open((await startOwner()).stateDir)
+
+    const failure = await failureOf(remote.devices.resolve("no-such-device"))
+
+    expect(REMOTE_CODES).toContain(failure.code)
+    expect(failure.next_action.length).toBeGreaterThan(0)
+  })
+})
+
+describe("omo-ai/remote: sessions", () => {
+  test("#given devices with sessions #when a script lists sessions #then it gets ONE merged list whose rows name their device", async () => {
+    const remote = open((await startOwner()).stateDir)
+
+    const list = await valueOf(remote.sessions.list({ all_scope: true }))
+
+    expect(list.rows.length).toBeGreaterThan(0)
+    for (const row of list.rows) expect(row.thread).toBe(`${row.device.id}/${row.thread.split("/")[1]}`)
+  })
+
+  test("#given the SDK #when a script reaches for the session verbs #then create, send, read, watch, interrupt, close and archive are all members", () => {
+    const empty = mkdtempSync(join(tmpdir(), "omo-remote-sdk-"))
+    dirs.push(empty)
+    const remote = open(empty)
+
+    expect(Object.keys(remote.sessions).sort()).toEqual(
+      expect.arrayContaining(["archive", "close", "follow", "get", "interrupt", "list", "open", "read", "send"]),
+    )
+  })
+})
