@@ -172,8 +172,8 @@ export async function prepareRemoteAttach(
     try {
       resolved = await resolveSessionTarget(remote, parsedTarget)
     } finally {
-      // The port only resolves the target on this connection, which the attach keeps; closing it clears its attach
-      // pool, so no idle detach timer outlives the attach TUI.
+      // The port only lists sessions to resolve the target and never attaches, so its attach pool stays empty; it is
+      // closed because this function built it (hygiene: nothing it holds would outlive the attach TUI).
       await remote.sessions.close?.()
     }
     if (resolved.kind === "error") {
