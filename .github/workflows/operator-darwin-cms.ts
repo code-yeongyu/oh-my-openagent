@@ -170,7 +170,12 @@ export function verifyDeveloperIdSigner(
   })
   if (matching.length !== 1) refuse("the signing certificate is not exactly one certificate in the CMS")
   const leafNode = at(matching, 0, "signing certificate")
-  const leaf = new X509Certificate(raw(cms, leafNode))
+  let leaf: X509Certificate
+  try {
+    leaf = new X509Certificate(raw(cms, leafNode))
+  } catch {
+    return refuse("the signing certificate is not a valid X.509 certificate")
+  }
   const parts = certificateParts(cms, leafNode)
 
   const values = new Map<string, Tlv[]>()

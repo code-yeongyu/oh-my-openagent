@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { rmSync, unlinkSync, writeFileSync } from "node:fs"
 import { basename, join } from "node:path"
-import { X509Certificate } from "node:crypto"
+import { createHash, X509Certificate } from "node:crypto"
 import {
   inspectSignatures,
   Refusal,
@@ -315,6 +315,24 @@ describe("operator darwin verifier", () => {
       () =>
         run(writeFixture(), { inspect: (name) => (name === "omo-darwin-arm64" ? caValidForeignSigner() : undefined) }),
       /^omo-darwin-arm64: signed by team ATTACKER99, expected 523JNR86LZ$/,
+    ],
+    [
+      "#13964 LOW-2: an arm64e keychain helper slice",
+      () =>
+        run(
+          writeFixture(),
+          keychainSlices((slice) => (slice.cpuType === 0x0100000c ? { ...slice, cpuSubtype: 2 } : slice)),
+        ),
+      /omo-keychain-darwin-universal: slices are not exactly x86_64 \+ arm64/,
+    ],
+    [
+      "#13964 LOW-1: a pinned manifest that is not JSON",
+      () => {
+        const fixture = writeFixture()
+        writeFileSync(join(fixture.dir, "operator-darwin-manifest.json"), "{not json")
+        return run(fixture, {}, { manifestSha256: createHash("sha256").update("{not json").digest("hex") })
+      },
+      /^operator-darwin-manifest\.json is not valid JSON$/,
     ],
     [
       "a keychain helper with another designated requirement",
