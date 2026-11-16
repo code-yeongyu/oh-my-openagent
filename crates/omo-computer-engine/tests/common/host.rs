@@ -22,6 +22,7 @@ pub const HOST_LATCH: &str = "computer/host-latch";
 pub const FAKE_IDENTITY: &str = "fake-host-identity";
 pub const CONSENT: &str = "computer/consent.json";
 
+#[cfg(unix)]
 pub fn status(suspended: bool, stop_epoch: u64) -> Value {
     json!({"consentFingerprint": "fp-test", "latch": {"suspended": suspended, "stopEpoch": stop_epoch}})
 }

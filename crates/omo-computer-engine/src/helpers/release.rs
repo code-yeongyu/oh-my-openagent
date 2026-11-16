@@ -17,6 +17,7 @@ use super::parent::ParentWatch;
 use crate::route;
 
 /// One held input on the helper's pipe: `{"key":"shift"}` or `{"button":"left","origin":{"x":..,"y":..}}`.
+#[cfg(unix)]
 #[must_use]
 pub fn to_wire(held: &Held) -> Value {
     match held {

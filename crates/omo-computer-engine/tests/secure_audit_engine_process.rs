@@ -294,7 +294,7 @@ fn engine_process_plain_type_keeps_the_digest_the_grep_looks_for() {
     let got = [&typed["text"]["sha256_16"], &marker["text"]["sha256_16"]];
     assert_eq!(got, [&json!(digest), &json!(digest)]);
     // C2: the marker carries the engine's hello.generation (Session::with_generation).
-    assert_eq!(marker["generation"], json!(1), "{marker}");
+    assert_eq!(marker["binding"]["generation"], json!(1), "{marker}");
     // The grep sees a digest when one is there: in the audit and the marker.
     assert_eq!(
         left.on_disk(&digest).map(|count| count > 0),

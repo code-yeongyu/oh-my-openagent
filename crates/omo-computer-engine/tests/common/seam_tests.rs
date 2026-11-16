@@ -5,6 +5,7 @@
 use std::fs;
 use std::path::Path;
 use std::process::Command;
+#[cfg(unix)]
 use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};

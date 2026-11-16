@@ -26,6 +26,7 @@ use identity::Identity;
 use crate::router::WireError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(not(unix), allow(dead_code, reason = "only the unix host-API dial clears the latch; row 60 brings the named pipe"))]
 pub enum LatchOutcome {
     /// Latched; `audit` names why when the reason is an attack signal or a disagreement.
     Set { audit: Option<String> },
@@ -44,6 +45,7 @@ impl LatchOutcome {
 
 /// `capabilities().consent.authority`: `host` only after the listener's identity passed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(not(unix), allow(dead_code, reason = "only the unix host-API dial proves a host; row 60 brings the named pipe"))]
 pub enum Authority {
     Host,
     FileOnly,

@@ -22,7 +22,9 @@ mod replay;
 #[path = "common/seam_tests.rs"]
 mod seam_tests;
 
+#[cfg(unix)]
 use std::process::{Command, Stdio};
+#[cfg(unix)]
 use std::time::{Duration, Instant};
 
 use live::{request, scenario_with, Live};
