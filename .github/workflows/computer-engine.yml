@@ -31,14 +31,21 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  platform:
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/pr-platform-decision.yml
+
   native-contract:
     name: computer native contract (${{ matrix.os }})
+    needs: platform
     strategy:
       fail-fast: false
       matrix:
-        # Pull requests run Linux only; the ci:full-matrix label, pushes and dispatches run every OS (#13802).
+        # macOS/Windows only when the shared platform decision allows it (pr-platform-decision.yml, #13859).
         include: >-
-          ${{ fromJSON(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'ci:full-matrix') && '[{"os": "ubuntu-22.04", "rust_target": "x86_64-unknown-linux-gnu"},
+          ${{ fromJSON(needs.platform.outputs.full_matrix != 'true' && '[{"os": "ubuntu-22.04", "rust_target": "x86_64-unknown-linux-gnu"},
           {"os": "ubuntu-22.04-arm", "rust_target": "aarch64-unknown-linux-gnu"}]' || '[{"os": "macos-26", "rust_target": "aarch64-apple-darwin"},
           {"os": "macos-15", "rust_target": "aarch64-apple-darwin"},
           {"os": "ubuntu-22.04", "rust_target": "x86_64-unknown-linux-gnu"},
