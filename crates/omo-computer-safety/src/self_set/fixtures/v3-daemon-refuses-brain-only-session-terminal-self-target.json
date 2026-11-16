@@ -1,0 +1,86 @@
+{
+  "description": "A fake omo brain with zero engines (a bash-only session) is known only by its per-session lock file under the runtime root; it runs in a fake terminal on the hand. The daemon's self set holds that terminal, so a type aimed at it is SelfTarget, force:true included, with nothing sent; a lock file that appears mid-session is picked up on the next call, and a lock whose process start does not match is ignored.",
+  "enginePid": 100,
+  "processes": [
+    {
+      "pid": 1,
+      "ppid": 0,
+      "start": 1,
+      "name": "systemd",
+      "tty": null,
+      "hostPid": null,
+      "sessionLeader": true
+    },
+    {
+      "pid": 100,
+      "ppid": 1,
+      "start": 10,
+      "name": "omo-computer-engine",
+      "tty": null,
+      "hostPid": null,
+      "sessionLeader": false
+    },
+    {
+      "pid": 320,
+      "ppid": 1,
+      "start": 4000,
+      "name": "login",
+      "tty": 7,
+      "hostPid": null,
+      "sessionLeader": true
+    },
+    {
+      "pid": 310,
+      "ppid": 320,
+      "start": 4500,
+      "name": "zsh",
+      "tty": 7,
+      "hostPid": null,
+      "sessionLeader": false
+    },
+    {
+      "pid": 300,
+      "ppid": 310,
+      "start": 5000,
+      "name": "node",
+      "tty": 7,
+      "hostPid": null,
+      "sessionLeader": false
+    },
+    {
+      "pid": 400,
+      "ppid": 1,
+      "start": 3900,
+      "name": "kitty",
+      "tty": null,
+      "hostPid": null,
+      "sessionLeader": false
+    }
+  ],
+  "ttyOwners": [
+    [
+      7,
+      400
+    ]
+  ],
+  "sessionLocks": [
+    {
+      "pid": 300,
+      "processStart": 5000
+    }
+  ],
+  "staleLocks": [
+    {
+      "pid": 310,
+      "processStart": 1
+    }
+  ],
+  "terminal": {
+    "pid": 400,
+    "appKey": "org.example.Terminal"
+  },
+  "expect": {
+    "code": "ProtectedProcess",
+    "reason": "self_target"
+  }
+}
