@@ -137,8 +137,8 @@ fn a_layout_shifted_key_is_a_held_modifier_too() {
 }
 
 #[test]
-fn plain_keys_and_a_lone_modifier_still_post() {
-    for vks in [&[VK_K][..], &[VK_F1 + 4], &[VK_CONTROL], &[VK_F1, VK_K]] {
+fn plain_keys_and_modifier_only_chords_still_post() {
+    for vks in [&[VK_K][..], &[VK_F1 + 4], &[VK_CONTROL], &[VK_CONTROL, VK_SHIFT], &[VK_F1, VK_K]] {
         assert!(posted_chord_refusal("4242", vks).is_none(), "{vks:?}");
     }
 }

@@ -3,9 +3,9 @@
 //! chosen class that this test thread owns, so every posted message lands in
 //! this thread's queue where the test reads it back.
 
-use senpi_desktop_core::backend::DeliveryMode;
-use senpi_desktop_core::error::ErrorCode;
-use senpi_desktop_core::holds::HoldControl;
+use senpi_desktop_core::backend::{DeliveryMode, MouseButton};
+use senpi_desktop_core::error::{DesktopError, ErrorCode};
+use senpi_desktop_core::holds::{HoldControl, MouseHold};
 use senpi_desktop_core::keys::KeyName;
 use senpi_desktop_core::types::Target;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse as kbm;
@@ -133,9 +133,15 @@ fn background_modifier_chord_is_refused_with_nothing_posted() {
         .unwrap_err();
     // Then: refused before anything was posted, and nothing left held
     println!("code={} message={}", error.code.as_str(), error.message);
-    assert_eq!(error.code, ErrorCode::BackgroundUnavailable);
+    assert_modifier_refusal(&error);
     assert_eq!(window.drain(), []);
     assert!(input.held.is_empty());
+}
+
+fn assert_modifier_refusal(error: &DesktopError) {
+    assert_eq!(error.code, ErrorCode::BackgroundUnavailable, "{}", error.message);
+    let reason = error.report.as_ref().and_then(|report| report.reason.as_deref());
+    assert_eq!(reason, Some("key_route_unproven"), "{}", error.message);
 }
 
 #[test]
@@ -155,7 +161,27 @@ fn background_modifier_hold_is_refused_with_nothing_posted() {
         )
         .unwrap_err();
     // Then
-    assert_eq!(error.code, ErrorCode::BackgroundUnavailable);
+    assert_modifier_refusal(&error);
+    assert_eq!(window.drain(), []);
+    assert!(input.held.is_empty());
+}
+
+#[test]
+fn background_mouse_hold_with_a_modifier_chord_is_refused_before_any_geometry() {
+    // Given: a mouse hold whose keys are ctrl+k; the session accepts any
+    // keys for a mouse hold, not only modifiers (review L1 on #13734)
+    let window = ProbeWindow::new("SenpiModifierMouseHoldProbe");
+    let mut input = input();
+    let ready = || -> senpi_desktop_core::error::CoreResult<()> { Ok(()) };
+    let control = HoldControl { check: &ready, wait: &ready };
+    let keys = [KeyName::Ctrl, KeyName::Char('k')];
+    let hold = MouseHold { x: 1.0, y: 1.0, button: MouseButton::Left, keys: &keys };
+    // When
+    let error = input
+        .hold_mouse(&Target::Window(window.id()), &hold, DeliveryMode::Background, &control)
+        .unwrap_err();
+    // Then: the chord refusal, not a point-mapping failure, and nothing posted
+    assert_modifier_refusal(&error);
     assert_eq!(window.drain(), []);
     assert!(input.held.is_empty());
 }
