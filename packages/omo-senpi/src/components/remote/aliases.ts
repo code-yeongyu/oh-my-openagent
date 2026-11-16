@@ -1,6 +1,6 @@
 import type { AliasError, AliasRegistry, AliasResult } from "../thread/remote/ports"
 import type { ClientCore, Outcome, RemoteClient } from "./client"
-import { type RemoteCode, remoteFailure } from "./codes"
+import { nextActionFor, type RemoteCode, remoteFailure } from "./codes"
 import { DEADLINES, withinDeadline } from "./deadlines"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
 import type { Opts, RemoteFailure, ThreadHandle } from "./types"
@@ -89,31 +89,68 @@ export function aliasMembers(core: ClientCore): RemoteClient["aliases"] {
     return parsed.kind === "ok" && parsed.value.target.kind === "device_session" ? parsed.value.target : undefined
   }
 
+  // The registry holds a session by its durable id, as the thread tools do (cross-device.ts), never by its session key:
+  // the listed row on the handle's device names it.
+  const durableIdOf = async (
+    target: { readonly device: string; readonly session: string },
+    opts: Opts | undefined,
+  ): Promise<Outcome<string>> => {
+    const listed = await core.sessionsList({ device: target.device }, opts)
+    if (listed.kind === "error") return listed
+    const row = listed.value.rows.find((candidate) => {
+      const listedAt = sessionOf(candidate.thread)
+      return listedAt?.device === target.device && listedAt.session === target.session
+    })
+    if (row === undefined)
+      return remoteFailure("not_found", "No listed session has that handle.", nextActionFor("not_found"), {
+        details: { kind: "session" },
+      })
+    if (row.durable_id === undefined)
+      return remoteFailure(
+        "unsupported",
+        "The session's device lists no durable id for it, and an alias is held by the durable id.",
+        nextActionFor("unsupported"),
+        { details: { feature: "aliases", reason: "no_durable_id" } },
+      )
+    return { kind: "ok", value: row.durable_id }
+  }
+
   return {
+    // The holder's durable id back to the handle of the row its device lists with it.
     resolve: async (alias, opts) =>
       run(opts, false, async (aliases) => {
         const holder = await aliases.resolve(alias)
-        return holder.kind === "error"
-          ? aliasFailure(holder.error)
-          : { kind: "ok", value: handleOf(holder.value.device, holder.value.session_id) }
+        if (holder.kind === "error") return aliasFailure(holder.error)
+        const { device, session_id: durableId } = holder.value
+        const listed = await core.sessionsList({ device }, opts)
+        if (listed.kind === "error") return listed
+        const row = listed.value.rows.find((candidate) => candidate.durable_id === durableId)
+        const session = row === undefined ? undefined : sessionOf(row.thread)
+        return session === undefined
+          ? remoteFailure("not_found", "No listed session holds that alias's durable id.", nextActionFor("not_found"), {
+              details: { kind: "session", durable_id: durableId },
+            })
+          : { kind: "ok", value: handleOf(session.device, session.session) }
       }),
     // Claim when the thread holds no alias, else rename it (thread/remote/cross-device.ts renameAlias).
     set: async (thread, alias, opts) => {
       const target = sessionOf(thread)
       if (target === undefined) return notASession()
       return run(opts, true, async (aliases) => {
-        const current = await aliases.aliasesOf([target.session])
+        const durable = await durableIdOf(target, opts)
+        if (durable.kind === "error") return durable
+        const current = await aliases.aliasesOf([durable.value])
         if (current.kind === "error") return aliasFailure(current.error)
-        const from = current.value.get(target.session)
+        const from = current.value.get(durable.value)
         const idempotency_key = `aliases.set\u0000${thread}\u0000${alias}`
         const changed =
           from === undefined
             ? await aliases.claim({
                 alias,
-                holder: { session_id: target.session, device: target.device },
+                holder: { session_id: durable.value, device: target.device },
                 idempotency_key,
               })
-            : await aliases.rename({ session_id: target.session, from, to: alias, idempotency_key })
+            : await aliases.rename({ session_id: durable.value, from, to: alias, idempotency_key })
         return changed.kind === "error"
           ? aliasFailure(changed.error)
           : { kind: "ok", value: { alias: changed.value.alias } }
@@ -123,11 +160,13 @@ export function aliasMembers(core: ClientCore): RemoteClient["aliases"] {
       const target = sessionOf(thread)
       if (target === undefined) return notASession()
       return run(opts, true, async (aliases) => {
-        const current = await aliases.aliasesOf([target.session])
+        const durable = await durableIdOf(target, opts)
+        if (durable.kind === "error") return durable
+        const current = await aliases.aliasesOf([durable.value])
         if (current.kind === "error") return aliasFailure(current.error)
-        const alias = current.value.get(target.session)
+        const alias = current.value.get(durable.value)
         if (alias === undefined) return { kind: "ok", value: { released: false } }
-        const released = await aliases.release({ session_id: target.session, alias })
+        const released = await aliases.release({ session_id: durable.value, alias })
         return released.kind === "error" ? aliasFailure(released.error) : { kind: "ok", value: released.value }
       })
     },
