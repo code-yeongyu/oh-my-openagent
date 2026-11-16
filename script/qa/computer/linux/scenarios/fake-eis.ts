@@ -4,7 +4,7 @@
 // `xkbcli` compiled. The fake's observer log (`fake-eis.json`, rewritten every 50 ms by the
 // fake itself, never by the engine) is the scenario's independent oracle for what reached libei.
 import { spawnSync } from "node:child_process"
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 
 import { targetDir } from "../lib/engine-bin.ts"
@@ -15,8 +15,11 @@ import type { Context } from "../lib/scenario.ts"
 export type FakeMode = "serve" | "drop-once" | "second-client-refused"
 
 export interface FakeEis {
-  /** The fake's current observer log. */
-  read(): JsonObject
+  /**
+   * The fake's observer log as the fake wrote it AFTER this call: the fake rewrites the file
+   * every 50 ms, so a read waits for the next rewrite instead of returning an older snapshot.
+   */
+  read(): Promise<JsonObject>
   /** Stops the fake and removes its socket directory. */
   stop(): Promise<void>
 }
@@ -73,7 +76,11 @@ export async function startFakeEis(
   const logFile = join(dir, "fake-eis.json")
   await until(() => existsSync(socket) && existsSync(logFile), "the fake EIS to listen and write its log")
   return {
-    read: () => JSON.parse(readFileSync(logFile, "utf8")) as JsonObject,
+    async read() {
+      const since = statSync(logFile).mtimeMs
+      await until(() => statSync(logFile).mtimeMs > since, "the fake EIS to rewrite its log")
+      return JSON.parse(readFileSync(logFile, "utf8")) as JsonObject
+    },
     async stop() {
       if (child.exitCode === null && child.signalCode === null) {
         const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()))

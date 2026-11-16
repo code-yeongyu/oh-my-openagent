@@ -37,11 +37,11 @@ export const waylandHoldRefusedReleaseUnproven: Scenario = {
         compositor?: { name?: string }
       }
       const diagnosis = (await engine.call("diagnose")) as { checks?: { name: string; state: string }[] }
-      const before = eis.read()
+      const before = await eis.read()
       const keyDown = await engine.refusal("key.down", { target: "screen", chord: "shift" })
       const mouseDown = await engine.refusal("mouse.down", { target: "screen", x: 10, y: 10 })
       const press = await engine.refusal("press", { chord: "a" })
-      const after = eis.read()
+      const after = await eis.read()
       const held = after.held
       return {
         checks: {

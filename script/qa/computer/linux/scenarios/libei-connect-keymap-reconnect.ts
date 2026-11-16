@@ -39,12 +39,12 @@ export const libeiConnectKeymapReconnect: Scenario = {
       await engine.open("none")
       const capabilities = (await engine.call("capabilities")) as { compositor?: { name?: string } }
       const first = (await engine.call("diagnose")) as { checks?: Check[] }
-      const connected = eis.read()
-      await until(() => count(eis.read(), "dropped") === 1, "the fake EIS to drop the engine's client once")
+      const connected = await eis.read()
+      await until(async () => count(await eis.read(), "dropped") === 1, "the fake EIS to drop the engine's client once")
       const started = performance.now()
       const second = (await engine.call("diagnose")) as { checks?: Check[] }
       const tookMs = Math.round(performance.now() - started)
-      const after = eis.read()
+      const after = await eis.read()
       const expectedKeymap = keymap.groups.join(", ")
       return {
         checks: {

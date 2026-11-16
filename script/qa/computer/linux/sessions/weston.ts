@@ -21,7 +21,15 @@ export async function start(procs: Processes, runDir: string): Promise<Stage> {
   const dirs = privateDirs(runDir)
   const child = procs.start(
     "weston",
-    [weston, `--backend=${BACKEND}`, `--socket=${SOCKET}`, "--width=1280", "--height=800", "--idle-time=0", "--no-config"],
+    [
+      weston,
+      `--backend=${BACKEND}`,
+      `--socket=${SOCKET}`,
+      "--width=1280",
+      "--height=800",
+      "--idle-time=0",
+      "--no-config",
+    ],
     { ...HOST_DISPLAYS, ...dirs },
   )
   const socket = join(dirs.XDG_RUNTIME_DIR, SOCKET)
