@@ -130,8 +130,17 @@ export function machoSigned(options: {
   team?: string
   runtime?: boolean
   cms?: Uint8Array
+  /** Signs the finished CodeDirectory; its CMS length must not depend on the CodeDirectory's bytes. */
+  sign?: (codeDirectory: Uint8Array) => Uint8Array
   extraBlobs?: ReadonlyArray<readonly [number, Uint8Array]>
 }): { file: Uint8Array; codeDirectory: Uint8Array } {
+  if (options.sign) {
+    const placeholder = options.sign(new Uint8Array(1))
+    const { codeDirectory } = machoSigned({ ...options, sign: undefined, cms: placeholder })
+    const cms = options.sign(codeDirectory)
+    if (cms.byteLength !== placeholder.byteLength) throw new Error("fixture CMS length depends on the CodeDirectory")
+    return machoSigned({ ...options, sign: undefined, cms })
+  }
   const requirements = blob(0xfade0c01, new Uint8Array(4))
   const cms = blob(0xfade0b01, options.cms ?? new Uint8Array())
   const ident = new TextEncoder().encode(`${options.identifier ?? "ai.sisyphuslabs.fixture"}\0`)

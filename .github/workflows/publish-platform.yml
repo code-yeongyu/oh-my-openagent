@@ -372,6 +372,24 @@ jobs:
         with:
           bun-version: "1.4.4"
 
+      # The verifier and its pins run from the dispatched ref (#13943): refuse one that differs from the default
+      # branch's, so a release branch cannot carry its own trust rules. A release branch takes the merged files.
+      - name: Refuse operator darwin verifier code that differs from the default branch
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch || 'dev' }}
+        run: |
+          set -euo pipefail
+          if ! git fetch --no-tags --depth=1 origin "$DEFAULT_BRANCH"; then
+            echo "::error::operator_darwin_artifacts refused: could not fetch ${DEFAULT_BRANCH} to compare the verifier."
+            exit 1
+          fi
+          if ! git diff --quiet FETCH_HEAD HEAD -- '.github/workflows/operator-darwin-*.ts'; then
+            echo "::error::operator_darwin_artifacts refused: .github/workflows/operator-darwin-*.ts differ from ${DEFAULT_BRANCH}; the dispatched ref must carry the merged verifier unchanged."
+            git diff --stat FETCH_HEAD HEAD -- '.github/workflows/operator-darwin-*.ts'
+            exit 1
+          fi
+          echo "The operator darwin verifier equals ${DEFAULT_BRANCH}."
+
       - name: Download operator darwin artifacts
         env:
           GH_TOKEN: ${{ github.token }}
@@ -405,7 +423,13 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
-          SOURCE_SHA="$(jq -r '.source_sha // empty' "$OPERATOR_DARWIN_DIR/operator-darwin-manifest.json")"
+          # Nothing reads the operator-supplied manifest before its sha256 matches the maintainer's dispatch pin.
+          MANIFEST="$OPERATOR_DARWIN_DIR/operator-darwin-manifest.json"
+          if [ ! -f "$MANIFEST" ] || [ "$(sha256sum "$MANIFEST" | cut -d' ' -f1)" != "$MANIFEST_SHA256" ]; then
+            echo "::error::operator_darwin_artifacts refused: operator-darwin-manifest.json does not match the pinned operator_darwin_manifest_sha256."
+            exit 1
+          fi
+          SOURCE_SHA="$(jq -r '.source_sha // empty' "$MANIFEST")"
           if ! [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ && "$PREPARED_RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::operator_darwin_artifacts refused: the manifest source_sha and prepared_release_sha must be 40-hex SHAs."
             exit 1

@@ -68,9 +68,15 @@ The `operator-darwin` job runs `.github/workflows/operator-darwin-verify.ts` on 
 5. Each engine's `__OMO_META,__build` section names the source sha, its host and target, and the version.
 6. Each `omo-darwin-*` binary embeds the verified engine, trust helper and keychain helper bytes unchanged, inside its signed bytes (the trust helpers are signed only, as on the hosted path, so this containment in a notarized binary is what notarization covers for them). That binds the binary to the engine's signed source stamp.
 
+Hardening from the #13928 reviews (#13943):
+- **Notarization contract.** Notarization is proven by Apple's ticket service, the same lookup Gatekeeper makes for a bare Mach-O, which cannot carry a stapled ticket. The verifier asks for `2/2/<cdhash>` using the cdhash it computed itself, and accepts only an answer about that exact record. A network failure, an HTTP error, a non-JSON reply, a reply about another record, or any server error other than "not found" is a typed refusal. The operator script also records its notary submission ids in the manifest (`notary_submissions`) for audit; the publish run does not trust them.
+- **Pins come from the default branch.** Before anything else, the operator-darwin job refuses a dispatched ref whose `.github/workflows/operator-darwin-*.ts` (TEAM_ID, CA pins, verifier) differ from the default branch's. A release branch must carry the merged verifier unchanged. A protected environment on the job is still the owner's settings decision.
+- **Keychain helper contract.** As in the hosted keychain-helper job, `omo-keychain-darwin-universal` must carry exactly the designated requirement `identifier "com.mengmota.omo-keychain-helper" and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] and certificate leaf[field.1.2.840.113635.100.6.1.13] and certificate leaf[subject.OU] = "523JNR86LZ"`, checked as the sha256 of its requirements blob. It must have no entitlements, and exactly an x86_64 slice and an arm64 slice.
+- **The manifest is pinned before it is parsed.** The workflow step compares the manifest's sha256 with the dispatch pin before `jq` reads it.
+- **Bounded parsing.** CMS input nested deeper than 32 indefinite-length levels is a typed refusal, not a stack overflow.
+
 Trade-offs (accepted):
-- No Gatekeeper or OCSP evaluation runs in CI. Notarization is read from Apple's ticket service, as Gatekeeper does for a bare binary.
-- These hosted checks run only on the operator's Mac, so they are self-attested in the operator log: the engine and trust-helper selftests, the omo version and eval smokes, and the keychain helper's designated-requirement check.
-- The verifier and its pins run from the dispatched ref, the same trust level as publish.yml itself.
+- No Gatekeeper or OCSP evaluation runs in CI.
+- These hosted checks run only on the operator's Mac, so they are self-attested in the operator log: the engine and trust-helper selftests, and the omo version and eval smokes.
 
 Running Gatekeeper or OCSP in CI would need a hosted macOS job, which reintroduces the wait this path removes. The operator's local `codesign --verify --strict` and `spctl -a -t install` verdicts are recorded in the operator log, but they are self-attested.
