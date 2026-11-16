@@ -3,8 +3,8 @@
 
 use std::hash::{BuildHasher, Hasher};
 
-use omo_computer_core::backend::{Delivered, Refusal};
-use omo_computer_core::error::{EngineCode, Reason};
+use omo_computer_core::backend::Delivered;
+use omo_computer_core::error::Reason;
 use omo_computer_core::intervention::BackendClock;
 use omo_computer_core::params::ReportMode;
 use omo_computer_core::results::ExecReply;
@@ -12,6 +12,7 @@ use serde_json::json;
 
 mod binding;
 mod delivered;
+mod last_pass;
 mod lock;
 mod readmit;
 mod refusal;
@@ -172,46 +173,17 @@ impl Session {
             }
             Ok(Verdict::Proceed) => {}
         }
-        let lock = match self.interaction_lock() {
+        // Time passes between the first gate and here (the busy wait, another holder of the
+        // interaction lock, a takeover wait): the last pass runs the gate again under the lock,
+        // after every wait, and nothing is SENT before it. (The exec permit and the marker
+        // recovery come earlier; they send nothing.)
+        let lock = match self.last_pass(&mutation, &mut admission, pausing, object) {
             Ok(lock) => lock,
-            Err(error) => {
-                self.funnel
-                    .warn(format!("interaction lock not taken: {error}"));
-                return Err(self.refuse(
-                    record,
-                    Some("Lock".to_owned()),
-                    TRANSACTION_FAILED.into(),
-                ));
+            Err(refused) => {
+                let (stage, out) = *refused;
+                return Err(self.refuse(record, Some(stage), out));
             }
         };
-        // Time passes between the first gate and here (the busy wait, another holder of the
-        // interaction lock): on every path the gate runs again once the lock is held, and
-        // nothing is SENT before it. (The exec permit and the marker recovery come earlier;
-        // they send nothing.) A refusal drops the lock with nothing sent.
-        // Row 21 on #13391's re-admit (R70bg(2)): the stop is reconciled through the funnel, the
-        // epoch is read fresh and the gate runs on a fresh plan's stages, so a stop or a consent
-        // change while another holder kept the lock refuses here too.
-        if let Err(refused) = self.readmit(&mutation) {
-            let (stage, out) = *refused;
-            drop(lock);
-            let out = self.stamp(out, object);
-            return Err(self.refuse(record, Some(stage), out));
-        }
-        // R70s(5): a foreign input inside the attribution window just before the send holds it.
-        let pid = admission.pid;
-        if object && crate::intervention::foreign_input_holds(self.backend.as_ref(), pid) {
-            drop(lock);
-            let out = self.stamp(Refusal::bare(EngineCode::UserIntervened).into(), object);
-            return Err(self.refuse(record, Some("Attribution".to_owned()), out));
-        }
-        // Review M2 of #13355 (IS-2): the busy wait and the lock wait let time pass; the takeover
-        // hold is checked again right before delivery, so a send never lands on a user working
-        // in the target.
-        if let Err(out) = self.recheck_takeover(&mut admission, pausing) {
-            drop(lock);
-            let out = self.stamp(out, object);
-            return Err(self.refuse(record, Some("Pause".to_owned()), out));
-        }
         if let Err(error) = self.funnel.markers.create(&record.marker) {
             self.funnel.warn(format!("marker not written: {error}"));
             return Err(self.refuse(record, Some("Marker".to_owned()), MARKER_UNAVAILABLE.into()));
