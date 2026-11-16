@@ -9,6 +9,9 @@ use std::os::unix::net::UnixStream;
 use std::sync::mpsc::{self, Receiver};
 use std::sync::{Arc, Mutex, PoisonError};
 
+use omo_computer_core::params::HandRegisterParams;
+use omo_computer_core::requests::{read_hand_register, HostRequest};
+use omo_computer_core::results::HandRegistered;
 use serde_json::{json, Value};
 
 use super::admit::constant_time_eq;
@@ -149,11 +152,17 @@ fn own_method(request: &Value, id: &Value, grant: Grant, shared: &Shared, out: &
         send(out, &json!({"jsonrpc": "2.0", "id": id, "result": null}));
         std::process::exit(0);
     }
-    let pid = request.pointer("/params/pid").and_then(Value::as_i64).and_then(|p| i32::try_from(p).ok());
-    let reply = match pid.map(|pid| shared.register(pid)) {
-        Some(Ok(capability)) => json!({"jsonrpc": "2.0", "id": id, "result": {"capability": hex(&capability)}}),
-        Some(Err(problem)) => error(id, -32_603, "Internal error", json!({"detail": problem.to_string()})),
-        None => error(id, -32_602, "Invalid params", json!({"detail": "pid"})),
+    let params = request.get("params").cloned().unwrap_or_else(|| json!({}));
+    let reply = match serde_json::from_value::<HandRegisterParams>(params).map(read_hand_register) {
+        Ok(HostRequest::HandRegister { pid, process_start }) => match shared.register(pid, process_start) {
+            Ok(capability) => {
+                let registered = HandRegistered { capability: hex(&capability) };
+                json!({"jsonrpc": "2.0", "id": id, "result": registered})
+            }
+            Err(problem) => error(id, -32_603, "Internal error", json!({"detail": problem.to_string()})),
+        },
+        Ok(_) => error(id, -32_602, "Invalid params", Value::Null),
+        Err(problem) => error(id, -32_602, "Invalid params", json!({"detail": problem.to_string()})),
     };
     send(out, &reply);
     true
