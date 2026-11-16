@@ -123,6 +123,12 @@ export function createRemoteThreadFixture() {
       /** The turn finishes before its prompt's reply reaches the sender: its records go out at once, before the aim. */
       recordsBeforeReply?: boolean
       rows?: readonly RemoteSessionRow[]
+      /** Devices the account listing names as not answering this round. */
+      incomplete?: readonly string[]
+      /** Extra devices the account lists beyond this one and b. */
+      devices?: readonly RemoteDevice[]
+      /** The roster as relayd answers it: without this device (its row then comes from thisDeviceName). */
+      rosterWithoutSelf?: boolean
       registryDown?: "refused" | "throws" | "signed_out"
       /** Only the claim fails (resolve and aliasesOf still answer): a token that expired between the two calls. */
       claimDown?: "refused" | "signed_out"
@@ -140,6 +146,8 @@ export function createRemoteThreadFixture() {
       withoutLookup?: boolean
       /** omo#13037 review: the account's device list cannot be read. */
       devicesFail?: boolean
+      /** This device's own id read (device.info): it fails, or the service answers without an id. */
+      selfDevice?: "throws" | "unknown"
       /** omo#13037: this device's service cannot carry the wake target (no wake is sent; today's path). */
       noWake?: boolean
       /** omo#13037: the wake path's answer; default the consumer's queued envelope with `waiting_on: {kind: "wake"}`. */
@@ -284,8 +292,9 @@ export function createRemoteThreadFixture() {
       return ok({})
     }
     const devices: RemoteDevice[] = [
-      { device: "here", label: "this mac", online: true },
+      ...(options.rosterWithoutSelf === true ? [] : [{ device: "here", label: "this mac", online: true }]),
       { device: "b", label: "studio", online: options.online ?? true },
+      ...(options.devices ?? []),
     ]
     for (const device of [
       ...(options.rows ?? []).map((row) => row.device),
@@ -369,8 +378,10 @@ export function createRemoteThreadFixture() {
         status: async () => ({ state: options.plan ?? "connected" }),
         thisDevice: async () => {
           deviceReads.thisDevice += 1
-          return "here"
+          if (options.selfDevice === "throws") throw new Error("device.info failed")
+          return options.selfDevice === "unknown" ? null : "here"
         },
+        thisDeviceName: async () => "this mac",
         devices: async () => {
           deviceReads.devices += 1
           if (options.devicesFail === true) throw new Error("closed")
@@ -382,6 +393,14 @@ export function createRemoteThreadFixture() {
           if (options.failSessionsList === true) throw new Error("account list failed")
           const rows = options.rows ?? [{ ...B_ROW, state: options.rowState ?? B_ROW.state }]
           return filter?.device === undefined ? rows : rows.filter((row) => row.device === filter.device)
+        },
+        listing: async () => {
+          listings.all += 1
+          if (options.failSessionsList === true) throw new Error("account list failed")
+          return {
+            rows: options.rows ?? [{ ...B_ROW, state: options.rowState ?? B_ROW.state }],
+            incomplete: options.incomplete ?? [],
+          }
         },
         endpointCommand: async (device, rpc) => {
           sent.push({ via: "endpoint", device, rpc })

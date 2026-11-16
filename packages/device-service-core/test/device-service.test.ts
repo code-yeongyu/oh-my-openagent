@@ -195,7 +195,7 @@ describe("DeviceService", () => {
 
   test("attaching to an unknown session fails with the service's error code", async () => {
     const { service } = await serviceFor()
-    const error = await service.attach(PEER, "bm8tc3VjaC1zZXNzaW9u").catch((e: unknown) => e)
+    const error = await service.attach(PEER, "bm8tc3VjaC1zZXNzaW9uLQ").catch((e: unknown) => e)
     expect(error).toBeInstanceOf(LocalApiError)
     expect((error as LocalApiError).code).toBe("session_not_found")
   })

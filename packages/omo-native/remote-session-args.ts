@@ -22,7 +22,8 @@ export type SessionArgs =
       readonly permissionPreset?: string
       readonly worktree?: WorktreeRequest
       readonly prompt?: string
-      readonly delivery: "auto" | "steer" | "follow_up"
+      /** How `prompt` is delivered; absent means auto. */
+      readonly delivery?: "auto" | "steer" | "follow_up"
     }
   | {
       readonly verb: "send"
