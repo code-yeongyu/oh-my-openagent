@@ -60,6 +60,25 @@ describe("an account alias for a session on another device (#13923)", () => {
     },
   )
 
+  test.each([
+    ["disabled, workspace scope", "disabled", false],
+    ["not_configured, workspace scope", "not_configured", false],
+    ["signed_out, workspace scope", "signed_out", false],
+    ["disabled, all_scope", "disabled", true],
+    ["offline, workspace scope", "offline", false],
+    ["offline, all_scope", "offline", true],
+  ] as const)(
+    "#given the device service is %s #when thread_list runs #then the registry is not asked and aliases_unavailable says not_asked, so no caller reads an alias as free",
+    async (_case, plan, allScope) => {
+      const a = account({ plan, aliases: new Map([["lane-here", { session_id: "dur-local", device: "here" }]]) })
+      const { run } = surface(a.remote)
+      const listed = await run("thread_list", allScope ? { all_scope: true } : {})
+      expect(listed).toMatchObject({ kind: "ok", aliases_unavailable: "not_asked" })
+      expect(rows(listed)).toContainEqual(["dur-local", null, null])
+      expect(a.registryCalls).toEqual([])
+    },
+  )
+
   test("#given an alias held by b's session #when thread_interrupt and thread_close name the alias #then each command goes to b's session", async () => {
     const a = account({ aliases: new Map([["lane-b", { session_id: "dur-on-b", device: "b" }]]) })
     const { run } = surface(a.remote)

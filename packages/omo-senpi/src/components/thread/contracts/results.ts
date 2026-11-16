@@ -150,10 +150,11 @@ export type ThreadListResult =
        */
       readonly remote_unavailable?: string
       /**
-       * Set when the account's alias registry could not be read (`sign_in`, or `host_unavailable`): the threads are listed
-       * without aliases, so a missing alias is unknown, not free.
+       * Set when the threads are listed without the account's aliases, so a missing alias is unknown, not free: the alias
+       * registry could not be read (`sign_in`, or `host_unavailable`), or was not asked because this device's device
+       * service is not connected (`not_asked`).
        */
-      readonly aliases_unavailable?: "sign_in" | "host_unavailable"
+      readonly aliases_unavailable?: "sign_in" | "host_unavailable" | "not_asked"
     }
   | ThreadDataError
 
