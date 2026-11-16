@@ -13,14 +13,22 @@ import {
   LocalApiError,
   SESSION_ROW_STATES,
 } from "../device-service-core/src/device-service.ts"
-import type { DeviceRef, DeviceRow, SessionFilter } from "../device-service-core/src/local-api/protocol.ts"
+import type { DeviceRow, SessionFilter, Status } from "../device-service-core/src/local-api/protocol.ts"
 import type { SessionRowState } from "../device-service-core/src/local-api/vocabulary.ts"
 import type { RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
 import { readAccountInProcess } from "./account-show"
 import type { LocalStatus } from "./remote-cold-wake"
 import packageJson from "./package.json" with { type: "json" }
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
-import { controlLines, deviceLines, localRows, sessionLines, statusLines, wakeLines } from "./remote-render"
+import {
+  controlLines,
+  deviceLines,
+  type ListedDevice,
+  localRows,
+  sessionLines,
+  statusLines,
+  wakeLines,
+} from "./remote-render"
 import { isSessionVerb, parseSession, type SessionArgs } from "./remote-session-args"
 import { runSession } from "./remote-session-verbs"
 
@@ -28,22 +36,24 @@ import { runSession } from "./remote-session-verbs"
 // parsing, the account notice, the connection, and each verb's body. `remote-cli.ts` keeps usage, `bootstrap` (a
 // download) and `attach` (the engine) and delegates the rest here; nothing in this module reaches the network.
 
-/** The account's devices with this one first: relayd's roster lists only the peers (#13402). */
-function withThisDevice(
-  roster: readonly DeviceRow[],
-  self: DeviceRef | null,
-): readonly (DeviceRow & { readonly this_device: boolean })[] {
+/**
+ * The account's devices with this one first: relayd's roster lists only the peers (#13402). This device's own row is
+ * made from the service's status: it is online only while the service is connected, and its kind is not invented
+ * (the service reports none for this device).
+ */
+function withThisDevice(roster: readonly DeviceRow[], status: Status): readonly ListedDevice[] {
+  const self = status.device
   const peers = roster.map((row) => ({ ...row, this_device: row.device === self?.id }))
   if (self === null || roster.some((row) => row.device === self.id)) return peers
-  const here: DeviceRow = {
+  const here: ListedDevice = {
     device: self.id,
     label: self.name,
-    kind: "this device",
     platform: process.platform,
     last_seen_ms: null,
-    online: true,
+    online: status.state === "connected",
+    this_device: true,
   }
-  return [{ ...here, this_device: true }, ...peers]
+  return [here, ...peers]
 }
 
 export interface RemoteCommandDependencies {
@@ -160,7 +170,8 @@ async function runOn(service: DeviceService, parsed: Parsed, dependencies: Remot
       )
     }
     case "devices": {
-      const devices = withThisDevice(await service.devices(), await service.thisDevice())
+      const [roster, status] = await Promise.all([service.devices(), service.status()])
+      const devices = withThisDevice(roster, status)
       return print(devices, () => deviceLines(devices, dependencies.now()))
     }
     case "sessions": {
@@ -171,7 +182,11 @@ async function runOn(service: DeviceService, parsed: Parsed, dependencies: Remot
       ])
       // A typo in --device and a device with no sessions both list nothing: name the unknown device instead.
       const wanted = parsed.filter.device
-      if (wanted !== undefined && wanted !== self?.id && !devices.some((device) => device.device === wanted)) {
+      const known = (device: string) =>
+        device === self?.id ||
+        devices.some((row) => row.device === device) ||
+        result.rows.some((row) => row.device === device)
+      if (wanted !== undefined && !known(wanted)) {
         dependencies.error(`omo remote sessions: no device ${wanted} on this account (see omo remote devices)`)
         return REMOTE_EXIT.usage
       }
