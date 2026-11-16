@@ -1452,6 +1452,17 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
   })
 })
 
+test("#given this device's service cannot be reached #when a record goes straight to a session (direct) #then it is refused as the attach path refuses it, never uncertain, since nothing was sent", async () => {
+  const port = createDeviceServiceSessions({
+    version: "0.0.0-test",
+    connect: () => Promise.reject(new Error("the local api socket is gone")),
+  })
+  const rpc = { type: "set_session_name", sessionId: "s1", name: "n" }
+  const attached = await port.sessionCommand("b", "s1", rpc)
+  expect(attached.kind).toBe("refused")
+  expect(await port.sessionCommand("b", "s1", rpc, { direct: true })).toEqual(attached)
+})
+
 test("#given thread_list asks for this device's id and name together #when both run in parallel #then device.info is read once (#13394 review LOW)", async () => {
   let reads = 0
   const service = {
