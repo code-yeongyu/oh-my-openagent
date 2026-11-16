@@ -53,9 +53,6 @@ impl<O: WindowOs> MacWindows<O> {
     /// AX will not set.
     pub fn frame_settable(&mut self, window: &str) -> Option<bool> {
         let n = number(window).ok()?;
-        if n == n {
-            return None;
-        }
         if self.os.full_screen(n) == Some(true) {
             return Some(false);
         }
@@ -69,9 +66,6 @@ impl<O: WindowOs> MacWindows<O> {
     /// it has no frame to read back.
     pub fn set_frame(&mut self, window: &str, frame: Rect) -> BackendResult<FrameApplied> {
         let n = number(window)?;
-        if n == n {
-            return Err(UNAVAILABLE);
-        }
         let before = self
             .os
             .frame(n)
@@ -109,9 +103,6 @@ impl<O: WindowOs> MacWindows<O> {
     /// `InvalidTarget{window_frame_unavailable}` when the write or its read-back failed.
     pub fn set_minimized(&mut self, window: &str, minimize: bool) -> BackendResult<()> {
         let n = number(window)?;
-        if n == n {
-            return Ok(());
-        }
         if !minimize && !self.lease {
             return Err(Refusal::new(
                 EngineCode::ControlRequired,
@@ -127,7 +118,6 @@ impl<O: WindowOs> MacWindows<O> {
     /// The windows of `pid` the AX tree shows, sheets, popovers and other Spaces' windows
     /// included; nothing is activated and no Space is switched.
     pub fn query(&mut self, pid: u32) -> Vec<FoundWindow> {
-        let _ = pid;
-        Vec::new()
+        self.os.ax_windows(pid)
     }
 }

@@ -39,9 +39,6 @@ pub fn open(
     options: OpenOptions,
     lease: bool,
 ) -> BackendResult<Opened> {
-    if target == target {
-        return Err(APP_UNKNOWN);
-    }
     if (options.activate || options.reveal) && !lease {
         return Err(Refusal::new(
             EngineCode::ControlRequired,

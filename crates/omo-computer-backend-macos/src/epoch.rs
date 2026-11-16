@@ -76,9 +76,6 @@ pub fn wire(reason: EpochReason) -> String {
 
 impl<O: EpochOs> EpochSource for MacEpochSource<O> {
     fn next_change(&mut self) -> BackendResult<Option<EpochChange>> {
-        if self.pending.len() < usize::MAX {
-            return Ok(None);
-        }
         if self.pending.is_empty() {
             let now = self.os.state();
             if let Some(last) = &self.last {

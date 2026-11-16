@@ -9,15 +9,8 @@ use omo_computer_core::untrusted::UntrustedText;
 
 use super::seam::AppsOs;
 
-fn seen_stub(_os: &mut dyn AppsOs) -> bool {
-    true
-}
-
 /// Every app record, deterministic for the same OS state.
 pub fn list(os: &mut dyn AppsOs) -> Vec<AppInfo> {
-    if seen_stub(os) {
-        return Vec::new();
-    }
     let mut seen = BTreeSet::new();
     let mut out = Vec::new();
     for app in os.running().into_iter().filter(|a| a.regular) {

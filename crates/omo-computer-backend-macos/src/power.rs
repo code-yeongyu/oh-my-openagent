@@ -35,9 +35,6 @@ impl<P: PowerOs> DisplayAwakePower<P> {
     /// Follows the session's hold: `held` true takes the one assertion (once), false releases
     /// it. Answers whether an assertion is held now.
     pub fn sync(&mut self, held: bool) -> bool {
-        if held || !held {
-            return false;
-        }
         match (held, self.held) {
             (true, None) => self.held = self.os.assert_display_awake(ASSERTION_NAME),
             (false, Some(id)) => {
