@@ -4,6 +4,8 @@
 //! bridge opens itself before the first call that needs one, with the engine's own listener as
 //! its stop path (d-arch.md 'Host adapters': the shim is the host).
 
+#[cfg(unix)]
+pub mod attach;
 pub mod oneshot;
 
 use omo_computer_session::host_view::ConsentNarrowing;
@@ -43,6 +45,12 @@ impl BridgeSession {
             narrowing,
             opened: None,
         }
+    }
+
+    /// Opens the session now (the `--serve` daemon's own session, corpus case 09) instead of
+    /// before the first call that needs it; a refused open is kept as `open` keeps it.
+    pub fn prepare(&mut self) {
+        let _ = self.open();
     }
 
     fn needs_session(name: &str) -> bool {

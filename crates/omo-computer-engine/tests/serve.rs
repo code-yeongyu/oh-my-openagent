@@ -1,0 +1,486 @@
+//! Row 29: the `--serve` daemon - concurrent same-uid clients, the after-accept peer check, the
+//! raw 32-byte capability preamble plus the capability on every request (lead decision Q2 C),
+//! `hand.register` (Q1 A), the fake-peer verdict seam (Q3 A), the push outbox, the lock, idle exit.
+#![cfg(unix)]
+
+#[path = "common/peer.rs"]
+#[allow(dead_code)]
+mod peer;
+#[path = "common/daemon.rs"]
+mod daemon;
+#[path = "common/case.rs"]
+#[allow(dead_code)]
+mod case;
+#[path = "common/compare.rs"]
+#[allow(dead_code)]
+mod compare;
+#[path = "common/owed.rs"]
+mod owed;
+#[path = "common/host.rs"]
+#[allow(dead_code)]
+mod host;
+
+use std::time::{Duration, Instant};
+
+use daemon::{hex, Daemon};
+use serde_json::json;
+
+fn opened(daemon: &Daemon) -> daemon::Client {
+    let mut client = daemon.connect(&daemon.capability);
+    let reply = client.call(1, "session.open", &json!({})).expect("the bound client is answered");
+    assert!(reply.get("result").is_some(), "{reply}");
+    client
+}
+
+#[test]
+fn a_wrong_preamble_closes_unauthorized_with_no_frame_decoded() {
+    let daemon = Daemon::start(&[]);
+    let mut client = daemon.connect(&[0u8; 32]);
+    client.send_with(1, "session.open", &json!({}), None);
+    assert!(client.closed_silently(), "a wrong preamble gets no reply and is closed");
+}
+
+#[test]
+fn capability_required_on_every_request() {
+    let daemon = Daemon::start(&[]);
+    let mut client = opened(&daemon);
+    client.send_with(2, "capabilities", &json!({}), Some(&hex(&[9u8; 32])));
+    let reply = client.read_reply(2);
+    assert!(reply.as_ref().is_none_or(|r| r["error"]["data"]["code"] == "unauthorized"), "{reply:?}");
+}
+
+#[test]
+fn cross_connection_capability_refused() {
+    let daemon = Daemon::start(&[]);
+    let mut first = opened(&daemon);
+    let registered = first
+        .call(2, "hand.register", &json!({"pid": std::process::id(), "processStart": 0}))
+        .expect("the authority connection registers a peer");
+    let minted = registered["result"]["capability"].as_str().expect("a minted capability").to_owned();
+    let mut other = daemon.connect(&daemon.capability);
+    other.send_with(3, "capabilities", &json!({}), Some(&minted));
+    let reply = other.read_reply(3);
+    assert!(reply.as_ref().is_none_or(|r| r["error"]["data"]["code"] == "unauthorized"), "{reply:?}");
+}
+
+#[test]
+fn a_registered_peer_cannot_register_another() {
+    let daemon = Daemon::start(&[]);
+    let mut authority = opened(&daemon);
+    let reply = authority
+        .call(2, "hand.register", &json!({"pid": std::process::id(), "processStart": 0}))
+        .expect("registered");
+    let minted = reply["result"]["capability"].as_str().expect("capability");
+    let bytes: Vec<u8> = (0..32).map(|i| u8::from_str_radix(&minted[i * 2..i * 2 + 2], 16).expect("hex")).collect();
+    let mut peer = daemon::Client::dial(&daemon.socket(), &bytes, bytes.clone().try_into().expect("32"));
+    let refused = peer.call(3, "hand.register", &json!({"pid": 1, "processStart": 0})).expect("answered");
+    assert_eq!(refused["error"]["code"], -32_601, "{refused}");
+    assert_eq!(refused["error"]["data"]["peer_kind"], "attach_host", "{refused}");
+}
+
+#[test]
+fn peer_uid_mismatch_is_refused_after_accept() {
+    let daemon = Daemon::start(&[]);
+    std::fs::write(daemon.dir.path().join("fake-peer"), "foreign-uid").expect("verdict");
+    let mut client = daemon.connect(&daemon.capability);
+    client.send_with(1, "session.open", &json!({}), None);
+    assert!(client.closed_silently(), "a foreign uid is closed before any frame");
+}
+
+#[test]
+fn a_real_backend_daemon_ignores_the_fake_peer_verdict_file() {
+    let daemon = Daemon::start(&[("OMO_COMPUTER_BACKEND", "linux")]);
+    std::fs::write(daemon.dir.path().join("fake-peer"), "foreign-uid").expect("verdict");
+    let mut client = daemon.connect(&daemon.capability);
+    let reply = client.call(1, "capabilities", &json!({}));
+    assert!(reply.is_some(), "the real path never reads the verdict: the frame is decoded and answered");
+}
+
+#[test]
+fn same_uid_unregistered_peer_refused_unauthorized() {
+    let daemon = Daemon::start(&[]);
+    std::fs::write(daemon.dir.path().join("fake-peer"), "unregistered").expect("verdict");
+    let mut client = daemon.connect(&daemon.capability);
+    client.send_with(1, "session.open", &json!({"consent": {"tier": "exec"}}), None);
+    assert!(client.closed_silently(), "an unregistered pid is closed before any frame");
+}
+
+#[test]
+fn two_clients_one_daemon_stuck_capture_does_not_block_the_other() {
+    let mut slow: serde_json::Value = serde_json::from_str(daemon::ONE_WINDOW).expect("scenario");
+    slow["delay_ms"] = json!({"capture": 3000});
+    let daemon = Daemon::start_with(&slow.to_string(), &[]);
+    let mut stuck = opened(&daemon);
+    stuck.send_with(2, "capture", &json!({"target": "101"}), None);
+    let mut other = opened(&daemon);
+    let started = Instant::now();
+    let reply = other.call(3, "capabilities", &json!({})).expect("answered");
+    assert!(reply.get("result").is_some() && started.elapsed() < Duration::from_secs(1), "{reply}");
+    let captured = stuck.read_reply(2).expect("the stuck capture still answers");
+    assert!(captured.get("result").is_some(), "{captured}");
+}
+
+#[test]
+fn notification_reaches_every_subscriber_within_idle_flush() {
+    let daemon = Daemon::start(&[]);
+    let mut idle = opened(&daemon);
+    let mut actor = opened(&daemon);
+    actor.call(2, "stopPath.stop", &json!({"source": "test"})).expect("stopped");
+    let started = Instant::now();
+    let note = std::iter::from_fn(|| idle.next_message()).find(|m| m["method"] == "stopPath.changed");
+    assert!(note.is_some() && started.elapsed() < Duration::from_secs(1), "{note:?}");
+}
+
+#[test]
+fn second_daemon_start_loses_the_lock() {
+    let first = Daemon::start(&[]);
+    let status = std::process::Command::new(peer::engine())
+        .args(["--enable-daemon", "--serve", "--endpoint"])
+        .arg(first.dir.path().join("second.sock"))
+        .arg("--lock")
+        .arg(first.dir.path().join("engine.lock"))
+        .env("OMO_COMPUTER_BACKEND", "fake")
+        .stdin(std::process::Stdio::null())
+        .status()
+        .expect("runs");
+    assert!(!status.success(), "the second start must lose the lock");
+}
+
+#[test]
+fn hello_carries_the_daemon_generation() {
+    let daemon = Daemon::start(&[]);
+    let mut client = daemon.connect(&daemon.capability);
+    let hello = client.call(1, "engine.hello", &json!({})).expect("hello");
+    assert!(hello["result"]["generation"].is_string() || hello["result"]["generation"].is_u64(), "{hello}");
+}
+
+#[test]
+fn desktop_shutdown_is_host_only_and_ends_the_daemon() {
+    let mut daemon = Daemon::start(&[]);
+    let mut client = opened(&daemon);
+    client.call(2, "desktop.shutdown", &json!({})).expect("acknowledged");
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while daemon.child.try_wait().expect("wait").is_none() {
+        assert!(Instant::now() < deadline, "the daemon did not exit after desktop.shutdown");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+}
+
+/// The client side of the real-process test, run only as a re-executed child of it.
+#[test]
+#[ignore = "run by same_uid_unregistered_real_process_is_closed_unread as its child"]
+fn unregistered_client_helper() {
+    let (Ok(socket), Ok(capability)) = (std::env::var("W1E_DIAL"), std::env::var("W1E_CAP")) else { return };
+    let bytes: Vec<u8> = (0..32).map(|i| u8::from_str_radix(&capability[i * 2..i * 2 + 2], 16).expect("hex")).collect();
+    let mut client = daemon::Client::dial(std::path::Path::new(&socket), &bytes, bytes.clone().try_into().expect("32"));
+    client.send_with(1, "session.open", &json!({}), None);
+    println!("{}", if client.closed_silently() { "CLOSED-UNREAD" } else { "ANSWERED" });
+}
+
+#[test]
+fn same_uid_unregistered_real_process_is_closed_unread() {
+    let daemon = Daemon::start(&[]);
+    let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
+        .args(["--exact", "unregistered_client_helper", "--ignored", "--nocapture"])
+        .env("W1E_DIAL", daemon.socket())
+        .env("W1E_CAP", hex(&daemon.capability))
+        .output()
+        .expect("the second process runs");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("CLOSED-UNREAD"), "a same-uid pid not on the allowlist, even holding the generation capability: {stdout}");
+}
+
+#[test]
+fn launcher_killed_alone_ends_the_daemon_within_2s() {
+    let mut daemon = Daemon::start(&[]);
+    drop(daemon.child.stdin.take());
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while daemon.child.try_wait().expect("wait").is_none() {
+        assert!(Instant::now() < deadline, "the daemon outlived its launcher's pipe");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+}
+
+fn machine_id_over(args: &[&str], method: &str, daemon: &Daemon) -> serde_json::Value {
+    let env: Vec<(String, String)> = vec![
+        ("OMO_COMPUTER_BACKEND".to_owned(), "fake".to_owned()),
+        ("OMO_COMPUTER_RUNTIME_DIR".to_owned(), daemon.dir.path().to_string_lossy().into_owned()),
+        ("OMO_COMPUTER_FAKE_SCENARIO".to_owned(), daemon.dir.path().join("scenario.json").to_string_lossy().into_owned()),
+        ("OMO_COMPUTER_FAKE_STOP_PATH".to_owned(), "live".to_owned()),
+    ];
+    let mut engine = peer::Peer::spawn(args, &env, daemon.dir.path());
+    engine.send(&json!({"jsonrpc": "2.0", "id": 1, "method": method, "params": {}}));
+    let reply = engine.next().expect("hello is answered");
+    drop(engine.close());
+    reply["result"]["machineId"].clone()
+}
+
+#[test]
+fn hello_machine_id_matches_across_stdio_serve_and_oneshot() {
+    let daemon = Daemon::start(&[]);
+    let served = daemon.connect(&daemon.capability).call(1, "engine.hello", &json!({})).expect("hello")["result"]["machineId"].clone();
+    assert!(served.is_string(), "{served}");
+    assert_eq!(machine_id_over(&["--stdio"], "engine.hello", &daemon), served);
+    // --oneshot speaks the v1 `desktop.*` names (corpus case 09).
+    assert_eq!(machine_id_over(&["--oneshot"], "desktop.engine.hello", &daemon), served);
+}
+
+#[test]
+fn a_stop_from_one_connection_suspends_every_session() {
+    let daemon = Daemon::start(&[]);
+    let mut idle = opened(&daemon);
+    let mut actor = opened(&daemon);
+    for client in [&mut idle, &mut actor] {
+        let started = client.call(5, "stopPath.start", &json!({"chord": "ctrl+alt+shift+escape"})).expect("armed");
+        assert!(started.get("result").is_some(), "{started}");
+    }
+    actor.call(2, "stopPath.stop", &json!({"source": "test"})).expect("stopped");
+    let status = idle.call(3, "stopPath.status", &json!({})).expect("status");
+    assert_eq!(status["result"]["suspended"], true, "a stop is hand-wide: {status}");
+}
+
+#[test]
+fn daemon_refuses_sibling_host_terminal_self_target() {
+    let host_terminal = std::os::unix::process::parent_id();
+    let scenario = json!({"windows": [{"id": "301", "title": "the host's terminal", "app": "Terminal",
+        "pid": host_terminal, "x": 0, "y": 0, "width": 400, "height": 300, "focused": true, "elevated": null}],
+        "ax": {}});
+    let daemon = Daemon::start_with(&scenario.to_string(), &[]);
+    let mut client = opened(&daemon);
+    client.call(5, "stopPath.start", &json!({"chord": "ctrl+alt+shift+escape"})).expect("armed");
+    let typed = client.call(2, "typeText", &json!({"target": "301", "text": "rm -rf ~"})).expect("answered");
+    assert!(typed.get("error").is_some(), "{typed}");
+    assert_eq!(typed["error"]["data"]["reason"], "self_target", "{typed}");
+}
+
+fn any_marker_names(dir: &std::path::Path, call_id: &str) -> bool {
+    std::fs::read_dir(dir).into_iter().flatten().filter_map(Result::ok).any(|entry| {
+        let path = entry.path();
+        if path.is_dir() {
+            any_marker_names(&path, call_id)
+        } else {
+            std::fs::read_to_string(&path).is_ok_and(|marker| marker.contains(call_id))
+        }
+    })
+}
+
+fn marker_names(runtime: &std::path::Path, call_id: &str) -> bool {
+    std::fs::read_to_string(runtime.join("markers/local/default.json")).is_ok_and(|marker| marker.contains(call_id))
+}
+
+#[test]
+fn marker_precedes_input_in_serve_and_oneshot_modes() {
+    let daemon = Daemon::start(&[]);
+    let mut client = opened(&daemon);
+    client.call(5, "stopPath.start", &json!({"chord": "ctrl+alt+shift+escape"})).expect("armed");
+    client.call(6, "capture", &json!({"target": "101"})).expect("a frame to click in");
+    let clicked = client.call(2, "click", &json!({"target": "101", "x": 10, "y": 10, "callId": "serve-marker"})).expect("answered");
+    assert!(clicked.get("result").is_some(), "{clicked}");
+    assert!(marker_names(daemon.dir.path(), "serve-marker"), "the daemon's click left its pre-input marker");
+
+    // The oneshot leg: registered oneshots against the daemon (corpus case 09, lead decision Q4 A)
+    // on a hand with consent; the click rides the daemon's own bridge session. The serve leg's
+    // session closes first so it no longer holds the window (another session's hold is InputBusy).
+    client.call(7, "session.close", &json!({})).expect("closed");
+    host::consent(daemon.dir.path(), true);
+    let mut authority = daemon.connect(&daemon.capability);
+    let capture = json!({"jsonrpc": "2.0", "id": 1, "method": "desktop.capture", "params": {"target": "101"}});
+    assert!(attached_oneshot(&daemon, Some(&mut authority), &capture, "").is_some_and(|r| r.get("result").is_some()));
+    let click = json!({"jsonrpc": "2.0", "id": 2, "method": "desktop.click",
+        "params": {"target": "101", "x": 10, "y": 10, "callId": "oneshot-marker"}});
+    let clicked = attached_oneshot(&daemon, Some(&mut authority), &click, "");
+    assert!(clicked.as_ref().is_some_and(|r| r.get("error").is_none()), "{clicked:?}");
+    assert!(any_marker_names(&daemon.dir.path().join("markers"), "oneshot-marker"), "the oneshot click left its pre-input marker");
+}
+
+fn alive_after(daemon: &mut Daemon, wait: Duration) -> bool {
+    let deadline = Instant::now() + wait;
+    while Instant::now() < deadline {
+        if daemon.child.try_wait().expect("wait").is_some() {
+            return false;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    true
+}
+
+#[test]
+fn idle_exit_only_without_open_session() {
+    let mut daemon = Daemon::start(&[("OMO_COMPUTER_FAKE_CLOCK", "1")]);
+    let mut client = opened(&daemon);
+    client.call(2, "$/test.advanceClock", &json!({"ms": 301_000})).expect("advanced");
+    assert!(alive_after(&mut daemon, Duration::from_millis(1500)), "an open session keeps the daemon up");
+    client.call(3, "session.close", &json!({})).expect("closed");
+    client.call(4, "$/test.advanceClock", &json!({"ms": 301_000})).expect("advanced");
+    assert!(!alive_after(&mut daemon, Duration::from_secs(3)), "300 s idle with no open session ends the daemon");
+}
+
+fn posted_inputs(runtime: &std::path::Path) -> usize {
+    std::fs::read_dir(runtime)
+        .expect("the runtime dir is readable")
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_name().to_string_lossy().starts_with("fake-sink-"))
+        .map(|entry| std::fs::read_to_string(entry.path()).unwrap_or_default())
+        .map(|sink| sink.lines().filter(|line| line.starts_with("post_input")).count())
+        .sum()
+}
+
+#[test]
+fn marker_persist_fails_input_not_sent_in_serve_mode() {
+    use std::os::unix::fs::PermissionsExt;
+    let daemon = Daemon::start(&[]);
+    let markers = daemon.dir.path().join("markers");
+    std::fs::create_dir_all(&markers).expect("markers dir");
+    std::fs::set_permissions(&markers, std::fs::Permissions::from_mode(0o500)).expect("read-only");
+    let mut client = opened(&daemon);
+    client.call(5, "stopPath.start", &json!({"chord": "ctrl+alt+shift+escape"})).expect("armed");
+    client.call(6, "capture", &json!({"target": "101"})).expect("a frame to click in");
+    let clicked = client.call(2, "click", &json!({"target": "101", "x": 10, "y": 10, "callId": "k-unavailable"})).expect("answered");
+    std::fs::set_permissions(&markers, std::fs::Permissions::from_mode(0o700)).expect("restore");
+    assert_eq!(clicked["error"]["data"]["reason"], "marker_unavailable", "{clicked}");
+    assert_eq!(posted_inputs(daemon.dir.path()), 0, "nothing was sent");
+}
+
+#[test]
+fn marker_found_after_engine_restart_refuses_the_act_in_serve_mode() {
+    use std::os::unix::fs::PermissionsExt;
+    let daemon = Daemon::start(&[]);
+    let local = daemon.dir.path().join("markers/local");
+    std::fs::create_dir_all(&local).expect("markers dir");
+    std::fs::set_permissions(daemon.dir.path().join("markers"), std::fs::Permissions::from_mode(0o700)).expect("0700");
+    std::fs::set_permissions(&local, std::fs::Permissions::from_mode(0o700)).expect("0700");
+    let left = local.join("default.json");
+    std::fs::write(&left, "a marker the previous engine left mid-call").expect("left marker");
+    std::fs::set_permissions(&left, std::fs::Permissions::from_mode(0o600)).expect("0600");
+    let mut client = opened(&daemon);
+    client.call(5, "stopPath.start", &json!({"chord": "ctrl+alt+shift+escape"})).expect("armed");
+    client.call(6, "capture", &json!({"target": "101"})).expect("a frame to click in");
+    let clicked = client.call(2, "click", &json!({"target": "101", "x": 10, "y": 10, "callId": "k-after-restart"})).expect("answered");
+    assert_eq!(clicked["error"]["data"]["reason"], "recovery_required", "{clicked}");
+    assert_eq!(posted_inputs(daemon.dir.path()), 0, "nothing was sent");
+}
+
+#[test]
+fn screen_lock_pause_refuses_the_act_in_serve_mode() {
+    let mut locked: serde_json::Value = serde_json::from_str(daemon::ONE_WINDOW).expect("scenario");
+    locked["session_timeline"] = json!([{"t_ms": 0, "screen_locked": false}, {"t_ms": 1, "screen_locked": true}, {"t_ms": 5000, "screen_locked": false}]);
+    let daemon = Daemon::start_with(&locked.to_string(), &[("OMO_COMPUTER_FAKE_CLOCK", "1")]);
+    let mut client = opened(&daemon);
+    client.call(5, "stopPath.start", &json!({"chord": "ctrl+alt+shift+escape"})).expect("armed");
+    client.call(6, "capture", &json!({"target": "101"})).expect("a frame to click in");
+    client.call(7, "$/test.advanceClock", &json!({"ms": 10})).expect("the lock is due");
+    let clicked = client.call(2, "click", &json!({"target": "101", "x": 10, "y": 10, "callId": "k-lock"})).expect("answered");
+    assert_eq!(clicked["error"]["data"]["code"], "ScreenLocked", "{clicked}");
+    assert_eq!(posted_inputs(daemon.dir.path()), 0, "nothing was sent while locked");
+}
+
+fn process_start(pid: u32) -> u64 {
+    let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).expect("stat");
+    let after = &stat[stat.rfind(')').expect("comm") + 2..];
+    after.split_whitespace().nth(19).expect("starttime").parse().expect("number")
+}
+
+/// One `--oneshot --attach` process. `authority` registers it first (the row 37 `hand.ensure`
+/// stand-in, lead decision Q4 A); without it the process holds only `capability`.
+fn attached_oneshot(daemon: &Daemon, authority: Option<&mut daemon::Client>, request: &serde_json::Value, capability: &str) -> Option<serde_json::Value> {
+    use std::io::{BufRead, Write};
+    let mut child = std::process::Command::new(peer::engine())
+        .args(["--oneshot", "--attach"])
+        .arg(daemon.socket())
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .expect("the oneshot spawns");
+    let presented = match authority {
+        Some(authority) => {
+            let pid = child.id();
+            let registered = authority
+                .call(900, "hand.register", &json!({"pid": pid, "processStart": process_start(pid)}))
+                .expect("registered");
+            registered["result"]["capability"].as_str().expect("minted").to_owned()
+        }
+        None => capability.to_owned(),
+    };
+    let mut stdin = child.stdin.take().expect("stdin");
+    writeln!(stdin, "{presented}").and_then(|()| writeln!(stdin, "{request}")).expect("the oneshot reads");
+    drop(stdin);
+    let mut line = String::new();
+    let stdout = child.stdout.take().expect("stdout");
+    let _ = std::io::BufReader::new(stdout).read_line(&mut line);
+    let _ = child.wait();
+    serde_json::from_str(&line).ok()
+}
+
+#[test]
+fn a_registered_oneshot_is_answered_and_an_unregistered_one_is_closed_unread() {
+    let daemon = Daemon::start(&[]);
+    let mut authority = daemon.connect(&daemon.capability);
+    let request = json!({"jsonrpc": "2.0", "id": "v1", "method": "desktop.capabilities", "params": {}});
+    let answered = attached_oneshot(&daemon, Some(&mut authority), &request, "");
+    assert!(answered.as_ref().is_some_and(|r| r["result"]["backend"] == "fake" && r["id"] == "v1"), "{answered:?}");
+    let leaked = hex(&daemon.capability);
+    let refused = attached_oneshot(&daemon, None, &request, &leaked);
+    assert!(refused.is_none(), "an unregistered oneshot, even holding the generation capability, is closed before any frame: {refused:?}");
+}
+
+#[test]
+fn oneshot_daemon_session_case_09() {
+    let case = case::load("crates/omo-computer-engine/tests/fixtures/v1-consumers/09-oneshot-daemon-session.json");
+    let scenario = std::fs::read_to_string(case::repo().join(case.scenario.as_deref().expect("scenario"))).expect("scenario file");
+    let env: Vec<(&str, &str)> = case.env.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+    let daemon = Daemon::start_with(&scenario, &env);
+    // The hand's host keeps its consent file (G2: without one the engine admits read only).
+    host::consent(daemon.dir.path(), true);
+    let mut authority = daemon.connect(&daemon.capability);
+    let mut deltas = compare::load(&case.name);
+    let mut failures = Vec::new();
+    for (index, step) in case.steps.iter().enumerate() {
+        let case::Step::Send { send, expect, .. } = step else { continue };
+        let reply = attached_oneshot(&daemon, Some(&mut authority), send, "");
+        for expectation in expect {
+            let mut ctx = compare::Context {
+                variable: expectation.variable.iter().map(String::as_str).collect(),
+                deltas: &mut deltas,
+                failures: Vec::new(),
+            };
+            compare::compare(&expectation.message, reply.as_ref(), "", &mut ctx);
+            failures.extend(ctx.failures.into_iter().map(|f| format!("MISMATCH step={} message=1 {f}", index + 1)));
+        }
+    }
+    // Steps another row builds (capture caps, the ax outline) are OWED (lead decision 5).
+    let (failures, owed) = owed::split(&case.name, failures);
+    for line in &owed {
+        println!("OWED {line}");
+    }
+    assert!(failures.is_empty(), "case 09 did not replay clean:\n{}", failures.join("\n"));
+}
+
+fn lines_naming(dir: &std::path::Path, needle: &str, found: &mut Vec<(std::path::PathBuf, String)>) {
+    for entry in std::fs::read_dir(dir).into_iter().flatten().filter_map(Result::ok) {
+        let path = entry.path();
+        if path.is_dir() {
+            lines_naming(&path, needle, found);
+        } else if let Ok(text) = std::fs::read_to_string(&path) {
+            found.extend(text.lines().filter(|line| line.contains(needle)).map(|line| (path.clone(), line.to_owned())));
+        }
+    }
+}
+
+#[test]
+fn an_attached_oneshot_audits_as_issuer_remote() {
+    let daemon = Daemon::start(&[]);
+    host::consent(daemon.dir.path(), true);
+    let mut authority = daemon.connect(&daemon.capability);
+    let capture = json!({"jsonrpc": "2.0", "id": 1, "method": "desktop.capture", "params": {"target": "101"}});
+    assert!(attached_oneshot(&daemon, Some(&mut authority), &capture, "").is_some_and(|r| r.get("result").is_some()));
+    let click = json!({"jsonrpc": "2.0", "id": 2, "method": "desktop.click",
+        "params": {"target": "101", "x": 10, "y": 10, "callId": "issuer-probe"}});
+    let clicked = attached_oneshot(&daemon, Some(&mut authority), &click, "");
+    assert!(clicked.as_ref().is_some_and(|r| r.get("error").is_none()), "{clicked:?}");
+    let mut found = Vec::new();
+    lines_naming(daemon.dir.path(), "issuer-probe", &mut found);
+    let audited: Vec<_> = found.iter().filter(|(_, line)| line.contains("\"issuer\"")).collect();
+    assert!(!audited.is_empty(), "the click left an audit line naming its callId: {found:?}");
+    assert!(audited.iter().all(|(_, line)| line.contains("\"issuer\":\"remote\"")), "an attached peer never audits as local: {audited:?}");
+}

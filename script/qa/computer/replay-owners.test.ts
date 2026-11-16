@@ -126,13 +126,19 @@ describe("R57 replay-all classification", () => {
     expect(v1("04-unowned.json")).toBe(`FAIL ${V1}/04-unowned.json unowned`)
   })
 
-  test("(c) the parity ledgers owe every v1-consumers case to a later row at row 20", async () => {
+  // R57a(1): every v1-consumers case has an owner in the ledgers - owed to a later row, or
+  // marked passed by the leg of the row that made it replay clean (R57: a passed case that
+  // mismatches FAILS); never unowned.
+  test("(c) the parity ledgers own every v1-consumers case at row 20: owed to a later row or passed", async () => {
     const ledgers = await readLedgers(join(ROOT, "crates/omo-computer-core/parity"))
     const cases = (await casesIn(join(ROOT, V1))).map((path) => relative(ROOT, path))
     expect(cases.length).toBeGreaterThan(0)
     const outcomes = cases.map((name): Outcome => ({ name, status: "failed" }))
     const { lines } = classify(20, outcomes, ledgers, PLAN)
-    for (const [i, name] of cases.entries()) expect(lines[i]).toStartWith(`owed ${name} row `)
+    for (const [i, name] of cases.entries()) {
+      const owned = lines[i]?.startsWith(`owed ${name} row `) || lines[i]?.startsWith(`FAIL ${name} passed in DEFERRED-LEGS T1 `)
+      expect(owned, lines[i]).toBe(true)
+    }
   })
 
   test("the summary counts every outcome and only the failing set fails the run", () => {

@@ -12,7 +12,8 @@ mod router;
 mod schema;
 mod selftest;
 #[cfg(unix)]
-mod serve;
+#[cfg(unix)]
+mod daemon;
 mod stdio;
 
 use std::process::ExitCode;
@@ -41,8 +42,10 @@ fn main() -> ExitCode {
         Mode::Oneshot => stdio::oneshot(),
         Mode::Mcp { tier } => stdio::mcp(tier),
         #[cfg(unix)]
-        Mode::Serve { endpoint, lock } => serve::run(&endpoint, &lock),
+        Mode::Serve { endpoint, lock } => daemon::run(&endpoint, &lock),
+        #[cfg(unix)]
+        Mode::OneshotAttach { endpoint } => bridge::attach::run(&endpoint),
         #[cfg(not(unix))]
-        Mode::Serve { .. } => ExitCode::from(2),
+        Mode::Serve { .. } | Mode::OneshotAttach { .. } => ExitCode::from(2),
     }
 }

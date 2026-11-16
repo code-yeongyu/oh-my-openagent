@@ -293,6 +293,12 @@ impl Session {
         self.funnel.secure.secure(self.backend.as_ref(), target)
     }
 
+    /// Sets the `(issuer, scope)` before the session's first call: the daemon's attach-only
+    /// peers run as issuer `remote` (d-remote.md:207; lead decision Q5).
+    pub fn rebind(&mut self, binding: Binding) {
+        self.funnel.binding = binding;
+    }
+
     pub(crate) fn funnel_issuer(&self) -> String {
         self.funnel.binding.issuer.clone()
     }

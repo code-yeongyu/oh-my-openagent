@@ -57,6 +57,12 @@ fn os_leg(_stream: &UnixStream) -> Identity {
 
 #[cfg(target_os = "linux")]
 fn peer_uid(stream: &UnixStream) -> Option<u32> {
+    peer_credentials(stream).map(|(uid, _)| uid)
+}
+
+/// The connected peer's `(uid, pid)` from `SO_PEERCRED`.
+#[cfg(target_os = "linux")]
+pub fn peer_credentials(stream: &UnixStream) -> Option<(u32, i32)> {
     use std::os::fd::AsRawFd;
     let mut cred = libc::ucred { pid: 0, uid: 0, gid: 0 };
     let mut len = libc::socklen_t::try_from(std::mem::size_of::<libc::ucred>()).ok()?;
@@ -70,7 +76,12 @@ fn peer_uid(stream: &UnixStream) -> Option<u32> {
             &raw mut len,
         )
     };
-    (status == 0).then_some(cred.uid)
+    (status == 0).then_some((cred.uid, cred.pid))
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn peer_credentials(_stream: &UnixStream) -> Option<(u32, i32)> {
+    None
 }
 
 pub fn checker(paths: &HostPaths, fake: bool) -> Box<dyn ListenerIdentity> {

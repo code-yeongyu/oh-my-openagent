@@ -72,6 +72,14 @@ impl Peer {
         }
     }
 
+    /// One raw line on the engine's stdin (the daemon's generation capability).
+    #[allow(dead_code, reason = "only the latch tests send a raw line; this file is shared by several test binaries")]
+    pub fn send_line(&mut self, line: &str) {
+        if let Some(stdin) = self.stdin.as_mut() {
+            let _ = writeln!(stdin, "{line}").and_then(|()| stdin.flush());
+        }
+    }
+
     pub fn send(&mut self, message: &Value) {
         if let Some(stdin) = self.stdin.as_mut() {
             let sent = writeln!(stdin, "{message}").and_then(|()| stdin.flush());
