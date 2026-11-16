@@ -64,10 +64,12 @@ impl Daemon {
         self.dir.path().join("engine.sock")
     }
 
+    /// Waits for the daemon to LISTEN: the socket file appears at bind, a moment before listen,
+    /// so only an accepted connect proves readiness. The probe sends nothing and is closed.
     fn wait_for_socket(&self) {
         let deadline = Instant::now() + Duration::from_secs(10);
-        while !self.socket().exists() {
-            assert!(Instant::now() < deadline, "the daemon never bound its socket");
+        while UnixStream::connect(self.socket()).is_err() {
+            assert!(Instant::now() < deadline, "the daemon never listened");
             std::thread::sleep(Duration::from_millis(20));
         }
     }
