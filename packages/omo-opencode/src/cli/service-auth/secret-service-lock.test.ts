@@ -22,6 +22,22 @@ Gio.bus_own_name(Gio.BusType.SESSION, "org.freedesktop.secrets", Gio.BusNameOwne
 GLib.MainLoop().run()
 `
 
+// A private session bus with no <servicedir>: nothing on it can be D-Bus-activated, so "none" means no Secret Service
+// even on a host whose gnome-keyring ships an activatable org.freedesktop.secrets (#12643).
+const PRIVATE_BUS_CONFIG = `<!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-Bus Bus Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
+<busconfig>
+  <type>session</type>
+  <listen>unix:tmpdir=/tmp</listen>
+  <auth>EXTERNAL</auth>
+  <policy context="default">
+    <allow send_destination="*" eavesdrop="true"/>
+    <allow eavesdrop="true"/>
+    <allow own="*"/>
+  </policy>
+</busconfig>
+`
+
 // What such a host looks like to a session bus that does read service dirs: an activatable Secret Service that never
 // answers. Every probe runs with it on its XDG data path.
 const HANGING_SECRET_SERVICE = "[D-BUS Service]\nName=org.freedesktop.secrets\nExec=/bin/sleep 600\n"
@@ -65,6 +81,8 @@ describe.skipIf(!canRun)(
       try {
         const fakePath = join(dir, "fake.py")
         writeFileSync(fakePath, FAKE_SECRET_SERVICE)
+        const busConfig = join(dir, "bus.conf")
+        writeFileSync(busConfig, PRIVATE_BUS_CONFIG)
         const services = join(dir, "data", "dbus-1", "services")
         mkdirSync(services, { recursive: true })
         writeFileSync(join(services, "org.freedesktop.secrets.service"), HANGING_SECRET_SERVICE)
@@ -76,6 +94,7 @@ describe.skipIf(!canRun)(
         const run = spawnSync(
           "dbus-run-session",
           [
+            `--config-file=${busConfig}`,
             "--",
             "bash",
             "-c",
