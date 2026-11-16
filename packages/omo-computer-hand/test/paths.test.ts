@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest"
 
 import { resolveHandPaths } from "../src/index.ts"
 
-const base = { uid: 501, home: "/home/u", tmp: "/var/folders/xy/T" }
+const base = { uid: 501, home: "/home/u", tmp: "/var/folders/xy/T", isDirectory: () => true }
 
 describe("hand paths: the same files and address the engine resolves", () => {
   it("under the fake-backend seam every file, the host API socket included, sits in the runtime dir", () => {
@@ -68,6 +68,22 @@ describe("hand paths: the same files and address the engine resolves", () => {
       // Then the latch the host writes is the one the engine reads: under the user-database home.
       expect(resolved.kind === "resolved" && resolved.paths.hostLatch.startsWith("/home/u/")).toBe(true)
     }
+  })
+
+  it("with XDG_RUNTIME_DIR unset and no /run/user/<uid>, no runtime root is named (the engine refuses NoRuntimeDir)", () => {
+    expect(
+      resolveHandPaths({
+        ...base,
+        platform: "linux",
+        fake: false,
+        env: {},
+        isDirectory: (path) => path !== "/run/user/501",
+      }),
+    ).toEqual({ kind: "unavailable", reason: "no_runtime_dir" })
+    expect(resolveHandPaths({ ...base, platform: "linux", fake: false, env: {} })).toMatchObject({
+      kind: "resolved",
+      paths: { runtimeRoot: "/run/user/501/omo-computer/501" },
+    })
   })
 
   it("real macOS paths: Application Support for config and state, a socket file in the per-uid temp root", () => {

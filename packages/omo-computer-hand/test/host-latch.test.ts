@@ -82,4 +82,28 @@ describe("host latch file", () => {
       ],
     ])
   })
+
+  it("reads the latch only through owner-only, non-link directories, exactly like the engine's host/files.rs", () => {
+    // Given a clear latch reached through a symlinked computer/ dir.
+    const elsewhere = temp()
+    writeHostLatch(latchPath(elsewhere), { suspended: false, stopEpoch: 4 })
+    const linkedRoot = temp()
+    symlinkSync(join(elsewhere, "computer"), join(linkedRoot, "computer"))
+
+    // Given a clear latch in a computer/ dir its group can write.
+    const groupRoot = temp()
+    writeHostLatch(latchPath(groupRoot), { suspended: false, stopEpoch: 4 })
+    chmodSync(join(groupRoot, "computer"), 0o770)
+
+    // Given a clear latch under a config root others can enter.
+    const openRoot = temp()
+    writeHostLatch(latchPath(openRoot), { suspended: false, stopEpoch: 4 })
+    chmodSync(openRoot, 0o755)
+
+    // Then each is unreadable, i.e. STOPPED, never the clear latch it holds.
+    for (const root of [linkedRoot, groupRoot, openRoot]) {
+      expect(readHostLatch(latchPath(root)).kind).toBe("unreadable")
+      expect(effectiveLatch(readHostLatch(latchPath(root)))).toMatchObject({ suspended: true })
+    }
+  })
 })

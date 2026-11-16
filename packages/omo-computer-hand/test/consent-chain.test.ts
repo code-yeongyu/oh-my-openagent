@@ -160,6 +160,40 @@ describe("consent tamper evidence bound to the audit chain", () => {
     expect(h.start(600).verifyAndAnchor()).toEqual({ kind: "tampered" })
   })
 
+  it("a non-clean verdict survives every later restart: tampered stays tampered and rebased stays rebased until a UI save", () => {
+    // Given a saved consent whose admission key is then flipped outside the UI.
+    const tampered = hand()
+    const host = tampered.start(100)
+    host.verifyAndAnchor()
+    host.save(CONSENT)
+    writeFileSync(
+      tampered.settingsFile,
+      JSON.stringify({ ...JSON.parse(readFileSync(tampered.settingsFile, "utf8")), "computer.send_on_enter": true }),
+    )
+
+    // Then every restart reads tampered: a bad start opens no new segment that would strand the sidecar.
+    expect([600, 601, 602].map((pid) => tampered.start(pid).verifyAndAnchor().kind)).toEqual([
+      "tampered",
+      "tampered",
+      "tampered",
+    ])
+
+    // Given consent and sidecar rewritten consistently outside the UI.
+    const rebased = hand()
+    const first = rebased.start(100)
+    first.verifyAndAnchor()
+    first.save(CONSENT)
+    const sidecar = JSON.parse(readFileSync(rebased.files.sidecar, "utf8"))
+    writeFileSync(rebased.files.consent, JSON.stringify({ ...CONSENT, foreground: "always" }), { mode: 0o600 })
+    const forged = rebased.start(400).fingerprintNow()
+    writeFileSync(rebased.files.sidecar, JSON.stringify({ fingerprint: forged, lineHash: sidecar.lineHash }), {
+      mode: 0o600,
+    })
+
+    // Then every restart reads rebased.
+    expect([500, 501].map((pid) => rebased.start(pid).verifyAndAnchor().kind)).toEqual(["rebased", "rebased"])
+  })
+
   it("every admission key flipped outside the UI reads tampered; a UI save of the same flip reads clean", () => {
     for (const key of ADMISSION_KEYS) {
       const h = hand()
