@@ -10,6 +10,9 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { load } from "js-yaml"
 
+// The writer runs against a PATH stub for gh, which Windows bash cannot shadow reliably.
+const posixBashTest = test.skipIf(process.platform === "win32" || spawnSync("bash", ["-c", "exit 0"]).status !== 0)
+
 const root = mkdtempSync(join(tmpdir(), "platform-red-tracker-"))
 afterAll(() => rmSync(root, { recursive: true, force: true }))
 
@@ -62,19 +65,19 @@ function runWriter(name: string, listAnswers: readonly string[]): string[] {
 }
 
 describe("#given the platform-red writer", () => {
-  test("#then an open issue gets a comment and nothing is created", () => {
+  posixBashTest("#then an open issue gets a comment and nothing is created", () => {
     const calls = runWriter("existing", ["17"])
     expect(calls.filter((call) => call.startsWith("issue comment 17 "))).toHaveLength(1)
     expect(calls.some((call) => call.startsWith("issue create"))).toBe(false)
   })
 
-  test("#then a writer that lost the race comments on the older issue and closes its own", () => {
+  posixBashTest("#then a writer that lost the race comments on the older issue and closes its own", () => {
     const calls = runWriter("race", ["", "41"])
     expect(calls.filter((call) => call.startsWith("issue comment 41 "))).toHaveLength(1)
     expect(calls.filter((call) => call.startsWith("issue close 42 "))).toHaveLength(1)
   })
 
-  test("#then a re-read that briefly returns nothing keeps the issue it just created", () => {
+  posixBashTest("#then a re-read that briefly returns nothing keeps the issue it just created", () => {
     const calls = runWriter("stale-read", ["", ""])
     expect(calls.some((call) => call.startsWith("issue create"))).toBe(true)
     expect(calls.some((call) => call.startsWith("issue comment"))).toBe(false)
