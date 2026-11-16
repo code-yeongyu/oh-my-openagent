@@ -284,6 +284,23 @@ describe("authoritative credential reads under the shared lock", () => {
     expect(await first.boundary(() => "dispatched")).toBe("dispatched")
   }, 30_000)
 
+  test("#given a captured CLI account #when the boundary's authoritative read is transiently empty #then the re-read keeps it current and the dispatch runs", async () => {
+    const f = await fixture()
+    await f.store.write(credential("device-a"))
+    const source = createCliAccountSource({
+      api: ORIGIN,
+      store: f.store,
+      home: f.home,
+      fetch: identity("account-a", () => "device-a", []),
+    })
+    const first = await source()
+    if (first === null) throw new Error("the fixture account did not resolve")
+
+    f.blank(1)
+    expect(await first.boundary(() => "dispatched")).toBe("dispatched")
+    expect(first.signal.aborted).toBe(false)
+  }, 30_000)
+
   test("#given a captured CLI account #when two authoritative reads in a row are empty #then that read fails closed and the next resolve of the same generation is live", async () => {
     const f = await fixture()
     await f.store.write(credential("device-a"))
