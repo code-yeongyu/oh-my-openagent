@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { connectDeviceService, LocalApiError } from "@oh-my-opencode/device-service-core"
-import { createDeviceServiceSessions } from "./device-service"
+import { createDeviceServiceSessions } from "../../remote/port/device-service"
 
 // The adapter over the real SDK: an endpoint command whose endpoint lookup fails sent nothing and is refused (a create
 // or fork may be retried); the same timeout after session.command was written may have run and stays uncertain.
