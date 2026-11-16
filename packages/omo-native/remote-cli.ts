@@ -1,6 +1,5 @@
 import { borrowedService } from "./remote-session-verbs"
-import { createRemoteClient } from "../omo-senpi/src/components/remote/client"
-import { userInfo } from "node:os"
+import { remoteClientForPerson } from "../omo-senpi/src/components/remote"
 import { existsSync } from "node:fs"
 
 import { type DeviceService, deviceServiceEndpointPath } from "../device-service-core/src/index.ts"
@@ -169,14 +168,11 @@ export async function prepareRemoteAttach(
           connect: async () => ({ conn: connected, owned: false }),
         }),
         // `omo remote` is a person at this device; the account reads go through the one remote client (#13414).
-        client: createRemoteClient(
-          { kind: "person", uid: String(userInfo().uid) },
-          {
-            version: connected.serviceVersion,
-            stateDir: dependencies.stateDir,
-            connect: async () => borrowedService(connected),
-          },
-        ),
+        client: remoteClientForPerson({
+          version: connected.serviceVersion,
+          stateDir: dependencies.stateDir,
+          connect: async () => borrowedService(connected),
+        }),
         chain: { stamp: (record: JsonObject) => record },
       }))
     )(service)

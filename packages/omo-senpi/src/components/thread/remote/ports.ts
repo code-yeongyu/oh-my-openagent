@@ -1,4 +1,4 @@
-import type { RemoteClient } from "../../remote/client"
+import type { RemoteClient } from "../../remote"
 import type { DeviceService } from "@oh-my-opencode/device-service-core/device-service"
 import type { AliasRegistry } from "./alias-port"
 

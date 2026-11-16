@@ -9,7 +9,7 @@ import {
 } from "../omo-senpi/src/components/thread/control/operations"
 import { createRelayControl } from "../omo-senpi/src/components/thread/control/relay-control"
 import { createDeviceServiceSessions } from "../omo-senpi/src/components/remote/port/device-service"
-import { createRemoteClient } from "../omo-senpi/src/components/remote/client"
+import { remoteClientForPerson } from "../omo-senpi/src/components/remote"
 import { randomUUID } from "node:crypto"
 import { existsSync } from "node:fs"
 import { userInfo } from "node:os"
@@ -66,10 +66,11 @@ const deviceServiceSurface = (
     dialEndpoint: async () => ({ conn: await dial(), owned: true }),
   }),
   // `omo remote` is a person at this device; the account reads go through the one remote client (#13414).
-  client: createRemoteClient(
-    { kind: "person", uid: String(userInfo().uid) },
-    { version: service.serviceVersion, stateDir, connect: async () => borrowedService(service) },
-  ),
+  client: remoteClientForPerson({
+    version: service.serviceVersion,
+    stateDir,
+    connect: async () => borrowedService(service),
+  }),
   chain: { stamp: (record) => record },
 })
 
