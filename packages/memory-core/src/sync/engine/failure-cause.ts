@@ -1,6 +1,7 @@
 // What a failed sync cycle tells a person, a harness or the desktop about its error (#13635): a closed
 // set of safe fields, never the error's message, paths or anything else it carries. The raw error,
-// stacks and cause chain included, goes to the local memory log at debug level only (OMO_DEBUG=1).
+// stacks and cause chain included, goes to the local memory log: a git failure's argv/stdout/stderr only at debug
+// level (OMO_DEBUG=1), any other error's message and stack also on the always-on warning line.
 
 import { GitCommandError, GitError, GitNotFoundError, GitTimeoutError } from "../../git/errors"
 import { SyncFormatError } from "../crypto/vendor/sync-format/jcs"
@@ -93,6 +94,8 @@ const GIT_SUBCOMMAND = /^[a-z][a-z0-9-]{0,31}$/
 
 /** A git error on a warning names its class, subcommand and exit code only: argv, stdout and stderr can hold memory paths and file text. */
 function printableAtWarn(value: unknown): string {
+  // The sync repo's own commit failure embeds git's stderr in its message (#13655 review M1).
+  if (value instanceof SyncCommitError) return value.name
   if (!(value instanceof GitError)) return printable(value)
   const argv: unknown = "argv" in value ? value.argv : undefined
   const subcommand = Array.isArray(argv)

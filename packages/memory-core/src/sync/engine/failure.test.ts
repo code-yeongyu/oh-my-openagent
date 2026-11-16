@@ -2,6 +2,7 @@ import { expect, test } from "bun:test"
 
 import { GitCommandError } from "../../git/errors"
 import { SyncFormatError } from "../crypto/vendor/sync-format/jcs"
+import { SyncCommitError } from "./adapters/git-sync-repo"
 import { SyncHttpError } from "./adapters/http-transport"
 import { describeSyncFailure } from "./failure"
 import { logCycleFailure } from "./failure-cause"
@@ -101,6 +102,20 @@ test("a failed git command on the warning names its class, subcommand and exit c
 
   const warnings = lines.filter(({ level }) => level === "warn").map(({ line }) => line)
   expect(warnings).toEqual([expect.stringContaining("GitCommandError: git commit exited 128")])
+  expect(warnings[0]).not.toContain("secret-value")
+  expect(lines.filter(({ level }) => level === "info").map(({ line }) => line)).toEqual([
+    expect.stringContaining("secret-value"),
+  ])
+})
+
+test("a failed sync-repo commit on the warning names its class only; its git output stays at info", () => {
+  const lines: { readonly line: string; readonly level: string }[] = []
+  const error = new Error("cycle failed", { cause: new SyncCommitError(`git commit failed: fatal: ${RAW}`) })
+
+  logCycleFailure((line, level = "info") => lines.push({ line, level }), "apply", error, true)
+
+  const warnings = lines.filter(({ level }) => level === "warn").map(({ line }) => line)
+  expect(warnings).toEqual([expect.stringContaining("SyncCommitError")])
   expect(warnings[0]).not.toContain("secret-value")
   expect(lines.filter(({ level }) => level === "info").map(({ line }) => line)).toEqual([
     expect.stringContaining("secret-value"),
