@@ -754,7 +754,8 @@ describe("omo remote session verbs", () => {
 
   test("a waiting send whose started turn was interrupted and finished before the send caught up fails with a typed line (probe)", async () => {
     const a = fixture.account({
-      records: [{ type: "agent_settled" }],
+      // The run's own prompt precedes its settle, so the settle is this send's turn and not an earlier run's.
+      records: [{ type: "message_end", message: { role: "user", content: "hi" } }, { type: "agent_settled" }],
       recordsBeforeReply: true,
       entriesAfterAnswer: [
         { role: "user", content: "hi" },

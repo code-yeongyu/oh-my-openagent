@@ -67,6 +67,25 @@ export const comparable = (result: ThreadToolResult): unknown => {
   return rest
 }
 
+/**
+ * A record the prompt's run writes, as senpi streams it: the prompt's own user message (`message_start`/`message_end`)
+ * carries the client message id the prompt named, when it named one and the record names none.
+ */
+export const stampPromptRecord = (record: JsonObject, clientMessageId: unknown): JsonObject => {
+  const message = record["message"]
+  if (
+    typeof clientMessageId !== "string" ||
+    (record["type"] !== "message_start" && record["type"] !== "message_end") ||
+    typeof message !== "object" ||
+    message === null ||
+    Array.isArray(message) ||
+    (message as JsonObject)["role"] !== "user" ||
+    "clientMessageId" in message
+  )
+    return record
+  return { ...record, message: { ...(message as JsonObject), clientMessageId } }
+}
+
 export function createRemoteThreadFixture() {
   const directories: string[] = []
   const stores: GatewayStore[] = []
@@ -147,10 +166,13 @@ export function createRemoteThreadFixture() {
     const watchers = new Set<(record: JsonObject) => void>()
     let answeredPrompt = false
     let recordsOut = false
+    // The client message id the answered prompt named: senpi stamps the prompt's own user message with it.
+    let promptClientMessageId: unknown
     const writeRecords = () => {
       if (recordsOut) return
       recordsOut = true
-      for (const record of options.records ?? []) for (const listener of [...watchers]) listener(record)
+      for (const record of options.records ?? [])
+        for (const listener of [...watchers]) listener(stampPromptRecord(record, promptClientMessageId))
     }
     const hops: number[] = []
     const lookups: Array<{ readonly device: string; readonly durable_id: string }> = []
@@ -381,6 +403,7 @@ export function createRemoteThreadFixture() {
           const outcome = answer(rpc, session)
           if (rpc["type"] === "prompt" && outcome.kind === "ok") {
             answeredPrompt = true
+            promptClientMessageId = rpc["clientMessageId"]
             if (options.recordsBeforeReply === true) writeRecords()
           }
           return outcome

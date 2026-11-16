@@ -46,9 +46,19 @@ export const Message = Type.String({
 })
 
 export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const
+// Spelled out, not mapped from THINKING_LEVELS: a mapped array loses the literal types, and the level's static type then
+// reads as never wherever a parsed level is passed on (setThinkingLevelOn).
 export const thinkingLevel = (description: string) =>
   Type.Union(
-    THINKING_LEVELS.map((level) => Type.Literal(level)),
+    [
+      Type.Literal("off"),
+      Type.Literal("minimal"),
+      Type.Literal("low"),
+      Type.Literal("medium"),
+      Type.Literal("high"),
+      Type.Literal("xhigh"),
+      Type.Literal("max"),
+    ],
     { description },
   )
 
