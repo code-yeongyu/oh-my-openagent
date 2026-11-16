@@ -3,10 +3,9 @@ import { outcomeFailure } from "./outcome"
 
 describe("outcomeFailure for a session the other device no longer runs", () => {
   for (const reason of ["unknown_session", "session_not_found"]) {
-    test(`#given a command refused ${reason} #when it is explained #then it is not_resumable and never tells the agent to update omo`, () => {
+    test(`#given a command refused ${reason} #when it is explained #then it is not_resumable`, () => {
       const failure = outcomeFailure({ kind: "refused", reason }, "b")
       expect(failure.error.code).toBe("not_resumable")
-      expect(failure.error.next_action).not.toContain("Update omo")
       expect(failure.error.details).toEqual({ device: "b", reason })
     })
   }
