@@ -3,7 +3,8 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, writ
 import { join } from "node:path"
 import { posixSecureFile, type SecureFile } from "../local-api/access.ts"
 import { refuseIfLocalOnly } from "../local-only.ts"
-import { currentUserSid, windowsSecureFile } from "../local-api/dacl.ts"
+import { currentUserSid } from "../local-api/dacl.ts"
+import { windowsSecureFile } from "./windows-dacl.ts"
 import {
   BINARY_MAX_BYTES,
   CHECKSUMS,
