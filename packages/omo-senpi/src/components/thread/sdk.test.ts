@@ -5,6 +5,7 @@ import { join } from "node:path"
 
 import type { GatewayEndpointRef, ReleaseSessionRequest } from "./gateway/adapter"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
+import { storeMigratedByNewerBuild } from "./gateway/testing/newer-schema"
 import type { RemoteThreadSurface } from "./remote/ports"
 import { createThreadSdk, type ThreadSdk } from "./sdk"
 import { createRemoteThreadFixture } from "./thread-remote-fixture"
@@ -221,6 +222,30 @@ describe("thread SDK: sessions", () => {
       await sdk.send({ thread: "my-tui", text: "ping", author: { platform_user_id: "U1", display: "Jane" } }),
     ).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
     expect(await store.list()).toEqual([])
+  })
+})
+
+describe("thread SDK: a gateway store a newer omo build migrated", () => {
+  test("#given the agent dir's store is at a schema newer than this binary's #when omo thread send runs #then it answers gateway_schema_too_new naming both schemas and the update command", async () => {
+    let versions = { gateway: 0, binary: 0 }
+    const { sdk } = fixture({
+      store: (agentDir) => {
+        versions = storeMigratedByNewerBuild(agentDir)
+        return createGatewayStore({ agentDir })
+      },
+    })
+    const sent = await sdk.send({ thread: "my-tui", text: "ping" })
+    expect(sent).toMatchObject({
+      kind: "error",
+      error: {
+        code: "gateway_schema_too_new",
+        details: {
+          gateway_schema: versions.gateway,
+          binary_schema: versions.binary,
+          update_command: expect.any(String),
+        },
+      },
+    })
   })
 })
 
