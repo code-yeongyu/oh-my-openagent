@@ -3,14 +3,12 @@
 //! `consent.json`. One resolver, so the engine (row 28) and the host (row 37) cannot diverge;
 //! the config root is built from the user-database home, never `$HOME` (#13882 M3).
 //!
-//! Linux names an abstract socket instead of a path: an abstract name cannot be unlinked, and
-//! once the host holds it no other process can bind it. Under the fake-backend test seam the
-//! files sit under `OMO_COMPUTER_RUNTIME_DIR` and the Linux name gains a suffix derived from it
-//! (B1: the suffix is computed only on that path; a real backend never reads the seam).
+//! Every Unix host API is a socket FILE in the per-uid runtime root, which is owner-only: the
+//! directory's permissions keep every other uid from connecting to it or binding the name
+//! (#13882 M2; a Linux abstract name has no permissions at all). Under the fake-backend test seam
+//! the files sit under `OMO_COMPUTER_RUNTIME_DIR` (B1: a real backend never reads the seam).
 
 use std::path::{Path, PathBuf};
-
-use sha2::{Digest, Sha256};
 
 use crate::paths::RUNTIME_DIR_SEAM;
 
@@ -26,16 +24,13 @@ const fn user_home() -> Option<PathBuf> {
     None
 }
 
-const ABSTRACT_PREFIX: &str = "omo-host-api";
 const SOCKET_FILE: &str = "host-api.sock";
 const ENDPOINT_FILE: &str = "host-endpoint";
 
 /// The address the authority host binds.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HostAddress {
-    /// A Linux abstract-namespace name, without the leading NUL.
-    Abstract(String),
-    /// A Unix socket file (macOS).
+    /// A Unix socket file in the owner-only runtime root (Linux, macOS).
     Socket(PathBuf),
     /// The owner-only file the Windows host publishes its pipe name in.
     Endpoint(PathBuf),
@@ -79,23 +74,17 @@ pub enum HostPathsUnavailable {
 ///
 /// # Errors
 /// The seam with a real backend, or no config root.
-pub fn resolve(
-    lookup: impl Fn(&str) -> Option<String>,
-    fake: bool,
-    uid: u32,
-) -> Result<HostPaths, HostPathsUnavailable> {
+pub fn resolve(lookup: impl Fn(&str) -> Option<String>, fake: bool) -> Result<HostPaths, HostPathsUnavailable> {
     let seam = lookup(RUNTIME_DIR_SEAM).filter(|dir| !dir.is_empty());
     match (seam, fake) {
         (Some(_), false) => Err(HostPathsUnavailable::SeamWithRealBackend),
-        (Some(dir), true) => Ok(under_seam(Path::new(&dir), uid)),
-        (None, _) => real(&lookup, uid),
+        (Some(dir), true) => Ok(under_seam(Path::new(&dir))),
+        (None, _) => real(&lookup),
     }
 }
 
-fn under_seam(dir: &Path, uid: u32) -> HostPaths {
-    let address = if cfg!(target_os = "linux") {
-        HostAddress::Abstract(format!("{ABSTRACT_PREFIX}-{uid}-{}", seam_suffix(dir)))
-    } else if cfg!(windows) {
+fn under_seam(dir: &Path) -> HostPaths {
+    let address = if cfg!(windows) {
         HostAddress::Endpoint(dir.join(ENDPOINT_FILE))
     } else {
         HostAddress::Socket(dir.join(SOCKET_FILE))
@@ -106,16 +95,7 @@ fn under_seam(dir: &Path, uid: u32) -> HostPaths {
     }
 }
 
-/// The first 16 hex digits of SHA-256 over the runtime dir's path (R70k choice 4).
-fn seam_suffix(dir: &Path) -> String {
-    Sha256::digest(dir.to_string_lossy().as_bytes())
-        .iter()
-        .take(8)
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
-}
-
-fn real(lookup: &impl Fn(&str) -> Option<String>, uid: u32) -> Result<HostPaths, HostPathsUnavailable> {
+fn real(lookup: &impl Fn(&str) -> Option<String>) -> Result<HostPaths, HostPathsUnavailable> {
     let absolute = |name: &str| lookup(name).map(PathBuf::from).filter(|path| path.is_absolute());
     let home = user_home();
     let config = if cfg!(target_os = "macos") {
@@ -128,9 +108,7 @@ fn real(lookup: &impl Fn(&str) -> Option<String>, uid: u32) -> Result<HostPaths,
             .map(|dir| dir.join("omo"))
     }
     .ok_or(HostPathsUnavailable::NoConfigRoot)?;
-    let address = if cfg!(target_os = "linux") {
-        HostAddress::Abstract(format!("{ABSTRACT_PREFIX}-{uid}"))
-    } else if cfg!(windows) {
+    let address = if cfg!(windows) {
         HostAddress::Endpoint(config.join("computer").join(ENDPOINT_FILE))
     } else {
         let runtime = crate::paths::resolve(lookup).map_err(|_| HostPathsUnavailable::NoConfigRoot)?;
@@ -150,12 +128,12 @@ mod tests {
     #[test]
     fn a_real_backend_with_the_seam_set_computes_no_name() {
         let seam = [(RUNTIME_DIR_SEAM, "/tmp/omo-test"), ("HOME", "/home/u")];
-        assert_eq!(resolve(env(&seam), false, 501), Err(HostPathsUnavailable::SeamWithRealBackend));
+        assert_eq!(resolve(env(&seam), false), Err(HostPathsUnavailable::SeamWithRealBackend));
     }
 
     #[test]
     fn under_the_seam_every_file_sits_in_the_runtime_dir() {
-        let paths = resolve(env(&[(RUNTIME_DIR_SEAM, "/tmp/omo-test")]), true, 501).expect("seam paths");
+        let paths = resolve(env(&[(RUNTIME_DIR_SEAM, "/tmp/omo-test")]), true).expect("seam paths");
         assert_eq!(paths.consent(), Path::new("/tmp/omo-test/computer/consent.json"));
         assert_eq!(paths.host_latch(), Path::new("/tmp/omo-test/computer/host-latch"));
         // Review M2 of #13882: an abstract name has no file permissions, so every uid could call
@@ -172,7 +150,7 @@ mod tests {
     #[test]
     fn the_config_root_never_follows_home_from_the_environment() {
         let lookup = env(&[("HOME", "/not-the-user-database-home"), ("XDG_RUNTIME_DIR", "/run/user/501")]);
-        let paths = resolve(lookup, false, 501).expect("real paths");
+        let paths = resolve(lookup, false).expect("real paths");
         assert!(!paths.config.starts_with("/not-the-user-database-home"), "{:?}", paths.config);
         let tail = if cfg!(target_os = "macos") { "Library/Application Support/OmO" } else { ".config/omo" };
         assert!(paths.config.ends_with(tail), "{:?}", paths.config);
@@ -180,7 +158,7 @@ mod tests {
 
     #[test]
     fn the_real_linux_host_api_is_a_socket_file_in_the_per_uid_runtime_root() {
-        let paths = resolve(env(&[("HOME", "/home/u"), ("XDG_RUNTIME_DIR", "/run/user/501")]), false, 501)
+        let paths = resolve(env(&[("HOME", "/home/u"), ("XDG_RUNTIME_DIR", "/run/user/501")]), false)
             .expect("real paths");
         if cfg!(target_os = "linux") {
             let runtime = crate::paths::resolve(|name| (name == "XDG_RUNTIME_DIR").then(|| "/run/user/501".to_owned()))

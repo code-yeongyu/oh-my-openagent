@@ -16,7 +16,7 @@ use std::thread;
 
 use serde_json::{json, Value};
 
-#[cfg(all(unix, not(target_os = "linux")))]
+#[cfg(unix)]
 pub const HOST_API: &str = "host-api.sock";
 pub const HOST_LATCH: &str = "computer/host-latch";
 pub const FAKE_IDENTITY: &str = "fake-host-identity";
@@ -39,29 +39,10 @@ fn write_0600(path: &Path, text: &str) {
     fs::set_permissions(path, fs::Permissions::from_mode(0o600)).expect("0600");
 }
 
-#[cfg(all(unix, not(target_os = "linux")))]
+/// Every Unix host API is a socket file in the runtime root (#13882 M2), as the host binds it.
+#[cfg(unix)]
 fn bind(runtime: &Path) -> UnixListener {
     UnixListener::bind(runtime.join(HOST_API)).expect("the host socket binds")
-}
-
-/// Linux (revision 2, item 1): the abstract name `omo-host-api-<uid>`, under the test seam with a
-/// suffix from the runtime dir (PROPOSED: the first 16 hex digits of SHA-256 over its path).
-#[cfg(target_os = "linux")]
-fn bind(runtime: &Path) -> UnixListener {
-    use sha2::{Digest, Sha256};
-    use std::os::linux::net::SocketAddrExt;
-    use std::os::unix::fs::MetadataExt;
-    use std::os::unix::net::SocketAddr;
-    let uid = fs::metadata(runtime).expect("the runtime dir").uid();
-    let digest = Sha256::digest(runtime.to_string_lossy().as_bytes());
-    let suffix: String = digest
-        .iter()
-        .take(8)
-        .map(|byte| format!("{byte:02x}"))
-        .collect();
-    let name = format!("omo-host-api-{uid}-{suffix}");
-    let addr = SocketAddr::from_abstract_name(name.as_bytes()).expect("an abstract name");
-    UnixListener::bind_addr(&addr).expect("the host name binds")
 }
 
 /// `pass`, `fail` or `foreign-uid`: what the engine's fake listener-identity check reports.

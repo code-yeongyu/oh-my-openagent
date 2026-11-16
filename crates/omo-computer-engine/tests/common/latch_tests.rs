@@ -46,9 +46,8 @@ fn host_latch_file_set_and_no_socket_starts_suspended() {
     replay_case(&case).assert_clean();
 }
 
-// Linux binds an abstract name, which has no path to unlink (the point of the design); the
-// unlink attack exists only where the address is a socket file.
-#[cfg(not(target_os = "linux"))]
+// Every Unix host API is a socket file (#13882 M2), so the unlink attack applies everywhere: the
+// persisted latch file still starts the run suspended.
 #[test]
 fn host_api_socket_unlinked_while_host_latched_starts_suspended() {
     let case = oneshot_typing_with_host(

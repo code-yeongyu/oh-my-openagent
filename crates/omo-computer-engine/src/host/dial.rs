@@ -30,10 +30,6 @@ fn connect(address: &HostAddress) -> std::io::Result<Option<UnixStream>> {
             let path = path.clone();
             connect_within(BUDGET, move || UnixStream::connect(path)).map(Some)
         }
-        HostAddress::Abstract(name) => {
-            let name = name.clone();
-            connect_within(BUDGET, move || abstract_connect(&name)).map(Some)
-        }
         HostAddress::Endpoint(_) => Ok(None),
     }
 }
@@ -52,18 +48,6 @@ fn connect_within(
     outcome
         .recv_timeout(budget)
         .unwrap_or_else(|_| Err(std::io::ErrorKind::TimedOut.into()))
-}
-
-#[cfg(target_os = "linux")]
-fn abstract_connect(name: &str) -> std::io::Result<UnixStream> {
-    use std::os::linux::net::SocketAddrExt;
-    let addr = std::os::unix::net::SocketAddr::from_abstract_name(name.as_bytes())?;
-    UnixStream::connect_addr(&addr)
-}
-
-#[cfg(not(target_os = "linux"))]
-fn abstract_connect(_name: &str) -> std::io::Result<UnixStream> {
-    Err(std::io::ErrorKind::Unsupported.into())
 }
 
 fn no_listener(error: &std::io::Error) -> bool {

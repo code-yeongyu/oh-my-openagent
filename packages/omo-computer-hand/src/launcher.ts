@@ -68,7 +68,8 @@ const spawnWithPipe: SpawnDaemon = (command, args, env) => {
   return { pid: child.pid, stdin: child.stdin, exited, kill: () => child.kill("SIGTERM") }
 }
 
-function listening(endpoint: string): Promise<boolean> {
+/** Whether something accepts a connection at the socket `endpoint`. */
+export function listening(endpoint: string): Promise<boolean> {
   return new Promise((resolve) => {
     const probe = createConnection(endpoint, () => {
       probe.destroy()

@@ -1,11 +1,12 @@
-import { createHash } from "node:crypto"
 import { isAbsolute, join } from "node:path"
 
-/** Where the engine dials the authority host (crates/omo-computer-core/src/host_paths.rs, the one resolver). */
+/**
+ * Where the engine dials the authority host (crates/omo-computer-core/src/host_paths.rs, the one
+ * resolver): on every Unix a socket file in the owner-only runtime root, whose directory keeps
+ * every other uid out (no abstract name: it has no permissions).
+ */
 export type HostAddress =
-  | { readonly kind: "abstract"; readonly name: string }
-  | { readonly kind: "socket"; readonly path: string }
-  | { readonly kind: "endpoint"; readonly path: string }
+  { readonly kind: "socket"; readonly path: string } | { readonly kind: "endpoint"; readonly path: string }
 
 export interface HandPaths {
   /** The STATE root: the `global-stop` marker, audit, artifacts. */
@@ -41,10 +42,6 @@ export interface HandPathsInput {
 
 const SEAM = "OMO_COMPUTER_RUNTIME_DIR"
 
-function sha256Hex16(text: string): string {
-  return createHash("sha256").update(text).digest("hex").slice(0, 16)
-}
-
 function absolute(env: HandPathsInput["env"], name: string): string | undefined {
   const value = env[name]
   return value !== undefined && isAbsolute(value) ? value : undefined
@@ -72,11 +69,9 @@ export function resolveHandPaths(input: HandPathsInput): HandPathsResult {
   if (seam !== undefined && seam !== "") {
     if (!input.fake) return { kind: "unavailable", reason: "seam_with_real_backend" }
     const address: HostAddress =
-      input.platform === "linux"
-        ? { kind: "abstract", name: `omo-host-api-${input.uid}-${sha256Hex16(seam)}` }
-        : input.platform === "win32"
-          ? { kind: "endpoint", path: join(seam, "host-endpoint") }
-          : { kind: "socket", path: join(seam, "host-api.sock") }
+      input.platform === "win32"
+        ? { kind: "endpoint", path: join(seam, "host-endpoint") }
+        : { kind: "socket", path: join(seam, "host-api.sock") }
     return { kind: "resolved", paths: paths(seam, seam, seam, address) }
   }
   switch (input.platform) {
@@ -114,17 +109,13 @@ export function resolveHandPaths(input: HandPathsInput): HandPathsResult {
         (input.home === undefined ? undefined : join(input.home, ".local", "state"))
       if (configBase === undefined || stateBase === undefined) return { kind: "unavailable", reason: "no_config_root" }
       const runtimeBase = absolute(input.env, "XDG_RUNTIME_DIR") ?? `/run/user/${input.uid}`
+      const runtime = join(runtimeBase, "omo-computer", String(input.uid))
       return {
         kind: "resolved",
-        paths: paths(
-          join(stateBase, "omo", "computer-control"),
-          join(runtimeBase, "omo-computer", String(input.uid)),
-          join(configBase, "omo"),
-          {
-            kind: "abstract",
-            name: `omo-host-api-${input.uid}`,
-          },
-        ),
+        paths: paths(join(stateBase, "omo", "computer-control"), runtime, join(configBase, "omo"), {
+          kind: "socket",
+          path: join(runtime, "host-api.sock"),
+        }),
       }
     }
   }

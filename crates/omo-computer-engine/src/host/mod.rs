@@ -83,17 +83,7 @@ fn set(audit: Option<String>) -> HostView {
 /// # Errors
 /// Why no path is named, as the audit text of a latch SET.
 pub fn host_paths(lookup: impl Fn(&str) -> Option<String>, fake: bool) -> Result<HostPaths, String> {
-    host_paths::resolve(&lookup, fake, uid()).map_err(|why| format!("host_paths_unavailable:{why:?}"))
-}
-
-#[cfg(unix)]
-fn uid() -> u32 {
-    files::euid()
-}
-
-#[cfg(not(unix))]
-const fn uid() -> u32 {
-    0
+    host_paths::resolve(&lookup, fake).map_err(|why| format!("host_paths_unavailable:{why:?}"))
 }
 
 /// The host view for this engine's environment; `fake` says the backend is the fake.
