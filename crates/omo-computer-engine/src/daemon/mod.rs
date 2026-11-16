@@ -5,6 +5,7 @@
 
 mod admit;
 mod conn;
+mod idle;
 mod state;
 
 use std::fs::OpenOptions;
@@ -42,6 +43,17 @@ fn watch_launcher() {
     });
 }
 
+/// Ends the daemon once it has been idle with no open session for [`idle::IDLE_EXIT`].
+fn watch_idle(shared: std::sync::Arc<Shared>) {
+    std::thread::spawn(move || loop {
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        if shared.idle.expired() {
+            eprintln!("omo-computer-engine: --serve: idle with no open session, exiting");
+            std::process::exit(0);
+        }
+    });
+}
+
 fn serve(endpoint: &Path, lock: &Path) -> io::Result<()> {
     OpenOptions::new().write(true).create_new(true).open(lock)?;
     let generation = read_capability()?;
@@ -52,6 +64,7 @@ fn serve(endpoint: &Path, lock: &Path) -> io::Result<()> {
     let spawning_host = i32::try_from(std::os::unix::process::parent_id()).unwrap_or_default();
     let shared = Shared::new(runtime, fake, generation, vec![spawning_host]);
     let listener = UnixListener::bind(endpoint)?;
+    watch_idle(std::sync::Arc::clone(&shared));
     for (connection, stream) in listener.incoming().enumerate() {
         let Ok(mut stream) = stream else { continue };
         let shared = std::sync::Arc::clone(&shared);

@@ -108,6 +108,14 @@ pub fn serve(stream: UnixStream, grant: Grant, shared: &Arc<Shared>, connection:
             send(&out, &error(&id, -32_001, "unauthorized", json!({"code": "unauthorized"})));
             break;
         }
+        match request.get("method").and_then(Value::as_str) {
+            Some("session.open") => shared.idle.opened(connection),
+            Some("session.close") => shared.idle.closed(connection),
+            Some("$/test.advanceClock") => {
+                shared.idle.advance(request.pointer("/params/ms").and_then(Value::as_u64).unwrap_or(0));
+            }
+            _ => {}
+        }
         if !own_method(&request, &id, grant, shared, &out) {
             let mut bytes = request.to_string().into_bytes();
             bytes.push(b'\n');
@@ -119,6 +127,7 @@ pub fn serve(stream: UnixStream, grant: Grant, shared: &Arc<Shared>, connection:
     drop(forward);
     let _ = executor.join();
     shared.unsubscribe(connection);
+    shared.idle.closed(connection);
     let _ = out.lock().unwrap_or_else(PoisonError::into_inner).shutdown(std::net::Shutdown::Both);
 }
 
