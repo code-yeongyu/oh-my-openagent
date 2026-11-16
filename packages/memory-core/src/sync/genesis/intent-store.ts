@@ -17,14 +17,17 @@ type IntentOwner = {
   readonly keyring: DeviceKeyring
   readonly pinDir: string
 } & SyncOperationOptions
-const location = (owner: IntentOwner): string =>
+/** Where one account/principal keeps its genesis intent; its lock and phrase markers sit beside it. */
+export const genesisIntentLocation = (pinDir: string, account: string, principalId: string): string =>
   join(
-    owner.pinDir,
+    pinDir,
     "genesis-intent",
     createHash("sha256")
-      .update(JSON.stringify([owner.account, owner.keyring.principal().id]))
+      .update(JSON.stringify([account, principalId]))
       .digest("hex"),
   )
+const location = (owner: IntentOwner): string =>
+  genesisIntentLocation(owner.pinDir, owner.account, owner.keyring.principal().id)
 const missing = (error: unknown): boolean => error instanceof Error && "code" in error && error.code === "ENOENT"
 
 /** One account/principal ceremony across CLI and engine processes, including native preparation. */
