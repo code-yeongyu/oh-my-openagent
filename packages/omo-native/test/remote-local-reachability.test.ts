@@ -76,6 +76,8 @@ const SPAWN_CALL_SITES = [
   // omo#13748: `open --prompt` hands the new session its first message through the same person pipeline as `send`.
   "packages/omo-native/remote-session-verbs.ts: openOn(remote; args)",
   "packages/omo-native/remote-session-verbs.ts: packages/omo-senpi/src/components/thread/gateway/provenance-resolver.ts#resolveProvenance({cwd,env}; -)",
+  // The person client's sessions.open stamps this device's sender provenance (one git remote read), as the session verbs did.
+  "packages/omo-senpi/src/components/remote/sessions.ts: packages/omo-senpi/src/components/thread/gateway/provenance-resolver.ts#resolveProvenance({cwd,env}; -)",
   "packages/omo-native/remote-session-verbs.ts: personDelivery(remote; dependencies)",
   "packages/omo-native/remote-session-verbs.ts: personDelivery(remote; dependencies)",
   "packages/omo-native/remote-session-verbs.ts: personSenderProvenance(remote; -)",
