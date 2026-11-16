@@ -67,6 +67,11 @@ impl FakeBackend {
     }
 
     #[must_use]
+    pub fn executable_path(&self, pid: u32) -> Option<String> {
+        self.lock().scenario.executable_path.get(&pid).cloned()
+    }
+
+    #[must_use]
     pub fn hand(&self) -> Option<HandIdentity> {
         self.lock().scenario.hand.clone()
     }

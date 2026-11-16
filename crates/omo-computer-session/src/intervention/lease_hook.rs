@@ -50,6 +50,7 @@ impl crate::Session {
             refs: crate::refs::RefRegistry::default(),
             frames: crate::frames::FrameStore::default(),
             trace: crate::trace::Trace::default(),
+            settle: crate::settle::SettleState::default(),
             display_awake: crate::intervention::SharedHold::default(),
         })
     }

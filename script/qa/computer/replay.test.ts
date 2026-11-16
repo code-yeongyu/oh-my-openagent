@@ -1,7 +1,9 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { existsSync, readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
+import { isImported, scenarioOverride } from "./replay-case"
 
 const ROOT = resolve(import.meta.dir, "../../..")
 const DRIVER = join(ROOT, "script/qa/computer/replay.ts")
@@ -175,17 +177,29 @@ async function probe(casePath: string): Promise<{ run: Run; argv: unknown[] }> {
   }
 }
 
+// A stand-in engine runnable on every OS: the script itself where its shebang runs it, and a
+// binary compiled for this host on Windows, which cannot spawn a script.
+async function standIn(name: string, source: string): Promise<string> {
+  const script = join(dir, `${name}.ts`)
+  await writeFile(script, source)
+  if (process.platform !== "win32") {
+    await chmod(script, 0o755)
+    return script
+  }
+  const binary = join(dir, `${name}.exe`)
+  const build = Bun.spawn(["bun", "build", "--compile", script, "--outfile", binary], {
+    stdout: "inherit",
+    stderr: "inherit",
+  })
+  expect(await build.exited).toBe(0)
+  return binary
+}
+
 beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), "omo-replay-test-"))
-  scripted = join(dir, "scripted-engine.ts")
-  await writeFile(scripted, SCRIPTED_ENGINE)
-  await chmod(scripted, 0o755)
-  probeEngine = join(dir, "probe-engine.ts")
-  await writeFile(probeEngine, PROBE_ENGINE)
-  await chmod(probeEngine, 0o755)
-  plantEngine = join(dir, "plant-engine.ts")
-  await writeFile(plantEngine, PLANT_ENGINE)
-  await chmod(plantEngine, 0o755)
+  scripted = await standIn("scripted-engine", SCRIPTED_ENGINE)
+  probeEngine = await standIn("probe-engine", PROBE_ENGINE)
+  plantEngine = await standIn("plant-engine", PLANT_ENGINE)
   const build = Bun.spawn(["cargo", "build", "-p", "omo-computer-engine", "--locked"], {
     cwd: ROOT,
     stdout: "inherit",
@@ -526,4 +540,42 @@ describe("replay driver", () => {
     expect(run.stdout).toContain("sink")
     expect(run.code).toBe(1)
   }, 60_000)
+})
+
+describe("SCENARIO-OVERRIDES.tsv (R70bj)", () => {
+  const dir = join(ROOT, "crates/omo-computer-core/fixtures/conformance")
+  const rows = readFileSync(join(dir, "v3-scenario-overrides.tsv"), "utf8")
+    .split("\n")
+    .slice(1)
+    .filter(Boolean)
+    .map((line) => line.split("\t"))
+
+  test("every row names an existing imported case and an existing fixture", async () => {
+    expect(rows.length).toBe(9)
+    for (const [file, scenario] of rows) {
+      expect(file.startsWith("crates/omo-computer-core/fixtures/conformance/")).toBe(true)
+      expect(existsSync(join(ROOT, file))).toBe(true)
+      expect(await isImported(join(ROOT, file))).toBe(true)
+      expect(existsSync(join(ROOT, scenario))).toBe(true)
+      expect(await scenarioOverride(join(ROOT, file))).toBe(scenario)
+    }
+  })
+
+  test("a case that is not in the table loads its own scenario", async () => {
+    expect(await scenarioOverride(join(dir, "v3-consent-identity-changed.json"))).toBeUndefined()
+  })
+
+  // Review L8 at a07dff9 (R70cl): the table keys on the repository-relative path, so a case with
+  // the same file name in another conformance tree is never redirected.
+  test("a case of the same name elsewhere is not redirected", async () => {
+    const elsewhere = join(ROOT, "crates/senpi-desktop-core/fixtures/conformance/frame-invalidation.json")
+    expect(await scenarioOverride(elsewhere)).toBeUndefined()
+    expect(await scenarioOverride(join(dir, "frame-invalidation.json"))).toBeDefined()
+  })
+
+  test("a missing table is an error, never an empty table", async () => {
+    await expect(scenarioOverride(join(dir, "frame-invalidation.json"), join(dir, "no-such-overrides.tsv"))).rejects.toThrow(
+      "scenario_overrides_unreadable",
+    )
+  })
 })

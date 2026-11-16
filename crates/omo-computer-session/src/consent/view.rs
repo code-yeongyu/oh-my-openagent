@@ -48,6 +48,11 @@ pub struct ConsentView {
     /// The file differs from the host's last write: exec refused, reads continue.
     pub tampered: bool,
     pub foreground_input_lock: bool,
+    /// `stopHotkey` as carried by the handed view (A-IS-62 rev 5, R70ao(2)): `None` = the member is
+    /// NOT carried (unreadable), `Some(None)` = JSON null, absent in the file (the OS default),
+    /// `Some(Some(chord))` = the configured chord.
+    #[serde(default = "not_carried", deserialize_with = "carried")]
+    pub stop_hotkey: Option<Option<String>>,
 }
 
 impl Default for ConsentView {
@@ -61,16 +66,85 @@ impl Default for ConsentView {
             full_access: false,
             tampered: false,
             foreground_input_lock: false,
+            // A view built in code models "absent in the file" (R70ao(2)).
+            stop_hotkey: Some(None),
+        }
+    }
+}
+
+const fn not_carried() -> Option<Option<String>> {
+    None
+}
+
+fn carried<'de, D: serde::Deserializer<'de>>(de: D) -> Result<Option<Option<String>>, D::Error> {
+    Option::<String>::deserialize(de).map(Some)
+}
+
+/// The stop chord the consent file names (A-IS-62).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StopChord {
+    /// A parseable chord, or the documented OS default when the key is absent.
+    Chord(String),
+    /// Not a chord: it never falls back to the default (the listener reads deaf on it).
+    Unparseable(String),
+    /// The view did not carry the member: nothing is equal and every exec is refused (R70an B).
+    Unreadable,
+}
+
+/// The documented default `computer.stopHotkey` per OS (`design/d-safety.md`:84).
+#[must_use]
+pub const fn default_stop_hotkey(os: omo_computer_safety::protected::Os) -> &'static str {
+    match os {
+        omo_computer_safety::protected::Os::Macos => "ctrl+opt+cmd+escape",
+        omo_computer_safety::protected::Os::Linux | omo_computer_safety::protected::Os::Windows => {
+            "ctrl+alt+shift+escape"
         }
     }
 }
 
 impl ConsentView {
-    /// The view a host wrote; a view that does not parse is treated as tampered.
+    /// The stop chord this view names on `os`: absent is the OS default; an unparseable value is
+    /// not a chord and never the default (A-IS-62).
+    #[must_use]
+    pub fn stop_chord(&self, os: omo_computer_safety::protected::Os) -> StopChord {
+        match &self.stop_hotkey {
+            None => StopChord::Unreadable,
+            Some(None) => StopChord::Chord(default_stop_hotkey(os).to_owned()),
+            // Review L6: the parser's canonical spelling, the one the backend is sent and the
+            // re-arm compares.
+            Some(Some(text)) => omo_computer_safety::protected::Chord::parse(text)
+                .map_or_else(|| StopChord::Unparseable(text.clone()), |chord| StopChord::Chord(chord.canonical())),
+        }
+    }
+
+    /// Whether `requested` is the configured stop chord on `os`, compared through the engine's
+    /// ONE chord parser (A-IS-62 rev 5): spelling, case and order fold; an unparseable chord on
+    /// either side equals nothing.
+    #[must_use]
+    pub fn same_stop_chord(&self, os: omo_computer_safety::protected::Os, requested: &str) -> bool {
+        let StopChord::Chord(configured) = self.stop_chord(os) else {
+            return false;
+        };
+        let parse = omo_computer_safety::protected::Chord::parse;
+        matches!((parse(&configured), parse(requested)), (Some(a), Some(b)) if a == b)
+    }
+
+    /// The view a host wrote; a view that does not parse is treated as tampered. Its stopHotkey
+    /// keeps the member's own state (review L2, A-IS-62): missing is not carried, null is the OS
+    /// default, and any other value that is not a string is "not a chord", never the default.
     #[must_use]
     pub fn from_host(value: serde_json::Value) -> Self {
+        let stop_hotkey = match value.get("stopHotkey") {
+            None => None,
+            Some(serde_json::Value::Null) => Some(None),
+            Some(serde_json::Value::String(text)) => Some(Some(text.clone())),
+            // The raw text alone could parse (`5` is a key), so it ends in an empty key segment,
+            // which the engine's one parser refuses: the value is kept as "not a chord".
+            Some(other) => Some(Some(format!("{other}+"))),
+        };
         serde_json::from_value(value).unwrap_or_else(|_| Self {
             tampered: true,
+            stop_hotkey,
             ..Self::default()
         })
     }

@@ -75,7 +75,17 @@ pub(super) fn refused_call(refused: &Refused) -> Failure {
             data["warning"] = json!(warning);
         }
     }
+    busy_data(refused, &mut failure);
     failure
+}
+
+/// `InputBusy{target_busy}`: the busy wait's `indicator`, `waitedMs` and `retryAfterMs`.
+fn busy_data(refused: &Refused, failure: &mut Failure) {
+    if let (Some(busy), Some(data)) = (&refused.busy, failure.data.as_mut()) {
+        data["indicator"] = json!(busy.indicator);
+        data["waitedMs"] = json!(busy.waited_ms);
+        data["retryAfterMs"] = json!(busy.retry_after_ms);
+    }
 }
 
 /// A ref that did not resolve: the refusal, and on `AmbiguousTarget` the `candidates`.
