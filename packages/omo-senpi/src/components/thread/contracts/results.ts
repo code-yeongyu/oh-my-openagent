@@ -149,6 +149,11 @@ export type ThreadListResult =
        * unreachable), or `devices_unavailable` when only the device roster failed (the threads are still merged).
        */
       readonly remote_unavailable?: string
+      /**
+       * Set when the account's alias registry could not be read (`sign_in`, or `host_unavailable`): the threads are listed
+       * without aliases, so a missing alias is unknown, not free.
+       */
+      readonly aliases_unavailable?: "sign_in" | "host_unavailable"
     }
   | ThreadDataError
 

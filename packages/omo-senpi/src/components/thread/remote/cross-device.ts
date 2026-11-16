@@ -266,9 +266,11 @@ async function withAliases(
   try {
     aliases = await remote.aliases.aliasesOf(ids)
   } catch {
-    return listed
+    return { ...listed, aliases_unavailable: "host_unavailable" }
   }
-  if (aliases.kind === "error") return listed
+  // Said, never silently dropped (#13923): a row without an alias then means "not read", never "holds none".
+  if (aliases.kind === "error")
+    return { ...listed, aliases_unavailable: signedOut(aliases.error) ? "sign_in" : "host_unavailable" }
   return {
     ...listed,
     threads: listed.threads.map((thread) => {
