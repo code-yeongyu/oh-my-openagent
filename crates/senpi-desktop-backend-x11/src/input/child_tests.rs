@@ -11,15 +11,16 @@ use super::server::SentEvent;
 use super::X11Input;
 
 const SHELL: Window = 0x40_0001;
-const VT100: Window = 0x40_0002;
+const TEXT_WIDGET: Window = 0x40_0002;
 
 #[test]
 fn a_background_click_is_sent_to_the_child_widget_under_the_point() {
-    // Given: an xterm-like shell whose VT100 widget covers its client area.
+    // Given: an Xt shell whose text widget covers its client area.
     let mut input = X11Input::with_server(
         FakeInputServer::new(Some(0x80_0001))
-            .window(SHELL, (100, 50), b"xterm\0XTerm\0")
-            .child(SHELL, VT100),
+            .window(SHELL, (100, 50), b"xedit\0Xedit\0")
+            .process(SHELL, &["libXaw.so.7", "libXt.so.6"], &["xedit"])
+            .child(SHELL, TEXT_WIDGET),
     );
     let click = PointerEvent::Click {
         x: 130.0,
@@ -46,5 +47,5 @@ fn a_background_click_is_sent_to_the_child_widget_under_the_point() {
             _ => None,
         })
         .collect();
-    assert_eq!(windows, [VT100, VT100]);
+    assert_eq!(windows, [TEXT_WIDGET, TEXT_WIDGET]);
 }

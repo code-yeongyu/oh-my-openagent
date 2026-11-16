@@ -1,6 +1,7 @@
-import { createHash } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import {
   chmodSync,
+  constants,
   copyFileSync,
   existsSync,
   mkdirSync,
@@ -87,10 +88,10 @@ export function materializeProvisionedExecutable(
       return
     }
   }
-  const temporaryPath = `${destinationPath}.tmp-${process.pid}`
+  // Workers and separate PID namespaces can share a PID and runtime directory.
+  const temporaryPath = `${destinationPath}.tmp-${process.pid}-${randomUUID()}`
   try {
-    rmSync(temporaryPath, { force: true })
-    copyFileSync(sourcePath, temporaryPath)
+    copyFileSync(sourcePath, temporaryPath, constants.COPYFILE_EXCL)
     chmodSync(temporaryPath, 0o755)
     renameSync(temporaryPath, destinationPath)
   } finally {

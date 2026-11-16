@@ -10,6 +10,9 @@ import {
   readUsernsView,
   USERNS_ROOTS_ENV,
 } from "../trust-userns"
+import { usePrivateTmpdir } from "./trust-private-tmpdir"
+
+usePrivateTmpdir()
 
 const NAMESPACED_MAP = "      1000       1000          1\n"
 const INITIAL_MAP = "         0          0 4294967295\n"
