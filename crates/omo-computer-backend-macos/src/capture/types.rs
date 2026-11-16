@@ -26,8 +26,9 @@ pub struct CgWindow {
 pub struct AxWindowFacts {
     /// `kAXMinimizedAttribute`.
     pub minimized: bool,
-    /// The window is the app's `kAXFocusedWindowAttribute` and the app is frontmost.
-    pub focused: bool,
+    /// The window is its app's `kAXFocusedWindowAttribute`. Every running app has one, so this
+    /// alone never makes a window focused: the listing also requires the app to be frontmost.
+    pub focused_in_app: bool,
     /// `kAXTitleAttribute`, used when the list withholds the title.
     pub title: Option<String>,
 }

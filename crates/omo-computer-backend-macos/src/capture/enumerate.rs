@@ -30,7 +30,10 @@ pub struct Listed {
 /// The window server answered no list.
 pub fn listing(os: &mut dyn CaptureOs, own_pid: u32) -> BackendResult<Vec<Listed>> {
     let windows = os.window_list()?;
-    let displays = os.displays()?;
+    let scene = Scene {
+        displays: os.displays()?,
+        frontmost: os.frontmost_pid(),
+    };
     let mut starts: BTreeMap<u32, Option<u64>> = BTreeMap::new();
     let mut listed = Vec::new();
     for window in windows.iter().filter(|w| eligible(w, own_pid)) {
@@ -47,7 +50,7 @@ pub fn listing(os: &mut dyn CaptureOs, own_pid: u32) -> BackendResult<Vec<Listed
             .unwrap_or_else(|| window.owner.clone());
         let space = os.space_of(window.number);
         let z = u32::try_from(listed.len()).unwrap_or(u32::MAX);
-        let info = record(window, process_start, &ax, app_key, space, &displays, z);
+        let info = record(window, process_start, &ax, app_key, space, &scene, z);
         listed.push(Listed {
             info,
             minimized: ax.minimized,
@@ -103,6 +106,12 @@ pub fn own_on_screen(os: &mut dyn CaptureOs, own_pid: u32) -> BackendResult<Vec<
         .collect())
 }
 
+/// What one listing reads once for all its windows.
+struct Scene {
+    displays: Vec<DisplayRecord>,
+    frontmost: Option<u32>,
+}
+
 fn eligible(window: &CgWindow, own_pid: u32) -> bool {
     window.layer == 0
         && window.pid != own_pid
@@ -128,7 +137,7 @@ fn record(
     ax: &AxWindowFacts,
     app_key: String,
     space: Option<String>,
-    displays: &[DisplayRecord],
+    scene: &Scene,
     z: u32,
 ) -> WindowInfo {
     let title = match (&ax.title, window.title.is_empty()) {
@@ -148,10 +157,11 @@ fn record(
         app_key,
         title,
         bounds: window.bounds,
-        display: display_of(displays, &window.bounds)
+        display: display_of(&scene.displays, &window.bounds)
             .map(|d| d.id.to_string())
             .unwrap_or_default(),
-        focused: ax.focused,
+        // Every running app has a focused window; only the frontmost app's one is focused.
+        focused: ax.focused_in_app && scene.frontmost == Some(window.pid),
         is_on_screen: window.on_screen,
         space,
         minimized: ax.minimized,

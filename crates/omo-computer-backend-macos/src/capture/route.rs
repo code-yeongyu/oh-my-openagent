@@ -1,7 +1,8 @@
 //! The capture route ladder. The persistent ScreenCaptureKit helper is the default route; the
 //! SkyLight window capture runs only when its symbol resolved AND the session opted in (until
 //! row 78's receipt makes it the default), and falls back to the helper on an error or a fully
-//! transparent frame.
+//! transparent frame. The SkyLight capture draws no pointer, so a frame with the pointer always
+//! takes the helper.
 
 use image::RgbaImage;
 use omo_computer_core::backend::Refusal;
@@ -43,10 +44,10 @@ pub fn window_still(
     cursor: bool,
     skylight_opt_in: bool,
 ) -> Result<(RgbaImage, CaptureRouteTaken), Refusal> {
-    if skylight_opt_in {
+    if skylight_opt_in && !cursor {
         let frame = os
             .skylight()
-            .and_then(|route| route.capture_window(number, cursor).ok())
+            .and_then(|route| route.capture_window(number).ok())
             .and_then(from_raw)
             .filter(|image| !fully_transparent(image));
         if let Some(image) = frame {

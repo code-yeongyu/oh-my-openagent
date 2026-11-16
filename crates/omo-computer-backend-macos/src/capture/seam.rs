@@ -18,6 +18,9 @@ pub trait CaptureOs: Send {
     fn process_start(&mut self, pid: u32) -> Option<u64>;
     /// The bundle id of `pid`'s application; `None` for a bare executable.
     fn bundle_id(&mut self, pid: u32) -> Option<String>;
+    /// The pid of the frontmost application (the system-wide `AXFocusedApplication`); `None`
+    /// when no application is frontmost or AX cannot read it.
+    fn frontmost_pid(&mut self) -> Option<u32>;
     /// The accessibility facts of the window; `None` when AX cannot match it.
     fn ax_window(&mut self, window: &CgWindow) -> Option<AxWindowFacts>;
     /// The Space of the window through the probed SkyLight symbol; `None` when unresolved.
@@ -36,11 +39,11 @@ pub trait CaptureOs: Send {
     fn helper(&mut self) -> Result<&mut dyn CaptureHelper, CaptureFault>;
 }
 
-/// The SkyLight hardware window capture, one window's own pixels.
+/// The SkyLight hardware window capture, one window's own pixels, never the pointer.
 pub trait SkylightCapture: Send {
     /// # Errors
     /// A [`CaptureFault`] when the call yields no image.
-    fn capture_window(&mut self, number: u32, cursor: bool) -> Result<RawFrame, CaptureFault>;
+    fn capture_window(&mut self, number: u32) -> Result<RawFrame, CaptureFault>;
 }
 
 /// The capture helper's request/reply channel.

@@ -1,5 +1,6 @@
-//! The AX side of the listing: a window's minimized, focused and title facts, matched to its
-//! window number through the private `_AXUIElementGetWindow` when it resolves, else by frame.
+//! The AX side of the listing: the frontmost application, and a window's minimized,
+//! focused-in-its-app and title facts, matched to its window number through the private
+//! `_AXUIElementGetWindow` when it resolves, else by frame.
 
 use std::ffi::{c_void, CStr};
 
@@ -14,6 +15,8 @@ const VALUE_CGSIZE: u32 = 2;
 #[link(name = "ApplicationServices", kind = "framework")]
 unsafe extern "C" {
     fn AXUIElementCreateApplication(pid: i32) -> CfRef;
+    fn AXUIElementCreateSystemWide() -> CfRef;
+    fn AXUIElementGetPid(element: CfRef, pid: *mut i32) -> i32;
     fn AXUIElementCopyAttributeValue(element: CfRef, attribute: CfRef, value: *mut CfRef) -> i32;
     fn AXValueGetValue(value: CfRef, kind: u32, out: *mut c_void) -> bool;
 }
@@ -58,6 +61,20 @@ fn same_window(element: CfRef, window: &CgWindow) -> bool {
     frame_matches(element, window)
 }
 
+/// The pid of the frontmost application; `None` without the Accessibility grant or when no
+/// application is frontmost.
+pub fn frontmost_pid() -> Option<u32> {
+    // SAFETY: plain call; the result is a +1 AXUIElement.
+    let system = Owned::new(unsafe { AXUIElementCreateSystemWide() })?;
+    let app = attribute(system.get(), c"AXFocusedApplication")?;
+    let mut pid = 0i32;
+    // SAFETY: `app` is an AXUIElement and `pid` an i32 the call writes.
+    let status = unsafe { AXUIElementGetPid(app.get(), &raw mut pid) };
+    (status == AX_SUCCESS)
+        .then_some(pid)
+        .and_then(|p| u32::try_from(p).ok())
+}
+
 /// The facts of `window`; `None` without the Accessibility grant or without a match.
 pub fn facts(window: &CgWindow) -> Option<AxWindowFacts> {
     let pid = i32::try_from(window.pid).ok()?;
@@ -73,7 +90,7 @@ pub fn facts(window: &CgWindow) -> Option<AxWindowFacts> {
         same_window(element, window).then(|| AxWindowFacts {
             minimized: attribute(element, c"AXMinimized").is_some_and(|v| cf::boolean(v.get())),
             // SAFETY: both are AXUIElements; AX hands out distinct references to one window.
-            focused: focused
+            focused_in_app: focused
                 .as_ref()
                 .is_some_and(|f| unsafe { cf::CFEqual(f.get(), element) }),
             title: attribute(element, c"AXTitle").and_then(|v| cf::string(v.get())),
