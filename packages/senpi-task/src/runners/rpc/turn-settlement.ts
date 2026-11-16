@@ -91,7 +91,7 @@ export function sessionIsIdle(state: {
 
 export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement {
   let held: RunnerOutcome | undefined
-  let pendingRetry: RunnerOutcome | undefined
+  let recovery: "announced" | "failed" | undefined
   let confirmation: SettlementTimerHandle | undefined
   let unreadableProbes = 0
   const scheduleConfirmation = input.scheduleConfirmation ?? defaultConfirmationScheduler
@@ -144,7 +144,7 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
   }
 
   const rearm = (): void => {
-    if (held === undefined || held.status !== "error") return
+    if (held === undefined || held.status !== "error" || recovery === "announced") return
     if (input.probe === undefined || input.settleConfirmMs === undefined) return
     if (confirmation !== undefined) return
     confirmation = scheduleConfirmation(confirmHeld, input.settleConfirmMs)
@@ -161,7 +161,7 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
     held = input.abortedByUser()
       ? { status: "cancelled" }
       : { status: "error", failure: { kind: "child-turn-failed", message } }
-    pendingRetry = undefined
+    recovery = "failed"
     unreadableProbes = 0
     rearm()
   }
@@ -172,17 +172,17 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
         case "agent_start":
           clearConfirmation()
           held = undefined
-          pendingRetry = undefined
+          recovery = undefined
           return
         case "agent_end": {
           const outcome = endOutcome(event)
           if (event.willRetry !== false) {
             clearConfirmation()
-            held = undefined
-            pendingRetry = outcome
+            held = outcome
+            recovery = "announced"
             return
           }
-          pendingRetry = undefined
+          recovery = undefined
           // A replaced session runs nothing more for this child: its interrupt is final at once.
           if (outcome.status === "cancelled" || outcome.status === "interrupted") {
             clearConfirmation()
@@ -199,9 +199,7 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
           if (!event.success) {
             holdRecoveryFailure(
               event.finalError ??
-                (pendingRetry?.status === "error"
-                  ? pendingRetry.failure.message
-                  : "RPC child retry ended without completing"),
+                (held?.status === "error" ? held.failure.message : "RPC child retry ended without completing"),
             )
           }
           return
@@ -209,11 +207,12 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
           holdRecoveryFailure(event.errorMessage)
           return
         case "agent_idle": {
-          if (input.wakeSourcesLive?.() === true) return
+          // Session-lifetime monitors outlive completed turns; only recovery still belongs to them.
+          if (recovery !== undefined && input.wakeSourcesLive?.() === true) return
           clearConfirmation()
-          const outcome = held ?? pendingRetry
+          const outcome = held
           held = undefined
-          pendingRetry = undefined
+          recovery = undefined
           if (outcome !== undefined) input.settle(outcome)
           return
         }
@@ -221,7 +220,7 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
           return
       }
     },
-    pending: () => held ?? pendingRetry,
+    pending: () => held,
     cancelConfirmation: clearConfirmation,
     reconfirmHeld: rearm,
   }

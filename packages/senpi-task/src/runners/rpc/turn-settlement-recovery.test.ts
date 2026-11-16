@@ -24,14 +24,14 @@ function fixture(wakeSourcesLive: () => boolean = () => false) {
   return { settlement, scheduler, outcomes }
 }
 
-function retryingEnd(): AgentSessionEvent {
+function turnEnd(willRetry = true): AgentSessionEvent {
   return {
     type: "agent_end",
-    willRetry: true,
+    willRetry,
     messages: [
       {
         role: "assistant",
-        content: [],
+        content: willRetry ? [] : [{ type: "text", text: "done" }],
         api: "anthropic-messages",
         provider: "synthetic",
         model: "primary",
@@ -43,8 +43,8 @@ function retryingEnd(): AgentSessionEvent {
           totalTokens: 0,
           cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
         },
-        stopReason: "error",
-        errorMessage: COMPACTION_ERROR,
+        stopReason: willRetry ? "error" : "stop",
+        ...(willRetry ? { errorMessage: COMPACTION_ERROR } : {}),
         timestamp: 1,
       },
     ],
@@ -52,10 +52,22 @@ function retryingEnd(): AgentSessionEvent {
 }
 
 describe("recovery settlement (omo#13785)", () => {
+  test("settles a completed turn while a session-lifetime monitor remains armed", () => {
+    // given
+    const { settlement, outcomes } = fixture(() => true)
+    settlement.observe(turnEnd(false))
+
+    // when
+    settlement.observe({ type: "agent_idle" })
+
+    // then
+    expect(outcomes).toEqual([{ status: "completed", finalResponse: "done" }])
+  })
+
   test("settles the original retrying error when recovery becomes idle without a retry-end event", () => {
     // given
     const { settlement, outcomes } = fixture()
-    settlement.observe(retryingEnd())
+    settlement.observe(turnEnd())
 
     // when
     settlement.observe({ type: "agent_idle" })
@@ -68,7 +80,7 @@ describe("recovery settlement (omo#13785)", () => {
     // given
     let live = true
     const { settlement, outcomes } = fixture(() => live)
-    settlement.observe(retryingEnd())
+    settlement.observe(turnEnd())
 
     // when
     settlement.observe({ type: "agent_idle" })
@@ -84,7 +96,7 @@ describe("recovery settlement (omo#13785)", () => {
   test("does not arm terminal confirmation for a retry that still owns recovery", () => {
     // given
     const { settlement, scheduler, outcomes } = fixture()
-    settlement.observe(retryingEnd())
+    settlement.observe(turnEnd())
 
     // when
     settlement.reconfirmHeld()
@@ -94,10 +106,27 @@ describe("recovery settlement (omo#13785)", () => {
     expect(outcomes).toEqual([])
   })
 
+  test("keeps failed recovery owned by its wake source until a new run completes", () => {
+    // given
+    const { settlement, outcomes } = fixture(() => true)
+    settlement.observe(turnEnd())
+    settlement.observe({ type: "auto_retry_end", success: false, attempt: 1, finalError: COMPACTION_ERROR })
+
+    // when
+    settlement.observe({ type: "agent_idle" })
+    expect(outcomes).toEqual([])
+    settlement.observe({ type: "agent_start" })
+    settlement.observe(turnEnd(false))
+    settlement.observe({ type: "agent_idle" })
+
+    // then
+    expect(outcomes).toEqual([{ status: "completed", finalResponse: "done" }])
+  })
+
   test("reports a declined retry when no further agent_end or agent_idle arrives", async () => {
     // given
     const { settlement, scheduler, outcomes } = fixture()
-    settlement.observe(retryingEnd())
+    settlement.observe(turnEnd())
 
     // when
     settlement.observe({ type: "auto_retry_end", success: false, attempt: 1, finalError: COMPACTION_ERROR })
@@ -112,7 +141,7 @@ describe("recovery settlement (omo#13785)", () => {
   test("reports a continuation rejection without relying on a second agent_end", () => {
     // given
     const { settlement, outcomes } = fixture()
-    settlement.observe(retryingEnd())
+    settlement.observe(turnEnd())
 
     // when
     settlement.observe({ type: "continuation_error", errorMessage: CONTINUATION_ERROR })
@@ -125,7 +154,7 @@ describe("recovery settlement (omo#13785)", () => {
   test("preserves the announced error when the declined retry omits finalError", async () => {
     // given
     const { settlement, scheduler, outcomes } = fixture()
-    settlement.observe(retryingEnd())
+    settlement.observe(turnEnd())
 
     // when
     settlement.observe({ type: "auto_retry_end", success: false, attempt: 1 })
@@ -139,7 +168,7 @@ describe("recovery settlement (omo#13785)", () => {
   test("does not fail a retry that starts another run", async () => {
     // given
     const { settlement, scheduler, outcomes } = fixture()
-    settlement.observe(retryingEnd())
+    settlement.observe(turnEnd())
 
     // when
     settlement.observe({ type: "auto_retry_end", success: true, attempt: 1 })
@@ -155,7 +184,7 @@ describe("recovery settlement (omo#13785)", () => {
   test("drops a held recovery failure if a continuation takes over", async () => {
     // given
     const { settlement, scheduler, outcomes } = fixture()
-    settlement.observe(retryingEnd())
+    settlement.observe(turnEnd())
     settlement.observe({ type: "auto_retry_end", success: false, attempt: 1, finalError: COMPACTION_ERROR })
 
     // when
