@@ -12,6 +12,9 @@ import { resumeProcess, suspendProcess } from "./gateway/testing/job-control"
 import { createRemoteThreadFixture } from "./thread-remote-fixture"
 import type { ThreadHost } from "./tools"
 import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
+import { DEVICE_SERVICE_STATE_DIR_ENV } from "@oh-my-opencode/device-service-core/device-service"
+import { startFakeOwner } from "../../../../device-service-core/test/local-api/conformance/fake-owner.ts"
+import { defaultWorld, PEER, SESSION_ID } from "../../../../device-service-core/test/local-api/conformance/world.ts"
 
 function host(): ThreadHost {
   return {
@@ -1209,5 +1212,49 @@ describe("thread component production registration", () => {
       context([]) as never,
     )
     expect(f.tools).toHaveLength(18)
+  })
+})
+
+// #13873 follow-up: the remote surface the component builds for itself is its session's. Closing it at session_shutdown
+// clears its attach pool (no idle detach timer outlives the session) and ends the device-service connection it opened.
+// The connection is the observable: closing the port is what clears the pool (device-service.test.ts, #13892).
+describe("the thread component's own remote surface ends with its session", () => {
+  test("#given the component's default remote surface opened its device-service connection #when the session shuts down #then that connection is closed and holds no attach", async () => {
+    const agentDir = mkdtempSync(join(tmpdir(), "thr-component-remote-close-"))
+    const previous = process.env[DEVICE_SERVICE_STATE_DIR_ENV]
+    // The device service refuses a state dir that is not an existing private directory; mkdtemp makes one (0700).
+    const stateDir = mkdtempSync(join(tmpdir(), "thr-component-device-service-"))
+    const owner = await startFakeOwner({ stateDir, world: defaultWorld() })
+    process.env[DEVICE_SERVICE_STATE_DIR_ENV] = owner.stateDir
+    try {
+      const f = eventApi()
+      createThreadComponent({
+        host: host(),
+        stateDirectory: join(agentDir, "state"),
+        agentDir: () => agentDir,
+      }).register(f.pi as never, context([]) as never)
+      const ctx = sessionCtx("dur-1")
+      // Listing the account's sessions loads the default surface, which opens its own device-service connection.
+      await f.tool("thread_list").execute("call-1", {}, undefined, undefined, ctx)
+      expect(owner.state.conns.size).toBe(1)
+      // Subscribed before the shutdown: the owner drops a connection from its set when that connection closes.
+      const closed = new Promise<void>((resolve) => {
+        const remove = owner.state.conns.delete.bind(owner.state.conns)
+        owner.state.conns.delete = (conn) => {
+          const removed = remove(conn)
+          if (owner.state.conns.size === 0) resolve()
+          return removed
+        }
+      })
+      await f.dispatch("session_shutdown", ctx)
+      await within(closed, 5_000, "the component's device-service connection to close at session_shutdown")
+      expect(owner.state.attaches.size).toBe(0)
+    } finally {
+      if (previous === undefined) delete process.env[DEVICE_SERVICE_STATE_DIR_ENV]
+      else process.env[DEVICE_SERVICE_STATE_DIR_ENV] = previous
+      await owner.stop()
+      rmSync(agentDir, { recursive: true, force: true })
+      rmSync(stateDir, { recursive: true, force: true })
+    }
   })
 })

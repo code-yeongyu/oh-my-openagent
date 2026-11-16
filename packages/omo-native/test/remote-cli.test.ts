@@ -21,6 +21,7 @@ import {
 } from "../../device-service-core/test/local-api/conformance/world.ts"
 import { createCredentialStore } from "../../omo-opencode/src/cli/service-auth/keystore"
 import type { RemoteSessionsPort, RemoteThreadSurface } from "../../omo-senpi/src/components/thread/remote/ports"
+import { createDeviceServiceSessions } from "../../omo-senpi/src/components/remote/port/device-service"
 import { createRemoteThreadFixture, ENGINE } from "../../omo-senpi/src/components/thread/thread-remote-fixture"
 import { runAccountVerb } from "../account-cli"
 import { deviceServiceBootstrapSetup } from "../remote-bootstrap"
@@ -1021,5 +1022,52 @@ describe("ago", () => {
     [NOW - 3 * 86_400_000, "3d ago"],
   ])("%p -> %p", (ms, label) => {
     expect(ago(ms, NOW)).toBe(label)
+  })
+})
+
+// #13873 follow-up: the session port prepareRemoteAttach builds only resolves the target on the CLI's connection. It is
+// closed once that is done, so its attach pool keeps no idle detach timer for the life of the attach TUI.
+describe("omo remote attach: the session port it builds", () => {
+  test.each([
+    ["the attach is prepared", `${PEER}/${SESSION_ID}`, "object"],
+    ["the session is not on that device", `${PEER}/missing-session`, "number"],
+  ] as const)("is closed once %s", async (_label, target, outcome) => {
+    const owner = await startFakeOwner({ stateDir: privateDir(), world: defaultWorld() })
+    owners.push(owner)
+    const service = await connectDeviceService({ version: "5.1.52", stateDir: owner.stateDir })
+    let closes = 0
+    try {
+      const prepared = await prepareRemoteAttach(
+        {
+          accountShow: async () => SIGNED_IN,
+          stateDir: owner.stateDir,
+          connect: async () => service,
+          now: () => NOW,
+          output: () => {},
+          write: () => {},
+          error: () => {},
+          remote: (connected) => {
+            const port = createDeviceServiceSessions({
+              version: connected.serviceVersion,
+              connect: async () => ({ conn: connected, owned: false }),
+            })
+            return {
+              sessions: {
+                ...port,
+                close: async () => {
+                  closes += 1
+                  await port.close?.()
+                },
+              },
+              chain: { stamp: (record) => record },
+            }
+          },
+        },
+        [target],
+      )
+      expect([typeof prepared, closes]).toEqual([outcome, 1])
+    } finally {
+      service.close()
+    }
   })
 })
