@@ -119,7 +119,7 @@ A node sees only its prompt: no conversation history, no way to ask you anything
 
 Make PASS/FAIL decidable from the prompt alone ("exit code 0 and `dist/index.js` exists", never "check it works"), and say what to do rather than what to avoid.
 
-`start` may return advisory `warnings` about the definition: a prompt missing its TASK: or STOP WHEN marker, or a graph with no verification-shaped node. They never block the run. Act on one when it points at a real gap; a graph whose check you run yourself needs no verification node.
+`start` may return advisory `warnings` about the definition. They never block the run. Act on one when it points at a real gap; a graph whose check you run yourself needs no verification node.
 
 ## Verification
 
