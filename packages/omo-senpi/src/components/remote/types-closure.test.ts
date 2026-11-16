@@ -19,6 +19,8 @@ const ALLOWED = new Set([
   "packages/omo-senpi/src/components/thread/errors.ts",
   // The one list of approval modes (dev #13748): a leaf that imports nothing.
   "packages/omo-senpi/src/components/thread/contracts/permission-presets.ts",
+  // The alias port (AliasRegistry and its result types): a leaf that imports nothing; ports.ts re-exports it.
+  "packages/omo-senpi/src/components/thread/remote/alias-port.ts",
   "packages/omo-senpi/src/components/thread/remote/ports.ts",
   `${DSC}/src/account-state.ts`,
   `${DSC}/src/local-api/errors.ts`,
