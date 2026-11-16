@@ -81,7 +81,7 @@ impl<S: UiaSource> UiaReader<S> {
         read
     }
 
-    fn element(&self, handle: AxHandle) -> Option<UiaElement> {
+    pub(super) fn element(&self, handle: AxHandle) -> Option<UiaElement> {
         usize::try_from(handle.0)
             .ok()
             .and_then(|index| self.elements.get(index))

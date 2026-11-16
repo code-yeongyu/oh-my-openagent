@@ -51,3 +51,22 @@ fn paste_and_clipboard_read_on_a_password_focus_are_refused_secure_focus() {
     let mut nothing = UiaHost::new(Box::new(|| Ok(FakeUia::winforms())));
     assert_eq!(nothing.secure_focus(None), None, "no focus read: unknown, which the gate refuses");
 }
+
+/// Review M1 of #13837: the focused password box is a child window of the named top-level window,
+/// so the secure-focus read compares the window it lives in, not its own child HWND.
+#[test]
+fn secure_focus_on_a_named_window_matches_a_password_box_with_its_own_child_hwnd() {
+    let mut host = UiaHost::new(Box::new(|| Ok(password_focused())));
+    assert_eq!(host.secure_focus(Some("4660")), Some(true), "the box's top-level window is 0x1234");
+    assert_eq!(host.secure_focus(Some("1")), Some(false), "focus is in another window");
+}
+
+/// Review L2 of #13837: a password box's value never stays in the reader's kept elements.
+#[test]
+fn a_password_value_is_not_kept_by_the_reader() {
+    let mut reader = UiaReader::new(FakeUia::winforms());
+    let read = children(&mut reader);
+    let password = read.iter().find(|n| n.secure).expect("password node");
+    let kept = reader.element(password.handle.expect("handle")).expect("kept");
+    assert_eq!(kept.value, None, "the secret is dropped at the read");
+}

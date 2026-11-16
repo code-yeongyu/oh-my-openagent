@@ -17,6 +17,9 @@ pub struct UiaElement {
     pub enabled: bool,
     pub bounds: Option<Rect>,
     pub hwnd: isize,
+    /// The top-level window (`GetAncestor(GA_ROOT)`) the element lives in; a control's own
+    /// `hwnd` is a child window, and a windowless element has none.
+    pub top_level: isize,
     pub pid: u32,
     pub process_start: u64,
     pub child_count: u32,

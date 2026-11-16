@@ -115,6 +115,7 @@ fn read(element: &IUIAutomationElement) -> UiaElement {
                 height: f64::from(r.bottom - r.top),
             }),
             hwnd: element.CachedNativeWindowHandle().map_or(0, |h| h.0 as isize),
+            top_level: 0,
             pid: element.CachedProcessId().map_or(0, |pid| u32::try_from(pid).unwrap_or(0)),
             process_start: 0,
             child_count: 0,
