@@ -91,6 +91,7 @@ impl Session {
             Write::Clipboard { text } => return (outcome_of(self.backend.clipboard_write(text).map(|()| omo_computer_core::backend::Delivered { count: 1, of: 1 })), None),
             Write::Paste { text, chord, restore } => return self.send_paste(text, chord, restore),
             Write::Quit { app_key, pid, force } => {
+                let before = quit_readback::app_listed(self.backend.as_mut(), app_key, *pid);
                 let input = omo_computer_core::backend::TaggedInput {
                     event: omo_computer_core::backend::InputEvent::AppQuit { app_key: app_key.clone(), force: *force },
                     tag,
@@ -99,7 +100,7 @@ impl Session {
                     return (outcome_of(Err(refusal)), None);
                 }
                 let after = quit_readback::app_listed(self.backend.as_mut(), app_key, *pid);
-                return (Outcome { count: 1, of: 1, stop: None }, Some(quit_readback::judge(after)));
+                return (Outcome { count: 1, of: 1, stop: None }, Some(quit_readback::judge(before, after)));
             }
             Write::Minimized { window, minimize } => {
                 let sent = self.backend.set_minimized(window, *minimize).map(|()| omo_computer_core::backend::Delivered { count: 1, of: 1 });
