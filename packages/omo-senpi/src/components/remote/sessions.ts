@@ -446,7 +446,8 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     let asked = translated
     const preset = request.preset
     // A person (at a terminal or not) opens in the mode it names (absent, the engine's own default). A caller that acts
-    // for a session may keep or narrow that session's mode; absent, it keeps it. A mode it is not told passes only `ask`.
+    // for a session may keep or narrow that session's mode; absent, it keeps it. Not told its mode, only `ask` passes, and
+    // an open without a preset asks for `ask`.
     if (sender.kind === "session" || sender.kind === "connector") {
       const told = core.deps.permissionPreset?.()
       const own = told !== undefined && isPermissionPreset(told) ? told : undefined
@@ -457,7 +458,8 @@ export function sessionMembers(core: ClientCore): SessionMembers {
           "Call sessions.open with this session's own mode or a narrower one (ask is always allowed), or without a preset.",
           { details: { reason: "permission_preset_wider", requested: preset, ...(own === undefined ? {} : { own }) } },
         )
-      if (preset === undefined && own !== undefined) asked = { ...asked, permissionPreset: own }
+      // Never the device default, which may allow more than the mode this caller acts in.
+      if (preset === undefined) asked = { ...asked, permissionPreset: own ?? "ask" }
     }
     const key = request.idempotency_key
     if (key === undefined) return await openOnce(request, asked, openBudget(request, opts))
