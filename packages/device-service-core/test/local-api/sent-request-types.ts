@@ -65,5 +65,6 @@ export const scanSentRequestTypes = (root: string = SRC): SentScan => {
     for (const [, type] of text.matchAll(LITERAL_SEND)) if (isRequestType(type)) sent.add(type)
     for (const [, argument] of text.matchAll(OTHER_SEND)) unscanned.push(`${relative(root, file)}: ${argument}`)
   }
-  return { sent: [...sent].toSorted(), unscanned }
+  // readdir order differs between file systems, so both lists are sorted.
+  return { sent: [...sent].toSorted(), unscanned: unscanned.toSorted() }
 }
