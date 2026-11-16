@@ -70,8 +70,9 @@ const r = (await tool.thread_list({ all_scope: true })).details.result
 | any machine op | `MachineWireError`, `e.code === "host_detached"` | The target device's service is not attached right now. Report it; retry only after it is back. |
 | any machine op | `e.code === "invoke_deadline"` / `"budget_exceeded"` | Too slow for one call: use `spawn` or `exec_command` instead of `shell`. |
 | first `bunshin` call | `BunshinSessionError`, `e.code === "no_transport"` | This device's device service is not connected to the relay. Tell the user to sign in and turn remote control on; do not retry. |
-| relay | `RelayTransportError`, `e.code` `not_connected` / `closed` | The relay link dropped and the op was not sent. Retry once; if it repeats, report it. |
-| relay | `RelayTransportError`, `e.code === "request_timeout"` | The op may already have run. Do not send it again: call `bunshin.resultOf(e.requestId)` until its `state` is `terminal` and use that `result`. |
+| relay | `RelayTransportError`, `e.code === "not_connected"` | No relay link was open, so the op was not sent. Retry once; if it repeats, report it. |
+| relay | `RelayTransportError`, `e.code === "closed"` | The link closed with the op pending; it may already have run, and this error carries no `requestId`. Before re-running anything with side effects, check its effect on that machine (the file, process or output it would have produced); only an idempotent op may simply be retried once. |
+| relay | `RelayTransportError`, `e.code === "request_timeout"` | The op may already have run. Do not send it again: poll `bunshin.resultOf(e.requestId)` while it returns `{ state: "in-flight" }`. On `{ state: "terminal", result }`, the op's output is `result.response` when `result.state === "applied"` (for `shell`, the `{ exitCode, stdout, ... }` object); otherwise it failed with `result.error.code`. If `resultOf` throws `RelayTransportError` `result_expired`, no result is held: check the op's effect on that machine as for `closed`. |
 | thread tools | `device_offline` | That device is offline; nothing was queued. Retry when it is online. |
 | thread tools | `not_found` | Unknown thread or device: call `thread_list({ all_scope: true })` and use an id it returned. |
 | thread tools | `scope_denied` | Add `all_scope: true`; if it is already set, the other device does not allow commands from this one. |
