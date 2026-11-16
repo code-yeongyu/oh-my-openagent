@@ -2,10 +2,15 @@
 //! under the point, as every backend now does: the target's own descendants
 //! never cover it, another element of the same window does.
 
+use senpi_desktop_backend_fake::FakeMethod;
+use senpi_desktop_core::error::ErrorCode;
 use senpi_desktop_core::report::ReportMode;
 use serde_json::{json, Value};
 
 use super::{button, opened, press, pressed, scene, FakeTime};
+
+/// More failed parent reads than the battery's polls within its wait.
+const PARENT_FAILURES: usize = 400;
 
 /// A focused list at 200,200 80x100 holding `rows`.
 fn list(rows: &[Value]) -> Value {
@@ -36,6 +41,23 @@ fn a_descendant_overhanging_the_target_is_not_occlusion() {
     // When
     let result = press(&mut harness, reference);
     // Then
+    assert!(result.is_ok(), "{result:?}");
+    assert_eq!(pressed(&harness), 1);
+}
+
+#[test]
+fn a_hit_whose_parents_cannot_be_read_is_not_occlusion() {
+    // Given: the overhanging row again, and every parent read of the walk fails.
+    let row = json!({"role": "row", "title": "notes.txt", "bounds": {"x": 200, "y": 240, "width": 300, "height": 24}});
+    let mut harness = opened(&scene(list(&[row]), &[]), ReportMode::Object);
+    harness.worker.battery_clock = Box::new(FakeTime(harness.ax_clock.clone()));
+    for _ in 0..PARENT_FAILURES {
+        harness.faults.fail_next(FakeMethod::AxParent, ErrorCode::AxFailed);
+    }
+    let reference = harness.focused_ref();
+    // When
+    let result = press(&mut harness, reference);
+    // Then: what the walk cannot establish counts as not covered, as the owner read does.
     assert!(result.is_ok(), "{result:?}");
     assert_eq!(pressed(&harness), 1);
 }

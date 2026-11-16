@@ -217,19 +217,27 @@ impl Worker {
             (ax.owner(&hit, &windows), ax.owner(handle, &windows)),
             (Ok(AxOwner::Window(hit_window)), Ok(AxOwner::Window(own_window))) if hit_window == own_window
         );
-        same_window && !descends_from(ax, hit, handle)
+        same_window && outside_of(ax, hit, handle)
     }
 }
 
-/// Whether `target` is an ancestor of `node`; a parent the backend cannot
-/// read ends the walk.
-fn descends_from(ax: &mut dyn AxBackend, mut node: AxHandle, target: &AxHandle) -> bool {
+/// Whether `node` provably lies outside `target`'s subtree: its parents
+/// reach the root without meeting `target`. A parent the backend cannot
+/// read, or a chain past the depth guard, leaves that unproven and answers
+/// `false`, like every other read `occluded` cannot establish. A backend
+/// that cannot compare its own elements cannot prove either way; the walk is
+/// skipped and `node` counts as outside, as before `same_element` existed.
+fn outside_of(ax: &mut dyn AxBackend, mut node: AxHandle, target: &AxHandle) -> bool {
+    if !ax.same_element(&node, &node) {
+        return true;
+    }
     for _ in 0..MAX_OCCLUDER_DEPTH {
-        let Ok(Some(parent)) = ax.parent(&node) else { return false };
-        if ax.same_element(&parent, target) {
-            return true;
+        match ax.parent(&node) {
+            Ok(None) => return true,
+            Ok(Some(parent)) if ax.same_element(&parent, target) => return false,
+            Ok(Some(parent)) => node = parent,
+            Err(_) => return false,
         }
-        node = parent;
     }
     false
 }
