@@ -42,11 +42,12 @@ It writes `<artifact>.sha256` files and `operator-darwin-manifest.json`, then up
 Dispatch `publish.yml` with these inputs:
 - `prepared_release_sha`;
 - `operator_darwin_artifacts=operator-darwin-<sha12>`;
+- `operator_darwin_manifest_sha256=<sha256 of the staged operator-darwin-manifest.json>`. The run trusts the draft's files only through that manifest, so editing the draft after dispatch cannot swap an artifact;
 - if hosted CI is also waived, the `ci_basis_receipt` inputs.
 
 `gate-reuse` refuses the input in any of these cases:
 - `prepared_release_sha` is not a 40-hex SHA;
-- the input is not `operator-darwin-<12 hex>`;
+- the input is not `operator-darwin-<12 hex>`, or the manifest pin is not 64 lowercase hex (or is set without the input);
 - `github.actor` or `github.triggering_actor` lacks the `admin` or `maintain` role.
 
 A preparation run (one with an empty `prepared_release_sha`) that sets the input is refused, and it does not dispatch the child run.
@@ -55,7 +56,7 @@ A preparation run (one with an empty `prepared_release_sha`) that sets the input
 
 The `operator-darwin` job runs `.github/workflows/operator-darwin-verify.ts` on the downloaded draft release. It refuses unless every one of these checks passes:
 
-1. The asset set is exactly the 8 artifacts, their `.sha256` files and the manifest. Each sha256 matches its `.sha256` file and the manifest.
+1. The dispatcher and triggering actor are re-checked as admin or maintain. The manifest's sha256 equals the pinned `operator_darwin_manifest_sha256`. The asset set is exactly the 8 artifacts, their `.sha256` files and the manifest, and each sha256 matches its `.sha256` file and the manifest.
 2. The manifest `source_sha` is `prepared_release_sha`, or an ancestor of it whose diff touches only `.github/workflows/`, the same rule as the `ci_basis_receipt` waiver. The tag names that source.
 3. Per Mach-O slice, the verifier checks the signature itself. It uses no external tool and trusts nothing the operator supplies (`operator-darwin-macho.ts`, `operator-darwin-cms.ts`):
    - every code page and every requirements/entitlements blob matches the CodeDirectory, and the CodeDirectory covers every byte before the signature;
@@ -65,6 +66,11 @@ The `operator-darwin` job runs `.github/workflows/operator-darwin-verify.ts` on 
    - the identifier is the expected one and the hardened runtime is set.
 4. Apple's ticket service returns a notarization ticket for every notarized artifact, looked up by the cdhash the verifier computed from the checked CodeDirectory. Bare Mach-O files cannot be stapled, so the ticket lookup replaces stapling. Trust helpers are signed only, as in the hosted path.
 5. Each engine's `__OMO_META,__build` section names the source sha, its host and target, and the version.
-6. Each `omo-darwin-*` binary embeds the verified engine and trust helper bytes unchanged, inside its signed bytes (the trust helpers are signed only, as on the hosted path, so this containment in a notarized binary is what notarization covers for them). That binds the binary to the engine's signed source stamp.
+6. Each `omo-darwin-*` binary embeds the verified engine, trust helper and keychain helper bytes unchanged, inside its signed bytes (the trust helpers are signed only, as on the hosted path, so this containment in a notarized binary is what notarization covers for them). That binds the binary to the engine's signed source stamp.
 
-Trade-off (accepted): no Gatekeeper or OCSP evaluation runs in CI. Running one would need a hosted macOS job, which reintroduces the wait this path removes. The operator's local `codesign --verify --strict` and `spctl -a -t install` verdicts are recorded in the operator log, but they are self-attested.
+Trade-offs (accepted):
+- No Gatekeeper or OCSP evaluation runs in CI. Notarization is read from Apple's ticket service, as Gatekeeper does for a bare binary.
+- These hosted checks run only on the operator's Mac, so they are self-attested in the operator log: the engine and trust-helper selftests, the omo version and eval smokes, and the keychain helper's designated-requirement check.
+- The verifier and its pins run from the dispatched ref, the same trust level as publish.yml itself.
+
+Running Gatekeeper or OCSP in CI would need a hosted macOS job, which reintroduces the wait this path removes. The operator's local `codesign --verify --strict` and `spctl -a -t install` verdicts are recorded in the operator log, but they are self-attested.

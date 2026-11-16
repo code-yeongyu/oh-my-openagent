@@ -34,9 +34,12 @@ type Overrides = {
   readonly delta?: string
   /** Replaces the inspector's answer for one artifact: forged facts, or a refusal reason. */
   readonly inspect?: (name: string) => SliceFacts[] | string | undefined
+  readonly roles?: Readonly<Record<string, string | null>>
 }
 
-async function run(fixture: Fixture, overrides: Overrides = {}, input: Partial<{ tag: string; prepared: string; version: string }> = {}) {
+type RunInput = Partial<{ tag: string; prepared: string; version: string; manifestSha256: string; actors: string[] }>
+
+async function run(fixture: Fixture, overrides: Overrides = {}, input: RunInput = {}) {
   dirs.push(fixture.dir)
   const tickets: string[] = []
   const nameOf = (bytes: Uint8Array) => [...fixture.files].find(([, content]) => Buffer.from(content).equals(Buffer.from(bytes)))?.[0] ?? ""
@@ -55,9 +58,20 @@ async function run(fixture: Fixture, overrides: Overrides = {}, input: Partial<{
       args[0] === "merge-base"
         ? { status: overrides.ancestor === false ? 1 : 0, stdout: "" }
         : { status: 0, stdout: overrides.delta ?? ".github/workflows/publish.yml\n" },
+    role: async (login) => {
+      const roles = overrides.roles ?? { maintainer: "maintain", owner: "admin", writer: "write" }
+      return login in roles ? (roles[login] ?? null) : "none"
+    },
   }
   const verdict = await verifyOperatorDarwin(
-    { dir: fixture.dir, tag: input.tag ?? TAG, preparedSha: input.prepared ?? PREPARED_SHA, version: input.version ?? VERSION },
+    {
+      dir: fixture.dir,
+      tag: input.tag ?? TAG,
+      manifestSha256: input.manifestSha256 ?? fixture.manifestSha256,
+      actors: input.actors ?? ["maintainer", "owner"],
+      preparedSha: input.prepared ?? PREPARED_SHA,
+      version: input.version ?? VERSION,
+    },
     tools,
   ).then(
     (rows) => ({ ok: true, detail: rows.join("\n") }),
@@ -84,10 +98,17 @@ describe("operator darwin verifier", () => {
   })
 
   const refusals: Array<[string, () => Promise<{ ok: boolean; detail: string }>, RegExp]> = [
+    ["a manifest other than the pinned one", () => run(writeFixture(), {}, { manifestSha256: "0".repeat(64) }), /operator-darwin-manifest\.json sha256 [0-9a-f]{64} is not the pinned operator_darwin_manifest_sha256 0{64}/],
+    ["a malformed manifest pin", () => run(writeFixture(), {}, { manifestSha256: "abc" }), /operator_darwin_manifest_sha256 must be a 64-hex sha256/],
+    ["a write-role dispatcher", () => run(writeFixture(), {}, { actors: ["writer", "maintainer"] }), /writer has repository role 'write'/],
+    ["a write-role triggering actor", () => run(writeFixture(), {}, { actors: ["maintainer", "writer"] }), /writer has repository role 'write'/],
+    ["an unreadable role", () => run(writeFixture(), { roles: { maintainer: null } }, { actors: ["maintainer"] }), /maintainer has repository role 'unreadable'/],
+    ["a bot dispatcher", () => run(writeFixture(), {}, { actors: ["github-actions[bot]"] }), /github-actions\[bot\] has repository role 'not a user login'/],
     ["an extra asset", async () => { const f = writeFixture(); writeFileSync(join(f.dir, "extra"), "x"); return run(f) }, /asset set differs/],
     ["a missing asset", async () => { const f = writeFixture(); unlinkSync(join(f.dir, "omo-darwin-x64")); return run(f) }, /asset set differs/],
     ["a .sha256 that does not match", async () => { const f = writeFixture(); writeFileSync(join(f.dir, "omo-darwin-arm64.sha256"), `${"0".repeat(64)}  omo-darwin-arm64\n`); return run(f) }, /omo-darwin-arm64: sha256 .* does not match omo-darwin-arm64\.sha256/],
     ["a manifest hash that does not match", () => run(writeFixture(buildFiles(), { sha256: {} })), /does not match the manifest/],
+    ["an omo binary without the verified keychain helper", () => { const files = buildFiles(); const omo = files.get("omo-darwin-arm64") ?? new Uint8Array(); files.set("omo-darwin-arm64", omo.subarray(0, omo.byteLength - (files.get("omo-keychain-darwin-universal")?.byteLength ?? 0))); return run(writeFixture(files)) }, /omo-darwin-arm64: does not embed the verified omo-keychain-darwin-universal/],
     ["a tag naming another source", () => run(writeFixture(), {}, { tag: "operator-darwin-aaaaaaaaaaaa" }), /does not name source/],
     ["a malformed tag", () => run(writeFixture(), {}, { tag: "operator-darwin-ABC" }), /is not operator-darwin-<12 hex>/],
     ["a short prepared sha", () => run(writeFixture(), {}, { prepared: "2222" }), /prepared_release_sha must be a full/],

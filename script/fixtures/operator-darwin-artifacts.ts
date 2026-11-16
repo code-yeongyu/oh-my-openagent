@@ -40,6 +40,8 @@ export function machoWithMeta(meta: string, body: string): Uint8Array {
 
 export type Fixture = {
   readonly dir: string
+  /** sha256 of the written manifest: what the maintainer pins at dispatch. */
+  readonly manifestSha256: string
   readonly files: Map<string, Uint8Array>
   /** The verified signature facts of each artifact; tests replace one entry to forge a single defect. */
   readonly signatures: Map<string, SliceFacts[]>
@@ -61,7 +63,8 @@ export function buildFiles(): Map<string, Uint8Array> {
     const host = platform === "darwin-arm64" ? "darwin-arm64" : "darwin-x64"
     const engine = files.get(`senpi-desktop-engine-${host}`) ?? new Uint8Array()
     const helper = files.get(`omo-engine-trust-helper-${host}`) ?? new Uint8Array()
-    files.set(`omo-${platform}`, new Uint8Array([...text(`omo-${platform}:`), ...engine, ...helper]))
+    const keychain = files.get("omo-keychain-darwin-universal") ?? new Uint8Array()
+    files.set(`omo-${platform}`, new Uint8Array([...text(`omo-${platform}:`), ...engine, ...helper, ...keychain]))
   }
   return files
 }
@@ -88,9 +91,7 @@ export function writeFixture(files = buildFiles(), manifest: Record<string, unkn
       },
     ])
   }
-  writeFileSync(
-    join(dir, MANIFEST),
-    JSON.stringify({ schema: "omo-darwin-operator-manifest/1", source_sha: SOURCE_SHA, version: VERSION, operator: "fixture-operator", sha256, ...manifest }),
-  )
-  return { dir, files, signatures }
+  const manifestText = JSON.stringify({ schema: "omo-darwin-operator-manifest/1", source_sha: SOURCE_SHA, version: VERSION, operator: "fixture-operator", sha256, ...manifest })
+  writeFileSync(join(dir, MANIFEST), manifestText)
+  return { dir, manifestSha256: createHash("sha256").update(manifestText).digest("hex"), files, signatures }
 }

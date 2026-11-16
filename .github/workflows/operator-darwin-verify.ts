@@ -2,7 +2,8 @@
 // Lives under .github/workflows/ so a release source-state branch can take it as a workflow-only commit.
 //
 //   bun .github/workflows/operator-darwin-verify.ts --dir <downloaded assets> --tag operator-darwin-<sha12>
-//     --prepared-sha <40-hex> --version <x.y.z> --repo <git dir> --summary <markdown file>
+//     --manifest-sha256 <64-hex> --prepared-sha <40-hex> --version <x.y.z> --repo <git dir>
+//     --actor <login> --triggering-actor <login> --repository <owner/name> --summary <markdown file>
 //
 // Every refusal exits 1 with one `::error::operator_darwin_artifacts refused: ...` line on stdout. On success it
 // writes the markdown summary rows (asset, sha256, cdhashes) to --summary and prints nothing else.
@@ -45,17 +46,17 @@ export const ARTIFACTS: Readonly<Record<string, Artifact>> = {
   "omo-darwin-arm64": {
     identifier: "ai.sisyphuslabs.omo",
     notarized: true,
-    contains: ["senpi-desktop-engine-darwin-arm64", "omo-engine-trust-helper-darwin-arm64"],
+    contains: ["senpi-desktop-engine-darwin-arm64", "omo-engine-trust-helper-darwin-arm64", "omo-keychain-darwin-universal"],
   },
   "omo-darwin-x64": {
     identifier: "ai.sisyphuslabs.omo",
     notarized: true,
-    contains: ["senpi-desktop-engine-darwin-x64", "omo-engine-trust-helper-darwin-x64"],
+    contains: ["senpi-desktop-engine-darwin-x64", "omo-engine-trust-helper-darwin-x64", "omo-keychain-darwin-universal"],
   },
   "omo-darwin-x64-baseline": {
     identifier: "ai.sisyphuslabs.omo",
     notarized: true,
-    contains: ["senpi-desktop-engine-darwin-x64", "omo-engine-trust-helper-darwin-x64"],
+    contains: ["senpi-desktop-engine-darwin-x64", "omo-engine-trust-helper-darwin-x64", "omo-keychain-darwin-universal"],
   },
 }
 
@@ -80,6 +81,8 @@ export type Tools = {
   /** True when Apple serves a notarization ticket for the 20-byte cdhash (hex). */
   readonly ticket: (cdhash: string) => Promise<boolean>
   readonly git: (args: readonly string[]) => { readonly status: number; readonly stdout: string }
+  /** The repository role_name of a login, or null when it cannot be read. */
+  readonly role: (login: string) => Promise<string | null>
 }
 
 export function inspectSignatures(bytes: Uint8Array): SliceFacts[] {
@@ -108,6 +111,9 @@ function embedsHashed(container: Uint8Array, slices: readonly SliceFacts[], part
 export type Input = {
   readonly dir: string
   readonly tag: string
+  /** sha256 of operator-darwin-manifest.json, pinned by the maintainer in the dispatch inputs. */
+  readonly manifestSha256: string
+  readonly actors: readonly string[]
   readonly preparedSha: string
   readonly version: string
 }
@@ -115,13 +121,23 @@ export type Input = {
 export async function verifyOperatorDarwin(input: Input, tools: Tools): Promise<string[]> {
   if (!/^operator-darwin-[0-9a-f]{12}$/.test(input.tag)) refuse(`tag ${input.tag} is not operator-darwin-<12 hex>`)
   if (!/^[0-9a-f]{40}$/.test(input.preparedSha)) refuse("prepared_release_sha must be a full 40-character hex SHA")
+  if (!/^[0-9a-f]{64}$/.test(input.manifestSha256)) refuse("operator_darwin_manifest_sha256 must be a 64-hex sha256")
+  if (input.actors.length === 0) refuse("no dispatching actor")
+  for (const login of input.actors) {
+    const role = /^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/.test(login) ? await tools.role(login) : "not a user login"
+    if (role !== "admin" && role !== "maintain") refuse(`${login} has repository role '${role ?? "unreadable"}'; only admin or maintain may use operator darwin artifacts`)
+  }
 
   const expected = [MANIFEST, ...Object.keys(ARTIFACTS).flatMap((name) => [name, `${name}.sha256`])].sort()
   const present = readdirSync(input.dir).sort()
   if (JSON.stringify(present) !== JSON.stringify(expected))
     refuse(`asset set differs from the expected ${expected.length}: got ${present.join(", ")}`)
 
-  const manifest = record(JSON.parse(readFileSync(join(input.dir, MANIFEST), "utf8")))
+  // Every operator-supplied file is trusted only through this manifest, whose hash the maintainer pinned at dispatch.
+  const manifestBytes = readFileSync(join(input.dir, MANIFEST))
+  if (sha256(manifestBytes) !== input.manifestSha256)
+    refuse(`${MANIFEST} sha256 ${sha256(manifestBytes)} is not the pinned operator_darwin_manifest_sha256 ${input.manifestSha256}`)
+  const manifest = record(JSON.parse(manifestBytes.toString("utf8")))
   const sourceSha = String(manifest.source_sha ?? "")
   if (!/^[0-9a-f]{40}$/.test(sourceSha)) refuse("manifest source_sha is not a 40-hex SHA")
   if (input.tag !== `operator-darwin-${sourceSha.slice(0, 12)}`) refuse(`tag ${input.tag} does not name source ${sourceSha}`)
@@ -210,10 +226,24 @@ async function main(argv: readonly string[]): Promise<number> {
       return response.ok && typeof record(record(first.fields).signedTicket).value === "string"
     },
     git: (args) => run(["git", "-C", repo, ...args]),
+    role: async (login) => {
+      const response = await fetch(`https://api.github.com/repos/${arg("--repository")}/collaborators/${login}/permission`, {
+        headers: { authorization: `Bearer ${process.env.GH_TOKEN ?? ""}`, accept: "application/vnd.github+json" },
+      })
+      const role = response.ok ? record(await response.json()).role_name : undefined
+      return typeof role === "string" ? role : null
+    },
   }
   try {
     const rows = await verifyOperatorDarwin(
-      { dir: arg("--dir"), tag: arg("--tag"), preparedSha: arg("--prepared-sha"), version: arg("--version") },
+      {
+        dir: arg("--dir"),
+        tag: arg("--tag"),
+        manifestSha256: arg("--manifest-sha256"),
+        actors: [arg("--actor"), arg("--triggering-actor")],
+        preparedSha: arg("--prepared-sha"),
+        version: arg("--version"),
+      },
       tools,
     )
     await Bun.write(arg("--summary"), `${rows.join("\n")}\n`)

@@ -24,6 +24,10 @@ on:
         required: false
         type: string
         default: ""
+      operator_darwin_manifest_sha256:
+        required: false
+        type: string
+        default: ""
       prepared_release_sha:
         required: false
         type: string
@@ -359,7 +363,10 @@ jobs:
       run:
         shell: bash
     steps:
+      # The job holds a write token while it parses operator-supplied binaries: keep it out of .git/config.
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -387,8 +394,15 @@ jobs:
       - name: Verify operator darwin artifacts
         env:
           TAG: ${{ inputs.operator_darwin_artifacts }}
+          MANIFEST_SHA256: ${{ inputs.operator_darwin_manifest_sha256 }}
           PREPARED_RELEASE_SHA: ${{ inputs.prepared_release_sha }}
           VERSION: ${{ inputs.version }}
+          # The verifier re-checks the dispatcher's role itself, so a future caller of this workflow cannot skip
+          # publish.yml's maintainer gate.
+          GH_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
           SOURCE_SHA="$(jq -r '.source_sha // empty' "$OPERATOR_DARWIN_DIR/operator-darwin-manifest.json")"
@@ -401,7 +415,8 @@ jobs:
             exit 1
           fi
           bun .github/workflows/operator-darwin-verify.ts --dir "$OPERATOR_DARWIN_DIR" --tag "$TAG" \
-            --prepared-sha "$PREPARED_RELEASE_SHA" --version "$VERSION" --repo . \
+            --manifest-sha256 "$MANIFEST_SHA256" --prepared-sha "$PREPARED_RELEASE_SHA" --version "$VERSION" --repo . \
+            --actor "$ACTOR" --triggering-actor "$TRIGGERING_ACTOR" --repository "$REPOSITORY" \
             --summary "${RUNNER_TEMP}/operator-darwin-rows.md"
           {
             echo "### Darwin artifacts: OPERATOR-BUILT"
