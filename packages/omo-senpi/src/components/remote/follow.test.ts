@@ -212,7 +212,9 @@ describe("sessions.follow rows", () => {
 
   test("#given a session that does not exist #when follow opens #then failed not_found", async () => {
     const { client } = await on(IDLE)
-    const events = reader(client.sessions.follow(handleOf(PEER, "no-such-session")))
+    // A well-formed listing key the device does not hold: a service with #1350 refuses an id that is no key at all as
+    // invalid_request before any lookup.
+    const events = reader(client.sessions.follow(handleOf(PEER, "bm90LWhlbGQta2V5LTAwMQ")))
     expect(await drain(events)).toEqual([
       {
         kind: "failed",
