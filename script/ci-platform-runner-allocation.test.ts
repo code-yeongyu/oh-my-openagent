@@ -8,6 +8,7 @@
 import { describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
 import { load } from "js-yaml"
+import { type ExpressionContext, evaluate } from "../test-support/github-expression"
 
 const workflowsDir = new URL("../.github/workflows/", import.meta.url)
 const NOT_FULL_MATRIX = "needs.ci-mode.outputs.full_matrix != 'true'"
@@ -37,50 +38,11 @@ function job(file: string, name: string): Record<string, unknown> {
   return found
 }
 
-// The GitHub expression subset these workflows use, rewritten outside string literals into JavaScript.
-function toJavaScript(expression: string): string {
-  return expression
-    .split(/('(?:[^']|'')*')/)
-    .map((part, index) =>
-      index % 2 === 1
-        ? part
-        : part
-            .replace(/([!=])=/g, "$1==")
-            .replace(/\.labels\.\*\.name/g, ".labels?.map((label) => label.name)")
-            .replace(/needs\.([\w-]+)\./g, 'needs["$1"].')
-            .replace(/(?<=[\w\]])\.(?=[A-Za-z_])/g, "?."),
-    )
-    .join("")
-}
-
-interface Context {
-  readonly github: unknown
-  readonly needs?: unknown
-  readonly matrix?: unknown
-}
-
-const functions = {
-  always: () => true,
-  cancelled: () => false,
-  contains: (haystack: unknown, needle: unknown) =>
-    Array.isArray(haystack) || typeof haystack === "string" ? haystack.includes(String(needle)) : false,
-  startsWith: (value: unknown, prefix: unknown) => String(value ?? "").startsWith(String(prefix)),
-  fromJSON: (value: unknown) => JSON.parse(String(value)),
-}
-
-function evaluate(expression: unknown, context: Context): unknown {
-  const text = String(expression).trim()
-  const body = /^\$\{\{\s*([\s\S]+?)\s*\}\}$/.exec(text)?.[1] ?? text
-  const names = ["github", "needs", "matrix", "inputs", ...Object.keys(functions)]
-  const run = new Function(...names, `return (${toJavaScript(body)})`)
-  return run(context.github, context.needs ?? {}, context.matrix ?? {}, {}, ...Object.values(functions))
-}
-
 function isExpression(value: unknown): boolean {
   return typeof value === "string" && value.includes("${{")
 }
 
-function matrixLegs(job: Record<string, unknown>, context: Context): Record<string, unknown>[] {
+function matrixLegs(job: Record<string, unknown>, context: ExpressionContext): Record<string, unknown>[] {
   const strategy = job["strategy"]
   if (!isRecord(strategy)) return [{}]
   const raw = isExpression(strategy["matrix"]) ? evaluate(strategy["matrix"], context) : strategy["matrix"]
