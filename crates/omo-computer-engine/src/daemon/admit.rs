@@ -44,12 +44,20 @@ pub fn admit(stream: &mut UnixStream, shared: &Shared) -> Option<Grant> {
     if uid != crate::host::files::euid() || matches!(verdict, Verdict::ForeignUid) {
         return None;
     }
-    if matches!(verdict, Verdict::Unregistered) || !shared.allows_pid(pid) {
+    if matches!(verdict, Verdict::Unregistered) || !shared.allows_peer(pid, process_start(pid)) {
         return None;
     }
     let mut preamble: Capability = [0; CAPABILITY_LEN];
     stream.read_exact(&mut preamble).ok()?;
     shared.bind(&preamble)
+}
+
+/// A process's start time in clock ticks since boot (`/proc/<pid>/stat` field 22, Linux).
+#[must_use]
+pub fn process_start(pid: i32) -> Option<u64> {
+    let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
+    let after_name = stat.get(stat.rfind(')')? + 2..)?;
+    after_name.split_whitespace().nth(19)?.parse().ok()
 }
 
 #[cfg(test)]
@@ -61,6 +69,12 @@ mod tests {
         assert!(constant_time_eq(&[1, 2, 3], &[1, 2, 3]));
         assert!(!constant_time_eq(&[1, 2, 3], &[1, 2, 4]));
         assert!(!constant_time_eq(&[1, 2], &[1, 2, 3]));
+    }
+
+    #[test]
+    fn our_own_process_has_a_start_time() {
+        let pid = i32::try_from(std::process::id()).expect("pid");
+        assert!(process_start(pid).is_some_and(|start| start > 0));
     }
 
     #[test]

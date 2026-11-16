@@ -19,6 +19,7 @@ pub enum Grant {
 
 struct Registered {
     pid: i32,
+    process_start: u64,
     capability: Capability,
     bound: bool,
 }
@@ -45,9 +46,12 @@ impl Shared {
         })
     }
 
+    /// The pid allowlist, keyed on `(pid, processStart)` for registered peers so a recycled pid
+    /// never inherits a registration (d-remote.md:207).
     #[must_use]
-    pub fn allows_pid(&self, pid: i32) -> bool {
-        self.host_pids.contains(&pid) || self.registry().iter().any(|peer| peer.pid == pid)
+    pub fn allows_peer(&self, pid: i32, start: Option<u64>) -> bool {
+        self.host_pids.contains(&pid)
+            || self.registry().iter().any(|peer| peer.pid == pid && Some(peer.process_start) == start)
     }
 
     fn registry(&self) -> std::sync::MutexGuard<'_, Vec<Registered>> {
@@ -82,14 +86,15 @@ impl Shared {
         }
     }
 
-    /// `hand.register{pid}`: a fresh capability for that peer's one future connection.
+    /// `hand.register{pid, processStart}`: a fresh capability for that peer's one future connection.
     ///
     /// # Errors
     /// The OS random source could not be read.
-    pub fn register(&self, pid: i32) -> std::io::Result<Capability> {
+    pub fn register(&self, pid: u32, process_start: u64) -> std::io::Result<Capability> {
+        let pid = i32::try_from(pid).map_err(std::io::Error::other)?;
         let mut capability: Capability = [0; CAPABILITY_LEN];
         std::fs::File::open("/dev/urandom")?.read_exact(&mut capability)?;
-        self.registry().push(Registered { pid, capability, bound: false });
+        self.registry().push(Registered { pid, process_start, capability, bound: false });
         Ok(capability)
     }
 
