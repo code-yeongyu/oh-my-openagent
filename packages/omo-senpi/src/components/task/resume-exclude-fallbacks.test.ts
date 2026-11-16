@@ -23,7 +23,7 @@ describe("a revived process child's persisted fallback chain honors exclude_mode
         platform: "darwin",
         agentDir: "/agent",
         listInstalledPackageRoots: () => [],
-        excludeModels: ["claude-fable-*"],
+        excludeModels: () => ["claude-fable-*"],
       })
 
       // when

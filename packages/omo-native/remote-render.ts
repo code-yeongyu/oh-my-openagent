@@ -1,11 +1,14 @@
 import type {
   ControlAttachState,
+  ControlSessionWakeState,
   DeviceRow,
   ListingResult,
   Status,
   StatusState,
+  UnitState,
 } from "../device-service-core/src/index.ts"
 import type { ThreadDelivery, ThreadToolResult } from "../omo-senpi/src/components/thread/contracts"
+import type { LocalStatus } from "./remote-cold-wake"
 
 // The human forms of `omo remote`; every command also has a --json form that prints the SDK's typed value as is.
 const STATE_LABELS: Readonly<Record<StatusState, string>> = {
@@ -45,16 +48,51 @@ export function ago(ms: number | null, now: number): string {
   return `${Math.round(hours / 24)}d ago`
 }
 
-export function statusLines(status: Status, serviceVersion: string): string[] {
-  const rows: [string, string][] = [
+export function statusLines(
+  status: Status,
+  serviceVersion: string,
+  local: readonly (readonly [string, string])[] = [],
+): string[] {
+  const rows: (readonly [string, string])[] = [
     ["State", STATE_LABELS[status.state]],
     ["Remote sessions", status.enabled ? "on" : "off"],
     ["This device", status.device === null ? "not set up" : status.device.name],
     ["Service", serviceVersion],
   ]
   if (status.detail?.action) rows.push(["Action", status.detail.action])
+  rows.push(...local)
   const width = Math.max(...rows.map(([label]) => label.length))
   return rows.map(([label, value]) => `${label.padEnd(width)}  ${value}`)
+}
+
+const UNIT_STATE_LABELS: Readonly<Record<UnitState, string>> = {
+  running: "running",
+  stopped: "stopped",
+  not_installed: "not installed",
+  unknown: "unknown",
+}
+
+const yesNoUnknown = (value: boolean | "unknown", yes: string, no: string): string =>
+  value === "unknown" ? "unknown" : value ? yes : no
+
+/** `omo remote status` rows for this device's own units, as its service manager reports them (omo#13594). */
+export function localRows(local: LocalStatus): (readonly [string, string])[] {
+  const host = local.session_host
+  const hostDetail =
+    host.state === "not_installed"
+      ? UNIT_STATE_LABELS[host.state]
+      : [
+          UNIT_STATE_LABELS[host.state],
+          host.enabled ? "enabled" : "not enabled",
+          yesNoUnknown(host.pinned, "pinned", "not pinned"),
+        ].join(", ")
+  return [
+    ["Session host", `${hostDetail} (${host.unit})`],
+    ["Service unit", `${UNIT_STATE_LABELS[local.device_service.state]} (${local.device_service.unit})`],
+    ["Cold wake", yesNoUnknown(local.cold_wake_entry, "on", "off")],
+    // The service has no read for registered agent dirs yet; this is the one every omo start and `enable` register.
+    ["Agent dir", `${local.agent_dir} (registered at every omo start)`],
+  ]
 }
 
 export function deviceLines(devices: readonly DeviceRow[], now: number): string[] {
@@ -144,6 +182,22 @@ export function sendWaitNotice(label: string, result: ThreadToolResult): string 
   if (result.kind !== "ok" || !("delivery" in result)) return null
   const { delivery } = result
   return delivery.kind === "queued" || delivery.kind === "queued_offline" ? queuedLine(label, delivery) : null
+}
+
+export function wakeLines(state: ControlSessionWakeState): string[] {
+  const line = state.enabled
+    ? "Waking is on: sessions on this device that are not running may be started by a message from your other signed-in devices."
+    : "Waking is off: a message from another device waits until this session is opened here."
+  const source =
+    state.stored === null
+      ? "Nothing is stored for this device, so it follows this build's default."
+      : state.stored === "unreadable"
+        ? "The stored value could not be read; set it again to repair it."
+        : `Stored on this device: ${state.stored ? "on" : "off"}.`
+  const lines = [line, source]
+  if (state.overridden)
+    lines.push("This run of the device service cannot wake sessions for other devices whatever the switch says.")
+  return lines
 }
 
 export function controlLines(state: ControlAttachState, now: number): string[] {

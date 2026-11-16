@@ -27,6 +27,12 @@ export type OutboundDelivery = {
   /** As the caller wrote it; each transport validates it the way its receiver does (`^\d+$`). */
   readonly expected_turn_id?: string
   readonly idempotency_key: string
+  /**
+   * Set only by a sender that follows its own answer (`omo remote send --wait`): the relay transport carries it as the
+   * started or queued prompt's `clientMessageId`, which senpi stamps on the user entry it stores, so the follow
+   * anchors on that entry even when a template or skill expansion changed its text (#13272 review).
+   */
+  readonly client_message_id?: string
   /** The call's parsed arguments, hashed by a transport that keeps its own receipt. */
   readonly args: unknown
   /** The highest chain hop an input of the caller's run arrived with from another device; both transports continue it (K8). */
