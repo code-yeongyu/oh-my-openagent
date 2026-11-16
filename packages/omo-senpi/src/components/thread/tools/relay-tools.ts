@@ -96,7 +96,7 @@ export function createRelayTools(context: RelayToolsContext): AnyTool[] {
         failure(
           "internal_error",
           `Thread relay operation failed: ${message}`,
-          "Retry; if it fails again, check the binding with `omo thread bindings --session <this session>`.",
+          "Retry; thread_report without binding_id uses the chat binding the gateway keeps for this session.",
         ),
       )
     }

@@ -155,6 +155,11 @@ export type GatewayRelayOptions = {
   readonly now?: () => number
 }
 
+const SELF = "thread_report without binding_id uses the chat binding the gateway keeps for this session."
+
+// The relay does not know its caller here. A session reaches every code below except binding_conflict and stale_revision
+// (only bind/rebind/unbind return them, and only the gateway or the CLI calls those), so every other text names session
+// tools and never a shell command.
 const NEXT_ACTION: Partial<Record<ThreadErrorCode, string>> = {
   binding_conflict:
     "Find the binding that holds this thread with `omo thread bindings`, then rebind it with its revision, or unbind it first.",
@@ -169,11 +174,10 @@ const NEXT_ACTION: Partial<Record<ThreadErrorCode, string>> = {
     "Retry after a moment: another answer is still being handed to the session, and the question goes back to pending if that fails.",
   idempotency_conflict: "Retry with a new idempotency_key.",
   idempotency_uncertain:
-    "Check the current state with `omo thread bindings` or thread_outbox before retrying with a new key.",
-  scope_denied:
-    "Report through the chat binding the gateway keeps for this session; `omo thread bindings --session <id>` lists them.",
+    "Read the binding's outbox with thread_outbox to see whether the earlier call took effect, then retry with a new idempotency_key.",
+  scope_denied: `That binding belongs to another session: ${SELF}`,
   unsupported: "Report only the events the binding subscribes to, through a binding with an outbound direction.",
-  not_found: "List the binding ids that exist with `omo thread bindings`.",
+  not_found: `No binding has that id: ${SELF}`,
   cursor_invalid: "Read thread_outbox again and ack a cursor it returned.",
   host_unavailable: "Retry when the session is running; the question stays pending.",
   invalid_arguments: "Fix the arguments and call again.",
@@ -194,12 +198,7 @@ function failure(
 ): { readonly kind: "error"; readonly error: ThreadToolFailure } {
   return {
     kind: "error",
-    error: threadToolFailure(
-      code,
-      message,
-      nextAction ?? NEXT_ACTION[code] ?? "Check the binding with `omo thread bindings` and retry.",
-      details,
-    ),
+    error: threadToolFailure(code, message, nextAction ?? NEXT_ACTION[code] ?? `Retry; ${SELF}`, details),
   }
 }
 
