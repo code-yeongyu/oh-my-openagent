@@ -77,6 +77,47 @@ describe("an app that failed registration as a background agent and later activa
     ])
   })
 
+  // A quiet failure covers only the window from that failure until the app registers again; it is never a whole-run
+  // flag on the pid. Gaps before it, and gaps after its window closed, are judged on their own.
+  test("a regular failure before the pid's first quiet failure stays a fault", () => {
+    const regularFailure = {
+      ...quietFailure,
+      t: 1_200,
+      origin: "launch",
+      policy: "regular",
+      attempts: 10,
+      regular: true,
+      since: 1_000,
+    } as const
+    const lateQuietFailure = { ...quietFailure, t: 1_801, origin: "activation", since: 1_801 } as const
+    expect(summarize(cleanRun([regularFailure, { ...activation, t: 1_800 }, lateQuietFailure])).faults).toEqual([
+      "dialog: window observer for pid 300 did not register after 10 attempts (AX cannotComplete)",
+    ])
+  })
+
+  test("a late registration before the pid's first quiet failure stays a fault", () => {
+    const late = { ...reRegistered, t: 1_500, origin: "launch", attempts: 4, since: 1_200 } as const
+    expect(summarize(cleanRun([late, { ...quietFailure, t: 2_500, since: 2_500 }])).faults).toEqual([
+      "dialog: window observer for pid 300 registered only after 4 attempts (300 ms without one inside the recording)",
+    ])
+  })
+
+  test("a gap after the quiet failure's window closed is judged on its own", () => {
+    const closedBeforeStart = [quietFailure, { ...activation, t: 700 }, { ...reRegistered, t: 800 }]
+    const laterFailure = {
+      ...quietFailure,
+      t: 2_500,
+      origin: "activation",
+      policy: "regular",
+      attempts: 10,
+      regular: true,
+      since: 2_000,
+    } as const
+    expect(summarize(cleanRun([...closedBeforeStart, laterFailure])).faults).toEqual([
+      "dialog: window observer for pid 300 did not register after 10 attempts (AX cannotComplete)",
+    ])
+  })
+
   test("a background agent that never activates, or activates after stop, is not judged", () => {
     expect(summarize(cleanRun([quietFailure])).faults).toEqual([])
     expect(summarize(cleanRun([quietFailure, { ...activation, t: 3_500 }])).faults).toEqual([])
