@@ -10,9 +10,9 @@ export function serviceAccountsOpen(): boolean {
 }
 
 /**
- * Where this computer signs in to OmO: `omo login` once accounts open, until then the desktop app,
- * whose sign-in the CLI shares through `omo account adopt`. Every sign-in hint keys on this, so no
- * message sends a person to a command that refuses (#11379).
+ * Where this computer signs in to OmO: the desktop app, whose sign-in the CLI shares through `omo account adopt`,
+ * or `omo login` in a terminal (while accounts are closed, by device code). Every sign-in hint keys on this, and a
+ * closed hint names both routes, so no message sends a person to a command that refuses (#11379, #13265 C11).
  */
 export type SignInRoute = "cli" | "desktop"
 
@@ -23,8 +23,9 @@ export function signInRoute(open: boolean = serviceAccountsOpen()): SignInRoute 
 const SIGN_IN_HINTS = {
   cli: { first: "Run omo login first.", again: "Sign in again with omo login." },
   desktop: {
-    first: "Sign in from the OmO desktop app on this computer first.",
-    again: "Sign in again from the OmO desktop app on this computer.",
+    first:
+      "Sign in from the OmO desktop app on this computer, or run omo login in a terminal on a computer without it.",
+    again: "Sign in again from the OmO desktop app on this computer, or run omo login in a terminal.",
   },
 } as const satisfies Record<SignInRoute, { readonly first: string; readonly again: string }>
 
