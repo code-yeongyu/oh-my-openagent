@@ -1,7 +1,7 @@
 import { outcomeOf } from "../thread/remote/outcome"
-import { eventStream, openAttachment } from "./attach"
+import { eventStream, openAttachment, pendingRequestOf, raiserOnly } from "./attach"
 import type { RemoteClient } from "./client"
-import { nextActionFor, remoteFailure } from "./codes"
+import { engineCode, nextActionFor, remoteFailure } from "./codes"
 import { type ClientCore, ok } from "./core"
 import { DEADLINES } from "./deadlines"
 import { canonicalizeThreadHandle } from "./seams"
@@ -34,8 +34,11 @@ type WatchHandlers = {
 type SessionWatch = {
   readonly initial: SnapshotBody
   readonly handle: AttachHandle
-  /** The first fresh read, started once the caller can take it; settles once it was delivered to `fresh` or told nothing. */
-  readonly baseline: () => Promise<void>
+  /**
+   * The first fresh read, started once the caller can take it: undefined once a state was delivered to `fresh`, else
+   * why none was (the read failed, ended uncertain, or the host sent no engine reply).
+   */
+  readonly baseline: () => Promise<RemoteFailure | undefined>
   readonly stop: () => void
 }
 
@@ -64,13 +67,29 @@ async function watchSession(
   const record: JsonObject =
     target?.kind === "device_session" ? { type: "get_state", sessionId: target.session } : { type: "get_state" }
   let stopped = false
-  // A read that fails, or that the host answers without the engine's reply, tells nothing; the records still do.
-  const readFresh = async (): Promise<void> => {
+  // A read that fails, or that the host answers without the engine's reply, delivers nothing and says why; the records
+  // still flow either way.
+  const readFresh = async (): Promise<RemoteFailure | undefined> => {
     const sent = await handle.command(record)
-    if (stopped || sent.kind === "error") return
+    if (sent.kind === "error") return sent
     const outcome = outcomeOf(sent.value)
-    const data = outcome.kind === "ok" ? outcome.response["data"] : undefined
-    if (isObject(data)) handlers.fresh(data)
+    if (outcome.kind === "uncertain")
+      return remoteFailure("unconfirmed", `get_state ended uncertain: ${outcome.reason}.`, RETRY_WAIT, {
+        details: { reason: outcome.reason },
+      })
+    if (outcome.kind === "refused") {
+      const mapped = engineCode(outcome.reason)
+      return remoteFailure(mapped.code, `The engine refused get_state: ${outcome.reason}.`, RETRY_WAIT, {
+        ...(mapped.details === undefined ? {} : { details: mapped.details }),
+      })
+    }
+    const data = outcome.response["data"]
+    if (!isObject(data))
+      return remoteFailure("unsupported", "The session's host sent no engine reply to get_state.", RETRY_WAIT, {
+        details: { feature: "fresh_state" },
+      })
+    if (!stopped) handlers.fresh(data)
+    return undefined
   }
   const stopSnapshots = onSnapshot((snapshot) => {
     if (stopped) return
@@ -156,17 +175,28 @@ const toolEvent = (record: JsonObject): Signal | undefined => {
   }
 }
 
+/** A request the session waits on a person for; `raiserOnly` ones are answerable only on the connection that raised them. */
+type Asked = { readonly kind: PendingRequest["kind"]; readonly raiserOnly: boolean }
+
 /** One session's status and its current turn, moved by the attach's events; what follow and wait both read. */
 class SessionTurn {
   status = "idle"
   /** A run is in flight: a source showed it running and no end was observed since. Only `#end` clears it. */
   running = false
-  /** A run was seen in flight since the follow or wait started. */
-  ran = false
   text = ""
   turnId: string | undefined
   aborted = false
   #leaseSeq = -1
+  #compacting = false
+  /** The engine (its run lease or its session_status) says it waits on a person, with no request this attach saw. */
+  #asksElsewhere = false
+  /** The requests the session waits on, shown ones and raiser-only ones alike (#13753 M2). */
+  readonly #asked = new Map<string, Asked>()
+
+  /** The requests the session waits on now. */
+  asked(): readonly Asked[] {
+    return [...this.#asked.values()]
+  }
 
   /** What an attach event changes, in order; `closed` once the session left its engine. */
   apply(event: AttachEvent): readonly Signal[] | "closed" {
@@ -174,9 +204,11 @@ class SessionTurn {
       case "record":
         return this.#record(event.record)
       case "frame":
-        return [{ kind: "frame", request: event.request }, ...this.#show("waiting_input", true)]
+        this.#asked.set(event.request.request_id, { kind: event.request.kind, raiserOnly: false })
+        return [{ kind: "frame", request: event.request }, ...this.#update(true)]
       case "frame_settled":
-        return []
+        this.#asked.delete(event.request_id)
+        return this.#update()
       case "approvals_unobservable":
         return [{ kind: "unobservable", device: event.device }]
       case "channel_lost":
@@ -193,14 +225,20 @@ class SessionTurn {
 
   /** An engine state (a snapshot's or a fresh get_state's): the same rule as `resync`. */
   fresh(state: EngineState, entries: readonly unknown[] = []): readonly Signal[] {
-    const leased = this.#lease(newer(leaseOf(state["lifecycle"]), newestLease(entries)))
-    if (leased.length > 0) return leased
-    const questions = state["pendingQuestions"]
     const dialogs = state["pendingDialogs"]
-    if (state["isCompacting"] === true) return this.#show("compacting")
-    if ((Array.isArray(questions) && questions.length > 0) || (Array.isArray(dialogs) && dialogs.length > 0))
-      return this.#show("waiting_input")
-    return state["isStreaming"] === true ? this.#run() : []
+    const questions = state["pendingQuestions"]
+    if (Array.isArray(dialogs) || Array.isArray(questions)) {
+      this.#asked.clear()
+      for (const request of [
+        ...(Array.isArray(dialogs) ? dialogs : []),
+        ...(Array.isArray(questions) ? questions : []),
+      ])
+        this.#ask(request)
+    }
+    this.#compacting = state["isCompacting"] === true
+    const ended = this.#lease(newer(leaseOf(state["lifecycle"]), newestLease(entries)))
+    if (state["isStreaming"] === true && !ended) this.#markRunning()
+    return this.#update(false, ended)
   }
 
   outcome(): FollowOutcome {
@@ -211,13 +249,25 @@ class SessionTurn {
     }
   }
 
-  /** A run lease newer than the last one seen: running runs, waiting_human asks, any other state ends the run. */
-  #lease(lease: Lease | undefined): readonly Signal[] {
-    if (lease === undefined || lease.seq <= this.#leaseSeq) return []
+  #ask(request: unknown, id?: string): void {
+    if (!isObject(request)) return
+    const requestId = id ?? nonEmpty(request["id"])
+    const pending = requestId === undefined ? undefined : pendingRequestOf(request, requestId)
+    if (requestId !== undefined && pending !== undefined)
+      this.#asked.set(requestId, { kind: pending.kind, raiserOnly: raiserOnly(request) })
+  }
+
+  /**
+   * A run lease newer than the last one seen: running runs, waiting_human asks, any other state ends the run. Answers
+   * whether it ended a run in flight.
+   */
+  #lease(lease: Lease | undefined): boolean {
+    if (lease === undefined || lease.seq <= this.#leaseSeq) return false
     this.#leaseSeq = lease.seq
-    if (lease.state === "running") return this.#run()
-    if (lease.state === "waiting_human") return this.#show("waiting_input")
-    return this.#end()
+    this.#asksElsewhere = lease.state === "waiting_human"
+    if (lease.state === "running") this.#markRunning()
+    else if (lease.state !== "waiting_human") return this.#markEnded()
+    return false
   }
 
   #record(record: JsonObject): readonly Signal[] | "closed" {
@@ -243,46 +293,64 @@ class SessionTurn {
   #moved(record: JsonObject): readonly Signal[] | "closed" {
     switch (record["type"]) {
       case "agent_start":
-        return this.#run()
+        this.#markRunning()
+        return this.#update()
       case "agent_settled":
-        return this.#end()
+        return this.#update(false, this.#markEnded())
       case "session_lifecycle":
-        return this.#lease(leaseOf(record["lifecycle"]))
+        return this.#update(false, this.#lease(leaseOf(record["lifecycle"])))
       case "entry_appended":
-        return this.#lease(newestLease([record["entry"]]))
+        return this.#update(false, this.#lease(newestLease([record["entry"]])))
+      // The mirror of a raiser-only request: attach.ts passes it on as a record, never as a frame.
+      case "ui_request_pending": {
+        const id = nonEmpty(record["uiRequestId"])
+        if (id === undefined) return []
+        this.#ask(record["request"], id)
+        return this.#update(true)
+      }
+      case "ui_request_settled": {
+        const id = nonEmpty(record["uiRequestId"])
+        return id !== undefined && this.#asked.delete(id) ? this.#update() : []
+      }
       case "session_status": {
         const status = nonEmpty(record["status"])
         if (status === "closed") return "closed"
-        if (status === "running") return this.#run()
-        if (status === "idle") return this.#end()
-        return status === undefined ? [] : this.#show(status)
+        this.#compacting = status === "compacting"
+        this.#asksElsewhere = status === "waiting_input"
+        if (status === "running") this.#markRunning()
+        return this.#update(false, status === "idle" && this.#markEnded())
       }
       default:
         return []
     }
   }
 
-  #run(): readonly Signal[] {
+  #markRunning(): void {
     this.running = true
-    this.ran = true
-    return this.#show("running")
   }
 
-  /** An observed end of the run: the only way `running` goes false. */
-  #end(): readonly Signal[] {
+  /** An observed end of the run: the only way `running` goes false. Answers whether a run was in flight. */
+  #markEnded(): boolean {
     const was = this.running
     this.running = false
-    if (was) {
-      this.status = "idle"
-      return [{ kind: "run_ended" }]
-    }
-    return this.#show("idle")
+    this.#asksElsewhere = false
+    return was
   }
 
-  #show(status: string, always = false): readonly Signal[] {
-    if (status === this.status && !always) return []
+  /** The status the fields now give, as a signal when it changed (or `always`); `run_ended` when a run just ended. */
+  #update(always = false, ended = false): readonly Signal[] {
+    const status =
+      this.#asked.size > 0 || this.#asksElsewhere
+        ? "waiting_input"
+        : this.#compacting
+          ? "compacting"
+          : this.running
+            ? "running"
+            : "idle"
+    const changed = status !== this.status
     this.status = status
-    return [{ kind: "status", status }]
+    if (ended && status === "idle") return [{ kind: "run_ended" }]
+    return changed || always ? [{ kind: "status", status }] : []
   }
 }
 
@@ -306,6 +374,8 @@ const WAITING: Readonly<Record<string, Extract<FollowEvent, { readonly kind: "wa
   compacting: "compacting",
   opening: "queued",
 }
+
+const RETRY_WAIT = "Call sessions.get for the session's state, then sessions.wait again."
 
 const ANSWER_ELSEWHERE = "A person answers it with attach(thread).answer on a person client."
 
@@ -355,15 +425,17 @@ export function streamMembers(core: ClientCore): StreamMembers {
       const state = WAITING[status]
       if (state === undefined) return undefined
       if (state !== "awaiting_approval") return { kind: "waiting", state }
-      const pending = watch?.handle.pending() ?? []
-      return person
-        ? { kind: "waiting", state, pending }
-        : {
-            kind: "waiting",
-            state,
-            pending_redacted: { count: pending.length, kinds: pending.map((request) => request.kind) },
-            next_action: ANSWER_ELSEWHERE,
-          }
+      // A person sees the requests this client can answer; anyone else, or a request only its raiser may answer (a
+      // secret input on another connection), gets the count and kinds.
+      const asked = turn?.asked() ?? []
+      if (person && !asked.some((request) => request.raiserOnly))
+        return { kind: "waiting", state, pending: watch?.handle.pending() ?? [] }
+      return {
+        kind: "waiting",
+        state,
+        pending_redacted: { count: asked.length, kinds: asked.map((request) => request.kind) },
+        next_action: ANSWER_ELSEWHERE,
+      }
     }
     const deliver = (signals: readonly Signal[] | "closed"): void => {
       if (turn === undefined || finished) return
@@ -442,8 +514,12 @@ export function streamMembers(core: ClientCore): StreamMembers {
         turn = new SessionTurn()
         turn.resync(opened.value.initial)
         check([])
-        await opened.value.baseline()
-        confirmed = true
+        const unread = await opened.value.baseline()
+        // Without a fresh state "no run" is unknown (the snapshot's idle can be stale): a run already seen is still
+        // waited for, but a wait that would answer settled/idle answers why it cannot tell instead.
+        if (unread === undefined) confirmed = true
+        else if (!turn.running && turn.status !== "waiting_input")
+          return done({ ...unread, details: { ...unread.details, phase: "baseline" } })
         check([])
       })
     })

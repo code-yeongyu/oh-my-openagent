@@ -29,14 +29,29 @@ const firstSession = (world: World): WorldSession => {
 export const worldWith = (
   state: JsonObject,
   records: readonly JsonObject[] = [],
-  extra: { readonly reply?: JsonObject; readonly entries?: readonly JsonObject[] } = {},
+  extra: {
+    readonly reply?: JsonObject
+    readonly entries?: readonly JsonObject[]
+    /** The host takes no delegated commands: a command gets its outcome states and no engine reply. */
+    readonly undelegated?: true
+    readonly outcome?: WorldSession["outcome"]
+  } = {},
 ): World => {
   const world = defaultWorld()
   const session = firstSession(world)
   const snapshot = { ...session.snapshot, state, entries: [...session.snapshot.entries, ...(extra.entries ?? [])] }
+  const { delegated: _delegated, ...rest } = session
   return {
     ...world,
-    sessions: [{ ...session, snapshot, records, delegated: { data: extra.reply ?? {}, frames: [] } }],
+    sessions: [
+      {
+        ...rest,
+        snapshot,
+        records,
+        ...(extra.undelegated === true ? {} : { delegated: { data: extra.reply ?? {}, frames: [] } }),
+        ...(extra.outcome === undefined ? {} : { outcome: extra.outcome }),
+      },
+    ],
   }
 }
 

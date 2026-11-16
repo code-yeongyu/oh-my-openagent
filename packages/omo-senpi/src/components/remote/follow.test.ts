@@ -4,7 +4,7 @@ import { pushDetached, pushFrame, pushRecords, pushSnapshot, reader, THREAD, wor
 import { DEADLINES } from "./deadlines"
 import { sessionStatusOf } from "./follow"
 import { handleOf } from "./seams"
-import { clientOn, closeClients, fakeClock, startOwner } from "./testing/fake-service"
+import { clientOn, closeClients, fakeClock, startModeOwner, startOwner } from "./testing/fake-service"
 import type { RemoteClient } from "./client"
 import type { FollowEvent, JsonObject, PendingRequest, RemoteSender } from "./types"
 
@@ -20,6 +20,13 @@ const textDelta = (delta: string): JsonObject => ({
   message: {},
   assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta, partial: {} },
 })
+// A secret input raised on another connection: only its raiser may answer it, so it is never shown here as a frame.
+const SECRET_PENDING: JsonObject = {
+  type: "ui_request_pending",
+  uiRequestId: "ui-9",
+  method: "input",
+  request: { type: "extension_ui_request", id: "ui-9", method: "input", title: "API key", secret: true },
+}
 const DIALOG = {
   type: "extension_ui_request",
   id: "ui-1",
@@ -117,6 +124,28 @@ describe("sessions.follow rows", () => {
     })
   })
 
+  test("#given a person follower #when the approval is answered #then the next state is turn_running again", async () => {
+    const { owner, client } = await on(RUNNING)
+    const { events } = await following(client)
+    pushRecords(owner, [{ type: "ui_request_pending", uiRequestId: "ui-1", method: "confirm", request: DIALOG }])
+    expect(await events.next("the frame")).toMatchObject({ kind: "frame" })
+    expect(await events.next("awaiting_approval")).toMatchObject({ kind: "waiting", state: "awaiting_approval" })
+    pushRecords(owner, [{ type: "ui_request_settled", uiRequestId: "ui-1", disposition: "answered" }])
+    expect(await events.next("the state after the answer")).toEqual({ kind: "waiting", state: "turn_running" })
+  })
+
+  test("#given a person follower #when the turn waits on a secret input raised on another connection #then awaiting_approval, redacted, with no frame", async () => {
+    const { owner, client } = await on(RUNNING)
+    const { events } = await following(client)
+    pushRecords(owner, [SECRET_PENDING])
+    expect(await events.next("the waiting state")).toEqual({
+      kind: "waiting",
+      state: "awaiting_approval",
+      pending_redacted: { count: 1, kinds: ["input"] },
+      next_action: expect.any(String),
+    })
+  })
+
   test("#given a running turn #when a re-attach snapshot's run lease shows it done #then the turn that settled in the gap ends settled", async () => {
     const { owner, client } = await on(RUNNING)
     const { events } = await following(client)
@@ -206,6 +235,32 @@ describe("sessions.wait rows: a running turn behind an idle snapshot (live relay
   })
 })
 
+describe("sessions.wait rows: a first get_state that tells nothing (#13753 review M1)", () => {
+  // The engine's truth: a run lease still running. The snapshot says idle and carries no lease, so only the fresh read
+  // could tell; when it fails, "no run" is unknown and wait must not answer settled/idle.
+  const behind = { lifecycle: { state: "running", seq: 4 } }
+
+  test.each([
+    ["the engine refuses get_state", "terminal" as const, worldWith(IDLE, [], { reply: behind })],
+    [
+      "get_state ends uncertain",
+      undefined,
+      worldWith(IDLE, [], {
+        reply: behind,
+        outcome: [{ state: "uncertain", reason: "unconfirmed", retryable: false }],
+      }),
+    ],
+    ["the host sends no engine reply", undefined, worldWith(IDLE, [], { undelegated: true })],
+  ])(
+    "#given %s on an idle-looking snapshot #when wait runs #then it answers a failure, never settled/idle",
+    async (_name, mode, world) => {
+      const owner = mode === undefined ? await startOwner(world) : (await startModeOwner(mode, world, [])).owner
+      const outcome = await clientOn(owner.stateDir, fakeClock()).sessions.wait(THREAD)
+      expect(outcome).toMatchObject({ kind: "error", details: expect.objectContaining({ phase: "baseline" }) })
+    },
+  )
+})
+
 describe("sessions.wait rows", () => {
   test("#given an idle session #when wait runs #then settled at once", async () => {
     const { client } = await on(IDLE)
@@ -229,6 +284,16 @@ describe("sessions.wait rows", () => {
     const settling = client.sessions.wait(THREAD)
     await listening(client)
     pushFrame(owner, DIALOG)
+    expect(await settling).toMatchObject({ kind: "ok", value: { outcome: "settled", status: "waiting_input" } })
+  })
+
+  test("#given a turn blocked on a secret input raised on another connection #when wait runs #then settled waiting_input, not its deadline", async () => {
+    const { owner, client, clock } = await on(RUNNING)
+    const settling = client.sessions.wait(THREAD, { deadlineMs: 1_000 })
+    await listening(client)
+    pushRecords(owner, [SECRET_PENDING])
+    await listening(client)
+    clock.advance(1_000)
     expect(await settling).toMatchObject({ kind: "ok", value: { outcome: "settled", status: "waiting_input" } })
   })
 
