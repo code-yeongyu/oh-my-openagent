@@ -2,7 +2,7 @@ use std::fs::{self, File};
 use std::time::{Duration, UNIX_EPOCH};
 
 use super::{foreign, names, seed, HOUR};
-use crate::audit::gc::{artifact_name, ArtifactStore, GcLimits, SweepTrigger, SESSIONS_DIR};
+use crate::audit::gc::{artifact_name, ArtifactStore, GcLimits, SweepTrigger};
 
 #[test]
 fn artifact_gc_200_stale_20_fresh_5_foreign() {
@@ -104,7 +104,7 @@ fn artifact_ac33_capture_leaves_one_file_that_the_first_sweep_after_stale_ms_rem
 fn artifact_sweep_io_error_warns_capture_succeeds() {
     let now = crate::audit::now_ms();
     let dir = tempfile::tempdir().expect("tempdir");
-    let session = dir.path().join(SESSIONS_DIR).join("s-1");
+    let session = dir.path().join(crate::audit::gc::SESSIONS_DIR).join("s-1");
     fs::create_dir_all(session.join("turn-00001")).expect("session dir");
     seed(
         &session.join("turn-00001"),

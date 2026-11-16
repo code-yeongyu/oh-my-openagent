@@ -69,7 +69,9 @@ pub fn resolve(lookup: impl Fn(&str) -> Option<String>) -> Result<Roots, RootsUn
     os::resolve(&lookup)
 }
 
-/// An absolute path from the environment, or `None` (a relative value is ignored).
+/// An absolute path from the environment, or `None` (a relative value is ignored). macOS
+/// resolves its roots without the environment, so only the other targets use it.
+#[cfg(not(target_os = "macos"))]
 fn absolute(lookup: &impl Fn(&str) -> Option<String>, name: &str) -> Option<PathBuf> {
     lookup(name)
         .map(PathBuf::from)
