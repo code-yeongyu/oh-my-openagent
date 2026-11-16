@@ -118,6 +118,15 @@ describe("remote import guard G1 matcher", () => {
     'import { sessions } from "../omo-senpi/src/components/remote/sessions.ts"\n',
   )
   write("packages/omo-native/other.ts", 'import { sessions } from "../omo-senpi/src/components/remote/sessions.ts"\n')
+  write(
+    `${senpi}/src/components/remote/tui/command.ts`,
+    'import { sessions } from "../sessions.ts"\nimport { run } from "./run.ts"\n',
+  )
+  write(
+    `${senpi}/src/components/remote/tui/run.ts`,
+    'import type { DeviceService } from "@oh-my-opencode/device-service-core"\nexport const run = 1\n',
+  )
+  write(`${senpi}/src/components/remote/tui/entry.ts`, 'import { createRemoteClient } from "../index.ts"\n')
   const fixture = findings(root)
 
   test("#given each import shape #then S1 matches the vendored client even through a type-only import", () => {
@@ -144,6 +153,8 @@ describe("remote import guard G1 matcher", () => {
       [`${senpi}/src/components/thread/tool-member.ts`]: ["packages/omo-senpi/src/components/remote/"],
       [`${senpi}/src/components/thread/tool-port.ts`]: ["packages/omo-senpi/src/components/remote/"],
       "packages/omo-native/remote-verb.ts": ["packages/omo-senpi/src/components/remote/"],
+      [`${senpi}/src/components/remote/tui/command.ts`]: ["packages/omo-senpi/src/components/remote/"],
+      [`${senpi}/src/components/remote/tui/run.ts`]: ["packages/device-service-core/src/"],
     })
   })
 })

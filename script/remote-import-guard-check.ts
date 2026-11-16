@@ -97,7 +97,7 @@ export function checkImports(facts: readonly FileFacts[], resolve: Resolver, rul
       for (const rule of rules.s1) {
         if (target.startsWith(rule.target) && !under(fact.file, rule.allowedImporters)) add(s1, fact.file, rule.target)
       }
-      if (rules.s3.surface(fact.file) && target !== rules.s3.entry)
+      if (rules.s3.surface(fact.file) && target !== rules.s3.entry && !rules.s3.surface(target))
         for (const layer of rules.s3.layers) if (target.startsWith(layer)) add(s3, fact.file, layer)
       if (under(fact.file, rules.s2AllowedImporters)) continue
       const ownNames = new Set(

@@ -7,10 +7,14 @@ const LOCAL_API = "packages/device-service-core/src/local-api/"
 const BUNSHIN_TS_RELAY = "packages/omo-senpi/vendor/bunshin-ts-relay/"
 const REMOTE = "packages/omo-senpi/src/components/remote/"
 
-// The surfaces of #13414 (thread tools, the omo remote CLI; the TUI's /remote joins when rt-tui adds it) are thin callers
-// of the one remote module: S3 lets them reach the remote layer only through its index, type-only imports included.
+// The surfaces of #13414 (thread tools, the omo remote CLI, the TUI's /remote under components/remote/tui) are thin callers
+// of the one remote module: S3 lets them reach the remote layer only through its index, type-only imports included. A
+// surface importing another surface file (the TUI's own files) is not reaching the layer. Scope: S3 sees direct static
+// imports, require() and literal import() only; a route through another module, or bin/lib/thread.js loading built
+// bundles by a non-literal import() (frozen by NON_LITERAL_IMPORT_OFFENDERS), is outside it.
 const isRemoteSurface = (file: string): boolean =>
   file.startsWith("packages/omo-senpi/src/components/thread/") ||
+  file.startsWith(`${REMOTE}tui/`) ||
   /^packages\/omo-native\/remote-[^/]+\.ts$/.test(file) ||
   file === "packages/omo-native/bin/lib/thread.js"
 
