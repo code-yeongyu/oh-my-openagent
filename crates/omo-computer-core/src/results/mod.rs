@@ -17,6 +17,6 @@ pub use reads::{
     PointerPosition, WaitOutcome, WaitResult, WindowsReply,
 };
 pub use v1::{
-    AxNode, AxSnapshotText, AxTypeTextReply, CapabilitiesReply, CaptureMode, ControlState,
+    AxNode, AxSnapshotText, AxTypeTextReply, CapabilitiesReply, CaptureMode, ControlState, HandRegistered,
     LegacyFrame, LegacyObservation, LegacyWindow, SessionOpened, StopPathStatus, TypeTextMethod,
 };

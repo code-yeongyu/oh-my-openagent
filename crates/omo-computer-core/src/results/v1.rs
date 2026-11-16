@@ -148,6 +148,14 @@ pub struct StopPathStatus {
 }
 
 /// The foreground-control grant (`control.grant`, `control.acquire`, `control.changed`).
+/// `hand.register`'s reply: the 32-byte capability (hex) bound to the registered peer's one
+/// future connection.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HandRegistered {
+    pub capability: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ControlState {

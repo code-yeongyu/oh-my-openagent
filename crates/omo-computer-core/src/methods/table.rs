@@ -9,6 +9,7 @@ use crate::hello::Hello;
 use crate::listing::{AppInfo, ElementInfo, Surface};
 use crate::observation::{Frame, Observation};
 use crate::params::{
+    HandRegisterParams,
     AdvanceClockParams, AppsOpenParams, AppsQuitParams, AxPerformParams, AxRefParams,
     AxSetValueParams, AxTargetParams, AxTypeTextParams, CancelParams, CaptureParams, ClickParams,
     ClipboardWriteParams, ControlGrantParams, DragParams, DrillParams, ElementAtParams,
@@ -20,6 +21,7 @@ use crate::params::{
     WindowFrameParams, WindowParams, WindowsParams, ZoomParams,
 };
 use crate::results::{
+    HandRegistered,
     AxNode, AxSnapshotText, AxTypeTextReply, CapabilitiesReply, CaptureReply, ClipboardContent,
     ControlState, Diagnosis, DisplayInfo, ExecReply, MenuItems, ObserveReply, PointerPosition,
     SessionOpened, StopPathStatus, WaitResult, WindowsReply,
@@ -138,6 +140,7 @@ method_table! {
     StopPathStop = "stopPath.stop", Read, PUBLIC, StopPathStopParams => StopPathStatus;
     StopPathResume = "stopPath.resume", Exec, AUTHORITY, StopPathResumeParams => StopPathStatus;
     DesktopShutdown = "desktop.shutdown", Exec, AUTHORITY, EmptyParams => ();
+    HandRegister = "hand.register", Exec, AUTHORITY, HandRegisterParams => HandRegistered;
     Cancel = "$/cancel", Read, PUBLIC, CancelParams => ();
     TestAdvanceClock = "$/test.advanceClock", Exec, TEST, AdvanceClockParams => ();
 }

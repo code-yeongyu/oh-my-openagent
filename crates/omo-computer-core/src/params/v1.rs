@@ -109,5 +109,7 @@ params! { ControlGrantParams { reason: String; confirmation_id: String, } }
 params! { StopPathStartParams { ; chord: String, } }
 params! { StopPathStopParams { ; source: String, } }
 params! { StopPathResumeParams { token: String; } }
+/// `hand.register`: the attach-only peer the spawning host admits (row 29, lead decision Q1 A).
+params! { HandRegisterParams { pid: u32, process_start: u64; } }
 params! { CancelParams { id: RequestId; } }
 params! { AdvanceClockParams { ms: u64; } }
