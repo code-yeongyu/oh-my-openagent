@@ -86,6 +86,21 @@ impl Read for Forwarded {
 
 /// Serves `stream` after admission until it closes.
 pub fn serve(stream: UnixStream, grant: Grant, shared: &Arc<Shared>, connection: usize) {
+    if matches!(grant, Grant::AttachHost { .. }) {
+        let expected = hex(&shared.expected(grant));
+        let admit_request = |request: &mut Value| {
+            let presented = request.as_object_mut().and_then(|o| o.remove("capability"));
+            constant_time_eq(presented.as_ref().and_then(Value::as_str).unwrap_or_default().as_bytes(), expected.as_bytes())
+        };
+        let out: Out = match stream.try_clone() {
+            Ok(clone) => Arc::new(Mutex::new(clone)),
+            Err(_) => return,
+        };
+        let own = |request: &Value, id: &Value| own_method(request, id, grant, shared, &out);
+        super::attached::serve(&stream, &shared.bridge, &admit_request, &own);
+        let _ = stream.shutdown(std::net::Shutdown::Both);
+        return;
+    }
     let Ok(reader) = stream.try_clone() else { return };
     if let Ok(subscriber) = stream.try_clone() {
         shared.subscribe(connection, subscriber);

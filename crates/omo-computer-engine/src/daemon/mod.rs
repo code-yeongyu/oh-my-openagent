@@ -4,6 +4,7 @@
 //! concurrent connections each admitted before any frame is decoded.
 
 mod admit;
+mod attached;
 mod conn;
 mod idle;
 mod state;

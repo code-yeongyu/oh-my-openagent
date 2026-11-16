@@ -40,7 +40,7 @@ pub fn run() -> ExitCode {
     }
 }
 
-fn narrowing(launched: &Launched, requested: Tier) -> omo_computer_session::host_view::ConsentNarrowing {
+pub(crate) fn narrowing(launched: &Launched, requested: Tier) -> omo_computer_session::host_view::ConsentNarrowing {
     let vars = launched.vars.clone();
     tier::narrowing(
         move |name| vars.iter().find(|(key, _)| key == name).map(|(_, value)| value.clone()),

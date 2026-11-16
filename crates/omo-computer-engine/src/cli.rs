@@ -12,6 +12,8 @@ pub enum Mode {
     Stdio,
     /// One request line in, one reply line out, a standalone session.
     Oneshot,
+    /// One `desktop.*` request against a running daemon (row 29, corpus case 09).
+    OneshotAttach { endpoint: PathBuf },
     /// The MCP stdio shim over the engine's own router.
     Mcp { tier: Tier },
     /// The detached presence renderer.
@@ -32,6 +34,7 @@ pub fn parse(args: &[String]) -> Result<Mode, String> {
     match args.as_slice() {
         [] | ["--stdio"] => Ok(Mode::Stdio),
         ["--oneshot"] => Ok(Mode::Oneshot),
+        ["--oneshot", "--attach", endpoint] => Ok(Mode::OneshotAttach { endpoint: PathBuf::from(endpoint) }),
         ["--mcp", rest @ ..] => tier::parse(rest).map(|tier| Mode::Mcp { tier }),
         ["--presence-helper"] => Ok(Mode::PresenceHelper),
         ["--enable-daemon", "--serve", "--endpoint", endpoint, "--lock", lock] => Ok(Mode::Serve {
@@ -59,6 +62,10 @@ mod tests {
         assert_eq!(parse(&args(&[])), Ok(Mode::Stdio));
         assert_eq!(parse(&args(&["--stdio"])), Ok(Mode::Stdio));
         assert_eq!(parse(&args(&["--oneshot"])), Ok(Mode::Oneshot));
+        assert_eq!(
+            parse(&args(&["--oneshot", "--attach", "/run/e.sock"])),
+            Ok(Mode::OneshotAttach { endpoint: PathBuf::from("/run/e.sock") })
+        );
         assert_eq!(parse(&args(&["--mcp"])), Ok(Mode::Mcp { tier: Tier::Read }));
         assert_eq!(parse(&args(&["--mcp", "--tier", "exec"])), Ok(Mode::Mcp { tier: Tier::Exec }));
         assert!(parse(&args(&["--mcp", "--tier", "admin"])).is_err());
