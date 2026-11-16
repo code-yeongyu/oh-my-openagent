@@ -1,4 +1,5 @@
 import { expect, onTestFinished, test } from "bun:test"
+import { existsSync } from "node:fs"
 import { readdir, readFile, stat } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import { fakeApi, grant, minted, temporaryHome } from "./test-support"
@@ -77,6 +78,8 @@ test("real omo launcher signs in, reports status, and logs out without disk or o
   await run(["logout"])
   expect(stored).toBeNull()
   expect(requests.filter((path) => path.startsWith("POST"))).toEqual(["POST /v1/device/code", "POST /v1/device/token"])
+  // The login's remote setup stays off in the suite: no device service was installed under this home (omo#13627).
+  expect(existsSync(join(home, ".omo", "device-service"))).toBe(false)
   for (const name of await readdir(home, { recursive: true })) {
     const file = join(home, name)
     if (!(await stat(file)).isFile()) continue
