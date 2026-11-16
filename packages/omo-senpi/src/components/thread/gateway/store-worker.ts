@@ -13,6 +13,7 @@ import { WAKE_LEASE_MS, WOKEN_SESSION_CAP } from "./constants"
 import { lockWaitExceeded } from "./lock-wait"
 import { gatewayDatabasePath, gatewayRootDirectory, gatewayWakeMarkerPath } from "./paths"
 import { isClaimantDead, processStartTime } from "./process-identity"
+import { GatewaySchemaVersionError } from "./schema"
 import { isBusyError, Sql, type SqliteConnection, type SqlRow } from "./sql"
 import * as ops from "./store-ops"
 import * as relay from "./store-relay-ops"
@@ -334,6 +335,7 @@ async function pump(): Promise<void> {
               typeof (error as { code?: unknown } | null)?.code === "string"
                 ? (error as { code: string }).code
                 : undefined,
+            details: error instanceof GatewaySchemaVersionError ? error.details : undefined,
           },
         })
       }

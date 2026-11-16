@@ -45,6 +45,7 @@ export const THREAD_ERROR_CODES = [
   "device_offline",
   "relay_requires_paid_plan",
   "alias_taken",
+  "gateway_schema_too_new",
 ] as const
 
 export type ThreadErrorCode = (typeof THREAD_ERROR_CODES)[number]
@@ -75,4 +76,37 @@ export function threadToolFailure(
     throw new Error(`unknown thread error code: ${String(code)}`)
   }
   return { code, message, next_action: nextAction, ...(details === undefined ? {} : { details }) }
+}
+
+/**
+ * The gateway store refuses to open because a newer omo build on this machine already migrated it past the schema this
+ * build knows (`gateway/schema.ts` `GatewaySchemaVersionError`, carried across the store worker with its `details`).
+ * The refusal stands, since reading a newer schema could corrupt it; this turns it into the one failure that names
+ * both versions and the remedy. Any other error answers undefined.
+ */
+export function gatewaySchemaRefusal(
+  error: unknown,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): ThreadToolFailure | undefined {
+  const { code, details } = (error ?? {}) as { code?: unknown; details?: { found?: unknown; supported?: unknown } }
+  if (code !== "gateway_schema_too_new" || typeof details?.found !== "number" || typeof details.supported !== "number")
+    return undefined
+  const command = updateCommand(env)
+  return threadToolFailure(
+    "gateway_schema_too_new",
+    `This omo build reads gateway schema ${details.supported}, but this machine's gateway store is at schema ${details.found}: a newer omo build already upgraded it. Nothing was sent or changed.`,
+    `Update omo with \`${command}\`, restart this session, then retry.`,
+    { gateway_schema: details.found, binary_schema: details.supported, update_command: command },
+  )
+}
+
+/** The update command the omo launcher hands the engine in `SENPI_BRAND` (a source build names its rebuild), else `omo update`. */
+function updateCommand(env: Readonly<Record<string, string | undefined>>): string {
+  try {
+    const command = (JSON.parse(env.SENPI_BRAND ?? "{}") as { update?: { command?: unknown } }).update?.command
+    if (typeof command === "string" && command.trim().length > 0) return command.trim()
+  } catch {
+    // An unreadable brand names no command; the release command is the right one for every installed omo.
+  }
+  return "omo update"
 }

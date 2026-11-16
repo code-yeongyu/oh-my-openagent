@@ -292,6 +292,7 @@ describe("thread error taxonomy", () => {
       "device_offline",
       "relay_requires_paid_plan",
       "alias_taken",
+      "gateway_schema_too_new",
     ])
     expect(new Set(THREAD_ERROR_CODES).size).toBe(THREAD_ERROR_CODES.length)
   })
