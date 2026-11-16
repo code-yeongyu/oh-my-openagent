@@ -42,7 +42,7 @@ C8	the v1-consumer case `03-stdio-click-type-text-null.json` (whole case: host-r
 C9	a drag point refused by another session's reservation: InputBusy's {window, holder} flat beside the stage pair (R60b), reachable only with two sessions (R60c)	23	85	owed
 C18	replay of the imported case `stale-ref.json` against the v3 engine exits 0 (plan L984: row 18 checks stale-ref.json (replay exits 0))	20	18	owed
 C9	replay of the imported case `bounded-holds-closed.json` against the v3 engine exits 0 (plan L1097: row 23 checks bounded-holds-closed.json (replay exits 0))	20	23	owed
-C14	replay of the imported case `remote-typing.json` against the v3 engine exits 0 (plan L1167: row 26 checks remote-typing.json (replay exits 0))	20	26	passed:omo-computer-session::send_on_enter::tests::a_remote_screen_window_refuses_untypable_and_background_shift_text_before_any_key
+C14	replay of the imported case `remote-typing.json` against the v3 engine exits 0 (plan L1167: row 26 checks remote-typing.json (replay exits 0))	20	26	owed
 T1	replay of the imported case `ax-type-text.json` against the v3 engine exits 0 (plan L1120: row 24 checks ax-type-text.json, moved to row 28 by ruling R56a; plan L1200: row 28 replays the imported corpus in full)	20	28	owed
 T1	replay of the imported case `ax-unconfirmed.json` against the v3 engine exits 0 (plan L1121: row 24 checks ax-unconfirmed.json, moved to row 28 by ruling R56a; plan L1200: row 28 replays the imported corpus in full)	20	28	owed
 T1	replay of the imported case `frame-invalidation.json` against the v3 engine exits 0 (plan L1015 and L1200: row 28 replays frame-invalidation.json with the imported corpus)	20	28	owed
