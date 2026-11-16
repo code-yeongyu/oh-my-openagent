@@ -13,6 +13,8 @@ pub mod mutate;
 pub mod observe;
 pub mod refs;
 mod session;
+#[cfg(test)]
+mod test_process;
 pub mod trace;
 
 pub use epoch::EpochChanged;

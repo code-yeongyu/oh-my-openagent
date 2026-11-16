@@ -371,7 +371,9 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: windows-root-test-telemetry-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard == '1/2' && 'shard-1' || 'shard-2' }}
-          path: ${{ runner.temp }}/windows-root-test-telemetry/*.json
+          path: |
+            ${{ runner.temp }}/windows-root-test-telemetry/*.json
+            ${{ runner.temp }}/windows-root-test-telemetry/*.junit.xml
           if-no-files-found: warn
           overwrite: false
 
@@ -480,11 +482,17 @@ jobs:
         id: root-tests-posix-1
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         timeout-minutes: 20
-        run: bun test --timeout 20000 packages/omo-opencode packages/memory-core
+        env:
+          CI_JUNIT_DIR: ${{ runner.temp }}/junit
+        run: |
+          mkdir -p "$CI_JUNIT_DIR"
+          bun test --timeout 20000 packages/omo-opencode packages/memory-core --reporter=junit --reporter-outfile="$CI_JUNIT_DIR/root-1.xml"
       - name: Run root test shard 2
         id: root-tests-posix-2
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         timeout-minutes: 20
+        env:
+          CI_JUNIT_DIR: ${{ runner.temp }}/junit
         run: bash .github/scripts/ci-root-shard-2.sh
       - name: Run Codex platform smoke
         id: codex-platform-tests
@@ -498,7 +506,20 @@ jobs:
         id: senpi-tests-posix
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         timeout-minutes: 20
+        env:
+          CI_JUNIT_DIR: ${{ runner.temp }}/junit
         run: bash .github/scripts/ci-senpi-posix.sh
+
+      # The JUnit reports prove a re-sharded layout runs exactly the tests this one runs (#13315).
+      - name: Upload macOS JUnit reports
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v6
+        with:
+          name: macos-junit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/junit/*.xml
+          if-no-files-found: warn
+          overwrite: false
 
       - name: Write job summary
         if: always()
@@ -916,7 +937,9 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: windows-senpi-compatibility-telemetry-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/windows-senpi-compatibility-telemetry/*.json
+          path: |
+            ${{ runner.temp }}/windows-senpi-compatibility-telemetry/*.json
+            ${{ runner.temp }}/windows-senpi-compatibility-telemetry/*.junit.xml
           if-no-files-found: warn
           overwrite: false
 
