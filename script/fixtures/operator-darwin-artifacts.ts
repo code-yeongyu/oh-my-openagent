@@ -77,6 +77,24 @@ export function signatureReport(file: string, fields: SignatureFields): string {
   ].join("\n")
 }
 
+/** rcodesign 0.29's report for an ad-hoc signature (`codesign -s - -o runtime`): no team, no CMS signer. */
+export function adhocReport(file: string, identifier: string, cdSha256: string): string {
+  return [
+    `- path: ${file}`,
+    "  entity:",
+    "    mach_o:",
+    "      signature:",
+    "        blobs:",
+    "        - slot: CodeDirectory (0)",
+    `          sha256: ${cdSha256}`,
+    "        code_directory:",
+    "          flags: CodeSignatureFlags(ADHOC | RUNTIME)",
+    `          identifier: ${identifier}`,
+    "        cms: null",
+    "",
+  ].join("\n")
+}
+
 export type Fixture = {
   readonly dir: string
   readonly files: Map<string, Uint8Array>

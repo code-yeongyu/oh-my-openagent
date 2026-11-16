@@ -5,6 +5,7 @@ import { rmSync, unlinkSync, writeFileSync } from "node:fs"
 import { basename, join } from "node:path"
 import { type Tools, verifyOperatorDarwin } from "../.github/workflows/operator-darwin-verify.ts"
 import {
+  adhocReport,
   buildFiles,
   engineMeta,
   type Fixture,
@@ -34,6 +35,7 @@ type Overrides = {
   readonly ticket?: (cdhash: string) => boolean
   readonly ancestor?: boolean
   readonly delta?: string
+  readonly report?: (name: string) => string | undefined
 }
 
 async function run(fixture: Fixture, overrides: Overrides = {}, input: Partial<{ tag: string; prepared: string; version: string }> = {}) {
@@ -42,6 +44,8 @@ async function run(fixture: Fixture, overrides: Overrides = {}, input: Partial<{
   const tools: Tools = {
     verify: (file) => overrides.verifyStatus?.(basename(file)) ?? 0,
     signatureInfo: (file) => {
+      const forged = overrides.report?.(basename(file))
+      if (forged !== undefined) return forged
       const fields = fixture.signatures.get(basename(file))
       return fields ? signatureReport(file, fields) : "[]"
     },
@@ -94,6 +98,7 @@ describe("operator darwin verifier", () => {
     ["a source differing outside workflows", () => run(writeFixture(), { delta: ".github/workflows/publish.yml\nscript/build-omo-binary.ts\n" }), /outside \.github\/workflows\/: script\/build-omo-binary\.ts/],
     ["a failing rcodesign verify", () => run(writeFixture(), { verifyStatus: (name) => (name === "omo-darwin-x64" ? 1 : 0) }), /omo-darwin-x64: rcodesign verify failed/],
     ["an unsigned file", async () => { const f = writeFixture(); f.signatures.delete("omo-keychain-darwin-universal"); return run(f) }, /omo-keychain-darwin-universal: no code signature/],
+    ["an ad-hoc signature (no team, no Developer ID signer)", () => run(writeFixture(), { report: (name) => (name === "omo-darwin-arm64" ? adhocReport(name, "ai.sisyphuslabs.omo", "a".repeat(64)) : undefined) }), /omo-darwin-arm64: TeamIdentifier , expected 523JNR86LZ/],
     ["another identifier", () => run(forge("senpi-desktop-engine-darwin-x64", { identifier: "ai.sisyphuslabs.omo" })), /identifier ai\.sisyphuslabs\.omo, expected/],
     ["another team in the code directory", () => run(forge("omo-darwin-arm64", { team: "ABCDE12345" })), /TeamIdentifier ABCDE12345/],
     ["a signer certificate of another team", () => run(forge("omo-darwin-arm64", { leafTeam: "ABCDE12345" })), /not a Developer ID Application certificate/],

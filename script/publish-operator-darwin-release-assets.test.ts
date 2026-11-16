@@ -62,8 +62,12 @@ test("operator mode publishes senpi-desktop-engine-checksums.txt with the verifi
   for (const name of readdirSync(artifacts).filter((n) => pattern.match(n))) cpSync(join(artifacts, name), release, { recursive: true })
   const lines = readFileSync(writeDesktopEngineChecksums(release), "utf8").trimEnd().split("\n")
 
-  const digests = new Map(lines.map((line) => [line.split("  ")[1], line.split("  ")[0]]))
-  expect([...digests.keys()].sort()).toEqual(DESKTOP_ENGINE_RELEASE_HOSTS.map((h) => desktopEngineReleaseAssetName(h)).sort())
+  const digests = new Map<string, string>()
+  for (const line of lines) {
+    const [digest = "", asset = ""] = line.split("  ")
+    digests.set(asset, digest)
+  }
+  expect([...digests.keys()].sort()).toEqual(DESKTOP_ENGINE_RELEASE_HOSTS.map((h) => desktopEngineReleaseAssetName(h) ?? "").sort())
   const manifest = JSON.parse(readFileSync(join(fixture.dir, "operator-darwin-manifest.json"), "utf8")) as { sha256: Record<string, string> }
   for (const asset of ["senpi-desktop-engine-darwin-arm64", "senpi-desktop-engine-darwin-x64"]) {
     expect({ asset, digest: digests.get(asset) }).toEqual({ asset, digest: manifest.sha256[asset] })
