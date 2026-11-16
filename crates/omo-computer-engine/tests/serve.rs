@@ -448,3 +448,32 @@ fn oneshot_daemon_session_case_09() {
     }
     assert!(failures.is_empty(), "case 09 did not replay clean:\n{}", failures.join("\n"));
 }
+
+fn lines_naming(dir: &std::path::Path, needle: &str, found: &mut Vec<(std::path::PathBuf, String)>) {
+    for entry in std::fs::read_dir(dir).into_iter().flatten().filter_map(Result::ok) {
+        let path = entry.path();
+        if path.is_dir() {
+            lines_naming(&path, needle, found);
+        } else if let Ok(text) = std::fs::read_to_string(&path) {
+            found.extend(text.lines().filter(|line| line.contains(needle)).map(|line| (path.clone(), line.to_owned())));
+        }
+    }
+}
+
+#[test]
+fn an_attached_oneshot_audits_as_issuer_remote() {
+    let daemon = Daemon::start(&[]);
+    host::consent(daemon.dir.path(), true);
+    let mut authority = daemon.connect(&daemon.capability);
+    let capture = json!({"jsonrpc": "2.0", "id": 1, "method": "desktop.capture", "params": {"target": "101"}});
+    assert!(attached_oneshot(&daemon, Some(&mut authority), &capture, "").is_some_and(|r| r.get("result").is_some()));
+    let click = json!({"jsonrpc": "2.0", "id": 2, "method": "desktop.click",
+        "params": {"target": "101", "x": 10, "y": 10, "callId": "issuer-probe"}});
+    let clicked = attached_oneshot(&daemon, Some(&mut authority), &click, "");
+    assert!(clicked.as_ref().is_some_and(|r| r.get("error").is_none()), "{clicked:?}");
+    let mut found = Vec::new();
+    lines_naming(daemon.dir.path(), "issuer-probe", &mut found);
+    let audited: Vec<_> = found.iter().filter(|(_, line)| line.contains("\"issuer\"")).collect();
+    assert!(!audited.is_empty(), "the click left an audit line naming its callId: {found:?}");
+    assert!(audited.iter().all(|(_, line)| line.contains("\"issuer\":\"remote\"")), "an attached peer never audits as local: {audited:?}");
+}
