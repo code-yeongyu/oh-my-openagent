@@ -110,7 +110,7 @@ fn notification_reaches_every_subscriber_within_idle_flush() {
     let daemon = Daemon::start(&[]);
     let mut idle = opened(&daemon);
     let mut actor = opened(&daemon);
-    actor.call(2, "stopPath.stop", &json!({"reason": "test"})).expect("stopped");
+    actor.call(2, "stopPath.stop", &json!({"source": "test"})).expect("stopped");
     let started = Instant::now();
     let note = std::iter::from_fn(|| idle.next_message()).find(|m| m["method"] == "stopPath.changed");
     assert!(note.is_some() && started.elapsed() < Duration::from_secs(1), "{note:?}");

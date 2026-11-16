@@ -127,9 +127,12 @@ impl Client {
         }
     }
 
-    /// True when the daemon closed the connection without sending a single byte.
+    /// True when the daemon closed (or reset) the connection without sending a single byte.
     pub fn closed_silently(&mut self) -> bool {
         let mut line = String::new();
-        matches!(self.reader.read_line(&mut line), Ok(0)) && line.is_empty()
+        match self.reader.read_line(&mut line) {
+            Ok(0) | Err(_) => line.is_empty(),
+            Ok(_) => false,
+        }
     }
 }
