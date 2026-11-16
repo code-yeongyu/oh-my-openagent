@@ -99,15 +99,6 @@ export async function spawningWorld(engine: string, existing?: string): Promise<
     lock: paths.daemonLock,
     env,
     latch: () => latch.get(),
-    spawnDaemon: (command, args, childEnv) => {
-      const child = spawn(command, [...args], { env: { ...childEnv }, stdio: ["pipe", "ignore", "inherit"] })
-      return {
-        pid: child.pid,
-        stdin: child.stdin,
-        exited: new Promise((resolve) => child.once("exit", () => resolve())),
-        kill: () => child.kill("SIGTERM"),
-      }
-    },
   })
   const ensure = createHandEnsure({ launcher, remoteCommandsEnabled: () => true })
   let answered: boolean | undefined

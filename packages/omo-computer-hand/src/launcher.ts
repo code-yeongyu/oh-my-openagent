@@ -7,11 +7,14 @@ import type { Writable } from "node:stream"
 import { connectDaemon, type DaemonLink } from "./daemon-link.ts"
 import type { HostLatch } from "./host-latch.ts"
 
+/** How a daemon process ended: it ran and exited, or its binary never started. */
+export type DaemonExit = { readonly kind: "exited" } | { readonly kind: "spawn_failed"; readonly detail: string }
+
 /** The daemon process as the launcher holds it: its stdin is the capability pipe and the launcher watch. */
 export interface DaemonChild {
   readonly pid: number | undefined
   readonly stdin: Writable
-  readonly exited: Promise<void>
+  readonly exited: Promise<DaemonExit>
   kill(): void
 }
 
@@ -43,7 +46,7 @@ export interface Generation {
   readonly child: DaemonChild
 }
 
-export type LaunchFailure = "daemon_owned_elsewhere" | "daemon_never_listened"
+export type LaunchFailure = "daemon_owned_elsewhere" | "daemon_never_listened" | "engine_spawn_failed"
 
 class DaemonLaunchFailed extends Error {
   readonly reason: LaunchFailure
@@ -57,7 +60,11 @@ class DaemonLaunchFailed extends Error {
 
 const spawnWithPipe: SpawnDaemon = (command, args, env) => {
   const child = spawn(command, [...args], { env: { ...env }, stdio: ["pipe", "ignore", "inherit"] })
-  const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()))
+  const exited = new Promise<DaemonExit>((resolve) => {
+    child.once("exit", () => resolve({ kind: "exited" }))
+    // A binary that cannot start emits `error` and no `exit`; a later `error` (a failed kill) settles nothing new.
+    child.on("error", (error) => resolve({ kind: "spawn_failed", detail: error.message }))
+  })
   return { pid: child.pid, stdin: child.stdin, exited, kill: () => child.kill("SIGTERM") }
 }
 
@@ -120,6 +127,9 @@ export class DaemonLauncher {
     const args = ["--enable-daemon", "--serve", "--endpoint", config.endpoint, "--lock", config.lock]
     if (config.latch().suspended) args.push("--start-stopped")
     const child = (config.spawnDaemon ?? spawnWithPipe)(config.engine, args, config.env)
+    // A daemon gone before it read the line (or never started) fails this write with EPIPE: `#dial`
+    // reports that end through `exited` as a launch refusal, so the write error must not crash the host.
+    child.stdin.on("error", () => undefined)
     child.stdin.write(`${capability.toString("hex")}\n`)
     this.#generation += 1
     const authority = await this.#dial(capability, child)
@@ -129,20 +139,23 @@ export class DaemonLauncher {
   async #dial(capability: Buffer, child: DaemonChild): Promise<DaemonLink> {
     const connectAuthority = this.#config.connectAuthority ?? connectDaemon
     const deadline = Date.now() + (this.#config.listenTimeoutMs ?? 10_000)
-    let exited = false
-    void child.exited.then(() => {
-      exited = true
+    let exit: DaemonExit | undefined
+    void child.exited.then((ended) => {
+      exit = ended
     })
     for (;;) {
       try {
         return await connectAuthority(this.#config.endpoint, capability)
       } catch (error) {
         if (!(error instanceof Error) || !("code" in error)) throw error
-        if (exited || Date.now() > deadline) {
+        if (exit !== undefined || Date.now() > deadline) {
           child.kill()
+          if (exit?.kind === "spawn_failed") {
+            throw new DaemonLaunchFailed("engine_spawn_failed", `${this.#config.engine}: ${exit.detail}`)
+          }
           throw new DaemonLaunchFailed(
             "daemon_never_listened",
-            `${this.#config.endpoint}: ${String(Reflect.get(error, "code"))}${exited ? " (the daemon exited)" : ""}`,
+            `${this.#config.endpoint}: ${String(Reflect.get(error, "code"))}${exit === undefined ? "" : " (the daemon exited)"}`,
           )
         }
         await new Promise((resolve) => setTimeout(resolve, 20))
