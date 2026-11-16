@@ -99,7 +99,8 @@ async function ensureShard(socket: string, env: NodeJS.ProcessEnv) {
     ],
     env,
   )
-  expect(result.exitCode).toBe(0)
+  // On a refusal the engine names its reason (e.g. unsafe_key_record) in the ensure output; the assertion carries it.
+  expect(result.exitCode, `host ensure failed: ${result.stdout}${result.stderr}`).toBe(0)
   const payload = JSON.parse(result.stdout) as { pid: number }
   ownedPids.add(payload.pid)
   return payload.pid
