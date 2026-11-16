@@ -63,7 +63,6 @@ describe("omo remote", () => {
       {
         device: "dev-self",
         label: "This Mac",
-        kind: "this device",
         platform: process.platform,
         last_seen_ms: null,
         online: true,
@@ -71,6 +70,28 @@ describe("omo remote", () => {
       },
       ...defaultWorld().devices.map((device) => ({ ...device, this_device: false })),
     ])
+  })
+
+  test("devices shows this device offline while its service is not connected, and invents no kind for it", async () => {
+    const world = defaultWorld()
+    const owner = await startFakeOwner({
+      stateDir: privateDir(),
+      world: { ...world, status: { ...world.status, state: "offline" } },
+    })
+    owners.push(owner)
+    const { code, out } = await run(["devices"], owner.stateDir)
+    expect(code).toBe(REMOTE_EXIT.ok)
+    expect(out[1]).toMatch(new RegExp(`^dev-self\\s+This Mac\\s+this device\\s+${process.platform}\\s+never$`))
+    const json = await run(["devices", "--json"], owner.stateDir)
+    const [here] = JSON.parse(json.out.join("")) as Record<string, unknown>[]
+    expect(here).toEqual({
+      device: "dev-self",
+      label: "This Mac",
+      platform: process.platform,
+      last_seen_ms: null,
+      online: false,
+      this_device: true,
+    })
   })
 
   test("sessions shows attach targets, marks cached rows and names devices that did not answer", async () => {
@@ -95,6 +116,20 @@ describe("omo remote", () => {
     expect(typo.err).toEqual(["omo remote sessions: no device no-such-device on this account (see omo remote devices)"])
     const self = await run(["sessions", "--device", "dev-self", "--json"])
     expect(self.code).toBe(REMOTE_EXIT.ok)
+  })
+
+  test("sessions --device accepts a device the roster misses when the listing still has its rows", async () => {
+    const world = defaultWorld()
+    const owner = await startFakeOwner({
+      stateDir: privateDir(),
+      world: { ...world, devices: world.devices.filter((device) => device.device !== PEER) },
+    })
+    owners.push(owner)
+    const { code, out, err } = await run(["sessions", "--device", PEER, "--json"], owner.stateDir)
+    expect(err).toEqual([])
+    expect(code).toBe(REMOTE_EXIT.ok)
+    const result = JSON.parse(out.join("")) as { rows: { device: string }[] }
+    expect(result.rows.map((row) => row.device)).toEqual([PEER])
   })
 
   test("disable and enable report the switch the service answers with", async () => {
