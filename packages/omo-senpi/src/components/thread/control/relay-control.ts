@@ -177,7 +177,11 @@ async function waitSettled(
     turn = turnId ?? turn
     clearTimeout(quiet)
   }
-  const watched = await remote.sessions.watch(
+  // The deadline and the abort cover the attach and its baseline read too, not only the wait after them.
+  const onAbort = () => finish("cancelled", status, turn)
+  signal?.addEventListener("abort", onAbort, { once: true })
+  const timer = setTimeout(() => finish("timeout", status, turn), timeoutMs)
+  const watching = remote.sessions.watch(
     row.device,
     row.session_id,
     {
@@ -208,11 +212,25 @@ async function waitSettled(
     },
     { baseline: true },
   )
-  if (watched.kind !== "ok") throw new ControlRefusal(outcomeFailure(watched, row.device).error)
-  const { watch } = watched
-  const onAbort = () => finish("cancelled", status, turn)
-  signal?.addEventListener("abort", onAbort, { once: true })
-  const timer = setTimeout(() => finish("timeout", status, turn), timeoutMs)
+  const cleanup = () => {
+    clearTimeout(timer)
+    clearTimeout(quiet)
+    signal?.removeEventListener("abort", onAbort)
+  }
+  const first = await Promise.race([watching, done])
+  if (!("kind" in first)) {
+    // The wait ended before the attach answered: a watch that opens later is stopped at once.
+    cleanup()
+    void watching.then((late) => {
+      if (late.kind === "ok") late.watch.stop()
+    })
+    return first
+  }
+  if (first.kind !== "ok") {
+    cleanup()
+    throw new ControlRefusal(outcomeFailure(first, row.device).error)
+  }
+  const { watch } = first
   void watch.ended.then((end) =>
     finish(end === "session_closed" ? "settled" : "ended", end === "session_closed" ? "closed" : end, turn),
   )
@@ -223,9 +241,7 @@ async function waitSettled(
   try {
     return await done
   } finally {
-    clearTimeout(timer)
-    clearTimeout(quiet)
-    signal?.removeEventListener("abort", onAbort)
+    cleanup()
     watch.stop()
   }
 }
