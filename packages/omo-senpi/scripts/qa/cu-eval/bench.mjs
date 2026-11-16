@@ -19,7 +19,6 @@ import { fileURLToPath } from "node:url"
 import { withTelemetryOptOut } from "../telemetry-opt-out-env.mjs"
 
 const here = dirname(fileURLToPath(import.meta.url))
-const repoRoot = resolve(here, "..", "..", "..", "..", "..")
 
 if (process.versions.bun === undefined) {
   const child = spawnSync("bun", [fileURLToPath(import.meta.url), ...process.argv.slice(2)], {
