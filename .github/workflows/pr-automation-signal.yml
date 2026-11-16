@@ -1,7 +1,7 @@
 name: PR Automation Signal
 
-# No checkout, artifacts, secrets, or write token. Privileged consumers resolve
-# the PR from GitHub's run metadata and read its current state through the API.
+# No checkout, artifacts, secrets, or write token. The privileged consumer (pr-automation.yml) resolves
+# the PR from GitHub's run metadata and reads its current state through the API.
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
@@ -10,6 +10,12 @@ on:
 
 permissions:
   contents: read
+
+# One signal per PR: a newer event for the same PR replaces a queued or running older signal. Its one consumer,
+# PR Automation, acts on the PR's current state, so only the newest signal carries anything to act on.
+concurrency:
+  group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   signal:

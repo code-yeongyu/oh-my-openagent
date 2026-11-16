@@ -13,3 +13,5 @@ omo-computer-safety = { path = "../omo-computer-safety" }
 
 [dev-dependencies]
 omo-computer-backend-fake = { path = "../omo-computer-backend-fake" }
+serde.workspace = true
+serde_json.workspace = true
