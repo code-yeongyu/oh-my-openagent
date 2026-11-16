@@ -84,14 +84,11 @@ export function threadToolFailure(
  * The refusal stands, since reading a newer schema could corrupt it; this turns it into the one failure that names
  * both versions and the remedy. Any other error answers undefined.
  */
-export function gatewaySchemaRefusal(
-  error: unknown,
-  env: Readonly<Record<string, string | undefined>> = process.env,
-): ThreadToolFailure | undefined {
+export function gatewaySchemaRefusal(error: unknown): ThreadToolFailure | undefined {
   const { code, details } = (error ?? {}) as { code?: unknown; details?: { found?: unknown; supported?: unknown } }
   if (code !== "gateway_schema_too_new" || typeof details?.found !== "number" || typeof details.supported !== "number")
     return undefined
-  const command = updateCommand(env)
+  const command = UPDATE_COMMAND
   return threadToolFailure(
     "gateway_schema_too_new",
     `This omo build reads gateway schema ${details.supported}, but this machine's gateway store is at schema ${details.found}: a newer omo build already upgraded it. Nothing was sent or changed.`,
@@ -100,13 +97,9 @@ export function gatewaySchemaRefusal(
   )
 }
 
-/** The update command the omo launcher hands the engine in `SENPI_BRAND` (a source build names its rebuild), else `omo update`. */
-function updateCommand(env: Readonly<Record<string, string | undefined>>): string {
-  try {
-    const command = (JSON.parse(env.SENPI_BRAND ?? "{}") as { update?: { command?: unknown } }).update?.command
-    if (typeof command === "string" && command.trim().length > 0) return command.trim()
-  } catch {
-    // An unreadable brand names no command; the release command is the right one for every installed omo.
-  }
-  return "omo update"
-}
+/**
+ * The one command that updates any omo build: a release updates itself, a source build answers with its own rebuild command
+ * (omo-native `compile-entry.ts`). Nothing in the environment can name a better one: the engine strips `SENPI_BRAND` at
+ * startup and the `omo thread` CLI runs in the launcher, which never has it.
+ */
+const UPDATE_COMMAND = "omo update"
