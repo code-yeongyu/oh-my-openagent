@@ -4,6 +4,7 @@ import { createHash } from "node:crypto"
 import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
+import { BYTECODE_COMPILE_ARGS } from "./build-omo-binary"
 import { senpiWorkerCompileArgs } from "./senpi-worker-compile"
 import { removeTreeSync } from "../test-support/remove-tree"
 
@@ -56,7 +57,7 @@ console.log("two-workers-ready " + judge.KILL_GUARD_TAG);`,
       // when: use the same args as the release builder, then remove the entire source.
       const built = spawnSync(
         process.execPath,
-        ["build", "--compile", entry, ...senpiWorkerCompileArgs(root), "--outfile", binary],
+        ["build", "--compile", ...BYTECODE_COMPILE_ARGS, entry, ...senpiWorkerCompileArgs(root), "--outfile", binary],
         { cwd: root, encoding: "utf8", timeout: 30_000 },
       )
       expect(built.status, built.stderr).toBe(0)

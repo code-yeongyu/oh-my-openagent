@@ -52,10 +52,14 @@ impl DisplayAwakeHold {
                 since_ms,
                 last_exec_ms,
             } => {
-                if now_ms.saturating_sub(since_ms) >= limits.session_cap_ms {
-                    Self::Capped
-                } else if now_ms.saturating_sub(last_exec_ms) >= limits.grace_ms {
+                // Whichever bound came FIRST decides: a hold that lapsed before it reached the cap
+                // is idle, however late the clock is read.
+                let lapsed_at = last_exec_ms.saturating_add(limits.grace_ms);
+                let capped_at = since_ms.saturating_add(limits.session_cap_ms);
+                if now_ms >= lapsed_at && lapsed_at <= capped_at {
                     Self::Idle
+                } else if now_ms >= capped_at {
+                    Self::Capped
                 } else {
                     self
                 }

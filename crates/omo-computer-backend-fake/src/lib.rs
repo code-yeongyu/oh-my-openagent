@@ -20,6 +20,7 @@ mod scenario;
 mod scripting;
 mod seams;
 mod session_reads;
+mod settle_source;
 mod sink;
 mod state;
 #[cfg(test)]
@@ -28,7 +29,7 @@ mod timeline;
 mod typing;
 
 pub use ax_tree::{NODES_PER_MS, PAD_ROLE};
-pub use backend::{FakeBackend, StopPathScript};
+pub use backend::{FakeBackend, FakeConsentHandle, StopPathScript};
 pub use capabilities::BACKEND_NAME;
 pub use clock::{ClockSeamInvalid, FakeClock, CLOCK_SEAM};
 pub use desktop::MAX_COMPOSITE_PIXELS;

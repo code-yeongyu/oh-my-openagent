@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """A GTK3 fixture window: a solid background with single-pixel markers at logical
-coordinates. GTK reads Xft.dpi, so at 192 dpi the window and its markers render at 2x in
-device pixels - the scaling the xft-dpi-scale and occluder-oracle scenarios measure."""
+coordinates. GTK3 takes its window scale from GDK_SCALE (or the XSETTINGS window scale a
+desktop sets beside Xft.dpi), not from Xft.dpi itself, so the xft-dpi-scale scenario starts it
+with GDK_SCALE=2 and the window and its markers render at 2x in device pixels."""
 import argparse
 
 import gi
