@@ -1,56 +1,39 @@
-import { randomUUID } from "node:crypto"
-import { format } from "node:util"
-import vm from "node:vm"
 import type {
   AuditEvent,
   AuditRecord,
   ComputerRunOk,
   ComputerSessionSnapshot,
 } from "@oh-my-opencode/senpi-desktop-protocol"
-import { isRecord } from "../service/parse"
 import type { DesktopService } from "../service/service"
-import {
-  ComputerRunError,
-  type ConfirmControl,
-  type EngineCall,
-  type Resume,
-  type RunContext,
-  RunOutput,
-} from "./context"
-import { createDesktopFacade } from "./facade"
-import { createWait, type WaitOptions } from "./wait"
+import { ComputerRunError, type ConfirmControl, type EngineCall, type RunContext, RunOutput } from "./context"
+import { createDesktopFacade, type DesktopFacade } from "./facade"
+import { sleep } from "./wait"
 
-/** The host's tool pipeline (senpi `executeTool`): validation, permission, and lazy activation stay host-side. */
-export type ExecuteTool = (
-  toolName: string,
-  params: unknown,
-  options: { readonly signal: AbortSignal },
-) => Promise<unknown>
-
-export interface ComputerRunRequest {
-  /** An async function body; `return` sets the run's value. */
-  readonly code: string
+export interface ComputerCallRequest {
+  /** The tool call this work belongs to; every audit record it produces is tagged with it. */
+  readonly toolCallId: string
   readonly snapshot: ComputerSessionSnapshot
   readonly timeoutMs: number
   readonly signal?: AbortSignal
 }
 
-/** `DesktopService` surface used by the run facade; `control.grant`/`revoke` stay host-only. */
-export interface ComputerRunHost {
-  readonly service: Pick<DesktopService, "call" | "onAudit" | "revokeControl" | "reportError">
-  readonly executeTool: ExecuteTool
+/** `DesktopService` surface used by the facade; `control.grant`/`revoke` stay host-only. */
+export interface ComputerCallHost {
+  readonly service: Pick<DesktopService, "call" | "auditBarrier" | "onAudit" | "revokeControl" | "reportError">
   /** Human confirmation behind `desktop.control.acquire`; absent: headless, never grants (#9651 B5b). */
   readonly confirmControl?: ConfirmControl
 }
 
-const FILENAME = "computer-run.js"
-
-/** The watchdog error is created in the run's realm, so it is no host `Error`: match its code. */
-function isVmTimeout(error: unknown): boolean {
-  return isRecord(error) && error.code === "ERR_SCRIPT_EXECUTION_TIMEOUT"
+/** What a step program reaches: the desktop facade, and a sleep cancelled with the call. */
+export interface StepScope {
+  readonly desktop: DesktopFacade
+  readonly sleep: (ms: number) => Promise<void>
 }
 
-/** A return value detached from the run's realm: structured-cloneable as-is, else JSON, else `String`. */
+/** Host-written steps over the facade (a call chain, a CUA batch); no model-written code runs in this process. */
+export type StepProgram = (scope: StepScope) => Promise<unknown>
+
+/** A return value detached from the facade's objects: structured-cloneable as-is, else JSON, else `String`. */
 function cloneSafe(value: unknown): unknown {
   if (value === undefined) return undefined
   try {
@@ -66,13 +49,13 @@ function cloneSafe(value: unknown): unknown {
   }
 }
 
-function auditRecord(event: AuditEvent, sessionId: string, runId: string): AuditRecord {
+function auditRecord(event: AuditEvent, sessionId: string, toolCallId: string): AuditRecord {
   const { action, target, delivery, durationMs, focusRestored, textLength, textSha256, keys } = event
   const code = event.code ?? null
   return {
     timestamp: new Date().toISOString(),
     sessionId,
-    runId,
+    toolCallId,
     action,
     target,
     delivery,
@@ -88,100 +71,57 @@ function auditRecord(event: AuditEvent, sessionId: string, runId: string): Audit
 }
 
 /**
- * Runs `code` in a fresh `node:vm` context of this process, with `desktop`, `wait`, `assert`, `tool`,
- * and `console` as its globals. The vm is not a security boundary; it scopes the run's globals and
- * bounds its synchronous work.
- *
- * `microtaskMode: "afterEvaluate"` gives the context its own microtask queue, so every synchronous
- * stretch of user code (the first one and each continuation after an `await`) runs inside a
- * `runInContext` call bounded by the remaining budget: `while (true) {}` fails the run instead of
- * freezing the host. That queue is drained only by `runInContext`, so every host promise handed to the
- * code resumes the vm from a macrotask once it settles. After the run ends nothing resumes it, and
- * work it leaked stays frozen.
+ * Runs one tool call's `program` against a desktop facade bound to this call: the call's signal aborts on the
+ * caller's signal, on `timeoutMs`, and when the call ends, and every engine request carries it. Displays,
+ * screenshot artifacts, and the engine's audit events received meanwhile are collected for the result.
  */
-export async function runComputerCode(request: ComputerRunRequest, host: ComputerRunHost): Promise<ComputerRunOk> {
-  const { code, snapshot, timeoutMs } = request
-  const runId = randomUUID()
+export async function runComputerSteps(
+  request: ComputerCallRequest,
+  host: ComputerCallHost,
+  program: StepProgram,
+): Promise<ComputerRunOk> {
+  const { snapshot, timeoutMs, toolCallId } = request
   const controller = new AbortController()
   const { signal } = controller
-  const deadline = Date.now() + timeoutMs
   const fail = (reason: unknown) => controller.abort(reason)
-  const timeout = () => new ComputerRunError("timeout", `computer run timed out after ${timeoutMs} ms`)
-  const timer = setTimeout(() => fail(timeout()), timeoutMs)
-  const onCallerAbort = () => fail(new ComputerRunError("aborted", "computer run was aborted"))
+  const timer = setTimeout(
+    () => fail(new ComputerRunError("timeout", `computer call timed out after ${timeoutMs} ms`)),
+    timeoutMs,
+  )
+  const onCallerAbort = () => fail(new ComputerRunError("aborted", "computer call was aborted"))
   request.signal?.addEventListener("abort", onCallerAbort, { once: true })
   if (request.signal?.aborted) onCallerAbort()
   const audit: AuditRecord[] = []
-  const unsubscribe = host.service.onAudit((event) => audit.push(auditRecord(event, snapshot.sessionId, runId)))
-
+  const unsubscribe = host.service.onAudit((event) => audit.push(auditRecord(event, snapshot.sessionId, toolCallId)))
   const context: RunContext = {
     signal,
     readOnly: snapshot.readOnly,
     snapshot,
     output: new RunOutput(),
     screenshots: [],
-    deadline,
+    deadline: Date.now() + timeoutMs,
   }
-  const drain = new vm.Script("")
-  const resumeVm = () => {
-    if (signal.aborted) return
-    try {
-      drain.runInContext(sandbox, { timeout: Math.max(1, deadline - Date.now()) })
-    } catch (error) {
-      fail(isVmTimeout(error) ? timeout() : error)
-    }
+  let sent = false
+  const call: EngineCall = (method, params) => {
+    sent = true
+    return host.service.call(method, params, { signal })
   }
-  const resume: Resume = (promise) => {
-    const schedule = () => setImmediate(resumeVm)
-    promise.then(schedule, schedule)
-    return promise
-  }
-  const call: EngineCall = (method, params) => host.service.call(method, params, { signal })
-  const wait = createWait(signal, timeoutMs)
-  const print = (...values: readonly unknown[]) => context.output.text(format(...values))
-  const sandbox = vm.createContext(
-    {
-      desktop: createDesktopFacade({
-        context,
-        call,
-        resume,
-        ...(host.confirmControl === undefined ? {} : { confirmControl: host.confirmControl }),
-      }),
-      wait: (msOrPredicate: unknown, options?: WaitOptions) => resume(wait(msOrPredicate, options)),
-      assert: (condition: unknown, message?: string): void => {
-        if (!condition) throw new ComputerRunError("assertion", message ?? "Assertion failed")
-      },
-      tool: new Proxy<Record<string, (params: unknown) => Promise<unknown>>>(
-        {},
-        {
-          get: (_tools, name) => (params: unknown) => {
-            signal.throwIfAborted()
-            return resume(host.executeTool(String(name), params, { signal }))
-          },
-        },
-      ),
-      console: { log: print, info: print, warn: print, error: print, debug: print },
-    },
-    { name: FILENAME, microtaskMode: "afterEvaluate" },
-  )
-
+  const desktop = createDesktopFacade({
+    context,
+    call,
+    ...(host.confirmControl === undefined ? {} : { confirmControl: host.confirmControl }),
+  })
   try {
     signal.throwIfAborted()
-    // The evaluation promise is marked handled inside the vm before its microtasks drain: code that throws
-    // before its first await rejects it right then, ahead of the host's handler, which Node would report
-    // as an unhandled rejection in the host. The rejection itself still reaches the host below unchanged.
-    const script = new vm.Script(`((run) => (run.catch(() => undefined), run))((async () => {\n${code}\n})())`, {
-      filename: FILENAME,
-      lineOffset: -1,
-    })
-    const evaluation: unknown = script.runInContext(sandbox, { timeout: timeoutMs })
     const returnValue = await new Promise((resolve, reject) => {
       signal.addEventListener("abort", () => reject(signal.reason), { once: true })
-      signal.throwIfAborted()
-      Promise.resolve(evaluation).then(resolve, reject)
-      // Code that settled during the first evaluation queued this subscription on the vm's own microtask
-      // queue, which only a later runInContext drains; without this drain such a run hangs to its timeout.
-      setImmediate(resumeVm)
+      // The audit of the call's last request arrives after that request's reply; collect it before settling.
+      program({ desktop, sleep: (ms) => sleep(ms, signal) })
+        .then(async (value) => {
+          if (sent) await host.service.auditBarrier({ signal, timeoutMs: Math.max(1, context.deadline - Date.now()) })
+          return value
+        })
+        .then(resolve, reject)
     })
     return {
       displays: context.output.finish(),
@@ -190,18 +130,16 @@ export async function runComputerCode(request: ComputerRunRequest, host: Compute
       audit: [...audit],
     }
   } catch (error) {
-    const failure = isVmTimeout(error) ? timeout() : error
-    // A failed run revokes the control grant (lead add (a) of #9651), so the next foreground action
-    // asks the human again; an interrupted (aborted) run lands here too. The revoke is written to the
-    // engine's serial queue before the run settles, so the run still settles at its own deadline, and
-    // nothing sent afterwards can overtake it. Engine failures reach the error hub inside revokeControl;
-    // anything else it rethrows is a bug and is reported there too, never dropped (#9967).
-    void host.service.revokeControl().catch((error: unknown) => host.service.reportError(error))
-    throw failure
+    // A failed call revokes the control grant (lead add (a) of #9651), so the next foreground action asks the
+    // human again; an interrupted (aborted) call lands here too. The revoke is written to the engine's serial
+    // queue before the call settles, so nothing sent afterwards can overtake it. Engine failures reach the error
+    // hub inside revokeControl; anything else it rethrows is a bug and is reported there too (#9967).
+    void host.service.revokeControl().catch((failure: unknown) => host.service.reportError(failure))
+    throw error
   } finally {
     clearTimeout(timer)
     request.signal?.removeEventListener("abort", onCallerAbort)
     unsubscribe()
-    if (!signal.aborted) controller.abort(new ComputerRunError("ended", "computer run has ended"))
+    if (!signal.aborted) controller.abort(new ComputerRunError("ended", "computer call has ended"))
   }
 }

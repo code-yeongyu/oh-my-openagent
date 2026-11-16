@@ -9,7 +9,6 @@ it("carries engine permission metadata through the public computer result", asyn
   const fixture = desktopFixture({}, { FAKE_ENGINE_INPUT_ERROR: "PermissionDenied" })
   const tool = createComputerTool({
     handle: fixture.handle,
-    executeTool: () => Promise.reject(new Error("no host tools")),
   })
   const result = await tool.execute(
     "permission",
@@ -39,7 +38,6 @@ it("marks the denial inside details so the code-mode marshal reports hasError", 
   const fixture = desktopFixture({}, { FAKE_ENGINE_INPUT_ERROR: "PermissionDenied" })
   const tool = createComputerTool({
     handle: fixture.handle,
-    executeTool: () => Promise.reject(new Error("no host tools")),
   })
   const result = await tool.execute(
     "permission",

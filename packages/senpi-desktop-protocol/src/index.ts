@@ -2,6 +2,7 @@ export type { AuditPrimaryError, AuditRecord, AuditStatus } from "./audit"
 export {
   ComputerCallError,
   type ComputerCallErrorReason,
+  classifyComputerCall,
   type ComputerCallPolicy,
   type ComputerCallStep,
   DESKTOP_METHODS,

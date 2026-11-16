@@ -33,7 +33,7 @@ interface MatchedWindow {
 }
 
 /**
- * The `desktop` global of a computer run (and the root of direct `call` chains): one engine target plus lookups.
+ * The desktop facade of one computer tool call (the root of its `call` chain): one engine target plus lookups.
  * Lookups run through the `@oh-my-opencode/senpi-desktop-sdk` `Computer` over this run's engine channel.
  */
 export function createDesktopFacade(scope: RunScope) {

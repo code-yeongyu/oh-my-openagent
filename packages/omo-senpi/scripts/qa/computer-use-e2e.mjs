@@ -134,31 +134,50 @@ function runScenario({ name, permission, steps, computer = {} }) {
 }
 
 const screenshotChain = { action: "call", chain: [{ method: "screenshot" }] }
-// Coordinate input is bound to the last capture of its target, so the click runs after a screenshot; a
-// multi-step sequence is `run` code (a `chain` is one fluent call on a window or element).
-const clickChain = { action: "run", code: "await desktop.screenshot(); await desktop.click(5, 5); return 'clicked'" }
+// Coordinate input is bound to the last capture of its target, so the click is its own call after a screenshot.
+const clickChain = { action: "call", chain: [{ method: "click", args: [5, 5] }] }
+
+// A multi-step desktop task is one eval cell of computer helper calls (computer use has no code cell of its own).
+// The computer global appears in the cell after the tool's first call, so every cell scenario starts with one.
+const cell = (code) => ({
+  type: "tool_call",
+  name: "eval",
+  arguments: { language: "js", code, summary: "computer QA" },
+})
+const cellSteps = (code) => [
+  { type: "tool_call", name: "computer", arguments: screenshotChain },
+  cell(code),
+  { type: "text", text: "done" },
+]
+const cellResult = (results) => results.find((r) => r.toolName === "eval")
+// The eval tool shows a cell's returned string JSON-quoted; checks read the string itself.
+function cellText(result) {
+  const text = resultText(result)
+  try {
+    const value = JSON.parse(text)
+    return typeof value === "string" ? value : text
+  } catch {
+    return text
+  }
+}
 
 // A per-call display handle: its screenshot and input target display:<id>, never the session default.
-const displayRun = {
-  action: "run",
-  code: "const all = await desktop.display('all'); const two = await desktop.display('2'); const a = await all.screenshot({ silent: true }); const b = await two.screenshot({ silent: true }); await two.click(20, 10); return JSON.stringify({ all: [a.width, a.height], two: [b.width, b.height] })",
-}
+const displayCell =
+  "const all = await computer.display('all'); const two = await computer.display('2'); const a = await all.screenshot({ silent: true }); const b = await two.screenshot({ silent: true }); await two.click(20, 10); return JSON.stringify({ all: [a.width, a.height], two: [b.width, b.height] })"
 // Zoom recaptures native detail of a region while input stays in the full screenshot's frame.
-const zoomRun = {
-  action: "run",
-  code: "const full = await desktop.screenshot({ silent: true }); const zoom = await desktop.zoom({ x: 0, y: 0, width: full.width / 4, height: full.height / 4 }, { silent: true }); await desktop.click(full.width - 10, full.height - 10); return 'ZOOM ' + [full.width, full.height, zoom.coordinateWidth, zoom.coordinateHeight, zoom.region.width, zoom.region.height, full.sourceWidth, full.sourceHeight, zoom.sourceWidth, zoom.sourceHeight].join(' ')",
-}
+const zoomCell =
+  "const full = await computer.screenshot({ silent: true }); const zoom = await computer.zoom({ x: 0, y: 0, width: full.width / 4, height: full.height / 4 }, { silent: true }); await computer.click(full.width - 10, full.height - 10); return 'ZOOM ' + [full.width, full.height, zoom.coordinateWidth, zoom.coordinateHeight, zoom.region.width, zoom.region.height, full.sourceWidth, full.sourceHeight, zoom.sourceWidth, zoom.sourceHeight].join(' ')"
 // Observe returns one window frame and its accessibility tree together; later input uses that frame.
-const observeRun = {
-  action: "run",
-  code: "const win = await desktop.window('101'); const seen = await win.observe({ silent: true }); await win.click(5, 5); return 'OBSERVE ' + [seen.frameId, seen.coordinateWidth, seen.coordinateHeight, seen.nodeCount, seen.ax.includes('[ref=e'), seen.truncated].join(' ')",
-}
+const observeCell =
+  "const win = await computer.window('101'); const seen = await win.observe({ silent: true }); await win.click(5, 5); return 'OBSERVE ' + [seen.frameId, seen.coordinateWidth, seen.coordinateHeight, seen.nodeCount, seen.ax.includes('[ref=e'), seen.truncated].join(' ')"
 // This wire scenario observes routing and bounds. Native release ordering is
 // asserted against RecordingSink in the session tests, not exposed by the audit.
-const holdsRun = {
-  action: "run",
-  code: "await desktop.holdKeys(['shift', 'a'], { duration: 0.2 }); await desktop.screenshot({ silent: true }); await desktop.holdMouse(5, 5, { duration: 0.2, button: 'left' }); let refused = 'no'; try { await desktop.holdKeys(['shift'], { duration: 101 }) } catch (error) { refused = String(error?.message ?? error).slice(0, 80) } return 'HOLDS ok ' + refused",
-}
+const holdsCell =
+  "await computer.holdKeys(['shift', 'a'], { duration: 0.2 }); await computer.screenshot({ silent: true }); await computer.holdMouse(5, 5, { duration: 0.2, button: 'left' }); let refused = 'no'; try { await computer.holdKeys(['shift'], { duration: 101 }) } catch (error) { refused = String(error?.message ?? error).slice(0, 80) } return 'HOLDS ok ' + refused"
+// #13634: a multi-step task as one cell; each input helper resolves to its value with the engine report and the
+// id of the tool call that sent it, so the cell can branch on report.disposition.retry.
+const taskCell =
+  "const win = await computer.window('101'); await win.screenshot({ silent: true }); const typed = await win.type('hello'); const pressed = await win.press('enter'); const clip = await computer.clipboard.write('copied'); const back = await computer.clipboard.read(); return ['TASK', typed.report.disposition.retry, pressed.report.disposition.delivery, new Set([typed.toolCallId, pressed.toolCallId, clip.toolCallId]).size, Array.isArray(pressed.auditIds), back].join(' ')"
 const displayShotChain = { action: "call", chain: [{ method: "display", args: ["2"] }, { method: "screenshot" }] }
 const displayClickChain = {
   action: "call",
@@ -170,16 +189,31 @@ const displayClickChain = {
 
 const scenarios = [
   {
+    name: "eval-cell-runs-a-multi-step-task-with-reports",
+    permission: undefined,
+    steps: cellSteps(taskCell),
+    verify: ({ results, methods }) => {
+      const result = cellResult(results)
+      const [retry, delivery, distinctCalls, auditIds, back] = (
+        /TASK (\S+) (\S+) (\S+) (\S+) (\S+)/.exec(cellText(result)) ?? []
+      ).slice(1)
+      return [
+        ["the cell succeeded", result?.isError === false],
+        ["each input helper returned its own report", retry === "unsafe" && /^[a-z_]+$/.test(delivery ?? "")],
+        ["each helper was its own tool call", distinctCalls === "3" && auditIds === "true"],
+        ["the cell read back what it wrote", back === "copied"],
+        ["the typing and the chord reached the engine", methods.includes("typeText") && methods.includes("keyChord")],
+      ]
+    },
+  },
+  {
     name: "observe-returns-one-frame-and-tree",
     permission: undefined,
-    steps: [
-      { type: "tool_call", name: "computer", arguments: observeRun },
-      { type: "text", text: "done" },
-    ],
+    steps: cellSteps(observeCell),
     verify: ({ results, methods }) => {
-      const result = results.find((r) => r.toolName === "computer")
+      const result = cellResult(results)
       const [frameId, width, height, nodes, hasRefs, truncated] = (
-        /OBSERVE (\S+) (\S+) (\S+) (\S+) (\S+) (\S+)/.exec(resultText(result)) ?? []
+        /OBSERVE (\S+) (\S+) (\S+) (\S+) (\S+) (\S+)/.exec(cellText(result)) ?? []
       ).slice(1)
       return [
         ["the observe run succeeded", result?.isError === false],
@@ -198,14 +232,11 @@ const scenarios = [
   {
     name: "holds-are-bounded-and-routed",
     permission: undefined,
-    steps: [
-      { type: "tool_call", name: "computer", arguments: holdsRun },
-      { type: "text", text: "done" },
-    ],
+    steps: cellSteps(holdsCell),
     verify: ({ results, methods }) => {
-      const text = resultText(results.find((r) => r.toolName === "computer"))
+      const text = cellText(cellResult(results))
       return [
-        ["the holds run succeeded", results.find((r) => r.toolName === "computer")?.isError === false],
+        ["the holds cell succeeded", cellResult(results)?.isError === false],
         ["both bounded holds reached the engine", methods.includes("holdKeys") && methods.includes("holdMouse")],
         ["a 101 s hold was refused with the duration bound", /HOLDS ok /.test(text) && /0\.\.=100/.test(text)],
         ["the refused hold never reached the engine", methods.filter((m) => m === "holdKeys").length === 1],
@@ -215,19 +246,16 @@ const scenarios = [
   {
     name: "zoom-keeps-the-full-input-frame",
     permission: undefined,
-    steps: [
-      { type: "tool_call", name: "computer", arguments: zoomRun },
-      { type: "text", text: "done" },
-    ],
+    steps: cellSteps(zoomCell),
     verify: ({ results, methods }) => {
       const [fw, fh, cw, ch, rw, rh, fsw, fsh, zsw, zsh] = (
-        /ZOOM ([\d. ]+)/.exec(resultText(results.find((r) => r.toolName === "computer")))?.[1] ?? ""
+        /ZOOM ([\d. ]+)/.exec(cellText(cellResult(results)))?.[1] ?? ""
       )
         .trim()
         .split(" ")
         .map(Number)
       return [
-        ["the zoom run succeeded", results.find((r) => r.toolName === "computer")?.isError === false],
+        ["the zoom cell succeeded", cellResult(results)?.isError === false],
         ["zoom reports the full screenshot as its input frame", fw > 0 && cw === fw && ch === fh],
         ["zoom echoes the requested quarter region", rw === fw / 4 && rh === fh / 4],
         ["zoom recaptured only the region: a quarter of the full native source", zsw === fsw / 4 && zsh === fsh / 4],
@@ -238,20 +266,14 @@ const scenarios = [
   {
     name: "display-handles-capture-and-click",
     permission: undefined,
-    steps: [
-      { type: "tool_call", name: "computer", arguments: displayRun },
-      { type: "text", text: "done" },
-    ],
+    steps: cellSteps(displayCell),
     verify: ({ results, methods }) => [
-      ["the display run succeeded", results.find((r) => r.toolName === "computer")?.isError === false],
+      ["the display cell succeeded", cellResult(results)?.isError === false],
       [
         "display 2 alone is captured at its native 2880x1800",
-        resultText(results.find((r) => r.toolName === "computer")).includes('"two":[2880,1800]'),
+        cellText(cellResult(results)).includes('"two":[2880,1800]'),
       ],
-      [
-        "the composite spans both displays",
-        resultText(results.find((r) => r.toolName === "computer")).includes('"all":[3840,1440]'),
-      ],
+      ["the composite spans both displays", cellText(cellResult(results)).includes('"all":[3840,1440]')],
       ["the click on display 2 reached the engine", methods.includes("click")],
     ],
   },
@@ -293,14 +315,15 @@ const scenarios = [
     name: "exec-denied",
     permission: "computer:exec=deny",
     steps: [
+      { type: "tool_call", name: "computer", arguments: screenshotChain },
       { type: "tool_call", name: "computer", arguments: clickChain },
       { type: "text", text: "done" },
     ],
     verify: ({ results, methods }) => [
-      ["the click call was refused", results.find((r) => r.toolName === "computer")?.isError === true],
+      ["the click call was refused", results.filter((r) => r.toolName === "computer")[1]?.isError === true],
       [
         "by the permission rule, not the stop path",
-        !resultText(results.find((r) => r.toolName === "computer")).includes("StopPathUnavailable"),
+        !resultText(results.filter((r) => r.toolName === "computer")[1]).includes("StopPathUnavailable"),
       ],
       ["no click reached the engine", !methods.includes("click")],
     ],
@@ -309,11 +332,12 @@ const scenarios = [
     name: "exec-allowed",
     permission: undefined,
     steps: [
+      { type: "tool_call", name: "computer", arguments: screenshotChain },
       { type: "tool_call", name: "computer", arguments: clickChain },
       { type: "text", text: "done" },
     ],
     verify: ({ results, methods }) => [
-      ["the click call succeeded", results.find((r) => r.toolName === "computer")?.isError === false],
+      ["the click call succeeded", results.filter((r) => r.toolName === "computer")[1]?.isError === false],
       ["the click reached the engine", methods.includes("click")],
     ],
   },

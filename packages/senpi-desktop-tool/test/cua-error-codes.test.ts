@@ -1,4 +1,3 @@
-import type { ExecuteTool } from "@oh-my-opencode/senpi-desktop-service"
 import { afterEach, expect, it } from "vitest"
 import { createComputerActionsTool } from "../src/cua-adapter"
 import { closeDesktops, desktopFixture, hostContext } from "./fixtures"
@@ -7,7 +6,6 @@ import { closeDesktops, desktopFixture, hostContext } from "./fixtures"
 // still fails the action as COMPUTER_ERROR instead of breaking the call (ErrorCode amendment 1, #11461).
 
 const HANG_GUARD = { timeout: 30_000 }
-const noTools: ExecuteTool = () => Promise.reject(new Error("no tools"))
 
 afterEach(closeDesktops)
 
@@ -17,7 +15,7 @@ async function clickFailure(
 ): Promise<{ readonly code: unknown; readonly message: unknown }> {
   const env: Record<string, string> = reason === undefined ? {} : { FAKE_ENGINE_INPUT_REASON: reason }
   const fixture = desktopFixture({}, { FAKE_ENGINE_INPUT_ERROR: engineCode, ...env })
-  const tool = createComputerActionsTool({ handle: fixture.handle, executeTool: noTools })
+  const tool = createComputerActionsTool({ handle: fixture.handle })
   const result = await tool.execute("call", { action: "click", x: 10, y: 10 }, undefined, undefined, hostContext())
   expect(result.isError).toBe(true)
   const value = result.details.value

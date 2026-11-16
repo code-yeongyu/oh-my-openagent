@@ -21,12 +21,12 @@ function fixture() {
   }
 }
 
-function started(toolCallId: string, action: "capabilities" | "run") {
+function started(toolCallId: string, action: "capabilities" | "call") {
   return {
     type: "tool_execution_start",
     toolCallId,
     toolName: "computer",
-    args: action === "run" ? { action, code: "private typed text" } : { action },
+    args: action === "call" ? { action, chain: [{ method: "type", args: ["private typed text"] }] } : { action },
   }
 }
 
@@ -51,7 +51,7 @@ describe("computer-use permission telemetry ordering", () => {
   test("#given mixed preflights #when the earlier read call is denied #then its own call id preserves the read tier", () => {
     const f = fixture()
     f.telemetry.toolExecutionStarted(started("read-denied", "capabilities"))
-    f.telemetry.toolExecutionStarted(started("exec-allowed", "run"))
+    f.telemetry.toolExecutionStarted(started("exec-allowed", "call"))
 
     f.telemetry.permissionTierDenied(denied("read-denied"), f.context, "quartz")
 
@@ -71,7 +71,7 @@ describe("computer-use permission telemetry ordering", () => {
   test("#given duplicate denied notifications #when both settle #then another call's tier is never consumed", () => {
     const f = fixture()
     f.telemetry.toolExecutionStarted(started("read-denied", "capabilities"))
-    f.telemetry.toolExecutionStarted(started("exec-denied", "run"))
+    f.telemetry.toolExecutionStarted(started("exec-denied", "call"))
 
     f.telemetry.permissionTierDenied(denied("read-denied"), f.context, "quartz")
     f.telemetry.permissionTierDenied(denied("read-denied"), f.context, "quartz")

@@ -1,5 +1,5 @@
 import { expect, it } from "vitest"
-import { DesktopService, runComputerCode } from "@oh-my-opencode/senpi-desktop-service"
+import { DesktopService, runComputerSteps } from "@oh-my-opencode/senpi-desktop-service"
 import { refusalChild } from "../../senpi-desktop-engine/test/refusal-child"
 import { ComputerHandle } from "../src/activation"
 import { runComputerCommand } from "../src/command"
@@ -11,7 +11,6 @@ import { hostContext } from "./fixtures"
 
 function fixture() {
   let launches = 0
-  let hostTools = 0
   const service = new DesktopService({
     createChild: () => {
       launches += 1
@@ -20,21 +19,11 @@ function fixture() {
   })
   const settings = resolveComputerSettings({ auditLog: { enabled: false } }, "darwin")
   const handle = new ComputerHandle({ service, settings: () => settings })
-  const deps = {
-    handle,
-    executeTool: async () => {
-      hostTools += 1
-      return undefined
-    },
-  }
-  return { service, settings, handle, deps, launches: () => launches, hostTools: () => hostTools }
+  const deps = { handle }
+  return { service, settings, handle, deps, launches: () => launches }
 }
 
-for (const input of [
-  { action: "call", chain: [{ method: "windows" }] },
-  { action: "run", code: "return await desktop.windows();", read_only: true },
-  { action: "capabilities" },
-]) {
+for (const input of [{ action: "call", chain: [{ method: "windows" }] }, { action: "capabilities" }]) {
   it(`maps actual startup refusal for computer ${input.action} without permission metadata`, async () => {
     const f = fixture()
     try {
@@ -52,7 +41,6 @@ for (const input of [
       expect(result.details.value).not.toHaveProperty("permission")
       expect(result.details.value).not.toHaveProperty("settingsUrl")
       expect(f.launches()).toBe(1)
-      expect(f.hostTools()).toBe(0)
     } finally {
       await f.service.close()
     }
@@ -82,7 +70,6 @@ it("maps actual startup refusal for computer_actions", async () => {
       },
     })
     expect(f.launches()).toBe(1)
-    expect(f.hostTools()).toBe(0)
   } finally {
     await f.service.close()
   }
@@ -110,13 +97,10 @@ it("propagates a restart refusal through the eval-facing real service facade", a
       if (!(error instanceof Error)) throw error
     })
     await expect(
-      runComputerCode(
-        {
-          code: "return await desktop.windows();",
-          snapshot: runSnapshot(f.settings, hostContext(), true),
-          timeoutMs: 5_000,
-        },
-        { service: f.service, executeTool: f.deps.executeTool },
+      runComputerSteps(
+        { toolCallId: "launch", snapshot: runSnapshot(f.settings, hostContext(), true), timeoutMs: 5_000 },
+        { service: f.service },
+        ({ desktop }) => desktop.windows(),
       ),
     ).rejects.toMatchObject({
       code: "launch-context-unavailable",

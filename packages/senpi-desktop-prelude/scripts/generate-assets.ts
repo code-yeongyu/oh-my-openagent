@@ -157,11 +157,11 @@ export const COMPOSED_HELPERS: readonly ComposedHelper[] = [
 ]
 
 /** Tool actions of their own (`{ action }` without a chain); not call-chain methods. */
-const ACTION_HELPERS: readonly string[] = ["run", "capabilities", "close"]
+const ACTION_HELPERS: readonly string[] = ["capabilities", "close"]
 
 /** Manifest methods no kernel helper wraps, each with the reason; a new manifest method must land in one place. */
 const KERNEL_OMITTED: Readonly<Record<string, string>> = {
-  "Computer.batch": "kernels sequence steps with computer.run(fn)",
+  "Computer.batch": "kernels sequence steps as awaited helper calls in one eval cell",
   "Computer.close": "the kernel close() is the tool's close action, which ends the host session",
   "ControlLease.release": "kernels release the grant with computer.control.release()",
   "StopPath.status": "the SDK event stream is for in-process callers; kernels see stops as errors",

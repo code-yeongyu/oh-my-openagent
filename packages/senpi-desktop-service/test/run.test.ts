@@ -1,15 +1,14 @@
 import type { ComputerSessionSnapshot } from "@oh-my-opencode/senpi-desktop-protocol"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { ComputerRunError } from "../src/run/context"
-import { type ExecuteTool, runComputerCode } from "../src/run/runtime"
+import { runComputerSteps, type StepProgram } from "../src/run/runtime"
 import { DesktopEngineRpcError } from "../src/service/rpc-client"
 import { DesktopService } from "../src/service/service"
 import { fakeEngineFactory, rejectionOf, type SpawnLog } from "./harness"
 
 // Every case waits on real child-process I/O; the guard only catches a hang, it never times behavior.
 const HANG_GUARD = { timeout: 30_000 }
-// Only the runtime's and the service's timers are faked; child-process I/O and the vm resume
-// (`setImmediate`) keep running on the real loop.
+// Only the runtime's and the service's timers are faked; child-process I/O keeps running on the real loop.
 const TIMERS: Parameters<typeof vi.useFakeTimers>[0] = {
   toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval"],
 }
@@ -36,7 +35,6 @@ interface RunOptions {
   readonly readOnly?: boolean
   readonly timeoutMs?: number
   readonly signal?: AbortSignal
-  readonly executeTool?: ExecuteTool
 }
 
 function snapshot(readOnly: boolean): ComputerSessionSnapshot {
@@ -53,17 +51,16 @@ function snapshot(readOnly: boolean): ComputerSessionSnapshot {
   }
 }
 
-const noTools: ExecuteTool = (name) => Promise.reject(new Error(`unexpected tool ${name}`))
-
-function run(service: DesktopService, code: string, options: RunOptions = {}) {
-  return runComputerCode(
+function run(service: DesktopService, program: StepProgram, options: RunOptions = {}) {
+  return runComputerSteps(
     {
-      code,
+      toolCallId: "tool-call-1",
       snapshot: snapshot(options.readOnly ?? false),
       timeoutMs: options.timeoutMs ?? RUN_TIMEOUT_MS,
       ...(options.signal === undefined ? {} : { signal: options.signal }),
     },
-    { service, executeTool: options.executeTool ?? noTools },
+    { service },
+    program,
   )
 }
 
@@ -71,42 +68,28 @@ function methods(log: SpawnLog): readonly string[] {
   return log.requests.map((request) => request.method)
 }
 
-describe("runComputerCode", HANG_GUARD, () => {
-  it("settles a run that returns without awaiting any host call", async () => {
+describe("runComputerSteps", HANG_GUARD, () => {
+  it("returns the program's value detached from the facade and displays the inline capture", async () => {
     // Given
     const { service } = await openDesktop()
 
     // When
-    const results = await Promise.all(
-      [
-        "return 42;",
-        "if (true) return { early: true }; await desktop.windows();",
-        "await Promise.resolve(); return 'x';",
-      ].map((code) => run(service, code, { timeoutMs: 5_000 })),
-    )
+    const result = await run(service, async ({ desktop }) => {
+      const shot = await desktop.screenshot()
+      const editor = await desktop.window({ app: "code" })
+      return { width: shot.width, frameId: shot.frameId, window: editor.id, handle: editor }
+    })
 
-    // Then
-    expect(results.map((result) => result.returnValue)).toEqual([42, { early: true }, "x"])
-  })
-
-  it("returns the code's value and displays the inline capture before later console output", async () => {
-    // Given
-    const { service } = await openDesktop()
-    const code = `
-			const shot = await desktop.screenshot();
-			const editor = await desktop.window({ app: "code" });
-			console.log("found", editor.title);
-			return { width: shot.width, frameId: shot.frameId, window: editor.id };
-		`
-
-    // When
-    const result = await run(service, code)
-
-    // Then
-    expect(result.returnValue).toEqual({ width: 1280, frameId: "desktop-1", window: "101" })
-    expect(result.displays.map((display) => display.type)).toEqual(["text", "image", "text"])
+    // Then: a window handle comes back as its plain fields, never as a live facade object
+    expect(result.returnValue).toMatchObject({
+      width: 1280,
+      frameId: "desktop-1",
+      window: "101",
+      handle: { id: "101" },
+    })
+    expect(Object.getPrototypeOf(Reflect.get(Object(result.returnValue), "handle"))).toBe(Object.prototype)
+    expect(result.displays.map((display) => display.type)).toEqual(["text", "image"])
     expect(result.displays[1]).toEqual({ type: "image", data: expect.any(String), mimeType: "image/png" })
-    expect(result.displays[2]).toEqual({ type: "text", text: "found main.ts" })
   })
 
   it("types into an element through ax.typeText and returns how the text was delivered", async () => {
@@ -114,10 +97,10 @@ describe("runComputerCode", HANG_GUARD, () => {
     const { service, log } = await openDesktop()
 
     // When
-    const result = await run(
-      service,
-      `const el = await desktop.ref("e1"); return [await el.type("hello"), await el.type("x", { delivery: "foreground" })];`,
-    )
+    const result = await run(service, async ({ desktop }) => {
+      const el = await desktop.ref("e1")
+      return [await el.type("hello"), await el.type("x", { delivery: "foreground" })]
+    })
 
     // Then
     expect(result.returnValue).toEqual([{ method: "inserted" }, { method: "inserted" }])
@@ -133,7 +116,7 @@ describe("runComputerCode", HANG_GUARD, () => {
     const { service } = await openDesktop()
 
     // When
-    const result = await run(service, `return (await (await desktop.window("202")).screenshot()).path;`)
+    const result = await run(service, async ({ desktop }) => (await (await desktop.window("202")).screenshot()).path)
 
     // Then
     const path = "/tmp/fake-captures/202-1.png"
@@ -145,40 +128,27 @@ describe("runComputerCode", HANG_GUARD, () => {
     ])
   })
 
-  it("rejects with the error of code that throws before its first await, leaving nothing unhandled", async () => {
-    // Given: the vm rejects its evaluation promise while its own microtasks drain, before the host has
-    // attached a handler; that used to surface as an unhandled rejection in the host (Vitest fails the
-    // run on one, so this test guards that too)
-    const { service } = await openDesktop()
-
-    // When
-    const error = await rejectionOf(run(service, `throw new Error("thrown before any await");`))
-
-    // Then
-    expect(error).toMatchObject({ message: "thrown before any await" })
-  })
-
   it("rejects click in a read-only run before it reaches the engine", async () => {
     // Given
     const { service, log } = await openDesktop()
 
     // When
-    const error = await rejectionOf(run(service, "await desktop.click(1, 1)", { readOnly: true }))
+    const error = await rejectionOf(run(service, ({ desktop }) => desktop.click(1, 1), { readOnly: true }))
 
     // Then
     expect(error).toBeInstanceOf(ComputerRunError)
     expect(error).toHaveProperty("reason", "readOnly")
-    expect(error).toHaveProperty("message", "read-only run: 'click' requires read_only: false")
+    expect(error).toHaveProperty("message", "read-only call: 'click' sends input, which needs the exec tier")
     expect(methods(log)).not.toContain("click")
   })
 
   it("rejects menu.select in a read-only run before it reaches the engine", async () => {
     // Given
     const { service, log } = await openDesktop()
-    const code = `
-			const editor = await desktop.window({ app: "Code" });
-			await editor.menu.select(["File", "Save"]);
-		`
+    const code: StepProgram = async ({ desktop }) => {
+      const editor = await desktop.window({ app: "Code" })
+      await editor.menu.select(["File", "Save"])
+    }
 
     // When
     const error = await rejectionOf(run(service, code, { readOnly: true }))
@@ -186,20 +156,20 @@ describe("runComputerCode", HANG_GUARD, () => {
     // Then
     expect(error).toBeInstanceOf(ComputerRunError)
     expect(error).toHaveProperty("reason", "readOnly")
-    expect(error).toHaveProperty("message", "read-only run: 'menu.select' requires read_only: false")
+    expect(error).toHaveProperty("message", "read-only call: 'menu.select' sends input, which needs the exec tier")
     expect(methods(log)).not.toContain("menus.select")
   })
 
   it("allows menu.items in a read-only run and returns the menu tree", async () => {
     // Given
     const { service, log } = await openDesktop()
-    const code = `
-			const editor = await desktop.window({ app: "Code" });
-			return {
-				root: (await editor.menu.items()).map((item) => item.title),
-				file: (await editor.menu.items(["File"])).map((item) => item.title),
-			};
-		`
+    const code: StepProgram = async ({ desktop }) => {
+      const editor = await desktop.window({ app: "Code" })
+      return {
+        root: (await editor.menu.items()).map((item) => item.title),
+        file: (await editor.menu.items(["File"])).map((item) => item.title),
+      }
+    }
 
     // When
     const result = await run(service, code, { readOnly: true })
@@ -213,11 +183,11 @@ describe("runComputerCode", HANG_GUARD, () => {
   it("forwards the window id and the full menu path to the engine", async () => {
     // Given
     const { service, log } = await openDesktop()
-    const code = `
-			const editor = await desktop.window({ app: "Code" });
-			await editor.menu.items(["File"]);
-			await editor.menu.select(["File", "Export…", "PDF"]);
-		`
+    const code: StepProgram = async ({ desktop }) => {
+      const editor = await desktop.window({ app: "Code" })
+      await editor.menu.items(["File"])
+      await editor.menu.select(["File", "Export…", "PDF"])
+    }
 
     // When
     await run(service, code)
@@ -232,11 +202,11 @@ describe("runComputerCode", HANG_GUARD, () => {
   it("forwards an explicit menu.select delivery as deliveryMode and omits it otherwise (#9888)", async () => {
     // Given
     const { service, log } = await openDesktop()
-    const code = `
-			const editor = await desktop.window({ app: "Code" });
-			await editor.menu.select(["File", "Save"]);
-			await editor.menu.select(["File", "Save"], { delivery: "foreground" });
-		`
+    const code: StepProgram = async ({ desktop }) => {
+      const editor = await desktop.window({ app: "Code" })
+      await editor.menu.select(["File", "Save"])
+      await editor.menu.select(["File", "Save"], { delivery: "foreground" })
+    }
 
     // When
     await run(service, code)
@@ -252,7 +222,7 @@ describe("runComputerCode", HANG_GUARD, () => {
     const { service, log } = await openDesktop()
 
     // When
-    const result = await run(service, "return (await desktop.screenshot({ silent: true })).frameId;", {
+    const result = await run(service, async ({ desktop }) => (await desktop.screenshot({ silent: true })).frameId, {
       readOnly: true,
     })
 
@@ -266,7 +236,7 @@ describe("runComputerCode", HANG_GUARD, () => {
     const { service } = await openDesktop()
 
     // When
-    const error = await rejectionOf(run(service, "await desktop.click(5, 5)"))
+    const error = await rejectionOf(run(service, ({ desktop }) => desktop.click(5, 5)))
 
     // Then
     expect(error).toBeInstanceOf(DesktopEngineRpcError)
@@ -274,14 +244,14 @@ describe("runComputerCode", HANG_GUARD, () => {
     expect(error).toHaveProperty("data.code", "InvalidCoordinateFrame")
   })
 
-  it("drives a window handle by its id and reports the engine's audit events for the run", async () => {
+  it("drives a window handle by its id and reports the engine's audit events tagged with the tool call", async () => {
     // Given
     const { service, log } = await openDesktop()
-    const code = `
-			const editor = await desktop.window({ app: "Code" });
-			await editor.screenshot({ silent: true });
-			await editor.click(3, 4, { delivery: "foreground" });
-		`
+    const code: StepProgram = async ({ desktop }) => {
+      const editor = await desktop.window({ app: "Code" })
+      await editor.screenshot({ silent: true })
+      await editor.click(3, 4, { delivery: "foreground" })
+    }
 
     // When
     const result = await run(service, code)
@@ -290,34 +260,21 @@ describe("runComputerCode", HANG_GUARD, () => {
     const click = log.requests.find((request) => request.method === "click")
     expect(click?.params).toEqual({ target: "101", x: 3, y: 4, opts: { deliveryMode: "foreground" } })
     expect(result.audit).toEqual([
-      expect.objectContaining({ sessionId: "session-1", action: "click", target: "101", status: "success" }),
+      expect.objectContaining({
+        sessionId: "session-1",
+        toolCallId: "tool-call-1",
+        action: "click",
+        target: "101",
+        status: "success",
+      }),
     ])
-  })
-
-  it("reaches the host executeTool from tool.<name> inside the run", async () => {
-    // Given
-    const { service } = await openDesktop()
-    const executeTool = vi.fn<ExecuteTool>(async () => ({ content: [{ type: "text", text: "file body" }] }))
-
-    // When
-    const result = await run(service, `return (await tool.read({ path: "notes.txt" })).content[0].text;`, {
-      executeTool,
-    })
-
-    // Then
-    expect(result.returnValue).toBe("file body")
-    expect(executeTool).toHaveBeenCalledExactlyOnceWith(
-      "read",
-      { path: "notes.txt" },
-      { signal: expect.any(AbortSignal) },
-    )
   })
 
   it("rejects an aborted run and sends $/cancel for its in-flight engine call", async () => {
     // Given
     const { service, log } = await openDesktop({ FAKE_ENGINE_STALL: "windows" })
     const abort = new AbortController()
-    const running = rejectionOf(run(service, "await desktop.windows()", { signal: abort.signal }))
+    const running = rejectionOf(run(service, ({ desktop }) => desktop.windows(), { signal: abort.signal }))
     const sent = await log.nthRequest("windows", 1)
 
     // When
@@ -329,13 +286,18 @@ describe("runComputerCode", HANG_GUARD, () => {
     expect((await log.nthRequest("$/cancel", 1)).params).toEqual({ id: sent.id })
   })
 
-  it("times out a run that loops forever at timeoutMs and cancels its in-flight engine call", async () => {
+  it("times out a program that keeps calling at timeoutMs and cancels its in-flight engine call", async () => {
     // Given
     vi.useFakeTimers(TIMERS)
     const { service, log } = await openDesktop({ FAKE_ENGINE_STALL: "windows" })
     let settled = false
     const running = rejectionOf(
-      run(service, "for (;;) { await desktop.displays(); await desktop.windows(); }").finally(() => {
+      run(service, async ({ desktop }) => {
+        for (;;) {
+          await desktop.displays()
+          await desktop.windows()
+        }
+      }).finally(() => {
         settled = true
       }),
     )
@@ -348,20 +310,5 @@ describe("runComputerCode", HANG_GUARD, () => {
     expect(settled).toBe(true)
     expect(await running).toHaveProperty("reason", "timeout")
     expect((await log.nthRequest("$/cancel", 1)).params).toEqual({ id: sent.id })
-  })
-
-  it.each([
-    ["the first synchronous stretch", "while (true) {}"],
-    ["a stretch after an await", "await desktop.displays(); while (true) {}"],
-  ])("times out a synchronous infinite loop in %s", async (_stretch, code) => {
-    // Given
-    const { service } = await openDesktop()
-
-    // When
-    const error = await rejectionOf(run(service, code, { timeoutMs: 200 }))
-
-    // Then
-    expect(error).toBeInstanceOf(ComputerRunError)
-    expect(error).toHaveProperty("reason", "timeout")
   })
 })

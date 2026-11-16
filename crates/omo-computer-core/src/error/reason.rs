@@ -6,7 +6,7 @@
 
 closed_names! {
     /// Every `data.reason` any stage, gate, backend default or layer emits.
-    Reason [144] {
+    Reason [142] {
         NotInteractive = "not_interactive",
         PromptPending = "prompt_pending",
         Revoked = "revoked",
@@ -146,8 +146,6 @@ closed_names! {
         Unreachable = "unreachable",
         NoBridge = "no_bridge",
         AbiMismatch = "abi_mismatch",
-        HostGlobal = "host_global",
-        BodyThrew = "body_threw",
         ConcealedClipboard = "concealed_clipboard",
         SecretNoClipboardRoute = "secret_no_clipboard_route",
         Unmeasured = "unmeasured",
@@ -157,7 +155,7 @@ closed_names! {
 closed_names! {
     /// Failures raised outside the engine's code table: the JSON-RPC layer, the hand host,
     /// the transport, the SDK, the run cell, the tool and the provider adapter.
-    LayerFailure [21] {
+    LayerFailure [19] {
         PermissionRuleDenied = "PermissionRuleDenied",
         InvalidArguments = "InvalidArguments",
         MethodNotFound = "MethodNotFound",
@@ -177,7 +175,5 @@ closed_names! {
         Disabled = "Disabled",
         SecureFocus = "SecureFocus",
         LaunchContextRequired = "LaunchContextRequired",
-        RunLimit = "RunLimit",
-        RunFailed = "RunFailed",
     }
 }

@@ -1,8 +1,6 @@
-import type { PermissionDeniedData } from "@oh-my-opencode/senpi-desktop-protocol"
 import { DesktopEngineRpcError, DesktopLaunchContextError } from "@oh-my-opencode/senpi-desktop-service"
 import {
   actionsOf,
-  actionsScript,
   type ComputerActionsInput,
   isReadOnlyActions,
   parseComputerActions,
@@ -13,23 +11,8 @@ import { ComputerArgumentsError } from "./action-schema"
 import { computerFailure, launchContextFailure } from "./cua-errors"
 import { DEFAULT_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS } from "./params"
 import type { ComputerHostContext } from "./session"
-import { type ComputerToolDeps, type ComputerToolResult, runComputer } from "./tool"
-
-interface StepOutcome {
-  readonly index: number
-  readonly action: string
-  readonly status: "success" | "error"
-  readonly code?: string
-  readonly message?: string
-  readonly permission?: PermissionDeniedData
-  readonly reason?: string | null
-}
-
-interface ActionsOutcome {
-  readonly steps: readonly StepOutcome[]
-  readonly bounds: ScreenshotBounds | null
-  readonly failedIndex: number | null
-}
+import { type ActionsOutcome, runActions } from "./cua-steps"
+import { type ComputerToolDeps, type ComputerToolResult, oversizeArgumentsResult, runComputer } from "./tool"
 
 function isActionsOutcome(value: unknown): value is ActionsOutcome {
   return typeof value === "object" && value !== null && Array.isArray(Reflect.get(value, "steps"))
@@ -44,13 +27,15 @@ export function createComputerActionsTool(deps: ComputerToolDeps) {
   return {
     ...computerActionsToolDefinition,
     async execute(
-      _toolCallId: string,
+      toolCallId: string,
       input: Readonly<Record<string, unknown>>,
       signal: AbortSignal | undefined,
       _onUpdate: unknown,
       context: ComputerHostContext,
     ): Promise<ComputerToolResult & { isError?: boolean }> {
       const stopHotkey = deps.handle.settings().stopHotkey
+      const tooLarge = oversizeArgumentsResult(input, stopHotkey)
+      if (tooLarge !== undefined) return tooLarge
       let params: ComputerActionsInput
       try {
         params = parseComputerActions(input)
@@ -65,10 +50,17 @@ export function createComputerActionsTool(deps: ComputerToolDeps) {
       }
       const timeoutSeconds = Math.min(params.timeout ?? DEFAULT_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS)
       const readOnly = isReadOnlyActions(params)
-      const code = actionsScript(actionsOf(params), bounds)
+      const actions = actionsOf(params)
+      const frame = bounds
       let result: ComputerToolResult
       try {
-        result = await runComputer(deps, context, { code, readOnly, timeoutSeconds }, signal)
+        result = await runComputer(
+          deps,
+          context,
+          { toolCallId, readOnly, timeoutSeconds },
+          (scope) => runActions(scope, actions, frame),
+          signal,
+        )
       } catch (error) {
         if (!(error instanceof Error)) throw error
         if (error instanceof DesktopLaunchContextError) {

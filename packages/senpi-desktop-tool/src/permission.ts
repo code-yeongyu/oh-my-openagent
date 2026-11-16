@@ -23,16 +23,14 @@ function isCallChain(value: unknown): value is readonly ComputerCallStep[] {
 }
 
 /**
- * The approval tier of one `computer` tool input (oh-my-pi `computerApproval`): capability inspection,
- * inspection-only call chains, and `run` with `read_only: true` are `read`; everything else is `exec`,
+ * The approval tier of one `computer` tool input (oh-my-pi `computerApproval`): capability inspection and
+ * inspection-only call chains are `read`; everything else is `exec`,
  * including every malformed input and any chain naming an unknown or unchainable method.
  */
 export function computerTier(input: Readonly<Record<string, unknown>>): ComputerCallPolicy {
   switch (input.action) {
     case "capabilities":
       return "read"
-    case "run":
-      return input.read_only === true ? "read" : "exec"
     case "call": {
       if (!isCallChain(input.chain)) return "exec"
       try {

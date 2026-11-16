@@ -1,7 +1,7 @@
 import type { AuditEvent } from "@oh-my-opencode/senpi-desktop-protocol"
-import { runComputerCode } from "../src/run/runtime"
+import { runComputerSteps, type StepProgram } from "../src/run/runtime"
 import { DesktopService } from "../src/service/service"
-import { type ConfirmControl, noTools, snapshot } from "./control-harness"
+import { type ConfirmControl, snapshot } from "./control-harness"
 import { fakeEngineFactory, type SpawnLog } from "./harness"
 
 const services: DesktopService[] = []
@@ -33,10 +33,11 @@ export async function openGated(fullAccess: Preset, env: Record<string, string> 
   return { service, log, audits }
 }
 
-export function runCode(service: DesktopService, code: string, confirmControl?: ConfirmControl) {
-  return runComputerCode(
-    { code, snapshot: snapshot(false), timeoutMs: 15_000 },
-    { service, executeTool: noTools, ...(confirmControl === undefined ? {} : { confirmControl }) },
+export function runCode(service: DesktopService, program: StepProgram, confirmControl?: ConfirmControl) {
+  return runComputerSteps(
+    { toolCallId: "tool-call-1", snapshot: snapshot(false), timeoutMs: 15_000 },
+    { service, ...(confirmControl === undefined ? {} : { confirmControl }) },
+    program,
   )
 }
 

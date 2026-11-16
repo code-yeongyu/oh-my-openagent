@@ -28,7 +28,7 @@ fn check_row_rules(problems: &mut Vec<String>) {
         let (nothing, some) = match row.disposition {
             DispositionRule::Fixed(pair) => (pair, None),
             DispositionRule::BySent { nothing, some } => (nothing, Some(some)),
-            DispositionRule::OfInnerCode | DispositionRule::LastReport => continue,
+            DispositionRule::OfInnerCode => continue,
         };
         if row.recovery.is_some() != recovery_expected(nothing.retry()) {
             problems.push(format!(
@@ -138,7 +138,7 @@ fn error_table_is_total_over_codes_and_reasons() {
         used.len(),
         reached.len()
     );
-    assert_eq!(ComputerCode::ALL.len(), 56);
+    assert_eq!(ComputerCode::ALL.len(), 55);
     assert!(
         problems.is_empty(),
         "{} problems:\n{}",

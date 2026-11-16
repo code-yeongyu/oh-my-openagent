@@ -1,7 +1,7 @@
 // Sandbox wiring every EQ.omo case shares (fused-equivalence-e2e.mjs): the built plugin's trust, every config/state
 // root inside the case sandbox, the telemetry opt-out, and the omo config the case runs with. Nothing here turns a
 // plugin surface off.
-import { mkdirSync, writeFileSync } from "node:fs"
+import { mkdirSync, realpathSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs"
 
@@ -30,7 +30,11 @@ export function prepareCaseSandbox(run, omoConfig) {
   const tmp = join(root, "tmp")
   mkdirSync(tmp, { recursive: true })
   for (const name of ["TMPDIR", "TMP", "TEMP"]) run.env[name] = tmp
-  writeFileSync(join(run.box.agentDir, "trust.json"), `${JSON.stringify({ [run.box.cwd]: true }, null, 2)}\n`)
+  // Keyed by the resolved cwd: the CLI trusts the path it resolves (macOS reports /tmp as /private/tmp).
+  writeFileSync(
+    join(run.box.agentDir, "trust.json"),
+    `${JSON.stringify({ [realpathSync(run.box.cwd)]: true }, null, 2)}\n`,
+  )
   // No mcp.json: the plugin's MCP declarations (`_ast_grep`, `context7`, `grep_app`) load exactly as in a normal
   // session, the two remote ones over the real network.
   mkdirSync(join(run.box.cwd, ".omo"), { recursive: true })

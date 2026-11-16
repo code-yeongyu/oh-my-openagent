@@ -1,5 +1,5 @@
 import type { ComputerSessionSnapshot } from "@oh-my-opencode/senpi-desktop-protocol"
-import { type ExecuteTool, runComputerCode } from "../src/run/runtime"
+import { runComputerSteps, type StepProgram } from "../src/run/runtime"
 import { DesktopService } from "../src/service/service"
 import { fakeEngineFactory, type SpawnLog } from "./harness"
 
@@ -36,8 +36,6 @@ export function snapshot(readOnly: boolean): ComputerSessionSnapshot {
   }
 }
 
-export const noTools: ExecuteTool = (name) => Promise.reject(new Error(`unexpected tool ${name}`))
-
 export type ConfirmControl = (reason: string, signal: AbortSignal, budgetMs: number) => Promise<boolean>
 
 export interface RunOptions {
@@ -47,19 +45,19 @@ export interface RunOptions {
   readonly timeoutMs?: number
 }
 
-export function run(service: DesktopService, code: string, options: RunOptions = {}) {
-  return runComputerCode(
+export function run(service: DesktopService, program: StepProgram, options: RunOptions = {}) {
+  return runComputerSteps(
     {
-      code,
+      toolCallId: "tool-call-1",
       snapshot: snapshot(options.readOnly ?? false),
       timeoutMs: options.timeoutMs ?? RUN_TIMEOUT_MS,
       ...(options.signal === undefined ? {} : { signal: options.signal }),
     },
     {
       service,
-      executeTool: noTools,
       ...(options.confirmControl === undefined ? {} : { confirmControl: options.confirmControl }),
     },
+    program,
   )
 }
 

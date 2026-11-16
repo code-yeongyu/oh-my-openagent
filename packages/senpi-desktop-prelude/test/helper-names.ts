@@ -43,7 +43,7 @@ export const CHAIN_METHODS: readonly string[] = [
   "windows",
   "zoom",
 ]
-export const ACTION_HELPERS: readonly string[] = ["capabilities", "close", "run"]
+export const ACTION_HELPERS: readonly string[] = ["capabilities", "close"]
 export const COMPOSED_HELPERS: readonly string[] = ["drill", "verify"]
 // </generated:facade>
 

@@ -40,6 +40,7 @@ import {
   toolResults,
 } from "./computer-control-live-macos-scenarios.mjs"
 import { desktopScenarios } from "./computer-control-live-macos-desktop.mjs"
+import { cell, chain } from "./computer-control-live-macos-steps.mjs"
 import { createSandbox, seedSandbox } from "./drive.mjs"
 import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs"
@@ -60,6 +61,9 @@ const evidenceDir = argValue("--evidence-dir")
 const only = argValue("--only")?.split(",")
 const skylightDisabled = process.argv.includes("--disable-skylight")
 
+// A read of the grant state activates the computer global for the cell after it.
+const activate = chain({ method: "control.state" })
+
 const offSpaceRun = `
 const w = await desktop.window({ title: ${JSON.stringify(TARGET_TITLE)} });
 await desktop.press("ctrl+right");
@@ -74,28 +78,25 @@ const offSpaceScenario = {
   "off-space-capture": {
     preset: "full-access",
     env: skylightDisabled ? { SENPI_DESKTOP_DISABLE_SKYLIGHT: "1" } : {},
-    steps: [
-      { type: "tool_call", name: "computer", arguments: { action: "run", code: offSpaceRun } },
-      { type: "text", text: "done" },
-    ],
+    steps: [activate, cell(offSpaceRun), { type: "text", text: "done" }],
     drive: async (session) => {
       session.send({ type: "prompt", message: "control QA: capture the dialog from another Space" })
       await session.until("agent_end", () => session.agentEnds() >= 1)
     },
     verify: ({ results }) => {
-      const raw = results[0] ?? ""
+      const raw = results.at(-1) ?? ""
       const match = /\{"offSpace":\{[^}]*\}\}/.exec(raw.replaceAll('\\"', '"'))
       const outcome = match === null ? undefined : JSON.parse(match[0]).offSpace
       return skylightDisabled
         ? [
-            ["the run reported its off-Space outcome", outcome !== undefined],
+            ["the cell reported its off-Space outcome", outcome !== undefined],
             [
               "without SkyLight the off-Space window is CaptureUnavailable off-space",
               String(outcome?.error).includes("CaptureUnavailable") || String(outcome?.error).includes("another Space"),
             ],
           ]
         : [
-            ["the run reported its off-Space outcome", outcome !== undefined],
+            ["the cell reported its off-Space outcome", outcome !== undefined],
             ["the off-Space window was captured", outcome?.error === null && outcome.width > 0 && outcome.height > 0],
           ]
     },
@@ -160,14 +161,7 @@ const twoWindowScenario = (variant, focusA) => ({
   computer: { macos_key_priming: "on" },
   setup: () => openDocuments(variant),
   teardown: closeDocuments,
-  steps: () => [
-    {
-      type: "tool_call",
-      name: "computer",
-      arguments: { action: "run", code: twoWindowRun(twoWindow.b, twoWindow.a, focusA) },
-    },
-    { type: "text", text: "done" },
-  ],
+  steps: () => [activate, cell(twoWindowRun(twoWindow.b, twoWindow.a, focusA)), { type: "text", text: "done" }],
   drive: async (session) => {
     session.send({ type: "prompt", message: "control QA: type into the background document B" })
     await session.until("agent_end", () => session.agentEnds() >= 1)
@@ -178,7 +172,7 @@ const twoWindowScenario = (variant, focusA) => ({
     })
   },
   verify: ({ results, before, observed }) => {
-    const raw = (results[0] ?? "").replaceAll('\\"', '"')
+    const raw = (results.at(-1) ?? "").replaceAll('\\"', '"')
     const match = /\{"twoWindow":\[.*?\]\}/s.exec(raw)
     const calls = match === null ? undefined : JSON.parse(match[0]).twoWindow
     return [

@@ -9,9 +9,9 @@ import type {
 import { type Computer, ComputerError, connect } from "@oh-my-opencode/senpi-desktop-sdk"
 import { DesktopServiceError } from "../service/rpc-client"
 
-/** Why a computer run failed inside the runtime; engine failures surface as `DesktopEngineRpcError`. */
+/** Why a computer call failed inside the runtime; engine failures surface as `DesktopEngineRpcError`. */
 export type ComputerRunErrorReason =
-  "readOnly" | "timeout" | "aborted" | "ended" | "assertion" | "window" | "wait" | "unavailable"
+  "readOnly" | "timeout" | "aborted" | "ended" | "assertion" | "window" | "unavailable"
 
 export class ComputerRunError extends Error {
   readonly reason: ComputerRunErrorReason
@@ -41,9 +41,9 @@ export class RunOutput {
 }
 
 /**
- * The state one run owns. Each run gets its own vm context and a facade bound to this object, so
- * async work leaked from an ended run keeps that run's aborted signal and read-only policy instead of
- * borrowing the next run's (what oh-my-pi's AsyncLocalStorage run context guarded against).
+ * The state one tool call owns. Each call gets a facade bound to this object, so async work leaked from an
+ * ended call keeps that call's aborted signal and read-only policy instead of borrowing the next call's (what
+ * oh-my-pi's AsyncLocalStorage run context guarded against).
  */
 export interface RunContext {
   /** Aborts on the caller's signal, the run timeout, or the end of the run. */
@@ -60,20 +60,16 @@ export interface RunContext {
 /** One engine request on behalf of the run, carrying the run signal. */
 export type EngineCall = (method: EngineMethod, params: object) => Promise<unknown>
 
-/** Returns `promise` after arranging for user code awaiting it to resume once it settles. */
-export type Resume = <T>(promise: Promise<T>) => Promise<T>
-
 /**
  * The human confirmation behind `desktop.control.acquire`; absent on a headless run, which then
  * never grants (#9651 B5b). `budgetMs` is how long the run can still wait for the answer.
  */
 export type ConfirmControl = (reason: string, signal: AbortSignal, budgetMs: number) => Promise<boolean>
 
-/** What every facade method needs: the run it belongs to, its engine channel, and the vm resume hook. */
+/** What every facade method needs: the call it belongs to and its engine channel. */
 export interface RunScope {
   readonly context: RunContext
   readonly call: EngineCall
-  readonly resume: Resume
   readonly confirmControl?: ConfirmControl
 }
 
@@ -87,7 +83,7 @@ export type MethodTiers = Readonly<Record<string, ComputerCallPolicy>>
 export function guardRun(context: RunContext, tiers: MethodTiers, method: string): void {
   const tier = Object.hasOwn(tiers, method) ? tiers[method] : "exec"
   if (context.readOnly && tier === "exec") {
-    throw new ComputerRunError("readOnly", `read-only run: '${method}' requires read_only: false`)
+    throw new ComputerRunError("readOnly", `read-only call: '${method}' sends input, which needs the exec tier`)
   }
   context.signal.throwIfAborted()
 }
@@ -148,20 +144,17 @@ export async function viaSdk<T>(method: EngineMethod, work: () => Promise<T>): P
   }
 }
 
-/** Runs one facade method of a surface: guarded, never throwing synchronously, and resuming the vm. */
+/** Runs one facade method of a surface: guarded and never throwing synchronously. */
 export type FacadeMethod = <T>(method: string, work: (scope: RunScope) => Promise<T> | T) => Promise<T>
 
 /**
  * The single entry of every facade method on one surface (`tiers`). Even a guard refusal or a bad
- * argument settles the returned promise, and that promise resumes the vm, so user code awaiting it
- * always continues.
+ * argument settles the returned promise instead of throwing at the call site.
  */
 export function facadeMethod(scope: RunScope, tiers: MethodTiers): FacadeMethod {
   return (method, work) =>
-    scope.resume(
-      Promise.resolve().then(() => {
-        guardRun(scope.context, tiers, method)
-        return work(scope)
-      }),
-    )
+    Promise.resolve().then(() => {
+      guardRun(scope.context, tiers, method)
+      return work(scope)
+    })
 }

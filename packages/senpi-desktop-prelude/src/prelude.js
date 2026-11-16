@@ -18,18 +18,11 @@
     }
     return options
   }
-  const serializeFunction = (label, fn) => {
-    const source = String(fn)
-    if (source.includes("[native code]")) {
-      throw new TypeError(`${label} cannot serialize a native or bound function; pass an arrow or function expression`)
-    }
-    return source
-  }
   // Direct helpers cross the tool boundary as JSON, where functions and RegExp values would vanish silently.
   const plainArg = (value) => {
     if (typeof value === "function" || value instanceof RegExp) {
       throw new TypeError(
-        "computer helpers take plain data; pass functions and RegExp values through computer.run(fn, { args })",
+        "computer helpers take plain data; functions and RegExp values cannot cross the tool call, so filter results in the cell",
       )
     }
     return value
@@ -39,14 +32,10 @@
     while (trimmed.length > 0 && trimmed[trimmed.length - 1] === undefined) trimmed.pop()
     return trimmed
   }
-  // `computer.run(fn)` ships source text, so each argument becomes a JavaScript expression.
-  const runArgSource = (value) => {
-    if (typeof value === "function") return `(${serializeFunction("computer.run() argument", value)})`
-    if (value instanceof RegExp) return String(value)
-    return JSON.stringify(value) ?? "undefined"
-  }
   // The tool result is `{ text, details?, images?, hasError? }`: images display, `details.value` is the return value.
-  // A failed call's `details.value.code` (COMPUTER_*) rides on the thrown error as `error.code`.
+  // A failed call's `details.value.code` (COMPUTER_*) rides on the thrown error as `error.code`. A call that sent input
+  // carries the engine's report: the helper then resolves to { value, report, reports, auditIds, toolCallId }, so code
+  // can check report.disposition.retry before sending the same input again.
   const invoke = async (args) => {
     const result = await globalThis.tool.computer(args)
     if (result.hasError) {
@@ -56,7 +45,15 @@
       throw error
     }
     for (const image of result.images ?? []) globalThis.display(image)
-    return result.details?.value
+    const details = result.details ?? {}
+    if (details.report === undefined) return details.value
+    return {
+      value: details.value,
+      report: details.report,
+      reports: details.reports ?? [details.report],
+      auditIds: details.auditIds ?? [],
+      toolCallId: details.toolCallId,
+    }
   }
   const callValue = (chain) => invoke({ action: "call", chain })
   const step = (method, args) => ({ method, args: trimArgs(args).map(plainArg) })
@@ -203,21 +200,6 @@
     release: () => callValue([step("control.release", [])]),
     state: () => callValue([step("control.state", [])]),
   })
-  computer.run = async (fnOrCode, options) => {
-    if (typeof fnOrCode !== "function" && typeof fnOrCode !== "string") {
-      throw new TypeError("computer.run() expects a function or code string")
-    }
-    const opts = validateOptions("computer.run", options)
-    let code = fnOrCode
-    if (typeof fnOrCode === "function") {
-      const args = trimArgs(Array.isArray(opts.args) ? opts.args : []).map((value) => `, ${runArgSource(value)}`)
-      code = `return await (${serializeFunction("computer.run()", fnOrCode)})({ desktop, wait, assert }${args.join("")});`
-    }
-    const parameters = { action: "run", code }
-    if (opts.read_only !== undefined) parameters.read_only = opts.read_only
-    if (opts.timeout !== undefined) parameters.timeout = opts.timeout
-    return invoke(parameters)
-  }
   const EXPECTATION_KINDS = new Set([
     "elementExists",
     "elementValue",

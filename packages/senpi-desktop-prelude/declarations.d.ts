@@ -208,23 +208,23 @@ interface ComputerElement {
   readonly focused: boolean
   readonly childCount: number
   value(): Promise<string | undefined>
-  setValue(value: string): Promise<void>
+  setValue(value: string): Promise<ComputerActionResult>
   /** Bounds in global desktop coordinates, or null when the element has none. */
   bounds(): Promise<ComputerBounds | null>
   attributes(): Promise<Record<string, string>>
   actions(): Promise<string[]>
-  perform(action: string): Promise<void>
+  perform(action: string): Promise<ComputerActionResult>
   /** Perform the element's native press action; needs no screenshot. */
-  press(): Promise<void>
+  press(): Promise<ComputerActionResult>
   /** Click the element's center with native input. */
-  click(options?: ComputerDeliveryOptions): Promise<void>
+  click(options?: ComputerDeliveryOptions): Promise<ComputerActionResult>
   /**
    * Type into this element without taking the user's focus (macOS): a native text field takes the text through its
    * own selection (`inserted`), any other element takes keys once it holds its app's keyboard focus (`keys`); an
    * element that never takes focus throws `BackgroundUnavailable` (`InputFailed` in the foreground) with nothing typed.
    */
-  type(text: string, options?: ComputerDeliveryOptions): Promise<{ method: "inserted" | "keys" }>
-  focus(): Promise<void>
+  type(text: string, options?: ComputerDeliveryOptions): Promise<ComputerActionResult<{ method: "inserted" | "keys" }>>
+  focus(): Promise<ComputerActionResult>
   parent(): Promise<ComputerElement | null>
   children(): Promise<ComputerElement[]>
 }
@@ -234,18 +234,18 @@ interface ComputerInputTarget {
   screenshot(options?: ComputerScreenshotOptions): Promise<ComputerScreenshotResult>
   /** Fresh native-detail crop; later clicks still use the last full screenshot's coordinates. */
   zoom(region: ComputerCaptureRegion, options?: ComputerScreenshotOptions): Promise<ComputerScreenshotResult>
-  click(x: number, y: number, options?: ComputerClickOptions): Promise<void>
-  doubleClick(x: number, y: number, options?: Omit<ComputerClickOptions, "count">): Promise<void>
-  move(x: number, y: number): Promise<void>
-  drag(points: Array<[number, number]>, options?: ComputerDragOptions): Promise<void>
-  scroll(x: number, y: number, options?: ComputerScrollOptions): Promise<void>
-  type(text: string, options?: ComputerDeliveryOptions): Promise<void>
+  click(x: number, y: number, options?: ComputerClickOptions): Promise<ComputerActionResult>
+  doubleClick(x: number, y: number, options?: Omit<ComputerClickOptions, "count">): Promise<ComputerActionResult>
+  move(x: number, y: number): Promise<ComputerActionResult>
+  drag(points: Array<[number, number]>, options?: ComputerDragOptions): Promise<ComputerActionResult>
+  scroll(x: number, y: number, options?: ComputerScrollOptions): Promise<ComputerActionResult>
+  type(text: string, options?: ComputerDeliveryOptions): Promise<ComputerActionResult>
   /** Key chord such as `"cmd+shift+p"` or `["cmd", "shift", "p"]`. */
-  press(chord: string | string[], options?: ComputerDeliveryOptions): Promise<void>
+  press(chord: string | string[], options?: ComputerDeliveryOptions): Promise<ComputerActionResult>
   /** Non-empty keys; press in order and release in reverse on every exit. */
-  holdKeys(keys: readonly string[], options: ComputerHoldOptions): Promise<void>
+  holdKeys(keys: readonly string[], options: ComputerHoldOptions): Promise<ComputerActionResult>
   /** Uses the latest full frame. No pressed state escapes this call. */
-  holdMouse(x: number, y: number, options: ComputerHoldMouseOptions): Promise<void>
+  holdMouse(x: number, y: number, options: ComputerHoldMouseOptions): Promise<ComputerActionResult>
 }
 
 /** A display target; `active` resolves focus again on each capture, `all` composites every display. */
@@ -261,7 +261,7 @@ interface ComputerWindow extends ComputerInputTarget {
   readonly pid?: number
   readonly bounds: ComputerBounds
   readonly focused: boolean
-  raise(): Promise<void>
+  raise(): Promise<ComputerActionResult>
   readonly menu: {
     /** Inspect a menu path without activating the application (empty path = the menu bar). */
     items(path?: string[]): Promise<ComputerMenuItem[]>
@@ -270,7 +270,7 @@ interface ComputerWindow extends ComputerInputTarget {
      * default) refuses an app with several windows; `delivery: "foreground"` raises and keys this window, so
      * multi-window apps work, and needs the human-confirmed grant (`computer.control.acquire`) first.
      */
-    select(path: string[], options?: { delivery?: "background" | "foreground" }): Promise<void>
+    select(path: string[], options?: { delivery?: "background" | "foreground" }): Promise<ComputerActionResult>
   }
   /** Formatted accessibility tree as one string, one node per line with `[ref=eN]` tags. */
   ax(options?: ComputerAxOptions): Promise<string>
@@ -282,7 +282,7 @@ interface ComputerWindow extends ComputerInputTarget {
   drill(ref: string, options?: ComputerAxOptions): Promise<string>
 }
 
-/** Desktop helpers shared by the direct `computer` facade and the `desktop` object inside `computer.run`. */
+/** Desktop helpers of the `computer` facade. */
 interface ComputerDesktop extends ComputerInputTarget {
   displays(): Promise<ComputerDisplay[]>
   /** Resolve a display id, `"active"`, or `"all"` without changing the session default (active). */
@@ -297,7 +297,7 @@ interface ComputerDesktop extends ComputerInputTarget {
   ref(ref: string): Promise<ComputerElement | null>
   readonly clipboard: {
     read(): Promise<string>
-    write(text: string): Promise<void>
+    write(text: string): Promise<ComputerActionResult>
   }
   readonly control: {
     /** Ask the human for the foreground-control grant; returns `{ active }` (false when headless or refused). */
@@ -318,46 +318,57 @@ interface ComputerControlState {
   grantedAt?: string | null
 }
 
-/** Scope object passed as the first argument to a computer run function. */
-interface ComputerRunScope {
-  /** Persistent host-desktop facade with the same helpers as `computer`. */
-  readonly desktop: ComputerDesktop
-  /** Sleep for milliseconds or poll a predicate until truthy. */
-  readonly wait: (
-    msOrPredicate: number | (() => unknown),
-    options?: {
-      /** Maximum polling time in milliseconds. */
-      timeout?: number
-      /** Delay between predicate calls in milliseconds. */
-      interval?: number
-    },
-  ) => Promise<unknown>
-  /** Throw with `message` when `condition` is falsy. */
-  readonly assert: (condition: unknown, message?: string) => void
+/** Whether input reached the target, and whether sending the same input again could duplicate it. */
+type ComputerDisposition =
+  | { readonly delivery: "not_delivered"; readonly retry: "safe" | "after_user" }
+  | { readonly delivery: "delivery_uncertain"; readonly retry: "unsafe" | "unknown" }
+  | { readonly delivery: "delivered_unverified"; readonly retry: "unsafe" }
+  | { readonly delivery: "delivered_verified"; readonly retry: "unsafe" }
+  | { readonly delivery: "unknown"; readonly retry: "unknown" }
+
+/** The engine's report of one input action. */
+interface ComputerActionReport {
+  readonly disposition: ComputerDisposition
+  /** Characters, keys or steps delivered out of those requested; `null` when the engine does not count. */
+  readonly delivered: { readonly count: number; readonly of: number } | null
+  readonly effect: "confirmed" | "unverifiable" | "no_change" | "refused"
+  readonly route: "ax" | "background_window" | "background_pid" | "foreground_hid" | null
+  readonly hit: { readonly role: string; readonly label: string | null } | null
+  readonly focusRestoration: "not_needed" | "restored" | "user_moved_on" | "not_confirmed"
+  readonly openedSurfaces: ReadonlyArray<{
+    kind: string
+    title: string | null
+    windowId: string | null
+    ref: string | null
+  }>
+  readonly nextCall: { readonly method: string; readonly args: Readonly<Record<string, unknown>> } | null
+  readonly note: string | null
+  readonly warning: string | null
+  /** Ids of the engine audit events this action emitted. */
+  readonly auditIds: readonly string[]
+  /** `true` when the engine predates reports: the input was sent but nothing is known about it. */
+  readonly legacy: boolean
 }
 
-/** Arguments and policy for code executed by `computer.run`. */
-interface ComputerRunOptions {
-  /** Positional arguments passed after the run-scope object: JSON data, functions, or RegExp values. */
-  args?: unknown[]
-  /** Allow desktop inspection while blocking desktop-facade input and mutation. */
-  read_only?: boolean
-  /** Execution timeout in seconds. */
-  timeout?: number
+/** What an input helper resolves to: its value plus the engine's report of the input it sent. */
+interface ComputerActionResult<T = undefined> {
+  readonly value: T
+  /** The last input action's report; check `report.disposition.retry` before sending the same input again. */
+  readonly report: ComputerActionReport
+  /** Every input action's report of this call, in send order. */
+  readonly reports: readonly ComputerActionReport[]
+  /** The engine audit ids of those reports. */
+  readonly auditIds: readonly string[]
+  /** The tool call that sent the input; the call's audit records carry it. */
+  readonly toolCallId: string
 }
 
 /**
  * Session-scoped host-computer facade in JavaScript eval while the `computer` tool is active. Every helper is one
- * `tool.computer(...)` call, so it passes the same permission check as a direct tool call.
+ * `tool.computer(...)` call, so it passes the same permission check as a direct tool call; a multi-step task is a
+ * cell that awaits one helper per step.
  */
 declare const computer: ComputerDesktop & {
-  /** Run a serialized function in the persistent computer runtime for multi-step sequences. */
-  run<R>(
-    fn: (scope: ComputerRunScope, ...args: unknown[]) => R | Promise<R>,
-    options?: ComputerRunOptions,
-  ): Promise<Awaited<R>>
-  /** Run a JavaScript function body in the persistent computer runtime. */
-  run<R = unknown>(code: string, options?: ComputerRunOptions): Promise<R>
   /** End the persistent desktop session; later calls fail. */
   close(): Promise<void>
   /** Poll read calls until `expectation` holds or `timeoutMs` (default 2000) passes; never sends input. */

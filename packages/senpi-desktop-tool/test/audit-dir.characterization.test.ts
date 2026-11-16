@@ -5,7 +5,6 @@
 // `DesktopService` whose engine child is the scripted fake desktop, and reads the wire requests it logged.
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { ExecuteTool } from "@oh-my-opencode/senpi-desktop-service"
 import { afterEach, describe, expect, it } from "vitest"
 import type { ComputerHandle } from "../src/activation"
 import {
@@ -22,14 +21,25 @@ import { closeDesktops, desktopFixture, hostContext, methodsOf } from "./fixture
 // Every case waits on real child-process I/O; the guard only catches a hang, it never times behavior.
 const HANG_GUARD = { timeout: 30_000 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
-
 afterEach(closeDesktops)
 
-const noTools: ExecuteTool = () => Promise.reject(new Error("no tools"))
-
 function toolFor(handle: ComputerHandle) {
-  return createComputerTool({ handle, executeTool: noTools })
+  return createComputerTool({ handle })
+}
+
+/** A capture then a click on the Code window, one chain call each; resolves to the click call's result. */
+async function clickCode(
+  tool: ReturnType<typeof toolFor>,
+  toolCallId: string,
+  context: ComputerHostContext,
+  x = 1,
+  y = 1,
+) {
+  const window = { method: "window", args: [{ app: "Code" }] }
+  const capture = { action: "call", chain: [window, { method: "screenshot", args: [{ silent: true }] }] }
+  await tool.execute(`${toolCallId}-capture`, capture, undefined, undefined, context)
+  const click = { action: "call", chain: [window, { method: "click", args: [x, y] }] }
+  return tool.execute(toolCallId, click, undefined, undefined, context)
 }
 
 function contextIn(sessionDir: string, cwd = "/work"): ComputerHostContext {
@@ -136,34 +146,23 @@ describe("X17: computer-use audit and capture path (today)", HANG_GUARD, () => {
     ])
   })
 
-  it("#given a run that captures a window and clicks it #when it finishes #then details.audit holds one host record per engine audit, stamped with the session and a run id", async () => {
+  it("#given a call that clicks a captured window #when it finishes #then details.audit holds one host record per engine audit, stamped with the session and the tool call id", async () => {
     // Given
     const { handle } = desktopFixture()
-    const code = `
-			const editor = await desktop.window({ app: "Code" });
-			await editor.screenshot({ silent: true });
-			await editor.click(3, 4);
-		`
 
     // When
-    const result = await toolFor(handle).execute(
-      "call-run",
-      { action: "run", code },
-      undefined,
-      undefined,
-      hostContext(),
-    )
+    const result = await clickCode(toolFor(handle), "call-click", hostContext(), 3, 4)
 
     // Then
     const audit = result.details.audit ?? []
     expect(audit).toHaveLength(1)
     const [record] = audit
-    expect(record?.runId).toMatch(UUID)
     expect(Number.isNaN(Date.parse(record?.timestamp ?? ""))).toBe(false)
-    expect({ ...record, runId: "<run>", timestamp: "<time>" }).toEqual({
+    expect(result.details.toolCallId).toBe("call-click")
+    expect({ ...record, timestamp: "<time>" }).toEqual({
       timestamp: "<time>",
       sessionId: "session-1",
-      runId: "<run>",
+      toolCallId: "call-click",
       action: "click",
       target: "101",
       delivery: "background",
@@ -174,43 +173,43 @@ describe("X17: computer-use audit and capture path (today)", HANG_GUARD, () => {
     })
   })
 
-  it("#given two runs #when each clicks once #then each run gets its own run id and only its own audit records", async () => {
+  it("#given two calls #when each clicks once #then each call's records carry its own tool call id and only its own audit", async () => {
     // Given
     const { handle } = desktopFixture()
     const tool = toolFor(handle)
-    const code = `const w = await desktop.window({ app: "Code" }); await w.screenshot({ silent: true }); await w.click(1, 1);`
 
     // When
-    const first = await tool.execute("run-1", { action: "run", code }, undefined, undefined, hostContext())
-    const second = await tool.execute("run-2", { action: "run", code }, undefined, undefined, hostContext())
+    const first = await clickCode(tool, "call-1", hostContext())
+    const second = await clickCode(tool, "call-2", hostContext())
 
     // Then
     const firstAudit = first.details.audit ?? []
     const secondAudit = second.details.audit ?? []
     expect([firstAudit.length, secondAudit.length]).toEqual([1, 1])
-    expect(firstAudit[0]?.runId).not.toBe(secondAudit[0]?.runId)
+    expect([firstAudit[0]?.toolCallId, secondAudit[0]?.toolCallId]).toEqual(["call-1", "call-2"])
   })
 
-  it("#given an inline capture and an artifact-only capture #when the run finishes #then details.screenshots lists only the artifact capture, and captures add no audit record", async () => {
+  it("#given an inline capture and an artifact-only capture #when the calls finish #then details.screenshots lists only the artifact capture, and captures add no audit record", async () => {
     // Given
     const { handle, log } = desktopFixture()
-    const code = `
-			await (await desktop.window({ app: "Code" })).screenshot({ silent: true });
-			await (await desktop.window({ app: "Mail" })).screenshot({ silent: true });
-		`
+    const tool = toolFor(handle)
+    const capture = (app: string) => ({
+      action: "call",
+      chain: [
+        { method: "window", args: [{ app }] },
+        { method: "screenshot", args: [{ silent: true }] },
+      ],
+    })
 
     // When
-    const result = await toolFor(handle).execute(
-      "call-cap",
-      { action: "run", code },
-      undefined,
-      undefined,
-      hostContext(),
-    )
+    const results = [
+      await tool.execute("call-code", capture("Code"), undefined, undefined, hostContext()),
+      await tool.execute("call-mail", capture("Mail"), undefined, undefined, hostContext()),
+    ]
 
     // Then
     expect(methodsOf(log).filter((method) => method === "capture")).toHaveLength(2)
-    expect(result.details.screenshots).toEqual([
+    expect(results.flatMap((result) => result.details.screenshots ?? [])).toEqual([
       {
         path: "/tmp/fake-captures/202-2.png",
         width: 900,
@@ -220,7 +219,7 @@ describe("X17: computer-use audit and capture path (today)", HANG_GUARD, () => {
         target: "202",
       },
     ])
-    expect(result.details.audit).toEqual([])
+    expect(results.flatMap((result) => result.details.audit ?? [])).toEqual([])
   })
 
   it("#given settings and a host context #when a run snapshot is taken #then the capture caps and session id come from them", () => {

@@ -70,20 +70,14 @@ export interface ComputerUseComponentOptions {
 
 function hostApi(pi: SenpiExtensionAPI): ComputerHostApi | undefined {
   const candidate = pi as SenpiExtensionAPI & Partial<ComputerHostApi>
-  if (
-    typeof candidate.getActiveTools !== "function" ||
-    typeof candidate.setActiveTools !== "function" ||
-    typeof candidate.executeTool !== "function"
-  ) {
+  if (typeof candidate.getActiveTools !== "function" || typeof candidate.setActiveTools !== "function") {
     return undefined
   }
   const getActiveTools = candidate.getActiveTools
   const setActiveTools = candidate.setActiveTools
-  const executeTool = candidate.executeTool
   return {
     getActiveTools: () => getActiveTools.call(candidate),
     setActiveTools: (names) => setActiveTools.call(candidate, names),
-    executeTool: (name, params, options) => executeTool.call(candidate, name, params, options),
   }
 }
 
@@ -117,7 +111,7 @@ export function createComputerUseComponent(options: ComputerUseComponentOptions 
       const availability = ((): { host: ComputerHostApi; settings: ComputerSettings } | ComputerUnavailableReason => {
         if (!isSupportedHost(platform)) return "unsupported_host"
         if (api === undefined) {
-          ctx.logger.warn("computer-use skipped: host lacks getActiveTools/setActiveTools/executeTool", {
+          ctx.logger.warn("computer-use skipped: host lacks getActiveTools/setActiveTools", {
             component: COMPUTER_USE_COMPONENT_NAME,
           })
           return "host_api_missing"

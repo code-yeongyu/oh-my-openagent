@@ -97,10 +97,7 @@ function scrubbedEnv() {
   return Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^(OMO|SENPI|PI)_/.test(key)))
 }
 
-const acquireRun = {
-  action: "run",
-  code: `const state = await desktop.control.acquire({ reason: ${JSON.stringify(REASON)} }); return JSON.stringify(state)`,
-}
+const acquireCall = { action: "call", chain: [{ method: "control.acquire", args: [{ reason: REASON }] }] }
 
 // Plays the rpc client: sends one prompt, answers (or not) the confirm, resolves on agent_end.
 function runScenario({ name, answer, senpiArgs = [] }) {
@@ -112,7 +109,7 @@ function runScenario({ name, answer, senpiArgs = [] }) {
     JSON.stringify({ computer: { engine_path: enginePath, allow_host_relay_only_stop: true } }),
   )
   const steps = [
-    { type: "tool_call", name: "computer", arguments: acquireRun },
+    { type: "tool_call", name: "computer", arguments: acquireCall },
     { type: "text", text: "done" },
   ]
   writeFileSync(join(sandbox.cwd, "mock-script.json"), `${JSON.stringify({ steps }, null, 2)}\n`)
@@ -233,7 +230,7 @@ const scenarios = [
       ["it carries the host's timeout", outcome.confirms[0]?.timeout === CONFIRM_TIMEOUT_MS],
       ["the turn ended on its own", outcome.ended],
       ["it waited for the timeout, not less", outcome.elapsedMs >= CONFIRM_TIMEOUT_MS],
-      ["the run reported no grant", resultText(computerResult(outcome)).includes('"active":false')],
+      ["the call reported no grant", /"active":\s*false/.test(resultText(computerResult(outcome)))],
       ["the engine never saw control.grant", !outcome.audits.includes("control.grant")],
     ],
   },
@@ -243,7 +240,7 @@ const scenarios = [
     verify: (outcome) => [
       ["the confirm left senpi as an extension_ui_request", outcome.confirms.length === 1],
       ["the turn ended", outcome.ended],
-      ["the run reported no grant", resultText(computerResult(outcome)).includes('"active":false')],
+      ["the call reported no grant", /"active":\s*false/.test(resultText(computerResult(outcome)))],
       ["the engine never saw control.grant", !outcome.audits.includes("control.grant")],
     ],
   },
@@ -254,7 +251,7 @@ const scenarios = [
       ["no confirm reached the client", outcome.confirms.length === 0],
       ["the session noted the grant with the model's reason", outcome.notes.some((note) => note?.includes(REASON))],
       ["the turn ended", outcome.ended],
-      ["the run reported an active grant", resultText(computerResult(outcome)).includes('"active":true')],
+      ["the call reported an active grant", /"active":\s*true/.test(resultText(computerResult(outcome)))],
       ["the engine audited control.grant", outcome.audits.includes("control.grant")],
       ["the end of the task revoked it", outcome.audits.includes("control.revoke")],
     ],
@@ -265,7 +262,7 @@ const scenarios = [
     verify: (outcome) => [
       ["the confirm left senpi as an extension_ui_request", outcome.confirms.length === 1],
       ["the turn ended", outcome.ended],
-      ["the run reported an active grant", resultText(computerResult(outcome)).includes('"active":true')],
+      ["the call reported an active grant", /"active":\s*true/.test(resultText(computerResult(outcome)))],
       ["the engine audited control.grant", outcome.audits.includes("control.grant")],
       ["the end of the task revoked it", outcome.audits.includes("control.revoke")],
     ],

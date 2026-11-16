@@ -111,7 +111,7 @@ export function sessionOpenParams(settings: ComputerSettings, context: ComputerH
   }
 }
 
-/** The frozen per-run settings `runComputerCode` hands to the facade. */
+/** The frozen per-call settings `runComputerSteps` hands to the facade. */
 export function runSnapshot(
   settings: ComputerSettings,
   context: ComputerHostContext,

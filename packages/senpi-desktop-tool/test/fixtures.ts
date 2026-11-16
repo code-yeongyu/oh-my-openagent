@@ -12,6 +12,8 @@ export function closedService(): ComputerService {
     open: unreachable,
     ensureStopPath: unreachable,
     call: unreachable,
+    auditBarrier: unreachable,
+    resetCallBudget: () => undefined,
     onAudit: () => () => undefined,
     capabilities: unreachable,
     stopPathStatus: unreachable,
@@ -43,9 +45,10 @@ const services: DesktopService[] = []
 export function desktopFixture(
   settings: ComputerSettingsInput = {},
   env: Readonly<Record<string, string>> = {},
+  callBudget?: number,
 ): DesktopFixture {
   const log = fakeEngineFactory({ FAKE_ENGINE_DESKTOP: "1", ...env })
-  const service = new DesktopService({ createChild: log.factory })
+  const service = new DesktopService({ createChild: log.factory, ...(callBudget === undefined ? {} : { callBudget }) })
   services.push(service)
   const resolved = resolveComputerSettings(settings, "linux")
   return { handle: new ComputerHandle({ service, settings: () => resolved }), service, log }

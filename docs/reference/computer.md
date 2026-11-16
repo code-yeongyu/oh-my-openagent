@@ -19,17 +19,20 @@ The OmO Native computer-use component registers a search-exposed `computer` tool
 | `action` | Parameters | Result |
 |----------|------------|--------|
 | `call` | `chain`: a desktop helper `{ method, args? }`, optionally followed by one window or element method | The helper's result; a screenshot also returns image content |
-| `run` | `code`: JavaScript async function body with `desktop`, `wait`, `assert` and `tool`; optional `read_only` and `timeout` in seconds | The returned value and displays |
 | `capabilities` | None | Backend, capture/input/AX permissions, stop path and focus guard |
 | `close` | None | Ends the desktop session |
 
-For example, `{ "action": "call", "chain": [{ "method": "screenshot" }] }` captures the desktop. A `run` can call `await desktop.screenshot()` then `await desktop.click(x, y)` using a coordinate from that frame. Screenshots are limited to a coordinate-safe size when passed to a model; a stale frame is rejected with `InvalidCoordinateFrame`.
+For example, `{ "action": "call", "chain": [{ "method": "screenshot" }] }` captures the desktop, and a later `call` of `click` uses a coordinate from that frame. Screenshots are limited to a coordinate-safe size when passed to a model; a stale frame is rejected with `InvalidCoordinateFrame`.
 
-The `computer` eval global offers the same operations as a fluent facade. A `run` marked `read_only: true` is constrained by the runtime, so attempted input fails rather than escaping the read tier.
+The `computer` eval global offers the same operations as a fluent facade, one `call` per helper. Computer use has no code cell of its own: a multi-step task is an eval cell that awaits one helper per step, and each step is judged by its own tier. An input helper resolves to `{ value, report, reports, auditIds, toolCallId }`, so the cell can check `report.disposition.retry` before sending the same input again.
+
+## Tool boundary
+
+The desktop service executes no model-written code. A `call` chain and a `computer_actions` batch run as data: each step names a facade method, and its arguments cross as JSON. At the `computer` and `computer_actions` boundary, an input over 1 MiB of JSON is refused with `COMPUTER_ARGUMENTS_TOO_LARGE` before anything starts, and a helper value over 8 MiB of JSON is replaced by `COMPUTER_RESULT_TOO_LARGE`. Each session may send 20,000 desktop requests; past that every call is refused with `COMPUTER_CALL_BUDGET_EXCEEDED` and nothing is sent, until the user turns computer use off and on again (`/computer off`). Audit records returned with a result carry the session id and the tool call id.
 
 ## Permission classification
 
-`capabilities`, inspection-only `call` chains, and `run` with `read_only: true` use `computer:read`. `close`, other calls and runs, unknown methods and malformed inputs use `computer:exec`. The host checks the tier before the engine receives an action, so an exec-denied click is not audited as an engine click. Rules may target the entire `computer` tool or the `computer:read` and `computer:exec` tiers. An approval for read never approves exec.
+`capabilities` and inspection-only `call` chains use `computer:read`. `close`, other calls, unknown methods and malformed inputs use `computer:exec`. The host checks the tier before the engine receives an action, so an exec-denied click is not audited as an engine click. Rules may target the entire `computer` tool or the `computer:read` and `computer:exec` tiers. An approval for read never approves exec.
 
 ## Coordinates and delivery
 

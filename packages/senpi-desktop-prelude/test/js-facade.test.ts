@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { ELEMENT_SNAPSHOT, IMAGE, loadJsFacade, WINDOW_SNAPSHOT, windowResponder } from "./harness"
 
-type AsyncBody = new (...parameters: string[]) => (...args: unknown[]) => Promise<unknown>
-const AsyncFunction: AsyncBody = Object.getPrototypeOf(async () => {}).constructor
-
 describe("JavaScript computer facade", () => {
   it("sends display input as a display-hopped chain with its selector preserved", async () => {
     // Given
@@ -134,40 +131,60 @@ describe("JavaScript computer facade", () => {
     expect(kernel.calls).toEqual([{ action: "call", chain: [{ method: "window", args: [{ app: "Code" }] }] }])
   })
 
-  it("serializes computer.run(fn) into code that calls fn with the run scope and the args", async () => {
-    // Given
-    const kernel = loadJsFacade(() => ({ text: "" }))
-    await kernel.run(`
-			await computer.run(async ({ desktop }, name, pattern, pick) => pick(await desktop.windows(), name, pattern), {
-				args: ["Code", /main\\.ts$/i, (list, name, pattern) => list.filter((w) => w.app === name && pattern.test(w.title))],
-				read_only: true,
-				timeout: 30,
-			});
-		`)
-    const [request] = kernel.calls
-    const desktop = { windows: async () => [WINDOW_SNAPSHOT, { ...WINDOW_SNAPSHOT, id: "w2", title: "README.md" }] }
+  it("resolves an input helper to its value with the engine's report, audit ids and tool call id", async () => {
+    // Given: the tool's details for a call that sent input
+    const report = {
+      disposition: { delivery: "delivered_unverified", retry: "unsafe" },
+      delivered: null,
+      effect: "unverifiable",
+      route: null,
+      hit: null,
+      focusRestoration: "not_needed",
+      openedSurfaces: [],
+      nextCall: null,
+      note: null,
+      warning: null,
+      auditIds: ["audit-click"],
+      timings: null,
+      legacy: false,
+    }
+    const kernel = loadJsFacade(() => ({
+      text: "",
+      details: { report, auditIds: ["audit-click"], toolCallId: "call-7" },
+    }))
 
     // When
-    const value = await new AsyncFunction("desktop", "wait", "assert", String(request.code))(desktop, null, null)
+    const result = await kernel.run("return await computer.click(1, 2);")
 
     // Then
-    expect({ action: request.action, read_only: request.read_only, timeout: request.timeout, value }).toEqual({
-      action: "run",
-      read_only: true,
-      timeout: 30,
-      value: [WINDOW_SNAPSHOT],
+    expect(result).toEqual({
+      value: undefined,
+      report,
+      reports: [report],
+      auditIds: ["audit-click"],
+      toolCallId: "call-7",
     })
   })
 
-  it("sends a code string to computer.run unchanged", async () => {
+  it("keeps every report of a call in send order and leaves a read helper's value as is", async () => {
     // Given
-    const kernel = loadJsFacade(() => ({ text: "", details: { value: 7 } }))
+    const first = { disposition: { delivery: "delivered_verified", retry: "unsafe" }, auditIds: ["a1"] }
+    const last = { disposition: { delivery: "not_delivered", retry: "safe" }, auditIds: ["a2"] }
+    const kernel = loadJsFacade((args) =>
+      args.action === "call" && JSON.stringify(args.chain).includes("windows")
+        ? { text: "", details: { value: [WINDOW_SNAPSHOT] } }
+        : { text: "", details: { report: last, reports: [first, last], auditIds: ["a1", "a2"], toolCallId: "call-8" } },
+    )
 
     // When
-    const value = await kernel.run(`return await computer.run("return 7;");`)
+    const typed = await kernel.run('return await computer.type("hi");')
+    const windows = await kernel.run("return await computer.windows();")
 
     // Then
-    expect({ value, calls: kernel.calls }).toEqual({ value: 7, calls: [{ action: "run", code: "return 7;" }] })
+    expect({ typed, windows }).toEqual({
+      typed: { value: undefined, report: last, reports: [first, last], auditIds: ["a1", "a2"], toolCallId: "call-8" },
+      windows: [WINDOW_SNAPSHOT],
+    })
   })
 
   it("maps capabilities() and close() to their own tool actions", async () => {

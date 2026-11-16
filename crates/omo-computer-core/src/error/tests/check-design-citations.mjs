@@ -31,7 +31,7 @@ const CODES =
     " ",
   )
 const LAYERS =
-  "PermissionRuleDenied MethodNotFound MalformedMessage MalformedReport HandCrashed HandOffline LinkDegraded TransportLost RemoteCommandsDisabled EntitlementRequired ProtocolMismatch FeatureUnavailable HandOutdated UnsupportedAction SafetyCheckDeclined Disabled SecureFocus LaunchContextRequired RunLimit RunFailed InvalidArguments".split(
+  "PermissionRuleDenied MethodNotFound MalformedMessage MalformedReport HandCrashed HandOffline LinkDegraded TransportLost RemoteCommandsDisabled EntitlementRequired ProtocolMismatch FeatureUnavailable HandOutdated UnsupportedAction SafetyCheckDeclined Disabled SecureFocus LaunchContextRequired InvalidArguments".split(
     " ",
   )
 // Names outside the closed 33, and the (code, reason) the interpretations key them under.

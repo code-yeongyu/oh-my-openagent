@@ -14,7 +14,10 @@ describe("global input needs the control grant outside full access (#10788)", HA
 
     // When
     const error = await rejectionOf(
-      runCode(desktop.service, `await desktop.screenshot(); await desktop.click(10, 10);`),
+      runCode(desktop.service, async ({ desktop }) => {
+        await desktop.screenshot()
+        await desktop.click(10, 10)
+      }),
     )
 
     // Then
@@ -29,7 +32,11 @@ describe("global input needs the control grant outside full access (#10788)", HA
     const desktop = await openGated({ value: false })
 
     // When
-    const error = await rejectionOf(runCode(desktop.service, `await (await desktop.display("1")).type("hi");`))
+    const error = await rejectionOf(
+      runCode(desktop.service, async ({ desktop }) => {
+        await (await desktop.display("1")).type("hi")
+      }),
+    )
 
     // Then
     expect(error).toMatchObject({ data: { code: "ControlRequired" } })
@@ -41,7 +48,11 @@ describe("global input needs the control grant outside full access (#10788)", HA
     const desktop = await openGated({ value: false })
 
     // When
-    await runCode(desktop.service, `const w = await desktop.window("101"); await w.screenshot(); await w.click(5, 5);`)
+    await runCode(desktop.service, async ({ desktop }) => {
+      const w = await desktop.window("101")
+      await w.screenshot()
+      await w.click(5, 5)
+    })
 
     // Then
     expect(admitted(desktop, "click")).toBe(1)
@@ -55,7 +66,11 @@ describe("global input needs the control grant outside full access (#10788)", HA
     // When
     await runCode(
       desktop.service,
-      `await desktop.control.acquire({ reason: "click Run" }); await desktop.screenshot(); await desktop.click(10, 10);`,
+      async ({ desktop }) => {
+        await desktop.control.acquire({ reason: "click Run" })
+        await desktop.screenshot()
+        await desktop.click(10, 10)
+      },
       () => Promise.resolve(true),
     )
 
@@ -68,7 +83,10 @@ describe("global input needs the control grant outside full access (#10788)", HA
     const desktop = await openGated({ value: true })
 
     // When
-    await runCode(desktop.service, `await desktop.screenshot(); await desktop.click(10, 10);`)
+    await runCode(desktop.service, async ({ desktop }) => {
+      await desktop.screenshot()
+      await desktop.click(10, 10)
+    })
 
     // Then
     const methods = desktop.log.requests.map((request) => request.method)
@@ -80,12 +98,19 @@ describe("global input needs the control grant outside full access (#10788)", HA
   it("keeps a human-confirmed grant when the session is not in full access", async () => {
     // Given
     const desktop = await openGated({ value: false })
-    await runCode(desktop.service, `await desktop.control.acquire({ reason: "click Run" });`, () =>
-      Promise.resolve(true),
+    await runCode(
+      desktop.service,
+      async ({ desktop }) => {
+        await desktop.control.acquire({ reason: "click Run" })
+      },
+      () => Promise.resolve(true),
     )
 
     // When: a later run in the same turn
-    await runCode(desktop.service, `await desktop.screenshot(); await desktop.click(10, 10);`)
+    await runCode(desktop.service, async ({ desktop }) => {
+      await desktop.screenshot()
+      await desktop.click(10, 10)
+    })
 
     // Then
     expect(admitted(desktop, "click")).toBe(1)

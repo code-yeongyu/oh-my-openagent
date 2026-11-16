@@ -104,22 +104,19 @@ describe("Python computer facade", () => {
     expect(run.out).toEqual(WINDOW_SNAPSHOT)
   })
 
-  it("sends computer.run options only when set", () => {
+  it("returns an input helper's value with the engine's report, audit ids and tool call id", () => {
+    // Given: the tool's details for a call that sent input
+    const report = { disposition: { delivery: "not_delivered", retry: "safe" }, auditIds: ["audit-click"] }
+    const details = { report, auditIds: ["audit-click"], toolCallId: "call-7" }
+    const responders = { click: JSON.stringify({ text: "", details, images: [], hasError: false }) }
+
     // When
-    const run = runPythonFacade("computer.run('return 1;', read_only=True)")
+    const run = runPythonFacade("out = computer.click(1, 2)", responders)
 
     // Then
-    expect(run.calls).toEqual([{ action: "run", code: "return 1;", read_only: true }])
-  })
-
-  it("refuses a Python callable for computer.run before calling the tool", () => {
-    // When
-    const run = runPythonFacade("computer.run(lambda: 1)")
-
-    // Then
-    expect({ error: run.error, calls: run.calls }).toEqual({
-      error: "TypeError: computer.run() expects a JavaScript code string",
-      calls: [],
+    expect({ error: run.error, out: run.out }).toEqual({
+      error: null,
+      out: { value: null, report, reports: [report], auditIds: ["audit-click"], toolCallId: "call-7" },
     })
   })
 

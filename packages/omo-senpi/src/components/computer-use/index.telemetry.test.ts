@@ -250,7 +250,7 @@ describe("computer-use component telemetry", () => {
         type: "tool_execution_start",
         toolCallId: "call-1",
         toolName: "computer",
-        args: { action: "run", code: "private typed text" },
+        args: { action: "call", chain: [{ method: "type", args: ["private typed text"] }] },
       },
       context(),
     )

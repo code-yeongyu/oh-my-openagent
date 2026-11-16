@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest"
 import { RunOutput, type RunScope } from "../src/run/context"
 import { createDesktopFacade } from "../src/run/facade"
-import { runComputerCode } from "../src/run/runtime"
-import { closeDesktops, methods, noTools, openDesktop, run, snapshot } from "./control-harness"
+import { runComputerSteps } from "../src/run/runtime"
+import { interpretChain } from "../src/run/steps"
+import { closeDesktops, methods, openDesktop, run, snapshot } from "./control-harness"
 import { rejectionOf } from "./harness"
 
 // Every case waits on real child-process I/O; the guard only catches a hang, it never times behavior.
@@ -11,35 +12,41 @@ const HANG_GUARD = { timeout: 30_000 }
 afterEach(closeDesktops)
 
 describe("foreground-control grant boundaries (#9967)", HANG_GUARD, () => {
-  it("gives run code no handle-level path to control.grant", async () => {
+  it("gives a call chain no handle-level path to control.grant", async () => {
     // Given: the method seam that once let run code send any engine method (M1)
     const { service, log } = await openDesktop()
-    const grant = `(scope) => scope.call("control.grant", { reason: "x", confirmationId: "y" })`
-    const viaMethod = `const w = await desktop.window("202"); return await w.method("click", ${grant});`
-    const viaSend = `const w = await desktop.window("202"); return await w.send("click", "control.grant", { reason: "x", confirmationId: "y" });`
+    const window = { method: "window", args: ["202"] }
+    const viaMethod = [window, { method: "method", args: ["click"] }]
+    const viaSend = [window, { method: "send", args: ["click", "control.grant", { reason: "x", confirmationId: "y" }] }]
 
     // When
-    const surface = await run(
-      service,
-      `const w = await desktop.window("202"); return [typeof w.method, typeof w.send];`,
-    )
-    const methodError = await rejectionOf(run(service, viaMethod))
-    const sendError = await rejectionOf(run(service, viaSend))
+    const surface = await run(service, async ({ desktop }) => {
+      const w = await desktop.window("202")
+      return [typeof Reflect.get(w, "method"), typeof Reflect.get(w, "send")]
+    })
+    const methodError = await rejectionOf(run(service, ({ desktop }) => interpretChain(desktop, viaMethod)))
+    const sendError = await rejectionOf(run(service, ({ desktop }) => interpretChain(desktop, viaSend)))
 
     // Then
     expect(methods(log)).not.toContain("control.grant")
     expect(surface.returnValue).toEqual(["undefined", "undefined"])
-    expect(methodError).toMatchObject({ message: expect.stringContaining("w.method is not a function") })
-    expect(sendError).toMatchObject({ message: expect.stringContaining("w.send is not a function") })
+    expect(methodError).toMatchObject({ name: "ComputerCallError", reason: "unknownMethod" })
+    expect(sendError).toMatchObject({ name: "ComputerCallError", reason: "unknownMethod" })
   })
 
   it("sends no revoke after a grant the engine refused", async () => {
     // Given: another session holds the grant, so the engine refuses this one InputBusy (L2)
     const { service, log } = await openDesktop({ FAKE_ENGINE_CONTROL_BUSY: "1" })
     await rejectionOf(
-      run(service, `await desktop.control.acquire({ reason: "click Run" });`, {
-        confirmControl: () => Promise.resolve(true),
-      }),
+      run(
+        service,
+        async ({ desktop }) => {
+          await desktop.control.acquire({ reason: "click Run" })
+        },
+        {
+          confirmControl: () => Promise.resolve(true),
+        },
+      ),
     )
     await log.nthRequest("control.grant", 1)
 
@@ -85,7 +92,6 @@ describe("foreground-control grant boundaries (#9967)", HANG_GUARD, () => {
         engineCalls.push(method)
         return Promise.resolve({ active: method === "control.grant" })
       },
-      resume: (promise) => promise,
       confirmControl: (_reason, signal) => {
         asked.resolve()
         return new Promise<boolean>((resolve) => signal.addEventListener("abort", () => resolve(true), { once: true }))
@@ -113,6 +119,7 @@ describe("foreground-control grant boundaries (#9967)", HANG_GUARD, () => {
     let revoke: Promise<void> | undefined
     const service = {
       call: () => Promise.resolve({}),
+      auditBarrier: () => Promise.resolve(),
       onAudit: () => () => undefined,
       // Created on the call, so the runtime attaches its handler before the rejection is observed.
       revokeControl: () => {
@@ -124,11 +131,11 @@ describe("foreground-control grant boundaries (#9967)", HANG_GUARD, () => {
 
     // When
     await rejectionOf(
-      runComputerCode(
-        { code: `throw new Error("boom");`, snapshot: snapshot(false), timeoutMs: 15_000 },
-        {
-          service,
-          executeTool: noTools,
+      runComputerSteps(
+        { toolCallId: "tool-call-1", snapshot: snapshot(false), timeoutMs: 15_000 },
+        { service },
+        async () => {
+          throw new Error("boom")
         },
       ),
     )

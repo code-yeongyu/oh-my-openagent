@@ -1,4 +1,3 @@
-import type { ExecuteTool } from "@oh-my-opencode/senpi-desktop-service"
 import { afterEach, describe, expect, it } from "vitest"
 import type { ComputerActionsInput } from "../src/cua-actions"
 import { ComputerActionsParams } from "../src/cua-actions"
@@ -11,11 +10,9 @@ const HANG_GUARD = { timeout: 30_000 }
 
 afterEach(closeDesktops)
 
-const noTools: ExecuteTool = () => Promise.reject(new Error("no tools"))
-
 function adapter(env: Readonly<Record<string, string>> = {}) {
   const fixture = desktopFixture({}, env)
-  const tool = createComputerActionsTool({ handle: fixture.handle, executeTool: noTools })
+  const tool = createComputerActionsTool({ handle: fixture.handle })
   const act = (params: ComputerActionsInput) => tool.execute("call", params, undefined, undefined, hostContext())
   const actRaw = (params: Readonly<Record<string, unknown>>) =>
     tool.execute("call", params, undefined, undefined, hostContext())

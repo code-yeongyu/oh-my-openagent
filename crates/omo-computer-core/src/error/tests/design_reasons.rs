@@ -20,8 +20,8 @@ const INVENTORY: &str = include_str!("design-reasons.tsv");
 const EXCLUSIONS: &str = include_str!("design-exclusions.tsv");
 /// The exact number of inventory pairs: a pair dropped from the table, the reason set and the
 /// inventory together still changes this number.
-const INVENTORY_PAIRS: usize = 204;
-const EXCLUDED_CANDIDATES: usize = 73;
+const INVENTORY_PAIRS: usize = 200;
+const EXCLUDED_CANDIDATES: usize = 67;
 
 struct DesignPair {
     line: usize,

@@ -3,7 +3,7 @@
 	"version": "0.1.0",
 	"type": "module",
 	"private": true,
-	"description": "JSON-RPC client over the senpi-desktop-engine child process and the computer.run runtime",
+	"description": "JSON-RPC client over the senpi-desktop-engine child process and the per-call desktop step runner",
 	"exports": {
 		".": {
 			"types": "./src/index.ts",

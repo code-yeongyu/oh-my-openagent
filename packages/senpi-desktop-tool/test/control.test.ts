@@ -1,4 +1,3 @@
-import type { ExecuteTool } from "@oh-my-opencode/senpi-desktop-service"
 import { afterEach, describe, expect, it } from "vitest"
 import { rejectionOf } from "../../senpi-desktop-service/test/harness"
 import { createComputerTool, type ControlConfirmRequest } from "../src/tool"
@@ -9,8 +8,6 @@ const HANG_GUARD = { timeout: 30_000 }
 
 afterEach(closeDesktops)
 
-const noTools: ExecuteTool = () => Promise.reject(new Error("no tools"))
-
 describe("computer tool control (#9651 B5b)", HANG_GUARD, () => {
   it("grants after the injected confirm approves", async () => {
     // Given
@@ -18,7 +15,6 @@ describe("computer tool control (#9651 B5b)", HANG_GUARD, () => {
     const requests: ControlConfirmRequest[] = []
     const tool = createComputerTool({
       handle,
-      executeTool: noTools,
       confirmControl: (request) => {
         requests.push(request)
         return Promise.resolve(true)
@@ -46,7 +42,6 @@ describe("computer tool control (#9651 B5b)", HANG_GUARD, () => {
     const { handle, log } = desktopFixture()
     const tool = createComputerTool({
       handle,
-      executeTool: noTools,
       confirmControl: () => Promise.resolve(false),
     })
 
@@ -64,16 +59,18 @@ describe("computer tool control (#9651 B5b)", HANG_GUARD, () => {
     expect(methodsOf(log)).not.toContain("control.grant")
   })
 
-  it("sends control.revoke when a computer run errors while granted", async () => {
-    // Given
+  it("sends control.revoke when a computer call errors while granted", async () => {
+    // Given: a granted session
     const { handle, log } = desktopFixture()
-    const tool = createComputerTool({ handle, executeTool: noTools, confirmControl: () => Promise.resolve(true) })
+    const tool = createComputerTool({ handle, confirmControl: () => Promise.resolve(true) })
+    const acquire = { action: "call", chain: [{ method: "control.acquire", args: [{ reason: "click Run" }] }] }
+    await tool.execute("call-1", acquire, undefined, undefined, hostContext())
 
-    // When
+    // When: the next call fails
     const error = await rejectionOf(
       tool.execute(
-        "call-1",
-        { action: "run", code: "await desktop.control.acquire({ reason: 'click Run' }); throw new Error('boom');" },
+        "call-2",
+        { action: "call", chain: [{ method: "window", args: ["no-such-window"] }] },
         undefined,
         undefined,
         hostContext(),
@@ -81,21 +78,20 @@ describe("computer tool control (#9651 B5b)", HANG_GUARD, () => {
     )
 
     // Then
-    expect(error).toMatchObject({ message: expect.stringContaining("boom") })
+    expect(error).toMatchObject({ message: expect.stringContaining("no window matches") })
     await log.nthRequest("control.revoke", 1)
   })
 
-  it("sends control.revoke when the tool call is aborted mid-run while granted", async () => {
-    // Given
-    const { handle, log } = desktopFixture()
-    const tool = createComputerTool({ handle, executeTool: noTools, confirmControl: () => Promise.resolve(true) })
+  it("sends control.revoke when the tool call is aborted mid-call while granted", async () => {
+    // Given: a granted session whose next windows request stalls
+    const { handle, log } = desktopFixture({}, { FAKE_ENGINE_STALL: "windows" })
+    const tool = createComputerTool({ handle, confirmControl: () => Promise.resolve(true) })
+    const acquire = { action: "call", chain: [{ method: "control.acquire", args: [{ reason: "click Run" }] }] }
+    await tool.execute("call-1", acquire, undefined, undefined, hostContext())
     const controller = new AbortController()
     const promise = tool.execute(
-      "call-1",
-      {
-        action: "run",
-        code: "await desktop.control.acquire({ reason: 'click Run' }); await desktop.windows(); await wait(() => false, { timeout: 4000, interval: 50 });",
-      },
+      "call-2",
+      { action: "call", chain: [{ method: "windows" }] },
       controller.signal,
       undefined,
       hostContext(),
@@ -114,7 +110,7 @@ describe("computer tool control (#9651 B5b)", HANG_GUARD, () => {
   it("maps ControlRequired to a failure that tells the model to acquire first", async () => {
     // Given
     const { handle } = desktopFixture({}, { FAKE_ENGINE_INPUT_ERROR: "ControlRequired" })
-    const tool = createComputerTool({ handle, executeTool: noTools })
+    const tool = createComputerTool({ handle })
 
     // When
     const result = await tool.execute(
@@ -135,7 +131,6 @@ describe("computer tool control (#9651 B5b)", HANG_GUARD, () => {
     const { handle } = desktopFixture({}, { FAKE_ENGINE_CONTROL_BUSY: "1" })
     const tool = createComputerTool({
       handle,
-      executeTool: noTools,
       confirmControl: () => Promise.resolve(true),
     })
 
@@ -158,7 +153,6 @@ describe("computer tool control (#9651 B5b)", HANG_GUARD, () => {
     const { handle, log } = desktopFixture({}, { FAKE_ENGINE_GRANT_ERROR: "Suspended" })
     const tool = createComputerTool({
       handle,
-      executeTool: noTools,
       confirmControl: () => Promise.resolve(true),
     })
 

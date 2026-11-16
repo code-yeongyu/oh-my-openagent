@@ -11,14 +11,15 @@ export interface AuditPrimaryError {
 }
 
 /**
- * One persisted audit line: the engine `AuditEvent` plus run context. FROZEN field set;
- * the engine audit writer (todo 22) persists exactly these fields.
+ * The host's record of one audited desktop action, returned with the tool result (`details.audit`): the engine
+ * `AuditEvent` plus the session and the tool call it belongs to. The engine writes its own audit file line.
  */
 export interface AuditRecord {
   /** ISO-8601 UTC timestamp. */
   readonly timestamp: string
   readonly sessionId: string
-  readonly runId: string
+  /** The `computer` (or `computer_actions`) tool call whose request produced this record. */
+  readonly toolCallId: string
   readonly action: EngineMethod | UnknownAuditValue
   readonly target: string
   /** `background`, `foreground`, or `control` (a `control.*` method's own record). */

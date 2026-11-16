@@ -3,7 +3,6 @@
 // sessions are pinned by audit-dir.characterization.test.ts (X17).
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { ExecuteTool } from "@oh-my-opencode/senpi-desktop-service"
 import { afterEach, describe, expect, it } from "vitest"
 import type { ComputerHandle } from "../src/activation"
 import {
@@ -22,10 +21,8 @@ const HANG_GUARD = { timeout: 30_000 }
 
 afterEach(closeDesktops)
 
-const noTools: ExecuteTool = () => Promise.reject(new Error("no tools"))
-
 function toolFor(handle: ComputerHandle) {
-  return createComputerTool({ handle, executeTool: noTools })
+  return createComputerTool({ handle })
 }
 
 function scope(sessionId: string, coordinateSafe = true): ComputerExecutionScope {
@@ -71,7 +68,20 @@ function openParams(log: ReturnType<typeof desktopFixture>["log"]) {
     })
 }
 
-const clickOnce = `const w = await desktop.window({ app: "Code" }); await w.screenshot({ silent: true }); await w.click(1, 1);`
+/** A capture then a click on the Code window, one chain call each; resolves to the click call's result. */
+async function clickCode(
+  tool: ReturnType<typeof toolFor>,
+  toolCallId: string,
+  context: ComputerHostContext,
+  x = 1,
+  y = 1,
+) {
+  const window = { method: "window", args: [{ app: "Code" }] }
+  const capture = { action: "call", chain: [window, { method: "screenshot", args: [{ silent: true }] }] }
+  await tool.execute(`${toolCallId}-capture`, capture, undefined, undefined, context)
+  const click = { action: "call", chain: [window, { method: "click", args: [x, y] }] }
+  return tool.execute(toolCallId, click, undefined, undefined, context)
+}
 
 describe("O13: computer-use audit and capture from a hand's execution scope", HANG_GUARD, () => {
   it("#given a hand scope #when the tool activates #then the audit file is in the scope's audit directory, artifacts stay in the OS tmpdir, and capture follows the scope's policy", async () => {
@@ -135,23 +145,17 @@ describe("O13: computer-use audit and capture from a hand's execution scope", HA
     expect(openParams(log).map((params) => params.auditPath)).toEqual([null])
   })
 
-  it("#given a run on a hand scope #when it clicks #then its audit record carries the calling session's id and a run id", async () => {
+  it("#given a call on a hand scope #when it clicks #then its audit record carries the calling session's id and the tool call id", async () => {
     // Given
     const { handle } = desktopFixture()
 
     // When
-    const result = await toolFor(handle).execute(
-      "run-1",
-      { action: "run", code: clickOnce },
-      undefined,
-      undefined,
-      handContext(scope("owner-a")),
-    )
+    const result = await clickCode(toolFor(handle), "call-1", handContext(scope("owner-a")))
 
     // Then
     const audit = result.details.audit ?? []
     expect(audit.map((record) => record.sessionId)).toEqual(["owner-a"])
-    expect(audit[0]?.runId).toMatch(/^[0-9a-f-]{36}$/)
+    expect(audit[0]?.toolCallId).toBe("call-1")
   })
 
   it("MULTI #given two scopes of different owners on one hand #when each runs #then each gets its own audit file and its own session id on its records", async () => {
@@ -160,20 +164,8 @@ describe("O13: computer-use audit and capture from a hand's execution scope", HA
     const tool = toolFor(handle)
 
     // When
-    const a = await tool.execute(
-      "run-a",
-      { action: "run", code: clickOnce },
-      undefined,
-      undefined,
-      handContext(scope("owner-a")),
-    )
-    const b = await tool.execute(
-      "run-b",
-      { action: "run", code: clickOnce },
-      undefined,
-      undefined,
-      handContext(scope("owner-b")),
-    )
+    const a = await clickCode(tool, "call-a", handContext(scope("owner-a")))
+    const b = await clickCode(tool, "call-b", handContext(scope("owner-b")))
 
     // Then
     expect(openParams(log).map((params) => params.auditPath)).toEqual([
