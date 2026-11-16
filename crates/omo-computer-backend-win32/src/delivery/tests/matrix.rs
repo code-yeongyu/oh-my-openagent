@@ -2,7 +2,8 @@
 //! the spike's probe ledger (`probes/win32-delivery.tsv`, spike row 7 / #13145); a REFUSAL the
 //! spike did not measure cites the design's harvest id instead (a refusal sends nothing, so it is
 //! safe without a measurement); a constant without either is a guess. The barrier's timing
-//! constants cite ledger rows too.
+//! constants cite ledger rows too. A cited ledger id must have a measured row: an id whose every
+//! row reads `UNMEASURED` (NOT-RUN) proves nothing.
 
 use crate::delivery::matrix::parse;
 
@@ -10,6 +11,7 @@ const MATRIX: &str = include_str!("../matrix.tsv");
 const BARRIER: &str = include_str!("../../barrier.rs");
 const LEDGER: &str = "probes/win32-delivery.tsv";
 
+/// The ledger ids with at least one measured row (verdict column not `UNMEASURED`).
 fn probe_ids() -> Vec<String> {
     let ledger = std::fs::read_to_string(concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -19,6 +21,7 @@ fn probe_ids() -> Vec<String> {
     ledger
         .lines()
         .skip(1)
+        .filter(|line| line.split('\t').nth(4).is_some_and(|verdict| verdict != "UNMEASURED"))
         .filter_map(|line| line.split('\t').next())
         .map(str::to_owned)
         .collect()
@@ -46,7 +49,7 @@ fn matrix_constants_cite_probe_rows() {
         ) {
             (Some(id), _) => assert!(
                 probe_ids.iter().any(|known| known == id),
-                "{row}: cites no ledger row"
+                "{row}: cites no measured ledger row"
             ),
             (None, Some(id)) => assert!(
                 refuses && !id.is_empty(),
@@ -64,7 +67,7 @@ fn matrix_constants_cite_probe_rows() {
     for id in cited {
         assert!(
             probe_ids.iter().any(|known| known == id),
-            "barrier.rs cites {id}, not a ledger row"
+            "barrier.rs cites {id}, not a measured ledger row"
         );
     }
 }
