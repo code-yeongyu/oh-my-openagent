@@ -9,6 +9,7 @@ import {
   registerDelegatedChildSessionBootstrap,
 } from "../../shared/delegated-child-session-bootstrap"
 import { log } from "../../shared/logger"
+import { ProviderPinRegistry } from "../../shared/provider-pin-registry"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import type { ExecutorContext, ParentContext } from "./executor-types"
 import { buildTaskPrompt } from "./prompt-builder"
@@ -36,6 +37,7 @@ export async function registerSyncSessionSideEffects(input: {
     promptText: buildTaskPrompt(input.args.prompt, input.agentToUse, input.executorCtx.sisyphusAgentConfig?.tdd),
     fallbackChain: input.fallbackChain,
     category: input.args.category,
+    providerPin: input.args.provider,
     system: input.systemContent,
     tools: buildSyncPromptTools(input.agentToUse, userPermission),
     modelFallbackControllerAccessor: input.executorCtx.modelFallbackControllerAccessor,
@@ -68,4 +70,5 @@ export function cleanupSyncSessionSideEffects(
   clearDelegatedChildSessionBootstrap(sessionID)
   executorCtx.modelFallbackControllerAccessor?.clearSessionFallbackChain(sessionID)
   SessionCategoryRegistry.remove(sessionID)
+  ProviderPinRegistry.remove(sessionID)
 }

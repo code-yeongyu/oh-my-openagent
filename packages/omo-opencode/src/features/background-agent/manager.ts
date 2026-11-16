@@ -27,6 +27,7 @@ import {
   awaitLateRuntimeFallbackRecoveryDecision,
   awaitRuntimeFallbackRecoveryDecision,
 } from "../../shared/runtime-fallback-recovery"
+import { ProviderPinRegistry } from "../../shared/provider-pin-registry"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { setSessionTools } from "../../shared/session-tools-store"
@@ -959,6 +960,7 @@ The fallback retry session is now created and can be inspected directly.
       promptText: input.prompt,
       fallbackChain: input.fallbackChain,
       category: input.category,
+      providerPin: input.providerPin,
       system: input.skillContent,
       tools: launchTools,
       modelFallbackControllerAccessor: this.modelFallbackControllerAccessor,
@@ -1013,6 +1015,7 @@ The fallback retry session is now created and can be inspected directly.
             promptText: input.prompt,
             fallbackChain: input.fallbackChain,
             category: input.category,
+            providerPin: input.providerPin,
             system: input.skillContent,
             tools: fallbackTools,
             modelFallbackControllerAccessor: this.modelFallbackControllerAccessor,
@@ -2100,6 +2103,7 @@ The fallback retry session is now created and can be inspected directly.
       clearDelegatedChildSessionBootstrap(sessionID)
       clearSessionAgent(sessionID)
       SessionCategoryRegistry.remove(sessionID)
+      ProviderPinRegistry.remove(sessionID)
     }
 
     if (event.type === "session.status") {
@@ -2200,6 +2204,7 @@ The fallback retry session is now created and can be inspected directly.
     if (task.sessionId) {
       clearDelegatedChildSessionBootstrap(task.sessionId)
       SessionCategoryRegistry.remove(task.sessionId)
+      ProviderPinRegistry.remove(task.sessionId)
       await this.abortSessionWithLogging(task.sessionId, `${reason} cleanup`)
     }
 
@@ -2369,6 +2374,7 @@ The fallback retry session is now created and can be inspected directly.
     if (task.sessionId) {
       clearDelegatedChildSessionBootstrap(task.sessionId)
       SessionCategoryRegistry.remove(task.sessionId)
+      ProviderPinRegistry.remove(task.sessionId)
     }
 
     // Update continuation marker for CLI run mode
@@ -2631,6 +2637,7 @@ The task was re-queued on a fallback model after a retryable failure.
         subagentSessions.delete(task.sessionId)
         clearDelegatedChildSessionBootstrap(task.sessionId)
         SessionCategoryRegistry.remove(task.sessionId)
+        ProviderPinRegistry.remove(task.sessionId)
         const deleteSession = this.client.session.delete?.bind(this.client.session)
         if (typeof deleteSession === "function") {
           await deleteSession({ path: { id: task.sessionId } }).catch((error: unknown) => {
@@ -2685,6 +2692,7 @@ The task was re-queued on a fallback model after a retryable failure.
 
       clearDelegatedChildSessionBootstrap(task.sessionId)
       SessionCategoryRegistry.remove(task.sessionId)
+      ProviderPinRegistry.remove(task.sessionId)
     }
     if (task.currentAttemptID) {
       finalizeAttempt(task, task.currentAttemptID, "cancelled", reason)
@@ -2871,6 +2879,7 @@ The task was re-queued on a fallback model after a retryable failure.
         clearSessionAgent(task.sessionId)
         clearDelegatedChildSessionBootstrap(task.sessionId)
         SessionCategoryRegistry.remove(task.sessionId)
+        ProviderPinRegistry.remove(task.sessionId)
 
         // Awaited to prevent dangling promise during subagent teardown (Bun/WebKit SIGABRT)
         await this.abortSessionWithLogging(task.sessionId, `task completion (${source})`)
@@ -3321,6 +3330,7 @@ The task was re-queued on a fallback model after a retryable failure.
     if (task.sessionId) {
       clearDelegatedChildSessionBootstrap(task.sessionId)
       SessionCategoryRegistry.remove(task.sessionId)
+      ProviderPinRegistry.remove(task.sessionId)
     }
 
     // Update continuation marker for CLI run mode
@@ -3572,6 +3582,7 @@ The task was re-queued on a fallback model after a retryable failure.
       subagentSessions.delete(sessionID)
       clearDelegatedChildSessionBootstrap(sessionID)
       SessionCategoryRegistry.remove(sessionID)
+      ProviderPinRegistry.remove(sessionID)
     }
 
     this.concurrencyManager.clear()

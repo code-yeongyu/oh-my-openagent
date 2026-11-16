@@ -3,6 +3,7 @@
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import { beforeEach, describe, expect, test } from "bun:test"
 import { _resetMemCacheForTesting, updateConnectedProvidersCache } from "../../shared/connected-providers-cache"
+import { ProviderPinRegistry } from "../../shared/provider-pin-registry"
 
 type ChatMessageOutput = {
   message: Record<string, unknown>
@@ -63,6 +64,24 @@ describe("model fallback hook", () => {
       providerID: "anthropic",
       modelID: "claude-opus-5-5",
     })
+  })
+
+  test("does not arm a fallback for a session pinned to a provider", () => {
+    // given
+    ProviderPinRegistry.register("ses_model_fallback_pinned", "openai")
+
+    // when
+    const set = setPendingModelFallback(
+      modelFallback,
+      "ses_model_fallback_pinned",
+      "multimodal-looker",
+      "openai",
+      "gpt-6.1-sol",
+    )
+    ProviderPinRegistry.remove("ses_model_fallback_pinned")
+
+    // then
+    expect(set).toBe(false)
   })
 
   test("preserves fallback progression across repeated session.error retries", async () => {

@@ -6,6 +6,7 @@ import type {
   AgentOverrides,
   SisyphusAgentConfig,
 } from "../../config/schema"
+import type { ProviderModelsConfig } from "../../config/schema/provider-models"
 import type { ModelFallbackControllerAccessor } from "../../hooks/model-fallback"
 import type { OpencodeClient } from "./types"
 
@@ -18,6 +19,7 @@ export interface ExecutorContext {
   sisyphusJuniorModel?: string
   browserProvider?: BrowserAutomationProvider
   agentOverrides?: AgentOverrides
+  providerModels?: ProviderModelsConfig
   sisyphusAgentConfig?: SisyphusAgentConfig
   claudeCodeAgentsEnabled?: boolean
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
