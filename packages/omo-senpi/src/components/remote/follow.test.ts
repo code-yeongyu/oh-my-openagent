@@ -209,6 +209,21 @@ const turnRecords = (runId: string, text: string, seq: number): JsonObject[] => 
 ]
 
 describe("sessions.follow rows: anchored at its open (#13753, the U6 waited send)", () => {
+  test("#given a send whose turn already runs when follow's first get_state answers #when the turn ends #then the end is that turn's, not a hang", async () => {
+    // U6 opens follow and sends at once: the baseline read can land after the new run started.
+    const { owner, client } = await on(IDLE, undefined, {
+      reply: { lifecycle: { state: "running", seq: 6, runId: "run-2" } },
+    })
+    const { events } = await following(client)
+    // Its start (lease running, agent_start) came before the attach's snapshot; only the rest of it streams.
+    pushRecords(owner, turnRecords("run-2", "ping", 6).slice(2))
+    expect(await drain(events)).toEqual([
+      { kind: "waiting", state: "turn_running" },
+      { kind: "text", delta: "ping" },
+      { kind: "end", outcome: { reason: "settled", text: "ping" } },
+    ])
+  })
+
   test("#given turns the attach replays #when follow opens and then a send starts the next turn #then the end is that turn's, twice in a row", async () => {
     // get_state at each open answers the session as it is then: its last run done.
     const reply: { lifecycle: JsonObject } = { lifecycle: { state: "done", seq: 5, runId: "run-1" } }

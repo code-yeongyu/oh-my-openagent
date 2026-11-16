@@ -155,9 +155,9 @@ const recordLease = (record: JsonObject): Lease | undefined =>
  * streams records it buffered since an older snapshot), so everything the attach replays or the snapshot holds is
  * history, and history never reaches the turn: no text, no tool event, no end. The anchor is the run lease the session
  * held when follow opened (its first fresh get_state): a run counts only once a lease with a newer seq shows it
- * running. Until that baseline is known every record waits; a run's records wait until a newer lease decides them,
- * and a run that settles without one was history. A run in flight when follow opened started before it: history too.
- * An engine whose state carries no lease is followed as before.
+ * running, or it is the run in flight at the baseline. Until that baseline is known every record waits; a run's
+ * records wait until a newer lease decides them, and a run that settles without one was history. An engine whose state
+ * carries no lease is followed as before.
  */
 class FollowAnchor {
   #known = false
@@ -176,7 +176,12 @@ class FollowAnchor {
     if (lease === undefined) this.#unanchored = true
     else {
       this.#seq = lease.seq
-      if (lease.state === "running") this.#run = { id: lease.runId, verdict: "history", held: [] }
+      // A run in flight at the baseline is this follow's: the read can land after the send it follows started its run
+      // (a caller opens follow and sends without waiting for the open), and nothing tells that run from an older one.
+      if (lease.state === "running") {
+        if (lease.runId !== undefined) this.#live.add(lease.runId)
+        this.#run = { id: lease.runId, verdict: "live", held: [] }
+      }
     }
     return this.#early.splice(0).flatMap((event) => this.#accept(event))
   }
