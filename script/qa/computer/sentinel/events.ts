@@ -21,6 +21,8 @@ export type SentinelEvent = { readonly t: number } & (
   | { readonly kind: "armed"; readonly signal: Signal; readonly via: string }
   | { readonly kind: "fault"; readonly signal: Signal; readonly detail: string }
   | { readonly kind: "tick" | "start" }
+  // A sampler tick that took long: its total time and its slowest read, so a stalled sampler names what held it.
+  | { readonly kind: "slow_tick"; readonly ms: number; readonly read: string; readonly readMs: number }
   | { readonly kind: "stop"; readonly pendingReads?: number; readonly pendingRegistrations?: number }
   | { readonly kind: "focus" | "space"; readonly via: Via; readonly value: string }
   | { readonly kind: "order"; readonly windows: readonly string[] }
@@ -93,6 +95,7 @@ const SHAPES: Readonly<Record<SentinelEvent["kind"], Readonly<Record<string, Che
   armed: { signal: oneOf(...SIGNALS), via: str },
   fault: { signal: oneOf(...SIGNALS), detail: str },
   tick: {},
+  slow_tick: { ms: num, read: str, readMs: num },
   start: {},
   stop: { pendingReads: optional(num), pendingRegistrations: optional(num) },
   focus: { via, value: str },

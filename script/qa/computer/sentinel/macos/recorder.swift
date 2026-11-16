@@ -1,6 +1,7 @@
 // The eight-signal recorder. Event-driven where macOS offers a notification (AX focus and window creation, the
 // pointer event tap, workspace activation and Space changes, the typist field's value), with a 20 Hz sampler beside
-// it for what has no notification (window order, the pasteboard change count) and as a second read of the rest.
+// it for what has no notification (window order; the pasteboard change count on its own queue) and as a second read
+// of the rest.
 // It never acts on the desktop and judges nothing: it reports facts (including the raw AXError of a new window's
 // reads and how many such reads were still running at stop), and the reducer in summary.ts judges them. The
 // self-test's sabotage lives in that reducer, not here.
@@ -36,6 +37,7 @@ final class Recorder: NSObject {
   // when an app failed registration while it was not regular: its gap is carried into the activation re-registration
   var failedSince: [pid_t: Double] = [:]
   var stopping = false
+  let pasteboard = PasteboardPoller()
 
   init(userPid: pid_t, targetPids: [pid_t], fieldIdentifier: String) {
     self.userPid = userPid
@@ -106,7 +108,7 @@ final class Recorder: NSObject {
       fault("pointer", "listen-only event tap could not be created")
     }
 
-    armed("clipboard", "sample")
+    armed("clipboard", "poller")
 
     let center = NSWorkspace.shared.notificationCenter
     center.addObserver(self, selector: #selector(spaceChanged), name: NSWorkspace.activeSpaceDidChangeNotification, object: nil)
@@ -184,6 +186,7 @@ final class Recorder: NSObject {
       return after(0.05) { self.drainThenStop(deadline: deadline) }
     }
     recording = false
+    pasteboard.drain()
     emit(["kind": "stop", "pendingReads": pendingReads, "pendingRegistrations": registering.count])
     stopping = false
   }
