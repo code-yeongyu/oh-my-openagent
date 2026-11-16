@@ -127,6 +127,8 @@ describe("#13010 remote CLI session identity", () => {
       try {
         expect(typeof prepared).toBe("object")
         if (typeof prepared === "number") return
+        // The attach port only borrowed the CLI's own connection (#13761): it still answers.
+        expect((await service.status()).state).toBe("connected")
         const socket = prepared.engineArgs[1]
         if (socket === undefined) throw new Error("attach did not name its endpoint")
         const endpoint = dirname(socket)

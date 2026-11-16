@@ -259,14 +259,14 @@ export class SyncEngine {
       this.loaded = true
     }
     const before = await journal.updateState({ eventHead: Math.max(this.eventHead, (await journal.state()).eventHead) })
-    let holds: CaptureHolds = { held: new Map(), withheld: new Set() }
+    let holds: CaptureHolds = { held: new Map(), withheld: new Set(), joining: new Set() }
     if (before.cycle !== null) {
       const resumed = before.cycle
       await deps.lock.withLock(async () => {
         // A cycle resumed at merged re-renders its keys over the working files: capture any edit made
         // since the crash first, so it merges into the doc instead of being overwritten.
         if (resumed.stage === "merged") holds = await capture(deps, journal, resumed)
-        await advance(deps, journal, resumed, new Set(holds.held.keys()))
+        await advance(deps, journal, resumed, notRenderedNow(holds))
       })
     }
     let applied = 0
@@ -279,7 +279,10 @@ export class SyncEngine {
       snapshot = got.snapshot ?? snapshot
       const done = await deps.lock.withLock(async () => {
         holds = await capture(deps, journal)
-        return applyVerified(deps, journal, new Set(holds.held.keys()))
+        const appliedNow = await applyVerified(deps, journal, notRenderedNow(holds))
+        // A joining file adopts the space's state in this same cycle, so its edit goes out with this push.
+        if (holds.joining.size > 0) holds = await capture(deps, journal)
+        return appliedNow
       })
       applied += done.batches
       memories += done.memories
@@ -310,3 +313,6 @@ export class SyncEngine {
 }
 
 const failureKey = (failure: SyncFailure): string => `${failure.kind}\n${failure.action}`
+
+/** Keys whose render this cycle owes instead of landing: held edits, and files of keys the device is joining. */
+const notRenderedNow = (holds: CaptureHolds): Set<string> => new Set([...holds.held.keys(), ...holds.joining])
