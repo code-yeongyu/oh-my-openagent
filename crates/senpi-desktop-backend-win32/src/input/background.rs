@@ -56,7 +56,10 @@ pub(super) fn key_target(
         EventKind::Keystroke
     };
     let window = deliverable(id, own, kind)?;
-    posted_chord_refusal(id, vks).map_or(Ok(window.keyboard_focus()), Err)
+    if let Some(refusal) = posted_chord_refusal(id, vks) {
+        return Err(refusal);
+    }
+    Ok(window.keyboard_focus())
 }
 
 pub(super) fn post(window: Window, message: u32, wparam: WPARAM, lparam: LPARAM) -> CoreResult<()> {
