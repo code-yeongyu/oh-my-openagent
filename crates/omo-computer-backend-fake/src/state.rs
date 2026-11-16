@@ -131,7 +131,7 @@ impl FakeState {
             Fault::Fail { code, reason } => Err(Fault::refusal(code, reason)),
             Fault::RefuseFocus => Err(Refusal::new(
                 EngineCode::InputFailed,
-                Reason::ActivationRefused.wire(),
+                Reason::ActivationRefused,
             )),
             Fault::Panic => panic!("scripted fault: the fake panics in {}", method.as_str()),
         }

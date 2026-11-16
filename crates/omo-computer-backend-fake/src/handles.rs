@@ -75,7 +75,7 @@ impl StopListener for FakeStopListener {
         if self.script == StopPathScript::Deaf {
             return Err(Refusal::new(
                 EngineCode::StopPathUnavailable,
-                Reason::Deaf.wire(),
+                Reason::Deaf,
             ));
         }
         let mut state = lock(&self.shared);

@@ -1,6 +1,7 @@
 //! An epoch change supersedes every frame and expires every ref, for every reason and on
 //! every persona.
 
+use omo_computer_core::error::Reason;
 use omo_computer_backend_fake::Persona;
 use omo_computer_core::frame::EpochReason;
 use serde_json::json;
@@ -26,7 +27,7 @@ fn epoch_changed_expires_frames_and_refs() {
         let stale = session.refs.locate(&token, false).expect_err("expired");
         assert_eq!(
             (stale.code.wire(), stale.reason),
-            ("StaleRef", Some("epoch")),
+            ("StaleRef", Some(Reason::Epoch)),
             "{reason:?}"
         );
         let named = json!({"target": "101", "x": 10, "y": 10, "frameId": captured.frame_id});
@@ -71,7 +72,7 @@ fn epoch_change_supersedes_frame_and_expires_refs() {
         let stale = session.refs.locate(&token, false).expect_err("expired");
         assert_eq!(
             (stale.code.wire(), stale.reason),
-            ("StaleRef", Some("epoch")),
+            ("StaleRef", Some(Reason::Epoch)),
             "{persona:?}"
         );
     }
