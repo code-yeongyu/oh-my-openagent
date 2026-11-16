@@ -87,6 +87,10 @@ export type ThreadHost = {
     readonly forkFrom?: string
     readonly initialSkills?: readonly string[]
     readonly permissionPreset?: string
+    /** The engine's launch profile: the model (`provider` + `modelId`) and thinking level the new session starts on. */
+    readonly provider?: string
+    readonly modelId?: string
+    readonly thinkingLevel?: string
   }) => Promise<ThreadHostSession>
   readonly getMessages: (sessionId: string) => Promise<readonly ThreadTranscriptEntry[]>
   readonly getState: (sessionId: string) => Promise<{ readonly isStreaming?: boolean; readonly activeTurnId?: string }>
