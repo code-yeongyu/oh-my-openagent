@@ -77,7 +77,7 @@ impl<B: Bus> AtspiBackend<B> {
         let plan = LaunchPlan {
             program: program.clone(),
             args: args.to_vec(),
-            env: child_env(std::env::vars()),
+            env: child_env(std::env::vars_os()),
         };
         launcher
             .launch(&plan)

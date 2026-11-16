@@ -2,6 +2,7 @@
 //! never inherits the engine's activation token or startup id, so it cannot claim focus on
 //! the agent's behalf.
 
+use std::ffi::OsString;
 use std::process::{Command, Stdio};
 
 /// What is spawned: a program, its arguments and the whole child environment.
@@ -9,7 +10,8 @@ use std::process::{Command, Stdio};
 pub struct LaunchPlan {
     pub program: String,
     pub args: Vec<String>,
-    pub env: Vec<(String, String)>,
+    /// Taken as the OS gives it: a key or value that is not Unicode passes through untouched.
+    pub env: Vec<(OsString, OsString)>,
 }
 
 /// Spawns a plan and answers the child's pid.
@@ -24,10 +26,12 @@ pub const STRIPPED: &[&str] = &["XDG_ACTIVATION_TOKEN", "DESKTOP_STARTUP_ID"];
 
 /// The child's environment from the engine's.
 #[must_use]
-pub fn child_env(parent: impl IntoIterator<Item = (String, String)>) -> Vec<(String, String)> {
+pub fn child_env(
+    parent: impl IntoIterator<Item = (OsString, OsString)>,
+) -> Vec<(OsString, OsString)> {
     parent
         .into_iter()
-        .filter(|(key, _)| !STRIPPED.contains(&key.as_str()))
+        .filter(|(key, _)| !STRIPPED.iter().any(|stripped| key == stripped))
         .collect()
 }
 
