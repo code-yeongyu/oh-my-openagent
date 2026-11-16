@@ -24,12 +24,12 @@ fn lookup<'a>(
     reference: &Ref,
 ) -> BackendResult<(&'a FakeAxNode, String, u64)> {
     let (generation, index) = parse_ref(&reference.0)
-        .ok_or_else(|| Refusal::new(EngineCode::InvalidTarget, Reason::RefUnqualified.wire()))?;
+        .ok_or_else(|| Refusal::new(EngineCode::InvalidTarget, Reason::RefUnqualified))?;
     let window = state.snapshots.get(&generation).ok_or_else(stale)?;
     if state.exited.contains(window) {
         return Err(Refusal::new(
             EngineCode::StaleRef,
-            Reason::IdentityChanged.wire(),
+            Reason::IdentityChanged,
         ));
     }
     let root = state.scenario.ax.get(window).ok_or_else(stale)?;
@@ -107,7 +107,7 @@ impl AxBackend for FakeBackend {
             if !supports(node, &action.0) {
                 return Err(Refusal::new(
                     EngineCode::AxUnsupported,
-                    Reason::PerformUnsupported.wire(),
+                    Reason::PerformUnsupported,
                 ));
             }
             let mut line = format!("ax_perform ref={} action={}", reference.0, action.0);
