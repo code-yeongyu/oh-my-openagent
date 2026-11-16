@@ -355,6 +355,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       actions: read
+      pull-requests: read
     steps:
       - name: Report a skipped signal with no newer run for this head
         uses: actions/github-script@v9
@@ -372,6 +373,19 @@ jobs:
             const newer = data.workflow_runs.filter((run) => run.id > thisId);
             if (newer.length > 0) {
               core.info(`A newer PR Automation Signal run (${newer[0].run_number}) covers head ${head.slice(0, 10)}; this signal carried no result to act on.`);
+              return;
+            }
+            // A push cancels the signal of the head it replaced: only a head that is still an open PR's head is a gap.
+            const signal = context.payload.workflow_run;
+            const { data: open } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${signal.head_repository.owner.login}:${signal.head_branch}`,
+              per_page: 100,
+            });
+            if (!open.some((pr) => pr.head.sha === head)) {
+              core.info(`Head ${head.slice(0, 10)} is no longer an open PR head; its superseded signal needs no checks.`);
               return;
             }
             core.warning(`No newer PR Automation Signal run for head ${head.slice(0, 10)}: the ${context.workflow} checks have NOT run for this head. Re-run with workflow_dispatch (pr_number) if this head still needs them.`);
