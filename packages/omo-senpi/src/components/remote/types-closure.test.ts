@@ -17,6 +17,8 @@ const ROOTS = [`${REMOTE}/types.ts`, `${REMOTE}/seams.ts`, `${REMOTE}/codes.ts`]
 const ALLOWED = new Set([
   ...ROOTS,
   "packages/omo-senpi/src/components/thread/errors.ts",
+  // The one list of approval modes (dev #13748): a leaf that imports nothing.
+  "packages/omo-senpi/src/components/thread/contracts/permission-presets.ts",
   "packages/omo-senpi/src/components/thread/remote/ports.ts",
   `${DSC}/src/account-state.ts`,
   `${DSC}/src/local-api/errors.ts`,
