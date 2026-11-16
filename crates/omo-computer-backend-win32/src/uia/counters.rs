@@ -65,7 +65,10 @@ impl ChangeCounters {
         let (lock, ready) = &*self.inner;
         let mut counts = lock.lock().unwrap_or_else(PoisonError::into_inner);
         *counts.per_window.entry(window.to_owned()).or_default() += 1;
-        let _ = kind;
+        counts.queue.push_back(AxEvent {
+            kind: kind.wire().to_owned(),
+            window: window.to_owned(),
+        });
         ready.notify_all();
     }
 
@@ -126,14 +129,12 @@ impl<S: UiaSource + Send> SettleSource for UiaSettle<S> {
     }
 
     fn busy(&mut self, _window: &str) -> BackendResult<Option<BusyIndicator>> {
-        let _ = LOADING_UNSUPPORTED;
-        Ok(None)
+        Err(LOADING_UNSUPPORTED)
     }
 
     fn notifications(&mut self) -> BackendResult<Vec<NotificationFingerprint>> {
         let now = self.source.now_ms();
-        let _ = self.source.toasts();
-        let toasts: Vec<super::element::Toast> = Err(NO_NOTIFICATION_SURFACE)?;
+        let toasts = self.source.toasts().ok_or(NO_NOTIFICATION_SURFACE)?;
         Ok(toasts
             .into_iter()
             .map(|toast| NotificationFingerprint {

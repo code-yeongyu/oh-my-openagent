@@ -66,8 +66,7 @@ fn client_side_only(description: &str) -> bool {
 /// The cache request a walk under a root with `provider_description` uses.
 #[must_use]
 pub fn cache_request(provider_description: &str) -> CacheRequest {
-    let _ = (client_side_only(provider_description), names_a_process(provider_description));
-    let skip = false;
+    let skip = client_side_only(provider_description) && !names_a_process(provider_description);
     CacheRequest {
         batching: if skip { Batching::Skip } else { Batching::Batch },
         properties: PROPERTIES,

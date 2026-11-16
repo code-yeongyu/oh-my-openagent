@@ -35,7 +35,7 @@ impl<S: UiaSource> UiaHost<S> {
     /// # Errors
     /// `AxUnsupported` when the client cannot be created.
     pub fn reader(&mut self) -> BackendResult<&mut UiaReader<S>> {
-        {
+        if self.reader.is_none() {
             let source = (self.factory)().map_err(|_| Refusal::bare(EngineCode::AxUnsupported))?;
             self.created = self.created.saturating_add(1);
             self.reader = Some(UiaReader::new(source));
@@ -59,14 +59,21 @@ impl<S: UiaSource> UiaHost<S> {
     /// Whether a password field has focus, in `window` (a decimal `HWND`) or anywhere;
     /// `None` when the focus cannot be read.
     pub fn secure_focus(&mut self, window: Option<&str>) -> Option<bool> {
-        let _ = (window, self.reader().ok()?.source().focused());
-        None
+        let focused = self.reader().ok()?.source().focused()?;
+        match window {
+            Some(window) if window.parse::<isize>().ok()? != focused.hwnd => Some(false),
+            _ => Some(focused.is_password),
+        }
     }
 
     /// The value the element with `runtime_id` reads back after a write; never a password's.
     pub fn value_readback(&mut self, runtime_id: &[i32]) -> Option<String> {
         let reader = self.reader().ok()?;
         let element = reidentify(reader.source_mut().find_runtime_id(0, runtime_id)).ok()?;
-        element.value
+        if element.is_password {
+            None
+        } else {
+            element.value
+        }
     }
 }
