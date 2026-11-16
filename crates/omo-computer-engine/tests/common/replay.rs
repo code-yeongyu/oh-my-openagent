@@ -19,6 +19,7 @@ const TOKEN_PLACEHOLDER: &str = "${RESUME_TOKEN}";
 pub struct Report {
     pub name: String,
     pub failures: Vec<String>,
+    pub owed: Vec<String>,
     pub deltas: Vec<Delta>,
 }
 
@@ -26,6 +27,9 @@ impl Report {
     pub fn assert_clean(&self) {
         for delta in &self.deltas {
             println!("DELTA matched={} {}", delta.matched, delta.line);
+        }
+        for owed in &self.owed {
+            println!("OWED {owed}");
         }
         assert!(
             self.failures.is_empty(),
@@ -172,9 +176,11 @@ pub fn replay_case_in(case: &Case, runtime: &Path) -> Report {
     if let Some(peer) = peer {
         failures.extend(peer.close().into_iter().map(|m| format!("LEFTOVER {m}")));
     }
+    let (failures, owed) = super::owed::split(&case.name, failures);
     Report {
         name: case.name.clone(),
         failures,
+        owed,
         deltas,
     }
 }

@@ -15,6 +15,8 @@ mod compare;
 mod host;
 #[path = "common/peer.rs"]
 mod peer;
+#[path = "common/owed.rs"]
+mod owed;
 #[path = "common/replay.rs"]
 mod replay;
 
