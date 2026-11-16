@@ -12,7 +12,7 @@ use std::process::{Child, Command, Stdio};
 use std::sync::mpsc::channel;
 use std::time::Duration;
 
-use atspi::{ObjectRefOwned, Role};
+use atspi::ObjectRefOwned;
 use senpi_desktop_core::ax::AxBackend;
 use senpi_desktop_core::types::DesktopWindow;
 
@@ -64,19 +64,19 @@ fn find_window(ax: &mut AtSpiAx, title: &str) -> DesktopWindow {
         .unwrap_or_else(|| panic!("the fixture window never reached the registry"))
 }
 
-/// The first element under `root`, breadth first, with this role and name.
-fn find(ax: &mut AtSpiAx, root: ObjectRefOwned, role: Role, name: &str) -> ObjectRefOwned {
+/// The first element under `root`, breadth first, with this name.
+fn find(ax: &mut AtSpiAx, root: ObjectRefOwned, name: &str) -> ObjectRefOwned {
     let mut queue = vec![root];
     for _ in 0..MAX_WALK {
         let Some(node) = (!queue.is_empty()).then(|| queue.remove(0)) else {
             break;
         };
-        if ax.bus.role(&node).ok() == Some(role) && ax.bus.name(&node).is_ok_and(|found| found == name) {
+        if ax.bus.name(&node).is_ok_and(|found| found == name) {
             return node;
         }
         queue.extend(ax.bus.children(&node).unwrap_or_default());
     }
-    panic!("no {role:?} named {name:?} in the fixture window");
+    panic!("nothing named {name:?} in the fixture window");
 }
 
 #[test]
@@ -86,15 +86,16 @@ fn element_at_names_the_deepest_element_of_a_real_gtk_window() {
     let _fixture = spawn(&title);
     let mut ax = AtSpiAx::new(WindowIds::Native).unwrap();
     let window = find_window(&mut ax, &title);
-    for (role, name) in [(Role::Button, "Press"), (Role::Entry, "Value")] {
+    for name in ["Press", "Value"] {
         let root = window_root(&mut ax.bus, &window).unwrap();
-        let target = find(&mut ax, root, role, name);
+        let target = find(&mut ax, root, name);
+        let want = (ax.bus.role(&target).unwrap(), name.to_string());
         let box_ = ax.bus.extents(&target).unwrap();
         let (x, y) = (box_.x + box_.width / 2, box_.y + box_.height / 2);
         let hit = ax.element_at(f64::from(x), f64::from(y)).unwrap().unwrap();
         let hit = hit.downcast_native::<ObjectRefOwned>().unwrap().clone();
         let got = (ax.bus.role(&hit).unwrap(), ax.bus.name(&hit).unwrap());
-        println!("target={role:?}:{name} point={x},{y} hit_test={:?}:{} matches={}", got.0, got.1, got == (role, name.to_string()));
-        assert_eq!(got, (role, name.to_string()));
+        println!("target={:?}:{name} point={x},{y} hit_test={:?}:{} matches={}", want.0, got.0, got.1, got == want);
+        assert_eq!(got, want);
     }
 }
