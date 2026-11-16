@@ -19,7 +19,7 @@ function fieldsOf(version: string): readonly number[] | undefined {
  * A compiled omo binary stamps its own release version over the engine's (senpi's package version reads "5.1.72"), so
  * there the engine is known by the omo release that pins it: 5.1.72 is the first to pin senpi 2026.11.15-2 or later.
  */
-export const MIN_WAKE_OMO_VERSION = "5.1.72"
+const MIN_WAKE_OMO_VERSION = "5.1.72"
 
 // An omob dev build stamps `0.0.0-omob.<omo commit>.<senpi commit>`: built from a tracked senpi, never a release.
 const OMOB_VERSION = /^0\.0\.0-omob\./
