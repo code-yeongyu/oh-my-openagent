@@ -80,7 +80,7 @@ async function run(
   // The copied launcher's runtime probe creates .local/.cache/xdg-run under the temp HOME; a credential file would
   // still surface here.
   const homeEntries = readdirSync(home).filter((name) => name !== ".local" && name !== ".cache" && name !== "xdg-run")
-  return { stdout, stderr, code, requests, homeEntries }
+  return { stdout, stderr, code, requests, homeEntries, home }
 }
 
 for (const [name, entry] of Object.entries(entries)) {
@@ -123,8 +123,8 @@ for (const [name, entry] of Object.entries({ launcher: entries.launcher, compile
   }, 60_000)
 }
 
-// C4: logout and whoami run while closed. On an empty store whoami says so with the hint; logout signs out (no
-// device to revoke, so no request) and leaves the signed-out marker.
+// C4: logout and whoami run while closed. On an empty store whoami says so with the hint; logout says honestly
+// that nothing was stored, leaves the signed-out marker, and makes no request (#13281 review LOW 2 and LOW 4).
 test("#given accounts are closed and no sign-in is stored #when the launcher runs omo whoami #then it says so with the hint", async () => {
   const result = await run(entries.launcher, ["whoami"], {}, "closed-device-login.fixture.ts")
   expect(result.code).toBe(1)
@@ -134,21 +134,37 @@ test("#given accounts are closed and no sign-in is stored #when the launcher run
   expect(result.stderr).not.toContain("Cannot access Linux Secret Service")
 }, 60_000)
 
-test("#given accounts are closed and no sign-in is stored #when the launcher runs omo logout #then it signs out with no request", async () => {
+test("#given accounts are closed and no sign-in is stored #when the launcher runs omo logout #then it says nothing was stored and leaves the signed-out marker", async () => {
   const result = await run(entries.launcher, ["logout"], {}, "closed-device-login.fixture.ts")
   expect(result.code).toBe(0)
-  expect(result.stdout).toContain("Signed out of OmO.")
+  expect(result.stdout).toContain("No OmO sign-in was stored on this computer")
   expect(result.requests).toBe(0)
   expect(result.stderr).not.toContain("Cannot access Linux Secret Service")
+  const marker = readdirSync(result.home, { recursive: true })
+    .map((entry) => String(entry))
+    .find((entry) => /account-state\/[^/]+\.signed-out\.json$/.test(entry))
+  expect(marker).toMatch(/\.signed-out\.json$/)
 }, 60_000)
 
-// C4 grammar: logout and whoami take --api and refuse anything else with the route-naming refusal.
-test("#given accounts are closed #when the launcher runs omo logout with a stray operand #then it refuses naming the route", async () => {
+// C4 grammar (#13281 review LOW 3): logout and whoami take --api and --help; any other form refuses in that
+// command's own words, never in the login form's words.
+test("#given accounts are closed #when the launcher runs omo logout with a stray operand #then it refuses in logout's own words", async () => {
   const result = await run(entries.launcher, ["logout", "extra"])
   expect(result.code).toBe(1)
-  expect(result.stderr.trim()).toBe(CLOSED_LOGIN_MESSAGE)
+  expect(result.stderr.trim()).toBe(
+    "This form of omo logout isn't available while OmO accounts are closed. Run plain omo logout, optionally with --api <url>.",
+  )
   expect(result.requests).toBe(0)
 }, 60_000)
+
+for (const name of ["logout", "whoami"] as const) {
+  test(`#given accounts are closed #when the launcher runs omo ${name} --help #then it describes that command`, async () => {
+    const result = await run(entries.launcher, [name, "--help"])
+    expect(result.code).toBe(0)
+    expect(result.stdout).toContain(name === "logout" ? "Sign out of OmO" : "Show the current OmO device sign-in")
+    expect(result.stderr).not.toContain(CLOSED_LOGIN_MESSAGE)
+  }, 60_000)
+}
 
 // Contract: every sign-in hint follows the same switch as the commands (#11379); while closed the hint names BOTH
 // routes (C11), because omo login now runs.

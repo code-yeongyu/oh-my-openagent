@@ -111,12 +111,20 @@ async function run(
       }),
     })
     if (action === "logout") {
+      // The CLI store is this command's own state: an empty store means nothing was removed on this side, whatever
+      // the machine's device service holds (#13281 review LOW 4; the shared-device semantics stay with the owner's
+      // pending decision on how a person signs a machine out).
+      const storedBefore = await store.read().catch(() => undefined)
       const revoked = await session.logout()
-      console.log("Signed out of OmO. Stored credentials and device keys were removed.")
-      if (!revoked)
-        console.error(
-          "Server device revocation could not be confirmed. Remove this device from the Devices page of your OmO account when connected.",
-        )
+      if (storedBefore === null) {
+        console.log("No OmO sign-in was stored on this computer; there was nothing to remove.")
+      } else {
+        console.log("Signed out of OmO. Stored credentials and device keys were removed.")
+        if (!revoked)
+          console.error(
+            "Server device revocation could not be confirmed. Remove this device from the Devices page of your OmO account when connected.",
+          )
+      }
       return
     }
     if (action === "whoami") {
@@ -246,8 +254,21 @@ function configureClosedServiceAuthCommands(program: Command, hooks: ServiceAuth
       .allowUnknownOption()
       .allowExcessArguments()
       .option("--api <url>")
+      .option("--help")
       .action((options: Options) => {
-        if (command.args.length !== 0) refuseClosedServiceAuth()
+        if (options.help === true) {
+          console.log(name === "logout" ? CLOSED_LOGOUT_HELP : CLOSED_WHOAMI_HELP)
+          return
+        }
+        // With helpOption(false) an --help flag lands in the leftover args, so any leftover (operand or flag) is
+        // refused in this command's own words, not the login form's (#13281 review LOW 3).
+        if (command.args.length !== 0) {
+          console.error(
+            `This form of omo ${name} isn't available while OmO accounts are closed. Run plain omo ${name}, optionally with --api <url>.`,
+          )
+          process.exitCode = 1
+          return
+        }
         return run(name, options, hooks)
       })
     // `omo help <name>` calls the subcommand's help() directly, bypassing its action.
