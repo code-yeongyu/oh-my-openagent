@@ -1,6 +1,7 @@
 //! The mutate funnel, pre-input marker, audit, refs registry, settle, frames, consent and verbs.
 
 pub mod apps;
+pub mod attribution;
 pub mod audit;
 pub mod batch;
 pub mod budget;
@@ -10,22 +11,30 @@ mod displays;
 pub mod epoch;
 pub mod frames;
 pub mod grant;
+pub mod holds;
+pub mod intervention;
 pub mod lease;
+pub mod liveness;
 pub mod lock;
 pub mod marker;
 pub mod menus;
 pub mod mutate;
 pub mod observe;
+pub mod pause;
+mod pointer;
 pub mod presence;
 pub mod preview;
 pub mod refs;
 pub mod reservation;
 pub mod surfaces;
 mod session;
+pub mod session_state;
+pub mod settle;
 pub mod trace;
+mod wait_for;
 
 pub use epoch::EpochChanged;
 pub use frames::CapturedFrame;
-pub use mutate::{Binding, Mutation, Refused, SecureInputProbe, SecureProbe};
+pub use mutate::{Binding, Mutation, Refused, SecureInputProbe, SecureProbe, Stamps};
 pub use refs::{RefRegistry, Unresolved};
 pub use session::{legacy_capabilities, Session, NOT_OPEN, NO_GLOBAL_LISTENER, POINT_REQUIRED};

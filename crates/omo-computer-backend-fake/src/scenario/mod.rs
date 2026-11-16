@@ -7,6 +7,7 @@ mod events;
 mod invalid;
 mod records;
 mod references;
+mod session_timeline;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -17,11 +18,12 @@ use serde::Deserialize;
 use serde_json::Value;
 
 pub use additions::{
-    AxNotification, BusyMark, ClipboardScript, FrameAxis, FramePolicy, HandIdentity, SecureFocus,
-    TargetExit,
+    AxNotification, BusyMark, ClipboardScript, FrameAxis, FramePolicy, HandIdentity,
+    NotificationPost, SecureFocus, StopPress, TargetExit,
 };
 pub use events::{DisplaysChange, EpochEvent, EpochReason, IdentityChange};
 pub use invalid::{field_names, InvalidKind, ScenarioInvalid};
+pub use session_timeline::{state_at, SessionMark};
 pub use records::{
     DelayMs, FakeAxNode, FakeDisplay, FakeMenuNode, FakeWindow, FocusRead, FocusRecordKind,
     FocusRecordOutcome, RemoteForwarding, ScriptedFailure, ScriptedHit, TimedUserInput,
@@ -73,6 +75,10 @@ pub struct FakeScenario {
     pub ax_notification_timeline: Vec<AxNotification>,
     /// Loading indicators by fake-clock time.
     pub busy_timeline: Vec<BusyMark>,
+    /// Stop-chord presses by fake-clock time.
+    pub stop_timeline: Vec<StopPress>,
+    /// Notifications by fake-clock time; absent scripts a host with no notification surface.
+    pub notification_timeline: Option<Vec<NotificationPost>>,
     pub secure_focus: Option<SecureFocus>,
     pub secure_input_on: bool,
     pub clipboard: Option<ClipboardScript>,
@@ -85,14 +91,27 @@ pub struct FakeScenario {
     pub window_frame_policy: BTreeMap<String, FramePolicy>,
     /// Keys the user holds physically at start.
     pub held_keys: Vec<String>,
+    /// The route's wheel-step cap per scroll: steps past it deliver 0 of 1 (row 23, R48c).
+    pub scroll_cap: Option<u32>,
+    /// The user presses the stop chord right after the engine's Nth input post (row 23, R53:
+    /// a stop between the units of one stroke).
+    pub stop_chord_after_posts: Option<u32>,
     pub full_access_preset: bool,
     pub target_exit: Vec<TargetExit>,
     /// Window id -> the session or hand that holds its reservation.
     pub window_reservation: BTreeMap<String, String>,
     /// Signed code identity per pid.
     pub code_identity: BTreeMap<u32, CodeIdentity>,
+    // --- Row 21 (review M3): the executable path per pid a path-only consent binds to. ---
+    pub executable_path: BTreeMap<u32, String>,
+    // --- Row 21 (R70av): chords the fake's set_stop_chord refuses (default: none). ---
+    pub unarmable_stop_chords: Vec<String>,
     /// The hand identity the fleet harness reads.
     pub hand: Option<HandIdentity>,
+    /// Session-state fields (lock, sleep, console, saver, Secure Input, suspend) by fake-clock time.
+    pub session_timeline: Vec<SessionMark>,
+    /// Fake-clock milliseconds between two typed Unicode scalars of one text.
+    pub typing_unit_ms: Option<u64>,
     // --- Row 21: the fake host's consent view handed to the engine at `session.open`. ---
     pub consent: Option<serde_json::Value>,
     // --- Row 25: apps, system surfaces and the browser windows' focused URLs. ---

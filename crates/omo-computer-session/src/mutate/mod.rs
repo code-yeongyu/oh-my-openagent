@@ -21,12 +21,15 @@ mod tests;
 
 pub use binding::{Binding, SecureInputProbe, SecureProbe};
 pub use call::Mutation;
+pub(crate) use report::released_reply;
 pub use memory_markers::MemoryMarkers;
 pub(crate) use route::{key_event, route_for};
 
 use std::path::{Path, PathBuf};
 
-use omo_computer_core::backend::Refusal;
+use omo_computer_core::backend::{Delivered, Refusal};
+use omo_computer_core::intervention::{Pause, TargetLiveness};
+use omo_computer_core::session_state::SessionState;
 use omo_computer_core::error::{EngineCode, Reason};
 use omo_computer_core::paths::Roots;
 use omo_computer_core::report::Disposition;
@@ -59,7 +62,8 @@ pub const TRANSACTION_FAILED: Refusal = Refusal::bare(EngineCode::TransactionFai
 pub const LOCAL_HAND: &str = "local";
 
 /// A refusal and what the funnel adds to it on the wire: the `callId` it concerns, the
-/// stored receipt of a replay, and the disposition of an interrupted earlier send.
+/// stored receipt of a replay, the disposition of an interrupted earlier send, and the busy
+/// wait of an `InputBusy{target_busy}` refusal.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Refused {
     pub refusal: Refusal,
@@ -69,8 +73,28 @@ pub struct Refused {
     /// The members a consent or lease refusal carries on the wire (`app`, `identity`,
     /// `window`, `holder`, `retryAfterMs`).
     pub detail: Option<Box<Value>>,
+    /// What row 22 stamps on a refusal, boxed so the error type stays small.
+    pub stamps: Box<Stamps>,
+    /// Boxed so the error type stays small (R70cg).
+    pub busy: Option<Box<crate::settle::BusyDetail>>,
     /// `write_failed` when the refusal's own audit line could not be written.
     pub warning: Option<String>,
+}
+
+/// The members a refusal carries beside its code.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Stamps {
+    /// Object mode: the units sent before an interrupted send stopped.
+    pub delivered: Option<Delivered>,
+    /// What the admission waited for before it refused or the send stopped.
+    pub paused: Vec<Pause>,
+    /// Object mode: the session state sampled for the call.
+    pub session: Option<SessionState>,
+    /// The target that exited or stopped answering.
+    pub target: Option<TargetLiveness>,
+    /// In either report mode, the units an interrupted send got out before it stopped; 0 for
+    /// a refusal before any send. Never on the wire: the hold ledger reads it.
+    pub sent: u32,
 }
 
 impl From<Refusal> for Refused {
@@ -80,9 +104,19 @@ impl From<Refusal> for Refused {
             call_id: None,
             receipt: None,
             interrupted: None,
+            stamps: Box::default(),
             detail: None,
+            busy: None,
             warning: None,
         }
+    }
+}
+
+impl Refused {
+    #[must_use]
+    pub fn with_paused(mut self, paused: Vec<Pause>) -> Self {
+        self.stamps.paused = paused;
+        self
     }
 }
 
@@ -166,7 +200,7 @@ impl Funnel {
     }
 
     /// The audit sink, opened at first use; a file that cannot be opened refuses every exec.
-    fn audit(&mut self) -> &mut dyn AuditSink {
+    pub(crate) fn audit(&mut self) -> &mut dyn AuditSink {
         let sink = match self.audit.take() {
             Some(sink) => sink,
             None => self.open_audit(),

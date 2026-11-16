@@ -8,7 +8,10 @@ use std::borrow::Cow;
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
 
+use crate::intervention::{Pause, TargetLiveness};
 use crate::listing::Surface;
+use crate::session_state::SessionState;
+use crate::observation::ObservationSettle;
 use crate::untrusted::UntrustedText;
 
 use super::disposition::Disposition;
@@ -43,6 +46,9 @@ pub struct ReportParts {
     pub audit_ids: Vec<String>,
     #[serde(default)]
     pub timings: Option<Timings>,
+    /// The post-send settle: the regime picked and its outcome.
+    #[serde(default)]
+    pub settle: Option<ObservationSettle>,
     pub evidence: Vec<Evidence>,
     /// Row 25: `"unknown"` when a browser window's URL could not be read under a non-empty
     /// `computer.url_policy` (the send was delivered, fail-open).
@@ -50,6 +56,15 @@ pub struct ReportParts {
     pub url_policy: Option<crate::url_policy::UrlPolicyStamp>,
     /// Required on the wire: a report without `{untrustedText: true}` does not parse.
     pub observation: UntrustedText,
+    /// What the admission waited for before the send.
+    #[serde(default)]
+    pub paused: Vec<Pause>,
+    /// The session state sampled for this call (object mode).
+    #[serde(default)]
+    pub session: Option<SessionState>,
+    /// Present only when the target exited or stopped answering during the call.
+    #[serde(default)]
+    pub target: Option<TargetLiveness>,
 }
 
 /// A validated `ActionReport`.
@@ -76,10 +91,18 @@ pub struct ActionReport {
     audit_ids: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     timings: Option<Timings>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    settle: Option<ObservationSettle>,
     evidence: Vec<Evidence>,
     #[serde(skip_serializing_if = "Option::is_none")]
     url_policy: Option<crate::url_policy::UrlPolicyStamp>,
     observation: UntrustedText,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    paused: Vec<Pause>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    session: Option<SessionState>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    target: Option<TargetLiveness>,
 }
 
 impl ActionReport {
@@ -143,6 +166,26 @@ impl ActionReport {
         &self.audit_ids
     }
 
+    #[must_use]
+    pub fn paused(&self) -> &[Pause] {
+        &self.paused
+    }
+
+    #[must_use]
+    pub const fn session(&self) -> Option<&SessionState> {
+        self.session.as_ref()
+    }
+
+    #[must_use]
+    pub const fn target(&self) -> Option<TargetLiveness> {
+        self.target
+    }
+
+    #[must_use]
+    pub const fn settle(&self) -> Option<&ObservationSettle> {
+        self.settle.as_ref()
+    }
+
     fn from_checked(parts: ReportParts) -> Self {
         Self {
             disposition: parts.disposition,
@@ -157,9 +200,13 @@ impl ActionReport {
             warning: parts.warning,
             audit_ids: parts.audit_ids,
             timings: parts.timings,
+            settle: parts.settle,
             evidence: parts.evidence,
             url_policy: parts.url_policy,
             observation: parts.observation,
+            paused: parts.paused,
+            session: parts.session,
+            target: parts.target,
         }
     }
 }

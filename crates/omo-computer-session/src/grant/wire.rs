@@ -26,6 +26,7 @@ pub(crate) fn typed<T: DeserializeOwned>(params: Value) -> Result<T, HostCallErr
 impl Session {
     /// One host call this session's rows serve, or `None` for any other method.
     pub fn host_call(&mut self, method: Method, params: Value) -> Option<Result<Value, HostCallError>> {
+        self.reconcile_stop();
         let outcome = match method {
             Method::ControlGrant => typed::<ControlGrantParams>(params).map(|p| json!(self.control_grant(p))),
             Method::ControlAcquire => typed::<EmptyParams>(params).and_then(|_| {
@@ -51,8 +52,13 @@ impl Session {
                 self.preview_subscribe();
                 Value::Null
             }),
-            // Row 25 (R31): its own methods, served by its own session module.
-            _ => return crate::menus::wire::host_call(self, method, params),
+            // Row 25 (R31): its own methods; then row 23's.
+            _ => {
+                if let Some(served) = crate::menus::wire::host_call(self, method, params.clone()) {
+                    return Some(served);
+                }
+                return self.row23_call(method, params);
+            }
         };
         Some(outcome)
     }

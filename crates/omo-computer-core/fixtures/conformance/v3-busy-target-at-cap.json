@@ -1,0 +1,337 @@
+{
+  "description": "Row 19 failure path: an unchanged click on window 101 settles at 500 ms; the window then shows a spinner (t=100 ms) that never clears, so the observe returns at the unchanged regime's 1,000 ms cap with settle.outcome timeout naming the indicator and the tree as read, and the click that follows answers InputBusy{target_busy} with data.indicator \"spinner\", data.waitedMs 1000 and data.retryAfterMs 1000, and nothing sent (the sink stays at the first click's three lines).",
+  "transport": "stdio",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/v3-busy-target-at-cap.json",
+  "env": {
+    "OMO_COMPUTER_FAKE_STOP_PATH": "live"
+  },
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {
+          "reportMode": "object"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayCount": 0,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capture": {
+                  "available": true,
+                  "route": "composite"
+                },
+                "windowCapture": {
+                  "available": true
+                },
+                "windowInput": {
+                  "available": true
+                },
+                "observe": true,
+                "settle": true,
+                "ocr": false,
+                "background_window_input": true,
+                "background_window_input_basis": "route_available",
+                "inputModes": [
+                  "pointer",
+                  "keyboard",
+                  "ax"
+                ],
+                "backgroundReach": "full",
+                "toolkitRoutes": {
+                  "seeded": [],
+                  "learned": []
+                },
+                "session": {
+                  "screenLocked": "unknown",
+                  "displayAsleep": "unknown",
+                  "userActive": {
+                    "active": "unknown",
+                    "lastInputAgeMs": null
+                  },
+                  "secureInputActive": "unknown",
+                  "sessionActive": "unknown",
+                  "screensaverActive": "unknown",
+                  "pauseReasons": [],
+                  "sampledAt": 0
+                },
+                "sessionProbes": {
+                  "screenLocked": "none",
+                  "displayAsleep": "none",
+                  "userActive": "none",
+                  "secureInputActive": "none",
+                  "sessionActive": "none",
+                  "screensaverActive": "none",
+                  "sessionActiveDeliveryVerified": false
+                },
+                "displayAwake": {
+                  "state": "idle",
+                  "graceMs": 0,
+                  "capMs": 0,
+                  "heldSinceMs": null,
+                  "mechanism": "unavailable"
+                },
+                "surfaces": [],
+                "routeLadder": [],
+                "sendOnEnter": {
+                  "keys": 0
+                },
+                "stopPath": {
+                  "kind": "none",
+                  "hostRelayLive": false,
+                  "allowHostRelayOnly": false,
+                  "listener": "none",
+                  "deaf": false,
+                  "stale": false
+                }
+              },
+              "resumeToken": "22e7315e88842731e1f3185ceee686da"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "stopPath.start",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "suspended": false,
+              "globalLive": true,
+              "hostRelayLive": false,
+              "heartbeatFresh": true,
+              "stopPath": "global",
+              "reason": null
+            }
+          },
+          "variable": []
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "capture",
+        "params": {
+          "target": "101"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": {
+              "frameId": "frame-01m6fpgstw33ky1ae8azckv6j9-1",
+              "target": "101",
+              "width": 800,
+              "height": 600,
+              "coordinateWidth": 800,
+              "coordinateHeight": 600,
+              "scale": 1,
+              "cursor": "os",
+              "session": {
+                "screenLocked": "unknown",
+                "displayAsleep": "unknown",
+                "userActive": {
+                  "active": "unknown",
+                  "lastInputAgeMs": null
+                },
+                "secureInputActive": "unknown",
+                "sessionActive": "unknown",
+                "screensaverActive": "unknown",
+                "pauseReasons": [],
+                "sampledAt": 0
+              },
+              "observation": {
+                "untrustedText": true
+              }
+            }
+          },
+          "variable": [
+            "/result/frameId"
+          ]
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "click",
+        "params": {
+          "target": "101",
+          "x": 10,
+          "y": 10
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "result": {
+              "disposition": {
+                "delivery": "delivered_unverified",
+                "retry": "unsafe"
+              },
+              "delivered": {
+                "count": 3,
+                "of": 3
+              },
+              "effect": "unverifiable",
+              "route": "background_window",
+              "auditIds": [],
+              "timings": {
+                "settleMs": 500
+              },
+              "settle": {
+                "outcome": "settled",
+                "quietMs": 500,
+                "waitedMs": 500,
+                "regime": "unchanged"
+              },
+              "evidence": [],
+              "observation": {
+                "untrustedText": true
+              }
+            }
+          },
+          "variable": [
+            "/result/auditIds"
+          ]
+        }
+      ],
+      "sink": 3
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "observe",
+        "params": {
+          "target": "101"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "result": {
+              "tree": "- window \"Untitled - Notes\" [ref=s1:e1] app=Notes win=101/4242/0 (focused)\n  - toolbar \"Formatting\" [ref=s1:e2]\n    - button \"Bold\" [ref=s1:e3]\n    - button \"Italic\" [ref=s1:e4]\n    - button \"Underline\" [ref=s1:e5]\n  - textarea \"Body\" [ref=s1:e6] (focused): \"Dear Ms. Park,\"\n  - group \"Sidebar\" [ref=s1:e7]\n    - statictext \"Notes\" [ref=s1:e8]\n    - button \"New note\" [ref=s1:e9]\n    - button \"Delete\" [ref=s1:e10]\n  - button \"Share\" [ref=s1:e11]\n… 11 nodes observed, 11 shown (skeleton depth 3); complete",
+              "focused": {
+                "ref": "s1:e6",
+                "role": "textarea",
+                "label": "Body",
+                "title": "Body",
+                "value": "Dear Ms. Park,",
+                "focused": true,
+                "childCount": 0,
+                "actions": [
+                  "set_value",
+                  "type_text"
+                ],
+                "window": "101",
+                "generation": 1,
+                "observation": {
+                  "untrustedText": true
+                }
+              },
+              "complete": true,
+              "nodesObserved": 11,
+              "cuts": [],
+              "generation": 1,
+              "session": {
+                "screenLocked": "unknown",
+                "displayAsleep": "unknown",
+                "userActive": {
+                  "active": "unknown",
+                  "lastInputAgeMs": null
+                },
+                "secureInputActive": "unknown",
+                "sessionActive": "unknown",
+                "screensaverActive": "unknown",
+                "pauseReasons": [],
+                "sampledAt": 0
+              },
+              "observation": {
+                "untrustedText": true
+              },
+              "settle": {
+                "outcome": "timeout",
+                "indicator": "spinner",
+                "quietMs": 500,
+                "waitedMs": 1000,
+                "regime": "unchanged"
+              }
+            }
+          },
+          "variable": []
+        }
+      ],
+      "sink": 3
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "method": "click",
+        "params": {
+          "target": "101",
+          "x": 10,
+          "y": 10
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "error": {
+              "code": -32021,
+              "message": "InputBusy",
+              "data": {
+                "code": "InputBusy",
+                "hint": null,
+                "reason": "target_busy",
+                "indicator": "spinner",
+                "waitedMs": 1000,
+                "retryAfterMs": 1000
+              }
+            }
+          },
+          "variable": []
+        }
+      ],
+      "sink": 3
+    }
+  ]
+}

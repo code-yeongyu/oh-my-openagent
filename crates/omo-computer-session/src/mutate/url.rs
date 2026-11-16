@@ -19,6 +19,18 @@ pub(crate) struct UrlStage {
     pub(crate) unknown: bool,
 }
 
+impl crate::Session {
+    /// Row 25's URL-policy and per-point target stages on a fresh plan (the first pass and every
+    /// re-admit, so a re-admission never drops them); answers the Consequential refusal's detail.
+    pub(super) fn url_stages(&mut self, plan: &mut crate::grant::Plan, mutation: &super::Mutation<'_>) -> Option<Value> {
+        let url = check(&self.funnel.url_policy, self.backend.as_mut(), &mutation.call);
+        plan.stages.consequential = url.refusal;
+        plan.stages.targets = mutation.targets.clone();
+        self.funnel.url_unknown = url.unknown;
+        url.detail
+    }
+}
+
 pub(crate) fn check(policy: &UrlPolicy, backend: &mut dyn Backend, call: &Call<'_>) -> UrlStage {
     if policy.is_empty() {
         return UrlStage::default();
