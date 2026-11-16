@@ -6,6 +6,7 @@ import {
   WAKE_ACCEPTS,
   type CommandResult,
   type DeviceService,
+  type EndpointCommandResult,
   type RemoteAttach,
 } from "@oh-my-opencode/device-service-core/device-service"
 import { CATALOG_RECORD, createAttachPool, type HeldAttach } from "./attach-pool"
@@ -105,6 +106,12 @@ const MARKED_RECORDS: ReadonlySet<string> = new Set(["admit_external_message"])
 // A single-probe locate that ran and found nothing: the device answered and holds no such session. Any other failure
 // means the device did not answer within the bound (or could not be reached), so the lookup counts it as silent.
 const LOOKUP_NONE: ReadonlySet<string> = new Set(["session_not_found", "peer_not_found", "peer_not_session_client"])
+
+// A kept endpoint key the device no longer lists: its synchronous refusal (this device's service answers a command to an
+// endpoint key no listing names `unsupported`, with no command id: nothing was sent) or the device's `route_unlisted`.
+const UNLISTED_ENDPOINT: RemoteCommandOutcome = { kind: "refused", reason: "route_unlisted" }
+const unlistedEndpointError = (error: unknown): boolean =>
+  error instanceof LocalApiError && error.command_id === undefined && error.code === "unsupported"
 
 const recordKey = (record: WireRpc): string =>
   JSON.stringify(Object.entries(record).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
@@ -313,17 +320,28 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       }
       const connected = dialed.conn
       // The device's engine endpoint key, kept from the last command toward it, spares each later one its session.endpoints
-      // round trip. A key the device no longer serves (its host restarted) is refused, and a refused record ran nothing, so
-      // a refusal toward a kept key forgets it and the record goes once more on a fresh lookup.
-      const send = async (endpoint: string | undefined) => {
-        const sent = await connected.endpointCommand(device, record, { ...endpointOptions, endpoint })
+      // round trip. A key the device no longer lists (its host restarted) is refused before anything runs, as an
+      // `unsupported` error response from this device's service or a `route_unlisted` refusal from the device's; only
+      // that refusal of a KEPT key forgets it and sends the record once more on a fresh lookup. Every other outcome is
+      // the answer as is: an engine that ran the record and failed it, or an uncertain one, is never sent again.
+      const send = async (endpoint: string | undefined): Promise<RemoteCommandOutcome> => {
+        let sent: EndpointCommandResult
+        try {
+          sent = await connected.endpointCommand(device, record, { ...endpointOptions, endpoint })
+        } catch (error) {
+          if (endpoint !== undefined && unlistedEndpointError(error)) return UNLISTED_ENDPOINT
+          throw error
+        }
+        if (sent.outcome.state === "engine_refused" && sent.outcome.reason === "route_unlisted") {
+          endpoints.delete(device)
+          return endpoint === undefined ? outcomeOf(sent) : UNLISTED_ENDPOINT
+        }
         endpoints.set(device, sent.endpoint)
         return outcomeOf(sent)
       }
       try {
-        const kept = endpoints.get(device)
-        const outcome = await send(kept)
-        if (kept === undefined || outcome.kind !== "refused") return outcome
+        const outcome = await send(endpoints.get(device))
+        if (outcome !== UNLISTED_ENDPOINT) return outcome
         endpoints.delete(device)
         return await send(undefined)
       } catch (error) {
