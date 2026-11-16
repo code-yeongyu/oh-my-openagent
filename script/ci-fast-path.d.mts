@@ -4,6 +4,7 @@ export type CiMode = {
   readonly runHeavy: boolean
   readonly fullMatrix: boolean
   readonly runtimeTouching: boolean
+  readonly labelRefused: boolean
 }
 
 export function isRuntimePath(path: string): boolean
@@ -15,4 +16,6 @@ export function classifyCiMode(input: {
   readonly mergeParentCount: number
   readonly headRef?: string
   readonly labels?: readonly string[]
+  readonly body?: string
+  readonly changedFiles?: number
 }): CiMode
