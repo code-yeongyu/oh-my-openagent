@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@eda08c786872ad5b766b5adba76f9698d4f1cad6 packages/local-api/src/protocol-control.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@42078b7cbfbc8db06cd626d99ab3b80017e7ae2a packages/local-api/src/protocol-control.ts
 import type { StatusUpdatePhase } from "./vocabulary.ts";
 
 // #184 D1: the host's attach setting. Local only: served on this device's own local API, never over the relay.

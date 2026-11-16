@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@eda08c786872ad5b766b5adba76f9698d4f1cad6 packages/local-api/src/command-text.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@42078b7cbfbc8db06cd626d99ab3b80017e7ae2a packages/local-api/src/command-text.ts
 import { ProtoError } from "./spec-proto.ts";
 
 // The five-op session.command text limits and text check, kept local after relay-spec decision 0011 replaced that
