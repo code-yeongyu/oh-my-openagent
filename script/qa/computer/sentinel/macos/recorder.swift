@@ -195,9 +195,11 @@ final class Recorder: NSObject {
   func drainThenStop(deadline: Double) {
     if pendingReads > 0 && uptimeMs() < deadline { return after(0.05) { self.drainThenStop(deadline: deadline) } }
     recording = false
-    pasteboard.drain()
-    emit(["kind": "stop", "pendingReads": pendingReads])
-    stopping = false
+    let stop: [String: Any] = ["kind": "stop", "pendingReads": pendingReads]
+    pasteboard.drain {
+      emit(stop)
+      DispatchQueue.main.async { self.stopping = false }
+    }
   }
 
 

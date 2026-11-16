@@ -20,8 +20,14 @@ final class PasteboardPoller {
 
   func start() { timer.resume() }
 
-  // Waits for a read still running and reads once more, so a change made before `stop` is emitted before it.
-  func drain() { queue.sync { read() } }
+  // Behind a read still running, reads once more and then calls `done` on this queue, so a change made before `stop` is
+  // emitted before it; the main thread keeps sampling meanwhile instead of waiting on the pasteboard server.
+  func drain(then done: @escaping () -> Void) {
+    queue.async { [unowned self] in
+      self.read()
+      done()
+    }
+  }
 
   private func read() {
     let count = NSPasteboard.general.changeCount
