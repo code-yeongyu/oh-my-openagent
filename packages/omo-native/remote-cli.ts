@@ -136,7 +136,11 @@ export async function prepareRemoteAttach(
     const remote = (
       dependencies.remote ??
       ((connected) => ({
-        sessions: createDeviceServiceSessions({ version: connected.serviceVersion, connect: async () => connected }),
+        sessions: createDeviceServiceSessions({
+          version: connected.serviceVersion,
+          // The attach command owns this connection and closes it itself: the port only borrows it.
+          connect: async () => ({ conn: connected, owned: false }),
+        }),
         chain: { stamp: (record) => record },
       }))
     )(service)
