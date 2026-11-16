@@ -1,5 +1,6 @@
 import { createConnection } from "node:net"
 import type { ThreadSocketConnect } from "../thread/live-surface"
+import type { AddressBookHost } from "../thread/address-book"
 import type { ThreadHost, ThreadHostSession } from "../thread/tools/ports"
 import { handleOf } from "./seams"
 import type { DeviceRow, SessionRow } from "./types"
@@ -13,18 +14,17 @@ const updatedMs = (session: ThreadHostSession): number => {
   return Number.isNaN(parsed) ? 0 : parsed
 }
 
-const notRunning = (error: unknown): boolean => {
-  if (!(error instanceof Error)) return false
-  const code = Reflect.get(error, "code")
-  return error.message.startsWith("host_unavailable:") || code === "ENOENT" || code === "ECONNREFUSED"
-}
+// An endpoint that runs nothing: no socket at all, or a socket left behind that refuses the connect (`dead`).
+const notRunning = (host: AddressBookHost): boolean =>
+  host.reason === "dead" || String(host.error).startsWith("host_unavailable:")
 
 /**
- * This device's sessions as listing rows, read from its own operator endpoint (#13787): the service's listing does not
- * carry the asking device's sessions, and every member serves them locally by durable id, which is their handle. A
- * session its host is closing or has closed is `ended`; any other one the host holds is `running`, as the service's
- * listing marks a session an engine holds. Empty when no endpoint runs here (none listening, or a socket left behind
- * that refuses the connect); undefined when one did not answer.
+ * This device's sessions as listing rows, read from its own endpoints (#13787): the operator endpoint and every endpoint
+ * registered on disk. The service's listing does not carry the asking device's sessions, and every member serves them
+ * locally by durable id, which is their handle. A session its host is closing or has closed is `ended`; any other one
+ * the host holds is `running`, as the service's listing marks a session an engine holds. Empty when no endpoint runs here
+ * (every one has no socket or refuses the connect); undefined when every endpoint failed and one of them failed any
+ * other way, or the listing itself failed.
  */
 export async function localSessionRows(
   hostOn: (connect: ThreadSocketConnect) => Promise<ThreadHost>,
@@ -32,10 +32,18 @@ export async function localSessionRows(
 ): Promise<readonly SessionRow[] | undefined> {
   let sessions: readonly ThreadHostSession[]
   try {
-    sessions = await (await hostOn((path) => createConnection(path))).listSessions()
+    const host = await hostOn((path) => createConnection(path))
+    if (host.listView === undefined) sessions = await host.listSessions()
+    else {
+      // Every endpoint's own outcome: the listing alone raises only the first endpoint's failure.
+      const view = await host.listView({ offline: true })
+      if (view.hosts.length > 0 && view.hosts.every((endpoint) => endpoint.alive === false))
+        return view.hosts.every(notRunning) ? [] : undefined
+      sessions = view.sessions
+    }
   } catch (error) {
-    // No endpoint running here holds no session; any other failure leaves this device unanswered.
-    return notRunning(error) ? [] : undefined
+    // A host with one endpoint raises its failure: no socket there holds no session.
+    return error instanceof Error && error.message.startsWith("host_unavailable:") ? [] : undefined
   }
   return sessions.map((session) => {
     const durable = session.durableSessionId ?? session.sessionId
