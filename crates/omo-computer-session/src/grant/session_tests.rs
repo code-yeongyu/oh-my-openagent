@@ -737,6 +737,42 @@ fn a_stop_while_another_holder_keeps_the_lock_ends_the_lease_and_revokes_the_gra
     assert!(other.try_acquire().expect("try").is_some(), "the refused exec released the lock");
 }
 
+/// Review L2 of #13767 (at 22ad891b7b): a stop marker another engine commits while this exec
+/// waits for the interaction lock ends the lease and revokes the grant, as the chord does: the
+/// latch advances the stop epoch, so the funnel's reconcile ends what the stop covers.
+#[test]
+fn a_marker_committed_during_the_lock_wait_ends_the_lease_and_revokes_the_grant() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let sink = RecordingSink::default();
+    let clock = FakeClock::default();
+    let backend = FakeBackend::with_parts(scenario(&json!({})), clock.clone(), sink.clone())
+        .with_stop_path(StopPathScript::Live);
+    let runtime = dir.path().join("run");
+    let state = dir.path().join("s");
+    let mut s = Session::for_roots(Box::new(backend), &Roots { state: state.clone(), runtime: runtime.clone() });
+    s.open(params(json!({ "reportMode": "null" }))).expect("open");
+    s.stop_path_start(params(json!({})));
+    grant(&mut s);
+    capture(&mut s, "1");
+    let other = crate::lock::InteractionLock::under(&runtime);
+    let held = other.acquire().expect("the other holder takes the lock");
+    let marker = state.join(omo_computer_core::paths::STOP_MARKER_FILE);
+    clock.on_advance(Box::new(move |_| {
+        if !marker.exists() {
+            use omo_computer_safety::marker::MarkerStore;
+            omo_computer_safety::marker::FileMarker::at(marker.clone()).commit().expect("another engine stops");
+        }
+    }));
+    let refused = s
+        .click(params(json!({ "target": "1", "x": 5, "y": 5, "delivery": "foreground" })))
+        .expect_err("the marker refuses");
+    assert_eq!(refused.refusal.code.wire(), "Suspended");
+    assert!(sink.lines().iter().all(|line| !line.contains("click") && !line.contains("mouse")), "nothing sent: {:?}", sink.lines());
+    assert!(!s.holds_lease(), "the marker's stop ended the lease");
+    assert!(!s.funnel.control.grant.is_held(), "the marker's stop revoked the grant");
+    drop(held);
+}
+
 /// Review L2 at a07dff9 (R70cl): a stopHotkey of the wrong type is "not a chord": the view still
 /// reads tampered, its chord is never the OS default, and stopPath.start arms nothing that hears.
 #[test]
