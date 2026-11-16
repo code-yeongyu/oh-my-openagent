@@ -43,9 +43,9 @@ export function createLazyLiveThreadSurface(
         const port = await target()
         return await port.prompt(sessionId, message, options, durableId)
       },
-      interrupt: async (sessionId, turnId, durableId) => {
+      interrupt: async (sessionId, request, durableId) => {
         const port = await target()
-        return await port.interrupt(sessionId, turnId, durableId)
+        return await port.interrupt(sessionId, request, durableId)
       },
       setSessionName: async (sessionId, name, durableId) => {
         const port = await target()

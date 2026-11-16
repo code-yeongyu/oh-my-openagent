@@ -19,6 +19,7 @@ import { streamMembers } from "./follow"
 import { resolveMember } from "./resolve"
 import { handleOf } from "./seams"
 import { sessionMembers } from "./sessions"
+import { thisDeviceRow } from "./this-device-row"
 import type {
   DeviceRow,
   Opts,
@@ -31,19 +32,22 @@ import type {
   SessionsList,
   SessionsListFilter,
 } from "./types"
+import { unknownDevice } from "./unknown-device"
 
 /** The client's deps over the device service SDK's own connection and attach (types.ts `RemoteClientDeps`). */
 export type RemoteClientDeps = RemoteClientDepsOver<DeviceService, RemoteAttach>
 export type { RemoteClient }
 
 export type Outcome<T> = { readonly kind: "ok"; readonly value: T } | RemoteFailure
-const ok = <T>(value: T): Outcome<T> => ({ kind: "ok", value })
+export const ok = <T>(value: T): Outcome<T> => ({ kind: "ok", value })
 
 /** What every member module is built from: the client's sender, clock, deps, connection and member runner. */
 export type ClientCore = {
   readonly sender: RemoteSender
   readonly timers: Timers
   readonly deps: RemoteClientDeps
+  /** Opens a new proven connection, as the client's own is opened; the caller owns it and closes it. */
+  readonly dial: () => Promise<DeviceService>
   /** Runs `body` on the proven connection under the member's deadline; settles with data, never throws. */
   readonly member: <T>(
     opts: Opts | undefined,
@@ -140,9 +144,11 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
   const timers = deps.timers ?? realTimers
   const stateDir = deps.stateDir ?? deviceServiceStateDir()
   let service: Promise<DeviceService> | undefined
+  const dial = (): Promise<DeviceService> =>
+    (deps.connect ?? connectDeviceService)({ version: deps.version, stateDir, timers })
   const connection = (): Promise<DeviceService> => {
     if (service !== undefined) return service
-    const opening = (deps.connect ?? connectDeviceService)({ version: deps.version, stateDir, timers }).then(
+    const opening = dial().then(
       (connected) => {
         void connected.closed.then(() => {
           if (service === opening) service = undefined
@@ -212,17 +218,11 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
   }
 
   const listDevices = async (svc: DeviceService): Promise<readonly DeviceRow[]> => {
-    const [rows, self] = await Promise.all([svc.devices(), svc.thisDevice()])
-    const control = svc.capabilities.includes("control")
+    const [rows, self, status] = await Promise.all([svc.devices(), svc.thisDevice(), svc.status()])
     const listed = rows.map(deviceRow)
     if (self === null) return [localSelfRow(), ...listed]
     const own = listed.find((row) => row.id === self.id)
-    const selfRow: DeviceRow = {
-      ...(own ?? { ...localSelfRow(), id: self.id, name: self.name, last_seen_ms: timers.now() }),
-      self: true,
-      online: true,
-      caps: { attach: true, machine: false, control },
-    }
+    const selfRow = thisDeviceRow(self, own, status, timers.now(), svc.capabilities.includes("control"))
     return [selfRow, ...listed.filter((row) => row.id !== self.id)]
   }
 
@@ -246,6 +246,8 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
         listDevices(svc),
       ])
       const byId = new Map(devices.map((row) => [row.id, row]))
+      const unknown = unknownDevice(filter?.device, byId, listing)
+      if (unknown !== undefined) return unknown
       const deviceOf = (id: string): DeviceRow => byId.get(id) ?? unlistedDevice(id)
       const wanted = filter?.name?.toLowerCase()
       const rows = listing.rows
@@ -267,7 +269,7 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
       return ok({ revision: listing.revision, rows, unanswered })
     })
 
-  const core: ClientCore = { sender, timers, deps, member, sessionsList, devicesList }
+  const core: ClientCore = { sender, timers, deps, dial, member, sessionsList, devicesList }
 
   return {
     service: {
