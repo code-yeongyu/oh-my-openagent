@@ -11,6 +11,7 @@ use senpi_desktop_core::report::Disposition;
 
 use super::client_process::ClientProcess;
 use super::toolkit_filter::{accepting_library, class_label, dropping_library, filtering_toolkit, Toolkit};
+use super::xterm_resources::allows_send_events;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Acceptance {
@@ -52,11 +53,13 @@ pub fn acceptance(
             evidence: "its process runs Chromium --type= helpers".to_owned(),
         };
     }
-    if is_xterm(wm_class, &process.args) && !allows_send_events(&process.args, resources) {
-        return Acceptance::Drops {
-            toolkit: Toolkit::Xterm,
-            evidence: "allowSendEvents is not set to true".to_owned(),
-        };
+    if let Some((instance, class)) = xterm_identity(wm_class, &process.args) {
+        if !allows_send_events(&instance, &class, &process.args, resources) {
+            return Acceptance::Drops {
+                toolkit: Toolkit::Xterm,
+                evidence: format!("no resource for {instance}/{class} sets allowSendEvents to true"),
+            };
+        }
     }
     accepting_library(&process.libraries).map_or_else(
         || Acceptance::Unproven {
@@ -95,38 +98,24 @@ pub fn refusal(window: &str, kind: &str, acceptance: Acceptance) -> Option<Deskt
     )
 }
 
-fn is_xterm(wm_class: &[u8], args: &[String]) -> bool {
-    let class_is_xterm = wm_class
+/// The resource instance and class of an xterm client (its `WM_CLASS`
+/// parts, `xterm`/`XTerm` when it has none), or `None` for another program.
+fn xterm_identity(wm_class: &[u8], args: &[String]) -> Option<(String, String)> {
+    let parts: Vec<String> = wm_class
         .split(|&byte| byte == 0)
-        .any(|part| part.eq_ignore_ascii_case(b"xterm"));
+        .filter(|part| !part.is_empty())
+        .map(|part| String::from_utf8_lossy(part).into_owned())
+        .collect();
+    let class_is_xterm = parts.iter().any(|part| part.eq_ignore_ascii_case("xterm"));
     let program_is_xterm = args
         .first()
         .and_then(|program| program.rsplit('/').next())
         .is_some_and(|name| name == "xterm");
-    class_is_xterm || program_is_xterm
-}
-
-/// xterm's `allowSendEvents`, from a `-xrm` argument or the resource
-/// database; the last setting wins, as in Xrm.
-fn allows_send_events(args: &[String], resources: &[u8]) -> bool {
-    let from_args = args
-        .windows(2)
-        .filter(|pair| pair[0] == "-xrm")
-        .map(|pair| pair[1].as_str());
-    let database = String::from_utf8_lossy(resources);
-    database
-        .lines()
-        .chain(from_args)
-        .filter_map(allow_send_events_value)
-        .next_back()
-        .unwrap_or(false)
-}
-
-fn allow_send_events_value(line: &str) -> Option<bool> {
-    let (key, value) = line.split_once(':')?;
-    let key = key.trim().to_ascii_lowercase();
-    if !(key.ends_with(".allowsendevents") || key.ends_with("*allowsendevents") || key == "allowsendevents") {
+    if !(class_is_xterm || program_is_xterm) {
         return None;
     }
-    Some(matches!(value.trim().to_ascii_lowercase().as_str(), "true" | "on" | "yes"))
+    match parts.as_slice() {
+        [instance, class, ..] => Some((instance.clone(), class.clone())),
+        _ => Some(("xterm".to_owned(), "XTerm".to_owned())),
+    }
 }

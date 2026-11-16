@@ -20,6 +20,7 @@ mod settle;
 mod synthetic_input;
 mod toolkit_filter;
 mod transitions;
+mod xterm_resources;
 mod xtest;
 
 #[cfg(test)]
