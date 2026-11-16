@@ -32,7 +32,7 @@ fn after_change(v0: Vec<Node>, v1: Vec<Node>, newer: bool, title: &str) -> (Resu
 }
 
 const fn refusal(code: EngineCode, reason: Reason) -> Refusal {
-    Refusal::new(code, reason.wire())
+    Refusal::new(code, reason)
 }
 
 #[test]

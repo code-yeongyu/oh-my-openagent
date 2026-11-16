@@ -63,6 +63,6 @@ impl FrameRefusal {
             Self::IdentityChanged => EngineCode::WindowNotFound,
             _ => EngineCode::InvalidCoordinateFrame,
         };
-        Refusal::new(code, self.reason().wire())
+        Refusal::new(code, self.reason())
     }
 }
