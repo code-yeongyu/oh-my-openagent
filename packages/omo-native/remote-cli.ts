@@ -4,6 +4,7 @@ import { type DeviceService, deviceServiceEndpointPath } from "../device-service
 import { serveRemoteAttach } from "./remote-attach"
 import { type BootstrapSetup, type DeviceLink, runBootstrapVerb, runEnableVerb } from "./remote-bootstrap"
 import { applyColdWake, type ColdWake } from "./remote-cold-wake"
+import type { RemoteOptOut } from "./remote-opt-out"
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
 import {
   accountNotice,
@@ -27,8 +28,10 @@ export interface RemoteVerbDependencies extends RemoteCommandDependencies {
   readonly bootstrap: BootstrapSetup
   /** The session host unit `bootstrap` and `enable` install, `disable` removes and `status` reads back (omo#13594). */
   readonly coldWake: ColdWake
-  /** `enable` only: hands the signed-in session's device to a service that holds none (omo#13602). */
+  /** `enable` and `bootstrap`: hands the signed-in session's device to a service that holds none (omo#13602). */
   readonly linkDevice: DeviceLink
+  /** This user's recorded `omo remote disable`, which keeps the default-on bootstrap off (omo#13602). */
+  readonly optOut: RemoteOptOut
 }
 
 export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: readonly string[]): Promise<number> {
@@ -60,33 +63,52 @@ export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: 
   // switch, the device link and the session host unit. It reaches the network, so it is not a local-only verb.
   if (parsed.command === "enable") {
     try {
-      return await runEnableVerb(
-        dependencies,
-        dependencies.bootstrap,
-        dependencies.coldWake,
-        dependencies.linkDevice,
-        parsed.json,
-      )
+      return await runEnableVerb(dependencies, dependencies.bootstrap, dependencies, parsed.json)
     } catch (error) {
       return reportFailure(dependencies, error)
     }
   }
   if (parsed.command === "bootstrap")
-    return (await runBootstrapVerb(dependencies, dependencies.bootstrap, dependencies.coldWake, parsed.json)) ===
-      "connected"
+    return (await runBootstrapVerb(dependencies, dependencies.bootstrap, dependencies, parsed.json)) === "connected"
       ? REMOTE_EXIT.ok
       : REMOTE_EXIT.unavailable
   // The service manager's view of this device's units is read here, outside remote-local's graph (omo#13440), and
   // handed to `status` as data.
+  // `disable` records the user's off before anything that can fail (#13602 review M1): a service that is not running,
+  // or a signed-out account, must not let the default-on bootstrap turn remote back on at the next start.
+  // A record that cannot be saved never stops disable from turning remote off (#13602 review M2); it is reported and the
+  // command fails, so the user knows the next omo login would turn remote on again.
+  let recordFailure: string | undefined
+  if (parsed.command === "disable") {
+    try {
+      dependencies.optOut.record()
+    } catch (error) {
+      recordFailure = error instanceof Error ? error.message : String(error)
+    }
+  }
   const localUnits = parsed.command === "status" ? await dependencies.coldWake.status() : undefined
   const code = await runLocalRemoteVerb(
     localUnits === undefined ? dependencies : { ...dependencies, localUnits },
     parsed,
   )
-  // After the verb's connection is closed: a changed table restarts the device service, which would cut it.
-  if (code === REMOTE_EXIT.ok && parsed.command === "disable")
-    await applyColdWake(dependencies.coldWake, false, dependencies.error)
+  // After the verb's connection is closed (a changed table restarts the device service, which would cut it), and whatever
+  // the verb's exit code: the unit goes even when the service could not be reached.
+  if (parsed.command === "disable") await applyColdWake(dependencies.coldWake, false, dependencies.error)
+  if (recordFailure !== undefined) {
+    dependencies.error(disableNotSavedNotice(recordFailure, code === REMOTE_EXIT.ok))
+    return REMOTE_EXIT.failed
+  }
   return code
+}
+
+/**
+ * What `omo remote disable` says when it could not save the opt-out (#13602 review M3): that remote is off only when the
+ * verb turned the switch off; otherwise that it may still be on.
+ */
+export function disableNotSavedNotice(reason: string, switchedOff: boolean): string {
+  return switchedOff
+    ? `omo remote disable: remote is off now, but the choice could not be saved (${reason}); the next omo login will turn it on again.`
+    : `omo remote disable: the choice could not be saved (${reason}) and remote could not be turned off, so it may still be on. Fix the error above, then run omo remote disable again.`
 }
 
 export type RemoteAttachLaunch = { readonly engineArgs: readonly string[] }
