@@ -17,7 +17,7 @@ use crate::input::{Posted, WM_CHAR, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSK
 
 use super::family::{admit, family_of, Verb};
 use super::integrity::admit_read;
-use super::messages::{button, moved, notches, wheel, WHEEL_DELTA};
+use super::messages::{button, moved, notch_delta, notches, wheel, MAX_NOTCHES};
 use super::target::{
     coordinate, key_target, window_of, ClientPoint, DeliveryOs, PostFailure, TARGET_UNKNOWN,
 };
@@ -35,7 +35,8 @@ pub struct Deliverer {
 }
 
 impl Deliverer {
-    /// The barrier result of the last delivered verb (`None` before any, or after a move).
+    /// The barrier result of the last delivered verb (`None` before any, after a move, or after a
+    /// refusal).
     #[must_use]
     pub const fn last_barrier(&self) -> Option<Barrier> {
         self.last
@@ -54,11 +55,11 @@ impl Deliverer {
         window: &str,
         event: &InputEvent,
     ) -> BackendResult<Delivered> {
+        self.last = None;
         let top = window_of(window)
             .filter(|top| os.alive(*top))
             .ok_or(TARGET_UNKNOWN)?;
         admit_read(os.integrity(top))?;
-        self.last = None;
         match event {
             InputEvent::Text(text) => {
                 let target = admitted_key_target(os, top, Verb::Text)?;
@@ -128,16 +129,26 @@ impl Deliverer {
         let at = self.position(top)?;
         let (child, _) = admitted_child(os, top, at, Verb::Scroll)?;
         let screen = screen_point(at).ok_or(NO_POINT)?;
-        let (horizontal, distance) = if dy == 0.0 { (true, dx) } else { (false, dy) };
-        // A positive distance scrolls down (or right): the wheel turns toward the user.
-        let delta = if (distance > 0.0) == horizontal {
-            WHEEL_DELTA
-        } else {
-            -WHEEL_DELTA
+        let (vertical, horizontal) = (notches(dy), notches(dx));
+        let of = vertical.saturating_add(horizontal);
+        if of == 0 {
+            return Ok(Delivered { count: 0, of });
+        }
+        // At most MAX_NOTCHES go out, vertical first; the report counts them of all that were asked.
+        let posted_vertical = vertical.min(MAX_NOTCHES);
+        let posted_horizontal = horizontal.min(MAX_NOTCHES - posted_vertical);
+        let notch = |horizontal: bool, distance: f64| {
+            vec![wheel(horizontal, notch_delta(horizontal, distance), screen)]
         };
-        let notch = vec![wheel(horizontal, delta, screen)];
-        let all: Vec<Vec<Posted>> = (0..notches(distance)).map(|_| notch.clone()).collect();
-        self.send(os, child, &all, true)
+        let all: Vec<Vec<Posted>> = (0..posted_vertical)
+            .map(|_| notch(false, dy))
+            .chain((0..posted_horizontal).map(|_| notch(true, dx)))
+            .collect();
+        let sent = self.send(os, child, &all, true)?;
+        Ok(Delivered {
+            count: sent.count,
+            of,
+        })
     }
 
     fn position(&self, top: isize) -> Result<Point, Refusal> {

@@ -70,12 +70,29 @@ pub fn wheel(horizontal: bool, delta: i16, screen: ClientPoint) -> Posted {
     }
 }
 
-/// `floor((|d| + 50) / 100)` notches, at least one and at most [`MAX_NOTCHES`].
+/// The notches a scroll distance asks for: none for zero, else `floor((|d| + 50) / 100)` and at
+/// least one, uncapped (the deliverer posts at most [`MAX_NOTCHES`] and reports the rest).
 #[must_use]
 pub fn notches(distance: f64) -> u32 {
-    let mut count = 1;
-    while count < MAX_NOTCHES && f64::from(count + 1) * 100.0 - 50.0 <= distance.abs() {
-        count += 1;
+    if distance.is_nan() || distance == 0.0 {
+        return 0;
     }
-    count
+    let asked = ((distance.abs() + 50.0) / 100.0).floor().max(1.0);
+    if asked >= f64::from(u32::MAX) {
+        return u32::MAX;
+    }
+    // In range by the checks above, so the cast neither truncates nor saturates.
+    asked as u32
+}
+
+/// One notch's signed delta: a positive distance scrolls down or right, and down is a negative
+/// `WM_MOUSEWHEEL` delta (the wheel turns toward the user) while right is a positive
+/// `WM_MOUSEHWHEEL` one.
+#[must_use]
+pub fn notch_delta(horizontal: bool, distance: f64) -> i16 {
+    if (distance > 0.0) == horizontal {
+        WHEEL_DELTA
+    } else {
+        -WHEEL_DELTA
+    }
 }

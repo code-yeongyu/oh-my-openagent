@@ -27,16 +27,18 @@ pub trait HitOs {
 pub fn deepest_child(os: &dyn HitOs, top: isize, at: Point) -> Option<(isize, ClientPoint)> {
     let screen = (i32::from(coordinate(at.x)?), i32::from(coordinate(at.y)?));
     let mut current = top;
-    let mut client = os.to_client(current, screen)?;
+    let mut client = in_client(os, current, screen)?;
     for _ in 0..MAX_DEPTH {
-        match os.child_from_point(current, client) {
-            Some(child) if child != current => {
-                current = child;
-                client = os.to_client(current, screen)?;
-            }
-            _ => break,
+        // NULL: the point is outside `current`, so it is under no window of `top`.
+        let child = os.child_from_point(current, client)?;
+        if child == current {
+            break;
         }
+        current = child;
+        client = os.to_client(current, screen)?;
     }
+    // A point on a child's border is outside its client area: no client message can carry it.
+    in_client(os, current, screen)?;
     Some((
         current,
         ClientPoint {
@@ -44,4 +46,11 @@ pub fn deepest_child(os: &dyn HitOs, top: isize, at: Point) -> Option<(isize, Cl
             y: i16::try_from(client.1).ok()?,
         },
     ))
+}
+
+/// The screen point in `window`'s client coordinates, `None` off its client area.
+fn in_client(os: &dyn HitOs, window: isize, screen: (i32, i32)) -> Option<(i32, i32)> {
+    let client = os.to_client(window, screen)?;
+    let (width, height) = os.client_size(window)?;
+    ((0..width).contains(&client.0) && (0..height).contains(&client.1)).then_some(client)
 }
