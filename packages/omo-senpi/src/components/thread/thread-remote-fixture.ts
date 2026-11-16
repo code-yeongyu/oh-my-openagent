@@ -475,9 +475,13 @@ export function createRemoteThreadFixture() {
     const remote: RemoteThreadSurface = {
       client: fakeRemoteClient({
         state: () => options.plan ?? "connected",
-        here: "here",
+        // This device's own id comes from the same account read: unknown names no device, a failed read fails it.
+        here: options.selfDevice === "unknown" ? null : "here",
         devices: () => devices,
         reads: accountReads,
+        ...(options.selfDevice === "throws"
+          ? { fail: { kind: "error", code: "host_unavailable", message: "device.info failed", next_action: "Retry." } }
+          : {}),
         ...(options.devicesFail === true
           ? {
               devicesFail: {

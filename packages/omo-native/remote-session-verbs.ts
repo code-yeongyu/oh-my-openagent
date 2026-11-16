@@ -55,16 +55,36 @@ export function gatewayWorkerAnchor(root: string = packageRoot): URL | undefined
 // (K8) starts at its first hop: a person at a terminal is no thread chain. The command's one connection is shared:
 // the port borrows it (never closes it) and endpoint commands ride a fresh connection per call, so `open_session`
 // never closes the CLI's only connection (#13075).
-const deviceServiceSurface = (service: DeviceService, dial: () => Promise<DeviceService>): RemoteThreadSurface => ({
+const deviceServiceSurface = (
+  service: DeviceService,
+  dial: () => Promise<DeviceService>,
+  stateDir: string,
+): RemoteThreadSurface => ({
   sessions: createDeviceServiceSessions({
     version: service.serviceVersion,
     connect: async () => ({ conn: service, owned: false }),
     dialEndpoint: async () => ({ conn: await dial(), owned: true }),
   }),
   // `omo remote` is a person at this device; the account reads go through the one remote client (#13414).
-  client: createRemoteClient({ kind: "person", uid: String(userInfo().uid) }, { version: service.serviceVersion }),
+  client: createRemoteClient(
+    { kind: "person", uid: String(userInfo().uid) },
+    { version: service.serviceVersion, stateDir, connect: async () => borrowedService(service) },
+  ),
   chain: { stamp: (record) => record },
 })
+
+/**
+ * The command's one device-service connection, lent to its remote client: the client's account reads ride it, and the
+ * client's close() leaves it open for the command, which closes it itself.
+ */
+export const borrowedService = (service: DeviceService): DeviceService =>
+  new Proxy(service, {
+    get: (target, key) => {
+      if (key === "close") return () => undefined
+      const value: unknown = Reflect.get(target, key, target)
+      return typeof value === "function" ? value.bind(target) : value
+    },
+  })
 
 type Show = (result: ThreadToolResult, label: string) => number
 
@@ -83,7 +103,9 @@ export async function runSession(
   json: boolean,
   dependencies: RemoteCommandDependencies,
 ): Promise<number> {
-  const remote = (dependencies.remote ?? ((service) => deviceServiceSurface(service, dependencies.connect)))(service)
+  const remote = (
+    dependencies.remote ?? ((service) => deviceServiceSurface(service, dependencies.connect, dependencies.stateDir))
+  )(service)
   // The client holds its own device-service connection; a command that left it open would keep the process alive.
   try {
     return await runSessionOn(remote, args, json, dependencies)

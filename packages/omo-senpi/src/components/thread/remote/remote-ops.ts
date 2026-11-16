@@ -34,7 +34,10 @@ export async function remoteReady(remote: RemoteThreadSurface): Promise<Failure 
       "host_unavailable",
       "This device's device service is not reachable.",
       "Install or start the device service, then retry.",
-      { reason: status.message },
+      // No device service at all is "not set up" (no state); a service that answers with a failure is an outage.
+      status.details?.["reason"] === "service_not_installed"
+        ? { reason: status.message }
+        : { reason: status.message, state: "unreachable" },
     )
   const state = status.state
   if (state === "plan_required")

@@ -1,9 +1,22 @@
-import { describe, expect, test } from "bun:test"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { dirname, join } from "node:path"
+import { deviceServiceEndpointPath } from "../device-service-core/src/index.ts"
+import { describe, expect, test, onTestFinished } from "bun:test"
 import type { DeviceService } from "../device-service-core/src/index.ts"
 import { createRemoteThreadFixture, fakeRemoteClient } from "../omo-senpi/src/components/thread/thread-remote-fixture"
 import type { RemoteCommandDependencies } from "./remote-cli"
 import { REMOTE_EXIT } from "./remote-exit"
 import { personSenderProvenance, runSession } from "./remote-session-verbs"
+
+// The command reaches its client through the state dir it is connected on; a connected device service has its endpoint file there.
+const connectedStateDir = (): string => {
+  const dir = mkdtempSync(join(tmpdir(), "omo-remote-open-"))
+  mkdirSync(dirname(deviceServiceEndpointPath(dir)), { recursive: true })
+  writeFileSync(deviceServiceEndpointPath(dir), "")
+  onTestFinished(() => rmSync(dir, { recursive: true, force: true }))
+  return dir
+}
 
 const ENV = { OMO_PROVENANCE_WORKSPACE: "Owner workspace", OMO_PROVENANCE_PROJECT: "sender-project" }
 
@@ -62,6 +75,8 @@ describe("omo remote open connection", () => {
           calls.push(`${name}:status`)
           return { state: "connected" }
         },
+        thisDevice: async () => null,
+        capabilities: [],
         devices: async () => {
           calls.push(`${name}:devices`)
           return [{ device: "b", label: "studio", kind: "desktop", platform: "darwin", last_seen_ms: 1, online: true }]
@@ -100,7 +115,7 @@ describe("omo remote open connection", () => {
       },
       write: () => {},
       now: () => 0,
-      stateDir: "/unused",
+      stateDir: connectedStateDir(),
       accountShow: async () => {
         throw new Error("account show is not part of open")
       },
@@ -115,7 +130,8 @@ describe("omo remote open connection", () => {
     expect({ code, errors, calls, dialed: dialed.length, sharedClosed: shared.wasClosed() }).toEqual({
       code: REMOTE_EXIT.ok,
       errors: [],
-      calls: ["shared:status", "shared:devices", "dialed:endpoint", "dialed:close", "shared:attach"],
+      // The readiness check reads the state; the client's device list reads it again in its own round.
+      calls: ["shared:status", "shared:devices", "shared:status", "dialed:endpoint", "dialed:close", "shared:attach"],
       dialed: 1,
       sharedClosed: false,
     })
