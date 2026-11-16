@@ -186,9 +186,11 @@ final class Recorder: NSObject {
       return after(0.05) { self.drainThenStop(deadline: deadline) }
     }
     recording = false
-    pasteboard.drain()
-    emit(["kind": "stop", "pendingReads": pendingReads, "pendingRegistrations": registering.count])
-    stopping = false
+    let stop: [String: Any] = ["kind": "stop", "pendingReads": pendingReads, "pendingRegistrations": registering.count]
+    pasteboard.drain {
+      emit(stop)
+      DispatchQueue.main.async { self.stopping = false }
+    }
   }
 
   func onTap(_ type: CGEventType, _ event: CGEvent) {
