@@ -12,9 +12,6 @@ import {
   deviceServiceEndpointPath,
   deviceServiceStateDir,
   LocalApiError,
-  SESSION_ROW_STATES,
-  type SessionFilter,
-  type SessionRowState,
   type Status,
 } from "../device-service-core/src/device-service.ts"
 import { type RemoteClient, type RemoteFailure, remoteClientForPerson } from "../omo-senpi/src/components/remote/index"
@@ -22,13 +19,13 @@ import type { RemoteThreadSurface } from "../omo-senpi/src/components/thread/rem
 import { readAccountInProcess } from "./account-show"
 import type { LocalStatus } from "./remote-cold-wake"
 import packageJson from "./package.json" with { type: "json" }
+import { type Parsed, storedWake } from "./remote-args"
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
 import { controlLines, deviceLines, localRows, sessionLines, statusLines, wakeLines } from "./remote-render"
-import { isSessionVerb, parseSession, type SessionArgs } from "./remote-session-args"
 import { runSession } from "./remote-session-verbs"
 
-// The `omo remote` verbs whose whole call path is the account read plus this device's local API (omo#13440): argument
-// parsing, the account notice, the connection, and each verb's body. `remote-cli.ts` keeps usage, `bootstrap` (a
+// The `omo remote` verbs whose whole call path is the account read plus this device's local API (omo#13440): the
+// account notice, the connection, and each verb's body; `remote-args.ts` parses the arguments. `remote-cli.ts` keeps usage, `bootstrap` (a
 // download) and `attach` (the engine) and delegates the rest here; nothing in this module reaches the network.
 
 export interface RemoteCommandDependencies {
@@ -83,65 +80,6 @@ const personClient = (dependencies: RemoteCommandDependencies): RemoteClient =>
     stateDir: dependencies.stateDir,
     connect: () => dependencies.connect(),
   })
-
-const CONTROL_VALUES = ["on", "off"] as const
-type ControlValue = (typeof CONTROL_VALUES)[number]
-const isControlValue = (value: string | undefined): value is ControlValue => CONTROL_VALUES.some((v) => v === value)
-
-// omo#13037 A7.2.5: the wake switch also takes "default", which removes the stored value.
-const WAKE_VALUES = ["on", "off", "default"] as const
-type WakeValue = (typeof WAKE_VALUES)[number]
-const isWakeValue = (value: string | undefined): value is WakeValue => WAKE_VALUES.some((v) => v === value)
-const storedWake = (value: WakeValue): boolean | null => (value === "default" ? null : value === "on")
-
-export type Parsed = {
-  readonly command: string
-  readonly json: boolean
-  readonly filter: SessionFilter
-  readonly control: ControlValue | undefined
-  readonly wake?: WakeValue
-  readonly session?: SessionArgs
-}
-
-const isRowState = (value: string): value is SessionRowState =>
-  (SESSION_ROW_STATES as readonly string[]).includes(value)
-
-export function parse(args: readonly string[]): Parsed {
-  const [command = "", ...rest] = args
-  if (isSessionVerb(command)) return { command, filter: {}, control: undefined, ...parseSession(command, rest) }
-  let json = false
-  const filter: { device?: string; project?: string; state?: SessionRowState } = {}
-  let control: ControlValue | undefined
-  let wake: WakeValue | undefined
-  for (let index = 0; index < rest.length; index++) {
-    const flag = rest[index]
-    if (flag === "--json") {
-      json = true
-      continue
-    }
-    if (command === "control") {
-      if (control !== undefined || !isControlValue(flag))
-        throw new UsageError("omo remote control: the value is on or off")
-      control = flag
-      continue
-    }
-    if (command === "wake") {
-      if (wake !== undefined || !isWakeValue(flag))
-        throw new UsageError("omo remote wake: the value is on, off or default")
-      wake = flag
-      continue
-    }
-    if (command !== "sessions" || (flag !== "--device" && flag !== "--project" && flag !== "--state"))
-      throw new UsageError(`omo remote ${command}: unknown argument ${flag}`)
-    const value = rest[++index]
-    if (value === undefined || value === "") throw new UsageError(`omo remote sessions: ${flag} needs a value`)
-    if (flag === "--device") filter.device = value
-    else if (flag === "--project") filter.project = value
-    else if (isRowState(value)) filter.state = value
-    else throw new UsageError(`omo remote sessions: --state is one of ${SESSION_ROW_STATES.join(", ")}`)
-  }
-  return { command, json, filter, control, ...(wake === undefined ? {} : { wake }) }
-}
 
 async function runOn(service: DeviceService, parsed: Parsed, dependencies: RemoteCommandDependencies): Promise<number> {
   switch (parsed.command) {
