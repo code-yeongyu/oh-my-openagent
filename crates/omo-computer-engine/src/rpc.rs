@@ -111,7 +111,7 @@ fn refused(refusal: &Refusal) -> Failure {
     }
     let mut data = json!({ "code": refusal.code.wire(), "hint": null });
     if let Some(reason) = refusal.reason {
-        data["reason"] = json!(reason);
+        data["reason"] = json!(reason.wire());
     }
     failure(refusal.code.number(), refusal.code.wire(), Some(data))
 }
@@ -165,6 +165,7 @@ fn reply(id: &Value, outcome: Result<Value, Failure>) -> String {
 
 #[cfg(test)]
 mod tests {
+    use omo_computer_core::error::Reason;
     use omo_computer_backend_fake::{FakeBackend, FakeClock, FakeScenario, RecordingSink};
     use omo_computer_core::backend::Backend;
     use omo_computer_core::error::EngineCode;
@@ -223,7 +224,7 @@ mod tests {
     #[test]
     fn an_interrupted_call_carries_its_disposition_on_the_wire() {
         let interrupted = omo_computer_session::Refused {
-            refusal: Refusal::new(EngineCode::TransactionFailed, "recovery_required"),
+            refusal: Refusal::new(EngineCode::TransactionFailed, Reason::RecoveryRequired),
             call_id: Some("k-1".to_owned()),
             receipt: None,
             interrupted: Some(omo_computer_core::report::Disposition::UNCERTAIN_UNSAFE),
@@ -234,13 +235,13 @@ mod tests {
         assert_eq!(data["warning"], json!("write_failed"), "an unwritten audit line is surfaced");
         assert_eq!(data["callId"], json!("k-1"));
         assert_eq!(data["disposition"], json!({ "delivery": "delivery_uncertain", "retry": "unsafe" }));
-        let plain = refused_call(&Refusal::new(EngineCode::TransactionFailed, "marker_unavailable").into());
+        let plain = refused_call(&Refusal::new(EngineCode::TransactionFailed, Reason::MarkerUnavailable).into());
         assert!(plain.data.expect("data").get("disposition").is_none(), "a refusal before any send carries none");
     }
 
     #[test]
     fn a_reasoned_refusal_carries_its_reason() {
-        let refusal = Refusal::new(EngineCode::InvalidTarget, "drag_destination");
+        let refusal = Refusal::new(EngineCode::InvalidTarget, Reason::DragDestination);
         assert!(refusal.computer_code().is_ok(), "the pair has a table row");
         let Failure { code, data, .. } = refused(&refusal);
         assert_eq!(code, EngineCode::InvalidTarget.number());

@@ -109,7 +109,7 @@ fn capture_rect(state: &FakeState, target: &Target) -> BackendResult<(Rect, f64)
     match target {
         Target::Window(id) if state.exited.contains(id) => Err(Refusal::new(
             EngineCode::CaptureUnavailable,
-            Reason::Unmapped.wire(),
+            Reason::Unmapped,
         )),
         Target::Window(id) => {
             let window = state
@@ -244,7 +244,7 @@ impl Backend for FakeBackend {
         match self.stop_path {
             StopPathScript::None => Err(Refusal::new(
                 EngineCode::StopPathUnavailable,
-                Reason::NoListener.wire(),
+                Reason::NoListener,
             )),
             script => Ok(Box::new(FakeStopListener::new(self.shared.clone(), script))),
         }
