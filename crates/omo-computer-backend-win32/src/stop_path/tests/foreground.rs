@@ -190,8 +190,12 @@ fn a_held_right_win_key_is_refused_like_the_left() {
 
 /// Review L3 of the #13350 delta: the chord's key comes from the layout of the window that receives
 /// it, not the calling thread's. On French AZERTY the key that types 'a' is the one US calls Q.
+/// Live: a service session (the native-contract runner) can hand back the active layout for a
+/// layout it does not load, so this runs on the interactive desktop leg, which checks the
+/// loaded layout's language before trusting it.
 #[cfg(windows)]
 #[test]
+#[ignore = "live: needs an interactive Windows desktop"]
 fn layout_vk_reads_the_given_layout_not_the_calling_threads() {
     use windows::core::w;
     use windows::Win32::UI::Input::KeyboardAndMouse::{
@@ -207,6 +211,8 @@ fn layout_vk_reads_the_given_layout_not_the_calling_threads() {
     let azerty = unsafe { LoadKeyboardLayoutW(w!("0000040C"), KLF_NOTELLSHELL) }.expect("AZERTY");
     // SAFETY: as above.
     let us = unsafe { LoadKeyboardLayoutW(w!("00000409"), KLF_NOTELLSHELL) }.expect("US");
+    assert_eq!(azerty.0 as usize & 0xFFFF, 0x040C, "the AZERTY layout itself is loaded, not a substitute");
+    assert_eq!(us.0 as usize & 0xFFFF, 0x0409, "the US layout itself is loaded, not a substitute");
     assert_eq!(
         layout_vk_in('a', azerty),
         Some(0x51),
