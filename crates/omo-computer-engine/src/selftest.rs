@@ -3,7 +3,7 @@
 
 use std::process::ExitCode;
 
-use omo_computer_backend_fake::{FakeBackend, FakeClock, FakeScenario, RecordingSink};
+use omo_computer_backend_fake::{FakeBackend, FakeClock, FakeScenario, RecordingSink, StopPathScript};
 use omo_computer_session::Session;
 use serde_json::{json, Value};
 
@@ -12,13 +12,15 @@ use crate::rpc;
 const CHECKS: &[(&str, &str)] = &[
     ("session.open", r#"{"jsonrpc":"2.0","id":1,"method":"session.open","params":{}}"#),
     ("capabilities", r#"{"jsonrpc":"2.0","id":2,"method":"capabilities","params":{}}"#),
-    ("click", r#"{"jsonrpc":"2.0","id":3,"method":"click","params":{"target":"1","x":1,"y":1}}"#),
-    ("session.close", r#"{"jsonrpc":"2.0","id":4,"method":"session.close","params":{}}"#),
+    ("stopPath.start", r#"{"jsonrpc":"2.0","id":3,"method":"stopPath.start","params":{}}"#),
+    ("click", r#"{"jsonrpc":"2.0","id":4,"method":"click","params":{"x":1,"y":1}}"#),
+    ("session.close", r#"{"jsonrpc":"2.0","id":5,"method":"session.close","params":{}}"#),
 ];
 
 fn checks() -> Vec<(String, bool)> {
     let sink = RecordingSink::default();
-    let backend = FakeBackend::with_parts(FakeScenario::default(), FakeClock::default(), sink.clone());
+    let backend = FakeBackend::with_parts(FakeScenario::default(), FakeClock::default(), sink.clone())
+        .with_stop_path(StopPathScript::Live);
     let mut session = Session::new(Box::new(backend));
     let mut results: Vec<(String, bool)> = CHECKS
         .iter()
