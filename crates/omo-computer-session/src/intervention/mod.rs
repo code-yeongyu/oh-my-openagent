@@ -39,11 +39,16 @@ pub fn user_active_in_target(backend: &dyn Backend, pid: u32) -> bool {
 /// R70s(5): a foreign (physical) input in `pid` inside row 19's attribution window before
 /// now holds the send.
 pub fn foreign_input_holds(backend: &dyn Backend, pid: Option<u32>) -> bool {
-    let (Some(pid), Some(clock), Some(reads)) = (pid, backend.clock(), backend.intervention()) else {
+    let (Some(pid), Some(clock), Some(reads)) = (pid, backend.clock(), backend.intervention())
+    else {
         return false;
     };
+    // Review L6 of #13355: the send goes out after this check, so an input stamped at the
+    // check's own millisecond is before it (the mid-send watch counts only later inputs).
+    let send_ms = clock.now_ms().saturating_add(1);
     reads.last_user_input_ms(pid).is_some_and(|at_ms| {
-        crate::attribution::holds_send(&[crate::attribution::InputSeen { at_ms, own: false }], clock.now_ms())
+        let seen = crate::attribution::InputSeen { at_ms, own: false };
+        crate::attribution::holds_send(&[seen], send_ms)
     })
 }
 
