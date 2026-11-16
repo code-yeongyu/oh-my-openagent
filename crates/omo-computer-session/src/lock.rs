@@ -11,6 +11,8 @@ use std::path::{Path, PathBuf};
 
 pub(crate) mod file;
 #[cfg(test)]
+mod dacl_tests;
+#[cfg(test)]
 mod process;
 
 /// The lock file's name under the RUNTIME root.
