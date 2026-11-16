@@ -127,13 +127,21 @@ fn a_burst_the_server_reads_slowly_is_sent_once_on_the_same_connection() {
     // Far more than a unix socket buffers while nobody reads it.
     let burst = "a".repeat(20_000);
     let sent = send(&mut backend, &text(&burst));
-    assert!(sent.is_ok(), "the burst goes out once the server reads again: {sent:?}");
+    assert!(
+        sent.is_ok(),
+        "the burst goes out once the server reads again: {sent:?}"
+    );
     let expected = burst.len() * 2;
     assert!(
-        rig.eis.wait_for(SETTLE + SLOW_READER_STALL, |log| log.keys.len() >= expected),
+        rig.eis
+            .wait_for(SETTLE + SLOW_READER_STALL, |log| log.keys.len() >= expected),
         "every key reached the fake"
     );
     let log = rig.eis.log();
     assert_eq!(log.connections, 1, "a slow reader is not a lost connection");
-    assert_eq!(log.keys.len(), expected, "every key exactly once, nothing resent");
+    assert_eq!(
+        log.keys.len(),
+        expected,
+        "every key exactly once, nothing resent"
+    );
 }

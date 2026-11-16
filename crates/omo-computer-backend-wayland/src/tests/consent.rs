@@ -73,7 +73,10 @@ fn a_cancelled_consent_dialog_sticks_for_the_lifecycle_and_reads_permission_deni
         "every later input call answers the same refusal"
     );
     let seen = portal.log();
-    assert_eq!(seen.dialogs, 1, "a denial is never re-prompted inside an input call");
+    assert_eq!(
+        seen.dialogs, 1,
+        "a denial is never re-prompted inside an input call"
+    );
     assert_eq!(seen.connects, 0, "no ConnectToEIS without consent");
     assert_eq!(rig.eis.log().connections, 0, "nothing reached libei");
     drop(backend);

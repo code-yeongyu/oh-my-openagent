@@ -70,7 +70,9 @@ impl EiSession {
         let mut handshaker = EiHandshaker::new("omo-computer", ei::handshake::ContextType::Sender);
         let deadline = Instant::now() + HANDSHAKE_DEADLINE;
         let response = loop {
-            wait_readable(&context, deadline)?;
+            if !readable_by(&context, deadline) {
+                return Err(LinkError::Handshake("timed out".to_owned()));
+            }
             read(&context)?;
             let mut done = None;
             while let Some(pending) = context.pending_event() {
@@ -123,9 +125,9 @@ impl EiSession {
                     Ok(())
                 };
             }
-            if wait_readable(&self.context, until).is_err() && Instant::now() < until {
-                return Err(LinkError::Lost);
-            }
+            // A poll that times out only returns to the deadline check above; a closed socket
+            // polls readable and the next pump reports it as lost.
+            readable_by(&self.context, until);
         }
     }
 
@@ -275,13 +277,12 @@ fn poll(context: &ei::Context, timeout_ms: i32) -> bool {
     rustix::event::poll(&mut fds, timeout_ms).is_ok_and(|ready| ready > 0)
 }
 
-fn wait_readable(context: &ei::Context, deadline: Instant) -> Result<(), LinkError> {
+/// Waits until `context` is readable or `deadline` passes; `false` on the deadline.
+fn readable_by(context: &ei::Context, deadline: Instant) -> bool {
     let left = deadline.saturating_duration_since(Instant::now());
-    let millis = i32::try_from(left.as_millis()).unwrap_or(i32::MAX);
-    if millis == 0 || !poll(context, millis) {
-        return Err(LinkError::Handshake("timed out".to_owned()));
-    }
-    Ok(())
+    // Rounded up, so a poll never wakes before the deadline it waits for.
+    let millis = i32::try_from(left.as_micros().div_ceil(1_000)).unwrap_or(i32::MAX);
+    millis > 0 && poll(context, millis)
 }
 
 impl AsFd for EiSession {
