@@ -191,6 +191,10 @@ mod action_tests;
 #[cfg(test)]
 mod fake;
 #[cfg(test)]
+mod hit_live_tests;
+#[cfg(test)]
+mod hit_tests;
+#[cfg(test)]
 mod live_tests;
 #[cfg(test)]
 mod menus_binding_tests;

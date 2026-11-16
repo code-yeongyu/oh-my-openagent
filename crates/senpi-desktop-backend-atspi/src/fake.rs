@@ -205,9 +205,14 @@ impl AtSpiBus for FakeBus {
         Ok(point.x >= e.x && point.y >= e.y && point.x < e.x + e.width && point.y < e.y + e.height)
     }
 
+    /// Like the bus, an object without a Component interface fails the call.
     fn accessible_at_point(&mut self, node: &u64, point: ScreenPoint) -> BusResult<u64> {
         self.calls.push(format!("hit {node} @{},{}", point.x, point.y));
-        Ok(self.get(*node)?.hit.unwrap_or(0))
+        let found = self.get(*node)?;
+        if !found.interfaces.contains(Interface::Component) {
+            return Err("no Component".to_string());
+        }
+        Ok(found.hit.unwrap_or(0))
     }
 
     fn grab_focus(&mut self, node: &u64) -> BusResult<bool> {
