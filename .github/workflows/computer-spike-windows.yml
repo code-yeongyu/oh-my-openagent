@@ -62,3 +62,16 @@ jobs:
           name: sp-n-win32-delivery
           path: ${{ runner.temp }}/win32-delivery.tsv
           if-no-files-found: warn
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Computer spike SP-N (Windows)
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Precompiles the helper's native assembly, proves an interactive desktop, then measures the SP-N rows and verifies them against a second pass.
+            - The ledger is uploaded, never committed here; rows land only through the spike's own pull request.
+          JOB_SUMMARY_NEXT: Open the sp-n-win32-delivery artifact for the measured ledger TSV.
+        run: |
+          GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

@@ -1,0 +1,11 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    ".": {
+      "entry": [
+        // SP-N spike probe, run by path from .github/workflows/computer-spike-windows.yml (crates/omo-computer-backend-win32/probes/README.md)
+        "crates/omo-computer-backend-win32/probes/probe-sp-n.ts",
+      ]
+    }
+  }
+}
