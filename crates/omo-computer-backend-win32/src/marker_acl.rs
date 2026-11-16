@@ -10,25 +10,12 @@ pub fn owner_only_sddl(user_sid: &str) -> String {
     format!("D:P(A;;FA;;;{user_sid})(A;;FA;;;SY)")
 }
 
-/// Whether SDDL trustee `trustee` is `user_sid`: the SID itself, or an alias SDDL read-back writes
-/// for a well-known account (`LA`, `LG`) that `resolve` turns into exactly that SID. The aliases
-/// name THIS machine's RID-500/501 accounts, so only the OS can say which SID they are: a domain
-/// RID-500 user is not `LA` (review L2 of the #13350 delta).
-fn is_user(trustee: &str, user_sid: &str, resolve: &dyn Fn(&str) -> Option<String>) -> bool {
-    match trustee {
-        "LA" | "LG" => resolve(trustee).as_deref() == Some(user_sid),
-        _ => trustee == user_sid,
-    }
-}
-
-/// Whether `dacl_sddl` is protected and grants exactly the user and SYSTEM, both present.
-/// `resolve` turns an SDDL alias trustee (`LA`, `LG`) into the SID it stands for on this machine.
+/// Whether `dacl_sddl` is protected and grants exactly the user and SYSTEM, both present. The
+/// user's ACE may read back in any of `user_forms`: its SID, or the spelling SDDL read-back writes
+/// for it (`LA`/`LG` for THIS machine's RID-500/501), which row 17's `canonical_sid` answers - so a
+/// domain RID-500 user is never `LA` (review L2 of the #13350 delta; D8: one SID compare).
 #[must_use]
-pub fn is_owner_only(
-    dacl_sddl: &str,
-    user_sid: &str,
-    resolve: &dyn Fn(&str) -> Option<String>,
-) -> bool {
+pub fn is_owner_only(dacl_sddl: &str, user_forms: &[&str]) -> bool {
     let Some(rest) = dacl_sddl.strip_prefix("D:") else {
         return false;
     };
@@ -41,13 +28,11 @@ pub fn is_owner_only(
         .filter(|ace| !ace.is_empty())
         .filter_map(|ace| ace.trim_start_matches('(').rsplit(';').next())
         .collect();
-    let allowed =
-        |sid: &&str| is_user(sid, user_sid, resolve) || *sid == "SY" || *sid == "S-1-5-18";
-    trustees.iter().all(allowed)
-        && trustees.iter().any(|sid| is_user(sid, user_sid, resolve))
-        && trustees
-            .iter()
-            .any(|sid| *sid == "SY" || *sid == "S-1-5-18")
+    let is_user = |sid: &str| user_forms.first() == Some(&sid);
+    let is_system = |sid: &str| sid == "SY" || sid == "S-1-5-18";
+    trustees.iter().all(|sid| is_user(sid) || is_system(sid))
+        && trustees.iter().any(|sid| is_user(sid))
+        && trustees.iter().any(|sid| is_system(sid))
 }
 
 #[cfg(windows)]
@@ -62,12 +47,12 @@ mod os {
     use windows::Win32::Foundation::{CloseHandle, LocalFree, HANDLE, HLOCAL};
     use windows::Win32::Security::Authorization::{
         ConvertSecurityDescriptorToStringSecurityDescriptorW, ConvertSidToStringSidW,
-        ConvertStringSecurityDescriptorToSecurityDescriptorW, ConvertStringSidToSidW,
+        ConvertStringSecurityDescriptorToSecurityDescriptorW,
         SDDL_REVISION_1,
     };
     use windows::Win32::Security::{
         GetFileSecurityW, GetTokenInformation, SetFileSecurityW, TokenUser,
-        DACL_SECURITY_INFORMATION, PROTECTED_DACL_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR, PSID,
+        DACL_SECURITY_INFORMATION, PROTECTED_DACL_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR,
         TOKEN_QUERY, TOKEN_USER,
     };
     use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
@@ -111,24 +96,6 @@ mod os {
             let sid = text.to_string().unwrap_or_default();
             let _ = LocalFree(Some(HLOCAL(text.0.cast())));
             Ok(sid)
-        }
-    }
-
-    /// The SID an SDDL alias (`LA`, `LG`) stands for on this machine, as a string; the OS resolves
-    /// it, so the comparison is the SID's own (the string form of two equal SIDs is equal).
-    fn resolve_alias(alias: &str) -> Option<String> {
-        let text = wide(alias);
-        let mut sid = PSID::default();
-        // SAFETY: a NUL-terminated SID string; `sid` and `out` are freed with LocalFree.
-        unsafe {
-            ConvertStringSidToSidW(PCWSTR(text.as_ptr()), &mut sid).ok()?;
-            let mut out = PWSTR::null();
-            let converted = ConvertSidToStringSidW(sid, &mut out);
-            let _ = LocalFree(Some(HLOCAL(sid.0)));
-            converted.ok()?;
-            let resolved = out.to_string().ok();
-            let _ = LocalFree(Some(HLOCAL(out.0.cast())));
-            resolved
         }
     }
 
@@ -199,7 +166,8 @@ mod os {
             )?;
             let sddl = text.to_string().unwrap_or_default();
             let _ = LocalFree(Some(HLOCAL(text.0.cast())));
-            Ok(is_owner_only(&sddl, &user_sid()?, &resolve_alias))
+            let user = user_sid()?;
+            Ok(is_owner_only(&sddl, &[user.as_str()]))
         }
     }
 }
