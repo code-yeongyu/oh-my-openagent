@@ -424,6 +424,37 @@ describe("device-service adapter: relay round trips per thread op", () => {
     const closed = new Promise<void>((resolve) => {
       close = resolve
     })
+    const endpointCommand = async (rpc: JsonObject, commandId: string, asked: boolean) => {
+      frames.push("session.command")
+      locateAsked.push(asked)
+      if (asked && relayd === "older-local") throw new LocalApiError("invalid_request", "request has an unknown field")
+      const response = {
+        type: "response",
+        command: rpc["type"],
+        success: true,
+        data: { state: { sessionId: CREATED_ENGINE_ID }, sessionId: CREATED_ENGINE_ID },
+      }
+      const located =
+        asked && relayd === "located" ? { located: { key: CREATED_KEY, session: `b.${CREATED_KEY}` } } : {}
+      queueMicrotask(() => {
+        emit({
+          type: "event",
+          kind: "session.command_event",
+          device: "b",
+          command_id: commandId,
+          response,
+          ...located,
+        })
+        emit({
+          type: "event",
+          kind: "session.command_state",
+          command_id: commandId,
+          state: "engine_applied",
+          retryable: false,
+        })
+      })
+      return commandId
+    }
     const client = {
       welcome: {
         type: "welcome",
@@ -454,7 +485,13 @@ describe("device-service adapter: relay round trips per thread op", () => {
         listeners.add(listener)
         return () => listeners.delete(listener)
       },
-      command: async (_attach: string, rpc: JsonObject, commandId: string) => {
+      commandTo: async (
+        target: { readonly attach: string } | { readonly device: string; readonly endpoint: string },
+        rpc: JsonObject,
+        commandId: string,
+        route?: { readonly locate?: true },
+      ) => {
+        if ("endpoint" in target) return await endpointCommand(rpc, commandId, route?.locate === true)
         frames.push("session.command")
         records.push(rpc)
         const scripted =
@@ -504,45 +541,6 @@ describe("device-service adapter: relay round trips per thread op", () => {
       list: async () => {
         frames.push("sessions.list")
         return { query_id: "q", revision: 1, rows: [], incomplete: [], devices: {} }
-      },
-      endpointCommand: async (
-        _device: string,
-        _endpoint: string,
-        rpc: JsonObject,
-        commandId: string,
-        options?: { readonly locate?: boolean },
-      ) => {
-        frames.push("session.command")
-        const asked = options?.locate === true
-        locateAsked.push(asked)
-        if (asked && relayd === "older-local")
-          throw new LocalApiError("invalid_request", "request has an unknown field")
-        const response = {
-          type: "response",
-          command: rpc["type"],
-          success: true,
-          data: { state: { sessionId: CREATED_ENGINE_ID }, sessionId: CREATED_ENGINE_ID },
-        }
-        const located =
-          asked && relayd === "located" ? { located: { key: CREATED_KEY, session: `b.${CREATED_KEY}` } } : {}
-        queueMicrotask(() => {
-          emit({
-            type: "event",
-            kind: "session.command_event",
-            device: "b",
-            command_id: commandId,
-            response,
-            ...located,
-          })
-          emit({
-            type: "event",
-            kind: "session.command_state",
-            command_id: commandId,
-            state: "engine_applied",
-            retryable: false,
-          })
-        })
-        return commandId
       },
       oversizedLines: () => 0,
       close: () => close(),

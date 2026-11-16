@@ -78,7 +78,11 @@ describe("device service clock seam", () => {
       minimums: { wakeMark: "1.4.0", singleLocate: "1.4.0" },
       connect: async (options) => {
         const client = await connectLocalApi(options)
-        return { ...client, wakeCommand: async (_device, _durableId, _rpc, commandId) => commandId ?? "" }
+        return {
+          ...client,
+          commandTo: async (target, rpc, commandId, route, mark) =>
+            "wake" in target ? (commandId ?? "") : await client.commandTo(target, rpc, commandId, route, mark),
+        }
       },
     })
     services.push(service)

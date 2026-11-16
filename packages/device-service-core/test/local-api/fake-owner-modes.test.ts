@@ -105,7 +105,7 @@ describe("fake owner modes", () => {
     const { owner, withheld } = await startMode("ack-no-final", endpointWorld())
     const client = await connect(owner, clock)
     const events = collect(client)
-    const commandId = await client.endpointCommand(PEER, ENDPOINT, { type: "prompt", message: "hi" })
+    const commandId = await client.commandTo({ device: PEER, endpoint: ENDPOINT }, { type: "prompt", message: "hi" })
     await withheld("final_state")
     clock.advance(125_000)
     await flush(client)
@@ -147,7 +147,7 @@ describe("fake owner modes", () => {
   test("terminal takes only its reduced control set and answers any other record as an unknown command", async () => {
     const clock = fakeClock()
     const replyTo = async (client: LocalApiClient, events: LocalEvent[], type: string) => {
-      const commandId = await client.endpointCommand(PEER, ENDPOINT, { type })
+      const commandId = await client.commandTo({ device: PEER, endpoint: ENDPOINT }, { type })
       await flush(client)
       return commandEvents(events, commandId)[0]
     }
