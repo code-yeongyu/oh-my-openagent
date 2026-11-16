@@ -244,3 +244,21 @@ fn a_parked_listener_reads_deaf_in_capabilities_stop_path() {
         (CapabilityKind::Global, false, None)
     );
 }
+
+/// Review L1 at 0ddebf5f6c (IS-9): a stop press that reaches the outgoing listener after the
+/// pre-arm poll, while stopPath.start opens the new listener, still latches when the new one
+/// replaces it.
+#[test]
+fn a_press_between_the_pre_arm_poll_and_the_swap_still_latches() {
+    let mut supervisor = local();
+    supervisor.arm(listener(vec![Ok(false), Ok(true)]), None, 0);
+    supervisor.observe(0, &mut never_rearms, &mut NoHolds);
+    assert_eq!(supervisor.latch(), None, "the pre-arm poll heard nothing");
+    supervisor.arm(listener(vec![]), None, 10);
+    assert_eq!(
+        supervisor.latch(),
+        Some(SuspendReason::Hotkey),
+        "the press queued on the outgoing listener is not dropped with it"
+    );
+    assert_eq!(supervisor.stop_epoch(), 1);
+}
