@@ -13,7 +13,6 @@ export type PoolHost = {
   readonly hypervisor: string | null
   readonly baseImages: Readonly<Record<string, string>>
   readonly consoleUser: string | null
-  readonly runnerUser: string
 }
 
 export type Refusal = { readonly kind: "refused"; readonly reason: string }
