@@ -52,8 +52,8 @@ export function gatewayWorkerAnchor(root: string = packageRoot): URL | undefined
 
 // The surface the agent's thread tools reach other devices through, on this command's own connection. The chain count
 // (K8) starts at its first hop: a person at a terminal is no thread chain. The command's one connection is shared:
-// the port borrows it (never closes it) and endpoint commands ride a fresh connection per call, so `open_session`
-// never closes the CLI's only connection (#13075).
+// the port borrows it (never closes it); only `open_session` rides a fresh connection per call (#12777), so opening a
+// session never closes the CLI's only connection (#13075).
 const deviceServiceSurface = (service: DeviceService, dial: () => Promise<DeviceService>): RemoteThreadSurface => ({
   sessions: createDeviceServiceSessions({
     version: service.serviceVersion,
@@ -144,7 +144,13 @@ async function openOn(
     ...(args.worktree === undefined ? {} : { worktree: args.worktree }),
   })
   if (open.kind !== "ok") return show(open, "")
-  const opened = { kind: "ok", thread: open.thread, deduplicated: false } as const
+  // --json keeps naming the model the session opened on, as it did when a set_model followed the open (#13748 review).
+  const opened = {
+    kind: "ok",
+    thread: open.thread,
+    deduplicated: false,
+    ...(args.model === undefined ? {} : { model: { provider: args.model.provider, id: args.model.modelId } }),
+  } as ThreadToolResult & { readonly thread: typeof open.thread }
   if (args.prompt === undefined) return show(opened, "")
   // The first prompt (#13410) goes to the session just opened, by its own id, as `omo remote send --no-wait` sends it.
   const label = `${args.device}/${opened.thread.thread_id}`

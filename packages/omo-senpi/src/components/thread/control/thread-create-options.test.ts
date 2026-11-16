@@ -163,6 +163,17 @@ describe("thread_create with a first prompt (#13410)", () => {
     expect(types(a.sent).filter((type) => type === "admit_external_message")).toHaveLength(1)
   })
 
+  // Review L1 at 0571de8: a delivery that throws (not a typed refusal) must not turn the created thread into internal_error.
+  test("#given the prompt's delivery throws #when created with one #then the thread is answered and the failure is the prompt's outcome", async () => {
+    const a = account({ admitThrows: "connection lost" })
+    const { run } = surface(a.remote)
+    const result = (await run("thread_create", { device: "studio", prompt: "build it" })) as {
+      prompt?: Record<string, unknown>
+    }
+    expect(result).toMatchObject({ kind: "ok", thread: { thread_id: "dur-new-on-b" } })
+    expect(result.prompt).toMatchObject({ error: { code: "internal_error" } })
+  })
+
   test("#given b refuses the prompt #when created with one #then the thread is answered and the refusal is the prompt's outcome", async () => {
     const a = account({ admitRefuse: "session_busy" })
     const { run } = surface(a.remote)

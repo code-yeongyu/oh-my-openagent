@@ -17,7 +17,12 @@ import {
   type SessionRowState,
   type Status,
 } from "../device-service-core/src/device-service.ts"
-import { type RemoteClient, type RemoteFailure, remoteClientForPerson } from "../omo-senpi/src/components/remote/index"
+import {
+  exitCodeOf,
+  type RemoteClient,
+  type RemoteFailure,
+  remoteClientForPerson,
+} from "../omo-senpi/src/components/remote/index"
 import type { RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
 import { readAccountInProcess } from "./account-show"
 import type { LocalStatus } from "./remote-cold-wake"
@@ -263,9 +268,9 @@ function renderFailure(dependencies: RemoteCommandDependencies, failure: RemoteF
     )
     return REMOTE_EXIT.unavailable
   }
-  // No local API answer at all (a stale socket, a refused or timed-out handshake): the service is not running.
-  const localCode = details["local_api_code"]
-  if (failure.code === "host_unavailable" && (localCode === undefined || localCode === "handshake_timeout")) {
+  // The client tags a failure of the connection itself with phase "connect" (the service is not running); a failure
+  // inside a member after a good connect keeps its own message below.
+  if (failure.code === "host_unavailable" && details["phase"] === "connect") {
     dependencies.error(NOT_RUNNING)
     return REMOTE_EXIT.unavailable
   }
@@ -287,9 +292,7 @@ function renderFailure(dependencies: RemoteCommandDependencies, failure: RemoteF
   }
   dependencies.error(`omo remote: ${failure.message}`)
   dependencies.error(withVerbs(failure.next_action))
-  return failure.code === "host_unavailable" || failure.code === "relay_requires_paid_plan"
-    ? REMOTE_EXIT.unavailable
-    : REMOTE_EXIT.failed
+  return exitCodeOf(failure)
 }
 
 /** Runs one parsed local verb: the account notice, then the read verb on the person client or the verb's connection. */
