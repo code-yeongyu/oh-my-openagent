@@ -8,6 +8,7 @@
 import { describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
 import { load } from "js-yaml"
+import { type ExpressionContext, evaluate } from "../test-support/github-expression"
 
 const workflowsDir = new URL("../.github/workflows/", import.meta.url)
 const NOT_FULL_MATRIX = "needs.ci-mode.outputs.full_matrix != 'true'"
@@ -37,50 +38,11 @@ function job(file: string, name: string): Record<string, unknown> {
   return found
 }
 
-// The GitHub expression subset these workflows use, rewritten outside string literals into JavaScript.
-function toJavaScript(expression: string): string {
-  return expression
-    .split(/('(?:[^']|'')*')/)
-    .map((part, index) =>
-      index % 2 === 1
-        ? part
-        : part
-            .replace(/([!=])=/g, "$1==")
-            .replace(/\.labels\.\*\.name/g, ".labels?.map((label) => label.name)")
-            .replace(/needs\.([\w-]+)\./g, 'needs["$1"].')
-            .replace(/(?<=[\w\]])\.(?=[A-Za-z_])/g, "?."),
-    )
-    .join("")
-}
-
-interface Context {
-  readonly github: unknown
-  readonly needs?: unknown
-  readonly matrix?: unknown
-}
-
-const functions = {
-  always: () => true,
-  cancelled: () => false,
-  contains: (haystack: unknown, needle: unknown) =>
-    Array.isArray(haystack) || typeof haystack === "string" ? haystack.includes(String(needle)) : false,
-  startsWith: (value: unknown, prefix: unknown) => String(value ?? "").startsWith(String(prefix)),
-  fromJSON: (value: unknown) => JSON.parse(String(value)),
-}
-
-function evaluate(expression: unknown, context: Context): unknown {
-  const text = String(expression).trim()
-  const body = /^\$\{\{\s*([\s\S]+?)\s*\}\}$/.exec(text)?.[1] ?? text
-  const names = ["github", "needs", "matrix", "inputs", ...Object.keys(functions)]
-  const run = new Function(...names, `return (${toJavaScript(body)})`)
-  return run(context.github, context.needs ?? {}, context.matrix ?? {}, {}, ...Object.values(functions))
-}
-
 function isExpression(value: unknown): boolean {
   return typeof value === "string" && value.includes("${{")
 }
 
-function matrixLegs(job: Record<string, unknown>, context: Context): Record<string, unknown>[] {
+function matrixLegs(job: Record<string, unknown>, context: ExpressionContext): Record<string, unknown>[] {
   const strategy = job["strategy"]
   if (!isRecord(strategy)) return [{}]
   const raw = isExpression(strategy["matrix"]) ? evaluate(strategy["matrix"], context) : strategy["matrix"]
@@ -110,7 +72,7 @@ function matrixLegs(job: Record<string, unknown>, context: Context): Record<stri
 function scheduledRunners(file: string, github: Record<string, unknown>, fullMatrix: string): string[] {
   const needs = new Proxy(
     { "ci-mode": { outputs: { full_matrix: fullMatrix, run_heavy: "true" } } },
-    { get: (target, key) => Reflect.get(target, key) ?? { result: "skipped", outputs: {} } },
+    { get: (target, key) => Reflect.get(target, key) ?? { result: "success", outputs: { full_matrix: fullMatrix } } },
   )
   const runners: string[] = []
   for (const [name, definition] of Object.entries(jobs(file))) {
@@ -155,6 +117,28 @@ describe("#given every workflow a pull request triggers", () => {
     expect(scheduled).toEqual([])
   })
 
+  // The label is honored only through the one platform decision (#13859): a refused label must not reach a runner.
+  test("#then a refused ci:full-matrix label schedules no macOS or Windows runner in any workflow", () => {
+    const scheduled = pullRequestWorkflows().flatMap((file) =>
+      nonLinux(scheduledRunners(file, pullRequest([OPT_IN_LABEL]), "false")).map((runner) => `${file} ${runner}`),
+    )
+    expect(scheduled).toEqual([])
+  })
+
+  test("#then only the decision's inputs read the PR labels; no workflow tests the raw label name", () => {
+    const readers = readdirSync(workflowsDir)
+      .filter((file) => /\.ya?ml$/.test(file))
+      .filter((file) => /pull_request\.labels|'ci:full-matrix'/.test(readFileSync(new URL(file, workflowsDir), "utf8")))
+    // ci.yml and pr-platform-decision.yml feed the labels to the classifier; changelog-gate.yml reads changelog labels;
+    // the label workflow's trigger tests the labeled event's own label name.
+    expect(readers.sort()).toEqual([
+      "changelog-gate.yml",
+      "ci-full-matrix-label.yml",
+      "ci.yml",
+      "pr-platform-decision.yml",
+    ])
+  })
+
   test.each(pullRequestWorkflows())("#then the opt-in label gives %s the same macOS/Windows legs as a push", (file) => {
     const labelled = nonLinux(scheduledRunners(file, pullRequest([OPT_IN_LABEL]), "true"))
     expect(labelled).toEqual(nonLinux(scheduledRunners(file, push, "true")))
@@ -179,15 +163,15 @@ describe("#given the dev push runs that now carry macOS/Windows coverage", () =>
     expect([...(Array.isArray(watched) ? watched : [])].sort()).toEqual(platformOnDev.sort())
   })
 
-  // GitHub keeps one pending run per concurrency group, so a group that every dev completion enters can drop a
-  // red run before its issue exists. Only the writer, gated on a failed macOS/Windows job, may serialize.
-  test("#then only the issue writer, gated on a failed macOS/Windows job, enters the tracker's concurrency group", () => {
+  // GitHub keeps one pending run per concurrency group and cancels the older one, so any group in the tracker can
+  // drop a red run's failed jobs and merged PR before they reach the issue. Writers dedupe the issue instead.
+  test("#then no tracker job can be dropped by a concurrency group, and only a failed macOS/Windows job writes", () => {
     const file = "platform-red-tracker.yml"
     expect(workflow(file)["concurrency"]).toBeUndefined()
     const grouped = Object.entries(jobs(file)).filter(
       ([, definition]) => isRecord(definition) && definition["concurrency"],
     )
-    expect(grouped.map(([name]) => name)).toEqual(["file-issue"])
+    expect(grouped.map(([name]) => name)).toEqual([])
     const writer = job(file, "file-issue")
     const detect = String(writer["needs"])
     const runsFor = (failed: string) =>

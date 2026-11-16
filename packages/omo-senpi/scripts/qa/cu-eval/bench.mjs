@@ -19,7 +19,6 @@ import { fileURLToPath } from "node:url"
 import { withTelemetryOptOut } from "../telemetry-opt-out-env.mjs"
 
 const here = dirname(fileURLToPath(import.meta.url))
-const repoRoot = resolve(here, "..", "..", "..", "..", "..")
 
 if (process.versions.bun === undefined) {
   const child = spawnSync("bun", [fileURLToPath(import.meta.url), ...process.argv.slice(2)], {
@@ -38,7 +37,7 @@ if (process.versions.bun === undefined) {
   process.exit(child.status ?? 1)
 }
 
-const { connect } = await import(join(repoRoot, "packages", "senpi-desktop-sdk", "src", "index.ts"))
+const { connect } = await import("../../../../senpi-desktop-sdk/src/index.ts")
 const { engineLauncher } = await import("./engine-port.mjs")
 const core = await import("./eval-core.mjs")
 const { locateEngine } = await import("./run.mjs")
