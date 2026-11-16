@@ -123,6 +123,13 @@ describe("sweep deletes only pool guests nothing is using", () => {
     expect(hypervisor.removed).toEqual([])
   })
 
+  test("a guest list that cannot be read fails the sweep with its reason, never an uncaught error", () => {
+    expect(sweepGuests(fakeHypervisor([], { listThrows: true }), () => 0)).toEqual({
+      lines: ["sweep: list failed: hypervisor list exited 1"],
+      exitCode: 1,
+    })
+  })
+
   test("the summary counts a failed delete as not deleted and fails the sweep", () => {
     const listing = [{ name: "omo-cu-macos15-1", running: false }]
     const hypervisor = fakeHypervisor([listing, listing], { removeFails: true })
