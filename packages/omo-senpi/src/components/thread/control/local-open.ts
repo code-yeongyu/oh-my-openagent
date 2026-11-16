@@ -1,5 +1,6 @@
 import type { ThreadHost } from "../tools/ports"
 import { folderFailure } from "../worktree/failures"
+import { modelRefusal } from "./open-reply"
 import { discardWorktree } from "../worktree/discard-worktree"
 import { checkFolder, createThreadWorktree, runGit } from "../worktree/thread-worktree"
 import { openedThread, type SessionOpenOutcome, type SessionOpenRequest } from "./session-host"
@@ -18,7 +19,18 @@ export async function openLocally(
     const refused = await checkFolder(request.cwd)
     if (refused !== undefined) return refused
   }
-  if (worktree === undefined) return { kind: "ok", thread: openedThread(await host.openSession(request)) }
+  const model = request.provider === undefined ? undefined : `${request.provider}/${request.modelId ?? ""}`
+  // A model the engine cannot run refuses the open (`model_unavailable`); that is the caller's argument to fix.
+  const unrunnable = (error: unknown) => modelRefusal(error instanceof Error ? error.message : String(error), model)
+  if (worktree === undefined) {
+    try {
+      return { kind: "ok", thread: openedThread(await host.openSession(request)) }
+    } catch (error) {
+      const refused = unrunnable(error)
+      if (refused === undefined) throw error
+      return refused
+    }
+  }
   if (request.cwd === undefined)
     return folderFailure("relative_path", "A worktree needs the repository folder; pass cwd.")
   const made = await createThreadWorktree({ repository: request.cwd, request: worktree, root: worktreeRoot() })
@@ -31,7 +43,11 @@ export async function openLocally(
     // The open failed: undo the worktree this call made, so a retry does not leave another one; the open's own
     // failure stands unless the worktree could not be removed, which is then the answer, naming what remains.
     const left = await discardWorktree({ repository, path, branch, root: worktreeRoot(), git: runGit })
-    if (left === undefined) throw error
+    if (left === undefined) {
+      const refused = unrunnable(error)
+      if (refused === undefined) throw error
+      return refused
+    }
     return { ...left, error: { ...left.error, details: { ...left.error.details, cause: String(error) } } }
   }
   return { kind: "ok", thread: { ...openedThread(opened), worktree: made.worktree } }
