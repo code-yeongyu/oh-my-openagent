@@ -125,6 +125,8 @@ mod os {
                 path.display()
             )));
         }
+        // L9: the lock is relied on only on a local NTFS or ReFS volume, read from the handle.
+        omo_computer_safety::durable::admit_volume(&file)?;
         Ok(file)
     }
 

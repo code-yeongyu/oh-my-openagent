@@ -12,7 +12,7 @@ use std::path::Path;
 mod windows;
 
 #[cfg(windows)]
-pub use windows::{durable_rename, sync_dir};
+pub use windows::{admit_volume, durable_rename, sync_dir};
 
 /// Renames `temp` over `path` in `dir`, then fsyncs `dir`.
 ///
@@ -51,40 +51,61 @@ pub fn sync_dir(_dir: &Path) -> io::Result<()> {
     Err(io::Error::other("no durable directory sync on this target"))
 }
 
-/// The filesystem a Windows stop marker may be committed on: NTFS or ReFS, the two whose
-/// directory flush the arm relies on. Anything else, or a name that could not be read, is an
-/// error naming what was read: an Ok the arm cannot back would be fail-open.
+/// What a Windows marker or lock relies on about its volume: the filesystem's name and
+/// whether the volume is a remote device.
 #[cfg(any(windows, test))]
-pub(crate) fn admit_filesystem(read: io::Result<String>) -> io::Result<()> {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Volume {
+    pub filesystem: String,
+    pub remote: bool,
+}
+
+/// The volume a Windows stop marker, pre-input marker or lock may rely on: a LOCAL volume
+/// whose filesystem is NTFS or ReFS, the two whose directory flush and byte-range locks the
+/// arms rely on (A-IS-65 L9). Anything else, or a volume that could not be read, is an error
+/// naming what was read: an Ok the arm cannot back would be fail-open.
+#[cfg(any(windows, test))]
+pub(crate) fn admit_filesystem(read: io::Result<Volume>) -> io::Result<()> {
     match read {
-        Ok(name) if name == "NTFS" || name == "ReFS" => Ok(()),
-        Ok(name) => Err(io::Error::new(
+        Ok(volume)
+            if !volume.remote && (volume.filesystem == "NTFS" || volume.filesystem == "ReFS") =>
+        {
+            Ok(())
+        }
+        Ok(volume) => Err(io::Error::new(
             io::ErrorKind::Unsupported,
-            UnsupportedFilesystem { name },
+            UnsupportedFilesystem {
+                name: volume.filesystem,
+                remote: volume.remote,
+            },
         )),
         Err(error) => Err(io::Error::new(
             error.kind(),
             UnsupportedFilesystem {
                 name: format!("unreadable ({error})"),
+                remote: false,
             },
         )),
     }
 }
 
-/// The stop marker's filesystem is not one whose directory flush makes a rename durable.
+/// The volume is not a local NTFS or ReFS volume.
 #[cfg(any(windows, test))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnsupportedFilesystem {
     /// What the volume reported: its filesystem name, or why it could not be read.
     pub name: String,
+    /// The volume is a remote device.
+    pub remote: bool,
 }
 
 #[cfg(any(windows, test))]
 impl std::fmt::Display for UnsupportedFilesystem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let place = if self.remote { "a remote" } else { "a local" };
         write!(
             f,
-            "the stop marker's filesystem is {:?}, not NTFS or ReFS",
+            "the volume's filesystem is {:?} on {place} device, not NTFS or ReFS on a local one",
             self.name
         )
     }
@@ -92,4 +113,3 @@ impl std::fmt::Display for UnsupportedFilesystem {
 
 #[cfg(any(windows, test))]
 impl std::error::Error for UnsupportedFilesystem {}
-
