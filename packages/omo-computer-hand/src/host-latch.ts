@@ -1,5 +1,7 @@
 import {
   closeSync,
+  constants,
+  fstatSync,
   fsyncSync,
   lstatSync,
   mkdirSync,
@@ -26,11 +28,76 @@ export type LatchRead =
 
 const MAX_BYTES = 64 * 1024
 
+type Opened = { readonly kind: "open"; readonly fd: number } | Exclude<LatchRead, { readonly kind: "read" }>
+
 /**
- * Reads `host-latch` the way the engine does (host/files.rs): owner-only file, not a symlink,
- * under 64 KiB, `{"suspended":bool,"stopEpoch":n}`. Anything else is unreadable.
+ * Opens one path component with O_NOFOLLOW and checks the DESCRIPTOR (owner is this uid, no mode
+ * bits beyond `allowed`), as host/files.rs does: a link or a loose directory reads as unreadable.
+ */
+function openChecked(path: string, flags: number, allowed: number, what: string): Opened {
+  let fd: number
+  try {
+    fd = openSync(path, flags | constants.O_NOFOLLOW | constants.O_RDONLY)
+  } catch (error) {
+    if (!(error instanceof Error) || !("code" in error)) throw error
+    const code = String(Reflect.get(error, "code"))
+    return code === "ENOENT" ? { kind: "absent" } : { kind: "unreadable", why: `${what}:${code}` }
+  }
+  const stat = fstatSync(fd)
+  const why =
+    stat.uid !== process.getuid?.() ? `${what}_owner` : (stat.mode & 0o777 & ~allowed) !== 0 ? `${what}_mode` : undefined
+  if (why === undefined) return { kind: "open", fd }
+  closeSync(fd)
+  return { kind: "unreadable", why }
+}
+
+/**
+ * Reads `host-latch` the way the engine does (host/files.rs): the config dir and `computer/` are
+ * opened O_DIRECTORY|O_NOFOLLOW and must be this uid's with no group or other bits, and the file
+ * is reached THROUGH the `computer/` descriptor (Linux: /proc/self/fd, openat's effect), opened
+ * O_NOFOLLOW, checked owner-only on its descriptor and read from it, under 64 KiB. Anything else is
+ * unreadable. One deliberate difference: a config dir that does not exist yet reads as absent (no
+ * latch can be in it); the engine reads it as set, the stricter side.
  */
 export function readHostLatch(path: string): LatchRead {
+  if (process.platform === "win32") return readLatchByPath(path)
+  const computer = dirname(path)
+  const config = openChecked(dirname(computer), constants.O_DIRECTORY, 0o700, "config_dir")
+  if (config.kind !== "open") return config
+  try {
+    const dir = openChecked(
+      process.platform === "linux" ? `/proc/self/fd/${config.fd}/computer` : computer,
+      constants.O_DIRECTORY,
+      0o700,
+      "computer_dir",
+    )
+    if (dir.kind !== "open") return dir
+    try {
+      const file = openChecked(
+        process.platform === "linux" ? `/proc/self/fd/${dir.fd}/host-latch` : path,
+        0,
+        0o600,
+        "host_latch",
+      )
+      if (file.kind !== "open") return file
+      try {
+        const stat = fstatSync(file.fd)
+        if (!stat.isFile()) return { kind: "unreadable", why: "not_a_regular_file" }
+        if (stat.size > MAX_BYTES) return { kind: "unreadable", why: "size" }
+        return parseLatch(readFileSync(file.fd, "utf8"))
+      } finally {
+        closeSync(file.fd)
+      }
+    } finally {
+      closeSync(dir.fd)
+    }
+  } finally {
+    closeSync(config.fd)
+  }
+}
+
+/** Windows (no O_NOFOLLOW, ACLs are row 60's): the file itself, never a link. */
+function readLatchByPath(path: string): LatchRead {
   let stat: Stats
   try {
     stat = lstatSync(path)
@@ -44,9 +111,13 @@ export function readHostLatch(path: string): LatchRead {
   if ((stat.mode & 0o077) !== 0) return { kind: "unreadable", why: "mode" }
   if (typeof process.getuid === "function" && stat.uid !== process.getuid()) return { kind: "unreadable", why: "owner" }
   if (stat.size > MAX_BYTES) return { kind: "unreadable", why: "size" }
+  return parseLatch(readFileSync(path, "utf8"))
+}
+
+function parseLatch(text: string): LatchRead {
   let value: unknown
   try {
-    value = JSON.parse(readFileSync(path, "utf8"))
+    value = JSON.parse(text)
   } catch (error) {
     if (error instanceof SyntaxError) return { kind: "unreadable", why: "parse" }
     throw error

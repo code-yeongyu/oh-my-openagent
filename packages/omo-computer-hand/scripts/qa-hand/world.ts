@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process"
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir, userInfo } from "node:os"
 import { join } from "node:path"
 
@@ -61,6 +61,7 @@ export function seamPaths(seam: string): HandPaths {
     platform: process.platform,
     home: userInfo().homedir,
     tmp: tmpdir(),
+    isDirectory: (path) => statSync(path, { throwIfNoEntry: false })?.isDirectory() === true,
   })
   if (resolved.kind !== "resolved") throw new Error(`no hand paths: ${resolved.reason}`)
   return resolved.paths

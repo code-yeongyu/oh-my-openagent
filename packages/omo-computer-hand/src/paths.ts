@@ -38,6 +38,8 @@ export interface HandPathsInput {
   readonly home: string | undefined
   /** The per-user temp directory (macOS runtime root). */
   readonly tmp: string
+  /** Whether `path` is a directory: `/run/user/<uid>` must exist when XDG_RUNTIME_DIR is unset (paths.rs). */
+  readonly isDirectory: (path: string) => boolean
 }
 
 const SEAM = "OMO_COMPUTER_RUNTIME_DIR"
@@ -109,6 +111,8 @@ export function resolveHandPaths(input: HandPathsInput): HandPathsResult {
         (input.home === undefined ? undefined : join(input.home, ".local", "state"))
       if (configBase === undefined || stateBase === undefined) return { kind: "unavailable", reason: "no_config_root" }
       const runtimeBase = absolute(input.env, "XDG_RUNTIME_DIR") ?? `/run/user/${input.uid}`
+      if (absolute(input.env, "XDG_RUNTIME_DIR") === undefined && !input.isDirectory(runtimeBase))
+        return { kind: "unavailable", reason: "no_runtime_dir" }
       const runtime = join(runtimeBase, "omo-computer", String(input.uid))
       return {
         kind: "resolved",

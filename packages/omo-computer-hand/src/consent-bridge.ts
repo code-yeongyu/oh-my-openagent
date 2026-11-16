@@ -119,14 +119,16 @@ export class ConsentBridge {
       : { kind: "rebased" }
   }
 
-  /** Host start: verify, then open this host's segment; only a clean verdict re-points the sidecar and the latch. */
+  /**
+   * Host start: verify, and on a CLEAN verdict open this host's segment and re-point the sidecar and
+   * the latch. A non-clean start opens nothing: a new segment would leave the sidecar's line outside
+   * the newest segment, so the next start would read chain_broken instead of the verdict itself. The
+   * next UI save opens the segment (`save`).
+   */
   verifyAndAnchor(): ConsentVerdict {
     const verdict = this.verify()
-    if (this.#audit === undefined) return verdict
-    const fingerprint =
-      verdict.kind === "clean" ? verdict.fingerprint : (readSidecar(this.#files.sidecar)?.fingerprint ?? "")
-    const anchor = this.#audit.open({ fingerprint, ...this.#latch() })
-    if (verdict.kind === "clean") this.#point(fingerprint, anchor)
+    if (this.#audit === undefined || verdict.kind !== "clean") return verdict
+    this.#point(verdict.fingerprint, this.#audit.open({ fingerprint: verdict.fingerprint, ...this.#latch() }))
     return verdict
   }
 
