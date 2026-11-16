@@ -19,6 +19,8 @@ mod transitions;
 mod xtest;
 
 #[cfg(test)]
+mod background_truth_tests;
+#[cfg(test)]
 mod child_tests;
 #[cfg(test)]
 pub(crate) mod fake;
