@@ -167,7 +167,7 @@ fn background_modifier_hold_is_refused_with_nothing_posted() {
 }
 
 #[test]
-fn background_mouse_hold_with_a_modifier_chord_is_refused_before_any_geometry() {
+fn background_mouse_hold_with_a_modifier_chord_is_refused_before_mapping_its_point() {
     // Given: a mouse hold whose keys are ctrl+k; the session accepts any
     // keys for a mouse hold, not only modifiers (review L1 on #13734)
     let window = ProbeWindow::new("SenpiModifierMouseHoldProbe");

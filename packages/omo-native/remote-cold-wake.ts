@@ -106,7 +106,8 @@ export async function applyColdWake(
   error: (line: string) => void,
 ): Promise<ColdWakeOutcome> {
   const outcome = await (enabled ? coldWake.install() : coldWake.uninstall())
-  const notice = coldWakeNotice(outcome)
+  // Removing finds nothing to remove when the device service is not installed: that is not worth a notice.
+  const notice = !enabled && outcome.kind === "service_not_installed" ? undefined : coldWakeNotice(outcome)
   if (notice !== undefined) error(notice)
   return outcome
 }

@@ -9,7 +9,7 @@ import type {
   SnapshotBody,
 } from "../device-service-core/src/index.ts"
 import { outcomeFailure, outcomeOf } from "../omo-senpi/src/components/thread/remote/outcome"
-import { MirroredDialogs } from "./remote-attach-dialogs"
+import { MirroredDialogs, pendingIds } from "./remote-attach-dialogs"
 
 // One authenticated attach TUI connection to the `omo remote attach` endpoint (remote-attach.ts): the attach's session
 // presented as the one row LOCAL_SESSION_ID, its plumbing answered here, every other record forwarded to the host.
@@ -78,9 +78,10 @@ export class Presentation {
   event(event: RemoteAttachEvent): void {
     switch (event.kind) {
       case "snapshot":
-        // The first snapshot replays when the stream starts; the TUI reads its dialogs through get_state. A later one is
-        // a re-attach after a relay gap, whose dialogs the TUI never reads, so they are presented here (omo#13474).
-        if (this.snapshot !== undefined && this.snapshot !== event.snapshot) this.presentPending(event.snapshot)
+        // Every snapshot (the first and each re-attach after a relay gap) presents its pending dialogs and questions as
+        // the TUI's request frames (#13482, omo#13474); the TUI shows a request id once, so get_state's copy of the same
+        // dialogs does not show it twice.
+        this.presentPending(event.snapshot)
         this.snapshot = event.snapshot
         return
       case "records":
@@ -114,7 +115,9 @@ export class Presentation {
   private presentPending(snapshot: SnapshotBody): void {
     const { pendingDialogs, pendingQuestions } = this.pendingOf(snapshot)
     const pending = [...pendingDialogs, ...pendingQuestions]
-    for (const resolved of this.dialogs.settledAway(pending, LOCAL_SESSION_ID)) this.send(resolved)
+    const state = isRecord(snapshot.state) ? snapshot.state : {}
+    const still = pendingIds(state.pendingDialogs, state.pendingQuestions)
+    for (const resolved of this.dialogs.settledAway(still, LOCAL_SESSION_ID)) this.send(resolved)
     for (const dialog of pending) this.send(dialog)
   }
 
