@@ -56,20 +56,7 @@ jobs:
 
       - name: Teardown receipts
         if: always()
-        shell: bash
-        run: |
-          set -uo pipefail
-          left=0
-          if pgrep -x Xorg >/dev/null; then echo "Xorg LEFT $(pgrep -x Xorg | tr '\n' ' ')"; left=1; else echo "Xorg procs 0"; fi
-          if grep -q 'omo-qa-' /proc/bus/input/devices; then echo "uinput devices LEFT"; left=1; else echo "uinput devices REMOVED"; fi
-          sockets=$(find /tmp/.X11-unix -maxdepth 1 -name 'X*' 2>/dev/null | wc -l)
-          if test "$sockets" -eq 0; then echo "X sockets REMOVED"; else echo "X sockets LEFT ${sockets}"; left=1; fi
-          if test -e /dev/uinput && getfacl -p /dev/uinput 2>/dev/null | grep -q "^user:$(id -un):"; then
-            echo "uinput ACL LEFT $(id -un)"; left=1
-          else
-            echo "uinput ACL REMOVED $(id -un)"
-          fi
-          exit "$left"
+        run: bun script/qa/computer/pool/xorg-uinput-probe.ts --teardown-check
 
       - name: Upload evidence
         if: always()
