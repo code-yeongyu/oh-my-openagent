@@ -65,7 +65,7 @@ mod tests {
 
     fn wire(value: &str, range: TextRange) -> (String, Option<String>, Option<serde_json::Value>) {
         let refused = range_of(value, &range).expect_err("refused");
-        (refused.refusal.code.wire().to_owned(), refused.refusal.reason.map(str::to_owned), refused.detail.map(|d| *d))
+        (refused.refusal.code.wire().to_owned(), refused.refusal.reason.map(|reason| reason.wire().to_owned()), refused.detail.map(|d| *d))
     }
 
     #[test]
