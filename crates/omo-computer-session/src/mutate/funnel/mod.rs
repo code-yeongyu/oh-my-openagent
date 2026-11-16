@@ -117,7 +117,7 @@ impl Session {
     /// The stages after the gate admitted the call and its lease and reservations are taken.
     fn admitted(
         &mut self,
-        mutation: Mutation<'_>,
+        mut mutation: Mutation<'_>,
         mut record: Record,
         (call_id, report_mode, tag): (String, omo_computer_core::params::ReportMode, u64),
         held: Held,
@@ -179,6 +179,14 @@ impl Session {
             let out = self.stamp(Refusal::bare(EngineCode::UserIntervened).into(), object);
             return Err(self.refuse(record, Some("Attribution".to_owned()), out));
         }
+        let text_cut = match self.send_on_enter(&mut mutation) {
+            Ok(cut) => cut,
+            Err(out) => {
+                drop(lock);
+                let out = self.stamp(out, object);
+                return Err(self.refuse(record, Some("Consequential".to_owned()), out));
+            }
+        };
         if let Err(error) = self.funnel.markers.create(&record.marker) {
             self.funnel.warn(format!("marker not written: {error}"));
             return Err(self.refuse(record, Some("Marker".to_owned()), MARKER_UNAVAILABLE.into()));
@@ -191,6 +199,7 @@ impl Session {
             None => (self.send_watched(mutation.events, mutation.route, tag, watch, target), None),
         };
         drop(lock);
+        let outcome = crate::send_on_enter::TextCut::finish(text_cut, outcome);
         let (count, of) = (outcome.count, outcome.of);
         if count > 0 {
             if let Some(now) = self.backend.clock().map(BackendClock::now_ms) {
@@ -236,6 +245,7 @@ impl Session {
                         sent: count,
                     }),
                     warning,
+                    detail: ended.detail,
                     ..Refused::from(ended.refusal)
                 })
             }
