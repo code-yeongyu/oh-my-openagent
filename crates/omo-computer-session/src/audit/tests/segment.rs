@@ -11,18 +11,18 @@ fn an_audit_file_that_cannot_be_read_is_an_error_not_a_missing_link() {
     let dir = tempfile::tempdir().expect("tempdir");
     let file = dir.path().join("audit.jsonl");
     assert!(
-        matches!(last_line_hash(&file), Ok(None)),
+        matches!(last_line_hash(&file, 1 << 20), Ok(None)),
         "no file: no link"
     );
     fs::write(&file, "{\"lineHash\":\"aa\"}\n{\"lineHash\":\"bb\"}\n").expect("file");
     assert_eq!(
-        last_line_hash(&file).expect("readable"),
+        last_line_hash(&file, 1 << 20).expect("readable"),
         Some("bb".to_owned())
     );
     let unreadable = dir.path().join("a-dir.jsonl");
     fs::create_dir(&unreadable).expect("a directory where the file goes");
     assert!(
-        last_line_hash(&unreadable).is_err(),
+        last_line_hash(&unreadable, 1 << 20).is_err(),
         "a file that is there and cannot be read is an error"
     );
 }

@@ -148,8 +148,14 @@ impl AuditWriter {
             audit_dir: audit_dir.to_owned(),
             scan: HandScan::default(),
         };
-        let last = chain_link(&this.path);
-        this.open_segment(last)?;
+        // R7-3: audit.1.jsonl with no audit.jsonl is a rotation in progress, never a fresh hand:
+        // the new file's chain starts from the retired file's last line.
+        let max_line = this.limits.max_event + super::scan::LINE_STAMP_BYTES;
+        let retired = this.path.with_file_name(ROTATED_FILE);
+        let last = chain_link(&this.path, max_line).or_else(|| {
+            (!this.path.exists() && retired.exists()).then(|| chain_link(&retired, max_line)).flatten()
+        });
+        this.open_segment(last, false)?;
         Ok(this)
     }
 
@@ -163,14 +169,19 @@ impl AuditWriter {
         self.degraded
     }
 
-    /// `last`: the last `lineHash` of the segment this one follows.
-    fn open_segment(&mut self, last: Option<String>) -> io::Result<()> {
+    /// `last`: the last `lineHash` of the segment this one follows; `carry`: the anchor carries
+    /// an unresolved mark into the new file (R7-3).
+    fn open_segment(&mut self, last: Option<String>, carry: bool) -> io::Result<()> {
         self.segment.seq = 0;
         self.segment.prev = "meta".to_owned();
         self.cap_refusal_written = false;
         let mut lines = vec![self.segment.meta()];
         if let Some(anchor) = self.authority.clone() {
-            let mut line = stamp(&mut self.segment, &anchor_event(&anchor))?;
+            let mut event = anchor_event(&anchor);
+            if carry {
+                event.evidence.push(super::mark::CARRIES_MARK.to_owned());
+            }
+            let mut line = stamp(&mut self.segment, &event)?;
             let prev = last.unwrap_or_else(|| "meta".to_owned());
             line["prev"] = json!(prev);
             lines.push(line);
@@ -207,11 +218,31 @@ impl AuditWriter {
         fs::metadata(&self.path).map_or(0, |meta| meta.len())
     }
 
+    /// R7-3, under the hand's lock from the scan through the new file's first records: reads
+    /// audit.1.jsonl and the file it retires; when either holds an unresolved mark (or reads
+    /// tampered), appends a carried mark as the retiring file's last line, renames, and opens the
+    /// new file with an anchor that carries the mark. A file it cannot read means no rotation.
     fn rotate(&mut self) -> io::Result<()> {
-        let rotated = self.path.with_file_name(ROTATED_FILE);
-        let last = chain_link(&self.path);
-        fs::rename(&self.path, rotated)?;
-        self.open_segment(last)
+        let dir = self.hand_dir()?.to_owned();
+        let hand = self.segment.hand_id().to_owned();
+        let carry = match HandScan::default().read_held(&dir, &hand, self.limits).tampered {
+            None => false,
+            Some(Tamper::Unreadable) => {
+                return Err(io::Error::other("the hand's audit cannot be read: no rotation"))
+            }
+            Some(_) => true,
+        };
+        if carry {
+            let mut segment = self.segment.clone();
+            let mut line = stamp(&mut segment, &super::mark::carried_mark())?.to_string();
+            line.push('\n');
+            self.write_held(line.as_bytes())?;
+            self.segment = segment;
+        }
+        let max_line = self.limits.max_event + super::scan::LINE_STAMP_BYTES;
+        let last = chain_link(&self.path, max_line);
+        fs::rename(&self.path, self.path.with_file_name(ROTATED_FILE))?;
+        self.open_segment(last, carry)
     }
 }
 

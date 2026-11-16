@@ -4,7 +4,7 @@
 
 use serde_json::Value;
 
-use super::line::{AuditEvent, GateOutcome, Status};
+use super::line::{AuditEvent, DeliveryKind, GateOutcome, Status, Tier};
 
 const REFUSING_CALLS: [&str; 2] = ["session.open", "stopPath.start"];
 /// The action of the line a rotation appends to the file it retires when a mark is unresolved.
@@ -45,4 +45,18 @@ pub fn carries_mark(line: &Value) -> bool {
 #[must_use]
 pub fn is_anchor(line: &Value) -> bool {
     line["grant"]["verdict"] == "rotation_anchor"
+}
+
+/// The line a rotation appends as the last line of the file it retires when a mark is unresolved.
+#[must_use]
+pub fn carried_mark() -> AuditEvent {
+    AuditEvent {
+        action: CARRIED_MARK.to_owned(),
+        target: "audit".to_owned(),
+        delivery: DeliveryKind::Control,
+        tier: Tier::Read,
+        status: Status::Refused,
+        evidence: vec![CARRIES_MARK.to_owned()],
+        ..AuditEvent::default()
+    }
 }
