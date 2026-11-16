@@ -4,12 +4,12 @@
 use std::hash::{BuildHasher, Hasher};
 
 use omo_computer_core::backend::{Refusal, TaggedInput};
-use omo_computer_core::env::FAKE_BACKEND;
 use omo_computer_core::report::Disposition;
 use omo_computer_core::results::ExecReply;
 use serde_json::json;
 
 mod binding;
+mod lockwait;
 mod readmit;
 mod refusal;
 
@@ -69,12 +69,21 @@ impl Session {
                 }
             }
         }
+        let took_slot = plan.foreground && !self.funnel.control.slot.is_mine(&self.funnel.control.token);
         if let Err(out) = self.funnel.control.commit(self.backend.as_mut(), &plan, epoch) {
             return Err(self.refuse(record, Some("Lease".to_owned()), out));
         }
         let binding = plan.audit_binding.clone();
         let result = self.admitted(mutation, record, (call_id, report_mode, tag), binding);
-        self.funnel.control.reported(&plan);
+        // A-IS-66 W3: a call refused at the lock's bound releases what its own commit took.
+        if result.as_ref().is_err_and(|refused| refused.refusal.reason == Some("interaction_lock")) {
+            self.funnel.control.release_call(&plan);
+            if took_slot {
+                self.end_lease(crate::presence::LeaseEnd::Release);
+            }
+        } else {
+            self.funnel.control.reported(&plan);
+        }
         result
     }
 
@@ -105,17 +114,9 @@ impl Session {
             }
             Ok(Verdict::Proceed) => {}
         }
-        let lock = match self.interaction_lock() {
+        let lock = match self.wait_for_interaction_lock() {
             Ok(lock) => lock,
-            Err(error) => {
-                self.funnel
-                    .warn(format!("interaction lock not taken: {error}"));
-                return Err(self.refuse(
-                    record,
-                    Some("Lock".to_owned()),
-                    TRANSACTION_FAILED.into(),
-                ));
-            }
+            Err((stage, out)) => return Err(self.refuse(record, Some(stage), out)),
         };
         // Time passes between the first gate and here (the busy wait, another holder of the
         // interaction lock): on every path the gate runs again once the lock is held, and
@@ -212,17 +213,6 @@ impl Session {
         }
     }
 
-    /// The interaction lock for this exec. A session with no RUNTIME root has none; only the
-    /// fake acts without it, and any other backend is refused (A-IS-65 L10(b)).
-    fn interaction_lock(&self) -> std::io::Result<Option<crate::lock::LockGuard>> {
-        match self.funnel.lock.as_ref() {
-            Some(lock) => lock.acquire().map(Some),
-            None if self.backend.capabilities().backend == FAKE_BACKEND => Ok(None),
-            None => Err(std::io::Error::other(
-                "no runtime root: a real backend acts only under the interaction lock",
-            )),
-        }
-    }
 
     /// The one side-effect sink: every event in order, stopping at the first refusal.
     fn send(

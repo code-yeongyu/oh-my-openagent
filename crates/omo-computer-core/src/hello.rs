@@ -14,8 +14,11 @@ pub const PROTOCOL_VERSION: &str = "1";
 /// The ABI line the engine reports and a host compares by major.
 pub const ABI: &str = "omo-computer/1";
 
-/// The opt-in features this engine advertises in `hello.features`.
-pub const FEATURES: &[&str] = &["action-report"];
+/// The opt-in features this engine advertises in `hello.features`. `interaction-lock` is the
+/// shipped engine's text (A-IS-66 'Not in this amendment' (c)): input from this user's engines in
+/// every process is serialized by a machine-wide lock, and a lock held past its wait budget
+/// answers `InputBusy`.
+pub const FEATURES: &[&str] = &["action-report", "interaction-lock"];
 
 /// The size ceilings a host must respect on this connection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

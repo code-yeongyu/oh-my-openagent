@@ -131,6 +131,7 @@ InputBusy{app_leased}	engine	InputBusy	app_leased	COMPUTER_INPUT_BUSY	design/d-s
 InputBusy{window}	engine	InputBusy	window	COMPUTER_INPUT_BUSY	design/d-sdk-skill.md:518	c506733b98b2ca6c08aeaaadc4239a5ef45c711ac93aad9fc26caae5662d5cb4	InputBusy{window, holder}: the window reservation keyed by its reason
 InputBusy{budget}	engine	InputBusy	budget	COMPUTER_BUSY	design/d-sdk-skill.md:519	5cb9b3a6582cbd1c55f7a6704967a0574ea69ce9cff89bbe5405ba8b87ecb4cd	-
 InputBusy{target_busy}	engine	InputBusy	target_busy	COMPUTER_INPUT_BUSY	design/d-sdk-skill.md:520	edb7f2df02857aee5790518759e84d8b91a5fb5a9885cedbbee97dc16e2519d6	-
+InputBusy{interaction_lock}	engine	InputBusy	interaction_lock	COMPUTER_INPUT_BUSY	crates/omo-computer-core/src/error/reason.rs:106	a25f812413db842cb4ee75e2dd0874fc44ba615d8803c51d9c35d4e81c7d5417	A-IS-66 W3 (bound): the pin lines d-safety.md:248 and d-sdk-skill.md's error table are written at the re-pin; until then the amendment is their authority
 ControlRequired{foreground}	engine	ControlRequired	foreground	COMPUTER_CONTROL_REQUIRED	design/d-sdk-skill.md:508	9568e299a9db050b1ecfa4ee06d39bb3a54cf59b01a87434508d903270addaa2	-
 ControlRequired{headless_host}	engine	ControlRequired	headless_host	COMPUTER_CONTROL_REQUIRED	design/d-sdk-skill.md:508	9568e299a9db050b1ecfa4ee06d39bb3a54cf59b01a87434508d903270addaa2	-
 ControlRequired{app_scope}	engine	ControlRequired	app_scope	COMPUTER_CONTROL_REQUIRED	design/d-sdk-skill.md:508	9568e299a9db050b1ecfa4ee06d39bb3a54cf59b01a87434508d903270addaa2	-

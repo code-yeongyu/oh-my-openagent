@@ -250,6 +250,14 @@ impl Control {
             })
     }
 
+    /// The call was refused at the interaction lock's bound: its own window reservations go at
+    /// once (A-IS-66 W3); a record another session holds is never touched.
+    pub(crate) fn release_call(&mut self, plan: &Plan) {
+        for window in &plan.windows {
+            self.reservations.release(&self.token, window);
+        }
+    }
+
     /// The call's report went out.
     pub(crate) fn reported(&mut self, plan: &Plan) {
         let now = self.now_ms();

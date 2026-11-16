@@ -6,7 +6,7 @@
 
 closed_names! {
     /// Every `data.reason` any stage, gate, backend default or layer emits.
-    Reason [144] {
+    Reason [145] {
         NotInteractive = "not_interactive",
         PromptPending = "prompt_pending",
         Revoked = "revoked",
@@ -102,6 +102,8 @@ closed_names! {
         Window = "window",
         Budget = "budget",
         TargetBusy = "target_busy",
+        // A-IS-66 W3: another engine or session held the machine-wide interaction lock past the wait budget.
+        InteractionLock = "interaction_lock",
         Foreground = "foreground",
         HeadlessHost = "headless_host",
         AppScope = "app_scope",
