@@ -4,7 +4,7 @@
 //! connection of the source's own.
 
 use omo_computer_core::backend::{BackendResult, EpochChange, EpochSource, Refusal};
-use omo_computer_core::error::EngineCode;
+use omo_computer_core::error::{EngineCode, Reason};
 use omo_computer_core::frame::EpochReason;
 
 use crate::capture::server::{Monitor, XServer};

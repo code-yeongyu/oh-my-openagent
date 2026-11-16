@@ -101,7 +101,7 @@ mod tests {
         let mut x11 = backend(&vars(&[(BACKEND_SEAM, "x11")])).expect("x11 backend");
         assert_eq!(
             x11.displays().unwrap_err(),
-            omo_computer_core::backend::Refusal::new(omo_computer_core::error::EngineCode::Internal, Reason::NoDisplayServer)
+            omo_computer_core::backend::Refusal::new(omo_computer_core::error::EngineCode::Internal, omo_computer_core::error::Reason::NoDisplayServer)
         );
         assert!(matches!(backend(&vars(&[])), Err(RouteError::NoBackend(None))));
     }

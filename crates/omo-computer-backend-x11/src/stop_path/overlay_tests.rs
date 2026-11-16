@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use omo_computer_core::backend::Presence;
+use omo_computer_core::error::Reason;
 
 use crate::capture::server::PixelRect;
 use crate::overlay::{borders, Overlay, OverlayServer, BORDER_PX, OVERLAY_RGB};
