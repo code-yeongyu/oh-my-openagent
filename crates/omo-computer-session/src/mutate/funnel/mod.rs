@@ -205,7 +205,7 @@ impl Session {
         let (count, of) = (outcome.count, outcome.of);
         if count > 0 {
             if let Some(now) = self.backend.clock().map(BackendClock::now_ms) {
-                self.display_awake.update(|hold| hold.on_exec(now, hold_limits));
+                self.display_awake.update(|hold| hold.tick(now, hold_limits).on_exec(now, hold_limits));
             }
         }
         if let Some((target, frame_id)) = mutation.consume.as_ref().filter(|_| count > 0) {
