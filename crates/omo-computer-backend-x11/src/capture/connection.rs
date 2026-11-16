@@ -142,8 +142,8 @@ impl X11Connection {
         Ok(states.value32().is_some_and(|mut values| values.any(|atom| atom == hidden)))
     }
 
-    /// Whether the client repainted before the deadline: a notify carrying the `ClearArea`'s
-    /// own sequence number is the server's background paint, any later one the client's repaint.
+    /// Whether the client repainted before the deadline: only a notify after the `ClearArea`'s
+    /// sequence is the client's repaint; the `DamageCreate` report and the server paint come before.
     fn wait_damage(&self, damage_id: u32, watch: DamageWatch) -> Result<bool, XError> {
         let deadline = Instant::now() + DAMAGE_WAIT;
         while Instant::now() < deadline {
