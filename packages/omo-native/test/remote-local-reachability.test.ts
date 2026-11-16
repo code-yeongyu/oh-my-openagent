@@ -77,7 +77,6 @@ const SPAWN_CALL_SITES = [
   "packages/omo-native/remote-session-verbs.ts: openOn(remote; args)",
   "packages/omo-native/remote-session-verbs.ts: packages/omo-senpi/src/components/thread/gateway/provenance-resolver.ts#resolveProvenance({cwd,env}; -)",
   // The person client's sessions.open stamps this device's sender provenance (one git remote read), as the session verbs did.
-  "packages/omo-senpi/src/components/remote/sessions.ts: packages/omo-senpi/src/components/thread/gateway/provenance-resolver.ts#resolveProvenance({cwd,env}; -)",
   "packages/omo-native/remote-session-verbs.ts: personDelivery(remote; dependencies)",
   "packages/omo-native/remote-session-verbs.ts: personDelivery(remote; dependencies)",
   "packages/omo-native/remote-session-verbs.ts: personSenderProvenance(remote; -)",
@@ -105,7 +104,6 @@ const SPAWN_CALL_SITES = [
   'packages/omo-opencode/src/cli/service-auth/keystore.ts: createSealedStore(api; "omo-cli")',
   "packages/omo-opencode/src/cli/service-auth/keystore.ts: packages/omo-opencode/src/cli/service-auth/keychain-helper/store-binding.ts#bindKeychainHelper({platform,namespace,secrets,key,background,origin,notice,pending,...}; -)",
   'packages/omo-opencode/src/cli/service-auth/secret-service-lock.ts: node:child_process#spawn("gdbus"; [ "call", "--session", "--dest", "org.freedesktop.secrets", "--object-path", DEFAULT_COLLECTION, "--method", "org.freedesktop.DBus.Properties.Get", "org.free...)',
-  "packages/omo-senpi/src/components/remote/sessions.ts: packages/omo-senpi/src/components/thread/gateway/provenance-resolver.ts#resolveProvenance({cwd,env}; -)",
   "packages/omo-senpi/src/components/thread/addressing.ts: gitWorktreeRoot(dir; -)",
   "packages/omo-senpi/src/components/thread/addressing.ts: gitWorktreeRoot(root; -)",
   'packages/omo-senpi/src/components/thread/addressing.ts: node:child_process#execFileSync("git"; ["-C", dir, "rev-parse", "--show-toplevel"])',

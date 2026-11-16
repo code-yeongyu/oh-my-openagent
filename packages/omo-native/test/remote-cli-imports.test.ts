@@ -9,7 +9,7 @@ import { join } from "node:path"
 const NATIVE = join(import.meta.dir, "..")
 
 const OFFENDERS: readonly string[] = [
-  // 4c-1 leaves these: `wake`, `enable` and the session verbs still run on their own connection.
+  // 4c-1 leaves these: `enable` and the session verbs still run on their own connection.
   "remote-cli.ts -> ../device-service-core/src/index.ts",
   "remote-cold-wake.ts -> ../device-service-core/src/index.ts",
   "remote-entry.ts -> ../device-service-core/src/device-service.ts",
@@ -54,6 +54,10 @@ const OFFENDERS: readonly string[] = [
   "remote-bootstrap.ts -> ./package.json",
 ]
 
+// This device's operator endpoint leg opens sockets, so remote-cli loads it lazily, never into remote-local's local-only
+// graph (omo#13440): allowed only as a dynamic import from remote-cli.ts.
+const LAZY: ReadonlySet<string> = new Set(["remote-cli.ts -> ../omo-senpi/src/components/remote/local-sessions"])
+
 const allowed = (specifier: string): boolean =>
   specifier.startsWith("node:") ||
   /^\.\/(remote-[\w-]+|thread-[\w-]+\.js)$/.test(specifier) ||
@@ -73,7 +77,8 @@ function violations(): string[] {
   for (const file of cliFiles()) {
     const transpiler = new Bun.Transpiler({ loader: file.endsWith(".js") ? "js" : "ts" })
     for (const entry of transpiler.scanImports(readFileSync(join(NATIVE, file), "utf8")))
-      if (!allowed(entry.path)) found.push(`${file} -> ${entry.path}`)
+      if (!allowed(entry.path) && !(entry.kind === "dynamic-import" && LAZY.has(`${file} -> ${entry.path}`)))
+        found.push(`${file} -> ${entry.path}`)
   }
   return found.sort()
 }

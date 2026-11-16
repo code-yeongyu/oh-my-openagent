@@ -38,7 +38,7 @@ import type { DeliveryPipeline } from "./gateway/pipeline"
 import type { DeliveryTarget } from "./gateway/transport"
 import { createGatewayServices } from "./tools/gateway-services"
 import { listThreads, readThread } from "./tools/read-ops"
-import { createRelayTools } from "./tools/relay-tools"
+import { createRelayTools, REMOVED_RELAY_TOOL_HINTS } from "./tools/relay-tools"
 import { consumedSendersOf, threadSendPermission } from "./tools/reply-permission"
 import { otherDevice, replyTargetMismatch } from "./tools/reply-target"
 import { accountDevices } from "./remote/account"
@@ -468,16 +468,30 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
       message: value.prompt ?? "",
       ...(value.delivery === undefined ? {} : { delivery: value.delivery }),
     }
-    const sent = await deliverThrough(
-      options,
-      pipeline,
-      current,
-      target,
-      send,
-      `${operationId}:prompt`,
-      callerId,
-      undefined,
-    )
+    // The thread exists from here on: a delivery that throws (a store or connection failure, not a typed refusal) is the
+    // prompt's outcome, never the create's, so the caller still gets the thread it made (review L1 at 0571de8).
+    let sent: ThreadToolResult
+    try {
+      sent = await deliverThrough(
+        options,
+        pipeline,
+        current,
+        target,
+        send,
+        `${operationId}:prompt`,
+        callerId,
+        undefined,
+      )
+    } catch (error) {
+      return {
+        error: threadToolFailure(
+          "internal_error",
+          `The thread was created, but its first prompt was not delivered: ${error instanceof Error ? error.message : String(error)}.`,
+          `Send it with thread_send to ${thread.thread_id}; read the thread first if the prompt may have arrived.`,
+          { thread_id: thread.thread_id },
+        ),
+      }
+    }
     if (sent.kind === "error") return { error: sent.error }
     const { delivery, deduplicated, delivery_id, effective_mode, endpoint } = sent as Extract<
       ThreadSendResult,
@@ -680,7 +694,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
       }
     return { kind: "file", sessionPath: entry.session_path }
   }
-  const relayTools = createRelayTools({ options, relay, view, failure })
+  const relayTools = createRelayTools({ options, relay, failure })
   const dispose = () => {
     pipeline.dispose()
     unanswered.clear()
@@ -898,8 +912,9 @@ async function deliverThrough(
 }
 
 /**
- * Registers the eighteen tools, and with `pi.on` the store extensions' session tools at each `session_start`
- * (`tools/extension-tools.ts`); `dispose` (shutdown) cancels the relay's background retries and drops the receipt-recovery keys.
+ * Registers the fourteen tools, a removed-tool hint for each chat-binding tool sessions no longer have, and with `pi.on`
+ * the store extensions' session tools at each `session_start` (`tools/extension-tools.ts`); `dispose` (shutdown) cancels
+ * the relay's background retries and drops the receipt-recovery keys.
  */
 export function registerThreadTools(
   pi: ExtensionToolHost,
@@ -909,6 +924,7 @@ export function registerThreadTools(
   const built = buildThreadTools(options)
   // Thread tools run on the loop side of a split session (engine `ToolDefinition.runs`).
   for (const tool of built.tools) pi.registerTool({ ...tool, runs: "brain" })
+  for (const [name, hint] of Object.entries(REMOVED_RELAY_TOOL_HINTS)) pi.registerRemovedToolHint?.(name, hint)
   if (pi.on !== undefined)
     registerExtensionTools(pi as ExtensionToolHost & Required<Pick<ExtensionToolHost, "on">>, options, log)
   return { dispose: built.dispose }

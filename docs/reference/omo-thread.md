@@ -1,7 +1,9 @@
 # omo thread - the session gateway from scripts and connectors
 
 `omo thread` runs every thread operation the agent tools offer (`thread_list`, `thread_send`,
-`thread_read`, `thread_bind` ... `thread_answer`) without an agent session. It is how a script,
+`thread_read`, `thread_report` ... `thread_answer`) without an agent session, plus the binding
+operations (`bind`, `unbind`, `rebind`, `bindings`) that are not session tools: the always-on
+gateway binds chat threads, and a script can do the same here. It is how a script,
 a cron job or a chat connector talks to running OmO sessions: terminal sessions (`tui`),
 Desktop threads and task children on their hosts (`rpc_host`).
 
