@@ -105,6 +105,15 @@ const keptCases: ReadonlyArray<{
     reason: "repo-in-use",
   },
   {
+    name: "a process starts working in the repository during the settle window",
+    ageMs: 70 * 60_000,
+    scans: () => {
+      let calls = 0
+      return { ...idleScans, findRepoUsers: async () => (calls++ === 0 ? [] : [4242]) }
+    },
+    reason: "repo-in-use",
+  },
+  {
     name: "it changes during the settle window",
     ageMs: 70 * 60_000,
     scans: (lock) => ({

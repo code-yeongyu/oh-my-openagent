@@ -1,7 +1,7 @@
 import { hostname } from "node:os"
 import { join } from "node:path"
 
-import { appendFile, lstat, readFile, readdir, unlink } from "../fs/resilient"
+import { lstat, readFile, readdir, unlink } from "../fs/resilient"
 import { memoryWriterLockPath, parseLockRecord, type LockRecord } from "../locks"
 import { isLockOwnerProvenDead } from "../locks/acquire"
 import { provenDeadTakeoverFor } from "../locks/proven-dead-takeovers"
@@ -9,6 +9,9 @@ import { isGitLockError, withGitLockRetry } from "./config-lock"
 import { GitError } from "./errors"
 import { identityLocksDirForRepo, probeGitActivityIdle } from "./git-activity-lock"
 import { PRODUCTION_LOCK_SCANS, type GitLockScans } from "./lock-scans"
+import { removeJournaled } from "./stale-lock-journal"
+
+export { STALE_LOCK_JOURNAL } from "./stale-lock-journal"
 
 // Settle window between observing an idle lock candidate and re-checking it. The crash-
 // consistency fixture child shortens its OWN process's window through the
@@ -37,7 +40,6 @@ export interface StaleIndexLockPolicy {
 export const STALE_INDEX_LOCK_POLICY: StaleIndexLockPolicy = { staleAgeMs: 10 * 60_000, staleSettleMs: 60_000 }
 
 /** One line per index.lock the writer removed without an owner proof, next to the identity's locks. */
-export const STALE_LOCK_JOURNAL = "stale-index-lock-removals.jsonl"
 
 export interface KeptGitLock {
   readonly path: string
@@ -126,7 +128,7 @@ async function settledVerdict(
   return holders.length > 0 ? "open-holder" : "removable"
 }
 
-// A repo outside the identity layout has no writer lock to authorize with, so it is never swept.
+// A repo outside the identity layout has no writer lock to authorize with; its stranded locks are always kept.
 export function writerLockPathForRepo(repoDir: string): string | null {
   const locksDir = identityLocksDirForRepo(repoDir)
   return locksDir === null ? null : memoryWriterLockPath(locksDir)
@@ -147,6 +149,14 @@ export function writerLockPathForRepo(repoDir: string): string | null {
 // takeover published (omo #10199 r5 MEDIUM 3), so a released takeover or another lock's proof
 // never authorizes anything.
 // Returns the proven-dead previous owner that authorizes this sweep, or null.
+async function callerHoldsWriterLock(repoDir: string): Promise<boolean> {
+  const writerLockPath = writerLockPathForRepo(repoDir)
+  if (writerLockPath === null) return false
+  const raw = await readFile(writerLockPath, "utf8").catch(() => undefined)
+  const current = raw === undefined ? null : parseLockRecord(raw)
+  return current !== null && current.pid === process.pid && current.hostname === hostname()
+}
+
 async function authorizedPreviousOwner(repoDir: string): Promise<LockRecord | null> {
   const writerLockPath = writerLockPathForRepo(repoDir)
   if (writerLockPath === null) return null
@@ -232,6 +242,9 @@ async function sweepOwnerlessStaleIndexLock(
     kept: [...kept, { path: indexLock, reason }],
   })
   if (before === undefined) return { removed: [], kept }
+  // A removal must be journaled (#13808 ruling); a repository outside the identity layout has nowhere to record it.
+  const locksDir = identityLocksDirForRepo(dir)
+  if (locksDir === null || !(await callerHoldsWriterLock(dir))) return keep("owner-not-proven-dead")
   const ageMs = Date.now() - before.mtimeMs
   if (ageMs < stale.staleAgeMs) return keep("owner-not-proven-dead")
   const users = await scans.findRepoUsers(dir)
@@ -244,24 +257,22 @@ async function sweepOwnerlessStaleIndexLock(
     return keep("changed-during-settle")
   const usersAfter = await scans.findRepoUsers(dir)
   if (usersAfter === null || usersAfter.length > 0) return keep("repo-in-use")
+  // As on the authorized path, the exclusive git-activity hold spans the final check and unlink, so no memory-core git starts in between.
+  const activity = await probeGitActivityIdle(dir)
+  if (activity.kind === "busy") return keep("repo-in-use")
   try {
-    await unlink(indexLock)
-  } catch {
-    return keep("unlink-failed")
+    const final = await lstat(indexLock).catch(() => undefined)
+    if (
+      final === undefined ||
+      final.ino !== before.ino ||
+      final.size !== before.size ||
+      final.mtimeMs !== before.mtimeMs
+    )
+      return keep("changed-during-settle")
+    return await removeJournaled(indexLock, locksDir, { ageMs, before, settleMs: stale.staleSettleMs }, keep, kept)
+  } finally {
+    if (activity.kind === "idle") await activity.release()
   }
-  const locksDir = identityLocksDirForRepo(dir)
-  if (locksDir !== null) {
-    const entry = {
-      at: new Date().toISOString(),
-      path: indexLock,
-      ageMs,
-      mtime: new Date(before.mtimeMs).toISOString(),
-      size: before.size,
-      checks: { repoUsers: 0, openHolders: 0, unchangedForMs: stale.staleSettleMs },
-    }
-    await appendFile(join(locksDir, STALE_LOCK_JOURNAL), `${JSON.stringify(entry)}\n`, { mode: 0o600 })
-  }
-  return { removed: [indexLock], kept }
 }
 
 export async function withStrandedGitLockRecovery<T>(
