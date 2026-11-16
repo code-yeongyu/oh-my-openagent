@@ -53,5 +53,5 @@ export const OpenClawConfigSchema = z.object({
 export type OpenClawConfig = z.infer<typeof OpenClawConfigSchema> & CoreOpenClawConfig
 export type OpenClawGateway = z.infer<typeof OpenClawGatewaySchema> & CoreOpenClawGateway
 export type OpenClawHook = z.infer<typeof OpenClawHookSchema> & CoreOpenClawHook
-export type OpenClawReplyListenerConfig =
-  z.infer<typeof OpenClawReplyListenerConfigSchema> & CoreOpenClawReplyListenerConfig
+export type OpenClawReplyListenerConfig = z.infer<typeof OpenClawReplyListenerConfigSchema> &
+  CoreOpenClawReplyListenerConfig

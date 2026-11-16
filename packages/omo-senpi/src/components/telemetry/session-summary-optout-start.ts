@@ -40,7 +40,8 @@ export function startOptOutPurge(input: {
     report(error)
   }
   if (!hasLivenessLeftovers(input.stateDir)) return Promise.resolve()
-  return input.load()
+  return input
+    .load()
     .then((sidecar) => {
       sidecar.purgeOptedOutStorage({
         stateDir: input.stateDir,

@@ -1,10 +1,7 @@
 import pc from "picocolors"
 import type { RunContext, Todo, ChildSession, SessionStatus } from "./types"
 import { normalizeSDKResponse } from "../../shared"
-import {
-  getContinuationState,
-  type ContinuationState,
-} from "./continuation-state"
+import { getContinuationState, type ContinuationState } from "./continuation-state"
 
 export async function checkCompletionConditions(ctx: RunContext): Promise<boolean> {
   try {
@@ -16,7 +13,7 @@ export async function checkCompletionConditions(ctx: RunContext): Promise<boolea
       return false
     }
 
-    if (!continuationState.hasTodoHookMarker && !await areAllTodosComplete(ctx)) {
+    if (!continuationState.hasTodoHookMarker && !(await areAllTodosComplete(ctx))) {
       return false
     }
 
@@ -25,7 +22,7 @@ export async function checkCompletionConditions(ctx: RunContext): Promise<boolea
       return false
     }
 
-    if (!await areAllChildrenIdle(ctx)) {
+    if (!(await areAllChildrenIdle(ctx))) {
       return false
     }
 
@@ -40,10 +37,7 @@ export async function checkCompletionConditions(ctx: RunContext): Promise<boolea
   }
 }
 
-function areContinuationHooksIdle(
-  ctx: RunContext,
-  continuationState: ContinuationState
-): boolean {
+function areContinuationHooksIdle(ctx: RunContext, continuationState: ContinuationState): boolean {
   if (continuationState.hasActiveBoulder) {
     logWaiting(ctx, "boulder continuation is active")
     return false
@@ -64,9 +58,7 @@ async function areAllTodosComplete(ctx: RunContext): Promise<boolean> {
   })
   const todos = normalizeSDKResponse(todosRes, [] as Todo[])
 
-  const incompleteTodos = todos.filter(
-    (t) => t.status !== "completed" && t.status !== "cancelled"
-  )
+  const incompleteTodos = todos.filter((t) => t.status !== "completed" && t.status !== "cancelled")
 
   if (incompleteTodos.length > 0) {
     logWaiting(ctx, `${incompleteTodos.length} todos remaining`)
@@ -81,9 +73,7 @@ async function areAllChildrenIdle(ctx: RunContext): Promise<boolean> {
   return areAllDescendantsIdle(ctx, ctx.sessionID, allStatuses)
 }
 
-async function fetchAllStatuses(
-  ctx: RunContext
-): Promise<Record<string, SessionStatus>> {
+async function fetchAllStatuses(ctx: RunContext): Promise<Record<string, SessionStatus>> {
   const statusRes = await ctx.client.session.status({
     query: { directory: ctx.directory },
   })
@@ -93,7 +83,7 @@ async function fetchAllStatuses(
 async function areAllDescendantsIdle(
   ctx: RunContext,
   sessionID: string,
-  allStatuses: Record<string, SessionStatus>
+  allStatuses: Record<string, SessionStatus>,
 ): Promise<boolean> {
   const childrenRes = await ctx.client.session.children({
     path: { id: sessionID },
@@ -108,11 +98,7 @@ async function areAllDescendantsIdle(
       return false
     }
 
-    const descendantsIdle = await areAllDescendantsIdle(
-      ctx,
-      child.id,
-      allStatuses
-    )
+    const descendantsIdle = await areAllDescendantsIdle(ctx, child.id, allStatuses)
     if (!descendantsIdle) {
       return false
     }

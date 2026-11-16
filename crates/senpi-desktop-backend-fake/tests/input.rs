@@ -25,6 +25,7 @@ fn frame() -> FrameGeometry {
 fn two_window_backend() -> FakeBackend {
     let mut scenario = common::fixture_scenario();
     scenario.windows.push(DesktopWindow {
+        identity: None,
         id: "202".into(),
         title: "Terminal".into(),
         app: "Terminal".into(),

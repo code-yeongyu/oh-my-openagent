@@ -1,4 +1,6 @@
+// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/local-api/src/validate-fields.ts
 import { posix, win32 } from "node:path";
+import { fromBase64, toBase64 } from "./bytes-encoding.ts";
 import type { JsonObject, JsonValue } from "./protocol.ts";
 import { COMMAND_ID_CHARS } from "./vocabulary.ts";
 
@@ -47,6 +49,22 @@ export const exactly = (
   for (const key of Object.keys(v))
     if (!required.includes(key) && !optional.includes(key)) fail(`${what} has an unknown field`);
   return v;
+};
+export type FieldCheck = typeof exactly;
+
+// What this client READS from the service (welcome, refused, response, event, blob payload): a required field must be
+// present, and a field this version does not define is dropped, so a newer service that adds one keeps an installed
+// client working (#914, #1129). The result holds only the named fields, so `exactly` on it still refuses a field another
+// variant of the same message defines. What a peer SENDS to be acted on (hello, request) stays `exactly`.
+export const known: FieldCheck = (v, required, optional = [], what = "message") => {
+  if (!isRecord(v)) return fail(`${what} must be an object`);
+  const out: { [key: string]: unknown } = {};
+  for (const name of required) {
+    if (!Object.hasOwn(v, name)) fail(`${what} misses ${name}`);
+    out[name] = v[name];
+  }
+  for (const name of optional) if (Object.hasOwn(v, name)) out[name] = v[name];
+  return out;
 };
 
 export const oneOf = <T extends string>(list: readonly T[], v: unknown, what: string): T =>
@@ -111,8 +129,14 @@ export const sha256Field = (v: unknown, what: string): string =>
 export const base64Bytes = (v: unknown, max: number, what: string): Uint8Array => {
   if (typeof v !== "string" || v.length === 0 || v.length > 4 * Math.ceil(max / 3))
     return fail(what);
-  const bytes = Buffer.from(v, "base64");
-  return bytes.length <= max && bytes.toString("base64") === v ? new Uint8Array(bytes) : fail(what);
+  let bytes: Uint8Array;
+  try {
+    bytes = fromBase64(v);
+  } catch (error) {
+    if (error instanceof Error) return fail(what);
+    throw error;
+  }
+  return bytes.length <= max && toBase64(bytes) === v ? bytes : fail(what);
 };
 
 const UNSAFE_KEYS: readonly string[] = ["__proto__", "constructor", "prototype"];

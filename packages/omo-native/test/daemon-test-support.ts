@@ -13,9 +13,7 @@ export interface EngineResult {
   readonly stderr?: string
 }
 
-export function scriptedEngine(
-  responder: (args: readonly string[], call: number) => EngineResult,
-) {
+export function scriptedEngine(responder: (args: readonly string[], call: number) => EngineResult) {
   const calls: EngineCall[] = []
   return {
     calls,
@@ -95,17 +93,19 @@ export function endpoint(
     open_fds: options.fds ?? 5,
     memory_pressure: false,
     env_keys: [],
-    generations: options.generations ?? [{
-      instanceId: `instance-${pid}`,
-      generation,
-      pid,
-      engineVersion: options.engineVersion ?? "2026.9.28+1.test",
-      rss_mb: options.rss ?? 10,
-      host_rss_mb: options.hostRss ?? 8,
-      sessions: options.sessions ?? 0,
-      current: true,
-      alive: reachable,
-    }],
+    generations: options.generations ?? [
+      {
+        instanceId: `instance-${pid}`,
+        generation,
+        pid,
+        engineVersion: options.engineVersion ?? "2026.9.28+1.test",
+        rss_mb: options.rss ?? 10,
+        host_rss_mb: options.hostRss ?? 8,
+        sessions: options.sessions ?? 0,
+        current: true,
+        alive: reachable,
+      },
+    ],
     crashes: options.crashes ?? 0,
     shard: options.shard ?? null,
     session_rows: [],

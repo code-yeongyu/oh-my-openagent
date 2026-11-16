@@ -23,7 +23,10 @@ export async function findMissingSpawnedScripts(input: {
     if (!isAbsolute(scriptPath)) continue
     const relativePath = relative(repoRoot, scriptPath)
     if (relativePath.startsWith(`..${sep}`) || relativePath === "..") continue
-    const exists = await stat(scriptPath).then(() => true, () => false)
+    const exists = await stat(scriptPath).then(
+      () => true,
+      () => false,
+    )
     if (!exists) missing.push(scriptPath)
   }
   return missing

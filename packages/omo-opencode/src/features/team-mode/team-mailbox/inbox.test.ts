@@ -21,24 +21,30 @@ describe("listUnreadMessages", () => {
     const inboxDir = getInboxDir(resolveBaseDir(config), teamRunId, "m1")
     await mkdir(path.join(inboxDir, "processed"), { recursive: true })
 
-    await writeFile(path.join(inboxDir, "later.json"), JSON.stringify({
-      version: 1,
-      messageId: randomUUID(),
-      from: "m2",
-      to: "m1",
-      kind: "message",
-      body: "later",
-      timestamp: 200,
-    }))
-    await writeFile(path.join(inboxDir, "earlier.json"), JSON.stringify({
-      version: 1,
-      messageId: randomUUID(),
-      from: "m3",
-      to: "m1",
-      kind: "message",
-      body: "earlier",
-      timestamp: 100,
-    }))
+    await writeFile(
+      path.join(inboxDir, "later.json"),
+      JSON.stringify({
+        version: 1,
+        messageId: randomUUID(),
+        from: "m2",
+        to: "m1",
+        kind: "message",
+        body: "later",
+        timestamp: 200,
+      }),
+    )
+    await writeFile(
+      path.join(inboxDir, "earlier.json"),
+      JSON.stringify({
+        version: 1,
+        messageId: randomUUID(),
+        from: "m3",
+        to: "m1",
+        kind: "message",
+        body: "earlier",
+        timestamp: 100,
+      }),
+    )
     await writeFile(path.join(inboxDir, "bad.json"), "{not-json")
     await writeFile(path.join(inboxDir, ".hidden.json"), "{}")
     await writeFile(path.join(inboxDir, "processed", "done.json"), "{}")

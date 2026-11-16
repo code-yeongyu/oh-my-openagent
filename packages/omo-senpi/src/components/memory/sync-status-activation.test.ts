@@ -24,18 +24,22 @@ test("#given a background sync failure with no further transition #when the fore
     },
   }
   const activeSession = { current: "other-session" }
-  const wiring = createMemoryReflectionLiveWiring({
-    sessions: new Map([["session-1", { context: identity }]]),
-    loadConfig: () => loadedMemoryConfig(memorySettings()),
-    cwd: () => root,
-    env: {},
-    syncStatus: async () => ({
-      kind: "failing",
-      since: 0,
-      attempts: 3,
-      failure: { kind: "offline", reason: "Cannot reach the service.", action: "Check your connection." },
-    }),
-  }, activeSession, { current: eventCtx })
+  const wiring = createMemoryReflectionLiveWiring(
+    {
+      sessions: new Map([["session-1", { context: identity }]]),
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      cwd: () => root,
+      env: {},
+      syncStatus: async () => ({
+        kind: "failing",
+        since: 0,
+        attempts: 3,
+        failure: { kind: "offline", reason: "Cannot reach the service.", action: "Check your connection." },
+      }),
+    },
+    activeSession,
+    { current: eventCtx },
+  )
   try {
     await wiring.onSyncStatusChanged(identity.identityPaths.repo)
     expect(notices).toEqual([])

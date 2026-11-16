@@ -42,16 +42,18 @@ async function catalog(table: string): Promise<{
 // probe error. Both degrade to a reactive launch, so the slash tests below also assert that no preflight
 // warning fired - only the `filtered` verdict is silent - to keep the assertion from passing for the
 // wrong reason.
-const TABLE_WITH_SLASH_ID = [
-  "provider                    model                                                     context  max-out  thinking  images",
-  "apitopia                    z-ai/glm-5.2-ultrafast-unlocked                           1M       131.1K   yes       no",
-  "apitopia                    kimi-for-coding-highspeed                                 262.1K   65.5K    yes       yes",
-].join("\n") + "\n"
+const TABLE_WITH_SLASH_ID =
+  [
+    "provider                    model                                                     context  max-out  thinking  images",
+    "apitopia                    z-ai/glm-5.2-ultrafast-unlocked                           1M       131.1K   yes       no",
+    "apitopia                    kimi-for-coding-highspeed                                 262.1K   65.5K    yes       yes",
+  ].join("\n") + "\n"
 
-const TABLE_WITHOUT_THE_MODEL = [
-  "provider                    model                          context",
-  "apitopia                    kimi-for-coding-highspeed      262.1K",
-].join("\n") + "\n"
+const TABLE_WITHOUT_THE_MODEL =
+  [
+    "provider                    model                          context",
+    "apitopia                    kimi-for-coding-highspeed      262.1K",
+  ].join("\n") + "\n"
 
 describe("resolveAndPreflightMemoryLaunch", () => {
   describe("#given a catalog whose model id contains a slash", () => {
@@ -147,7 +149,10 @@ describe("resolveAndPreflightMemoryLaunch", () => {
       })
 
       // then
-      const error = await launch.then(() => undefined, (reason: unknown) => reason)
+      const error = await launch.then(
+        () => undefined,
+        (reason: unknown) => reason,
+      )
       expect(error).toBeInstanceOf(MemoryModelExhaustedError)
       const message = error instanceof Error ? error.message : ""
       expect(message).toContain("model_not_visible:apitopia/truly-absent-model")

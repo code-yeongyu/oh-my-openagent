@@ -1,7 +1,16 @@
 import { describe, expect, test } from "bun:test"
 
 import { MEMORY_EXPANSION_BOUNDS } from "./memory"
-import { commitLegacyMemory, commitMemory, harness, jsonOf, memoryRepo, tempRoot, textOf, writeMemory } from "./test-support"
+import {
+  commitLegacyMemory,
+  commitMemory,
+  harness,
+  jsonOf,
+  memoryRepo,
+  tempRoot,
+  textOf,
+  writeMemory,
+} from "./test-support"
 
 interface SearchHit {
   readonly path: string
@@ -13,7 +22,12 @@ describe("memory tool (read-only)", () => {
   test("#given committed memories #when search runs #then only corpus-verified paths are returned and recorded for nudging", async () => {
     const root = await tempRoot()
     const repo = await memoryRepo()
-    await commitMemory(repo, "notes/deploy.md", "Deploy with bun build before tagging a release.", "Release deploy steps")
+    await commitMemory(
+      repo,
+      "notes/deploy.md",
+      "Deploy with bun build before tagging a release.",
+      "Release deploy steps",
+    )
     await commitMemory(repo, "notes/unrelated.md", "Coffee preferences.", "Coffee")
     await writeMemory(repo, "notes/uncommitted-deploy.md", "Deploy uncommitted draft.")
     const h = harness({ workspaceRoot: root, repo })
@@ -110,7 +124,9 @@ describe("memory tool search with query expansion", () => {
     const memory = h.tools.find((tool) => tool.name === "memory")
     for (const field of ADDED) expect(JSON.stringify(memory?.parameters)).not.toContain(`"${field}"`)
     const plain = jsonOf(await h.call("memory", { operation: "search", query: "undo shipment" }))
-    const widened = jsonOf(await h.call("memory", { operation: "search", query: "undo shipment", synonyms: ["revert", "release"] }))
+    const widened = jsonOf(
+      await h.call("memory", { operation: "search", query: "undo shipment", synonyms: ["revert", "release"] }),
+    )
     expect((plain.results as SearchHit[]).map((hit) => hit.path)).toEqual(["notes/deploy.md"])
     expect(widened).toEqual(plain)
   })
@@ -121,7 +137,14 @@ describe("memory tool search with query expansion", () => {
 
     const memory = h.tools.find((tool) => tool.name === "memory")
     for (const field of ADDED) expect(JSON.stringify(memory?.parameters)).toContain(`"${field}"`)
-    const result = jsonOf(await h.call("memory", { operation: "search", query: "undo shipment", synonyms: ["revert", "release"], note_line: "Roll the release back when the canary fails." }))
+    const result = jsonOf(
+      await h.call("memory", {
+        operation: "search",
+        query: "undo shipment",
+        synonyms: ["revert", "release"],
+        note_line: "Roll the release back when the canary fails.",
+      }),
+    )
     expect((result.results as SearchHit[]).map((hit) => hit.path)).toEqual(["notes/deploy.md", "notes/revert.md"])
     expect([...h.searchedPaths].sort()).toEqual(["notes/deploy.md", "notes/revert.md"])
   })
@@ -133,7 +156,9 @@ describe("memory tool search with query expansion", () => {
 
     const expected = jsonOf(await off.call("memory", { operation: "search", query: "undo shipment" }))
     expect(jsonOf(await on.call("memory", { operation: "search", query: "undo shipment" }))).toEqual(expected)
-    expect(jsonOf(await on.call("memory", { operation: "search", query: "undo shipment", synonyms: [], note_line: "" }))).toEqual(expected)
+    expect(
+      jsonOf(await on.call("memory", { operation: "search", query: "undo shipment", synonyms: [], note_line: "" })),
+    ).toEqual(expected)
   })
 
   for (const field of ["keywords", "related", "note_line"] as const) {
@@ -145,7 +170,9 @@ describe("memory tool search with query expansion", () => {
       const search = { operation: "search", query: "undo shipment", synonyms: ["revert"] }
       expect(jsonOf(await h.call("memory", search)).results).toEqual([])
 
-      const result = jsonOf(await h.call("memory", { ...search, [field]: field === "note_line" ? "Coffee preferences." : ["coffee"] }))
+      const result = jsonOf(
+        await h.call("memory", { ...search, [field]: field === "note_line" ? "Coffee preferences." : ["coffee"] }),
+      )
       expect((result.results as SearchHit[]).map((hit) => hit.path)).toEqual(["notes/coffee.md"])
       expect([...h.searchedPaths]).toEqual(["notes/coffee.md"])
     })

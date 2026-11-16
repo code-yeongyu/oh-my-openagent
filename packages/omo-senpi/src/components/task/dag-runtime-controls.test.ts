@@ -11,10 +11,16 @@ test("paused send and staged retry cannot recreate or adopt a retired scheduler"
   const h = await pausedRun()
   const { initialRecord: _initialRecord, ...schedulerOptions } = h.options
   const controls = createDagRuntimeControls({
-    coreManager: createDagManager({ store: h.store }), schedulerOptions, schedulers: new Map(),
+    coreManager: createDagManager({ store: h.store }),
+    schedulerOptions,
+    schedulers: new Map(),
     sessionId: () => "parent-1",
-    controller: () => { throw new Error("paused controls must not create a scheduler") },
-    adoptReentry: () => { throw new Error("paused controls must not adopt a scheduler") },
+    controller: () => {
+      throw new Error("paused controls must not create a scheduler")
+    },
+    adoptReentry: () => {
+      throw new Error("paused controls must not adopt a scheduler")
+    },
     clearAdmissionLatch: () => undefined,
   })
   try {
@@ -24,5 +30,7 @@ test("paused send and staged retry cannot recreate or adopt a retired scheduler"
     expect(h.read().retryOnResume).toEqual([h.b])
     expect(h.read().status).toBe("paused")
     expect(h.inProcess.startedSpecs).toHaveLength(1)
-  } finally { await h.manager.cancelTask(h.taskId) }
+  } finally {
+    await h.manager.cancelTask(h.taskId)
+  }
 })

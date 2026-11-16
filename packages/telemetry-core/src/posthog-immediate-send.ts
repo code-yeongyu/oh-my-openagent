@@ -18,7 +18,11 @@ type Fetch = NonNullable<PostHogOptions["fetch"]>
  * The PostHog class comes from the caller, so a bundle that loads this module lazily (the senpi telemetry
  * sidecar) does not carry a second copy of posthog-node.
  */
-export function createImmediateSender(apiKey: string, options: PostHogOptions, PostHogClient: typeof PostHog): {
+export function createImmediateSender(
+  apiKey: string,
+  options: PostHogOptions,
+  PostHogClient: typeof PostHog,
+): {
   readonly send: (message: TelemetryCaptureMessage) => Promise<void>
   readonly shutdown: () => Promise<void>
 } {

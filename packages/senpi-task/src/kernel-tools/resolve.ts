@@ -104,7 +104,10 @@ export async function resolveKernelToolGrant(request: KernelToolGrantRequest): P
       return denied("tool_name_collision", `Parent kernel tool name "${requested}" is requested more than once.`)
     }
     if (existing.has(key)) {
-      return denied("tool_name_collision", `Parent kernel tool name "${requested}" collides with an existing child tool.`)
+      return denied(
+        "tool_name_collision",
+        `Parent kernel tool name "${requested}" collides with an existing child tool.`,
+      )
     }
     seen.add(key)
     normalized.push(name)

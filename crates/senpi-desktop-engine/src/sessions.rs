@@ -71,7 +71,7 @@ impl Sessions {
                 "exactly one NDJSON frame is required".to_owned(),
             ));
         }
-        let request = crate::connection::parse_request(frame).map_err(|(_, failure)| failure)?;
+        let request = crate::connection::parse_request(frame).map_err(|failure| failure.1)?;
         Method::from_name(&request.method).ok_or(Failure::Rejected(MethodRejection::Unknown))
     }
 

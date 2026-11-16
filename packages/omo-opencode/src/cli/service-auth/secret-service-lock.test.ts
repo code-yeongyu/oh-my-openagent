@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -22,9 +22,32 @@ Gio.bus_own_name(Gio.BusType.SESSION, "org.freedesktop.secrets", Gio.BusNameOwne
 GLib.MainLoop().run()
 `
 
+// A private session bus with no <servicedir>: nothing on it can be D-Bus-activated, so "none" means no Secret Service
+// even on a host whose gnome-keyring ships an activatable org.freedesktop.secrets (#12643).
+const PRIVATE_BUS_CONFIG = `<!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-Bus Bus Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
+<busconfig>
+  <type>session</type>
+  <listen>unix:tmpdir=/tmp</listen>
+  <auth>EXTERNAL</auth>
+  <policy context="default">
+    <allow send_destination="*" eavesdrop="true"/>
+    <allow eavesdrop="true"/>
+    <allow own="*"/>
+  </policy>
+</busconfig>
+`
+
+// What such a host looks like to a session bus that does read service dirs: an activatable Secret Service that never
+// answers. Every probe runs with it on its XDG data path.
+const HANGING_SECRET_SERVICE = "[D-BUS Service]\nName=org.freedesktop.secrets\nExec=/bin/sleep 600\n"
+
 const has = (cmd: string, args: string[]) => spawnSync(cmd, args, { stdio: "ignore" }).status === 0
-const canRun = process.platform === "linux" && has("dbus-run-session", ["--version"]) && has("gdbus", ["help"])
-  && has("python3", ["-c", "from gi.repository import Gio"])
+const canRun =
+  process.platform === "linux" &&
+  has("dbus-run-session", ["--version"]) &&
+  has("gdbus", ["help"]) &&
+  has("python3", ["-c", "from gi.repository import Gio"])
 
 describe("probeSecretServiceLock without gdbus", () => {
   // #10658 review: a minimal install without libglib2.0-bin has no gdbus; that says nothing about the keyring.
@@ -50,24 +73,49 @@ describe("parseLockedReply", () => {
   })
 })
 
-describe.skipIf(!canRun)("probeSecretServiceLock against a fake Secret Service on a private D-Bus (desktop#3509)", () => {
-  const probeIn = (fake: "locked" | "unlocked" | "none"): string => {
-    const dir = mkdtempSync(join(tmpdir(), "omo-secret-service-"))
-    try {
-      const fakePath = join(dir, "fake.py")
-      writeFileSync(fakePath, FAKE_SECRET_SERVICE)
-      const probeModule = join(import.meta.dir, "secret-service-lock.ts")
-      const start = fake === "none" ? "" : `python3 ${JSON.stringify(fakePath)} ${fake} > "$D/ready" & until grep -q READY "$D/ready" 2>/dev/null; do :; done;`
-      const run = spawnSync("dbus-run-session", ["--", "bash", "-c",
-        `D=${JSON.stringify(dir)}; ${start} bun -e 'const { probeSecretServiceLock } = await import(${JSON.stringify(probeModule)}); console.log(await probeSecretServiceLock())'`],
-        { encoding: "utf8", timeout: 20_000 })
-      return run.stdout.trim().split("\n").at(-1) ?? ""
-    } finally {
-      rmSync(dir, { recursive: true, force: true })
+describe.skipIf(!canRun)(
+  "probeSecretServiceLock against a fake Secret Service on a private D-Bus (desktop#3509)",
+  () => {
+    const probeIn = (fake: "locked" | "unlocked" | "none"): string => {
+      const dir = mkdtempSync(join(tmpdir(), "omo-secret-service-"))
+      try {
+        const fakePath = join(dir, "fake.py")
+        writeFileSync(fakePath, FAKE_SECRET_SERVICE)
+        const busConfig = join(dir, "bus.conf")
+        writeFileSync(busConfig, PRIVATE_BUS_CONFIG)
+        const services = join(dir, "data", "dbus-1", "services")
+        mkdirSync(services, { recursive: true })
+        writeFileSync(join(services, "org.freedesktop.secrets.service"), HANGING_SECRET_SERVICE)
+        const probeModule = join(import.meta.dir, "secret-service-lock.ts")
+        const start =
+          fake === "none"
+            ? ""
+            : `python3 ${JSON.stringify(fakePath)} ${fake} > "$D/ready" & until grep -q READY "$D/ready" 2>/dev/null; do :; done;`
+        const run = spawnSync(
+          "dbus-run-session",
+          [
+            `--config-file=${busConfig}`,
+            "--",
+            "bash",
+            "-c",
+            `D=${JSON.stringify(dir)}; ${start} bun -e 'const { probeSecretServiceLock } = await import(${JSON.stringify(probeModule)}); console.log(await probeSecretServiceLock())'`,
+          ],
+          { encoding: "utf8", timeout: 20_000, env: { ...process.env, XDG_DATA_HOME: join(dir, "data") } },
+        )
+        return run.stdout.trim().split("\n").at(-1) ?? ""
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
     }
-  }
 
-  test("a locked default collection is locked", () => { expect(probeIn("locked")).toBe("locked") })
-  test("an unlocked default collection is unlocked", () => { expect(probeIn("unlocked")).toBe("unlocked") })
-  test("no Secret Service on the bus is absent", () => { expect(probeIn("none")).toBe("absent") })
-})
+    test("a locked default collection is locked", () => {
+      expect(probeIn("locked")).toBe("locked")
+    })
+    test("an unlocked default collection is unlocked", () => {
+      expect(probeIn("unlocked")).toBe("unlocked")
+    })
+    test("no Secret Service on the bus is absent, also where the host could activate one (#12643)", () => {
+      expect(probeIn("none")).toBe("absent")
+    })
+  },
+)

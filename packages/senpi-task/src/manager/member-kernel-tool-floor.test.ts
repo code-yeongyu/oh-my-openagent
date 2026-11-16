@@ -15,7 +15,11 @@ afterEach(() => {
 async function memberGrant() {
   const capability = fakeKernelTools()
   capability.define({ name: "fixture_lookup" })
-  const resolved = await resolveKernelToolGrant({ requestedNames: ["fixture_lookup"], capability, executionMode: "in-process" })
+  const resolved = await resolveKernelToolGrant({
+    requestedNames: ["fixture_lookup"],
+    capability,
+    executionMode: "in-process",
+  })
   if (resolved.kind !== "granted") throw new Error(`expected a grant, got ${resolved.kind}`)
   return { capability, grant: resolved.grant }
 }

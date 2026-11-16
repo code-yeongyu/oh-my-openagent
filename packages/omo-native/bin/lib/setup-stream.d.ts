@@ -54,9 +54,15 @@ export type SetupApplyStage = {
 
 export function canonicalAgentDir(env?: Readonly<Record<string, string | undefined>>, home?: string): string
 
-export function scanSetup(runtime: SetupRuntime, agentDir: string, options?: SetupScanOptions): AsyncGenerator<SetupStageResult, void, undefined>
+export function scanSetup(
+  runtime: SetupRuntime,
+  agentDir: string,
+  options?: SetupScanOptions,
+): AsyncGenerator<SetupStageResult, void, undefined>
 
-export function collectSetupPlans(stream: AsyncIterable<SetupStageResult> | Iterable<SetupStageResult>): Promise<{ inventory: SetupInventory; plans: SetupPlans }>
+export function collectSetupPlans(
+  stream: AsyncIterable<SetupStageResult> | Iterable<SetupStageResult>,
+): Promise<{ inventory: SetupInventory; plans: SetupPlans }>
 
 export type SetupAuthEntry = {
   readonly provider: string
@@ -78,7 +84,11 @@ export class SetupStaleError extends Error {
 }
 
 /** The target paths of the given stages whose content changed since their plans read them (content hash, never mtime alone). */
-export function staleSetupTargets(plans: SetupPlans, stageIds: Iterable<SetupStageId>, written?: ReadonlySet<string>): string[]
+export function staleSetupTargets(
+  plans: SetupPlans,
+  stageIds: Iterable<SetupStageId>,
+  written?: ReadonlySet<string>,
+): string[]
 
 /** True when any of the given stages would write into a credential store. */
 export function authWritesPending(plans: SetupPlans, stageIds: Iterable<SetupStageId>): boolean

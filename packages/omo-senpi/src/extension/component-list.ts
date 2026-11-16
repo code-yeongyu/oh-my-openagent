@@ -9,6 +9,7 @@ import { createCommentCheckerComponent } from "../components/comment-checker"
 import { createComputerUseComponent } from "../components/computer-use"
 import { createConfigStartupComponent } from "../components/config-startup"
 import { createConfigWatchComponent } from "../components/config-watch"
+import { createDeviceServiceComponent } from "../components/device-service"
 import { createFallbackArchitectComponent } from "../components/fallback-architect"
 import { createFeedbackComponent } from "../components/feedback"
 import { createGitMasterAttributionComponent } from "../components/git-master"
@@ -19,6 +20,7 @@ import { createModelProfileComponent } from "../components/model-profile"
 import { createNativeBadgeComponent } from "../components/native-badge"
 import { createOnboardingComponent, createOnboardingScanComponent } from "../components/onboarding"
 import { createQuestionGatesComponent } from "../components/question-gates"
+import { createRemoteTuiComponent } from "../components/remote/tui"
 import { createSkillCommandsComponent } from "../components/skill-commands"
 import { createSidePanelComponent } from "../components/side-panel"
 import { createSkillPointersComponent } from "../components/skill-pointers"
@@ -64,6 +66,8 @@ export function createOmoSenpiComponents(taskComponent: OmoSenpiComponent): OmoS
     createXSearchComponent(),
     createComputerUseComponent(),
     createFeedbackComponent(),
+    createDeviceServiceComponent(),
+    createRemoteTuiComponent(),
     createBrowserBridgeComponent(),
     createDesktopToolkitComponent(),
     createClaudeCodeComponent(),

@@ -25,15 +25,14 @@ const NOW = new Date("2026-08-10T12:00:00.000Z")
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rmEfaultTolerant(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(
+    tempDirs
+      .splice(0)
+      .map((dir) => rmEfaultTolerant(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })),
+  )
 })
 
-function textEntry(
-  conversationId: string,
-  index: number,
-  text: string,
-  capturedAt: string,
-): TranscriptEntry {
+function textEntry(conversationId: string, index: number, text: string, capturedAt: string): TranscriptEntry {
   return {
     kind: index % 2 === 0 ? "user" : "assistant",
     text,
@@ -144,11 +143,7 @@ describe("dream conversation scoring", () => {
 
   test("#given three equal scores #when ranked #then unreflected steps recency and conversation id break ties in order", () => {
     // given
-    const candidates = [
-      scored("zeta", 7, 0.8, 1),
-      scored("beta", 7, 0.7, 2),
-      scored("alpha", 7, 0.7, 2),
-    ]
+    const candidates = [scored("zeta", 7, 0.8, 1), scored("beta", 7, 0.7, 2), scored("alpha", 7, 0.7, 2)]
 
     // when
     const ranked = rankDreamCandidates(candidates)
@@ -189,12 +184,15 @@ describe("dream journal selection", () => {
       ])
 
       // when
-      const result = await selectRecentDreamConversations({
-        transcriptsDir,
-        autoSelectMax: 1,
-        autoSelectMaxBytes: 10_000,
-        now: () => NOW,
-      }, 1)
+      const result = await selectRecentDreamConversations(
+        {
+          transcriptsDir,
+          autoSelectMax: 1,
+          autoSelectMaxBytes: 10_000,
+          now: () => NOW,
+        },
+        1,
+      )
 
       // then
       expect(result.conversationIds).toEqual(["actually-recent"])
@@ -246,12 +244,7 @@ describe("dream journal selection", () => {
     const gamma = [textEntry("gamma", 0, "focus later", "2026-08-10T09:00:00.000Z")]
     await writeJournal(transcriptsDir, "gamma", gamma, state({ steps_since_last_successful_reflection: 10 }))
     await writeJournal(transcriptsDir, "alpha", alpha, state({ steps_since_last_successful_reflection: 20 }))
-    await writeJournal(
-      transcriptsDir,
-      "beta",
-      beta,
-      state({ reflected_through_message_id: "beta:message:0" }),
-    )
+    await writeJournal(transcriptsDir, "beta", beta, state({ reflected_through_message_id: "beta:message:0" }))
     const options = {
       transcriptsDir,
       currentConversationId: "gamma",
@@ -304,9 +297,7 @@ describe("dream journal scan contention", () => {
     const root = realpathSync.native(await mkdtemp(join(tmpdir(), "dream-selector-torn-")))
     tempDirs.push(root)
     const transcriptsDir = join(root, "transcripts")
-    await writeJournal(transcriptsDir, "torn", [
-      textEntry("torn", 0, "intact row", "2026-08-10T11:00:00.000Z"),
-    ])
+    await writeJournal(transcriptsDir, "torn", [textEntry("torn", 0, "intact row", "2026-08-10T11:00:00.000Z")])
     await appendFile(join(transcriptsDir, "torn", "transcript.jsonl"), '{"kind":"assistant","text":"torn', "utf8")
 
     // when

@@ -19,9 +19,7 @@ import type { ReflectionCompletionRecord } from "./worker/completion-contracts"
 import { removeTree } from "../../../../../test-support/remove-tree"
 
 const roots: string[] = []
-afterEach(async () =>
-  Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 }))),
-)
+afterEach(async () => Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 }))))
 
 interface Fixture {
   readonly identity: MemoryIdentity

@@ -4,11 +4,15 @@ import { join } from "node:path"
 export const TRANSCRIPT_MESSAGE_LIMIT = 50
 const TOOL_RESULT_KEEP = 1200
 
-const SECRET_KEY_WORD = /(^|_)(api_?key|key|keys|token|tokens|access_token|refresh_token|id_token|secret|secrets|password|passwd|passphrase|authorization|auth|cookie|cookies|credential|credentials|private_key|client_secret|bearer|session_key)$/
+const SECRET_KEY_WORD =
+  /(^|_)(api_?key|key|keys|token|tokens|access_token|refresh_token|id_token|secret|secrets|password|passwd|passphrase|authorization|auth|cookie|cookies|credential|credentials|private_key|client_secret|bearer|session_key)$/
 const NOT_SECRET = /(^|_)(max|min|limit|count|budget|window|length|size|context)(_|$)/
 
 const isSecretKey = (key: string): boolean => {
-  const snake = key.replace(/([a-z0-9])([A-Z])/g, "$1_$2").replace(/-/g, "_").toLowerCase()
+  const snake = key
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .replace(/-/g, "_")
+    .toLowerCase()
   return SECRET_KEY_WORD.test(snake) && !NOT_SECRET.test(snake)
 }
 const SECRET_CONTAINERS = new Set(["headers", "env"])
@@ -86,9 +90,37 @@ export const LOG_WINDOW_MS = 15 * 60 * 1000
 const LOG_LINES_PER_FILE = 200
 const LOG_TAIL_BYTES = 512 * 1024
 const LOG_FIELDS = [
-  "ts", "timestamp", "level", "event", "component", "source", "kind", "type", "reason", "code", "status", "outcome",
-  "durationMs", "elapsedMs", "latencyMs", "ms", "attempt", "attempts", "turn", "from", "to", "chainKey", "model", "provider",
-  "sessionId", "threadId", "taskId", "requestId", "pid", "exitCode", "signal",
+  "ts",
+  "timestamp",
+  "level",
+  "event",
+  "component",
+  "source",
+  "kind",
+  "type",
+  "reason",
+  "code",
+  "status",
+  "outcome",
+  "durationMs",
+  "elapsedMs",
+  "latencyMs",
+  "ms",
+  "attempt",
+  "attempts",
+  "turn",
+  "from",
+  "to",
+  "chainKey",
+  "model",
+  "provider",
+  "sessionId",
+  "threadId",
+  "taskId",
+  "requestId",
+  "pid",
+  "exitCode",
+  "signal",
 ] as const
 const LOG_STRING_MAX = 160
 
@@ -127,7 +159,9 @@ export function engineLogText(agentDir: string, now: Date): string {
   const dir = join(agentDir, "logs")
   let names: string[]
   try {
-    names = readdirSync(dir).filter((name) => name.endsWith(".log")).sort()
+    names = readdirSync(dir)
+      .filter((name) => name.endsWith(".log"))
+      .sort()
   } catch {
     return ""
   }
@@ -151,4 +185,3 @@ export function engineLogText(agentDir: string, now: Date): string {
   }
   return blocks.join("\n\n")
 }
-

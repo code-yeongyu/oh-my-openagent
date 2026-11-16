@@ -1,6 +1,6 @@
 ---
 name: mass-ulw
-description: "Drives dependency-ordered child work through the native workflow tool, each phase's stages defined up front in one run, with retry/amend/send recovery. Use when the user asks for mass-ulw, a DAG of tasks, or fan-out work where some tasks must wait on others."
+description: "Drives dependency-ordered child work through the native workflow tool: a graph sized to the request, one run per phase, with retry/amend/send recovery. Use when the user asks for mass-ulw, a DAG of tasks, or fan-out work where some tasks must wait on others."
 argument-hint: "<task>"
 metadata:
   short-description: Dependency-graph orchestration of child agents
@@ -8,11 +8,15 @@ metadata:
 
 # mass-ulw
 
-Use this skill when the user asks for `mass-ulw`, a task DAG, staged fan-out, or any multi-agent job where real dependencies exist: task C needs A and B finished first. For fully independent workers, plain parallel `task` spawns are simpler. Reach for `workflow` when the ordering itself is the point. A run covers ONE phase, the unit your loop checkpoints (a goal criterion, a worktree, an evidence gate, a ulw-execute plan wave), and NEVER a whole multi-phase job; a harvest wave or a pipeline stage is not a phase. Define EVERY stage of the phase you can already write (harvest, expand, verify, reduce) in that run before `start`, chained with `dependsOn`; split it across concurrent runs only when it would exceed `task.dag.max_nodes_per_run`, counting the nodes later amends add, and start a reducer that reads several runs as its own run once they settle. Start a NEW run for the next phase, and `amend` a settled run to add nodes whose prompts need content you must read first. Under `ulw-loop` or `ulw-execute`, that contract owns the goal, criteria, evidence, and checkpoints; this skill owns only how each phase's run is defined, driven, and recovered.
+Use this skill when the user asks for `mass-ulw`, a task DAG, staged fan-out, or any multi-agent job where real dependencies exist: task C needs A and B finished first. For fully independent workers, plain parallel `task` spawns are simpler. Reach for `workflow` when the ordering itself is the point.
 
-## Planning - MANDATORY first step
+## Size the graph to the request
 
-Before defining ANY graph, read `references/planning.md` (relative to this skill's own directory) IN FULL. Do not call `sdk.define`, `sdk.start`, or `tool.workflow` with `action: "start"` before reading it. It carries the working doctrine this file deliberately omits: how to decompose the request into nodes, how to route each node's `category`, how to keep parallel write scopes disjoint, the node prompt contract, the verification wave, and the failure playbook. A graph defined without it is unplanned work.
+The request sets the size of the graph, and small is the default. Scout inline first (list the files, read the diff, count the items) so the node list comes from what exists. An ordinary ask gets a handful of nodes and a check you run yourself. Widen the fan-out or add verifier nodes when the user asks for thoroughness ("all of them", "thorough", an audit, mass research) or when a settled run shows more work.
+
+A run covers one phase, the unit your loop checkpoints (a goal criterion, a worktree, an evidence gate, a ulw-execute plan wave): not a whole multi-phase job, and not a single wave inside a phase. Put the stages you can already write into that run, chained with `dependsOn`. When the next stage's shape depends on what this one finds, let the run settle, read its results, then `amend` it or start the next run. Start a new run for the next phase. Under `ulw-loop` or `ulw-execute`, that contract owns the goal, criteria, evidence, and checkpoints; this skill owns only how each run is defined, driven, and recovered.
+
+Read `references/planning.md` (relative to this skill's own directory) before you define your first graph. It covers decomposition, category routing, write scopes and capacity, the node prompt contract, verification, mass research, and the failure playbook.
 
 ## The shape
 
@@ -20,17 +24,15 @@ A run is a declarative definition: a stable `key` (idempotency: re-starting the 
 
 Route every node by `category` using the routing table in `references/planning.md`; the run executes nodes in parallel waves as their dependencies clear.
 
-## Goal before start
+## Done means checked
 
-Every run is goal-bound. In a standalone run, register the goal as written (`create_goal`, or a `# Goal` block where no goal tool exists). Under `ulw-loop` or `ulw-execute`, the loop's registered goal already covers the run, so register no second goal. The objective names the deliverable the graph produces, and the success criteria carry RESULT VERIFICATION - node and run completion claims are false until proven against captured evidence, the same contract the dag completion directive injects (TREAT AS FALSE UNTIL YOU PROVE IT). The verification wave (references/planning.md) produces the evidence those criteria name; the run ends when the criteria pass, never when the last node reports completion.
+A node's report is a claim, and so is a settled run. The work is done when the deliverable passes a real check (the test, the build, the file itself), never when the last node reports completion; `references/planning.md` says who runs that check. A job that spans several runs registers its goal first (`create_goal`, or a `# Goal` block where no goal tool exists) with that check as a success criterion. Under `ulw-loop` or `ulw-execute`, the loop's registered goal already covers the run, so register no second goal.
 
 Ask a decision only the user can make (scope, spend, anything irreversible) from the main session through the question tool, with header `Authorize` (`권한` in Korean) and `required: true` on the call, before starting the run that depends on it - never from an eval cell or a node prompt. A timed-out, dismissed, or unavailable answer is not an answer, even when the tool result says to continue on your best judgment: do not start that run.
 
 ## Running a dag - eval is the default
 
-Build and run every dag INSIDE an eval cell. The eval kernel installs the `tool.workflow` proxy and the extension publishes a small JS SDK at `OMO_DAG_SDK_ROOT`; driving runs from a cell is what unlocks the orchestration patterns in `references/planning.md` (data-driven graph construction, multi-run composition, concurrent runs, adaptive retries).
-
-JS cells import the SDK from the path the extension publishes:
+Build and run every dag inside an eval cell. The kernel installs the `tool.workflow` proxy and the extension publishes a small JS SDK at `OMO_DAG_SDK_ROOT`, so a cell can build the graph from data, branch on results, and compose runs (`references/planning.md`, Eval orchestration patterns).
 
 ```js
 const sdk = await import(`${env("OMO_DAG_SDK_ROOT")}/sdk.js`)
@@ -44,9 +46,9 @@ const run = await sdk.start(dag)
 const result = await sdk.wait(run.run_id)
 ```
 
-`define` builds the definition and rejects duplicate node ids locally, before anything is started. `start`, `attach`, `snapshot`, `wait`, and `cancel` are the whole surface.
+`define` builds the definition and rejects duplicate node ids locally, before anything is started. `start`, `attach`, `snapshot`, `wait`, and `cancel` drive a run; `retry`, `send`, and `amend` (below) recover its nodes.
 
-Python cells cannot import the ESM SDK; call `tool.workflow({...})` directly with the same payload shape the SDK produces - note the SDK passes `detach: false` on `wait`, so a blocking Python wait is `tool.workflow({"action": "wait", "run_id": run_id, "detach": False})`; without it the tool detaches against a live run and returns the current snapshot. Prefer a JS cell whenever the run involves any orchestration beyond a single `start` + `wait`.
+Python cells cannot import the ESM SDK; call `tool.workflow({...})` directly with the same payload shape. A blocking Python wait passes `detach: False` (`tool.workflow({"action": "wait", "run_id": run_id, "detach": False})`); without it the tool detaches against a live run and returns the current snapshot. Prefer a JS cell for anything beyond a single `start` + `wait`.
 
 ## Run lifecycle
 
@@ -61,14 +63,14 @@ await sdk.cancel(runId, "superseded by a new plan")
 ```
 
 - `attach` re-binds to a live run you already own, for example after your own context was rebuilt.
-- `start` returns at once; the session wakes when the run settles or pauses, never per node, and each wake carries the TREAT-AS-FALSE verification directive. Do independent work between wakes.
+- `start` returns at once; the session wakes when the run settles or pauses, never per node. Do independent work between wakes.
 - `snapshot` is a one-off read of status and node counts when a midpoint decision needs it, never a polling loop.
 - `wait` blocks the cell until the run settles (the SDK passes `detach: false`; the bare tool action detaches by default against a live run). Use it only inside a detached cell or when nothing else remains.
 - `cancel` stops the run; pass a reason so the record says why.
 
 ## Recovering one node - retry, send, amend
 
-A settled run is not a dead end. Three verbs act on a SINGLE node, so one bad node never costs you the whole graph, and every node that already finished keeps its cached result:
+Three verbs recover failed or stale nodes without restarting the graph, and every node that already finished keeps its cached result:
 
 ```js
 await sdk.retry(runId)                                  // every failed/cancelled node gets a fresh attempt
@@ -78,22 +80,18 @@ await sdk.send(runId, "lint", "skip the vendored dir")  // steer a running child
 await sdk.amend(runId, editedDefinition)                // re-run only what changed, plus its dependents
 ```
 
-- **`retry`** gives a fresh attempt to every `failed` or `cancelled` node (or just the `node_ids` you name) and hands their skip-cascaded dependents back to the wave loop. Completed nodes are reused, never re-executed. Passing a single `node_id` with `prompt` edits that node's instruction as it retries. Retrying a COMPLETED node is refused with `node_not_retryable` - use `amend`. A `skipped` node is retryable only when a failed or cancelled ancestor is in the same retry set. While the run is still `running`, retry is refused with `run_still_active`: let the wave settle first.
-- **`send`** delivers a message to ONE node's child. A running child is steered in place; a finished child that is still resident is revived with its context intact, so it continues instead of starting over. A child that cannot be continued is refused with `node_not_continuable`, and `retry` is the remedy.
-- **`amend`** submits an edited definition against the SAME run. Each node's fingerprint is diffed: unchanged completed nodes keep their cached results, and only changed or added nodes plus their transitive dependents re-run. Amending a node that is currently running is refused with `amend_running_node`. `load_skills` is deliberately outside the fingerprint, so a skills-only edit re-runs nothing.
+- **`retry`** gives a fresh attempt to every `failed` or `cancelled` node (or just the `node_ids` you name) and hands their skip-cascaded dependents back to the wave loop. Passing a single `node_id` with `prompt` edits that node's instruction as it retries. Retrying a completed node is refused with `node_not_retryable` - use `amend`. A `skipped` node is retryable only when a failed or cancelled ancestor is in the same retry set. While the run is still `running`, retry is refused with `run_still_active`: let the wave settle first.
+- **`send`** delivers a message to one node's child. A running child is steered in place; a finished child that is still resident is revived with its context intact, so it continues instead of starting over. A child that cannot be continued is refused with `node_not_continuable`, and `retry` is the remedy.
+- **`amend`** submits an edited definition against the same run. Each node's fingerprint is diffed: unchanged completed nodes keep their cached results, and only changed or added nodes plus their transitive dependents re-run. Amending a node that is currently running is refused with `amend_running_node`. `load_skills` is deliberately outside the fingerprint, so a skills-only edit re-runs nothing.
 
 ## Resume across a restart
 
 Runs are journaled. When the session dies mid-run, the run pauses instead of being lost; on restart the extension resumes paused runs it owns, reusing outputs of nodes that already finished so completed work is never redone. Your side of the contract: `start` with the same `key` and definition returns the existing run (`reused: true`) instead of forking a duplicate, or `attach` with the stored `run_id`. Never re-issue a changed definition under an old key; that's a definition conflict.
 
-`start` is for STARTING a run, not for recovering one: re-issuing the same key and definition against an already-settled run returns it untouched and schedules nothing. To move a settled run forward, use `retry` or `amend` above.
+`start` is for starting a run, not for recovering one: re-issuing the same key and definition against an already-settled run returns it untouched and schedules nothing. To move a settled run forward, use `retry` or `amend` above.
 
 ## Supervising a run
 
-Observation is supervision, not spectating. Running children err, over-engineer, obsess over one sub-problem, and drift out of scope MID-RUN, not only at the end. On every mid-run wake (a goal continuation, a monitor event), check each active node against ITS OWN prompt's SCOPE: the assigned work, only the assigned work, at the assigned depth. On any sign of drift - writes outside its scope, gold-plating past the deliverable, circling one sub-problem - steer it back with `send` naming the exact boundary it crossed; a node that stays off course gets a tightened prompt through `retry` or `amend` (above) once the run settles. Drift corrected in wave 1 costs one message; drift discovered at synthesis costs the run.
+On a mid-run wake (a goal continuation, a monitor event), check each active node against its own prompt's scope. Steer drift back with `send`, naming the boundary it crossed: writes outside its scope, gold-plating past the deliverable, circling one sub-problem. A node that stays off course gets a tightened prompt through `retry` or `amend` once the run settles.
 
-Surfaces:
-
-- The TUI status widget shows live runs with per-node progress.
-- `/dag` opens the detail view: node states, waves, and failures for each run in the session.
-- External viewers subscribe to the RPC channels `omo.dag.event` (journaled, sequenced), `omo.dag.updated` (full snapshots), `omo.dag.heartbeat`, and `omo.dag.activity`.
+The TUI status widget shows live runs with per-node progress, and `/dag` opens the detail view: node states, waves, and failures for each run in the session.

@@ -60,7 +60,7 @@ describe("createToolExecuteAfterHandler", () => {
         },
         directory: "/repo",
       } as never,
-      { disabledHooks: ["PostToolUse"] }
+      { disabledHooks: ["PostToolUse"] },
     )
 
     await handler(
@@ -89,7 +89,7 @@ describe("createToolExecuteAfterHandler", () => {
             keep: false,
           },
         },
-      }
+      },
     )
 
     expect(appendTranscriptEntry).toHaveBeenCalledTimes(1)
@@ -160,7 +160,7 @@ describe("createToolExecuteAfterHandler", () => {
         },
         directory: "/repo",
       } as never,
-      { disabledHooks: [] }
+      { disabledHooks: [] },
     )
     const output = {
       title: "tool",
@@ -173,11 +173,7 @@ describe("createToolExecuteAfterHandler", () => {
 
     // then
     expect(output.output).toBe(
-      [
-        "Warning line\n  warning detail",
-        "Context line\n  context detail",
-        "Message line\nmessage detail",
-      ].join("\n\n")
+      ["Warning line\n  warning detail", "Context line\n  context detail", "Message line\nmessage detail"].join("\n\n"),
     )
     expect(output.output).not.toContain("\r")
   })
@@ -201,7 +197,7 @@ describe("createToolExecuteAfterHandler", () => {
         },
         directory: "/repo",
       } as never,
-      { disabledHooks: [] }
+      { disabledHooks: [] },
     )
     const output = {
       title: "tool",

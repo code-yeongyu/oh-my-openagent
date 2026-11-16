@@ -1,0 +1,75 @@
+# Every (name, token) the sweep finds in the pin that is not an inventory pair, with why it has no row. source is the first line that writes it.
+name	token	source	source_sha256	why
+AxUnsupported	app	design/FOLD-13.md:56	5298c5c2862906f5cd638526aadb76078671454a6ed0b3b12bffdf275a2f77cc	data member carried beside the reason, not a data.reason
+AxUnsupported	hint	design/FOLD-13.md:56	5298c5c2862906f5cd638526aadb76078671454a6ed0b3b12bffdf275a2f77cc	data member carried beside the reason, not a data.reason
+InputBusy	indicator	design/d-a11y-model.md:253	f9d700ce661de466dbd2b4d91d31047b829e1adbc3bc7350ac0fd417e3027298	data member carried beside the reason, not a data.reason
+AmbiguousTarget	candidates	design/d-a11y-model.md:297	0a9e7dc217eedabda29be146a4fe9764aac6ad683606c298592fcb8116a84c7c	data member carried beside the reason, not a data.reason
+UnsupportedAction	role	design/d-a11y-model.md:299	0600609d46545617dbade4daf1bb40640a99d026df377e47a82115f5d8d0f588	data member carried beside the reason, not a data.reason
+UnsupportedAction	action	design/d-a11y-model.md:299	0600609d46545617dbade4daf1bb40640a99d026df377e47a82115f5d8d0f588	data member carried beside the reason, not a data.reason
+ControlRequired	host	design/d-a11y-model.md:301	54982cbaf1e6d49cb6501ceae2582ea650d24da5dfd92c09dd2fb083b85ee4d0	data member carried beside the reason, not a data.reason
+ControlRequired	app	design/d-a11y-model.md:301	54982cbaf1e6d49cb6501ceae2582ea650d24da5dfd92c09dd2fb083b85ee4d0	data member carried beside the reason, not a data.reason
+AxUnsupported	role	design/d-a11y-model.md:339	22f7ab8bd8123eb60182e727d7544ce04a743f54ef4b4f578fc72722efa0e3e8	data member carried beside the reason, not a data.reason
+PermissionDenied	portal	design/d-arch.md:127	7e1ab8c1d083371ed1fc497be7784c618315d914ba390aace28c8879125b7bc7	permission kind (data.permission), not a data.reason
+EngineCrashed	delivery_uncertain	design/d-arch.md:164	69eb656c43310db71a87673a7fbd2ab9eda539ca26632ceaab256450dd15b6cc	disposition written beside the name, not a data.reason
+EngineCrashed	unsafe	design/d-arch.md:164	69eb656c43310db71a87673a7fbd2ab9eda539ca26632ceaab256450dd15b6cc	disposition written beside the name, not a data.reason
+FeatureUnavailable	feature	design/d-arch.md:175	b5e84840712963eb5f8b9e5a568342fdcdb82b68043e81b368354d5d8e1f52a6	data member carried beside the reason, not a data.reason
+TransactionFailed	receipt	design/d-arch.md:356	28a10d82eb2a83808fc152a0b3fced60b606c1f7c3009a4c470dec930e06618d	data member carried beside the reason, not a data.reason
+InvalidKey	glyph	design/d-linux.md:65	13eca3c5962172cd4c1e65c44f0a516d8ffe2df2b16283857c993953acf8eaf2	data member carried beside the reason, not a data.reason
+InvalidKey	group	design/d-linux.md:65	13eca3c5962172cd4c1e65c44f0a516d8ffe2df2b16283857c993953acf8eaf2	data member carried beside the reason, not a data.reason
+InvalidKey	grapheme	design/d-linux.md:85	9ae8ed28b04438ff6a610233ae3d78c0f1aa3184927392b99a36fcd9feada3af	data member carried beside the reason, not a data.reason
+WindowFrameUnavailable	reason	design/d-linux.md:212	9412ba9971c6e0bc97136338559f5ca73e4ded8d0871b9690c7584cc8a0ad6fd	placeholder word for the reasons listed or named elsewhere; each has its row
+Unavailable	surface	design/d-linux.md:260	8cc236a26ede115cc905a8020a68708c47032f41b59068463b1731c9ef84f645	data member carried beside the reason, not a data.reason
+COMPUTER_RUN_LIMIT	reason	design/d-loop-migration.md:69	bae7ce45023ccc1ca72e76e3c0a0b39f3ce49cd7e809a7a72aa31d92ab3a6b0f	placeholder word for the reasons listed or named elsewhere; each has its row
+COMPUTER_RUN_LIMIT	name	design/d-loop-migration.md:69	bae7ce45023ccc1ca72e76e3c0a0b39f3ce49cd7e809a7a72aa31d92ab3a6b0f	data member carried beside the reason, not a data.reason
+ConsequentialAction	app	design/d-loop-migration.md:389	25a54af98d1d452ad2e650f894f93ea5d7d3a3f67a1ee500016359d06b3b0546	data member carried beside the reason, not a data.reason
+ConsequentialAction	composer	design/d-loop-migration.md:389	25a54af98d1d452ad2e650f894f93ea5d7d3a3f67a1ee500016359d06b3b0546	data member carried beside the reason, not a data.reason
+COMPUTER_CONTROL_REQUIRED	host	design/d-loop-migration.md:395	76340003133dca0e8db7014e60bbcb606357f9cfe92a17ab591486e410ed4db4	data member carried beside the reason, not a data.reason
+COMPUTER_CONTROL_REQUIRED	app	design/d-loop-migration.md:395	76340003133dca0e8db7014e60bbcb606357f9cfe92a17ab591486e410ed4db4	data member carried beside the reason, not a data.reason
+PermissionDenied	screen_recording	design/d-macos.md:43	3e94fddae35b539d21aaf37aca7dccfbd3e77976583967d2ad4a427a7b9ebfc2	permission kind (data.permission), not a data.reason
+PermissionDenied	accessibility	design/d-macos.md:157	851cccc227ecb2d9bb2495e852c0dd8fedd4fda1e2ef9b45b357160aa5de15ef	permission kind (data.permission), not a data.reason
+InvalidTarget	candidates	design/d-macos.md:214	1843f52647d94bd21850a1ac2f354871b8bdbfb94bcbe507c9839dedf52b014c	data member carried beside the reason, not a data.reason
+PermissionDenied	permission	design/d-macos.md:266	2f7a50d5016fa73a41f88e8406253edd08638d791df95c01e83e90d2c0c3a5e4	permission kind (data.permission), not a data.reason
+PermissionDenied	app	design/d-macos.md:266	2f7a50d5016fa73a41f88e8406253edd08638d791df95c01e83e90d2c0c3a5e4	data member carried beside the reason, not a data.reason
+ScreenLocked	unknown	design/d-macos.md:318	c099b46897d15d9dbf2d884bb3139da31de69c98fc7d0a7b7b036995b9b1db85	withdrawn: d-macos.md:318 withdraws the pre-fold ScreenLocked{unknown}; BackgroundUnavailable{target_unknown} replaces it
+Unavailable	reason	design/d-macos.md:381	60be19c03f2fcd15d6779cb2a319628ee513dad7c63bc04772581e75001bbd53	placeholder word for the reasons listed or named elsewhere; each has its row
+Unavailable	<bare>	design/d-macos.md:466	d274772dbb04b38dbce4aa7e2229ba68ec3c4f9462a8ababe5d38325125878fe	family name without a reason; its reasons (wayland_no_pointer_read, surface_unsupported, no_notification_surface, clipboard, ...) have rows
+InvalidTarget	selector	design/d-remote.md:144	5b58b21657341b143837bab5a1638fc63d54593242a896ca0afe7b8021047688	data member carried beside the reason, not a data.reason
+HandOffline	pipe	design/d-remote.md:177	5161e10367ee69a6a52844bd5705f2cd21cd3ce060c25c9f00f78d743d6eb06e	data member carried beside the reason, not a data.reason
+InvalidTarget	expected	design/d-remote.md:177	5161e10367ee69a6a52844bd5705f2cd21cd3ce060c25c9f00f78d743d6eb06e	data member carried beside the reason, not a data.reason
+InvalidTarget	observed	design/d-remote.md:177	5161e10367ee69a6a52844bd5705f2cd21cd3ce060c25c9f00f78d743d6eb06e	data member carried beside the reason, not a data.reason
+HandOffline	reason	design/d-remote.md:456	f7e8b72d99fa4136b4a442b1b369a9f01dfa2af77dd6fb40429d4c0a11061b29	placeholder word for the reasons listed or named elsewhere; each has its row
+Suspended	path	design/d-safety.md:33	881d8f1e883130e02f7944ab42ca3d8ec0d744cc4250d5f383dd1d939c95acf9	data member carried beside the reason, not a data.reason
+StopPathUnavailable	portal-global-shortcuts-unavailable	design/d-safety.md:88	120ca498928675153aaafb3333d1a955efd5b4b9b0058e1e5913ed9e9a9c9fb2	superseded, replaced by StopPathUnavailable{deaf}: the round-18 deaf reason covers a missing GlobalShortcuts portal with no raw fallback (d-sdk-skill.md:471); row StopPathUnavailable{deaf}
+ScreenLocked	session	design/d-safety.md:122	6ff8739cd5e4d60fec0b105e64763f7261fdea90e21dc1c4c3ea3a7f554e79f8	data member carried beside the reason, not a data.reason
+PermissionDenied	input_monitoring	design/d-safety.md:178	efcf13a7c719532cece1a6080451984aaa47d5d10ac5e72107951534d5053a1d	permission kind (data.permission), not a data.reason
+InvalidTarget	point	design/d-safety.md:242	4fa3af31c5833eedc191fa03240c856f1c6964e7042cdddbaf89e27c0169dfe5	data member carried beside the reason, not a data.reason
+InvalidTarget	code	design/d-safety.md:242	4fa3af31c5833eedc191fa03240c856f1c6964e7042cdddbaf89e27c0169dfe5	data member carried beside the reason, not a data.reason
+InputBusy	holder	design/d-safety.md:242	4fa3af31c5833eedc191fa03240c856f1c6964e7042cdddbaf89e27c0169dfe5	data member carried beside the reason, not a data.reason
+BackgroundUnavailable	button	design/d-safety.md:246	e80dccfed26830cfcc27926534c1b8544b194a826f66682899c701cfdc431a94	data member carried beside the reason, not a data.reason
+BackgroundUnavailable	reason	design/d-safety.md:246	e80dccfed26830cfcc27926534c1b8544b194a826f66682899c701cfdc431a94	placeholder word for the reasons listed or named elsewhere; each has its row
+PermissionDenied	band	design/d-safety.md:511	dbde11605f545f49bb12038bd36538aa526f401be7bd735059b71684a22cfe2d	data member carried beside the reason, not a data.reason
+Unavailable	path	design/d-safety.md:578	e9baeacffabb88ecf6945c26bb3b05af6d42beac77520ec83228d371b2f0f608	data member carried beside the reason, not a data.reason
+SessionInactive	session	design/d-sdk-skill.md:175	abbf96955f86f94c0c912d57b8633c591389f0ff49e89d95d81a8c93e138110f	data member carried beside the reason, not a data.reason
+BackgroundUnavailable	chord	design/d-sdk-skill.md:280	1cd5348949d1540c0e2942ae7d49e842e34f3d8d597ac6739e3b1efae69996c2	data member carried beside the reason, not a data.reason
+ControlRequired	session	design/d-sdk-skill.md:488	063e2e17a5c570a4e66e31c0735ed116b6df16fed203427694c645249293d9cf	data member carried beside the reason, not a data.reason
+CaptureFailed	session	design/d-sdk-skill.md:495	c2496b2a5b085d4132aa940aa245cf69405df3a8daac99515998c01feb278d7d	data member carried beside the reason, not a data.reason
+BackgroundUnavailable	drop-matrix	design/d-sdk-skill.md:499	6fd00f8c528e9d40c03332a958d2d0e050d9d18825e3f59982eba4d723092685	placeholder word for the reasons listed or named elsewhere; each has its row
+BackgroundUnavailable	family	design/d-sdk-skill.md:499	6fd00f8c528e9d40c03332a958d2d0e050d9d18825e3f59982eba4d723092685	data member carried beside the reason, not a data.reason
+BackgroundUnavailable	refusal	design/d-sdk-skill.md:499	6fd00f8c528e9d40c03332a958d2d0e050d9d18825e3f59982eba4d723092685	placeholder word for the reasons listed or named elsewhere; each has its row
+UserIntervened	delivered	design/d-sdk-skill.md:521	9b25acea631bbb120623c62bdea38da6b4df898dbb706a174f7cb556c35ed973	data member carried beside the reason, not a data.reason
+RunFailed	name	design/d-sdk-skill.md:543	98905b0e220824688e5574de957f821673dd1174b9b6459309c088021e32f635	data member carried beside the reason, not a data.reason
+RunFailed	message	design/d-sdk-skill.md:543	98905b0e220824688e5574de957f821673dd1174b9b6459309c088021e32f635	data member carried beside the reason, not a data.reason
+RunLimit	limit	design/d-sdk-skill.md:558	b3488074b894f10f5e0dd6567e26fe5a5de0ee658037715b5d1f2582f0ca6c74	data member carried beside the reason, not a data.reason
+RunLimit	value	design/d-sdk-skill.md:558	b3488074b894f10f5e0dd6567e26fe5a5de0ee658037715b5d1f2582f0ca6c74	data member carried beside the reason, not a data.reason
+RunLimit	max	design/d-sdk-skill.md:558	b3488074b894f10f5e0dd6567e26fe5a5de0ee658037715b5d1f2582f0ca6c74	data member carried beside the reason, not a data.reason
+RunLimit	name	design/d-sdk-skill.md:558	b3488074b894f10f5e0dd6567e26fe5a5de0ee658037715b5d1f2582f0ca6c74	data member carried beside the reason, not a data.reason
+BackgroundUnavailable	qt_xcb	design/d-sdk-skill.md:946	77271bc7bb886a536c4aa32d027cf655e5dbb185c35d91b481ea074acc452c46	toolkit value; its reason QT_CORE_KEYBOARD has the row
+COMPUTER_PERMISSION_DENIED	reason	design/d-sdk-skill.md:966	41ba5c7d55339066b795d4e71e21a6dc231996be96b853fa2d18ab93d503202f	placeholder word for the reasons listed or named elsewhere; each has its row
+InvalidCoordinateFrame	reason	design/d-vision.md:210	394e35e61819f80d618e96fee6bb8ab07a724d057d62fe101de235bc41764d11	placeholder word for the reasons listed or named elsewhere; each has its row
+BackgroundUnavailable	class	design/d-windows.md:146	d6aee5a0758d0217d3119679debc6e958b0b22b38f058122c0cd1e9a07de98cc	data member carried beside the reason, not a data.reason
+BackgroundUnavailable	kind	design/d-windows.md:146	d6aee5a0758d0217d3119679debc6e958b0b22b38f058122c0cd1e9a07de98cc	data member carried beside the reason, not a data.reason
+HandCrashed	delivery_uncertain	waves/analysis/ideal-state.md:238	6838817c7c5d4c9a76acdb4019cf9ffa4bdeeabcaad5869c3130683450995416	disposition written beside the name, not a data.reason
+HandCrashed	unsafe	waves/analysis/ideal-state.md:238	6838817c7c5d4c9a76acdb4019cf9ffa4bdeeabcaad5869c3130683450995416	disposition written beside the name, not a data.reason
+ScreenLocked	display_asleep	waves/analysis/ideal-state.md:388	e910d6fb50270f74a4acdc54c1bb267ecbb8fa9318d1980c8556e8b745c89c23	withdrawn in contract round 11: replaced by ControlRequired{display_asleep}
+ScreenLocked	reason	waves/analysis/ideal-state.md:742	0ce4fbc574bb037b492b6b1fc8c88658a21aee60aa56d9991dff48d79238f6ed	placeholder word for the reasons listed or named elsewhere; each has its row
+ScreenLocked	session_inactive	waves/analysis/ideal-state.md:788	e54c724e148b7349aa7eb344dbbf98b5c4a618f6eea6e24989ae3180154c85c5	rejected in contract round 12: replaced by SessionInactive (its own code)

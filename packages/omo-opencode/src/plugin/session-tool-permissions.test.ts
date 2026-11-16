@@ -7,11 +7,15 @@ function createLookup(responses: Array<"ok" | "fail">) {
   const reads: string[] = []
   const ctx = {
     directory: "/workspace",
-    client: { session: { get: async ({ path }: { path: { id: string } }) => {
-      reads.push(path.id)
-      if (responses.shift() === "fail") throw new Error("Session metadata unavailable")
-      return { data: { permission: [{ permission: "question", pattern: "*", action: "deny" }] } }
-    } } },
+    client: {
+      session: {
+        get: async ({ path }: { path: { id: string } }) => {
+          reads.push(path.id)
+          if (responses.shift() === "fail") throw new Error("Session metadata unavailable")
+          return { data: { permission: [{ permission: "question", pattern: "*", action: "deny" }] } }
+        },
+      },
+    },
   } as unknown as PluginContext
   return { ...createSessionToolPermissionLookup(ctx), reads }
 }

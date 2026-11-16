@@ -20,6 +20,7 @@ fn display(id: &str, x: i32, y: i32, primary: bool) -> DesktopDisplay {
 
 fn window(x: i32, y: i32, width: u32, height: u32) -> DesktopWindow {
     DesktopWindow {
+        identity: None,
         id: "window".into(),
         title: String::new(),
         app: String::new(),

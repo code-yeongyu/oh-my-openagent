@@ -30,10 +30,12 @@ export function hasCrashLivenessEvent(stdout) {
 }
 
 function isCrashLivenessDetails(details) {
-  return details !== null
-    && typeof details === "object"
-    && details.memberName === "crash"
-    && (ABNORMAL_MEMBER_STATES.has(details.lastKnownState) || details.killed === true)
+  return (
+    details !== null &&
+    typeof details === "object" &&
+    details.memberName === "crash" &&
+    (ABNORMAL_MEMBER_STATES.has(details.lastKnownState) || details.killed === true)
+  )
 }
 
 export async function runCrashRestartScenario(input) {
@@ -63,20 +65,20 @@ export async function runCrashRestartScenario(input) {
     const before = ops.readCrashReservationState(sandbox, target)
     const parentAliveAtHold = initial.pid !== undefined && ops.isProcessAlive(initial.pid)
     const memberAliveAtHold = target.pid !== undefined && ops.isProcessAlive(target.pid)
-    const memberKilled = parentAliveAtHold && memberAliveAtHold && target.pid !== undefined
-      ? ops.killProcess(target.pid)
-      : false
+    const memberKilled =
+      parentAliveAtHold && memberAliveAtHold && target.pid !== undefined ? ops.killProcess(target.pid) : false
     const memberTerminal = memberKilled
       ? await ops.pollUntil(
-        () => Promise.resolve(ops.readMemberTerminal(sandbox, target)),
-        (value) => value.kind !== undefined,
-        HOLD_TIMEOUT_MS,
-      )
+          () => Promise.resolve(ops.readMemberTerminal(sandbox, target)),
+          (value) => value.kind !== undefined,
+          HOLD_TIMEOUT_MS,
+        )
       : { kind: undefined }
     const parentAliveBeforeTermination = initial.pid !== undefined && ops.isProcessAlive(initial.pid)
-    const parentTermination = parentAliveBeforeTermination && memberTerminal.kind !== undefined && initial.pid !== undefined
-      ? await ops.terminateProcessTree(initial.pid)
-      : failedParentTermination(initial.pid, "parent was not live after the member terminal transition")
+    const parentTermination =
+      parentAliveBeforeTermination && memberTerminal.kind !== undefined && initial.pid !== undefined
+        ? await ops.terminateProcessTree(initial.pid)
+        : failedParentTermination(initial.pid, "parent was not live after the member terminal transition")
     const reservationAged = target.ready ? ops.ageCrashReservation(sandbox, target) : false
     const initialResult = await initial.completion
     const afterKillRecord = target.taskId === undefined ? undefined : ops.taskRecord(sandbox, target.taskId)
@@ -132,33 +134,32 @@ export function evaluateCrashRecovery(evidence) {
   const runEpoch = evidence.afterRestartRecord?.notification?.run_epoch
   const livenessNotifiedEpoch = evidence.afterRestartRecord?.notification?.liveness_notified_epoch
   return {
-    crashHoldReached: evidence.target.ready && evidence.parentAliveAtHold === true && evidence.memberAliveAtHold === true,
+    crashHoldReached:
+      evidence.target.ready && evidence.parentAliveAtHold === true && evidence.memberAliveAtHold === true,
     crashKilledMemberAtHold:
-      evidence.memberKilled === true
-      && evidence.memberTerminal?.kind !== undefined
-      && evidence.parentAliveBeforeTermination === true
-      && evidence.parentTermination?.kind === "terminated"
-      && evidence.initialStatus !== 0,
+      evidence.memberKilled === true &&
+      evidence.memberTerminal?.kind !== undefined &&
+      evidence.parentAliveBeforeTermination === true &&
+      evidence.parentTermination?.kind === "terminated" &&
+      evidence.initialStatus !== 0,
     crashReservationUncommittedAtKill:
-      evidence.before.reservedExists === true
-      && evidence.before.processedExists === false
-      && evidence.before.eventCount === 0,
+      evidence.before.reservedExists === true &&
+      evidence.before.processedExists === false &&
+      evidence.before.eventCount === 0,
     crashReservationRestoredUnread:
-      evidence.reservationAged === true
-      && evidence.afterReclaim.reservedExists === false
-      && evidence.afterReclaim.unreadExists === true,
+      evidence.reservationAged === true &&
+      evidence.afterReclaim.reservedExists === false &&
+      evidence.afterReclaim.unreadExists === true,
     crashReservationNoResidue: evidence.afterReplacement.reservedExists === false,
     crashReservedMessageDeliveredExactlyOnce:
-      evidence.afterReplacement.unreadExists === false
-      && evidence.afterReplacement.processedExists === true
-      && evidence.afterReplacement.eventCount === 1
-      && evidence.afterReplacement.envelopeCount === 1,
+      evidence.afterReplacement.unreadExists === false &&
+      evidence.afterReplacement.processedExists === true &&
+      evidence.afterReplacement.eventCount === 1 &&
+      evidence.afterReplacement.envelopeCount === 1,
     crashRestartExitClean: evidence.restartStatus === 0,
     crashLivenessInjectedToLead: evidence.livenessInjected === true,
     crashLivenessAcknowledged:
-      typeof runEpoch === "number"
-      && typeof livenessNotifiedEpoch === "number"
-      && livenessNotifiedEpoch >= runEpoch,
+      typeof runEpoch === "number" && typeof livenessNotifiedEpoch === "number" && livenessNotifiedEpoch >= runEpoch,
   }
 }
 

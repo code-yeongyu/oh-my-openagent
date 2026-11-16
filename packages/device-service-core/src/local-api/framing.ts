@@ -1,3 +1,4 @@
+// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/local-api/src/framing.ts
 import { LocalApiError } from "./errors.ts";
 
 // Framing: LF-delimited UTF-8 JSON, one object per line, at most LOCAL_LINE_MAX bytes per line (the LF not counted).

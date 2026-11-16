@@ -17,7 +17,7 @@ export class PromptFileNotFoundError extends Error {
     readonly promptName: string,
     readonly variant: string,
     readonly filePath: string,
-    options?: ErrorOptions
+    options?: ErrorOptions,
   ) {
     super(`Prompt file not found for ${promptName}/${variant}: ${filePath}`, options)
   }
@@ -28,27 +28,27 @@ export class PromptPathTraversalError extends Error {
 
   constructor(
     readonly promptName: string,
-    readonly variant: string
+    readonly variant: string,
   ) {
     super(`Prompt path escapes source directory for ${promptName}/${variant}`)
   }
 }
 
 export function loadPrompt<TFrontmatter = Record<string, unknown>>(
-  input: LoadBundledPromptInput
+  input: LoadBundledPromptInput,
 ): LoadedPrompt<TFrontmatter>
 export function loadPrompt<TFrontmatter = Record<string, unknown>>(
-  input: LoadFilesystemPromptInput
+  input: LoadFilesystemPromptInput,
 ): Promise<LoadedPrompt<TFrontmatter>>
 export function loadPrompt<TFrontmatter = Record<string, unknown>>(
-  input: LoadPromptInput
+  input: LoadPromptInput,
 ): LoadedPrompt<TFrontmatter> | Promise<LoadedPrompt<TFrontmatter>> {
   if (isLoadBundledPromptInput(input)) return loadBundledPrompt(input)
   return loadFilesystemPrompt(input)
 }
 
 export function loadPromptSync<TFrontmatter = Record<string, unknown>>(
-  input: LoadBundledPromptInput
+  input: LoadBundledPromptInput,
 ): LoadedPrompt<TFrontmatter> {
   return loadBundledPrompt(input)
 }
@@ -58,7 +58,7 @@ function isLoadBundledPromptInput(input: LoadPromptInput): input is LoadBundledP
 }
 
 async function loadFilesystemPrompt<TFrontmatter = Record<string, unknown>>(
-  input: LoadFilesystemPromptInput
+  input: LoadFilesystemPromptInput,
 ): Promise<LoadedPrompt<TFrontmatter>> {
   const filePath = resolvePromptFilePath(input.source.baseDir, input.name, input.variant)
   const content = await readPromptFile(input.name, input.variant, filePath)
@@ -75,7 +75,7 @@ async function loadFilesystemPrompt<TFrontmatter = Record<string, unknown>>(
 }
 
 function loadBundledPrompt<TFrontmatter = Record<string, unknown>>(
-  input: LoadBundledPromptInput
+  input: LoadBundledPromptInput,
 ): LoadedPrompt<TFrontmatter> {
   const parsed = parseFrontmatter<TFrontmatter>(input.source.content)
   const body = applyRuntimeInjectionsSync(parsed.body, input.inject ?? [])
@@ -110,10 +110,7 @@ async function readPromptFile(promptName: string, variant: string, filePath: str
   }
 }
 
-async function applyRuntimeInjections(
-  body: string,
-  injections: readonly RuntimeInjection[]
-): Promise<string> {
+async function applyRuntimeInjections(body: string, injections: readonly RuntimeInjection[]): Promise<string> {
   let renderedBody = body
   for (const injection of injections) {
     renderedBody = renderedBody.replaceAll(injection.placeholder, await injection.resolver())
@@ -121,10 +118,7 @@ async function applyRuntimeInjections(
   return renderedBody
 }
 
-function applyRuntimeInjectionsSync(
-  body: string,
-  injections: readonly SyncRuntimeInjection[]
-): string {
+function applyRuntimeInjectionsSync(body: string, injections: readonly SyncRuntimeInjection[]): string {
   let renderedBody = body
   for (const injection of injections) {
     renderedBody = renderedBody.replaceAll(injection.placeholder, injection.resolver())

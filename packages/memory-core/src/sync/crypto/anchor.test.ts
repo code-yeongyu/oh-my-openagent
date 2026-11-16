@@ -1,10 +1,33 @@
 import { describe, expect, test } from "bun:test"
 import type { DeviceKeyring } from "../keyring-port.ts"
-import { type BootstrapAnchor, type ChainAnchor, creatorAnchor, pairingAnchor, recoveryAnchor, type TrustAnchor } from "./anchor.ts"
-import { appendEntries, atVerifiedHead, type ChainState, emptyChain, isChainState, isVerifiedWrap, verifyKeyringEntry } from "./chain.ts"
+import {
+  type BootstrapAnchor,
+  type ChainAnchor,
+  creatorAnchor,
+  pairingAnchor,
+  recoveryAnchor,
+  type TrustAnchor,
+} from "./anchor.ts"
+import {
+  appendEntries,
+  atVerifiedHead,
+  type ChainState,
+  emptyChain,
+  isChainState,
+  isVerifiedWrap,
+  verifyKeyringEntry,
+} from "./chain.ts"
 import type { KeyringEntry, VerifiedWrap } from "./entry.ts"
 import { createRejectionCounter } from "./rejection.ts"
-import { approvalEntry, genesisEntry, headAfter, newDeviceKeyring, newRecoveryCredential, type PairingTranscript, pairingTranscript } from "./testing/genesis.ts"
+import {
+  approvalEntry,
+  genesisEntry,
+  headAfter,
+  newDeviceKeyring,
+  newRecoveryCredential,
+  type PairingTranscript,
+  pairingTranscript,
+} from "./testing/genesis.ts"
 import { sealedEpochWrap } from "./testing/hpke-seal.ts"
 import { pinnedFixtureAnchor } from "./testing/pinned.test-support.ts"
 import { ACCOUNT, fixtureAnchor, mainChain, record } from "./testing/sync-v1.test-support.ts"
@@ -37,16 +60,35 @@ const ceremony = (self: DeviceKeyring, approver: DeviceKeyring, transcript: Pair
     approverNonce: transcript.approver_nonce,
   })
 
-const accountBy = async (owner: DeviceKeyring, joining: DeviceKeyring, transcript: PairingTranscript, epochKey: Uint8Array) => {
+const accountBy = async (
+  owner: DeviceKeyring,
+  joining: DeviceKeyring,
+  transcript: PairingTranscript,
+  epochKey: Uint8Array,
+) => {
   const ownerId = `device:${owner.principal().id}`
-  const genesis = await genesisEntry(ACCOUNT, owner, await sealedEpochWrap(owner.publicKeys().sealing, ACCOUNT, ownerId, epochKey), newRecoveryCredential())
+  const genesis = await genesisEntry(
+    ACCOUNT,
+    owner,
+    await sealedEpochWrap(owner.publicKeys().sealing, ACCOUNT, ownerId, epochKey),
+    newRecoveryCredential(),
+  )
   const joiningId = `device:${joining.principal().id}`
-  const approval = await approvalEntry(headAfter(genesis), ACCOUNT, owner, joining, transcript, await sealedEpochWrap(joining.publicKeys().sealing, ACCOUNT, joiningId, epochKey))
+  const approval = await approvalEntry(
+    headAfter(genesis),
+    ACCOUNT,
+    owner,
+    joining,
+    transcript,
+    await sealedEpochWrap(joining.publicKeys().sealing, ACCOUNT, joiningId, epochKey),
+  )
   return [genesis, approval] as const
 }
 
 const opened = async (keyring: DeviceKeyring, state: ChainState) => {
-  const wrap = state.received.flatMap((entry) => entry.wraps).find((candidate) => candidate.id === `device:${keyring.principal().id}`)
+  const wrap = state.received
+    .flatMap((entry) => entry.wraps)
+    .find((candidate) => candidate.id === `device:${keyring.principal().id}`)
   return wrap === undefined ? null : openWrap(keyring, wrap, ACCOUNT, new Map())
 }
 
@@ -55,7 +97,10 @@ describe("H1: a joining device trusts only the approval its own ceremony bound",
     const [approver, joining] = [await newDeviceKeyring(), await newDeviceKeyring()]
     const transcript = await pairingTranscript(ACCOUNT, joining)
     const epochKey = crypto.getRandomValues(new Uint8Array(32))
-    const { outcome } = await walk(ceremony(joining, approver, transcript), await accountBy(approver, joining, transcript, epochKey))
+    const { outcome } = await walk(
+      ceremony(joining, approver, transcript),
+      await accountBy(approver, joining, transcript, epochKey),
+    )
     if (!outcome.ok) throw new Error(`refused: ${outcome.reason}`)
     expect(outcome.state.pin?.pinnedBy).toBe("pairing")
     expect(outcome.state.pin?.genesisDigest).toBe(outcome.state.genesisDigest ?? "")
@@ -95,7 +140,11 @@ describe("H1: a joining device trusts only the approval its own ceremony bound",
     const [genesis] = await accountBy(approver, joining, transcript, crypto.getRandomValues(new Uint8Array(32)))
     const step = await verifyKeyringEntry(emptyChain(ACCOUNT, ceremony(joining, approver, transcript)), genesis, "main")
     if (!step.ok) throw new Error(`genesis refused: ${step.reason}`)
-    expect({ anchored: step.state.anchored, received: step.state.received.length, held: step.state.unanchored.length }).toEqual({ anchored: false, received: 0, held: 1 })
+    expect({
+      anchored: step.state.anchored,
+      received: step.state.received.length,
+      held: step.state.unanchored.length,
+    }).toEqual({ anchored: false, received: 0, held: 1 })
     const held = step.state.unanchored[0]?.wraps ?? []
     expect(held.length).toBeGreaterThan(0)
     expect(held.some((wrap) => isVerifiedWrap(wrap))).toBe(false)
@@ -155,7 +204,13 @@ describe("every value the verifier trusts is minted by the verifier: a hand-buil
       const copy: BootstrapAnchor = handBuilt
       expectRefused(await walk(copy, [served]), "untrusted_root")
     }
-    const handRecovery = { kind: "recovery", account: ACCOUNT, credentialId: "c", sealing_public_key: "s", signing_public_key: "k" }
+    const handRecovery = {
+      kind: "recovery",
+      account: ACCOUNT,
+      credentialId: "c",
+      sealing_public_key: "s",
+      signing_public_key: "k",
+    }
     // @ts-expect-error only recoveryAnchor creates a recovery anchor
     expectRefused(await walk(handRecovery, mainChain()), "untrusted_root")
   })
@@ -181,7 +236,8 @@ describe("every value the verifier trusts is minted by the verifier: a hand-buil
     const authority = state.authority
     const record0 = state.history[0]
     const entry0 = state.received[0]
-    if (authority === null || state.head === null || record0 === undefined || entry0 === undefined) throw new Error("fixture has no verified records")
+    if (authority === null || state.head === null || record0 === undefined || entry0 === undefined)
+      throw new Error("fixture has no verified records")
     const attempts: ReadonlyArray<() => unknown> = [
       () => Reflect.apply(Array.prototype.push, state.received, [entry0]),
       () => Reflect.apply(Array.prototype.push, state.history, [record0]),
@@ -202,7 +258,11 @@ describe("every value the verifier trusts is minted by the verifier: a hand-buil
     ]
     for (const [target, key, value] of assignments) expect(Reflect.set(target, key, value)).toBe(false)
     expect(isChainState(state)).toBe(true)
-    expect({ seq: state.head.seq, members: authority.members.size, received: state.received.length }).toEqual({ seq: mainChain().length, members: authority.members.size, received: mainChain().length })
+    expect({ seq: state.head.seq, members: authority.members.size, received: state.received.length }).toEqual({
+      seq: mainChain().length,
+      members: authority.members.size,
+      received: mainChain().length,
+    })
     expect(entry0.wraps.every(isVerifiedWrap)).toBe(true)
   })
 
@@ -212,7 +272,9 @@ describe("every value the verifier trusts is minted by the verifier: a hand-buil
     const head = outcome.state.head
     expect(atVerifiedHead(outcome.state, head)?.head).toEqual(head)
     expect(atVerifiedHead(outcome.state, { ...head, link: "L".repeat(43) })).toBeNull()
-    expect(atVerifiedHead(outcome.state, { ...head, seq: head.seq + 5, link: "L".repeat(43) })?.head?.seq).toBe(head.seq + 5)
+    expect(atVerifiedHead(outcome.state, { ...head, seq: head.seq + 5, link: "L".repeat(43) })?.head?.seq).toBe(
+      head.seq + 5,
+    )
     expect(atVerifiedHead(outcome.state, { ...head, keyring_link: "K".repeat(43) })).toBeNull()
     expect(atVerifiedHead(outcome.state, { ...head, seq: head.seq - 1 })).toBeNull()
     const [approver, joining] = [await newDeviceKeyring(), await newDeviceKeyring()]
@@ -228,7 +290,12 @@ describe("every value the verifier trusts is minted by the verifier: a hand-buil
 describe("H1: a pinned root refuses every other root", () => {
   test("a valid-looking genesis that is not the pinned one is refused before anything is trusted", async () => {
     const [server, joining] = [await newDeviceKeyring(), await newDeviceKeyring()]
-    const substituted = await accountBy(server, joining, await pairingTranscript(ACCOUNT, joining), crypto.getRandomValues(new Uint8Array(32)))
+    const substituted = await accountBy(
+      server,
+      joining,
+      await pairingTranscript(ACCOUNT, joining),
+      crypto.getRandomValues(new Uint8Array(32)),
+    )
     expectRefused(await walk(await pinnedFixtureAnchor(), substituted), "untrusted_root")
   })
 
@@ -242,7 +309,12 @@ describe("H1: a pinned root refuses every other root", () => {
   test("a hand-built VerifiedWrap does not compile and is refused at runtime", async () => {
     const keyring = await newDeviceKeyring()
     // @ts-expect-error a VerifiedWrap carries a brand no literal can supply
-    const forged: VerifiedWrap = { epoch: 1, id: `device:${keyring.principal().id}`, wrap: "Z".repeat(43), account: ACCOUNT }
+    const forged: VerifiedWrap = {
+      epoch: 1,
+      id: `device:${keyring.principal().id}`,
+      wrap: "Z".repeat(43),
+      account: ACCOUNT,
+    }
     expect(await openWrap(keyring, forged, ACCOUNT, new Map())).toEqual({ ok: false, reason: "unverified_wrap" })
   })
 })

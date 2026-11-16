@@ -3,7 +3,12 @@ import { afterEach, describe, expect, test } from "bun:test"
 import type { TaskRecord } from "../state"
 import { runTaskCancel } from "../tools/control/cancel"
 import { runTaskOutput } from "../tools/output/output"
-import { HOST_CHILD_MODEL, startHostWorld, type HostWorld, type ParentSession } from "./rpc-host/__fixtures__/host-world"
+import {
+  HOST_CHILD_MODEL,
+  startHostWorld,
+  type HostWorld,
+  type ParentSession,
+} from "./rpc-host/__fixtures__/host-world"
 import { manualRecoveryClock, type ManualRecoveryClock } from "./rpc-host/__fixtures__/manual-recovery-clock"
 
 /**
@@ -28,7 +33,11 @@ async function laneOf(slots: number): Promise<Lane> {
   const world = await startHostWorld({ sessionProcesses: true })
   worlds.push(world)
   const clock = manualRecoveryClock()
-  const parent = world.connect("parent-a", { settings: { default_concurrency: slots }, reattachDelaysMs: [0, 0], recoveryClock: clock })
+  const parent = world.connect("parent-a", {
+    settings: { default_concurrency: slots },
+    reattachDelaysMs: [0, 0],
+    recoveryClock: clock,
+  })
   return { world, parent, clock }
 }
 
@@ -51,7 +60,10 @@ function sessionOf(world: HostWorld, record: TaskRecord) {
 }
 
 function commandsFor(world: HostWorld, routingId: string, from: number): readonly string[] {
-  return world.host.commands.slice(from).filter((command) => command.sessionId === routingId).map((command) => command.type)
+  return world.host.commands
+    .slice(from)
+    .filter((command) => command.sessionId === routingId)
+    .map((command) => command.type)
 }
 
 function bounded<T>(work: Promise<T>, label: string): Promise<T> {
@@ -81,7 +93,11 @@ describe("task_cancel stops the child", () => {
 
     // then - never a false cancelled, and the lane is still held by a child that may still run
     expect(cancelled.details).toMatchObject({ kind: "cancel_pending", task_id: child.task_id })
-    const pendingView = await runTaskOutput({ manager: parent.manager, stateDir: parent.store.stateDir }, { task_id: child.task_id }, parent.sessionId)
+    const pendingView = await runTaskOutput(
+      { manager: parent.manager, stateDir: parent.store.stateDir },
+      { task_id: child.task_id },
+      parent.sessionId,
+    )
     expect(JSON.stringify(pendingView.details)).toContain("cancel requested, child unreachable")
     expect(concurrencyOf(parent).getCount(HOST_CHILD_MODEL)).toBe(1)
     expect(recordAt(parent, 1).status).toBe("pending")
@@ -96,7 +112,9 @@ describe("task_cancel stops the child", () => {
     await nextPrompt
 
     // then - the cancel ran before anything else; nothing was re-prompted; the process ended with it
-    const sentAfter = world.host.commands.slice(mark).filter((command) => command.type === "prompt" || command.type === "steer" || command.type === "followUp")
+    const sentAfter = world.host.commands
+      .slice(mark)
+      .filter((command) => command.type === "prompt" || command.type === "steer" || command.type === "followUp")
     expect(sentAfter.map((command) => String(command.payload.message))).toEqual(["host child parent-a #1"])
     expect(world.host.sessions().some((candidate) => candidate.sessionPath === session.sessionPath)).toBe(false)
     await bounded(session.processExit ?? Promise.resolve(), "the cancelled child's process exit")

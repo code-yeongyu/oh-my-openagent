@@ -19,9 +19,7 @@ describe("createSkillContext", () => {
   beforeEach(() => {
     mkdirSync(testDirectory, { recursive: true })
     mockGlobalConfigDir = mkdtempSync(join(tmpdir(), "skill-context-global-"))
-    getOpenCodeConfigDirSpy = spyOn(opencodeConfigDir, "getOpenCodeConfigDir").mockReturnValue(
-      mockGlobalConfigDir,
-    )
+    getOpenCodeConfigDirSpy = spyOn(opencodeConfigDir, "getOpenCodeConfigDir").mockReturnValue(mockGlobalConfigDir)
   })
 
   afterEach(() => {
@@ -32,38 +30,14 @@ describe("createSkillContext", () => {
 
   it("exposes security skills to the OMO skill tool context", async () => {
     // given
-    const discoverConfigSourceSkillsSpy = spyOn(
-      skillLoader,
-      "discoverConfigSourceSkills",
-    ).mockResolvedValue([])
-    const discoverUserClaudeSkillsSpy = spyOn(
-      skillLoader,
-      "discoverUserClaudeSkills",
-    ).mockResolvedValue([])
-    const discoverProjectClaudeSkillsSpy = spyOn(
-      skillLoader,
-      "discoverProjectClaudeSkills",
-    ).mockResolvedValue([])
-    const discoverOpencodeGlobalSkillsSpy = spyOn(
-      skillLoader,
-      "discoverOpencodeGlobalSkills",
-    ).mockResolvedValue([])
-    const discoverOpencodeProjectSkillsSpy = spyOn(
-      skillLoader,
-      "discoverOpencodeProjectSkills",
-    ).mockResolvedValue([])
-    const discoverProjectAgentsSkillsSpy = spyOn(
-      skillLoader,
-      "discoverProjectAgentsSkills",
-    ).mockResolvedValue([])
-    const discoverGlobalAgentsSkillsSpy = spyOn(
-      skillLoader,
-      "discoverGlobalAgentsSkills",
-    ).mockResolvedValue([])
-    const getSystemMcpServerNamesSpy = spyOn(
-      mcpLoader,
-      "getSystemMcpServerNames",
-    ).mockReturnValue(new Set<string>())
+    const discoverConfigSourceSkillsSpy = spyOn(skillLoader, "discoverConfigSourceSkills").mockResolvedValue([])
+    const discoverUserClaudeSkillsSpy = spyOn(skillLoader, "discoverUserClaudeSkills").mockResolvedValue([])
+    const discoverProjectClaudeSkillsSpy = spyOn(skillLoader, "discoverProjectClaudeSkills").mockResolvedValue([])
+    const discoverOpencodeGlobalSkillsSpy = spyOn(skillLoader, "discoverOpencodeGlobalSkills").mockResolvedValue([])
+    const discoverOpencodeProjectSkillsSpy = spyOn(skillLoader, "discoverOpencodeProjectSkills").mockResolvedValue([])
+    const discoverProjectAgentsSkillsSpy = spyOn(skillLoader, "discoverProjectAgentsSkills").mockResolvedValue([])
+    const discoverGlobalAgentsSkillsSpy = spyOn(skillLoader, "discoverGlobalAgentsSkills").mockResolvedValue([])
+    const getSystemMcpServerNamesSpy = spyOn(mcpLoader, "getSystemMcpServerNames").mockReturnValue(new Set<string>())
 
     const pluginConfig = OhMyOpenCodeConfigSchema.parse({})
 
@@ -115,30 +89,12 @@ describe("createSkillContext", () => {
       ].join("\n"),
     )
 
-    const discoverConfigSourceSkillsSpy = spyOn(
-      skillLoader,
-      "discoverConfigSourceSkills",
-    ).mockResolvedValue([])
-    const discoverUserClaudeSkillsSpy = spyOn(
-      skillLoader,
-      "discoverUserClaudeSkills",
-    ).mockResolvedValue([])
-    const discoverOpencodeGlobalSkillsSpy = spyOn(
-      skillLoader,
-      "discoverOpencodeGlobalSkills",
-    ).mockResolvedValue([])
-    const discoverProjectAgentsSkillsSpy = spyOn(
-      skillLoader,
-      "discoverProjectAgentsSkills",
-    ).mockResolvedValue([])
-    const discoverGlobalAgentsSkillsSpy = spyOn(
-      skillLoader,
-      "discoverGlobalAgentsSkills",
-    ).mockResolvedValue([])
-    const getSystemMcpServerNamesSpy = spyOn(
-      mcpLoader,
-      "getSystemMcpServerNames",
-    ).mockReturnValue(new Set<string>())
+    const discoverConfigSourceSkillsSpy = spyOn(skillLoader, "discoverConfigSourceSkills").mockResolvedValue([])
+    const discoverUserClaudeSkillsSpy = spyOn(skillLoader, "discoverUserClaudeSkills").mockResolvedValue([])
+    const discoverOpencodeGlobalSkillsSpy = spyOn(skillLoader, "discoverOpencodeGlobalSkills").mockResolvedValue([])
+    const discoverProjectAgentsSkillsSpy = spyOn(skillLoader, "discoverProjectAgentsSkills").mockResolvedValue([])
+    const discoverGlobalAgentsSkillsSpy = spyOn(skillLoader, "discoverGlobalAgentsSkills").mockResolvedValue([])
+    const getSystemMcpServerNamesSpy = spyOn(mcpLoader, "getSystemMcpServerNames").mockReturnValue(new Set<string>())
 
     const pluginConfig = OhMyOpenCodeConfigSchema.parse({
       browser_automation_engine: { provider: "dev-browser" },
@@ -185,39 +141,15 @@ describe("createSkillContext", () => {
 
     const opencodeDir = join(testDirectory, ".opencode")
     mkdirSync(opencodeDir, { recursive: true })
-    writeFileSync(
-      join(opencodeDir, "opencode.jsonc"),
-      JSON.stringify({ skills: { paths: [hostSkillsDir] } }),
-    )
+    writeFileSync(join(opencodeDir, "opencode.jsonc"), JSON.stringify({ skills: { paths: [hostSkillsDir] } }))
 
-    const discoverUserClaudeSkillsSpy = spyOn(
-      skillLoader,
-      "discoverUserClaudeSkills",
-    ).mockResolvedValue([])
-    const discoverProjectClaudeSkillsSpy = spyOn(
-      skillLoader,
-      "discoverProjectClaudeSkills",
-    ).mockResolvedValue([])
-    const discoverOpencodeGlobalSkillsSpy = spyOn(
-      skillLoader,
-      "discoverOpencodeGlobalSkills",
-    ).mockResolvedValue([])
-    const discoverOpencodeProjectSkillsSpy = spyOn(
-      skillLoader,
-      "discoverOpencodeProjectSkills",
-    ).mockResolvedValue([])
-    const discoverProjectAgentsSkillsSpy = spyOn(
-      skillLoader,
-      "discoverProjectAgentsSkills",
-    ).mockResolvedValue([])
-    const discoverGlobalAgentsSkillsSpy = spyOn(
-      skillLoader,
-      "discoverGlobalAgentsSkills",
-    ).mockResolvedValue([])
-    const getSystemMcpServerNamesSpy = spyOn(
-      mcpLoader,
-      "getSystemMcpServerNames",
-    ).mockReturnValue(new Set<string>())
+    const discoverUserClaudeSkillsSpy = spyOn(skillLoader, "discoverUserClaudeSkills").mockResolvedValue([])
+    const discoverProjectClaudeSkillsSpy = spyOn(skillLoader, "discoverProjectClaudeSkills").mockResolvedValue([])
+    const discoverOpencodeGlobalSkillsSpy = spyOn(skillLoader, "discoverOpencodeGlobalSkills").mockResolvedValue([])
+    const discoverOpencodeProjectSkillsSpy = spyOn(skillLoader, "discoverOpencodeProjectSkills").mockResolvedValue([])
+    const discoverProjectAgentsSkillsSpy = spyOn(skillLoader, "discoverProjectAgentsSkills").mockResolvedValue([])
+    const discoverGlobalAgentsSkillsSpy = spyOn(skillLoader, "discoverGlobalAgentsSkills").mockResolvedValue([])
+    const getSystemMcpServerNamesSpy = spyOn(mcpLoader, "getSystemMcpServerNames").mockReturnValue(new Set<string>())
 
     const pluginConfig = OhMyOpenCodeConfigSchema.parse({})
 
@@ -266,10 +198,7 @@ describe("createSkillContext", () => {
     )
 
     // on-disk config returns nothing: proves the runtime arg is the source.
-    const readOpencodeConfigSkillsSpy = spyOn(
-      skillLoader,
-      "readOpencodeConfigSkills",
-    ).mockReturnValue(undefined)
+    const readOpencodeConfigSkillsSpy = spyOn(skillLoader, "readOpencodeConfigSkills").mockReturnValue(undefined)
     const discoverUserClaudeSkillsSpy = spyOn(skillLoader, "discoverUserClaudeSkills").mockResolvedValue([])
     const discoverProjectClaudeSkillsSpy = spyOn(skillLoader, "discoverProjectClaudeSkills").mockResolvedValue([])
     const discoverOpencodeGlobalSkillsSpy = spyOn(skillLoader, "discoverOpencodeGlobalSkills").mockResolvedValue([])
@@ -314,34 +243,15 @@ describe("createSkillContext", () => {
       scope: "user" as const,
     }
 
-    const discoverConfigSourceSkillsSpy = spyOn(
-      skillLoader,
-      "discoverConfigSourceSkills",
-    ).mockResolvedValue([])
-    const discoverUserClaudeSkillsSpy = spyOn(
-      skillLoader,
-      "discoverUserClaudeSkills",
-    ).mockResolvedValue([discoveredDevBrowserSkill])
-    const discoverProjectClaudeSkillsSpy = spyOn(
-      skillLoader,
-      "discoverProjectClaudeSkills",
-    ).mockResolvedValue([])
-    const discoverOpencodeGlobalSkillsSpy = spyOn(
-      skillLoader,
-      "discoverOpencodeGlobalSkills",
-    ).mockResolvedValue([])
-    const discoverProjectAgentsSkillsSpy = spyOn(
-      skillLoader,
-      "discoverProjectAgentsSkills",
-    ).mockResolvedValue([])
-    const discoverGlobalAgentsSkillsSpy = spyOn(
-      skillLoader,
-      "discoverGlobalAgentsSkills",
-    ).mockResolvedValue([])
-    const getSystemMcpServerNamesSpy = spyOn(
-      mcpLoader,
-      "getSystemMcpServerNames",
-    ).mockReturnValue(new Set<string>())
+    const discoverConfigSourceSkillsSpy = spyOn(skillLoader, "discoverConfigSourceSkills").mockResolvedValue([])
+    const discoverUserClaudeSkillsSpy = spyOn(skillLoader, "discoverUserClaudeSkills").mockResolvedValue([
+      discoveredDevBrowserSkill,
+    ])
+    const discoverProjectClaudeSkillsSpy = spyOn(skillLoader, "discoverProjectClaudeSkills").mockResolvedValue([])
+    const discoverOpencodeGlobalSkillsSpy = spyOn(skillLoader, "discoverOpencodeGlobalSkills").mockResolvedValue([])
+    const discoverProjectAgentsSkillsSpy = spyOn(skillLoader, "discoverProjectAgentsSkills").mockResolvedValue([])
+    const discoverGlobalAgentsSkillsSpy = spyOn(skillLoader, "discoverGlobalAgentsSkills").mockResolvedValue([])
+    const getSystemMcpServerNamesSpy = spyOn(mcpLoader, "getSystemMcpServerNames").mockReturnValue(new Set<string>())
 
     const pluginConfig = OhMyOpenCodeConfigSchema.parse({
       browser_automation_engine: {
@@ -397,38 +307,16 @@ describe("createSkillContext", () => {
     const discoverConfigSourceSkillsSpy = spyOn(skillLoader, "discoverConfigSourceSkills")
       .mockResolvedValueOnce([pluginConfigSkill]) // first call -> plugin config
       .mockResolvedValueOnce([hostConfigSkill]) // second call -> host config
-    const discoverUserClaudeSkillsSpy = spyOn(
-      skillLoader,
-      "discoverUserClaudeSkills",
-    ).mockResolvedValue([])
-    const discoverProjectClaudeSkillsSpy = spyOn(
-      skillLoader,
-      "discoverProjectClaudeSkills",
-    ).mockResolvedValue([])
-    const discoverOpencodeGlobalSkillsSpy = spyOn(
-      skillLoader,
-      "discoverOpencodeGlobalSkills",
-    ).mockResolvedValue([])
-    const discoverOpencodeProjectSkillsSpy = spyOn(
-      skillLoader,
-      "discoverOpencodeProjectSkills",
-    ).mockResolvedValue([])
-    const discoverProjectAgentsSkillsSpy = spyOn(
-      skillLoader,
-      "discoverProjectAgentsSkills",
-    ).mockResolvedValue([])
-    const discoverGlobalAgentsSkillsSpy = spyOn(
-      skillLoader,
-      "discoverGlobalAgentsSkills",
-    ).mockResolvedValue([])
-    const readOpencodeConfigSkillsSpy = spyOn(
-      skillLoader,
-      "readOpencodeConfigSkills",
-    ).mockReturnValue({ paths: ["/fake/host/skills"] })
-    const getSystemMcpServerNamesSpy = spyOn(
-      mcpLoader,
-      "getSystemMcpServerNames",
-    ).mockReturnValue(new Set<string>())
+    const discoverUserClaudeSkillsSpy = spyOn(skillLoader, "discoverUserClaudeSkills").mockResolvedValue([])
+    const discoverProjectClaudeSkillsSpy = spyOn(skillLoader, "discoverProjectClaudeSkills").mockResolvedValue([])
+    const discoverOpencodeGlobalSkillsSpy = spyOn(skillLoader, "discoverOpencodeGlobalSkills").mockResolvedValue([])
+    const discoverOpencodeProjectSkillsSpy = spyOn(skillLoader, "discoverOpencodeProjectSkills").mockResolvedValue([])
+    const discoverProjectAgentsSkillsSpy = spyOn(skillLoader, "discoverProjectAgentsSkills").mockResolvedValue([])
+    const discoverGlobalAgentsSkillsSpy = spyOn(skillLoader, "discoverGlobalAgentsSkills").mockResolvedValue([])
+    const readOpencodeConfigSkillsSpy = spyOn(skillLoader, "readOpencodeConfigSkills").mockReturnValue({
+      paths: ["/fake/host/skills"],
+    })
+    const getSystemMcpServerNamesSpy = spyOn(mcpLoader, "getSystemMcpServerNames").mockReturnValue(new Set<string>())
 
     const pluginConfig = OhMyOpenCodeConfigSchema.parse({})
 

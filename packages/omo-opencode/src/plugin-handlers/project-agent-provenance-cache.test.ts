@@ -8,7 +8,10 @@ import * as commands from "./command-config-handler"
 import * as mcps from "./mcp-config-handler"
 import * as plugins from "./plugin-components-loader"
 import { createConfigHandler } from "./config-handler"
-import { hasProjectAgentProvenance, replaceProjectAgentProvenance } from "../features/team-mode/final-open-code-agent-registry"
+import {
+  hasProjectAgentProvenance,
+  replaceProjectAgentProvenance,
+} from "../features/team-mode/final-open-code-agent-registry"
 
 const restorers: Array<{ mockRestore(): void }> = []
 let directory: string
@@ -22,7 +25,13 @@ beforeEach(() => {
     spyOn(commands, "applyCommandConfig").mockResolvedValue(undefined),
     spyOn(mcps, "applyMcpConfig").mockResolvedValue(undefined),
     spyOn(plugins, "loadPluginComponents").mockResolvedValue({
-      commands: {}, skills: {}, agents: {}, mcpServers: {}, hooksConfigs: [], plugins: [], errors: [],
+      commands: {},
+      skills: {},
+      agents: {},
+      mcpServers: {},
+      hooksConfigs: [],
+      plugins: [],
+      errors: [],
     }),
   )
 })
@@ -33,8 +42,10 @@ afterEach(() => {
 })
 
 function writeAgent(name = "project-worker", prompt = "first source") {
-  writeFileSync(path.join(directory, ".opencode", "agents", `${name}.md`),
-    `---\ndescription: project worker\nmode: subagent\n---\n${prompt}\n`)
+  writeFileSync(
+    path.join(directory, ".opencode", "agents", `${name}.md`),
+    `---\ndescription: project worker\nmode: subagent\n---\n${prompt}\n`,
+  )
 }
 
 function handler() {
@@ -80,17 +91,54 @@ test("clears stale provenance before a failed cold config refresh", async () => 
 
 test("does not attribute a later OpenCode config definition or host-only entry to a project file", async () => {
   writeAgent()
-  writeFileSync(path.join(directory, ".opencode", "opencode.jsonc"), JSON.stringify({
-    agent: { "project-worker": { mode: "subagent", prompt: "later source" } },
-  }))
+  writeFileSync(
+    path.join(directory, ".opencode", "opencode.jsonc"),
+    JSON.stringify({
+      agent: { "project-worker": { mode: "subagent", prompt: "later source" } },
+    }),
+  )
   await handler()({ agent: { "host-only": { mode: "subagent" } } })
   expect(hasProjectAgentProvenance(directory, "project-worker")).toBe(false)
   expect(hasProjectAgentProvenance(directory, "host-only")).toBe(false)
 })
 
+test("does not attribute an incoming config override to a project file", async () => {
+  writeAgent()
+  writeAgent("other-worker")
+  await handler()({ agent: { "project-worker": { mode: "subagent", prompt: "host override" } } })
+  expect(hasProjectAgentProvenance(directory, "project-worker")).toBe(false)
+  expect(hasProjectAgentProvenance(directory, "other-worker")).toBe(true)
+})
+
+test("uses host origin for incoming project agents and invalidates equal-value cache entries when it changes", async () => {
+  writeAgent()
+  writeFileSync(path.join(directory, ".opencode", "agents", "filename.md"), "---\nname: alias\nmode: subagent\n---\nWorker\n")
+  const apply = handler()
+  const agent = { "project-worker": { mode: "subagent", prompt: "first source" }, alias: { mode: "subagent", prompt: "Worker" } }
+  const config = (origins: Record<string, string>) => {
+    const value = { agent }
+    Object.defineProperty(value, Symbol.for("opencode.agent-origins.v1"), { value: origins })
+    return value
+  }
+  await apply(config({ "project-worker": path.join(directory, ".opencode", "agents", "project-worker.md"), alias: path.join(directory, ".opencode", "agents", "filename.md") }))
+  expect(hasProjectAgentProvenance(directory, "project-worker")).toBe(true)
+  expect(hasProjectAgentProvenance(directory, "alias")).toBe(true)
+  await apply(config({ alias: path.join(directory, ".opencode", "agent", "filename.md") }))
+  expect(hasProjectAgentProvenance(directory, "alias")).toBe(false)
+  await apply(config({ alias: path.join(directory, "..", ".opencode", "agents", "filename.md") }))
+  expect(hasProjectAgentProvenance(directory, "alias")).toBe(false)
+  await apply(config({}))
+  expect(hasProjectAgentProvenance(directory, "project-worker")).toBe(false)
+  expect(hasProjectAgentProvenance(directory, "alias")).toBe(false)
+  await apply({ agent })
+  expect(hasProjectAgentProvenance(directory, "project-worker")).toBe(false)
+})
+
 test("does not attribute a filtered project collision to the surviving protected built-in", async () => {
   writeAgent("oracle")
-  const builtin = spyOn(agents, "createBuiltinAgents").mockResolvedValue({ oracle: { mode: "subagent", prompt: "builtin" } })
+  const builtin = spyOn(agents, "createBuiltinAgents").mockResolvedValue({
+    oracle: { mode: "subagent", prompt: "builtin" },
+  })
   restorers.push(builtin)
   await handler()({ agent: {} })
   expect(hasProjectAgentProvenance(directory, "oracle")).toBe(false)

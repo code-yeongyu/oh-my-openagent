@@ -35,10 +35,10 @@ export function packagedSkillDirs(
 ): readonly string[] {
   const moduleDir = dirname(fileURLToPath(moduleUrl))
   const override = resolveBundledSkillsOverride(env, logger)
-  const bundled = override === undefined ? [
-    resolve(moduleDir, "../../../plugin/skills"),
-    resolve(moduleDir, "../skills"),
-  ] : [override]
+  const bundled =
+    override === undefined
+      ? [resolve(moduleDir, "../../../plugin/skills"), resolve(moduleDir, "../skills")]
+      : [override]
   return [
     ...bundled,
     resolve(moduleDir, "../../../plugin/skills-conditional"),
@@ -50,10 +50,7 @@ function defaultLoadSettings(cwd: string): OmoGitMasterSettings {
   return resolveOmoGitMasterSettings(loadSenpiOmoConfig({ cwd }).config)
 }
 
-function withGitMasterSettings(
-  loader: SkillLoader,
-  loadSettings: (cwd: string) => OmoGitMasterSettings,
-): SkillLoader {
+function withGitMasterSettings(loader: SkillLoader, loadSettings: (cwd: string) => OmoGitMasterSettings): SkillLoader {
   return (names, cwd) => {
     const resolution = loader(names, cwd)
     const resolvedSkills = resolution.skills ?? []

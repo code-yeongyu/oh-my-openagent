@@ -37,7 +37,10 @@ async function register(results: (input: RunCommentCheckerInput) => CheckResult)
       return results(input)
     },
   })
-  await component.register(pi, { logger: createRecordingLogger(), config: { getFlag: (name: string) => pi.getFlag(name) } })
+  await component.register(pi, {
+    logger: createRecordingLogger(),
+    config: { getFlag: (name: string) => pi.getFlag(name) },
+  })
   return { pi, calls, resolveCount: () => resolves, ctx: createContext(cwd), cwd }
 }
 
@@ -72,7 +75,10 @@ describe("X8a comment-checker turn reset (characterization of today)", () => {
     const second = await h.pi.dispatch("tool_result", edit("src/a.ts", "t2"), h.ctx)
 
     // then
-    expect(feedbackTexts(first)).toEqual(["edited", `${COMMENT_CHECKER_FEEDBACK_HEADER} ${resolve(h.cwd, "src/a.ts")}:\nline 1: redundant comment`])
+    expect(feedbackTexts(first)).toEqual([
+      "edited",
+      `${COMMENT_CHECKER_FEEDBACK_HEADER} ${resolve(h.cwd, "src/a.ts")}:\nline 1: redundant comment`,
+    ])
     expect(second).toEqual([undefined])
     expect(h.calls).toHaveLength(1)
   })
@@ -89,7 +95,10 @@ describe("X8a comment-checker turn reset (characterization of today)", () => {
     // then
     expect(reset).toEqual([undefined])
     expect(h.calls).toHaveLength(2)
-    expect(feedbackTexts(again)).toEqual(["edited", `${COMMENT_CHECKER_FEEDBACK_HEADER} ${resolve(h.cwd, "src/a.ts")}:\nline 1: redundant comment`])
+    expect(feedbackTexts(again)).toEqual([
+      "edited",
+      `${COMMENT_CHECKER_FEEDBACK_HEADER} ${resolve(h.cwd, "src/a.ts")}:\nline 1: redundant comment`,
+    ])
   })
 
   it("#given every turn reports the file #when three turns each edit it twice #then each turn checks and reports it exactly once", async () => {
@@ -169,7 +178,9 @@ describe("X8a comment-checker turn reset (characterization of today)", () => {
     const patch = createToolResultEvent({
       toolCallId: "t2",
       toolName: "apply_patch",
-      input: { input: "*** Begin Patch\n*** Update File: a.ts\n@@\n-old\n+new\n*** Add File: b.ts\n+new\n*** End Patch" },
+      input: {
+        input: "*** Begin Patch\n*** Update File: a.ts\n@@\n-old\n+new\n*** Add File: b.ts\n+new\n*** End Patch",
+      },
     })
 
     // when

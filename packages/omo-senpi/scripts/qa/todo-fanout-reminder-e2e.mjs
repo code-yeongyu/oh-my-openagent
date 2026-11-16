@@ -21,13 +21,21 @@ function createFakePi() {
   return {
     handlers,
     messages,
-    on(event, handler) { handlers.push({ event, handler }) },
-    registerFlag(name, options) { if (!flagValues.has(name)) flagValues.set(name, options?.default) },
-    getFlag(name) { return flagValues.get(name) },
+    on(event, handler) {
+      handlers.push({ event, handler })
+    },
+    registerFlag(name, options) {
+      if (!flagValues.has(name)) flagValues.set(name, options?.default)
+    },
+    getFlag(name) {
+      return flagValues.get(name)
+    },
     registerTool() {},
     registerCommand() {},
     registerMessageRenderer() {},
-    sendMessage(message, options) { messages.push({ message, options }) },
+    sendMessage(message, options) {
+      messages.push({ message, options })
+    },
     sendUserMessage() {},
     async dispatch(event, payload, ctx) {
       const results = []
@@ -68,30 +76,48 @@ const pi = createFakePi()
 await factory(pi)
 
 // Arm ultrawork for session s-1 through the real input path.
-await pi.dispatch("input", { type: "input", text: "ulw prove the fan-out reminder", source: "interactive" }, sessionCtx("s-1"))
+await pi.dispatch(
+  "input",
+  { type: "input", text: "ulw prove the fan-out reminder", source: "interactive" },
+  sessionCtx("s-1"),
+)
 const armed = pi.messages.some((m) => m.message?.customType === "omo-ultrawork:directive")
 check("ulw input arms session via hidden directive message", armed, { messages: pi.messages.length })
 
 // Every composed component's tool_result handler runs per dispatch, so scan ALL
 // handler results for the reminder transform instead of assuming index 0.
 const reminderFrom = (results) =>
-  results.find((r) => Array.isArray(r?.content) && r.content.some((b) => typeof b?.text === "string" && b.text.includes("<system-reminder>")))
+  results.find(
+    (r) =>
+      Array.isArray(r?.content) &&
+      r.content.some((b) => typeof b?.text === "string" && b.text.includes("<system-reminder>")),
+  )
 
 // First task-adding todo result in the armed session -> exactly one reminder transform.
 const firstResults = await pi.dispatch("tool_result", todoResult("init"), sessionCtx("s-1"))
 const first = reminderFrom(firstResults)
 const firstText = first?.content?.[first.content.length - 1]?.text ?? ""
-check("first todo init result carries appended <system-reminder>", firstText.includes("<system-reminder>") && firstText.includes("fan-out") && firstText.includes("fresh"), { blocks: first?.content?.length, handlerResults: firstResults.length })
+check(
+  "first todo init result carries appended <system-reminder>",
+  firstText.includes("<system-reminder>") && firstText.includes("fan-out") && firstText.includes("fresh"),
+  { blocks: first?.content?.length, handlerResults: firstResults.length },
+)
 
 // Second todo result in the same session -> no duplicate.
 const secondResults = await pi.dispatch("tool_result", todoResult("append"), sessionCtx("s-1"))
-check("second todo result in same session is untransformed", reminderFrom(secondResults) === undefined, { handlerResults: secondResults.length })
+check("second todo result in same session is untransformed", reminderFrom(secondResults) === undefined, {
+  handlerResults: secondResults.length,
+})
 
 // Unarmed session -> no reminder.
 const unarmedResults = await pi.dispatch("tool_result", todoResult("init"), sessionCtx("s-2"))
-check("unarmed session gets no reminder", reminderFrom(unarmedResults) === undefined, { handlerResults: unarmedResults.length })
+check("unarmed session gets no reminder", reminderFrom(unarmedResults) === undefined, {
+  handlerResults: unarmedResults.length,
+})
 
 const failed = results.filter((r) => !r.ok)
 const verdict = failed.length === 0 ? "PASS" : "FAIL"
-console.log(JSON.stringify({ verdict, surface: "built plugin/extensions/omo.js via senpi loader contract", results }, null, 2))
+console.log(
+  JSON.stringify({ verdict, surface: "built plugin/extensions/omo.js via senpi loader contract", results }, null, 2),
+)
 process.exit(failed.length === 0 ? 0 : 1)

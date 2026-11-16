@@ -58,7 +58,10 @@ function endpointName(endpoint) {
   if (kind === "shard") {
     const owner = endpoint.owner?.owner_session_id
     const file = endpoint.owner?.owner_session_file
-    const suffix = [owner === undefined ? undefined : `parent ${owner.slice(0, 8)}`, file === undefined ? undefined : basename(file)]
+    const suffix = [
+      owner === undefined ? undefined : `parent ${owner.slice(0, 8)}`,
+      file === undefined ? undefined : basename(file),
+    ]
       .filter(Boolean)
       .join(", ")
     return `shard p-${endpoint.shard.key}${suffix === "" ? "" : ` (${suffix})`}`
@@ -80,7 +83,9 @@ function runningDetails(endpoint, includeGeneration = true) {
     includeGeneration && endpoint.generation !== null && endpoint.generation !== undefined
       ? `gen ${endpoint.generation}`
       : undefined,
-    endpoint.engineVersion === null || endpoint.engineVersion === undefined ? undefined : `engine ${endpoint.engineVersion}`,
+    endpoint.engineVersion === null || endpoint.engineVersion === undefined
+      ? undefined
+      : `engine ${endpoint.engineVersion}`,
     `${endpoint.sessions?.total ?? 0} session(s)`,
     `rss ${metric(endpoint.rss_mb)} MB (host ${metric(endpoint.host_rss_mb)} MB)`,
     `fds ${metric(endpoint.open_fds)}`,
@@ -98,7 +103,8 @@ function generationLine(generation, endpoint) {
 /** A terminal row: `tui <name> pid <n> cwd <path>`, named by its session, else by its socket. */
 function terminalLine(endpoint) {
   const owner = endpoint.owner ?? {}
-  const socketName = typeof endpoint.socket === "string" ? basename(endpoint.socket, ".sock") : basename(endpoint.dir ?? "unknown")
+  const socketName =
+    typeof endpoint.socket === "string" ? basename(endpoint.socket, ".sock") : basename(endpoint.dir ?? "unknown")
   const line = `tui ${owner.session?.name ?? socketName} pid ${metric(owner.pid)} cwd ${owner.cwd ?? "?"}`
   if (endpoint.alive !== false && endpoint.reachable) return line
   return `${line}: not responding (${endpoint.reason ?? "unreachable"}; omo daemon gc reaps it once its process is gone)`

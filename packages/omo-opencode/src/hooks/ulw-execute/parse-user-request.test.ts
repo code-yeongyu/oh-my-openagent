@@ -52,7 +52,7 @@ describe("parseUserRequest", () => {
 
   describe("when plan name is wrapped in quotes", () => {
     test("#given quoted plan name #when parsing #then strips wrapping quotes", () => {
-      const result = parseUserRequest("<user-request>\"my feature plan\"</user-request>")
+      const result = parseUserRequest('<user-request>"my feature plan"</user-request>')
       expect(result.planName).toBe("my feature plan")
       expect(result.explicitWorktreePath).toBeNull()
     })

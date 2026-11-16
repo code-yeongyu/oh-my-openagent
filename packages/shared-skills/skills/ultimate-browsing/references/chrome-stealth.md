@@ -29,7 +29,8 @@ page that only a signed-in user can reach belongs to the attached engine, not to
 
 ## Cookie login limits
 
-`scripts/extract_cookies.py` still exports cookies from a local browser; inject them with
+`scripts/extract_cookies.py` still exports cookies from a local browser's default profile store (run it only where
+that profile is not the user's live one; see `../SKILL.md`, Cookie login); inject them with
 `injectCookies(page, cookies)` into an **owned** profile. It sanitizes the set (drops expired
 entries, keeps host-prefixed cookies secure and root-scoped). Limits that do not change:
 

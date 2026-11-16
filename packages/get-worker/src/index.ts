@@ -10,7 +10,10 @@ const RELEASE_PATH = /^\/v\/([^/]+)\/([^/]+)$/
 const CHANNEL_PATH = /^\/channels\/([^/]+)$/
 
 function plain(status: number, body: string): Response {
-  return new Response(`${body}\n`, { status, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } })
+  return new Response(`${body}\n`, {
+    status,
+    headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
+  })
 }
 
 export async function route(request: Request, ctx: RequestContext): Promise<Response> {
@@ -25,7 +28,8 @@ export async function route(request: Request, ctx: RequestContext): Promise<Resp
   const scriptName = pathname.slice(1)
   if (isScriptName(scriptName)) return serveScript(request, ctx, scriptName)
   const channel = CHANNEL_PATH.exec(pathname)?.[1]
-  if (channel !== undefined) return isChannel(channel) ? serveChannel(request, ctx, channel) : plain(404, "unknown channel")
+  if (channel !== undefined)
+    return isChannel(channel) ? serveChannel(request, ctx, channel) : plain(404, "unknown channel")
   const release = RELEASE_PATH.exec(pathname)
   if (release?.[1] !== undefined && release[2] !== undefined) {
     return serveReleaseAsset(request, ctx, release[1], release[2])

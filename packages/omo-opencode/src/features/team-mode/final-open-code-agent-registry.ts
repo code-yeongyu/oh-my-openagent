@@ -4,18 +4,24 @@ import { getAgentToolRestrictions, normalizeSDKResponse } from "../../shared"
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 
 const REQUIRED_TEAM_TOOLS = [
-  "team_send_message", "team_task_list", "team_task_get", "team_task_update", "team_status",
+  "team_send_message",
+  "team_task_list",
+  "team_task_get",
+  "team_task_update",
+  "team_status",
 ] as const
 const FinalOpenCodeAgentSchema = z.object({
   name: z.string(),
   mode: z.string(),
   native: z.boolean(),
   hidden: z.boolean().nullish(),
-  permission: z.array(z.object({
-    permission: z.string(),
-    pattern: z.string(),
-    action: z.enum(["allow", "ask", "deny"]),
-  })),
+  permission: z.array(
+    z.object({
+      permission: z.string(),
+      pattern: z.string(),
+      action: z.enum(["allow", "ask", "deny"]),
+    }),
+  ),
   model: z.object({ providerID: z.string(), modelID: z.string() }).nullish(),
   variant: z.string().nullish(),
 })
@@ -28,7 +34,7 @@ export type FinalOpenCodeAgentRegistryClient = {
   }
 }
 
-export class ProjectAgentResolutionError extends Error {
+class ProjectAgentResolutionError extends Error {
   constructor(message: string) {
     super(message)
     this.name = "ProjectAgentResolutionError"
@@ -36,9 +42,10 @@ export class ProjectAgentResolutionError extends Error {
 }
 
 export function replaceProjectAgentProvenance(directory: string, names: readonly string[]): void {
-  projectAgentNamesByDirectory.set(path.resolve(directory), new Set(
-    names.filter((name) => !Object.hasOwn(Object.prototype, name)),
-  ))
+  projectAgentNamesByDirectory.set(
+    path.resolve(directory),
+    new Set(names.filter((name) => !Object.hasOwn(Object.prototype, name))),
+  )
 }
 
 export function hasProjectAgentProvenance(directory: string, name: string): boolean {
@@ -56,7 +63,7 @@ export function listProjectAgentProvenance(directory: string): readonly string[]
   return [...(projectAgentNamesByDirectory.get(path.resolve(directory)) ?? [])]
 }
 
-export async function loadFinalOpenCodeAgentRegistry(
+async function loadFinalOpenCodeAgentRegistry(
   client: FinalOpenCodeAgentRegistryClient,
   directory: string,
 ): Promise<readonly unknown[]> {
@@ -67,7 +74,8 @@ export async function loadFinalOpenCodeAgentRegistry(
 
 function wildcardMatches(value: string, pattern: string): boolean {
   const normalizedValue = value.replaceAll("\\", "/")
-  let escapedPattern = pattern.replaceAll("\\", "/")
+  let escapedPattern = pattern
+    .replaceAll("\\", "/")
     .replace(/[.+^${}()|[\]\\]/g, "\\$&")
     .replace(/\*/g, ".*")
     .replace(/\?/g, ".")
@@ -105,7 +113,8 @@ export async function resolveFinalProjectAgent(
     )
   }
   const registry = await loadFinalOpenCodeAgentRegistry(client, directory)
-  const agent = registry.map((entry) => FinalOpenCodeAgentSchema.safeParse(entry))
+  const agent = registry
+    .map((entry) => FinalOpenCodeAgentSchema.safeParse(entry))
     .find((entry) => entry.success && entry.data.name === name)?.data
   if (agent === undefined) {
     throw new ProjectAgentResolutionError(`Project agent '${name}' has no exact final OpenCode registry entry.`)
@@ -133,14 +142,16 @@ export async function resolveFinalProjectAgent(
     ...getAgentToolRestrictions(name, { includeTeamToolDenylist: false }),
   }
   for (const [tool, allowed] of Object.entries(launchToolPermissions)) {
-    if (!hasUnconditionalFinalAction(agent, tool, "allow")
-      && (allowed || !hasUnconditionalFinalAction(agent, tool, "deny"))) {
+    if (
+      !hasUnconditionalFinalAction(agent, tool, "allow") &&
+      (allowed || !hasUnconditionalFinalAction(agent, tool, "deny"))
+    ) {
       throw new ProjectAgentResolutionError(
         `Project agent '${name}' must already agree with the launch permission '${tool}: ${allowed}' in its final permission rules.`,
       )
     }
   }
-  const model = agent.model == null ? undefined
-    : agent.variant == null ? agent.model : { ...agent.model, variant: agent.variant }
+  const model =
+    agent.model == null ? undefined : agent.variant == null ? agent.model : { ...agent.model, variant: agent.variant }
   return { name: agent.name, model }
 }

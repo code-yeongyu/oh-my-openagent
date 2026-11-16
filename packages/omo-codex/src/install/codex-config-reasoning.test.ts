@@ -216,6 +216,6 @@ describe("codex-config-reasoning", () => {
 
     // then
     expect(catalog.current.model).toBe("gpt-6-astra")
-    expect(catalog.managedProfiles.map(profile => profile.model)).not.toContain("gpt-5.4")
+    expect(catalog.managedProfiles.map((profile) => profile.model)).not.toContain("gpt-5.4")
   })
 })

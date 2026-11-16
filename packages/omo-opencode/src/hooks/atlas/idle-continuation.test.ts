@@ -19,7 +19,11 @@ describe("scheduleRetry", () => {
     const timerId = nextTimerId
     nextTimerId += 1
     capturedTimers.set(timerId, { callback })
-    return { cancel: () => { capturedTimers.delete(timerId) } }
+    return {
+      cancel: () => {
+        capturedTimers.delete(timerId)
+      },
+    }
   }
 
   beforeEach(() => {

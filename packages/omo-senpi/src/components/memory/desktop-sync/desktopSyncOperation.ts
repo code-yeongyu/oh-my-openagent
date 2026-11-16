@@ -6,7 +6,10 @@ import {
   type DesktopSyncWire,
 } from "./desktopSyncProtocol"
 
-type OperationRequest = { readonly op: "service" | "keyring" | "genesisRun"; readonly data: unknown }
+type OperationRequest = {
+  readonly op: "service" | "keyring" | "genesisRun" | "phraseGenesisRun"
+  readonly data: unknown
+}
 
 export interface DesktopSyncOperationHandle {
   readonly handle: string
@@ -15,7 +18,10 @@ export interface DesktopSyncOperationHandle {
 }
 
 /** The owner fence encloses the immediate authenticated write, not an async preparation. */
-export async function openDesktopSyncOperation(wire: DesktopSyncWire, authority: DesktopSyncAuthority): Promise<DesktopSyncOperationHandle> {
+export async function openDesktopSyncOperation(
+  wire: DesktopSyncWire,
+  authority: DesktopSyncAuthority,
+): Promise<DesktopSyncOperationHandle> {
   let handle: string | undefined
   let cancelled = authority.signal.aborted
   let ended = false

@@ -3,7 +3,9 @@ import { join } from "node:path"
 
 export interface XaiAuthRegistry {
   authStorage: { get(provider: string): unknown }
-  getProviderAuth(provider: string): Promise<{ auth: { apiKey?: string; headers?: Record<string, string | null> } } | undefined>
+  getProviderAuth(
+    provider: string,
+  ): Promise<{ auth: { apiKey?: string; headers?: Record<string, string | null> } } | undefined>
 }
 
 export async function resolveXaiBearer({
@@ -27,7 +29,13 @@ export async function resolveXaiBearer({
   return bearer ? { bearer, provenance: "env" } : undefined
 }
 
-export function hasXaiCredential({ agentDir, env = process.env }: { agentDir: string; env?: Record<string, string | undefined> }): boolean {
+export function hasXaiCredential({
+  agentDir,
+  env = process.env,
+}: {
+  agentDir: string
+  env?: Record<string, string | undefined>
+}): boolean {
   const path = join(agentDir, "auth.json")
   if (!existsSync(path)) return Boolean(env.XAI_API_KEY?.trim())
   try {

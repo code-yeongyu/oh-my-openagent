@@ -64,17 +64,18 @@ impl MacInput {
                 }
                 self.background(|this| {
                     guard::guard(&window, "keyboard", None)?;
-                    guard::prepare_keys(&window, pid, wid, capture)?;
-                    this.last_activated = Some((pid, wid));
-                    element_keys(pid, element, || {
-                        keys::type_text_interruptible(
-                            &this.source,
-                            &mut this.held,
-                            text,
-                            KeyRoute::Process(pid),
-                            check_stop,
-                            delivered,
-                        )
+                    let (source, held, feed) = (&this.source, &mut this.held, this.raw_feed.as_deref());
+                    guard::deliver_keys(&window, pid, wid, capture, feed, &mut this.last_activated, || {
+                        element_keys(pid, element, || {
+                            keys::type_text_interruptible(
+                                source,
+                                held,
+                                text,
+                                KeyRoute::Process(pid),
+                                check_stop,
+                                delivered,
+                            )
+                        })
                     })
                 })
             }),
@@ -224,6 +225,47 @@ fn holds_keyboard_focus(pid: libc::pid_t, element: &AXUIElement, within: Duratio
     // SAFETY: The retained application element is valid for the timeout update.
     let _ = unsafe { app.set_messaging_timeout(timeout) };
     element::copy_element(&app, "AXFocusedUIElement").is_some_and(|focused| *focused == *element)
+}
+
+/// Key priming's read of `pid`: its `AXFocusedWindow` and the window of its
+/// `AXFocusedUIElement`, every read (the focused element's own included)
+/// waiting at most `within`; `None` when the application cannot be addressed
+/// or any read did not answer (a timeout), never an empty read.
+pub(super) fn focus_read(pid: libc::pid_t, within: Duration) -> Option<super::priming::FocusRead> {
+    let app = element::create_application(pid).ok()?;
+    // A zero timeout restores the system default, so the bound stays positive.
+    let timeout = within.as_secs_f32().clamp(0.001, PROBE_TIMEOUT_SECONDS);
+    // SAFETY: The retained application element is valid for the timeout update.
+    let _ = unsafe { app.set_messaging_timeout(timeout) };
+    let focused_window = element::copy_answered(&app, "AXFocusedWindow")?
+        .and_then(|value| value.downcast::<AXUIElement>().ok())
+        .and_then(|window| element::window_id(&window));
+    let element_window = match element::copy_answered(&app, "AXFocusedUIElement")?
+        .and_then(|value| value.downcast::<AXUIElement>().ok())
+    {
+        None => None,
+        Some(focused) => {
+            // A child element keeps the system default timeout unless it gets its own.
+            // SAFETY: The retained focused element is valid for the timeout update.
+            let _ = unsafe { focused.set_messaging_timeout(timeout) };
+            focused_element_window(&focused)?
+        }
+    };
+    Some(super::priming::FocusRead { focused_window, element_window })
+}
+
+/// The window owning the focused element (the element itself when it is a
+/// window); `None` when a read did not answer.
+fn focused_element_window(focused: &AXUIElement) -> Option<Option<u32>> {
+    let role = element::copy_answered(focused, "AXRole")?.and_then(|value| value.downcast::<CFString>().ok());
+    if role.is_some_and(|role| role.to_string() == "AXWindow") {
+        return Some(element::window_id(focused));
+    }
+    Some(
+        element::copy_answered(focused, "AXWindow")?
+            .and_then(|value| value.downcast::<AXUIElement>().ok())
+            .and_then(|window| element::window_id(&window)),
+    )
 }
 
 /// Where `pid` has keyboard focus now: its focused window, else the window

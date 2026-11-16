@@ -19,5 +19,5 @@ export interface GlobOptions {
   maxDepth?: number
   timeout?: number
   limit?: number
-  threads?: number  // limit rg thread count
+  threads?: number // limit rg thread count
 }

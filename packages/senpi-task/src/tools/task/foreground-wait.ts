@@ -1,4 +1,8 @@
 import type { TaskManager } from "../../manager"
+import {
+  sharedForegroundDialogOrigins,
+  type ForegroundDialogOrigins,
+} from "../../runners/child-dialogs/foreground-origins"
 import type { TaskRecord } from "../../state"
 import type { TaskToolContext } from "./types"
 
@@ -11,6 +15,7 @@ export type ScheduleDeadline = (callback: () => void, delayMs: number) => () => 
 export type ForegroundWaitOptions = {
   readonly env?: Readonly<Record<string, string | undefined>>
   readonly scheduleDeadline?: ScheduleDeadline
+  readonly dialogOrigins?: ForegroundDialogOrigins
 }
 
 export type ForegroundWaitResult =
@@ -44,6 +49,15 @@ export function resolvePromptCacheSafeWaitSeconds(
 }
 
 export async function waitForForegroundTask(input: ForegroundWaitInput): Promise<ForegroundWaitResult> {
+  const leave = (input.dialogOrigins ?? sharedForegroundDialogOrigins).enter(input.taskId)
+  try {
+    return await waitInForeground(input)
+  } finally {
+    leave()
+  }
+}
+
+async function waitInForeground(input: ForegroundWaitInput): Promise<ForegroundWaitResult> {
   const cacheSafeSeconds = resolvePromptCacheSafeWaitSeconds(input.ctx, input.env ?? process.env)
   const budgetSeconds =
     cacheSafeSeconds === undefined ? undefined : Math.min(cacheSafeSeconds, MAX_FOREGROUND_WAIT_SECONDS)

@@ -15,9 +15,8 @@ const mockAutoMigrate = mock((): MigrationResult => ({
   configPath: null,
 }))
 
-const mockShowToast = mock(
-  (_arg: { body: { title: string; message: string; variant: string; duration: number } }) =>
-    Promise.resolve(),
+const mockShowToast = mock((_arg: { body: { title: string; message: string; variant: string; duration: number } }) =>
+  Promise.resolve(),
 )
 const mockLog = mock(() => {})
 

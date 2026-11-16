@@ -48,72 +48,111 @@ describe("keychain helper release workflows (#11262)", () => {
     expect([build.index, sign.index, verify.index, pack.index, tarball.index, asset.index]).toEqual(
       [build.index, sign.index, verify.index, pack.index, tarball.index, asset.index].slice().sort((a, b) => a - b),
     )
-    expect(build.value.run).toContain('bun packages/omo-native/keychain-helper/build.ts --out "$HELPER_DIR/omo-keychain"')
+    expect(build.value.run).toContain(
+      'bun packages/omo-native/keychain-helper/build.ts --out "$HELPER_DIR/omo-keychain"',
+    )
     for (const name of MATERIAL) expect(sign.value.env?.[name]).toBe(`\${{ secrets.${name} }}`)
     expect(sign.value.env?.MACOS_SIGNING_REQUIRED).toBe("true")
-    expect(sign.value.run).toContain(`bash .github/scripts/macos-sign-and-notarize.sh --identifier ${KEYCHAIN_HELPER_IDENTIFIER} "$KEYCHAIN_HELPER"`)
+    expect(sign.value.run).toContain(
+      `bash .github/scripts/macos-sign-and-notarize.sh --identifier ${KEYCHAIN_HELPER_IDENTIFIER} "$KEYCHAIN_HELPER"`,
+    )
     expect(sign.value.run).not.toContain("--entitlements")
     expect(sign.value.run).not.toContain("--sign-only")
     expect(verify.value.run).toBe('bun script/keychain-helper-release.ts verify "$KEYCHAIN_HELPER"')
-    expect(tarball.value.with).toMatchObject({ name: "keychain-helper", path: ".omo/keychain-helper/omo-keychain.tar.gz", "if-no-files-found": "error" })
-    expect(asset.value.with).toMatchObject({ name: `release-binary-omo-keychain`, path: `.omo/release-binaries/${KEYCHAIN_HELPER_RELEASE_ASSET}`, "if-no-files-found": "error" })
+    expect(tarball.value.with).toMatchObject({
+      name: "keychain-helper",
+      path: ".omo/keychain-helper/omo-keychain.tar.gz",
+      "if-no-files-found": "error",
+    })
+    expect(asset.value.with).toMatchObject({
+      name: `release-binary-omo-keychain`,
+      path: `.omo/release-binaries/${KEYCHAIN_HELPER_RELEASE_ASSET}`,
+      "if-no-files-found": "error",
+    })
   })
 
-  test.skipIf(process.platform === "win32")("packages a mode-preserving tarball and the release asset from the signed file", () => {
-    withRoot("omo-keychain-pack-", (root) => {
-      const signed = join(root, "runner-temp", "omo-keychain")
-      mkdirSync(join(root, "runner-temp"), { recursive: true })
-      writeFileSync(signed, HELPER_BYTES)
-      chmodSync(signed, 0o644)
-      const result = bash(runBlock(platformWorkflow, "      - name: Package keychain helper artifacts\n", "      - name: Upload keychain helper artifact\n"), root, { KEYCHAIN_HELPER: signed })
-      expect(result.status, String(result.stderr)).toBe(0)
-
-      const extracted = join(root, "extracted")
-      mkdirSync(extracted)
-      expect(spawnSync("tar", ["-xzpf", join(root, ".omo/keychain-helper/omo-keychain.tar.gz"), "-C", extracted]).status).toBe(0)
-      expect(mode(join(extracted, "omo-keychain"))).toBe(0o755)
-      expect(readFileSync(join(root, ".omo/release-binaries", KEYCHAIN_HELPER_RELEASE_ASSET), "utf8")).toBe(HELPER_BYTES)
-    })
-  }, SUBPROCESS_TEST_TIMEOUT_MS)
-
-  test.skipIf(process.platform === "win32")("darwin build legs stage the helper for the compiled payload and the platform package before both builds", () => {
-    const steps = jobSteps(platformWorkflow, "build")
-    const launcher = stepAt(steps, "Build launcher")
-    const download = stepAt(steps, "Download keychain helper")
-    const stage = stepAt(steps, "Stage keychain helper")
-    const compile = stepAt(steps, "Build release binary")
-    const compress = stepAt(steps, "Compress binary")
-    const darwinGate = "startsWith(matrix.platform, 'darwin-') && (steps.release-assets.outputs.binary_exists != 'true' || steps.check.outputs.skip != 'true')"
-
-    expect(launcher.index).toBeLessThan(download.index)
-    expect(download.index).toBeLessThan(stage.index)
-    expect(stage.index).toBeLessThan(compile.index)
-    expect(stage.index).toBeLessThan(compress.index)
-    expect(download.value.if).toBe(darwinGate)
-    expect(stage.value.if).toBe(darwinGate)
-    expect(download.value.with).toEqual({ name: "keychain-helper", path: ".omo/keychain-helper" })
-
-    const script = runBlock(platformWorkflow, "      - name: Stage keychain helper\n", "      - name: Build release binary\n")
-    for (const packageSkip of ["false", "true"]) {
-      withRoot("omo-keychain-stage-", (root) => {
-        helperTarball(root)
-        const result = bash(script, root, { PLATFORM: "darwin-arm64", PACKAGE_SKIP: packageSkip })
+  test.skipIf(process.platform === "win32")(
+    "packages a mode-preserving tarball and the release asset from the signed file",
+    () => {
+      withRoot("omo-keychain-pack-", (root) => {
+        const signed = join(root, "runner-temp", "omo-keychain")
+        mkdirSync(join(root, "runner-temp"), { recursive: true })
+        writeFileSync(signed, HELPER_BYTES)
+        chmodSync(signed, 0o644)
+        const result = bash(
+          runBlock(
+            platformWorkflow,
+            "      - name: Package keychain helper artifacts\n",
+            "      - name: Upload keychain helper artifact\n",
+          ),
+          root,
+          { KEYCHAIN_HELPER: signed },
+        )
         expect(result.status, String(result.stderr)).toBe(0)
-        expect(mode(join(root, KEYCHAIN_HELPER_SOURCE))).toBe(0o755)
-        const packaged = join(root, "packages/oh-my-opencode-darwin-arm64/bin/omo-keychain")
-        expect(existsSync(packaged)).toBe(packageSkip === "false")
-        if (packageSkip === "false") {
-          expect(mode(packaged)).toBe(0o755)
-          expect(readFileSync(packaged, "utf8")).toBe(HELPER_BYTES)
-        }
+
+        const extracted = join(root, "extracted")
+        mkdirSync(extracted)
+        expect(
+          spawnSync("tar", ["-xzpf", join(root, ".omo/keychain-helper/omo-keychain.tar.gz"), "-C", extracted]).status,
+        ).toBe(0)
+        expect(mode(join(extracted, "omo-keychain"))).toBe(0o755)
+        expect(readFileSync(join(root, ".omo/release-binaries", KEYCHAIN_HELPER_RELEASE_ASSET), "utf8")).toBe(
+          HELPER_BYTES,
+        )
       })
-    }
-  }, SUBPROCESS_TEST_TIMEOUT_MS)
+    },
+    SUBPROCESS_TEST_TIMEOUT_MS,
+  )
+
+  test.skipIf(process.platform === "win32")(
+    "darwin build legs stage the helper for the compiled payload and the platform package before both builds",
+    () => {
+      const steps = jobSteps(platformWorkflow, "build")
+      const launcher = stepAt(steps, "Build launcher")
+      const download = stepAt(steps, "Download keychain helper")
+      const stage = stepAt(steps, "Stage keychain helper")
+      const compile = stepAt(steps, "Build release binary")
+      const compress = stepAt(steps, "Compress binary")
+      const darwinGate =
+        "startsWith(matrix.platform, 'darwin-') && (steps.release-assets.outputs.binary_exists != 'true' || steps.check.outputs.skip != 'true')"
+
+      expect(launcher.index).toBeLessThan(download.index)
+      expect(download.index).toBeLessThan(stage.index)
+      expect(stage.index).toBeLessThan(compile.index)
+      expect(stage.index).toBeLessThan(compress.index)
+      expect(download.value.if).toBe(darwinGate)
+      expect(stage.value.if).toBe(darwinGate)
+      expect(download.value.with).toEqual({ name: "keychain-helper", path: ".omo/keychain-helper" })
+
+      const script = runBlock(
+        platformWorkflow,
+        "      - name: Stage keychain helper\n",
+        "      - name: Build release binary\n",
+      )
+      for (const packageSkip of ["false", "true"]) {
+        withRoot("omo-keychain-stage-", (root) => {
+          helperTarball(root)
+          const result = bash(script, root, { PLATFORM: "darwin-arm64", PACKAGE_SKIP: packageSkip })
+          expect(result.status, String(result.stderr)).toBe(0)
+          expect(mode(join(root, KEYCHAIN_HELPER_SOURCE))).toBe(0o755)
+          const packaged = join(root, "packages/oh-my-opencode-darwin-arm64/bin/omo-keychain")
+          expect(existsSync(packaged)).toBe(packageSkip === "false")
+          if (packageSkip === "false") {
+            expect(mode(packaged)).toBe(0o755)
+            expect(readFileSync(packaged, "utf8")).toBe(HELPER_BYTES)
+          }
+        })
+      }
+    },
+    SUBPROCESS_TEST_TIMEOUT_MS,
+  )
 
   test("the native darwin smoke checks the provisioned helper against its requirement", () => {
     const smoke = stepAt(jobSteps(platformWorkflow, "build"), "Smoke test release binary").value.run ?? ""
     expect(smoke).toContain('local helper="${HOME}/.omo/binary-runtime/${OMO_AI_VERSION}/omo-keychain"')
     expect(smoke).toContain('bun script/keychain-helper-release.ts verify "$helper"')
-    expect(smoke).toMatch(/darwin-arm64\)\n(?:.*\n)*?\s+assert_first_run_provisioned\n\s+assert_keychain_helper_provisioned\n/)
+    expect(smoke).toMatch(
+      /darwin-arm64\)\n(?:.*\n)*?\s+assert_first_run_provisioned\n\s+assert_keychain_helper_provisioned\n/,
+    )
   })
 })

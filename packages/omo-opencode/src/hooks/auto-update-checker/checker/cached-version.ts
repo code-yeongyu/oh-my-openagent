@@ -30,7 +30,8 @@ export function getCachedVersion(options: CachedVersionOptions = {}): string | n
   // first means the toast can announce a version the runtime isn't running.
   // The module-relative walk-up always reflects what is actually loaded.
   try {
-    const currentDir = options.currentDir === undefined ? path.dirname(fileURLToPath(import.meta.url)) : options.currentDir
+    const currentDir =
+      options.currentDir === undefined ? path.dirname(fileURLToPath(import.meta.url)) : options.currentDir
     if (currentDir) {
       const pkgPath = findPackageJson(currentDir)
       if (pkgPath) {

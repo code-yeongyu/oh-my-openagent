@@ -267,7 +267,10 @@ test("#given a recycled-pid lock file #when withLock runs #then it reaps and acq
   const start = await getProcessStartIdentity(process.pid)
   if (start === null) throw new Error("process-start identity unavailable")
   const priorStart = `${start.slice(0, start.indexOf(":"))}:0`
-  await writeFile(lockPath, `prior-owner\n${process.pid}\n${Date.now()}\n00000000-0000-4000-8000-000000000002\n${priorStart}\n`)
+  await writeFile(
+    lockPath,
+    `prior-owner\n${process.pid}\n${Date.now()}\n00000000-0000-4000-8000-000000000002\n${priorStart}\n`,
+  )
   expect(lockOwnerInstanceId).not.toBe("00000000-0000-4000-8000-000000000002")
 
   // when
@@ -295,7 +298,11 @@ test("#given a lock held by a live foreign pid #when detectStaleLock runs #then 
   const { detectStaleLock } = await import("./locks")
   const rootDirectory = await createTempDirectory("locks-foreign-live-")
   const lockPath = join(rootDirectory, "lock")
-  const child = Bun.spawn([process.execPath, "-e", "process.stdin.resume()"], { stdin: "pipe", stdout: "ignore", stderr: "ignore" })
+  const child = Bun.spawn([process.execPath, "-e", "process.stdin.resume()"], {
+    stdin: "pipe",
+    stdout: "ignore",
+    stderr: "ignore",
+  })
   try {
     const childPid = child.pid
     if (childPid === undefined) throw new Error("foreign holder spawn produced no pid")

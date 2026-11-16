@@ -21,12 +21,17 @@ describe("memory notice inputs warn sink", () => {
       join(repo.dir, AGREEMENTS_PATH),
       `---\ndescription: Agreements\n---\n\n- [global] ${TEXT} <!-- id: ${ID}; by: agent; n: 3; status: needs-human -->\n`,
     )
-    await repo.commitWrite([AGREEMENTS_PATH], "chore(facts): extract 1 fact", { agentId: "prompt-agent", authorName: "Facts Extractor" })
+    await repo.commitWrite([AGREEMENTS_PATH], "chore(facts): extract 1 fact", {
+      agentId: "prompt-agent",
+      authorName: "Facts Extractor",
+    })
     const warnings: string[] = []
     const inputs = createMemoryNoticeInputs({
       resolveContext: () => context,
       loadSettings: () => memorySettings(),
-      onWarn: (message) => { warnings.push(message) },
+      onWarn: (message) => {
+        warnings.push(message)
+      },
     })
     const sync = durability.syncJournalDirectory
     const intercepted = spyOn(durability, "syncJournalDirectory").mockImplementation(async (dir) => {

@@ -1,10 +1,7 @@
-import type { OhMyOpenCodeConfig } from "../config";
-import { deepMerge, mergeUniqueStrings, mergeUniqueStringsCaseInsensitive } from "@oh-my-opencode/utils";
+import type { OhMyOpenCodeConfig } from "../config"
+import { deepMerge, mergeUniqueStrings, mergeUniqueStringsCaseInsensitive } from "@oh-my-opencode/utils"
 
-export function mergeConfigs(
-  base: OhMyOpenCodeConfig,
-  override: Partial<OhMyOpenCodeConfig>
-): OhMyOpenCodeConfig {
+export function mergeConfigs(base: OhMyOpenCodeConfig, override: Partial<OhMyOpenCodeConfig>): OhMyOpenCodeConfig {
   return {
     ...base,
     ...override,
@@ -21,5 +18,5 @@ export function mergeConfigs(
     disabled_providers: mergeUniqueStringsCaseInsensitive(base.disabled_providers, override.disabled_providers),
     mcp_env_allowlist: override.mcp_env_allowlist ?? base.mcp_env_allowlist,
     claude_code: deepMerge(base.claude_code, override.claude_code),
-  };
+  }
 }

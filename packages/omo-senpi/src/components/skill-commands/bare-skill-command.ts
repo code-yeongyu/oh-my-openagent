@@ -22,7 +22,10 @@ export type BareSkillCommandResolution =
   | { readonly kind: "unavailable"; readonly name: string }
   | { readonly kind: "expand"; readonly text: string }
 
-export function parseBareSkillCommand(text: string, bundledSkillNames: ReadonlySet<string>): BareSkillCommand | undefined {
+export function parseBareSkillCommand(
+  text: string,
+  bundledSkillNames: ReadonlySet<string>,
+): BareSkillCommand | undefined {
   const match = BARE_COMMAND_PATTERN.exec(text)
   const name = match?.[1]
   if (name === undefined || !bundledSkillNames.has(name)) return undefined

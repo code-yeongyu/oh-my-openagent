@@ -26,17 +26,25 @@ const CLOCK_BASE = 1_800_000_000_000
 const CLOCK_STEP = 1_000
 
 type ScheduledRetry = { readonly run: () => void; readonly delayMs: number }
-export type ChaosRetryScheduler = { readonly pendingCount: number; readonly schedule: CompletionRetrySchedule; run(index: number): boolean }
+export type ChaosRetryScheduler = {
+  readonly pendingCount: number
+  readonly schedule: CompletionRetrySchedule
+  run(index: number): boolean
+}
 
 function makeRetryScheduler(): ChaosRetryScheduler {
   const pending = new Map<number, ScheduledRetry>()
   let nextId = 0
   return {
-    get pendingCount() { return pending.size },
+    get pendingCount() {
+      return pending.size
+    },
     schedule: (run, delayMs) => {
       const id = nextId++
       pending.set(id, { run, delayMs })
-      return () => { pending.delete(id) }
+      return () => {
+        pending.delete(id)
+      }
     },
     run(index) {
       const selected = [...pending.entries()][index]
@@ -62,15 +70,23 @@ function makeWaiters(manager: TaskManager): ChaosWaiters {
   let registrations = 0
   let settlements = 0
   return {
-    get registrations() { return registrations },
-    get settlements() { return settlements },
+    get registrations() {
+      return registrations
+    },
+    get settlements() {
+      return settlements
+    },
     register(taskId, abortAfterSteps) {
       const controller = new AbortController()
       registrations += 1
       scheduled.set(controller, currentStep + abortAfterSteps)
       void manager.waitFor(taskId, { signal: controller.signal }).then(
-        () => { settlements += 1 },
-        () => { settlements += 1 },
+        () => {
+          settlements += 1
+        },
+        () => {
+          settlements += 1
+        },
       )
     },
     advance() {
@@ -82,7 +98,8 @@ function makeWaiters(manager: TaskManager): ChaosWaiters {
       }
     },
     abortAll() {
-      for (const controller of scheduled.keys()) controller.abort(new DOMException("chaos parent wait drained", "AbortError"))
+      for (const controller of scheduled.keys())
+        controller.abort(new DOMException("chaos parent wait drained", "AbortError"))
       scheduled.clear()
     },
   }
@@ -118,14 +135,27 @@ export type ChaosHarness = {
   observeLiveHandles(): void
 }
 
-export type ChaosHarnessOptions = { readonly concurrency: number; readonly residencyMax: number; readonly maxDepth: number }
+export type ChaosHarnessOptions = {
+  readonly concurrency: number
+  readonly residencyMax: number
+  readonly maxDepth: number
+}
 
 function observePendingCancellations(store: TaskRecordStore, taskIds: Set<string>): TaskRecordStore {
-  return { ...store, appendEvent: (taskId, event: PersistedTaskEvent) => {
-    if (event.type === "cancelled" && typeof event.payload === "object" && event.payload !== null &&
-      "previous_status" in event.payload && event.payload.previous_status === "pending") taskIds.add(taskId)
-    return store.appendEvent(taskId, event)
-  } }
+  return {
+    ...store,
+    appendEvent: (taskId, event: PersistedTaskEvent) => {
+      if (
+        event.type === "cancelled" &&
+        typeof event.payload === "object" &&
+        event.payload !== null &&
+        "previous_status" in event.payload &&
+        event.payload.previous_status === "pending"
+      )
+        taskIds.add(taskId)
+      return store.appendEvent(taskId, event)
+    },
+  }
 }
 
 export function buildHarness(options: ChaosHarnessOptions): ChaosHarness {
@@ -142,11 +172,27 @@ export function buildHarness(options: ChaosHarnessOptions): ChaosHarness {
   })
   const processes = new ChaosProcessTable()
   const lifecycleObservations: LifecycleChaosObservations = {
-    actionCounts: { suspend_session: 0, resume_session: 0, crash_mid_suspend: 0, sibling_reconcile_race: 0, mass_revive_at_cap: 0 },
-    liveHandleBreaches: [], pidBreaches: [], reclamationBreaches: [], terminalRelaunches: [], actionTrace: [],
+    actionCounts: {
+      suspend_session: 0,
+      resume_session: 0,
+      crash_mid_suspend: 0,
+      sibling_reconcile_race: 0,
+      mass_revive_at_cap: 0,
+    },
+    liveHandleBreaches: [],
+    pidBreaches: [],
+    reclamationBreaches: [],
+    terminalRelaunches: [],
+    actionTrace: [],
   }
   const engines = buildChaosEngines({
-    store, config, clock, project, model: CHAOS_MODEL, processes, observations: lifecycleObservations,
+    store,
+    config,
+    clock,
+    project,
+    model: CHAOS_MODEL,
+    processes,
+    observations: lifecycleObservations,
   })
 
   const primary = engines[0]
@@ -156,14 +202,33 @@ export function buildHarness(options: ChaosHarnessOptions): ChaosHarness {
   const waiters = makeWaiters(primary.manager)
   const notificationEpochs = createNotificationEpochTracker()
   const parentNotifier = createChaosNotifier(store, observed.observations, notificationEpochs)
-  const notifier = instrumentCompletionNotifier(createCompletionNotifier({
-    notifier: parentNotifier, store, schedule: retryScheduler.schedule,
-    getCurrentSessionId: () => CHAOS_SESSION, getParentState: () => ({ kind: "idle" }),
-  }), store, notificationEpochs)
+  const notifier = instrumentCompletionNotifier(
+    createCompletionNotifier({
+      notifier: parentNotifier,
+      store,
+      schedule: retryScheduler.schedule,
+      getCurrentSessionId: () => CHAOS_SESSION,
+      getParentState: () => ({ kind: "idle" }),
+    }),
+    store,
+    notificationEpochs,
+  )
 
   return makeHarnessResult({
-    project, options, store, observed: observed.observations, pendingCancelledTaskIds, engines,
-    primary, probeEngine, processes, lifecycleObservations, retryScheduler, waiters, parentNotifier, notifier,
+    project,
+    options,
+    store,
+    observed: observed.observations,
+    pendingCancelledTaskIds,
+    engines,
+    primary,
+    probeEngine,
+    processes,
+    lifecycleObservations,
+    retryScheduler,
+    waiters,
+    parentNotifier,
+    notifier,
   })
 }
 
@@ -187,12 +252,24 @@ type HarnessResultInput = {
 function makeHarnessResult(input: HarnessResultInput): ChaosHarness {
   const { primary, store } = input
   return {
-    model: CHAOS_MODEL, sessionId: CHAOS_SESSION, manager: primary.manager, lifecycle: primary.lifecycle,
-    notifier: input.notifier, parentNotifier: input.parentNotifier, retryScheduler: input.retryScheduler,
-    waiters: input.waiters, runner: primary.inProcessRunner, registry: primary.registry,
-    engines: input.engines, probeEngine: input.probeEngine, processes: input.processes,
-    lifecycleObservations: input.lifecycleObservations, observations: input.observed, store,
-    pendingCancelledTaskIds: input.pendingCancelledTaskIds, residencyMax: input.options.residencyMax,
+    model: CHAOS_MODEL,
+    sessionId: CHAOS_SESSION,
+    manager: primary.manager,
+    lifecycle: primary.lifecycle,
+    notifier: input.notifier,
+    parentNotifier: input.parentNotifier,
+    retryScheduler: input.retryScheduler,
+    waiters: input.waiters,
+    runner: primary.inProcessRunner,
+    registry: primary.registry,
+    engines: input.engines,
+    probeEngine: input.probeEngine,
+    processes: input.processes,
+    lifecycleObservations: input.lifecycleObservations,
+    observations: input.observed,
+    store,
+    pendingCancelledTaskIds: input.pendingCancelledTaskIds,
+    residencyMax: input.options.residencyMax,
     limit: input.options.concurrency,
     writeSession(taskId) {
       const directory = join(store.stateDir, "children", taskId, "sessions")

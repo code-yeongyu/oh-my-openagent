@@ -16,5 +16,5 @@ function isSenpiThinkingLevelName(value: string): value is SenpiThinkingLevelNam
 export function asSenpiThinkingLevel(reasoning: string | undefined): SenpiThinkingLevel | undefined {
   if (reasoning === undefined) return undefined
   const normalized = reasoning === "none" ? "off" : reasoning
-  return normalized === "auto" ? undefined : (isSenpiThinkingLevelName(normalized) ? normalized : undefined)
+  return normalized === "auto" ? undefined : isSenpiThinkingLevelName(normalized) ? normalized : undefined
 }
