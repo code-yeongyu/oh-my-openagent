@@ -54,8 +54,14 @@ pub fn first_unresolvable(
 /// machine's screen; `x11_keymap_remap`: the opt-in `computer.x11_keymap_remap`.
 #[must_use]
 pub const fn text_route(platform: crate::report::Platform, remote_screen: bool, x11_keymap_remap: bool) -> TextRoute {
-    let _ = (platform, remote_screen, x11_keymap_remap);
-    TextRoute::Unicode
+    use crate::report::Platform;
+    match platform {
+        Platform::Macos => TextRoute::Unicode,
+        Platform::Windows if remote_screen => TextRoute::None,
+        Platform::Windows => TextRoute::Unicode,
+        Platform::X11 if x11_keymap_remap => TextRoute::Remap,
+        Platform::X11 | Platform::Wayland => TextRoute::None,
+    }
 }
 
 impl Unresolvable {

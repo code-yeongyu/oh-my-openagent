@@ -15,8 +15,12 @@ impl Session {
     }
 }
 
+/// The literal the pin names for a secure field the agent must not fill (d-a11y-model.md:356).
+const PRIVATE_NEXT_CALL: &str = "ask the user to fill the field";
+
 pub(crate) fn withhold_observation(observation: &mut Observation) {
     observation.secure = Some(true);
+    observation.next_call = Some(PRIVATE_NEXT_CALL.to_owned());
     observation.tree = None;
     observation.diff = None;
     observation.frame = None;

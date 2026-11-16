@@ -141,6 +141,9 @@ pub struct Observation {
     pub observation: UntrustedText,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub secure: Option<bool>,
+    /// Row 26 (R70f(1), R70g(1)): present only when `secure` is true; names the user.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_call: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub settle: Option<ObservationSettle>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
