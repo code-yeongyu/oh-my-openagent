@@ -1,9 +1,8 @@
 import type { ThreadAddressEntry } from "../addressing"
 import type { ThreadStatus } from "../contracts/results"
 import type { ThreadToolFailure } from "../errors"
-import { accountDevices } from "./account"
 import { rowThreadId, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
-import { holderTarget, remoteAvailable } from "./remote-ops"
+import { holderTarget, remoteReady } from "./remote-ops"
 
 // Decision 0027 section 1: the relay transport's address book. The account listing becomes entries of the SAME shape the
 // local book yields, so one resolver judges local and remote threads together: an exact durable id, then an account
@@ -68,13 +67,13 @@ const remoteNotSetUp = (state: unknown): boolean =>
   state === undefined || (typeof state === "string" && REMOTE_NOT_SET_UP.has(state))
 
 export async function relayAddressBook(remote: RemoteThreadSurface, address: string): Promise<RelayAddressBook> {
-  const unavailable = await remoteAvailable(remote)
-  if (unavailable !== undefined) {
-    if (unavailable.error.code === "host_unavailable" && remoteNotSetUp(unavailable.error.details?.["state"]))
-      return { entries: [] }
-    return { entries: [], unavailable: unavailable.error }
+  const ready = await remoteReady(remote)
+  if ("kind" in ready) {
+    if (ready.error.code === "host_unavailable" && remoteNotSetUp(ready.error.details?.["state"])) return { entries: [] }
+    return { entries: [], unavailable: ready.error }
   }
-  const [{ here }, rows] = await Promise.all([accountDevices(remote.client), remote.sessions.sessions()])
+  const { here } = ready
+  const rows = await remote.sessions.sessions()
   const entries = rows.filter((row) => row.device !== here).map((row) => relayAddressEntry(row))
   if (remote.aliases === undefined) return { entries }
   const alias = await remote.aliases.resolve(address).catch(() => undefined)

@@ -80,6 +80,8 @@ export function fakeRemoteClient(account: {
   readonly here: string | null
   readonly devices: () => readonly RemoteDevice[]
   readonly fail?: RemoteFailure
+  /** Only the device list fails with this (the service state still answers). */
+  readonly devicesFail?: RemoteFailure
   /** Each account read, by member name, in call order. */
   readonly reads?: string[]
 }): RemoteClient {
@@ -120,7 +122,7 @@ export function fakeRemoteClient(account: {
     devices: {
       list: async () => {
         account.reads?.push("devices.list")
-        return account.fail ?? { kind: "ok", value: account.devices().map(row) }
+        return account.fail ?? account.devicesFail ?? { kind: "ok", value: account.devices().map(row) }
       },
       resolve: none("devices.resolve"),
     },
@@ -430,6 +432,9 @@ export function createRemoteThreadFixture() {
         here: "here",
         devices: () => devices,
         reads: accountReads,
+        ...(options.devicesFail === true
+          ? { devicesFail: { kind: "error", code: "host_unavailable", message: "closed", next_action: "Retry." } as const }
+          : {}),
       }),
       sessions: {
         status: async () => {

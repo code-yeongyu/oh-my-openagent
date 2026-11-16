@@ -22,6 +22,12 @@ const fail = (
 
 /** A5: the relay is paid only; on any other plan the remote path answers this, never a silent failure or a queue. */
 export async function remoteAvailable(remote: RemoteThreadSurface): Promise<Failure | undefined> {
+  const ready = await remoteReady(remote)
+  return "kind" in ready ? ready : undefined
+}
+
+/** remoteAvailable, and on a connected relay this device's account id, read in the same status round. */
+export async function remoteReady(remote: RemoteThreadSurface): Promise<Failure | { readonly here: string | null }> {
   const status = await accountState(remote.client)
   if ("kind" in status)
     return fail(
@@ -44,7 +50,7 @@ export async function remoteAvailable(remote: RemoteThreadSurface): Promise<Fail
       "Sign in, turn remote sessions on, or wait for the device service to connect, then retry.",
       { state },
     )
-  return undefined
+  return { here: status.here }
 }
 
 export function aliasFailure(error: AliasError): Failure {
@@ -127,7 +133,18 @@ export async function holderTarget(
 
 /** A typed `device_offline` when the device is known and not online; nothing is ever queued for it (A3). */
 export async function deviceOnline(remote: RemoteThreadSurface, device: string): Promise<Failure | undefined> {
-  return deviceRefusal((await accountDevices(remote.client)).devices, device)
+  let devices: readonly RemoteDevice[]
+  try {
+    devices = (await accountDevices(remote.client)).devices
+  } catch (error) {
+    return fail(
+      "host_unavailable",
+      "This device's device service could not list the account's devices.",
+      "Retry when the device service is reachable.",
+      { device, reason: error instanceof Error ? error.message : String(error) },
+    )
+  }
+  return deviceRefusal(devices, device)
 }
 
 /** deviceOnline over a device list the caller already read: not_found for an unknown id, device_offline for an offline one. */

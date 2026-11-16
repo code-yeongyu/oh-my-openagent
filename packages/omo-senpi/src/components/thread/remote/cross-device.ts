@@ -5,7 +5,7 @@ import { rowThreadId, type AliasRegistry, type RemoteSessionRow, type RemoteThre
 import type { WorktreeRequest } from "../worktree/thread-worktree"
 import { placeFolder } from "./create-folder"
 import { accountDevices } from "./account"
-import { aliasFailure, remoteAvailable } from "./remote-ops"
+import { aliasFailure, remoteReady } from "./remote-ops"
 import {
   planCreate as placeCreate,
   signedOut,
@@ -159,10 +159,10 @@ export async function listAcross(
 ): Promise<ThreadToolResult> {
   if (remote === undefined || local.kind !== "ok" || !("threads" in local)) return local
   const ids = local.threads.map((thread) => thread.thread_id)
-  const unavailable = await remoteAvailable(remote)
-  if (!allScope) return unavailable === undefined ? withAliases(remote, local, ids) : local
-  if (unavailable !== undefined) return { ...local, remote_unavailable: unavailable.error.code }
-  const { here } = await accountDevices(remote.client)
+  const ready = await remoteReady(remote)
+  if (!allScope) return "kind" in ready ? local : withAliases(remote, local, ids)
+  if ("kind" in ready) return { ...local, remote_unavailable: ready.error.code }
+  const { here } = ready
   const known = new Set(ids)
   let listed: readonly RemoteSessionRow[]
   try {

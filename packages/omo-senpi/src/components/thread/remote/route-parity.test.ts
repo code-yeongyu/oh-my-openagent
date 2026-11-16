@@ -228,7 +228,12 @@ describe("#13012 route parity", () => {
         state: () => "connected",
         here: "here",
         devices: () => [],
-        fail: { kind: "error", code: "host_unavailable", message: "device lookup failed", next_action: "Retry." },
+        devicesFail: {
+          kind: "error",
+          code: "host_unavailable",
+          message: "device lookup failed",
+          next_action: "Retry.",
+        },
       }),
     })
     expect(await run("thread_read", { thread: B_ROW.title })).toMatchObject({

@@ -32,8 +32,13 @@ export async function accountDevices(client: RemoteClient): Promise<AccountDevic
   }
 }
 
-/** The device service state (`connected`, `plan_required`, ...); a failed read is the client's typed failure. */
-export async function accountState(client: RemoteClient): Promise<{ readonly state: string } | RemoteFailure> {
+/**
+ * The device service state (`connected`, `plan_required`, ...) and this device's account id from the same status
+ * round, so a caller that checks the relay needs no device read to know which device it is on.
+ */
+export async function accountState(
+  client: RemoteClient,
+): Promise<{ readonly state: string; readonly here: string | null } | RemoteFailure> {
   const status = await client.service.status()
-  return status.kind === "error" ? status : { state: status.value.state }
+  return status.kind === "error" ? status : { state: status.value.state, here: status.value.device?.id ?? null }
 }

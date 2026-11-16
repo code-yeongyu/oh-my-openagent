@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { anchorMatches, followRemote } from "./remote-ops"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
+import { fakeRemoteClient } from "../thread-remote-fixture"
 
 // The adapter drops anything delivered before `live = true`, so records reach the listener only after watch()
 // returns; over the relay the previous turn's replay arrives exactly then, after the send's reply (#13267).
@@ -12,8 +13,12 @@ function followSurface(transcript: JsonObject[]) {
     if (listener !== undefined) for (const record of records) listener(record)
   }
   const remote = {
+    client: fakeRemoteClient({
+      state: () => "connected",
+      here: null,
+      devices: () => [{ device: "b", label: "b", online: true }],
+    }),
     sessions: {
-      devices: async () => [{ device: "b", label: "b", online: true }],
       watch: async (_device: string, _session: string, records: RecordListener) => {
         listener = records
         return {
