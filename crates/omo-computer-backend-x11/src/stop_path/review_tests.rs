@@ -180,3 +180,35 @@ fn a_compositor_read_that_failed_is_unknown() {
 fn the_x11_backend_declares_the_x11_platform() {
     assert_eq!(X11Backend::from_env(None, None).platform(), Some(Platform::X11));
 }
+
+
+/// Review L1 at 7ab3a2d55e: before stopPath.start arms anything, the capabilities name no deaf
+/// reason; a caller reads deafReason only next to deaf:true.
+#[test]
+fn before_any_arm_the_capabilities_name_no_deaf_reason() {
+    let keys = FakeKeys::new((2, 2));
+    let backend = backend(&keys);
+    assert_eq!(backend.capabilities().stop_path.deaf_reason, None);
+}
+
+/// Review L2 at 7ab3a2d55e: a connection that cannot be made at arm reads as no seat (absent),
+/// which a live host relay covers like any absent listener; the next stopPath.start re-arms.
+#[test]
+fn a_connection_lost_at_arm_reads_absent_and_a_live_relay_covers_it() {
+    let keys = FakeKeys::new((2, 2));
+    keys.lock().alive = false;
+    let mut backend = backend(&keys);
+    assert_eq!(backend.set_stop_chord(Some(DEFAULT_STOP_CHORD)), Ok(()));
+    let mut supervisor = Supervisor::new(
+        Box::new(MemoryMarker::default()),
+        StopPolicy {
+            allow_host_relay_only: true,
+        },
+    );
+    supervisor.arm(backend.stop_listener(), None, 0);
+    supervisor.heartbeat(0);
+    assert!(supervisor.view(0).admit().is_ok(), "absent + live relay: the relay covers it");
+    keys.lock().alive = true;
+    supervisor.arm(backend.stop_listener(), None, 1);
+    assert_eq!(supervisor.view(1).global, omo_computer_safety::stop_path::GlobalListener::Fresh);
+}

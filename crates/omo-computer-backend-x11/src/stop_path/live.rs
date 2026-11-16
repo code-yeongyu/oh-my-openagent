@@ -120,12 +120,11 @@ impl Live {
         }
     }
 
-    /// Why the stop path would read deaf: the last arm's reason, or `chord-unarmable` while no
-    /// chord is configured.
+    /// Why the last arm read deaf; `None` before any arm (review L1: capabilities never name a
+    /// deaf reason for a stop path nothing has tried to arm).
     #[must_use]
-    pub fn deaf_reason(&self) -> Option<DeafReason> {
+    pub const fn deaf_reason(&self) -> Option<DeafReason> {
         self.deaf
-            .or_else(|| self.chord.is_none().then_some(DeafReason::ChordUnarmable))
     }
 
     /// The raw listener for the configured chord on its own connection. A server it cannot be
@@ -134,7 +133,9 @@ impl Live {
     ///
     /// # Errors
     /// `StopPathUnavailable{deaf}` as above; a bare `StopPathUnavailable` when the connection
-    /// broke, which the supervisor's ladder retries.
+    /// broke. Broken while polling, the supervisor's ladder re-arms it; unreachable at arm, the
+    /// slot reads absent (no seat), which a live host relay covers like any absent listener,
+    /// and the next `stopPath.start` arms again (review L2).
     pub fn stop_listener(&mut self) -> BackendResult<Box<dyn StopListener>> {
         let Some(chord) = self.chord.clone() else {
             self.deaf = Some(DeafReason::ChordUnarmable);

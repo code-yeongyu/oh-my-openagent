@@ -27,7 +27,7 @@ export async function noConsentFile(ctx: Context, chord: string | undefined): Pr
       stop_path_start_refused_deaf: deaf(start),
       capabilities_read_deaf: stopPath.deaf === true,
       deaf_reason_is_chord_unarmable: stopPath.deafReason === "chord-unarmable",
-      click_refused: click !== undefined,
+      click_refused_stop_path_deaf: deaf(click),
       pointer_unmoved_for_the_oracle: before === after,
     },
     facts: {
