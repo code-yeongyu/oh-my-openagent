@@ -13,6 +13,8 @@ import {
   type Timers,
 } from "@oh-my-opencode/device-service-core/device-service"
 import type { AliasRegistry } from "../thread/remote/ports"
+import type { ThreadSocketConnect } from "../thread/live-surface"
+import type { ThreadHost } from "../thread/tools/ports"
 import { aliasMembers } from "./aliases"
 import { attachMember } from "./attach"
 import { failureFromError, nextActionFor, remoteFailure } from "./codes"
@@ -21,6 +23,8 @@ import { streamMembers } from "./follow"
 import { resolveMember } from "./resolve"
 import { handleOf } from "./seams"
 import { sessionMembers } from "./sessions"
+import { defaultLocalThreadHost } from "./sessions-local"
+import { localSessionRows } from "./sessions-local-list"
 import type {
   AttachHandle,
   BootstrapResult,
@@ -82,6 +86,11 @@ export type RemoteClientDeps = {
    * it, never widen it. Absent, only the narrowest mode passes.
    */
   readonly permissionPreset?: () => string | undefined
+  /**
+   * Test seam: this device's operator endpoint, where an open on this device lands (the engine's own host by default),
+   * built over the socket `connect` the open watches its frames on.
+   */
+  readonly localThreadHost?: (connect: ThreadSocketConnect) => Promise<ThreadHost>
   /** Test seam: opens the proven device-service connection (`connectDeviceService` by default). */
   readonly connect?: (options: {
     readonly version: string
@@ -330,7 +339,9 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
     if (self === null) return [localSelfRow(), ...listed]
     const own = listed.find((row) => row.id === self.id)
     const selfRow: DeviceRow = {
-      ...(own ?? { ...localSelfRow(), id: self.id, name: self.name, last_seen_ms: timers.now() }),
+      // A connected service's own device: thisDevice() names no kind, so it is a cli device; "local" is only the row
+      // of a device with no service.
+      ...(own ?? { ...localSelfRow(), kind: "cli", id: self.id, name: self.name, last_seen_ms: timers.now() }),
       self: true,
       online: true,
       caps: { attach: true, machine: false, control },
@@ -360,8 +371,21 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
       const byId = new Map(devices.map((row) => [row.id, row]))
       const deviceOf = (id: string): DeviceRow => byId.get(id) ?? unlistedDevice(id)
       const wanted = filter?.name?.toLowerCase()
-      const rows = listing.rows
-        .map((row) => sessionRow(row, deviceOf(row.device)))
+      // This device's own sessions come from its own operator endpoint (#13787): the service's listing does not carry
+      // the asking device's sessions. One it already lists by the same durable id keeps the service's row.
+      const self = devices.find((row) => row.self === true && row.kind !== "local")
+      const listed = listing.rows.map((row) => sessionRow(row, deviceOf(row.device)))
+      const local =
+        self === undefined || (filter?.device !== undefined && filter.device !== self.id)
+          ? []
+          : await localSessionRows(deps.localThreadHost ?? defaultLocalThreadHost, self)
+      const known = new Set(listed.flatMap((row) => (row.durable_id === undefined ? [] : [row.durable_id])))
+      const rows = [
+        ...listed,
+        ...(local ?? []).filter((row) => row.durable_id === undefined || !known.has(row.durable_id)),
+      ]
+        .filter((row) => filter?.state === undefined || row.state === filter.state)
+        .filter((row) => filter?.project === undefined || row.project === filter.project)
         .filter(
           (row) =>
             (filter?.archived === undefined || row.archived === filter.archived) &&
@@ -374,6 +398,8 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
           ...Object.entries(listing.devices)
             .filter(([, state]) => state !== "answered")
             .map(([id]) => id),
+          // This device's own host did not answer: its sessions are missing from this listing.
+          ...(self !== undefined && local === undefined ? [self.id] : []),
         ]),
       ].map(deviceOf)
       return ok({ revision: listing.revision, rows, unanswered })
