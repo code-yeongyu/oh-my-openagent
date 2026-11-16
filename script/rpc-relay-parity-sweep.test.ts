@@ -156,6 +156,37 @@ describe("compareAnswers", () => {
     expect(describeAnswer({ kind: "reply", reply: { success: true, data: {} } })).toBe("reply ok")
   })
 
+  test("a local reply that reports an unapplied outcome is not served, so a relay refusal is differs, not missing", () => {
+    const refusedUnload: Answer = {
+      kind: "reply",
+      reply: { success: true, data: { outcome: "refused", reason: "unsupported", detail: "unknown_session" } },
+    }
+    expect(
+      compareAnswers(refusedUnload, { kind: "outcome", state: "engine_refused", reason: "malformed" }, new Map()),
+    ).toEqual({
+      kind: "differs",
+      detail:
+        "reply ok (outcome refused: unknown_session) locally, outcome engine_refused (malformed) through the relay",
+    })
+    expect(
+      compareAnswers(refusedUnload, { kind: "refused", code: "unsupported", message: "unsupported" }, new Map()),
+    ).toEqual({
+      kind: "differs",
+      detail: "reply ok (outcome refused: unknown_session) locally, refused unsupported through the relay",
+    })
+    expect(compareAnswers(refusedUnload, { kind: "no_reply" }, new Map())).toEqual({
+      kind: "differs",
+      detail: "reply ok (outcome refused: unknown_session) locally, no reply through the relay",
+    })
+    const appliedUnload: Answer = { kind: "reply", reply: { success: true, data: { outcome: "applied" } } }
+    expect(
+      compareAnswers(appliedUnload, { kind: "refused", code: "unsupported", message: "unsupported" }, new Map()),
+    ).toEqual({
+      kind: "missing",
+      error: "unsupported",
+    })
+  })
+
   test("the same typed refusal on both legs is the same answer", () => {
     const refusal = (id: string): Answer => ({
       kind: "reply",

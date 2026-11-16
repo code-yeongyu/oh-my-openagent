@@ -85,19 +85,25 @@ function firstDifference(left: Json, right: Json, path = "$"): string | undefine
   return `${path}: ${show(left)} locally, ${show(right)} through the relay`
 }
 
+/** A successful reply can still report an outcome it did not apply (unload_session answers `{ outcome: "refused" }`). */
+const unappliedOutcome = (reply: JsonObject): { readonly outcome: string; readonly detail?: string } | undefined => {
+  const data = reply["data"]
+  if (!isObject(data)) return undefined
+  const outcome = data["outcome"]
+  if (typeof outcome !== "string" || outcome === "applied") return undefined
+  const detail = data["detail"] ?? data["reason"]
+  return typeof detail === "string" ? { outcome, detail } : { outcome }
+}
+
 /** One short label for an answer, e.g. `reply ok`, `reply unknown_session`, `refused unsupported`. */
 export function describe(answer: Answer): string {
   switch (answer.kind) {
     case "reply": {
       const code = answer.reply["errorCode"]
-      // #13895 review: a reply can succeed while reporting an outcome it did not apply (unload_session answers
-      // { outcome: "refused", detail }); show that outcome so a table row never reads it as a plain ok.
       if (answer.reply["success"] === true) {
-        const data = answer.reply["data"]
-        const outcome = isObject(data) ? data["outcome"] : undefined
-        if (typeof outcome !== "string" || outcome === "applied") return "reply ok"
-        const detail = isObject(data) ? (data["detail"] ?? data["reason"]) : undefined
-        return `reply ok (outcome ${outcome}${typeof detail === "string" ? `: ${detail}` : ""})`
+        const unapplied = unappliedOutcome(answer.reply)
+        if (unapplied === undefined) return "reply ok"
+        return `reply ok (outcome ${unapplied.outcome}${unapplied.detail === undefined ? "" : `: ${unapplied.detail}`})`
       }
       return `reply ${typeof code === "string" ? code : JSON.stringify(answer.reply["error"] ?? null).slice(0, 60)}`
     }
@@ -125,7 +131,9 @@ const relayGated = (answer: Answer): string | undefined => {
  */
 export function compareAnswers(local: Answer, relay: Answer, aliases: ReadonlyMap<string, string>): Verdict {
   const gate = relayGated(relay)
-  const localServed = local.kind === "no_reply" || (local.kind === "reply" && local.reply["success"] === true)
+  const localServed =
+    local.kind === "no_reply" ||
+    (local.kind === "reply" && local.reply["success"] === true && unappliedOutcome(local.reply) === undefined)
   if (gate !== undefined && localServed) return { kind: "missing", error: gate }
   if (local.kind === "no_reply" && relay.kind === "outcome" && relay.state === "engine_applied") return { kind: "same" }
   if (local.kind === "reply" && relay.kind === "reply") {
