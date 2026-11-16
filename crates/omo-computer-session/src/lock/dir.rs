@@ -122,8 +122,12 @@ fn token_sid(class: TOKEN_INFORMATION_CLASS) -> io::Result<String> {
 
 /// The protected descriptor of L3 for `user`, built from its SDDL text.
 fn descriptor(user: &str) -> io::Result<Local> {
-    let text = format!("O:{user}D:P(A;OICI;FA;;;{user})(A;OICI;FA;;;SY)");
-    let text = wide(std::ffi::OsStr::new(&text));
+    descriptor_text(&format!("O:{user}D:P(A;OICI;FA;;;{user})(A;OICI;FA;;;SY)"))
+}
+
+/// A descriptor built from SDDL `text`.
+fn descriptor_text(text: &str) -> io::Result<Local> {
+    let text = wide(std::ffi::OsStr::new(text));
     let mut sd: PSECURITY_DESCRIPTOR = std::ptr::null_mut();
     // SAFETY: a NUL-terminated wide string alive across the call; the out-parameter is live.
     let built = unsafe {
@@ -138,6 +142,29 @@ fn descriptor(user: &str) -> io::Result<Local> {
         return Err(io::Error::last_os_error());
     }
     Ok(Local(sd))
+}
+
+/// `sid` as SDDL text writes it back (an alias such as `LA` for the local Administrator).
+fn canonical(sid: &str) -> io::Result<String> {
+    let sd = descriptor_text(&format!("O:{sid}"))?;
+    let mut text: *mut u16 = std::ptr::null_mut();
+    // SAFETY: a live descriptor; the out-parameter is live and writable.
+    let converted = unsafe {
+        ConvertSecurityDescriptorToStringSecurityDescriptorW(
+            sd.0,
+            SDDL_REVISION_1,
+            OWNER_SECURITY_INFORMATION,
+            &raw mut text,
+            std::ptr::null_mut(),
+        )
+    };
+    if converted == 0 {
+        return Err(io::Error::last_os_error());
+    }
+    let read = take_wide(text);
+    owner(&read)
+        .map(str::to_owned)
+        .ok_or_else(|| io::Error::other(format!("no owner in {read:?}")))
 }
 
 /// Creates `dir` with the descriptor; `false` when it already existed.
@@ -228,8 +255,10 @@ pub(crate) fn protected_dir(dir: &Path) -> io::Result<()> {
     if let Some(parent) = dir.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    let user = token_sid(TokenUser)?;
-    let default_owner = token_sid(TokenOwner)?;
+    // SDDL text names some SIDs by alias (LA, BA, SY): every SID is compared in the form the
+    // read-back uses, its own descriptor's round trip.
+    let user = canonical(&token_sid(TokenUser)?)?;
+    let default_owner = canonical(&token_sid(TokenOwner)?)?;
     let owners = [user.as_str(), default_owner.as_str()];
     let path = wide(dir.as_os_str());
     let sd = descriptor(&user)?;
