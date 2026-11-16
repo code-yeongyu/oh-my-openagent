@@ -120,3 +120,44 @@ describe("omo remote open connection", () => {
     expect(lines.length).toBeGreaterThan(0)
   })
 })
+
+// #13873 follow-up: a verb's session port borrows the command's connection. Closing it once the verb is done clears its
+// attach pool, so no idle detach timer outlives the verb (remote-id-contract.test.ts measured one left after open and send).
+describe("omo remote session verbs: the session port each verb builds", () => {
+  const remoteFixture = createRemoteThreadFixture()
+
+  test.each([
+    ["open", { verb: "open", device: "b", permissionPreset: "full-access" }],
+    ["interrupt", { verb: "interrupt", target: { device: "b", session: "s-missing" } }],
+  ] as const)("is closed once %s is done", async (_verb, args) => {
+    const account = remoteFixture.account()
+    let closes = 0
+    const dependencies = {
+      connect: async () => ({}) as DeviceService,
+      output: () => {},
+      error: () => {},
+      write: () => {},
+      now: () => 0,
+      stateDir: "/unused",
+      accountShow: async () => {
+        throw new Error("account show is not part of a session verb")
+      },
+      localPermissionPreset: () => "full-access",
+      remote: () => ({
+        ...account.remote,
+        sessions: {
+          ...account.remote.sessions,
+          close: async () => {
+            closes += 1
+          },
+        },
+      }),
+    } as RemoteCommandDependencies
+    try {
+      await runSession({} as DeviceService, args, true, dependencies)
+      expect(closes).toBe(1)
+    } finally {
+      await remoteFixture.cleanup()
+    }
+  })
+})
