@@ -41,7 +41,6 @@ import type {
   RemoteFailure,
   SendReceipt,
   SendRequest,
-  SessionDetail,
   ThreadHandle,
 } from "./types"
 
@@ -205,6 +204,15 @@ export function personIdentity(uid: string): { readonly sender: GatewaySender; r
   return { sender: { kind: "person", uid: numeric, user: userInfo().username }, caller: `person:${uid}` }
 }
 
+/** A session's message to a session on its own device: its thread tools deliver it, never this client. */
+const selfDelivery = (device: string): RemoteFailure =>
+  remoteFailure(
+    "local_only",
+    "A session's message to a session on its own device is delivered by that device's thread tools.",
+    "Send it from the calling session's thread tools (thread_send); sessions.send reaches other devices.",
+    { details: { device } },
+  )
+
 /** How many keyed opens a client remembers for replay. */
 const OPENS_KEPT = 256
 
@@ -323,6 +331,39 @@ export function sessionMembers(core: ClientCore): SessionMembers {
 
   // A session on this device is served by its own operator endpoint: the relay cannot route to the device that asks.
   const local = localSessionMembers(core.deps.localThreadHost ?? defaultLocalThreadHost)
+  // A person's sends on this device under an idempotency key, newest last: a repeat replays one, other arguments
+  // conflict, and one that ran nothing frees its key (the relay leg's receipts do this for other devices).
+  const localSends = new Map<string, { readonly hash: string; readonly result: Promise<Outcome<SendReceipt>> }>()
+  const localSend = async (
+    thread: ThreadHandle,
+    target: SessionTarget,
+    device: DeviceRow,
+    request: SendRequest,
+    caller: string,
+  ): Promise<Outcome<SendReceipt>> => {
+    const run = () => local.send(target, thread, device, request, clientMessageIdOf(caller, request.idempotency_key))
+    const key = request.idempotency_key
+    if (key === undefined) return await run()
+    const hash = hashArgs({ thread, text: request.text, mode: request.mode, expected: request.expected_turn_id })
+    const known = localSends.get(key)
+    if (known !== undefined)
+      return known.hash === hash
+        ? await known.result
+        : remoteFailure(
+            "idempotency_conflict",
+            "The idempotency key was already used for another send.",
+            nextActionFor("idempotency_conflict"),
+          )
+    const result = run()
+    localSends.set(key, { hash, result })
+    for (const oldest of localSends.keys()) {
+      if (localSends.size <= OPENS_KEPT) break
+      localSends.delete(oldest)
+    }
+    const settled = await result
+    if (settled.kind === "error" && settled.uncertain !== true) localSends.delete(key)
+    return settled
+  }
   const isThisDevice = async (svc: DeviceService, device: string): Promise<boolean> =>
     (await svc.thisDevice())?.id === device
 
@@ -411,19 +452,8 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     return core.member<SendReceipt>(stage(), DEADLINES.drive, true, async (svc) => {
       if (await isThisDevice(svc, target.device))
         return from.sender.kind === "person"
-          ? await local.send(
-              target,
-              thread,
-              device.value,
-              request,
-              clientMessageIdOf(from.caller, request.idempotency_key),
-            )
-          : remoteFailure(
-              "local_only",
-              "A session's message to a session on its own device is delivered by that device's thread tools.",
-              "Send it from the calling session's thread tools (thread_send); sessions.send reaches other devices.",
-              { details: { device: target.device } },
-            )
+          ? await localSend(thread, target, device.value, request, from.caller)
+          : selfDelivery(target.device)
       const row = namedDeviceRow(target.device, target.session)
       const mode = request.mode ?? "auto"
       const expected = request.expected_turn_id === undefined ? undefined : String(request.expected_turn_id)
@@ -550,6 +580,9 @@ export function sessionMembers(core: ClientCore): SessionMembers {
         if (device.kind === "error") return device
         // This device opens on its own operator endpoint, never through the relay to itself (#13787).
         if (device.value.self === true) {
+          // A session's message to a session on its own device belongs to its thread tools: refused before the open.
+          if (request.first !== undefined && sender.kind !== "person" && sender.kind !== "cli")
+            return selfDelivery(device.value.id)
           const local = await openOnThisDevice(
             core.deps.localThreadHost ?? defaultLocalThreadHost,
             device.value.id,
@@ -569,11 +602,15 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       // No device service on this device (the connection says so, not a row): the operator endpoint could open a session,
       // but no handle would address it, since every session member reaches a session through the service.
       () =>
-        remoteFailure(
-          "local_only",
-          "This device has no device service, so a session can only be opened here from inside omo.",
-          "Call service.bootstrap to install the device service, then call sessions.open again.",
-        ),
+        request.device === "local"
+          ? remoteFailure(
+              "local_only",
+              "This device has no device service, so a session can only be opened here from inside omo.",
+              "Call service.bootstrap to install the device service, then call sessions.open again.",
+            )
+          : remoteFailure("not_found", `No device has the id ${request.device}.`, nextActionFor("not_found"), {
+              details: { kind: "device" },
+            }),
     )
     if (made.kind === "error") return made
     const target = { device: made.value.device.id, session: made.value.key }

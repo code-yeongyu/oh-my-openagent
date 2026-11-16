@@ -146,7 +146,12 @@ export function localSessionMembers(hostOn: HostOn) {
       run<SendReceipt>(target, "delivered the message", async ({ port, routing, durable }) => {
         // The prompt's client message id, the receipt's delivery_id (senpi stamps it on the turn that answers it). The
         // host's port spreads its options onto the prompt record, so the id rides beside streamingBehavior.
-        const stamped = (streamingBehavior: "steer" | "followUp") => ({ streamingBehavior, clientMessageId })
+        const stamped = (streamingBehavior: "steer" | "followUp", expectedTurnId?: string) => ({
+          streamingBehavior,
+          clientMessageId,
+          // A steer names the turn it read, so the engine refuses it if that turn ended in between (#13787 review L4).
+          ...(expectedTurnId === undefined ? {} : { expectedTurnId }),
+        })
         const state = await port.getState(routing)
         const running = state.isStreaming === true
         const turn = text(Reflect.get(state, "currentTurnId"))
@@ -169,7 +174,7 @@ export function localSessionMembers(hostOn: HostOn) {
                 details: { device: target.device, current_turn_id: turn },
               },
             )
-          await port.prompt(routing, request.text, stamped("steer"), durable)
+          await port.prompt(routing, request.text, stamped("steer", turn), durable)
           return ok({ thread, device, delivery_id: clientMessageId, lane: "steered", turn_id: turn })
         }
         const reply = await port.prompt(routing, request.text, stamped("followUp"), durable)
@@ -182,7 +187,9 @@ export function localSessionMembers(hostOn: HostOn) {
             lane: "started",
             ...(started === undefined ? {} : { turn_id: started }),
           })
-        const pending = Reflect.get(await port.getState(routing), "pendingMessageCount")
+        // The engine took the prompt: a failed queue read after it leaves the position unknown, never the delivery.
+        const after = await port.getState(routing).catch(() => undefined)
+        const pending = after === undefined ? undefined : Reflect.get(after, "pendingMessageCount")
         return ok({
           thread,
           device,

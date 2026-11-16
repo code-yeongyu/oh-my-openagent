@@ -8,7 +8,12 @@ import type { RemoteFailure } from "./types"
  * What the wire saw of one call on this device's operator endpoint: whether a frame of the watched (changing) types
  * was written, and the engine's first answer to one. A failure is judged by this, never by an error's wording.
  */
-export type WireProbe = { sent: boolean; answer?: { readonly success: boolean; readonly error: string } }
+export type WireProbe = {
+  sent: boolean
+  answer?: { readonly success: boolean; readonly error: string }
+  /** The engine's first refusal of any frame naming a session (a read included): it maps, never "unreachable". */
+  refused?: string
+}
 
 const framesOf = (text: string): unknown[] =>
   text.split("\n").flatMap((line) => {
@@ -27,12 +32,14 @@ export const probing =
   (path): Socket => {
     const socket = createConnection(path)
     const ids = new Set<unknown>()
+    const sessionFrames = new Set<unknown>()
     socket.write = new Proxy(socket.write, {
       apply: (write, self, args: unknown[]) => {
         const [chunk] = args
         if (typeof chunk === "string")
           for (const frame of framesOf(chunk)) {
             const type = field(frame, "type")
+            if (field(frame, "sessionId") !== undefined) sessionFrames.add(field(frame, "id"))
             if (typeof type === "string" && watched.has(type)) {
               probe.sent = true
               ids.add(field(frame, "id"))
@@ -47,11 +54,13 @@ export const probing =
       buffer += decoder.write(chunk)
       const end = buffer.lastIndexOf("\n")
       if (end < 0) return
-      for (const frame of framesOf(buffer.slice(0, end)))
-        if (probe.answer === undefined && ids.has(field(frame, "id"))) {
-          const error = field(frame, "errorCode") ?? field(frame, "error")
-          probe.answer = { success: field(frame, "success") === true, error: typeof error === "string" ? error : "" }
-        }
+      for (const frame of framesOf(buffer.slice(0, end))) {
+        const error = field(frame, "errorCode") ?? field(frame, "error")
+        const text = typeof error === "string" ? error : ""
+        const success = field(frame, "success") === true
+        if (probe.answer === undefined && ids.has(field(frame, "id"))) probe.answer = { success, error: text }
+        if (probe.refused === undefined && !success && sessionFrames.has(field(frame, "id"))) probe.refused = text
+      }
       buffer = buffer.slice(end + 1)
     })
     return socket
@@ -88,6 +97,7 @@ function engineRefusal(text: string, self: string): RemoteFailure {
 export function wireFailure(probe: WireProbe, error: unknown, self: string, what: string): RemoteFailure {
   const reason = error instanceof Error ? error.message : String(error)
   if (probe.answer?.success === false) return engineRefusal(probe.answer.error, self)
+  if (probe.refused !== undefined) return engineRefusal(probe.refused, self)
   if (!probe.sent)
     return remoteFailure(
       "host_unavailable",

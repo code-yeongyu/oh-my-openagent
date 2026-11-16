@@ -229,9 +229,15 @@ describe("sessions.open", () => {
   test("#given no device service on this device #when sessions.open runs #then local_only names the SDK step", async () => {
     const stateDir = mkdtempSync(join(tmpdir(), "rs-"))
     emptyDirs.push(stateDir)
-    const failure = failureOf(await clientOn(stateDir, fakeClock()).sessions.open({ device: "local" }))
+    const client = clientOn(stateDir, fakeClock())
+    const failure = failureOf(await client.sessions.open({ device: "local" }))
     expect(failure.code).toBe("local_only")
     expect(failure.next_action).toContain("service.bootstrap")
+    // Another device's id is not this device: with no service it names no device (#13787 review L5).
+    expect(failureOf(await client.sessions.open({ device: PEER }))).toMatchObject({
+      code: "not_found",
+      details: { kind: "device" },
+    })
   })
 })
 
@@ -482,15 +488,15 @@ describe("#13756 review", () => {
   test("#given a slow listing then a command with no final state #when close runs with deadlineMs N #then it settles timeout by N (L3)", async () => {
     const clock = fakeClock()
     const { owner, withheld } = await startModeOwner("ack-no-final", world())
-    const listing = Promise.withResolvers<void>()
-    const release = Promise.withResolvers<void>()
+    const listing = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
     const client = clientOn(owner.stateDir, clock, undefined, {
       connect: async (options) => {
         const svc = await connectDeviceService(options)
         return {
           ...svc,
           sessions: async (filter) => {
-            listing.resolve()
+            listing.resolve(undefined)
             await release.promise
             return await svc.sessions(filter)
           },
@@ -502,7 +508,7 @@ describe("#13756 review", () => {
     const settling = client.sessions.close(LIVE, { deadlineMs: N })
     await listing.promise
     clock.advance(N * 0.6)
-    release.resolve()
+    release.resolve(undefined)
     await withheld("final_state")
     clock.advance(N * 0.4)
     // Every timer due by N fired synchronously in advance(); one macrotask lets the settled chain resolve.
@@ -725,6 +731,85 @@ describe("an open on this device", () => {
       expect(failureOf(await session.sessions.send(SELF_SESSION, { text: "x" })).code).toBe("local_only")
       expect(host.mutations).toEqual([])
       expect(owner.state.commands).toEqual([])
+    })
+  })
+
+  // #13787 review LOWs on the local leg.
+  const fakeReply = (socket: Socket, frame: Record<string, unknown>, reply: Record<string, unknown>) =>
+    socket.emit(
+      "data",
+      Buffer.from(`${JSON.stringify({ id: frame["id"], type: "response", command: frame["type"], ...reply })}\n`),
+    )
+
+  test("#given this device's engine refuses a read of the session #when get reads it #then not_found{session}, not an unreachable host (L2)", async () => {
+    await withContractHost({ silent: ["get_state"] }, async (host) => {
+      const { client } = await localClient(host, selfWorld(), (frame, socket) => {
+        if (frame["type"] === "get_state") fakeReply(socket, frame, { success: false, error: "unknown_session" })
+      })
+      expect(failureOf(await client.sessions.get(SELF_SESSION))).toMatchObject({
+        code: "not_found",
+        details: { kind: "session", device: SELF },
+      })
+    })
+  })
+
+  test("#given a prompt this device's engine took #when the queue read after it fails #then the send is queued, not uncertain (L3)", async () => {
+    await withContractHost({ silent: ["get_state"] }, async (host) => {
+      // The host never answers get_state itself: the first read finds the session idle, the one after the prompt fails.
+      let reads = 0
+      const { client } = await localClient(host, selfWorld(), (frame, socket) => {
+        if (frame["type"] !== "get_state") return
+        reads += 1
+        fakeReply(
+          socket,
+          frame,
+          reads === 1 ? { success: true, data: { isStreaming: false } } : { success: false, error: "busy" },
+        )
+      })
+      expect(await valueOf(client.sessions.send(SELF_SESSION, { text: "q" }))).toMatchObject({
+        lane: "queued",
+        queue_position: 1,
+      })
+    })
+  })
+
+  test("#given a running turn #when a person steers a session on this device #then the prompt names that turn (L4)", async () => {
+    // The host never answers get_state itself: the running turn is the reply put on the socket.
+    await withContractHost({ silent: ["get_state"] }, async (host) => {
+      const { client } = await localClient(host, selfWorld(), (frame, socket) => {
+        if (frame["type"] === "get_state")
+          fakeReply(socket, frame, { success: true, data: { isStreaming: true, currentTurnId: "5" } })
+      })
+      expect(await valueOf(client.sessions.send(SELF_SESSION, { text: "s", mode: "steer" }))).toMatchObject({
+        lane: "steered",
+        turn_id: "5",
+      })
+      expect(host.mutations).toEqual([expect.objectContaining({ type: "prompt", expectedTurnId: "5" })])
+    })
+  })
+
+  test("#given a session client #when it opens on its own device with a first prompt #then local_only before anything is opened (L5)", async () => {
+    await withContractHost({}, async (host) => {
+      const { owner } = await localClient(host)
+      const session = clientOn(owner.stateDir, fakeClock(), { kind: "session", id: "dur-caller" })
+      expect(
+        failureOf(await session.sessions.open({ device: SELF, workspace: host.root, first: { text: "go" } })).code,
+      ).toBe("local_only")
+      expect(opensOn(host)).toEqual([])
+    })
+  })
+
+  test("#given a person's send on this device under an idempotency key #when it is repeated #then it replays, and other text under it conflicts (L6)", async () => {
+    await withContractHost({}, async (host) => {
+      const { client } = await localClient(host)
+      const first = await valueOf(client.sessions.send(SELF_SESSION, { text: "once", idempotency_key: "lk-1" }))
+      expect(await valueOf(client.sessions.send(SELF_SESSION, { text: "once", idempotency_key: "lk-1" }))).toEqual(
+        first,
+      )
+      expect(failureOf(await client.sessions.send(SELF_SESSION, { text: "twice", idempotency_key: "lk-1" })).code).toBe(
+        "idempotency_conflict",
+      )
+      expect(host.mutations.filter((frame) => frame["type"] === "prompt")).toHaveLength(1)
     })
   })
 
