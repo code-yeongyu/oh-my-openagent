@@ -1,9 +1,10 @@
 //! What `/proc` shows about the local process behind a window: the shared
 //! objects it has mapped, its arguments, the binary its `exe` link resolves
 //! to (which names an xterm run under another name), and whether it runs
-//! Chromium helper children. `WM_CLASS` is chosen by the application and often names no
-//! toolkit (a GTK app run from `fixture.py` is `Fixture.py`), so whether a
-//! window accepts synthetic input is read from the process instead.
+//! Chromium helper children. `WM_CLASS` is chosen by the application and
+//! often names no toolkit (a GTK app run from `fixture.py` is `Fixture.py`),
+//! so whether a window accepts synthetic input is read from the process
+//! instead.
 
 use std::fs;
 use std::path::Path;
