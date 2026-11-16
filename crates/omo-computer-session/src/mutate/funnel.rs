@@ -4,6 +4,7 @@
 use std::hash::{BuildHasher, Hasher};
 
 use omo_computer_core::backend::{Refusal, TaggedInput};
+use omo_computer_core::env::FAKE_BACKEND;
 use omo_computer_core::report::Disposition;
 use omo_computer_core::results::ExecReply;
 use serde_json::json;
@@ -63,13 +64,7 @@ impl Session {
             }
             Ok(Verdict::Proceed) => {}
         }
-        let lock = match self
-            .funnel
-            .lock
-            .as_ref()
-            .map(crate::lock::InteractionLock::acquire)
-            .transpose()
-        {
+        let lock = match self.interaction_lock() {
             Ok(lock) => lock,
             Err(error) => {
                 self.funnel
@@ -168,6 +163,18 @@ impl Session {
                 self.store_receipt(&mut record, receipt);
                 Ok(reply)
             }
+        }
+    }
+
+    /// The interaction lock for this exec. A session with no RUNTIME root has none; only the
+    /// fake acts without it, and any other backend is refused (A-IS-65 L10(b)).
+    fn interaction_lock(&self) -> std::io::Result<Option<crate::lock::LockGuard>> {
+        match self.funnel.lock.as_ref() {
+            Some(lock) => lock.acquire().map(Some),
+            None if self.backend.capabilities().backend == FAKE_BACKEND => Ok(None),
+            None => Err(std::io::Error::other(
+                "no runtime root: a real backend acts only under the interaction lock",
+            )),
         }
     }
 
