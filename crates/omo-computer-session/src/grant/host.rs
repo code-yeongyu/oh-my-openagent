@@ -146,6 +146,11 @@ impl Session {
         if self.funnel.control.lease_epoch.is_some_and(|taken| taken != epoch) {
             self.end_lease(LeaseEnd::Stop);
         }
+        // Row 50 (review M1): the lease-end key, read after the listener poll that hears it on
+        // X11 and before the call plans; a press with no lease is consumed and ends nothing.
+        if self.backend.take_lease_end() && self.funnel.control.lease_epoch.is_some() {
+            self.end_lease(LeaseEnd::UserEsc);
+        }
     }
 
     /// The lease ends under the user (the next report reads `user_moved_on`, no `Suspended`).
