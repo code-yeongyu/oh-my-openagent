@@ -36,8 +36,8 @@ fn password_value_is_withheld() {
 fn typing_into_a_password_box_is_admitted_by_keystrokes_and_reports_no_value() {
     let mut host = UiaHost::new(Box::new(|| Ok(password_focused())));
     assert_eq!(host.secure_focus(None), Some(true), "a password box has focus");
-    assert_eq!(host.value_readback(&[42, 3]), None, "no value read back to report");
-    assert_eq!(host.value_readback(&[42, 2]).as_deref(), Some("hello"));
+    assert_eq!(host.value_readback("4660", &[42, 3]), None, "no value read back to report");
+    assert_eq!(host.value_readback("4660", &[42, 2]).as_deref(), Some("hello"));
 }
 
 #[test]
@@ -69,4 +69,17 @@ fn a_password_value_is_not_kept_by_the_reader() {
     let password = read.iter().find(|n| n.secure).expect("password node");
     let kept = reader.element(password.handle.expect("handle")).expect("kept");
     assert_eq!(kept.value, None, "the secret is dropped at the read");
+}
+
+/// Review MEDIUM of #13837 at 44cdbb2103: the read-back searches the target's top-level window,
+/// never the whole desktop; a window it cannot name gets no search at all.
+#[test]
+fn value_readback_searches_the_target_window_and_never_the_desktop() {
+    let mut host = UiaHost::new(Box::new(|| Ok(FakeUia::winforms())));
+    assert_eq!(host.value_readback("4660", &[42, 2]).as_deref(), Some("hello"), "found in the target's window");
+    assert_eq!(host.value_readback("1", &[42, 2]), None, "not in another window");
+    assert_eq!(host.value_readback("0", &[42, 2]), None, "no window named");
+    assert_eq!(host.value_readback("not-a-window", &[42, 2]), None, "no window named");
+    let calls = &host.reader().expect("reader").source().calls;
+    assert_eq!(calls, &["find_runtime_id 4660", "find_runtime_id 1"], "no search without a window");
 }

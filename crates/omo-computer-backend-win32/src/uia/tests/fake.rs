@@ -103,8 +103,14 @@ impl UiaSource for FakeUia {
         Slice::Read(self.get(&element.runtime_id))
     }
 
-    fn find_runtime_id(&mut self, _hwnd: isize, runtime_id: &[i32]) -> Vec<UiaElement> {
-        self.elements.iter().filter(|e| e.runtime_id == runtime_id).cloned().collect()
+    /// Answers only from the top-level window it is asked to search, like the live client.
+    fn find_runtime_id(&mut self, hwnd: isize, runtime_id: &[i32]) -> Vec<UiaElement> {
+        self.calls.push(format!("find_runtime_id {hwnd}"));
+        self.elements
+            .iter()
+            .filter(|e| e.top_level == hwnd && e.runtime_id == runtime_id)
+            .cloned()
+            .collect()
     }
 
     fn focused(&self) -> Option<UiaElement> {

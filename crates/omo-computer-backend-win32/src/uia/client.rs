@@ -67,7 +67,7 @@ impl<S: UiaSource> UiaHost<S> {
     }
 
     /// The value the element with `runtime_id` reads back after a write; never a password's.
-    pub fn value_readback(&mut self, runtime_id: &[i32]) -> Option<String> {
+    pub fn value_readback(&mut self, _window: &str, runtime_id: &[i32]) -> Option<String> {
         let reader = self.reader().ok()?;
         let element = reidentify(reader.source_mut().find_runtime_id(0, runtime_id)).ok()?;
         if element.is_password {
