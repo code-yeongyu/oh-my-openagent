@@ -11,6 +11,7 @@ mod secure;
 mod standalone;
 mod swallowed;
 
+use omo_computer_core::error::Reason;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -42,7 +43,7 @@ pub(super) fn click(call_id: &str) -> omo_computer_core::params::ClickParams {
 }
 
 pub(super) fn wire(refused: &Refused) -> (&'static str, Option<&'static str>) {
-    (refused.refusal.code.wire(), refused.refusal.reason)
+    (refused.refusal.code.wire(), refused.refusal.reason.map(Reason::wire))
 }
 
 /// One engine's roots in a temp dir, and the sink every backend of the test records into.

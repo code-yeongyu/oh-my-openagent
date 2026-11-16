@@ -7,7 +7,7 @@ use omo_computer_core::error::{EngineCode, Reason};
 /// The refusal `code{reason}`; the one place a `Reason` becomes the refusal's reason.
 #[must_use]
 pub(crate) const fn reasoned(code: EngineCode, reason: Reason) -> Refusal {
-    Refusal::new(code, reason.wire())
+    Refusal::new(code, reason)
 }
 
 /// One closed refusal set: `Variant => Code(Reason)` or `Variant => Code` (the bare row).

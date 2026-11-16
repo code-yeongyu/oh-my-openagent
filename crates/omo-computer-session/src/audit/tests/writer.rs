@@ -84,8 +84,8 @@ fn audit_is_one_file_per_hand_with_per_writer_segments() {
     let hand = |name: &str| vec!["computer".to_owned(), "hand-1".to_owned(), name.to_owned()];
     assert_eq!(
         files,
-        vec![hand("audit.jsonl"), hand("audit.lock")],
-        "one data file per hand, beside the hand's lock (A-IS-62 R7-3)"
+        vec![hand("audit.jsonl"), hand(crate::audit::AUDIT_LOCK_FILE)],
+        "one data file per hand, beside the hand's lock on every OS (A-IS-62 R7-3)"
     );
     let all = lines(first.path());
     let metas: Vec<&Value> = all
