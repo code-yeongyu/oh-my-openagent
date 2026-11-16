@@ -6,7 +6,7 @@
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use omo_computer_core::backend::{BackendResult, Presence, Refusal};
-use omo_computer_core::error::EngineCode;
+use omo_computer_core::error::{EngineCode, Reason};
 
 use crate::capture::server::PixelRect;
 
