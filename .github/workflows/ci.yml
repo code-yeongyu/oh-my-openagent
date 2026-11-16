@@ -65,6 +65,7 @@ jobs:
       run_heavy: ${{ steps.classify.outputs.run_heavy }}
       full_matrix: ${{ steps.classify.outputs.full_matrix }}
       runtime_touching: ${{ steps.classify.outputs.runtime_touching }}
+      label_refused: ${{ steps.classify.outputs.label_refused }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -78,6 +79,7 @@ jobs:
           HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message || '' }}
           HEAD_REF: ${{ github.head_ref || '' }}
           PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) || '[]' }}
+          PR_BODY: ${{ github.event.pull_request.body || '' }}
         run: |
           set -euo pipefail
 
@@ -92,6 +94,8 @@ jobs:
           fi
 
           MERGE_PARENTS="$(git show -s --format=%P "$GITHUB_SHA" | wc -w)"
+          BODY_FILE="$RUNNER_TEMP/pr-body.md"
+          printf '%s' "${PR_BODY:-}" > "$BODY_FILE"
 
           MODE_JSON="$(node script/ci-fast-path.mjs \
             --event "$GITHUB_EVENT_NAME" \
@@ -100,6 +104,7 @@ jobs:
             --merge-parents "$MERGE_PARENTS" \
             --head-ref "$HEAD_REF" \
             --labels "${PR_LABELS:-[]}" \
+            --body-file "$BODY_FILE" \
             < "$PATHS_FILE")"
 
           jq -r '"generated_release_push=\(.generatedReleasePush)"' <<< "$MODE_JSON" >> "$GITHUB_OUTPUT"
@@ -107,6 +112,10 @@ jobs:
           jq -r '"run_heavy=\(.runHeavy)"' <<< "$MODE_JSON" >> "$GITHUB_OUTPUT"
           jq -r '"full_matrix=\(.fullMatrix)"' <<< "$MODE_JSON" >> "$GITHUB_OUTPUT"
           jq -r '"runtime_touching=\(.runtimeTouching)"' <<< "$MODE_JSON" >> "$GITHUB_OUTPUT"
+          jq -r '"label_refused=\(.labelRefused)"' <<< "$MODE_JSON" >> "$GITHUB_OUTPUT"
+          if jq -e '.labelRefused' <<< "$MODE_JSON" > /dev/null; then
+            echo "::warning title=ci:full-matrix refused::This diff touches no platform path and the PR body has no 'Platform-reason: <why>' line, so this run stays on Linux. Add the line or remove the label."
+          fi
           jq . <<< "$MODE_JSON"
 
       # The report-only temp-leak list (#9766) may only shrink: a new leak is fixed, not listed.
@@ -128,6 +137,7 @@ jobs:
             - Web-only change: `${{ steps.classify.outputs.web_only || 'unknown' }}`.
             - Run heavy validation: `${{ steps.classify.outputs.run_heavy || 'unknown' }}`.
             - Runtime-touching change: `${{ steps.classify.outputs.runtime_touching || 'unknown' }}` (informational; the OS matrix follows the full-matrix flag below).
+            - `ci:full-matrix` refused: `${{ steps.classify.outputs.label_refused || 'unknown' }}` (the label needs a platform path in the diff or a `Platform-reason: <why>` line in the PR body).
             - Full 3-OS matrix: `${{ steps.classify.outputs.full_matrix || 'unknown' }}` (pull requests set it only for the `ci:full-matrix` label or a release-state head, #13802; false keeps heavy work on ubuntu; add `ci:full-matrix` for a separate run with optional `full-matrix / ...` checks that do not gate merge; keep the label and push a commit or reopen the PR to run the full matrix in required checks).
           JOB_SUMMARY_NEXT: Classification failures default to heavy validation (every OS on push, Linux only on a pull request); inspect the changed-path diff and event metadata.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

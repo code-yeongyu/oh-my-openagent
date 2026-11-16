@@ -59,4 +59,23 @@ describe("#given required CI and an optional full-matrix label run", () => {
     expect(String(concurrency["group"])).toContain("github.event.pull_request.number")
     expect(String(concurrency["group"])).not.toContain("github.ref")
   })
+
+  test("#then a refused label fails fast on Linux before any macOS/Windows job is scheduled", () => {
+    // given / when
+    const jobs = record(workflow("ci-full-matrix-label.yml")["jobs"])
+    const gate = record(jobs["gate"])
+    const fullMatrix = record(jobs["full-matrix"])
+    const steps = (gate["steps"] as unknown[]).map(record)
+    const decide = steps.find((step) => String(step["run"] ?? "").includes("script/ci-fast-path.mjs"))
+
+    // then: the reusable full-matrix call waits for the gate, which runs on one Linux runner in minutes.
+    expect(fullMatrix["needs"]).toBe("gate")
+    expect(gate["if"]).toBe("github.event.label.name == 'ci:full-matrix'")
+    expect(String(gate["runs-on"])).toStartWith("ubuntu-")
+    expect(Number(gate["timeout-minutes"])).toBeLessThanOrEqual(5)
+    expect(decide).toBeDefined()
+    expect(String(decide?.["run"])).toContain("--body-file")
+    expect(String(decide?.["run"])).toContain("labelRefused")
+    expect(String(decide?.["run"])).toContain("Platform-reason:")
+  })
 })

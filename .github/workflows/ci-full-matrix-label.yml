@@ -12,7 +12,55 @@ permissions:
   pull-requests: write
 
 jobs:
+  # The label costs macOS/Windows runners: it is honored only for a diff that touches a platform path or a PR body with a
+  # 'Platform-reason: <why>' line (script/ci-fast-path.mjs). A refused label fails here in seconds, on Linux, before
+  # any macOS/Windows job is scheduled. These checks are optional; required CI is untouched.
+  gate:
+    name: Full-matrix label gate
+    if: github.event.label.name == 'ci:full-matrix'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Refuse the label without a platform path or a Platform-reason line
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_REF: ${{ github.head_ref }}
+          PR_BODY: ${{ github.event.pull_request.body || '' }}
+        run: |
+          set -euo pipefail
+          paths="$RUNNER_TEMP/paths"
+          body="$RUNNER_TEMP/pr-body.md"
+          git diff --name-only -z "$(git merge-base "$BASE_SHA" HEAD)" HEAD > "$paths"
+          printf '%s' "$PR_BODY" > "$body"
+          mode="$(node script/ci-fast-path.mjs --event pull_request --message "" --diff-available true \
+            --merge-parents 2 --head-ref "$HEAD_REF" --labels '["ci:full-matrix"]' --body-file "$body" < "$paths")"
+          jq . <<< "$mode"
+          if jq -e '.labelRefused' <<< "$mode" > /dev/null; then
+            echo "::error title=ci:full-matrix refused::No changed path is platform-specific and the PR body has no reason line. Add a line 'Platform-reason: <why this change needs macOS/Windows on the pull request>' to the PR body and re-apply the label, or remove the label. The post-merge push to dev runs macOS/Windows for every change."
+            exit 1
+          fi
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Full-matrix label gate
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Honors `ci:full-matrix` only for a platform path in the diff or a `Platform-reason: <why>` line in the PR body.
+            - A refusal fails here, on Linux, before any macOS/Windows job is scheduled.
+          JOB_SUMMARY_NEXT: Add the Platform-reason line to the PR body and re-apply the label, or remove the label.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
   full-matrix:
+    needs: gate
     if: github.event.label.name == 'ci:full-matrix'
     # Only matching labels enter this group; bot labels cannot cancel it.
     concurrency:
