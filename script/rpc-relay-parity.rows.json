@@ -1,66 +1,342 @@
 {
+  "abort": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "abort_bash": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "abort_branch_summary": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "abort_compaction": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "abort_retry": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "account_order": {
+    "relay": "unsafe-to-probe, harmless form: same: session No stored credential for provider both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "account_pin": {
+    "relay": "unsafe-to-probe, harmless form: same: session No stored credential for provider both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "account_remove": {
+    "relay": "unsafe-to-probe, harmless form: same: session Provider account not found both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "account_reset": {
+    "relay": "unsafe-to-probe, harmless form: same: session account_not_found both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
   "admit_external_message": {
-    "relay": "differs (draft code reading, not measured; #13004, #13011, #13037)",
+    "relay": "same: session admit_external_message needs deliveryId both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)",
     "test": "packages/omo-senpi/src/components/thread/route-parity.test.ts (fakes)"
   },
+  "append_session_entry": {
+    "relay": "same: session append_session_entry entry is malformed. both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "append_user_message": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "attach_session": {
+    "relay": "unsafe-to-probe, harmless form: differs: session unknown_session locally, engine_refused malformed through the relay; endpoint unknown_session locally, refused unsupported through the relay (#13880; measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "bash": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "check_reload_veto": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
   "claim_session": {
-    "relay": "differs (draft code reading, not measured)"
+    "relay": "unsafe-to-probe, harmless form: same: session ok both; endpoint ok both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "cleanup_bash_output": {
+    "relay": "unsafe-to-probe, harmless form: same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "clear_queue": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "clone": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
   },
   "close_session": {
-    "relay": "differs (draft code reading, not measured)"
+    "relay": "unsafe-to-probe, harmless form: differs: session unknown_session locally, engine_refused malformed through the relay; endpoint unknown_session locally, refused unsupported through the relay (#13880; measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "compact": {
+    "relay": "same: session Nothing to compact session too small both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "continue_from_leaf": {
+    "relay": "same: session leaf_not_assistant both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "cycle_model": {
+    "relay": "unsafe-to-probe, harmless form: same: session this._scopedModels.map is not a function. In thi both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "cycle_thinking_level": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "dequeue_message": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "edit_assistant_message": {
+    "relay": "unsafe-to-probe, harmless form: same: session not_found both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "edit_queued_message": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "edit_user_message": {
+    "relay": "unsafe-to-probe, harmless form: same: session not_found both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "eval_cells.list": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "eval_cells.peek": {
+    "relay": "same: session eval_cell_not_found both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "eval_cells.stop": {
+    "relay": "same: session eval_cell_not_found both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "export_html": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "export_jsonl": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "extension_request": {
+    "relay": "same: session Unknown extension RPC request both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "extension_ui_progress": {
+    "relay": "differs: session unknown_extension_ui_request locally, engine_refused capability_missing through the relay; endpoint missing_session_id locally, engine_refused capability_missing through the relay (#13014; measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
   },
   "extension_ui_response": {
-    "relay": "differs (draft code reading, not measured; #13011)"
+    "relay": "differs: session unknown_extension_ui_request locally, engine_refused capability_missing through the relay; endpoint missing_session_id locally, engine_refused capability_missing through the relay (#13014; measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "follow_up": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "fork": {
+    "relay": "unsafe-to-probe, harmless form: same: session Invalid entry ID for forking both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "get_auth_providers": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "get_available_models": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "get_available_thinking_levels": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "get_commands": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "get_effect_status": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "get_entries": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "get_fast_mode": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "get_follow_up_messages": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "get_fork_messages": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "get_last_assistant_text": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "get_loaded_surfaces": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "get_media": {
+    "relay": "same: session media_not_found both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
   },
   "get_messages": {
-    "relay": "differs (draft code reading, not measured; #13215)"
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "get_model_thinking_level": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "get_pending_inputs": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
   },
   "get_project_settings": {
-    "relay": "differs (draft code reading, not measured)"
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
   },
   "get_project_trust": {
-    "relay": "differs (draft code reading, not measured)"
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "get_protocol_info": {
+    "relay": "same: session ok both; endpoint ok both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "get_provider_accounts": {
+    "relay": "unsafe-to-probe, harmless form: same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "get_session_stats": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "get_snapshot": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "get_state": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "get_steering_messages": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "get_subscription_limits": {
+    "relay": "same: session ok both; endpoint ok both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "get_tree": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "hold_input": {
+    "relay": "same: session hold_input_requires_interactive_client both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "import_jsonl": {
+    "relay": "unsafe-to-probe, harmless form: same: session File not found both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "interrupt": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
   },
   "list_hands": {
-    "relay": "differs (draft code reading, not measured)"
+    "relay": "same: session hand_selection_unsupported both; endpoint hand_selection_unsupported both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "list_sessions": {
+    "relay": "same: session ok both; endpoint ok both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "login_api_key": {
+    "relay": "unsafe-to-probe, harmless form: same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "login_cancel": {
+    "relay": "unsafe-to-probe, harmless form: same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "login_start": {
+    "relay": "unsafe-to-probe, harmless form: same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "logout": {
+    "relay": "unsafe-to-probe, harmless form: same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "memory_report": {
+    "relay": "same: session memory_report_disabled both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "navigate_tree": {
+    "relay": "unsafe-to-probe, harmless form: same: session not_found both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "new_session": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
   },
   "open_session": {
-    "relay": "differs: created on the target but unlisted, then session_not_found (measured on 5.1.69; #13393)"
+    "relay": "same: session ok both; endpoint ok both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
   },
   "park_session": {
-    "relay": "differs (draft code reading, not measured)"
+    "relay": "unsafe-to-probe, harmless form: same: session open_failed both; endpoint open_failed both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "pause_for_run": {
+    "relay": "unsafe-to-probe, harmless form: same: session task_parent_required both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
   },
   "prompt": {
-    "relay": "differs (draft code reading, not measured; #13011)"
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
   },
   "read_project_file": {
-    "relay": "differs (draft code reading, not measured)"
+    "relay": "same: session project_file_not_allowed both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "record_bash_result": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "release_tool_barrier": {
+    "relay": "same: session barrierId must be a non-empty string of at most both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "reload": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "request_self_settle": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "resolve_path": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "resume_for_run": {
+    "relay": "unsafe-to-probe, harmless form: same: session task_parent_required both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "resume_session": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
   },
   "select_hand": {
-    "relay": "differs (draft code reading, not measured)"
+    "relay": "unsafe-to-probe, harmless form: same: session hand_selection_unsupported both; endpoint hand_selection_unsupported both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "send_custom_message": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "set_auto_compaction": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "set_auto_retry": {
+    "relay": "unsafe-to-probe, harmless form: same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "set_fast_mode": {
+    "relay": "unsafe-to-probe, harmless form: same: session set_fast_mode requires a boolean enabled field. both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "set_favorite_models": {
+    "relay": "unsafe-to-probe, harmless form: same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "set_follow_up_mode": {
+    "relay": "unsafe-to-probe, harmless form: same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "set_label": {
+    "relay": "same: session Entry rpcpar-none not found both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
   },
   "set_model": {
-    "relay": "differs (draft code reading, not measured)"
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
   },
   "set_permission_preset": {
-    "relay": "differs (draft code reading, not measured; #13011)"
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
   },
   "set_project_setting": {
-    "relay": "differs (draft code reading, not measured)"
+    "relay": "unsafe-to-probe, harmless form: same: session project_cwd_mismatch both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
   },
   "set_project_trust": {
-    "relay": "differs (draft code reading, not measured)"
+    "relay": "unsafe-to-probe, harmless form: same: session invalid_argument both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "set_retry_fallback": {
+    "relay": "same: session set_retry_fallback is for a single-session rpc p both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "set_scoped_models": {
+    "relay": "unsafe-to-probe, harmless form: same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "set_session_context": {
+    "relay": "differs: session ok locally, session_not_attached through the relay; endpoint missing_session_id both (#13881; measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
   },
   "set_session_name": {
-    "relay": "differs (draft code reading, not measured; #13438)"
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "set_steering_mode": {
+    "relay": "unsafe-to-probe, harmless form: same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "set_thinking_level": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "steer": {
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "switch_session": {
+    "relay": "unsafe-to-probe, harmless form: same: session EACCES both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "test_provider_account": {
+    "relay": "unsafe-to-probe, harmless form: same: session unsupported_provider both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
   },
   "unload_session": {
-    "relay": "differs (draft code reading, not measured)"
+    "relay": "unsafe-to-probe, harmless form: missing: session ok locally, engine_refused malformed through the relay; endpoint ok locally, refused unsupported through the relay (#13880; measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "verify_api_key": {
+    "relay": "unsafe-to-probe, harmless form: same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
   },
   "wake": {
-    "relay": "missing: no remote counterpart (#13037)"
+    "relay": "same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+  },
+  "withdraw_held_input": {
+    "relay": "same: session hold_input_requires_interactive_client both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
   },
   "write_project_file": {
-    "relay": "differs (draft code reading, not measured)"
+    "relay": "unsafe-to-probe, harmless form: same: session project_cwd_mismatch both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
   }
 }
