@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@04288f856dcd224a87108cb46d62d0343ce77136 packages/local-api/src/validate.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/local-api/src/validate.ts
 import { LocalApiError } from "./errors.ts";
 import type {
   Empty,
