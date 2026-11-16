@@ -54,6 +54,7 @@ impl AppsOs for Os {
                     name: name_of(&bundle),
                     path: Some(bundle.display().to_string()),
                     regular: true,
+                    has_windows: true,
                 })
             })
             .collect()

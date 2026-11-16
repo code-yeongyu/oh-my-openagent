@@ -7,7 +7,7 @@ use omo_computer_core::error::{EngineCode, Reason};
 use omo_computer_core::listing::Rect;
 use omo_computer_core::window_frame::{judge, FrameOutcome};
 
-use crate::windows::seam::{FoundWindow, WindowOs};
+use crate::windows::seam::{FoundWindow, QueryNode, WindowOs};
 use crate::windows::MacWindows;
 
 #[derive(Default)]
@@ -17,7 +17,9 @@ struct FakeWindows {
     pinned_width: Option<f64>,
     minimized: BTreeMap<u32, bool>,
     writes: Vec<String>,
-    found: Vec<FoundWindow>,
+    app_windows: Vec<QueryNode>,
+    children: BTreeMap<u64, Vec<QueryNode>>,
+    listed: Vec<FoundWindow>,
 }
 
 impl WindowOs for FakeWindows {
@@ -60,8 +62,16 @@ impl WindowOs for FakeWindows {
         true
     }
 
-    fn ax_windows(&mut self, _pid: u32) -> Vec<FoundWindow> {
-        self.found.clone()
+    fn app_windows(&mut self, _pid: u32) -> Vec<QueryNode> {
+        self.app_windows.clone()
+    }
+
+    fn children(&mut self, node: u64) -> Vec<QueryNode> {
+        self.children.get(&node).cloned().unwrap_or_default()
+    }
+
+    fn listed_windows(&mut self, _pid: u32) -> Vec<FoundWindow> {
+        self.listed.clone()
     }
 }
 
@@ -156,16 +166,41 @@ fn unknown_window_is_window_not_found() {
     }
 }
 
+fn found(number: Option<u32>, role: &str, subrole: Option<&str>) -> FoundWindow {
+    FoundWindow {
+        number,
+        role: role.into(),
+        subrole: subrole.map(Into::into),
+        title: None,
+        frame: None,
+    }
+}
+
+fn at(id: u64, found: FoundWindow) -> QueryNode {
+    QueryNode { id, found }
+}
+
 #[test]
 fn windows_the_list_omits_are_found_through_the_window_query() {
     let mut windows = windows();
-    let sheet = FoundWindow {
-        number: None,
-        role: "AXWindow".into(),
-        subrole: Some("AXSheet".into()),
-        title: None,
-        frame: None,
-    };
-    windows.os_mut().found = vec![sheet.clone()];
-    assert_eq!(windows.query(70), vec![sheet]);
+    let window = found(Some(7), "AXWindow", Some("AXStandardWindow"));
+    let sheet = found(None, "AXSheet", None);
+    let popover = found(None, "AXPopover", None);
+    let button = found(None, "AXButton", None);
+    let elsewhere = found(Some(9), "AXWindow", None);
+    let fake = windows.os_mut();
+    fake.app_windows = vec![at(1, window.clone())];
+    fake.children.insert(
+        1,
+        vec![at(2, sheet.clone()), at(3, found(None, "AXGroup", None))],
+    );
+    fake.children
+        .insert(3, vec![at(4, button), at(5, popover.clone())]);
+    // The window list names window 7 (this Space) and window 9 (another Space).
+    fake.listed = vec![found(Some(7), "AXWindow", None), elsewhere.clone()];
+    assert_eq!(
+        windows.query(70),
+        vec![window, sheet, popover, elsewhere],
+        "sheets and popovers from the AX children, other Spaces from the window list, no duplicate"
+    );
 }

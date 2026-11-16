@@ -60,6 +60,7 @@ fn fixture() -> FakeApps {
                 name: "TextEdit".into(),
                 path: Some("/System/Applications/TextEdit.app".into()),
                 regular: true,
+                has_windows: true,
             },
             RunningApp {
                 pid: 71,
@@ -67,6 +68,7 @@ fn fixture() -> FakeApps {
                 name: "Agent".into(),
                 path: None,
                 regular: false,
+                has_windows: false,
             },
         ],
         installed: vec![
@@ -197,4 +199,56 @@ fn apps_open_unknown_key_refused() {
         Err(APP_UNKNOWN)
     );
     assert!(os.launches.is_empty());
+}
+
+#[test]
+fn running_lists_window_owners_and_windowless_regular_apps() {
+    let running = |pid, id: &str, regular, has_windows| RunningApp {
+        pid,
+        bundle_id: Some(id.into()),
+        name: id.into(),
+        path: None,
+        regular,
+        has_windows,
+    };
+    let mut os = FakeApps {
+        running: vec![
+            running(80, "com.example.windowless", true, false),
+            running(81, "com.example.menubar", false, true),
+            running(82, "com.example.daemon", false, false),
+        ],
+        ..FakeApps::default()
+    };
+    let keys: Vec<_> = list(&mut os)
+        .into_iter()
+        .filter(|a| a.running)
+        .map(|a| a.app_key)
+        .collect();
+    assert_eq!(
+        keys,
+        vec!["com.example.menubar", "com.example.windowless"],
+        "running window owners plus regular-policy apps; a windowless background agent is not listed"
+    );
+}
+
+#[test]
+fn installed_scan_finds_nested_bundles_but_never_inside_one() {
+    let root = std::env::temp_dir().join(format!("omo-apps-scan-{}", std::process::id()));
+    let make = |rel: &str| std::fs::create_dir_all(root.join(rel)).expect("mkdir");
+    make("Top.app/Contents/Helpers/Inner.app");
+    make("Utilities/Tool.app");
+    make("Vendor/Suite/Editor.app");
+    make("a/b/c/d/TooDeep.app");
+    let mut found: Vec<String> = super::scan::app_bundles(&root)
+        .iter()
+        .filter_map(|p| p.strip_prefix(&root).ok())
+        .map(|p| p.display().to_string())
+        .collect();
+    found.sort();
+    std::fs::remove_dir_all(&root).expect("cleanup");
+    assert_eq!(
+        found,
+        vec!["Top.app", "Utilities/Tool.app", "Vendor/Suite/Editor.app"],
+        "vendor subfolders are scanned; a bundle's own helpers and anything past the depth are not"
+    );
 }

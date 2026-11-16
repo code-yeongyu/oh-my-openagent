@@ -2,6 +2,7 @@
 
 pub mod list;
 pub mod open;
+pub mod scan;
 pub mod seam;
 
 #[cfg(target_os = "macos")]

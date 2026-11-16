@@ -118,6 +118,6 @@ impl<O: WindowOs> MacWindows<O> {
     /// The windows of `pid` the AX tree shows, sheets, popovers and other Spaces' windows
     /// included; nothing is activated and no Space is switched.
     pub fn query(&mut self, pid: u32) -> Vec<FoundWindow> {
-        self.os.ax_windows(pid)
+        super::query::query(&mut self.os, pid)
     }
 }

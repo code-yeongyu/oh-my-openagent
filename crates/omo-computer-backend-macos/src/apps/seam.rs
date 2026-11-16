@@ -2,7 +2,7 @@
 
 use omo_computer_core::backend::Refusal;
 
-/// A running application with windows or a regular activation policy.
+/// A running application: a window owner, or an app with the regular activation policy.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunningApp {
     pub pid: u32,
@@ -10,8 +10,11 @@ pub struct RunningApp {
     pub name: String,
     /// The `.app` bundle path.
     pub path: Option<String>,
-    /// `NSApplicationActivationPolicyRegular` (a background agent is not listed).
+    /// The regular activation policy (the bundle declares neither `LSUIElement` nor
+    /// `LSBackgroundOnly`).
     pub regular: bool,
+    /// The app owns an application-layer window.
+    pub has_windows: bool,
 }
 
 /// An installed application LaunchServices knows.

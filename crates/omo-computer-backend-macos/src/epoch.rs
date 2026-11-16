@@ -207,6 +207,23 @@ mod tests {
     }
 
     #[test]
+    fn display_sleep_is_one_sleep_event() {
+        let mut source = MacEpochSource::new(Scripted(base()));
+        reasons(&mut source);
+        // Sleeping displays leave the active list: that is the sleep, not a reconfiguration.
+        source.os_mut().0.displays.clear();
+        source.os_mut().0.pixels.clear();
+        source.os_mut().0.asleep = Some(true);
+        assert_eq!(reasons(&mut source), vec!["sleep"]);
+        source.os_mut().0 = base();
+        assert_eq!(
+            reasons(&mut source),
+            vec!["sleep"],
+            "and the wake is one event too"
+        );
+    }
+
+    #[test]
     fn lock_and_sleep_each_move_the_epoch() {
         let mut source = MacEpochSource::new(Scripted(base()));
         reasons(&mut source);
