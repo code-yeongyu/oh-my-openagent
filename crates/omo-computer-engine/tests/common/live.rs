@@ -53,7 +53,7 @@ impl Live {
     }
 
     pub fn spawn_with(args: &[&str], scenario: &Value, prepare: impl FnOnce(&Path)) -> Self {
-        let runtime = tempfile::tempdir().expect("a runtime dir");
+        let runtime = super::peer::runtime_dir();
         prepare(runtime.path());
         let file = runtime.path().join("scenario.json");
         fs::write(&file, scenario.to_string()).expect("the scenario file");

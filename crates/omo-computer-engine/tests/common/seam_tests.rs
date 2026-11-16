@@ -122,7 +122,8 @@ fn session_open_without_host_self_set_still_refuses_own_pid_chain() {
     let own = std::process::id();
     let scenario = scenario_with(
         &json!({"windows": [{"id": "301", "title": "the MCP client", "app": "Terminal", "pid": own,
-        "x": 0, "y": 0, "width": 400, "height": 300, "focused": true, "elevated": null}]}),
+        "x": 0, "y": 0, "width": 400, "height": 300, "focused": true, "elevated": null}],
+        "ax": {}}),
     );
     let mut live = mcp("exec", &scenario, Some(true));
     let typed = tool(
@@ -132,8 +133,9 @@ fn session_open_without_host_self_set_still_refuses_own_pid_chain() {
         &json!({"target": "301", "text": "rm -rf ~"}),
     );
     assert_eq!(typed["result"]["isError"], json!(true), "{typed}");
+    // The self target rides an existing code as `data.reason` (d-arch.md 'Wire protocol').
     assert!(
-        typed.to_string().contains("SelfTarget"),
+        typed.to_string().contains(r#"\"reason\":\"self_target\""#),
         "refused as the engine's own pid chain: {typed}"
     );
     assert!(
@@ -160,6 +162,12 @@ fn sigkill_mid_type_releases_key_within_2s() {
         )
         .get("result")
         .is_some());
+    // A hold needs the foreground lease, which needs the human grant (row 23).
+    assert!(live
+        .call(4, "control.grant", &json!({"reason": "row 28 sigkill test"}))
+        .get("result")
+        .is_some());
+    assert!(live.call(5, "control.acquire", &json!({})).get("result").is_some());
     let held = live.call(3, "key.down", &json!({"target": "101", "chord": "shift"}));
     assert!(held.get("result").is_some(), "the key is held: {held}");
     let pid = live.peer.child.id().to_string();

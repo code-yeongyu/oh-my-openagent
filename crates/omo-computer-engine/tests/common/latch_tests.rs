@@ -116,7 +116,7 @@ fn host_latch_symlink_is_not_followed_and_reads_latch_set() {
 }
 
 fn replay_with_hook(case: &Case, hook: impl Fn(&Path)) {
-    let runtime = tempfile::tempdir().expect("a runtime dir");
+    let runtime = super::peer::runtime_dir();
     host::setup(runtime.path(), case.host.as_ref().expect("a host block"));
     hook(runtime.path());
     let mut bare = case.clone();
@@ -142,7 +142,7 @@ fn rogue_serve_starts_suspended_when_the_live_hosts_latch_is_set() {
     let case = load(&fixture(
         "marker-deleted-host-latch-set-rogue-serve-starts-stopped.json",
     ));
-    let runtime = tempfile::tempdir().expect("a runtime dir");
+    let runtime = super::peer::runtime_dir();
     host::setup(
         runtime.path(),
         case.host.as_ref().expect("the case scripts a host"),

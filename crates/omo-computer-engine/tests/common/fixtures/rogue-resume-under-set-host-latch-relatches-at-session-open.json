@@ -75,6 +75,23 @@
             "/result/reason",
             "/result/stopEpoch"
           ]
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "stopPath.changed",
+            "params": {
+              "suspended": true
+            }
+          },
+          "variable": [
+            "/params/globalLive",
+            "/params/hostRelayLive",
+            "/params/heartbeatFresh",
+            "/params/stopPath",
+            "/params/reason",
+            "/params/stopEpoch"
+          ]
         }
       ]
     },
