@@ -34,7 +34,13 @@ pub enum Mode {
     /// While one client is connected, a second one is refused (the libei socket of a
     /// compositor that admits one emulating client; the X2 SIGKILL leg's mode).
     SecondClientRefused,
+    /// Once the first client is settled its socket is left unread for [`SLOW_READER_STALL`]
+    /// (a compositor busy elsewhere) or until a second client connects; then it is read.
+    SlowReader,
 }
+
+/// How long [`Mode::SlowReader`] leaves its first client unread.
+pub const SLOW_READER_STALL: Duration = Duration::from_secs(2);
 
 /// What the fake announces.
 #[derive(Debug, Clone)]
@@ -65,6 +71,8 @@ pub struct Log {
     pub released_at: Option<Instant>,
     /// The keymap layouts the fake has fed, newest last.
     pub keymaps_fed: u32,
+    /// How many times [`Mode::SlowReader`] stopped reading its client.
+    pub stalls: u32,
 }
 
 /// A command to the server thread.
@@ -174,6 +182,7 @@ fn serve(
     let mut clients: Vec<Client> = Vec::new();
     let mut script = script.clone();
     let mut dropped_once = false;
+    let mut stall_until: Option<Instant> = None;
     loop {
         for command in inbox.try_iter() {
             match command {
@@ -195,7 +204,17 @@ fn serve(
         if let Ok((stream, _)) = listener.accept() {
             accept(stream, &script, &mut clients, log);
         }
-        clients.retain_mut(|client| client.pump(&script, log));
+        if script.mode == Mode::SlowReader
+            && stall_until.is_none()
+            && clients.iter().any(Client::settled)
+        {
+            stall_until = Some(Instant::now() + SLOW_READER_STALL);
+            note(log, |log| log.stalls += 1);
+        }
+        let stalled = clients.len() == 1 && stall_until.is_some_and(|until| Instant::now() < until);
+        if !stalled {
+            clients.retain_mut(|client| client.pump(&script, log));
+        }
         if script.mode == Mode::DropOnce && !dropped_once && clients.iter().any(Client::settled) {
             dropped_once = true;
             clients.clear();

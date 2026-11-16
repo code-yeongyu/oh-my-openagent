@@ -5,8 +5,8 @@ use std::time::{Duration, Instant};
 use omo_computer_core::capabilities::CompositorName;
 use omo_computer_core::error::{EngineCode, Reason};
 
-use super::support::{key, send, Rig, SETTLE, US};
-use crate::fake::Mode;
+use super::support::{key, send, text, Rig, SETTLE, US};
+use crate::fake::{Mode, SLOW_READER_STALL};
 use crate::input::RECONNECT_BACKOFF_MS;
 
 /// The longest a reconnect may take: every backoff step plus one handshake's slack.
@@ -111,4 +111,29 @@ fn libei_reconnect_on_portal_route() {
         "no ConnectToEIS on a closed session"
     );
     assert_eq!(portal.log().dialogs, 1);
+}
+
+#[test]
+fn a_burst_the_server_reads_slowly_is_sent_once_on_the_same_connection() {
+    // Review L3 (#13909): a flush that meets a full socket (EAGAIN) has already sent part of
+    // the burst; resending it on a new connection would type part of it twice.
+    let rig = Rig::new(US, Mode::SlowReader);
+    let mut backend = rig.socket_backend(CompositorName::Mutter);
+    assert!(backend.connect_input().is_ok());
+    assert!(
+        rig.eis.wait_for(SETTLE, |log| log.stalls == 1),
+        "the fake stopped reading its settled client"
+    );
+    // Far more than a unix socket buffers while nobody reads it.
+    let burst = "a".repeat(20_000);
+    let sent = send(&mut backend, &text(&burst));
+    assert!(sent.is_ok(), "the burst goes out once the server reads again: {sent:?}");
+    let expected = burst.len() * 2;
+    assert!(
+        rig.eis.wait_for(SETTLE + SLOW_READER_STALL, |log| log.keys.len() >= expected),
+        "every key reached the fake"
+    );
+    let log = rig.eis.log();
+    assert_eq!(log.connections, 1, "a slow reader is not a lost connection");
+    assert_eq!(log.keys.len(), expected, "every key exactly once, nothing resent");
 }

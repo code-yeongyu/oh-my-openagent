@@ -5,7 +5,7 @@ mod eis;
 mod eis_client;
 mod portal;
 
-pub use eis::{FakeEis, FakeRegion, Log, Mode, Script};
+pub use eis::{FakeEis, FakeRegion, Log, Mode, Script, SLOW_READER_STALL};
 pub use portal::{FakePortal, FakePortalClient, PortalLog};
 
 use crate::clipboard::{ClipboardIo, ClipboardRoute};

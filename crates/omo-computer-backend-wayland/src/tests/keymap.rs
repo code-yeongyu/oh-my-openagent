@@ -116,3 +116,18 @@ fn unresolvable_grapheme_sends_no_libei_event_and_a_following_paste_reads_back()
         "the paste typed nothing either"
     );
 }
+
+#[test]
+fn a_keymap_past_the_size_cap_is_not_read() {
+    // Review L6 (#13909): the declared keymap size is the server's word; past the cap the
+    // engine reads none of it instead of allocating what it was told.
+    let padded = format!("{US}{}", "\0".repeat(2 * 1024 * 1024));
+    let rig = Rig::new(&padded, Mode::Serve);
+    let mut backend = rig.socket_backend(CompositorName::Mutter);
+    assert!(backend.connect_input().is_ok(), "the seat still connects");
+    assert!(
+        backend.input_report().layouts.is_empty(),
+        "a keymap past the cap is not read: {:?}",
+        backend.input_report().layouts
+    );
+}

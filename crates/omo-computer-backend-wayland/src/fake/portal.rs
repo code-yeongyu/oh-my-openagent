@@ -28,6 +28,7 @@ struct Behaviour {
     inheritable: bool,
     clipboard_version: Option<u32>,
     closed: bool,
+    cancel_dialogs: bool,
 }
 
 #[derive(Debug, Default)]
@@ -73,6 +74,11 @@ impl FakePortal {
     #[must_use]
     pub fn with_clipboard(self, version: Option<u32>) -> Self {
         self.with(|shared| shared.behaviour.clipboard_version = version)
+    }
+
+    /// Whether the user answers every consent dialog with Cancel (the portal's `Cancelled`).
+    pub fn cancel_dialogs(&self, cancel: bool) {
+        self.update(|shared| shared.behaviour.cancel_dialogs = cancel);
     }
 
     /// The portal's `Closed` signal for the live session.
@@ -130,6 +136,9 @@ impl RemoteDesktop for FakePortalClient {
             }
             if !honoured {
                 shared.log.dialogs += 1;
+                if shared.behaviour.cancel_dialogs {
+                    return Err(PortalError::Cancelled);
+                }
             }
             let granted = clipboard && shared.behaviour.clipboard_version.is_some();
             shared.log.clipboard_requested_before_start |= granted;
