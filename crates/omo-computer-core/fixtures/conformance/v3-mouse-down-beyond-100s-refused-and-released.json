@@ -273,6 +273,15 @@
               "auditIds": [
                 "13bb943806a2d4ec"
               ],
+              "timings": {
+                "settleMs": 500
+              },
+              "settle": {
+                "outcome": "settled",
+                "quietMs": 500,
+                "waitedMs": 500,
+                "regime": "unchanged"
+              },
               "evidence": [],
               "observation": {
                 "untrustedText": true
@@ -330,6 +339,15 @@
               "auditIds": [
                 "2d9159f3d1b7d329"
               ],
+              "timings": {
+                "settleMs": 500
+              },
+              "settle": {
+                "outcome": "settled",
+                "quietMs": 500,
+                "waitedMs": 500,
+                "regime": "unchanged"
+              },
               "evidence": [],
               "observation": {
                 "untrustedText": true
@@ -385,6 +403,15 @@
               "auditIds": [
                 "a223a4a0d7fefa59"
               ],
+              "timings": {
+                "settleMs": 500
+              },
+              "settle": {
+                "outcome": "settled",
+                "quietMs": 500,
+                "waitedMs": 500,
+                "regime": "unchanged"
+              },
               "evidence": [],
               "observation": {
                 "untrustedText": true

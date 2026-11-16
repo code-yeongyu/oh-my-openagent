@@ -39,6 +39,9 @@ pub(crate) struct WindowRefs {
     pub(crate) needs_observe: bool,
     /// Generations below the first number expired at once for the reason.
     pub(crate) wiped: Option<(u64, Reason)>,
+    /// The element numbers the latest expiry wiped: the only expired numbers that keep an
+    /// owner, so their tokens answer the expiry's reason (ruling R70bx).
+    pub(crate) wiped_numbers: Vec<u64>,
 }
 
 impl WindowRefs {

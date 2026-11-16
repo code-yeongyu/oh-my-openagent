@@ -92,8 +92,29 @@ impl RefRegistry {
         let Some(window) = self.windows.get_mut(window_id) else { return };
         let tops: Vec<u64> = window.generations.values().filter(|g| g.parent.is_none()).map(|g| g.number).collect();
         let keep_from = tops.len().saturating_sub(GENERATIONS_PER_WINDOW);
+        let mut removed = Vec::new();
         for old in tops.into_iter().take(keep_from) {
+            removed.extend(numbers_with_drills(window, old));
             self.retained -= remove_with_drills(window, old);
+        }
+        self.forget_owners(window_id, &removed);
+    }
+
+    /// Drops the owner entries of `removed` (numbers of generations age-out or the LRU prune
+    /// just removed) that no kept generation of `window_id` still holds: the owner map shrinks
+    /// with the generations, so element churn cannot grow it. A dropped number resolves to
+    /// nothing (`StaleRef`), as a pruned one always did. Numbers an expiry wiped keep their
+    /// owner, so their tokens still answer the expiry's reason.
+    fn forget_owners(&mut self, window_id: &str, removed: &[u64]) {
+        let held: std::collections::HashSet<u64> = self
+            .windows
+            .get(window_id)
+            .map(|window| window.generations.values().flat_map(|g| g.entries.iter().map(|entry| entry.n)).collect())
+            .unwrap_or_default();
+        for n in removed {
+            if !held.contains(n) && self.owner.get(n).is_some_and(|owner| owner == window_id) {
+                self.owner.remove(n);
+            }
         }
     }
 
@@ -110,11 +131,24 @@ impl RefRegistry {
                 })
                 .min();
             let Some((_, id, number, _)) = oldest else { break };
+            let mut removed = Vec::new();
             if let Some(window) = self.windows.get_mut(&id) {
+                removed = numbers_with_drills(window, number);
                 self.retained -= remove_with_drills(window, number);
             }
+            self.forget_owners(&id, &removed);
         }
     }
+}
+
+/// The element numbers generation `number` and the drills under it hold.
+fn numbers_with_drills(window: &WindowRefs, number: u64) -> Vec<u64> {
+    window
+        .generations
+        .values()
+        .filter(|g| g.number == number || g.parent == Some(number))
+        .flat_map(|g| g.entries.iter().map(|entry| entry.n))
+        .collect()
 }
 
 /// Removes generation `number` and the drills under it; returns the objects released.

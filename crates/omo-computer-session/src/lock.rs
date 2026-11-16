@@ -1,11 +1,29 @@
 //! `InteractionLock`: the machine-wide input lock under the fixed per-user RUNTIME root.
-//! Every engine process of the uid takes it exclusively around its input dispatch, so two
-//! engines never interleave input. An advisory `flock`, released when the guard drops or
-//! the process dies.
+//! Every engine process of the user takes it exclusively around its input dispatch, so two
+//! engines never interleave input, in any process or logon session of the user (A-IS-65 L1).
+//! It is taken through the session crate's one file-lock helper (`file`): `flock` on unix,
+//! the OS file lock on Windows, on a handle of its own per acquire, released when the guard
+//! drops or the process dies. A failure to create, open or lock the file is an error, and the
+//! funnel refuses with nothing sent (L2); a target with neither arm refuses the same way.
+//!
+//! The funnel's contract (ruling R70cp(1)): a backend's foreground restore completes BEFORE its
+//! send call returns to the funnel, so the guard's drop after the send is a drop after the
+//! restore and the lock is held through activate, act and restore (L1). A backend that
+//! restores later is a defect; the rows that build each OS's restore prove the hold with their
+//! own test (DEFERRED-LEGS, L1).
 
-use std::fs::{File, OpenOptions};
 use std::io;
 use std::path::{Path, PathBuf};
+
+#[cfg(any(windows, test))]
+mod dacl;
+#[cfg(test)]
+mod dacl_tests;
+#[cfg(windows)]
+mod dir;
+pub(crate) mod file;
+#[cfg(test)]
+mod process;
 
 /// The lock file's name under the RUNTIME root.
 pub const LOCK_FILE: &str = "interaction.lock";
@@ -18,7 +36,7 @@ pub struct InteractionLock {
 /// Holds the lock until dropped.
 #[derive(Debug)]
 pub struct LockGuard {
-    _file: File,
+    _held: file::Held,
 }
 
 impl InteractionLock {
@@ -39,9 +57,8 @@ impl InteractionLock {
     /// # Errors
     /// The lock file cannot be opened or locked.
     pub fn acquire(&self) -> io::Result<LockGuard> {
-        let file = self.open()?;
-        flock(&file, false)?;
-        Ok(LockGuard { _file: file })
+        let held = file::lock(self.open()?)?;
+        Ok(LockGuard { _held: held })
     }
 
     /// Takes the lock when it is free; `None` while another holder has it.
@@ -49,46 +66,20 @@ impl InteractionLock {
     /// # Errors
     /// The lock file cannot be opened or locked.
     pub fn try_acquire(&self) -> io::Result<Option<LockGuard>> {
-        let file = self.open()?;
-        match flock(&file, true) {
-            Ok(()) => Ok(Some(LockGuard { _file: file })),
-            Err(error) if error.kind() == io::ErrorKind::WouldBlock => Ok(None),
-            Err(error) => Err(error),
-        }
+        let held = file::try_lock(self.open()?)?;
+        Ok(held.map(|held| LockGuard { _held: held }))
     }
 
-    fn open(&self) -> io::Result<File> {
+    fn open(&self) -> io::Result<std::fs::File> {
         if let Some(dir) = self.path.parent() {
+            // Windows: the lock directory carries L3's protected DACL, read back.
+            #[cfg(windows)]
+            dir::protected_dir(dir)?;
+            #[cfg(not(windows))]
             crate::marker::private_dir(dir)?;
         }
-        let mut options = OpenOptions::new();
-        options.read(true).write(true).create(true).truncate(false);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt;
-            options.mode(0o600).custom_flags(libc::O_NOFOLLOW);
-        }
-        options.open(&self.path)
+        file::open(&self.path)
     }
-}
-
-#[cfg(unix)]
-fn flock(file: &File, nonblocking: bool) -> io::Result<()> {
-    use std::os::unix::io::AsRawFd;
-    let operation = libc::LOCK_EX | if nonblocking { libc::LOCK_NB } else { 0 };
-    // SAFETY: the descriptor is open for the call; flock has no other precondition.
-    let status = unsafe { libc::flock(file.as_raw_fd(), operation) };
-    if status == 0 {
-        Ok(())
-    } else {
-        Err(io::Error::last_os_error())
-    }
-}
-
-#[cfg(not(unix))]
-fn flock(_file: &File, _nonblocking: bool) -> io::Result<()> {
-    // The Windows named-object lock is the Windows lane's (row 60); a file open is enough here.
-    Ok(())
 }
 
 #[cfg(test)]

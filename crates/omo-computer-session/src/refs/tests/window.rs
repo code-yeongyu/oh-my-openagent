@@ -147,3 +147,63 @@ fn heavy_drill_use_keeps_its_parent_observation_through_a_prune() {
     assert!(refs.generation("a", top).is_some(), "the parent stays");
     assert!(refs.generation("b", other).is_none(), "the least recently used observation went");
 }
+
+/// Review L1 of #13368 (at d8305695c6): the registry's owner map is pruned with the window's
+/// generations, so element churn cannot grow it past the numbers the kept generations hold.
+#[test]
+fn element_churn_keeps_the_owner_map_to_the_kept_numbers() {
+    let mut refs = RefRegistry::default();
+    for read in 0..40_u64 {
+        refs.mint(&root("w"), &flat_walk(50, 1_000 * (read + 1)), None);
+    }
+    let held: std::collections::HashSet<u64> = refs.windows["w"]
+        .generations
+        .values()
+        .flat_map(|g| g.entries.iter().map(|e| e.n))
+        .collect();
+    let owned: Vec<u64> = refs.owner.iter().filter(|(_, w)| w.as_str() == "w").map(|(n, _)| *n).collect();
+    assert_eq!(owned.len(), held.len(), "the owner map holds only kept numbers");
+    assert!(owned.iter().all(|n| held.contains(n)));
+}
+
+/// Review L5 of #13391 (at c2a47beb10, ruling R70bx): each window keeps the owner entries of its
+/// LATEST expiry only. A token of that expiry answers `StaleRef` with its reason (pin :120); a
+/// token of an earlier expiry is a pruned token and answers what a pruned token answers (pin
+/// :122). Both carry the same next call, and repeated expiries cannot grow the owner map.
+#[test]
+fn repeated_expiries_keep_only_the_latest_expiry_s_owner_entries() {
+    use omo_computer_core::error::{lookup, FailureKey, Source};
+    let mut refs = RefRegistry::default();
+    let mut tokens = Vec::new();
+    for read in 0..5_u64 {
+        let minted = refs.mint(&root("w"), &flat_walk(20, 10_000 * (read + 1)), None);
+        tokens.push(refs.generation("w", minted.generation).expect("minted").token(1));
+        refs.expire("w", Expiry::Epoch);
+    }
+    let owned = refs.owner.values().filter(|owner| owner.as_str() == "w").count();
+    assert_eq!(owned, 20, "only the latest expiry's 20 numbers keep an owner");
+    let mut tree = Tree::default();
+    let latest = refs.resolve(&tokens[4], true, &mut tree).map_err(|u| u.refusal);
+    let earlier = refs.resolve(&tokens[0], true, &mut tree).map_err(|u| u.refusal);
+    assert_eq!(latest, Err(stale(Reason::Epoch)), "the latest expiry answers its reason");
+    assert_eq!(earlier, Err(Refusal::bare(EngineCode::StaleRef)), "an earlier expiry is a pruned token");
+    let next = |reason| lookup(FailureKey { source: Source::Engine(EngineCode::StaleRef), reason }).map(|row| row.next_call);
+    assert_eq!(next(Some(Reason::Epoch)), next(None), "both answers carry the same next call");
+}
+
+/// Review L1 of #13391 (at 68521dfbec): an expiry that wipes nothing (two epoch moves with no
+/// observe in between, e.g. lock then sleep) keeps the previous expiry's owner entries, so the
+/// window's last real tokens still answer `StaleRef{epoch}` with their reason.
+#[test]
+fn an_expiry_that_wipes_nothing_keeps_the_last_tokens_reason() {
+    let mut refs = RefRegistry::default();
+    let minted = refs.mint(&root("w"), &flat_walk(20, 10_000), None);
+    let token = refs.generation("w", minted.generation).expect("minted").token(1);
+    refs.expire("w", Expiry::Epoch);
+    refs.expire("w", Expiry::Epoch);
+    let owned = refs.owner.values().filter(|owner| owner.as_str() == "w").count();
+    assert_eq!(owned, 20, "the empty expiry did not drop the last expiry's owner entries");
+    let mut tree = Tree::default();
+    let answer = refs.resolve(&token, true, &mut tree).map_err(|u| u.refusal);
+    assert_eq!(answer, Err(stale(Reason::Epoch)), "the last real token keeps its reason");
+}

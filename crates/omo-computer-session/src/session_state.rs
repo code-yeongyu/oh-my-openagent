@@ -63,13 +63,11 @@ pub fn ceiling_refusal(reason: PauseReason) -> Refusal {
         PauseReason::ScreenLocked => {
             Refusal::new(EngineCode::ScreenLocked, Reason::ScreenLocked.wire())
         }
-        PauseReason::SystemSuspended => Refusal::new(
-            EngineCode::SessionInactive,
-            Reason::SystemSuspended.wire(),
-        ),
+        PauseReason::SystemSuspended => {
+            Refusal::new(EngineCode::SessionInactive, Reason::SystemSuspended.wire())
+        }
     }
 }
-
 
 impl crate::Session {
     /// The backend's capabilities with the session state its probes read now and the stop path.

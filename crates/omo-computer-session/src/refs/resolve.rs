@@ -111,13 +111,15 @@ impl RefRegistry {
                 // Live candidates get fresh tokens: rung 3's read is minted as a sub-generation
                 // of the observation the resolve started from, as a drill of its root is.
                 if let Some((root, walk)) = read {
-                    let anchor = self.generation(&window, top).map(|g| g.entries[0].identity.clone());
-                    if let Some(anchor) = anchor {
+                    // One lookup gives the anchor and the STORED window key: the sub-generation is
+                    // minted under the stored key, as observe's drill does (a drill mint skips the
+                    // identity check), so no path can mint it under the live key.
+                    let started = self
+                        .generation(&window, top)
+                        .map(|g| (g.entries[0].identity.clone(), g.window.clone()));
+                    if let Some((anchor, stored)) = started {
                         let drilled = Drilled { top, from: top, index: 0, identity: &anchor };
-                        // Under the STORED window key, as observe's drill does: a drill mint skips
-                        // the identity check, so the live key must never rebind the window here.
-                        let stored = self.generation(&window, top).map(|g| g.window.clone());
-                        let root = RootRead { window: stored.unwrap_or(root.window), ..root };
+                        let root = RootRead { window: stored, ..root };
                         let sub = self.mint(&root, &walk, Some(drilled)).generation;
                         for candidate in &mut candidates {
                             candidate.at = candidate.node.map(|node| (sub, node));

@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::lease::{is_live, write_new, Holder, SessionToken};
+use crate::lease::{is_live, replace, Holder, SessionToken};
 
 /// How long a reservation outlives the report of the call that took it.
 pub const AFTER_REPORT_MS: u64 = 10_000;
@@ -32,6 +32,15 @@ pub struct WindowBusy {
     pub window: String,
     pub holder: Holder,
     pub retry_after_ms: u64,
+}
+
+/// Why a window reservation was not taken.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AdmitRefusal {
+    /// Another live session holds a window.
+    Busy(WindowBusy),
+    /// The machine-wide record lock cannot be taken (A-IS-65 L2: its own refusal, never busy).
+    LockUnavailable,
 }
 
 impl WindowBusy {
@@ -56,9 +65,27 @@ impl Reservations {
     /// Reserves every window in `windows` for this session until its report.
     ///
     /// # Errors
-    /// The first window another live session holds at `now_ms`; nothing is reserved then.
-    pub fn admit(&mut self, token: &SessionToken, windows: &[String], now_ms: u64) -> Result<(), WindowBusy> {
-        self.check(token, windows, now_ms)?;
+    /// The first window another live session holds at `now_ms`, or the record lock cannot be
+    /// taken; nothing is reserved then.
+    pub fn admit(
+        &mut self,
+        token: &SessionToken,
+        windows: &[String],
+        now_ms: u64,
+    ) -> Result<(), AdmitRefusal> {
+        // A call that reserves no window takes no lock (review L10).
+        if windows.is_empty() {
+            return Ok(());
+        }
+        // Check-then-take under the machine-wide record lock, so two sessions never both take one
+        // window. A lock that cannot be taken refuses on its own terms (fail closed, review L4;
+        // never a busy window naming this session, review L10).
+        let _locked = token
+            .dir()
+            .map(crate::lease::dir_lock)
+            .transpose()
+            .map_err(|_| AdmitRefusal::LockUnavailable)?;
+        self.check(token, windows, now_ms).map_err(AdmitRefusal::Busy)?;
         for window in windows {
             self.put(token, window, None);
         }
@@ -69,7 +96,12 @@ impl Reservations {
     ///
     /// # Errors
     /// The first window another live session holds at `now_ms`.
-    pub fn check(&self, token: &SessionToken, windows: &[String], now_ms: u64) -> Result<(), WindowBusy> {
+    pub fn check(
+        &self,
+        token: &SessionToken,
+        windows: &[String],
+        now_ms: u64,
+    ) -> Result<(), WindowBusy> {
         windows
             .iter()
             .find_map(|window| self.busy(token, window, now_ms))
@@ -78,6 +110,10 @@ impl Reservations {
 
     /// The report went out: the reservations run on for [`AFTER_REPORT_MS`].
     pub fn report(&mut self, token: &SessionToken, windows: &[String], now_ms: u64) {
+        // Read-then-write under the record lock (review L4); without it, write nothing.
+        let Ok(_locked) = token.dir().map(crate::lease::dir_lock).transpose() else {
+            return;
+        };
         for window in windows {
             if self.mine(token, window) {
                 self.put(token, window, Some(now_ms.saturating_add(AFTER_REPORT_MS)));
@@ -92,6 +128,11 @@ impl Reservations {
 
     /// Releases this session's reservation of `window` at once.
     pub fn release(&mut self, token: &SessionToken, window: &str) {
+        // Read-then-delete under the record lock (review L4): a record another session took in the
+        // meantime is never removed. Without the lock nothing is removed (fail closed).
+        let Ok(_locked) = token.dir().map(crate::lease::dir_lock).transpose() else {
+            return;
+        };
         if self.mine(token, window) {
             self.memory.remove(window);
             if let Some(dir) = token.dir() {
@@ -131,7 +172,8 @@ impl Reservations {
     }
 
     fn mine(&self, token: &SessionToken, window: &str) -> bool {
-        self.record(token, window).is_some_and(|r| r.holder == *token.holder())
+        self.record(token, window)
+            .is_some_and(|r| r.holder == *token.holder())
     }
 
     fn record(&self, token: &SessionToken, window: &str) -> Option<Record> {
@@ -149,8 +191,7 @@ impl Reservations {
         if let Some(dir) = token.dir() {
             let path = record_path(dir, window);
             let _ = fs::create_dir_all(dir.join("windows"));
-            let _ = fs::remove_file(&path);
-            let _ = write_new(&path, &serde_json::to_vec(&record).unwrap_or_default());
+            let _ = replace(&path, &serde_json::to_vec(&record).unwrap_or_default());
         }
         self.memory.insert(window.to_owned(), record);
     }
@@ -159,7 +200,13 @@ impl Reservations {
 fn record_path(dir: &Path, window: &str) -> PathBuf {
     let safe: String = window
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
     dir.join("windows").join(format!("{safe}.json"))
 }

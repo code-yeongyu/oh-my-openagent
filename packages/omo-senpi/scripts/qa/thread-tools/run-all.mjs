@@ -52,6 +52,7 @@ const gateway = [
   ["binding-author", "binding-author.mjs"],
   ["report-origin", "report-origin.mjs"],
   ["report-origin-steer", "report-origin-steer.mjs"],
+  ["report-origin-auto-steer", "report-origin-auto-steer.mjs"],
 ]
 
 const legacy = [
