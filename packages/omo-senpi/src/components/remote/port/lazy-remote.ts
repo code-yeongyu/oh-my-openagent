@@ -117,13 +117,13 @@ export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThrea
   const { client, loaded } = createLazyRemoteClient({ ...options, loadRuntime })
   let port: Promise<RemoteSessionsPort> | undefined
   const load = () =>
-    (port ??= loadRuntime().then(
-      async ({ remoteSessionsPort }) => remoteSessionsPort(options.version, await loaded()),
-      (error: unknown) => {
+    (port ??= loadRuntime()
+      .then(async ({ remoteSessionsPort }) => remoteSessionsPort(options.version, await loaded()))
+      .catch((error: unknown) => {
+        // Any failed load, the client's or the port factory's included, is not kept.
         port = undefined
         throw error
-      },
-    ))
+      }))
   const sessions: RemoteSessionsPort = {
     status: async () => await (await load()).status(),
     thisDevice: async () => await (await load()).thisDevice(),

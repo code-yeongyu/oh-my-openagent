@@ -276,6 +276,7 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
     })
 
   let built: RemoteClient | undefined
+  let closed = false
   const self = (): RemoteClient => {
     if (built === undefined) throw new Error("the remote client was used before it was built")
     return built
@@ -366,6 +367,7 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
     attach: attachMember(core),
     aliases: aliasMembers(core),
     close: () => {
+      closed = true
       const open = service
       service = undefined
       void open?.then(
@@ -374,13 +376,19 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
       )
     },
   }
-  // The thread runtime's port rides this client's one connection (connection-of.ts); a failure to open it throws, as a
-  // port connect does.
-  lendConnection(built, async () => {
-    const opened = await connected(undefined)
-    if (opened === "not_installed") throw new Error("The device service is not installed on this device.")
-    if (opened.kind === "error") throw new Error(opened.message)
-    return opened.value
+  // The thread runtime's port rides this client's one connection (connection-of.ts). A connect failure is thrown as the
+  // port's own connect throws it (the typed local-API error), and a closed client opens nothing again.
+  lendConnection(built, {
+    shared: async () => {
+      if (closed) throw new Error("The remote client is closed.")
+      if (!existsSync(deviceServiceEndpointPath(stateDir)))
+        throw new Error("The device service is not installed on this device.")
+      return await connection()
+    },
+    dial: async () => {
+      if (closed) throw new Error("The remote client is closed.")
+      return await dial()
+    },
   })
   return built
 }

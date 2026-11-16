@@ -1,7 +1,8 @@
+import { userInfo } from "node:os"
 import { createServiceAliasRegistry, type ServiceAccess } from "../../thread/remote/alias-registry"
 import type { RemoteSessionsPort, RemoteThreadSurface } from "../../thread/remote/ports"
 import type { RemoteClient } from "../client"
-import { connectionOf } from "../connection-of"
+import { connectionOf, dialOf } from "../connection-of"
 import {
   remoteClientForCli,
   remoteClientForConnector,
@@ -19,7 +20,11 @@ import { createLazyRemoteSurface } from "./lazy-remote"
 
 // The port borrows the client's shared connection (#13768 L3): one connection per engine, closed by the client.
 export const remoteSessionsPort = (version: string, client: RemoteClient): RemoteSessionsPort =>
-  createDeviceServiceSessions({ version, connect: async () => ({ conn: await connectionOf(client), owned: false }) })
+  createDeviceServiceSessions({
+    version,
+    connect: async () => ({ conn: await connectionOf(client), owned: false }),
+    dialEndpoint: async () => ({ conn: await dialOf(client), owned: true }),
+  })
 
 // Built through its sender's factory, as every client is (remote/index.ts).
 export function remoteClient(version: string, sender: RemoteSender): RemoteClient {
@@ -29,6 +34,8 @@ export function remoteClient(version: string, sender: RemoteSender): RemoteClien
     case "cli":
       return remoteClientForCli(sender.uid, { version })
     case "person":
+      // A person client acts as the OS user running this process; any other uid is refused, never silently replaced.
+      if (sender.uid !== String(userInfo().uid)) throw new Error("A person client is built for the user running omo.")
       return remoteClientForPerson({ version })
     case "connector":
       return remoteClientForConnector(sender.binding, { version })
