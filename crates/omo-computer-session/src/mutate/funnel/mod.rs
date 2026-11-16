@@ -187,6 +187,8 @@ impl Session {
         // Row 21 on #13391's re-admit (R70bg(2)): the stop is reconciled through the funnel, the
         // epoch is read fresh and the gate runs on a fresh plan's stages, so a stop or a consent
         // change while another holder kept the lock refuses here too.
+        // A-IS-62 R7-2: the hand's audit is read once the lock is held, before the re-admission.
+        self.read_audit_mark();
         if let Err(refused) = self.readmit(&mutation) {
             let (stage, out) = *refused;
             drop(lock);

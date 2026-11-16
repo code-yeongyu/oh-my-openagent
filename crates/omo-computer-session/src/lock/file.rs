@@ -19,14 +19,6 @@ pub struct Held {
     file: File,
 }
 
-impl Held {
-    /// The locked handle (the audit writer appends through it on unix).
-    #[cfg_attr(not(unix), allow(dead_code))]
-    pub(crate) const fn file(&self) -> &File {
-        &self.file
-    }
-}
-
 impl Drop for Held {
     fn drop(&mut self) {
         if let Err(error) = os::unlock(&self.file) {

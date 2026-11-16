@@ -6,6 +6,7 @@
 //! and revoked the moment the session leaves full access. Any stop revokes; resume never
 //! restores.
 
+mod audit_mark;
 mod host;
 mod lease_hook;
 mod state;

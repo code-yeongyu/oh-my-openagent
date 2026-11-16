@@ -46,7 +46,7 @@ pub fn launch(vars: Vec<(String, String)>) -> Result<Launched, String> {
             read_host_view(|name| host_vars.iter().find(|(key, _)| key == name).map(|(_, v)| v.clone()), fake)
         }),
     };
-    let session = match (&ctx.fake_clock, test_clock) {
+    let mut session = match (&ctx.fake_clock, test_clock) {
         (Some(clock), true) => {
             let clock = clock.clone();
             Session::for_roots_clocked(launched.backend, &roots, move || clock.now_ms())
@@ -54,6 +54,9 @@ pub fn launch(vars: Vec<(String, String)>) -> Result<Launched, String> {
         _ => Session::for_roots(launched.backend, &roots),
     }
     .with_generation(crate::router::GENERATION);
+    // A-IS-62 R7-2: the hand's audit is read at engine start, before any session opens, in
+    // every entry mode that builds a session here (--stdio, --oneshot, --mcp).
+    session.read_audit_at_start();
     Ok(Launched {
         router: Router::new(session, ctx),
         pace: fake && !test_clock,
