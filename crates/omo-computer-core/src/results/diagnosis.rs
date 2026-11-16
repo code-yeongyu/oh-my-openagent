@@ -103,4 +103,26 @@ pub struct Diagnosis {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub release_helper: Option<ReleaseHelper>,
     pub observation: UntrustedText,
+    /// R62: a backend's own doctor checks that are not permissions (an X11 display, the
+    /// accessibility bus, MPX, the compositor). They never feed `ok`; absent when there are none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub checks: Vec<ProbeCheck>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum ProbeState {
+    Ok,
+    Unavailable,
+    Unknown,
+}
+
+/// R62: one backend doctor check, e.g. `{name: "ax_bus", state: "unavailable", reason: "unreachable"}`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ProbeCheck {
+    pub name: String,
+    pub state: ProbeState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
 }

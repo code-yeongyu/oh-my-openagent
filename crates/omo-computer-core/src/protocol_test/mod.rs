@@ -141,6 +141,7 @@ const ALLOWLIST: &[(&str, Effect, Exposure)] = &[
     ("stopPath.stop", R, P),
     ("stopPath.resume", X, A),
     ("desktop.shutdown", X, A),
+    ("hand.register", X, A),
     ("$/cancel", R, P),
     ("$/test.advanceClock", X, T),
 ];
@@ -197,6 +198,7 @@ fn host_only_methods_are_split_by_peer_kind() {
         "stopPath.start",
         "stopPath.resume",
         "desktop.shutdown",
+        "hand.register",
     ];
     authority.sort_unstable();
     assert_eq!(named(S), session);

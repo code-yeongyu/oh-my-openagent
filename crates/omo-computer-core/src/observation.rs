@@ -3,6 +3,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::ax::DiffFallback;
 use crate::listing::{ElementInfo, Rect};
 use crate::session_state::SessionState;
 use crate::untrusted::UntrustedText;
@@ -34,6 +35,14 @@ pub struct FrameArtifact {
     pub ttl_ms: u64,
 }
 
+/// What a frame's pixels had masked. Frames are declared unredacted (G3): only `none` exists, and
+/// a desktop or display frame says so, so no caller believes a secure field on it was masked (IS-6).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum FrameRedaction {
+    None,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Frame {
@@ -49,6 +58,9 @@ pub struct Frame {
     pub path: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub artifact: Option<FrameArtifact>,
+    /// Row 26 (plan owner 2026-11-16): present on a desktop or display frame, always `none`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub redaction: Option<FrameRedaction>,
     pub session: SessionState,
     pub observation: UntrustedText,
 }
@@ -88,6 +100,9 @@ pub struct ObservationSettle {
     pub indicator: Option<BusyIndicator>,
     pub quiet_ms: u64,
     pub waited_ms: u64,
+    /// The regime of `settle_profile` the engine picked.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub regime: Option<crate::settle_profile::SettleRegime>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -119,6 +134,12 @@ pub struct Observation {
     pub tree: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub diff: Option<String>,
+    /// Why a read that named `since` answered the full tree.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub diff_fallback: Option<DiffFallback>,
+    /// The generation `diff` is against.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub baseline: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub focused: Option<ElementInfo>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -131,6 +152,9 @@ pub struct Observation {
     pub observation: UntrustedText,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub secure: Option<bool>,
+    /// Row 26 (R70f(1), R70g(1)): present only when `secure` is true; names the user.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_call: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub settle: Option<ObservationSettle>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -37,6 +37,8 @@
     "README.md: omo doctor x2",
     "README.ru.md: omo doctor",
     "README.zh-cn.md: omo doctor",
+    "crates/omo-computer-core/parity/DEFERRED-LEGS.tsv: omo doctor",
+    "crates/omo-computer-core/src/diagnose.rs: omo doctor x2",
     "docs/guide/binary-install.md: /bin/omo",
     "docs/guide/computer-use.md: omo doctor",
     "docs/guide/install.md: /bin/omo x5",

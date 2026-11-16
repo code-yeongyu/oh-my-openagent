@@ -11,6 +11,10 @@
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
         "vitest.config.ts",
+        // the row 38 QA driver (cu-v3 plan: packages/omo-computer-engine/scripts/qa-locator.ts)
+        "scripts/qa-locator.ts",
+        // the release's pin generator (#13877 L2): writes src/release-digests.ts from the published checksums file
+        "scripts/pin-release-digests.ts",
       ],
     }
   },
