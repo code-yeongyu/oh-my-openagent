@@ -8,6 +8,7 @@ import { git } from "../concurrency/two-process-kit.test-support"
 import { buildIdentityPaths } from "../identity"
 import { acquireLock, createLockRecord, memoryWriterLockPath, releaseLock } from "../locks"
 import type { GitLockScans } from "./lock-scans"
+import { holdGitActivityShared } from "./git-activity-lock"
 import { type KeptGitLockReason, STALE_LOCK_JOURNAL, sweepStrandedGitLockFiles } from "./repo-lock-sweep"
 import { disableFixtureAutoMaintenance } from "./test-repo-config.test-support"
 
@@ -139,3 +140,34 @@ for (const kept of keptCases) {
     }
   })
 }
+
+test("#given a stale ownerless index.lock #when the sweep runs without holding the memory-write lock #then the lock is kept", async () => {
+  const fixture = await repoWithStaleLock(70 * 60_000)
+  await fixture.release()
+
+  const report = await sweepStrandedGitLockFiles(fixture.repo, 0, idleScans, {
+    staleAgeMs: 10 * 60_000,
+    staleSettleMs: 0,
+  })
+
+  expect(report.removed).toEqual([])
+  expect(report.kept).toEqual([{ path: fixture.lock, reason: "owner-not-proven-dead" }])
+})
+
+test("#given a stale ownerless index.lock #when a memory-core git process holds the git-activity lock #then the lock is kept as repo-in-use", async () => {
+  const fixture = await repoWithStaleLock(70 * 60_000)
+  const hold = await holdGitActivityShared(fixture.repo)
+  if (hold === null) throw new Error("the fixture could not take the git-activity lock")
+  try {
+    const report = await sweepStrandedGitLockFiles(fixture.repo, 0, idleScans, {
+      staleAgeMs: 10 * 60_000,
+      staleSettleMs: 0,
+    })
+
+    expect(report.removed).toEqual([])
+    expect(report.kept).toEqual([{ path: fixture.lock, reason: "repo-in-use" }])
+  } finally {
+    await hold.release()
+    await fixture.release()
+  }
+})

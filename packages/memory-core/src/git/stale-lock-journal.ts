@@ -19,7 +19,9 @@ export async function removeJournaled(
   kept: KeptGitLock[],
 ): Promise<GitLockSweepReport> {
   const { ageMs, before } = facts
+  const journal = join(locksDir, STALE_LOCK_JOURNAL)
   const entry = {
+    outcome: "removing",
     at: new Date().toISOString(),
     path: indexLock,
     ageMs,
@@ -27,10 +29,16 @@ export async function removeJournaled(
     size: before.size,
     checks: { repoUsers: 0, openHolders: 0, unchangedForMs: facts.settleMs },
   }
-  await appendFile(join(locksDir, STALE_LOCK_JOURNAL), `${JSON.stringify(entry)}\n`, { mode: 0o600 })
+  await appendFile(journal, `${JSON.stringify(entry)}\n`, { mode: 0o600 })
   try {
     await unlink(indexLock)
   } catch {
+    // The intent line stays; this one says the lock was kept, so status counts only real removals.
+    await appendFile(
+      journal,
+      `${JSON.stringify({ outcome: "unlink-failed", at: new Date().toISOString(), path: indexLock })}\n`,
+      { mode: 0o600 },
+    ).catch(() => undefined)
     return keep("unlink-failed")
   }
   return { removed: [indexLock], kept }

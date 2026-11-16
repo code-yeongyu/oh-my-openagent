@@ -64,21 +64,41 @@ const memfsStatus: MemfsSubcommand = async ({ deps, ctx, identity }) => {
 async function renderStaleLockRemovals(locksDir: string): Promise<string | undefined> {
   const text = await readFile(join(locksDir, STALE_LOCK_JOURNAL), "utf8").catch(() => null)
   if (text === null) return undefined
-  const removals = text
+  const entries = text
     .split("\n")
     .filter((line) => line.trim().length > 0)
-    .flatMap((line): { at: string; ageMs: number }[] => {
+    .flatMap((line): { outcome: string; at: string; path: string; ageMs: number | undefined }[] => {
       try {
         const entry: unknown = JSON.parse(line)
         if (typeof entry !== "object" || entry === null) return []
-        const { at, ageMs } = entry as { at?: unknown; ageMs?: unknown }
-        return typeof at === "string" && typeof ageMs === "number" ? [{ at, ageMs }] : []
+        const { outcome, at, path, ageMs } = entry as {
+          outcome?: unknown
+          at?: unknown
+          path?: unknown
+          ageMs?: unknown
+        }
+        if (typeof at !== "string" || typeof path !== "string") return []
+        return [
+          {
+            outcome: typeof outcome === "string" ? outcome : "removing",
+            at,
+            path,
+            ageMs: typeof ageMs === "number" ? ageMs : undefined,
+          },
+        ]
       } catch {
         return []
       }
     })
+  // An intent line followed by an "unlink-failed" line for the same lock was not a removal.
+  const removals = entries.filter(
+    (entry, index) =>
+      entry.outcome === "removing" &&
+      !(entries[index + 1]?.outcome === "unlink-failed" && entries[index + 1]?.path === entry.path) &&
+      entry.ageMs !== undefined,
+  )
   const last = removals.at(-1)
-  if (last === undefined) return undefined
+  if (last === undefined || last.ageMs === undefined) return undefined
   return `Stale index.lock removed: ${removals.length} (last ${last.at}, ${Math.round(last.ageMs / 60_000)} min old)`
 }
 

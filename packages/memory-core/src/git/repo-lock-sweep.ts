@@ -39,8 +39,6 @@ export interface StaleIndexLockPolicy {
 
 export const STALE_INDEX_LOCK_POLICY: StaleIndexLockPolicy = { staleAgeMs: 10 * 60_000, staleSettleMs: 60_000 }
 
-/** One line per index.lock the writer removed without an owner proof, next to the identity's locks. */
-
 export interface KeptGitLock {
   readonly path: string
   readonly reason: KeptGitLockReason
@@ -134,6 +132,15 @@ export function writerLockPathForRepo(repoDir: string): string | null {
   return locksDir === null ? null : memoryWriterLockPath(locksDir)
 }
 
+// The ownerless index.lock path (#13808) runs only while this process holds the identity's memory-write lock.
+async function callerHoldsWriterLock(repoDir: string): Promise<boolean> {
+  const writerLockPath = writerLockPathForRepo(repoDir)
+  if (writerLockPath === null) return false
+  const raw = await readFile(writerLockPath, "utf8").catch(() => undefined)
+  const current = raw === undefined ? null : parseLockRecord(raw)
+  return current !== null && current.pid === process.pid && current.hostname === hostname()
+}
+
 // The sweep's contract changed with omo #10199 review HIGH 1: a git process killed
 // mid-transaction strands lock files it can never remove, but so does a LIVE writer in the
 // windows where git already closed the lock fd (commit's prepare_index, the files ref backend's
@@ -149,14 +156,6 @@ export function writerLockPathForRepo(repoDir: string): string | null {
 // takeover published (omo #10199 r5 MEDIUM 3), so a released takeover or another lock's proof
 // never authorizes anything.
 // Returns the proven-dead previous owner that authorizes this sweep, or null.
-async function callerHoldsWriterLock(repoDir: string): Promise<boolean> {
-  const writerLockPath = writerLockPathForRepo(repoDir)
-  if (writerLockPath === null) return false
-  const raw = await readFile(writerLockPath, "utf8").catch(() => undefined)
-  const current = raw === undefined ? null : parseLockRecord(raw)
-  return current !== null && current.pid === process.pid && current.hostname === hostname()
-}
-
 async function authorizedPreviousOwner(repoDir: string): Promise<LockRecord | null> {
   const writerLockPath = writerLockPathForRepo(repoDir)
   if (writerLockPath === null) return null

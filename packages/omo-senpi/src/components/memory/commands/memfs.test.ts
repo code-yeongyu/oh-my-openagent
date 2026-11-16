@@ -51,6 +51,24 @@ async function backupNames(root: string): Promise<string[]> {
 }
 
 describe("/memfs status", () => {
+  test("#given a removal whose unlink failed #when status runs #then it is not counted as removed", async () => {
+    const { identity, pi, ctx } = await harness()
+    await mkdir(identity.identityPaths.locks, { recursive: true })
+    const path = join(identity.identityPaths.repo, ".git", "index.lock")
+    const lines = [
+      { outcome: "removing", at: "2026-11-16T08:55:00.000Z", path, ageMs: 70 * 60_000 },
+      { outcome: "unlink-failed", at: "2026-11-16T08:55:00.100Z", path },
+    ]
+    await writeFile(
+      join(identity.identityPaths.locks, STALE_LOCK_JOURNAL),
+      lines.map((l) => `${JSON.stringify(l)}\n`).join(""),
+    )
+
+    const text = await invoke(pi, "memfs", "status", ctx)
+
+    expect(text).not.toContain("Stale index.lock removed")
+  })
+
   test("#given the writer removed a stale index.lock #when status runs #then the removal is shown with its age", async () => {
     const { identity, pi, ctx } = await harness()
     await mkdir(identity.identityPaths.locks, { recursive: true })
