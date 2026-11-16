@@ -1,3 +1,4 @@
+use omo_computer_core::error::Reason;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -211,7 +212,7 @@ fn acquire_runs_the_grant_and_latch_checks_before_taking_the_slot() {
     let mut never = session(&json!({ "object": true, "consent": { "foreground": "never" } }), &sink, None);
     never.control_grant(params(json!({ "reason": "r" })));
     let refused = never.control_acquire().expect_err("consent says never");
-    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("ControlRequired", Some("foreground")));
+    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("ControlRequired", Some(Reason::Foreground)));
     assert!(!never.holds_lease(), "no slot taken");
     assert!(!sink.lines().iter().any(|line| line.contains("presence show")), "{:?}", sink.lines());
 
@@ -242,7 +243,7 @@ fn acquire_refuses_a_tampered_or_consent_less_hand() {
         s.control_grant(params(json!({ "reason": "r" })));
         let refused = s.control_acquire().expect_err("the hand may not take the foreground slot");
         assert_eq!(refused.refusal.code.wire(), "ControlRequired", "{consent}");
-        assert_eq!(refused.refusal.reason, Some("tampered"), "{consent}");
+        assert_eq!(refused.refusal.reason, Some(Reason::Tampered), "{consent}");
         assert!(!s.holds_lease(), "{consent}: no slot taken");
         assert!(!sink.lines().iter().any(|line| line.contains("presence show")), "{consent}: {:?}", sink.lines());
     }

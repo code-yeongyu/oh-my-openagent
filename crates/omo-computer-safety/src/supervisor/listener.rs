@@ -27,7 +27,7 @@ pub(super) enum Slot {
 }
 
 fn is_deaf(refusal: &omo_computer_core::backend::Refusal) -> bool {
-    refusal.code == EngineCode::StopPathUnavailable && refusal.reason == Some(Reason::Deaf.wire())
+    refusal.code == EngineCode::StopPathUnavailable && refusal.reason == Some(Reason::Deaf)
 }
 
 /// What a deaf arm leaves in the slot: a listener that exists and cannot hear, so gate 2 refuses
@@ -38,7 +38,7 @@ impl StopListener for Unhearing {
     fn poll_stop(&mut self) -> BackendResult<bool> {
         Err(omo_computer_core::backend::Refusal::new(
             EngineCode::StopPathUnavailable,
-            Reason::Deaf.wire(),
+            Reason::Deaf,
         ))
     }
 }

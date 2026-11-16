@@ -26,7 +26,7 @@ describe("thread_set_model on another device", () => {
         "session",
         "b",
         "rk-on-b",
-        { type: "set_model", sessionId: "rk-on-b", provider: "anthropic", modelId: "claude-opus" },
+        { type: "set_model", sessionId: "rk-on-b", provider: "anthropic", modelId: "claude-opus", scope: "session" },
       ],
     ])
   })
@@ -38,6 +38,25 @@ describe("thread_set_model on another device", () => {
     expect(result).toMatchObject({ kind: "error", error: { code: "scope_denied" } })
     expect(a.sent.map((entry) => entry.rpc?.["type"])).toEqual(["get_available_models"])
   })
+})
+
+describe("thread_set_reasoning on another device", () => {
+  test.each([undefined, "session", "turn"] as const)(
+    "#given a thread on b #when thread_set_reasoning runs with scope %s #then set_thinking_level goes to b's session scoped to that session, never to b's remembered level for the model",
+    async (scope) => {
+      const a = account()
+      const { run } = surface(a.remote)
+      const result = await run("thread_set_reasoning", {
+        thread: "dur-on-b",
+        level: "high",
+        ...(scope === undefined ? {} : { scope }),
+      })
+      expect(result).toMatchObject({ kind: "ok", thread_id: "dur-on-b", level: "high", scope: scope ?? "session" })
+      expect(a.sent.map((entry) => [entry.via, entry.device, entry.session, entry.rpc])).toEqual([
+        ["session", "b", "rk-on-b", { type: "set_thinking_level", sessionId: "rk-on-b", level: "high", scope: "turn" }],
+      ])
+    },
+  )
 })
 
 describe("SC-R8: from this device on another (create, list, open, status, prompt, abort, fork)", () => {

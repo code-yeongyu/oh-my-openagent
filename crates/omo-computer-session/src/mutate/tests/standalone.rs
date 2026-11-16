@@ -3,6 +3,7 @@
 //! driver runs it, so no case depends on what an earlier run left behind. A case a later row
 //! superseded replays through its newest replacement.
 
+use omo_computer_core::error::Reason;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -171,7 +172,7 @@ fn check(outcome: Result<ExecReply, Refused>, expected: &Value, at: &str) {
             let data = &expected["error"]["data"];
             assert_eq!(json!(refused.refusal.code.wire()), data["code"], "{at}");
             assert_eq!(
-                json!(refused.refusal.reason),
+                json!(refused.refusal.reason.map(Reason::wire)),
                 data.get("reason").cloned().unwrap_or(Value::Null),
                 "{at}"
             );

@@ -21,7 +21,7 @@ use crate::diagnose::{probes, BusReach, CompositorRead, HostReads, Uinput};
 use crate::X11Backend;
 
 fn deaf() -> Refusal {
-    Refusal::new(EngineCode::StopPathUnavailable, Reason::Deaf.wire())
+    Refusal::new(EngineCode::StopPathUnavailable, Reason::Deaf)
 }
 
 fn backend(keys: &FakeKeys) -> X11Backend<FakeX> {

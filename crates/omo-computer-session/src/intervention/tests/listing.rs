@@ -6,7 +6,7 @@ use omo_computer_core::backend::{
     WindowList,
 };
 use omo_computer_core::capabilities::Capabilities;
-use omo_computer_core::error::EngineCode;
+use omo_computer_core::error::{EngineCode, Reason};
 use omo_computer_core::intervention::{BackendClock, InterventionSource};
 
 use super::*;
@@ -23,7 +23,7 @@ impl Backend for ListingFails {
     }
     fn windows(&mut self, filter: &WindowFilter) -> BackendResult<WindowList> {
         if self.fail {
-            return Err(Refusal::new(EngineCode::Internal, "windows_unsupported"));
+            return Err(Refusal::new(EngineCode::Internal, Reason::WindowsUnsupported));
         }
         self.inner.windows(filter)
     }

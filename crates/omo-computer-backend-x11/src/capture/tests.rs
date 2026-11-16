@@ -105,12 +105,12 @@ fn minimized_and_unmapped_windows_refuse_typed() {
     server.windows[0].minimized = true;
     let capture = X11Capture::new(server, None);
     let refusal = capture.capture_frame(&Target::Window("7".into()), &options(false)).unwrap_err();
-    assert_eq!(refusal, Refusal::new(EngineCode::CaptureUnavailable, Reason::Minimized.wire()));
+    assert_eq!(refusal, Refusal::new(EngineCode::CaptureUnavailable, Reason::Minimized));
     let mut server = occluded();
     server.windows[0].viewable = false;
     let capture = X11Capture::new(server, None);
     let refusal = capture.capture_frame(&Target::Window("7".into()), &options(false)).unwrap_err();
-    assert_eq!(refusal, Refusal::new(EngineCode::CaptureUnavailable, Reason::Unmapped.wire()));
+    assert_eq!(refusal, Refusal::new(EngineCode::CaptureUnavailable, Reason::Unmapped));
     let refusal = capture.capture_frame(&Target::Window("99".into()), &options(false)).unwrap_err();
     assert_eq!(refusal, Refusal::bare(EngineCode::WindowNotFound));
 }
