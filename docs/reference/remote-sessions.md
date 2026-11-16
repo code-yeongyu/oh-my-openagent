@@ -76,7 +76,8 @@ Remote is turning on for this device in the background. Check: omo remote status
 
 The background enable installs the service and then switches remote sessions on. Check how far it got with
 `omo remote status`. To turn remote off, run `omo remote disable`, even while the background enable is still running:
-the enable sees the record and leaves remote off.
+the enable reads the record after its install and again after it switches remote on, so a disable that lands at any
+point leaves remote off.
 
 Every omo start then keeps the device set up (`omo remote bootstrap`). `omo remote disable` turns remote sessions
 off and records that in `~/.omo/remote-sessions.json`, so neither `omo login` nor an omo start turns them on again;

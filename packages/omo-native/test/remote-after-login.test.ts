@@ -56,6 +56,72 @@ describe("the background enable omo login starts", () => {
     expect([owners[0]?.state.status.enabled, record.off, record.clears]).toEqual([false, true, 0])
   })
 
+  // #13762 review L1: a disable that lands right after the enable's re-read (it records the opt-out and switches the
+  // service off) and before the enable's switch-on. The hook runs inside that re-read, so the order is fixed, not timed.
+  test("a disable between its re-read and its switch-on: the switch ends off, the unit removed, the opt-out kept", async () => {
+    const stateDir = privateDir()
+    const { record, optOut } = optOutRecord()
+    let reads = 0
+    const disableAfterFirstRead = {
+      ...optOut,
+      read: () => {
+        const off = optOut.read()
+        reads += 1
+        if (reads === 1) {
+          record.off = true
+          const owner = owners[0]
+          if (owner !== undefined) owner.state.status = { ...owner.state.status, enabled: false, state: "disabled" }
+        }
+        return off
+      },
+    }
+    const { code, out, coldWake } = await run(
+      ["enable", AFTER_LOGIN_FLAG, "--json"],
+      stateDir,
+      SIGNED_IN,
+      testBootstrap({
+        install: async () => {
+          owners.push(await startFakeOwner({ stateDir, world: defaultWorld() }))
+          return { ok: true }
+        },
+      }),
+      undefined,
+      { optOut: disableAfterFirstRead },
+    )
+    expect([code, out.map((line) => JSON.parse(line)), coldWake]).toEqual([
+      REMOTE_EXIT.ok,
+      [{ enabled: false }],
+      ["uninstall"],
+    ])
+    expect([owners[0]?.state.status.enabled, record.off, record.clears]).toEqual([false, true, 0])
+  })
+
+  // #13724 review L1: with no opt-out recorded there is nothing to clear; a clear here could only erase one a disable
+  // recorded after the re-read.
+  test("no opt-out recorded: it switches remote on and never clears the opt-out record", async () => {
+    const stateDir = privateDir()
+    const { record, optOut } = optOutRecord()
+    const { code, out, coldWake } = await run(
+      ["enable", AFTER_LOGIN_FLAG, "--json"],
+      stateDir,
+      SIGNED_IN,
+      testBootstrap({
+        install: async () => {
+          owners.push(await startFakeOwner({ stateDir, world: defaultWorld() }))
+          return { ok: true }
+        },
+      }),
+      undefined,
+      { optOut },
+    )
+    expect([code, out.map((line) => JSON.parse(line)), coldWake]).toEqual([
+      REMOTE_EXIT.ok,
+      [{ enabled: true }],
+      ["install"],
+    ])
+    expect([owners[0]?.state.status.enabled, record.off, record.clears]).toEqual([true, false, 0])
+  })
+
   test("a user-typed enable is the user turning remote on: it switches on and clears the opt-out", async () => {
     const stateDir = privateDir()
     const { record, optOut } = optOutRecord()

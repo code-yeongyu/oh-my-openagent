@@ -104,7 +104,8 @@ export type RemoteSetup = {
  * `omo remote enable`: the bootstrap (install the pinned service when none runs, connect, register the refresher and
  * this agent dir), then the switch on, the device link and the always-on session host unit, and it clears a recorded
  * opt-out (omo#13594, omo#13602). Every step is idempotent, so running it again changes nothing already in place.
- * `afterLogin`: started by `omo login`, not typed by the user; an opt-out recorded by then keeps remote off instead.
+ * `afterLogin`: started by `omo login`, not typed by the user; an opt-out recorded by then keeps remote off instead, and
+ * it never clears the opt-out record.
  */
 export async function runEnableVerb(
   io: BootstrapIo,
@@ -152,12 +153,25 @@ async function enableRemote(
     return false
   }
   let enabled: boolean
+  let optedOutSince = false
   try {
     enabled = await outcome.service.setEnabled(true)
+    // A disable can still land between the re-read and the switch-on (#13762 review L1). It records the opt-out before it
+    // switches the service off, so reading once more here converges: a record made before this read is seen and this
+    // enable switches off last; one made after it is followed by that disable's own switch-off, which comes last.
+    optedOutSince = afterLogin && remote.optOut.read()
+    if (optedOutSince && enabled) await outcome.service.setEnabled(false)
   } finally {
     outcome.service.close()
   }
-  if (enabled) remote.optOut.clear()
+  if (optedOutSince) {
+    report(false)
+    await applyColdWake(remote.coldWake, false, io.error)
+    return false
+  }
+  // Only the user turning remote on clears an opt-out. After login none was recorded at the re-read above, so a clear
+  // could only erase one a `omo remote disable` recorded since (#13724 review L1).
+  if (enabled && !afterLogin) remote.optOut.clear()
   report(enabled)
   if (outcome.status.device === null && (await remote.linkDevice()) === "signed_out") io.error(NOT_LINKED)
   await applyColdWake(remote.coldWake, enabled, io.error)
