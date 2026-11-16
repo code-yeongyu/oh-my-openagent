@@ -1,12 +1,11 @@
 //! The imported scripting fields drive the `Backend` half as their scenarios say.
 
-use omo_computer_core::error::Reason;
 use omo_computer_core::backend::{
     Backend, CaptureOptions, InputEvent, Route, TaggedInput, Target, WindowFilter,
 };
 use omo_computer_core::params::Point;
 
-use omo_computer_core::error::{ComputerCode, EngineCode};
+use omo_computer_core::error::{ComputerCode, EngineCode, Reason};
 
 use crate::{
     fixtures_dir, FakeBackend, FakeScenario, FocusRecordKind, FocusRecordOutcome, UserInputKind,

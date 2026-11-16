@@ -1,10 +1,9 @@
 //! Each field the v3 rows add changes the fake's behaviour against its null control.
 
-use omo_computer_core::error::Reason;
 use omo_computer_core::backend::{AxBackend, Backend, CaptureOptions, Target};
 use omo_computer_core::listing::Rect;
 
-use omo_computer_core::error::EngineCode;
+use omo_computer_core::error::{EngineCode, Reason};
 
 use crate::{
     fixtures_dir, ClipboardRead, FakeBackend, FakeScenario, FrameAxis, LoadingState, Persona,
