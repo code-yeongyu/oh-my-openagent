@@ -13,12 +13,21 @@ import type {
 export * from "./vocabulary.ts"
 export * from "./protocol-events.ts"
 export type * from "./protocol-delegated.ts"
+export * from "./protocol-deliveries.ts"
+import type { DeliveriesRequest, DeliveriesResponseData } from "./protocol-deliveries.ts"
 import type { SessionCandidate, SessionEndpoints, SessionEndpointsData, SessionLocate } from "./protocol-delegated.ts"
 import type { SessionCommand, SessionCommandPart } from "./protocol-command.ts"
 export type * from "./protocol-command.ts"
 export type * from "./protocol-control.ts"
 
-import type { ControlAttachGet, ControlAttachSet, ControlAttachState } from "./protocol-control.ts"
+import type {
+  ControlAttachGet,
+  ControlAttachSet,
+  ControlAttachState,
+  ControlSessionWakeGet,
+  ControlSessionWakeSet,
+  ControlSessionWakeState,
+} from "./protocol-control.ts"
 
 // The local API v1 messages (docs/local-api.md). One JSON object per LF-terminated line: the handshake, then
 // requests {id, type, ...} each answered by exactly one response, and pushed events {type: "event", kind, ...}.
@@ -187,6 +196,9 @@ export type LocalRequest =
   | SessionLocate
   | ControlAttachGet
   | ControlAttachSet
+  | ControlSessionWakeGet
+  | ControlSessionWakeSet
+  | DeliveriesRequest
 export type RequestType = LocalRequest["type"]
 
 export type DeviceRow = {
@@ -197,7 +209,7 @@ export type DeviceRow = {
   readonly last_seen_ms: number | null
   readonly online: boolean
 }
-export type ResponseData = {
+export type ResponseData = DeliveriesResponseData & {
   readonly authenticate: Empty
   readonly "status.get": Status
   readonly "status.subscribe": Empty
@@ -221,6 +233,8 @@ export type ResponseData = {
   readonly "session.locate": SessionCandidate
   readonly "control.attach.get": ControlAttachState
   readonly "control.attach.set": ControlAttachState
+  readonly "control.session_wake.get": ControlSessionWakeState
+  readonly "control.session_wake.set": ControlSessionWakeState
 }
 export type PathRefusal = { readonly component: string; readonly problem: PathRefusalProblem }
 export type ErrorBody = {
