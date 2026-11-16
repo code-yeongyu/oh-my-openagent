@@ -41,10 +41,13 @@ export function canonicalizeThreadHandle(
   )
     return {
       kind: "ok",
-      value: { handle: `${device}/${session}`, target: { kind: "device_session", device, session }, scope },
+      value: { handle: handleOf(device, session), target: { kind: "device_session", device, session }, scope },
     }
-  return { kind: "ok", value: { handle: text, target: { kind: "address", address: text }, scope } }
+  return { kind: "ok", value: { handle: text as ThreadHandle, target: { kind: "address", address: text }, scope } }
 }
+
+/** The handle of a session a device listed: `<device>/<session>`, the monitor target form. */
+export const handleOf = (device: string, session: string): ThreadHandle => `${device}/${session}` as ThreadHandle
 
 /** Seam 2: the only helper that names a thread to a person; every message and renderer goes through it. */
 export function describeThread(row: SessionRow): string {
