@@ -1,6 +1,8 @@
+import type { ModelProvider } from "../config/schema/provider-models"
 import type { ModelFallbackControllerAccessor } from "../hooks/model-fallback"
 import { createInternalAgentTextPart } from "./internal-initiator-marker"
 import type { FallbackEntry } from "./model-requirements"
+import { ProviderPinRegistry } from "./provider-pin-registry"
 import { SessionCategoryRegistry } from "./session-category-registry"
 
 export type DelegatedChildSessionRetryPart = {
@@ -40,6 +42,7 @@ export function registerDelegatedChildSessionBootstrap(_args: {
   category?: string
   system?: string
   tools?: Record<string, boolean>
+  providerPin?: ModelProvider
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
 }): void {
   const retryParts = [createInternalAgentTextPart(_args.promptText)]
@@ -56,6 +59,9 @@ export function registerDelegatedChildSessionBootstrap(_args: {
   _args.modelFallbackControllerAccessor?.setSessionFallbackChain(_args.sessionID, fallbackChain)
   if (_args.category) {
     SessionCategoryRegistry.register(_args.sessionID, _args.category)
+  }
+  if (_args.providerPin) {
+    ProviderPinRegistry.register(_args.sessionID, _args.providerPin)
   }
 }
 

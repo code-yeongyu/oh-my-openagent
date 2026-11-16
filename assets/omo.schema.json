@@ -29060,6 +29060,127 @@
             "additionalProperties": false
           }
         },
+        "provider_models": {
+          "type": "object",
+          "properties": {
+            "openai": {
+              "description": "Pins used when look_at or task is called with provider=\"openai\".",
+              "type": "object",
+              "properties": {
+                "agents": {
+                  "description": "Agent name (sisyphus-junior, multimodal-looker, explore, librarian, oracle, ...) to the model task(subagent_type=...) and look_at use when this provider is requested.",
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "model": {
+                        "type": "string",
+                        "pattern": "^[^/\\s]+\\/\\S+$",
+                        "description": "Model id as provider/model, for example openai/gpt-6.1-sol."
+                      },
+                      "variant": {
+                        "description": "Model variant (reasoning level), for example high. Omitted: none.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "model"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "categories": {
+                  "description": "Category name (quick, deep-low, writing, ...) to the model task(category=...) uses when this provider is requested.",
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "model": {
+                        "type": "string",
+                        "pattern": "^[^/\\s]+\\/\\S+$",
+                        "description": "Model id as provider/model, for example openai/gpt-6.1-sol."
+                      },
+                      "variant": {
+                        "description": "Model variant (reasoning level), for example high. Omitted: none.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "model"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "additionalProperties": false
+            },
+            "anthropic": {
+              "description": "Pins used when look_at or task is called with provider=\"anthropic\".",
+              "type": "object",
+              "properties": {
+                "agents": {
+                  "description": "Agent name (sisyphus-junior, multimodal-looker, explore, librarian, oracle, ...) to the model task(subagent_type=...) and look_at use when this provider is requested.",
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "model": {
+                        "type": "string",
+                        "pattern": "^[^/\\s]+\\/\\S+$",
+                        "description": "Model id as provider/model, for example openai/gpt-6.1-sol."
+                      },
+                      "variant": {
+                        "description": "Model variant (reasoning level), for example high. Omitted: none.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "model"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "categories": {
+                  "description": "Category name (quick, deep-low, writing, ...) to the model task(category=...) uses when this provider is requested.",
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "model": {
+                        "type": "string",
+                        "pattern": "^[^/\\s]+\\/\\S+$",
+                        "description": "Model id as provider/model, for example openai/gpt-6.1-sol."
+                      },
+                      "variant": {
+                        "description": "Model variant (reasoning level), for example high. Omitted: none.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "model"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false,
+          "description": "Per-provider pin sets for the provider argument of look_at and task. A call that passes provider uses only that set: its pin replaces agent/category models, fallback chains and runtime model overrides, and a missing pin fails the call instead of falling back to another provider. Calls without provider are unaffected."
+        },
         "claude_code": {
           "type": "object",
           "properties": {
