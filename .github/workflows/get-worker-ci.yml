@@ -73,10 +73,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { os: ubuntu-latest, name: linux-glibc }
-          - { os: ubuntu-24.04-arm, name: linux-arm64 }
-          - { os: macos-latest, name: macos-arm64 }
+        # Pull requests run Linux only; the ci:full-matrix label, pushes and dispatches run every OS (#13802).
+        include: >-
+          ${{ fromJSON(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'ci:full-matrix') && '[{"os": "ubuntu-latest", "name": "linux-glibc"},
+          {"os": "ubuntu-24.04-arm", "name": "linux-arm64"}]' || '[{"os": "ubuntu-latest", "name": "linux-glibc"},
+          {"os": "ubuntu-24.04-arm", "name": "linux-arm64"}, {"os": "macos-latest", "name": "macos-arm64"}]') }}
     runs-on: ${{ matrix.os == 'ubuntu-latest' && 'ubuntu-26.04' || matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -145,6 +146,8 @@ jobs:
 
   install-windows:
     needs: worker
+    # Pull requests run Linux only; the ci:full-matrix label, pushes and dispatches run every OS (#13802).
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-matrix')
     runs-on: windows-latest
     strategy:
       fail-fast: false

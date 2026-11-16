@@ -37,6 +37,7 @@ function capture() {
       status: untouched("the cold-wake unit"),
     },
     linkDevice: untouched("the device link"),
+    optOut: { read: untouched("the opt-out"), record: untouched("the opt-out"), clear: untouched("the opt-out") },
   }
   return { out, err, dependencies }
 }
