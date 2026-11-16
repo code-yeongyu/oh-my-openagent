@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { existsSync } from "node:fs"
+import { dirname } from "node:path"
 import { PEER, SESSION_ID } from "../../../../device-service-core/test/local-api/conformance/world.ts"
 import { pushDetached, pushFrame, pushRecords, pushSnapshot, reader, THREAD, worldWith } from "./attach.test-support"
 import { DEADLINES } from "./deadlines"
@@ -214,5 +215,20 @@ describe("attach rows: end", () => {
     expect(served.value.sessionRef).toBe(SESSION_ID)
     await handle.detach()
     expect(existsSync(served.value.socketPath)).toBe(false)
+  })
+
+  test("#given a served endpoint #when the far side ends the attach #then the endpoint's private directory and its secret are gone once the events end", async () => {
+    const { owner, handle } = await attached()
+    const served = await handle.serveEndpoint()
+    if (served.kind !== "ok") throw new Error(`expected an endpoint, got ${JSON.stringify(served)}`)
+    const directory = dirname(served.value.socketPath)
+    expect(existsSync(`${served.value.socketPath}.secret`)).toBe(true)
+    const events = reader(handle.events)
+    pushDetached(owner, "session_closed")
+    let event = await events.next("session_closed")
+    while (event !== "done" && event.kind !== "session_closed") event = await events.next("session_closed")
+    expect(event).toEqual({ kind: "session_closed" })
+    expect(await events.next("the end")).toBe("done")
+    expect(existsSync(directory)).toBe(false)
   })
 })

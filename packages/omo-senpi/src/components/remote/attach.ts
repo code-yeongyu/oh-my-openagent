@@ -1,5 +1,4 @@
 import type { RemoteAttach } from "@oh-my-opencode/device-service-core/device-service"
-import { serveRemoteAttach } from "../../../../omo-native/remote-attach"
 import { outcomeOf } from "../thread/remote/outcome"
 import { type ClientCore, ok, type Outcome, type RemoteClient } from "./client"
 import { engineCode, nextActionFor, remoteFailure } from "./codes"
@@ -236,6 +235,17 @@ function createAttachment(core: ClientCore, attached: RemoteAttach, thread: Thre
   const dialogs = new MirroredDialogs()
   const snapshotListeners = new Set<(snapshot: SnapshotBody) => void>()
   const endpoints: (() => Promise<void>)[] = []
+  // Every served endpoint closes when the attach ends, whoever ended it (this handle's detach, the far side, the
+  // connection): each holds a private directory with the endpoint's secret. Chained, so a second caller waits for the
+  // closes the first one started, and each endpoint closes once.
+  let closing: Promise<void> = Promise.resolve()
+  const closeEndpoints = (): Promise<void> => {
+    closing = closing.then(async () => {
+      await Promise.all(endpoints.splice(0).map((close) => close()))
+    })
+    return closing
+  }
+  let ended = false
   const events = eventStream<AttachEvent>({ bound: { kept: EVENTS_KEPT, overflow: EVENTS_OVERFLOW } })
   let latest: SnapshotBody | undefined
 
@@ -276,11 +286,14 @@ function createAttachment(core: ClientCore, attached: RemoteAttach, thread: Thre
     if (raised !== null) events.push(raised)
   })
   const stopLosses = attached.onChannelLoss((reason) => events.push({ kind: "channel_lost", reason }))
-  void attached.detached.then((reason) => {
+  // The events end only once the served endpoints are closed, so a reader that saw the end sees nothing left behind.
+  void attached.detached.then(async (reason) => {
+    ended = true
     stopFrames()
     stopLosses()
     if (reason === "session_closed" || reason === "session_replaced") events.push({ kind: "session_closed" })
     else if (reason !== "detached") events.push({ kind: "channel_lost", reason })
+    await closeEndpoints()
     events.end()
   })
 
@@ -298,8 +311,19 @@ function createAttachment(core: ClientCore, attached: RemoteAttach, thread: Thre
       withinDeadline(core.timers, undefined, DEADLINES.observeRead, false, async () => ok(await attached.read(page))),
     serveEndpoint: () =>
       withinDeadline(core.timers, undefined, DEADLINES.serveEndpoint, false, async () => {
+        // Loaded only here, so nothing of an attach loads node:net (the endpoint's net server) until a caller serves one.
+        const { serveRemoteAttach } = await import("../../../../omo-native/remote-attach")
         const endpoint = await serveRemoteAttach(attached, { label: thread })
         endpoints.push(endpoint.close)
+        // An attach that ended while the endpoint was being made closes it at once.
+        if (ended) {
+          await closeEndpoints()
+          return remoteFailure(
+            "session_ended",
+            "The attach ended before its endpoint was served.",
+            "Call attach again.",
+          )
+        }
         return ok({ socketPath: endpoint.socketPath, sessionRef: endpoint.sessionRef })
       }),
     pending: () => dialogs.current(),
@@ -331,7 +355,7 @@ function createAttachment(core: ClientCore, attached: RemoteAttach, thread: Thre
     detach: async () => {
       stopEvents()
       events.end()
-      await Promise.all(endpoints.splice(0).map((close) => close()))
+      await closeEndpoints()
       // A session.detach that fails leaves nothing held: the service ended the attach or the connection closed.
       await attached.detach().catch(() => undefined)
     },
