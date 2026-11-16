@@ -30,7 +30,7 @@ const typedCall =
   }
 
 /** The same machine, whose every operation rejects with a typed `BunshinSessionError` naming it and the device. */
-export function typedMachine<Machine extends StandaloneMachine>(machine: Machine): Machine {
+function typedMachine<Machine extends StandaloneMachine>(machine: Machine): Machine {
   const device = machine.alias === "" ? machine.id : machine.alias
   return new Proxy(machine, {
     get(target, property) {

@@ -1,7 +1,7 @@
 import type { ThreadErrorCode, ThreadToolFailure } from "../components/thread/errors"
 
 // The relay daemon's machine.op_result error codes for device ops, kept 1:1.
-export const RELAY_OP_ERROR_CODES = [
+const RELAY_OP_ERROR_CODES = [
   "device_offline",
   "undelivered",
   "transport_expired",
