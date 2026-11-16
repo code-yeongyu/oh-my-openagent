@@ -156,17 +156,33 @@ mod tests {
         assert!(paths.config.ends_with(tail), "{:?}", paths.config);
     }
 
-    // Linux only: elsewhere no user-database home or APPDATA may exist, and `user_home` is Unix-only.
-    #[cfg(target_os = "linux")]
+    /// Linux and macOS: the host API is a socket file in the per-uid runtime root (#13882 M2) and the
+    /// config root sits under the user-database home, never `$HOME` (M3).
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     #[test]
-    fn the_real_linux_host_api_is_a_socket_file_in_the_per_uid_runtime_root() {
-        let paths = resolve(env(&[("HOME", "/home/u"), ("XDG_RUNTIME_DIR", "/run/user/501")]), false)
-            .expect("real paths");
-        let runtime = crate::paths::resolve(|name| (name == "XDG_RUNTIME_DIR").then(|| "/run/user/501".to_owned()))
-            .expect("the runtime root")
-            .runtime;
+    fn the_real_unix_paths_name_a_socket_file_and_the_user_database_config_root() {
+        let lookup = env(&[("HOME", "/home/u"), ("XDG_RUNTIME_DIR", "/run/user/501")]);
+        let paths = resolve(&lookup, false).expect("real paths");
+        let runtime = crate::paths::resolve(&lookup).expect("the runtime root").runtime;
         assert_eq!(paths.address, HostAddress::Socket(runtime.join("host-api.sock")));
         let home = crate::paths::user_home().expect("the user database names a home");
-        assert_eq!(paths.consent(), home.join(".config/omo/computer/consent.json"));
+        let config = if cfg!(target_os = "macos") {
+            home.join("Library/Application Support/OmO")
+        } else {
+            home.join(".config/omo")
+        };
+        assert_eq!(paths.consent(), config.join("computer/consent.json"));
+    }
+
+    /// Windows roots everything at `%APPDATA%\OmO` and names the host by its endpoint file; without
+    /// `APPDATA` (a `HOME`-only environment) no config root is named.
+    #[cfg(windows)]
+    #[test]
+    fn the_real_windows_paths_sit_under_appdata() {
+        let paths = resolve(env(&[("APPDATA", r"C:\Users\u\AppData\Roaming")]), false).expect("real paths");
+        let computer = Path::new(r"C:\Users\u\AppData\Roaming\OmO\computer");
+        assert_eq!(paths.consent(), computer.join("consent.json"));
+        assert_eq!(paths.address, HostAddress::Endpoint(computer.join("host-endpoint")));
+        assert_eq!(resolve(env(&[("HOME", "/home/u")]), false), Err(HostPathsUnavailable::NoConfigRoot));
     }
 }
