@@ -135,7 +135,7 @@ export type RemoteClient = {
 }
 
 export type Outcome<T> = { readonly kind: "ok"; readonly value: T } | RemoteFailure
-const ok = <T>(value: T): Outcome<T> => ({ kind: "ok", value })
+export const ok = <T>(value: T): Outcome<T> => ({ kind: "ok", value })
 
 /** What every member module is built from: the client's sender, clock, deps, connection and member runner. */
 export type ClientCore = {
