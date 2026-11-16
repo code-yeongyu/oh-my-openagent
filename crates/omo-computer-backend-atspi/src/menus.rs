@@ -103,7 +103,9 @@ impl<B: Bus> AtspiBackend<B> {
         let mut level = read_level(bus, &container, 0, &mut 0);
         let full: Vec<String> = path.iter().map(|label| (*label).to_owned()).collect();
         match prove(&nodes(&level), &full) {
-            Err(refusal) if refusal.code != EngineCode::StaleRef => return Err(AxRefusal::plain(refusal)),
+            Err(refusal) if refusal.code != EngineCode::StaleRef => {
+                return Err(AxRefusal::plain(refusal))
+            }
             _ => {}
         }
         let mut delivered = Delivered { count: 0, of: 0 };

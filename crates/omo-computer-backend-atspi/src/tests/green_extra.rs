@@ -172,10 +172,9 @@ fn the_menu_tree_is_read_without_acting_and_twin_labels_are_ambiguous() {
         .collect();
     assert_eq!(labels, ["Export", "Export"]);
     assert_eq!(twin.code(), EngineCode::AmbiguousTarget);
-    assert_eq!(
-        handle.performed(),
-        vec![(file, 0)],
-        "only the opener was pressed, never an Export"
+    assert!(
+        handle.performed().is_empty(),
+        "an ambiguous path presses nothing, not even File"
     );
 }
 
