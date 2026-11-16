@@ -137,9 +137,11 @@ function legs(
             fields: [],
             run: (dir) =>
               withFixture(command, sabotage, dir, async (fixture) => {
-                check(geometryProblems(fixture.report().geometry), "at start")
+                const atStart = fixture.report()
+                check(geometryProblems(atStart.geometry, atStart.fields.dragOrder), "at start")
                 await fixture.send("poke drag")
-                check(geometryProblems(fixture.report().geometry), "after the drag reordered the rows")
+                const dragged = fixture.report()
+                check(geometryProblems(dragged.geometry, dragged.fields.dragOrder), "after the drag reordered the rows")
               }),
           },
         ]
