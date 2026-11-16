@@ -35,7 +35,9 @@ function sandbox() {
   roots.push(agentDir)
   const socket = join(agentDir, "rpc", "shards", "p-aaaaaaaaaaaaaaaa.sock")
   expect(Buffer.byteLength(`${socket}.next-99`)).toBeLessThanOrEqual(103)
-  mkdirSync(join(agentDir, "rpc", "shards"), { recursive: true })
+  // The senpi RPC host refuses to publish its key record into a group- or world-writable directory, so the fixture
+  // directories must be private whatever the caller's umask is (#13159).
+  mkdirSync(join(agentDir, "rpc", "shards"), { recursive: true, mode: 0o700 })
   const env = {
     ...process.env,
     TMPDIR: agentDir,
@@ -47,6 +49,23 @@ function sandbox() {
     PI_CODING_AGENT_DIR: agentDir,
   }
   return { agentDir, socket, env }
+}
+
+// POSIX-only like every other sandbox() caller: the sandbox lives under /tmp and its check reads POSIX mode bits.
+if (process.platform !== "win32") {
+  describe("daemon real-engine sandbox", () => {
+    test("#given a group-writable umask #when the sandbox is created #then its rpc directories stay private", () => {
+      const previous = process.umask(0o002)
+      try {
+        const { agentDir } = sandbox()
+        for (const dir of [join(agentDir, "rpc"), join(agentDir, "rpc", "shards")]) {
+          expect(lstatSync(dir).mode & 0o077).toBe(0)
+        }
+      } finally {
+        process.umask(previous)
+      }
+    })
+  })
 }
 
 // A cold `node` start on a loaded host can take longer than any fixed per-spawn budget (#9679), so each child runs
@@ -224,7 +243,7 @@ if (process.platform !== "win32") {
 
     test("#given production status with a write mutant #when the read-only guard runs #then production turns red", async () => {
       const { agentDir } = sandbox()
-      mkdirSync(join(agentDir, "rpc-host-daemon"), { recursive: true })
+      mkdirSync(join(agentDir, "rpc-host-daemon"), { recursive: true, mode: 0o700 })
 
       await expect(
         assertReadOnlyState(agentDir, () => {
