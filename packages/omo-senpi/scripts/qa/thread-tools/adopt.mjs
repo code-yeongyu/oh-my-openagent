@@ -70,8 +70,8 @@ await runScenario("adopt", async ({ report, scratch, install, startTui }) => {
   )
 
   const threads = await omo(scratch, install, ["thread", "list", "--json"])
-  const rows = Array.isArray(threads.json)
-    ? threads.json.filter((thread) => thread.thread_id === hostSession.durableId)
+  const rows = Array.isArray(threads.json?.threads)
+    ? threads.json.threads.filter((thread) => thread.thread_id === hostSession.durableId)
     : []
   report.assert(
     "listed-once-as-tui",

@@ -9,6 +9,7 @@ import {
   validateWelcome,
 } from "../../src/local-api/validate.ts"
 import { exactly } from "../../src/local-api/validate-fields.ts"
+import { validateRequest as validateReleasedRequest } from "../../vendor/omo-5.1.66-decoder/validate.ts"
 import { PEER, defaultWorld } from "./conformance/world.ts"
 import { eventExamples } from "./event-examples.ts"
 
@@ -20,14 +21,15 @@ const world = defaultWorld()
 const KEY = "RVBFUEVQRVBFUEVQRVBFUA"
 const SHA = "ab".repeat(32)
 const COMMAND_ID = "Y29tbWFuZC1pZC0wMDAwMQ"
-const NEWER = { environments: [{ environment_id: "env-1", revoked: false, closed: false }] }
+const NEWER = { added_later: { rows: [1, "two"] } }
 const deviceRow = world.devices[0]
 if (deviceRow === undefined) throw new Error("the world lists a device")
 const attachState = { attached: true, changedAt: "2026-11-09T12:00:00.000Z" }
 const wakeState = { enabled: false, stored: null, changedAt: "", overridden: false }
 
-// One answer per request type; a new request type without a row fails typecheck here.
-const answers: { readonly [T in RequestType]: ResponseData[T] } = {
+// One answer per request type omo sends; the machine, delivery, presenter, wake and update-commit requests the
+// vendored client added are covered by its upstream suite.
+const answers = {
   authenticate: {},
   "status.get": world.status,
   "status.subscribe": {},
@@ -59,11 +61,17 @@ const answers: { readonly [T in RequestType]: ResponseData[T] } = {
   "delivery.pending": {},
   "delivery.drained": { kept: false },
   "peer.admitted": { admitted: true },
-}
+} satisfies { readonly [T in RequestType]?: ResponseData[T] }
 const answerRows = Object.entries(answers) as [RequestType, unknown][]
 const response = (data: unknown) => ({ id: "r1", type: "response", ok: true, data })
 const decode = (type: RequestType, data: unknown) => validateResponse(response(data), type)
 const withExtra = (v: object, extra: object = NEWER): object => ({ ...v, ...extra })
+// Optional fields an example carries (protocol-events.ts): dropping one leaves a valid event (upstream LA26).
+const OPTIONAL: { readonly [kind: string]: readonly string[] } = {
+  "host.update_notice": ["deadline_ms", "update_id"],
+  "session.records": ["seqs"],
+  "machine.op_state": ["timing"],
+}
 
 const welcome = {
   type: "welcome",
@@ -196,7 +204,9 @@ describe("LA21 a reply the client reads still refuses a missing required field",
       expect(() => validateResponse(rest, "authenticate"), name).toThrow("protocol_violation")
     }
     for (const event of Object.values(eventExamples) as LocalEvent[])
-      for (const name of Object.keys(event).filter((key) => key !== "type" && key !== "kind")) {
+      for (const name of Object.keys(event).filter(
+        (key) => key !== "type" && key !== "kind" && !(OPTIONAL[event.kind] ?? []).includes(key),
+      )) {
         const { [name]: _dropped, ...rest } = event as Record<string, unknown>
         expect(() => validateEvent(withExtra(rest)), `${event.kind} without ${name}`).toThrow("protocol_violation")
       }
@@ -244,7 +254,8 @@ describe("LA21 a reply the client reads still refuses a missing required field",
 
 describe("LA21 what a peer sends to be acted on keeps refusing unknown fields", () => {
   test("a request with an unknown field is invalid_request", () => {
-    expect(validateRequest({ id: "r2", type: "session.endpoints", device: PEER, ...NEWER })).toEqual({
+    // `environments` is a defined request field since device-service 0.1.24; a field no version defines stays refused.
+    expect(validateRequest({ id: "r2", type: "session.endpoints", device: PEER, undefined_field: true })).toEqual({
       ok: false,
       id: "r2",
       code: "invalid_request",
@@ -273,6 +284,7 @@ describe("LA21 what a peer sends to be acted on keeps refusing unknown fields", 
 describe("LA21 mixed client and service versions on session.endpoints", () => {
   const unasked = { endpoints: [KEY] }
   const carryingAField = { endpoints: [KEY], ...NEWER }
+  const carryingEnvironments = { endpoints: [KEY], environments: [KEY] }
   const strictClient = (data: unknown) => ({ endpoints: exactly(data, ["endpoints"], [], "data")["endpoints"] })
   const newClient = (data: unknown) => {
     const verdict = decode("session.endpoints", data)
@@ -294,9 +306,15 @@ describe("LA21 mixed client and service versions on session.endpoints", () => {
       { endpoints: [KEY] },
     ],
     [
+      "new client, a 0.1.24 service answering environments: decoded",
+      newClient,
+      carryingEnvironments,
+      { endpoints: [KEY], environments: [KEY] },
+    ],
+    [
       "5.1.65 client, a reply carrying environments unasked (the build rolled 2026-11-09)",
       strictClient,
-      carryingAField,
+      carryingEnvironments,
       "data has an unknown field",
     ],
   ]
@@ -307,7 +325,7 @@ describe("LA21 mixed client and service versions on session.endpoints", () => {
     })
 
   test("pre-0.1.24 service refuses session.endpoints {device, environments: true}, so this version never sends it", () => {
-    expect(validateRequest({ id: "r3", type: "session.endpoints", device: PEER, environments: true })).toEqual({
+    expect(validateReleasedRequest({ id: "r3", type: "session.endpoints", device: PEER, environments: true })).toEqual({
       ok: false,
       id: "r3",
       code: "invalid_request",
