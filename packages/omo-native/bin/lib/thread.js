@@ -456,7 +456,7 @@ export async function runThreadCommand(args, options) {
       )
       return exitCode
     }
-    if (json) stdout.write(`${JSON.stringify(name === "list" ? result.threads : result)}\n`)
+    if (json) stdout.write(`${JSON.stringify(result)}\n`)
     else for (const line of humanLines(name, result)) stdout.write(`${line}\n`)
     return exitCode
   } finally {

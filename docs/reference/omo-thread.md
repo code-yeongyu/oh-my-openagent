@@ -48,6 +48,12 @@ omo thread outbox <binding-id> [--after <cursor>] [--limit <n>] [--ack]
 omo thread ack <binding-id> <cursor> [--provider-message-id <id>]
 ```
 
+`omo thread list` lists this device's threads (in this directory's workspace, or every workspace with `--all-scope`)
+together with the threads on the account's other devices, each with its `device`. With `--json` it prints the whole
+result as one object: `threads`, `devices` (each device's name, platform, kind, `online`, `last_seen`, `this_device`,
+its thread count and `listing`: `listed`, `incomplete` when it did not answer this listing, or `offline`) and
+`remote_unavailable` when other devices could not be listed.
+
 `omo thread` does not create or resume sessions: session lifecycle belongs to the engine's host
 API, and a connector cannot start a session for a new chat thread through `omo thread` alone. To
 give a new chat thread its own session, a connector opens one on the operator endpoint
