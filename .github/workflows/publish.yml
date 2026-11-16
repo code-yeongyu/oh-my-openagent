@@ -46,6 +46,11 @@ on:
         required: false
         type: string
         default: ""
+      operator_darwin_artifacts:
+        description: "Maintainer-only: draft release operator-darwin-<12 hex> holding operator-built, signed and notarized darwin artifacts. Replaces the hosted macOS legs of publish-platform. Requires prepared_release_sha. Leave empty for the hosted legs."
+        required: false
+        type: string
+        default: ""
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
@@ -64,6 +69,57 @@ jobs:
       issues: read
     steps:
       - uses: actions/checkout@v7
+
+      # Operator-built darwin artifacts (#13921) replace the hosted macOS legs only for a maintainer on the
+      # prepared-source run. An empty input never enters the block.
+      - name: Refuse inadmissible operator darwin artifacts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPERATOR_DARWIN_ARTIFACTS: ${{ inputs.operator_darwin_artifacts }}
+          PREPARED_RELEASE_SHA: ${{ inputs.prepared_release_sha }}
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ -z "$OPERATOR_DARWIN_ARTIFACTS" ]; then
+            echo "operator_darwin_artifacts is empty; publish-platform uses the hosted macOS legs."
+            exit 0
+          fi
+          LC_ALL=C
+          if [ -z "$PREPARED_RELEASE_SHA" ]; then
+            echo "::error::operator_darwin_artifacts refused: prepared_release_sha is empty; operator-built darwin artifacts only apply to the prepared-source publish run."
+            exit 1
+          fi
+          if ! [[ "$PREPARED_RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::operator_darwin_artifacts refused: prepared_release_sha must be a full 40-character lowercase hex commit SHA."
+            exit 1
+          fi
+          if ! [[ "$OPERATOR_DARWIN_ARTIFACTS" =~ ^operator-darwin-[0-9a-f]{12}$ ]]; then
+            echo "::error::operator_darwin_artifacts refused: it must be operator-darwin-<12 lowercase hex of the source commit>."
+            exit 1
+          fi
+          for login in "$ACTOR" "$TRIGGERING_ACTOR"; do
+            if ! [[ "$login" =~ ^[A-Za-z0-9][A-Za-z0-9-]{0,38}$ ]]; then
+              echo "::error::operator_darwin_artifacts refused: actor '${login}' is not a GitHub user login and cannot be a maintainer."
+              exit 1
+            fi
+            if ! role="$(gh api "repos/${REPOSITORY}/collaborators/${login}/permission" --jq '.role_name')"; then
+              echo "::error::operator_darwin_artifacts refused: could not read the repository permission of ${login}."
+              exit 1
+            fi
+            if [ "$role" != "admin" ] && [ "$role" != "maintain" ]; then
+              echo "::error::operator_darwin_artifacts refused: ${login} has repository role '${role}'; only admin or maintain may replace the hosted macOS legs."
+              exit 1
+            fi
+          done
+          {
+            echo "### Darwin artifacts: OPERATOR-BUILT"
+            echo "- Staging release: \`${OPERATOR_DARWIN_ARTIFACTS}\`; prepared source: \`${PREPARED_RELEASE_SHA}\`."
+            echo "- Dispatched by \`${ACTOR}\` (triggered by \`${TRIGGERING_ACTOR}\`); publish-platform verifies every artifact before use."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "operator_darwin_artifacts ${OPERATOR_DARWIN_ARTIFACTS} admitted for ${ACTOR}."
 
       # Pull requests run Linux only (#13802); a macOS/Windows job that fails on dev opens the ci:platform-red
       # issue (platform-red-tracker.yml). Both the release cut and the publish run refuse while it is open.
@@ -765,6 +821,7 @@ jobs:
       always() &&
       github.repository == 'code-yeongyu/oh-my-openagent' &&
       inputs.prepared_release_sha == '' &&
+      inputs.operator_darwin_artifacts == '' &&
       needs.release-metadata.result == 'success' &&
       needs.prepare-release-state.result == 'success'
     permissions:
@@ -1333,6 +1390,8 @@ jobs:
       version: ${{ needs.release-metadata.outputs.version }}
       dist_tag: ${{ needs.release-metadata.outputs.dist_tag }}
       omo_ai_version: ${{ needs.release-metadata.outputs.omo_ai_version }}
+      operator_darwin_artifacts: ${{ inputs.operator_darwin_artifacts }}
+      prepared_release_sha: ${{ inputs.prepared_release_sha }}
     secrets: inherit
 
   release:
