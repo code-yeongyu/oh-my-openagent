@@ -170,6 +170,11 @@ impl DeliveryOs for Os {
         window == top || unsafe { IsChild(hwnd(top), hwnd(window)) }.as_bool()
     }
 
+    fn enabled(&self, window: isize) -> bool {
+        // SAFETY: a plain read; any HWND value is accepted.
+        unsafe { IsWindowEnabled(hwnd(window)) }.as_bool()
+    }
+
     fn wants_chars(&self, window: isize) -> Vec<isize> {
         let mut found: Vec<isize> = Vec::new();
         // SAFETY: `collect` writes only into `found`, which outlives the synchronous enumeration.

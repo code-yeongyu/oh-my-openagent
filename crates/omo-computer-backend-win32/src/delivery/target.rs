@@ -42,6 +42,8 @@ pub trait DeliveryOs: FocusOs + PaintOs + Send {
     /// Whether `window` is `top` or one of its descendants (`IsChild`): input posted to it lands
     /// in the addressed window.
     fn within(&self, window: isize, top: isize) -> bool;
+    /// `IsWindowEnabled`: a window a modal dialog disabled takes no real input.
+    fn enabled(&self, window: isize) -> bool;
     /// The visible, enabled descendants answering `WM_GETDLGCODE` with `DLGC_WANTCHARS`.
     fn wants_chars(&self, window: isize) -> Vec<isize>;
     /// The deepest enabled, visible child of `window` under the screen point, with the point in

@@ -26,6 +26,8 @@ pub(super) struct Win {
     /// The GUI thread, when it is another window's (two top-levels on one thread); by default each
     /// window's thread is its own id, and the thread's focus is that window's `focus`.
     pub(super) thread: Option<u32>,
+    /// Disabled (a modal dialog's owner); enabled by default.
+    pub(super) disabled: bool,
 }
 
 pub(super) struct ScriptedOs {
@@ -127,6 +129,10 @@ impl DeliveryOs for ScriptedOs {
             current = self.windows.get(&at).and_then(|w| w.parent);
         }
         false
+    }
+
+    fn enabled(&self, window: isize) -> bool {
+        self.windows.get(&window).is_some_and(|w| !w.disabled)
     }
 
     fn wants_chars(&self, window: isize) -> Vec<isize> {

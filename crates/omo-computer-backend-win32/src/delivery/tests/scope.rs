@@ -17,6 +17,11 @@ const DIALOG_EDIT: isize = 0x511;
 
 /// A main window and a dialog on ONE GUI thread (the main window's), the focus in the dialog.
 fn shared_thread(main_wants_chars: Vec<isize>) -> ScriptedOs {
+    shared_thread_with(main_wants_chars, false)
+}
+
+/// The same, with the main window disabled when the dialog is modal.
+fn shared_thread_with(main_wants_chars: Vec<isize>, modal: bool) -> ScriptedOs {
     let thread = u32::try_from(MAIN).ok();
     ScriptedOs::with(vec![
         (
@@ -24,6 +29,7 @@ fn shared_thread(main_wants_chars: Vec<isize>) -> ScriptedOs {
             Win {
                 focus: Some(DIALOG_EDIT),
                 wants_chars: main_wants_chars,
+                disabled: modal,
                 ..win("WindowsForms10.Window.8.app.0.1")
             },
         ),
@@ -94,6 +100,20 @@ fn a_foreign_focus_falls_back_to_the_addressed_windows_sole_character_wanting_de
             "{event:?}"
         );
         assert!(os.posts.iter().all(|(to, _)| *to == MAIN_EDIT));
+    }
+}
+
+#[test]
+fn an_owner_disabled_by_a_modal_dialog_takes_no_fallback_input() {
+    for event in events() {
+        let mut os = shared_thread_with(vec![MAIN_EDIT], true);
+        let refused = Deliverer::default().deliver(&mut os, "0x500", &event);
+        assert_eq!(
+            refused.map_err(|r| r.reason),
+            Err(Some(Reason::NoFocusTarget)),
+            "{event:?}"
+        );
+        assert!(os.posts.is_empty(), "{:?}", os.posts);
     }
 }
 
