@@ -13,7 +13,7 @@ impl Session {
         };
         if !self.funnel.control.chord_tamper.holds(None) {
             self.funnel.warn(format!(
-                "the hand's audit reads tampered ({tamper:?}): exec is refused until consent is re-saved"
+                "the hand's audit reads tampered ({tamper:?}): exec is refused with nothing sent and reads continue; nothing clears the mark until row 37's host-confirmed reset"
             ));
         }
         let raw = self.backend.host_consent();
