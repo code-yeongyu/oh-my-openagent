@@ -83,11 +83,6 @@ pub trait Backend: Send {
         ))
     }
 
-    /// R62: the backend's own doctor checks; `None` (the default) adds nothing to `diagnose`.
-    fn diagnose(&self) -> Option<BackendProbes> {
-        None
-    }
-
     /// The tri-state permission read; never prompts. Unknown by default, which is never granted.
     fn probe_permissions(&self) -> PermissionProbe {
         PermissionProbe {
