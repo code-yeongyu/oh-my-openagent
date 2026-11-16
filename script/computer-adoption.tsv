@@ -1,0 +1,65 @@
+id	source	head	licence	verdict	mechanism	rows
+ADP-1	goat-cu	40c6f6ebf8	MIT	adopt	Declared-outcome catalog: every action x toolkit x mode cell declares Deliver or Refuse with exact codes; skips forbidden; a validator rejects missing or contradictory results	4
+ADP-2	goat-cu	40c6f6ebf8	MIT	adopt	Desktop observer on every background cell: foreground window, stacking, focus journal, real cursor, leaked input caught by an occluding sentinel window; test status kept apart from observed behaviour	3
+ADP-3	goat-cu	40c6f6ebf8	MIT	adopt	Environment preflight record written once before a matrix; a missing prerequisite is ENVIRONMENT_ERROR, never a smaller green matrix	4
+ADP-4	goat-cu	40c6f6ebf8	MIT	adopt	Primary-seat isolation oracle with a negative control (a 50 px warp-and-return must be detected) and saved-file oracles (the app's saved document proves the effect)	3
+ADP-5	agent-desktop	54855b6225	Apache-2.0	adopt	Graded probe ledgers with reruns: Linux accessibility-bus findings with measured numbers, and 28 Windows probe scripts (patterns, elevation, session and DPI, Electron activation)	7
+ADP-6	goat-cu	40c6f6ebf8	MIT	adopt	Window target promotion: a process with exactly one eligible window is promoted to that window; otherwise refuse with the candidates listed	13
+ADP-7	oh-my-pi	4ad629ea51	MIT	adopt	Bounded wait for another session's input lock before answering InputBusy; the physical Escape ends the wait; the wait ends before the run's deadline	13
+ADP-8	goat-cu	40c6f6ebf8	MIT	adopt	Recovery rule table: the suggested next call is always a safe read or a call that cannot take focus; a foreground retry is never suggested	12
+ADP-9	goat-cu	40c6f6ebf8	MIT	adopt	Send admission under a lock, fenced sockets and bounded workers: after a timeout, a stop or a dropped caller nothing more is sent, even when the display server is wedged	13
+ADP-10	goat	ef32f951c4	MIT	adopt	Four-way call outcome at the transport (result, unsent, deadline, lost); dispatch evidence outranks an error code	16
+ADP-11	oh-my-pi	4ad629ea51	MIT	adopt	Sent-aware refusal: before any event the answer is a refusal with nothing sent; after the first event it is a failure that may have landed and is not rerunnable	16
+ADP-12	oh-my-pi	4ad629ea51	MIT	adopt	X11 delivery receipt from raw input events: the server's raw key or button event matching our device confirms delivery; the report also states that core focus did not change	16
+ADP-13	goat-cu	40c6f6ebf8	MIT	adapt	Wayland delivery evidence from the input protocol's own sync acknowledgement	16
+ADP-14	goat-cu	40c6f6ebf8	MIT	adapt	Window-set difference as owned effect evidence: a window that appears or closes after a click counts only when it belongs to the target process	16
+ADP-15	oh-my-pi	4ad629ea51	MIT	adopt	Verified accessibility text write: write, read back, and for a masked field compare by length without ever placing the text in an error	32
+ADP-16	goat-cu	40c6f6ebf8	MIT	adopt	Pixel frame without a capture: published frame, then the display's scale ratio, then a capture; a mismatch refuses and no scale is guessed	21
+ADP-17	oh-my-pi	4ad629ea51	MIT	adopt	A background drag across native text becomes an accessibility selection and returns the selected text	21
+ADP-18	oh-my-pi	4ad629ea51	MIT	adopt	Keys for a window go to the sheet focused on it; the Finder desktop focus is restored after background input; a popup is held open by a live pick watch	21
+ADP-19	oh-my-pi	4ad629ea51	MIT	adopt	Wait for a window opened by an action, measured on the monotonic clock and listing windows for the whole wait	38
+ADP-20	oh-my-pi	4ad629ea51	MIT	adopt	Chromium text fields are typed with keys, not accessibility value writes, which only appear to succeed	22
+ADP-21	goat-cu	40c6f6ebf8	MIT	adapt	Pure router and imperative shell: facts in, one decision out (execute or refuse); the shell runs exactly one actuator and never improvises a second	13
+ADP-22	goat-cu	40c6f6ebf8	MIT	reject	Electron background drag sent from the app's own main process	
+ADP-23	goat-cu	40c6f6ebf8	MIT	adopt	Accessibility values under a web area are not trusted as a receipt	16
+ADP-24	goat-cu	40c6f6ebf8	MIT	adopt	Hit-test first: a screen point is resolved to an actionable accessibility node and acted on semantically; pixels are the fallback	28
+ADP-25	goat-cu	40c6f6ebf8	MIT	probe	Embedded web views driven through their debugging endpoint, input dispatch only, on a target re-verified before every mutation	28
+ADP-26	agent-desktop	54855b6225	Apache-2.0	adopt	Windows probe scripts as the measurement set for patterns, elevation and session state	6
+ADP-27	UFO2 paper	v1	paper; no code read	probe	A second Windows session on the same machine as the agent's own desktop, through the system's remote-desktop loopback	44
+ADP-28	goat	ef32f951c4	MIT	adopt	Bundle integrity before every spawn: walk without following links, SHA-256 per file against a signed manifest, nothing unlisted, identity re-walked after hashing	26
+ADP-29	oh-my-pi	4ad629ea51	MIT	adopt	A session-lived second pointer and keyboard pair with real input devices behind it; never retargeted per action (per-action churn crashed a window manager and an office suite)	30
+ADP-30	oh-my-pi	4ad629ea51	MIT	adopt	Crash-safe ownership encoded in the device name (boot, namespace, user, process start) and orphan reaping under a server grab; a live peer is never touched	30
+ADP-31	oh-my-pi	4ad629ea51	MIT	adopt	Device-free preflight with a cached typed reason; a warm-up key and flat acceleration on the virtual devices	30
+ADP-32	oh-my-pi	4ad629ea51	MIT	adopt	One keymap per route (core, test extension device, virtual device) and a held-key guard that never releases a key the person is holding	30
+ADP-33	goat	ef32f951c4	MIT	adopt	Person or agent by device identity, not timing: raw events from physical devices; a ledger for reused device ids that fails toward 'person'	30
+ADP-34	goat	ef32f951c4	MIT	adapt	Own-pixels window capture: the window's off-screen pixmap, refused when a foreign window draws over it, with a before/after proof of the same window and geometry and a server grab capped at 250 ms	32
+ADP-35	oh-my-pi	4ad629ea51	MIT	adopt	GTK4 element placement on X11 from the native window origin, and a position_known flag where no placement is possible	32
+ADP-36	oh-my-pi	4ad629ea51	MIT	adapt	Crash-safe reads: no bulk property read on toolkits it crashes (Qt 5, Qt before 6.9.2, GTK 3, Firefox on an old bridge); the fast concurrent bulk read and the GTK4 cache call only where a toolkit and version table says safe	32
+ADP-37	agent-desktop	54855b6225	Apache-2.0	adopt	Bus detection by one auto-starting address call; events need a bus match rule (registration alone delivers nothing); GTK 3 sends only on the registered connection	32
+ADP-38	goat	ef32f951c4	MIT	adopt	Bus calls only to unique names, with the reply sender checked	32
+ADP-39	goat	ef32f951c4	MIT	adopt	Secure-focus probe with a GTK4 walk fallback, a re-verification pass, and answers dropped when a focus change overlapped them; focus changes pushed as events	32
+ADP-40	goat-cu	40c6f6ebf8	MIT	adopt	Lock state bound to our own login session: the screen-saver service's owner and the login manager's session must match; 250 ms cap; unknown stays explicit	32
+ADP-41	oh-my-pi	4ad629ea51	MIT	adopt	Background menu commands and actions matched by machine name, never the first action; re-resolved and re-checked before the action	32
+ADP-42	goat	ef32f951c4	MIT	adopt	Observation-required holds: a hold placed for a secure field is released only by an observation, never by a helper exiting	32
+ADP-43	agent-desktop	54855b6225	Apache-2.0	adapt	Focus gate before every key-down edge and every text chunk; without the focus-grab call where it activates a window	32
+ADP-44	goat-cu	40c6f6ebf8	MIT	adopt	Input-session discipline: keep-alive, every protocol interface including ping, strictly increasing monotonic timestamps, a device quiet period, bounded reconnect	31
+ADP-45	oh-my-pi	4ad629ea51	MIT	adopt	Region routing and whole-string admission before any key; typing from the device's own keymap in the active layout group; a layout is never assumed	31
+ADP-46	oh-my-pi	4ad629ea51	MIT	adopt	Promptless input probe with a three-state permission; a consent dialog given up before the run's deadline; cancellation that never restarts a request	31
+ADP-47	agent-desktop	54855b6225	Apache-2.0	adopt	Portal screenshot done safely: subscribe before calling, a measured consent budget, hardened intake of the returned file, per-display crop proven against the layout read before and after consent	33
+ADP-48	agent-desktop	54855b6225	Apache-2.0	probe	GNOME rungs beside the portal: a kept keyboard session and an absolute pointer through the compositor's own remote-desktop service	33
+ADP-49	goat-cu	40c6f6ebf8	MIT	adapt	GNOME Shell helper: a window's own pixels, exact activation verified by a second read, window rectangles and the agent cursor; a version handshake with owner proof	33
+ADP-50	goat-cu	40c6f6ebf8	MIT	adapt	KDE: a trusted read-only window identity helper, and per-window capture through the compositor's screenshot interface with a non-prompting readiness probe	33
+ADP-51	goat-cu	40c6f6ebf8	MIT	adopt	Hyprland and niri adapters: identity from the compositor's socket with peer attestation on both sockets, per-window capture with a before/after list check, focus with read-back and layout-safe typing on niri	33
+ADP-52	goat	ef32f951c4	MIT	adopt	Readiness by a real capture and a real tree read; a single-colour frame is blank; a denied capture that renders a placeholder is detected	33
+ADP-53	goat-cu	40c6f6ebf8	MIT	adapt	Compositor-owned agent seats: a seat per agent inside the compositor, single-use target grants bound to a window revision, revoked on lock, display sleep, layout or focus change	34
+ADP-54	goat-cu	40c6f6ebf8	MIT	adopt	A compositor plugin pinned to the compositor's exact build, refusing to load on a mismatch, requalified nightly per compositor build	34
+ADP-55	goat-cu	40c6f6ebf8	MIT	adapt	A compositor the agent owns: input goes straight to a client surface, so nothing depends on focus	42
+ADP-56	agent-desktop	54855b6225	Apache-2.0	adopt	A private headless desktop started on the first command under a lock: display, window manager, session bus and accessibility bus	42
+ADP-57	goat-cu	40c6f6ebf8	MIT	adapt	Approval that cannot arrive through the agent's own channel: a broker on a private channel with peer credentials, a nonce and a single-use grant; the consent surface is a refused target	17
+ADP-58	goat-cu	40c6f6ebf8	MIT	adapt	Authority bound to an inherited connection; end of that connection revokes every delegated session	18
+ADP-59	agent-desktop	54855b6225	Apache-2.0	adapt	An agent-owned macOS desktop: a guest set up once by a person and cloned headless afterwards, with a fresh host key per clone; our engine runs persistently in the guest instead of one process per command	44
+ADP-60	goat-cu	40c6f6ebf8	MIT	adapt	Action history as metadata only: start and completion pairs from the dispatch seam, a bounded queue that never blocks an action, an encrypted store keyed by the OS credential store; no screenshots, text or titles	47
+ADP-61	goat-cu	40c6f6ebf8	MIT	adapt	A cursor that carries state: a colour per session, an action badge, one shared motion planner on every desktop	47
+ADP-62	goat-cu	40c6f6ebf8	MIT	adopt	A batching nudge: after three single actions in a row the result suggests one cell	14
+ADP-63	goat	ef32f951c4	MIT	reject	Treating an unknown secure-field state as secure and refusing	
+ADP-64	goat-cu	40c6f6ebf8	MIT	reject	A bundled screen-parsing model for element detection	

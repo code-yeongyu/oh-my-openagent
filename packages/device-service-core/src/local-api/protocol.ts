@@ -13,12 +13,21 @@ import type {
 export * from "./vocabulary.ts"
 export * from "./protocol-events.ts"
 export type * from "./protocol-delegated.ts"
+export * from "./protocol-deliveries.ts"
+import type { DeliveriesRequest, DeliveriesResponseData } from "./protocol-deliveries.ts"
 import type { SessionCandidate, SessionEndpoints, SessionEndpointsData, SessionLocate } from "./protocol-delegated.ts"
 import type { SessionCommand, SessionCommandPart } from "./protocol-command.ts"
 export type * from "./protocol-command.ts"
 export type * from "./protocol-control.ts"
 
-import type { ControlAttachGet, ControlAttachSet, ControlAttachState } from "./protocol-control.ts"
+import type {
+  ControlAttachGet,
+  ControlAttachSet,
+  ControlAttachState,
+  ControlSessionWakeGet,
+  ControlSessionWakeSet,
+  ControlSessionWakeState,
+} from "./protocol-control.ts"
 
 // The local API v1 messages (docs/local-api.md). One JSON object per LF-terminated line: the handshake, then
 // requests {id, type, ...} each answered by exactly one response, and pushed events {type: "event", kind, ...}.
@@ -111,25 +120,6 @@ export type DeviceAdopt = {
 }
 export type DeviceForget = { readonly id: string; readonly type: "device.forget" }
 export type DeviceInfo = { readonly id: string; readonly type: "device.info" }
-/** omo-service#1016: the machine binding for the account's salt; the raw machine id never crosses the local API. */
-export type DeviceMachineBinding = {
-  readonly id: string
-  readonly type: "device.machine_binding"
-  readonly machine_salt: string
-}
-/** The identity relayd already holds: its public keys, raw 32 bytes as unpadded base64url (the service's encoding). */
-export type MachineBoundDevice = {
-  readonly id: string
-  readonly signing_public_key: string
-  readonly sealing_public_key: string
-}
-export type MachineBinding = {
-  /** Unpadded base64url HMAC-SHA256; null when this machine has no readable machine id. */
-  readonly machine_hash: string | null
-  readonly device: MachineBoundDevice | null
-  /** Other device ids this machine held (prior identities, client credentials), for the service to fold in. */
-  readonly merge_device_ids: readonly string[]
-}
 export type EndpointsRegister = {
   readonly id: string
   readonly type: "endpoints.register"
@@ -191,7 +181,6 @@ export type LocalRequest =
   | DeviceAdopt
   | DeviceForget
   | DeviceInfo
-  | DeviceMachineBinding
   | EndpointsRegister
   | EndpointsUnregister
   | DevicesList
@@ -207,6 +196,9 @@ export type LocalRequest =
   | SessionLocate
   | ControlAttachGet
   | ControlAttachSet
+  | ControlSessionWakeGet
+  | ControlSessionWakeSet
+  | DeliveriesRequest
 export type RequestType = LocalRequest["type"]
 
 export type DeviceRow = {
@@ -217,7 +209,7 @@ export type DeviceRow = {
   readonly last_seen_ms: number | null
   readonly online: boolean
 }
-export type ResponseData = {
+export type ResponseData = DeliveriesResponseData & {
   readonly authenticate: Empty
   readonly "status.get": Status
   readonly "status.subscribe": Empty
@@ -226,7 +218,6 @@ export type ResponseData = {
   readonly "device.adopt": { readonly device: DeviceRef }
   readonly "device.forget": Empty
   readonly "device.info": { readonly device: DeviceRef | null }
-  readonly "device.machine_binding": MachineBinding
   readonly "endpoints.register": Empty
   readonly "endpoints.unregister": Empty
   readonly "devices.list": { readonly devices: readonly DeviceRow[] }
@@ -242,6 +233,8 @@ export type ResponseData = {
   readonly "session.locate": SessionCandidate
   readonly "control.attach.get": ControlAttachState
   readonly "control.attach.set": ControlAttachState
+  readonly "control.session_wake.get": ControlSessionWakeState
+  readonly "control.session_wake.set": ControlSessionWakeState
 }
 export type PathRefusal = { readonly component: string; readonly problem: PathRefusalProblem }
 export type ErrorBody = {

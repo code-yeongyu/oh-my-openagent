@@ -47,7 +47,7 @@ export type FallbackSessionHarness = {
   readonly calls: readonly string[]
   readonly events: readonly AgentSessionEvent[]
   readonly session: Awaited<ReturnType<typeof createAgentSession>>["session"]
-  dispose(): void
+  dispose(): Promise<void>
 }
 
 export const FALLBACK_PROVIDER = "runtime-fallback-test-alt"
@@ -120,9 +120,12 @@ export async function createFallbackSessionHarness(errorMessage: string): Promis
     calls,
     events,
     session,
-    dispose() {
+    // The engine starts its fallback-log first-start step when the session is created; dispose() only folds that step
+    // into the session's barrier, which is what says this root's agent dir can no longer be written (#13520).
+    async dispose() {
       unsubscribe()
       session.dispose()
+      await session.whenToolChildClosed()
       rmSync(root, { recursive: true, force: true })
     },
   }
