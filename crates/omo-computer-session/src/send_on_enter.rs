@@ -237,4 +237,30 @@ mod tests {
         typed(&mut session, "101", "hello").expect("unshifted text goes out as keys");
         typed(&mut session, "202", "Hello World").expect("HID reports carry Shift");
     }
+
+    /// Acceptance 80 (b): on the Windows fake, background shift+return replays the scripted
+    /// BackgroundUnavailable{posted_modifier_chord} with nothing in the sink; the foreground
+    /// delivery then sends the one chord. (The rule itself is the Windows backend's, row 56.)
+    #[test]
+    fn send_on_enter_shift_return_on_the_windows_fake_background_is_refused_and_foreground_delivers() {
+        let mut scenario: Value = serde_json::from_str(SCENARIO).expect("scenario json");
+        scenario["persona"] = json!("win32");
+        scenario["fail_next"] = json!([{ "method": "post_input", "code": "BackgroundUnavailable", "reason": "posted_modifier_chord" }]);
+        let sink = RecordingSink::default();
+        let fake = FakeBackend::with_parts(FakeScenario::from_value(&scenario).expect("scenario"), FakeClock::default(), sink.clone())
+            .with_stop_path(StopPathScript::Live);
+        let mut session = Session::new(Box::new(fake));
+        session
+            .open(serde_json::from_value(json!({ "reportMode": "object", "settings": { "send_on_enter": listed() } })).expect("open"))
+            .expect("open");
+        session.stop_path_start(serde_json::from_value(json!({})).expect("start"));
+        let refused = press(&mut session, "shift+return", false).expect_err("the scripted background refusal");
+        assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("BackgroundUnavailable", Some("posted_modifier_chord")));
+        assert!(posts(&sink).is_empty(), "{:?}", posts(&sink));
+        session.control_grant(serde_json::from_value(json!({ "reason": "test" })).expect("grant"));
+        session
+            .press(serde_json::from_value(json!({ "target": "101", "chord": "shift+return", "delivery": "foreground" })).expect("press"))
+            .expect("the foreground delivery sends the chord");
+        assert!(!posts(&sink).is_empty());
+    }
 }
