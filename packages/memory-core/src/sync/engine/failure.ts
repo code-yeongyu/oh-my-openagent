@@ -62,7 +62,7 @@ export function isFailureShown(kind: SyncFailureKind, attempts: number): boolean
 const UNKNOWN = {
   kind: "unknown",
   reason: "Memory sync stopped on an unexpected error.",
-  action: "Sync retries on its own. If this stays, restart OmO; the error is in the memory log.",
+  action: "Sync retries on its own. If this stays, restart OmO; run it with OMO_DEBUG=1 to log the full error.",
 } as const
 
 const DISK_FULL = {
@@ -75,13 +75,14 @@ const PERMISSION_DENIED = {
   kind: "no_write_access",
   reason: "Memory sync is not allowed to write a file it needs (permission denied).",
   action:
-    "Make sure your user account owns the memory folder and OmO's data folder and can write to them; the memory log names the file. Sync retries on its own.",
+    "Make sure your user account owns the memory folder and OmO's data folder and can write to them; with OMO_DEBUG=1 the memory log names the file. Sync retries on its own.",
 } as const
 
 const READ_ONLY = {
   kind: "no_write_access",
   reason: "Memory sync cannot write because the disk holding its files is read-only.",
-  action: "Make the memory folder writable again; the memory log names the file. Sync retries on its own.",
+  action:
+    "Make the memory folder writable again; with OMO_DEBUG=1 the memory log names the file. Sync retries on its own.",
 } as const
 
 const FULL_CODES: ReadonlySet<string> = new Set(["ENOSPC", "EDQUOT"])
@@ -98,7 +99,8 @@ function describeCausedFailure(error: unknown, stage: SyncStage): SyncFailure {
     return {
       kind: "service_refused",
       reason: "The OmO sync service refused a request from this device.",
-      action: "Sync retries on its own. If this stays, update OmO on this device; the memory log has the detail.",
+      action:
+        "Sync retries on its own. If this stays, update OmO on this device; with OMO_DEBUG=1 the memory log has the detail.",
       cause,
     }
   return { ...UNKNOWN, cause }
@@ -128,7 +130,7 @@ export function describeOversizedItems(
   const kept =
     stuck.length === 0
       ? ""
-      : `${nameKeys(stuck)} cannot be sent from this device even if made smaller; the change stays on this device, and the memory log has the detail.`
+      : `${nameKeys(stuck)} cannot be sent from this device even if made smaller; the change stays on this device, and with OMO_DEBUG=1 the memory log has the detail.`
   return {
     kind: "oversized_item",
     keys,

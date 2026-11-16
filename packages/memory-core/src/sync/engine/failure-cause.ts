@@ -1,6 +1,6 @@
 // What a failed sync cycle tells a person, a harness or the desktop about its error (#13635): a closed
 // set of safe fields, never the error's message, paths or anything else it carries. The raw error,
-// stacks and cause chain included, goes to the local memory log only.
+// stacks and cause chain included, goes to the local memory log at debug level only (OMO_DEBUG=1).
 
 import { GitCommandError, GitError, GitNotFoundError, GitTimeoutError } from "../../git/errors"
 import { SyncFormatError } from "../crypto/vendor/sync-format/jcs"

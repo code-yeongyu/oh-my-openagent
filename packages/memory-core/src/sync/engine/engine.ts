@@ -268,7 +268,10 @@ export class SyncEngine {
         this.stage = "apply"
         const appliedNow = await applyVerified(deps, journal, notRenderedNow(holds))
         // A joining file adopts the space's state in this same cycle, so its edit goes out with this push.
-        if (holds.joining.size > 0) holds = await capture(deps, journal)
+        if (holds.joining.size > 0) {
+          this.stage = "capture"
+          holds = await capture(deps, journal)
+        }
         return appliedNow
       })
       applied += done.batches
