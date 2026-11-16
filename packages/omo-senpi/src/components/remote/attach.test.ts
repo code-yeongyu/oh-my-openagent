@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { existsSync } from "node:fs"
+import { dirname } from "node:path"
 import { PEER, SESSION_ID } from "../../../../device-service-core/test/local-api/conformance/world.ts"
 import { pushDetached, pushFrame, pushRecords, pushSnapshot, reader, THREAD, worldWith } from "./attach.test-support"
+import { serveRemoteAttach } from "../../../../omo-native/remote-attach"
+import type { RemoteClientDeps } from "./client"
 import { DEADLINES } from "./deadlines"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
 import { clientOn, closeClients, failureOf, fakeClock, startModeOwner, startOwner } from "./testing/fake-service"
@@ -40,12 +43,19 @@ const STATE: JsonObject = {
   pendingQuestions: [QUESTION],
 }
 
-const attached = async (state: JsonObject = STATE, records: readonly JsonObject[] = []) => {
+const attached = async (
+  state: JsonObject = STATE,
+  records: readonly JsonObject[] = [],
+  deps: Partial<RemoteClientDeps> = {},
+) => {
   const owner = await startOwner(worldWith(state, records))
-  const outcome = await clientOn(owner.stateDir, fakeClock()).attach(THREAD)
+  const outcome = await clientOn(owner.stateDir, fakeClock(), undefined, deps).attach(THREAD)
   if (outcome.kind !== "ok") throw new Error(`expected an attach, got ${JSON.stringify(outcome)}`)
   return { owner, handle: outcome.value }
 }
+
+// The endpoint server a caller outside `omo remote`'s local-only graph injects (#13440): omo-native's own.
+const SERVING: Partial<RemoteClientDeps> = { serveAttach: (attach, label) => serveRemoteAttach(attach, { label }) }
 
 const ids = (handle: AttachHandle): string[] => handle.pending().map((request) => request.request_id)
 
@@ -207,12 +217,36 @@ describe("attach rows: end", () => {
   })
 
   test("#given an attach #when serveEndpoint runs and the attach detaches #then the endpoint names the session and goes away", async () => {
-    const { handle } = await attached()
+    const { handle } = await attached(STATE, [], SERVING)
     const served = await handle.serveEndpoint()
     if (served.kind !== "ok") throw new Error(`expected an endpoint, got ${JSON.stringify(served)}`)
     expect(existsSync(served.value.socketPath)).toBe(true)
     expect(served.value.sessionRef).toBe(SESSION_ID)
     await handle.detach()
     expect(existsSync(served.value.socketPath)).toBe(false)
+  })
+
+  test("#given a client built without serveAttach #when serveEndpoint runs #then it answers unsupported{serve_endpoint} as data", async () => {
+    const { handle } = await attached()
+    expect(failureOf(await handle.serveEndpoint())).toMatchObject({
+      code: "unsupported",
+      details: { feature: "serve_endpoint" },
+    })
+    await handle.detach()
+  })
+
+  test("#given a served endpoint #when the far side ends the attach #then the endpoint's private directory and its secret are gone once the events end", async () => {
+    const { owner, handle } = await attached(STATE, [], SERVING)
+    const served = await handle.serveEndpoint()
+    if (served.kind !== "ok") throw new Error(`expected an endpoint, got ${JSON.stringify(served)}`)
+    const directory = dirname(served.value.socketPath)
+    expect(existsSync(`${served.value.socketPath}.secret`)).toBe(true)
+    const events = reader(handle.events)
+    pushDetached(owner, "session_closed")
+    let event = await events.next("session_closed")
+    while (event !== "done" && event.kind !== "session_closed") event = await events.next("session_closed")
+    expect(event).toEqual({ kind: "session_closed" })
+    expect(await events.next("the end")).toBe("done")
+    expect(existsSync(directory)).toBe(false)
   })
 })
