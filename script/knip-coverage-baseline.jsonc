@@ -37,8 +37,6 @@
     "script/ci-fast-path.mjs": ["exports"],
     // pre-existing at origin dev 4686e425b5: unused export(s) judgeLeg
     "script/ci-leg-tests-guard.mjs": ["exports"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) platformOnlyStepTexts
-    "script/ci-platform-invocations.mjs": ["exports"],
     // pre-existing at origin dev 4686e425b5: unused export(s) claudeCodePackageFor, lockfileIntegrity
     "script/claude-code-pin.ts": ["exports"],
     // pre-existing at origin dev 4686e425b5: unused export(s) proveStagedDesktopEngine
@@ -217,8 +215,6 @@
         "script/check-temp-leak-report-only.d.mts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "script/ci-fast-path.d.mts",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "script/ci-platform-invocations.d.mts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "script/fixtures/senpi-hooks-state-error-runner.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
