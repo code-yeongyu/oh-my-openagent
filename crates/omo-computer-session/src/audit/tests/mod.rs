@@ -1,4 +1,10 @@
 mod append_lock;
+mod bound_anchor_start;
+mod bound_fixture;
+mod bound_full_read;
+mod bound_incremental;
+mod bound_no_rotate;
+mod bound_oversize;
 mod cap_refusal;
 mod clearing;
 mod gc;
