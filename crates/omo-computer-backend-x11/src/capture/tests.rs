@@ -6,7 +6,7 @@ use omo_computer_core::listing::Rect;
 use omo_computer_core::observation::CursorMode;
 use omo_computer_core::params::Point;
 
-use super::damage_wait::{after_notify, DamageWait, DamageWatch};
+use super::damage_wait::{DamageWait, DamageWatch};
 use super::fake::{FakeX, GREEN, MAGENTA, RED};
 use super::server::PixelRect;
 use super::X11Capture;
@@ -174,17 +174,11 @@ fn crosshair_is_drawn_at_the_frame_point() {
     assert_eq!(*frame.image.get_pixel(58, 50), gray);
 }
 
-#[test]
-fn the_server_background_paint_is_not_the_client_repainting() {
-    assert_eq!(after_notify(1), DamageWait::SubtractAndWait, "ClearArea's own background paint");
-    assert_eq!(after_notify(2), DamageWait::Repainted, "the client painted after its Expose");
-}
-
 /// The sequence number the fake `ClearArea` request carries in the scripts below.
 const CLEAR: u16 = 0x0412;
 
 fn repainted_after(clear: u16, notifies: &[u16]) -> Vec<DamageWait> {
-    let mut watch = DamageWatch::new(clear);
+    let watch = DamageWatch::new(clear);
     notifies.iter().map(|sequence| watch.after_notify(*sequence)).collect()
 }
 
@@ -209,6 +203,11 @@ fn a_repaint_right_after_the_server_paint_is_seen() {
     let steps = repainted_after(CLEAR, &[CLEAR, CLEAR + 1]);
     assert_eq!(steps.last(), Some(&DamageWait::Repainted), "{steps:?}");
     assert_ne!(steps[0], DamageWait::Repainted);
+}
+
+#[test]
+fn the_server_background_paint_is_not_the_client_repainting() {
+    assert_eq!(repainted_after(CLEAR, &[CLEAR]), [DamageWait::ServerPaint], "ClearArea's own background paint");
 }
 
 #[test]

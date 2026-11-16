@@ -7,14 +7,13 @@ use x11rb::connection::{Connection, RequestConnection};
 use x11rb::errors::{ConnectError, ConnectionError, ReplyError, ReplyOrIdError};
 use x11rb::protocol::composite::{self, ConnectionExt as _};
 use x11rb::protocol::damage::{self, ConnectionExt as _};
-
-use super::damage_wait::{after_notify, DamageWait};
 use x11rb::protocol::randr::{self, ConnectionExt as _};
 use x11rb::protocol::xfixes::{self, ConnectionExt as _};
 use x11rb::protocol::xproto::{AtomEnum, ConnectionExt as _, ImageFormat, ImageOrder, MapState};
 use x11rb::protocol::Event;
 use x11rb::rust_connection::RustConnection;
 
+use super::damage_wait::{DamageWait, DamageWatch};
 use super::server::{
     ChannelMasks, ClientWindow, CursorImage, Monitor, PixelRect, PixmapRead, Screen, WindowPlacement, XError,
     XServer, ZImage,
@@ -143,22 +142,16 @@ impl X11Connection {
         Ok(states.value32().is_some_and(|mut values| values.any(|atom| atom == hidden)))
     }
 
-    /// Whether the client repainted before the deadline: the first `DamageNotify` is the server's
-    /// own background paint from `ClearArea`, so it is subtracted and a second one is awaited.
-    fn wait_damage(&self, damage_id: u32) -> Result<bool, XError> {
+    /// Whether the client repainted before the deadline: a notify carrying the `ClearArea`'s
+    /// own sequence number is the server's background paint, any later one the client's repaint.
+    fn wait_damage(&self, damage_id: u32, watch: DamageWatch) -> Result<bool, XError> {
         let deadline = Instant::now() + DAMAGE_WAIT;
-        let mut seen = 0;
         while Instant::now() < deadline {
             while let Some(event) = self.conn.poll_for_event()? {
-                if matches!(event, Event::DamageNotify(notify) if notify.damage == damage_id) {
-                    seen += 1;
-                    match after_notify(seen) {
-                        DamageWait::Repainted => return Ok(true),
-                        DamageWait::SubtractAndWait => {
-                            self.conn.damage_subtract(damage_id, x11rb::NONE, x11rb::NONE)?;
-                            self.conn.flush()?;
-                        }
-                    }
+                let repaint = matches!(event, Event::DamageNotify(notify)
+                    if notify.damage == damage_id && watch.after_notify(notify.sequence) == DamageWait::Repainted);
+                if repaint {
+                    return Ok(true);
                 }
             }
             std::thread::sleep(DAMAGE_POLL);
@@ -169,15 +162,18 @@ impl X11Connection {
     fn read_pixmap(&self, window: u32, placement: &WindowPlacement) -> Result<PixmapRead, XError> {
         let damage_id = if self.damage {
             let id = self.conn.generate_id()?;
-            self.conn.damage_create(id, window, damage::ReportLevel::NON_EMPTY)?.check()?;
+            self.conn.damage_create(id, window, damage::ReportLevel::RAW_RECTANGLES)?.check()?;
             Some(id)
         } else {
             None
         };
-        self.conn.clear_area(true, window, 0, 0, 0, 0)?;
-        self.conn.flush()?;
+        let clear = self.conn.clear_area(true, window, 0, 0, 0, 0)?.sequence_number();
+        // The round trip right behind the ClearArea: every event generated after it carries a
+        // later sequence number than the ClearArea's own.
+        self.conn.get_input_focus()?.reply()?;
+        let watch = DamageWatch::new(u16::try_from(clear & u64::from(u16::MAX)).unwrap_or_default());
         let repainted = match damage_id {
-            Some(id) => self.wait_damage(id)?,
+            Some(id) => self.wait_damage(id, watch)?,
             None => false,
         };
         if !repainted {
