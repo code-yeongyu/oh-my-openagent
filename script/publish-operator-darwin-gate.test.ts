@@ -1,0 +1,175 @@
+/// <reference types="bun-types" />
+
+import { afterEach, describe, expect, test } from "bun:test"
+import { spawnSync } from "node:child_process"
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+
+/**
+ * Release security contract (#13921): `operator_darwin_artifacts` replaces the hosted macOS legs only for an
+ * admin/maintain actor AND triggering actor on the prepared-source run, with a well-formed staging tag; an
+ * empty input leaves every hosted leg in place. The gate step is executed from the parsed publish.yml with
+ * `gh` stubbed; the wiring is read from the parsed workflows.
+ */
+
+type Step = { name?: string; run?: string; if?: string; "continue-on-error"?: unknown }
+type Job = { if?: string; needs?: string[]; "runs-on"?: string; steps?: Step[]; with?: Record<string, string>; strategy?: { matrix?: { include?: unknown } } }
+type Workflow = { on: { workflow_call?: { inputs: Record<string, unknown> } }; jobs: Record<string, Job> }
+
+const load = (file: string): Workflow =>
+  Bun.YAML.parse(readFileSync(new URL(`../.github/workflows/${file}`, import.meta.url), "utf8").replace(/\r\n/g, "\n")) as Workflow
+const publish = load("publish.yml")
+const platform = load("publish-platform.yml")
+const job = (workflow: Workflow, name: string): Job => {
+  const found = workflow.jobs[name]
+  if (!found) throw new Error(`missing job ${name}`)
+  return found
+}
+const stepRun = (workflow: Workflow, jobName: string, stepName: string): string => {
+  const run = job(workflow, jobName).steps?.find((step) => step.name === stepName)?.run
+  if (!run) throw new Error(`${jobName} has no runnable step ${stepName}`)
+  return run
+}
+
+const PREPARED = "2222222222222222222222222222222222222222"
+const TAG = "operator-darwin-111111111111"
+const GH_STUB = [
+  "gh() {",
+  '  printf "%s\\n" "$*" >> "$GH_CALLS"',
+  '  [ -n "$PERMISSION_API_DOWN" ] && return 1',
+  '  local login="${2#*/collaborators/}"; login="${login%/permission}"',
+  '  local entry; for entry in $ROLES; do [ "${entry%%=*}" = "$login" ] && { printf "%s\\n" "${entry#*=}"; return 0; }; done',
+  '  printf "none\\n"',
+  "}",
+  "",
+].join("\n")
+
+const scratch: string[] = []
+afterEach(() => {
+  for (const dir of scratch.splice(0)) rmSync(dir, { recursive: true, force: true })
+})
+
+type Gate = { input?: string; prepared?: string; actor?: string; triggeringActor?: string; roles?: string; apiDown?: boolean }
+
+function gate(dispatch: Gate) {
+  const root = mkdtempSync(join(tmpdir(), "operator-darwin-gate-"))
+  scratch.push(root)
+  const script = join(root, "step.sh")
+  writeFileSync(script, GH_STUB + stepRun(publish, "gate-reuse", "Refuse inadmissible operator darwin artifacts").replaceAll("${{ github.repository }}", "o/r"))
+  const env = {
+    PATH: process.env.PATH ?? "",
+    GH_CALLS: join(root, "gh-calls"),
+    GITHUB_STEP_SUMMARY: join(root, "summary.md"),
+    OPERATOR_DARWIN_ARTIFACTS: dispatch.input ?? TAG,
+    PREPARED_RELEASE_SHA: dispatch.prepared ?? PREPARED,
+    ACTOR: dispatch.actor ?? "maintainer",
+    TRIGGERING_ACTOR: dispatch.triggeringActor ?? dispatch.actor ?? "maintainer",
+    REPOSITORY: "o/r",
+    ROLES: dispatch.roles ?? "maintainer=maintain owner=admin writer=write",
+    PERMISSION_API_DOWN: dispatch.apiDown ? "1" : "",
+  }
+  const result = spawnSync("bash", [script], { env, encoding: "utf8" })
+  const read = (file: string) => (existsSync(file) ? readFileSync(file, "utf8") : "")
+  return { status: result.status, output: `${result.stdout}${result.stderr}`, summary: read(env.GITHUB_STEP_SUMMARY), ghCalls: read(env.GH_CALLS) }
+}
+
+describe("operator darwin gate (publish.yml gate-reuse)", () => {
+  test("an empty input is admitted without any permission lookup or summary", () => {
+    const outcome = gate({ input: "", prepared: "" })
+    expect(outcome).toMatchObject({ status: 0, ghCalls: "", summary: "" })
+  })
+
+  test("a maintainer and an admin on the prepared-source run are admitted and named OPERATOR-BUILT", () => {
+    for (const actor of ["maintainer", "owner"]) {
+      const outcome = gate({ actor })
+      expect(outcome.status).toBe(0)
+      expect(outcome.summary).toContain("OPERATOR-BUILT")
+      expect(outcome.summary).toContain(TAG)
+      expect(outcome.summary).toContain(actor)
+    }
+  })
+
+  const refusals: Array<[string, Gate, RegExp, boolean]> = [
+    ["an empty prepared_release_sha", { prepared: "" }, /prepared_release_sha is empty/, false],
+    ["a short prepared_release_sha", { prepared: "2222222" }, /full 40-character/, false],
+    ["an uppercase prepared_release_sha", { prepared: "ABCDEF".repeat(6) + "ABCD" }, /full 40-character/, false],
+    ["a tag with uppercase hex", { input: "operator-darwin-11111111111A" }, /must be operator-darwin-/, false],
+    ["a tag with a short sha", { input: "operator-darwin-1111" }, /must be operator-darwin-/, false],
+    ["a foreign release tag", { input: "v5.1.73" }, /must be operator-darwin-/, false],
+    ["a tag with a trailing newline payload", { input: `${TAG}\nmalicious` }, /must be operator-darwin-/, false],
+    ["a write-role actor", { actor: "writer" }, /writer has repository role 'write'/, true],
+    ["a non-collaborator", { actor: "stranger" }, /stranger has repository role 'none'/, true],
+    ["a maintainer re-run triggered by a write-role user", { actor: "maintainer", triggeringActor: "writer" }, /writer has repository role 'write'/, true],
+    ["a bot actor", { actor: "github-actions[bot]" }, /is not a GitHub user login/, false],
+    ["an unreadable permission", { apiDown: true }, /could not read the repository permission/, true],
+  ]
+  for (const [name, dispatch, reason, looksUp] of refusals) {
+    test(`refuses ${name}`, () => {
+      const outcome = gate(dispatch)
+      expect(outcome.status).toBe(1)
+      expect(outcome.output).toMatch(new RegExp(`::error::operator_darwin_artifacts refused: .*${reason.source}`))
+      expect(outcome.summary).toBe("")
+      expect(outcome.ghCalls !== "").toBe(looksUp)
+    })
+  }
+})
+
+describe("operator darwin wiring", () => {
+  test("the parent preparation run never dispatches the child when the input is set", () => {
+    expect(job(publish, "dispatch-provenance-safe-publish").if).toContain("inputs.operator_darwin_artifacts == ''")
+  })
+
+  test("publish-platform receives the input and the prepared sha from the provenance run only", () => {
+    expect(job(publish, "publish-platform").with).toMatchObject({
+      operator_darwin_artifacts: "${{ inputs.operator_darwin_artifacts }}",
+      prepared_release_sha: "${{ inputs.prepared_release_sha }}",
+    })
+    expect(Object.keys(platform.on.workflow_call?.inputs ?? {})).toEqual(expect.arrayContaining(["operator_darwin_artifacts", "prepared_release_sha"]))
+  })
+
+  test("the desktop-engine matrix keeps both darwin legs only when the input is empty", () => {
+    const include = String(job(platform, "desktop-engine").strategy?.matrix?.include)
+    const parts = include.match(/inputs\.operator_darwin_artifacts == '' && '(.*?)' \|\| '', '(.*?)'\)\) \}\}$/)
+    expect(parts).not.toBeNull()
+    const hosts = (json: string) => (JSON.parse(`[${json}]`) as Array<{ host: string }>).map((leg) => leg.host)
+    const hosted = hosts(`${parts?.[1] ?? ""}${parts?.[2] ?? ""}`)
+    const operator = hosts(parts?.[2] ?? "")
+    expect(hosted).toEqual(["darwin-arm64", "darwin-x64", "linux-x64", "linux-arm64", "win32-x64", "win32-arm64"])
+    expect(operator).toEqual(["linux-x64", "linux-arm64", "win32-x64", "win32-arm64"])
+  })
+
+  test("the hosted keychain-helper runs only without the input, and operator-darwin only with it", () => {
+    expect(job(platform, "keychain-helper").if).toContain("inputs.operator_darwin_artifacts == ''")
+    expect(job(platform, "operator-darwin").if).toContain("inputs.operator_darwin_artifacts != ''")
+    expect(job(platform, "operator-darwin")["runs-on"]).toBe("ubuntu-24.04")
+  })
+
+  test("build waits for the verified operator artifacts and leaves macOS only for the hosted mode", () => {
+    const build = job(platform, "build")
+    expect(build.needs).toEqual(expect.arrayContaining(["desktop-engine", "keychain-helper", "operator-darwin"]))
+    expect(build.if).toContain("inputs.operator_darwin_artifacts != '' && needs.operator-darwin.result == 'success'")
+    expect(build.if).toContain("inputs.operator_darwin_artifacts == '' && needs.keychain-helper.result == 'success'")
+    expect(build["runs-on"]).toContain("startsWith(matrix.platform, 'darwin-') && inputs.operator_darwin_artifacts == '' && 'macos-latest'")
+  })
+
+  test("no operator-darwin step can be skipped or soft-fail", () => {
+    for (const step of job(platform, "operator-darwin").steps ?? []) {
+      expect({ step: step.name, if: step.if, soft: step["continue-on-error"] }).toEqual({ step: step.name, if: undefined, soft: undefined })
+    }
+  })
+
+  test("a darwin build leg with the input takes its release binary from the operator artifacts", () => {
+    const run = stepRun(platform, "build", "Check release assets").replaceAll("${{ matrix.platform }}", "darwin-x64")
+    const root = mkdtempSync(join(tmpdir(), "operator-darwin-assets-"))
+    scratch.push(root)
+    const output = join(root, "output")
+    const result = spawnSync("bash", ["-c", `gh() { echo gh-called >&2; return 1; }\nbun() { echo bun-called >&2; return 1; }\n${run}`], {
+      env: { PATH: process.env.PATH ?? "", GITHUB_OUTPUT: output, OMO_AI_VERSION: "5.1.73", VERSION: "5.1.73", OPERATOR_DARWIN_ARTIFACTS: TAG },
+      encoding: "utf8",
+    })
+    expect(result.status).toBe(0)
+    expect(readFileSync(output, "utf8")).toBe("binary_exists=true\n")
+    expect(result.stderr).not.toContain("called")
+  })
+})
