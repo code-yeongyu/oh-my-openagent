@@ -679,7 +679,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
       }
     return { kind: "file", sessionPath: entry.session_path }
   }
-  const relayTools = createRelayTools({ options, relay, view, failure })
+  const relayTools = createRelayTools({ options, relay, failure })
   const dispose = () => {
     pipeline.dispose()
     unanswered.clear()
@@ -897,7 +897,7 @@ async function deliverThrough(
 }
 
 /**
- * Registers the eighteen tools, and with `pi.on` the store extensions' session tools at each `session_start`
+ * Registers the fourteen tools, and with `pi.on` the store extensions' session tools at each `session_start`
  * (`tools/extension-tools.ts`); `dispose` (shutdown) cancels the relay's background retries and drops the receipt-recovery keys.
  */
 export function registerThreadTools(

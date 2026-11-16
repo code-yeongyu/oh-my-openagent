@@ -281,35 +281,6 @@ export type ThreadBinding = BindingRecord
 
 export type ThreadOutboxRow = OutboxRow
 
-export type ThreadBindResult =
-  { readonly kind: "ok"; readonly binding: ThreadBinding; readonly deduplicated: boolean } | ThreadDataError
-
-export type ThreadUnbindResult =
-  | {
-      readonly kind: "ok"
-      readonly binding: ThreadBinding
-      /** True when the binding was already detached or expired: the call replays success and changes nothing. */
-      readonly already_closed: boolean
-      /** Deliveries accepted through this binding that the session has not taken yet. */
-      readonly in_flight: readonly string[]
-      readonly deduplicated: boolean
-    }
-  | ThreadDataError
-
-export type ThreadRebindResult =
-  | {
-      readonly kind: "ok"
-      readonly binding: ThreadBinding
-      /** Deliveries queued under the old revision, closed with a binding_closed refusal instead of being moved. */
-      readonly closed: readonly string[]
-      readonly deduplicated: boolean
-    }
-  | ThreadDataError
-
-export type ThreadBindingsResult =
-  | { readonly kind: "ok"; readonly bindings: readonly ThreadBinding[]; readonly next_cursor: string | null }
-  | ThreadDataError
-
 export type ThreadReportResult =
   | {
       readonly kind: "ok"
@@ -345,10 +316,6 @@ export type ThreadAnswerResult =
   | ThreadDataError
 
 export type ThreadToolResult =
-  | ThreadBindResult
-  | ThreadUnbindResult
-  | ThreadRebindResult
-  | ThreadBindingsResult
   | ThreadReportResult
   | ThreadOutboxResult
   | ThreadOutboxAckResult
