@@ -141,15 +141,15 @@ describe("#given the dev push runs that now carry macOS/Windows coverage", () =>
     expect([...(Array.isArray(watched) ? watched : [])].sort()).toEqual(platformOnDev.sort())
   })
 
-  // GitHub keeps one pending run per concurrency group, so a group that every dev completion enters can drop a
-  // red run before its issue exists. Only the writer, gated on a failed macOS/Windows job, may serialize.
-  test("#then only the issue writer, gated on a failed macOS/Windows job, enters the tracker's concurrency group", () => {
+  // GitHub keeps one pending run per concurrency group and cancels the older one, so any group in the tracker can
+  // drop a red run's failed jobs and merged PR before they reach the issue. Writers dedupe the issue instead.
+  test("#then no tracker job can be dropped by a concurrency group, and only a failed macOS/Windows job writes", () => {
     const file = "platform-red-tracker.yml"
     expect(workflow(file)["concurrency"]).toBeUndefined()
     const grouped = Object.entries(jobs(file)).filter(
       ([, definition]) => isRecord(definition) && definition["concurrency"],
     )
-    expect(grouped.map(([name]) => name)).toEqual(["file-issue"])
+    expect(grouped.map(([name]) => name)).toEqual([])
     const writer = job(file, "file-issue")
     const detect = String(writer["needs"])
     const runsFor = (failed: string) =>
