@@ -13,7 +13,7 @@ use windows::Win32::System::Threading::{
 use windows::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId;
 
 /// The integrity RID of `process`, or `None` when its token cannot be read.
-fn rid(process: HANDLE) -> Option<u32> {
+pub(crate) fn rid(process: HANDLE) -> Option<u32> {
     let mut token = HANDLE::default();
     // SAFETY: out-parameter; the token handle is closed below.
     unsafe { OpenProcessToken(process, TOKEN_QUERY, &mut token) }.ok()?;
