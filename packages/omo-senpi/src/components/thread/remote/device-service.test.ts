@@ -1,4 +1,4 @@
-import { describe, expect, jest, test } from "bun:test"
+import { describe, expect, jest, spyOn, test } from "bun:test"
 import {
   connectDeviceService,
   LocalApiError,
@@ -1397,6 +1397,8 @@ describe("device-service adapter: an idle attach's detach timer", () => {
     jest.useFakeTimers()
     try {
       const conn = fakeService([state({ state: "engine_applied" }, {}), state({ state: "engine_applied" }, {})], [])
+      // The double hands out one attach object; the spy counts the pool's detach of it and still runs its own detach.
+      const detach = spyOn(await conn.attach("b", "s1"), "detach")
       let attaches = 0
       const service = {
         ...conn,
@@ -1412,6 +1414,7 @@ describe("device-service adapter: an idle attach's detach timer", () => {
       })
       expect((await port.sessionCommand("b", "s1", { type: "get_state" })).kind).toBe("ok")
       jest.advanceTimersByTime(IDLE_MS)
+      expect(detach).toHaveBeenCalledTimes(1)
       expect((await port.sessionCommand("b", "s1", { type: "get_state" })).kind).toBe("ok")
       expect(attaches).toBe(2)
     } finally {
