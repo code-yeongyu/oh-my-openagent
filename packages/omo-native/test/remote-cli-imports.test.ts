@@ -9,7 +9,7 @@ import { join } from "node:path"
 const NATIVE = join(import.meta.dir, "..")
 
 const OFFENDERS: readonly string[] = [
-  // 4c-1 leaves these: `wake`, `enable` and the session verbs still run on their own connection.
+  // 4c-1 leaves these: `enable` and the session verbs still run on their own connection.
   "remote-cli.ts -> ../device-service-core/src/index.ts",
   "remote-cold-wake.ts -> ../device-service-core/src/index.ts",
   "remote-entry.ts -> ../device-service-core/src/device-service.ts",
