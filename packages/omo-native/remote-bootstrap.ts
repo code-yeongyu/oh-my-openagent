@@ -174,8 +174,20 @@ async function enableRemote(
   if (enabled && !afterLogin) remote.optOut.clear()
   report(enabled)
   if (outcome.status.device === null && (await remote.linkDevice()) === "signed_out") io.error(NOT_LINKED)
-  await applyColdWake(remote.coldWake, enabled, io.error)
+  if (enabled && afterLogin) await installColdWakeUnlessOptedOut(remote, io)
+  else await applyColdWake(remote.coldWake, enabled, io.error)
   return enabled
+}
+
+/**
+ * The session host unit after login, ordered against a disable as the switch is (#13762 review LOW). A disable records
+ * the opt-out before it removes the unit, so an opt-out read before the install skips it, and one read after it removes
+ * the unit again: a record made after that read is followed by that disable's own removal, which comes last.
+ */
+async function installColdWakeUnlessOptedOut(remote: RemoteSetup, io: BootstrapIo): Promise<void> {
+  if (remote.optOut.read()) return
+  await applyColdWake(remote.coldWake, true, io.error)
+  if (remote.optOut.read()) await applyColdWake(remote.coldWake, false, io.error)
 }
 
 /**
