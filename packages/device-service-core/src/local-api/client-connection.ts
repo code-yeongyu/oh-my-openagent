@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@42078b7cbfbc8db06cd626d99ab3b80017e7ae2a packages/local-api/src/client-connection.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@04288f856dcd224a87108cb46d62d0343ce77136 packages/local-api/src/client-connection.ts
 import { LocalApiError } from "./errors.ts";
 import { encodeLine, LineDecoder, parseLine } from "./framing.ts";
 import { lineBytes, LOCAL_INLINE_MAX } from "./limits.ts";
