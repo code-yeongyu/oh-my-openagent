@@ -78,9 +78,9 @@ impl Session {
     /// stop marker another engine of the user may have committed, which is latched here so the
     /// stop sticks for the session's later calls (review L1 of #13767).
     fn stop_while_waiting(&mut self) -> Option<Refusal> {
+        self.guard.latch_committed_marker();
+        // After the latch: a marker's new stop epoch ends the lease and revokes the grant here.
         self.reconcile_stop();
-        self.guard
-            .latch_committed_marker()
-            .map(SuspendReason::refusal)
+        self.guard.supervisor().latch().map(SuspendReason::refusal)
     }
 }

@@ -52,10 +52,13 @@ pub enum StopOutcome {
 
 impl Supervisor {
     /// A stop marker another engine committed after this one started: latched as the marker
-    /// read at start is (A-IS-66 W4), so the stop sticks for every later call. Answers the latch.
+    /// read at start is (A-IS-66 W4), so the stop sticks for every later call; a new latch moves the stop epoch. Answers the latch.
     pub fn latch_committed_marker(&mut self) -> Option<SuspendReason> {
-        if self.marker.read().stops() {
-            self.latch = Some(self.latch.unwrap_or(SuspendReason::StopMarker));
+        if self.latch.is_none() && self.marker.read().stops() {
+            // A new stop: its epoch moves, so whatever the stop covers (the lease, the grant)
+            // is ended by the session's reconcile, as `stop()` does for the chord.
+            self.latch = Some(SuspendReason::StopMarker);
+            self.stop_epoch += 1;
         }
         self.latch
     }
