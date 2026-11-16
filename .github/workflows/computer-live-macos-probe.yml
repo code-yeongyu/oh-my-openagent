@@ -18,6 +18,8 @@ concurrency:
 jobs:
   probe:
     name: hosted macos live probe (${{ matrix.os }})
+    # macOS-only job: a pull request runs it only with the ci:full-matrix label (#13802); dispatches always run it.
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-matrix')
     strategy:
       fail-fast: false
       matrix:
@@ -59,7 +61,7 @@ jobs:
   ledger:
     name: hosted macos live ledger
     needs: probe
-    if: always()
+    if: always() && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-matrix'))
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
