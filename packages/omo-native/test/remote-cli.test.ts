@@ -596,7 +596,12 @@ describe("omo remote session verbs", () => {
       a.remote,
     )
     expect(code).toBe(REMOTE_EXIT.ok)
-    expect(JSON.parse(out.join(""))).toMatchObject({ kind: "ok", thread: { thread_id: "dur-new-on-b", device: "b" } })
+    // Review LOW at c09a616: --json still names the model the session opened on, as it did before #13409.
+    expect(JSON.parse(out.join(""))).toMatchObject({
+      kind: "ok",
+      thread: { thread_id: "dur-new-on-b", device: "b" },
+      model: { provider: "openai", id: "gpt-6" },
+    })
     expect(types(a.sent, "open_session").map((entry) => [entry.rpc?.["provider"], entry.rpc?.["modelId"]])).toEqual([
       ["openai", "gpt-6"],
     ])

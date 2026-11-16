@@ -73,7 +73,7 @@ describe("#13010 remote CLI session identity", () => {
     const result = await run(["open", PEER, "--model", "test/model", "--json"], fake.stateDir)
     expect({ code: result.code, json: JSON.parse(result.out.join("")) }).toMatchObject({
       code: REMOTE_EXIT.ok,
-      json: { kind: "ok", thread: { thread_id: DURABLE, sessionId: SESSION_ID } },
+      json: { kind: "ok", thread: { thread_id: DURABLE, sessionId: SESSION_ID }, model: MODEL },
     })
     expect(JSON.stringify(fake.state.commands)).not.toContain("set_model")
   })
