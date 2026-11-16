@@ -256,7 +256,9 @@ export function createCliAccountSource(options: {
       sameKeys(current, captured)
     const isCurrent = async (): Promise<boolean> => {
       if (abort.signal.aborted) return false
-      const current = await session.update(async (stored) => stored)
+      // #13739: one transiently empty read is read again under the same lock before the capture is retired; a cleared
+      // store (a real sign-out) reads empty twice and still ends sync here.
+      const current = await session.update(async (stored) => stored ?? (await store.readAuthoritative()))
       const same = sameCaptured(current)
       if (!same) abort.abort()
       return same && !abort.signal.aborted
@@ -295,6 +297,7 @@ export function createCliAccountSource(options: {
     await check()
     const descriptor: DesktopSyncDescriptor = {
       genesis: "unsupported",
+      phraseGenesis: "unsupported",
       rpId: null,
       userName: null,
       serviceOrigin: api,

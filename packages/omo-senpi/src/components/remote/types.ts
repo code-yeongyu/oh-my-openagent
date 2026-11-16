@@ -9,8 +9,9 @@ import type {
   JsonObject as WireJsonObject,
   SnapshotBody as WireSnapshotBody,
   Status,
-} from "../../../../device-service-core/src/local-api/protocol"
-import type { AliasRegistry } from "../thread/remote/ports"
+} from "../../../../device-service-core/src/wire"
+import type { PermissionPreset } from "../thread/contracts/permission-presets"
+import type { AliasRegistry } from "../thread/remote/alias-port"
 import type { RemoteCode } from "./codes"
 
 // The types of the one remote module (design one-remote-module v8-core r2, section B1 and Appendix B, as confirmed).
@@ -75,7 +76,8 @@ export type ThreadHandle = string & { readonly __brand: "ThreadHandle" }
 export type DeviceRow = {
   readonly id: string
   readonly name: string
-  readonly kind: string
+  /** Absent on this device's own row when the roster does not list it: the service reports no kind for it (#13402). */
+  readonly kind?: string
   readonly platform: string
   readonly online: boolean
   readonly last_seen_ms: number | null
@@ -122,7 +124,12 @@ export type SendRequest = {
 export type SendReceipt = {
   readonly thread: ThreadHandle
   readonly device: DeviceRow
+  /**
+   * The send's own id: the `clientMessageId` its prompt carried, which the engine stamps on every record of the turn
+   * that answers it (senpi ClientMessageEvents), live and in any replay. Pass the receipt as follow/wait `from`.
+   */
   readonly delivery_id?: string
+  /** The engine turn the send started or steered (`get_state.currentTurnId`); absent for a queued send. */
   readonly turn_id?: string
   readonly queued_id?: string
 } & (
@@ -147,8 +154,15 @@ export type PendingRequest = {
 export type FollowOutcome = {
   readonly reason: "settled" | "session_closed" | "interrupted" | "queued_unfollowable"
   readonly text?: string
+  /** Followed `from` a send: that receipt's `turn_id`, the same identity. Otherwise the engine run's id. */
   readonly turn_id?: string
 }
+/**
+ * The options of sessions.follow and sessions.wait. `from` anchors them on one send (#13753): with a receipt that carries
+ * a `delivery_id`, they follow only the turn that answers that send and end on its end, whatever the attach replays;
+ * without one they follow the session from now on.
+ */
+export type FollowOpts = Opts & { readonly from?: SendReceipt }
 export type FollowEvent =
   | { readonly kind: "receipt"; readonly receipt: SendReceipt }
   | { readonly kind: "text"; readonly delta: string }
@@ -229,9 +243,11 @@ export type SessionsList = {
 
 // What the members of part 4a-2 take and answer (#13414 W3: the rows' confirmed shapes, recorded in remote-tools SEAMS.md).
 
-/** senpi's approval modes (permission-system/types.ts), as `open_session` takes them (`permissionPreset`): the one list. */
-export const PERMISSION_PRESETS = ["full-access", "workspace", "accept-edits", "auto", "read-only", "ask"] as const
-export type PermissionPreset = (typeof PERMISSION_PRESETS)[number]
+/**
+ * senpi's approval modes (permission-system/types.ts), as `open_session` takes them (`permissionPreset`): the one list
+ * is the thread contracts' PERMISSION_PRESETS (thread_create narrows by it); its type is re-exported here.
+ */
+export type { PermissionPreset }
 
 /**
  * One new session, opened through the shared create path (thread SessionHost.open): `workspace` is its cwd, `model` is
@@ -398,9 +414,12 @@ export type RemoteClient = {
       page?: { readonly before?: string; readonly tail?: number },
       opts?: Opts,
     ) => R<ReadPage>
-    /** Status changes, turn ends and the turn's stream, from now on; survives relay, service and engine restarts. */
-    readonly follow: (thread: ThreadHandle, opts?: Opts) => RemoteStream<FollowEvent>
-    readonly wait: (thread: ThreadHandle, opts?: Opts) => R<WaitResult>
+    /**
+     * Status changes, turn ends and the turn's stream, from now on (or, with `opts.from`, the turn that answers that
+     * send); survives relay, service and engine restarts.
+     */
+    readonly follow: (thread: ThreadHandle, opts?: FollowOpts) => RemoteStream<FollowEvent>
+    readonly wait: (thread: ThreadHandle, opts?: FollowOpts) => R<WaitResult>
     readonly interrupt: (thread: ThreadHandle, opts?: Opts) => R<InterruptResult>
     /** The session's own model ("provider/id"); never a device default. */
     readonly setModel: (thread: ThreadHandle, model: string, opts?: Opts) => R<{ readonly model: string }>

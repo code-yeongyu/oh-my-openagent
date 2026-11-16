@@ -3,6 +3,7 @@ import { outcomeOf } from "../thread/remote/outcome"
 import { type ClientCore, ok, type Outcome, type RemoteClient } from "./client"
 import { engineCode, nextActionFor, remoteFailure } from "./codes"
 import { DEADLINES, withinDeadline } from "./deadlines"
+import { attachAddressed } from "./port/device-service"
 import { canonicalizeThreadHandle } from "./seams"
 import type {
   AttachEvent,
@@ -158,8 +159,10 @@ class MirroredDialogs {
     const uiRequestId = text(record["uiRequestId"])
     if (uiRequestId === undefined) return undefined
     if (record["type"] === "ui_request_settled") {
-      // Only a request this attach showed gets a frame_settled; any other settle goes on as a record.
-      if (this.#raiserOnly.delete(uiRequestId) || !this.#shown.delete(uiRequestId)) return undefined
+      // Forgotten in both sets (a secret raised on this connection's own channel is in both); only a request this attach
+      // showed gets a frame_settled, any other settle goes on as a record.
+      this.#raiserOnly.delete(uiRequestId)
+      if (!this.#shown.delete(uiRequestId)) return undefined
       const how = record["disposition"] === "answered" ? "answered" : "cancelled"
       return { kind: "frame_settled", request_id: uiRequestId, how }
     }
@@ -411,7 +414,8 @@ export async function openAttachment(core: ClientCore, thread: ThreadHandle, opt
   let opened: RemoteAttach | undefined
   let abandoned = false
   const outcome = await core.member(opts, DEADLINES.attachOpen, false, async (svc): Promise<Outcome<Attachment>> => {
-    const attached = await svc.attach(target.device, target.session)
+    // A mistyped id or a durable id is located once, as the thread tools do, so it answers not_found, never unsupported.
+    const { attached } = await attachAddressed(svc, target.device, target.session)
     opened = attached
     if (abandoned) await attached.detach()
     await attached.snapshot

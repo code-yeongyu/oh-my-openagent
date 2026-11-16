@@ -8,12 +8,14 @@ import type {
   AttachEvent,
   AttachHandle,
   FollowEvent,
+  FollowOpts,
   FollowOutcome,
   JsonObject,
   Opts,
   PendingRequest,
   R,
   RemoteFailure,
+  SendReceipt,
   SnapshotBody,
   ThreadHandle,
   WaitResult,
@@ -38,6 +40,8 @@ type SessionWatch = {
    * why none was (the read failed, ended uncertain, or the host sent no engine reply).
    */
   readonly baseline: () => Promise<RemoteFailure | undefined>
+  /** Delivers what arrived since the open (the attach's replay first), then everything as it arrives. */
+  readonly start: () => void
   readonly stop: () => void
 }
 
@@ -90,19 +94,37 @@ async function watchSession(
     if (!stopped) handlers.fresh(data)
     return undefined
   }
-  const stopSnapshots = onSnapshot((snapshot) => {
+  // Nothing reaches the handlers before the caller is ready for it (start): the attach replays its records the moment it
+  // opens, and a record dropped there could be the very turn a follow waits for.
+  type Arrival =
+    | { readonly kind: "event"; readonly event: AttachEvent }
+    | { readonly kind: "snapshot"; readonly snapshot: SnapshotBody }
+    | { readonly kind: "ended" }
+  let early: Arrival[] | undefined = []
+  const arrive = (arrival: Arrival): void => {
     if (stopped) return
-    handlers.snapshot(snapshot)
-    void readFresh()
-  })
+    if (early !== undefined) return void early.push(arrival)
+    if (arrival.kind === "event") handlers.event(arrival.event)
+    else if (arrival.kind === "ended") handlers.ended()
+    else {
+      handlers.snapshot(arrival.snapshot)
+      void readFresh()
+    }
+  }
+  const stopSnapshots = onSnapshot((snapshot) => arrive({ kind: "snapshot", snapshot }))
   void (async () => {
-    for await (const event of handle.events) if (!stopped) handlers.event(event)
-    if (!stopped) handlers.ended()
+    for await (const event of handle.events) arrive({ kind: "event", event })
+    arrive({ kind: "ended" })
   })()
   return ok({
     initial: handle.snapshot,
     handle,
     baseline: readFresh,
+    start: () => {
+      const arrived = early ?? []
+      early = undefined
+      for (const arrival of arrived) arrive(arrival)
+    },
     stop: () => {
       stopped = true
       stopSnapshots()
@@ -117,11 +139,15 @@ async function watchSession(
 // only on an observed end: `agent_settled`, a `session_status` idle, or senpi's run lease (the `session-lifecycle`
 // record its lifecycle ledger appends at each change, seen as `session_lifecycle` records, as transcript entries and as
 // get_state's `lifecycle`) moving to a state other than running.
-type Lease = { readonly state: string; readonly seq: number }
+type Lease = { readonly state: string; readonly seq: number; readonly runId?: string }
 
 const leaseOf = (value: unknown): Lease | undefined =>
   isObject(value) && typeof value["state"] === "string" && typeof value["seq"] === "number"
-    ? { state: value["state"], seq: value["seq"] }
+    ? {
+        state: value["state"],
+        seq: value["seq"],
+        ...(nonEmpty(value["runId"]) === undefined ? {} : { runId: String(value["runId"]) }),
+      }
     : undefined
 
 const newer = (a: Lease | undefined, b: Lease | undefined): Lease | undefined =>
@@ -137,6 +163,110 @@ const newestLease = (entries: readonly unknown[]): Lease | undefined =>
       ),
     undefined,
   )
+
+/** The newest run lease a snapshot holds: its state's `lifecycle`, or its newest `session-lifecycle` entry. */
+const snapshotLease = (snapshot: SnapshotBody): Lease | undefined =>
+  newer(leaseOf(isObject(snapshot.state) ? snapshot.state["lifecycle"] : undefined), newestLease(snapshot.entries))
+
+/** The run lease a record carries: a `session_lifecycle` record, or an appended `session-lifecycle` entry. */
+const recordLease = (record: JsonObject): Lease | undefined =>
+  record["type"] === "session_lifecycle"
+    ? leaseOf(record["lifecycle"])
+    : record["type"] === "entry_appended"
+      ? newestLease([record["entry"]])
+      : undefined
+
+/**
+ * follow's anchor (#13753): it follows from the moment it opens. The attach replays turns that already ran (the host
+ * streams records it buffered since an older snapshot), so everything the attach replays or the snapshot holds is
+ * history, and history never reaches the turn: no text, no tool event, no end. The anchor is the run lease the session
+ * held when follow opened (its first fresh get_state, the baseline). A run is this follow's when:
+ * - a lease newer than the baseline shows it running;
+ * - it is the run in flight at the baseline (a caller may open follow and send without waiting for the open); or
+ * - the baseline shows it ended, under a newer lease than the snapshot's and with another run id than the snapshot's
+ *   (it started after the open and ended before the baseline answered).
+ * Until the baseline is known every record waits; a run's records wait until one of these decides them, and a run that
+ * settles undecided was history. Without a fresh state the snapshot's lease is the baseline; an engine whose state
+ * carries no lease is followed as before.
+ */
+class FollowAnchor {
+  #known = false
+  #unanchored = false
+  #seq = -1
+  readonly #live = new Set<string>()
+  readonly #early: AttachEvent[] = []
+  /** The newest run lease the snapshot held when follow opened; undefined when it held none. */
+  readonly #atOpen: Lease | undefined
+  #run: { readonly id: string | undefined; verdict: "live" | "undecided"; readonly held: AttachEvent[] } | undefined
+
+  constructor(atOpen: Lease | undefined) {
+    this.#atOpen = atOpen
+  }
+
+  /** The lease the session held at the open (undefined: none known); answers the events it releases. */
+  baseline(lease: Lease | undefined): readonly AttachEvent[] {
+    if (this.#known) return []
+    this.#known = true
+    if (lease === undefined) this.#unanchored = true
+    else {
+      this.#seq = lease.seq
+      // A run in flight at the baseline is this follow's: the read can land after the send it follows started its run
+      // (a caller opens follow and sends without waiting for the open), and nothing tells that run from an older one.
+      if (lease.state === "running") {
+        if (lease.runId !== undefined) this.#live.add(lease.runId)
+        this.#run = { id: lease.runId, verdict: "live", held: [] }
+      } else if (
+        lease.runId !== undefined &&
+        this.#atOpen !== undefined &&
+        lease.seq > this.#atOpen.seq &&
+        lease.runId !== this.#atOpen.runId
+      )
+        // A run that started after follow opened (another run than the snapshot's, under a newer lease) and ended before
+        // the baseline read answered (it failed at once): it is this follow's, though its own leases are not newer than
+        // the baseline. The seq alone proves nothing: it also advances with no new run, and an idle lease keeps the
+        // previous run's id (senpi rpc.md "Session lifecycle").
+        this.#live.add(lease.runId)
+    }
+    return this.#early.splice(0).flatMap((event) => this.#accept(event))
+  }
+
+  /** The events of `event` that are this follow's, now (held ones included once decided). */
+  accept(event: AttachEvent): readonly AttachEvent[] {
+    // Only records can be history; a frame, a lost channel or the session's end are this follow's at once.
+    if (event.kind !== "record") return [event]
+    if (!this.#known) {
+      this.#early.push(event)
+      return []
+    }
+    return this.#accept(event)
+  }
+
+  #accept(event: AttachEvent): readonly AttachEvent[] {
+    if (this.#unanchored || event.kind !== "record") return [event]
+    const record = event.record
+    const lease = recordLease(record)
+    if (lease !== undefined) {
+      if (lease.seq <= this.#seq) return []
+      const run = this.#run
+      if (lease.state === "running" && lease.runId !== undefined) this.#live.add(lease.runId)
+      if (run?.verdict === "undecided" && (lease.runId === undefined || lease.runId === run.id)) {
+        run.verdict = "live"
+        return [...run.held.splice(0), event]
+      }
+      return [event]
+    }
+    if (record["type"] === "agent_start") {
+      const id = nonEmpty(record["runId"])
+      this.#run = { id, verdict: id !== undefined && this.#live.has(id) ? "live" : "undecided", held: [] }
+    }
+    const run = this.#run
+    if (run === undefined) return [event]
+    if (record["type"] === "agent_settled") this.#run = undefined
+    if (run.verdict === "live") return [event]
+    if (run.verdict === "undecided") run.held.push(event)
+    return []
+  }
+}
 
 type Signal =
   | { readonly kind: "status"; readonly status: string }
@@ -268,7 +398,7 @@ class SessionTurn {
     this.#leaseSeq = lease.seq
     this.#asksElsewhere = lease.state === "waiting_human"
     if (lease.state === "running") this.#markRunning()
-    else if (lease.state !== "waiting_human") return this.#markEnded()
+    else if (runOver(lease)) return this.#markEnded()
     return false
   }
 
@@ -307,6 +437,8 @@ class SessionTurn {
       case "ui_request_pending": {
         const id = nonEmpty(record["uiRequestId"])
         if (id === undefined) return []
+        // Already raised as this client's own frame: it stays answerable here, as it was raised.
+        if (this.#asked.has(id)) return []
         this.#ask(record["request"], id)
         return this.#update(true)
       }
@@ -325,6 +457,12 @@ class SessionTurn {
       default:
         return []
     }
+  }
+
+  /** The followed send's turn began: the session runs it (its agent_start carries no client id). */
+  markRunning(): readonly Signal[] {
+    this.#markRunning()
+    return this.#update()
   }
 
   #markRunning(): void {
@@ -374,6 +512,85 @@ export function sessionStatusOf(state: JsonObject, entries: readonly unknown[] =
   return turn.status
 }
 
+/**
+ * The lease states that say the run is over: the ones senpi ranks below running (session-lifecycle-reducer). A Stop or a
+ * hold ranks paused and held ahead of running, so they say nothing about the turn: its own records end it (a Stop's
+ * aborted agent_end), and waiting_human is a turn waiting on a person.
+ */
+const RUN_OVER: ReadonlySet<string> = new Set(["waiting_children", "waiting_background", "done", "failed", "cancelled"])
+
+/** A run lease that says the run is over (RUN_OVER). */
+const runOver = (lease: Lease): boolean => RUN_OVER.has(lease.state)
+
+/** A record's client message ids: the one it carries, and every input of its turn when it names several. */
+const clientIdsOf = (record: JsonObject): readonly string[] => {
+  const list = record["clientMessages"]
+  const listed = Array.isArray(list)
+    ? list.flatMap((input) => {
+        const id = isObject(input) ? nonEmpty(input["clientMessageId"]) : undefined
+        return id === undefined ? [] : [id]
+      })
+    : []
+  const own = nonEmpty(record["clientMessageId"])
+  return own === undefined ? listed : [own, ...listed]
+}
+
+/**
+ * follow and wait `from` one send (#13753). The engine stamps the prompt's clientMessageId on every record of the turn
+ * that answers it (senpi ClientMessageEvents: turn_start, message_*, tool_execution_*, its message entries, turn_end,
+ * agent_end), live and in any replay; leases, session_status, agent_start and agent_settled carry none (live relay
+ * trace). So the send's turn is exactly the records that carry its id: nothing else is its text or its end, whatever the
+ * attach replays. It ends at an agent_end that carries the id, or when another input's turn takes over (a queued input
+ * is answered inside the same run, whose agent_end then names only the last input).
+ */
+class SendTurn {
+  readonly #id: string
+  #seen = false
+
+  constructor(id: string) {
+    this.#id = id
+  }
+
+  /**
+   * What `record` is to this send: one of its turn's records; its turn's end (its own agent_end); "over" (another input's
+   * turn started: a turn_start without this id, stamped with another input's id or with none at all, since an id-less
+   * input such as an extension's custom-message follow-up clears the correlation); "ran_out" (the run ended after the
+   * send's turn with no record of its own saying so: an agent_end or agent_settled without this id, an idle status, a
+   * run lease neither running nor waiting on a person); or none of these.
+   */
+  classify(record: JsonObject): "ours" | "end" | "over" | "ran_out" | "other" {
+    const ids = clientIdsOf(record)
+    const type = record["type"]
+    if (ids.includes(this.#id)) {
+      this.#seen = true
+      // An agent_end before a provider retry (willRetry) is not the end: the retried run answers under the same id.
+      return type === "agent_end" && record["willRetry"] !== true ? "end" : "ours"
+    }
+    if (!this.#seen) return "other"
+    if (type === "turn_start") return "over"
+    if (type === "agent_end" || type === "agent_settled") return "ran_out"
+    if (type === "session_status" && record["status"] === "idle") return "ran_out"
+    const lease = recordLease(record)
+    return lease !== undefined && runOver(lease) ? "ran_out" : "other"
+  }
+
+  /** A fresh state after a relay gap: the run lease off running means the send's turn ended in the gap. */
+  ranOutIn(state: JsonObject): boolean {
+    const lease = leaseOf(state["lifecycle"])
+    return this.#seen && lease !== undefined && runOver(lease)
+  }
+
+  get started(): boolean {
+    return this.#seen
+  }
+}
+
+/** A send's turn end, under the receipt's turn id: the identity the send itself reported. */
+const sendOutcome = (turn: SessionTurn, from: SendReceipt): FollowOutcome => {
+  const { turn_id: _runId, ...outcome } = turn.outcome()
+  return { ...outcome, ...(from.turn_id === undefined ? {} : { turn_id: from.turn_id }) }
+}
+
 const WAITING: Readonly<Record<string, Extract<FollowEvent, { readonly kind: "waiting" }>["state"]>> = {
   running: "turn_running",
   idle: "idle",
@@ -381,6 +598,9 @@ const WAITING: Readonly<Record<string, Extract<FollowEvent, { readonly kind: "wa
   compacting: "compacting",
   opening: "queued",
 }
+
+// How long a re-attach's get_state that says a send's run is over waits for that turn's own records (#13753 review L3).
+const RESYNC_GRACE_MS = 2_000
 
 const RETRY_WAIT = "Call sessions.get for the session's state, then sessions.wait again."
 
@@ -400,7 +620,7 @@ const attachEnded = (): RemoteFailure =>
 export function streamMembers(core: ClientCore): StreamMembers {
   const person = core.sender.kind === "person"
 
-  const follow = (thread: ThreadHandle, opts?: Opts) => {
+  const follow = (thread: ThreadHandle, opts?: FollowOpts) => {
     let watch: SessionWatch | undefined
     let finished = false
     const deadlineMs = opts?.deadlineMs ?? DEADLINES.followTotal
@@ -411,6 +631,7 @@ export function streamMembers(core: ClientCore): StreamMembers {
       if (last !== undefined) output.push(last)
       output.end()
       cancelTimer()
+      resyncEnd?.()
       opts?.signal?.removeEventListener("abort", onAbort)
       watch?.stop()
     }
@@ -460,26 +681,78 @@ export function streamMembers(core: ClientCore): StreamMembers {
       }
     }
 
+    // From one send: only the records that carry its id (SendTurn); the session's state and leases are not consulted.
+    const from = opts?.from
+    const send = from?.delivery_id === undefined ? undefined : new SendTurn(from.delivery_id)
+    // A re-attach's get_state that says the run is over ends the turn only if no record of the send follows it within
+    // RESYNC_GRACE_MS: the turn's own end, with its last text and its aborted flag, wins when it still streams.
+    let resyncEnd: (() => void) | undefined
+    const ofSend = (event: AttachEvent): void => {
+      if (turn === undefined || from === undefined || send === undefined) return
+      if (event.kind !== "record") return deliver(turn.apply(event))
+      const seen = send.started
+      const verdict = send.classify(event.record)
+      if (verdict === "other") return
+      resyncEnd?.()
+      resyncEnd = undefined
+      // Another turn's records are never applied: its agent_end must not mark this turn interrupted.
+      if (verdict === "over" || verdict === "ran_out") return finish({ kind: "end", outcome: sendOutcome(turn, from) })
+      if (!seen) deliver(turn.markRunning())
+      deliver(turn.apply(event))
+      if (verdict === "end" && !finished) finish({ kind: "end", outcome: sendOutcome(turn, from) })
+    }
+
+    let anchor: FollowAnchor | undefined
+    const release = (events: readonly AttachEvent[]): void => {
+      for (const event of events) if (turn !== undefined) deliver(turn.apply(event))
+    }
     void watchSession(core, thread, opts?.signal, {
-      event: (event) => deliver(turn?.apply(event) ?? []),
-      snapshot: (snapshot) => deliver(turn?.resync(snapshot) ?? []),
-      fresh: (state) => deliver(turn?.fresh(state) ?? []),
+      event: (event) => (send === undefined ? release(anchor?.accept(event) ?? []) : ofSend(event)),
+      snapshot: (snapshot) => {
+        if (send === undefined) deliver(turn?.resync(snapshot) ?? [])
+      },
+      fresh: (state) => {
+        // From a send, only a re-attach reads the state: its run lease off running ends a turn whose end fell in the gap.
+        if (send !== undefined) {
+          const ending = turn
+          if (ending !== undefined && from !== undefined && resyncEnd === undefined && send.ranOutIn(state))
+            resyncEnd = core.timers.after(RESYNC_GRACE_MS, () =>
+              finish({ kind: "end", outcome: sendOutcome(ending, from) }),
+            )
+          return
+        }
+        deliver(turn?.fresh(state) ?? [])
+        release(anchor?.baseline(leaseOf(state["lifecycle"])) ?? [])
+      },
       ended: () => fail(attachEnded()),
     }).then((opened) => {
       if (opened.kind === "error") return fail(opened)
       watch = opened.value
       if (finished) return watch.stop()
       turn = new SessionTurn()
+      if (send !== undefined) {
+        if (person) for (const request of watch.handle.pending()) output.push({ kind: "frame", request })
+        if (from?.lane === "queued" || from?.lane === "queued_offline")
+          output.push({ kind: "waiting", state: "queued" })
+        return watch.start()
+      }
       turn.resync(opened.value.initial)
       if (person) for (const request of watch.handle.pending()) output.push({ kind: "frame", request })
       const first = waiting(turn.status)
       if (first !== undefined) output.push(first)
-      void watch.baseline()
+      const atOpen = snapshotLease(opened.value.initial)
+      const anchored = new FollowAnchor(atOpen)
+      anchor = anchored
+      watch.start()
+      // Without a fresh state the snapshot's lease is the best anchor this follow has.
+      void watch.baseline().then((unread) => {
+        if (unread !== undefined) release(anchored.baseline(atOpen))
+      })
     })
     return output.stream
   }
 
-  const wait = (thread: ThreadHandle, opts?: Opts): R<WaitResult> => {
+  const wait = (thread: ThreadHandle, opts?: FollowOpts): R<WaitResult> => {
     const start = core.timers.now()
     return new Promise((resolve) => {
       let watch: SessionWatch | undefined
@@ -491,6 +764,7 @@ export function streamMembers(core: ClientCore): StreamMembers {
         if (settled) return
         settled = true
         cancelTimer()
+        resyncEnd?.()
         opts?.signal?.removeEventListener("abort", onAbort)
         watch?.stop()
         resolve(outcome)
@@ -509,19 +783,57 @@ export function streamMembers(core: ClientCore): StreamMembers {
         if (turn.status === "waiting_input") return result("settled")
         if (!turn.running && (confirmed || signals.some((signal) => signal.kind === "run_ended"))) result("settled")
       }
+      // The records go through follow's anchor too: a turn the attach replays (its agent_settled above all) never
+      // settles a wait while a newer run is live (#13753 review M1).
+      let anchor: FollowAnchor | undefined
+      const release = (events: readonly AttachEvent[]): void => {
+        for (const event of events) if (turn !== undefined) check(turn.apply(event))
+      }
+      // From one send: settled on its turn's end (idle) or on the next input taking over (running), nothing else.
+      const send = opts?.from?.delivery_id === undefined ? undefined : new SendTurn(opts.from.delivery_id)
+      let resyncEnd: (() => void) | undefined
+      const ofSend = (event: AttachEvent): void => {
+        if (turn === undefined || send === undefined) return
+        if (event.kind !== "record") return check(turn.apply(event))
+        const verdict = send.classify(event.record)
+        if (verdict !== "other") {
+          resyncEnd?.()
+          resyncEnd = undefined
+        }
+        if (verdict === "end" || verdict === "ran_out") return result("settled", "idle")
+        if (verdict === "over") return result("settled", "running")
+        if (verdict === "ours") turn.markRunning()
+      }
       void watchSession(core, thread, opts?.signal, {
-        event: (event) => check(turn?.apply(event) ?? []),
-        snapshot: (snapshot) => check(turn?.resync(snapshot) ?? []),
-        fresh: (state) => check(turn?.fresh(state) ?? []),
+        event: (event) => (send === undefined ? release(anchor?.accept(event) ?? []) : ofSend(event)),
+        snapshot: (snapshot) => {
+          if (send === undefined) check(turn?.resync(snapshot) ?? [])
+        },
+        fresh: (state) => {
+          // From a send, only a re-attach reads the state: its run lease off running ends a turn whose end fell in the gap.
+          if (send !== undefined) {
+            if (resyncEnd === undefined && send.ranOutIn(state))
+              resyncEnd = core.timers.after(RESYNC_GRACE_MS, () => result("settled", "idle"))
+            return
+          }
+          check(turn?.fresh(state) ?? [])
+          release(anchor?.baseline(leaseOf(state["lifecycle"])) ?? [])
+        },
         ended: () => done(attachEnded()),
       }).then(async (opened) => {
         if (opened.kind === "error") return done(opened)
         watch = opened.value
         if (settled) return watch.stop()
         turn = new SessionTurn()
+        if (send !== undefined) return watch.start()
         turn.resync(opened.value.initial)
+        const atOpen = snapshotLease(opened.value.initial)
+        const anchored = new FollowAnchor(atOpen)
+        anchor = anchored
         check([])
+        watch.start()
         const unread = await opened.value.baseline()
+        if (unread !== undefined) release(anchored.baseline(atOpen))
         // Without a fresh state "no run" is unknown (the snapshot's idle can be stale): a run already seen is still
         // waited for, but a wait that would answer settled/idle answers why it cannot tell instead.
         if (unread === undefined) confirmed = true

@@ -88,10 +88,24 @@ describe("attach rows: open", () => {
     const name = canonicalizeThreadHandle("my-thread", {})
     if (name.kind !== "ok") throw new Error("a name parses")
     expect(failureOf(await client.attach(name.value.handle)).code).toBe("invalid_arguments")
-    expect(failureOf(await client.attach(handleOf(PEER, "no-such-session")))).toMatchObject({
+    // A well-formed listing key the device does not hold: a service with #1350 refuses an id that is no key at all as
+    // invalid_request before any lookup.
+    expect(failureOf(await client.attach(handleOf(PEER, "bm90LWhlbGQta2V5LTAwMQ")))).toMatchObject({
       code: "not_found",
       details: { kind: "session" },
     })
+  })
+
+  test("#given a mistyped session id and an unknown durable id #when attach opens #then each is not_found, never unsupported", async () => {
+    // The device answers session.locate and holds no session by either id.
+    const owner = await startOwner({ ...worldWith(STATE), located: { [PEER]: {} } })
+    const client = clientOn(owner.stateDir, fakeClock())
+    // The service refuses an id that is no listing key as invalid_request (#1350); the attach locates it once instead.
+    for (const session of ["no such session", "0195f0c4-7a1b-7c2d-8e3f-4a5b6c7d8e9f"])
+      expect(failureOf(await client.attach(handleOf(PEER, session)))).toMatchObject({
+        code: "not_found",
+        details: { kind: "session" },
+      })
   })
 
   test("#given a host that never sends the snapshot #when attach waits #then it answers timeout at attachOpen", async () => {
@@ -188,6 +202,24 @@ describe("attach rows: pending UI requests (#12750)", () => {
     })
     expect(await events.next("the next record")).toEqual({ kind: "record", record: { type: "agent_start" } })
     expect(ids(handle)).toEqual(["ui-6"])
+    await handle.detach()
+  })
+
+  test("#given a secret dialog raised on this connection's own channel #when it is answered #then one frame_settled and pending is empty", async () => {
+    const { owner, handle } = await attached({ sessionId: "engine-1", isStreaming: true, pendingDialogs: [] })
+    const events = reader(handle.events)
+    const mirror = {
+      type: "ui_request_pending",
+      uiRequestId: "ui-6",
+      method: "input",
+      request: { ...SECRET, id: "ui-6" },
+    }
+    pushFrame(owner, { ...SECRET, id: "ui-6" })
+    pushRecords(owner, [mirror, { type: "ui_request_settled", uiRequestId: "ui-6", disposition: "answered" }])
+    expect(await events.next("the raiser's frame")).toMatchObject({ kind: "frame", request: { request_id: "ui-6" } })
+    expect(await events.next("the mirror record")).toEqual({ kind: "record", record: mirror })
+    expect(await events.next("the settle")).toEqual({ kind: "frame_settled", request_id: "ui-6", how: "answered" })
+    expect(handle.pending()).toEqual([])
     await handle.detach()
   })
 

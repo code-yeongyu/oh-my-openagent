@@ -11,6 +11,8 @@ import {
   type ListingRow,
   type Timers,
 } from "@oh-my-opencode/device-service-core/device-service"
+import type { ThreadSocketConnect } from "../thread/live-surface"
+import type { ThreadHost } from "../thread/tools/ports"
 import { aliasMembers } from "./aliases"
 import { attachMember } from "./attach"
 import { failureFromError, nextActionFor, remoteFailure } from "./codes"
@@ -19,6 +21,9 @@ import { streamMembers } from "./follow"
 import { resolveMember } from "./resolve"
 import { handleOf } from "./seams"
 import { sessionMembers } from "./sessions"
+import { defaultLocalThreadHost } from "./sessions-local"
+import { localSessionRows } from "./sessions-local-list"
+import { thisDeviceRow } from "./this-device-row"
 import type {
   DeviceRow,
   Opts,
@@ -31,9 +36,16 @@ import type {
   SessionsList,
   SessionsListFilter,
 } from "./types"
+import { unknownDevice } from "./unknown-device"
 
 /** The client's deps over the device service SDK's own connection and attach (types.ts `RemoteClientDeps`). */
-export type RemoteClientDeps = RemoteClientDepsOver<DeviceService, RemoteAttach>
+export type RemoteClientDeps = RemoteClientDepsOver<DeviceService, RemoteAttach> & {
+  /**
+   * Test seam: this device's operator endpoint, where an open on this device lands (the engine's own host by default),
+   * built over the socket `connect` the open watches its frames on.
+   */
+  readonly localThreadHost?: (connect: ThreadSocketConnect) => Promise<ThreadHost>
+}
 export type { RemoteClient }
 
 export type Outcome<T> = { readonly kind: "ok"; readonly value: T } | RemoteFailure
@@ -44,6 +56,8 @@ export type ClientCore = {
   readonly sender: RemoteSender
   readonly timers: Timers
   readonly deps: RemoteClientDeps
+  /** Opens a new proven connection, as the client's own is opened; the caller owns it and closes it. */
+  readonly dial: () => Promise<DeviceService>
   /** Runs `body` on the proven connection under the member's deadline; settles with data, never throws. */
   readonly member: <T>(
     opts: Opts | undefined,
@@ -140,9 +154,11 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
   const timers = deps.timers ?? realTimers
   const stateDir = deps.stateDir ?? deviceServiceStateDir()
   let service: Promise<DeviceService> | undefined
+  const dial = (): Promise<DeviceService> =>
+    (deps.connect ?? connectDeviceService)({ version: deps.version, stateDir, timers })
   const connection = (): Promise<DeviceService> => {
     if (service !== undefined) return service
-    const opening = (deps.connect ?? connectDeviceService)({ version: deps.version, stateDir, timers }).then(
+    const opening = dial().then(
       (connected) => {
         void connected.closed.then(() => {
           if (service === opening) service = undefined
@@ -212,19 +228,11 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
   }
 
   const listDevices = async (svc: DeviceService): Promise<readonly DeviceRow[]> => {
-    const [rows, self] = await Promise.all([svc.devices(), svc.thisDevice()])
-    const control = svc.capabilities.includes("control")
+    const [rows, self, status] = await Promise.all([svc.devices(), svc.thisDevice(), svc.status()])
     const listed = rows.map(deviceRow)
     if (self === null) return [localSelfRow(), ...listed]
     const own = listed.find((row) => row.id === self.id)
-    const selfRow: DeviceRow = {
-      // A connected service's own device: thisDevice() names no kind, so it is a cli device; "local" is only the row
-      // of a device with no service.
-      ...(own ?? { ...localSelfRow(), kind: "cli", id: self.id, name: self.name, last_seen_ms: timers.now() }),
-      self: true,
-      online: true,
-      caps: { attach: true, machine: false, control },
-    }
+    const selfRow = thisDeviceRow(self, own, status, timers.now(), svc.capabilities.includes("control"))
     return [selfRow, ...listed.filter((row) => row.id !== self.id)]
   }
 
@@ -237,8 +245,22 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
       () => ok([localSelfRow()]),
     )
 
+  /**
+   * This device's own sessions, under a bound of their own that ends before the listing's (#13787 review L1): a host that
+   * takes list_sessions and never answers leaves this device unanswered, never the whole listing a timeout.
+   */
+  const localRowsBefore = async (end: number, self: DeviceRow): Promise<readonly SessionRow[] | undefined> => {
+    const ms = Math.max(0, Math.min(DEADLINES.sessionsListLocal, end - timers.now() - 1))
+    const answered = await withinDeadline(timers, undefined, ms, false, async () =>
+      ok(await localSessionRows(deps.localThreadHost ?? defaultLocalThreadHost, self)),
+    )
+    return answered.kind === "ok" ? answered.value : undefined
+  }
+
   const sessionsList = (filter?: SessionsListFilter, opts?: Opts): R<SessionsList> =>
     member(opts, DEADLINES.sessionsList, false, async (svc) => {
+      // The listing's own deadline, whose clock member starts as this body does.
+      const end = timers.now() + (opts?.deadlineMs ?? DEADLINES.sessionsList)
       const [listing, devices] = await Promise.all([
         svc.sessions({
           ...(filter?.device === undefined ? {} : { device: filter.device }),
@@ -248,10 +270,25 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
         listDevices(svc),
       ])
       const byId = new Map(devices.map((row) => [row.id, row]))
+      const unknown = unknownDevice(filter?.device, byId, listing)
+      if (unknown !== undefined) return unknown
       const deviceOf = (id: string): DeviceRow => byId.get(id) ?? unlistedDevice(id)
       const wanted = filter?.name?.toLowerCase()
-      const rows = listing.rows
-        .map((row) => sessionRow(row, deviceOf(row.device)))
+      // This device's own sessions come from its own operator endpoint (#13787): the service's listing does not carry
+      // the asking device's sessions. One it already lists by the same durable id keeps the service's row.
+      const self = devices.find((row) => row.self === true && row.kind !== "local")
+      const listed = listing.rows.map((row) => sessionRow(row, deviceOf(row.device)))
+      const local =
+        self === undefined || (filter?.device !== undefined && filter.device !== self.id)
+          ? []
+          : await localRowsBefore(end, self)
+      const known = new Set(listed.flatMap((row) => (row.durable_id === undefined ? [] : [row.durable_id])))
+      const rows = [
+        ...listed,
+        ...(local ?? []).filter((row) => row.durable_id === undefined || !known.has(row.durable_id)),
+      ]
+        .filter((row) => filter?.state === undefined || row.state === filter.state)
+        .filter((row) => filter?.project === undefined || row.project === filter.project)
         .filter(
           (row) =>
             (filter?.archived === undefined || row.archived === filter.archived) &&
@@ -264,12 +301,14 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
           ...Object.entries(listing.devices)
             .filter(([, state]) => state !== "answered")
             .map(([id]) => id),
+          // This device's own host did not answer: its sessions are missing from this listing.
+          ...(self !== undefined && local === undefined ? [self.id] : []),
         ]),
       ].map(deviceOf)
       return ok({ revision: listing.revision, rows, unanswered })
     })
 
-  const core: ClientCore = { sender, timers, deps, member, sessionsList, devicesList }
+  const core: ClientCore = { sender, timers, deps, dial, member, sessionsList, devicesList }
 
   return {
     service: {
