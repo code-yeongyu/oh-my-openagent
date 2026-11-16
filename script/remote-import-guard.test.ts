@@ -10,6 +10,7 @@ import {
   REMOTE_IMPORT_RULES,
   S1_OFFENDERS,
   S2_OFFENDERS,
+  S3_OFFENDERS,
 } from "./remote-import-guard-rules"
 import { scanRepository } from "./remote-import-guard-scan"
 
@@ -37,6 +38,11 @@ describe("remote import guard G1 over packages/**", () => {
   test("#given S2 #then connection and transport factories are used as values only where allowed", () => {
     // Matched by where the value comes from, so thread delivery's own createRelayTransport is not a hit.
     expect(asRecord(repo.s2)).toEqual(usesOf(S2_OFFENDERS))
+  })
+
+  test("#given S3 #then a remote surface reaches the remote layer only through components/remote/index.ts", () => {
+    // The import boundary of #13414: thread tools, the omo remote CLI and the TUI are thin callers of the one module.
+    expect(asRecord(repo.s3)).toEqual(usesOf(S3_OFFENDERS))
   })
 
   test("#given non-literal import() outside tests #then no file gains one", () => {
@@ -96,6 +102,22 @@ describe("remote import guard G1 matcher", () => {
     'import { connectLocalApi } from "../../device-service-core/src/local-api/client.ts"\n',
   )
   write(`${senpi}/src/dynamic.ts`, "export const load = (name: string) => import(name)\n")
+  write(`${senpi}/src/components/remote/index.ts`, 'export { createRemoteClient } from "./client.ts"\n')
+  write(`${senpi}/src/components/remote/sessions.ts`, "export const sessions = 1\n")
+  write(`${senpi}/src/components/remote/port/device-service.ts`, "export const port = 1\n")
+  write(`${senpi}/src/components/thread/tool-entry.ts`, 'import { createRemoteClient } from "../remote/index.ts"\n')
+  write(`${senpi}/src/components/thread/tool-member.ts`, 'import { sessions } from "../remote/sessions.ts"\n')
+  write(`${senpi}/src/components/thread/tool-port.ts`, 'import type { port } from "../remote/port/device-service.ts"\n')
+  write(
+    `${senpi}/src/components/thread/tool-l1.ts`,
+    'import type { DeviceService } from "@oh-my-opencode/device-service-core"\n',
+  )
+  write(`${senpi}/src/components/thread/tool.test.ts`, 'import { sessions } from "../remote/sessions.ts"\n')
+  write(
+    "packages/omo-native/remote-verb.ts",
+    'import { sessions } from "../omo-senpi/src/components/remote/sessions.ts"\n',
+  )
+  write("packages/omo-native/other.ts", 'import { sessions } from "../omo-senpi/src/components/remote/sessions.ts"\n')
   const fixture = findings(root)
 
   test("#given each import shape #then S1 matches the vendored client even through a type-only import", () => {
@@ -114,5 +136,14 @@ describe("remote import guard G1 matcher", () => {
       [`${senpi}/src/runtime.ts`]: ["connectDeviceService"],
     })
     expect(Object.fromEntries(fixture.nonLiteralImports)).toEqual({ [`${senpi}/src/dynamic.ts`]: 1 })
+  })
+
+  test("#given each import shape #then S3 holds surfaces to the module's index, type-only included, tests and non-surfaces exempt", () => {
+    expect(asRecord(fixture.s3)).toEqual({
+      [`${senpi}/src/components/thread/tool-l1.ts`]: ["packages/device-service-core/src/"],
+      [`${senpi}/src/components/thread/tool-member.ts`]: ["packages/omo-senpi/src/components/remote/"],
+      [`${senpi}/src/components/thread/tool-port.ts`]: ["packages/omo-senpi/src/components/remote/"],
+      "packages/omo-native/remote-verb.ts": ["packages/omo-senpi/src/components/remote/"],
+    })
   })
 })
