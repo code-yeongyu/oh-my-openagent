@@ -201,7 +201,7 @@ fn self_target_terminal_is_refused() {
         .expect_err("the terminal is self");
     assert_eq!(
         (refused.gate, refused.refusal.reason),
-        (Gate::Target, Some("self_target"))
+        (Gate::Target, Some(omo_computer_core::error::Reason::SelfTarget))
     );
     assert!(backend
         .processes()
@@ -265,6 +265,6 @@ fn a_handed_app_key_makes_its_window_self_target_without_a_host_chain() {
         force: true,
     };
     let refused = guard.admit_on(&mut backend, &call).expect_err("the desktop app is self");
-    assert_eq!((refused.gate, refused.refusal.reason), (Gate::Target, Some("self_target")));
+    assert_eq!((refused.gate, refused.refusal.reason), (Gate::Target, Some(omo_computer_core::error::Reason::SelfTarget)));
     let _ = fs::remove_dir_all(&root);
 }

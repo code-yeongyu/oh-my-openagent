@@ -90,10 +90,7 @@ impl Live {
         if let Some(keys) = &self.keys {
             return Ok(keys.boxed());
         }
-        let display = self.display.as_deref().ok_or(Refusal::new(
-            EngineCode::StopPathUnavailable,
-            Reason::NoListener.wire(),
-        ))?;
+        let display = self.display.as_deref().ok_or(Refusal::new(EngineCode::StopPathUnavailable, Reason::NoListener))?;
         Xi2Server::connect(display)
             .map(|server| Box::new(server) as Box<dyn super::RawKeyServer>)
             .map_err(|_| Refusal::bare(EngineCode::StopPathUnavailable))

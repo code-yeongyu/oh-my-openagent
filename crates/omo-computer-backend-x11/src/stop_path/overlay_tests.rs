@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use omo_computer_core::backend::Presence;
+use omo_computer_core::error::Reason;
 
 use crate::capture::server::PixelRect;
 use crate::overlay::{borders, Overlay, OverlayServer, BORDER_PX, OVERLAY_RGB};
@@ -79,5 +80,5 @@ fn no_overlay_server_is_no_presence_surface() {
     let mut overlay = Overlay::new(None);
     assert!(!overlay.available());
     let refused = overlay.show().expect_err("no surface");
-    assert_eq!(refused.reason, Some("no_presence_surface"));
+    assert_eq!(refused.reason, Some(Reason::NoPresenceSurface));
 }
