@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { applyExactDacl, exactDaclVerdict, parseSddl } from "../../src/local-api/dacl.ts"
+import { exactDaclVerdict, parseSddl } from "../../src/local-api/dacl.ts"
+import { aliasedDaclVerdict, applyExactDacl } from "../../src/release/windows-dacl.ts"
 import { rejectionOf } from "./conformance/rejection.ts"
 
 const U = "S-1-5-21-1111111111-2222222222-3333333333-1001"
@@ -118,11 +119,11 @@ describe("the SDDL alias of the user", () => {
     const aliased = parseSddl("O:LAD:PAI(A;;FA;;;LA)")
     expect(aliased).toBeDefined()
     if (aliased === undefined) return
-    expect(exactDaclVerdict(aliased, U, "file", "LA")).toBe(true)
-    expect(exactDaclVerdict(aliased, U, "file")).toBe(false)
-    expect(exactDaclVerdict(aliased, U, "file", "BA")).toBe(false)
+    expect(aliasedDaclVerdict(aliased, U, "file", "LA")).toBe(true)
+    expect(aliasedDaclVerdict(aliased, U, "file")).toBe(false)
+    expect(aliasedDaclVerdict(aliased, U, "file", "BA")).toBe(false)
     const mixed = parseSddl("O:LAD:PAI(A;;FA;;;BA)")
-    expect(mixed !== undefined && exactDaclVerdict(mixed, U, "file", "LA")).toBe(false)
+    expect(mixed !== undefined && aliasedDaclVerdict(mixed, U, "file", "LA")).toBe(false)
   })
 })
 
