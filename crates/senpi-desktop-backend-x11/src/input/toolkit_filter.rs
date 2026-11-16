@@ -11,7 +11,7 @@ pub enum Toolkit {
     Vcl,
     Chromium,
     Firefox,
-    /// xterm drops sent events unless its `allowSendEvents` resource is on.
+    /// xterm, whose `allowSendEvents` (off by default) no other client can read.
     Xterm,
 }
 
@@ -23,7 +23,7 @@ impl Toolkit {
             Self::Vcl => "LibreOffice VCL",
             Self::Chromium => "Chromium",
             Self::Firefox => "Firefox",
-            Self::Xterm => "xterm without allowSendEvents",
+            Self::Xterm => "xterm",
         }
     }
 }

@@ -76,7 +76,5 @@ pub trait InputServer {
     /// The local process of the client that owns `window`; `Err` says why
     /// it is unknown.
     fn client_process(&self, window: Window) -> Result<ClientProcess, String>;
-    /// The root window's `RESOURCE_MANAGER` database; empty when unset.
-    fn resources(&self) -> Vec<u8>;
     fn flush(&self) -> CoreResult<()>;
 }

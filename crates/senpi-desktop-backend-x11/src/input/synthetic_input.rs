@@ -11,7 +11,6 @@ use senpi_desktop_core::report::Disposition;
 
 use super::client_process::ClientProcess;
 use super::toolkit_filter::{accepting_library, class_label, dropping_library, filtering_toolkit, Toolkit};
-use super::xterm_resources::allows_send_events;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Acceptance {
@@ -23,14 +22,9 @@ pub enum Acceptance {
     Unproven { why: String },
 }
 
-/// Classifies the client of a window from its `WM_CLASS`, its process (read
-/// only when the class names no filtering toolkit) and the display's
-/// `RESOURCE_MANAGER` database.
-pub fn acceptance(
-    wm_class: &[u8],
-    client: impl FnOnce() -> Result<ClientProcess, String>,
-    resources: &[u8],
-) -> Acceptance {
+/// Classifies the client of a window from its `WM_CLASS` and its process
+/// (read only when the class names no filtering toolkit).
+pub fn acceptance(wm_class: &[u8], client: impl FnOnce() -> Result<ClientProcess, String>) -> Acceptance {
     if let Some(toolkit) = filtering_toolkit(wm_class) {
         return Acceptance::Drops {
             toolkit,
@@ -53,13 +47,13 @@ pub fn acceptance(
             evidence: "its process runs Chromium --type= helpers".to_owned(),
         };
     }
-    if let Some((instance, class)) = xterm_identity(wm_class, &process.args) {
-        if !allows_send_events(&instance, &class, &process.args, resources) {
-            return Acceptance::Drops {
-                toolkit: Toolkit::Xterm,
-                evidence: format!("no resource for {instance}/{class} sets allowSendEvents to true"),
-            };
-        }
+    if is_xterm(wm_class, &process.args) {
+        return Acceptance::Drops {
+            toolkit: Toolkit::Xterm,
+            evidence: "its allowSendEvents setting cannot be read: Xt merges resource files the engine cannot \
+                       see, and the xterm menu turns it off at runtime"
+                .to_owned(),
+        };
     }
     accepting_library(&process.libraries).map_or_else(
         || Acceptance::Unproven {
@@ -98,24 +92,15 @@ pub fn refusal(window: &str, kind: &str, acceptance: Acceptance) -> Option<Deskt
     )
 }
 
-/// The resource instance and class of an xterm client (its `WM_CLASS`
-/// parts, `xterm`/`XTerm` when it has none), or `None` for another program.
-fn xterm_identity(wm_class: &[u8], args: &[String]) -> Option<(String, String)> {
-    let parts: Vec<String> = wm_class
+/// xterm drops sent events unless its `allowSendEvents` resource is on, and
+/// that setting is never fully visible to another client.
+fn is_xterm(wm_class: &[u8], args: &[String]) -> bool {
+    let class_is_xterm = wm_class
         .split(|&byte| byte == 0)
-        .filter(|part| !part.is_empty())
-        .map(|part| String::from_utf8_lossy(part).into_owned())
-        .collect();
-    let class_is_xterm = parts.iter().any(|part| part.eq_ignore_ascii_case("xterm"));
+        .any(|part| part.eq_ignore_ascii_case(b"xterm") || part.eq_ignore_ascii_case(b"uxterm"));
     let program_is_xterm = args
         .first()
         .and_then(|program| program.rsplit('/').next())
-        .is_some_and(|name| name == "xterm");
-    if !(class_is_xterm || program_is_xterm) {
-        return None;
-    }
-    match parts.as_slice() {
-        [instance, class, ..] => Some((instance.clone(), class.clone())),
-        _ => Some(("xterm".to_owned(), "XTerm".to_owned())),
-    }
+        .is_some_and(|name| name == "xterm" || name == "uxterm");
+    class_is_xterm || program_is_xterm
 }

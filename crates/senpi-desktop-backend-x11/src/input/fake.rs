@@ -75,7 +75,6 @@ pub struct FakeInputServer {
     activate_updates_active: Cell<bool>,
     classes: HashMap<Window, Vec<u8>>,
     processes: HashMap<Window, ClientProcess>,
-    resources: Vec<u8>,
     origins: HashMap<Window, (i16, i16)>,
     /// A child window covering the whole of its parent (the widget a toolkit
     /// dispatches to), keyed by parent.
@@ -102,7 +101,6 @@ impl FakeInputServer {
             activate_updates_active: Cell::new(true),
             classes: HashMap::new(),
             processes: HashMap::new(),
-            resources: Vec::new(),
             origins: HashMap::new(),
             children: HashMap::new(),
             parents: HashMap::new(),
@@ -138,12 +136,6 @@ impl FakeInputServer {
         if let Some(process) = self.processes.get_mut(&window) {
             process.chromium_helpers = true;
         }
-        self
-    }
-
-    /// The display's `RESOURCE_MANAGER` database.
-    pub fn resources(mut self, database: &[u8]) -> Self {
-        self.resources = database.to_vec();
         self
     }
 
@@ -274,10 +266,6 @@ impl InputServer for FakeInputServer {
             current = self.parents.get(&id).copied();
         }
         Err("the X server knows no local process for the window's client".to_owned())
-    }
-
-    fn resources(&self) -> Vec<u8> {
-        self.resources.clone()
     }
 
     fn flush(&self) -> CoreResult<()> {

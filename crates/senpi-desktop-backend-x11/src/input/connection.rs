@@ -227,10 +227,6 @@ impl InputServer for X11InputConnection {
         super::connection_client::client_process(&self.conn, window)
     }
 
-    fn resources(&self) -> Vec<u8> {
-        super::connection_client::resources(&self.conn, self.root)
-    }
-
     fn flush(&self) -> CoreResult<()> {
         self.conn.flush().map_err(failed)
     }

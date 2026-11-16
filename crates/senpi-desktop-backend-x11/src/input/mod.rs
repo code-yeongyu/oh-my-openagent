@@ -20,7 +20,6 @@ mod settle;
 mod synthetic_input;
 mod toolkit_filter;
 mod transitions;
-mod xterm_resources;
 mod xtest;
 
 #[cfg(test)]
@@ -43,8 +42,6 @@ mod settle_tests;
 mod table_tests;
 #[cfg(test)]
 mod tests;
-#[cfg(test)]
-mod xterm_resources_tests;
 
 use senpi_desktop_core::backend::{DeliveryMode, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
@@ -251,11 +248,7 @@ impl<S: InputServer> X11Input<S> {
     }
 
     fn accepting(&self, window: Window, class: &[u8], id: &str, kind: &str) -> CoreResult<()> {
-        let acceptance = synthetic_input::acceptance(
-            class,
-            || self.server.client_process(window),
-            &self.server.resources(),
-        );
+        let acceptance = synthetic_input::acceptance(class, || self.server.client_process(window));
         synthetic_input::refusal(id, kind, acceptance).map_or(Ok(()), Err)
     }
 

@@ -1,6 +1,6 @@
-// X11 scenarios: capture + click into the target xterm, the foreground focus guard, background
-// `XSendEvent` delivery that leaves `_NET_ACTIVE_WINDOW` alone, scroll direction in both delivery
-// modes, and the XI2 stop chord latch.
+// X11 scenarios: capture + click into the target xterm, the foreground focus guard, the background
+// refusal for xterm that leaves `_NET_ACTIVE_WINDOW` alone, scroll direction in both delivery modes
+// (background `XSendEvent` delivered to the Tk widget), and the XI2 stop chord latch.
 import { asObject, Engine, type Json, type JsonObject, outcome } from "./engine.ts";
 import { until } from "./procs.ts";
 import { type Context, type Result, result } from "./scenario.ts";
@@ -84,9 +84,24 @@ async function deliveredClick(
 		const click = outcome(await engine.exec("click", clickParams(stage, frame, deliveryMode)));
 		const pasted = click === "ok" ? await observe.pastesAbove(before.count) : observe.pastes();
 		const after = { active: await observe.activeWindow(), ...pasted };
-		const name = deliveryMode === "foreground" ? "x11-focus-guard" : "x11-background-keeps-active-window";
+		if (deliveryMode === "background") {
+			// No client can read xterm's allowSendEvents (resource files, the runtime menu), so the engine refuses
+			// background input to it instead of reporting a delivery it cannot know (omo#9109); the Tk scroll
+			// scenario is the background delivery that must still arrive.
+			return result(
+				"x11-background-keeps-active-window",
+				{
+					other_active_before: before.active === stage.other,
+					click_refused_background_unavailable: click === "BackgroundUnavailable",
+					target_received_nothing: after.count === before.count,
+					active_window_restored: after.active === before.active,
+				},
+				{ display: stage.display, target: stage.target, other: stage.other, deliveryMode, click },
+				{ before, after },
+			);
+		}
 		return result(
-			name,
+			"x11-focus-guard",
 			{
 				other_active_before: before.active === stage.other,
 				click_ok: click === "ok",

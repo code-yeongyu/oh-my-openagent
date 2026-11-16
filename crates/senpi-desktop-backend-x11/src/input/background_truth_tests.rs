@@ -109,21 +109,6 @@ fn a_client_with_no_toolkit_known_to_accept_synthetic_input_is_refused() {
 }
 
 #[test]
-fn xterm_is_refused_until_its_resources_allow_send_events() {
-    // Given: an xterm with no allowSendEvents setting.
-    let xterm = || {
-        FakeInputServer::new(Some(EDITOR))
-            .window(FIXTURE, (2, 40), b"xterm\0XTerm\0")
-            .process(FIXTURE, &["libXaw.so.7", "libXt.so.6"], &["xterm"])
-    };
-    // When / Then: refused by default, delivered once the database allows it.
-    assert_refused(xterm(), "synthetic_input_dropped");
-    let (results, sent) = background_attempts(xterm().resources(b"XTerm*allowSendEvents:\ttrue\n"));
-    assert!(results.iter().all(Result::is_ok), "{results:?}");
-    assert!(sent > 0);
-}
-
-#[test]
 fn xterm_is_refused_even_when_the_resources_the_engine_can_read_allow_send_events() {
     // Given: -xrm sets allowSendEvents true, then the abbreviated -xr (Xt accepts it) sets it false;
     // XENVIRONMENT, ~/.Xdefaults-<host>, app-defaults and the runtime menu can override it unseen.
