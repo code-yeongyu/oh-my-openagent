@@ -5,7 +5,11 @@ import type {
   CeremonyClock,
   ApproveOutcome,
   JoinOutcome,
+  EnableMethod,
   EnableOutcome,
+  PhraseGate,
+  PhraseNoticeStatus,
+  PhraseVoidNotice,
   DesktopSyncAccount,
   DesktopSyncDescriptor,
   DesktopSyncOperation,
@@ -57,8 +61,33 @@ export interface SyncRpcRuntime {
       readonly rpId?: string
       readonly userName?: string
       readonly genesis?: DesktopSyncOperation["genesis"]
+      readonly method?: EnableMethod
+      readonly onCeremony?: (method: EnableMethod) => void
+      readonly phraseGate?: PhraseGate
     },
   ): Promise<EnableOutcome & { readonly created?: true }>
+  /** Absent when the host has not wired phrase notices: status then omits them. */
+  phraseNoticeStatus?(place: {
+    readonly pinDir: string
+    readonly account: string
+    readonly principalId: string
+  }): Promise<PhraseNoticeStatus>
+  /** Status with enroll/rotate markers resolved against the verified chain; used only when the local read is unresolved. */
+  verifiedPhraseNoticeStatus?(input: {
+    readonly pinDir: string
+    readonly account: string
+    readonly principalId: string
+    readonly chain: SyncRpcOperation["chain"]
+  }): Promise<PhraseNoticeStatus>
+  /** Absent when the host has not wired phrase notices: acknowledge then answers unavailable. */
+  acknowledgePhraseVoid?(
+    input: SyncRpcCeremonyInput & {
+      readonly serviceDeviceId: string
+      readonly serviceOrigin: string
+      readonly purpose: PhraseVoidNotice["purpose"]
+      readonly credentialId?: string
+    },
+  ): Promise<{ readonly ok: true }>
   joinAccount(
     input: SyncRpcCeremonyInput & {
       readonly clock: CeremonyClock
@@ -98,6 +127,8 @@ export interface SyncRpcOptions {
   readonly signal: AbortSignal
   readonly syncStatus: () => Promise<MemoryRpcSync | undefined>
   readonly clock?: CeremonyClock
+  /** Releases recovery-phrase key creation (amendment A1); absent means off. */
+  readonly phraseGate?: PhraseGate
   /** Receives one warning each time the status read's unavailable cause changes. */
   readonly warn?: (message: string, fields: Record<string, unknown>) => void
 }

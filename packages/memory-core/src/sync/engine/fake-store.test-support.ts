@@ -52,6 +52,11 @@ export class FakeItemStore implements ItemStore {
     return this.device
   }
 
+  /** The line-set fake keeps no per-peer history, so it never claims a rewindable first capture. */
+  async firstCapture(): Promise<"first" | "rewound" | "no"> {
+    return "no"
+  }
+
   keys(): readonly string[] {
     return [...new Set([...this.items.keys(), ...this.materialized.keys()])].sort()
   }

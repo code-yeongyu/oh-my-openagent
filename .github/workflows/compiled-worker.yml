@@ -17,11 +17,19 @@ permissions:
   contents: read
 
 jobs:
+  platform:
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/pr-platform-decision.yml
+
   relocated-worker:
+    needs: platform
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # macOS/Windows only when the shared platform decision allows it (pr-platform-decision.yml, #13859).
+        os: ${{ fromJSON(needs.platform.outputs.full_matrix != 'true' && '["ubuntu-latest"]' || '["ubuntu-latest", "macos-latest", "windows-latest"]') }}
     runs-on: ${{ matrix.os == 'ubuntu-latest' && 'ubuntu-26.04' || matrix.os }}
     timeout-minutes: 10
     steps:
