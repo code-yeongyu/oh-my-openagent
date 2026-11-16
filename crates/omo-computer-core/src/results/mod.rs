@@ -13,7 +13,7 @@ pub use diagnosis::{
 pub use exec::ExecReply;
 pub use notifications::{AuditLine, EpochChanged, ForegroundConsent, HandConsent, HandStatus};
 pub use reads::{
-    CaptureReply, ClipboardContent, ConcealedReason, DisplayInfo, MenuItems, ObserveReply,
+    CaptureReply, ClipboardContent, ClipboardReadReply, ConcealedReason, DisplayInfo, MenuItems, ObserveReply,
     PointerPosition, WaitOutcome, WaitResult, WindowsReply,
 };
 pub use v1::{

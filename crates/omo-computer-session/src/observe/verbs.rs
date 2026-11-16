@@ -52,15 +52,22 @@ impl Session {
             return Err(NO_CAPTURE.into());
         }
         let request = Request::read(params);
-        let reader = self.backend.ax_reader().ok_or(NO_READER)?;
-        observe(&mut self.refs, reader, &request)
+        let private = self.private_mode(&request.target);
+        let mut withholding = crate::redaction::Withholding::new(self.backend.ax_reader().ok_or(NO_READER)?);
+        let reader = &mut withholding;
+        let mut observation = observe(&mut self.refs, reader, &request)?;
+        if private {
+            crate::redaction::withhold_observation(&mut observation);
+        }
+        Ok(observation)
     }
 
     /// # Errors
     /// [`NOT_OPEN`], no reader, or the ref's resolution refusal.
     pub fn drill(&mut self, params: DrillParams) -> Result<Observation, Unresolved> {
         let object_mode = self.object_mode()?;
-        let reader = self.backend.ax_reader().ok_or(NO_READER)?;
+        let mut withholding = crate::redaction::Withholding::new(self.backend.ax_reader().ok_or(NO_READER)?);
+        let reader = &mut withholding;
         drill(&mut self.refs, reader, &params.reference, params.depth, object_mode)
     }
 
@@ -70,7 +77,8 @@ impl Session {
     /// [`NOT_OPEN`], no reader, or the ref's resolution refusal.
     pub fn ax_node(&mut self, params: AxRefParams) -> Result<AxNode, Unresolved> {
         let object_mode = self.object_mode()?;
-        let reader = self.backend.ax_reader().ok_or(NO_READER)?;
+        let mut withholding = crate::redaction::Withholding::new(self.backend.ax_reader().ok_or(NO_READER)?);
+        let reader = &mut withholding;
         let resolved = self.refs.resolve(&params.reference, object_mode, reader)?;
         let generation = self.refs.generation(&resolved.window, resolved.generation).ok_or(Refusal::bare(EngineCode::StaleRef))?;
         Ok(ax_node(generation.token(resolved.index), &resolved.live))
@@ -82,7 +90,8 @@ impl Session {
     /// [`NOT_OPEN`], no reader, or the ref's resolution refusal.
     pub fn ax_children(&mut self, params: AxRefParams) -> Result<Vec<AxNode>, Unresolved> {
         let object_mode = self.object_mode()?;
-        let reader = self.backend.ax_reader().ok_or(NO_READER)?;
+        let mut withholding = crate::redaction::Withholding::new(self.backend.ax_reader().ok_or(NO_READER)?);
+        let reader = &mut withholding;
         let resolved = self.refs.resolve(&params.reference, object_mode, reader)?;
         let generation = self.refs.generation(&resolved.window, resolved.generation).ok_or(Refusal::bare(EngineCode::StaleRef))?;
         Ok(generation

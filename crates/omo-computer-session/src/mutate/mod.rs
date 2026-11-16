@@ -21,6 +21,7 @@ mod tests;
 
 pub use binding::{Binding, SecureInputProbe, SecureProbe};
 pub use call::Mutation;
+pub(crate) use report::{refused_reply, released_reply};
 pub use memory_markers::MemoryMarkers;
 pub(crate) use route::{key_event, route_for};
 

@@ -14,6 +14,7 @@ mod settings;
 
 pub use admit::{Admission, Blocked};
 pub use display_awake::{DisplayAwakeHold, HoldLimits, SharedHold};
+pub(crate) use send::post_one;
 pub use send::{units, Ended, Outcome, Stop};
 pub use settings::OpenSettings;
 

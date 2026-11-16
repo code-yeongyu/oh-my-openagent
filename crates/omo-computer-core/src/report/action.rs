@@ -39,6 +39,12 @@ pub struct ReportParts {
     pub next_call: Option<String>,
     #[serde(default)]
     pub note: Option<String>,
+    /// Row 24 (R60): why an `effect:"refused"` report sent nothing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<RefusalReason>,
+    /// Row 24 (R60): `true` on a refused report: nothing was sent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nothing_sent: Option<bool>,
     #[serde(default)]
     pub warning: Option<String>,
     #[serde(default)]
@@ -83,6 +89,10 @@ pub struct ActionReport {
     #[serde(skip_serializing_if = "Option::is_none")]
     note: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    reason: Option<RefusalReason>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    nothing_sent: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     warning: Option<String>,
     audit_ids: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -106,6 +116,7 @@ impl ActionReport {
     /// The typed rejection of the first rule the shape breaks.
     pub fn new(context: ReportContext, parts: ReportParts) -> Result<Self, ReportRejection> {
         check(&shape_of(&parts), Some(context))?;
+        refused_members(&parts)?;
         Ok(Self::from_checked(parts))
     }
 
@@ -186,6 +197,8 @@ impl ActionReport {
             opened_surfaces: parts.opened_surfaces,
             next_call: parts.next_call,
             note: parts.note,
+            reason: parts.reason,
+            nothing_sent: parts.nothing_sent,
             warning: parts.warning,
             audit_ids: parts.audit_ids,
             timings: parts.timings,
@@ -213,6 +226,7 @@ impl TryFrom<ReportParts> for ActionReport {
 
     fn try_from(parts: ReportParts) -> Result<Self, Self::Error> {
         check(&shape_of(&parts), None)?;
+        refused_members(&parts)?;
         Ok(Self::from_checked(parts))
     }
 }
@@ -225,4 +239,24 @@ impl JsonSchema for ActionReport {
     fn json_schema(generator: &mut SchemaGenerator) -> Schema {
         ReportParts::json_schema(generator)
     }
+}
+
+/// R60a: `reason` and `nothingSent: true` are present exactly when the effect is `refused`.
+fn refused_members(parts: &ReportParts) -> Result<(), ReportRejection> {
+    let refused = parts.effect == Effect::Refused;
+    let members = (parts.reason.is_some(), parts.nothing_sent);
+    match (refused, members) {
+        (true, (true, Some(true))) | (false, (false, None)) => Ok(()),
+        _ => Err(ReportRejection::RefusedMembersMismatch),
+    }
+}
+
+/// Row 24 (R60): the pinned reasons a report is `effect:"refused"` with nothing sent
+/// (`design/d-sdk-skill.md`:555). A closed enum until the design lane rules its type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RefusalReason {
+    SecureFocus,
+    ConcealedClipboard,
+    SecretNoClipboardRoute,
 }

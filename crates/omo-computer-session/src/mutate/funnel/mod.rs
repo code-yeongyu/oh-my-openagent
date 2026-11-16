@@ -71,7 +71,9 @@ impl Session {
                     _ => None,
                 };
                 let mut refused = self.stamp(*blocked.refused, object);
-                refused.detail = detail.map(Box::new);
+                if let Some(detail) = detail {
+                    refused.detail = Some(Box::new(detail));
+                }
                 return Err(self.refuse(record, Some(blocked.stage), refused));
             }
         };
@@ -155,7 +157,10 @@ impl Session {
         let watch = admission
             .pid
             .and_then(|pid| MidSend::start(self.backend.as_ref(), pid, policy));
-        let outcome = self.send_watched(mutation.events, mutation.route, tag, watch, target);
+        let (outcome, read_back) = match mutation.write.clone() {
+            Some(write) => self.send_write(&write),
+            None => (self.send_watched(mutation.events, mutation.route, tag, watch, target), None),
+        };
         drop(lock);
         let (count, of) = (outcome.count, outcome.of);
         if count > 0 {
@@ -166,7 +171,7 @@ impl Session {
         if let Some((target, frame_id)) = mutation.consume.as_ref().filter(|_| count > 0) {
             self.frames.consume(target, frame_id);
         }
-        let read_back = report::read_back(report::settle());
+        let settled = report::read_back(report::settle());
         let paused = if object { admission.paused } else { Vec::new() };
         let session = object.then(|| sample(self.backend.as_ref()));
         match outcome.stop {
@@ -216,7 +221,8 @@ impl Session {
                     route: mutation.route,
                     count,
                     of,
-                    effect: read_back.effect,
+                    // A route that delivered fewer units than were asked reports it (R48c).
+                    effect: if count < of { omo_computer_core::report::Effect::Partial } else { read_back.as_ref().map_or(settled.effect, |r| r.effect) },
                     user_moved_on: self.funnel.control.presence.take_ended().is_some(),
                     url_unknown: std::mem::take(&mut self.funnel.url_unknown),
                     warning: appended.is_err().then(|| "write_failed".to_owned()),
@@ -224,6 +230,7 @@ impl Session {
                     paused,
                     session,
                     target: None,
+                    read_back,
                 };
                 let reply =
                     report::reply(report_mode, mutation.method, sent).unwrap_or_else(|rejection| {

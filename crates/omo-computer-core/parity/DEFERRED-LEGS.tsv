@@ -26,6 +26,19 @@ C24	the two-connection replay of `v3-consent-foreground-lease.json`: a second se
 C15	AC-66's `DisplayAwakeHold` legs (`capabilities().displayAwake.state` idle/held/released/capped; `display.resume` re-arms the hold); row 21 builds `display.release` ending the lease with `user_moved_on` and no `Suspended`	21	22	owed
 C13	AC-71/AC-72 fleet legs: denial memory and the per-app stop per hand in a fanout (hand 3 denied -> hand 4 still prompts; one hand's per-app stop leaves the other 99 delivering)	21	66	owed
 C13	AC-56 fanout leg: an out-of-scope app in a fanout marks the hand `skipped{consent, app}`	21	66	owed
+C9	`elementAt(x, y)` answers the element under the point with the hit-test click runs before send (needs a real per-OS accessibility hit-test; no stub, R50)	23	43	owed
+C9	`elementAt(x, y)` answers the element under the point with the hit-test click runs before send (needs a real per-OS accessibility hit-test; no stub, R50)	23	48	owed
+C9	`elementAt(x, y)` answers the element under the point with the hit-test click runs before send (needs a real per-OS accessibility hit-test; no stub, R50)	23	59	owed
+C9	click report `hit{role,label}` and the per-OS delivery-evidence kinds (`barrier_consumed`, `xi2_raw_confirm`) for `click_reports_point_and_delivery_evidence` (row 23 asserts `delivered` + `route` now; R50)	23	43	owed
+C9	click report `hit{role,label}` and the per-OS delivery-evidence kinds (`barrier_consumed`, `xi2_raw_confirm`) for `click_reports_point_and_delivery_evidence` (row 23 asserts `delivered` + `route` now; R50)	23	48	owed
+C9	click report `hit{role,label}` and the per-OS delivery-evidence kinds (`barrier_consumed`, `xi2_raw_confirm`) for `click_reports_point_and_delivery_evidence` (row 23 asserts `delivered` + `route` now; R50)	23	59	owed
+C9	a true in-flight `cancel` exit path for a held key (needs a cancel RPC; row 23 covers cancel as `control.revoke` during a held `key.down`, R49)	23	28	owed
+C9	`self-target-drag-drop-onto-own-terminal.json` (SelfTarget for a drop on the session's own terminal): needs the host's self-set additions wired into guard.open at session.open; row 16's session-level gate test covers the stage meanwhile (R55)	23	73	owed
+C9	`two-sessions-drag-drop-onto-held-window-input-busy.json` (InputBusy{window, holder} for a drop on another session's reserved window): needs two sessions on one hand (R55)	23	85	owed
+C8	the imported `ax-type-text.json` replay: its `stopPath.changed` and v1 `audit` notification legs (the notification channel); row 24 proves ax.snapshot / ax.typeText with its own v3 cases (R56a)	24	28	owed
+C8	the imported `ax-unconfirmed.json` replay: its `stopPath.changed` and v1 `audit` notification legs (the notification channel); row 24 proves AxUnconfirmed for ax.perform / ax.setValue / ax.focus with its own v3 cases (R56a)	24	28	owed
+C8	the v1-consumer case `03-stdio-click-type-text-null.json` (whole case: host-relay notification, v1 audit notification, v1 capture size scaling 64x48), in row 28's v1_consumers suite (R56a)	24	28	owed
+C9	a drag point refused by another session's reservation: InputBusy's {window, holder} flat beside the stage pair (R60b), reachable only with two sessions (R60c)	23	85	owed
 C18	replay of the imported case `stale-ref.json` against the v3 engine exits 0 (plan L984: row 18 checks stale-ref.json (replay exits 0))	20	18	owed
 C9	replay of the imported case `bounded-holds-closed.json` against the v3 engine exits 0 (plan L1097: row 23 checks bounded-holds-closed.json (replay exits 0))	20	23	owed
 C14	replay of the imported case `remote-typing.json` against the v3 engine exits 0 (plan L1167: row 26 checks remote-typing.json (replay exits 0))	20	26	owed

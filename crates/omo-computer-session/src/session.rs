@@ -49,6 +49,8 @@ pub struct Session {
     pub(crate) trace: crate::trace::Trace,
     /// The session-scoped display-awake hold (design row C22).
     pub(crate) display_awake: crate::intervention::SharedHold,
+    /// The generation of the latest `ax.snapshot` (row 24): a v1 ref `e2` names an element of it.
+    pub(crate) ax_generation: Option<u64>,
 }
 
 impl Session {

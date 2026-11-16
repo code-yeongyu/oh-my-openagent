@@ -26,6 +26,9 @@ impl FakeBackend {
         route: Route,
     ) -> BackendResult<Delivered> {
         self.call(FakeMethod::of_input(&input.event), |state, _| {
+            if let Some(capped) = super::posts::count(state, &input.event) {
+                return Ok(capped);
+            }
             match &input.event {
                 InputEvent::PointerMove(point) => state.cursor = Some(*point),
                 InputEvent::Key { key, down: true } => {

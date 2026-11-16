@@ -192,6 +192,8 @@ mod tests {
             opened_surfaces: Vec::new(),
             next_call: None,
             note: None,
+            reason: None,
+            nothing_sent: None,
             warning: None,
             audit_ids: Vec::new(),
             timings: None,

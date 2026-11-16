@@ -64,6 +64,53 @@ impl Backend for FakeBackend {
         Some(self)
     }
 
+    fn user_held_keys(&self) -> Vec<String> {
+        self.lock().scenario.held_keys.clone()
+    }
+
+    fn pointer(&self) -> Option<omo_computer_core::params::Point> {
+        self.lock().cursor
+    }
+
+    fn ax(&mut self) -> Option<&mut dyn omo_computer_core::backend::AxBackend> {
+        Some(self)
+    }
+
+    fn clipboard_read(&mut self) -> BackendResult<omo_computer_core::clipboard::ClipboardRead> {
+        Ok(match FakeBackend::clipboard_read(self)? {
+            crate::scripting::ClipboardRead::Concealed => omo_computer_core::clipboard::ClipboardRead::Concealed,
+            crate::scripting::ClipboardRead::Text(text) => omo_computer_core::clipboard::ClipboardRead::Text(text),
+        })
+    }
+
+    fn clipboard_write(&mut self, text: &str) -> BackendResult<()> {
+        FakeBackend::clipboard_write(self, text)
+    }
+
+    fn secure_focus(&self, window: Option<&str>) -> Option<bool> {
+        Some(window.map_or_else(|| FakeBackend::secure_focus_role(self).is_some(), |window| FakeBackend::secure_focus(self, window)))
+    }
+
+    fn quit_app(&mut self, app: &str) -> BackendResult<Delivered> {
+        let mut state = self.lock();
+        let ids: Vec<String> = state.windows.iter().filter(|w| w.app == app).map(|w| w.id.clone()).collect();
+        for id in ids {
+            state.exited.insert(id);
+        }
+        drop(state);
+        self.sink.record(format!("quit_app app={app}"));
+        Ok(Delivered { count: 1, of: 1 })
+    }
+
+    fn frame_settable(&self, window: &str) -> Option<bool> {
+        self.lock().scenario.window_frame_policy.get(window).and_then(|policy| policy.settable)
+    }
+
+    fn set_frame(&mut self, window: &str, frame: omo_computer_core::listing::Rect) -> BackendResult<omo_computer_core::window_frame::FrameApplied> {
+        let applied = FakeBackend::set_frame(self, window, frame)?;
+        Ok(omo_computer_core::window_frame::FrameApplied { frame: applied.frame, immovable: applied.immovable })
+    }
+
     fn post_text(
         &mut self,
         text: &str,
@@ -95,6 +142,8 @@ impl Backend for FakeBackend {
     }
 }
 
+
+mod posts;
 mod shell;
 
 #[cfg(test)]
