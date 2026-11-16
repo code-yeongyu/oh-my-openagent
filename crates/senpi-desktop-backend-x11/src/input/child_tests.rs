@@ -19,6 +19,7 @@ fn a_background_click_is_sent_to_the_child_widget_under_the_point() {
     let mut input = X11Input::with_server(
         FakeInputServer::new(Some(0x80_0001))
             .window(SHELL, (100, 50), b"xterm\0XTerm\0")
+            .process(SHELL, &["libXt.so.6"], &["xterm", "-xrm", "XTerm*allowSendEvents: true"])
             .child(SHELL, VT100),
     );
     let click = PointerEvent::Click {

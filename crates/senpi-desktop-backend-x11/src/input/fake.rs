@@ -9,6 +9,7 @@ use senpi_desktop_core::error::{CoreResult, DesktopError};
 use x11rb::protocol::xproto::Window;
 use xkeysym::Keysym;
 
+use super::client_process::ClientProcess;
 use super::keys::Keymap;
 use super::server::{FakeInput, InputServer, SentEvent};
 
@@ -73,6 +74,8 @@ pub struct FakeInputServer {
     pub covered_probes: Cell<usize>,
     activate_updates_active: Cell<bool>,
     classes: HashMap<Window, Vec<u8>>,
+    processes: HashMap<Window, ClientProcess>,
+    resources: Vec<u8>,
     origins: HashMap<Window, (i16, i16)>,
     /// A child window covering the whole of its parent (the widget a toolkit
     /// dispatches to), keyed by parent.
@@ -98,6 +101,8 @@ impl FakeInputServer {
             covered_probes: Cell::new(0),
             activate_updates_active: Cell::new(true),
             classes: HashMap::new(),
+            processes: HashMap::new(),
+            resources: Vec::new(),
             origins: HashMap::new(),
             children: HashMap::new(),
             parents: HashMap::new(),
@@ -111,6 +116,34 @@ impl FakeInputServer {
     pub fn window(mut self, window: Window, origin: (i16, i16), wm_class: &[u8]) -> Self {
         self.origins.insert(window, origin);
         self.classes.insert(window, wm_class.to_vec());
+        self
+    }
+
+    /// `window`'s client process maps `libraries` and runs with `args`.
+    pub fn process(mut self, window: Window, libraries: &[&str], args: &[&str]) -> Self {
+        let owned = |items: &[&str]| items.iter().map(|&item| item.to_owned()).collect();
+        self.processes.insert(
+            window,
+            ClientProcess {
+                libraries: owned(libraries),
+                args: owned(args),
+                chromium_helpers: false,
+            },
+        );
+        self
+    }
+
+    /// `window`'s client process runs Chromium `--type=` helper children.
+    pub fn with_chromium_helpers(mut self, window: Window) -> Self {
+        if let Some(process) = self.processes.get_mut(&window) {
+            process.chromium_helpers = true;
+        }
+        self
+    }
+
+    /// The display's `RESOURCE_MANAGER` database.
+    pub fn resources(mut self, database: &[u8]) -> Self {
+        self.resources = database.to_vec();
         self
     }
 
@@ -228,6 +261,17 @@ impl InputServer for FakeInputServer {
 
     fn wm_class(&self, window: Window) -> Option<Vec<u8>> {
         self.classes.get(&window).cloned()
+    }
+
+    fn client_process(&self, window: Window) -> Result<ClientProcess, String> {
+        self.processes
+            .get(&window)
+            .cloned()
+            .ok_or_else(|| "the X server knows no local process for the window's client".to_owned())
+    }
+
+    fn resources(&self) -> Vec<u8> {
+        self.resources.clone()
     }
 
     fn flush(&self) -> CoreResult<()> {

@@ -20,6 +20,7 @@ pub(super) fn input() -> X11Input<FakeInputServer> {
     X11Input::with_server(
         FakeInputServer::new(Some(EDITOR))
             .window(TERMINAL, (100, 50), b"xterm\0XTerm\0")
+            .process(TERMINAL, &["libXt.so.6"], &["xterm", "-xrm", "XTerm*allowSendEvents: true"])
             .window(GTK_APP, (0, 0), b"gtk3-demo\0Gtk3-demo\0"),
     )
 }

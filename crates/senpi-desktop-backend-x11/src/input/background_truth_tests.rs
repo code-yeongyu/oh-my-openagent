@@ -6,6 +6,7 @@
 use senpi_desktop_core::backend::{DeliveryMode, Modifiers, MouseButton, PointerEvent};
 use senpi_desktop_core::error::{DesktopError, ErrorCode};
 use senpi_desktop_core::keys::KeyName;
+use senpi_desktop_core::report::Disposition;
 use senpi_desktop_core::types::Target;
 use x11rb::protocol::xproto::Window;
 
@@ -16,9 +17,16 @@ const EDITOR: Window = 0x80_0001;
 /// The conformance fixture's own class: `fixture.py` names no toolkit.
 const FIXTURE: Window = 0x70_0001;
 const FIXTURE_CLASS: &[u8] = b"fixture.py\0Fixture.py\0";
+const PYTHON_GTK: [&str; 3] = ["libpython3.12.so.1.0", "libgtk-3.so.0", "libX11.so.6"];
 
-fn background_attempts(server: FakeInputServer, window: Window) -> Vec<(DesktopError, usize)> {
-    let target = Target::Window(window.to_string());
+fn server() -> FakeInputServer {
+    FakeInputServer::new(Some(EDITOR)).window(FIXTURE, (2, 40), FIXTURE_CLASS)
+}
+
+/// A click, a scroll, typing and a chord in the background; each result and
+/// how many events reached the server in total.
+fn background_attempts(server: FakeInputServer) -> (Vec<Result<(), DesktopError>>, usize) {
+    let target = Target::Window(FIXTURE.to_string());
     let click = PointerEvent::Click {
         x: 321.0,
         y: 70.0,
@@ -33,7 +41,7 @@ fn background_attempts(server: FakeInputServer, window: Window) -> Vec<(DesktopE
         dy: 3.0,
     };
     let mut input = X11Input::with_server(server);
-    let results = [
+    let results = vec![
         input.pointer(&target, &click, DeliveryMode::Background),
         input.pointer(&target, &scroll, DeliveryMode::Background),
         input.type_text(&target, "a", DeliveryMode::Background),
@@ -44,19 +52,80 @@ fn background_attempts(server: FakeInputServer, window: Window) -> Vec<(DesktopE
         ),
     ];
     let sent = input.server().calls().len();
+    (results, sent)
+}
+
+/// Every attempt is a `BackgroundUnavailable` refusal with `reason`, safe to
+/// retry, and nothing was sent.
+fn assert_refused(server: FakeInputServer, reason: &str) -> Vec<String> {
+    let (results, sent) = background_attempts(server);
+    assert_eq!(sent, 0, "no input may be sent");
     results
         .into_iter()
-        .map(|result| (result.expect_err("background input must not report delivered"), sent))
+        .map(|result| {
+            let error = result.expect_err("background input must not report delivered");
+            assert_eq!(error.code, ErrorCode::BackgroundUnavailable, "{}", error.message);
+            let report = error.report.as_deref().expect("refusal report");
+            assert_eq!(report.reason.as_deref(), Some(reason));
+            assert_eq!(report.disposition, Some(Disposition::NOT_DELIVERED_SAFE));
+            error.message
+        })
         .collect()
 }
 
 #[test]
 fn background_input_to_a_window_whose_process_cannot_be_inspected_is_refused_and_sends_nothing() {
     // Given: an unlisted class and no readable client process.
-    let server = FakeInputServer::new(Some(EDITOR)).window(FIXTURE, (2, 40), FIXTURE_CLASS);
     // When / Then: every background kind is refused before any event is sent.
-    for (error, sent) in background_attempts(server, FIXTURE) {
-        assert_eq!(error.code, ErrorCode::BackgroundUnavailable, "{}", error.message);
-        assert_eq!(sent, 0, "no input may be sent");
+    assert_refused(server(), "synthetic_input_unproven");
+}
+
+#[test]
+fn a_gtk_app_with_an_unlisted_class_is_refused_by_the_library_its_process_maps() {
+    // Given: the fixture's process maps GTK 3.
+    let server = server().process(FIXTURE, &PYTHON_GTK, &["python3", "fixture.py"]);
+    // When / Then
+    for message in assert_refused(server, "synthetic_input_dropped") {
+        assert!(message.contains("libgtk-3.so.0"), "{message}");
     }
+}
+
+#[test]
+fn a_chromium_helper_tree_is_refused_even_without_a_toolkit_library() {
+    // Given: a statically linked Chromium shell with helper children.
+    let server = server()
+        .process(FIXTURE, &["libX11.so.6", "libnss3.so"], &["/opt/app/app"])
+        .with_chromium_helpers(FIXTURE);
+    // When / Then
+    assert_refused(server, "synthetic_input_dropped");
+}
+
+#[test]
+fn a_client_with_no_toolkit_known_to_accept_synthetic_input_is_refused() {
+    // Given: only Xlib is mapped.
+    let server = server().process(FIXTURE, &["libX11.so.6"], &["/usr/bin/app"]);
+    // When / Then
+    assert_refused(server, "synthetic_input_unproven");
+}
+
+#[test]
+fn xterm_is_refused_until_its_resources_allow_send_events() {
+    // Given: an xterm with no allowSendEvents setting.
+    let xterm = || server().process(FIXTURE, &["libXaw.so.7", "libXt.so.6"], &["xterm"]);
+    // When / Then: refused by default, delivered once the database allows it.
+    assert_refused(xterm(), "synthetic_input_dropped");
+    let (results, sent) = background_attempts(xterm().resources(b"XTerm*allowSendEvents:\ttrue\n"));
+    assert!(results.iter().all(Result::is_ok), "{results:?}");
+    assert!(sent > 0);
+}
+
+#[test]
+fn a_tk_app_with_an_unlisted_class_takes_background_input() {
+    // Given: a Tk client, whose toolkit dispatches sent events.
+    let server = server().process(FIXTURE, &["libtk8.6.so", "libX11.so.6"], &["wish"]);
+    // When
+    let (results, sent) = background_attempts(server);
+    // Then
+    assert!(results.iter().all(Result::is_ok), "{results:?}");
+    assert!(sent > 0);
 }
