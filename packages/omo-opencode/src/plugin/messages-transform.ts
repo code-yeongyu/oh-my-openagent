@@ -17,7 +17,13 @@ const ASSISTANT_PREFILL_UNSUPPORTED_PROVIDERS = new Set([
   "opencode-zen-proxy",
   "vercel",
 ])
-const ASSISTANT_PREFILL_UNSUPPORTED_MODEL_PREFIXES = ["claude-opus-4", "claude-sonnet-4-6", "claude-mythos"]
+// Fable and Mythos ship as one release pair and both reject assistant prefill.
+const ASSISTANT_PREFILL_UNSUPPORTED_MODEL_PREFIXES = [
+  "claude-opus-4",
+  "claude-sonnet-4-6",
+  "claude-mythos",
+  "claude-fable",
+]
 
 type MessageWithParts = {
   info: Message
