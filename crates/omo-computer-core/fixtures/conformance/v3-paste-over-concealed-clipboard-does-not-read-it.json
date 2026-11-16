@@ -187,6 +187,15 @@
               "auditIds": [
                 "a74190f89f9b78ce"
               ],
+              "timings": {
+                "settleMs": 500
+              },
+              "settle": {
+                "outcome": "settled",
+                "quietMs": 500,
+                "waitedMs": 500,
+                "regime": "unchanged"
+              },
               "evidence": [],
               "observation": {
                 "untrustedText": true
