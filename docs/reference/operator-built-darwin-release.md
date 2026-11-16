@@ -57,14 +57,14 @@ The `operator-darwin` job runs `.github/workflows/operator-darwin-verify.ts` on 
 
 1. The asset set is exactly the 8 artifacts, their `.sha256` files and the manifest. Each sha256 matches its `.sha256` file and the manifest.
 2. The manifest `source_sha` is `prepared_release_sha`, or an ancestor of it whose diff touches only `.github/workflows/`, the same rule as the `ci_basis_receipt` waiver. The tag names that source.
-3. Per Mach-O slice, `rcodesign verify` (0.29.0, pinned by sha256) passes, and the signature checks out:
-   - the identifier is the expected one;
-   - the Team ID is `523JNR86LZ`, both in the code directory and in the signer's Developer ID Application certificate;
-   - the certificate chains to the Apple root;
-   - the hardened runtime is set;
-   - the CMS signature signs that code directory.
-4. Apple's ticket service returns a notarization ticket for the cdhash of every notarized artifact. Bare Mach-O files cannot be stapled, so the ticket lookup replaces stapling. Trust helpers are signed only, as in the hosted path.
+3. Per Mach-O slice, the verifier checks the signature itself. It uses no external tool and trusts nothing the operator supplies (`operator-darwin-macho.ts`, `operator-darwin-cms.ts`):
+   - every code page and every requirements/entitlements blob matches the CodeDirectory, and the CodeDirectory covers every byte before the signature;
+   - the CMS has exactly one signer. The certificate it names (by issuer and serial) is the one whose RSA signature over the signed attributes verifies, and the signed message digest is the sha256 of that CodeDirectory;
+   - that certificate is a Developer ID Application certificate issued by Apple's Developer ID CA (G2) under the Apple Root CA. Both CAs are pinned by fingerprint; intermediates in the signature's certificate list are never trusted;
+   - the team in the CodeDirectory and the team (OU) of that signing certificate are both `523JNR86LZ`;
+   - the identifier is the expected one and the hardened runtime is set.
+4. Apple's ticket service returns a notarization ticket for every notarized artifact, looked up by the cdhash the verifier computed from the checked CodeDirectory. Bare Mach-O files cannot be stapled, so the ticket lookup replaces stapling. Trust helpers are signed only, as in the hosted path.
 5. Each engine's `__OMO_META,__build` section names the source sha, its host and target, and the version.
-6. Each `omo-darwin-*` binary embeds the verified engine and trust helper bytes unchanged. That binds the binary to the engine's signed source stamp.
+6. Each `omo-darwin-*` binary embeds the verified engine and trust helper bytes unchanged, inside its signed bytes (the trust helpers are signed only, as on the hosted path, so this containment in a notarized binary is what notarization covers for them). That binds the binary to the engine's signed source stamp.
 
 Trade-off (accepted): no Gatekeeper or OCSP evaluation runs in CI. Running one would need a hosted macOS job, which reintroduces the wait this path removes. The operator's local `codesign --verify --strict` and `spctl -a -t install` verdicts are recorded in the operator log, but they are self-attested.

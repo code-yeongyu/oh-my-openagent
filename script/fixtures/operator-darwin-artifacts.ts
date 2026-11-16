@@ -1,11 +1,11 @@
 // Builds an operator-darwin staging directory for the verifier tests: synthetic thin Mach-O engines carrying a
 // real __OMO_META,__build section, omo binaries that embed their engine and trust helper, .sha256 files, a
-// manifest, and rcodesign reports shaped like rcodesign 0.29's print-signature-info output.
+// manifest, and the per-slice signature facts the real inspector would report for a valid signature.
 import { createHash } from "node:crypto"
 import { mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { ARTIFACTS, MANIFEST, TEAM_ID } from "../../.github/workflows/operator-darwin-verify.ts"
+import { ARTIFACTS, MANIFEST, type SliceFacts, TEAM_ID } from "../../.github/workflows/operator-darwin-verify.ts"
 
 export const SOURCE_SHA = "1111111111111111111111111111111111111111"
 export const PREPARED_SHA = "2222222222222222222222222222222222222222"
@@ -38,68 +38,11 @@ export function machoWithMeta(meta: string, body: string): Uint8Array {
   return bytes
 }
 
-export type SignatureFields = {
-  readonly identifier: string
-  readonly team: string
-  readonly flags: string
-  readonly cdSha256: string
-  readonly leafTeam: string
-  readonly leafProfile: string
-  readonly chains: boolean
-  readonly signerDigest: string
-}
-
-export function signatureReport(file: string, fields: SignatureFields): string {
-  return [
-    `- path: ${file}`,
-    "  entity:",
-    "    mach_o:",
-    "      signature:",
-    "        blobs:",
-    "        - slot: CodeDirectory (0)",
-    `          sha256: ${fields.cdSha256}`,
-    "        code_directory:",
-    `          flags: CodeSignatureFlags(${fields.flags})`,
-    `          identifier: ${fields.identifier}`,
-    `          team_name: ${fields.team}`,
-    "        cms:",
-    "          certificates:",
-    "          - subject: CN=Developer ID Certification Authority, OU=G2, O=Apple Inc., C=US",
-    "            chains_to_apple_root_ca: true",
-    "            apple_team_id: G2",
-    `          - subject: 'CN=Developer ID Application: Fixture (${fields.leafTeam}), OU=${fields.leafTeam}'`,
-    `            chains_to_apple_root_ca: ${fields.chains}`,
-    `            apple_certificate_profile: ${fields.leafProfile}`,
-    `            apple_team_id: ${fields.leafTeam}`,
-    "          signers:",
-    `          - message_digest: ${fields.signerDigest}`,
-    "",
-  ].join("\n")
-}
-
-/** rcodesign 0.29's report for an ad-hoc signature (`codesign -s - -o runtime`): no team, no CMS signer. */
-export function adhocReport(file: string, identifier: string, cdSha256: string): string {
-  return [
-    `- path: ${file}`,
-    "  entity:",
-    "    mach_o:",
-    "      signature:",
-    "        blobs:",
-    "        - slot: CodeDirectory (0)",
-    `          sha256: ${cdSha256}`,
-    "        code_directory:",
-    "          flags: CodeSignatureFlags(ADHOC | RUNTIME)",
-    `          identifier: ${identifier}`,
-    "        cms: null",
-    "",
-  ].join("\n")
-}
-
 export type Fixture = {
   readonly dir: string
   readonly files: Map<string, Uint8Array>
-  /** The signature each artifact carries; tests replace one entry to forge a single defect. */
-  readonly signatures: Map<string, SignatureFields>
+  /** The verified signature facts of each artifact; tests replace one entry to forge a single defect. */
+  readonly signatures: Map<string, SliceFacts[]>
 }
 
 export function engineMeta(host: string, rustTarget: string, overrides: Record<string, string> = {}): string {
@@ -127,23 +70,23 @@ export function buildFiles(): Map<string, Uint8Array> {
 export function writeFixture(files = buildFiles(), manifest: Record<string, unknown> = {}): Fixture {
   const dir = mkdtempSync(join(tmpdir(), "operator-darwin-"))
   const sha256: Record<string, string> = {}
-  const signatures = new Map<string, SignatureFields>()
+  const signatures = new Map<string, SliceFacts[]>()
   for (const [name, bytes] of files) {
     const digest = createHash("sha256").update(bytes).digest("hex")
     sha256[name] = digest
     writeFileSync(join(dir, name), bytes)
     writeFileSync(join(dir, `${name}.sha256`), `${digest}  ${name}\n`)
-    const cd = createHash("sha256").update(`cd:${name}`).digest("hex")
-    signatures.set(name, {
-      identifier: ARTIFACTS[name]?.identifier ?? "",
-      team: TEAM_ID,
-      flags: "RUNTIME",
-      cdSha256: cd,
-      leafTeam: TEAM_ID,
-      leafProfile: "developer-id-application",
-      chains: true,
-      signerDigest: cd,
-    })
+    signatures.set(name, [
+      {
+        identifier: ARTIFACTS[name]?.identifier ?? "",
+        team: TEAM_ID,
+        signerTeam: TEAM_ID,
+        runtime: true,
+        cdhash: createHash("sha256").update(`cd:${name}`).digest("hex").slice(0, 40),
+        start: 0,
+        hashedEnd: bytes.byteLength,
+      },
+    ])
   }
   writeFileSync(
     join(dir, MANIFEST),

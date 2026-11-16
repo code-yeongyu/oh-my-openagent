@@ -346,8 +346,9 @@ jobs:
   # Operator-built darwin artifacts (#13921) replace the hosted macOS legs: desktop-engine darwin-arm64/x64,
   # keychain-helper and the darwin release binaries. publish.yml's gate-reuse admitted the maintainer; this job
   # verifies every artifact on Linux before anything consumes it, then uploads them under the artifact names the
-  # hosted legs use. Trade-off (accepted): rcodesign checks the signature, its Developer ID chain and team, and
-  # Apple's ticket service confirms notarization by cdhash, but no Gatekeeper/OCSP evaluation runs in CI.
+  # hosted legs use. The verifier checks every code page, the CMS signer (the certificate that actually signed,
+  # chained to the pinned Developer ID CA and Apple root) and its team, and Apple's ticket service confirms
+  # notarization by cdhash. Trade-off (accepted): no Gatekeeper/OCSP evaluation runs in CI.
   operator-darwin:
     if: github.repository == 'code-yeongyu/oh-my-openagent' && inputs.operator_darwin_artifacts != ''
     runs-on: ubuntu-24.04
@@ -383,15 +384,6 @@ jobs:
           gh release download "$TAG" --dir "$DIR"
           echo "OPERATOR_DARWIN_DIR=$DIR" >> "$GITHUB_ENV"
 
-      - name: Install pinned rcodesign
-        run: |
-          set -euo pipefail
-          url="https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F0.29.0/apple-codesign-0.29.0-x86_64-unknown-linux-musl.tar.gz"
-          curl -fsSL --retry 3 -o "${RUNNER_TEMP}/rcodesign.tar.gz" "$url"
-          echo "dbe85cedd8ee4217b64e9a0e4c2aef92ab8bcaaa41f20bde99781ff02e600002  ${RUNNER_TEMP}/rcodesign.tar.gz" | sha256sum -c -
-          tar -xzf "${RUNNER_TEMP}/rcodesign.tar.gz" -C "$RUNNER_TEMP"
-          echo "RCODESIGN=${RUNNER_TEMP}/apple-codesign-0.29.0-x86_64-unknown-linux-musl/rcodesign" >> "$GITHUB_ENV"
-
       - name: Verify operator darwin artifacts
         env:
           TAG: ${{ inputs.operator_darwin_artifacts }}
@@ -409,8 +401,8 @@ jobs:
             exit 1
           fi
           bun .github/workflows/operator-darwin-verify.ts --dir "$OPERATOR_DARWIN_DIR" --tag "$TAG" \
-            --prepared-sha "$PREPARED_RELEASE_SHA" --version "$VERSION" --repo . --rcodesign "$RCODESIGN" \
-            > "${RUNNER_TEMP}/operator-darwin-rows.md"
+            --prepared-sha "$PREPARED_RELEASE_SHA" --version "$VERSION" --repo . \
+            --summary "${RUNNER_TEMP}/operator-darwin-rows.md"
           {
             echo "### Darwin artifacts: OPERATOR-BUILT"
             echo "npm provenance covers this publish run only; the darwin build is attested by the Developer ID signature, Apple notarization and the sha256 values below, which the release records."
@@ -491,6 +483,19 @@ jobs:
           path: .omo/operator-darwin/release-binary-darwin-x64-baseline/omo-darwin-x64-baseline
           retention-days: 1
           if-no-files-found: error
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Operator-built darwin artifacts
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Downloads the draft staging release named by operator_darwin_artifacts.
+            - Verifies every artifact's code pages, Developer ID signer, team and notarization ticket, and the engines' source stamp.
+            - Uploads the verified artifacts under the hosted darwin artifact names.
+          JOB_SUMMARY_NEXT: Read the operator_darwin_artifacts refused line; rebuild or re-stage the named artifact.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   # =============================================================================
   # Job 1: Build binaries for all platforms
@@ -649,7 +654,7 @@ jobs:
 
           PLATFORM="${{ matrix.platform }}"
           # The operator-darwin job already uploaded this leg's verified release binary (#13921).
-          if [ -n "$OPERATOR_DARWIN_ARTIFACTS" ] && [[ "$PLATFORM" == darwin-* ]]; then
+          if [ -n "${OPERATOR_DARWIN_ARTIFACTS:-}" ] && [[ "$PLATFORM" == darwin-* ]]; then
             echo "binary_exists=true" >> "$GITHUB_OUTPUT"
             echo "✓ omo-${PLATFORM} comes from verified operator-built artifacts ${OPERATOR_DARWIN_ARTIFACTS}"
             exit 0

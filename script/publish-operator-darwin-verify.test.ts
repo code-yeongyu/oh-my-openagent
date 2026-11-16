@@ -3,15 +3,13 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { rmSync, unlinkSync, writeFileSync } from "node:fs"
 import { basename, join } from "node:path"
-import { type Tools, verifyOperatorDarwin } from "../.github/workflows/operator-darwin-verify.ts"
+import { Refusal, type SliceFacts, type Tools, verifyOperatorDarwin } from "../.github/workflows/operator-darwin-verify.ts"
 import {
-  adhocReport,
   buildFiles,
   engineMeta,
   type Fixture,
   machoWithMeta,
   PREPARED_SHA,
-  signatureReport,
   SOURCE_SHA,
   TAG,
   VERSION,
@@ -21,8 +19,8 @@ import {
 /**
  * Release security contract (#13921): publish-platform consumes operator-built darwin artifacts only after
  * verify.ts accepts every one of them. Each row forges exactly one defect and must be refused with its own
- * reason; the untouched fixture is the GREEN control. rcodesign, Apple's ticket service and git are injected,
- * with the rcodesign report shaped like rcodesign 0.29 print-signature-info output.
+ * reason; the untouched fixture is the GREEN control. The signature inspector (whose own checks are proven in
+ * publish-operator-darwin-{signature,macho}.test.ts), Apple's ticket service and git are injected.
  */
 
 const dirs: string[] = []
@@ -31,23 +29,23 @@ afterEach(() => {
 })
 
 type Overrides = {
-  readonly verifyStatus?: (name: string) => number
   readonly ticket?: (cdhash: string) => boolean
   readonly ancestor?: boolean
   readonly delta?: string
-  readonly report?: (name: string) => string | undefined
+  /** Replaces the inspector's answer for one artifact: forged facts, or a refusal reason. */
+  readonly inspect?: (name: string) => SliceFacts[] | string | undefined
 }
 
 async function run(fixture: Fixture, overrides: Overrides = {}, input: Partial<{ tag: string; prepared: string; version: string }> = {}) {
   dirs.push(fixture.dir)
   const tickets: string[] = []
+  const nameOf = (bytes: Uint8Array) => [...fixture.files].find(([, content]) => Buffer.from(content).equals(Buffer.from(bytes)))?.[0] ?? ""
   const tools: Tools = {
-    verify: (file) => overrides.verifyStatus?.(basename(file)) ?? 0,
-    signatureInfo: (file) => {
-      const forged = overrides.report?.(basename(file))
-      if (forged !== undefined) return forged
-      const fields = fixture.signatures.get(basename(file))
-      return fields ? signatureReport(file, fields) : "[]"
+    inspect: (bytes) => {
+      const name = nameOf(bytes)
+      const forged = overrides.inspect?.(name)
+      if (typeof forged === "string") throw new Refusal(forged)
+      return forged ?? fixture.signatures.get(name) ?? []
     },
     ticket: async (cdhash) => {
       tickets.push(cdhash)
@@ -68,12 +66,12 @@ async function run(fixture: Fixture, overrides: Overrides = {}, input: Partial<{
   return { ...verdict, tickets }
 }
 
-function forge(name: string, change: Partial<NonNullable<ReturnType<Fixture["signatures"]["get"]>>>): Fixture {
+function forge(name: string, change: Partial<SliceFacts>): Overrides {
   const fixture = writeFixture()
-  const fields = fixture.signatures.get(name)
+  dirs.push(fixture.dir)
+  const [fields] = fixture.signatures.get(name) ?? []
   if (!fields) throw new Error(`no fixture signature for ${name}`)
-  fixture.signatures.set(name, { ...fields, ...change })
-  return fixture
+  return { inspect: (target) => (target === name ? [{ ...fields, ...change }] : undefined) }
 }
 
 describe("operator darwin verifier", () => {
@@ -96,17 +94,16 @@ describe("operator darwin verifier", () => {
     ["a manifest for another version", () => run(writeFixture(buildFiles(), { version: "5.1.72" })), /manifest version 5\.1\.72/],
     ["a source that is not an ancestor", () => run(writeFixture(), { ancestor: false }), /is not an ancestor/],
     ["a source differing outside workflows", () => run(writeFixture(), { delta: ".github/workflows/publish.yml\nscript/build-omo-binary.ts\n" }), /outside \.github\/workflows\/: script\/build-omo-binary\.ts/],
-    ["a failing rcodesign verify", () => run(writeFixture(), { verifyStatus: (name) => (name === "omo-darwin-x64" ? 1 : 0) }), /omo-darwin-x64: rcodesign verify failed/],
-    ["an unsigned file", async () => { const f = writeFixture(); f.signatures.delete("omo-keychain-darwin-universal"); return run(f) }, /omo-keychain-darwin-universal: no code signature/],
-    ["an ad-hoc signature (no team, no Developer ID signer)", () => run(writeFixture(), { report: (name) => (name === "omo-darwin-arm64" ? adhocReport(name, "ai.sisyphuslabs.omo", "a".repeat(64)) : undefined) }), /omo-darwin-arm64: TeamIdentifier , expected 523JNR86LZ/],
-    ["another identifier", () => run(forge("senpi-desktop-engine-darwin-x64", { identifier: "ai.sisyphuslabs.omo" })), /identifier ai\.sisyphuslabs\.omo, expected/],
-    ["another team in the code directory", () => run(forge("omo-darwin-arm64", { team: "ABCDE12345" })), /TeamIdentifier ABCDE12345/],
-    ["a signer certificate of another team", () => run(forge("omo-darwin-arm64", { leafTeam: "ABCDE12345" })), /not a Developer ID Application certificate/],
-    ["a non-Developer-ID signer profile", () => run(forge("omo-engine-trust-helper-darwin-arm64", { leafProfile: "apple-development" })), /not a Developer ID Application certificate/],
-    ["a chain that does not reach Apple", () => run(forge("omo-keychain-darwin-universal", { chains: false })), /not a Developer ID Application certificate/],
-    ["a missing hardened runtime", () => run(forge("omo-darwin-x64-baseline", { flags: "ADHOC" })), /hardened runtime flag missing/],
-    ["a CMS signature over another code directory", () => run(forge("omo-darwin-arm64", { signerDigest: "f".repeat(64) })), /does not sign the code directory/],
-    ["a notarized artifact without a ticket", async () => { const f = writeFixture(); const cd = f.signatures.get("omo-keychain-darwin-universal")?.cdSha256.slice(0, 40); return run(f, { ticket: (h) => h !== cd }) }, /omo-keychain-darwin-universal: no notarization ticket/],
+    ["an invalid signature reported by the inspector", () => run(writeFixture(), { inspect: (name) => (name === "omo-darwin-x64" ? "code page 3 does not match its hash" : undefined) }), /^omo-darwin-x64: code page 3 does not match its hash$/],
+    ["an ad-hoc or unsigned slice", () => run(writeFixture(), { inspect: (name) => (name === "omo-darwin-arm64" ? "no Developer ID signature (unsigned or ad-hoc)" : undefined) }), /^omo-darwin-arm64: no Developer ID signature/],
+    ["a file with no signed slice", () => run(writeFixture(), { inspect: (name) => (name === "omo-keychain-darwin-universal" ? [] : undefined) }), /omo-keychain-darwin-universal: no code signature/],
+    ["another identifier", () => run(writeFixture(), forge("senpi-desktop-engine-darwin-x64", { identifier: "ai.sisyphuslabs.omo" })), /identifier ai\.sisyphuslabs\.omo, expected/],
+    ["another team in the code directory", () => run(writeFixture(), forge("omo-darwin-arm64", { team: "ABCDE12345" })), /TeamIdentifier ABCDE12345/],
+    ["a signing certificate of another team", () => run(writeFixture(), forge("omo-engine-trust-helper-darwin-arm64", { signerTeam: "ATTACKER99" })), /signed by team ATTACKER99, expected 523JNR86LZ/],
+    ["a missing hardened runtime", () => run(writeFixture(), forge("omo-darwin-x64-baseline", { runtime: false })), /hardened runtime flag missing/],
+    ["a notarized artifact without a ticket", async () => { const f = writeFixture(); const cd = f.signatures.get("omo-keychain-darwin-universal")?.[0]?.cdhash; return run(f, { ticket: (h) => h !== cd }) }, /omo-keychain-darwin-universal: no notarization ticket/],
+    ["a source stamp outside the signed bytes", async () => { const f = writeFixture(); const [facts] = f.signatures.get("senpi-desktop-engine-darwin-arm64") ?? []; return run(f, { inspect: (n) => (n === "senpi-desktop-engine-darwin-arm64" && facts ? [{ ...facts, hashedEnd: 100 }] : undefined) }) }, /__OMO_META,__build lies outside the signed bytes/],
+    ["an engine embedded only in unsigned bytes of the omo binary", async () => { const f = writeFixture(); const [facts] = f.signatures.get("omo-darwin-arm64") ?? []; return run(f, { inspect: (n) => (n === "omo-darwin-arm64" && facts ? [{ ...facts, hashedEnd: 20 }] : undefined) }) }, /omo-darwin-arm64: does not embed the verified senpi-desktop-engine-darwin-arm64/],
     ["an engine without the source section", () => { const files = buildFiles(); files.set("senpi-desktop-engine-darwin-arm64", new TextEncoder().encode("plain")); return run(writeFixture(files)) }, /no __OMO_META,__build section/],
     ["an engine built from another source", () => { const files = buildFiles(); files.set("senpi-desktop-engine-darwin-x64", machoWithMeta(engineMeta("darwin-x64", "x86_64-apple-darwin", { source_sha: "3".repeat(40) }), "e")); return run(writeFixture(files)) }, /embedded source_sha 3{40}/],
     ["an engine stamped for another host", () => { const files = buildFiles(); files.set("senpi-desktop-engine-darwin-x64", machoWithMeta(engineMeta("darwin-arm64", "aarch64-apple-darwin"), "e")); return run(writeFixture(files)) }, /embedded target darwin-arm64/],

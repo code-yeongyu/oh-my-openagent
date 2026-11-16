@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process"
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { desktopEngineLegs } from "./release-workflow-test-steps"
 
 /**
  * Release security contract (#13921): `operator_darwin_artifacts` replaces the hosted macOS legs only for an
@@ -14,7 +15,7 @@ import { join } from "node:path"
  */
 
 type Step = { name?: string; run?: string; if?: string; "continue-on-error"?: unknown }
-type Job = { if?: string; needs?: string[]; "runs-on"?: string; steps?: Step[]; with?: Record<string, string>; strategy?: { matrix?: { include?: unknown } } }
+type Job = { if?: string; needs?: string[]; "runs-on"?: string; steps?: Step[]; with?: Record<string, string> }
 type Workflow = { on: { workflow_call?: { inputs: Record<string, unknown> } }; jobs: Record<string, Job> }
 
 const load = (file: string): Workflow =>
@@ -129,14 +130,9 @@ describe("operator darwin wiring", () => {
   })
 
   test("the desktop-engine matrix keeps both darwin legs only when the input is empty", () => {
-    const include = String(job(platform, "desktop-engine").strategy?.matrix?.include)
-    const parts = include.match(/inputs\.operator_darwin_artifacts == '' && '(.*?)' \|\| '', '(.*?)'\)\) \}\}$/)
-    expect(parts).not.toBeNull()
-    const hosts = (json: string) => (JSON.parse(`[${json}]`) as Array<{ host: string }>).map((leg) => leg.host)
-    const hosted = hosts(`${parts?.[1] ?? ""}${parts?.[2] ?? ""}`)
-    const operator = hosts(parts?.[2] ?? "")
-    expect(hosted).toEqual(["darwin-arm64", "darwin-x64", "linux-x64", "linux-arm64", "win32-x64", "win32-arm64"])
-    expect(operator).toEqual(["linux-x64", "linux-arm64", "win32-x64", "win32-arm64"])
+    const text = readFileSync(new URL("../.github/workflows/publish-platform.yml", import.meta.url), "utf8")
+    expect(desktopEngineLegs(text).map((leg) => leg.host)).toEqual(["darwin-arm64", "darwin-x64", "linux-x64", "linux-arm64", "win32-x64", "win32-arm64"])
+    expect(desktopEngineLegs(text, TAG).map((leg) => leg.host)).toEqual(["linux-x64", "linux-arm64", "win32-x64", "win32-arm64"])
   })
 
   test("the hosted keychain-helper runs only without the input, and operator-darwin only with it", () => {
@@ -153,9 +149,10 @@ describe("operator darwin wiring", () => {
     expect(build["runs-on"]).toContain("startsWith(matrix.platform, 'darwin-') && inputs.operator_darwin_artifacts == '' && 'macos-latest'")
   })
 
-  test("no operator-darwin step can be skipped or soft-fail", () => {
+  test("no operator-darwin step can be skipped or soft-fail (only the job summary runs always)", () => {
     for (const step of job(platform, "operator-darwin").steps ?? []) {
-      expect({ step: step.name, if: step.if, soft: step["continue-on-error"] }).toEqual({ step: step.name, if: undefined, soft: undefined })
+      const allowed = step.name === "Write job summary" ? "always()" : undefined
+      expect({ step: step.name, if: step.if, soft: step["continue-on-error"] }).toEqual({ step: step.name, if: allowed, soft: undefined })
     }
   })
 

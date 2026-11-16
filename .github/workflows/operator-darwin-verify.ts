@@ -2,14 +2,16 @@
 // Lives under .github/workflows/ so a release source-state branch can take it as a workflow-only commit.
 //
 //   bun .github/workflows/operator-darwin-verify.ts --dir <downloaded assets> --tag operator-darwin-<sha12>
-//     --prepared-sha <40-hex> --version <x.y.z> --repo <git dir> --rcodesign <path>
+//     --prepared-sha <40-hex> --version <x.y.z> --repo <git dir> --summary <markdown file>
 //
-// Every refusal exits 1 with one `::error::operator_darwin_artifacts refused: ...` line. On success it prints the
-// markdown summary rows (asset, sha256, cdhash) and writes nothing else.
+// Every refusal exits 1 with one `::error::operator_darwin_artifacts refused: ...` line on stdout. On success it
+// writes the markdown summary rows (asset, sha256, cdhashes) to --summary and prints nothing else.
+// The signature checks are done here (operator-darwin-macho.ts, operator-darwin-cms.ts), not by an external tool.
 import { createHash } from "node:crypto"
 import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
-import { parseSlices, readBuildMeta, record } from "./operator-darwin-signature.ts"
+import { verifyDeveloperIdSigner } from "./operator-darwin-cms.ts"
+import { Refusal, readBuildMeta, readSignatures, refuse } from "./operator-darwin-macho.ts"
 
 export const TEAM_ID = "523JNR86LZ"
 export const MANIFEST = "operator-darwin-manifest.json"
@@ -57,23 +59,52 @@ export const ARTIFACTS: Readonly<Record<string, Artifact>> = {
   },
 }
 
-export class Refusal extends Error {}
-function refuse(reason: string): never {
-  throw new Refusal(reason)
+export { Refusal }
+
+/** What one Mach-O slice of an artifact proves after its signature was verified. */
+export type SliceFacts = {
+  readonly identifier: string
+  /** Team in the CodeDirectory, and team of the certificate that verifiably signed it. */
+  readonly team: string
+  readonly signerTeam: string
+  readonly runtime: boolean
+  readonly cdhash: string
+  /** File range [start, hashedEnd) covered by the CodeDirectory's page hashes. */
+  readonly start: number
+  readonly hashedEnd: number
 }
 
 export type Tools = {
-  /** `rcodesign verify <file>` exit status. */
-  readonly verify: (file: string) => number
-  /** `rcodesign print-signature-info <file>` stdout. */
-  readonly signatureInfo: (file: string) => string
+  /** Verifies every slice's signature and reports it; throws a Refusal on any invalid signature. */
+  readonly inspect: (bytes: Uint8Array) => SliceFacts[]
   /** True when Apple serves a notarization ticket for the 20-byte cdhash (hex). */
   readonly ticket: (cdhash: string) => Promise<boolean>
   readonly git: (args: readonly string[]) => { readonly status: number; readonly stdout: string }
 }
 
-const sha256 = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex")
+export function inspectSignatures(bytes: Uint8Array): SliceFacts[] {
+  return readSignatures(bytes).map((slice) => ({
+    identifier: slice.identifier,
+    team: slice.team,
+    signerTeam: verifyDeveloperIdSigner(slice.codeDirectory, slice.cms).team,
+    runtime: slice.runtime,
+    cdhash: slice.cdhash,
+    start: slice.start,
+    hashedEnd: slice.hashedEnd,
+  }))
+}
 
+const sha256 = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex")
+const record = (value: unknown): Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : {}
+
+/** True when `part` occurs inside bytes some slice's CodeDirectory hashes (not in unhashed signature padding). */
+function embedsHashed(container: Uint8Array, slices: readonly SliceFacts[], part: Uint8Array): boolean {
+  const haystack = Buffer.from(container.buffer, container.byteOffset, container.byteLength)
+  for (let at = haystack.indexOf(part); at >= 0; at = haystack.indexOf(part, at + 1))
+    if (slices.some((slice) => at >= slice.start && at + part.byteLength <= slice.hashedEnd)) return true
+  return false
+}
 export type Input = {
   readonly dir: string
   readonly tag: string
@@ -106,6 +137,7 @@ export async function verifyOperatorDarwin(input: Input, tools: Tools): Promise<
   if (foreign.length > 0) refuse(`source differs from prepared_release_sha outside .github/workflows/: ${foreign[0]}`)
 
   const bytes = new Map<string, Uint8Array>()
+  const facts = new Map<string, SliceFacts[]>()
   const rows: string[] = []
   for (const [name, artifact] of Object.entries(ARTIFACTS)) {
     const file = join(input.dir, name)
@@ -116,27 +148,29 @@ export async function verifyOperatorDarwin(input: Input, tools: Tools): Promise<
     if (line.trim() !== `${digest}  ${name}`) refuse(`${name}: sha256 ${digest} does not match ${name}.sha256`)
     if (hashes[name] !== digest) refuse(`${name}: sha256 ${digest} does not match the manifest`)
 
-    if (tools.verify(file) !== 0) refuse(`${name}: rcodesign verify failed`)
-    const slices = parseSlices(tools.signatureInfo(file))
+    let slices: SliceFacts[]
+    try {
+      slices = tools.inspect(content)
+    } catch (error) {
+      if (error instanceof Refusal) refuse(`${name}: ${error.message}`)
+      throw error
+    }
+    facts.set(name, slices)
     if (slices.length === 0) refuse(`${name}: no code signature`)
-    const cdhashes: string[] = []
     for (const slice of slices) {
       if (slice.identifier !== artifact.identifier) refuse(`${name}: identifier ${slice.identifier}, expected ${artifact.identifier}`)
       if (slice.team !== TEAM_ID) refuse(`${name}: TeamIdentifier ${slice.team}, expected ${TEAM_ID}`)
-      if (slice.leafTeam !== TEAM_ID || slice.leafProfile !== "developer-id-application" || !slice.chainsToApple)
-        refuse(`${name}: signer is not a Developer ID Application certificate of team ${TEAM_ID} chaining to Apple`)
+      if (slice.signerTeam !== TEAM_ID) refuse(`${name}: signed by team ${slice.signerTeam}, expected ${TEAM_ID}`)
       if (!slice.runtime) refuse(`${name}: hardened runtime flag missing`)
-      if (!/^[0-9a-f]{64}$/.test(slice.cdSha256) || slice.signerDigest !== slice.cdSha256)
-        refuse(`${name}: CMS signature does not sign the code directory`)
-      const cdhash = slice.cdSha256.slice(0, 40)
-      if (artifact.notarized && !(await tools.ticket(cdhash))) refuse(`${name}: no notarization ticket for cdhash ${cdhash}`)
-      cdhashes.push(cdhash)
+      if (artifact.notarized && !(await tools.ticket(slice.cdhash))) refuse(`${name}: no notarization ticket for cdhash ${slice.cdhash}`)
     }
+    const cdhashes = slices.map((slice) => slice.cdhash)
 
     if (artifact.engine) {
-      const raw = readBuildMeta(content)
-      if (raw === null) refuse(`${name}: no __OMO_META,__build section`)
-      const meta = record(JSON.parse(raw))
+      const stamp = readBuildMeta(content)
+      if (stamp === null) refuse(`${name}: no __OMO_META,__build section`)
+      if (!slices.some((slice) => stamp.end <= slice.hashedEnd)) refuse(`${name}: __OMO_META,__build lies outside the signed bytes`)
+      const meta = record(JSON.parse(stamp.text))
       if (meta.source_sha !== sourceSha) refuse(`${name}: embedded source_sha ${String(meta.source_sha)} is not ${sourceSha}`)
       if (meta.host !== artifact.engine.host || meta.rust_target !== artifact.engine.rustTarget)
         refuse(`${name}: embedded target ${String(meta.host)}/${String(meta.rust_target)} is not ${artifact.engine.host}`)
@@ -146,7 +180,7 @@ export async function verifyOperatorDarwin(input: Input, tools: Tools): Promise<
   }
   for (const [name, artifact] of Object.entries(ARTIFACTS)) {
     for (const part of artifact.contains ?? []) {
-      if (Buffer.from(bytes.get(name) ?? []).indexOf(Buffer.from(bytes.get(part) ?? [])) < 0)
+      if (!embedsHashed(bytes.get(name) ?? new Uint8Array(), facts.get(name) ?? [], bytes.get(part) ?? new Uint8Array([0])))
         refuse(`${name}: does not embed the verified ${part}`)
     }
   }
@@ -158,15 +192,13 @@ async function main(argv: readonly string[]): Promise<number> {
     const index = argv.indexOf(flag)
     return index >= 0 ? (argv[index + 1] ?? "") : ""
   }
-  const rcodesign = arg("--rcodesign")
   const repo = arg("--repo")
   const run = (cmd: readonly string[]) => {
     const result = Bun.spawnSync([...cmd], { stdout: "pipe", stderr: "pipe" })
     return { status: result.exitCode ?? 1, stdout: result.stdout.toString() }
   }
   const tools: Tools = {
-    verify: (file) => run([rcodesign, "verify", file]).status,
-    signatureInfo: (file) => run([rcodesign, "print-signature-info", file]).stdout,
+    inspect: inspectSignatures,
     ticket: async (cdhash) => {
       const response = await fetch(TICKET_URL, {
         method: "POST",
@@ -184,7 +216,7 @@ async function main(argv: readonly string[]): Promise<number> {
       { dir: arg("--dir"), tag: arg("--tag"), preparedSha: arg("--prepared-sha"), version: arg("--version") },
       tools,
     )
-    console.log(rows.join("\n"))
+    await Bun.write(arg("--summary"), `${rows.join("\n")}\n`)
     return 0
   } catch (error) {
     if (!(error instanceof Refusal)) throw error
