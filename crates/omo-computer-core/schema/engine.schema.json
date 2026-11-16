@@ -3580,6 +3580,17 @@
             }
           ]
         },
+        "redaction": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FrameRedaction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Row 26 (plan owner 2026-11-16): present on a desktop or display frame, always `none`."
+        },
         "session": {
           "$ref": "#/$defs/SessionState"
         },
@@ -3628,6 +3639,13 @@
         "ttlMs"
       ],
       "description": "Present only when the bytes did not ride inline (size above `limits.maxResponseBytes`)."
+    },
+    "FrameRedaction": {
+      "type": "string",
+      "enum": [
+        "none"
+      ],
+      "description": "What a frame's pixels had masked. Frames are declared unredacted (G3): only `none` exists, and\na desktop or display frame says so, so no caller believes a secure field on it was masked (IS-6)."
     },
     "FullLiteral": {
       "type": "string",

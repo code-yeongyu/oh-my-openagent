@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "f8e4623bdcca4639aaf66c0a3b58516064978d3ff3480176759aeedcf787b7d9" as const
+export const SCHEMA_SHA256 = "c4746a98fbfc1f0ba8719c86f2a6d3fe490ec0620f6c1782a2ecb1b6f2294b29" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -871,6 +871,7 @@ export type Frame = {
 	cursor: CursorMode
 	path?: string | null
 	artifact?: FrameArtifact | null
+	redaction?: FrameRedaction | null
 	session: SessionState
 	observation: UntrustedText
 }
@@ -881,6 +882,8 @@ export type FrameArtifact = {
 	mime: ImageMime
 	ttlMs: number
 }
+
+export type FrameRedaction = "none"
 
 export type FullLiteral = "full"
 
