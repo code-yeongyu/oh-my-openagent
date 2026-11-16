@@ -199,6 +199,13 @@ impl Session {
             let out = self.stamp(out, object);
             return Err(self.refuse(record, Some(stage), out));
         }
+        // R70s(5): a foreign input inside the attribution window just before the send holds it.
+        let pid = admission.pid;
+        if object && crate::intervention::foreign_input_holds(self.backend.as_ref(), pid) {
+            drop(lock);
+            let out = self.stamp(Refusal::bare(EngineCode::UserIntervened).into(), object);
+            return Err(self.refuse(record, Some("Attribution".to_owned()), out));
+        }
         // Review M2 of #13355 (IS-2): the busy wait and the lock wait let time pass; the takeover
         // hold is checked again right before delivery, so a send never lands on a user working
         // in the target.
@@ -206,12 +213,6 @@ impl Session {
             drop(lock);
             let out = self.stamp(out, object);
             return Err(self.refuse(record, Some("Pause".to_owned()), out));
-        }
-        let pid = admission.pid;
-        if object && crate::intervention::foreign_input_holds(self.backend.as_ref(), pid) {
-            drop(lock);
-            let out = self.stamp(Refusal::bare(EngineCode::UserIntervened).into(), object);
-            return Err(self.refuse(record, Some("Attribution".to_owned()), out));
         }
         if let Err(error) = self.funnel.markers.create(&record.marker) {
             self.funnel.warn(format!("marker not written: {error}"));
