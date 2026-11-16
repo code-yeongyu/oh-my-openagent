@@ -11,12 +11,9 @@ const REVIEWED_UBUNTU_LATEST_JOBS: readonly string[] = [
   "cla.yml/cla",
   "package-labels.yml/ensure-labels",
   "package-labels.yml/label-issue",
-  "package-labels.yml/label-pull-request",
-  "package-labels.yml/resolve-pr",
   "pr-automation-signal.yml/signal",
   "refresh-model-capabilities.yml/refresh",
   "review-claims.yml/gate",
-  "review-claims.yml/reconcile",
   "review-claims.yml/stale-sweep",
   "sisyphus-agent.yml/agent",
   "stats.yml/stats",
@@ -33,17 +30,23 @@ interface Job {
   readonly strategy?: { readonly matrix?: Readonly<Record<string, unknown>> }
 }
 
+// A `${{ fromJSON(cond && '[...]' || '[...]') }}` matrix (#13802) can yield any of its literal lists.
+function literalLists(value: unknown): readonly unknown[] | undefined {
+  if (typeof value !== "string") return Array.isArray(value) ? value : undefined
+  const lists = [...value.matchAll(/'(\[[^']*\])'/g)].flatMap((match) => JSON.parse(match[1] ?? "[]") as unknown[])
+  return lists.length === 0 ? undefined : lists
+}
+
 function matrixValues(job: Job, key: string): readonly unknown[] | "unresolved" {
   const matrix = job.strategy?.matrix
   if (matrix === undefined) return "unresolved"
-  const listed = matrix[key]
-  const included = Array.isArray(matrix.include)
-    ? matrix.include.flatMap((entry) =>
-        typeof entry === "object" && entry !== null && key in entry ? [(entry as Record<string, unknown>)[key]] : [],
-      )
-    : []
-  if (listed !== undefined && !Array.isArray(listed)) return "unresolved"
-  return [...(listed ?? []), ...included]
+  const listed = matrix[key] === undefined ? [] : literalLists(matrix[key])
+  const include = matrix.include === undefined ? [] : literalLists(matrix.include)
+  if (listed === undefined || include === undefined) return "unresolved"
+  const included = include.flatMap((entry) =>
+    typeof entry === "object" && entry !== null && key in entry ? [(entry as Record<string, unknown>)[key]] : [],
+  )
+  return [...listed, ...included]
 }
 
 /** Whether `runs-on` can select ubuntu-latest; an expression this cannot evaluate counts as floating. */

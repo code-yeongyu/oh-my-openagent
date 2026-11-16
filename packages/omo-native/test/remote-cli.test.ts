@@ -567,7 +567,7 @@ describe("omo remote session verbs", () => {
       sessionCommand: (device, sessionId, rpc, options) =>
         note(`command:${String(rpc["type"])}`, port.sessionCommand(device, sessionId, rpc, options)),
       read: (device, sessionId, tail) => note("read", port.read(device, sessionId, tail)),
-      watch: (device, sessionId, listener) => note("watch", port.watch(device, sessionId, listener)),
+      watch: (device, sessionId, handlers, options) => note("watch", port.watch(device, sessionId, handlers, options)),
     }
     return { calls, remote: { ...remote, sessions } }
   }
@@ -585,7 +585,8 @@ describe("omo remote session verbs", () => {
     expect(types(a.sent, "open_session").map((entry) => entry.rpc?.["cwd"])).toEqual(["/work/b"])
   })
 
-  test("open --model sets the new session's model, and --json prints the typed result with it", async () => {
+  // #13409: the model is the open's launch profile, never a set_model after it.
+  test("open --model opens the session on that model in the one open_session, and --json prints the typed result", async () => {
     const a = fixture.account()
     const { code, out } = await run(
       ["open", "b", "--model", "openai/gpt-6", "--json"],
@@ -595,14 +596,11 @@ describe("omo remote session verbs", () => {
       a.remote,
     )
     expect(code).toBe(REMOTE_EXIT.ok)
-    expect(JSON.parse(out.join(""))).toMatchObject({
-      kind: "ok",
-      thread: { thread_id: "dur-new-on-b", device: "b" },
-      model: { provider: "openai", id: "gpt-6" },
-    })
-    expect(
-      types(a.sent, "set_model").map((entry) => [entry.session, entry.rpc?.["modelId"], entry.rpc?.["scope"]]),
-    ).toEqual([["dur-new-on-b", "gpt-6", "session"]])
+    expect(JSON.parse(out.join(""))).toMatchObject({ kind: "ok", thread: { thread_id: "dur-new-on-b", device: "b" } })
+    expect(types(a.sent, "open_session").map((entry) => [entry.rpc?.["provider"], entry.rpc?.["modelId"]])).toEqual([
+      ["openai", "gpt-6"],
+    ])
+    expect(types(a.sent, "set_model")).toEqual([])
   })
 
   test("send streams the answer's text deltas in order and returns once the turn settles", async () => {
@@ -635,29 +633,31 @@ describe("omo remote session verbs", () => {
     )
   })
 
-  test("open --model that the new session cannot use names the session it opened, which is still open, in human and --json output", async () => {
+  // #13409: b's engine refuses an open whose model it cannot run (senpi model_unavailable), so no session is left behind.
+  test("open --model that b cannot run opens nothing and fails with model_not_found, in human and --json output", async () => {
+    const refusal = "model_unavailable: no model nope/none"
+    const humanAccount = fixture.account({ openRefuse: refusal })
     const human = await run(
       ["open", "b", "--model", "nope/none"],
       undefined,
       SIGNED_IN,
       testBootstrap(),
-      fixture.account().remote,
+      humanAccount.remote,
     )
-    expect([human.code, human.out]).toEqual([REMOTE_EXIT.failed, ["b/dur-new-on-b"]])
-    expect(human.err[0]).toStartWith("omo remote: opened b/dur-new-on-b, but its model was not set: ")
-    expect(human.err[1]).toEndWith("The session is still open; end it with omo remote close b/dur-new-on-b.")
+    expect([human.code, human.out]).toEqual([REMOTE_EXIT.failed, []])
+    expect(human.err[0]).toStartWith("omo remote: No thread was created: device b cannot run nope/none")
+    expect(types(humanAccount.sent, "set_model")).toEqual([])
     const json = await run(
       ["open", "b", "--model", "nope/none", "--json"],
       undefined,
       SIGNED_IN,
       testBootstrap(),
-      fixture.account().remote,
+      fixture.account({ openRefuse: refusal }).remote,
     )
     expect(json.code).toBe(REMOTE_EXIT.failed)
     expect(JSON.parse(json.out.join(""))).toMatchObject({
       kind: "error",
-      error: { code: "model_not_found" },
-      thread: { thread_id: "dur-new-on-b", device: "b" },
+      error: { code: "model_not_found", details: { reason: "model_unavailable", model: "nope/none", device: "b" } },
     })
   })
 
@@ -819,7 +819,7 @@ describe("omo remote session verbs", () => {
     expect([code, out, port.calls]).toEqual([
       REMOTE_EXIT.ok,
       ["Steered turn 3 on b/dur-on-b."],
-      ["status", "locate", "devices", "command:get_state", "command:prompt"],
+      ["status", "devices", "command:get_state", "command:prompt"],
     ])
   })
 
@@ -858,18 +858,14 @@ describe("omo remote session verbs", () => {
     [
       ["model", "b/dur-on-b", "anthropic/claude-opus"],
       "b/dur-on-b now uses anthropic/claude-opus.",
-      ["status", "locate", "devices", "command:get_available_models", "command:set_model"],
+      ["status", "devices", "command:get_available_models", "command:set_model"],
     ],
-    [
-      ["interrupt", "b/dur-on-b"],
-      "Nothing was running on b/dur-on-b.",
-      ["status", "locate", "devices", "command:interrupt"],
-    ],
-    [["close", "b/dur-on-b"], "Closed b/dur-on-b.", ["status", "locate", "devices", "command:unload_session"]],
+    [["interrupt", "b/dur-on-b"], "Nothing was running on b/dur-on-b.", ["status", "devices", "command:interrupt"]],
+    [["close", "b/dur-on-b"], "Closed b/dur-on-b.", ["status", "devices", "command:unload_session"]],
     [
       ["send", "b/dur-on-b", "hi", "--no-wait"],
       "Sent to b/dur-on-b: turn turn-b started.",
-      ["status", "locate", "devices", "command:prompt"],
+      ["status", "devices", "command:prompt"],
     ],
     [["open", "b"], "b/dur-new-on-b", ["status", "devices", "endpoint:open_session", "locate"]],
   ])("%p makes only its remote op's calls and reports the answer", async (args, line, calls) => {

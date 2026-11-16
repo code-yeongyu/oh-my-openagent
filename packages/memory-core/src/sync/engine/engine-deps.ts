@@ -27,8 +27,9 @@ export const INBOUND_POINTS = [
 ] as const
 export const OUTBOUND_POINTS = ["sealed", "reserved", "uploaded", "append-landed", "appended"] as const
 /** After an older build's queued oversized ops are wound back in the store, before the journal drops them. */
-const REWIND_POINT = "rewound"
-export type EnginePoint = (typeof INBOUND_POINTS)[number] | (typeof OUTBOUND_POINTS)[number] | typeof REWIND_POINT
+const REWIND_POINTS = ["rewound", "rewound-joining"] as const
+export type EnginePoint =
+  (typeof INBOUND_POINTS)[number] | (typeof OUTBOUND_POINTS)[number] | (typeof REWIND_POINTS)[number]
 export type EngineFault = (point: EnginePoint) => void
 
 export class CrashInjected extends Error {
