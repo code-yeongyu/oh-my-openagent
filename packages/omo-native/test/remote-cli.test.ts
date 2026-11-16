@@ -984,8 +984,38 @@ describe("omo remote session verbs", () => {
       thread_id: "dur-on-b",
       turn_id: "turn-b",
       interrupted: true,
+      background: { status: "not_supported" },
       device: "b",
     })
+  })
+
+  test.each([
+    [
+      {
+        turnId: "turn-b",
+        interrupted: true,
+        background: {
+          stopped: [{ kind: "bash", id: "bash_3", description: "bun test" }],
+          failed: [{ kind: "bash", id: "bash_4", reason: "permission denied" }],
+        },
+      },
+      [
+        "Interrupted b/dur-on-b.",
+        "Stopped 1 background job: bun test.",
+        "Could not stop background job bash_4: permission denied.",
+      ],
+    ],
+    [
+      { turnId: "turn-b", interrupted: true },
+      [
+        "Interrupted b/dur-on-b.",
+        "Background jobs that turn started were left running: the engine on b/dur-on-b cannot stop them.",
+      ],
+    ],
+  ])("interrupt without --json names the background jobs it stopped or left (%#)", async (interrupt, lines) => {
+    const a = fixture.account({ engine: { ...ENGINE, interrupt } })
+    const { code, out } = await run(["interrupt", "b/dur-on-b"], undefined, SIGNED_IN, testBootstrap(), a.remote)
+    expect([code, out]).toEqual([REMOTE_EXIT.ok, lines])
   })
 
   test.each([
