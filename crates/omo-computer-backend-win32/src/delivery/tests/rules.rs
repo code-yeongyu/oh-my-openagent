@@ -33,6 +33,19 @@ fn chromium_family_is_refused_with_foreground_next_call() {
 }
 
 #[test]
+fn a_cell_the_spike_did_not_measure_refuses_every_background_verb() {
+    assert_eq!(family_of("Edit"), Family::Classic, "the measured cell");
+    let rich_edit = family_of("RichEditD2DPT");
+    assert_ne!(rich_edit, Family::Classic, "not the measured classic Edit");
+    for verb in Verb::ALL {
+        let refused = admit(rich_edit, verb).expect_err("unmeasured: refused until row 69");
+        assert_eq!(refused.refusal.code, EngineCode::BackgroundUnavailable);
+        assert_eq!(refused.next, NextDelivery::Foreground);
+    }
+    assert!(admit(family_of("Edit"), Verb::Text).is_ok());
+}
+
+#[test]
 fn barrier_consumed_is_delivery_not_effect() {
     let consumed = evidence(Barrier::Consumed).expect("consumed is evidence");
     assert_eq!(consumed.kind, "barrier_consumed");

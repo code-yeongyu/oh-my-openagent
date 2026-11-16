@@ -33,7 +33,7 @@ fn fixtures() -> ScriptedOs {
             NOTEPAD_EDIT,
             Win {
                 parent: Some(NOTEPAD),
-                ..win("RichEditD2DPT")
+                ..win("Edit")
             },
         ),
         (
@@ -144,6 +144,35 @@ fn a_background_route_needs_a_live_window() {
         Ok(Delivered { count: 1, of: 1 })
     );
     assert!(os.posts.iter().all(|(to, _)| *to == NOTEPAD_EDIT));
+}
+
+#[test]
+fn the_unmeasured_rich_edit_d2d_cell_refuses_with_nothing_posted() {
+    let mut os = fixtures();
+    os.windows.insert(
+        NOTEPAD_EDIT,
+        Win {
+            parent: Some(NOTEPAD),
+            ..win("RichEditD2DPT")
+        },
+    );
+    let mut deliverer = Deliverer::default();
+    for event in [
+        InputEvent::Text("a".to_owned()),
+        InputEvent::Key {
+            key: "a".to_owned(),
+            down: true,
+        },
+    ] {
+        let refused = deliverer
+            .deliver(&mut os, &id(NOTEPAD), &event)
+            .expect_err("the spike measured classic Edit, not RichEditD2DPT");
+        assert_eq!(
+            (refused.code, refused.reason),
+            (EngineCode::BackgroundUnavailable, Some(Reason::Toolkit))
+        );
+    }
+    assert!(os.posts.is_empty(), "nothing posted");
 }
 
 #[test]
