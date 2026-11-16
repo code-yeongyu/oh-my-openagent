@@ -240,6 +240,8 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     { readonly remote: RemoteThreadSurface; readonly relay: ReturnType<typeof createRelayTransport> }
   >()
   // One port per proven connection: a rebuilt connection gets a new one; the port never closes the shared connection.
+  // An open_session rides a connection of its own, closed once it settles, as `omo remote open` does (#13761): opened
+  // on the shared one, the host's delegated engine connection attaches to it too and every streamed delta arrives twice.
   const legOf = (svc: DeviceService) => {
     const known = legs.get(svc)
     if (known !== undefined) return known
@@ -247,6 +249,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       sessions: createDeviceServiceSessions({
         version: core.deps.version,
         connect: async () => ({ conn: svc, owned: false }),
+        dialEndpoint: async () => ({ conn: await core.dial(), owned: true }),
       }),
       chain: { stamp: (record) => record },
     }

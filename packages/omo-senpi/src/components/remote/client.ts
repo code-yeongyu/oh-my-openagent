@@ -152,6 +152,8 @@ export type ClientCore = {
   readonly sender: RemoteSender
   readonly timers: Timers
   readonly deps: RemoteClientDeps
+  /** Opens a new proven connection, as the client's own is opened; the caller owns it and closes it. */
+  readonly dial: () => Promise<DeviceService>
   /** Runs `body` on the proven connection under the member's deadline; settles with data, never throws. */
   readonly member: <T>(
     opts: Opts | undefined,
@@ -248,9 +250,11 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
   const timers = deps.timers ?? realTimers
   const stateDir = deps.stateDir ?? deviceServiceStateDir()
   let service: Promise<DeviceService> | undefined
+  const dial = (): Promise<DeviceService> =>
+    (deps.connect ?? connectDeviceService)({ version: deps.version, stateDir, timers })
   const connection = (): Promise<DeviceService> => {
     if (service !== undefined) return service
-    const opening = (deps.connect ?? connectDeviceService)({ version: deps.version, stateDir, timers }).then(
+    const opening = dial().then(
       (connected) => {
         void connected.closed.then(() => {
           if (service === opening) service = undefined
@@ -375,7 +379,7 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
       return ok({ revision: listing.revision, rows, unanswered })
     })
 
-  const core: ClientCore = { sender, timers, deps, member, sessionsList, devicesList }
+  const core: ClientCore = { sender, timers, deps, dial, member, sessionsList, devicesList }
 
   return {
     service: {
