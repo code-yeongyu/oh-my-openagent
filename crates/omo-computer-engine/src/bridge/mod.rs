@@ -47,6 +47,12 @@ impl BridgeSession {
         }
     }
 
+    /// Opens the session now (the `--serve` daemon's own session, corpus case 09) instead of
+    /// before the first call that needs it; a refused open is kept as `open` keeps it.
+    pub fn prepare(&mut self) {
+        let _ = self.open();
+    }
+
     fn needs_session(name: &str) -> bool {
         !matches!(name, "stopPath.status" | "stopPath.stop" | "engine.hello")
     }

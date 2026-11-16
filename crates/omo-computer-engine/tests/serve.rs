@@ -14,6 +14,9 @@ mod case;
 #[path = "common/compare.rs"]
 #[allow(dead_code)]
 mod compare;
+#[path = "common/host.rs"]
+#[allow(dead_code)]
+mod host;
 
 use std::time::{Duration, Instant};
 
@@ -403,6 +406,8 @@ fn oneshot_daemon_session_case_09() {
     let scenario = std::fs::read_to_string(case::repo().join(case.scenario.as_deref().expect("scenario"))).expect("scenario file");
     let env: Vec<(&str, &str)> = case.env.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
     let daemon = Daemon::start_with(&scenario, &env);
+    // The hand's host keeps its consent file (G2: without one the engine admits read only).
+    host::consent(daemon.dir.path(), true);
     let mut authority = daemon.connect(&daemon.capability);
     let mut deltas = compare::load(&case.name);
     let mut failures = Vec::new();
