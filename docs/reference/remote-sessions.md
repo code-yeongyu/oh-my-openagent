@@ -74,6 +74,9 @@ If it does not (a new device, or one still running an older service), login does
 Remote is turning on for this device in the background. Check: omo remote status. Turn off: omo remote disable
 ```
 
+On a platform the device service does not run on, login starts nothing in the background and prints
+`The OmO device service does not run on this platform yet.` instead.
+
 The background enable installs the service and then switches remote sessions on. Check how far it got with
 `omo remote status`. To turn remote off, run `omo remote disable`, even while the background enable is still running:
 the enable sees the record and leaves remote off.

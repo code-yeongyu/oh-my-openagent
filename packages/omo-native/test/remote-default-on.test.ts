@@ -4,7 +4,9 @@ import { connectDeviceService } from "../../device-service-core/src/index.ts"
 import { startFakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
 import { defaultWorld } from "../../device-service-core/test/local-api/conformance/world.ts"
 import { cliDeviceServiceHandoff } from "../device-service-handoff"
+import { loginBackground } from "../remote-background-enable"
 import {
+  deviceServiceBootstrapSetup,
   REMOTE_KEPT_OFF_AFTER_SIGN_IN,
   REMOTE_ON_AFTER_SIGN_IN,
   REMOTE_TURNING_ON_AFTER_SIGN_IN,
@@ -253,6 +255,34 @@ describe("omo login switches remote sessions on and says so", () => {
     ])
     expect(settled).toBe("background")
     expect([installs, backgroundStarts, out]).toEqual([[], ["enable"], [REMOTE_TURNING_ON_AFTER_SIGN_IN]])
+  })
+
+  // omo#14004: on a platform the device service does not run on there is nothing to install in the background, so login
+  // says so itself: the real setup's install stops at once with the platform notice, and no background verb starts.
+  test("a platform the device service does not run on: login starts nothing in the background and prints why", async () => {
+    const { io, remote } = await signedInDeviceWithSwitchOff(false)
+    const out: string[] = []
+    const noService = {
+      ...io,
+      stateDir: privateDir(),
+      connect: () => connectDeviceService({ version: "5.1.52", stateDir: privateDir() }),
+      output: (line: string) => out.push(line),
+      error: (line: string) => out.push(`stderr: ${line}`),
+    }
+    const setup = deviceServiceBootstrapSetup({
+      stateDir: noService.stateDir,
+      binaryPath: "/opt/omo/omo",
+      agentDir: "/home/user/.omo/agent",
+      platform: "freebsd",
+      arch: "x64",
+    })
+    const stop = await setup.install()
+    if (stop.ok) throw new Error("an unsupported platform's install must stop")
+
+    expect(await runLoginSetup(noService, setup, remote, loginBackground("/opt/omo/omo", "freebsd", "x64"))).toBe(
+      "not_on",
+    )
+    expect(out).toEqual([`stderr: ${stop.action}`])
   })
 
   // #13724 review M1: an opt-out is enforced at login on any device. With no current service (none, or an older one),

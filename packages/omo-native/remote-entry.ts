@@ -4,7 +4,7 @@ import { accountServiceApi } from "./account-show"
 import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { cliDeviceServiceHandoff } from "./device-service-handoff"
 import { deviceServiceBootstrapSetup, omoBinaryPath, runLoginSetup } from "./remote-bootstrap"
-import { backgroundRemote } from "./remote-background-enable"
+import { loginBackground } from "./remote-background-enable"
 import { prepareRemoteAttach, type RemoteVerbDependencies, runRemoteVerb } from "./remote-cli"
 import { coldWakeSetup } from "./remote-cold-wake"
 import { remoteOptOut } from "./remote-opt-out"
@@ -57,7 +57,7 @@ const testSkipKey = Symbol.for("omo.test.skipRemoteLoginSetup")
 export async function setUpRemoteAfterLogin(): Promise<void> {
   if ((globalThis as Record<symbol, unknown>)[testSkipKey] === true) return
   const dependencies = remoteDependencies()
-  await runLoginSetup(dependencies, dependencies.bootstrap, dependencies, backgroundRemote(omoBinaryPath()))
+  await runLoginSetup(dependencies, dependencies.bootstrap, dependencies, loginBackground(omoBinaryPath()))
 }
 
 /** `packageRoot`: the compiled binary's provisioned runtime directory (its staged `plugin/`); the npm launcher passes nothing. */

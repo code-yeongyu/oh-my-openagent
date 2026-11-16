@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { backgroundRemote, type DetachedSpawn } from "../remote-background-enable"
+import { backgroundRemote, type DetachedSpawn, loginBackground } from "../remote-background-enable"
 import { AFTER_LOGIN_FLAG } from "../remote-verbs"
 
 // omo#13722: the background remote verb must never keep omo login alive: a detached child with no pipes back, hidden
@@ -37,5 +37,16 @@ describe("omo login's background remote verb", () => {
     expect(spawned.map((s) => [s.command, ...s.args])).toEqual([
       ["/usr/bin/bun", "/lib/omo-ai/bin/omo.js", "remote", "bootstrap"],
     ])
+  })
+
+  // omo#14004: only a platform the device service runs on gets a background launcher; any other gets none, so login
+  // prints the platform notice instead of promising remote is turning on.
+  test.each([
+    ["linux", "x64", true],
+    ["win32", "arm64", true],
+    ["freebsd", "x64", false],
+    ["linux", "ia32", false],
+  ] as const)("%s-%s gets a background launcher: %p", (platform, arch, launches) => {
+    expect(loginBackground("/opt/omo/omo", platform, arch) !== null).toBe(launches)
   })
 })

@@ -190,21 +190,26 @@ export async function runLoginSetup(
   io: BootstrapIo,
   setup: BootstrapSetup,
   remote: RemoteSetup,
-  inBackground: BackgroundRemote,
+  inBackground: BackgroundRemote | null,
 ): Promise<"on" | "kept_off" | "not_on" | "background"> {
   // Login never installs the device service itself (omo#13722): the download, the platform's permission steps and the
   // service registration can take minutes (on Windows: Task Scheduler, PowerShell), and children of the login process
   // would keep it from exiting. A device whose current service already runs is set up here; any other is handed to a
   // detached `omo remote enable`. The install's "changed nothing" outcome keeps the bootstrap quiet about it.
+  // `inBackground` null: no device service runs on this host (omo#14004), so there is nothing to hand to the
+  // background. The setup runs here; its install stops at once with the platform notice, which login prints.
   let handedOff = false
-  const handOff = (verb: "enable" | "bootstrap"): BootstrapSetup => ({
-    ...setup,
-    install: async () => {
-      inBackground(verb)
-      handedOff = true
-      return { ok: false, state: "service_degraded", action: "", suppressed: true }
-    },
-  })
+  const handOff = (verb: "enable" | "bootstrap"): BootstrapSetup => {
+    if (inBackground === null) return setup
+    return {
+      ...setup,
+      install: async () => {
+        inBackground(verb)
+        handedOff = true
+        return { ok: false, state: "service_degraded", action: "", suppressed: true }
+      },
+    }
+  }
   if (remote.optOut.read()) {
     // Enforced now, not at the next omo start (#13602 security review M1): a switch that came back on is turned off and
     // the unit removed, as the bootstrap does for an opt-out. A setup that stops still leaves the record in charge.
