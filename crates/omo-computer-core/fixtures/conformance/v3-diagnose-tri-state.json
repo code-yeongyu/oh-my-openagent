@@ -82,7 +82,7 @@
               "identity": {
                 "match": "unknown"
               },
-              "consentAuthority": "file_only",
+              "consentAuthority": "host",
               "session": {
                 "screenLocked": "unknown",
                 "displayAsleep": "unknown",
