@@ -42,7 +42,7 @@ await runScenario("tui-to-tui", async ({ report, fake, scratch, install, startTu
   const listed = await waitFor(
     async () => {
       const result = await omo(scratch, install, ["thread", "list", "--json"])
-      const rows = Array.isArray(result.json) ? result.json : []
+      const rows = Array.isArray(result.json?.threads) ? result.json.threads : []
       const a = rows.find((row) => row.thread_id === alphaEndpoint.durableId)
       const b = rows.find((row) => row.thread_id === betaEndpoint.durableId)
       return a?.name === "tui-alpha" && b?.name === "tui-beta" ? rows : undefined
