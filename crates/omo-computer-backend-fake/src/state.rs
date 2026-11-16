@@ -35,13 +35,26 @@ pub struct FakeState {
     pub epochs: VecDeque<EpochChange>,
     pub cursor: Option<Point>,
     pub held: BTreeSet<String>,
+    /// Wheel steps since the last non-wheel input: one scroll's steps, for the route cap.
+    pub scroll_run: u32,
+    /// Input posts so far, for `stop_chord_after_posts`.
+    pub posts: u32,
     pub clipboard: Option<String>,
     pub focus_read_pos: BTreeMap<String, usize>,
     pub focus_record_pos: BTreeMap<FocusRecordKind, usize>,
     /// Snapshot generation -> the window it walked.
     pub snapshots: BTreeMap<u64, String>,
+    /// Root reads per window: which `ax_versions` entry the window serves.
+    pub ax_reads: BTreeMap<String, usize>,
     pub ax_event_pos: usize,
     pub stop_pressed: bool,
+    /// How many `stop_timeline` presses have fired.
+    pub stop_press_pos: usize,
+    /// How many times a live stop listener was polled.
+    pub stop_polls: u32,
+    // --- Row 21 (review L5, R70cl): each stop listener's own press queue. A press is handed to
+    // the listeners alive when it is delivered; a listener replaced before it is polled drops it. ---
+    pub stop_queues: Vec<std::sync::Weak<std::sync::atomic::AtomicBool>>,
 }
 
 impl FakeState {
@@ -49,6 +62,7 @@ impl FakeState {
         scenario
             .ax_notification_timeline
             .sort_by_key(|event| event.t_ms);
+        scenario.stop_timeline.sort_by_key(|press| press.t_ms);
         let mut faults = FaultQueue::default();
         for failure in &scenario.fail_next {
             faults.push(
@@ -80,12 +94,18 @@ impl FakeState {
             epochs: VecDeque::new(),
             cursor: scenario.cursor,
             held: BTreeSet::new(),
+            scroll_run: 0,
+            posts: 0,
             clipboard: scenario.clipboard.as_ref().and_then(|c| c.text.clone()),
             focus_read_pos: BTreeMap::new(),
             focus_record_pos: BTreeMap::new(),
             snapshots: BTreeMap::new(),
+            ax_reads: BTreeMap::new(),
             ax_event_pos: 0,
             stop_pressed: false,
+            stop_press_pos: 0,
+            stop_polls: 0,
+            stop_queues: Vec::new(),
             scenario,
         }
     }
