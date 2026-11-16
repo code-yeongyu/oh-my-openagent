@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { connectDeviceService } from "@oh-my-opencode/device-service-core/device-service"
 import { mkdtempSync, rmSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { tmpdir, userInfo } from "node:os"
 import { join } from "node:path"
 import type { JsonObject, ListingRow } from "../../../../device-service-core/src/local-api/protocol.ts"
 import {
@@ -11,8 +11,8 @@ import {
   type World,
 } from "../../../../device-service-core/test/local-api/conformance/world.ts"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
-import { resolveSessionTarget } from "./sessions"
-import { clientOn, closeClients, failureOf, fakeClock, startOwner } from "./testing/fake-service"
+import { personIdentity, resolveSessionTarget } from "./sessions"
+import { clientOn, closeClients, failureOf, fakeClock, startModeOwner, startOwner } from "./testing/fake-service"
 import type { ThreadHandle } from "./types"
 
 // The session members of #13414 unit U1 over the device service's conformance owner: the shared create path
@@ -401,5 +401,65 @@ describe("durable-id addressing", () => {
       session: NEW_KEY,
       row: { title: "review", durable_id: ENGINE_ID },
     })
+  })
+})
+
+describe("#13756 review", () => {
+  test("#given a cli client and no session mode #when it opens with full-access #then the open frame carries it (M1)", async () => {
+    const { owner, sent } = await onWorld()
+    const cli = clientOn(owner.stateDir, fakeClock(), { kind: "cli", uid: "501" })
+    await valueOf(cli.sessions.open({ device: PEER, preset: "full-access" }))
+    expect(sent("open_session").map((rpc) => rpc["permissionPreset"])).toEqual(["full-access"])
+  })
+
+  test("#given a person's uid #when the client builds its sender #then it is the CLI's one identity: that uid and this user's name (L1)", () => {
+    expect(personIdentity("501")).toEqual({
+      sender: { kind: "person", uid: 501, user: userInfo().username },
+      caller: "person:501",
+    })
+  })
+
+  test("#given more keyed opens than the client keeps #when the oldest key is reused #then it opens again while a recent one replays (L2)", async () => {
+    const { owner, sent } = await onWorld()
+    const client = clientOn(owner.stateDir, fakeClock())
+    for (let index = 0; index <= 256; index++)
+      await valueOf(client.sessions.open({ device: PEER, idempotency_key: `k-${index}` }))
+    expect(sent("open_session")).toHaveLength(257)
+    await valueOf(client.sessions.open({ device: PEER, idempotency_key: "k-256" }))
+    expect(sent("open_session")).toHaveLength(257)
+    await valueOf(client.sessions.open({ device: PEER, idempotency_key: "k-0" }))
+    expect(sent("open_session")).toHaveLength(258)
+  })
+
+  test("#given a slow listing then a command with no final state #when close runs with deadlineMs N #then it settles timeout by N (L3)", async () => {
+    const clock = fakeClock()
+    const { owner, withheld } = await startModeOwner("ack-no-final", world())
+    const listing = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const client = clientOn(owner.stateDir, clock, undefined, {
+      connect: async (options) => {
+        const svc = await connectDeviceService(options)
+        return {
+          ...svc,
+          sessions: async (filter) => {
+            listing.resolve()
+            await release.promise
+            return await svc.sessions(filter)
+          },
+        }
+      },
+    })
+    // Small enough that no local API bound beneath it (they run on the same fake clock) fires while the listing is held.
+    const N = 15_000
+    const settling = client.sessions.close(LIVE, { deadlineMs: N })
+    await listing.promise
+    clock.advance(N * 0.6)
+    release.resolve()
+    await withheld("final_state")
+    clock.advance(N * 0.4)
+    // Every timer due by N fired synchronously in advance(); one macrotask lets the settled chain resolve.
+    const flushed = new Promise<"pending">((resolve) => setImmediate(() => resolve("pending")))
+    expect(await Promise.race([settling.then((outcome) => outcome.kind), flushed])).toBe("error")
+    expect(failureOf(await settling)).toMatchObject({ code: "timeout" })
   })
 })
