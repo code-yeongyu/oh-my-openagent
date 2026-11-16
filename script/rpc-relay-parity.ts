@@ -7,6 +7,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { parseSync } from "oxc-parser"
 
 interface MethodClasses {
   readonly version: number
@@ -55,14 +56,71 @@ export function curatedRows(path: string = ROWS_PATH): Readonly<Record<string, C
   return Object.fromEntries(Object.entries(parsed).map(([method, row]) => [method, parseRow(path, method, row)]))
 }
 
+type AstNode = { readonly type: string; readonly [key: string]: unknown }
+
+const isNode = (value: unknown): value is AstNode =>
+  typeof value === "object" && value !== null && typeof Reflect.get(value, "type") === "string"
+
+const isLiteral = (node: unknown, value: string): boolean =>
+  isNode(node) && node.type === "Literal" && node["value"] === value
+
+/** `x.type`, `x["type"]` or their optional-chain forms (not `x.$type`, not `x.typeName`). */
+const isTypeMember = (node: unknown): boolean =>
+  isNode(node) && node.type === "ChainExpression"
+    ? isTypeMember(node["expression"])
+    : isNode(node) &&
+      node.type === "MemberExpression" &&
+      (node["computed"] === true
+        ? isLiteral(node["property"], "type")
+        : isNode(node["property"]) && node["property"]["name"] === "type")
+
+/** Whether one AST node uses `method` as a record type (see namesRecordType). */
+function usesRecordType(node: AstNode, method: string): boolean {
+  if (node.type === "Property") {
+    const key = node["key"]
+    const named = isNode(key) && (key["name"] === "type" || key["value"] === "type")
+    return named && isLiteral(node["value"], method)
+  }
+  if (node.type === "BinaryExpression" && ["===", "=="].includes(String(node["operator"]))) {
+    const [left, right] = [node["left"], node["right"]]
+    return (isTypeMember(left) && isLiteral(right, method)) || (isTypeMember(right) && isLiteral(left, method))
+  }
+  if (node.type === "CallExpression" && isNode(node["callee"]) && node["callee"].type === "MemberExpression") {
+    const callee = node["callee"]
+    const matcher = isNode(callee["property"]) ? callee["property"]["name"] : undefined
+    const subject = callee["object"]
+    const args = node["arguments"]
+    return (
+      (matcher === "toBe" || matcher === "toEqual") &&
+      Array.isArray(args) &&
+      isLiteral(args[0], method) &&
+      isNode(subject) &&
+      subject.type === "CallExpression" &&
+      Array.isArray(subject["arguments"]) &&
+      isTypeMember(subject["arguments"][0])
+    )
+  }
+  return false
+}
+
+function someNode(value: unknown, test: (node: AstNode) => boolean): boolean {
+  if (Array.isArray(value)) return value.some((item) => someNode(item, test))
+  if (!isNode(value)) return false
+  if (test(value)) return true
+  return Object.entries(value).some(
+    ([key, child]) => key !== "type" && typeof child === "object" && someNode(child, test),
+  )
+}
+
 /**
- * Whether `source` uses `method` as a record type: the quoted name as the value of a `type` field (`type: "m"`), compared
- * with one (`["type"] === "m"`, `.type === "m"`), or asserted on one (`.type).toBe("m")`). A mention anywhere else (a
- * comment, a test title, an unrelated string) does not count.
+ * Whether `source` (parsed as TypeScript) uses `method` as a record type in code: the quoted name as the value of a `type`
+ * property in an object (`{ type: "m" }`), compared with a `type` member (`x.type === "m"`, `x["type"] === "m"`), or
+ * asserted on one (`expect(x.type).toBe("m")`). Comments, strings (a test title), regex literals, type declarations,
+ * other properties such as `$type`, and a source that does not parse do not count.
  */
 export function namesRecordType(source: string, method: string): boolean {
-  const name = `["']${method}["']`
-  return new RegExp(`\\btype["']?\\]?\\s*(?::|===?)\\s*${name}|\\btype\\)\\.toBe\\(\\s*${name}\\s*\\)`).test(source)
+  const parsed = parseSync("pair-test.ts", source)
+  return parsed.errors.length === 0 && someNode(parsed.program, (node) => usesRecordType(node, method))
 }
 
 /** A curated pair test must be a file in this repository that uses its method as a record type (namesRecordType). */
