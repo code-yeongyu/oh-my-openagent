@@ -85,3 +85,26 @@ fn live_winforms_text_box_is_read_and_the_password_box_withheld() {
     let password = found.iter().find(|n| n.secure).expect("the password box reads secure");
     assert_eq!(password.value, None, "the password never leaves the reader");
 }
+
+/// Review M2 of #13837: re-identification searches the window as it is NOW, not the last walk's
+/// cache - an element seen in an earlier walk is found again after a later `root()` (which starts
+/// a new walk) and its value is read fresh.
+#[test]
+#[ignore = "live: needs an interactive Windows desktop"]
+fn live_runtime_id_search_finds_an_element_from_an_earlier_walk() {
+    let fixture = open_fixture();
+    let mut reader = UiaReader::new(UiaThread::start().expect("the uia thread creates its client"));
+    let root = reader.root_of(&fixture.hwnd.to_string()).expect("the form's root");
+    let mut found = Vec::new();
+    edits(&mut reader, &root.node, 4, &mut found);
+    let text = found.iter().find(|n| !n.secure).expect("the text box");
+    let runtime_id = reader
+        .element(text.handle.expect("handle"))
+        .expect("kept")
+        .runtime_id;
+    let source = reader.source_mut();
+    source.root(fixture.hwnd).expect("a new walk starts");
+    let again = source.find_runtime_id(fixture.hwnd, &runtime_id);
+    assert_eq!(again.len(), 1, "exactly the one text box");
+    assert_eq!(again[0].value.as_deref(), Some("hello"), "read now, not from the cache");
+}
