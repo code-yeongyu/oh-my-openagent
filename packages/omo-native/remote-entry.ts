@@ -4,6 +4,7 @@ import { accountServiceApi } from "./account-show"
 import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { cliDeviceServiceHandoff } from "./device-service-handoff"
 import { deviceServiceBootstrapSetup, omoBinaryPath, runLoginSetup } from "./remote-bootstrap"
+import { backgroundRemote } from "./remote-background-enable"
 import { prepareRemoteAttach, type RemoteVerbDependencies, runRemoteVerb } from "./remote-cli"
 import { coldWakeSetup } from "./remote-cold-wake"
 import { remoteOptOut } from "./remote-opt-out"
@@ -25,9 +26,11 @@ function remoteDependencies(packageRoot?: string): RemoteVerbDependencies {
       const api = accountServiceApi()
       const credentials = await createCredentialStore(api, { wait: SESSION_READ_WAIT }).read()
       if (credentials === null) return "signed_out"
-      await cliDeviceServiceHandoff({ api, stateDir, log: (line) => process.stderr.write(`${line}\n`) }).adopt(
-        credentials,
-      )
+      await cliDeviceServiceHandoff({
+        api,
+        stateDir,
+        log: (line) => process.stderr.write(`${line}\n`),
+      }).adopt(credentials)
       return "linked"
     },
   }
@@ -47,11 +50,14 @@ export async function runRemoteAttachCommand(args: readonly string[]): Promise<r
 // login never installs or links a device service on the machine running the suite. Nothing a user can set reaches it.
 const testSkipKey = Symbol.for("omo.test.skipRemoteLoginSetup")
 
-/** Right after a successful `omo login`: remote sessions switch on and the user is told (omo#13602). */
+/**
+ * Right after a successful `omo login`: remote sessions switch on and the user is told (omo#13602); a device with no
+ * current device service gets it from a detached `omo remote enable` instead of inside the login (omo#13722).
+ */
 export async function setUpRemoteAfterLogin(): Promise<void> {
   if ((globalThis as Record<symbol, unknown>)[testSkipKey] === true) return
   const dependencies = remoteDependencies()
-  await runLoginSetup(dependencies, dependencies.bootstrap, dependencies)
+  await runLoginSetup(dependencies, dependencies.bootstrap, dependencies, backgroundRemote(omoBinaryPath()))
 }
 
 /** `packageRoot`: the compiled binary's provisioned runtime directory (its staged `plugin/`); the npm launcher passes nothing. */
