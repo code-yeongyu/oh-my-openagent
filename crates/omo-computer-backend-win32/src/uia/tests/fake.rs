@@ -93,9 +93,18 @@ impl UiaSource for FakeUia {
     ) -> Slice<Vec<UiaElement>> {
         self.calls.push("children".to_owned());
         self.requests.push(request.clone());
-        let ids = self.children.get(&parent.runtime_id).cloned().unwrap_or_default();
+        let ids = self
+            .children
+            .get(&parent.runtime_id)
+            .cloned()
+            .unwrap_or_default();
         let from = usize::try_from(from).unwrap_or(usize::MAX);
-        Slice::Read(ids.iter().skip(from).filter_map(|id| self.get(id)).collect())
+        Slice::Read(
+            ids.iter()
+                .skip(from)
+                .filter_map(|id| self.get(id))
+                .collect(),
+        )
     }
 
     fn refresh(&mut self, element: &UiaElement, _slice_ms: u64) -> Slice<Option<UiaElement>> {

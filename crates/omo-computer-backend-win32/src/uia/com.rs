@@ -14,17 +14,16 @@ use windows::Win32::System::Com::{
     CoCreateInstance, CoInitializeEx, CLSCTX_INPROC_SERVER, COINIT_MULTITHREADED,
 };
 use windows::Win32::System::Variant::{VariantClear, VARIANT, VT_BSTR};
-use windows::Win32::UI::WindowsAndMessaging::{GetAncestor, GA_ROOT};
 use windows::Win32::UI::Accessibility::{
     AutomationElementMode_Full, CUIAutomation8, IUIAutomation, IUIAutomationCacheRequest,
-    IUIAutomationElement, TreeScope_Children, TreeScope_Element,
-    UIA_AutomationIdPropertyId,
+    IUIAutomationElement, TreeScope_Children, TreeScope_Element, UIA_AutomationIdPropertyId,
     UIA_BoundingRectanglePropertyId, UIA_ClassNamePropertyId, UIA_ControlTypePropertyId,
     UIA_HasKeyboardFocusPropertyId, UIA_IsEnabledPropertyId, UIA_IsPasswordPropertyId,
     UIA_NamePropertyId, UIA_NativeWindowHandlePropertyId, UIA_ProcessIdPropertyId,
     UIA_ProviderDescriptionPropertyId, UIA_RuntimeIdPropertyId, UIA_ValueValuePropertyId,
     UIA_PROPERTY_ID,
 };
+use windows::Win32::UI::WindowsAndMessaging::{GetAncestor, GA_ROOT};
 
 use super::cache::{Batching, CacheRequest};
 use super::control_type::name_of;
@@ -55,7 +54,10 @@ pub struct ComUia {
 }
 
 fn text(value: windows::core::Result<BSTR>) -> Option<String> {
-    value.ok().map(|bstr| bstr.to_string()).filter(|s| !s.is_empty())
+    value
+        .ok()
+        .map(|bstr| bstr.to_string())
+        .filter(|s| !s.is_empty())
 }
 
 /// The text a property VARIANT holds, cleared after the read; `None` for any other type.
@@ -89,14 +91,20 @@ fn read(element: &IUIAutomationElement) -> UiaElement {
     unsafe {
         let rect = element.CachedBoundingRectangle().ok();
         let is_password = element.CachedIsPassword().is_ok_and(|b| b.as_bool());
-        let hwnd = element.CachedNativeWindowHandle().map_or(0, |h| h.0 as isize);
+        let hwnd = element
+            .CachedNativeWindowHandle()
+            .map_or(0, |h| h.0 as isize);
         UiaElement {
             runtime_id: runtime_id(element),
             control_type: name_of(element.CachedControlType().map_or(0, |id| id.0)).to_owned(),
             name: text(element.CachedName()),
             automation_id: text(element.CachedAutomationId()),
             class_name: text(element.CachedClassName()),
-            value: if is_password { None } else { cached_string(element, UIA_ValueValuePropertyId) },
+            value: if is_password {
+                None
+            } else {
+                cached_string(element, UIA_ValueValuePropertyId)
+            },
             is_password,
             has_focus: element.CachedHasKeyboardFocus().is_ok_and(|b| b.as_bool()),
             enabled: element.CachedIsEnabled().is_ok_and(|b| b.as_bool()),
@@ -108,7 +116,9 @@ fn read(element: &IUIAutomationElement) -> UiaElement {
             }),
             hwnd,
             top_level: top_level_of(hwnd),
-            pid: element.CachedProcessId().map_or(0, |pid| u32::try_from(pid).unwrap_or(0)),
+            pid: element
+                .CachedProcessId()
+                .map_or(0, |pid| u32::try_from(pid).unwrap_or(0)),
             process_start: 0,
             child_count: 0,
         }
@@ -138,7 +148,11 @@ impl ComUia {
         u64::try_from(self.started.elapsed().as_millis()).unwrap_or(u64::MAX)
     }
 
-    fn cache(&self, request: &CacheRequest, scope_element: bool) -> Option<IUIAutomationCacheRequest> {
+    fn cache(
+        &self,
+        request: &CacheRequest,
+        scope_element: bool,
+    ) -> Option<IUIAutomationCacheRequest> {
         // SAFETY: builds a request object owned by this thread.
         unsafe {
             let cache = self.automation.CreateCacheRequest().ok()?;
@@ -149,7 +163,9 @@ impl ComUia {
                 cache.SetTreeScope(TreeScope_Element).ok()?;
             }
             if request.batching == Batching::Batch {
-                cache.SetAutomationElementMode(AutomationElementMode_Full).ok()?;
+                cache
+                    .SetAutomationElementMode(AutomationElementMode_Full)
+                    .ok()?;
             }
             Some(cache)
         }
@@ -189,7 +205,12 @@ impl ComUia {
     }
 
     /// Children of `parent` from `from` on, read in one batched call.
-    pub fn children(&mut self, parent: &UiaElement, request: &CacheRequest, from: u32) -> Slice<Vec<UiaElement>> {
+    pub fn children(
+        &mut self,
+        parent: &UiaElement,
+        request: &CacheRequest,
+        from: u32,
+    ) -> Slice<Vec<UiaElement>> {
         let Some(element) = self.kept.get(&parent.runtime_id).cloned() else {
             return Slice::Read(Vec::new());
         };
@@ -198,9 +219,9 @@ impl ComUia {
         };
         // SAFETY: a true condition and a cache request owned by this thread.
         let found = unsafe {
-            self.automation
-                .CreateTrueCondition()
-                .and_then(|condition| element.FindAllBuildCache(TreeScope_Children, &condition, &cache))
+            self.automation.CreateTrueCondition().and_then(|condition| {
+                element.FindAllBuildCache(TreeScope_Children, &condition, &cache)
+            })
         };
         let Ok(found) = found else {
             return Slice::Hung;
@@ -247,7 +268,9 @@ impl ComUia {
                 let Ok(parent) = walker.GetParentElement(&current) else {
                     return 0;
                 };
-                let hwnd = parent.CurrentNativeWindowHandle().map_or(0, |h| h.0 as isize);
+                let hwnd = parent
+                    .CurrentNativeWindowHandle()
+                    .map_or(0, |h| h.0 as isize);
                 if hwnd != 0 {
                     return top_level_of(hwnd);
                 }

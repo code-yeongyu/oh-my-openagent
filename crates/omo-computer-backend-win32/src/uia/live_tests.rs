@@ -70,19 +70,28 @@ fn edits(reader: &mut UiaReader<UiaThread>, node: &NodeRead, depth: u32, out: &m
 fn live_winforms_text_box_is_read_and_the_password_box_withheld() {
     let fixture = open_fixture();
     let mut reader = UiaReader::new(UiaThread::start().expect("the uia thread creates its client"));
-    let root = reader.root_of(&fixture.hwnd.to_string()).expect("the form's root");
+    let root = reader
+        .root_of(&fixture.hwnd.to_string())
+        .expect("the form's root");
     assert_eq!(root.node.role, "Window");
     let description = {
         let mut source = UiaThread::start().expect("a second client for the description read");
         let root = source.root(fixture.hwnd).expect("root");
         source.provider_description(&root)
     };
-    assert_eq!(cache_request(&description).batching, Batching::Batch, "{description}");
+    assert_eq!(
+        cache_request(&description).batching,
+        Batching::Batch,
+        "{description}"
+    );
     let mut found = Vec::new();
     edits(&mut reader, &root.node, 4, &mut found);
     let text = found.iter().find(|n| !n.secure).expect("the text box");
     assert_eq!(text.value.as_deref(), Some("hello"));
-    let password = found.iter().find(|n| n.secure).expect("the password box reads secure");
+    let password = found
+        .iter()
+        .find(|n| n.secure)
+        .expect("the password box reads secure");
     assert_eq!(password.value, None, "the password never leaves the reader");
 }
 
@@ -94,7 +103,9 @@ fn live_winforms_text_box_is_read_and_the_password_box_withheld() {
 fn live_runtime_id_search_finds_an_element_from_an_earlier_walk() {
     let fixture = open_fixture();
     let mut reader = UiaReader::new(UiaThread::start().expect("the uia thread creates its client"));
-    let root = reader.root_of(&fixture.hwnd.to_string()).expect("the form's root");
+    let root = reader
+        .root_of(&fixture.hwnd.to_string())
+        .expect("the form's root");
     let mut found = Vec::new();
     edits(&mut reader, &root.node, 4, &mut found);
     let text = found.iter().find(|n| !n.secure).expect("the text box");
@@ -106,10 +117,21 @@ fn live_runtime_id_search_finds_an_element_from_an_earlier_walk() {
     // Review L1 of #13837 at 44cdbb2103: hwnd 0 searches the window the text box was last seen
     // in, and once a new walk dropped that memory it searches nothing, never the desktop.
     let remembered = source.find_runtime_id(0, &runtime_id);
-    assert_eq!(remembered.len(), 1, "0 names the window the element was last seen in");
+    assert_eq!(
+        remembered.len(),
+        1,
+        "0 names the window the element was last seen in"
+    );
     source.root(fixture.hwnd).expect("a new walk starts");
-    assert!(source.find_runtime_id(0, &runtime_id).is_empty(), "no remembered window: no search");
+    assert!(
+        source.find_runtime_id(0, &runtime_id).is_empty(),
+        "no remembered window: no search"
+    );
     let again = source.find_runtime_id(fixture.hwnd, &runtime_id);
     assert_eq!(again.len(), 1, "exactly the one text box");
-    assert_eq!(again[0].value.as_deref(), Some("hello"), "read now, not from the cache");
+    assert_eq!(
+        again[0].value.as_deref(),
+        Some("hello"),
+        "read now, not from the cache"
+    );
 }

@@ -4,8 +4,8 @@
 
 use windows::Win32::Foundation::HWND;
 use windows::Win32::System::Ole::{
-    SafeArrayCreateVector, SafeArrayDestroy, SafeArrayGetElement, SafeArrayGetLBound, SafeArrayGetUBound,
-    SafeArrayPutElement,
+    SafeArrayCreateVector, SafeArrayDestroy, SafeArrayGetElement, SafeArrayGetLBound,
+    SafeArrayGetUBound, SafeArrayPutElement,
 };
 use windows::Win32::System::Variant::{VariantClear, VARENUM, VARIANT, VT_ARRAY, VT_I4};
 use windows::Win32::UI::Accessibility::{
@@ -23,7 +23,8 @@ pub(super) fn runtime_id(element: &IUIAutomationElement) -> Vec<i32> {
         let Ok(array) = element.GetRuntimeId() else {
             return Vec::new();
         };
-        let (Ok(low), Ok(high)) = (SafeArrayGetLBound(array, 1), SafeArrayGetUBound(array, 1)) else {
+        let (Ok(low), Ok(high)) = (SafeArrayGetLBound(array, 1), SafeArrayGetUBound(array, 1))
+        else {
             let _ = SafeArrayDestroy(array);
             return Vec::new();
         };
@@ -60,7 +61,10 @@ impl ComUia {
             let inner = &mut *value.Anonymous.Anonymous;
             inner.vt = VARENUM(VT_ARRAY.0 | VT_I4.0);
             inner.Anonymous.parray = array;
-            let condition = self.automation.CreatePropertyCondition(UIA_RuntimeIdPropertyId, &value).ok();
+            let condition = self
+                .automation
+                .CreatePropertyCondition(UIA_RuntimeIdPropertyId, &value)
+                .ok();
             let _ = VariantClear(&mut value);
             condition
         }
@@ -84,12 +88,20 @@ impl ComUia {
     /// Every element in top-level window `hwnd` (0: the window it was last seen in) whose
     /// `RuntimeId` is `wanted`, read fresh and kept for the next refresh. No window, no search: a
     /// desktop-wide subtree search would stall every later call on the one `uia` thread.
-    pub fn find_runtime_id(&mut self, hwnd: isize, wanted: &[i32], request: &CacheRequest) -> Vec<UiaElement> {
+    pub fn find_runtime_id(
+        &mut self,
+        hwnd: isize,
+        wanted: &[i32],
+        request: &CacheRequest,
+    ) -> Vec<UiaElement> {
         let window = self.search_window(hwnd, wanted);
         if window == 0 {
             return Vec::new();
         }
-        let (Some(cache), Some(condition)) = (self.cache(request, false), self.runtime_id_condition(wanted)) else {
+        let (Some(cache), Some(condition)) = (
+            self.cache(request, false),
+            self.runtime_id_condition(wanted),
+        ) else {
             return Vec::new();
         };
         // SAFETY: a window handle UIA validates, a condition and a cache request owned by this
