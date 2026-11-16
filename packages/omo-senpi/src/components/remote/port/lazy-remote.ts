@@ -59,7 +59,10 @@ function createLazyRemoteClient(options: LazyRemoteOptions): RemoteClient {
   const group = (name: "service" | "devices" | "sessions" | "aliases") =>
     new Proxy(
       {},
-      { get: (_, member) => forward((loaded) => (loaded[name] as unknown as Record<PropertyKey, Member>)[member] as Member) },
+      {
+        get: (_, member) =>
+          forward((loaded) => (loaded[name] as unknown as Record<PropertyKey, Member>)[member] as Member),
+      },
     )
   const follow: RemoteClient["sessions"]["follow"] = (thread, opts) => {
     let stopped = false
@@ -87,7 +90,9 @@ function createLazyRemoteClient(options: LazyRemoteOptions): RemoteClient {
   return {
     service: group("service"),
     devices: group("devices"),
-    sessions: new Proxy(sessions, { get: (target, member) => (member === "follow" ? follow : Reflect.get(target, member)) }),
+    sessions: new Proxy(sessions, {
+      get: (target, member) => (member === "follow" ? follow : Reflect.get(target, member)),
+    }),
     attach: forward((loaded) => loaded.attach as Member),
     aliases: group("aliases"),
     close: () => {
