@@ -152,12 +152,11 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "linux")]
     fn the_real_linux_name_carries_the_uid_and_no_suffix() {
         let paths = resolve(env(&[("HOME", "/home/u"), ("XDG_RUNTIME_DIR", "/run/user/501")]), false, 501)
             .expect("real paths");
-        if cfg!(target_os = "linux") {
-            assert_eq!(paths.address, HostAddress::Abstract("omo-host-api-501".to_owned()));
-            assert_eq!(paths.consent(), Path::new("/home/u/.config/omo/computer/consent.json"));
-        }
+        assert_eq!(paths.address, HostAddress::Abstract("omo-host-api-501".to_owned()));
+        assert_eq!(paths.consent(), Path::new("/home/u/.config/omo/computer/consent.json"));
     }
 }
