@@ -1515,9 +1515,18 @@ The fallback retry session is now created and can be inspected directly.
     // continuation is sent; completion must then be proven by output beyond it.
     const { status, pendingResume } = existingTask
     try {
-      const anchor = await captureResumeAnchor(this.client, existingTask.sessionId, existingTask.cwd ?? this.directory, input.prompt)
-      if (this.shutdownTriggered || this.tasks.get(existingTask.id) !== existingTask ||
-        existingTask.status !== status || existingTask.pendingResume !== pendingResume) {
+      const anchor = await captureResumeAnchor(
+        this.client,
+        existingTask.sessionId,
+        existingTask.cwd ?? this.directory,
+        input.prompt,
+      )
+      if (
+        this.shutdownTriggered ||
+        this.tasks.get(existingTask.id) !== existingTask ||
+        existingTask.status !== status ||
+        existingTask.pendingResume !== pendingResume
+      ) {
         throw new Error(`Task ${existingTask.id} changed while its continuation was being prepared`)
       }
       existingTask.resumeAnchor = anchor

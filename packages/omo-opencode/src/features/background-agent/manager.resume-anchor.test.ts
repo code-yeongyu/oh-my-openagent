@@ -13,7 +13,12 @@ import { withTimeout } from "../../shared/with-timeout"
 
 const SESSION = "ses_resumed"
 const WORKTREE = mkdtempSync(join(tmpdir(), "resume-anchor-"))
-const resumeInput = { sessionId: SESSION, prompt: "continue", parentSessionId: "ses_parent", parentMessageId: "msg_parent" }
+const resumeInput = {
+  sessionId: SESSION,
+  prompt: "continue",
+  parentSessionId: "ses_parent",
+  parentMessageId: "msg_parent",
+}
 
 type Part = { type: string; text: string }
 type Message = { info: { id: string; role: string; time: { completed: number } }; parts: Part[] }
@@ -38,12 +43,18 @@ function setup() {
     },
     // Like OpenCode, the prompt is stored as a user message with the parts it was sent with.
     promptAsync: async (request: { body: { parts: Part[] } }) => {
-      messages.push({ info: { id: `msg_prompt_${messages.length}`, role: "user", time: { completed: Date.now() } }, parts: request.body.parts })
+      messages.push({
+        info: { id: `msg_prompt_${messages.length}`, role: "user", time: { completed: Date.now() } },
+        parts: request.body.parts,
+      })
       dispatched.resolve()
       return { data: {} }
     },
     prompt: async () => ({}),
-    abort: async (request: { path: { id: string } }) => { aborts.push(request.path.id); return { data: true } },
+    abort: async (request: { path: { id: string } }) => {
+      aborts.push(request.path.id)
+      return { data: true }
+    },
     todo: async () => ({ data: [] }),
     get: async () => ({ data: { id: SESSION } }),
   }
@@ -56,12 +67,25 @@ function setup() {
     $: {} as PluginInput["$"],
     client: { session } as unknown as PluginInput["client"],
   } satisfies PluginInput
-  const manager = new BackgroundManager({ pluginContext, config: { defaultConcurrency: 1 }, enableParentSessionNotifications: false })
+  const manager = new BackgroundManager({
+    pluginContext,
+    config: { defaultConcurrency: 1 },
+    enableParentSessionNotifications: false,
+  })
   managers.push(manager)
   const task: BackgroundTask = {
-    id: "bg_resumed", status: "completed", sessionId: SESSION, cwd: WORKTREE, parentSessionId: "ses_parent",
-    parentMessageId: "msg_parent", description: "synthetic task", prompt: "launch", agent: "explore",
-    concurrencyGroup: "explore", completedAt: new Date(), startedAt: new Date(Date.now() - 60_000),
+    id: "bg_resumed",
+    status: "completed",
+    sessionId: SESSION,
+    cwd: WORKTREE,
+    parentSessionId: "ses_parent",
+    parentMessageId: "msg_parent",
+    description: "synthetic task",
+    prompt: "launch",
+    agent: "explore",
+    concurrencyGroup: "explore",
+    completedAt: new Date(),
+    startedAt: new Date(Date.now() - 60_000),
     progress: { toolCalls: 0, lastUpdate: new Date() },
   }
   manager["tasks"].set(task.id, task)
@@ -178,7 +202,10 @@ describe("resuming a completed background task", () => {
     messages.push(message("msg_partial", "assistant", "partial answer before the failure"))
     const pending = Promise.withResolvers<unknown>()
     const entered = Promise.withResolvers<void>()
-    session.messages = () => { entered.resolve(); return pending.promise }
+    session.messages = () => {
+      entered.resolve()
+      return pending.promise
+    }
     const poll = manager["pollRunningTasks"]()
     await entered.promise
 
@@ -192,37 +219,48 @@ describe("resuming a completed background task", () => {
     expect(aborts).toHaveLength(0)
   })
 
-  test.each(failedReads)("keeps it running when the check's message read %s", async (_label, read) => {
-    // given
-    const { manager, task, session, messages, aborts } = await resumed()
-    messages.push(message("msg_answer", "assistant", "continuation answer"))
-    session.messages = read
+  test.each(failedReads)(
+    "keeps it running when the check's message read %s",
+    async (_label, read) => {
+      // given
+      const { manager, task, session, messages, aborts } = await resumed()
+      messages.push(message("msg_answer", "assistant", "continuation answer"))
+      session.messages = read
 
-    // when
-    await manager["pollRunningTasks"]()
+      // when
+      await manager["pollRunningTasks"]()
 
-    // then
-    expect(task.status).toBe("running")
-    expect(manager["pollingInFlight"]).toBe(false)
-    expect(aborts).toHaveLength(0)
-  }, 10_000)
+      // then
+      expect(task.status).toBe("running")
+      expect(manager["pollingInFlight"]).toBe(false)
+      expect(aborts).toHaveLength(0)
+    },
+    10_000,
+  )
 
-  test.each(failedReads)("rejects the resume, without dispatching, when the message read %s", async (_label, read) => {
-    // given
-    const { manager, task, session } = setup()
-    let prompts = 0
-    session.messages = read
-    session.promptAsync = async () => { prompts += 1; return { data: {} } }
+  test.each(failedReads)(
+    "rejects the resume, without dispatching, when the message read %s",
+    async (_label, read) => {
+      // given
+      const { manager, task, session } = setup()
+      let prompts = 0
+      session.messages = read
+      session.promptAsync = async () => {
+        prompts += 1
+        return { data: {} }
+      }
 
-    // when
-    await expect(manager.resume(resumeInput)).rejects.toThrow()
+      // when
+      await expect(manager.resume(resumeInput)).rejects.toThrow()
 
-    // then
-    expect(task.status).toBe("completed")
-    expect(manager["concurrencyManager"].getCount("explore")).toBe(0)
-    expect(manager["completionTimers"].has(task.id)).toBe(true)
-    expect(prompts).toBe(0)
-  }, 10_000)
+      // then
+      expect(task.status).toBe("completed")
+      expect(manager["concurrencyManager"].getCount("explore")).toBe(0)
+      expect(manager["completionTimers"].has(task.id)).toBe(true)
+      expect(prompts).toBe(0)
+    },
+    10_000,
+  )
 
   test("takes the anchor when a queued resume is admitted, not when it was queued", async () => {
     // given
@@ -242,38 +280,50 @@ describe("resuming a completed background task", () => {
     expect(aborts).toHaveLength(0)
   })
 
-  test.each(failedReads)("reports failure and restores a queued resume when its admission read %s", async (_label, read) => {
-    // given
-    const { manager, task, session } = setup()
-    const reported = Promise.withResolvers<BackgroundTask>()
-    manager["notifyParentSession"] = async (notification) => { reported.resolve(notification) }
-    let prompts = 0
-    session.promptAsync = async () => { prompts += 1; return { data: {} } }
-    const slots = manager["concurrencyManager"]
-    await slots.acquire("explore")
-    await manager.resume({ ...resumeInput, parentSessionId: "ses_requesting_parent" })
-    session.messages = read
+  test.each(failedReads)(
+    "reports failure and restores a queued resume when its admission read %s",
+    async (_label, read) => {
+      // given
+      const { manager, task, session } = setup()
+      const reported = Promise.withResolvers<BackgroundTask>()
+      manager["notifyParentSession"] = async (notification) => {
+        reported.resolve(notification)
+      }
+      let prompts = 0
+      session.promptAsync = async () => {
+        prompts += 1
+        return { data: {} }
+      }
+      const slots = manager["concurrencyManager"]
+      await slots.acquire("explore")
+      await manager.resume({ ...resumeInput, parentSessionId: "ses_requesting_parent" })
+      session.messages = read
 
-    // when
-    slots.release("explore")
-    const notification = await withTimeout(reported.promise, 6_000, "Queued resume failure never notified its caller")
+      // when
+      slots.release("explore")
+      const notification = await withTimeout(reported.promise, 6_000, "Queued resume failure never notified its caller")
 
-    // then
-    expect(task.status).toBe("completed")
-    expect(slots.getCount("explore")).toBe(0)
-    expect(prompts).toBe(0)
-    expect(notification.status).toBe("error")
-    expect(notification.error).toBeTruthy()
-    expect(notification.parentSessionId).toBe("ses_requesting_parent")
-    expect(task.parentSessionId).toBe(resumeInput.parentSessionId)
-  }, 10_000)
+      // then
+      expect(task.status).toBe("completed")
+      expect(slots.getCount("explore")).toBe(0)
+      expect(prompts).toBe(0)
+      expect(notification.status).toBe("error")
+      expect(notification.error).toBeTruthy()
+      expect(notification.parentSessionId).toBe("ses_requesting_parent")
+      expect(task.parentSessionId).toBe(resumeInput.parentSessionId)
+    },
+    10_000,
+  )
 
   test("rejects the resume when the manager shuts down while the messages are read", async () => {
     // given
     const { manager, task, session } = setup()
     const pending = Promise.withResolvers<unknown>()
     const entered = Promise.withResolvers<void>()
-    session.messages = () => { entered.resolve(); return pending.promise }
+    session.messages = () => {
+      entered.resolve()
+      return pending.promise
+    }
     const resume = manager.resume(resumeInput)
     await entered.promise
 
@@ -292,7 +342,10 @@ describe("resuming a completed background task", () => {
     messages.push(message("msg_answer", "assistant", "continuation answer"))
     const pending = Promise.withResolvers<unknown>()
     const entered = Promise.withResolvers<void>()
-    session.messages = () => { entered.resolve(); return pending.promise }
+    session.messages = () => {
+      entered.resolve()
+      return pending.promise
+    }
     const poll = manager["pollRunningTasks"]()
     await entered.promise
 
