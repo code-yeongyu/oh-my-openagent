@@ -8,6 +8,12 @@
 mod peer;
 #[path = "common/daemon.rs"]
 mod daemon;
+#[path = "common/case.rs"]
+#[allow(dead_code)]
+mod case;
+#[path = "common/compare.rs"]
+#[allow(dead_code)]
+mod compare;
 
 use std::time::{Duration, Instant};
 
@@ -339,4 +345,79 @@ fn screen_lock_pause_refuses_the_act_in_serve_mode() {
     let clicked = client.call(2, "click", &json!({"target": "101", "x": 10, "y": 10, "callId": "k-lock"})).expect("answered");
     assert_eq!(clicked["error"]["data"]["code"], "ScreenLocked", "{clicked}");
     assert_eq!(posted_inputs(daemon.dir.path()), 0, "nothing was sent while locked");
+}
+
+fn process_start(pid: u32) -> u64 {
+    let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).expect("stat");
+    let after = &stat[stat.rfind(')').expect("comm") + 2..];
+    after.split_whitespace().nth(19).expect("starttime").parse().expect("number")
+}
+
+/// One `--oneshot --attach` process. `authority` registers it first (the row 37 `hand.ensure`
+/// stand-in, lead decision Q4 A); without it the process holds only `capability`.
+fn attached_oneshot(daemon: &Daemon, authority: Option<&mut daemon::Client>, request: &serde_json::Value, capability: &str) -> Option<serde_json::Value> {
+    use std::io::{BufRead, Write};
+    let mut child = std::process::Command::new(peer::engine())
+        .args(["--oneshot", "--attach"])
+        .arg(daemon.socket())
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .expect("the oneshot spawns");
+    let presented = match authority {
+        Some(authority) => {
+            let pid = child.id();
+            let registered = authority
+                .call(900, "hand.register", &json!({"pid": pid, "processStart": process_start(pid)}))
+                .expect("registered");
+            registered["result"]["capability"].as_str().expect("minted").to_owned()
+        }
+        None => capability.to_owned(),
+    };
+    let mut stdin = child.stdin.take().expect("stdin");
+    writeln!(stdin, "{presented}").and_then(|()| writeln!(stdin, "{request}")).expect("the oneshot reads");
+    drop(stdin);
+    let mut line = String::new();
+    let stdout = child.stdout.take().expect("stdout");
+    let _ = std::io::BufReader::new(stdout).read_line(&mut line);
+    let _ = child.wait();
+    serde_json::from_str(&line).ok()
+}
+
+#[test]
+fn a_registered_oneshot_is_answered_and_an_unregistered_one_is_closed_unread() {
+    let daemon = Daemon::start(&[]);
+    let mut authority = daemon.connect(&daemon.capability);
+    let request = json!({"jsonrpc": "2.0", "id": "v1", "method": "desktop.capabilities", "params": {}});
+    let answered = attached_oneshot(&daemon, Some(&mut authority), &request, "");
+    assert!(answered.as_ref().is_some_and(|r| r["result"]["backend"] == "fake" && r["id"] == "v1"), "{answered:?}");
+    let leaked = hex(&daemon.capability);
+    let refused = attached_oneshot(&daemon, None, &request, &leaked);
+    assert!(refused.is_none(), "an unregistered oneshot, even holding the generation capability, is closed before any frame: {refused:?}");
+}
+
+#[test]
+fn oneshot_daemon_session_case_09() {
+    let case = case::load("crates/omo-computer-engine/tests/fixtures/v1-consumers/09-oneshot-daemon-session.json");
+    let scenario = std::fs::read_to_string(case::repo().join(case.scenario.as_deref().expect("scenario"))).expect("scenario file");
+    let env: Vec<(&str, &str)> = case.env.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+    let daemon = Daemon::start_with(&scenario, &env);
+    let mut authority = daemon.connect(&daemon.capability);
+    let mut deltas = compare::load(&case.name);
+    let mut failures = Vec::new();
+    for (index, step) in case.steps.iter().enumerate() {
+        let case::Step::Send { send, expect, .. } = step else { continue };
+        let reply = attached_oneshot(&daemon, Some(&mut authority), send, "");
+        for expectation in expect {
+            let mut ctx = compare::Context {
+                variable: expectation.variable.iter().map(String::as_str).collect(),
+                deltas: &mut deltas,
+                failures: Vec::new(),
+            };
+            compare::compare(&expectation.message, reply.as_ref(), "", &mut ctx);
+            failures.extend(ctx.failures.into_iter().map(|f| format!("MISMATCH step={} {f}", index + 1)));
+        }
+    }
+    assert!(failures.is_empty(), "case 09 did not replay clean:\n{}", failures.join("\n"));
 }
