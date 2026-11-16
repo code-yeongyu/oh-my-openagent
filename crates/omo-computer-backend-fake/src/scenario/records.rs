@@ -75,6 +75,12 @@ pub struct FakeAxNode {
     pub bounds: Option<Rect>,
     #[serde(default)]
     pub actions: Vec<String>,
+    /// The native object the backend reports for the element; it outlives a tree version.
+    #[serde(default)]
+    pub object: Option<u64>,
+    /// `AXIdentifier` / `AutomationId` / accessible-id.
+    #[serde(default)]
+    pub native_id: Option<String>,
     #[serde(default)]
     pub children: Vec<Self>,
 }
