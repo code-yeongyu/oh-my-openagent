@@ -138,7 +138,7 @@ Your next move: <fill - e.g. approve, or run a high-accuracy review>. Full execu
 
 ## Execution strategy
 ### Parallel execution waves
-> Target 5-8 todos per wave. Fewer than 3 (except the final) means you under-split.
+> Size each wave to the todos that are independent of each other.
 
 ### Dependency matrix
 | Todo | Depends on | Blocks | Can parallelize with |
