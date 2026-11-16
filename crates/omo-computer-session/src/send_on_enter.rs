@@ -1,9 +1,11 @@
-//! The send-on-Enter composer guard at the session (row 26; acceptance 80): before the marker,
-//! the call's events are cut against the entry of the focused composer's app in the session's
-//! `computer.send_on_enter` table. `force:true` is the only override.
+//! Row 26's text guards at the session, before the marker: a remote-screen window's text is
+//! admitted against its fixed layout (acceptance 81's remote leg), and the call's events are cut
+//! against the entry of the focused composer's app in the session's `computer.send_on_enter`
+//! table (acceptance 80; `force:true` is the only override).
 
 use omo_computer_core::ax::{AxHandle, AxReader, NodeRead, Slice};
 use omo_computer_core::backend::{InputEvent, WindowFilter};
+use omo_computer_core::keys::unresolvable::admit_remote_text;
 use omo_computer_core::send_on_enter::{cut, Composer, Cut, COMPOSER_ROLES};
 use omo_computer_safety::TargetRef;
 use serde_json::Value;
@@ -86,15 +88,25 @@ impl Session {
         })
     }
 
-    /// The guard on `mutation` (acceptance 80): a send chord refuses the call with nothing sent;
-    /// a newline in typed text keeps the events before it and answers the cut to finish the call.
+    /// The text guards on `mutation`: a remote screen's layout (acceptance 81), then the
+    /// send-on-Enter cut (acceptance 80): a send chord refuses the call with nothing sent; a
+    /// newline in typed text keeps the events before it and answers the cut to finish the call.
     ///
     /// # Errors
+    /// `InvalidKey` / `BackgroundUnavailable` for a remote screen's text, or
     /// `ConsequentialAction{send_on_enter, app, composer, nextCall}` for a send chord.
     pub(crate) fn send_on_enter(&mut self, mutation: &mut Mutation<'_>) -> Result<Option<TextCut>, Refused> {
         let TargetRef::Window(window) = mutation.call.target else {
             return Ok(None);
         };
+        if let Some(forwarding) = self.backend.remote_screen(window) {
+            let background = mutation.route == omo_computer_core::backend::Route::BackgroundWindow;
+            for event in &mutation.events {
+                if let InputEvent::Text(text) = event {
+                    admit_remote_text(text, forwarding, background).map_err(Refused::from)?;
+                }
+            }
+        }
         if mutation.call.force || mutation.write.is_some() || self.funnel.send_on_enter.is_empty() {
             return Ok(None);
         }

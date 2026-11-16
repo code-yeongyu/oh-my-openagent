@@ -76,7 +76,13 @@ pub const fn remote_stroke(character: char) -> Option<bool> {
 /// # Errors
 /// The refusal, with nothing sent.
 pub fn admit_remote_text(text: &str, forwarding: RemoteForwarding, background: bool) -> Result<(), Refusal> {
-    let _ = (text, forwarding, background);
+    let strokes: Vec<Option<bool>> = text.chars().map(remote_stroke).collect();
+    if strokes.contains(&None) {
+        return Err(Refusal::bare(EngineCode::InvalidKey));
+    }
+    if background && forwarding == RemoteForwarding::KeyEvents && strokes.contains(&Some(true)) {
+        return Err(Refusal::bare(EngineCode::BackgroundUnavailable));
+    }
     Ok(())
 }
 
