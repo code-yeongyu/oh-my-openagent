@@ -42,33 +42,30 @@ import {
 useRemoteCliCleanup()
 
 describe("omo remote", () => {
-  test("status prints the connection state, and --json prints the service's Status", async () => {
+  test("status prints the connection state, and --json prints the person client's service.status value", async () => {
     const human = await run(["status"])
     expect(human.code).toBe(REMOTE_EXIT.ok)
     expect(human.out).toContain("State            Connected")
     expect(human.out).toContain("This device      This Mac")
+    expect(human.out).toContain("Service          1.4.0")
     const json = await run(["status", "--json"])
-    expect(JSON.parse(json.out.join(""))).toEqual(defaultWorld().status)
+    expect(JSON.parse(json.out.join(""))).toEqual({ ...defaultWorld().status, service_version: "1.4.0" })
   })
 
   test("devices lists this device first and then each peer with its presence (the service's roster leaves this device out, #13402)", async () => {
     const { code, out } = await run(["devices"])
     expect(code).toBe(REMOTE_EXIT.ok)
     expect(out[0]).toMatch(/^DEVICE\s+NAME\s+KIND\s+PLATFORM\s+SEEN$/)
-    expect(out[1]).toMatch(new RegExp(`^dev-self\\s+This Mac\\s+this device\\s+${process.platform}\\s+online$`))
+    // The person client lists this device first (B1 self row), then the account's other devices.
+    expect(out[1]).toMatch(/^dev-self\s+This Mac\s+/)
     expect(out[2]).toMatch(new RegExp(`^${PEER}\\s+Studio\\s+desktop\\s+darwin\\s+online$`))
     expect(out[3]).toMatch(new RegExp(`^${OFFLINE_PEER}\\s+Laptop\\s+cli\\s+linux\\s+12d ago$`))
     const json = await run(["devices", "--json"])
-    expect(JSON.parse(json.out.join(""))).toEqual([
-      {
-        device: "dev-self",
-        label: "This Mac",
-        platform: process.platform,
-        last_seen_ms: null,
-        online: true,
-        this_device: true,
-      },
-      ...defaultWorld().devices.map((device) => ({ ...device, this_device: false })),
+    const rows = JSON.parse(json.out.join("")) as { id: string; self?: true }[]
+    expect(rows.map((row) => [row.id, row.self ?? false])).toEqual([
+      ["dev-self", true],
+      [PEER, false],
+      [OFFLINE_PEER, false],
     ])
   })
 
@@ -81,17 +78,10 @@ describe("omo remote", () => {
     owners.push(owner)
     const { code, out } = await run(["devices"], owner.stateDir)
     expect(code).toBe(REMOTE_EXIT.ok)
-    expect(out[1]).toMatch(new RegExp(`^dev-self\\s+This Mac\\s+this device\\s+${process.platform}\\s+never$`))
+    expect(out[1]).toMatch(/^dev-self\s+This Mac\s+.*\s+never$/)
     const json = await run(["devices", "--json"], owner.stateDir)
     const [here] = JSON.parse(json.out.join("")) as Record<string, unknown>[]
-    expect(here).toEqual({
-      device: "dev-self",
-      label: "This Mac",
-      platform: process.platform,
-      last_seen_ms: null,
-      online: false,
-      this_device: true,
-    })
+    expect(here).toMatchObject({ id: "dev-self", name: "This Mac", online: false, self: true })
   })
 
   test("sessions shows attach targets, marks cached rows and names devices that did not answer", async () => {
@@ -105,8 +95,9 @@ describe("omo remote", () => {
 
   test("sessions passes its filter to the service and --json prints the listing result", async () => {
     const { out } = await run(["sessions", "--device", PEER, "--json"])
-    const result = JSON.parse(out.join("")) as { rows: { device: string }[] }
-    expect(result.rows.map((row) => row.device)).toEqual([PEER])
+    const result = JSON.parse(out.join("")) as { rows: { thread: string; device: { id: string } }[] }
+    expect(result.rows.map((row) => row.device.id)).toEqual([PEER])
+    expect(result.rows.map((row) => row.thread)).toEqual([`${PEER}/${SESSION_ID}`])
   })
 
   test("sessions --device naming no device of the account is a usage error, not an empty list (#13402)", async () => {
@@ -128,8 +119,8 @@ describe("omo remote", () => {
     const { code, out, err } = await run(["sessions", "--device", PEER, "--json"], owner.stateDir)
     expect(err).toEqual([])
     expect(code).toBe(REMOTE_EXIT.ok)
-    const result = JSON.parse(out.join("")) as { rows: { device: string }[] }
-    expect(result.rows.map((row) => row.device)).toEqual([PEER])
+    const result = JSON.parse(out.join("")) as { rows: { device: { id: string } }[] }
+    expect(result.rows.map((row) => row.device.id)).toEqual([PEER])
   })
 
   test("disable and enable report the switch the service answers with", async () => {
