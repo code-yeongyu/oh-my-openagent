@@ -5,6 +5,7 @@ export type CiMode = {
   readonly fullMatrix: boolean
   readonly runtimeTouching: boolean
   readonly labelRefused: boolean
+  readonly labelHonoredOverFileCap: boolean
 }
 
 export function isRuntimePath(path: string): boolean
