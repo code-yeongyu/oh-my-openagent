@@ -562,7 +562,7 @@ jobs:
           here=script/qa/computer/conformance/fixtures/webview-macos
           swiftc -swift-version 5 -O -warnings-as-errors -o "$RUNNER_TEMP/cleanup-check" "$here/cleanup-check/main.swift" "$here/webkit-temp-cleanup.swift"
           scratch=$(mktemp -d "$RUNNER_TEMP/cleanup-check.XXXXXX")
-          TMPDIR="$scratch/" "$RUNNER_TEMP/cleanup-check"
+          "$RUNNER_TEMP/cleanup-check" "$scratch"
 
       # The a11y leg reads the AX tree of another process, which needs accessibility trust: build the
       # probe, ad-hoc sign it and grant it in TCC. A runner that refuses the grant makes the probe exit 3

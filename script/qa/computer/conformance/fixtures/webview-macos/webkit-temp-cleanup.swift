@@ -24,8 +24,12 @@ enum WebKitTempCleanup {
         case failed(String)
     }
 
-    /// `startTimeOf` reads a process's start time; cleanup-check/main.swift passes one that cannot.
-    static func run(bound: TimeInterval, startTimeOf: @escaping (pid_t) -> timeval? = WebKitTempCleanup.startTime) -> Outcome {
+    /// `startTimeOf` reads a process's start time and `temporaryDirectory` is where this app's WebKit folders live;
+    /// cleanup-check/main.swift passes a reader that cannot read and a scratch directory (macOS ignores TMPDIR here).
+    static func run(
+        bound: TimeInterval, startTimeOf: @escaping (pid_t) -> timeval? = WebKitTempCleanup.startTime,
+        temporaryDirectory: String = NSTemporaryDirectory()
+    ) -> Outcome {
         guard let responsibleFor else {
             return .failed("this macOS does not export responsibility_get_pid_responsible_for_pid")
         }
@@ -38,7 +42,7 @@ enum WebKitTempCleanup {
         var owned = Set<pid_t>()
         var holders = Set<pid_t>()
         while true {
-            let seen = ownFolders()
+            let seen = ownFolders(in: temporaryDirectory)
             let live = helpers(of: owner, holding: seen)
             if live.isEmpty { break }
             if DispatchTime.now() >= deadline {
@@ -51,9 +55,9 @@ enum WebKitTempCleanup {
                 }
             }
         }
-        let folders = ownFolders()
+        let folders = ownFolders(in: temporaryDirectory)
         for folder in folders { try? FileManager.default.removeItem(atPath: folder) }
-        let left = ownFolders()
+        let left = ownFolders(in: temporaryDirectory)
         if !left.isEmpty { return .failed("could not remove \(left.joined(separator: ", "))") }
         return .clean(owned: owned.count, holders: holders.count)
     }
@@ -95,8 +99,8 @@ enum WebKitTempCleanup {
         return timeval(tv_sec: Int(info.pbi_start_tvsec), tv_usec: Int32(info.pbi_start_tvusec))
     }
 
-    private static func ownFolders() -> [String] {
-        let temp = realPath(NSTemporaryDirectory())
+    private static func ownFolders(in directory: String) -> [String] {
+        let temp = realPath(directory)
         let names = (try? FileManager.default.contentsOfDirectory(atPath: temp)) ?? []
         return names
             .filter { $0.hasPrefix("com.apple.WebKit.") && $0.contains("+Conformance Fixture") }
