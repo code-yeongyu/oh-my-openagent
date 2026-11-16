@@ -134,11 +134,9 @@ impl AxServer for Server {
     fn window(&mut self, pid: u32, number: u32) -> Option<Element> {
         let app = Self::app_element(pid)?;
         let windows = self.copy(app.get(), c"AXWindows")?;
-        let found = self
-            .elements_of(&windows)
+        self.elements_of(&windows)
             .into_iter()
-            .find(|e| self.get(*e).and_then(window_of) == Some(number));
-        found
+            .find(|e| self.get(*e).and_then(window_of) == Some(number))
     }
 
     fn app(&mut self, pid: u32) -> Option<Element> {
