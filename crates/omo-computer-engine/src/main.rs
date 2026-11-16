@@ -42,7 +42,7 @@ fn main() -> ExitCode {
         Mode::Oneshot => stdio::oneshot(),
         Mode::Mcp { tier } => stdio::mcp(tier),
         #[cfg(unix)]
-        Mode::Serve { endpoint, lock } => daemon::run(&endpoint, &lock),
+        Mode::Serve { endpoint, lock, start_stopped } => daemon::run(&endpoint, &lock, start_stopped),
         #[cfg(unix)]
         Mode::OneshotAttach { endpoint } => bridge::attach::run(&endpoint),
         #[cfg(not(unix))]

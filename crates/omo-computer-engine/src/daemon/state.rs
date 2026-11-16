@@ -44,7 +44,7 @@ pub struct Shared {
 
 impl Shared {
     #[must_use]
-    pub fn new(runtime: PathBuf, fake: bool, generation: Capability, host_pids: Vec<i32>) -> Arc<Self> {
+    pub fn new(runtime: PathBuf, fake: bool, generation: Capability, host_pids: Vec<i32>, start_stopped: bool) -> Arc<Self> {
         Arc::new(Self {
             runtime,
             fake,
@@ -53,7 +53,7 @@ impl Shared {
             registered: Mutex::new(Vec::new()),
             subscribers: Mutex::new(Vec::new()),
             injectors: Mutex::new(Vec::new()),
-            stopped: AtomicBool::new(false),
+            stopped: AtomicBool::new(start_stopped),
             bridge: super::attached::SharedBridge::default(),
             idle: super::idle::Idle::new(fake && std::env::var_os("OMO_COMPUTER_FAKE_CLOCK").is_some()),
         })
@@ -135,17 +135,19 @@ impl Shared {
         if self.stopped.swap(true, Ordering::SeqCst) {
             return;
         }
-        let mut line = serde_json::json!({
-            "jsonrpc": "2.0", "id": INJECTED_STOP, "method": "stopPath.stop", "params": {"source": "peer"}
-        })
-        .to_string()
-        .into_bytes();
-        line.push(b'\n');
+        let line = stop_line();
         for (id, input) in self.injectors.lock().unwrap_or_else(PoisonError::into_inner).iter() {
             if *id != from {
                 let _ = input.send(line.clone());
             }
         }
+    }
+
+    /// A hand-wide stop is in force (`--start-stopped` until the first resume, or a stop from any
+    /// session): a session that starts now starts suspended.
+    #[must_use]
+    pub fn is_stopped(&self) -> bool {
+        self.stopped.load(Ordering::SeqCst)
     }
 
     /// The push outbox: a notification line reaches every OTHER subscribed connection now (the
@@ -157,4 +159,16 @@ impl Shared {
             }
         }
     }
+}
+
+/// The daemon's own `stopPath.stop` line for a session's executor; its reply is never written.
+#[must_use]
+pub fn stop_line() -> Vec<u8> {
+    let mut line = serde_json::json!({
+        "jsonrpc": "2.0", "id": INJECTED_STOP, "method": "stopPath.stop", "params": {"source": "peer"}
+    })
+    .to_string()
+    .into_bytes();
+    line.push(b'\n');
+    line
 }

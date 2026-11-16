@@ -3,7 +3,7 @@
 //! public rows only; a test-only row exists only while the fake clock seam is installed and
 //! never crosses a bridge. Everything else is the v1 rejection, decided before any dispatch.
 
-use omo_computer_core::methods::{Exposure, Method, MethodSpec, METHODS};
+use omo_computer_core::methods::{Exposure, Method, MethodSpec, PeerKind, METHODS};
 
 use super::wire::WireError;
 
@@ -13,6 +13,9 @@ pub enum Peer {
     Host,
     /// `--oneshot` and the `--mcp` shim.
     Bridge,
+    /// A `hand.register`-ed peer on its own daemon connection (row 29b): the session's methods,
+    /// never the authority's.
+    AttachHost,
 }
 
 /// The row `name` names, when `peer` may call it.
@@ -23,8 +26,15 @@ pub fn admit(peer: Peer, name: &str, test_clock: bool) -> Result<MethodSpec, Wir
     let method = Method::from_name(name).ok_or_else(|| WireError::rejected("unknown"))?;
     let spec = METHODS[method as usize];
     match (spec.exposure, peer) {
-        (Exposure::Public, _) | (Exposure::HostOnly(_), Peer::Host) => Ok(spec),
+        (Exposure::Public, _)
+        | (Exposure::HostOnly(_), Peer::Host)
+        | (Exposure::HostOnly(PeerKind::Session), Peer::AttachHost) => Ok(spec),
         (Exposure::HostOnly(_), Peer::Bridge) => Err(WireError::rejected("hostOnly")),
+        (Exposure::HostOnly(PeerKind::Authority), Peer::AttachHost) => Err(WireError::new(
+            -32_601,
+            "Method not found",
+            Some(serde_json::json!({"reason": "hostOnly", "peer_kind": "attach_host"})),
+        )),
         (Exposure::TestOnly, Peer::Host) if test_clock => Ok(spec),
         (Exposure::TestOnly, _) => Err(WireError::rejected("testOnly")),
     }
@@ -46,6 +56,15 @@ mod tests {
         assert_eq!(reason(admit(Peer::Bridge, "stopPath.resume", true)), json!("hostOnly"));
         assert_eq!(reason(admit(Peer::Bridge, "$/test.advanceClock", true)), json!("testOnly"));
         assert_eq!(reason(admit(Peer::Bridge, "reset", true)), json!("unknown"));
+    }
+
+    #[test]
+    fn an_attach_host_reaches_session_rows_and_is_refused_authority_rows() {
+        assert!(admit(Peer::AttachHost, "session.open", false).is_ok());
+        assert!(admit(Peer::AttachHost, "engine.hello", false).is_ok());
+        let refused = admit(Peer::AttachHost, "stopPath.resume", false).err().and_then(|e| e.data).unwrap_or_default();
+        assert_eq!(refused, json!({"reason": "hostOnly", "peer_kind": "attach_host"}));
+        assert_eq!(reason(admit(Peer::AttachHost, "$/test.advanceClock", true)), json!("testOnly"));
     }
 
     #[test]

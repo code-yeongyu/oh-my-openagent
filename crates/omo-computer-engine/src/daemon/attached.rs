@@ -75,7 +75,9 @@ pub fn serve(
     bridge: &SharedBridge,
     admit_request: &dyn Fn(&mut Value) -> bool,
     own: &dyn Fn(&Value, &Value) -> bool,
+    start_stopped: bool,
 ) {
+    let mut session: Option<Result<super::own_session::OwnSession, String>> = None;
     let (Ok(reader), Ok(mut out)) = (stream.try_clone(), stream.try_clone()) else { return };
     for line in BufReader::new(reader).split(b'\n') {
         let Ok(line) = line else { break };
@@ -89,8 +91,21 @@ pub fn serve(
         }
         let method = request.get("method").and_then(Value::as_str).unwrap_or_default().to_owned();
         let params = request.get("params").cloned().unwrap_or_else(|| json!({}));
-        let outcome = bridge.call(method, params);
-        if writeln!(out, "{}", reply(&id, &outcome)).and_then(|()| out.flush()).is_err() {
+        // The v1 `desktop.*` names share the bridge session; any other name is this host's own
+        // session (row 29b): Public and HostOnly(session) methods, authority ones refused.
+        let (outcome, notifications) = if method.starts_with(crate::bridge::METHOD_PREFIX) {
+            (bridge.call(method, params), Vec::new())
+        } else {
+            match session.get_or_insert_with(|| super::own_session::OwnSession::start(start_stopped)) {
+                Ok(own_session) => own_session.call(&method, params),
+                Err(detail) => (Err(WireError::new(-32_603, "Internal error", Some(json!({"detail": detail})))), Vec::new()),
+            }
+        };
+        let mut written = writeln!(out, "{}", reply(&id, &outcome));
+        for notification in &notifications {
+            written = written.and_then(|()| writeln!(out, "{notification}"));
+        }
+        if written.and_then(|()| out.flush()).is_err() {
             break;
         }
     }

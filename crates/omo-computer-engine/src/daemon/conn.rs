@@ -97,7 +97,7 @@ pub fn serve(stream: UnixStream, grant: Grant, shared: &Arc<Shared>, connection:
             Err(_) => return,
         };
         let own = |request: &Value, id: &Value| own_method(request, id, grant, shared, &out);
-        super::attached::serve(&stream, &shared.bridge, &admit_request, &own);
+        super::attached::serve(&stream, &shared.bridge, &admit_request, &own, shared.is_stopped());
         let _ = stream.shutdown(std::net::Shutdown::Both);
         return;
     }
@@ -136,6 +136,11 @@ pub fn serve(stream: UnixStream, grant: Grant, shared: &Arc<Shared>, connection:
             bytes.push(b'\n');
             if forward.send(bytes).is_err() {
                 break;
+            }
+            // `--start-stopped` or a stop already in force: a session opened now is suspended
+            // right after its open (the open arms the guard; the stop then latches it).
+            if request.get("method").and_then(Value::as_str) == Some("session.open") && shared.is_stopped() {
+                let _ = forward.send(super::state::stop_line());
             }
         }
     }

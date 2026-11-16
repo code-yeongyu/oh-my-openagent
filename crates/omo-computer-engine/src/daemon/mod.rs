@@ -7,6 +7,7 @@ mod admit;
 mod attached;
 mod conn;
 mod idle;
+mod own_session;
 mod state;
 
 use std::fs::OpenOptions;
@@ -55,7 +56,7 @@ fn watch_idle(shared: std::sync::Arc<Shared>) {
     });
 }
 
-fn serve(endpoint: &Path, lock: &Path) -> io::Result<()> {
+fn serve(endpoint: &Path, lock: &Path, start_stopped: bool) -> io::Result<()> {
     OpenOptions::new().write(true).create_new(true).open(lock)?;
     let generation = read_capability()?;
     watch_launcher();
@@ -63,7 +64,7 @@ fn serve(endpoint: &Path, lock: &Path) -> io::Result<()> {
         .map_or_else(|| endpoint.parent().map(Path::to_path_buf).unwrap_or_default(), PathBuf::from);
     let fake = std::env::var("OMO_COMPUTER_BACKEND").is_ok_and(|backend| backend == "fake");
     let spawning_host = i32::try_from(std::os::unix::process::parent_id()).unwrap_or_default();
-    let shared = Shared::new(runtime, fake, generation, vec![spawning_host]);
+    let shared = Shared::new(runtime, fake, generation, vec![spawning_host], start_stopped);
     let listener = UnixListener::bind(endpoint)?;
     watch_idle(std::sync::Arc::clone(&shared));
     for (connection, stream) in listener.incoming().enumerate() {
@@ -80,8 +81,8 @@ fn serve(endpoint: &Path, lock: &Path) -> io::Result<()> {
     Ok(())
 }
 
-pub fn run(endpoint: &Path, lock: &Path) -> ExitCode {
-    match serve(endpoint, lock) {
+pub fn run(endpoint: &Path, lock: &Path, start_stopped: bool) -> ExitCode {
+    match serve(endpoint, lock, start_stopped) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("omo-computer-engine: --serve: {error}");

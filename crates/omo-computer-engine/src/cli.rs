@@ -20,8 +20,9 @@ pub enum Mode {
     PresenceHelper,
     /// Lifts the engine's held inputs after the engine dies (G3).
     ReleaseHelper,
-    /// A same-uid server on a caller-chosen endpoint and lock (row 29 builds the daemon).
-    Serve { endpoint: PathBuf, lock: PathBuf },
+    /// A same-uid server on a caller-chosen endpoint and lock (row 29 builds the daemon);
+    /// `start_stopped` (`--start-stopped`, row 29b) starts every session suspended.
+    Serve { endpoint: PathBuf, lock: PathBuf, start_stopped: bool },
     /// Prints the committed protocol schema.
     Schema,
     /// Drives a fake-backend session through the router and reports the checks.
@@ -40,10 +41,15 @@ pub fn parse(args: &[String]) -> Result<Mode, String> {
         ["--mcp", rest @ ..] => tier::parse(rest).map(|tier| Mode::Mcp { tier }),
         ["--presence-helper"] => Ok(Mode::PresenceHelper),
         ["--release-helper"] => Ok(Mode::ReleaseHelper),
-        ["--enable-daemon", "--serve", "--endpoint", endpoint, "--lock", lock] => Ok(Mode::Serve {
-            endpoint: PathBuf::from(endpoint),
-            lock: PathBuf::from(lock),
-        }),
+        ["--enable-daemon", "--serve", "--endpoint", endpoint, "--lock", lock, rest @ ..]
+            if rest.is_empty() || rest == ["--start-stopped"] =>
+        {
+            Ok(Mode::Serve {
+                endpoint: PathBuf::from(endpoint),
+                lock: PathBuf::from(lock),
+                start_stopped: !rest.is_empty(),
+            })
+        }
         ["--schema"] => Ok(Mode::Schema),
         ["--selftest"] => Ok(Mode::Selftest { json: false }),
         ["--selftest", "--json"] | ["--json", "--selftest"] => Ok(Mode::Selftest { json: true }),
