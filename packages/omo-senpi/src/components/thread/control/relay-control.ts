@@ -1,11 +1,12 @@
 import type { ThreadTranscriptEntry } from "../reader"
+import { relayAddressEntry } from "../remote/address-book"
 import { rowThreadId } from "../remote/ports"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "../remote/ports"
 import { outcomeFailure } from "../remote/outcome"
 import { replyData } from "../remote/remote-ops"
 import type { ModelChoice } from "../tools/model-match"
 import { closeLadder, SESSION_GONE, type RecordAnswer } from "./close-ladder"
-import { ControlRefusal, refuse, type SessionControl } from "./port"
+import { ControlRefusal, refuse, SESSION_ONLY_THINKING_SCOPE, type SessionControl } from "./port"
 
 const isObject = (value: unknown): value is JsonObject =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -48,6 +49,20 @@ export function createRelayControl(remote: RemoteThreadSurface, row: RemoteSessi
     thread_id: rowThreadId(row),
     device,
     title: row.title,
+    visible: async () => {
+      try {
+        return (await remote.sessions.sessions())
+          .filter((entry) => entry.device === device)
+          .map((entry) => relayAddressEntry(entry))
+      } catch (error) {
+        throw refuse(
+          "host_unavailable",
+          "The target device's thread names could not be listed.",
+          "Retry when the device service is reachable.",
+          { device, reason: error instanceof Error ? error.message : String(error) },
+        )
+      }
+    },
     interrupt: async (turnId) => {
       const reply = await command({ type: "interrupt", ...(turnId === undefined ? {} : { turnId }) })
       const reported = reply["turnId"]
@@ -73,7 +88,8 @@ export function createRelayControl(remote: RemoteThreadSurface, row: RemoteSessi
       return { models: modelsOf(replyData(outcome.response)["models"]), held: outcome.local === true }
     },
     setModel: async (provider, id) => {
-      const reply = await command({ type: "set_model", provider, modelId: id })
+      // `scope: "session"` switches only this session; without it the engine persists the device's default model.
+      const reply = await command({ type: "set_model", provider, modelId: id, scope: "session" })
       const confirmedProvider = reply["provider"]
       const confirmedId = reply["id"]
       return {
@@ -85,12 +101,12 @@ export function createRelayControl(remote: RemoteThreadSurface, row: RemoteSessi
       const levels = (await command({ type: "get_available_thinking_levels" }))["levels"]
       return Array.isArray(levels) ? levels.filter((level): level is string => typeof level === "string") : []
     },
-    setThinkingLevel: async (level, scope) => {
+    setThinkingLevel: async (level) => {
       const outcome = await remote.sessions.sessionCommand(device, sessionId, {
         type: "set_thinking_level",
         sessionId,
         level,
-        ...(scope === "turn" ? { scope } : {}),
+        scope: SESSION_ONLY_THINKING_SCOPE,
       })
       if (outcome.kind === "refused" && THINKING_LEVEL_UNSUPPORTED.test(outcome.reason))
         throw refuse(

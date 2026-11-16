@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "43b6b39795587ff3c3485ff8b1d06245cc4e93afb26843b465d3344f2a4f27dc" as const
+export const SCHEMA_SHA256 = "b1e294f921009a741e7503e5ed45e5056d0025a3c8f82eac712c3fca02a68fd2" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -398,6 +398,7 @@ export type ActionReport = {
 	warning?: string | null
 	auditIds?: string[]
 	timings?: Timings | null
+	settle?: ObservationSettle | null
 	evidence: Evidence[]
 	observation: UntrustedText
 	paused?: Pause[]
@@ -1108,6 +1109,14 @@ export type MoveParams = {
 	observeAfter?: ObserveOptions | null
 }
 
+export type NotificationMatch = {
+	app: string
+	title: string
+	bodyHash: string
+	arrivedAt: number
+	observation: UntrustedText
+}
+
 export type NotificationPredicate = {
 	app?: string | null
 	title?: string | null
@@ -1137,6 +1146,7 @@ export type ObservationSettle = {
 	indicator?: BusyIndicator | null
 	quietMs: number
 	waitedMs: number
+	regime?: SettleRegime | null
 }
 
 export type ObserveAx = boolean | {
@@ -1434,6 +1444,8 @@ export type SettleOptions = {
 
 export type SettleOutcome = "settled" | "pending" | "unsupported" | "timeout"
 
+export type SettleRegime = "changed" | "unchanged" | "navigation"
+
 export type SpawnPath = "open_a" | "disclaim"
 
 export type SshHost = {
@@ -1523,6 +1535,7 @@ export type Timings = {
 	dispatch?: number | null
 	verify?: number | null
 	restore?: number | null
+	settleMs?: number | null
 }
 
 export type ToolkitClass = "canvas_gl" | "chromium_electron" | "pointer_hw" | "qt_xcb"
@@ -1597,6 +1610,7 @@ export type WaitPredicate = {
 export type WaitResult = {
 	outcome: WaitOutcome
 	observation: Observation
+	notification?: NotificationMatch | null
 }
 
 export type WindowFrameParams = {

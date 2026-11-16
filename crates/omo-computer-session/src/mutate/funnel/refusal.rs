@@ -1,12 +1,12 @@
-//! The funnel's refusal and receipt bookkeeping: a refusal's audit line, a stored receipt, a
-//! marker cleared by a refusal (moved from funnel.rs, R65: no change).
+//! The funnel's refusal and receipt writers: every refusal writes its audit line before it answers.
 
 use super::super::record::Record;
 use super::super::Refused;
 use crate::audit::AuditEvent;
 use crate::marker::Receipt;
+use crate::Session;
 
-impl crate::Session {
+impl Session {
     pub(super) fn store_receipt(&mut self, record: &mut Record, reply: serde_json::Value) {
         record.marker.receipt = Some(Receipt { reply });
         if let Err(error) = self.funnel.markers.record_receipt(&record.marker) {

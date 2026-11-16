@@ -6,7 +6,7 @@ use omo_computer_core::backend::Refusal;
 use omo_computer_core::error::{EngineCode, Reason};
 
 /// The refusal of a scope name that binds to no app key.
-pub const UNBOUND_SCOPE: Refusal = Refusal::new(EngineCode::InvalidTarget, Reason::AppUnknown.wire());
+pub const UNBOUND_SCOPE: Refusal = Refusal::new(EngineCode::InvalidTarget, Reason::AppUnknown);
 
 /// The scope as the keys it bound to.
 ///

@@ -127,7 +127,7 @@ impl Session {
         if self.backend.displays().ok() != before {
             return Err(Refusal::new(
                 EngineCode::CaptureFailed,
-                Reason::GeometryChanged.wire(),
+                Reason::GeometryChanged,
             ));
         }
         let geometry = if pixels_only {

@@ -6,7 +6,7 @@ use omo_computer_core::listing::Rect;
 use omo_computer_core::observation::CursorMode;
 use omo_computer_core::params::Point;
 
-use super::damage_wait::{after_notify, DamageWait};
+use super::damage_wait::{DamageWait, DamageWatch};
 use super::fake::{FakeX, GREEN, MAGENTA, RED};
 use super::server::PixelRect;
 use super::X11Capture;
@@ -105,12 +105,12 @@ fn minimized_and_unmapped_windows_refuse_typed() {
     server.windows[0].minimized = true;
     let capture = X11Capture::new(server, None);
     let refusal = capture.capture_frame(&Target::Window("7".into()), &options(false)).unwrap_err();
-    assert_eq!(refusal, Refusal::new(EngineCode::CaptureUnavailable, Reason::Minimized.wire()));
+    assert_eq!(refusal, Refusal::new(EngineCode::CaptureUnavailable, Reason::Minimized));
     let mut server = occluded();
     server.windows[0].viewable = false;
     let capture = X11Capture::new(server, None);
     let refusal = capture.capture_frame(&Target::Window("7".into()), &options(false)).unwrap_err();
-    assert_eq!(refusal, Refusal::new(EngineCode::CaptureUnavailable, Reason::Unmapped.wire()));
+    assert_eq!(refusal, Refusal::new(EngineCode::CaptureUnavailable, Reason::Unmapped));
     let refusal = capture.capture_frame(&Target::Window("99".into()), &options(false)).unwrap_err();
     assert_eq!(refusal, Refusal::bare(EngineCode::WindowNotFound));
 }
@@ -174,8 +174,44 @@ fn crosshair_is_drawn_at_the_frame_point() {
     assert_eq!(*frame.image.get_pixel(58, 50), gray);
 }
 
+/// The sequence number the fake `ClearArea` request carries in the scripts below.
+const CLEAR: u16 = 0x0412;
+
+fn repainted_after(clear: u16, notifies: &[u16]) -> Vec<DamageWait> {
+    let watch = DamageWatch::new(clear);
+    notifies.iter().map(|sequence| watch.after_notify(*sequence)).collect()
+}
+
+#[test]
+fn a_background_none_window_is_repainted_on_its_first_notify() {
+    // review L4 case 1: the server paints no background for None, so the first notify the
+    // capture sees comes after the ClearArea, from the client's own repaint.
+    assert_eq!(repainted_after(CLEAR, &[CLEAR + 1]), [DamageWait::Repainted]);
+}
+
+#[test]
+fn the_server_paint_alone_is_never_a_repaint_however_many_rectangles_it_reports() {
+    // Raw rectangles: one ClearArea paint may report several notifies, all inside the request.
+    let steps = repainted_after(CLEAR, &[CLEAR, CLEAR, CLEAR]);
+    assert!(steps.iter().all(|step| *step != DamageWait::Repainted), "{steps:?}");
+}
+
+#[test]
+fn a_repaint_right_after_the_server_paint_is_seen() {
+    // review L4 case 2: the client repaints on Expose before the capture could subtract; the
+    // repaint is its own notify after the ClearArea, never merged into the server's paint.
+    let steps = repainted_after(CLEAR, &[CLEAR, CLEAR + 1]);
+    assert_eq!(steps.last(), Some(&DamageWait::Repainted), "{steps:?}");
+    assert_ne!(steps[0], DamageWait::Repainted);
+}
+
 #[test]
 fn the_server_background_paint_is_not_the_client_repainting() {
-    assert_eq!(after_notify(1), DamageWait::SubtractAndWait, "ClearArea's own background paint");
-    assert_eq!(after_notify(2), DamageWait::Repainted, "the client painted after its Expose");
+    assert_eq!(repainted_after(CLEAR, &[CLEAR]), [DamageWait::ServerPaint], "ClearArea's own background paint");
+}
+
+#[test]
+fn the_sequence_comparison_survives_the_16_bit_wrap() {
+    assert_eq!(repainted_after(u16::MAX, &[u16::MAX, 0]).last(), Some(&DamageWait::Repainted));
+    assert_eq!(repainted_after(u16::MAX, &[0]), [DamageWait::Repainted]);
 }

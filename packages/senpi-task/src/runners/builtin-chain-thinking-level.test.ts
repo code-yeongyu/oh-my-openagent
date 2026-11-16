@@ -32,10 +32,19 @@ type Machine = {
 const roots: string[] = []
 const sessions: Session[] = []
 
-afterEach(() => {
-  for (const session of sessions.splice(0)) session.dispose()
+afterEach(async () => {
+  // The engine's fallback logger writes on its own schedule until the session reports it closed; removing the agent dir before that races it.
+  await Promise.all([...sessions].map((session) => closed(session)))
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
+
+/** dispose() is not idempotent, so a session closed early leaves the afterEach list. */
+async function closed(session: Session): Promise<void> {
+  const at = sessions.indexOf(session)
+  if (at !== -1) sessions.splice(at, 1)
+  session.dispose()
+  await session.whenToolChildClosed()
+}
 
 async function machineLoggedInTo(providers: readonly string[]): Promise<Machine> {
   const senpi = await loadSenpiBarrel()
@@ -96,7 +105,9 @@ function fallbackLog(machine: Machine): readonly FallbackLogLine[] {
     .map((line) => JSON.parse(line) as FallbackLogLine)
 }
 
-function validationWarnings(machine: Machine): readonly string[] {
+/** Reads fallback.log once the given sessions are closed: the engine queues lines until its logger settles, so an earlier read can miss them. */
+async function validationWarnings(machine: Machine, started: readonly Session[]): Promise<readonly string[]> {
+  await Promise.all(started.map((session) => closed(session)))
   return fallbackLog(machine).flatMap((line) =>
     line.event === "validation_warning" && line.warning !== undefined ? [line.warning] : [],
   )
@@ -162,7 +173,7 @@ describe("builtin category chains run at a thinking level the model accepts (#93
 
     // then
     expect(started.flatMap((session) => session.fallbackValidationWarnings)).toEqual([])
-    expect(validationWarnings(machine)).toEqual([])
+    expect(await validationWarnings(machine, started)).toEqual([])
   }, 30_000)
 
   test("#given a user category whose models list sets a level that model rejects #when the child starts and its primary fails #then that entry warns once naming the level and the model, and still runs at a level the model accepts", async () => {
@@ -217,13 +228,13 @@ describe("builtin category chains run at a thinking level the model accepts (#93
     await session.prompt("finish through the user's fallback")
 
     // then: one warning naming the level and the model; omo keeps the user's entry and the engine runs it at a level it accepts
-    expect(validationWarnings(machine)).toEqual([
-      'Fallback chain entry "runtime-fallback-test/no-max-reasoner:max" uses thinking level "max", which is unsupported by runtime-fallback-test/no-max-reasoner.',
-    ])
     expect(calls).toEqual(["dead-primary", "no-max-reasoner"])
     expect(session.model?.id).toBe("no-max-reasoner")
     expect(session.thinkingLevel).not.toBe("max")
     expect(session.getAvailableThinkingLevels()).toContain(session.thinkingLevel)
     expect(session.getLastAssistantText()).toBe("fallback completed")
+    expect(await validationWarnings(machine, [session])).toEqual([
+      'Fallback chain entry "runtime-fallback-test/no-max-reasoner:max" uses thinking level "max", which is unsupported by runtime-fallback-test/no-max-reasoner.',
+    ])
   }, 20_000)
 })
