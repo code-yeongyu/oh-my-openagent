@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { chmodSync, copyFileSync, existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, copyFileSync, lstatSync, mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { DatabaseSync } from "node:sqlite"
 
@@ -34,7 +34,9 @@ export function launchFromStablePath<T>(
   try {
     lock.exec("PRAGMA busy_timeout = 30000")
     lock.exec("BEGIN EXCLUSIVE")
-    if (!existsSync(path) || sha256File(path) !== source.sha256) install(source, path, verifySignature)
+    // Anything but a regular file (a symlink, even to the right bytes) is replaced, never followed.
+    const current = lstatSync(path, { throwIfNoEntry: false })
+    if (!current?.isFile() || sha256File(path) !== source.sha256) install(source, path, verifySignature)
     if (sha256File(path) !== source.sha256)
       throw new EngineLaunchRefused("checksum_mismatch", source.host, `${path} changed under the lock`)
     writeFileSync(join(source.directory, "release.json"), JSON.stringify({ sha256: source.sha256 }))

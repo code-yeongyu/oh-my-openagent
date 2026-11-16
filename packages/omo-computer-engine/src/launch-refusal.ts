@@ -53,8 +53,8 @@ export class LaunchRefusalReader {
   }
 
   finish(code: number | null, signal: string | null): { readonly reason: LaunchContextRefusal } | undefined {
-    // A record cut off before its newline is not a refusal, whatever came before it.
-    if (this.#line.startsWith(MARKER.trimEnd())) return undefined
+    // A record cut off before its newline (even inside the marker) is not a refusal, whatever came before it.
+    if (this.#line.startsWith(MARKER) || (this.#line !== "" && MARKER.startsWith(this.#line))) return undefined
     if (this.#disabled || code !== 1 || signal !== null || this.#records !== 1 || this.#reason === undefined)
       return undefined
     return { reason: this.#reason }
@@ -65,7 +65,7 @@ export class LaunchRefusalReader {
     const oversized = this.#oversized
     this.#line = ""
     this.#oversized = false
-    if (!line.startsWith(MARKER.trimEnd())) return
+    if (!line.startsWith(MARKER)) return
     this.#records += 1
     this.#reason = oversized ? undefined : parseRecord(line)
   }
