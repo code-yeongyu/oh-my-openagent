@@ -158,9 +158,10 @@ mod tests {
         let paths = resolve(env(&[(RUNTIME_DIR_SEAM, "/tmp/omo-test")]), true, 501).expect("seam paths");
         assert_eq!(paths.consent(), Path::new("/tmp/omo-test/computer/consent.json"));
         assert_eq!(paths.host_latch(), Path::new("/tmp/omo-test/computer/host-latch"));
-        if cfg!(target_os = "linux") {
-            let HostAddress::Abstract(name) = paths.address else { panic!("abstract on Linux") };
-            assert!(name.starts_with("omo-host-api-501-") && name.len() == "omo-host-api-501-".len() + 16, "{name}");
+        // Review M2 of #13882: an abstract name has no file permissions, so every uid could call
+        // the host API or squat it; every Unix host API is a socket file in an owner-only dir.
+        if cfg!(unix) {
+            assert_eq!(paths.address, HostAddress::Socket(PathBuf::from("/tmp/omo-test/host-api.sock")));
         }
     }
 
@@ -178,11 +179,14 @@ mod tests {
     }
 
     #[test]
-    fn the_real_linux_name_carries_the_uid_and_no_suffix() {
+    fn the_real_linux_host_api_is_a_socket_file_in_the_per_uid_runtime_root() {
         let paths = resolve(env(&[("HOME", "/home/u"), ("XDG_RUNTIME_DIR", "/run/user/501")]), false, 501)
             .expect("real paths");
         if cfg!(target_os = "linux") {
-            assert_eq!(paths.address, HostAddress::Abstract("omo-host-api-501".to_owned()));
+            let runtime = crate::paths::resolve(|name| (name == "XDG_RUNTIME_DIR").then(|| "/run/user/501".to_owned()))
+                .expect("the runtime root")
+                .runtime;
+            assert_eq!(paths.address, HostAddress::Socket(runtime.join("host-api.sock")));
             let home = crate::paths::user_home().expect("the user database names a home");
             assert_eq!(paths.consent(), home.join(".config/omo/computer/consent.json"));
         }

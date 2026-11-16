@@ -6,8 +6,8 @@ import { resolveHandPaths } from "../src/index.ts"
 const base = { uid: 501, home: "/home/u", tmp: "/var/folders/xy/T" }
 
 describe("hand paths: the same files and address the engine resolves", () => {
-  it("under the fake-backend seam every file sits in the runtime dir and the Linux name gains the dir's sha256 prefix", () => {
-    // Given the seam set on a fake backend (the vector: sha256("/tmp/omo-test") starts f49cb7007bd94b48).
+  it("under the fake-backend seam every file, the host API socket included, sits in the runtime dir", () => {
+    // Given the seam set on a fake backend.
     const resolved = resolveHandPaths({
       ...base,
       platform: "linux",
@@ -19,7 +19,7 @@ describe("hand paths: the same files and address the engine resolves", () => {
     expect(resolved).toMatchObject({
       kind: "resolved",
       paths: {
-        hostAddress: { kind: "abstract", name: "omo-host-api-501-f49cb7007bd94b48" },
+        hostAddress: { kind: "socket", path: "/tmp/omo-test/host-api.sock" },
         hostLatch: "/tmp/omo-test/computer/host-latch",
         consent: "/tmp/omo-test/computer/consent.json",
         stopMarker: "/tmp/omo-test/global-stop",
@@ -37,7 +37,7 @@ describe("hand paths: the same files and address the engine resolves", () => {
     })
   })
 
-  it("real Linux paths: XDG config and state, the per-uid runtime root, the uid-only abstract name", () => {
+  it("real Linux paths: XDG config and state, the per-uid runtime root holding the host API socket", () => {
     const resolved = resolveHandPaths({
       ...base,
       platform: "linux",
@@ -47,7 +47,7 @@ describe("hand paths: the same files and address the engine resolves", () => {
     expect(resolved).toMatchObject({
       kind: "resolved",
       paths: {
-        hostAddress: { kind: "abstract", name: "omo-host-api-501" },
+        hostAddress: { kind: "socket", path: join("/run/user/501", "omo-computer", "501", "host-api.sock") },
         consent: "/home/u/.config/omo/computer/consent.json",
         stopMarker: "/home/u/.local/state/omo/computer-control/global-stop",
         sessionLockDir: join("/run/user/501", "omo-computer", "501", "sessions"),
