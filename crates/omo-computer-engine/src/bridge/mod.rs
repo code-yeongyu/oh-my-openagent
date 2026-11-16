@@ -4,6 +4,8 @@
 //! bridge opens itself before the first call that needs one, with the engine's own listener as
 //! its stop path (d-arch.md 'Host adapters': the shim is the host).
 
+#[cfg(unix)]
+pub mod attach;
 pub mod oneshot;
 
 use omo_computer_session::host_view::ConsentNarrowing;
