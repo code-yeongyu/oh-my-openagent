@@ -63,8 +63,8 @@ fn m3_the_bound_counts_from_the_live_press_only() {
     f.call(Method::KeyUp, json!({"target": "101", "chord": "shift"})).expect("up");
     f.clock.advance(10_000);
     f.call(Method::KeyDown, json!({"target": "101", "chord": "shift"})).expect("second down");
-    let wait = f.session.hold_wait().expect("one live hold");
-    assert_eq!(wait.as_millis(), u128::from(MAX_HOLD_MS), "the lifted press's deadline is gone");
+    let deadline = f.session.funnel.control.holds.next_deadline().expect("one live hold");
+    assert_eq!(deadline, f.clock.now_ms() + MAX_HOLD_MS, "the lifted press's deadline is gone");
 }
 
 #[test]
@@ -87,7 +87,8 @@ fn l6_a_drag_stopped_after_its_button_up_never_releases_the_button_again() {
     assert!(f.call(Method::Drag, drag).is_err(), "the modifier's key-up is refused");
     let ups = f.inputs().iter().filter(|l| ends_with(l, "button left down=false")).count();
     assert_eq!(ups, 1, "{:?}", f.inputs());
-    assert!(f.session.funnel.control.holds.held().is_empty());
+    // The refused shift-up stays held for the next exit path (review L9 of #13360); the button is gone.
+    assert!(!f.session.funnel.control.holds.held().iter().any(|held| matches!(held, Held::Button { .. })), "{:?}", f.session.funnel.control.holds.held());
 }
 
 #[test]
