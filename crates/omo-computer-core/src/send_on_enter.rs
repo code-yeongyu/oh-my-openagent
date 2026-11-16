@@ -92,7 +92,7 @@ pub fn cut(events: &[InputEvent], rule: &SendOnEnterRule) -> Cut {
                     held.push(key);
                     continue;
                 }
-                let pressed = canonical(&[held.join("+"), key].join("+").trim_start_matches('+').to_owned());
+                let pressed = canonical([held.join("+"), key].join("+").trim_start_matches('+'));
                 if chords.contains(&pressed) {
                     return Cut::Chord;
                 }

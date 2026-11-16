@@ -144,7 +144,7 @@ mod tests {
     }
 
     fn listed() -> Value {
-        json!({ "com.example.notes": { "chords": [] } })
+        json!({ "Notes": { "chords": [] } })
     }
 
     fn posts(sink: &RecordingSink) -> Vec<String> {
@@ -163,7 +163,7 @@ mod tests {
         let refused = press(&mut session, "return", false).expect_err("a bare Return sends");
         assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("ConsequentialAction", Some("send_on_enter")));
         let detail = refused.detail.expect("the refusal's members");
-        assert_eq!(detail["app"], json!("com.example.notes"));
+        assert_eq!(detail["app"], json!("Notes"));
         assert_eq!(detail["composer"]["role"], json!("AXTextArea"));
         assert_eq!(detail["nextCall"], json!("press(\"shift+return\")"));
         assert!(posts(&sink).is_empty(), "nothing sent: {:?}", posts(&sink));

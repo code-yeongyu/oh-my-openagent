@@ -4894,6 +4894,13 @@
             "null"
           ]
         },
+        "nextCall": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Row 26 (R70f(1), R70g(1)): present only when `secure` is true; names the user."
+        },
         "settle": {
           "anyOf": [
             {
