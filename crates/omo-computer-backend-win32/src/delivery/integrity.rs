@@ -1,6 +1,7 @@
-//! UIPI: a window above the engine's integrity RID drops every posted message (the post answers
-//! access denied, win32-delivery:n-uipi-postmessage), so a background verb on it is refused
-//! `PermissionDenied` before any post. A token that cannot be read counts as above (fail closed).
+//! UIPI: a window above the engine's integrity RID drops posted input (design/d-windows.md:151;
+//! the ledger row win32-delivery:n-uipi-postmessage is NOT-RUN on the hosted runner, owed to
+//! #13885), so a background verb on it is refused `PermissionDenied` before any post. A token
+//! that cannot be read counts as above (fail closed).
 
 use omo_computer_core::backend::Refusal;
 use omo_computer_core::error::EngineCode;
