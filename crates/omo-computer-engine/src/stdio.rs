@@ -82,7 +82,14 @@ impl Incoming for Receiver<io::Result<Vec<u8>>> {
 
 /// # Errors
 /// Reading the input or writing a reply failed.
-pub fn serve(session: &mut Session, mut input: impl Incoming, output: &mut impl Write) -> io::Result<()> {
+pub fn serve(session: &mut Session, input: impl Incoming, output: &mut impl Write) -> io::Result<()> {
+    let served = serve_lines(session, input, output);
+    session.close();
+    served
+}
+
+/// The serve loop; a read or write error ends it, and `serve` still closes the session.
+fn serve_lines(session: &mut Session, mut input: impl Incoming, output: &mut impl Write) -> io::Result<()> {
     loop {
         match input.next(session.hold_wait()) {
             Next::Closed => break,
@@ -99,7 +106,6 @@ pub fn serve(session: &mut Session, mut input: impl Incoming, output: &mut impl 
             }
         }
     }
-    session.close();
     Ok(())
 }
 
