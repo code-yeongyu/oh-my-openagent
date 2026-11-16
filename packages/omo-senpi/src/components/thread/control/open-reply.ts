@@ -1,4 +1,5 @@
 import type { ThreadDataError } from "../contracts"
+import { threadToolFailure } from "../errors"
 import type { JsonObject, RemoteCommandOutcome } from "../remote/ports"
 import { outcomeFailure } from "../remote/outcome"
 import { folderFailure } from "../worktree/failures"
@@ -18,6 +19,24 @@ export function openedEngineId(data: JsonObject, state: JsonObject): string | un
 }
 
 /**
+ * An open the engine refused because it cannot run the model the create named: senpi answers `model_unavailable: <why>`
+ * (open-session-model.ts) as the error text on both legs, and creates no session.
+ */
+export function modelRefusal(text: string, model: string | undefined, device?: string): ThreadDataError | undefined {
+  if (model === undefined || !/\bmodel_unavailable\b/.test(text)) return undefined
+  const where = device === undefined ? "this device" : `device ${device}`
+  return {
+    kind: "error",
+    error: threadToolFailure(
+      "model_not_found",
+      `No thread was created: ${where} cannot run ${model}.`,
+      `Pass a provider/id ${where} has (thread_set_model lists them), or leave model unset for its default.`,
+      { reason: "model_unavailable", model, ...(device === undefined ? {} : { device }) },
+    ),
+  }
+}
+
+/**
  * Why another device's engine refused an open_session: a folder that does not exist there (senpi answers
  * `missing_session_cwd`) or one that is a file there (`session_cwd_not_directory`, senpi#6686) is the caller's argument
  * to fix, never an omo update; every other refusal maps as any command's.
@@ -26,7 +45,10 @@ export function openRefusal(
   outcome: Exclude<RemoteCommandOutcome, { readonly kind: "ok" }>,
   device: string,
   cwd: string | undefined,
+  model?: string,
 ): ThreadDataError {
+  const unrunnable = outcome.kind === "refused" ? modelRefusal(outcome.reason, model, device) : undefined
+  if (unrunnable !== undefined) return unrunnable
   if (outcome.kind === "refused" && /missing_session_cwd|working directory does not exist/i.test(outcome.reason))
     return folderFailure("folder_missing", `Folder ${cwd ?? "(default)"} does not exist on device ${device}.`, {
       device,

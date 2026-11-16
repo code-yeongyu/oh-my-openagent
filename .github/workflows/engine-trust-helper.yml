@@ -39,6 +39,8 @@ concurrency:
 jobs:
   windows-helper:
     name: windows trust helper (${{ matrix.os }})
+    # Pull requests run Linux only; the ci:full-matrix label, pushes and dispatches run every OS (#13802).
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-matrix')
     strategy:
       fail-fast: false
       matrix:
