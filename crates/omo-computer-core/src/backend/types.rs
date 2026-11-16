@@ -55,6 +55,11 @@ pub enum InputEvent {
     Key { key: String, down: bool },
     Scroll { dx: f64, dy: f64 },
     Text(String),
+    // --- Row 25: the menu, app and system-surface side effects, through the one sink. ---
+    MenuSelect { path: Vec<String> },
+    AppLaunch { app_key: String, activate: bool },
+    AppQuit { app_key: String, force: bool },
+    OpenSurface { kind: crate::listing::SurfaceKind },
 }
 
 /// An input event carrying the engine's tag, so listeners can tell it from the user's.
@@ -128,4 +133,14 @@ pub struct Semantic(pub String);
 pub struct AxEvent {
     pub kind: String,
     pub window: String,
+}
+
+/// R62: what a backend's own doctor checks add to `diagnose` (row 50's X11 chain and the like):
+/// spawn-chain links after the host's, permission entries by name, and checks that are not
+/// permissions (they never feed `ok`). Reads only; never prompts.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct BackendProbes {
+    pub chain: Vec<crate::results::ChainLink>,
+    pub permissions: std::collections::BTreeMap<String, crate::results::PermissionReport>,
+    pub checks: Vec<crate::results::ProbeCheck>,
 }

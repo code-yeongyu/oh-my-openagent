@@ -1,0 +1,7 @@
+kind	match	source
+xaml	class=ApplicationFrameWindow	d-windows.md '## Accessibility' ensure_pattern_safe; OMPW-26/27
+xaml	class=WinUIDesktopWin32WindowClass	d-windows.md ensure_pattern_safe; OMPW-26/27
+xaml	class=Windows.UI.Core.CoreWindow	d-windows.md ensure_pattern_safe; OMPW-26/27
+xaml	class=Microsoft.UI.Content.DesktopChildSiteBridge	d-windows.md ensure_pattern_safe; OMPW-26/27
+chromium	class=Chrome_WidgetWin_1	d-windows.md ensure_pattern_safe; OMW-29
+wpf	class-prefix=HwndWrapper[	d-windows.md drop matrix (WPF HwndWrapper[...]); OMPW-12
