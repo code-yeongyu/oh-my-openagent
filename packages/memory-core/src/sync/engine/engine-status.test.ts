@@ -98,6 +98,100 @@ test(
 )
 
 test(
+  "a cycle stopped by a full disk while applying names the disk, its errno code and the stage, and logs the whole error (#13635)",
+  async () => {
+    const server = new FakeSyncServer()
+    const lines: { readonly line: string; readonly level: string }[] = []
+    const a = await makeDevice(server, "a")
+    const b = await makeDevice(server, "b", undefined, {
+      log: (line, level = "info") => lines.push({ line, level }),
+    })
+    devices.push(a, b)
+    await b.engine.runCycle()
+    await a.write("one.md", "one\n")
+    await a.engine.runCycle()
+    const full = new Error("commit failed", {
+      cause: Object.assign(new Error("ENOSPC: no space left on device, write"), { code: "ENOSPC" }),
+    })
+    const commit = spyOn(b.repo, "commit").mockImplementation(async () => {
+      throw full
+    })
+
+    expect(await failedCycle(b)).toBe(full)
+
+    expect(await b.engine.status()).toMatchObject({
+      kind: "failing",
+      failure: { kind: "disk_full", cause: { errorClass: "Error", code: "ENOSPC", stage: "apply" } },
+    })
+    const logged = lines.filter(({ line }) => line.startsWith("sync cycle failed"))
+    expect(logged).toEqual([{ line: expect.stringContaining("during apply"), level: "warn" }])
+    expect(logged[0]?.line).toContain(String(full.stack))
+    expect(logged[0]?.line).toContain("ENOSPC: no space left on device")
+    commit.mockRestore()
+  },
+  GIT_TEST_TIMEOUT,
+)
+
+test(
+  "a cycle that keeps failing warns once when its failure is shown and once when it changes, every other attempt at info (#13635)",
+  async () => {
+    const lines: { readonly line: string; readonly level: string }[] = []
+    const b = await makeDevice(new FakeSyncServer(), "b", undefined, {
+      log: (line, level = "info") => lines.push({ line, level }),
+    })
+    devices.push(b)
+    let error: Error = new SyncNetworkError(new TypeError("fetch failed"))
+    const load = spyOn(b.store, "load").mockImplementation(async () => {
+      throw error
+    })
+    const failures = () => lines.filter(({ line }) => line.startsWith("sync cycle failed"))
+    const warnings = () => failures().filter(({ level }) => level === "warn")
+
+    for (let poll = 0; poll < 6; poll += 1) expect(await failedCycle(b)).toBe(error)
+
+    expect(warnings()).toHaveLength(1)
+    expect(failures()).toHaveLength(6)
+
+    error = new SyncHttpError("payload_too_large", 413, false)
+    expect(await failedCycle(b)).toBe(error)
+    expect(await failedCycle(b)).toBe(error)
+
+    expect(warnings()).toHaveLength(2)
+    expect(warnings()[1]?.line).toContain("SyncHttpError")
+    load.mockRestore()
+  },
+  GIT_TEST_TIMEOUT,
+)
+
+test(
+  "a failed cycle whose logger throws, on a thrown value with no string form, still settles: it is shown, stop returns and the next cycle runs (#13635)",
+  async () => {
+    const b = await makeDevice(new FakeSyncServer(), "b", undefined, {
+      log: () => {
+        throw new Error("log sink gone")
+      },
+    })
+    devices.push(b)
+    const unprintable: unknown = Object.create(null)
+    const load = spyOn(b.store, "load").mockImplementation(async () => {
+      throw unprintable
+    })
+
+    expect(await failedCycle(b)).toBe(unprintable)
+
+    expect(await b.engine.status()).toMatchObject({
+      kind: "failing",
+      failure: { kind: "unknown", cause: { errorClass: "NonError", stage: "load" } },
+    })
+    await b.engine.stop()
+    load.mockRestore()
+    await b.engine.runCycle()
+    expect(await b.engine.status()).toMatchObject({ kind: "synced" })
+  },
+  GIT_TEST_TIMEOUT,
+)
+
+test(
   "an unexpected cycle error reports failing with a generic reason, never the raw error text",
   async () => {
     const { b } = await pair()
@@ -106,7 +200,11 @@ test(
     })
     expect(String(await failedCycle(b))).toContain("secret-value")
     const status = await b.engine.status()
-    expect(status).toMatchObject({ kind: "failing", attempts: 1, failure: { kind: "unknown" } })
+    expect(status).toMatchObject({
+      kind: "failing",
+      attempts: 1,
+      failure: { kind: "unknown", cause: { errorClass: "Error", stage: "load" } },
+    })
     expect(JSON.stringify(status)).not.toContain("secret-value")
     load.mockRestore()
     await b.engine.runCycle()

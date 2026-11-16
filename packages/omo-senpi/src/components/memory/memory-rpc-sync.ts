@@ -2,12 +2,12 @@
 // footer reads, so the desktop shows what the TUI shows. Omitted while this device does not sync the
 // repository (sync off, signed out, or another process holds the engine), and when the read fails.
 
-import type { SyncFailureKind } from "@oh-my-opencode/memory-core/sync-engine"
+import type { SyncFailureCause, SyncFailureKind } from "@oh-my-opencode/memory-core/sync-engine"
 
 import type { SyncStatusReader } from "./sync-status-surface"
 
 /** The failure kinds the desktop's status schema accepts (omo-desktop-app contracts); any other kind fails its whole status call. */
-type DesktopFailureKind = Exclude<SyncFailureKind, "oversized_item">
+export type DesktopFailureKind = Extract<SyncFailureKind, "stranded_lock" | "auth_expired" | "offline" | "unknown">
 
 export interface MemoryRpcSync {
   readonly state: "never_synced" | "synced" | "paused" | "failing" | "unavailable"
@@ -24,6 +24,11 @@ export interface MemoryRpcSync {
     readonly keys?: readonly string[]
     readonly stuckKeys?: readonly string[]
     readonly limitBytes?: number
+    /**
+     * What failed, for a failure the engine could not name or named from its error (#13635): the error class, an
+     * errno or service code, the HTTP status, a git exit code and the cycle stage. Never message text or paths.
+     */
+    readonly cause?: SyncFailureCause
   }
 }
 
