@@ -42,6 +42,7 @@
         "script/qa/computer/conformance/run.ts",
         // run by path as the computer-use v3 Linux QA driver (row 47)
         "script/qa/computer/linux.ts",
+        "script/qa/computer/pool/macos-vm.ts",
         "script/qa/computer/pool/windows-full.ts",
         "script/qa/computer/pool/xorg-uinput-probe.ts",
         // run by path as the computer-use v3 corpus replay driver

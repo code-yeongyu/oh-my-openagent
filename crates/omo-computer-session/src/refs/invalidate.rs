@@ -53,7 +53,7 @@ impl RefRegistry {
     /// `ControlRequired{needs_observe}` until a new observation of the window exists.
     pub fn exec_gate(&self, window: &str) -> Result<(), Refusal> {
         if self.windows.get(window).is_some_and(|refs| refs.needs_observe) {
-            return Err(Refusal::new(EngineCode::ControlRequired, Reason::NeedsObserve.wire()));
+            return Err(Refusal::new(EngineCode::ControlRequired, Reason::NeedsObserve));
         }
         Ok(())
     }

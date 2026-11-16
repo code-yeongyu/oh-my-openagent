@@ -48,11 +48,11 @@ pub fn route_refusal(state: &SessionState, route: Route) -> Option<Refusal> {
     if is_false(state.session_active) {
         return Some(Refusal::new(
             EngineCode::SessionInactive,
-            Reason::SessionDeactivated.wire(),
+            Reason::SessionDeactivated,
         ));
     }
     is_true(state.display_asleep)
-        .then(|| Refusal::new(EngineCode::ControlRequired, Reason::DisplayAsleep.wire()))
+        .then(|| Refusal::new(EngineCode::ControlRequired, Reason::DisplayAsleep))
 }
 
 /// The typed end of a hold that outlasted the pause ceiling.
@@ -61,10 +61,10 @@ pub fn ceiling_refusal(reason: PauseReason) -> Refusal {
     match reason {
         PauseReason::UserActive => Refusal::bare(EngineCode::UserIntervened),
         PauseReason::ScreenLocked => {
-            Refusal::new(EngineCode::ScreenLocked, Reason::ScreenLocked.wire())
+            Refusal::new(EngineCode::ScreenLocked, Reason::ScreenLocked)
         }
         PauseReason::SystemSuspended => {
-            Refusal::new(EngineCode::SessionInactive, Reason::SystemSuspended.wire())
+            Refusal::new(EngineCode::SessionInactive, Reason::SystemSuspended)
         }
     }
 }

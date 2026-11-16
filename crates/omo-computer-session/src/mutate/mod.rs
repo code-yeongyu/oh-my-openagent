@@ -44,15 +44,15 @@ use poison::Poisoned;
 /// A marker that cannot be persisted: the input is not sent.
 pub const MARKER_UNAVAILABLE: Refusal = Refusal::new(
     EngineCode::TransactionFailed,
-    Reason::MarkerUnavailable.wire(),
+    Reason::MarkerUnavailable,
 );
 /// A marker of this `(issuer, scope)` is outstanding: completion of that call is unknown.
 pub const RECOVERY_REQUIRED: Refusal = Refusal::new(
     EngineCode::TransactionFailed,
-    Reason::RecoveryRequired.wire(),
+    Reason::RecoveryRequired,
 );
 /// The `callId` already completed: its stored receipt answers, nothing is sent.
-pub const REPLAYED: Refusal = Refusal::new(EngineCode::TransactionFailed, Reason::Replayed.wire());
+pub const REPLAYED: Refusal = Refusal::new(EngineCode::TransactionFailed, Reason::Replayed);
 /// The interaction lock could not be taken.
 pub const TRANSACTION_FAILED: Refusal = Refusal::bare(EngineCode::TransactionFailed);
 
