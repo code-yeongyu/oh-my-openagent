@@ -78,6 +78,9 @@ impl Session {
         if let Some(frame) = mutation.frame_refusal {
             return Err(self.refuse(record, Some("Frame".to_owned()), frame.refusal().into()));
         }
+        if let Some(refusal) = mutation.after_gates {
+            return Err(self.refuse(record, Some("Lease".to_owned()), refusal.into()));
+        }
         if let Err((refusal, detail)) = self.funnel.control.commit(self.backend.as_mut(), &plan, epoch) {
             let out = Refused {
                 detail: detail.map(Box::new),

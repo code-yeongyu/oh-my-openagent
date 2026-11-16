@@ -65,6 +65,7 @@ pub fn dispatch(router: &mut Router, method: Method, params: Value) -> Result<Va
             json!(session.displays().map_err(|r| refused(&r))?)
         }
         Method::Windows => json!(session.windows(parse(params)?).map_err(|r| refused(&r))?),
+        Method::RaiseWindow => json!(session.raise_window(parse(params)?).map_err(|r| refused_call(&r))?),
         Method::Capture => json!(session.capture(parse(params)?).map_err(|r| refused(&r))?),
         Method::Click => json!(session.click(parse(params)?).map_err(|r| refused_call(&r))?),
         Method::TypeText => json!(session.type_text(parse(params)?).map_err(|r| refused_call(&r))?),
