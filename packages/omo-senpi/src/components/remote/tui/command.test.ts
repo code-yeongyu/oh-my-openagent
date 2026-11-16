@@ -259,6 +259,19 @@ describe("/remote", () => {
     expect(ui.notes.map((note) => note.type)).toEqual(["error"])
   })
 
+  it("#given enable stops with a notice and a non-zero exit #when the answer renders #then the CLI's notice is the error, not the exit code", async () => {
+    // given
+    const stopped = { state: "service_degraded", notice: "Could not download the OmO device service." }
+    const run = fakeRunner({ enable: { code: 3, stdout: `${JSON.stringify(stopped)}\n`, stderr: "" } })
+    const ui = fakeUi()
+
+    // when
+    await invoke(run, "enable", ui)
+
+    // then
+    expect(ui.notes).toEqual([{ message: stopped.notice, type: "error" }])
+  })
+
   it("#given enable, disable and control answers #when they render #then each shows a sentence that differs by state, never the raw JSON", async () => {
     // given
     const answers: ReadonlyArray<readonly [string, unknown]> = [

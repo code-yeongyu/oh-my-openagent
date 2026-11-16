@@ -212,10 +212,16 @@ function succeeded(ui: RemoteCommandUi, verb: string, target: string, answer: Om
     if (line !== undefined) ui.notify(line, "error")
     return false
   }
-  const failure = typedFailure(parsed(answer))
+  const value = parsed(answer)
+  const failure = typedFailure(value)
   if (answer.code === 0 && failure === undefined) return true
   const stderr = answer.stderr.trim()
-  ui.notify(failure ?? (stderr !== "" ? stderr : `omo remote exited with code ${String(answer.code)}`), "error")
+  // `enable` that stops prints {state, notice} on stdout and exits 3 (omo-native remote-bootstrap.ts): the notice says why.
+  const notice = isRecord(value) && typeof value["notice"] === "string" ? value["notice"] : undefined
+  ui.notify(
+    failure ?? notice ?? (stderr !== "" ? stderr : `omo remote exited with code ${String(answer.code)}`),
+    "error",
+  )
   return false
 }
 
@@ -263,11 +269,8 @@ function sessionVerbLines(verb: string, target: string, result: Record<string, u
   if (verb === "close") return [result["closed"] === true ? `Closed ${target}.` : `${target} was not open.`]
   if (verb === "model" && isRecord(result["model"]))
     return [`${target} now uses ${String(result["model"]["provider"])}/${String(result["model"]["id"])}.`]
-  if (verb === "model" && typeof result["model"] === "string") return [`${target} now uses ${result["model"]}.`]
   if ((verb === "enable" || verb === "disable") && typeof result["enabled"] === "boolean")
     return [`Remote sessions are ${result["enabled"] ? "on" : "off"} for this device.`]
-  if (verb === "enable" && result["state"] === "connected") return ["Remote sessions are on for this device."]
-  if (verb === "enable" && typeof result["notice"] === "string") return [result["notice"]]
   if (verb === "control" && typeof result["attached"] === "boolean")
     return [
       result["attached"]
