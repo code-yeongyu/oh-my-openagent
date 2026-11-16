@@ -25,6 +25,8 @@ struct FakeNode {
     text: Option<String>,
     attributes: Vec<(String, String)>,
     hung: bool,
+    /// `DoAction` takes effect but its reply never comes (the call times out).
+    unconfirmed: bool,
 }
 
 /// A scripted accessibility bus.
@@ -137,11 +139,15 @@ impl Bus for FakeBus {
         let found = self.live(node, slice)?;
         let declared = found.actions.len();
         let opens = found.facts.role == "menu";
+        let unconfirmed = found.unconfirmed;
         let mut log = self.log.lock().unwrap_or_else(PoisonError::into_inner);
         log.performed.push((node.clone(), index));
         let done = usize::try_from(index).is_ok_and(|at| at < declared);
         if done && opens && !log.open.contains(node) {
             log.open.push(node.clone());
+        }
+        if unconfirmed {
+            return Err(BusError::Timeout);
         }
         Ok(done)
     }

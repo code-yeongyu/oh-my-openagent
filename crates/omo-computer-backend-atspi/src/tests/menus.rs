@@ -1,11 +1,12 @@
-//! Menus: the tree read without acting, selection by exact label, an ambiguous path that
-//! presses nothing, and a refused path that closes every menu its walk opened.
+//! Menus: the tree read without acting, selection by exact label, a path the listed tree
+//! already disproves (ambiguous, missing or disabled) presses nothing, and a refusal after a
+//! press (refused or unconfirmed) closes every menu the walk opened.
 
 use omo_computer_core::backend::Delivered;
 use omo_computer_core::error::EngineCode;
 
 use super::{gedit, Fixture, GEDIT_XID};
-use crate::bus::NodeId;
+use crate::bus::{NodeId, States};
 
 /// gedit's File menu holding `items`, each pressable unless named in `inert`.
 fn file_menu(items: &[&str], inert: &[&str]) -> (Fixture, NodeId, NodeId) {
@@ -86,22 +87,37 @@ fn the_menu_tree_is_read_without_acting_and_twin_labels_are_ambiguous() {
 }
 
 #[test]
-fn a_refused_select_closes_every_menu_its_walk_opened() {
-    let (fx, bar, file) = file_menu(&["Mark done", "Mark done later"], &[]);
+fn a_path_the_listed_menu_disproves_presses_nothing() {
+    let (fx, _, _) = file_menu(&["Mark done", "Mark done later"], &[]);
     let (mut backend, handle) = fx.backend();
 
     let near_miss = backend
         .select_menu(GEDIT_XID, &["File", "Mark"])
-        .expect_err("no item is labelled exactly Mark");
+        .expect_err("no listed item is labelled exactly Mark");
 
     assert_eq!(near_miss.code(), EngineCode::StaleRef);
-    assert_eq!(handle.performed(), vec![(file, 0)], "only File was pressed");
     assert_eq!(
-        handle.open_menus(),
-        Vec::<NodeId>::new(),
-        "File is closed again"
+        handle.performed(),
+        Vec::new(),
+        "File's items were listed: nothing is pressed"
     );
-    assert_eq!(handle.cleared(), vec![bar]);
+    assert_eq!(handle.open_menus(), Vec::<NodeId>::new());
+}
+
+#[test]
+fn a_disabled_listed_item_presses_nothing() {
+    let (mut fx, _, file) = file_menu(&[], &[]);
+    let archive = fx.bus.node(&file, "menu item", "Archive");
+    fx.bus.set_actions(&archive, &["click"]);
+    fx.bus.set_states(&archive, States::default());
+    let (mut backend, handle) = fx.backend();
+
+    let disabled = backend
+        .select_menu(GEDIT_XID, &["File", "Archive"])
+        .expect_err("Archive is disabled");
+
+    assert_eq!(disabled.code(), EngineCode::StaleRef);
+    assert_eq!(handle.performed(), Vec::new());
 }
 
 #[test]
@@ -119,6 +135,26 @@ fn a_press_refused_below_an_opened_menu_closes_it() {
         handle.open_menus(),
         Vec::<NodeId>::new(),
         "File is closed again"
+    );
+    assert_eq!(handle.cleared(), vec![bar]);
+}
+
+#[test]
+fn an_unconfirmed_menu_press_is_closed_too() {
+    let (mut fx, bar, file) = file_menu(&["Mark done"], &["Mark done"]);
+    fx.bus.set_unconfirmed_action(&file);
+    let (mut backend, handle) = fx.backend();
+
+    let unconfirmed = backend
+        .select_menu(GEDIT_XID, &["File", "Mark done"])
+        .expect_err("File's DoAction times out");
+
+    assert_eq!(unconfirmed.code(), EngineCode::AxUnconfirmed);
+    assert_eq!(handle.performed(), vec![(file, 0)]);
+    assert_eq!(
+        handle.open_menus(),
+        Vec::<NodeId>::new(),
+        "a menu the timed-out press opened is closed again"
     );
     assert_eq!(handle.cleared(), vec![bar]);
 }

@@ -181,5 +181,19 @@ fn exec_quoting_and_field_codes_follow_the_desktop_entry_spec() {
         Err(ExecRefusal::ShellCommand("bash".to_owned()))
     );
     assert_eq!(argv("  "), Err(ExecRefusal::Empty));
+}
+
+#[test]
+fn a_shell_behind_a_wrapper_is_refused() {
+    let shell = |name: &str| Err(ExecRefusal::ShellCommand(name.to_owned()));
+
+    assert_eq!(argv("env sh -c \"a; b\""), shell("sh"));
+    assert_eq!(argv("env -i /bin/bash -c gedit"), shell("bash"));
+    assert_eq!(argv("env -S \"sh -c gedit\""), shell("env"));
+    assert_eq!(argv("env --split-string=gedit"), shell("env"));
+    assert_eq!(
+        argv("env FOO=1 gedit --new-window").expect("a wrapper without a shell"),
+        ["env", "FOO=1", "gedit", "--new-window"]
+    );
     let _ = Reason::LaunchNeedsUser;
 }

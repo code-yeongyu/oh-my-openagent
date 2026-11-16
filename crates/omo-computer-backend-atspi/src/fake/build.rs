@@ -104,6 +104,11 @@ impl FakeBus {
         self.at(node).actions = actions.iter().map(|name| (*name).to_owned()).collect();
     }
 
+    /// The node's `DoAction` takes effect but times out before it answers.
+    pub fn set_unconfirmed_action(&mut self, node: &NodeId) {
+        self.at(node).unconfirmed = true;
+    }
+
     pub fn set_states(&mut self, node: &NodeId, states: States) {
         self.at(node).facts.states = states;
     }
