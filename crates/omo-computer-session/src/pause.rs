@@ -48,7 +48,7 @@ pub struct PauseEnded {
 
 const USER_ACTIVE_IN_TARGET: Refusal = Refusal::new(
     EngineCode::BackgroundUnavailable,
-    Reason::UserActiveInTarget.wire(),
+    Reason::UserActiveInTarget,
 );
 
 impl Session {

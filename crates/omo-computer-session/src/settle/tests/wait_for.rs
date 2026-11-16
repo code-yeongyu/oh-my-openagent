@@ -282,7 +282,7 @@ fn a_failed_confirming_read_answers_its_own_refusal_unchanged() {
     let mut rig = Rig::new(json!({"ax_notification_timeline": [
         {"t_ms": 100, "window": "102", "kind": "AXUIElementDestroyed", "closes": true}
     ]}));
-    let revoked = Refusal::new(EngineCode::PermissionDenied, Reason::Revoked.wire());
+    let revoked = Refusal::new(EngineCode::PermissionDenied, Reason::Revoked);
     rig.refuse_listings_after(2, revoked.clone());
     let refused = rig
         .session

@@ -7,6 +7,7 @@ use omo_computer_core::backend::{
     Backend, BackendResult, Delivered, PermissionProbe, Route, StopListener, TaggedInput, WindowFilter, WindowList,
 };
 use omo_computer_core::capabilities::Capabilities;
+use omo_computer_core::error::Reason;
 use omo_computer_core::intervention::{BackendClock, InterventionSource};
 use serde_json::json;
 
@@ -124,7 +125,7 @@ fn a_stop_mid_text_ends_the_stroke_before_the_next_scalar() {
     let refused = session
         .type_text(params(json!({"target": "101", "text": "abcdefghij"})))
         .expect_err("the stop chord ends the text between its scalars");
-    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("Suspended", Some("hotkey")));
+    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("Suspended", Some(Reason::Hotkey)));
     assert_eq!(
         refused.stamps.delivered,
         Some(omo_computer_core::backend::Delivered { count: 1, of: 10 }),
@@ -140,7 +141,7 @@ fn a_stop_between_units_ends_the_stroke_with_the_exact_count() {
     let (inner, sink) = fake("");
     let mut session = object_session(Box::new(StopAfter { inner, after: 1, posts: 0 }));
     let refused = session.framed_click(None).expect_err("the stop chord ends the click");
-    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("Suspended", Some("hotkey")));
+    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("Suspended", Some(Reason::Hotkey)));
     assert_eq!(
         refused.stamps.delivered,
         Some(omo_computer_core::backend::Delivered { count: 1, of: 3 }),

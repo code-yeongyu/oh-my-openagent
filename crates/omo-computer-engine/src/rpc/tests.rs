@@ -2,7 +2,7 @@
 
 use omo_computer_backend_fake::{FakeBackend, FakeClock, FakeScenario, RecordingSink};
 use omo_computer_core::backend::{Backend, Refusal};
-use omo_computer_core::error::EngineCode;
+use omo_computer_core::error::{EngineCode, Reason};
 use serde_json::{json, Value};
 
 use super::*;
@@ -61,21 +61,21 @@ fn an_interrupted_call_carries_its_disposition_on_the_wire() {
         call_id: Some("k-1".to_owned()),
         interrupted: Some(omo_computer_core::report::Disposition::UNCERTAIN_UNSAFE),
         warning: Some("write_failed".to_owned()),
-        ..Refusal::new(EngineCode::TransactionFailed, "recovery_required").into()
+        ..Refusal::new(EngineCode::TransactionFailed, Reason::RecoveryRequired).into()
     };
     let Failure { data, .. } = refused_call(&interrupted);
     let data = data.expect("data");
     assert_eq!(data["warning"], json!("write_failed"), "an unwritten audit line is surfaced");
     assert_eq!(data["callId"], json!("k-1"));
     assert_eq!(data["disposition"], json!({ "delivery": "delivery_uncertain", "retry": "unsafe" }));
-    let plain = refused_call(&Refusal::new(EngineCode::TransactionFailed, "marker_unavailable").into());
+    let plain = refused_call(&Refusal::new(EngineCode::TransactionFailed, Reason::MarkerUnavailable).into());
     assert!(plain.data.expect("data").get("disposition").is_none(), "a refusal before any send carries none");
 }
 
 fn drag_refused(stage: Value) -> Value {
     let refused = omo_computer_session::Refused {
         detail: Some(Box::new(stage)),
-        ..Refusal::new(EngineCode::InvalidTarget, "drag_destination").into()
+        ..Refusal::new(EngineCode::InvalidTarget, Reason::DragDestination).into()
     };
     refused_call(&refused).data.expect("data")
 }
@@ -112,7 +112,7 @@ fn a_refused_drag_point_takes_its_stage_pairs_own_disposition() {
 #[test]
 fn every_other_refusal_keeps_its_wire_form() {
     let before = json!({"code": "ControlRequired", "hint": null, "reason": "denied_app"});
-    let plain = refused_call(&Refusal::new(EngineCode::ControlRequired, "denied_app").into());
+    let plain = refused_call(&Refusal::new(EngineCode::ControlRequired, Reason::DeniedApp).into());
     assert_eq!(plain.data.expect("data"), before, "no disposition or nextCall is added");
     let drag_without_stage = drag_refused(json!({"point": {"x": 1.0, "y": 2.0}}));
     assert!(drag_without_stage.get("disposition").is_none() && drag_without_stage.get("nextCall").is_none());
@@ -163,7 +163,7 @@ fn object_mode_refusals_carry_delivered_paused_and_session() {
 
 #[test]
 fn a_reasoned_refusal_carries_its_reason() {
-    let refusal = Refusal::new(EngineCode::InvalidTarget, "drag_destination");
+    let refusal = Refusal::new(EngineCode::InvalidTarget, Reason::DragDestination);
     assert!(refusal.computer_code().is_ok(), "the pair has a table row");
     let Failure { code, data, .. } = refused(&refusal);
     assert_eq!(code, EngineCode::InvalidTarget.number());

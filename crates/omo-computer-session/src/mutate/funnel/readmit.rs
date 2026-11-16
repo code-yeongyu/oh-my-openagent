@@ -48,6 +48,7 @@ impl Session {
 
 #[cfg(test)]
 mod tests {
+    use omo_computer_core::error::Reason;
     use omo_computer_backend_fake::{fixtures_dir, FakeBackend, FakeScenario, StopPathScript};
     use omo_computer_core::backend::Route;
     use omo_computer_core::methods::Method;
@@ -90,7 +91,7 @@ mod tests {
             .expect_err("the stored identity differs from the observed one");
         let (stage, out) = *refused;
         assert_eq!(stage, "Consent");
-        assert_eq!(out.refusal.reason, Some("identity_changed"));
+        assert_eq!(out.refusal.reason, Some(Reason::IdentityChanged));
         let detail = out.detail.expect("the fresh plan's consent detail");
         assert!(
             detail.get("app").is_some() && detail.get("identity").is_some(),

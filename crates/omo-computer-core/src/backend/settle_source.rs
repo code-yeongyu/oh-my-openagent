@@ -11,7 +11,7 @@ use crate::observation::BusyIndicator;
 /// `Unavailable{surface:"notification", reason:"no_notification_surface"}`: the OS exposes no
 /// notification surface, so a `waitFor({notification})` answers with nothing waited.
 pub const NO_NOTIFICATION_SURFACE: Refusal =
-    Refusal::new(EngineCode::Internal, Reason::NoNotificationSurface.wire());
+    Refusal::new(EngineCode::Internal, Reason::NoNotificationSurface);
 
 /// One notification as the surface lists it; the body is kept only as its hash.
 #[derive(Debug, Clone, PartialEq, Eq)]
