@@ -28,7 +28,7 @@ pub fn is_owner_only(dacl_sddl: &str, user_forms: &[&str]) -> bool {
         .filter(|ace| !ace.is_empty())
         .filter_map(|ace| ace.trim_start_matches('(').rsplit(';').next())
         .collect();
-    let is_user = |sid: &str| user_forms.first() == Some(&sid);
+    let is_user = |sid: &str| user_forms.contains(&sid);
     let is_system = |sid: &str| sid == "SY" || sid == "S-1-5-18";
     trustees.iter().all(|sid| is_user(sid) || is_system(sid))
         && trustees.iter().any(|sid| is_user(sid))
@@ -167,7 +167,10 @@ mod os {
             let sddl = text.to_string().unwrap_or_default();
             let _ = LocalFree(Some(HLOCAL(text.0.cast())));
             let user = user_sid()?;
-            Ok(is_owner_only(&sddl, &[user.as_str()]))
+            // Row 17's SID compare (D8): the spelling SDDL read-back writes for this SID. When it
+            // cannot be read, only the SID itself matches, so the read-back fails closed.
+            let canonical = user.clone(); // LOCAL CHECK ONLY: the cascade head calls row 17's canonical_sid here
+            Ok(is_owner_only(&sddl, &[user.as_str(), canonical.as_str()]))
         }
     }
 }
