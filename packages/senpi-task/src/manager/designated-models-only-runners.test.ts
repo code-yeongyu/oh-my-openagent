@@ -32,7 +32,7 @@ const modelId = (display: string) => display.slice(display.indexOf("/") + 1)
 const sha256 = (path: string) => createHash("sha256").update(readFileSync(path)).digest("hex")
 
 describe.each(["in-process", "process", "host"] as const)("a %s child runs only on its designated models", (runner) => {
-  const { primary, second, parent, opus55, opus5 } = chainIds(runner)
+  const { primary, second, parent, opus55, shippedRung } = chainIds(runner)
   const userChains = { [primary]: [parent, second], [opus55]: [parent, second] }
 
   test("#given the user's settings chain its only model to the parent's and another model #when that model hits its usage limit #then no other model is called and the task fails typed", async () => {
@@ -64,7 +64,7 @@ describe.each(["in-process", "process", "host"] as const)("a %s child runs only 
 
     // then
     expect(new Set(calledModels(world))).toEqual(new Set([primary, opus55]))
-    expect(calledModels(world)).not.toContain(opus5)
+    expect(calledModels(world)).not.toContain(shippedRung)
     expect(record.status).toBe("error")
     expect(record.failure_kind).toBe("model_chain_exhausted")
   }, 60_000)
@@ -86,14 +86,14 @@ describe.each(["in-process", "process", "host"] as const)("a %s child runs only 
 })
 
 describe.each(["in-process", "process", "host"] as const)("senpi's shipped default chain on a %s child", (runner) => {
-  const { opus55, opus5 } = chainIds(runner)
+  const { opus55, shippedRung } = chainIds(runner)
 
-  test("#given no user fallback chains and a child designated only claude-opus-5-5 #when it hits its usage limit #then claude-opus-5 is never called and the task fails typed", async () => {
-    // given: claude-opus-5 is served on another account, so only the shipped default could reach it.
+  test("#given no user fallback chains and a child designated only claude-opus-5-5 #when it hits its usage limit #then the shipped default rung is never called and the task fails typed", async () => {
+    // given: the shipped default rung (claude-fable-5-2) is served on another account, so only that default could reach it.
     // Precondition: the engine still ships that chain, or this case would pass without proving anything.
     const { SettingsManager } = await loadSenpiBarrel()
     const shipped = SettingsManager.inMemory({}).getRetryFallbackSettings().chains
-    expect(shipped[modelId(opus55)]?.map((rung) => rung.split(":")[0])).toContain(modelId(opus5))
+    expect(shipped[modelId(opus55)]?.map((rung) => rung.split(":")[0])).toContain(modelId(shippedRung))
     const { record, world } = await runCategoryChild({
       runner,
       category: "deep-high",
@@ -103,7 +103,7 @@ describe.each(["in-process", "process", "host"] as const)("senpi's shipped defau
 
     // then
     expect(calledModels(world)).toEqual([opus55])
-    expect(calledModels(world)).not.toContain(opus5)
+    expect(calledModels(world)).not.toContain(shippedRung)
     expect(record.status).toBe("error")
     expect(record.failure_kind).toBe("model_chain_exhausted")
     expect(record.error_message).toContain(`${opus55}: usage limit (resets 3:20am)`)
@@ -137,11 +137,11 @@ describe("a process child whose engine cannot hold its designated chain (#12759)
 })
 
 describe("each child's designated chain on one socket host stays its own session's", () => {
-  const { primary, second, parent, opus55, opus5 } = chainIds("host")
+  const { primary, second, parent, opus55, shippedRung } = chainIds("host")
 
   test("#given two children started together on one host with different chains #when every designated model is spent #then each walks only its own chain and the user's settings file is byte-identical", async () => {
     // given: A's chain keeps fallback on and has no opus55 key, so on B's session it would let the shipped
-    // default reach opus5; B's turns fallback off, so on A's session A would never reach its second model.
+    // default reach shippedRung; B's turns fallback off, so on A's session A would never reach its second model.
     const scripts = { [primary]: ["quota"], [second]: ["quota"], [opus55]: ["quota"] } as const
     const userFallbackChains = { [primary]: [parent, second], [opus55]: [parent, second] }
 
@@ -159,7 +159,7 @@ describe("each child's designated chain on one socket host stays its own session
     // then
     const [a, b] = records
     expect([...calledModels(oneHost)].sort()).toEqual([primary, second, opus55].sort())
-    expect(calledModels(oneHost)).not.toContain(opus5)
+    expect(calledModels(oneHost)).not.toContain(shippedRung)
     expect(a?.failure_kind).toBe("model_chain_exhausted")
     expect(a?.error_message).toContain(`${second}: usage limit (resets 3:20am)`)
     expect(a?.error_message).not.toContain(opus55)

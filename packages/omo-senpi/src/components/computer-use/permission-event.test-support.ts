@@ -117,6 +117,9 @@ export async function permissionSession(
       off()
       await session.extensionRunner?.emit({ type: "session_shutdown", reason: "quit" })
       session.dispose()
+      // The engine starts its fallback-log first-start step when the session is created; dispose() only folds that
+      // step into the session's barrier, so nothing under this directory is removed until the barrier settles (#13520).
+      await session.whenToolChildClosed()
       await rm(home, { recursive: true, force: true })
     },
   }
