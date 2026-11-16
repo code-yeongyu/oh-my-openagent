@@ -120,9 +120,37 @@ test(
 )
 
 test(
+  "#given a first push that stopped after sealing, before any append #when the other device's copy lands and it syncs again #then the seed lands once on both",
+  async () => {
+    const server = new FakeSyncServer()
+    const a = await makeDevice(server, "a", undefined, { realStore: true })
+    const b = await makeDevice(server, "b", crashAt("sealed"), { realStore: true })
+    devices.push(a, b)
+    await a.write("system/persona.md", note(SEED))
+    await commitSeed(a)
+    await b.write("system/persona.md", note(SEED))
+    await commitSeed(b)
+    const crashed = b.engine.runCycle().catch(() => undefined)
+    await Promise.race([crashed, b.clock.untilPending()])
+    await a.engine.runCycle()
+    await b.restart()
+    const resumed = b.engine.runCycle().catch(() => undefined)
+    if ((await Promise.race([resumed.then(() => "done"), b.clock.untilPending().then(() => "waiting")])) === "waiting")
+      b.clock.advance(8_000)
+    await resumed
+    await settle(a, b)
+    expect(await b.read("system/persona.md")).toBe(note(SEED))
+    expect(await a.read("system/persona.md")).toBe(note(SEED))
+  },
+  GIT_TEST_TIMEOUT,
+)
+
+test(
   "#given two fresh devices with different text for one key #when both join #then every line of both is kept and the shared line appears once",
   async () => {
     const { a, b } = await twoSeededDevices("shared line\nonly on a\n", "shared line\nonly on b\n")
+    await a.engine.runCycle()
+    expect((await b.engine.runCycle()).pushed).toBe(true)
     await settle(a, b)
     const merged = await a.read("system/persona.md")
     expect(await b.read("system/persona.md")).toBe(merged)

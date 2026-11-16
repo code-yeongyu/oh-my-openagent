@@ -243,7 +243,9 @@ async function rewindJoining(
   const joining = new Set<string>()
   if (incoming.size === 0) return joining
   const pending = await journal.pending()
-  const carried = new Set((pending.outgoing?.items ?? []).map((item) => item.digest))
+  // Only a batch that reached append can be on the server; a sealed or reserved one was never sent (#13730 review M2).
+  const sent = pending.outgoing?.stage === "uploaded" ? pending.outgoing.items : []
+  const carried = new Set(sent.map((item) => item.digest))
   const rewound = new Set<string>()
   for (const key of [...new Set(pending.items.map((item) => item.key))]) {
     if (!incoming.has(key)) continue
@@ -262,6 +264,10 @@ async function rewindJoining(
   // A crash here leaves the ops pending with their doc already rewound; the next capture finds them "rewound" and drops them.
   deps.fault?.("rewound-joining")
   const now = await journal.pending()
-  await journal.setPending({ ...now, items: now.items.filter((item) => !rewound.has(item.digest)) })
+  const unsentHoldsRewound = (now.outgoing?.items ?? []).some((item) => rewound.has(item.digest))
+  const outgoing = unsentHoldsRewound ? null : now.outgoing
+  const next = { items: now.items.filter((item) => !rewound.has(item.digest)), outgoing }
+  await journal.setPending(next)
+  if (unsentHoldsRewound) await journal.outbox.sweep(next)
   return joining
 }
