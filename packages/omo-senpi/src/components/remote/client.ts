@@ -313,7 +313,9 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
     if (self === null) return [localSelfRow(), ...listed]
     const own = listed.find((row) => row.id === self.id)
     const selfRow: DeviceRow = {
-      ...(own ?? { ...localSelfRow(), id: self.id, name: self.name, last_seen_ms: timers.now() }),
+      // A connected service's own device: thisDevice() names no kind, so it is a cli device; "local" is only the row
+      // of a device with no service.
+      ...(own ?? { ...localSelfRow(), kind: "cli", id: self.id, name: self.name, last_seen_ms: timers.now() }),
       self: true,
       online: true,
       caps: { attach: true, machine: false, control },
