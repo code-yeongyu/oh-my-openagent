@@ -94,9 +94,9 @@ async function send(script: Script) {
     ...account.remote,
     sessions: {
       ...base,
-      watch: async (device, session, receive) => {
-        listener = receive
-        const watched = await base.watch(device, session, () => {})
+      watch: async (device, session, handlers) => {
+        listener = handlers.record
+        const watched = await base.watch(device, session, { record: () => {} })
         if (watched.kind !== "ok") return watched
         // The follow's stop removes its listener, as the real port's stop does.
         return {

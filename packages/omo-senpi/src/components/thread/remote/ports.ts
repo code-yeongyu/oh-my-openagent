@@ -16,7 +16,17 @@ export type RemoteSessionRow = {
   readonly updated_ms: number
 }
 
-export type RemoteDevice = { readonly device: string; readonly label: string; readonly online: boolean }
+export type RemoteDevice = {
+  readonly device: string
+  readonly label: string
+  readonly online: boolean
+  readonly platform?: string
+  readonly kind?: string
+  readonly last_seen_ms?: number | null
+}
+
+/** One account listing: its rows, and the devices whose rows this listing could not include (timed out, unanswered). */
+export type RemoteListing = { readonly rows: readonly RemoteSessionRow[]; readonly incomplete: readonly string[] }
 
 /**
  * How a command sent to another device ended. `refused` carries the receiving side's reason
@@ -55,10 +65,62 @@ export type DeviceServiceDial = () => Promise<{ readonly conn: DeviceService; re
 export type RemoteLocateOutcome =
   { readonly kind: "ok"; readonly sessionId: string } | { readonly kind: "refused"; readonly reason: string }
 
-/** A session on another device followed from now on: its records go to the listener until `stop` or the attach ends. */
+/**
+ * Why a watch ended for good. `stopped`: its holder stopped it. `session_closed` / `session_replaced`: the session left
+ * its device's engine and could not be found again by its durable id. The access reasons (the relay's revocations, and
+ * the refusals a re-attach can meet) never retry. `listener_failed`: a handler threw.
+ */
+export type RemoteWatchEnd = "stopped" | "session_closed" | "session_replaced" | "listener_failed" | `access:${string}`
+
+/** The engine's session status (senpi `session_status`), or what a fresh `get_state` implies when no record said it. */
+export type RemoteSessionState = {
+  readonly status: string
+  readonly sessionId: string
+  readonly durableSessionId?: string
+  readonly currentTurnId?: string
+}
+
+export type RemoteStatusChange = {
+  readonly from: string | undefined
+  readonly to: string
+  /** True when the session's stream carries no `session_status` record and the change was read off its lifecycle records. */
+  readonly derived: boolean
+  readonly cause?: string
+}
+
+/** What a watch reports after a gap (a re-established attach, a re-attach, an overflowed queue): the session now. */
+export type RemoteResync = {
+  readonly from: string | undefined
+  readonly state: RemoteSessionState
+  /** Turns that settled while the watch could not see them, each reported once per turn id across the watch. */
+  readonly settledTurns: readonly string[]
+  /** The session was found again under a new key after its engine let it go (an engine restart). */
+  readonly restarted: boolean
+}
+
+export type RemoteWatchHandlers = {
+  /** Each record the session writes from now on, once: a record seq or turn id already applied is dropped. */
+  readonly record: (record: JsonObject) => void
+  readonly status?: (change: RemoteStatusChange) => void
+  readonly resynced?: (resync: RemoteResync) => void
+  /** Once per gap: the attach or the device service went away; the watch re-attaches with backoff. */
+  readonly lost?: (reason: string) => void
+}
+
+export type RemoteWatchOptions = {
+  /** Read the session's state once before the watch is returned, for a caller that shows where it starts. */
+  readonly baseline?: boolean
+}
+
+/**
+ * A session on another device followed from now on, across relay drops, device-service restarts and engine restarts,
+ * until `stop` or an end that no re-attach can undo.
+ */
 export type RemoteSessionWatch = {
-  /** Settles with the reason the attach ended; nothing is delivered after it. */
-  readonly ended: Promise<string>
+  /** Settles once with why the watch ended; nothing is delivered after it. */
+  readonly ended: Promise<RemoteWatchEnd>
+  /** The session's state when the watch started (`baseline`), else undefined. */
+  readonly initial?: RemoteSessionState
   readonly stop: () => void
 }
 
@@ -69,9 +131,13 @@ export type RemoteSessionsPort = {
   /** The device service state; `plan_required` means the account's plan has no relay (A5: paid only). */
   readonly status: () => Promise<RemoteServiceState>
   readonly thisDevice: () => Promise<string | null>
+  /** This device's own name. The account roster (`devices`) leaves this device out. Absent: the id stands in for it. */
+  readonly thisDeviceName?: () => Promise<string | null>
   readonly devices: () => Promise<readonly RemoteDevice[]>
   /** The account's session list; with `device`, that one device's rows only (no account-wide round). */
   readonly sessions: (filter?: { readonly device?: string }) => Promise<readonly RemoteSessionRow[]>
+  /** The account-wide list as `sessions` gives it, with the devices it could not include. Absent: every device counts as listed. */
+  readonly listing?: () => Promise<RemoteListing>
   /**
    * A session-less engine record (`open_session`, `list_sessions`) on `device`'s engine endpoint, with no
    * attach: the attach-less `session.command {device, endpoint, rpc}` shape (relay daemon #393). `locate` asks a
@@ -119,13 +185,14 @@ export type RemoteSessionsPort = {
   /** omo#13037: this device's own service can make the single probe (read from its connection; no round trip). */
   readonly canLookup?: () => Promise<boolean>
   /**
-   * The records `device`'s session writes from now on (none of the ones before), on the attach this port holds for it.
-   * Refused, typed, when that attach cannot be made.
+   * The records `device`'s session writes from now on (none of the ones before), on the attach this port holds for it,
+   * shared with every other holder, re-attached and resynced after a gap. Refused, typed, when that attach cannot be made.
    */
   readonly watch: (
     device: string,
     sessionId: string,
-    listener: (record: JsonObject) => void,
+    handlers: RemoteWatchHandlers,
+    options?: RemoteWatchOptions,
   ) => Promise<RemoteWatchOutcome>
   /** Closes the device-service connection this port opened, if any; a short-lived caller (the CLI) calls it at the end. */
   readonly close?: () => Promise<void>
