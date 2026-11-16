@@ -4,6 +4,7 @@ import {
 } from "../omo-opencode/src/cli/service-auth/commands"
 import { cliDeviceServiceHandoff } from "./device-service-handoff"
 import { setUpRemoteAfterLogin } from "./remote-entry"
+import { remoteOptOut } from "./remote-opt-out"
 
 /** The device-service hand-off both `omo login` and the OpenCode CLI use, so neither path sees only local credentials. */
 export const cliServiceAuthHooks: ServiceAuthHooks = {
@@ -32,6 +33,11 @@ export const LOGIN_REMOTE_SETUP_BOUND_MS = 5_000
 export const LOGIN_REMOTE_SETUP_TIMED_OUT =
   "OmO: remote sessions are still being set up for this device; run omo remote status to check them.\n"
 
+// A user who ran `omo remote disable` gets the setup that turns remote off again, so the bound says that instead
+// (#13731 review L1); the next omo start's bootstrap enforces the opt-out if this one was cut short.
+export const LOGIN_REMOTE_OPT_OUT_TIMED_OUT =
+  "OmO: remote sessions are still being turned off for this device; run omo remote status to check them.\n"
+
 // Ends the command at the bound: stdout is flushed first so nothing it already wrote is lost, then the process exits
 // with login's own code, because work the setup started (a socket, a child, a timer) would otherwise keep it alive.
 async function exitAfterFlush(code: number): Promise<never> {
@@ -56,7 +62,7 @@ export async function afterServiceAuth(
   try {
     const outcome = await Promise.race([setUpRemote().then(() => "done" as const), timedOut])
     if (outcome === "timed_out") {
-      process.stderr.write(LOGIN_REMOTE_SETUP_TIMED_OUT)
+      process.stderr.write(remoteOptOut().read() ? LOGIN_REMOTE_OPT_OUT_TIMED_OUT : LOGIN_REMOTE_SETUP_TIMED_OUT)
       await exitAfterFlush(Number(exitCode))
     }
   } finally {

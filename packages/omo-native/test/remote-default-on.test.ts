@@ -12,7 +12,7 @@ import {
   runLoginSetup,
 } from "../remote-bootstrap"
 import { disableNotSavedNotice, REMOTE_EXIT } from "../remote-cli"
-import { afterServiceAuth, LOGIN_REMOTE_SETUP_TIMED_OUT } from "../service-auth-command"
+import { afterServiceAuth, LOGIN_REMOTE_OPT_OUT_TIMED_OUT, LOGIN_REMOTE_SETUP_TIMED_OUT } from "../service-auth-command"
 import {
   owners,
   privateDir,
@@ -195,6 +195,32 @@ describe("omo login sets remote sessions up", () => {
     const [stdout, stderr] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()])
     expect({ outcome, stdout, stderr }).toEqual({ outcome: 0, stdout: "signed in\n", stderr: LOGIN_REMOTE_SETUP_TIMED_OUT })
     expect(performance.now() - started).toBeLessThan(5_000)
+  }, 15_000)
+
+  // #13731 review L1: for a user who ran `omo remote disable` the setup turns remote off, so the bound must not say
+  // remote sessions are being set up.
+  test("an opted-out user is told remote sessions are being turned off, not set up", async () => {
+    const home = privateDir()
+    await Bun.write(`${home}/.omo/remote-sessions.json`, `${JSON.stringify({ remote_sessions: "off" })}\n`)
+    const module = new URL("../service-auth-command.ts", import.meta.url).pathname
+    const script = [
+      `import { afterServiceAuth } from ${JSON.stringify(module)}`,
+      `await afterServiceAuth(["login"], 0, () => new Promise(() => { setInterval(() => {}, 1000) }), 300)`,
+    ].join("\n")
+    const child = Bun.spawn([process.execPath, "-e", script], {
+      env: { ...process.env, HOME: home, USERPROFILE: home },
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    let deadline: ReturnType<typeof setTimeout> | undefined
+    const ceiling = new Promise<"still running">((resolve) => {
+      deadline = setTimeout(() => resolve("still running"), 10_000)
+    })
+    const outcome = await Promise.race([child.exited, ceiling])
+    clearTimeout(deadline)
+    if (outcome === "still running") child.kill()
+    const stderr = await new Response(child.stderr).text()
+    expect({ outcome, stderr }).toEqual({ outcome: 0, stderr: LOGIN_REMOTE_OPT_OUT_TIMED_OUT })
   }, 15_000)
 })
 
