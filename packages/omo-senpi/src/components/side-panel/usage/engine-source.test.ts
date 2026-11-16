@@ -161,6 +161,47 @@ describe("createEngineUsageSource", () => {
     })
   })
 
+  test("#given a cooled pinned claude CLI account with a newer record #when the panel reads #then the healthy CLI account's record is drawn", () => {
+    // given no token in auth.json; the pinned account hit its limit and reported last
+    const limits = engine([
+      record("personal", 20, { reportedAt: "2026-10-19T03:00:00.000Z" }),
+      record("work", 100, { reportedAt: "2026-10-19T03:59:00.000Z" }),
+    ])
+    const source = createEngineUsageSource({
+      limits,
+      readCredentials: () => ({
+        auth: {
+          "anthropic-subscription": {
+            type: "oauth",
+            access: "claude-sdk-oauth-managed",
+            pinned: "work",
+            accounts: [
+              {
+                name: "work",
+                store: "claude-cli",
+                dirId: "work",
+                blockedUntil: NOW + 60_000,
+                blockReason: "rate_limit",
+              },
+              { name: "personal", store: "claude-cli", dirId: "personal" },
+            ],
+          },
+        },
+        pool: undefined,
+      }),
+      now: () => NOW,
+      onChange: () => {},
+    })
+
+    // then the account doing the work is named over its own quota, with the pin shown as failed over
+    expect(source.snapshot().claude).toMatchObject({
+      account: "personal",
+      pinnedAccount: "work",
+      accountState: "ok",
+      windows: [{ percent: 20 }, { percent: 3 }],
+    })
+  })
+
   test("#given a stored login with its own record and an env record #when the panel reads #then the stored login's record wins", () => {
     const limits = engine([record("env", 55), record("work", 41)])
     const source = createEngineUsageSource({
