@@ -17,3 +17,15 @@ export const markNotSent = (error: unknown): unknown =>
         ...(error.sign_in_reason === undefined ? {} : { sign_in_reason: error.sign_in_reason }),
       })
     : error
+
+/**
+ * omo#13763: the refusal of a wake toward a device service below the wake minimum. It names the running version and the
+ * minimum so an outdated service reads as one, never as a bare `unsupported`. A null minimum turns the wake off in
+ * this build, so no service can carry it.
+ */
+export const olderThanWakeMinimum = (serviceVersion: string, minimum: string | null): NotSentError =>
+  minimum === null
+    ? new NotSentError("unsupported", "this omo build does not send the wake target")
+    : new NotSentError("unsupported", `device service ${serviceVersion} is older than ${minimum}; update it`, {
+        action: `Run omo remote bootstrap to install device service ${minimum} or later.`,
+      })

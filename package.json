@@ -164,7 +164,7 @@
     "build:git-bash-mcp": "bun run --cwd packages/git-bash-mcp build",
     "build:ast-grep-mcp": "bun run --cwd packages/ast-grep-mcp build",
     "test:desktop": "bun script/check-cargo-pinned-deps.mjs && node --test scripts/desktop-package-boundaries.test.mjs && bun run --cwd packages/senpi-desktop-protocol test && bun run --cwd packages/senpi-desktop-engine test && bun run --cwd packages/senpi-desktop-prelude test && bun run --cwd packages/senpi-desktop-sdk test && bun run --cwd packages/senpi-desktop-service test && bun run --cwd packages/senpi-desktop-tool test",
-    "test:computer": "bun script/check-cargo-pinned-deps.mjs && bun run --cwd packages/omo-computer-protocol test && bun run --cwd packages/omo-computer-sdk test && bun run --cwd packages/omo-computer-engine test && bun run --cwd packages/omo-computer-hand test && bun run --cwd packages/omo-computer-carriers test && bun run --cwd packages/omo-computer-tool test && bun run --cwd packages/omo-computer-prelude test",
+    "test:computer": "bun script/check-cargo-pinned-deps.mjs && bun crates/omo-computer-backend-wayland/probes/probe-sp-w.ts --self-test && bun run --cwd packages/omo-computer-protocol test && bun run --cwd packages/omo-computer-sdk test && bun run --cwd packages/omo-computer-engine test && bun run --cwd packages/omo-computer-hand test && bun run --cwd packages/omo-computer-carriers test && bun run --cwd packages/omo-computer-tool test && bun run --cwd packages/omo-computer-prelude test",
     "fmt": "bun fmt --no-script",
     "fmt:check": "bun fmt --no-script --check",
     "lint:ratchet": "bun script/lint-ratchet.ts",
