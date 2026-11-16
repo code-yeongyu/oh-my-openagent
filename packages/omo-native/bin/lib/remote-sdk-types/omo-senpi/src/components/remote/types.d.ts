@@ -294,6 +294,8 @@ export type OpenResult = {
     readonly device: DeviceRow;
     /** The first prompt's receipt, when `first` was given. */
     readonly receipt?: SendReceipt;
+    /** Steps after the session existed that did not apply (its name, its listing key); the session is still created. */
+    readonly warnings?: readonly string[];
 };
 /** A background job of the interrupted turn (#13444). */
 export type InterruptJob = {

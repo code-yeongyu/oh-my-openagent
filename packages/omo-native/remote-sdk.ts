@@ -5,9 +5,12 @@ import { remoteClientForPerson, type RemoteClient } from "../omo-senpi/src/compo
 import packageJson from "./package.json" with { type: "json" }
 
 /** @public */
-export { REMOTE_CODES } from "../omo-senpi/src/components/remote/index.ts"
-/** @public */
-export { canonicalizeThreadHandle, describeThread, handleOf } from "../omo-senpi/src/components/remote/seams.ts"
+export {
+  canonicalizeThreadHandle,
+  describeThread,
+  handleOf,
+  REMOTE_CODES,
+} from "../omo-senpi/src/components/remote/index.ts"
 export type * from "../omo-senpi/src/components/remote/types.ts"
 
 export type Remote = RemoteClient

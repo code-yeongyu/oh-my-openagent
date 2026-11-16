@@ -2,8 +2,8 @@
 import { type ClientCore, type RemoteClient } from "./client";
 type StreamMembers = Pick<RemoteClient["sessions"], "follow" | "wait">;
 /**
- * The stream members of part 4a-2 (unit U2 of #13414): follow (status changes, turn ends, the turn's stream) and wait,
- * both on the attach pool's watch. Each answers `unsupported` until U2 lands.
+ * The stream members of part 4a-2 (unit U2 of #13414): follow (the turn's stream, its states and its end) and wait,
+ * both on the attach's events (`watchSession`), never a poll of read.
  */
-export declare function streamMembers(_core: ClientCore): StreamMembers;
+export declare function streamMembers(core: ClientCore): StreamMembers;
 export {};

@@ -19,6 +19,11 @@ export type RemoteClientDeps = {
      * compiled binary passes its provisioned runtime's copy; from source the store resolves its own worker.
      */
     readonly gatewayWorkerUrl?: URL;
+    /**
+     * The approval mode of the session this client acts for (a session or connector sender): an open may keep or narrow
+     * it, never widen it. Absent, only the narrowest mode passes.
+     */
+    readonly permissionPreset?: () => string | undefined;
     /** Test seam: opens the proven device-service connection (`connectDeviceService` by default). */
     readonly connect?: (options: {
         readonly version: string;
@@ -97,6 +102,7 @@ export type Outcome<T> = {
     readonly kind: "ok";
     readonly value: T;
 } | RemoteFailure;
+export declare const ok: <T>(value: T) => Outcome<T>;
 /** What every member module is built from: the client's sender, clock, deps, connection and member runner. */
 export type ClientCore = {
     readonly sender: RemoteSender;
