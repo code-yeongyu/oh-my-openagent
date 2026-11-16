@@ -15,7 +15,7 @@ interface RemoteCommandUi {
   input?(title: string, placeholder?: string): Promise<string | undefined>
 }
 
-export const REMOTE_COMMAND_USAGE = [
+const REMOTE_COMMAND_USAGE = [
   "/remote                                   pick a device, then a session, then what to do",
   "/remote status | devices",
   "/remote sessions [--device <d>] [--project <p>] [--state <s>]",
