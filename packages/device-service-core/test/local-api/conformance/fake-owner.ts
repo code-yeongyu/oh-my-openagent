@@ -95,6 +95,7 @@ export const startFakeOwner = async (options: FakeOwnerOptions): Promise<FakeOwn
     reports: [],
     refresher: null,
     attach: { attached: true, changedAt: "" },
+    sessionWake: { enabled: false, stored: null, changedAt: "", overridden: options.world.wake_overridden === true },
     now: options.now ?? Date.now,
     mint: mintId,
     stop: async () => {},
@@ -114,6 +115,8 @@ export const startFakeOwner = async (options: FakeOwnerOptions): Promise<FakeOwn
       attaches: new Set(),
       subscribed: false,
       client: () => client,
+      handed: new Set(),
+      asks: new Set(),
     }
     state.conns.add(conn)
     transport.onClose(() => {
