@@ -49,6 +49,8 @@ test("real omo launcher signs in, reports status, and logs out without disk or o
       USERPROFILE: home,
       OMO_RUNTIME: "bun",
       OMO_SERVICE_API_URL: api,
+      // The login hands remote set-up to a background enable (omo#13722); a closed origin keeps it from installing.
+      OMO_DEVICE_SERVICE_ORIGIN: "http://127.0.0.1:9",
       OMO_TEST_KEYSTORE_URL: `${api}/fake-keystore`,
       // The child's own lock home: the test preload's account seam does not reach a child process (#12978).
       OMO_TEST_CREDENTIAL_LOCK_HOME: home,

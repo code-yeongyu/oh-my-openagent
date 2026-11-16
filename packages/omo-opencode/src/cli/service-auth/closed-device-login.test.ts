@@ -59,6 +59,8 @@ async function run(entry: string, args: readonly string[], extraEnv: Record<stri
         OMO_RUNTIME: "bun",
         BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
         OMO_SERVICE_API_URL: api,
+        // The login hands remote set-up to a background enable (omo#13722); a closed origin keeps it from installing.
+        OMO_DEVICE_SERVICE_ORIGIN: "http://127.0.0.1:9",
         OMO_SERVICE_ACCOUNTS_URL: api,
         // The child's own lock home: the test preload's account seam does not reach a child process (#12978).
         OMO_TEST_CREDENTIAL_LOCK_HOME: home,
@@ -173,6 +175,8 @@ async function runLoginWithGrant(me: () => Response) {
         OMO_RUNTIME: "bun",
         BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
         OMO_SERVICE_API_URL: api,
+        // The login hands remote set-up to a background enable (omo#13722); a closed origin keeps it from installing.
+        OMO_DEVICE_SERVICE_ORIGIN: "http://127.0.0.1:9",
         OMO_SERVICE_ACCOUNTS_URL: api,
         OMO_TEST_CREDENTIAL_LOCK_HOME: home,
       },
