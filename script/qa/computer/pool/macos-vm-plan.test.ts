@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { guestName, isPoolGuest, planGuest, type PoolHost, RUNNER_LABEL, strayGuests } from "./macos-vm-plan.ts"
+import { guestName, isPoolGuest, planGuest, type PoolHost, RUNNER_LABEL } from "./macos-vm-plan.ts"
 
 const host: PoolHost = {
   platform: "darwin",
@@ -34,6 +34,14 @@ describe("guest plan", () => {
     expect(plan.kind).toBe("refused")
   })
 
+  test("a host where any person is signed in at the console is refused, not only the pool user", () => {
+    const plan = planGuest({ ...host, consoleUser: "someone" }, "15", "1")
+    expect(plan).toEqual({
+      kind: "refused",
+      reason: "someone is signed in at the console; guests run only on a host nobody is using",
+    })
+  })
+
   test("Linux, an Intel Mac and a host without a hypervisor are refused", () => {
     expect(planGuest({ ...host, platform: "linux" }, "15", "1").kind).toBe("refused")
     expect(planGuest({ ...host, arch: "x64" }, "15", "1").kind).toBe("refused")
@@ -46,14 +54,5 @@ describe("guest ownership", () => {
     expect(isPoolGuest(guestName("15", "77"))).toBe(true)
     expect(isPoolGuest("base-macos15")).toBe(false)
     expect(isPoolGuest("omo-cu-../../x")).toBe(false)
-  })
-
-  test("strays are this pool's guests that the current run does not keep", () => {
-    const listing = [
-      { name: "omo-cu-macos15-1", running: false },
-      { name: "omo-cu-macos26-2", running: true },
-      { name: "someone-elses-vm", running: true },
-    ]
-    expect(strayGuests(listing, new Set(["omo-cu-macos26-2"]))).toEqual(["omo-cu-macos15-1"])
   })
 })
