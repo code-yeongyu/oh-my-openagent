@@ -6,11 +6,12 @@ import {
   releaseAllPromptAsyncReservationsForTesting,
   releasePromptAsyncReservation,
 } from "./prompt-async-gate"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 async function waitForPromise<T>(promise: Promise<T>, label: string): Promise<T> {
   let timeoutID: ReturnType<typeof setTimeout> | undefined
   const timeout = new Promise<never>((_, reject) => {
-    timeoutID = setTimeout(() => reject(new Error(`timed out waiting for ${label}`)), 1_000)
+    timeoutID = setTimeout(() => reject(new Error(`waited out the test budget for ${label}`)), remainingTestTime())
   })
   return Promise.race([promise, timeout]).finally(() => {
     if (timeoutID !== undefined) {
