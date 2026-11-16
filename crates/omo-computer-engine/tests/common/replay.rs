@@ -96,7 +96,7 @@ fn env_for(case: &Case, runtime: &Path) -> Vec<(String, String)> {
 }
 
 pub fn replay_case(case: &Case) -> Report {
-    let runtime = tempfile::tempdir().expect("a runtime dir");
+    let runtime = super::peer::runtime_dir();
     if let Some(block) = &case.host {
         super::host::setup(runtime.path(), block);
     }
