@@ -174,8 +174,10 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // 1,547,852 B (the committed artifact predates the train); splitting the session wake into the lazy
 // #omo-wake-runtime sidecar brings it to 1,476,860 B, so the ceiling covers the measured need with a
 // 1,140-byte margin instead of failing it by 860 bytes.
-// Raised 1,493,600 -> 1,495,100 for remote wake and wait (#13743): a fresh build of dev 2bc17a2830 measures 1,493,577 B and
-// the merge result with #13743 1,494,355 B (+778 B: the monitor source and the thread_read wait); 745 B headroom.
+// Train omo-5173 (#13627, 22 members) on dev 71cc3ecf70 (1,481,163 B): the train-top regen measures 1,485,337 B (+4,174);
+// budget = measured + 4 KiB (lead rule) = 1,489,433.
+// Remerged on dev 050c1879cb (dev ceiling 1,493,600): the regenerated train-top omo.js measures 1,497,747 B;
+// budget = measured + 4 KiB (lead rule) = 1,501,843.
 const BUDGET_BYTES = bundleBudget.omoJsBytes
 
 describe("omo-senpi bundle size budget", () => {

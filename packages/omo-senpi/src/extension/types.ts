@@ -16,6 +16,8 @@ export type ReadClassifier = (input: {
 
 export interface BeforeAgentStartHandlerOptions {
   previewSafe?: boolean
+  /** senpi `runs`: the side of a split session this handler belongs on; a fused session registers it either way. */
+  runs?: "brain" | "hand"
   /** Stable omo subscriber name, retained in bundled settle diagnostics. */
   hookLabel?: string
   /** Required read-only status delivery before host settlement; never journal writes, reflection or recovery. */
