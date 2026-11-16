@@ -10,6 +10,8 @@
         "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "bin/senpi-patch.mjs",
+        // the omo-ai/remote SDK entry: script/build-remote-sdk.ts bundles it by path into bin/lib/remote-sdk.generated.js
+        "remote-sdk.ts",
         // the engine entry the npm launcher spawns by path for a launch that claims memory sync at boot (launcher.js)
         "bin/lib/engine-boot.js",
         // the manual GUI-session QA runner for the keychain helper: a person runs it by path in a dedicated QA login session

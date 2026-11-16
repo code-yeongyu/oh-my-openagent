@@ -40,8 +40,13 @@ export type Scope = {
     readonly all_scope?: boolean;
     readonly workspace?: string;
 };
-/** Opaque: callers never parse it. `canonicalizeThreadHandle` (seams.ts) is the only parser. */
-export type ThreadHandle = string;
+/**
+ * Opaque and branded: only seams.ts makes one (`canonicalizeThreadHandle`, or `handleOf` for a listed row), so a caller
+ * cannot build one from text. `canonicalizeThreadHandle` is the only parser.
+ */
+export type ThreadHandle = string & {
+    readonly __brand: "ThreadHandle";
+};
 export type DeviceRow = {
     readonly id: string;
     readonly name: string;

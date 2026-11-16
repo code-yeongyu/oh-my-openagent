@@ -51,8 +51,9 @@ Every member takes an optional last argument `{ signal?: AbortSignal, deadlineMs
 | `sessions.interrupt(thread)`, `sessions.close(thread)`, `sessions.archive(thread, archived)` | session control |
 | `close()` | closes the client's one connection |
 
-Threads are named `<device>/<session>`, as `sessions.list` returns them. Every remote call obeys the target session's
-own approval mode.
+Threads are named `<device>/<session>`, as `sessions.list` returns them. A thread handle is typed: take it from a list
+row or `sessions.open`, or build one with `handleOf(device, session)` or `canonicalizeThreadHandle(input, scope)` (both
+exported), never by joining strings. Every remote call obeys the target session's own approval mode.
 
 ## Two devices from one script
 

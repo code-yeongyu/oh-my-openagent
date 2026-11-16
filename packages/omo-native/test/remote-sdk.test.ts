@@ -4,7 +4,15 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { cleanup, startOwner } from "../../device-service-core/test/local-api/support.ts"
 import { OFFLINE_PEER, PEER } from "../../device-service-core/test/local-api/conformance/world.ts"
-import { openRemote, REMOTE_CODES, type Remote, type RemoteFailure } from "omo-ai/remote"
+import {
+  canonicalizeThreadHandle,
+  describeThread,
+  handleOf,
+  openRemote,
+  REMOTE_CODES,
+  type Remote,
+  type RemoteFailure,
+} from "omo-ai/remote"
 
 // omo#13413: the importable remote SDK. A program imports `omo-ai/remote` by its package name and drives devices and
 // sessions through the one remote module (design v8-core r2, as amended by Q's W3 ruling: the SDK is that module
@@ -67,13 +75,20 @@ describe("omo-ai/remote: devices", () => {
 })
 
 describe("omo-ai/remote: sessions", () => {
-  test("#given devices with sessions #when a script lists sessions #then it gets ONE merged list whose rows name their device", async () => {
+  test("#given devices with sessions #when a script lists sessions #then it gets ONE merged list whose handles name their device and round-trip through the exported seams", async () => {
     const remote = open((await startOwner()).stateDir)
 
     const list = await valueOf(remote.sessions.list({ all_scope: true }))
 
     expect(list.rows.length).toBeGreaterThan(0)
-    for (const row of list.rows) expect(row.thread).toBe(`${row.device.id}/${row.thread.split("/")[1]}`)
+    for (const row of list.rows) {
+      const parsed = canonicalizeThreadHandle(String(row.thread), { all_scope: true })
+      if (parsed.kind !== "ok" || parsed.value.target.kind !== "device_session")
+        throw new Error(`unparsed ${row.thread}`)
+      expect(parsed.value.target.device).toBe(row.device.id)
+      expect(handleOf(row.device.id, parsed.value.target.session)).toBe(row.thread)
+      expect(describeThread(row).length).toBeGreaterThan(0)
+    }
   })
 
   test("#given the SDK #when a script reaches for the session verbs #then create, send, read, watch, interrupt, close and archive are all members", () => {

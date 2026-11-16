@@ -45,7 +45,7 @@ const roundTrip = async (target: DeviceRow): Promise<void> => {
     detail: "",
   })
   const page = await timed(target.name, "read", () => remote.sessions.read(opened.thread, { tail: 20 }))
-  if (!JSON.stringify(page).includes(marker)) throw new Error(`${target.name} read does not carry the reply ${marker}`)
+  if (!JSON.stringify(page).includes(marker)) throw new Error(`${target.name} read does not carry the sent message ${marker}`)
   await timed(target.name, "close", () => remote.sessions.close(opened.thread))
 }
 

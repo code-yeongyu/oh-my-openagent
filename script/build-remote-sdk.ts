@@ -52,6 +52,9 @@ async function declarations(): Promise<Artifacts> {
         compilerOptions: {
           declaration: true,
           emitDeclarationOnly: true,
+          // Emit only: the package's own typecheck (packages/omo-native/tsconfig.json) proves these types. Checking here
+          // would re-check the whole graph the factories reach under preserveSymlinks, where unrelated modules resolve apart.
+          noCheck: true,
           allowImportingTsExtensions: true,
           skipLibCheck: true,
           strict: true,
@@ -59,6 +62,9 @@ async function declarations(): Promise<Artifacts> {
           moduleResolution: "bundler",
           target: "esnext",
           resolveJsonModule: true,
+          // Without it tsgo realpaths workspace links concurrently and, depending on which resolution wins, treats part of
+          // device-service-core as an external library and skips its declarations: a different tree on every run.
+          preserveSymlinks: true,
           types: ["bun-types"],
           typeRoots: [join(root, "node_modules", "@types"), join(root, "node_modules")],
           rootDir: packages,
