@@ -31,7 +31,7 @@ impl Session {
     /// `InvalidKey{unknown_key}` for a chord that does not parse, or the funnel's refusal.
     pub fn press(&mut self, params: PressParams) -> Result<ExecReply, Refused> {
         let keys = omo_computer_core::keys::chord_keys(&params.chord)
-            .map_err(|_| Refused::from(Refusal::new(EngineCode::InvalidKey, Reason::UnknownKey.wire())))?;
+            .map_err(|_| Refused::from(Refusal::new(EngineCode::InvalidKey, Reason::UnknownKey)))?;
         let target = params.target.clone();
         let authority = CallAuthority { call_id: params.call_id.clone(), run_generation: params.run_generation };
         let call = Call { verb: VerbKind::Keyboard, target: TargetRef::read(target.as_deref()), points: Vec::new(), chord: Some(params.chord.clone()), force: params.force.unwrap_or(false) };

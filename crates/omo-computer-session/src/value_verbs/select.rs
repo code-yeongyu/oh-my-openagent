@@ -13,13 +13,13 @@ pub(super) fn range_of(value: &str, range: &TextRange) -> Result<Utf16Range, cra
         TextRange::Span { start, end } => {
             let (start, end) = (usize::try_from(*start).unwrap_or(usize::MAX), usize::try_from(*end).unwrap_or(usize::MAX));
             if end < start {
-                let mut refused = Refused::from(Refusal::new(EngineCode::Internal, Reason::SpanInverted.wire()));
+                let mut refused = Refused::from(Refusal::new(EngineCode::Internal, Reason::SpanInverted));
                 refused.detail = Some(Box::new(serde_json::json!({ "field": "end", "message": "/end: expected end >= start" })));
                 return Err(refused);
             }
             let length = value.encode_utf16().count();
             if end > length {
-                let mut refused = Refused::from(Refusal::new(EngineCode::InvalidTarget, Reason::SpanOutOfRange.wire()));
+                let mut refused = Refused::from(Refusal::new(EngineCode::InvalidTarget, Reason::SpanOutOfRange));
                 refused.detail = Some(Box::new(serde_json::json!({ "length": length })));
                 return Err(refused);
             }
@@ -27,11 +27,11 @@ pub(super) fn range_of(value: &str, range: &TextRange) -> Result<Utf16Range, cra
         }
         TextRange::Text { text } => locate(value, text).map_err(|why| match why {
             NoRange::Ambiguous { occurrences } => {
-                let mut refused = Refused::from(Refusal::new(EngineCode::InvalidTarget, Reason::Ambiguous.wire()));
+                let mut refused = Refused::from(Refusal::new(EngineCode::InvalidTarget, Reason::Ambiguous));
                 refused.detail = Some(Box::new(serde_json::json!({ "occurrences": occurrences })));
                 refused
             }
-            NoRange::Absent => Refused::from(Refusal::new(EngineCode::InvalidTarget, Reason::TextAbsent.wire())),
+            NoRange::Absent => Refused::from(Refusal::new(EngineCode::InvalidTarget, Reason::TextAbsent)),
         }),
     }
 }

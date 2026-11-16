@@ -34,7 +34,7 @@ impl Session {
         let ask = FrameAsk { x: params.x, y: params.y, width: params.width, height: params.height };
         let moves = ask.x.is_some() || ask.y.is_some();
         if moves && self.backend.frame_settable(&params.target) == Some(false) {
-            return Err(Refused::from(Refusal::new(EngineCode::InvalidTarget, Reason::WindowImmovable.wire())));
+            return Err(Refused::from(Refusal::new(EngineCode::InvalidTarget, Reason::WindowImmovable)));
         }
         let current = self.current_frame(&params.target).ok_or_else(|| Refused::from(Refusal::bare(EngineCode::WindowNotFound)))?;
         let authority = CallAuthority { call_id: params.call_id.clone(), run_generation: params.run_generation };

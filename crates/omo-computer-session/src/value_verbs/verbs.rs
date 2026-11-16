@@ -22,7 +22,7 @@ impl Session {
         let ax = self
             .backend
             .ax()
-            .ok_or_else(|| Refused::from(Refusal::new(EngineCode::AxUnsupported, Reason::SnapshotUnsupported.wire())))?;
+            .ok_or_else(|| Refused::from(Refusal::new(EngineCode::AxUnsupported, Reason::SnapshotUnsupported)))?;
         let request = omo_computer_core::backend::SnapshotRequest {
             target: omo_computer_core::backend::Target::Window(params.target),
             options: omo_computer_core::params::ObserveOptions::default(),
@@ -45,7 +45,7 @@ impl Session {
         let ax = self
             .backend
             .ax()
-            .ok_or_else(|| Refused::from(Refusal::new(EngineCode::AxUnsupported, Reason::ResolveUnsupported.wire())))?;
+            .ok_or_else(|| Refused::from(Refusal::new(EngineCode::AxUnsupported, Reason::ResolveUnsupported)))?;
         ax.resolve(&Ref(reference.to_owned())).map(|resolved| resolved.element.window).map_err(Refused::from)
     }
 
