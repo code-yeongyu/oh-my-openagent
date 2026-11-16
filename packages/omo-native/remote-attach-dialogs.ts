@@ -82,15 +82,3 @@ export class MirroredDialogs {
     return { ...record, uiRequestId: id }
   }
 }
-
-/** The snapshot state with the frames only their raiser may answer removed: the TUI runs every pending frame it
- *  receives through its own dialog path without that filter, so they must never leave this process (#13482 review). */
-export const withoutRaiserOnly = (state: JsonObject): JsonObject => {
-  const out: Record<string, unknown> = { ...state }
-  for (const field of ["pendingDialogs", "pendingQuestions"]) {
-    const list = state[field]
-    if (!Array.isArray(list)) continue
-    out[field] = list.filter((entry) => typeof entry !== "object" || entry === null || !raiserOnly(entry as JsonObject))
-  }
-  return out as JsonObject
-}

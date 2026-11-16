@@ -9,7 +9,7 @@ import type {
   SnapshotBody,
 } from "../device-service-core/src/index.ts"
 import { outcomeFailure, outcomeOf } from "../omo-senpi/src/components/thread/remote/outcome"
-import { MirroredDialogs, withoutRaiserOnly } from "./remote-attach-dialogs"
+import { MirroredDialogs } from "./remote-attach-dialogs"
 
 // One authenticated attach TUI connection to the `omo remote attach` endpoint (remote-attach.ts): the attach's session
 // presented as the one row LOCAL_SESSION_ID, its plumbing answered here, every other record forwarded to the host.
@@ -29,8 +29,7 @@ const outcomeText = (outcome: CommandStateEvent, device: string): string => {
 }
 
 function stateOf(snapshot: SnapshotBody): Json {
-  // Frames only their raiser may answer never leave this process, whatever field carries them (#13482).
-  const state = withoutRaiserOnly(isRecord(snapshot.state) ? snapshot.state : {})
+  const state = isRecord(snapshot.state) ? snapshot.state : {}
   return { ...state, sessionId: LOCAL_SESSION_ID, isStreaming: state.isStreaming === true }
 }
 
