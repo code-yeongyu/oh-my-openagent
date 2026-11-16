@@ -820,8 +820,8 @@
     "packages/omo-senpi/src/components/telemetry/session-summary-storage.ts": ["purgeUnconsentedQueue"],
     // pre-existing at origin dev 4686e425b5: unused export(s) PROTO_TAG, SEMCONV_MAP_SHA256, wireKeyOf, TELEMETRY_SDK_NAMES
     "packages/omo-senpi/src/components/telemetry/telemetry-artifact.ts": ["PROTO_TAG", "SEMCONV_MAP_SHA256", "wireKeyOf", "TELEMETRY_SDK_NAMES"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) THREAD_MESSAGE_MAX_BYTES, THREAD_SUMMARY_MAX_LENGTH
-    "packages/omo-senpi/src/components/thread/contracts/fields.ts": ["THREAD_MESSAGE_MAX_BYTES", "THREAD_SUMMARY_MAX_LENGTH"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) THREAD_SUMMARY_MAX_LENGTH
+    "packages/omo-senpi/src/components/thread/contracts/fields.ts": ["THREAD_SUMMARY_MAX_LENGTH"],
     // pre-existing at origin dev 4686e425b5: unused export(s) THREAD_MESSAGE_MAX_BYTES, THREAD_SUMMARY_MAX_LENGTH
     "packages/omo-senpi/src/components/thread/contracts/index.ts": ["THREAD_MESSAGE_MAX_BYTES", "THREAD_SUMMARY_MAX_LENGTH"],
     // pre-existing at origin dev 4686e425b5: unused export(s) ThreadListParams, ThreadReadParams, ThreadInterruptParams, ThreadHandoffParams, ThreadRenameParams, ThreadSetModelParams, ThreadSetReasoningParams, ThreadBindParams, ThreadUnbindParams, ThreadRebindParams and 5 more
