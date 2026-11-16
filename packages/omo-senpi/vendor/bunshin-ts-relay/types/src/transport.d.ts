@@ -1,4 +1,4 @@
-import type { CapabilityTokenMintInput, CapabilityTokenMintResult, DevicePolicy, DurableResultStatus, FleetEventOptions, FleetEventSource, MachineHubTransport } from "../vendor/bunshin-ts/types.ts";
+import type { ArtifactRef, CapabilityTokenMintInput, CapabilityTokenMintResult, DevicePolicy, DurableResultStatus, FleetEventOptions, FleetEventSource, MachineHubTransport } from "../vendor/bunshin-ts/types.ts";
 import type { DeadlineTimer, OutputItem, RelayStatus } from "./types.ts";
 export declare const SDK_TRANSPORT_VERSION = "0.1.0";
 export declare const DESCRIBE_TIMEOUT_MS = 10000;
@@ -9,6 +9,7 @@ export type RelayTransportOptions = Readonly<{
     sessionRef?: string;
     requestTimeoutMs?: number;
     describeTimeoutMs?: number;
+    retryUnreachableMs?: number;
     timer?: DeadlineTimer;
     reportError?: (error: unknown) => void;
 }>;
@@ -21,5 +22,7 @@ export interface RelayMachineHubTransport extends MachineHubTransport {
     mintCapabilityToken(input: CapabilityTokenMintInput): Promise<CapabilityTokenMintResult>;
     relayStatus(): Promise<RelayStatus>;
     output(handle: string): AsyncIterable<OutputItem>;
+    uploadArtifact(bytes: Uint8Array): Promise<ArtifactRef>;
+    readonly fetchArtifact: typeof fetch;
 }
 export declare const createRelayTransport: (options?: RelayTransportOptions) => RelayMachineHubTransport;
