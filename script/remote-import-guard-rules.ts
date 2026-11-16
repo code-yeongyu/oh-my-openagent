@@ -52,6 +52,7 @@ export const S1_OFFENDERS: Readonly<Record<string, Offender>> = {
 }
 
 export const S2_OFFENDERS: Readonly<Record<string, Offender>> = {
+  "packages/omo-native/remote-cli.ts": { uses: ["createDeviceServiceSessions"], removedBy: "omo PR 4c-2" },
   "packages/omo-native/remote-local.ts": { uses: ["connectDeviceService"], removedBy: "omo PR 4c-1" },
   "packages/omo-native/remote-session-verbs.ts": { uses: ["createDeviceServiceSessions"], removedBy: "omo PR 4c-2" },
   "packages/omo-senpi/src/extension/bunshin-ts-pick-transport.ts": {
@@ -110,6 +111,8 @@ export const NON_LITERAL_IMPORT_OFFENDERS: Readonly<Record<string, number>> = {
   "packages/omo-senpi/src/components/onboarding/scan-component.ts": 1,
   "packages/omo-senpi/src/components/side-panel/index.ts": 1,
   "packages/omo-senpi/src/components/thread/gateway/extension-registrations.ts": 1,
+  // A child-process test fixture for hand-browser-placement.test.ts; it imports the engine entry by path like permission-registry.test-fixture.ts.
+  "packages/omo-senpi/src/extension/hand-browser-placement.test-fixture.ts": 1,
   "packages/omo-senpi/src/senpi-test-runtime.ts": 12,
   "packages/omo-senpi/test-support/split-local-session.ts": 1,
   "packages/shared-skills/skills/browser/scripts/omowright.mjs": 1,
