@@ -7,10 +7,10 @@ import { connectDeviceService } from "../../device-service-core/src/index.ts"
 import { type FakeOwner, startFakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
 import { defaultWorld } from "../../device-service-core/test/local-api/conformance/world.ts"
 import type { RemoteClient } from "../../omo-senpi/src/components/remote/index"
-import type { RemoteThreadSurface } from "../../omo-senpi/src/components/thread/remote/ports"
 import type { BootstrapSetup, DeviceLink } from "../remote-bootstrap"
 import { runRemoteVerb } from "../remote-cli"
 import type { ColdWake } from "../remote-cold-wake"
+import type { PermissionPreset } from "../remote-permission-preset"
 
 // The `omo remote` test harness: the real verbs over a fake device service (the conformance owner), with this omo's
 // sign-in, bootstrap and session host unit as seams. Shared by every remote-cli test file.
@@ -56,12 +56,12 @@ export async function run(
   stateDir?: string,
   account = SIGNED_IN,
   bootstrap = testBootstrap(),
-  remote?: RemoteThreadSurface,
   extra: {
     readonly packageRoot?: string
     readonly coldWake?: ColdWake
     readonly linkDevice?: DeviceLink
     readonly client?: () => RemoteClient
+    readonly localPermissionPreset?: () => PermissionPreset
   } = {},
 ) {
   let dir = stateDir
@@ -93,7 +93,6 @@ export async function run(
       linkDevice: async () => {
         throw new Error("this test links no device")
       },
-      ...(remote === undefined ? {} : { remote: () => remote }),
       ...extra,
     },
     args,

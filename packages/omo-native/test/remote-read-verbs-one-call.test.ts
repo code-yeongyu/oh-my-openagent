@@ -66,7 +66,7 @@ describe("omo remote read verbs (G3: one person-client call per verb)", () => {
     [["wake", "off"], "service.setWake"],
   ])("#given %p --json #when it runs #then it calls %s once and prints its value", async (args, member) => {
     const calls: string[] = []
-    const { code, out } = await run([...args, "--json"], privateDir(), undefined, undefined, undefined, {
+    const { code, out } = await run([...args, "--json"], privateDir(), undefined, undefined, {
       client: spyClient(calls),
     })
     expect(code).toBe(REMOTE_EXIT.ok)
