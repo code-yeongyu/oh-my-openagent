@@ -39,6 +39,8 @@ concurrency:
 jobs:
   windows-desktop-qa:
     name: Windows interactive-desktop QA
+    # Pull requests run Linux only; the ci:full-matrix label, pushes and dispatches run every OS (#13802).
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-matrix')
     runs-on: windows-latest
     timeout-minutes: 60
     env:
