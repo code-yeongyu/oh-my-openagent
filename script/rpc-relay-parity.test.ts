@@ -3,15 +3,19 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { ROUTE_PARITY } from "../packages/omo-senpi/src/components/thread/testing/route-parity.pair.ts"
 import {
-  checkProblems,
   curatedRows,
   engineMethodClasses,
+  pairDeclarations,
   pairTestProblems,
+  pairTestsByMethod,
+  RPC_METHODS_PATH,
+  renderRpcMethods,
   renderTable,
+  staleProblems,
   TABLE_PATH,
 } from "./rpc-relay-parity.ts"
-import { namesRecordType } from "./rpc-relay-parity-matcher.ts"
 
 const dirs: string[] = []
 afterEach(() => {
@@ -28,7 +32,12 @@ const rowsFile = (content: unknown): string => {
 
 describe("engine RPC local-versus-relay parity table (#13478)", () => {
   test("the committed table has one row per method in the pinned engine's method table", async () => {
-    expect(readFileSync(TABLE_PATH, "utf8")).toBe(renderTable(await engineMethodClasses(), curatedRows()))
+    const pairs = pairTestsByMethod(await pairDeclarations())
+    expect(readFileSync(TABLE_PATH, "utf8")).toBe(renderTable(await engineMethodClasses(), curatedRows(), pairs))
+  })
+
+  test("the committed method list that pair tests' covers are typed against is the engine's (#13961)", async () => {
+    expect(readFileSync(RPC_METHODS_PATH, "utf8")).toBe(renderRpcMethods(await engineMethodClasses()))
   })
 
   test("every curated row names a method the engine still has", async () => {
@@ -36,229 +45,46 @@ describe("engine RPC local-versus-relay parity table (#13478)", () => {
     expect(Object.keys(curatedRows()).filter((name) => !(name in classes))).toEqual([])
   })
 
-  test("every curated pair test is a file in this repository that names its method", () => {
-    expect(pairTestProblems(curatedRows())).toEqual([])
+  test("the table reads pair tests only from *.pair.ts declarations, and each names an existing test and engine methods (#13961)", async () => {
+    const declarations = await pairDeclarations()
+    expect(declarations).toContainEqual({ file: expect.stringMatching(/route-parity\.pair\.ts$/), ...ROUTE_PARITY })
+    expect(pairTestProblems(declarations, (await engineMethodClasses()).classes)).toEqual([])
+    expect(pairTestsByMethod(declarations)["admit_external_message"]).toContain(ROUTE_PARITY.test)
   })
 
-  test("a pair test naming a missing file is reported", () => {
-    expect(pairTestProblems({ prompt: { test: "no/such/pair.test.ts (fakes)" } })).toEqual([
-      "prompt: pair test no/such/pair.test.ts does not exist",
+  test("a declaration naming a missing test file or a method the engine lacks is reported (#13961)", async () => {
+    const { classes } = await engineMethodClasses()
+    const broken = [{ file: "x.pair.ts", test: "no/such/pair.test.ts", covers: ["prompt", "no_such_method"] }]
+    expect(pairTestProblems(broken, classes)).toEqual([
+      "x.pair.ts: pair test no/such/pair.test.ts does not exist",
+      "x.pair.ts: no_such_method is not a method of the engine's table",
     ])
   })
 
-  test("a pair test names its method only where the method is a record type", () => {
-    expect(namesRecordType('entry.rpc?.["type"] === "prompt"', "prompt")).toBe(true)
-    expect(namesRecordType('send({ type: "prompt", message: "hi" })', "prompt")).toBe(true)
-    expect(namesRecordType("expect(record.type).toBe('prompt')", "prompt")).toBe(true)
-    expect(namesRecordType('// covers "prompt"\ntest("prompt answers", () => {})', "prompt")).toBe(false)
-    expect(namesRecordType('{ type: "prompt_template" }', "prompt")).toBe(false)
+  test("two declarations of one method are both shown in its pair-test column (#13961)", () => {
+    const both = [
+      { file: "a.pair.ts", test: "a.test.ts", covers: ["prompt"] },
+      { file: "b.pair.ts", test: "b.test.ts", covers: ["prompt", "steer"] },
+    ]
+    expect(pairTestsByMethod(both)).toEqual({ prompt: "a.test.ts, b.test.ts", steer: "b.test.ts" })
   })
 
-  test("a record-type shape inside a comment, a string or a $type property does not count as a pair test", () => {
-    expect(namesRecordType('// sends { type: "prompt" }\n', "prompt")).toBe(false)
-    expect(namesRecordType('/* expects record.type === "prompt" */', "prompt")).toBe(false)
-    expect(namesRecordType(`test('type: "prompt" relays', () => {})`, "prompt")).toBe(false)
-    expect(namesRecordType('const title = `type: "prompt"`', "prompt")).toBe(false)
-    expect(namesRecordType('if (frame.$type === "prompt") relay()', "prompt")).toBe(false)
-    expect(namesRecordType('// comment first\nsend({ type: "prompt" })', "prompt")).toBe(true)
-  })
-
-  test("--check reports a broken pair-test row even when the committed table is current", async () => {
-    const rows = { prompt: { test: "no/such/pair.test.ts (fakes)" } }
-    const rendered = renderTable(await engineMethodClasses(), rows)
-    expect(checkProblems(rendered, rendered, rows)).toEqual(["prompt: pair test no/such/pair.test.ts does not exist"])
-  })
-
-  test("--check reports a stale committed table", async () => {
-    const rendered = renderTable(await engineMethodClasses(), {})
-    expect(checkProblems(`${rendered}stale`, rendered, {})).toEqual([
+  test("--check reports a stale committed table and a stale method list", async () => {
+    const methods = await engineMethodClasses()
+    const rendered = { table: renderTable(methods, {}, {}), methods: renderRpcMethods(methods) }
+    expect(staleProblems(rendered, rendered)).toEqual([])
+    expect(staleProblems({ table: `${rendered.table}stale`, methods: `${rendered.methods}stale` }, rendered)).toEqual([
       `${TABLE_PATH} is stale; run: bun script/rpc-relay-parity.ts`,
+      `${RPC_METHODS_PATH} is stale; run: bun script/rpc-relay-parity.ts`,
     ])
-  })
-
-  test("regex literals, ternaries, type declarations and template expressions are read as code (#13826 review L1-L3)", () => {
-    expect(namesRecordType(`/'/.test(x)\ntest('type: "prompt" relays', () => {})`, "prompt")).toBe(false)
-    expect(namesRecordType(`const q = /["']/g\nsend({ type: "prompt" })`, "prompt")).toBe(true)
-    expect(namesRecordType('const u = /https?:\\/\\//\nsend({ type: "prompt" })', "prompt")).toBe(true)
-    expect(namesRecordType('const k = flag ? "type" : "prompt"', "prompt")).toBe(false)
-    expect(namesRecordType('expect(s).toMatch(/type: "prompt"/)', "prompt")).toBe(false)
-    expect(namesRecordType('type Frame = { type: "prompt" }', "prompt")).toBe(false)
-    expect(namesRecordType('const t = `${send({ type: "prompt" })}`', "prompt")).toBe(true)
-    expect(namesRecordType('if (frame?.type === "prompt") relay()', "prompt")).toBe(true)
-  })
-
-  test("a case of a switch on a type member counts as a pair test (#13826 review L4)", () => {
-    expect(namesRecordType('switch (frame.type) { case "prompt": relay() }', "prompt")).toBe(true)
-  })
-
-  test("'as const', parenthesized and 'as string' forms of the literal count as a pair test (#13826 review L5)", () => {
-    expect(namesRecordType('send({ type: "prompt" as const })', "prompt")).toBe(true)
-    expect(namesRecordType('send({ type: ("prompt") })', "prompt")).toBe(true)
-    expect(namesRecordType('if (frame.type === ("prompt" as string)) relay()', "prompt")).toBe(true)
-  })
-
-  test("a computed key { [type]: m } does not count as a pair test (#13826 review L6)", () => {
-    expect(namesRecordType('const record = { [type]: "prompt" }', "prompt")).toBe(false)
-  })
-
-  test("toBe on a subject that is not expect(...) does not count as a pair test (#13826 review L6)", () => {
-    expect(namesRecordType('check(frame.type).toBe("prompt")', "prompt")).toBe(false)
-  })
-
-  test("'satisfies', a non-null type member and an asserted type member count as a pair test (#13935 review L1)", () => {
-    expect(namesRecordType('send({ type: "prompt" satisfies string })', "prompt")).toBe(true)
-    expect(namesRecordType('if (frame.type! === "prompt") relay()', "prompt")).toBe(true)
-    expect(namesRecordType('if ((frame.type as string) === "prompt") relay()', "prompt")).toBe(true)
-  })
-
-  test("toStrictEqual, a mapped type list, a plain template literal and assert.equal count as a pair test (#13935 review L2)", () => {
-    expect(namesRecordType('expect(frame.type).toStrictEqual("prompt")', "prompt")).toBe(true)
-    expect(namesRecordType('expect(sent.map((e) => e.type)).toEqual(["prompt"])', "prompt")).toBe(true)
-    expect(namesRecordType("send({ type: `prompt` })", "prompt")).toBe(true)
-    expect(namesRecordType('assert.equal(frame.type, "prompt")', "prompt")).toBe(true)
-  })
-
-  test("near misses of the review L2 forms do not count as a pair test (#13935 review L2)", () => {
-    expect(namesRecordType("send({ type: `${kind}` })", "prompt")).toBe(false)
-    expect(namesRecordType('expect(sent.map((e) => e.kind)).toEqual(["prompt"])', "prompt")).toBe(false)
-    expect(namesRecordType('expect(sent.map((e) => e.type)).toEqual(["other"])', "prompt")).toBe(false)
-    expect(namesRecordType('check.equal(frame.type, "prompt")', "prompt")).toBe(false)
-    expect(namesRecordType('assert.equal(frame.kind, "prompt")', "prompt")).toBe(false)
-  })
-
-  test("every counted form has its own case: argument order, block body, strictEqual, == and more (#13935 review 2 L1)", () => {
-    expect(namesRecordType('assert.equal("prompt", frame.type)', "prompt")).toBe(true)
-    expect(namesRecordType('assert.strictEqual(frame.type, "prompt")', "prompt")).toBe(true)
-    expect(namesRecordType('expect(sent.map((e) => { return e.type })).toEqual(["prompt"])', "prompt")).toBe(true)
-    expect(namesRecordType('expect(sent.map(function (e) { return e.type })).toEqual(["prompt"])', "prompt")).toBe(true)
-    expect(namesRecordType('expect(sent.map((e) => e?.type)).toStrictEqual(["prompt"])', "prompt")).toBe(true)
-    expect(namesRecordType('if (frame.type == "prompt") relay()', "prompt")).toBe(true)
-    expect(namesRecordType('expect(frame.type).toEqual("prompt")', "prompt")).toBe(true)
-    expect(namesRecordType('send({ "type": "prompt" })', "prompt")).toBe(true)
-    expect(namesRecordType('const record = { ["type"]: "prompt" }', "prompt")).toBe(true)
-    expect(namesRecordType('send({ type: <string>"prompt" })', "prompt")).toBe(true)
-    expect(namesRecordType('switch (frame.type as string) { case "prompt": relay() }', "prompt")).toBe(true)
-  })
-
-  test("a negative comparison excludes the method, so !== and != do not count (#13935 review 2 L2)", () => {
-    expect(namesRecordType('const rest = frames.filter((f) => f.type !== "prompt")', "prompt")).toBe(false)
-    expect(namesRecordType('if (frame.type !== "prompt") skip()', "prompt")).toBe(false)
-    expect(namesRecordType('if (frame.type != "prompt") skip()', "prompt")).toBe(false)
-    expect(namesRecordType('expect(frame.type).not.toBe("prompt")', "prompt")).toBe(false)
-  })
-
-  test("a mapped list counts only for its own parameter, a plain .map and toEqual (#13935 review 2 L3)", () => {
-    expect(namesRecordType('expect(sent.map((e) => other.type)).toEqual(["prompt"])', "prompt")).toBe(false)
-    expect(namesRecordType('expect(sent[map]((e) => e.type)).toEqual(["prompt"])', "prompt")).toBe(false)
-    expect(namesRecordType('expect(sent.map((e) => e.type)).toBe(["prompt"])', "prompt")).toBe(false)
-    expect(namesRecordType('expect(sent.map((e) => { log(e); return e.type })).toEqual(["prompt"])', "prompt")).toBe(
-      false,
-    )
-  })
-
-  test("a source that does not parse does not count, even when it holds a counted shape", () => {
-    expect(namesRecordType('send({ type: "prompt" ', "prompt")).toBe(false)
-    // A top-level return is a parse error, yet the recovered AST still holds the send call.
-    expect(namesRecordType('send({ type: "prompt" })\nreturn', "prompt")).toBe(false)
-  })
-
-  test("a mapped list may read its parameter through an assertion: (e as Frame).type (#13935 review 3 L1)", () => {
-    expect(namesRecordType('expect(sent.map((e) => (e as Frame).type)).toEqual(["prompt"])', "prompt")).toBe(true)
-  })
-
-  test("a comparison under ! or inside a subject asserted false does not count (#13935 review 3 L2)", () => {
-    expect(namesRecordType('const rest = frames.filter((f) => !(f.type === "prompt"))', "prompt")).toBe(false)
-    expect(namesRecordType('expect(sent.some((e) => e.type === "prompt")).toBe(false)', "prompt")).toBe(false)
-    expect(namesRecordType('expect(sent.some((e) => e.type === "prompt")).toStrictEqual(false)', "prompt")).toBe(false)
-    expect(namesRecordType('expect(sent.some((e) => e.type === "prompt")).toBeFalsy()', "prompt")).toBe(false)
-    expect(namesRecordType('expect(sent.some((e) => e.type === "prompt")).toBeFalse()', "prompt")).toBe(false)
-    expect(namesRecordType('expect(sent.some((e) => e.type === "prompt")).not.toBe(true)', "prompt")).toBe(false)
-    expect(namesRecordType('expect(sent.some((e) => e.type === "prompt")).not.toBeTrue()', "prompt")).toBe(false)
-    expect(namesRecordType('expect(sent.some((e) => e.type === "prompt")).not.toBeTruthy()', "prompt")).toBe(false)
-  })
-
-  test("a comparison asserted true still counts (#13935 review 3 L2)", () => {
-    expect(namesRecordType('expect(sent.some((e) => e.type === "prompt")).toBe(true)', "prompt")).toBe(true)
-    expect(namesRecordType('expect(sent.some((e) => e.type === "prompt")).not.toBe(false)', "prompt")).toBe(true)
-    expect(namesRecordType('expect(sent.some((e) => e.type === "prompt")).toBeTruthy()', "prompt")).toBe(true)
-  })
-
-  test("a destructured map callback and an optional .map call count as a mapped list (#13935 review 3 L3)", () => {
-    expect(namesRecordType('expect(sent.map(({ type }) => type)).toEqual(["prompt"])', "prompt")).toBe(true)
-    expect(namesRecordType('expect(sent.map(({ type: t }) => t)).toEqual(["prompt"])', "prompt")).toBe(true)
-    expect(namesRecordType('expect(sent.map(({ ["type"]: t }) => t)).toEqual(["prompt"])', "prompt")).toBe(true)
-    expect(namesRecordType('expect(sent?.map((e) => e.type)).toEqual(["prompt"])', "prompt")).toBe(true)
-    expect(namesRecordType('expect(sent.map(({ kind }) => kind)).toEqual(["prompt"])', "prompt")).toBe(false)
-    expect(namesRecordType('expect(sent.map(({ type: t }) => other)).toEqual(["prompt"])', "prompt")).toBe(false)
-  })
-
-  test("a record built under ! or inside a subject asserted false still counts (#13961 review L1)", () => {
-    expect(namesRecordType('expect(isRelayed({ type: "prompt" })).toBe(false)', "prompt")).toBe(true)
-    expect(namesRecordType('await expect(relay({ type: "prompt" })).resolves.toBe(false)', "prompt")).toBe(true)
-    expect(namesRecordType('if (!client.send({ type: "prompt" })) throw new Error("not sent")', "prompt")).toBe(true)
-  })
-
-  test("a throw guard and a double negation are positive claims (#13961 review L1)", () => {
-    const guard = 'if (!sent.some((e) => e.type === "prompt")) throw new Error("missing")'
-    expect(namesRecordType(guard, "prompt")).toBe(true)
-    expect(
-      namesRecordType('if (!sent.some((e) => e.type === "prompt")) { throw new Error("missing") }', "prompt"),
-    ).toBe(true)
-    expect(namesRecordType('if (frame.type !== "prompt") throw new Error("wrong type")', "prompt")).toBe(true)
-    expect(namesRecordType('if (frame.type != "prompt") throw new Error("wrong type")', "prompt")).toBe(true)
-    expect(namesRecordType('expect(!!sent.find((e) => e.type === "prompt")).toBe(true)', "prompt")).toBe(true)
-    expect(namesRecordType('if (frame.type === "prompt") throw new Error("unexpected")', "prompt")).toBe(false)
-    expect(namesRecordType('if (!sent.some((e) => e.type === "prompt")) skip()', "prompt")).toBe(false)
-  })
-
-  test("absence assertions negate their subject: assert twins, undefined, null, empty, -1, 0 (#13961 review L2)", () => {
-    const has = 'sent.some((e) => e.type === "prompt")'
-    const find = 'sent.find((e) => e.type === "prompt")'
-    const filter = 'sent.filter((e) => e.type === "prompt")'
-    expect(namesRecordType(`assert.equal(${has}, false)`, "prompt")).toBe(false)
-    expect(namesRecordType(`assert.strictEqual(false, ${has})`, "prompt")).toBe(false)
-    expect(namesRecordType(`expect(${find}).toBeUndefined()`, "prompt")).toBe(false)
-    expect(namesRecordType(`expect(${find}).toBeNull()`, "prompt")).toBe(false)
-    expect(namesRecordType(`expect(${find}).not.toBeDefined()`, "prompt")).toBe(false)
-    expect(namesRecordType(`expect(${filter}).toHaveLength(0)`, "prompt")).toBe(false)
-    expect(namesRecordType(`expect(${filter}).toEqual([])`, "prompt")).toBe(false)
-    expect(namesRecordType(`expect(${filter}.length).toBe(0)`, "prompt")).toBe(false)
-    expect(namesRecordType('expect(sent.findIndex((e) => e.type === "prompt")).toBe(-1)', "prompt")).toBe(false)
-    expect(namesRecordType(`const has = ${has}\nexpect(has).toBe(false)`, "prompt")).toBe(false)
-    // Only an expect(...) subject is asserted absent: an unrelated check(...).toBe(false) leaves the comparison positive.
-    expect(namesRecordType(`check(${has}).toBe(false)`, "prompt")).toBe(true)
-  })
-
-  test("the presence twins of the absence assertions still count (#13961 review L2)", () => {
-    const has = 'sent.some((e) => e.type === "prompt")'
-    expect(namesRecordType(`const has = ${has}\nexpect(has).toBe(true)`, "prompt")).toBe(true)
-    expect(namesRecordType(`assert.equal(${has}, true)`, "prompt")).toBe(true)
-    expect(namesRecordType('expect(sent.find((e) => e.type === "prompt")).toBeDefined()', "prompt")).toBe(true)
-    expect(namesRecordType('expect(sent.filter((e) => e.type === "prompt")).toHaveLength(1)', "prompt")).toBe(true)
-  })
-
-  test("a quoted destructured key binds the type field like usesRecordType's quoted key (#13961 review L3)", () => {
-    expect(namesRecordType('expect(sent.map(({ "type": t }) => t)).toEqual(["prompt"])', "prompt")).toBe(true)
-  })
-
-  test("the reviewer's mapped-list probes keep their verdicts (#13961 review)", () => {
-    const listed = (cb: string, matcher = 'toEqual(["prompt"])'): boolean =>
-      namesRecordType(`expect(sent.map(${cb})).${matcher}`, "prompt")
-    expect(listed("({ kind: type }) => type")).toBe(false)
-    expect(listed("({ type: { t } }) => t")).toBe(false)
-    expect(listed("({ [k]: t }) => t")).toBe(false)
-    expect(listed("({ ...type }) => type")).toBe(false)
-    expect(listed("({ type: a, type: b }) => b")).toBe(false)
-    expect(listed("(e) => { e = other; return e.type }")).toBe(false)
-    expect(listed("({ type }) => type", 'toBe(["prompt"])')).toBe(false)
-    expect(listed("({ type }) => type", 'not.toEqual(["prompt"])')).toBe(false)
-    expect(listed("function ({ type }) { return type }")).toBe(true)
-    expect(namesRecordType('expect(sent.map?.((e) => e.type)).toEqual(["prompt"])', "prompt")).toBe(true)
-    expect(namesRecordType('expect(sent?.filter(Boolean).map((e) => e.type)).toEqual(["prompt"])', "prompt")).toBe(true)
   })
 
   test("a rows file with a misspelled key is refused", () => {
     expect(() => curatedRows(rowsFile({ prompt: { relaay: "differs" } }))).toThrow('unknown key "relaay"')
+  })
+
+  test("a rows file that still names a pair test is refused: pair tests are declared in *.pair.ts (#13961)", () => {
+    expect(() => curatedRows(rowsFile({ prompt: { test: "x.test.ts" } }))).toThrow('unknown key "test"')
   })
 
   test("a rows file with a non-string verdict is refused", () => {
