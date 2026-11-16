@@ -43,8 +43,13 @@ export async function runRemoteAttachCommand(args: readonly string[]): Promise<r
   return prepared.engineArgs
 }
 
+// The sign-in suites drive the real `omo login` through the launcher; their in-process preload marks the child so a test
+// login never installs or links a device service on the machine running the suite. Nothing a user can set reaches it.
+const testSkipKey = Symbol.for("omo.test.skipRemoteLoginSetup")
+
 /** Right after a successful `omo login`: remote sessions switch on and the user is told (omo#13602). */
 export async function setUpRemoteAfterLogin(): Promise<void> {
+  if ((globalThis as Record<symbol, unknown>)[testSkipKey] === true) return
   const dependencies = remoteDependencies()
   await runLoginSetup(dependencies, dependencies.bootstrap, dependencies)
 }
