@@ -24,7 +24,7 @@ import {
 } from "../packages/senpi-desktop-engine/src/release-assets"
 import { PLATFORMS } from "./build-binaries"
 import { DESKTOP_ENGINE_TARGETS } from "./release-desktop-engine-target"
-import { runBlock, sliceWorkflowSection } from "./release-workflow-test-steps"
+import { desktopEngineLegs, runBlock, sliceWorkflowSection } from "./release-workflow-test-steps"
 
 // These tests spawn bash or bun children. On 16 windows-latest runs the slowest passed in 2.6 s,
 // while cold runners went past Bun's 5 s default (#9386): the per-test budget absorbs those slow
@@ -124,28 +124,17 @@ describe("release binary asset lane in the platform publish workflow", () => {
     const workflow = z
       .object({
         jobs: z.object({
-          "desktop-engine": z.object({
-            strategy: z.object({
-              matrix: z.object({
-                include: z.array(
-                  z.object({
-                    host: z.string(),
-                    rust_target: z.string(),
-                    binary: z.string(),
-                  }),
-                ),
-              }),
-            }),
-            steps: stepsSchema,
-          }),
+          "desktop-engine": z.object({ steps: stepsSchema }),
           build: z.object({
-            needs: z.tuple([z.literal("desktop-engine"), z.literal("keychain-helper")]),
+            // operator-darwin replaces keychain-helper and the darwin engine legs when operator artifacts are used.
+            needs: z.tuple([z.literal("desktop-engine"), z.literal("keychain-helper"), z.literal("operator-darwin")]),
             steps: stepsSchema,
           }),
         }),
       })
       .parse(load(readFileSync(publishPlatformWorkflowPath, "utf8")))
     const engine = workflow.jobs["desktop-engine"]
+    const legs = desktopEngineLegs(readFileSync(publishPlatformWorkflowPath, "utf8"))
     const build = workflow.jobs.build
     const step = (steps: z.infer<typeof stepsSchema>, name: string) => {
       const index = steps.findIndex((candidate) => candidate.name === name)
@@ -179,14 +168,14 @@ describe("release binary asset lane in the platform publish workflow", () => {
     expect(stage.value.run).toContain('cp ".omo/desktop-engine-assets/$ENGINE_ASSET" "$ENGINE_SOURCE"')
     expect(compile.value.run).toContain("script/build-omo-binary.ts")
     expect(build.steps.some((candidate) => candidate.run?.includes("cargo build"))).toBe(false)
-    expect(engine.strategy.matrix.include.map((entry) => entry.host)).toEqual([...DESKTOP_ENGINE_RELEASE_HOSTS])
+    expect(legs.map((entry) => entry.host)).toEqual([...DESKTOP_ENGINE_RELEASE_HOSTS])
     for (const target of DESKTOP_ENGINE_TARGETS) {
       if (!target.available) {
         expect(target.host).toBeNull()
         expect(target.source).toBeNull()
         continue
       }
-      const producer = engine.strategy.matrix.include.find((entry) => entry.host === target.host)
+      const producer = legs.find((entry) => entry.host === target.host)
       expect(producer).toBeDefined()
       expect(target.source).toBe(`target/${producer?.rust_target}/release/${producer?.binary}`)
     }
@@ -198,7 +187,7 @@ describe("release binary asset lane in the platform publish workflow", () => {
     const engineJob = sliceWorkflowSection(workflow, "  desktop-engine:\n", "  build:\n")
 
     // When its host list is compared to the release asset contract, each asset has one producer.
-    const hosts = [...engineJob.matchAll(/^\s+- \{ host: ([a-z0-9-]+), runner:/gm)].map((match) => match[1])
+    const hosts = desktopEngineLegs(workflow).map((leg) => leg.host)
     expect(hosts).toEqual([...DESKTOP_ENGINE_RELEASE_HOSTS])
     expect(new Set(hosts).size).toBe(6)
     expect(engineJob).toContain("name: desktop-engine-${{ matrix.host }}")

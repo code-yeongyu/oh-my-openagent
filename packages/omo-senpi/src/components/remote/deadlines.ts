@@ -36,6 +36,11 @@ export const DEADLINES = {
   devices: 35_000,
   aliases: 35_000,
   sessionsList: 35_000,
+  /**
+   * This device's own operator endpoint's list_sessions inside sessions.list (#13787), as one endpoint's list while the
+   * thread tools enumerate (thread/live-surface.ts ENDPOINT_LIST_TIMEOUT_MS): past it, this device is unanswered.
+   */
+  sessionsListLocal: 10_000,
   observeAttach: 32_000,
   observeRead: 35_000,
   drive: 125_000,
