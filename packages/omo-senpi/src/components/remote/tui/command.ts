@@ -40,6 +40,11 @@ const PASS_THROUGH_VERBS = new Set([
   "close",
 ])
 
+// A listing, open or control answers within the CLI's own deadlines (10 s handshake, listing rounds); a waited send
+// runs to the end of the remote turn, bounded by the design's total send deadline (v8-core r2 B1: 1,830,000 ms).
+export const COMMAND_DEADLINE_MS = 120_000
+export const SEND_DEADLINE_MS = 1_830_000
+
 const NO_LAUNCHER =
   "/remote runs omo remote, and this session was not started by the omo launcher, so there is no omo to run. Start OmO with the omo command, or run omo remote in a terminal."
 
@@ -48,6 +53,9 @@ export function registerRemoteCommand(
   options: { readonly run?: OmoRunner; readonly env?: Readonly<Record<string, string | undefined>> } = {},
 ): void {
   const run = options.run ?? launcherRunner(options.env ?? process.env)
+  // A send still waiting for its reply when the session ends is stopped with it.
+  const shutdown = new AbortController()
+  pi.on("session_shutdown", () => shutdown.abort())
   pi.registerCommand("remote", {
     description: "Devices and sessions on this account's other devices: list, open, send, interrupt, attach.",
     argumentHint: "[devices|sessions|open|send|interrupt|close|attach ...]",
@@ -58,10 +66,14 @@ export function registerRemoteCommand(
         ui.notify(NO_LAUNCHER, "error")
         return
       }
+      const remote: Remote = {
+        ui,
+        run: (argv, deadlineMs = COMMAND_DEADLINE_MS) => run(argv, { deadlineMs, signal: shutdown.signal }),
+      }
       try {
-        await runRemoteCommand(run, args, ui)
+        await runRemoteCommand(remote, args)
       } catch (error) {
-        ui.notify(`/remote: ${error instanceof Error ? error.message : String(error)}`, "error")
+        failed(ui, error)
       }
     },
   })
@@ -72,14 +84,23 @@ function launcherRunner(env: Readonly<Record<string, string | undefined>>): OmoR
   return omoBin !== undefined && omoBin !== "" && isAbsolute(omoBin) ? omoRunner(omoBin) : undefined
 }
 
-async function runRemoteCommand(run: OmoRunner, args: string, ui: RemoteCommandUi): Promise<void> {
+type Remote = {
+  readonly ui: RemoteCommandUi
+  readonly run: (argv: readonly string[], deadlineMs?: number) => Promise<OmoRun>
+}
+
+const failed = (ui: RemoteCommandUi, error: unknown): void =>
+  ui.notify(`/remote: ${error instanceof Error ? error.message : String(error)}`, "error")
+
+async function runRemoteCommand(remote: Remote, args: string): Promise<void> {
+  const { ui, run } = remote
   const trimmed = args.trim()
-  if (trimmed === "") return pick(run, ui)
+  if (trimmed === "") return pick(remote)
   const [verb = "", ...rest] = trimmed.split(/\s+/)
   if (verb === "send") {
     const match = /^\S+\s+(\S+)\s+([\s\S]+)$/.exec(trimmed)
     if (match?.[1] === undefined || match[2] === undefined) return usage(ui, "/remote send needs a session and a text.")
-    return send(run, ui, match[1], match[2])
+    return send(remote, match[1], match[2])
   }
   if (verb === "attach") {
     const [target] = rest
@@ -102,9 +123,14 @@ function attachNotice(ui: RemoteCommandUi, target: string): void {
   )
 }
 
-async function send(run: OmoRunner, ui: RemoteCommandUi, target: string, text: string): Promise<void> {
-  ui.notify(`Sending to ${target} and waiting for its reply...`, "info")
-  show(ui, "send", target, await run(["remote", "send", "--json", target, "--", text]))
+// The reply arrives when the remote turn ends, which can take minutes, so the TUI is not held for it: the command
+// returns at once and the reply (or the failure) is shown when it lands. `/remote interrupt` ends the turn early.
+function send({ ui, run }: Remote, target: string, text: string): void {
+  ui.notify(`Sent to ${target}. Its reply will show here; /remote interrupt ${target} stops the turn.`, "info")
+  run(["remote", "send", "--json", target, "--", text], SEND_DEADLINE_MS).then(
+    (answer) => show(ui, "send", target, answer),
+    (error: unknown) => failed(ui, error),
+  )
 }
 
 type Device = { readonly id: string; readonly name: string; readonly online: boolean; readonly self: boolean }
@@ -113,18 +139,21 @@ type Row = { readonly target: string; readonly title: string; readonly state: st
 const OPEN_NEW = "Open a new session"
 const ACTIONS = ["Send a message", "Interrupt", "Close", "Attach (new terminal)"] as const
 
-async function pick(run: OmoRunner, ui: RemoteCommandUi): Promise<void> {
+async function pick(remote: Remote): Promise<void> {
+  const { ui, run } = remote
   if (ui.select === undefined) return usage(ui, undefined)
   const devicesAnswer = await run(["remote", "devices", "--json"])
-  const devices = succeeded(ui, devicesAnswer) ? devicesOf(parsed(devicesAnswer)) : undefined
-  if (devices === undefined) return
+  if (!succeeded(ui, "devices", "", devicesAnswer)) return
+  const devices = devicesOf(parsed(devicesAnswer))
+  if (devices === undefined) return unreadable(ui, "devices", devicesAnswer)
   if (devices.length === 0) return ui.notify("No devices on this account.", "info")
   const deviceOptions = devices.map(deviceLine)
   const device = devices[deviceOptions.indexOf((await ui.select("Which device?", deviceOptions)) ?? "")]
   if (device === undefined) return
   const sessionsAnswer = await run(["remote", "sessions", "--device", device.id, "--json"])
-  const rows = succeeded(ui, sessionsAnswer) ? rowsOf(parsed(sessionsAnswer)) : undefined
-  if (rows === undefined) return
+  if (!succeeded(ui, "sessions", device.id, sessionsAnswer)) return
+  const rows = rowsOf(parsed(sessionsAnswer))
+  if (rows === undefined) return unreadable(ui, "sessions", sessionsAnswer)
   const rowOptions = rows.map(rowLine)
   const choice = await ui.select(`Sessions on ${device.name}`, [`${OPEN_NEW} on ${device.name}`, ...rowOptions])
   if (choice === undefined) return
@@ -136,7 +165,7 @@ async function pick(run: OmoRunner, ui: RemoteCommandUi): Promise<void> {
   if (action === "Send a message") {
     const text = await ui.input?.(`Message to ${target}`)
     if (text === undefined || text.trim() === "") return
-    return send(run, ui, target, text)
+    return send(remote, target, text)
   }
   if (action === "Interrupt") return show(ui, "interrupt", target, await run(["remote", "interrupt", target, "--json"]))
   if (action === "Close") return show(ui, "close", target, await run(["remote", "close", target, "--json"]))
@@ -166,7 +195,23 @@ function typedFailure(value: unknown): string | undefined {
   return typeof next === "string" && next !== "" ? `${message}\n${next}` : message
 }
 
-function succeeded(ui: RemoteCommandUi, answer: OmoRun): boolean {
+function unreadable(ui: RemoteCommandUi, verb: string, answer: OmoRun): void {
+  ui.notify(`omo remote ${verb} answered something /remote cannot read: ${answer.stdout.trim().slice(0, 200)}`, "error")
+}
+
+function stoppedLine(verb: string, target: string, ended: "deadline" | "aborted"): string | undefined {
+  if (ended === "aborted") return undefined
+  if (verb === "send")
+    return `No reply from ${target} within ${SEND_DEADLINE_MS / 60_000} minutes, so /remote stopped waiting. The turn may still be running there: /remote interrupt ${target} stops it.`
+  return `omo remote ${verb} did not answer within ${COMMAND_DEADLINE_MS / 1000} seconds and was stopped.`
+}
+
+function succeeded(ui: RemoteCommandUi, verb: string, target: string, answer: OmoRun): boolean {
+  if (answer.ended !== undefined) {
+    const line = stoppedLine(verb, target, answer.ended)
+    if (line !== undefined) ui.notify(line, "error")
+    return false
+  }
   const failure = typedFailure(parsed(answer))
   if (answer.code === 0 && failure === undefined) return true
   const stderr = answer.stderr.trim()
@@ -175,7 +220,7 @@ function succeeded(ui: RemoteCommandUi, answer: OmoRun): boolean {
 }
 
 function show(ui: RemoteCommandUi, verb: string, target: string, answer: OmoRun): void {
-  if (!succeeded(ui, answer)) return
+  if (!succeeded(ui, verb, target, answer)) return
   ui.notify(rendered(verb, target, parsed(answer)).join("\n"), "info")
 }
 

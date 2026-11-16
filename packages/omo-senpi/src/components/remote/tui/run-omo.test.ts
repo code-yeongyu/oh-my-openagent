@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join, relative } from "node:path"
+import { fileURLToPath } from "node:url"
 
 import { omoRunner } from "./run-omo"
 
@@ -18,6 +19,9 @@ function launcher(body: string): string {
   return path
 }
 
+const LONG = 60_000
+const NEVER_EXITS = "process.stdout.write('started\\n'); setInterval(() => {}, 1000)"
+
 describe("omoRunner", () => {
   it("#given an npm launcher #when it runs #then the launcher gets the arguments and both streams and the exit code come back", async () => {
     // given
@@ -26,7 +30,7 @@ describe("omoRunner", () => {
     )
 
     // when
-    const answer = await omoRunner(omo)(["remote", "devices", "--json"])
+    const answer = await omoRunner(omo)(["remote", "devices", "--json"], { deadlineMs: LONG })
 
     // then
     expect(answer).toEqual({ code: 3, stdout: '["remote","devices","--json"]\n', stderr: "warn\n" })
@@ -37,9 +41,54 @@ describe("omoRunner", () => {
     const missing = join(tmpdir(), "omo-remote-tui-missing", "omo")
 
     // when
-    const started = omoRunner(missing)(["remote", "status", "--json"])
+    const started = omoRunner(missing)(["remote", "status", "--json"], { deadlineMs: LONG })
 
     // then
     await expect(started).rejects.toThrow()
+  })
+
+  // The deadline itself is the behavior here, so a short real deadline is the input.
+  it("#given a process that never exits #when its deadline passes #then it is stopped and the answer says so", async () => {
+    // given
+    const omo = launcher(NEVER_EXITS)
+
+    // when
+    const answer = await omoRunner(omo)(["remote", "send"], { deadlineMs: 300 })
+
+    // then
+    expect(answer.ended).toBe("deadline")
+    expect(answer.stdout).toBe("started\n")
+  })
+
+  it("#given a process that never exits #when its signal aborts #then it is stopped and the answer says aborted", async () => {
+    // given
+    const omo = launcher(NEVER_EXITS)
+    const controller = new AbortController()
+
+    // when
+    const running = omoRunner(omo)(["remote", "send"], { deadlineMs: LONG, signal: controller.signal })
+    controller.abort()
+    const answer = await running
+
+    // then
+    expect(answer.ended).toBe("aborted")
+  })
+
+  // Guard G4b (design v8-core r2 B5): only the /remote command may start omo processes through this helper.
+  it("#given the package sources #when their imports are read #then only command.ts imports the spawn helper", () => {
+    // given
+    const src = join(dirname(fileURLToPath(import.meta.url)), "../../..")
+    const files = (dir: string): string[] =>
+      readdirSync(dir).flatMap((name) => {
+        const path = join(dir, name)
+        if (statSync(path).isDirectory()) return files(path)
+        return path.endsWith(".ts") && !path.endsWith(".test.ts") ? [path] : []
+      })
+
+    // when
+    const importers = files(src).filter((path) => /from\s+["'][^"']*\/run-omo["']/.test(readFileSync(path, "utf8")))
+
+    // then
+    expect(importers.map((path) => relative(src, path))).toEqual(["components/remote/tui/command.ts"])
   })
 })
