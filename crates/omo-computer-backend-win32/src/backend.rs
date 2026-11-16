@@ -1,20 +1,23 @@
-//! The Windows backend: capture, displays and OCR in this row; input, the foreground lease,
-//! background delivery, UI Automation, windows and permissions arrive in rows 56-60.
+//! The Windows backend: capture, displays and OCR (row 55), background delivery to an addressed
+//! window (row 58); the foreground lease, UI Automation, windows and permissions arrive in rows 56-60.
 
 use omo_computer_core::backend::{
-    refusing_capabilities, Backend, BackendResult, CaptureOptions, FrameBytes, Refusal, Target,
+    refusing_capabilities, Backend, BackendResult, CaptureOptions, Delivered, FrameBytes, Refusal,
+    Route, Target, TaggedInput,
 };
 use omo_computer_core::capabilities::{
     Availability, Capabilities, CaptureCapability, CaptureRoute,
 };
-use omo_computer_core::error::EngineCode;
+use omo_computer_core::error::{EngineCode, Reason};
 use omo_computer_core::observation::ImageMime;
 use omo_computer_core::report::Platform;
 use omo_computer_core::results::DisplayInfo;
 
 use omo_computer_core::observation::Ocr;
 
+use crate::barrier::Barrier;
 use crate::capture::{self, encode_png, CaptureOs, FrameRecord, RawFrame, SESSION0};
+use crate::delivery::{self, post::Deliverer, target::DeliveryOs};
 use crate::ocr::{cap_lines, OcrProbe, ENGINE};
 
 /// The backend name `capabilities()` reports.
@@ -31,6 +34,9 @@ pub struct Win32Backend<O: CaptureOs> {
     /// `GraphicsCaptureSession::IsSupported()`, read once when the backend is built.
     wgc: bool,
     ocr: OcrProbe,
+    /// Row 58: the background delivery seam (`None` off Windows) and its deliverer.
+    delivery: Option<Box<dyn DeliveryOs>>,
+    deliverer: Deliverer,
 }
 
 #[cfg(windows)]
@@ -55,7 +61,26 @@ impl<O: CaptureOs> Win32Backend<O> {
     pub fn with_os(mut os: O) -> Self {
         let wgc = os.session_id() != 0 && os.wgc_supported();
         let ocr = os.ocr_probe();
-        Self { os, wgc, ocr }
+        Self {
+            os,
+            wgc,
+            ocr,
+            delivery: delivery::live(),
+            deliverer: Deliverer::default(),
+        }
+    }
+
+    /// The same backend posting background input through `os` (tests script it).
+    #[must_use]
+    pub fn with_delivery(mut self, os: Box<dyn DeliveryOs>) -> Self {
+        self.delivery = Some(os);
+        self
+    }
+
+    /// The consumption barrier of the last delivered background verb.
+    #[must_use]
+    pub const fn last_barrier(&self) -> Option<Barrier> {
+        self.deliverer.last_barrier()
     }
 
     /// The OS seam (tests read what was called).
@@ -141,6 +166,16 @@ impl<O: CaptureOs> Backend for Win32Backend<O> {
         &mut self,
     ) -> BackendResult<Box<dyn omo_computer_core::backend::StopListener>> {
         Ok(Box::new(crate::stop_path::hook::HookListener::start()))
+    }
+
+    // Row 58: a background input goes to the window row 21a's route names; the foreground route
+    // (row 57's lease) and a pid-only address keep refusing here.
+    fn post_input(&mut self, input: &TaggedInput, route: Route) -> BackendResult<Delivered> {
+        match (route, self.delivery.as_deref_mut()) {
+            (Route::BackgroundWindow { window }, Some(os)) => self.deliverer.deliver(os, &window, &input.event),
+            (Route::BackgroundPid { .. }, _) => Err(delivery::target::TARGET_UNKNOWN),
+            _ => Err(Refusal::new(EngineCode::Internal, Reason::InputUnsupported)),
+        }
     }
 
     fn displays(&mut self) -> BackendResult<Vec<DisplayInfo>> {
