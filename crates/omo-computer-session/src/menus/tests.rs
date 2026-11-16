@@ -58,7 +58,7 @@ fn menu_select_on_a_denied_app_is_refused_before_its_menu_is_read() {
         let refused = s.menu_select(params(json!({ "target": "101", "path": path }))).expect_err("denied");
         assert_eq!(
             (refused.refusal.code.wire(), refused.refusal.reason),
-            ("ControlRequired", Some("denied_app")),
+            ("ControlRequired", Some(omo_computer_core::error::Reason::DeniedApp)),
             "{path}"
         );
     }
@@ -99,7 +99,7 @@ fn menu_items_on_a_denied_app_is_refused() {
     let sink = RecordingSink::default();
     let (mut s, _) = session(scenario, json!({}), &sink);
     let refused = s.menu_items(params(json!({ "target": "101" }))).expect_err("denied");
-    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("ControlRequired", Some("denied_app")));
+    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("ControlRequired", Some(omo_computer_core::error::Reason::DeniedApp)));
     assert_eq!(refused.detail.map(|d| d["app"].clone()), Some(json!("Code")));
     assert!(sink.lines().is_empty());
 }
@@ -123,8 +123,8 @@ fn apps_open_of_a_denied_app_launches_nothing() {
     let sink = RecordingSink::default();
     let (mut s, _) = session(scenario, json!({}), &sink);
     let refused = s.apps_open(params(json!({ "target": "Mail" }))).expect_err("denied");
-    assert_eq!(refused.refusal.reason, Some("denied_app"));
-    assert_eq!(s.apps_open(params(json!({ "target": "nope" }))).map_err(|r| r.refusal.reason), Err(Some("app_unknown")));
+    assert_eq!(refused.refusal.reason, Some(omo_computer_core::error::Reason::DeniedApp));
+    assert_eq!(s.apps_open(params(json!({ "target": "nope" }))).map_err(|r| r.refusal.reason), Err(Some(omo_computer_core::error::Reason::AppUnknown)));
     assert!(sent(&sink).is_empty());
     s.apps_open(params(json!({ "target": "com.example.notes" }))).expect("an allowed app launches");
     assert!(sent(&sink)[0].ends_with(r#"app_launch "com.example.notes" activate=false"#), "{:?}", sent(&sink));
@@ -146,7 +146,7 @@ fn unsupported_surface_is_unavailable_not_delivered() {
     let sink = RecordingSink::default();
     let (mut s, _) = session(fixture("v3-surfaces.json"), json!({}), &sink);
     let refused = s.surface(SurfaceKind::StartMenu).expect_err("not served");
-    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("Internal", Some("surface_unsupported")));
+    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("Internal", Some(omo_computer_core::error::Reason::SurfaceUnsupported)));
     assert_eq!(refused.refusal.computer_code().map(|c| c.wire()), Ok("COMPUTER_UNAVAILABLE"));
     assert_eq!(refused.detail.map(|d| d["surface"].clone()), Some(json!("start_menu")));
     assert!(s.open_system_surface(SurfaceKind::StartMenu).is_err());
@@ -171,7 +171,7 @@ fn click(s: &mut Session) -> Result<omo_computer_core::results::ExecReply, crate
 fn url_policy_denied_host_refuses_before_send() {
     let (mut s, sink) = bank(json!({ "101": "https://pay.bank.example/x" }), json!(["*.bank.example"]));
     let refused = click(&mut s).expect_err("denied host");
-    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("ControlRequired", Some("url_policy")));
+    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("ControlRequired", Some(omo_computer_core::error::Reason::UrlPolicy)));
     assert_eq!(refused.detail.map(|d| (d["host"].clone(), d["app"].clone())), Some((json!("pay.bank.example"), json!("Notes"))));
     assert!(sent(&sink).is_empty());
     let (mut ok, sink) = bank(json!({ "101": "https://docs.example" }), json!(["*.bank.example"]));
@@ -190,7 +190,7 @@ fn url_policy_holds_for_a_desktop_point_landing_in_a_denied_window() {
     let refused = s
         .click(params(json!({ "x": 300, "y": 300 })))
         .expect_err("the point lands in window 101");
-    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("ControlRequired", Some("url_policy")));
+    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("ControlRequired", Some(omo_computer_core::error::Reason::UrlPolicy)));
     assert!(sent(&sink).is_empty(), "{:?}", sent(&sink));
     let (mut s, sink) = bank(json!({ "101": "https://pay.bank.example/x" }), json!(["*.bank.example"]));
     s.capture(params(json!({ "target": "desktop" }))).expect("capture the desktop");
@@ -238,7 +238,7 @@ fn apps_open_of_a_non_running_app_is_judged_by_its_key_not_pid_0() {
     let shell = json!({ "app_key": "gnome-shell", "name": "GNOME Shell", "running": false, "source": "launch_services" });
     let (mut s, _) = session(apps_scenario(shell), json!({}), &sink);
     let refused = s.apps_open(params(json!({ "target": "gnome-shell" }))).expect_err("protected by key");
-    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("InvalidTarget", Some("protected_surface")));
+    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("InvalidTarget", Some(omo_computer_core::error::Reason::ProtectedSurface)));
     assert!(sent(&sink).is_empty());
 }
 
