@@ -136,6 +136,21 @@ const IN_PROGRESS: ReadonlySet<string> = new Set(["running", "compacting", "open
 // wait gives the run's own records this long to show up before it believes the idle.
 const QUIET_MS = 3_000
 
+// The records a run writes while it is under way. Others (agent_idle, entry_appended, thinking_level_changed, ...) also
+// arrive on an idle session, so they say nothing about a run.
+const RUN_RECORDS: ReadonlySet<string> = new Set([
+  "agent_start",
+  "turn_start",
+  "message_start",
+  "message_update",
+  "message_end",
+  "tool_execution_start",
+  "tool_execution_update",
+  "tool_execution_end",
+  "turn_end",
+  "agent_end",
+])
+
 const turnOf = (record: JsonObject): string | undefined =>
   typeof record["turnId"] === "string" && record["turnId"] !== "" ? record["turnId"] : undefined
 
@@ -191,9 +206,8 @@ async function waitSettled(
         if (type === "agent_settled") {
           status = record["reason"] === "session_closed" ? "closed" : "idle"
           finish("settled", status, turnOf(record) ?? turn)
-        } else if (type !== "session_status") {
-          // Any other live record is the run's own output (its start may predate the attach, whose replayed history
-          // only positions the watch), so a run is under way.
+        } else if (typeof type === "string" && RUN_RECORDS.has(type)) {
+          // The run's own output: its start may predate the attach, whose replayed history only positions the watch.
           runSeen(turnOf(record))
         }
       },
@@ -220,13 +234,22 @@ async function waitSettled(
     clearTimeout(quiet)
     signal?.removeEventListener("abort", onAbort)
   }
-  const first = await Promise.race([watching, done])
+  let first: Awaited<typeof watching> | ThreadWaitOutcome
+  try {
+    first = await Promise.race([watching, done])
+  } catch (error) {
+    cleanup()
+    throw error
+  }
   if (!("kind" in first)) {
     // The wait ended before the attach answered: a watch that opens later is stopped at once.
     cleanup()
-    void watching.then((late) => {
-      if (late.kind === "ok") late.watch.stop()
-    })
+    void watching.then(
+      (late) => {
+        if (late.kind === "ok") late.watch.stop()
+      },
+      () => undefined,
+    )
     return first
   }
   if (first.kind !== "ok") {
