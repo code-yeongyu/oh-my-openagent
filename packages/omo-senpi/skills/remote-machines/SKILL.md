@@ -54,7 +54,7 @@ const r = (await tool.thread_list({ all_scope: true })).details.result
 | `tool.thread_create({ device, cwd?, name?, alias?, skills? })` | New session on another device. Address it afterwards by the `thread_id` that `thread_list({ all_scope: true })` reports for it (match the `name` you gave and the `device`). |
 | `tool.thread_send({ thread, message, delivery?: "auto"\|"steer"\|"follow_up", all_scope: true })` | Give it work. `auto` steers a running turn or starts a new one. |
 | `tool.thread_read({ thread, max_bytes?, cursor?, wait_ms?, all_scope: true })` | Read its transcript; continue a truncated read with `next_cursor`. With `wait_ms` (1 to 600000) it first waits for the thread's turn to end; `result.wait` says how the wait ended: `outcome` `settled` (a turn ended, `turn_id`, or the thread is idle), `timeout` (still running after `wait_ms`), `cancelled` or `ended` (`status` names why), with `waited_ms`. |
-| `tool.thread_interrupt({ thread, all_scope: true })` | Stop its running turn. |
+| `tool.thread_interrupt({ thread, all_scope: true })` | Stop its running turn and the background jobs that turn started; `result.background` lists them as `stopped` and `failed`, or is `not_supported` on an older engine, where they keep running. |
 | `tool.thread_close({ thread, all_scope: true })` | End it when the work is done. |
 
 ## Errors and what to do
