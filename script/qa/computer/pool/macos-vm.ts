@@ -5,9 +5,9 @@
 //   bun script/qa/computer/pool/macos-vm.ts --sweep                        (deletes this pool's stopped guests; running ones are kept)
 //
 // The hypervisor command is POOL_HYPERVISOR (clone, run --no-graphics, list --format json, stop, delete); base images are
-// POOL_BASE_IMAGE_15 / POOL_BASE_IMAGE_26. Every run ends with the teardown receipts of live-set.ts.
+// POOL_BASE_IMAGE_15 / POOL_BASE_IMAGE_26. Every run ends with the measured teardown receipts of macos-vm-ops.ts.
 
-import { deleteGuest, type Hypervisor, sweepGuests, teardown, upStatus } from "./macos-vm-ops.ts"
+import { deleteGuest, type Hypervisor, sweepGuests, teardown, waitUntilRunning } from "./macos-vm-ops.ts"
 import { type GuestListing, MACOS_MAJORS, type MacosMajor, planGuest, type PoolHost } from "./macos-vm-plan.ts"
 
 type Ran = { readonly code: number; readonly stdout: string; readonly stderr: string }
@@ -47,7 +47,6 @@ function hostFacts(): PoolHost {
       }),
     ),
     consoleUser: console.code === 0 && console.stdout !== "root" ? console.stdout : null,
-    runnerUser: run("/usr/bin/id", ["-un"]).stdout,
   }
 }
 
@@ -74,8 +73,9 @@ function commandHypervisor(command: string): Hypervisor {
   }
 }
 
+// Live hypervisor processes for a guest: the clone that creates it and the run that boots it (both end in its name).
 function guestProcesses(name: string): number | null {
-  const found = run("/usr/bin/pgrep", ["-f", `run --no-graphics ${name}$`])
+  const found = run("/usr/bin/pgrep", ["-f", `(clone [^ ]+|run --no-graphics) ${name}$`])
   if (found.code === 1) return 0
   if (found.code !== 0) return null
   return found.stdout.split("\n").filter((line) => line !== "").length
@@ -96,14 +96,13 @@ async function up(host: PoolHost, which: MacosMajor, runId: string): Promise<num
   const started = Bun.spawn([command, "run", "--no-graphics", plan.guestName], { stdout: "ignore", stderr: "ignore" })
   started.unref()
   const hypervisor = commandHypervisor(command)
-  const deadline = Date.now() + UP_DEADLINE_MS
-  let status = upStatus([], plan.guestName)
-  while (status !== "running" && Date.now() < deadline) {
-    await Bun.sleep(2_000)
-    status = upStatus(hypervisor.list(), plan.guestName)
-  }
-  if (status !== "running") {
-    console.error(`macos-vm: guest ${plan.guestName} is ${status} after ${UP_DEADLINE_MS / 1000} s`)
+  const waited = await waitUntilRunning(hypervisor, plan.guestName, UP_DEADLINE_MS, {
+    now: Date.now,
+    sleep: (ms) => Bun.sleep(ms),
+  })
+  if (waited.status !== "running") {
+    const detail = "detail" in waited ? ` (${waited.detail})` : ` after ${UP_DEADLINE_MS / 1000} s`
+    console.error(`macos-vm: guest ${plan.guestName} is ${waited.status}${detail}`)
     console.log(deleteGuest(hypervisor, plan.guestName))
     return 1
   }
@@ -127,11 +126,9 @@ function sweep(host: PoolHost): number {
     console.error("macos-vm: refused: no hypervisor command on the pool host")
     return 2
   }
-  const result = sweepGuests(commandHypervisor(host.hypervisor))
-  for (const line of result.deleted) console.log(line)
-  for (const name of result.kept) console.log(`guest KEPT ${name} (running: a live run may own it)`)
-  console.log(`sweep: ${result.deleted.length} deleted, ${result.kept.length} kept`)
-  return result.deleted.every((line) => line.startsWith("guest DELETED")) ? 0 : 1
+  const result = sweepGuests(commandHypervisor(host.hypervisor), guestProcesses)
+  for (const line of result.lines) console.log(line)
+  return result.exitCode
 }
 
 async function main(args: readonly string[]): Promise<number> {

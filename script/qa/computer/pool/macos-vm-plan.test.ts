@@ -7,7 +7,6 @@ const host: PoolHost = {
   hypervisor: "/opt/hv/bin/vmctl",
   baseImages: { "15": "base-macos15", "26": "base-macos26" },
   consoleUser: null,
-  runnerUser: "qa-pool",
 }
 
 describe("guest plan", () => {
