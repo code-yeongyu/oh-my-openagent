@@ -13,6 +13,10 @@
         "vitest.config.ts",
         // the row 37 QA driver (cu-v3 plan: packages/omo-computer-hand/scripts/qa-hand.ts) and its scenario files
         "scripts/qa-hand.ts",
+        // the test helpers the vitest plugin reports with exports unchecked: listed, they are export-checked too
+        "test/support/fakes.ts",
+        "test/support/scheduler.ts",
+        "test/support/tmp.ts",
       ],
     }
   },

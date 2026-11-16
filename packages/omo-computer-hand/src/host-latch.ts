@@ -45,7 +45,11 @@ function openChecked(path: string, flags: number, allowed: number, what: string)
   }
   const stat = fstatSync(fd)
   const why =
-    stat.uid !== process.getuid?.() ? `${what}_owner` : (stat.mode & 0o777 & ~allowed) !== 0 ? `${what}_mode` : undefined
+    stat.uid !== process.getuid?.()
+      ? `${what}_owner`
+      : (stat.mode & 0o777 & ~allowed) !== 0
+        ? `${what}_mode`
+        : undefined
   if (why === undefined) return { kind: "open", fd }
   closeSync(fd)
   return { kind: "unreadable", why }
