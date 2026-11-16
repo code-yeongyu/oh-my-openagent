@@ -6,7 +6,7 @@
 
 closed_names! {
     /// Every `data.reason` any stage, gate, backend default or layer emits.
-    Reason [145] {
+    Reason [146] {
         NotInteractive = "not_interactive",
         PromptPending = "prompt_pending",
         Revoked = "revoked",
@@ -107,6 +107,7 @@ closed_names! {
         AppScope = "app_scope",
         DeniedThisTurn = "denied_this_turn",
         ConsentOff = "consent_off",
+        TierMissing = "tier_missing",
         UserStopped = "user_stopped",
         SpawnInsideSession = "spawn_inside_session",
         AttachInsideSession = "attach_inside_session",

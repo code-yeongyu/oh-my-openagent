@@ -20,7 +20,9 @@ pub fn notify(spec: MethodSpec, params: &Value, outcome: &Result<Value, WireErro
         Method::ControlGrant | Method::ControlRevoke | Method::ControlAcquire
     );
     let text = if control { params["reason"].as_str() } else { text_of(params) };
-    let target = if control { json!("control") } else { params["target"].clone() };
+    // `raiseWindow` names its window `windowId`; every other v1 exec names it `target`.
+    let named = params.get("target").or_else(|| params.get("windowId")).cloned().unwrap_or(Value::Null);
+    let target = if control { json!("control") } else { named };
     let delivery = match spec.method {
         _ if control => "control",
         Method::RaiseWindow | Method::WindowActivate | Method::WindowRaise => "foreground",
@@ -99,6 +101,13 @@ mod tests {
         assert_eq!(audit["params"]["textSha256"], json!("2cf24dba5fb0a30e"));
         assert_eq!((audit["params"]["textLength"].clone(), audit["params"]["textDelivered"].clone()), (json!(5), json!(5)));
         assert!(!audit.to_string().contains("hello"), "{audit}");
+    }
+
+    #[test]
+    fn raise_window_audits_its_window_id_as_the_target() {
+        let refused = Err(WireError::bare(omo_computer_core::error::EngineCode::StopPathUnavailable));
+        let audit = notify(spec(Method::RaiseWindow), &json!({"windowId": "101"}), &refused).expect("audited");
+        assert_eq!(audit["params"]["target"], "101", "{audit}");
     }
 
     #[test]

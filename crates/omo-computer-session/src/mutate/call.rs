@@ -25,6 +25,8 @@ pub struct Mutation<'a> {
     pub frame_refusal: Option<FrameRefusal>,
     /// `consume:true`: the `(target, frameId)` a delivery consumes.
     pub consume: Option<(String, String)>,
+    /// A verb no row builds yet: every gate runs, then this refuses, nothing sent.
+    pub after_gates: Option<omo_computer_core::backend::Refusal>,
 }
 
 impl<'a> Mutation<'a> {
@@ -50,6 +52,7 @@ impl<'a> Mutation<'a> {
             targets: None,
             frame_refusal: None,
             consume: None,
+            after_gates: None,
         }
     }
 
@@ -69,7 +72,14 @@ impl<'a> Mutation<'a> {
             targets: None,
             frame_refusal: None,
             consume: None,
+            after_gates: None,
         }
+    }
+
+    #[must_use]
+    pub fn refused_after_gates(mut self, refusal: omo_computer_core::backend::Refusal) -> Self {
+        self.after_gates = Some(refusal);
+        self
     }
 
     #[must_use]
