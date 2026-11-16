@@ -49,6 +49,7 @@ impl Session {
         let call_id = mutation.call_id.clone().unwrap_or_else(mint_call_id);
         let target = target_id(&mutation.call.target);
         let secure = self.funnel.secure.secure(self.backend.as_ref(), target);
+        self.funnel.call_secure = Some(secure);
         let record = Record::new(&self.funnel, &mutation, &call_id, secure);
         self.reconcile_stop();
         let mut epoch = self.guard.supervisor().stop_epoch();

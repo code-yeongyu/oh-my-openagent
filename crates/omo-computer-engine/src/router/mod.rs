@@ -62,10 +62,15 @@ impl Router {
     /// The v1 rejection, the host latch, or the session's refusal, as the wire carries it.
     pub fn call(&mut self, peer: Peer, method: &str, params: Value) -> Result<Value, WireError> {
         let spec = gate::admit(peer, method, self.ctx.test_clock)?;
+        self.session.take_call_secure();
         let outcome = self
             .admit_latched(spec.method, spec.effect)
             .and_then(|()| dispatch::dispatch(self, spec.method, params.clone()));
-        let secure = self.session.is_secure_target(params.get("target").and_then(Value::as_str));
+        // The funnel's own pre-send decision when the call reached it; else nothing was sent.
+        let secure = match self.session.take_call_secure() {
+            Some(secure) => secure,
+            None => self.session.is_secure_target(params.get("target").and_then(Value::as_str)),
+        };
         if let Some(audit) = audit::notify(spec, &params, &outcome, secure) {
             self.notifications.push(audit);
         }

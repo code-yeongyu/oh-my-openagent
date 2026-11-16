@@ -138,6 +138,8 @@ pub(crate) struct Funnel {
     permits: Permits,
     artifacts: Option<ArtifactStore>,
     secure: Box<dyn SecureProbe>,
+    /// The secure decision the last funnelled call took before its send (its audit's redaction).
+    call_secure: Option<bool>,
     pub(crate) control: crate::grant::Control,
     // Row 25: the hand's `computer.url_policy` and the last call's unknown-URL stamp.
     pub(crate) url_policy: omo_computer_core::url_policy::UrlPolicy,
@@ -193,6 +195,7 @@ impl Funnel {
             permits: Permits::default(),
             artifacts,
             secure: Box::new(SecureInputProbe),
+            call_secure: None,
             control: crate::grant::Control::default(),
             url_policy: omo_computer_core::url_policy::UrlPolicy::default(),
             url_unknown: false,
@@ -276,6 +279,12 @@ impl Session {
     pub fn with_binding(mut self, binding: Binding) -> Self {
         self.funnel.binding = binding;
         self
+    }
+
+    /// The secure decision the funnel took for the call that just ran, once: the wire audit
+    /// redacts by the same answer as the on-disk audit (review M1 of #13373).
+    pub fn take_call_secure(&mut self) -> Option<bool> {
+        self.funnel.call_secure.take()
     }
 
     /// Whether text sent to `target` falls under the secure predicate the audit redacts by.
