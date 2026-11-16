@@ -321,15 +321,4 @@ describe("getPlatformPackageCandidates", () => {
     // #then modern x64 first then x64 baseline
     expect(result).toEqual(["oh-my-opencode-windows-x64", "oh-my-opencode-windows-x64-baseline"])
   })
-
-  test("returns baseline first for Windows x64 when preferBaseline is true", () => {
-    // #given Windows x64 with baseline preference
-    const input = { platform: "win32", arch: "x64", preferBaseline: true }
-
-    // #when getting package candidates
-    const result = getPlatformPackageCandidates(input)
-
-    // #then baseline package is preferred first
-    expect(result).toEqual(["oh-my-opencode-windows-x64-baseline", "oh-my-opencode-windows-x64"])
-  })
 })

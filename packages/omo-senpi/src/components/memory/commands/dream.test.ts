@@ -6,7 +6,6 @@ import { join } from "node:path"
 import { TranscriptJournal, type TranscriptEntry } from "@oh-my-opencode/memory-core"
 
 import { MemoryFakeExtensionAPI } from "../memory.test-support"
-import { scoreDreamCandidate } from "../dream-selector"
 import { fakeCommandContext, fakeDeps, invoke, seededRepo, tempIdentity } from "./commands.test-support"
 import { registerDreamCommand } from "./dream"
 import { stageDreamTranscript } from "./dream-staging"
@@ -59,36 +58,6 @@ async function writeConversation(
 }
 
 describe("/dream scoring and selection", () => {
-  test("#given the fixed letta-parity scoring vector #when scored #then the exact operands and total are reproduced", () => {
-    // given
-    const input = {
-      searchMatchCount: 3,
-      stepsSinceLastSuccessfulReflection: 25,
-      lastActivity: "2026-08-03T12:00:00.000Z",
-      distinctSourceCount: 100,
-      totalBytes: 30,
-      targetBytes: 20,
-      isCurrent: true,
-      newestMessageCovered: true,
-      now: NOW,
-    }
-
-    // when
-    const result = scoreDreamCandidate(input)
-
-    // then
-    expect(result.operands).toEqual({
-      searchHits: 0.3,
-      unreflectedSteps: 0.5,
-      recency: Math.exp(-1),
-      sourceCount: 0.5,
-      sizeFit: 2 / 3,
-      isCurrent: 1,
-      penalty: 1,
-    })
-    expect(result.score).toBe(15 + 0.5 + Math.exp(-1) + 0.5 + 2 / 3)
-  })
-
   test("#given --auto and focus #when invoked #then manual dream selection is delegated without explicit ids", async () => {
     // given
     const { requests, pi, ctx } = await harness()

@@ -116,12 +116,6 @@ const FIDELITY_MINORS = [
 
 const FIDELITY_CODES_EXPECTED = [...FIDELITY_BLOCKERS, ...FIDELITY_MAJORS, ...FIDELITY_MINORS]
 
-function fourGateManifest() {
-  const manifest = sampleManifest()
-  const { fidelity: _dropped, ...gates } = manifest.gates
-  return { ...manifest, gates }
-}
-
 function sampleManifest() {
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -147,6 +141,5 @@ export {
   FIDELITY_MAJORS,
   FIDELITY_MINORS,
   FIDELITY_CODES_EXPECTED,
-  fourGateManifest,
   sampleManifest,
 }

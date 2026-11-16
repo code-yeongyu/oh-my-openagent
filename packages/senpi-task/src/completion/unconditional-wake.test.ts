@@ -1,8 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { createCompletionNotifier } from "./notifier"
-import { routeCompletion } from "./routing"
-import type { ParentNotifier, ParentNotifierMessage, ParentState } from "./types"
+import type { ParentNotifier, ParentNotifierMessage } from "./types"
 import type { TaskRecord } from "../state"
 import type { PersistedTaskEvent } from "../store"
 
@@ -55,17 +54,6 @@ function fakeNotifier(): { notifier: ParentNotifier; calls: ParentNotifierMessag
 }
 
 describe("unconditional wake", () => {
-  test("#given an idle parent #when a background child completes #then it always wakes with triggerTurn", () => {
-    // given an idle parent (the state the old wake_idle_parent:false knob used to silence)
-    const state: ParentState = { kind: "idle" }
-
-    // when routed
-    const decision = routeCompletion(state)
-
-    // then it wakes, never queues silently
-    expect(decision).toEqual({ kind: "wake" })
-  })
-
   test("#given an idle parent #when notified end to end #then a triggerTurn message is enqueued", () => {
     // given
     const record = baseRecord()

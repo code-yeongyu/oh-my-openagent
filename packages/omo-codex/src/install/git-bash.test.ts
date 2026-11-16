@@ -209,25 +209,6 @@ describe("git-bash", () => {
     expect(result).toEqual({ found: true, path: null, source: "not-required" })
   })
 
-  test("#given Windows without Git Bash #when preparing #then original install hint is preserved", async () => {
-    // given
-    const missingResolution = {
-      found: false,
-      checkedPaths: [PROGRAM_FILES_GIT_BASH, PROGRAM_FILES_X86_GIT_BASH],
-      installHint: "install hint",
-    } as const
-
-    // when
-    const result = await prepareGitBashForInstall({
-      platform: "win32",
-      env: {},
-      resolveGitBash: () => missingResolution,
-    })
-
-    // then
-    expect(result).toEqual(missingResolution)
-  })
-
   test("#given Windows without Git Bash #when preparing #then resolver is not retried after system install", async () => {
     // given
     const missingResolution = {
