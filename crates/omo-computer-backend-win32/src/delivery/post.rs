@@ -47,9 +47,6 @@ impl Deliverer {
     /// button with no position, all with nothing sent; `Internal{input_unsupported}` for an event
     /// this route does not carry.
     pub fn deliver(&mut self, os: &mut dyn DeliveryOs, window: &str, event: &InputEvent) -> BackendResult<Delivered> {
-        if !window.is_empty() {
-            return Err(UNSUPPORTED);
-        }
         let top = window_of(window).filter(|top| os.alive(*top)).ok_or(TARGET_UNKNOWN)?;
         admit_read(os.integrity(top))?;
         self.last = None;
