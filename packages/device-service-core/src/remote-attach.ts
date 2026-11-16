@@ -14,6 +14,7 @@ import type {
   LocalEvent,
   SnapshotBody,
 } from "./local-api/protocol.ts"
+import { realTimers, type Timers } from "./timers.ts"
 
 /** How an attach ended: a service-reported reason, the connection closing, or this client's own detach. */
 export type AttachEnd = DetachReason | "closed" | "detached" | "listener_failed"
@@ -21,7 +22,13 @@ export type AttachEnd = DetachReason | "closed" | "detached" | "listener_failed"
 export type RemoteAttachEvent =
   | { readonly kind: "pending"; readonly reason: AttachPendingReason }
   | { readonly kind: "snapshot"; readonly snapshot: SnapshotBody }
-  | { readonly kind: "records"; readonly attach_id: number; readonly records: readonly JsonObject[] }
+  /** `seqs`: each record's stream seq, when the service sends them (one per record, increasing within the attach_id). */
+  | {
+      readonly kind: "records"
+      readonly attach_id: number
+      readonly records: readonly JsonObject[]
+      readonly seqs?: readonly number[]
+    }
   | { readonly kind: "detached"; readonly reason: DetachReason }
 
 /**
@@ -105,7 +112,12 @@ const toRemote = (event: AttachEvent): RemoteAttachEvent => {
       return { kind: "snapshot", snapshot }
     }
     case "session.records":
-      return { kind: "records", attach_id: event.attach_id, records: event.records }
+      return {
+        kind: "records",
+        attach_id: event.attach_id,
+        records: event.records,
+        ...(event.seqs === undefined ? {} : { seqs: event.seqs }),
+      }
     case "session.attach_pending":
       return { kind: "pending", reason: event.reason }
     case "session.detached":
@@ -113,7 +125,12 @@ const toRemote = (event: AttachEvent): RemoteAttachEvent => {
   }
 }
 
-export function openAttach(client: LocalApiClient, device: string, sessionId: string): Promise<RemoteAttach> {
+export function openAttach(
+  client: LocalApiClient,
+  device: string,
+  sessionId: string,
+  timers: Timers = realTimers,
+): Promise<RemoteAttach> {
   // Events of the new attach can arrive before its handle is known, so they wait here until the response names it.
   const early: AttachEvent[] = []
   const history: RemoteAttachEvent[] = []
@@ -134,13 +151,13 @@ export function openAttach(client: LocalApiClient, device: string, sessionId: st
   let failure: unknown
   const commands = new Set<(reason: AttachEnd) => void>()
   let channel: DelegatedChannel | undefined
-  let drain: ReturnType<typeof setTimeout> | undefined
+  let cancelDrain: (() => void) | undefined
   let released = false
   // The connection subscription and the delegated channel stay until the attach has ended and no command waits on them.
   const release = (): void => {
     if (released) return
     released = true
-    clearTimeout(drain)
+    cancelDrain?.()
     stop()
     channel?.stop()
   }
@@ -155,8 +172,7 @@ export function openAttach(client: LocalApiClient, device: string, sessionId: st
     rejectSnapshot(new Error(`the attach ended before its snapshot: ${reason}`))
     resolveDetached(reason)
     if (reason === "closed" || commands.size === 0) return endCommands(reason)
-    drain = setTimeout(() => endCommands(reason), ENDED_COMMAND_WAIT_MS)
-    drain.unref?.()
+    cancelDrain = timers.after(ENDED_COMMAND_WAIT_MS, () => endCommands(reason))
   }
   // Listeners run inside the connection's data handler: a throw there must end this attach, never the connection.
   const deliver = (event: AttachEvent) => {

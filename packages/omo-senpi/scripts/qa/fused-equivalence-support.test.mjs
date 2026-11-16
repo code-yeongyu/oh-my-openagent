@@ -9,6 +9,7 @@ import {
   readlinkSync,
   realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs"
 import { tmpdir } from "node:os"
@@ -18,6 +19,7 @@ import {
   dropTimestampOffsets,
   goldenHostLeaks,
   pinEnginePackage,
+  resolveTmpdirSymlinks,
   splitStatusChannels,
   statusCounts,
   stopSandboxProcesses,
@@ -166,6 +168,29 @@ describe("pinEnginePackage", () => {
       writeFileSync(`${root}.lock`, `${process.ppid}\n`)
 
       expect(() => pinEnginePackage(join(modules, "@code-yeongyu/senpi"), { root })).toThrow(/owns/)
+    } finally {
+      rmSync(base, { recursive: true, force: true })
+    }
+  })
+})
+
+describe("resolveTmpdirSymlinks", () => {
+  test("#given a TMPDIR that is a symlink #when resolved #then TMPDIR names the directory behind it", () => {
+    // given: macOS spells its temp dir through a symlink into /private
+    const base = realpathSync(mkdtempSync(join(tmpdir(), "eq-tmpdir-test-")))
+    try {
+      const physical = join(base, "physical")
+      const link = join(base, "link")
+      mkdirSync(physical)
+      symlinkSync(physical, link, "junction")
+      const env = { TMPDIR: link }
+
+      // when
+      const resolved = resolveTmpdirSymlinks(env)
+
+      // then
+      expect(resolved).toBe(physical)
+      expect(env.TMPDIR).toBe(physical)
     } finally {
       rmSync(base, { recursive: true, force: true })
     }
