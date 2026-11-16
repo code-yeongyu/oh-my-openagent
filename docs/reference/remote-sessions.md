@@ -19,15 +19,15 @@ omo remote enable | disable [--json]   # set this device up and turn remote sess
 omo remote control [on|off]      # whether your other devices may view and command this device's sessions
 omo remote wake [on|off|default] # whether a message from your other devices may start a session here that is not running
 omo remote bootstrap [--json]    # set up the device service for your sign-in (every omo start runs it)
-omo remote attach <device>/<session>   # open a session on another device in the terminal UI, to watch and type
+omo remote attach <session>      # open a session in the terminal UI, to watch and type
 omo remote open <device> [--project P] [--model provider/id] [--thinking LEVEL] [--permission-preset MODE]
                 [--worktree [--branch B] [--base REF]] [--prompt TEXT [--steer|--follow-up]] [--json]
                                  # start a session on another device; prints <device>/<session>
-omo remote send <device>/<session> <text> [--steer|--follow-up] [--no-wait] [--json]
+omo remote send <session> <text> [--steer|--follow-up] [--no-wait] [--json]
                                  # send a message and print the answer as it arrives
-omo remote model <device>/<session> <provider/id> [--json]   # switch the session's model
-omo remote interrupt <device>/<session> [--json]   # stop the session's running turn
-omo remote close <device>/<session> [--json]       # end the session on its device
+omo remote model <session> <provider/id> [--json]   # switch the session's model
+omo remote interrupt <session> [--json]   # stop the session's running turn
+omo remote close <session> [--json]       # end the session on its device
 ```
 
 `open` runs the new session in `MODE` (default: this device's own setting, else full-access), on the
@@ -38,7 +38,15 @@ its HEAD). `--prompt` hands the new session its first message, delivered as `sen
 it; with `--json` the result's `prompt` field names that delivery or its failure (the session stays
 open). The agent tool `thread_create` takes the same options as `model`, `reasoning`,
 `permission_preset`, `worktree`, `prompt` and `delivery`; there `permission_preset` may only keep or
-narrow the calling session's own mode. `send`
+narrow the calling session's own mode.
+
+The canonical session identity is the durable `thread.thread_id` that `open --json` returns. Pass it
+directly to `send`, `model`, `interrupt`, `close` or `attach`; the CLI finds its device in the account
+listing. All five also take `<device>/<session>`, with either the durable id or the listing key in the
+`SESSION` column; an explicit device skips the account listing, and a durable id that device has not
+listed yet (a session opened a moment ago) is located on that device.
+
+`send`
 with `--steer` goes into the running turn, and `--no-wait` returns once the session took the message
 instead of printing the answer.
 

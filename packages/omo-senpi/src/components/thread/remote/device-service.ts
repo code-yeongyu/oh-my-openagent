@@ -143,6 +143,30 @@ function durableIdOf(row: object): { readonly durable_id?: string } {
 // not rest on the service honouring it. A device past the cap counts as silent.
 const LOOKUP_CAP_MS = 3_500
 
+/**
+ * Attaches to a session another device holds, by the address a caller typed. A thread is addressed by its durable id
+ * (decision 0027 D2), which the device's listing may not name yet for a session it opened a moment ago: an attach refused
+ * session_not_found locates the id once and attaches on the key the device names (omo#13748, omo#13707; measured over
+ * the relay as `omo remote open` then `omo remote model <device>/<id>` answering no session). A locate that cannot
+ * answer leaves the attach's own refusal as the answer. The thread tools' port and `omo remote attach` both use it.
+ */
+export async function attachAddressed(
+  connected: DeviceService,
+  device: string,
+  sessionId: string,
+): Promise<RemoteAttach> {
+  try {
+    return await connected.attach(device, sessionId)
+  } catch (error) {
+    if (!(error instanceof LocalApiError && error.code === "session_not_found")) throw error
+    const located = await Promise.resolve()
+      .then(() => connected.locate(device, sessionId))
+      .catch(() => undefined)
+    if (located === undefined || located.key === sessionId) throw error
+    return await connected.attach(device, located.key)
+  }
+}
+
 export function createDeviceServiceSessions(options: DeviceServiceSessionsOptions): RemoteSessionsPort {
   let service: Promise<DeviceService> | undefined
   const attaches = new Map<string, Promise<Session>>()
@@ -167,7 +191,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     const known = attaches.get(key)
     if (known !== undefined) return known
     const opened = svc()
-      .then((connected) => connected.attach(device, sessionId))
+      .then((connected) => attachAddressed(connected, device, sessionId))
       .then(
         (attached) => {
           void attached.detached.then(() => {

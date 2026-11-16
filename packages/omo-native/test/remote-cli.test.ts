@@ -403,7 +403,7 @@ describe("omo remote attach", () => {
     expect(socket).toMatch(/[\\/]t-[0-9a-f]{16}\.sock$/)
   })
 
-  test.each([[[]], [["no-slash"]], [["/session"]], [["device/"]], [[`${PEER}/${SESSION_ID}`, "extra"]]])(
+  test.each([[[]], [["/session"]], [["device/"]], [[`${PEER}/${SESSION_ID}`, "extra"]]])(
     "refuses the target %p as usage",
     async (target) => {
       const { prepared, err } = await attach(target)
@@ -887,7 +887,7 @@ describe("omo remote session verbs", () => {
 
   test.each([
     [
-      ["send", "no-slash", "hi"],
+      ["send", "/session", "hi"],
       "omo remote send: name the session as <device>/<session> (the SESSION column of omo remote sessions)",
     ],
     [["send", "b/dur-on-b"], "omo remote send: the message text is required"],

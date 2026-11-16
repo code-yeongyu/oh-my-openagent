@@ -26,7 +26,12 @@ import type { Provenance } from "../omo-senpi/src/components/thread/gateway/type
 import { threadLink } from "../omo-senpi/src/components/thread/thread-link"
 import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { packageRoot } from "./bin/lib/package-paths.js"
-import type { RemoteSessionRow, RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
+import {
+  rowThreadId,
+  type RemoteSessionRow,
+  type RemoteThreadSurface,
+} from "../omo-senpi/src/components/thread/remote/ports"
+import { resolveSessionTarget } from "./remote-session-target"
 import { deviceOnline, followRemote, remoteAvailable } from "../omo-senpi/src/components/thread/remote/remote-ops"
 import type { RemoteCommandDependencies } from "./remote-local"
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
@@ -88,12 +93,12 @@ export async function runSession(
   const unavailable = await remoteAvailable(remote)
   if (unavailable !== undefined) return show(unavailable, "")
   if (args.verb === "open") return await openOn(remote, args, { json, show }, dependencies)
-  const label = `${args.target.device}/${args.target.session}`
-  // Addressed directly, as the SDK does: its device refuses a session it does not hold (unknown_session). The
-  // account listing settles only with the slowest device (seconds) and lags a session just opened.
-  // The id a caller types is the id above the port (decision 0027 D2); the relay address book turns the device-named
-  // address into its transport reference.
-  const row = namedDeviceRow(args.target.device, args.target.session)
+  const label = args.target.device === undefined ? args.target.session : `${args.target.device}/${args.target.session}`
+  // `<device>/<session>` is addressed directly, as the SDK does (the port locates a durable id its listing lags on); a
+  // bare durable id is found in the account listing (omo#13707).
+  const resolved = await resolveSessionTarget(remote, args.target)
+  if (resolved.kind === "error") return show(resolved, label)
+  const { row } = resolved
   if (args.verb === "send") return sendTo(remote, row, args, { label, json, show }, dependencies)
   // The device is found online once, before its control is used, as the thread tools' locate does (A3).
   const offline = await deviceOnline(remote, row.device)
@@ -224,8 +229,8 @@ function personDelivery(remote: RemoteThreadSurface, dependencies: RemoteCommand
       }
     return {
       kind: "ok",
-      thread_id: row.session_id,
-      link: threadLink(row.session_id, row.title),
+      thread_id: rowThreadId(row),
+      link: threadLink(rowThreadId(row), row.title),
       delivery: sent.delivery,
       deduplicated: sent.deduplicated,
       device: row.device,

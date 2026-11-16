@@ -334,6 +334,59 @@ describe("device-service adapter: a session created on another device is address
     expect([created.thread.thread_id, created.thread.sessionId]).toEqual([ENGINE_ID, KEY])
     expect(located).toEqual([])
   })
+
+  // omo#13748 relay proof (NY2 -> seoul) and remote-tools: `omo remote open` prints <device>/<durable id>; the next verb
+  // on that address (`omo remote model`) attached by the durable id, which b's listing does not name, and answered
+  // "no session". An attach refused session_not_found is located once and retried on the key the device names.
+  test("#given b knows a session only by its key #when a command addresses it by its durable id #then the id is located once and the command runs on that key", async () => {
+    const attached: string[] = []
+    const located: string[] = []
+    const service = {
+      ...fakeService([], []),
+      locate: async (device: string, id: string) => {
+        located.push(id)
+        if (id !== ENGINE_ID) throw new LocalApiError("session_not_found", "no session with that id")
+        return { device, key: KEY, session: `${device}.${KEY}` }
+      },
+      attach: async (_device: string, sessionId: string) => {
+        attached.push(sessionId)
+        if (sessionId !== KEY) throw new LocalApiError("session_not_found", "no such session in that device's listing")
+        return {
+          command: async (rpc: Record<string, unknown>) =>
+            state({ state: "engine_applied" }, { type: "response", command: rpc["type"], success: true, data: {} }),
+          read: async () => ({ entries: [], next_before: null }),
+          detached: new Promise(() => {}),
+          ...quietStream,
+        } as unknown as RemoteAttach
+      },
+    } as unknown as DeviceService
+    const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: async () => service })
+    const first = await port.sessionCommand("b", ENGINE_ID, { type: "get_state" })
+    const second = await port.sessionCommand("b", ENGINE_ID, { type: "get_state" })
+    expect([first.kind, second.kind]).toEqual(["ok", "ok"])
+    expect(located).toEqual([ENGINE_ID])
+    expect(attached).toEqual([ENGINE_ID, KEY])
+  })
+
+  test("#given an id b holds under no name #when a command addresses it #then it is refused unknown_session after one locate", async () => {
+    const located: string[] = []
+    const service = {
+      ...fakeService([], []),
+      locate: async (_device: string, id: string) => {
+        located.push(id)
+        throw new LocalApiError("session_not_found", "no session with that id")
+      },
+      attach: async () => {
+        throw new LocalApiError("session_not_found", "no such session in that device's listing")
+      },
+    } as unknown as DeviceService
+    const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: async () => service })
+    expect(await port.sessionCommand("b", "gone", { type: "get_state" })).toEqual({
+      kind: "refused",
+      reason: "unknown_session",
+    })
+    expect(located).toEqual(["gone"])
+  })
 })
 
 describe("device-service adapter: relay round trips per thread op", () => {
