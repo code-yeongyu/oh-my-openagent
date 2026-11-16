@@ -69,10 +69,16 @@ fn next_frame_id() -> (String, u64) {
     (format!("frame-{}-{capture}", engine_instance()), capture)
 }
 
+/// Targets whose latest capture an object-mode cache keeps (DESIGN 9, frame
+/// store); capturing one more evicts the least recently captured target. A
+/// null-mode (v1) cache is not capped, as it is never idle-flushed.
+pub(crate) const MAX_TARGETS: usize = 16;
+
 /// How many superseded frame ids the cache remembers the target of.
 const RETIRED_FRAMES: usize = 256;
 
-/// The latest capture of every target; coordinate input maps through it.
+/// The latest capture of up to [`MAX_TARGETS`] targets; coordinate input maps
+/// through it.
 #[derive(Clone, Default)]
 pub(crate) struct FrameCache {
     /// `reportMode` of the session that owns the cache: a `"null"` (v1)
@@ -137,7 +143,23 @@ impl FrameCache {
             }
             self.retired.push_back((previous.id, target.key().to_owned()));
         }
+        if self.report_mode == ReportMode::Object && self.latest.len() > MAX_TARGETS {
+            self.evict_oldest();
+        }
         id
+    }
+
+    /// Drops the target captured longest ago; its frame id then answers as
+    /// never captured.
+    fn evict_oldest(&mut self) {
+        let oldest = self
+            .latest
+            .iter()
+            .min_by_key(|(_, frame)| frame.seq)
+            .map(|(key, _)| key.clone());
+        if let Some(key) = oldest {
+            self.latest.remove(&key);
+        }
     }
 
     /// The id of the latest capture of the target keyed `target_key`.
@@ -211,5 +233,67 @@ impl FrameCache {
             ))),
             Some(_) | None => Ok(frame.geometry.clone()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use senpi_desktop_core::frame::FrameGeometry;
+    use senpi_desktop_core::types::Target;
+    use senpi_desktop_safety::FrameRefusal;
+
+    use super::{FrameCache, ReportMode, MAX_TARGETS};
+
+    fn window(index: usize) -> Target {
+        Target::Window(format!("{index}"))
+    }
+
+    #[test]
+    fn capturing_a_seventeenth_target_evicts_the_least_recently_captured_one() {
+        // Given: 16 targets captured, target 0 recaptured last
+        let mut frames = FrameCache::with_report_mode(ReportMode::Object);
+        let first: Vec<String> = (0..MAX_TARGETS)
+            .map(|index| frames.record(&window(index), FrameGeometry::identity_global()))
+            .collect();
+        let recaptured = frames.record(&window(0), FrameGeometry::identity_global());
+        // When
+        let newest = frames.record(&window(MAX_TARGETS), FrameGeometry::identity_global());
+        // Then: target 1 (oldest capture) is gone, every other target keeps its latest
+        assert_eq!(frames.latest_id("1"), None);
+        assert_eq!(frames.refusal("1", Some(&first[1])), Some(FrameRefusal::NoCapture));
+        assert_eq!(frames.latest_id("0"), Some(recaptured.as_str()));
+        assert_eq!(frames.latest_id(&MAX_TARGETS.to_string()), Some(newest.as_str()));
+        for (index, id) in first.iter().enumerate().skip(2) {
+            assert_eq!(frames.latest_id(&index.to_string()), Some(id.as_str()), "target {index}");
+        }
+    }
+
+    #[test]
+    fn a_v1_session_keeps_its_oldest_frame_past_seventeen_targets() {
+        // Given
+        let mut frames = FrameCache::with_report_mode(ReportMode::Null);
+        let oldest = frames.record(&window(0), FrameGeometry::identity_global());
+        // When
+        for index in 1..=MAX_TARGETS {
+            frames.record(&window(index), FrameGeometry::identity_global());
+        }
+        // Then
+        assert_eq!(frames.latest_id("0"), Some(oldest.as_str()));
+        assert_eq!(frames.refusal("0", Some(&oldest)), None);
+    }
+
+    #[test]
+    fn recapturing_a_known_target_never_evicts() {
+        // Given
+        let mut frames = FrameCache::with_report_mode(ReportMode::Object);
+        for index in 0..MAX_TARGETS {
+            frames.record(&window(index), FrameGeometry::identity_global());
+        }
+        // When
+        for _ in 0..MAX_TARGETS {
+            frames.record(&window(3), FrameGeometry::identity_global());
+        }
+        // Then
+        assert!((0..MAX_TARGETS).all(|index| frames.latest_id(&index.to_string()).is_some()));
     }
 }
