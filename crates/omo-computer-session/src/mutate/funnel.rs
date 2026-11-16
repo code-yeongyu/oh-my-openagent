@@ -1,6 +1,7 @@
 //! `Session::mutate`: the stages in order. No OS call precedes the marker write, and no stage
 //! retries.
 
+use omo_computer_core::error::Reason;
 use std::hash::{BuildHasher, Hasher};
 
 use omo_computer_core::backend::{Refusal, TaggedInput};
@@ -122,7 +123,7 @@ impl Session {
                     Some(&refusal),
                 );
                 let stored =
-                    json!({ "error": { "code": refusal.code.wire(), "reason": refusal.reason } });
+                    json!({ "error": { "code": refusal.code.wire(), "reason": refusal.reason.map(Reason::wire) } });
                 self.store_receipt(&mut record, stored);
                 let warning = self.append_or_warn(record.event);
                 Err(Refused {
