@@ -60,11 +60,12 @@ async function watchSession(
   const { handle, onSnapshot } = opened.value
   const parsed = canonicalizeThreadHandle(thread, {})
   const target = parsed.kind === "ok" ? parsed.value.target : undefined
-  const sessionId = target?.kind === "device_session" ? { sessionId: target.session } : {}
+  const record: JsonObject =
+    target?.kind === "device_session" ? { type: "get_state", sessionId: target.session } : { type: "get_state" }
   let stopped = false
   // A read that fails, or that the host answers without the engine's reply, tells nothing; the records still do.
   const readFresh = async (): Promise<void> => {
-    const sent = await handle.command({ type: "get_state", ...sessionId })
+    const sent = await handle.command(record)
     if (stopped || sent.kind === "error") return
     const outcome = outcomeOf(sent.value)
     const data = outcome.kind === "ok" ? outcome.response["data"] : undefined
