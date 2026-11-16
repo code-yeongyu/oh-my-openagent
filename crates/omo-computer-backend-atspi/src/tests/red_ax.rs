@@ -15,8 +15,16 @@ use crate::AtspiBackend;
 fn focus_is_event_driven() {
     let mut fx = gedit();
     let button = fx.bus.node(&fx.frame, "push button", "OK");
-    fx.bus.set_states(&button, States { focused: true, enabled: true, ..States::default() });
-    fx.bus.push_event(0, "object:state-changed:focused", &button);
+    fx.bus.set_states(
+        &button,
+        States {
+            focused: true,
+            enabled: true,
+            ..States::default()
+        },
+    );
+    fx.bus
+        .push_event(0, "object:state-changed:focused", &button);
     let (mut backend, handle) = fx.backend();
     let before = handle.counts();
 
@@ -26,7 +34,11 @@ fn focus_is_event_driven() {
     assert_eq!(focused, Some(button));
     assert_eq!(after.applications, before.applications, "no registry walk");
     assert_eq!(after.children, before.children, "no descent into any tree");
-    assert_eq!(after.reads - before.reads, 1, "the event's sender is verified once");
+    assert_eq!(
+        after.reads - before.reads,
+        1,
+        "the event's sender is verified once"
+    );
 }
 
 #[test]
@@ -37,17 +49,31 @@ fn press_resolves_to_activate_when_only_activate_exists() {
     let both = fx.bus.node(&fx.frame, "push button", "Both");
     fx.bus.set_actions(&both, &["click", "activate"]);
     let (mut backend, handle) = fx.backend();
-    let tree = observe(&mut backend, GEDIT_XID).expect("observe").snapshot.tree;
+    let tree = observe(&mut backend, GEDIT_XID)
+        .expect("observe")
+        .snapshot
+        .tree;
     let press = Semantic("press".to_owned());
 
-    let delivered = backend.perform_detailed(&ref_of(&tree, "OK"), &press).expect("press");
-    let ambiguous = backend.perform_detailed(&ref_of(&tree, "Both"), &press).expect_err("two rungs");
+    let delivered = backend
+        .perform_detailed(&ref_of(&tree, "OK"), &press)
+        .expect("press");
+    let ambiguous = backend
+        .perform_detailed(&ref_of(&tree, "Both"), &press)
+        .expect_err("two rungs");
 
     assert_eq!(delivered, Delivered { count: 1, of: 1 });
-    assert_eq!(handle.performed(), vec![(ok, 0)], "activate is index 0, Both never acted");
+    assert_eq!(
+        handle.performed(),
+        vec![(ok, 0)],
+        "activate is index 0, Both never acted"
+    );
     assert_eq!(ambiguous.code(), EngineCode::AmbiguousTarget);
     let candidates = vec!["click".to_owned(), "activate".to_owned()];
-    assert_eq!(ambiguous.detail, Some(Detail::AmbiguousAction { candidates }));
+    assert_eq!(
+        ambiguous.detail,
+        Some(Detail::AmbiguousAction { candidates })
+    );
 }
 
 #[test]
@@ -55,7 +81,10 @@ fn no_action_role_is_typed_refusal() {
     let mut fx = gedit();
     fx.bus.node(&fx.frame, "image", "Logo");
     let (mut backend, handle) = fx.backend();
-    let tree = observe(&mut backend, GEDIT_XID).expect("observe").snapshot.tree;
+    let tree = observe(&mut backend, GEDIT_XID)
+        .expect("observe")
+        .snapshot
+        .tree;
     let before = handle.counts();
 
     let refused = backend
@@ -64,9 +93,16 @@ fn no_action_role_is_typed_refusal() {
 
     assert_eq!(refused.refusal.code, EngineCode::AxUnsupported);
     assert_eq!(refused.refusal.reason, None);
-    let detail = Detail::NoAction { role: "image".to_owned(), actions: Vec::new() };
+    let detail = Detail::NoAction {
+        role: "image".to_owned(),
+        actions: Vec::new(),
+    };
     assert_eq!(refused.detail, Some(detail));
-    assert_eq!(handle.counts().calls, before.calls, "refused before any bus call");
+    assert_eq!(
+        handle.counts().calls,
+        before.calls,
+        "refused before any bus call"
+    );
 }
 
 #[test]
@@ -100,7 +136,14 @@ fn twin_title_windows_are_ambiguous() {
 fn busy_state_reports_loading() {
     let mut fx = gedit();
     let frame = fx.frame.clone();
-    fx.bus.set_states(&frame, States { busy: true, enabled: true, ..States::default() });
+    fx.bus.set_states(
+        &frame,
+        States {
+            busy: true,
+            enabled: true,
+            ..States::default()
+        },
+    );
     let (mut backend, _) = fx.backend();
     let mut idle = gedit().backend().0;
 
@@ -126,5 +169,9 @@ fn linux_app_not_on_bus_is_refused_typed_with_zero_bus_calls() {
     assert_eq!(refused.refusal.code, EngineCode::AxUnsupported);
     assert_eq!(refused.refusal.reason, Some("not_on_bus"));
     assert!(matches!(refused.detail, Some(Detail::NotOnBus { ref app, .. }) if app == "slack"));
-    assert_eq!(handle.counts().calls, before.calls, "zero bus calls to the absent app");
+    assert_eq!(
+        handle.counts().calls,
+        before.calls,
+        "zero bus calls to the absent app"
+    );
 }

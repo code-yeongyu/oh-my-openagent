@@ -1,6 +1,8 @@
 //! Fixtures shared by the backend's tests: a scripted bus, the host's window list and helpers
 //! that observe a window and pick a ref out of the outline.
 
+mod green_extra;
+mod live;
 mod red_ax;
 mod red_session;
 
@@ -37,16 +39,27 @@ pub(crate) fn gedit() -> Fixture {
         title: GEDIT_TITLE.to_owned(),
         bounds: extents(100, 100, 800, 600),
     }];
-    Fixture { bus, handle, frame, windows }
+    Fixture {
+        bus,
+        handle,
+        frame,
+        windows,
+    }
 }
 
 impl Fixture {
     pub(crate) fn backend(self) -> (AtspiBackend<FakeBus>, FakeHandle) {
-        (AtspiBackend::new(Some(self.bus), Box::new(self.windows)), self.handle)
+        (
+            AtspiBackend::new(Some(self.bus), Box::new(self.windows)),
+            self.handle,
+        )
     }
 }
 
-pub(crate) fn observe(backend: &mut AtspiBackend<FakeBus>, window: &str) -> Result<Observation, AxRefusal> {
+pub(crate) fn observe<B: crate::bus::Bus>(
+    backend: &mut AtspiBackend<B>,
+    window: &str,
+) -> Result<Observation, AxRefusal> {
     backend.observe(&SnapshotRequest {
         target: Target::Window(window.to_owned()),
         options: ObserveOptions::default(),

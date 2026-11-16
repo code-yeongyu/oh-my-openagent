@@ -15,7 +15,10 @@ impl FakeBus {
     #[must_use]
     pub fn new() -> (Self, FakeHandle) {
         let log = Arc::new(Mutex::new(FakeLog::default()));
-        log.lock().unwrap_or_else(PoisonError::into_inner).counts.connects = 1;
+        log.lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .counts
+            .connects = 1;
         let bus = Self {
             apps: Vec::new(),
             nodes: HashMap::new(),
@@ -50,7 +53,13 @@ impl FakeBus {
             name: Some(name.to_owned()),
             ..NodeFacts::default()
         };
-        self.nodes.insert(root.clone(), FakeNode { facts, ..FakeNode::default() });
+        self.nodes.insert(
+            root.clone(),
+            FakeNode {
+                facts,
+                ..FakeNode::default()
+            },
+        );
         self.apps.push(AppRef {
             node: root.clone(),
             pid: Some(pid),
@@ -62,14 +71,24 @@ impl FakeBus {
     /// Adds a child of `parent` on `parent`'s connection.
     pub fn node(&mut self, parent: &NodeId, role: &str, name: &str) -> NodeId {
         self.serial += 1;
-        let id = NodeId::new(parent.bus.clone(), format!("/org/a11y/atspi/accessible/{}", self.serial));
+        let id = NodeId::new(
+            parent.bus.clone(),
+            format!("/org/a11y/atspi/accessible/{}", self.serial),
+        );
         let facts = NodeFacts {
             role: role.to_owned(),
             name: (!name.is_empty()).then(|| name.to_owned()),
-            states: States { enabled: true, ..States::default() },
+            states: States {
+                enabled: true,
+                ..States::default()
+            },
             ..NodeFacts::default()
         };
-        let node = FakeNode { facts, parent: Some(parent.clone()), ..FakeNode::default() };
+        let node = FakeNode {
+            facts,
+            parent: Some(parent.clone()),
+            ..FakeNode::default()
+        };
         self.nodes.insert(id.clone(), node);
         if let Some(found) = self.nodes.get_mut(parent) {
             found.children.push(id.clone());
@@ -97,6 +116,12 @@ impl FakeBus {
 
     pub fn set_text(&mut self, node: &NodeId, text: &str) {
         self.at(node).text = Some(text.to_owned());
+    }
+
+    pub fn set_attribute(&mut self, node: &NodeId, key: &str, value: &str) {
+        self.at(node)
+            .attributes
+            .push((key.to_owned(), value.to_owned()));
     }
 
     pub fn set_accessible_id(&mut self, node: &NodeId, id: &str) {
@@ -132,7 +157,10 @@ impl FakeBus {
     }
 
     pub fn set_owner(&mut self, pid: u32, name: &str) {
-        self.owner = Some(OwnerProcess { pid, name: name.to_owned() });
+        self.owner = Some(OwnerProcess {
+            pid,
+            name: name.to_owned(),
+        });
     }
 
     pub fn add_desktop_file(&mut self, path: &str, contents: &str) {
@@ -148,5 +176,10 @@ impl FakeBus {
 /// Extents shorthand for fixtures.
 #[must_use]
 pub const fn extents(x: i32, y: i32, width: i32, height: i32) -> Extents {
-    Extents { x, y, width, height }
+    Extents {
+        x,
+        y,
+        width,
+        height,
+    }
 }

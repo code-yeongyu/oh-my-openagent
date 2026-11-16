@@ -55,6 +55,8 @@ pub enum Detail {
     AmbiguousAction { candidates: Vec<String> },
     /// `AxUnsupported{reason:"not_on_bus", app, hint}`.
     NotOnBus { app: String, hint: &'static str },
+    /// Two menu items carry the label of one level.
+    AmbiguousItem { candidates: Vec<String> },
     /// Two windows or frames are the target: never a topmost guess.
     AmbiguousWindow { candidates: Vec<String> },
     /// Re-identification found this many live matches (0 or 2+).
@@ -85,6 +87,12 @@ impl AxRefusal {
             refusal,
             detail: None,
         }
+    }
+
+    /// No accessibility bus: `observe` answers the typed unavailability, nothing is read.
+    #[must_use]
+    pub const fn no_bus() -> Self {
+        Self::new(Refusal::bare(EngineCode::AxUnsupported), Detail::NoBus)
     }
 
     #[must_use]

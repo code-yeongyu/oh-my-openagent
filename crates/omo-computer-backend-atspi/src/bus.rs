@@ -151,8 +151,13 @@ pub trait Bus: Send {
     /// `org.a11y.Status.IsEnabled`.
     fn a11y_enabled(&mut self) -> BusResult<bool>;
     fn set_a11y_enabled(&mut self, enabled: bool) -> BusResult<()>;
+    /// The object's attributes (`Accessible.GetAttributes`, or the `Document` interface's for
+    /// a `document web` object): where the `URI` of a web document is read.
+    fn attributes(&mut self, node: &NodeId, slice: Duration) -> BusResult<Vec<(String, String)>>;
     /// Registers the events the backend listens to (`RegisterEvent` plus the match rule).
     fn register_events(&mut self, kinds: &[&str]) -> BusResult<()>;
+    /// The events the connection already received, in arrival order: no round trip.
+    fn pending_events(&mut self) -> Vec<BusEvent>;
     /// The next event, waiting at most `timeout`; `None` when none came.
     fn wait_event(&mut self, timeout: Duration) -> BusResult<Option<BusEvent>>;
     /// The owner of `org.freedesktop.Notifications`.

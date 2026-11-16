@@ -8,10 +8,16 @@ mod backend;
 pub mod bus;
 pub mod caps;
 pub mod fake;
+pub mod live;
+mod menus;
+mod notify;
 pub mod owner;
+mod roles;
+mod secure;
 pub mod types;
 
-pub use backend::{AtspiBackend, Observation};
+pub use backend::{AtspiBackend, Observation, EVENTS};
+pub use live::LiveBus;
 
 #[cfg(test)]
 mod tests;

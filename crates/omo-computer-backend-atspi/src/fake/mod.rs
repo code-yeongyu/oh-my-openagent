@@ -32,6 +32,7 @@ struct FakeLog {
     performed: Vec<(NodeId, i32)>,
     registered: Vec<String>,
     enabled_writes: Vec<bool>,
+    gone: Vec<NodeId>,
 }
 
 /// The test's view of the log after the bus moved into a backend.
@@ -59,6 +60,15 @@ impl FakeHandle {
         self.with(|log| log.registered.clone())
     }
 
+    /// The object leaves the bus after the bus moved into a backend.
+    pub fn kill(&self, node: &NodeId) {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .gone
+            .push(node.clone());
+    }
+
     #[must_use]
     pub fn enabled_writes(&self) -> Vec<bool> {
         self.with(|log| log.enabled_writes.clone())
@@ -72,6 +82,7 @@ struct FakeNode {
     parent: Option<NodeId>,
     actions: Vec<String>,
     text: Option<String>,
+    attributes: Vec<(String, String)>,
     hung: bool,
 }
 
@@ -110,6 +121,15 @@ impl FakeBus {
 
     fn live(&mut self, node: &NodeId, slice: Duration) -> BusResult<&FakeNode> {
         self.reach()?;
+        if self
+            .log
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .gone
+            .contains(node)
+        {
+            return Err(BusError::Failed(format!("{} is gone", node.object_id())));
+        }
         let hung = self.nodes.get(node).is_some_and(|found| found.hung);
         if hung {
             self.clock += u64::try_from(slice.as_millis()).unwrap_or(u64::MAX);
@@ -194,8 +214,16 @@ impl Bus for FakeBus {
         }
         self.enabled = Some(enabled);
         let log = Arc::clone(&self.log);
-        log.lock().unwrap_or_else(PoisonError::into_inner).enabled_writes.push(enabled);
+        log.lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .enabled_writes
+            .push(enabled);
         Ok(())
+    }
+
+    fn attributes(&mut self, node: &NodeId, slice: Duration) -> BusResult<Vec<(String, String)>> {
+        self.count(|_| {});
+        Ok(self.live(node, slice)?.attributes.clone())
     }
 
     fn register_events(&mut self, kinds: &[&str]) -> BusResult<()> {
@@ -203,8 +231,19 @@ impl Bus for FakeBus {
         self.reach()?;
         let log = Arc::clone(&self.log);
         let mut log = log.lock().unwrap_or_else(PoisonError::into_inner);
-        log.registered.extend(kinds.iter().map(|kind| (*kind).to_owned()));
+        log.registered
+            .extend(kinds.iter().map(|kind| (*kind).to_owned()));
         Ok(())
+    }
+
+    fn pending_events(&mut self) -> Vec<BusEvent> {
+        let mut due = Vec::new();
+        while self.events.front().is_some_and(|(at, _)| *at <= self.clock) {
+            if let Some((_, event)) = self.events.pop_front() {
+                due.push(event);
+            }
+        }
+        due
     }
 
     fn wait_event(&mut self, timeout: Duration) -> BusResult<Option<BusEvent>> {
