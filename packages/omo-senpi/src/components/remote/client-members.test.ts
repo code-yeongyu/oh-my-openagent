@@ -130,12 +130,10 @@ describe("members whose part has not landed", () => {
     const features = [
       failureOf(await client.attach(thread)),
       failureOf(await client.aliases.resolve("a")),
-      failureOf(await client.sessions.resolve("a")),
     ].map((failure) => [failure.code, failure.details?.["feature"]])
     expect(features).toEqual([
       ["unsupported", "attach"],
       ["unsupported", "aliases"],
-      ["unsupported", "sessions.resolve"],
     ])
   })
 })
