@@ -96,8 +96,18 @@ describe("omo remote", () => {
 
   test("devices moves this device first when the roster already lists it, and marks it this device (#13774)", async () => {
     const world = defaultWorld()
-    const self = { device: "dev-self", label: "This Mac", kind: "cli", platform: "linux", last_seen_ms: 1, online: true }
-    const owner = await startFakeOwner({ stateDir: privateDir(), world: { ...world, devices: [...world.devices, self] } })
+    const self = {
+      device: "dev-self",
+      label: "This Mac",
+      kind: "cli",
+      platform: "linux",
+      last_seen_ms: 1,
+      online: true,
+    }
+    const owner = await startFakeOwner({
+      stateDir: privateDir(),
+      world: { ...world, devices: [...world.devices, self] },
+    })
     owners.push(owner)
     const { code, out } = await run(["devices"], owner.stateDir)
     expect(code).toBe(REMOTE_EXIT.ok)
