@@ -19,3 +19,18 @@ pub(super) fn judge(after: Option<bool>) -> ReadBack {
     let read = Some(if running { "running" } else { "exited" }.to_owned());
     ReadBack::judge("exited", read, Some("running".to_owned()))
 }
+
+#[cfg(test)]
+mod tests {
+    use omo_computer_core::report::Effect;
+
+    use super::judge;
+
+    /// Review L1 of #13359: an unreadable listing after the quit is no evidence of "running".
+    #[test]
+    fn an_unreadable_listing_is_unverifiable_with_no_evidence() {
+        let verdict = judge(None);
+        assert_eq!(verdict.effect, Effect::Unverifiable);
+        assert!(verdict.evidence.is_empty(), "{:?}", verdict.evidence);
+    }
+}
