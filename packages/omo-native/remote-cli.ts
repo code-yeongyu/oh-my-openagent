@@ -63,7 +63,13 @@ export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: 
   // switch, the device link and the session host unit. It reaches the network, so it is not a local-only verb.
   if (parsed.command === "enable") {
     try {
-      return await runEnableVerb(dependencies, dependencies.bootstrap, dependencies, parsed.json)
+      return await runEnableVerb(
+        dependencies,
+        dependencies.bootstrap,
+        dependencies,
+        parsed.json,
+        parsed.afterLogin === true,
+      )
     } catch (error) {
       return reportFailure(dependencies, error)
     }

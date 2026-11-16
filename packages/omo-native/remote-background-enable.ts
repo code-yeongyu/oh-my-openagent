@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process"
 
 import type { BackgroundRemote } from "./remote-bootstrap"
+import { AFTER_LOGIN_FLAG } from "./remote-verbs"
 
 /** The part of node's spawn this needs; a test passes a recorder. */
 export type DetachedSpawn = (
@@ -24,7 +25,9 @@ export function backgroundRemote(
 ): BackgroundRemote {
   return (verb) => {
     const execPath = options.execPath ?? process.execPath
-    const [command, args] = omoBin.endsWith(".js") ? [execPath, [omoBin, "remote", verb]] : [omoBin, ["remote", verb]]
+    // The enable login starts says so, so it keeps an opt-out recorded while it installs (#13724 review M1).
+    const remoteArgs = verb === "enable" ? ["remote", verb, AFTER_LOGIN_FLAG] : ["remote", verb]
+    const [command, args] = omoBin.endsWith(".js") ? [execPath, [omoBin, ...remoteArgs]] : [omoBin, remoteArgs]
     const child = (options.spawn ?? spawn)(command, args, {
       detached: true,
       stdio: "ignore",

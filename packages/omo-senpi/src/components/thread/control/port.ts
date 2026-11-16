@@ -1,5 +1,6 @@
 import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "../errors"
 import type { ThreadTranscriptEntry } from "../reader"
+import type { InterruptOutcome } from "./interrupt"
 import type { ModelChoice } from "../tools/model-match"
 import type { ThreadCloseOutcome } from "../tools/ports"
 import type { ThreadSummary } from "../contracts"
@@ -18,8 +19,8 @@ export type SessionControl = {
   readonly title: string
   /** Names on the target device that a rename must not take. */
   readonly visible: () => Promise<readonly ThreadSummary[]>
-  /** The engine's own `interrupt`: an idle session answers `interrupted: false`. */
-  readonly interrupt: (turnId?: string) => Promise<{ readonly interrupted: boolean; readonly turn_id?: string }>
+  /** `interruptOver` on this leg's transport: an idle session answers `interrupted: false`. */
+  readonly interrupt: (turnId?: string) => Promise<InterruptOutcome>
   /** The one close ladder (`close-ladder.ts`) on the thread's engine. */
   readonly close: () => Promise<ThreadCloseOutcome>
   readonly setName: (name: string) => Promise<void>

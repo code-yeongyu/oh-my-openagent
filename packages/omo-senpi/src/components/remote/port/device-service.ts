@@ -1,4 +1,4 @@
-import { outcomeOf } from "./outcome"
+import { outcomeOf } from "../../thread/remote/outcome"
 import {
   connectDeviceService,
   LocalApiError,
@@ -7,7 +7,7 @@ import {
   type DeviceService,
   type RemoteAttach,
 } from "@oh-my-opencode/device-service-core/device-service"
-import type { JsonObject, RemoteCommandOutcome, RemoteSessionsPort } from "./ports"
+import type { JsonObject, RemoteCommandOutcome, RemoteSessionsPort } from "../../thread/remote/ports"
 
 export type DeviceServiceSessionsOptions = {
   readonly version: string

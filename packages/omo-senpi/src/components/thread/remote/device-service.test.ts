@@ -12,8 +12,8 @@ import { answered, closeThread, interruptThread, setModelOn } from "../control/o
 import { createRelayControl } from "../control/relay-control"
 import { createLiveThreadSurface } from "../live-surface"
 import { liveReadResult } from "../tools/read-ops"
-import { createDeviceServiceSessions } from "./device-service"
-import { createLazyRemoteSurface } from "./lazy-remote"
+import { createDeviceServiceSessions } from "../../remote/port/device-service"
+import { createLazyRemoteSurface } from "../../remote/port/lazy-remote"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 import { createRelaySessionHost } from "../control/relay-session-host"
 import { mkdtempSync, rmSync } from "node:fs"
@@ -213,7 +213,7 @@ describe("device-service adapter of the thread tools' account surface", () => {
         loads += 1
         if (loads === 1) throw new Error("sidecar missing")
         return {
-          createDeviceServiceSessions: () =>
+          remoteSessionsPort: () =>
             createDeviceServiceSessions({ version: "0.0.0-test", connect: async () => fakeService([], []) }),
         }
       },

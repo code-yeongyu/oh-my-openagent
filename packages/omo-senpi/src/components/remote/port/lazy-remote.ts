@@ -1,6 +1,6 @@
-import type { AliasRegistry, AliasResult, RemoteSessionsPort, RemoteThreadSurface } from "./ports"
+import type { AliasRegistry, AliasResult, RemoteSessionsPort, RemoteThreadSurface } from "../../thread/remote/ports"
 
-type Runtime = Pick<typeof import("./device-service"), "createDeviceServiceSessions">
+type Runtime = Pick<typeof import("./thread-runtime"), "remoteSessionsPort">
 
 export type LazyRemoteOptions = {
   readonly version: string
@@ -22,7 +22,7 @@ export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThrea
   let port: Promise<RemoteSessionsPort> | undefined
   const load = () =>
     (port ??= options.loadRuntime().then(
-      ({ createDeviceServiceSessions }) => createDeviceServiceSessions({ version: options.version }),
+      ({ remoteSessionsPort }) => remoteSessionsPort(options.version),
       (error: unknown) => {
         port = undefined
         throw error

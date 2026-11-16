@@ -12,23 +12,13 @@ import { localRemoteDependencies } from "./remote-local"
 
 // The launchers' `omo remote` entries: the verbs in remote-cli.ts over this device's real service, sign-in and binary.
 
-/**
- * `OMO_DEVICE_SERVICE_ORIGIN`: where the pinned device service release is fetched from instead of the default origin.
- * Every release is still verified against this build's release keys; the launcher tests point it at a closed port so a
- * login they run never downloads or installs a real service.
- */
-const releaseOrigin = (): { readonly release?: { readonly origin: string } } => {
-  const origin = process.env.OMO_DEVICE_SERVICE_ORIGIN
-  return origin === undefined || origin === "" ? {} : { release: { origin } }
-}
-
 function remoteDependencies(packageRoot?: string): RemoteVerbDependencies {
   const stateDir = deviceServiceStateDir()
   const binaryPath = omoBinaryPath()
   const agentDir = canonicalAgentDir()
   return {
     ...localRemoteDependencies(packageRoot),
-    bootstrap: deviceServiceBootstrapSetup({ stateDir, binaryPath, agentDir, ...releaseOrigin() }),
+    bootstrap: deviceServiceBootstrapSetup({ stateDir, binaryPath, agentDir }),
     coldWake: coldWakeSetup({ binaryPath, agentDir }),
     optOut: remoteOptOut(),
     // Reads the stored credential only when enable or the bootstrap finds a service that holds no device (omo#13602).
@@ -56,11 +46,16 @@ export async function runRemoteAttachCommand(args: readonly string[]): Promise<r
   return prepared.engineArgs
 }
 
+// The sign-in suites drive the real `omo login` through the launcher; their in-process preload marks the child so a test
+// login never installs or links a device service on the machine running the suite. Nothing a user can set reaches it.
+const testSkipKey = Symbol.for("omo.test.skipRemoteLoginSetup")
+
 /**
  * Right after a successful `omo login`: remote sessions switch on and the user is told (omo#13602); a device with no
  * current device service gets it from a detached `omo remote enable` instead of inside the login (omo#13722).
  */
 export async function setUpRemoteAfterLogin(): Promise<void> {
+  if ((globalThis as Record<symbol, unknown>)[testSkipKey] === true) return
   const dependencies = remoteDependencies()
   await runLoginSetup(dependencies, dependencies.bootstrap, dependencies, backgroundRemote(omoBinaryPath()))
 }

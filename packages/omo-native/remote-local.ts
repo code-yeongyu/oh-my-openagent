@@ -23,6 +23,7 @@ import { REMOTE_EXIT, UsageError } from "./remote-exit"
 import { controlLines, deviceLines, localRows, sessionLines, statusLines, wakeLines } from "./remote-render"
 import { isSessionVerb, parseSession, type SessionArgs } from "./remote-session-args"
 import { runSession } from "./remote-session-verbs"
+import { AFTER_LOGIN_FLAG } from "./remote-verbs"
 
 // The `omo remote` verbs whose whole call path is the account read plus this device's local API (omo#13440): argument
 // parsing, the account notice, the connection, and each verb's body. `remote-cli.ts` keeps usage, `bootstrap` (a
@@ -55,15 +56,16 @@ export interface RemoteCommandDependencies {
 /** This device's real account read, local API and stdio: every dependency the local verbs need. */
 export function localRemoteDependencies(packageRoot?: string): RemoteCommandDependencies {
   const stateDir = deviceServiceStateDir()
+  const error = (line: string) => process.stderr.write(`${line}\n`)
   return {
-    accountShow: readAccountInProcess,
+    accountShow: () => readAccountInProcess(error),
     stateDir,
     ...(packageRoot === undefined ? {} : { packageRoot }),
     connect: () => connectDeviceService({ version: packageJson.version, stateDir }),
     now: () => Date.now(),
     output: (line) => process.stdout.write(`${line}\n`),
     write: (text) => process.stdout.write(text),
-    error: (line) => process.stderr.write(`${line}\n`),
+    error,
   }
 }
 
@@ -84,6 +86,8 @@ export type Parsed = {
   readonly control: ControlValue | undefined
   readonly wake?: WakeValue
   readonly session?: SessionArgs
+  /** `enable` only: started by `omo login`, so an opt-out recorded meanwhile wins (remote-verbs.ts). */
+  readonly afterLogin?: true
 }
 
 const isRowState = (value: string): value is SessionRowState =>
@@ -96,10 +100,15 @@ export function parse(args: readonly string[]): Parsed {
   const filter: { device?: string; project?: string; state?: SessionRowState } = {}
   let control: ControlValue | undefined
   let wake: WakeValue | undefined
+  let afterLogin = false
   for (let index = 0; index < rest.length; index++) {
     const flag = rest[index]
     if (flag === "--json") {
       json = true
+      continue
+    }
+    if (command === "enable" && flag === AFTER_LOGIN_FLAG) {
+      afterLogin = true
       continue
     }
     if (command === "control") {
@@ -123,7 +132,14 @@ export function parse(args: readonly string[]): Parsed {
     else if (isRowState(value)) filter.state = value
     else throw new UsageError(`omo remote sessions: --state is one of ${SESSION_ROW_STATES.join(", ")}`)
   }
-  return { command, json, filter, control, ...(wake === undefined ? {} : { wake }) }
+  return {
+    command,
+    json,
+    filter,
+    control,
+    ...(wake === undefined ? {} : { wake }),
+    ...(afterLogin ? { afterLogin: true } : {}),
+  }
 }
 
 async function runOn(service: DeviceService, parsed: Parsed, dependencies: RemoteCommandDependencies): Promise<number> {

@@ -1,4 +1,5 @@
 import { expect, onTestFinished, test } from "bun:test"
+import { existsSync } from "node:fs"
 import { readdir, readFile, stat } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import { fakeApi, grant, minted, temporaryHome } from "./test-support"
@@ -49,8 +50,6 @@ test("real omo launcher signs in, reports status, and logs out without disk or o
       USERPROFILE: home,
       OMO_RUNTIME: "bun",
       OMO_SERVICE_API_URL: api,
-      // The login hands remote set-up to a background enable (omo#13722); a closed origin keeps it from installing.
-      OMO_DEVICE_SERVICE_ORIGIN: "http://127.0.0.1:9",
       OMO_TEST_KEYSTORE_URL: `${api}/fake-keystore`,
       // The child's own lock home: the test preload's account seam does not reach a child process (#12978).
       OMO_TEST_CREDENTIAL_LOCK_HOME: home,
@@ -79,6 +78,8 @@ test("real omo launcher signs in, reports status, and logs out without disk or o
   await run(["logout"])
   expect(stored).toBeNull()
   expect(requests.filter((path) => path.startsWith("POST"))).toEqual(["POST /v1/device/code", "POST /v1/device/token"])
+  // The login's remote setup stays off in the suite: no device service was installed under this home (omo#13627).
+  expect(existsSync(join(home, ".omo", "device-service"))).toBe(false)
   for (const name of await readdir(home, { recursive: true })) {
     const file = join(home, name)
     if (!(await stat(file)).isFile()) continue
