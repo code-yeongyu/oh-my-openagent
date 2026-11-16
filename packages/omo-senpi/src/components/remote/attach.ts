@@ -158,8 +158,8 @@ class MirroredDialogs {
     const uiRequestId = text(record["uiRequestId"])
     if (uiRequestId === undefined) return undefined
     if (record["type"] === "ui_request_settled") {
-      if (this.#raiserOnly.delete(uiRequestId)) return undefined
-      this.#shown.delete(uiRequestId)
+      // Only a request this attach showed gets a frame_settled; any other settle goes on as a record.
+      if (this.#raiserOnly.delete(uiRequestId) || !this.#shown.delete(uiRequestId)) return undefined
       const how = record["disposition"] === "answered" ? "answered" : "cancelled"
       return { kind: "frame_settled", request_id: uiRequestId, how }
     }

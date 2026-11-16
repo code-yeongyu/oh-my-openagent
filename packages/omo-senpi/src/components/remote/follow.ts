@@ -1,7 +1,7 @@
 import { outcomeOf } from "../thread/remote/outcome"
 import { eventStream, openAttachment, pendingRequestOf, raiserOnly } from "./attach"
 import { type ClientCore, ok, type RemoteClient } from "./client"
-import { nextActionFor, remoteFailure } from "./codes"
+import { engineCode, nextActionFor, remoteFailure } from "./codes"
 import { DEADLINES } from "./deadlines"
 import { canonicalizeThreadHandle } from "./seams"
 import type {
@@ -33,8 +33,11 @@ type WatchHandlers = {
 type SessionWatch = {
   readonly initial: SnapshotBody
   readonly handle: AttachHandle
-  /** The first fresh read, started once the caller can take it; settles once it was delivered to `fresh` or told nothing. */
-  readonly baseline: () => Promise<void>
+  /**
+   * The first fresh read, started once the caller can take it: undefined once a state was delivered to `fresh`, else
+   * why none was (the read failed, ended uncertain, or the host sent no engine reply).
+   */
+  readonly baseline: () => Promise<RemoteFailure | undefined>
   readonly stop: () => void
 }
 
@@ -63,13 +66,29 @@ async function watchSession(
   const record: JsonObject =
     target?.kind === "device_session" ? { type: "get_state", sessionId: target.session } : { type: "get_state" }
   let stopped = false
-  // A read that fails, or that the host answers without the engine's reply, tells nothing; the records still do.
-  const readFresh = async (): Promise<void> => {
+  // A read that fails, or that the host answers without the engine's reply, delivers nothing and says why; the records
+  // still flow either way.
+  const readFresh = async (): Promise<RemoteFailure | undefined> => {
     const sent = await handle.command(record)
-    if (stopped || sent.kind === "error") return
+    if (sent.kind === "error") return sent
     const outcome = outcomeOf(sent.value)
-    const data = outcome.kind === "ok" ? outcome.response["data"] : undefined
-    if (isObject(data)) handlers.fresh(data)
+    if (outcome.kind === "uncertain")
+      return remoteFailure("unconfirmed", `get_state ended uncertain: ${outcome.reason}.`, RETRY_WAIT, {
+        details: { reason: outcome.reason },
+      })
+    if (outcome.kind === "refused") {
+      const mapped = engineCode(outcome.reason)
+      return remoteFailure(mapped.code, `The engine refused get_state: ${outcome.reason}.`, RETRY_WAIT, {
+        ...(mapped.details === undefined ? {} : { details: mapped.details }),
+      })
+    }
+    const data = outcome.response["data"]
+    if (!isObject(data))
+      return remoteFailure("unsupported", "The session's host sent no engine reply to get_state.", RETRY_WAIT, {
+        details: { feature: "fresh_state" },
+      })
+    if (!stopped) handlers.fresh(data)
+    return undefined
   }
   const stopSnapshots = onSnapshot((snapshot) => {
     if (stopped) return
@@ -161,8 +180,6 @@ class SessionTurn {
   status = "idle"
   /** A run is in flight: a source showed it running and no end was observed since. Only `#end` clears it. */
   running = false
-  /** A run was seen in flight since the follow or wait started. */
-  ran = false
   text = ""
   turnId: string | undefined
   aborted = false
@@ -307,7 +324,6 @@ class SessionTurn {
 
   #markRunning(): void {
     this.running = true
-    this.ran = true
   }
 
   /** An observed end of the run: the only way `running` goes false. Answers whether a run was in flight. */
@@ -355,6 +371,8 @@ const WAITING: Readonly<Record<string, Extract<FollowEvent, { readonly kind: "wa
   compacting: "compacting",
   opening: "queued",
 }
+
+const RETRY_WAIT = "Call sessions.get for the session's state, then sessions.wait again."
 
 const ANSWER_ELSEWHERE = "A person answers it with attach(thread).answer on a person client."
 
@@ -493,8 +511,12 @@ export function streamMembers(core: ClientCore): StreamMembers {
         turn = new SessionTurn()
         turn.resync(opened.value.initial)
         check([])
-        await opened.value.baseline()
-        confirmed = true
+        const unread = await opened.value.baseline()
+        // Without a fresh state "no run" is unknown (the snapshot's idle can be stale): a run already seen is still
+        // waited for, but a wait that would answer settled/idle answers why it cannot tell instead.
+        if (unread === undefined) confirmed = true
+        else if (!turn.running && turn.status !== "waiting_input")
+          return done({ ...unread, details: { ...unread.details, phase: "baseline" } })
         check([])
       })
     })

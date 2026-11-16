@@ -4,7 +4,7 @@ import { pushDetached, pushFrame, pushRecords, pushSnapshot, reader, THREAD, wor
 import { DEADLINES } from "./deadlines"
 import { sessionStatusOf } from "./follow"
 import { handleOf } from "./seams"
-import { clientOn, closeClients, fakeClock, startOwner } from "./testing/fake-service"
+import { clientOn, closeClients, fakeClock, startModeOwner, startOwner } from "./testing/fake-service"
 import type { RemoteClient } from "./client"
 import type { FollowEvent, JsonObject, PendingRequest, RemoteSender } from "./types"
 
@@ -233,6 +233,32 @@ describe("sessions.wait rows: a running turn behind an idle snapshot (live relay
     pushRecords(owner, [{ type: "session_lifecycle", sessionId: "engine-1", lifecycle: { state: "done", seq: 6 } }], 2)
     expect(await settling).toMatchObject({ kind: "ok", value: { outcome: "settled", status: "idle" } })
   })
+})
+
+describe("sessions.wait rows: a first get_state that tells nothing (#13753 review M1)", () => {
+  // The engine's truth: a run lease still running. The snapshot says idle and carries no lease, so only the fresh read
+  // could tell; when it fails, "no run" is unknown and wait must not answer settled/idle.
+  const behind = { lifecycle: { state: "running", seq: 4 } }
+
+  test.each([
+    ["the engine refuses get_state", "terminal" as const, worldWith(IDLE, [], { reply: behind })],
+    [
+      "get_state ends uncertain",
+      undefined,
+      worldWith(IDLE, [], {
+        reply: behind,
+        outcome: [{ state: "uncertain", reason: "unconfirmed", retryable: false }],
+      }),
+    ],
+    ["the host sends no engine reply", undefined, worldWith(IDLE, [], { undelegated: true })],
+  ])(
+    "#given %s on an idle-looking snapshot #when wait runs #then it answers a failure, never settled/idle",
+    async (_name, mode, world) => {
+      const owner = mode === undefined ? await startOwner(world) : (await startModeOwner(mode, world, [])).owner
+      const outcome = await clientOn(owner.stateDir, fakeClock()).sessions.wait(THREAD)
+      expect(outcome).toMatchObject({ kind: "error", details: expect.objectContaining({ phase: "baseline" }) })
+    },
+  )
 })
 
 describe("sessions.wait rows", () => {

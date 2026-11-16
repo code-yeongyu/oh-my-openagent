@@ -167,6 +167,16 @@ describe("attach rows: pending UI requests (#12750)", () => {
     await handle.detach()
   })
 
+  test("#given a settle for a request this attach never showed #when it arrives #then no frame_settled, the record goes on as it is", async () => {
+    const { owner, handle } = await attached({ sessionId: "engine-1", isStreaming: true, pendingDialogs: [] })
+    const events = reader(handle.events)
+    const settle = { type: "ui_request_settled", uiRequestId: "ui-77", disposition: "answered" }
+    pushRecords(owner, [settle, { type: "agent_start" }])
+    expect(await events.next("the settle record")).toEqual({ kind: "record", record: settle })
+    expect(await events.next("the next record")).toEqual({ kind: "record", record: { type: "agent_start" } })
+    await handle.detach()
+  })
+
   test("#given a dialog raised on this connection's delegated channel #when it arrives #then it is a frame once, secret included, and pending holds it", async () => {
     const { owner, handle } = await attached({ sessionId: "engine-1", isStreaming: true, pendingDialogs: [] })
     const events = reader(handle.events)
@@ -257,6 +267,22 @@ describe("attach rows: end", () => {
       details: { feature: "serve_endpoint" },
     })
     await handle.detach()
+  })
+
+  test("#given an attach that already ended #when serveEndpoint runs #then the endpoint it made is closed at once and it answers session_ended", async () => {
+    const closed: string[] = []
+    const { owner, handle } = await attached(STATE, [], {
+      serveAttach: async () => ({
+        socketPath: "/served.sock",
+        sessionRef: "s",
+        close: async () => void closed.push("/served.sock"),
+      }),
+    })
+    const events = reader(handle.events)
+    pushDetached(owner, "session_closed")
+    for (let event = await events.next("the end"); event !== "done"; event = await events.next("the end"));
+    expect(failureOf(await handle.serveEndpoint())).toMatchObject({ code: "session_ended" })
+    expect(closed).toEqual(["/served.sock"])
   })
 
   test("#given a served endpoint #when the far side ends the attach #then the endpoint's private directory and its secret are gone once the events end", async () => {
