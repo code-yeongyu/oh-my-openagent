@@ -10,6 +10,18 @@ import type { RemoteFailure } from "./types"
 export const defaultLocalThreadHost = async (connect: ThreadSocketConnect): Promise<ThreadHost> =>
   (await import("#omo-thread-client-runtime")).createLiveThreadSurface(undefined, { connect })
 
+/**
+ * This device's endpoints for the listing's local leg, named by the registry on disk instead of the engine CLI's
+ * `host status --all`: that is a cold engine start (seconds), which every listing paid before it read anything, even
+ * with no endpoint running here. An endpoint that is not serving fails at connect; one that takes the request and hangs
+ * is bounded by the leg's deadline.
+ */
+export const listingLocalThreadHost = async (connect: ThreadSocketConnect): Promise<ThreadHost> =>
+  (await import("#omo-thread-client-runtime")).createLiveThreadSurface(undefined, {
+    connect,
+    statusAll: async () => undefined,
+  })
+
 export type LocalOpen =
   | { readonly kind: "ok"; readonly key: string }
   | { readonly kind: "error"; readonly error: ThreadToolFailure }

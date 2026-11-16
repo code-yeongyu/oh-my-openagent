@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { connectDeviceService } from "@oh-my-opencode/device-service-core/device-service"
-import { mkdtempSync, rmSync } from "node:fs"
-import type { Socket } from "node:net"
+import { connectDeviceService, realTimers } from "@oh-my-opencode/device-service-core/device-service"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { Socket } from "node:net"
 import { tmpdir, userInfo } from "node:os"
 import { join } from "node:path"
 import type { JsonObject, ListingRow } from "../../../../device-service-core/src/local-api/protocol.ts"
@@ -13,6 +13,7 @@ import {
 } from "../../../../device-service-core/test/local-api/conformance/world.ts"
 import { type ContractHost, withContractHost } from "../../../../senpi-task/src/runners/rpc-host/testing/contract-host"
 import { createLiveThreadSurface } from "../thread/live-surface"
+import { createRemoteClient } from "./client"
 import { DEADLINES } from "./deadlines"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
 import { personIdentity, resolveSessionTarget } from "./sessions"
@@ -100,11 +101,11 @@ const valueOf = async <T>(
   return settled.value
 }
 
-/** Awaits `signal`, failing the test with what never came if it has not settled within 5 s. */
-const within = <T>(signal: Promise<T>, what: string): Promise<T> => {
+/** Awaits `signal`, failing the test with what never came if it has not settled within `ms` (5 s by default). */
+const within = <T>(signal: Promise<T>, what: string, ms = 5_000): Promise<T> => {
   let timer: ReturnType<typeof setTimeout> | undefined
   const breaker = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`waited 5 s for ${what}; it never came`)), 5_000)
+    timer = setTimeout(() => reject(new Error(`waited ${ms} ms for ${what}; it never came`)), ms)
   })
   return Promise.race([signal, breaker]).finally(() => clearTimeout(timer))
 }
@@ -1000,6 +1001,65 @@ describe("an open on this device", () => {
       expect(listing.rows.filter((row) => row.device.id === SELF)).toEqual([])
       expect(listing.unanswered).toContainEqual(expect.objectContaining({ id: SELF, self: true }))
     })
+  })
+
+  test("#given no operator endpoint on this device and an engine CLI that never answers #when sessions.list reads the whole account through the default local host under real timers #then it answers at once, this device holding no session", async () => {
+    // The listing's local leg as a script gets it (no localThreadHost seam): were it to enumerate this device's endpoints
+    // through the engine CLI's `host status --all`, a cold engine start (seconds; this one never answers) would hold
+    // every listing up to the local leg's own 10 s bound.
+    const dir = mkdtempSync(join(tmpdir(), "omo-remote-no-endpoint-"))
+    emptyDirs.push(dir)
+    const engine = join(dir, "senpi")
+    writeFileSync(engine, "#!/bin/sh\nexec sleep 30\n", { mode: 0o755 })
+    process.env.SENPI_BIN = engine
+    // An empty agent dir: no operator socket, no endpoint registered on disk.
+    process.env.OMO_CODING_AGENT_DIR = join(dir, "agent")
+    const owner = await startOwner(selfWorld())
+    const client = createRemoteClient(
+      { kind: "person", uid: "user-1" },
+      { version: "5.1.70", stateDir: owner.stateDir, timers: realTimers },
+    )
+    try {
+      const listing = await valueOf(within(client.sessions.list(), "sessions.list with no local endpoint", 1_000))
+      expect(listing.rows.map((row) => row.device.id)).toContain(PEER)
+      expect(listing.rows.filter((row) => row.device.id === SELF)).toEqual([])
+      // Nothing runs here to hold a session: this device answered with none, it did not miss the round.
+      expect(listing.unanswered.map((row) => row.id)).not.toContain(SELF)
+    } finally {
+      client.close()
+    }
+  })
+
+  test("#given an operator socket left behind by a host that exited #when sessions.list reads the whole account #then the refused connect means this device holds no session, not that it missed the round", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "omo-remote-left-behind-"))
+    emptyDirs.push(dir)
+    const socket = join(dir, "rpc.sock")
+    writeFileSync(socket, "")
+    let dialed = 0
+    const owner = await startOwner(selfWorld())
+    const client = clientOn(owner.stateDir, fakeClock(), undefined, {
+      localThreadHost: async () =>
+        createLiveThreadSurface(undefined, {
+          socket,
+          env: {},
+          statusAll: async () => undefined,
+          registry: async () => [],
+          // What the kernel answers a connect to a socket path nothing listens on any more.
+          connect: () => {
+            dialed++
+            const refused = new Socket()
+            queueMicrotask(() =>
+              refused.destroy(Object.assign(new Error(`connect ECONNREFUSED ${socket}`), { code: "ECONNREFUSED" })),
+            )
+            return refused
+          },
+        }),
+    })
+    const listing = await valueOf(client.sessions.list())
+    expect(dialed).toBeGreaterThan(0)
+    expect(listing.rows.map((row) => row.device.id)).toContain(PEER)
+    expect(listing.rows.filter((row) => row.device.id === SELF)).toEqual([])
+    expect(listing.unanswered.map((row) => row.id)).not.toContain(SELF)
   })
 
   test("#given a keyed send on this device still in flight #when more than 256 other keyed sends settle #then its retry joins it instead of sending again, and the oldest settled key is the one forgotten (#13787 review L2)", async () => {

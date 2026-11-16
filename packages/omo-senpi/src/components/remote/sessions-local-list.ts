@@ -13,11 +13,18 @@ const updatedMs = (session: ThreadHostSession): number => {
   return Number.isNaN(parsed) ? 0 : parsed
 }
 
+const notRunning = (error: unknown): boolean => {
+  if (!(error instanceof Error)) return false
+  const code = Reflect.get(error, "code")
+  return error.message.startsWith("host_unavailable:") || code === "ENOENT" || code === "ECONNREFUSED"
+}
+
 /**
  * This device's sessions as listing rows, read from its own operator endpoint (#13787): the service's listing does not
  * carry the asking device's sessions, and every member serves them locally by durable id, which is their handle. A
  * session its host is closing or has closed is `ended`; any other one the host holds is `running`, as the service's
- * listing marks a session an engine holds. Empty when no operator endpoint runs here; undefined when it did not answer.
+ * listing marks a session an engine holds. Empty when no endpoint runs here (none listening, or a socket left behind
+ * that refuses the connect); undefined when one did not answer.
  */
 export async function localSessionRows(
   hostOn: (connect: ThreadSocketConnect) => Promise<ThreadHost>,
@@ -25,11 +32,10 @@ export async function localSessionRows(
 ): Promise<readonly SessionRow[] | undefined> {
   let sessions: readonly ThreadHostSession[]
   try {
-    // The operator endpoint's own list (the one a local open lands on); the whole-device view would run the engine.
     sessions = await (await hostOn((path) => createConnection(path))).listSessions()
   } catch (error) {
-    // No operator endpoint running here holds no session; any other failure leaves this device unanswered.
-    return error instanceof Error && error.message.startsWith("host_unavailable:") ? [] : undefined
+    // No endpoint running here holds no session; any other failure leaves this device unanswered.
+    return notRunning(error) ? [] : undefined
   }
   return sessions.map((session) => {
     const durable = session.durableSessionId ?? session.sessionId
