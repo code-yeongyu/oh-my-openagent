@@ -4,12 +4,17 @@
 //! near-black oracle, `BitBlt` per display), `displays()` and `Windows.Media.Ocr`.
 
 pub mod backend;
+pub mod apps;
 pub mod capture;
+pub mod diagnose;
 pub mod displays;
+pub mod epoch;
+pub mod frame_verbs;
 pub mod input;
 pub mod ocr;
 pub mod release_helper;
 pub mod uia;
+pub mod windows;
 
 pub use backend::Win32Backend;
 
