@@ -176,6 +176,13 @@ impl FakeBackend {
         self.lock().lease_end_pressed = true;
     }
 
+    /// Row 50 (review M1): the user presses the lease-end key and, as on X11, the backend only
+    /// hears it when its stop listener is next polled.
+    pub fn press_lease_end_through_listener(&self) {
+        let mut state = self.lock();
+        state.lease_end_heard_at = Some(state.stop_polls);
+    }
+
     /// Sends a preview frame to the subscriber; returns whether one is subscribed.
     pub fn publish_preview(&self, frame_id: &str) -> bool {
         let subscribed = self.lock().scenario.preview_subscribed;
