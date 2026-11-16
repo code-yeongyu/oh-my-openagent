@@ -1990,6 +1990,7 @@ dependencies = [
  "omo-computer-safety",
  "serde",
  "serde_json",
+ "sha2",
 ]
 
 [[package]]
