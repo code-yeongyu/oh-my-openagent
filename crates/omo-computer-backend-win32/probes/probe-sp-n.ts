@@ -2429,8 +2429,12 @@ const LOGIC_CHECKS: readonly Check[] = [
       if (nativeDir({ SPN_NATIVE_DIR: outside, TEMP: "/t" }, repo) !== outside)
         bad.push("SPN_NATIVE_DIR is not the native dir")
       if (nativeDir({ TEMP: outside }, repo) !== outside) bad.push("the native dir does not fall back to TEMP")
-      if (!/^\s+SPN_NATIVE_DIR: \$\{\{ runner\.temp \}\}[\\/]/m.test(yml))
+      // set in a step through GITHUB_ENV: the runner context is not available in job-level env, and GitHub refuses to
+      // parse a workflow that uses it there (dispatch: "Unrecognized named-value: 'runner'")
+      if (!/SPN_NATIVE_DIR=\$env:RUNNER_TEMP[\\/][^\n]*\$env:GITHUB_ENV/.test(yml))
         bad.push("the workflow does not set SPN_NATIVE_DIR under the runner temp dir")
+      if (/^ {4}env:\n(?: {6}.*\n)*? {6}[A-Z_]+: \$\{\{ runner\./m.test(yml))
+        bad.push("the workflow reads the runner context in job-level env")
       if (
         !/\[string\]\$NativeDir = \$\(if \(\$env:SPN_NATIVE_DIR\) \{ \$env:SPN_NATIVE_DIR \} else \{ \$env:TEMP \}\)/.test(
           helper,

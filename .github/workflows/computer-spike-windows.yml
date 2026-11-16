@@ -1,7 +1,8 @@
 name: Computer spike SP-N (Windows)
 
-# Measures the SP-N ledger rows on a hosted Windows desktop. Pull-request
-# triggered; the first step proves the job has an interactive desktop
+# Measures the SP-N ledger rows on a hosted Windows desktop. Runs on
+# workflow_dispatch and on a pull request that carries the ci:full-matrix label
+# (#13811); the first step proves the job has an interactive desktop
 # (OpenInputDesktop succeeds and the session id is not 0) and the probe exits
 # naming that precondition otherwise. The ledger is uploaded as an artifact;
 # rows are committed to the repository only by the spike's own pull request.
@@ -29,11 +30,14 @@ jobs:
     runs-on: windows-latest
     # 2 passes x 895 s + overhead + reserve, 10 % kept free (the self-test checks it)
     timeout-minutes: 45
-    env:
-      # the precompiled native assembly lives here, outside the checkout (sp-n.ps1 -NativeDir; probe-sp-n.ts passes it)
-      SPN_NATIVE_DIR: ${{ runner.temp }}\spn-native
     steps:
       - uses: actions/checkout@v7
+
+      # The precompiled native assembly lives under the runner temp dir, outside the checkout (sp-n.ps1 -NativeDir;
+      # probe-sp-n.ts passes it). Set here, not in job env: the runner context is not available at job level.
+      - name: Native assembly directory under the runner temp dir
+        shell: pwsh
+        run: '"SPN_NATIVE_DIR=$env:RUNNER_TEMP\spn-native" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8'
 
       - uses: oven-sh/setup-bun@v2
         with:
