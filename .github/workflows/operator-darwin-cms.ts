@@ -28,18 +28,19 @@ type Tlv = {
 // Deeper nesting than any CMS needs is refused, so a crafted blob cannot exhaust the stack.
 const MAX_INDEFINITE_DEPTH = 32
 
-// `depth` counts the indefinite-length elements already open around this one, so the outermost is level 1.
-function tlv(bytes: Uint8Array, at: number, depth = 1): Tlv {
-  if (depth > MAX_INDEFINITE_DEPTH) refuse(`DER nesting exceeds ${MAX_INDEFINITE_DEPTH} indefinite-length levels`)
+// `open` counts the indefinite-length elements already open around this one; only indefinite-length elements
+// count, so 32 such levels parse whatever they contain and a 33rd is refused.
+function tlv(bytes: Uint8Array, at: number, open = 0): Tlv {
   const tag = bytes[at] ?? refuse("truncated DER")
   let length = bytes[at + 1] ?? refuse("truncated DER")
   let body = at + 2
   if (length === 0x80) {
+    if (open + 1 > MAX_INDEFINITE_DEPTH) refuse(`DER nesting exceeds ${MAX_INDEFINITE_DEPTH} indefinite-length levels`)
     if (!(tag & 0x20)) refuse("indefinite length on a primitive element")
     let cursor = body
     while (bytes[cursor] !== 0 || bytes[cursor + 1] !== 0) {
       if (cursor >= bytes.byteLength) refuse("unterminated indefinite-length element")
-      cursor = tlv(bytes, cursor, depth + 1).end
+      cursor = tlv(bytes, cursor, open + 1).end
     }
     return { tag, start: at, body, stop: cursor, end: cursor + 2 }
   }

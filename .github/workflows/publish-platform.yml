@@ -356,8 +356,8 @@ jobs:
   operator-darwin:
     if: github.repository == 'code-yeongyu/oh-my-openagent' && inputs.operator_darwin_artifacts != ''
     runs-on: ubuntu-24.04
-    # The verifier's two network lookups (Apple ticket, GitHub role) time out per call. The gh, git and curl
-    # commands in the other steps have no per-call bound, so this caps the whole job well below the 6 h default.
+    # The verifier's two network lookups (Apple ticket, GitHub role) time out per call. The gh and git commands in
+    # the other steps have no per-call bound, so this caps the whole job well below the 6 h default.
     timeout-minutes: 30
     permissions:
       # Draft releases are listed only to tokens with push access; nothing here writes.
@@ -375,11 +375,13 @@ jobs:
         with:
           bun-version: "1.4.4"
 
-      # The verifier and its pins run from the dispatched ref (#13943). This step refuses a ref whose
-      # operator-darwin-*.ts or bunfig.toml differ from the default branch's; the verifier also runs with an empty
-      # Bun config, so no ref-supplied preload executes before it. It does NOT pin this workflow file itself: a ref
-      # that edits publish-platform.yml can drop this step, which only a protected environment or a branch rule on
-      # .github/workflows/** closes (owner setting, #13964).
+      # The checkout is the dispatched ref (#13943, #13964). This step refuses a ref whose operator-darwin-*.ts or
+      # bunfig.toml differ from the default branch's, and copies the DEFAULT BRANCH's verifier bytes outside the
+      # checkout. The verify step runs only that copy, from an empty working directory, with no Bun config, no .env
+      # and a cleared environment, so no file in the ref (bunfig.toml, tsconfig.json/jsconfig.json paths, .env) can
+      # replace the verifier or intercept its lookups. It does NOT pin this workflow file itself: a ref that edits
+      # publish-platform.yml can drop this step, which only a protected environment or a branch rule closes (owner
+      # setting).
       - name: Refuse operator darwin verifier code that differs from the default branch
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch || 'dev' }}
@@ -394,7 +396,14 @@ jobs:
             git diff --stat FETCH_HEAD HEAD -- '.github/workflows/operator-darwin-*.ts' bunfig.toml
             exit 1
           fi
-          echo "The operator darwin verifier equals ${DEFAULT_BRANCH}."
+          PINNED="${RUNNER_TEMP}/operator-darwin-verifier"
+          mkdir -p "$PINNED"
+          git ls-tree --name-only FETCH_HEAD .github/workflows/ | grep '/operator-darwin-[a-z]*\.ts$' | while read -r path; do
+            git show "FETCH_HEAD:${path}" > "${PINNED}/${path##*/}"
+          done
+          test -s "${PINNED}/operator-darwin-verify.ts"
+          echo "OPERATOR_DARWIN_VERIFIER=${PINNED}" >> "$GITHUB_ENV"
+          echo "The operator darwin verifier equals ${DEFAULT_BRANCH}; pinned copy at ${PINNED}."
 
       - name: Download operator darwin artifacts
         env:
@@ -444,13 +453,17 @@ jobs:
             echo "::error::operator_darwin_artifacts refused: could not fetch source ${SOURCE_SHA} and prepared_release_sha ${PREPARED_RELEASE_SHA}."
             exit 1
           fi
-          # An empty Bun config: no bunfig.toml preload from the checkout runs before the verifier.
-          : > "${RUNNER_TEMP}/operator-darwin-bunfig.toml"
-          bun --config="${RUNNER_TEMP}/operator-darwin-bunfig.toml" .github/workflows/operator-darwin-verify.ts \
+          # Run the pinned default-branch verifier from an empty directory outside the checkout: no bunfig.toml,
+          # tsconfig/jsconfig or .env from the ref is in reach, and the environment is rebuilt from scratch so no
+          # proxy, TLS override, NODE_OPTIONS or BUN_* setting reaches it.
+          RUN_DIR="$(mktemp -d "${RUNNER_TEMP}/operator-darwin-run.XXXXXX")"
+          : > "${RUN_DIR}/empty-bunfig.toml"
+          (cd "$RUN_DIR" && env -i PATH="$PATH" HOME="$RUN_DIR" RUNNER_TEMP="$RUNNER_TEMP" GH_TOKEN="${GH_TOKEN:-}" \
+            bun --no-env-file --config="${RUN_DIR}/empty-bunfig.toml" "${OPERATOR_DARWIN_VERIFIER}/operator-darwin-verify.ts" \
             --dir "$OPERATOR_DARWIN_DIR" --tag "$TAG" \
-            --manifest-sha256 "$MANIFEST_SHA256" --prepared-sha "$PREPARED_RELEASE_SHA" --version "$VERSION" --repo . \
+            --manifest-sha256 "$MANIFEST_SHA256" --prepared-sha "$PREPARED_RELEASE_SHA" --version "$VERSION" --repo "$GITHUB_WORKSPACE" \
             --actor "$ACTOR" --triggering-actor "$TRIGGERING_ACTOR" --repository "$REPOSITORY" \
-            --summary "${RUNNER_TEMP}/operator-darwin-rows.md"
+            --summary "${RUNNER_TEMP}/operator-darwin-rows.md")
           {
             echo "### Darwin artifacts: OPERATOR-BUILT"
             echo "npm provenance covers this publish run only; the darwin build is attested by the Developer ID signature, Apple notarization and the sha256 values below, which the release records."
