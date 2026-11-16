@@ -4,7 +4,7 @@ use serde_json::json;
 
 use crate::params::SessionOpenParams;
 use crate::settings::{
-    admission_keys, CuaAdapter, CuaAdapterMode, FullLiteral, RunLimits, Settings, Trace,
+    admission_keys, CuaAdapter, CuaAdapterMode, FullLiteral, Settings, Trace,
 };
 
 #[test]
@@ -31,7 +31,7 @@ fn trace_full_literal_is_accepted_by_the_strict_schema() {
 
 #[test]
 fn unknown_and_removed_keys_are_refused() {
-    for key in ["run_sandbox", "macos_canary", "showCursor", "lockState"] {
+    for key in ["run_limits", "macos_canary", "showCursor", "lockState"] {
         assert!(
             serde_json::from_value::<Settings>(json!({ key: "x" })).is_err(),
             "{key} is not a settings key"
@@ -41,28 +41,6 @@ fn unknown_and_removed_keys_are_refused() {
         json!({"settings": {"runtime": "v3", "mcp": {"tier": "read"}}}),
     );
     assert!(open.is_ok(), "{open:?}");
-}
-
-#[test]
-fn run_limits_default_to_the_cell_numbers_and_override_per_member() {
-    let settings: Settings =
-        serde_json::from_value(json!({"run_limits": {"wallMs": 5000}})).expect("partial override");
-    let limits = settings.run_limits.expect("present");
-    assert_eq!(limits.wall_ms, 5000);
-    assert_eq!(
-        RunLimits {
-            wall_ms: 30_000,
-            ..limits
-        },
-        RunLimits::default()
-    );
-    let defaults = serde_json::to_value(RunLimits::default()).expect("serializes");
-    assert_eq!(
-        defaults,
-        json!({"source": 65536, "wallMs": 30000, "heapBytes": 16777216, "stackBytes": 1048576, "calls": 64, "pending": 4,
-               "argBytes": 65536, "returnBytes": 65536, "treeBytes": 131072, "imageBytes": 2097152, "journal": 64,
-               "children": 4, "batchCalls": 16})
-    );
 }
 
 #[test]

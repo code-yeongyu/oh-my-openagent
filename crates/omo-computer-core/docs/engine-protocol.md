@@ -111,7 +111,6 @@ No other `OMO_COMPUTER_*` variable is read; a fake-only seam with a real backend
 | `computer.engine_path` | keep | engine locator (acquire source, identity-checked) | no |
 | `computer.send_on_enter` | new | session.open: send-on-enter composer guard | yes |
 | `computer.url_policy` | new | session.open: Consequential gate URL read | yes |
-| `computer.run_limits` | new | QuickJS run cell ceilings | no |
 | `computer.record` | new | per-run recording writer | yes |
 | `computer.pause_ceiling_ms` | new | mutate admission: deadline pause | no |
 | `computer.display_awake_grace_ms` | new | session.open: display-awake hold | no |

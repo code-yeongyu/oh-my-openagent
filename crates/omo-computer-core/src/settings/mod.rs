@@ -5,7 +5,7 @@ mod model;
 mod table;
 mod values;
 
-pub use limits::{FleetSettings, McpSettings, RunLimits};
+pub use limits::{FleetSettings, McpSettings};
 pub use model::Settings;
 pub use table::{admission_keys, SettingRow, SettingStatus, GROUPED_KEYS, SETTINGS_TABLE};
 pub use values::{
