@@ -17,7 +17,12 @@ const fail = (
 
 export function outcomeOf(result: CommandResult): RemoteCommandOutcome {
   const { outcome } = result
-  if (outcome.state === "engine_refused") return { kind: "refused", reason: outcome.reason }
+  if (outcome.state === "engine_refused") {
+    const detail = outcome.receipt?.["reason"]
+    return typeof detail === "string" && detail !== ""
+      ? { kind: "refused", reason: outcome.reason, detail }
+      : { kind: "refused", reason: outcome.reason }
+  }
   if (outcome.state === "uncertain") return { kind: "uncertain", reason: outcome.reason }
   if (outcome.state === "engine_stale") return { kind: "uncertain", reason: "engine_stale" }
   const response = result.response ?? {}
