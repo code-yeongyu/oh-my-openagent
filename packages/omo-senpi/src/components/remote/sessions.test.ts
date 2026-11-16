@@ -491,21 +491,12 @@ describe("#13756 review", () => {
 })
 
 describe("an open on this device", () => {
-  // The two-device proof's field failure: the account listing (devices()) leaves out this device, which only
-  // thisDevice() names; a connected service must still open here through the relay host, never local_only.
+  // The two-device proofs' field failures: the account listing (devices()) leaves out this device, which only
+  // thisDevice() names, and the relay cannot route to the device that asks. A session here is served by this device's
+  // own operator endpoint (the contract host, which names the session it opens dur-selected).
   const SELF = "dev-self"
-  const selfWorld = (): World => {
-    const base = world()
-    const live = base.sessions[0]
-    if (live === undefined) throw new Error("the world holds a live session")
-    return {
-      ...base,
-      endpoints: { ...base.endpoints, [SELF]: ["ZW5kcG9pbnQta2V5LTAwMD"] },
-      // The contract host names the session it opens dur-selected.
-      located: { ...base.located, [SELF]: { "dur-selected": NEW_KEY } },
-      sessions: [...base.sessions, { ...live, device: SELF, session_id: NEW_KEY }],
-    }
-  }
+  const SELF_SESSION = handleOf(SELF, "dur-selected")
+  const selfWorld = world
 
   test("#given a connected service whose device listing omits this device #when devices.list reads #then the self row is not the no-service row", async () => {
     const owner = await startOwner(selfWorld())
@@ -549,7 +540,7 @@ describe("an open on this device", () => {
     await withContractHost({}, async (host) => {
       const { owner, client } = await localClient(host)
       const opened = await valueOf(client.sessions.open({ device: SELF, workspace: host.root, preset: "read-only" }))
-      expect(opened.thread).toBe(handleOf(SELF, NEW_KEY))
+      expect(opened.thread).toBe(SELF_SESSION)
       expect(opened.device).toMatchObject({ id: SELF, self: true })
       expect(owner.state.commands.filter((rpc) => rpc["type"] === "open_session")).toEqual([])
       expect(opensOn(host)).toEqual([
@@ -565,7 +556,7 @@ describe("an open on this device", () => {
       })
       const request = { device: SELF, workspace: host.root, idempotency_key: "local-1" }
       const failure = failureOf(await client.sessions.open(request))
-      expect(failure).toMatchObject({ code: "unconfirmed", uncertain: true, details: { phase: "open" } })
+      expect(failure).toMatchObject({ code: "unconfirmed", uncertain: true, details: { phase: "send" } })
       expect(failure.next_action).toContain("sessions.list")
       expect(failureOf(await client.sessions.open(request))).toEqual(failure)
       expect(opensOn(host).length).toBeLessThanOrEqual(1)
@@ -613,12 +604,62 @@ describe("an open on this device", () => {
     })
   })
 
-  test("#given this device's service cannot name the new session's listing key #when sessions.open runs #then its durable id answers, with a warning (#13787 L1)", async () => {
+  test("#given a session opened on this device #when send, get, read, interrupt, setReasoning and close address it #then each runs on this device's own host and the relay is never asked (#13787)", async () => {
+    await withContractHost({ auth: true }, async (host) => {
+      const { owner, client } = await localClient(host)
+      expect((await valueOf(client.sessions.open({ device: SELF, workspace: host.root }))).thread).toBe(SELF_SESSION)
+      expect(await valueOf(client.sessions.send(SELF_SESSION, { text: "hello here" }))).toMatchObject({
+        thread: SELF_SESSION,
+        device: { id: SELF, self: true },
+        lane: "queued",
+      })
+      expect(await valueOf(client.sessions.get(SELF_SESSION))).toMatchObject({
+        thread: SELF_SESSION,
+        device: { id: SELF },
+        state: "idle",
+        source: "live",
+      })
+      expect(await valueOf(client.sessions.read(SELF_SESSION))).toEqual({ entries: [], next_before: null })
+      expect(await valueOf(client.sessions.interrupt(SELF_SESSION))).toMatchObject({
+        interrupted: true,
+        background: { status: "not_supported" },
+        device: SELF,
+      })
+      expect(await valueOf(client.sessions.setReasoning(SELF_SESSION, "high"))).toEqual({ reasoning: "high" })
+      expect(await valueOf(client.sessions.close(SELF_SESSION))).toEqual({ closed: true })
+      expect(host.mutations.map((frame) => frame["type"])).toEqual([
+        "prompt",
+        "interrupt",
+        "set_thinking_level",
+        "unload_session",
+      ])
+      expect(host.mutations[0]).toMatchObject({ message: "hello here", streamingBehavior: "followUp" })
+      expect(owner.state.commands).toEqual([])
+    })
+  })
+
+  test("#given a session on this device #when setModel addresses it, or a session client sends to it #then each is refused, typed, before anything runs (#13787)", async () => {
     await withContractHost({}, async (host) => {
-      const { client } = await localClient(host, { ...selfWorld(), located: { [PEER]: { [ENGINE_ID]: NEW_KEY } } })
-      const opened = await valueOf(client.sessions.open({ device: SELF, workspace: host.root }))
-      expect(opened.thread).toBe(handleOf(SELF, "dur-selected"))
-      expect(opened.warnings).toEqual([expect.stringContaining("did not name the listing key")])
+      const { owner, client } = await localClient(host)
+      expect(failureOf(await client.sessions.setModel(SELF_SESSION, "p/m"))).toMatchObject({
+        code: "unsupported",
+        details: { feature: "session_model_on_this_device" },
+      })
+      const session = clientOn(owner.stateDir, fakeClock(), { kind: "session", id: "dur-caller" })
+      expect(failureOf(await session.sessions.send(SELF_SESSION, { text: "x" })).code).toBe("local_only")
+      expect(host.mutations).toEqual([])
+      expect(owner.state.commands).toEqual([])
+    })
+  })
+
+  test("#given a handle this device's host does not hold #when close addresses it #then not_found{session}", async () => {
+    await withContractHost({}, async (host) => {
+      const { client } = await localClient(host)
+      expect(failureOf(await client.sessions.close(handleOf(SELF, "dur-nowhere")))).toMatchObject({
+        code: "not_found",
+        details: { kind: "session", device: SELF },
+      })
+      expect(host.mutations).toEqual([])
     })
   })
 })
