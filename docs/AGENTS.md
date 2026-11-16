@@ -42,6 +42,7 @@
 | Shared core multi-PR extraction QA | [docs/reference/shared-core-multi-pr.md](reference/shared-core-multi-pr.md) |
 | Re-export shim inventory | [docs/reference/re-export-shim-inventory.md](reference/re-export-shim-inventory.md) |
 | Release process | [docs/reference/release-process.md](reference/release-process.md) |
+| Operator-built darwin release artifacts (replacing the hosted macOS legs, verification, provenance) | [docs/reference/operator-built-darwin-release.md](reference/operator-built-darwin-release.md) |
 | Changelog fragments (per-PR `changes/unreleased/<n>.md`, migration, batches) | [docs/reference/changelog-fragments.md](reference/changelog-fragments.md) |
 | GitHub PR evidence attachments | [docs/reference/github-attachment-upload.md](reference/github-attachment-upload.md) |
 | Claiming the lazycodex npm name | [docs/reference/lazycodex-npm-reservation.md](reference/lazycodex-npm-reservation.md) |

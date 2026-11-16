@@ -219,7 +219,10 @@ export async function listAcross(
   if (unavailable !== undefined) {
     const notSetUp =
       unavailable.error.code === "host_unavailable" && remoteNotSetUp(unavailable.error.details?.["state"])
-    return !allScope && notSetUp ? local : { ...local, remote_unavailable: unavailable.error.code }
+    const listed = !allScope && notSetUp ? local : { ...local, remote_unavailable: unavailable.error.code }
+    // The registry is asked only while the account's other devices can be reached (#12833): not while the device service is
+    // not connected, nor on a plan without a relay (plan_required). A row's missing alias is then unknown, never "holds none" (#13923).
+    return remote.aliases === undefined || ids.length === 0 ? listed : { ...listed, aliases_unavailable: "not_asked" }
   }
   const known = new Set(ids)
   const [here, hereName, listed, roster] = await Promise.all([
@@ -266,9 +269,11 @@ async function withAliases(
   try {
     aliases = await remote.aliases.aliasesOf(ids)
   } catch {
-    return listed
+    return { ...listed, aliases_unavailable: "host_unavailable" }
   }
-  if (aliases.kind === "error") return listed
+  // Said, never silently dropped (#13923): a row without an alias then means "not read", never "holds none".
+  if (aliases.kind === "error")
+    return { ...listed, aliases_unavailable: signedOut(aliases.error) ? "sign_in" : "host_unavailable" }
   return {
     ...listed,
     threads: listed.threads.map((thread) => {
