@@ -4,7 +4,8 @@
 mod commit;
 mod listener;
 
-use omo_computer_core::backend::{BackendResult, StopListener};
+use omo_computer_core::backend::{BackendResult, Refusal, StopListener};
+use omo_computer_core::error::EngineCode;
 use omo_computer_core::capabilities::{
     DeafReason, StopPathCapability, StopPathKind as CapabilityKind,
 };
@@ -84,7 +85,13 @@ impl Supervisor {
         deaf_reason: Option<DeafReason>,
         now_ms: u64,
     ) {
-        self.slot = Slot::arm(listener, deaf_reason, now_ms);
+        // Review L1 (IS-9): the new listener already exists, so a press the outgoing one heard
+        // after its last poll is read here, once and without a re-arm, before it is dropped.
+        let incoming = Slot::arm(listener, deaf_reason, now_ms);
+        let mut outgoing = std::mem::replace(&mut self.slot, incoming);
+        if outgoing.poll(now_ms, &mut || Err(Refusal::bare(EngineCode::StopPathUnavailable))) {
+            self.stop(SuspendReason::Hotkey, &mut NoHolds);
+        }
     }
 
     /// `stopPath.heartbeat` from the session's host.
