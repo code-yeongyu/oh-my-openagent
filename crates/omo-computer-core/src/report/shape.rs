@@ -58,10 +58,11 @@ fn check_effect(shape: &Shape<'_>, verb: Option<VerbClass>) -> Result<(), Report
     let delivery = shape.disposition.delivery();
     let receipts = || shape.evidence.iter().filter(|entry| entry.is_receipt());
     let confirms = |entry: &Evidence| match verb {
-        Some(verb) => entry.kind() == verb.confirming_kind(),
+        // R59: a frame verb (a Value verb) is confirmed by its frame read-back receipt too.
+        Some(verb) => entry.kind() == verb.confirming_kind() || (verb == VerbClass::Value && entry.kind() == EvidenceKind::FrameReadback),
         None => matches!(
             entry.kind(),
-            EvidenceKind::BarrierConsumed | EvidenceKind::ValueReadback
+            EvidenceKind::BarrierConsumed | EvidenceKind::ValueReadback | EvidenceKind::FrameReadback
         ),
     };
     let confirming = receipts().any(confirms);
@@ -116,6 +117,13 @@ fn check_effect(shape: &Shape<'_>, verb: Option<VerbClass>) -> Result<(), Report
         }
         Effect::SuspectedNoop if observations().next().is_some() => {
             Err(ReportRejection::SuspectedNoopWithObservation)
+        }
+        _ if matches!(
+            delivery,
+            Delivery::NotDelivered | Delivery::DeliveredUnverified | Delivery::Unknown
+        ) && receipts().next().is_some() =>
+        {
+            Err(ReportRejection::ReceiptWithoutVerifiedDelivery { delivery })
         }
         _ => Ok(()),
     }

@@ -38,58 +38,71 @@ fn contains_word(line: &str, needle: &str) -> bool {
     })
 }
 
-/// The top-level items of every grouped `std` import in `line`.
-fn grouped_std_items(line: &str) -> Vec<String> {
+/// The top-level items of every grouped `std` import in `text`, each with the byte offset it
+/// starts at. A group may span lines (rustfmt splits a long one), so this reads the whole text.
+fn grouped_std_items(text: &str) -> Vec<(usize, String)> {
     let mut items = Vec::new();
-    for (at, _) in line.match_indices(STD_GROUP) {
-        let (mut depth, mut item) = (0_u32, String::new());
-        for ch in line[at + STD_GROUP.len()..].chars() {
+    for (at, _) in text.match_indices(STD_GROUP) {
+        let start = at + STD_GROUP.len();
+        let (mut depth, mut item_at, mut item) = (0_u32, start, String::new());
+        for (offset, ch) in text[start..].char_indices() {
             match ch {
                 '{' => depth += 1,
                 '}' if depth == 0 => break,
                 '}' => depth -= 1,
-                ',' if depth == 0 => items.push(std::mem::take(&mut item)),
+                ',' if depth == 0 => {
+                    items.push((item_at, std::mem::take(&mut item)));
+                    item_at = start + offset + 1;
+                }
                 _ if depth == 0 => item.push(ch),
                 _ => {}
             }
         }
-        items.push(item);
+        items.push((item_at, item));
     }
     items
 }
 
-/// Whether a grouped import names the environment module: bare, renamed with `as`, or
+/// Whether a grouped import item names the environment module: bare, renamed with `as`, or
 /// followed by a path into it.
-fn imports_env_module(line: &str) -> bool {
-    grouped_std_items(line).iter().any(|item| {
-        let item = item.trim();
-        item == ENV_MODULE
-            || item
-                .strip_prefix(ENV_MODULE)
-                .is_some_and(|rest| rest.starts_with(' ') || rest.starts_with(':'))
-    })
+fn names_env_module(item: &str) -> bool {
+    let item = item.trim();
+    item == ENV_MODULE
+        || item
+            .strip_prefix(ENV_MODULE)
+            .is_some_and(|rest| rest.starts_with(char::is_whitespace) || rest.starts_with(':'))
 }
 
-/// One finding per forbidden needle per line, plus one per grouped import of the
-/// environment module.
+/// The 1-based line of the first non-blank character at or after `at`.
+fn line_of(text: &str, at: usize) -> usize {
+    let rest = &text[at..];
+    let first = at + (rest.len() - rest.trim_start().len());
+    text[..first].matches('\n').count() + 1
+}
+
+/// One finding per forbidden needle per line, plus one per grouped import item that names the
+/// environment module, in line order.
 #[must_use]
 pub fn scan_text(file: &str, text: &str) -> Vec<String> {
-    text.lines()
-        .enumerate()
-        .flat_map(|(index, line)| {
-            let needles = FORBIDDEN
-                .iter()
-                .filter(move |needle| contains_word(line, needle))
-                .map(move |needle| format!("{file}:{}: {needle}", index + 1));
-            let grouped = imports_env_module(line).then(|| {
-                format!(
-                    "{file}:{}: grouped import of the {ENV_MODULE} module",
-                    index + 1
-                )
-            });
-            needles.chain(grouped)
-        })
-        .collect()
+    let needles = text.lines().enumerate().flat_map(|(index, line)| {
+        FORBIDDEN
+            .iter()
+            .filter(move |needle| contains_word(line, needle))
+            .map(move |needle| (index + 1, format!("{file}:{}: {needle}", index + 1)))
+    });
+    let grouped = grouped_std_items(text)
+        .into_iter()
+        .filter(|(_, item)| names_env_module(item))
+        .map(|(at, _)| {
+            let line = line_of(text, at);
+            (
+                line,
+                format!("{file}:{line}: grouped import of the {ENV_MODULE} module"),
+            )
+        });
+    let mut findings: Vec<(usize, String)> = needles.chain(grouped).collect();
+    findings.sort_by_key(|(line, _)| *line);
+    findings.into_iter().map(|(_, finding)| finding).collect()
 }
 
 fn rust_files(dir: &Path, out: &mut Vec<PathBuf>, findings: &mut Vec<String>) {

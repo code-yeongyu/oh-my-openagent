@@ -43,6 +43,8 @@ export type ChildSession = RunHoldSession & {
   getLastAssistantText(): string | undefined
   /** Absent on fakes that load no extensions; a live AgentSession always has one. */
   readonly extensionRunner?: ChildExtensionRunner
+  /** Absent on fakes; a live AgentSession resolves it once its shutdown-started work can no longer write. */
+  whenToolChildClosed?(): Promise<void>
   dispose(): void
 }
 
@@ -404,5 +406,8 @@ async function shutDownChildSession(session: ChildSession): Promise<void> {
       await runner.emit({ type: "session_shutdown", reason: "quit" })
   } finally {
     session.dispose()
+    // dispose() folds the session's already-started first-start work into this barrier, so awaiting it keeps a child
+    // writer from landing after a caller removes the directory that child's agent dir lives in (#13520).
+    await session.whenToolChildClosed?.()
   }
 }

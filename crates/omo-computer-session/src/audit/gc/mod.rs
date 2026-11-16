@@ -68,6 +68,13 @@ pub struct ArtifactStore {
     release_warnings: Vec<String>,
 }
 
+/// An artifact digest or extension: a plain path component (the rule `marker::component`
+/// applies to marker keys), never a way out of the artifact directory.
+fn plain<'a>(part: &'a str, what: &str) -> io::Result<&'a str> {
+    crate::marker::component(part)
+        .map_err(|_| io::Error::other(format!("an artifact {what} is not a plain path component")))
+}
+
 /// `senpi-computer-<digest>.<ext>`.
 #[must_use]
 pub fn artifact_name(digest: &str, ext: &str) -> String {
@@ -110,7 +117,8 @@ impl ArtifactStore {
     /// Writes one artifact; a write that crosses a cap sweeps.
     ///
     /// # Errors
-    /// The artifact itself could not be written (a sweep error only warns).
+    /// `digest` is not a plain path component, or the artifact itself could not be written (a
+    /// sweep error only warns).
     pub fn record(
         &mut self,
         digest: &str,
@@ -118,6 +126,8 @@ impl ArtifactStore {
         bytes: &[u8],
         now_ms: u64,
     ) -> io::Result<PathBuf> {
+        let digest = plain(digest, "digest")?;
+        let ext = plain(ext, "extension")?;
         fs::create_dir_all(&self.dir)?;
         let path = self.dir.join(artifact_name(digest, ext));
         fs::write(&path, bytes)?;
@@ -132,6 +142,10 @@ impl ArtifactStore {
     /// A removal that fails for any reason but "not there" reads as not released, never as a
     /// quiet second release: it is logged once, now, and carried into the next sweep's report.
     pub fn release(&mut self, digest: &str) -> bool {
+        // A digest is a plain path component, never a way out of the artifact directory.
+        if plain(digest, "digest").is_err() {
+            return false;
+        }
         let mut released = false;
         for suffix in SUFFIXES {
             let path = self.dir.join(format!("{ARTIFACT_PREFIX}{digest}{suffix}"));

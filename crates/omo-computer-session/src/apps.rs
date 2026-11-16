@@ -32,7 +32,8 @@ pub(crate) fn shell(session: &mut Session) -> Result<&mut dyn omo_computer_core:
         .ok_or(Refusal::bare(omo_computer_core::error::EngineCode::AxUnsupported))
 }
 
-/// The app a window belongs to, bound to its code identity.
+/// The app a window belongs to, bound to its executable path and its code identity, as the
+/// funnel binds it (review M3 of #13347): a path-only consent entry checks the path.
 pub(crate) fn window_app(session: &mut Session, window: &str) -> Option<AppTarget> {
     let found = session
         .backend
@@ -42,9 +43,10 @@ pub(crate) fn window_app(session: &mut Session, window: &str) -> Option<AppTarge
         .into_iter()
         .find(|w| w.id == window)?;
     let identity = session.backend.code_identity(found.identity.pid);
+    let path = session.backend.executable_path(found.identity.pid);
     Some(AppTarget {
         app_key: found.app_key,
-        bound: BoundIdentity::new(None, identity),
+        bound: BoundIdentity::new(path, identity),
     })
 }
 
@@ -90,8 +92,13 @@ impl Session {
         let force = request.policy.force;
         let app = self.resolve_app(request.target.as_deref().unwrap_or_default())?;
         let target = app_resolution(&app);
-        let event = InputEvent::AppQuit { app_key: app.app_key, force };
-        self.app_effect((Method::AppsQuit, VerbKind::AppsQuit), event, Route::BackgroundPid, (&request.authority, target))
+        let call = Call { verb: VerbKind::AppsQuit, target: TargetRef::Desktop, points: Vec::new(), chord: None, force: false };
+        let write = crate::value_verbs::Write::Quit { app_key: app.app_key, pid: app.pid, force };
+        self.mutate(
+            Mutation::exec(Method::AppsQuit, call, Vec::new(), Route::BackgroundPid, &request.authority)
+                .with_targets(vec![target])
+                .with_write(write),
+        )
     }
 
     /// The app `target` names, admitted by consent under its identity, before anything runs.
@@ -114,14 +121,20 @@ impl Session {
         route: Route,
         (authority, target): (&omo_computer_core::requests::CallAuthority, PointTarget),
     ) -> Result<ExecReply, Refused> {
-        let call = Call {
-            verb,
-            target: TargetRef::Desktop,
-            points: Vec::new(),
-            chord: None,
-            force: false,
-        };
+        let call = app_call(verb, &event);
         self.mutate(Mutation::exec(method, call, vec![event], route, authority).with_targets(vec![target]))
+    }
+}
+
+/// The gate's view of an app call: the app's own target, and the caller's `force` of an
+/// `apps.quit` carried onto the gate (review L1 of #13347).
+fn app_call(verb: VerbKind, event: &InputEvent) -> Call<'static> {
+    Call {
+        verb,
+        target: TargetRef::Desktop,
+        points: Vec::new(),
+        chord: None,
+        force: matches!(event, InputEvent::AppQuit { force: true, .. }),
     }
 }
 
@@ -135,4 +148,19 @@ fn app_resolution(app: &AppInfo) -> PointTarget {
             surface: None,
         }),
     )
+}
+
+#[cfg(test)]
+mod app_call_tests {
+    use omo_computer_core::backend::InputEvent;
+    use omo_computer_safety::gate::VerbKind;
+
+    #[test]
+    fn apps_quit_force_reaches_the_gate() {
+        let quit = |force| InputEvent::AppQuit { app_key: "k".to_owned(), force };
+        assert!(super::app_call(VerbKind::AppsQuit, &quit(true)).force, "force:true is on the gate");
+        assert!(!super::app_call(VerbKind::AppsQuit, &quit(false)).force);
+        let open = InputEvent::AppLaunch { app_key: "k".to_owned(), activate: true };
+        assert!(!super::app_call(VerbKind::Pointer, &open).force, "apps.open has no force");
+    }
 }

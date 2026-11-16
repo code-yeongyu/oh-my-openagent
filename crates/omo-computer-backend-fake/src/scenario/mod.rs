@@ -18,8 +18,8 @@ use serde::Deserialize;
 use serde_json::Value;
 
 pub use additions::{
-    AxNotification, BusyMark, ClipboardScript, FrameAxis, FramePolicy, HandIdentity, SecureFocus,
-    TargetExit,
+    AxNotification, BusyMark, ClipboardScript, FrameAxis, FramePolicy, HandIdentity,
+    NotificationPost, SecureFocus, StopPress, TargetExit,
 };
 pub use events::{DisplaysChange, EpochEvent, EpochReason, IdentityChange};
 pub use invalid::{field_names, InvalidKind, ScenarioInvalid};
@@ -69,12 +69,16 @@ pub struct FakeScenario {
     pub stop_marker: Option<String>,
     pub user_input_timeline: Vec<TimedUserInput>,
     pub user_presses: Vec<UserPress>,
-    /// The OS the fake plays; absent follows the host.
+    /// The OS the fake plays; absent plays x11 on every host (A-IS-64 item 2).
     pub persona: Option<Persona>,
     /// Observer events by fake-clock time: the quiet window the settle waits on.
     pub ax_notification_timeline: Vec<AxNotification>,
     /// Loading indicators by fake-clock time.
     pub busy_timeline: Vec<BusyMark>,
+    /// Stop-chord presses by fake-clock time.
+    pub stop_timeline: Vec<StopPress>,
+    /// Notifications by fake-clock time; absent scripts a host with no notification surface.
+    pub notification_timeline: Option<Vec<NotificationPost>>,
     pub secure_focus: Option<SecureFocus>,
     pub secure_input_on: bool,
     pub clipboard: Option<ClipboardScript>,
@@ -87,12 +91,24 @@ pub struct FakeScenario {
     pub window_frame_policy: BTreeMap<String, FramePolicy>,
     /// Keys the user holds physically at start.
     pub held_keys: Vec<String>,
+    /// The route's wheel-step cap per scroll: steps past it deliver 0 of 1 (row 23, R48c).
+    pub scroll_cap: Option<u32>,
+    /// The user presses the stop chord right after the engine's Nth input post (row 23, R53:
+    /// a stop between the units of one stroke).
+    pub stop_chord_after_posts: Option<u32>,
+    /// Row 24: what an element's value read-back answers, by ref (`e2`): a string, or null for
+    /// a value that cannot be read back. An absent ref reads the value written.
+    pub value_readback: Option<BTreeMap<String, Option<String>>>,
     pub full_access_preset: bool,
     pub target_exit: Vec<TargetExit>,
     /// Window id -> the session or hand that holds its reservation.
     pub window_reservation: BTreeMap<String, String>,
     /// Signed code identity per pid.
     pub code_identity: BTreeMap<u32, CodeIdentity>,
+    // --- Row 21 (review M3): the executable path per pid a path-only consent binds to. ---
+    pub executable_path: BTreeMap<u32, String>,
+    // --- Row 21 (R70av): chords the fake's set_stop_chord refuses (default: none). ---
+    pub unarmable_stop_chords: Vec<String>,
     /// The hand identity the fleet harness reads.
     pub hand: Option<HandIdentity>,
     /// Session-state fields (lock, sleep, console, saver, Secure Input, suspend) by fake-clock time.

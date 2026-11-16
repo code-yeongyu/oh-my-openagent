@@ -7,9 +7,9 @@ use crate::error::{EngineCode, Reason};
 use crate::listing::AppInfo;
 
 /// No app answers to the target.
-pub const APP_UNKNOWN: Refusal = Refusal::new(EngineCode::InvalidTarget, Reason::AppUnknown.wire());
+pub const APP_UNKNOWN: Refusal = Refusal::new(EngineCode::InvalidTarget, Reason::AppUnknown);
 /// More than one app answers to the target's display name.
-pub const APP_AMBIGUOUS: Refusal = Refusal::new(EngineCode::InvalidTarget, Reason::Ambiguous.wire());
+pub const APP_AMBIGUOUS: Refusal = Refusal::new(EngineCode::InvalidTarget, Reason::Ambiguous);
 
 /// The app `target` names: an exact app-key match first (ASCII case-insensitive), else exactly one
 /// app whose display name equals the target.

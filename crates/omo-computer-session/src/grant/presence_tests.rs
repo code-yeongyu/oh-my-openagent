@@ -1,3 +1,4 @@
+use omo_computer_core::error::Reason;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -174,4 +175,73 @@ fn every_lease_end_path_calls_the_hook_once_with_its_cause() {
     s.control_acquire().expect("lease a third time");
     s.end_lease(crate::presence::LeaseEnd::DisplayRelease);
     assert_eq!(taken(), ["ended DisplayRelease"], "a direct end_lease");
+}
+
+/// Review M1 of #13346: a physical (hotkey) stop commits through the gate's listener poll, not
+/// through `stop_control`. It must still end the lease through `end_lease` (the hook sees
+/// `Stop` exactly once), and the next host call or mutation frees the machine slot and the surface.
+#[test]
+fn a_stop_observed_by_the_gate_ends_the_lease_through_the_funnel_once() {
+    let sink = RecordingSink::default();
+    let mut s = session(&json!({ "object": true }), &sink, None);
+    let calls = Recorded::default();
+    s.set_lease_hook(Box::new(calls.clone()));
+    s.control_grant(params(json!({ "reason": "r" })));
+    capture(&mut s, "1");
+    s.control_acquire().expect("lease");
+    assert!(s.holds_lease());
+    // The hotkey path: the supervisor latches a stop; nothing calls stop_control.
+    s.guard.stop(Some("hotkey"), &mut omo_computer_safety::NoHolds);
+    // The next call is a control call that ends nothing itself: it must already reconcile the stop.
+    let _ = s.host_call(omo_computer_core::methods::Method::PreviewSubscribe, json!({}));
+    assert!(!s.holds_lease(), "the slot is freed on the next host call, not only the next mutation");
+    assert!(sink.lines().iter().any(|line| line.contains("presence hide")), "{:?}", sink.lines());
+    assert_eq!(std::mem::take(&mut *calls.0.lock().expect("lock")), ["ended Stop"], "through end_lease, once");
+    let _ = s.click(params(json!({ "target": "1", "x": 1, "y": 1 })));
+    assert!(std::mem::take(&mut *calls.0.lock().expect("lock")).is_empty(), "never a second Stop for the same epoch");
+}
+
+/// Review L1 of #13346: `control.acquire` runs the foreground grant's own checks and the stop
+/// latch before it shows presence or takes the machine slot.
+#[test]
+fn acquire_runs_the_grant_and_latch_checks_before_taking_the_slot() {
+    let sink = RecordingSink::default();
+    let mut never = session(&json!({ "object": true, "consent": { "foreground": "never" } }), &sink, None);
+    never.control_grant(params(json!({ "reason": "r" })));
+    let refused = never.control_acquire().expect_err("consent says never");
+    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("ControlRequired", Some(Reason::Foreground)));
+    assert!(!never.holds_lease(), "no slot taken");
+    assert!(!sink.lines().iter().any(|line| line.contains("presence show")), "{:?}", sink.lines());
+
+    let sink = RecordingSink::default();
+    let mut latched = session(&json!({ "object": true }), &sink, None);
+    latched.guard.stop(Some("hotkey"), &mut omo_computer_safety::NoHolds);
+    latched.control_grant(params(json!({ "reason": "after the stop" })));
+    let refused = latched.control_acquire().expect_err("the stop latch is set");
+    assert_ne!(refused.refusal.code.wire(), "InputBusy");
+    assert!(!latched.holds_lease(), "no slot taken while latched");
+    assert!(!sink.lines().iter().any(|line| line.contains("presence show")), "{:?}", sink.lines());
+}
+
+/// Review L7 at a07dff9 (R70cl): control.acquire checks the hand's consent as the exec path does:
+/// a tampered hand and a hand whose engine read no consent file (R6-1, read-only) are refused
+/// with no slot taken and no presence shown.
+#[test]
+fn acquire_refuses_a_tampered_or_consent_less_hand() {
+    // The second view does not carry stopHotkey: the state R6-1 gives a hand whose engine read no
+    // consent file (grant/host.rs view_of(None)).
+    for (consent, not_carried) in [(json!({ "stopHotkey": 5 }), false), (json!({ "apps": {} }), true)] {
+        let sink = RecordingSink::default();
+        let mut extra = json!({ "object": true, "consent": consent });
+        if not_carried {
+            extra["stopHotkeyNotCarried"] = json!(true);
+        }
+        let mut s = session(&extra, &sink, None);
+        s.control_grant(params(json!({ "reason": "r" })));
+        let refused = s.control_acquire().expect_err("the hand may not take the foreground slot");
+        assert_eq!(refused.refusal.code.wire(), "ControlRequired", "{consent}");
+        assert_eq!(refused.refusal.reason, Some(Reason::Tampered), "{consent}");
+        assert!(!s.holds_lease(), "{consent}: no slot taken");
+        assert!(!sink.lines().iter().any(|line| line.contains("presence show")), "{consent}: {:?}", sink.lines());
+    }
 }

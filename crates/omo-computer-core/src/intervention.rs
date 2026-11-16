@@ -77,12 +77,7 @@ pub struct TextDelivery {
     pub interrupted: bool,
 }
 
-/// A backend's monotonic clock in milliseconds, and its wait.
-pub trait BackendClock {
-    fn now_ms(&self) -> u64;
-    /// Waits `ms` on this clock (a fake clock just advances).
-    fn wait_ms(&self, ms: u64);
-}
+pub use crate::backend::BackendClock;
 
 /// What a backend reads for the user-wins-every-race stages.
 pub trait InterventionSource {
@@ -145,7 +140,7 @@ mod backend_default_tests {
     fn default_post_text_is_one_uninterruptible_post_input() {
         let mut bare = Bare::default();
         let asked = Cell::new(0);
-        let mut interrupt = |_: &dyn Backend| {
+        let mut interrupt = |_: &mut dyn Backend| {
             asked.set(asked.get() + 1);
             true
         };
@@ -192,6 +187,8 @@ mod tests {
             opened_surfaces: Vec::new(),
             next_call: None,
             note: None,
+            reason: None,
+            nothing_sent: None,
             warning: None,
             audit_ids: Vec::new(),
             timings: None,
@@ -201,6 +198,7 @@ mod tests {
             paused: Vec::new(),
             session: None,
             target: None,
+            settle: None,
         }
     }
 

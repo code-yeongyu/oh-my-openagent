@@ -11,7 +11,7 @@ pub const FRAMES_PER_SECOND: usize = 2;
 const WINDOW_MS: u64 = 1_000;
 
 /// `InputBusy{budget}`.
-pub const BUDGET_BUSY: Refusal = Refusal::new(EngineCode::InputBusy, Reason::Budget.wire());
+pub const BUDGET_BUSY: Refusal = Refusal::new(EngineCode::InputBusy, Reason::Budget);
 
 /// The frames of the last second.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

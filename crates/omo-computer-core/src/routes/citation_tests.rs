@@ -43,7 +43,7 @@ fn every_seed_citation_resolves_in_the_pin() {
         let entry = &seed["membership"][os];
         let cite = entry["cite"].as_str().expect("cite");
         let text = lines.get(cite).unwrap_or_else(|| panic!("{os}: {cite}"));
-        for field in ["exact", "exactWmClass"] {
+        for field in ["exact", "exactWmClass", "prefixWithSuffix", "startsWith", "notMembers"] {
             for key in entry[field].as_array().into_iter().flatten() {
                 let key = key.as_str().expect("key");
                 assert!(text.contains(key), "{key} is not on {cite}");
@@ -55,4 +55,20 @@ fn every_seed_citation_resolves_in_the_pin() {
     let source = macos[1].as_str().expect("source half");
     let path = source.split(':').next().expect("a source path");
     assert!(lines.get(first).is_some_and(|text| text.contains(path)), "{first} does not carry {path}");
+    // The macOS ids are not spelled on the pin line; it fixes their count ("closed list of 8 ids").
+    let ids = seed["membership"]["macos"]["bundleIds"].as_array().expect("bundleIds");
+    assert!(lines.get(first).is_some_and(|text| text.contains(&format!("closed list of {} ids", ids.len()))), "{first} does not fix {} ids", ids.len());
+}
+
+/// Every `notMembers` entry in the seed is refused by the loaded matcher (review L5).
+#[test]
+fn every_seeded_not_member_is_refused() {
+    let seed: Value = serde_json::from_str(super::SEED).expect("seed json");
+    let table = super::RouteTable::seed().expect("seed table");
+    let names = seed["membership"]["windows"]["notMembers"].as_array().expect("notMembers");
+    assert!(!names.is_empty());
+    for name in names {
+        let name = name.as_str().expect("name");
+        assert!(!table.membership().is_member(super::RouteOs::Windows, name), "{name} is listed as not a member");
+    }
 }
