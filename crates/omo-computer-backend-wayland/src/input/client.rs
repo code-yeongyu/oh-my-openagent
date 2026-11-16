@@ -33,6 +33,9 @@ pub enum LinkError {
     Lost,
     /// The handshake or device discovery did not complete.
     Handshake(String),
+    /// A flush failed after part of a burst may already have reached the server: the burst
+    /// must not be sent again.
+    Interrupted,
 }
 
 /// A live libei connection.
@@ -235,7 +238,18 @@ impl EiSession {
     }
 }
 
+/// The largest keymap the engine reads. The size is the server's word, so it is checked before
+/// any allocation; compiled XKB keymaps are a few dozen KiB (testdata: 63 to 69 KiB).
+const MAX_KEYMAP_BYTES: u32 = 1024 * 1024;
+
 fn read_keymap(keymap: &reis::event::Keymap) -> Option<String> {
+    if keymap.size > MAX_KEYMAP_BYTES {
+        eprintln!(
+            "omo-computer-backend-wayland: keymap of {} bytes refused (cap {MAX_KEYMAP_BYTES})",
+            keymap.size
+        );
+        return None;
+    }
     let file = std::fs::File::from(keymap.fd.try_clone().ok()?);
     let mut bytes = vec![0; usize::try_from(keymap.size).ok()?];
     file.read_exact_at(&mut bytes, 0).ok()?;

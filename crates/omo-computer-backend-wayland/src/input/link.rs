@@ -3,7 +3,9 @@
 //! connection. On the portal route the fd is the one `ConnectToEIS` of the one combined
 //! session: the engine re-calls `ConnectToEIS` on the LIVE session while `Closed` has not
 //! arrived; otherwise the session is lost, and a new one is opened only under a persisted
-//! restore token - never a consent dialog inside an input call.
+//! restore token - never a consent dialog inside an input call. A user who cancels the
+//! consent dialog has denied input for this engine lifecycle: every later input call answers
+//! `PermissionDenied{permission:"portal"}` without asking the portal again (acceptance 31).
 
 use std::os::fd::{AsFd, OwnedFd};
 use std::os::unix::net::UnixStream;
@@ -26,6 +28,8 @@ pub struct PortalLink {
     pub(crate) portal: Box<dyn RemoteDesktop>,
     pub(crate) started: Option<Started>,
     consent: Consent,
+    /// The user cancelled the consent dialog in this engine lifecycle.
+    denied: bool,
 }
 
 /// The route the hand's input takes.
@@ -47,6 +51,12 @@ fn unavailable() -> Refusal {
     Refusal::new(EngineCode::Internal, Reason::InputUnsupported)
 }
 
+/// The user's Cancel of the consent dialog: the only portal answer that counts as denied.
+fn consent_denied() -> Refusal {
+    Refusal::bare(EngineCode::PermissionDenied)
+        .with_data(serde_json::json!({ "permission": "portal" }))
+}
+
 impl Link {
     #[must_use]
     pub fn portal(portal: Box<dyn RemoteDesktop>, consent: Consent) -> Self {
@@ -54,6 +64,7 @@ impl Link {
             portal,
             started: None,
             consent,
+            denied: false,
         })
     }
 
@@ -61,18 +72,29 @@ impl Link {
     /// moment the consent dialog may open (the first input call).
     ///
     /// # Errors
-    /// `Internal{input_unsupported}` with nothing sent when the route cannot connect.
+    /// `PermissionDenied{permission:"portal"}` once the user cancelled the dialog, else
+    /// `Internal{input_unsupported}`; nothing sent either way.
     pub fn connect(&mut self) -> Result<EiSession, Refusal> {
         let stream = match self {
             Self::Socket(path) => UnixStream::connect(&*path).map_err(|_| unavailable())?,
             Self::Portal(link) => {
+                if link.denied {
+                    return Err(consent_denied());
+                }
                 if link.started.is_none() {
                     let clipboard = link.portal.clipboard_version().is_some();
                     let token = link.consent.token();
-                    let started = link
-                        .portal
-                        .start(token.as_deref(), link.consent.persist(), clipboard)
-                        .map_err(|_| unavailable())?;
+                    let persist = link.consent.persist();
+                    let started = match link.portal.start(token.as_deref(), persist, clipboard) {
+                        Ok(started) => started,
+                        Err(PortalError::Cancelled) => {
+                            link.denied = true;
+                            return Err(consent_denied());
+                        }
+                        Err(PortalError::Unavailable(_) | PortalError::Refused(_)) => {
+                            return Err(unavailable())
+                        }
+                    };
                     link.consent.keep(started.restore_token.as_deref());
                     link.started = Some(started);
                 }
@@ -95,7 +117,8 @@ impl Link {
     /// The bounded reconnect after a transient failure: up to three attempts with backoff.
     ///
     /// # Errors
-    /// `Internal{libei_lost}` with `nextCall:"capabilities()"` and nothing sent.
+    /// `Internal{libei_lost}` with `nextCall:"capabilities()"`, or the consent denial; nothing
+    /// sent either way.
     pub fn reconnect(&mut self, sleep: &dyn Fn(Duration)) -> Result<EiSession, Refusal> {
         for delay in RECONNECT_BACKOFF_MS {
             sleep(Duration::from_millis(delay));
@@ -103,6 +126,7 @@ impl Link {
                 Ok(session) => return Ok(session),
                 Err(Attempt::Retry) => {}
                 Err(Attempt::SessionLost) => return Err(libei_lost()),
+                Err(Attempt::Denied) => return Err(consent_denied()),
             }
         }
         Err(libei_lost())
@@ -115,7 +139,7 @@ impl Link {
             Self::Unavailable => return Err(Attempt::SessionLost),
         };
         EiSession::connect(stream).map_err(|error| match error {
-            LinkError::Lost | LinkError::Handshake(_) => Attempt::Retry,
+            LinkError::Lost | LinkError::Interrupted | LinkError::Handshake(_) => Attempt::Retry,
         })
     }
 }
@@ -123,10 +147,15 @@ impl Link {
 enum Attempt {
     Retry,
     SessionLost,
+    /// The user cancelled the consent dialog (now or earlier in this lifecycle).
+    Denied,
 }
 
 impl PortalLink {
     fn reconnect_stream(&mut self) -> Result<UnixStream, Attempt> {
+        if self.denied {
+            return Err(Attempt::Denied);
+        }
         let live = self
             .started
             .as_ref()
@@ -145,10 +174,16 @@ impl PortalLink {
         self.started = None;
         let token = self.consent.token().ok_or(Attempt::SessionLost)?;
         let clipboard = self.portal.clipboard_version().is_some();
-        let started = self
-            .portal
-            .start(Some(&token), true, clipboard)
-            .map_err(|_| Attempt::SessionLost)?;
+        let started = match self.portal.start(Some(&token), true, clipboard) {
+            Ok(started) => started,
+            Err(PortalError::Cancelled) => {
+                self.denied = true;
+                return Err(Attempt::Denied);
+            }
+            Err(PortalError::Unavailable(_) | PortalError::Refused(_)) => {
+                return Err(Attempt::SessionLost)
+            }
+        };
         self.consent.keep(started.restore_token.as_deref());
         let session = started.session.clone();
         self.started = Some(started);

@@ -79,10 +79,13 @@ pub fn backend(vars: &[(String, String)]) -> Result<Box<dyn Backend>, RouteError
                 lookup("GDK_SCALE").as_deref(),
             ),
         )),
-        // Row 51: the Wayland backend on Linux: libei input through `LIBEI_SOCKET` or the portal.
+        // Row 51: the Wayland backend on Linux: libei input through `LIBEI_SOCKET` or the portal,
+        // through the launch gate every backend the route selects as real takes (A-IS-64 (b)).
         #[cfg(target_os = "linux")]
         Some(value) if value == omo_computer_backend_wayland::WAYLAND_BACKEND => {
-            Ok(Box::new(omo_computer_backend_wayland::WaylandBackend::from_env(&lookup)))
+            let wayland = omo_computer_backend_wayland::WaylandBackend::from_env(&lookup);
+            launch_gate(selection(&value), &wayland)?;
+            Ok(Box::new(wayland))
         }
         other => Err(RouteError::NoBackend(other)),
     }
@@ -156,6 +159,17 @@ mod tests {
             )
         );
         assert!(matches!(backend(&vars(&[])), Err(RouteError::NoBackend(None))));
+    }
+
+    /// Review L5 of #13909: the Wayland arm is selected as real and passes the launch gate on
+    /// Linux; with no input route its capabilities still read the Wayland backend.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn wayland_is_selected_as_real_and_passes_the_launch_gate_on_linux() {
+        assert_eq!(selection(omo_computer_backend_wayland::WAYLAND_BACKEND), Selected::Real);
+        let wayland = backend(&vars(&[(BACKEND_SEAM, "wayland")])).expect("wayland backend");
+        assert!(declares_compile_target(wayland.as_ref()));
+        assert_eq!(wayland.capabilities().backend, "wayland");
     }
 
     use omo_computer_backend_fake::Persona;
