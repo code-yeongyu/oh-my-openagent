@@ -19,6 +19,8 @@ import type {
 
 /**
  * A stream fed by its producer: `push` queues an event, `end` lets the queue drain and finishes; `stop` drops the rest.
+ * It has ONE reader: a second iteration while one is reading throws at its start (its first `next()`), and the first
+ * keeps reading.
  * With `bound`, at most `kept` events wait for the reader: past that the oldest are dropped and the reader's next event
  * is `overflow`, once per overflow, so a slow or absent reader never grows the queue.
  */
@@ -33,6 +35,7 @@ export function eventStream<E>(options: {
   const { onStop, bound } = options
   const queue: E[] = []
   let overflowed = false
+  let reading = false
   let ended = false
   let stopped = false
   let wake: (() => void) | undefined
@@ -67,6 +70,9 @@ export function eventStream<E>(options: {
     stream: {
       stop,
       async *[Symbol.asyncIterator]() {
+        // Before the try: a refused second reader must not stop the stream its first reader is reading.
+        if (reading) throw new Error("This stream has one reader, and it is already being read.")
+        reading = true
         try {
           for (;;) {
             if (overflowed && bound !== undefined) {
@@ -94,12 +100,13 @@ const text = (value: unknown): string | undefined => (typeof value === "string" 
 // Lifted from omo#12750 (feat/remote-approvals, thread/remote/dialog-mirror.ts `raiserOnly`): a secret input or a grant
 // selection is answerable only on the connection that raised it, and relayd refuses every other answer to one, so a
 // viewer that sees only the session's mirror is never shown one.
-const raiserOnly = (request: JsonObject): boolean => request["secret"] === true || request["grantSelect"] === true
+export const raiserOnly = (request: JsonObject): boolean =>
+  request["secret"] === true || request["grantSelect"] === true
 
 const DIALOG_KINDS: ReadonlySet<string> = new Set(["select", "confirm", "input", "editor", "question"])
 
 /** An engine UI request (senpi `RpcExtensionUIRequest`) as a pending request; undefined for one that asks nothing. */
-function pendingRequestOf(request: JsonObject, requestId: string): PendingRequest | undefined {
+export function pendingRequestOf(request: JsonObject, requestId: string): PendingRequest | undefined {
   const kind = request["method"]
   if (typeof kind !== "string" || !DIALOG_KINDS.has(kind)) return undefined
   const questions = request["questions"]
@@ -135,23 +142,35 @@ const SHOWN_KEPT = 1024
  * sees the session's mirror, `ui_request_pending {uiRequestId, request}` and `ui_request_settled {uiRequestId,
  * disposition}`. This presents both as attach events under the uiRequestId and remembers each shown one, so a later
  * snapshot (a re-attach after a relay gap) settles the ones it no longer holds. The shown requests are also the pending
- * ones: the set the latest snapshot held, plus the ones raised since, less the ones settled since.
+ * ones: the set the latest snapshot held, plus the ones raised since, less the ones settled since. A raiser-only request
+ * (and its settle) is never shown as a frame here, but it passes on as a plain record: the session is still waiting on
+ * it, and follow and wait must see that (#13753 M2).
  */
 class MirroredDialogs {
   readonly #shown = new Map<string, PendingRequest>()
+  readonly #raiserOnly = new Set<string>()
 
-  /** The event for a dialog mirror record; null when it must not be shown; undefined for any other record. */
+  /**
+   * The event for a dialog mirror record; null when it must not be shown; undefined for any other record, and for a
+   * raiser-only request's records, which go on as they are.
+   */
   present(record: JsonObject): AttachEvent | null | undefined {
     const uiRequestId = text(record["uiRequestId"])
     if (uiRequestId === undefined) return undefined
     if (record["type"] === "ui_request_settled") {
+      if (this.#raiserOnly.delete(uiRequestId)) return undefined
       this.#shown.delete(uiRequestId)
       const how = record["disposition"] === "answered" ? "answered" : "cancelled"
       return { kind: "frame_settled", request_id: uiRequestId, how }
     }
     if (record["type"] !== "ui_request_pending") return undefined
     const request = record["request"]
-    if (!isObject(request) || raiserOnly(request)) return null
+    if (!isObject(request)) return null
+    if (raiserOnly(request)) {
+      this.#raiserOnly.add(uiRequestId)
+      for (const oldest of this.#raiserOnly) if (this.#raiserOnly.size > SHOWN_KEPT) this.#raiserOnly.delete(oldest)
+      return undefined
+    }
     return this.raised(request, uiRequestId)
   }
 

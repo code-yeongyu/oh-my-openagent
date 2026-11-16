@@ -138,20 +138,31 @@ describe("attach rows: pending UI requests (#12750)", () => {
     await handle.detach()
   })
 
-  test("#given the session's dialog mirror #when a dialog is raised and settled #then frame and frame_settled; a raiser-only one is never shown", async () => {
+  test("#given the session's dialog mirror #when a dialog is raised and settled #then frame and frame_settled; a raiser-only one is never a frame or pending, only a record", async () => {
     const { owner, handle } = await attached({ sessionId: "engine-1", isStreaming: true, pendingDialogs: [] })
     const events = reader(handle.events)
     const ui5 = { type: "extension_ui_request", id: "ui-5", method: "input", title: "Name" }
+    const secret = {
+      type: "ui_request_pending",
+      uiRequestId: "ui-4",
+      method: "input",
+      request: { ...SECRET, id: "ui-4" },
+    }
+    const secretSettled = { type: "ui_request_settled", uiRequestId: "ui-4", disposition: "answered" }
     pushRecords(owner, [
-      { type: "ui_request_pending", uiRequestId: "ui-4", method: "input", request: { ...SECRET, id: "ui-4" } },
+      secret,
       { type: "ui_request_pending", uiRequestId: "ui-5", method: "input", request: ui5 },
       { type: "ui_request_settled", uiRequestId: "ui-5", disposition: "answered" },
+      secretSettled,
     ])
+    // The session still waits on the raiser-only one, so its mirror goes on as a record for follow and wait.
+    expect(await events.next("the raiser-only mirror record")).toEqual({ kind: "record", record: secret })
     expect(await events.next("the raised dialog")).toEqual({
       kind: "frame",
       request: { request_id: "ui-5", kind: "input", title: "Name" },
     })
     expect(await events.next("its settle")).toEqual({ kind: "frame_settled", request_id: "ui-5", how: "answered" })
+    expect(await events.next("the raiser-only settle record")).toEqual({ kind: "record", record: secretSettled })
     expect(handle.pending()).toEqual([])
     await handle.detach()
   })
@@ -204,6 +215,19 @@ describe("attach rows: events buffer", () => {
     for (let event = await events.next("a kept record"); event !== "done"; event = await events.next("a kept record"))
       kept.push(event.kind === "record" ? event.record["n"] : event)
     expect(kept).toEqual(Array.from({ length: KEPT }, (_, i) => sent - KEPT + i))
+  })
+})
+
+describe("attach rows: events reader", () => {
+  test("#given an attach's events being read #when a second reader iterates them at the same time #then it fails at its start and the first keeps reading", async () => {
+    const { owner, handle } = await attached({ sessionId: "engine-1", isStreaming: true, pendingDialogs: [] })
+    const first = reader(handle.events)
+    const second = handle.events[Symbol.asyncIterator]()
+    const firstRead = first.next("the first reader's record")
+    await expect(second.next()).rejects.toThrow("one reader")
+    pushRecords(owner, [{ type: "agent_start" }])
+    expect(await firstRead).toEqual({ kind: "record", record: { type: "agent_start" } })
+    await handle.detach()
   })
 })
 
