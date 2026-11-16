@@ -16,6 +16,11 @@ const ADDITIONAL_SOURCE_GLOBS = [
   "packages/web/src/**/*.{ts,tsx,astro,md}",
 ] as const
 
+// Minified bundles built from other trees: one line joins hundreds of engine-internal identifiers, so a line scan reads
+// code, not wording. The remote SDK bundle is checked through its authored source (packages/omo-senpi/src/components,
+// scanned above); the rest of it is engine-internal (senpi-task, device-service-core), which this guard does not cover.
+const GENERATED_BUNDLES: ReadonlySet<string> = new Set(["packages/omo-native/bin/lib/remote-sdk.generated.js"])
+
 const USER_FACING_FILES = [
   "postinstall.mjs",
   "docs/guide/installation.md",
@@ -106,7 +111,7 @@ async function userFacingSources(): Promise<readonly string[]> {
   const sources = new Set<string>(USER_FACING_FILES)
   for (const glob of [INSTALLER_SOURCE_GLOB, ...ADDITIONAL_SOURCE_GLOBS]) {
     for await (const path of new Bun.Glob(glob).scan({ cwd: REPO_ROOT })) {
-      if (path.endsWith(".test.ts")) continue
+      if (path.endsWith(".test.ts") || GENERATED_BUNDLES.has(path)) continue
       sources.add(path)
     }
   }

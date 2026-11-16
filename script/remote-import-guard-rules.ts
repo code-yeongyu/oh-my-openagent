@@ -12,10 +12,18 @@ const REMOTE = "packages/omo-senpi/src/components/remote/"
 // surface importing another surface file (the TUI's own files) is not reaching the layer. Scope: S3 sees direct static
 // imports, require() and literal import() only; a route through another module, or bin/lib/thread.js loading built
 // bundles by a non-literal import() (frozen by NON_LITERAL_IMPORT_OFFENDERS), is outside it.
+// The `omo-ai/remote` SDK entry (#13413) is not a caller of the module but the module itself exported (Q's W3 ruling): it
+// reaches the module's public pieces directly so its published declarations stay that small closure (#13782), and it wires
+// local-attach, which the index leaves out (#13440). It sits beside the CLI files by name only.
+export const REMOTE_SDK_ENTRY: ReadonlySet<string> = new Set([
+  "packages/omo-native/remote-sdk.ts",
+  "packages/omo-native/remote-sdk-api.ts",
+])
+
 const isRemoteSurface = (file: string): boolean =>
   file.startsWith("packages/omo-senpi/src/components/thread/") ||
   file.startsWith(`${REMOTE}tui/`) ||
-  /^packages\/omo-native\/remote-[^/]+\.ts$/.test(file) ||
+  (/^packages\/omo-native\/remote-[^/]+\.ts$/.test(file) && !REMOTE_SDK_ENTRY.has(file)) ||
   file === "packages/omo-native/bin/lib/thread.js"
 
 // Tests, test helpers and QA fakes are exempt from S1, S2 and S3 (v6 V6).

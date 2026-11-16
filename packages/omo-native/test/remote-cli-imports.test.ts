@@ -5,6 +5,7 @@
 import { describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
+import { REMOTE_SDK_ENTRY } from "../../../script/remote-import-guard-rules.ts"
 
 const NATIVE = join(import.meta.dir, "..")
 
@@ -60,7 +61,13 @@ const allowed = (specifier: string): boolean =>
   /^\.\.\/omo-senpi\/src\/components\/remote\/(index|types)$/.test(specifier)
 
 function cliFiles(): string[] {
-  const remote = readdirSync(NATIVE).filter((name) => /^remote-.*\.ts$/.test(name) && !name.endsWith(".test.ts"))
+  // The SDK entry shares the remote- prefix but is the module exported, not a CLI file (G1's REMOTE_SDK_ENTRY).
+  const remote = readdirSync(NATIVE).filter(
+    (name) =>
+      /^remote-.*\.ts$/.test(name) &&
+      !name.endsWith(".test.ts") &&
+      !REMOTE_SDK_ENTRY.has(`packages/omo-native/${name}`),
+  )
   const thread = readdirSync(join(NATIVE, "bin", "lib"))
     .filter((name) => /^thread.*\.js$/.test(name))
     .map((name) => `bin/lib/${name}`)
