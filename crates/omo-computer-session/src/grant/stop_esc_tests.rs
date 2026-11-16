@@ -106,3 +106,60 @@ fn the_lease_end_key_ends_the_foreground_lease_once_through_the_hook() {
         "an Escape with no lease ends nothing"
     );
 }
+
+
+/// Review M1 at 77a028eea1 (R70aa(4)): on X11 the lease-end key is heard only when the stop
+/// listener is polled. An Escape pressed between two calls ends the lease before the next call's
+/// plan, so that call already reports `user_moved_on` and takes no lease.
+#[test]
+fn an_escape_heard_at_the_listener_poll_ends_the_lease_before_the_next_plan() {
+    let sink = RecordingSink::default();
+    let fake = backend(StopPathScript::Live, &sink);
+    let keys = fake.handle();
+    let mut s = Session::new(Box::new(fake));
+    s.open(params(json!({ "reportMode": "object" })))
+        .expect("open");
+    let heard = Arc::new(Mutex::new(Vec::new()));
+    s.set_lease_hook(Box::new(Heard(Arc::clone(&heard))));
+    s.stop_path_start(params(json!({})));
+    s.control_grant(params(json!({ "reason": "r" })));
+    capture(&mut s, "desktop");
+    capture(&mut s, "1");
+    s.click(params(json!({ "target": "desktop", "x": 5, "y": 5 })))
+        .expect("foreground click");
+    assert!(s.holds_lease());
+
+    keys.press_lease_end_through_listener();
+    let next = s
+        .click(params(json!({ "target": "1", "x": 1, "y": 1 })))
+        .expect("the run continues");
+    let report = serde_json::to_value(&next).expect("report");
+    assert_eq!(report["focusRestoration"], json!("user_moved_on"), "{report}");
+    assert_eq!(*heard.lock().expect("heard"), vec![LeaseEnd::UserEsc]);
+    assert!(!s.holds_lease());
+}
+
+/// Review M1's second case: an Escape heard while no lease exists ends nothing, then or later.
+#[test]
+fn an_escape_with_no_lease_never_ends_the_lease_taken_after_it() {
+    let sink = RecordingSink::default();
+    let fake = backend(StopPathScript::Live, &sink);
+    let keys = fake.handle();
+    let mut s = Session::new(Box::new(fake));
+    s.open(params(json!({ "reportMode": "object" })))
+        .expect("open");
+    let heard = Arc::new(Mutex::new(Vec::new()));
+    s.set_lease_hook(Box::new(Heard(Arc::clone(&heard))));
+    s.stop_path_start(params(json!({})));
+    s.control_grant(params(json!({ "reason": "r" })));
+    capture(&mut s, "desktop");
+    capture(&mut s, "1");
+
+    keys.press_lease_end_through_listener();
+    s.click(params(json!({ "target": "desktop", "x": 5, "y": 5 })))
+        .expect("foreground click");
+    s.click(params(json!({ "target": "1", "x": 1, "y": 1 })))
+        .expect("background click");
+    assert!(s.holds_lease(), "the Escape came before the lease");
+    assert!(heard.lock().expect("heard").is_empty());
+}

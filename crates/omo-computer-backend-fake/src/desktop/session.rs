@@ -54,7 +54,12 @@ impl FakeBackend {
 
     /// Row 50: the scripted lease-end key, taken once.
     pub(super) fn scripted_take_lease_end(&self) -> bool {
-        std::mem::take(&mut self.lock().lease_end_pressed)
+        let mut state = self.lock();
+        let heard = state.lease_end_heard_at.is_some_and(|at| state.stop_polls > at);
+        if heard {
+            state.lease_end_heard_at = None;
+        }
+        std::mem::take(&mut state.lease_end_pressed) || heard
     }
 
     pub(super) fn scripted_epoch_source(&self) -> Box<dyn EpochSource> {

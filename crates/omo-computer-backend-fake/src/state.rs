@@ -46,6 +46,9 @@ pub struct FakeState {
     pub stop_pressed: bool,
     /// Row 50: the user pressed the lease-end key (a bare physical Escape).
     pub lease_end_pressed: bool,
+    /// Row 50 (review M1): a lease-end key the live listener hears at its first poll after
+    /// the press, as the X11 listener does; the poll count when it was pressed.
+    pub lease_end_heard_at: Option<u32>,
     /// How many `stop_timeline` presses have fired.
     pub stop_press_pos: usize,
     /// How many times a live stop listener was polled.
@@ -100,6 +103,7 @@ impl FakeState {
             ax_event_pos: 0,
             stop_pressed: false,
             lease_end_pressed: false,
+            lease_end_heard_at: None,
             stop_press_pos: 0,
             stop_polls: 0,
             stop_queues: Vec::new(),
