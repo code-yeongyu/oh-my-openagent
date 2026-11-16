@@ -8,6 +8,7 @@ mod bound_oversize;
 mod cap_refusal;
 mod clearing;
 mod gc;
+mod healthy_hand;
 mod lock;
 mod redaction;
 mod rotation;
