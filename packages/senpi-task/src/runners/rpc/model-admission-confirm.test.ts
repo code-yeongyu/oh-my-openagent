@@ -71,6 +71,38 @@ describe("process model admission confirming probe", () => {
     })
   })
 
+  describe("#given a live exclude_models getter and a cached catalog that did not contain the requested model", () => {
+    it("#when a later admission runs inside the cache TTL #then it still re-probes, and a later exclude edit refuses before any probe", async () => {
+      // given
+      const catalog = scriptedProbe([["prov/alpha"], ["prov/alpha", "prov/beta"]])
+      let clock = 1_000
+      let excluded: readonly string[] | undefined
+      const admit = createRpcModelAdmission({
+        buildSpawn: () => descriptor(),
+        probe: catalog.probe,
+        now: () => clock,
+        excludeModels: () => excluded,
+      })
+      await admit(spec("prov/alpha"))
+
+      // when the partial catalog is still inside its TTL
+      clock += Math.floor(MODEL_CATALOG_CACHE_TTL_MS / 2)
+      const reprobed = admit(spec("prov/beta"))
+
+      // then it is re-probed instead of served stale
+      await expect(reprobed).resolves.toBeUndefined()
+      expect(catalog.probes()).toBe(2)
+
+      // when a mid-session edit excludes the model
+      excluded = ["prov/beta"]
+      const refused = admit(spec("prov/beta"))
+
+      // then the live list refuses it without another probe
+      await expect(refused).rejects.toMatchObject({ failure: { kind: "model_unavailable" } })
+      expect(catalog.probes()).toBe(2)
+    })
+  })
+
   describe("#given a model absent from every exit-0 catalog", () => {
     it("#when the confirming probe also omits it #then admission still rejects as model_unavailable", async () => {
       // given
