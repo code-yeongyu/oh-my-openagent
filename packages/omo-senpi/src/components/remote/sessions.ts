@@ -259,8 +259,19 @@ export function sessionMembers(core: ClientCore): SessionMembers {
   const legOf = (svc: DeviceService) => {
     const known = legs.get(svc)
     if (known !== undefined) return known
+    const port = createDeviceServiceSessions({ version: core.deps.version, connect: async () => svc })
     const remote: RemoteThreadSurface = {
-      sessions: createDeviceServiceSessions({ version: core.deps.version, connect: async () => svc }),
+      sessions: {
+        ...port,
+        // The account's device listing may leave out this device, which only thisDevice() names; a connected service's
+        // own device is online, so the relay host's online check finds it.
+        devices: async () => {
+          const [rows, self] = await Promise.all([port.devices(), svc.thisDevice()])
+          return self === null || rows.some((row) => row.device === self.id)
+            ? rows
+            : [{ device: self.id, label: self.name, online: true }, ...rows]
+        },
+      },
       chain: { stamp: (record) => record },
     }
     const relay = createRelayTransport({
@@ -495,30 +506,36 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     asked: SessionOpenRequest & LaunchProfile,
     stage: Stage,
   ): R<OpenResult> => {
-    const device = await deviceRow(request.device, stage(DEADLINES.devices))
-    // This device with no device service: thread_create's local host needs a running engine's extension context, which
-    // a client does not have, so the open is local only.
-    if (device.kind === "ok" && device.value.self === true && device.value.kind === "local")
-      return remoteFailure(
-        "local_only",
-        "This device has no device service, so a session can only be opened here from inside omo.",
-        "Call service.bootstrap to install the device service, then call sessions.open again.",
-      )
-    if (device.kind === "error") return device
-    const made = await core.member(stage(DEADLINES.openEndpoint), DEADLINES.openEndpoint, true, async (svc) => {
-      const outcome = await createRelaySessionHost(legOf(svc).remote, device.value.id).open(asked)
-      if (outcome.kind === "error") return modelUnavailable(fromThread(outcome.error), request.model)
-      return ok({
-        key: outcome.thread.sessionId,
-        warnings: (outcome.thread.warnings ?? []).map((warning) => warning.message),
-      })
-    })
+    const made = await core.member(
+      stage(DEADLINES.openEndpoint),
+      DEADLINES.openEndpoint,
+      true,
+      async (svc) => {
+        const device = await deviceRow(request.device, stage(DEADLINES.devices))
+        if (device.kind === "error") return device
+        const outcome = await createRelaySessionHost(legOf(svc).remote, device.value.id).open(asked)
+        if (outcome.kind === "error") return modelUnavailable(fromThread(outcome.error), request.model)
+        return ok({
+          device: device.value,
+          key: outcome.thread.sessionId,
+          warnings: (outcome.thread.warnings ?? []).map((warning) => warning.message),
+        })
+      },
+      // No device service on this device (the connection says so, not a row): thread_create's local host needs a
+      // running engine's extension context, which a client does not have, so the open is local only.
+      () =>
+        remoteFailure(
+          "local_only",
+          "This device has no device service, so a session can only be opened here from inside omo.",
+          "Call service.bootstrap to install the device service, then call sessions.open again.",
+        ),
+    )
     if (made.kind === "error") return made
-    const target = { device: device.value.id, session: made.value.key }
+    const target = { device: made.value.device.id, session: made.value.key }
     const thread = handleOf(target.device, target.session)
     const result: OpenResult = {
       thread,
-      device: device.value,
+      device: made.value.device,
       ...(made.value.warnings.length === 0 ? {} : { warnings: made.value.warnings }),
     }
     if (request.first === undefined) return ok(result)
@@ -552,9 +569,8 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       const resolved = await resolve(thread, stage)
       if (resolved.kind === "error") return resolved
       const target = resolved.value
-      const { row } = target
-      // Not listed (yet): there is no row to report it with.
-      if (row === undefined) return unknownSession(target.device, target.session)
+      // A session the listing does not carry yet (one just opened) is read from its device as named, like every member:
+      // only the device's own unknown_session makes it not_found.
       return core.member(stage(), DEADLINES.observeRead, false, async (svc) => {
         const state = await engineState(svc, target)
         if (state.kind === "error") return state
@@ -564,6 +580,27 @@ export function sessionMembers(core: ClientCore): SessionMembers {
         const id = text(model["id"])
         const turn = text(data["currentTurnId"])
         const queued = data["pendingMessageCount"]
+        let row = target.row
+        if (row === undefined) {
+          const device = await deviceRow(target.device, stage(DEADLINES.devices))
+          if (device.kind === "error") return device
+          const name = text(data["sessionName"]) ?? ""
+          const durable = text(data["sessionId"])
+          row = {
+            thread: handleOf(target.device, target.session),
+            ...(durable === undefined ? {} : { durable_id: durable }),
+            name,
+            title: name,
+            device: device.value,
+            project: text(data["cwd"]) ?? "",
+            path: text(data["sessionFile"]) ?? "",
+            state: data["isStreaming"] === true ? "running" : "idle",
+            archived: false,
+            // No listing row says when it last changed.
+            updated_ms: 0,
+            source: "live",
+          }
+        }
         const detail: SessionDetail = {
           ...row,
           cwd: text(data["cwd"]) ?? row.path,

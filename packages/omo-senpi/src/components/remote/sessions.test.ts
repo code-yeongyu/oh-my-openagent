@@ -337,6 +337,22 @@ describe("sessions controls", () => {
     })
   })
 
+  test("#given a session just opened that the listing does not carry yet #when sessions.get reads its handle #then its device answers its state (#13756 L2)", async () => {
+    const owner = await startOwner({ ...world(), listing: defaultWorld().listing })
+    const client = clientOn(owner.stateDir, fakeClock())
+    const { thread } = await valueOf(client.sessions.open({ device: PEER }))
+    expect(await valueOf(client.sessions.get(thread))).toMatchObject({
+      thread,
+      device: { id: PEER },
+      source: "live",
+      state: "idle",
+      cwd: "/home/user/omo",
+      model: "anthropic/claude",
+      reasoning: "high",
+      preset: "workspace",
+    })
+  })
+
   test("#given no layer stores archive state #when sessions.archive runs #then unsupported{archive}", async () => {
     const { owner } = await onWorld()
     expect(failureOf(await clientOn(owner.stateDir, fakeClock()).sessions.archive(LIVE, true))).toMatchObject({
@@ -468,5 +484,39 @@ describe("#13756 review", () => {
     const flushed = new Promise<"pending">((resolve) => setImmediate(() => resolve("pending")))
     expect(await Promise.race([settling.then((outcome) => outcome.kind), flushed])).toBe("error")
     expect(failureOf(await settling)).toMatchObject({ code: "timeout" })
+  })
+})
+
+describe("an open on this device", () => {
+  // The two-device proof's field failure: the account listing (devices()) leaves out this device, which only
+  // thisDevice() names; a connected service must still open here through the relay host, never local_only.
+  const SELF = "dev-self"
+  const selfWorld = (): World => {
+    const base = world()
+    const live = base.sessions[0]
+    if (live === undefined) throw new Error("the world holds a live session")
+    return {
+      ...base,
+      endpoints: { ...base.endpoints, [SELF]: ["ZW5kcG9pbnQta2V5LTAwMD"] },
+      located: { ...base.located, [SELF]: { [ENGINE_ID]: NEW_KEY } },
+      sessions: [...base.sessions, { ...live, device: SELF, session_id: NEW_KEY }],
+    }
+  }
+
+  test("#given a connected service whose device listing omits this device #when devices.list reads #then the self row is not the no-service row", async () => {
+    const owner = await startOwner(selfWorld())
+    const [self] = await valueOf(clientOn(owner.stateDir, fakeClock()).devices.list())
+    expect(self).toMatchObject({ id: SELF, self: true, kind: "cli" })
+  })
+
+  test("#given a connected service whose device listing omits this device #when sessions.open names this device #then it opens through the relay host", async () => {
+    const owner = await startOwner(selfWorld())
+    const opened = await valueOf(
+      clientOn(owner.stateDir, fakeClock()).sessions.open({ device: SELF, workspace: "/work" }),
+    )
+    expect(opened.thread).toBe(handleOf(SELF, NEW_KEY))
+    expect(owner.state.commands.filter((rpc) => rpc["type"] === "open_session")).toEqual([
+      expect.objectContaining({ cwd: "/work" }),
+    ])
   })
 })
