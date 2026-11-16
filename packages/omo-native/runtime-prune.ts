@@ -5,7 +5,8 @@ import { RELEASE_VERSION } from "./release-version"
 
 // Every release provisions ~/.omo/binary-runtime/<version>/ (~250MB) and nothing removed the old ones,
 // so a standalone install grew by one runtime per update. A launch prunes the versions older than its
-// own, keeping the newest older one for a rollback and any runtime a live process runs.
+// own, keeping the newest older one for a rollback and any runtime a live process runs. It prunes only
+// its own release channel: a 0.0.0 source build (omob) or another channel's runtime is never its to remove.
 const RETAINED_PREVIOUS_RUNTIMES = 1
 const PRUNE_PREFIX = ".prune-"
 
@@ -46,8 +47,12 @@ export function pruneProvisionedRuntimes(options: {
       // Still held (a Windows handle closes late); the next prune retries it.
     }
   }
+  const channel = releaseChannel(options.current)
   const older = entries
-    .filter((name) => RELEASE_VERSION.test(name) && Bun.semver.order(name, options.current) < 0)
+    .filter(
+      (name) =>
+        channel !== undefined && releaseChannel(name) === channel && Bun.semver.order(name, options.current) < 0,
+    )
     .sort((left, right) => Bun.semver.order(right, left))
   result.kept.push(...older.slice(0, RETAINED_PREVIOUS_RUNTIMES))
   const candidates = older.slice(RETAINED_PREVIOUS_RUNTIMES)
@@ -106,6 +111,21 @@ export function pruneProvisionedRuntimes(options: {
     }
   }
   return result
+}
+
+/**
+ * The update channel a release version installs from: "" for stable, the prerelease's non-numeric
+ * identifiers for a prerelease (`5.0.0-0.beta.89` -> "-beta"). Undefined for a name that is no release
+ * of any channel, including a 0.0.0 core, which only a source build carries.
+ */
+function releaseChannel(version: string): string | undefined {
+  if (!RELEASE_VERSION.test(version) || /^0\.0\.0(-|$)/.test(version)) return undefined
+  const prerelease = version.split("-")[1]
+  if (prerelease === undefined) return ""
+  return `-${prerelease
+    .split(".")
+    .filter((identifier) => !/^[0-9]+$/.test(identifier))
+    .join(".")}`
 }
 
 // The launcher execs the runtime by its absolute path, so argv[0] starts with the runtime directory.
