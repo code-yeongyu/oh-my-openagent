@@ -49,6 +49,12 @@ runner temp dir; else `TEMP`; never inside the checkout, passed to every leg as 
 present. The elevated rows' notes record which one the run used. A setup failure
 in the helper is a `legError` ("setup failed: ..."), never a silent exit.
 
+The UIPI and elevated rows (`n-uipi-*`, `n-elevated-*`) need a helper at medium integrity. The hosted runner has
+UAC off, so the `runas /trustlevel:0x20000` helper keeps high integrity and these rows read
+`UNMEASURED: skipped: helper integrity is high, not medium`. Their hosted ledger rows are NOT-RUN (verdict
+`UNMEASURED`, no pass/fail claim) and are owed to #13885, which ports the medium-integrity helper setup into the
+workflow.
+
 The second-monitor rows (`n-host-second-monitor`, `n-affinity-wgc-monitor-secondary`)
 are measured on H6 and on any host whose facts report two or more monitors (each
 monitor's resolution, position and DPI go into the row); with fewer they are not
