@@ -126,6 +126,7 @@ impl Session {
             Some(ReportMode::Null) | None => CapabilitiesReply::Legacy(Box::new(legacy_capabilities(
                 &capabilities,
                 &self.backend.probe_permissions(),
+                &self.guard.status(),
             ))),
         }
     }
@@ -216,7 +217,8 @@ const fn known_true(state: Tristate) -> bool {
 
 /// The v1 record a null-mode session reads, projected from the object-mode capabilities.
 #[must_use]
-pub fn legacy_capabilities(caps: &Capabilities, probe: &PermissionProbe) -> LegacyCapabilities {
+pub fn legacy_capabilities(caps: &Capabilities, probe: &PermissionProbe, stop: &StopPathStatus) -> LegacyCapabilities {
+    let armed = stop.stop_path != "none";
     LegacyCapabilities {
         backend: caps.backend.clone(),
         display_server: None,
@@ -231,8 +233,8 @@ pub fn legacy_capabilities(caps: &Capabilities, probe: &PermissionProbe) -> Lega
         ax_permission: permission(probe.accessibility).to_owned(),
         display_count: caps.display_count,
         focus_guard: caps.background_window_input,
-        stop_path: "none".to_owned(),
-        stop_reason: Some(NO_GLOBAL_LISTENER.to_owned()),
+        stop_path: stop.stop_path.clone(),
+        stop_reason: (!armed).then(|| NO_GLOBAL_LISTENER.to_owned()),
         integrity_level: None,
         screen_locked: known_true(caps.session.screen_locked),
         display_asleep: Some(known_true(caps.session.display_asleep)),
