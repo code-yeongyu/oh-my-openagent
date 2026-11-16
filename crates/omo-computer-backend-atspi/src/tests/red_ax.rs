@@ -1,6 +1,6 @@
 //! RED-first behaviour of the tree, refs, actions and focus (AC-89, L8, GAP-7).
 
-use omo_computer_core::backend::{Delivered, Semantic};
+use omo_computer_core::backend::{Delivered, Semantic, SettleSource};
 use omo_computer_core::error::{EngineCode, Reason};
 use omo_computer_core::observation::BusyIndicator;
 
@@ -147,8 +147,8 @@ fn busy_state_reports_loading() {
     let (mut backend, _) = fx.backend();
     let mut idle = gedit().backend().0;
 
-    assert_eq!(backend.busy(GEDIT_XID), Some(BusyIndicator::AxBusy));
-    assert_eq!(idle.busy(GEDIT_XID), None);
+    assert_eq!(backend.busy(GEDIT_XID), Ok(Some(BusyIndicator::AxBusy)));
+    assert_eq!(idle.busy(GEDIT_XID), Ok(None));
 }
 
 #[test]

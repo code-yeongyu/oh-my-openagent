@@ -1,28 +1,9 @@
-//! Crate-local shapes the core does not carry on this base. Rows 19 and 25 own the core
-//! spellings (STATE-row48.md '## Types expected from rows 19 and 25'); the refusal detail is
-//! R52's `Refusal.data`, threaded here until that member is on the base.
+//! The crate's own shapes: the audited accessibility-flag write and the detail a refusal
+//! carries beside its code and reason (R52's `Refusal.data`, threaded here until that member is
+//! on the base). Banners and menus use the core's `NotificationFingerprint` and `MenuNode`.
 
 use omo_computer_core::backend::Refusal;
 use omo_computer_core::error::EngineCode;
-
-/// Row 19's `Fingerprint{app, title, bodyHash, arrivedAt}` of `SettleSource::notifications()`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Fingerprint {
-    pub app: String,
-    pub title: String,
-    pub body_hash: u64,
-    pub arrived_at: u64,
-}
-
-/// One item of a menu level (row 25 owns `MenuItem` in core).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MenuItem {
-    pub label: String,
-    pub role: String,
-    pub enabled: bool,
-    pub checked: bool,
-    pub submenu: bool,
-}
 
 /// The audit record of the engine's `org.a11y.Status.IsEnabled` write:
 /// `a11y_enabled{by:"engine", before, persisted:"unknown"}`.

@@ -66,22 +66,13 @@ impl<B: Bus> AtspiBackend<B> {
         launcher: &mut dyn Launcher,
     ) -> Result<u32, AxRefusal> {
         let entry = self.entries().remove(app_key).ok_or_else(|| {
-            AxRefusal::plain(Refusal::new(
-                EngineCode::InvalidTarget,
-                Reason::AppUnknown,
-            ))
+            AxRefusal::plain(Refusal::new(EngineCode::InvalidTarget, Reason::AppUnknown))
         })?;
         let argv = exec::argv(&entry.exec).map_err(|_| {
-            AxRefusal::plain(Refusal::new(
-                EngineCode::Internal,
-                Reason::LaunchNeedsUser,
-            ))
+            AxRefusal::plain(Refusal::new(EngineCode::Internal, Reason::LaunchNeedsUser))
         })?;
         let (program, args) = argv.split_first().ok_or_else(|| {
-            AxRefusal::plain(Refusal::new(
-                EngineCode::Internal,
-                Reason::LaunchNeedsUser,
-            ))
+            AxRefusal::plain(Refusal::new(EngineCode::Internal, Reason::LaunchNeedsUser))
         })?;
         let plan = LaunchPlan {
             program: program.clone(),

@@ -139,7 +139,44 @@ fn a_menu_item_is_selected_by_its_exact_label() {
         handle.performed(),
         vec![(file.clone(), 0), (close, 0), (file, 0)]
     );
-    assert_eq!(missing.code(), EngineCode::InvalidTarget);
+    assert_eq!(
+        missing.code(),
+        EngineCode::StaleRef,
+        "a step naming no item is stale"
+    );
+}
+
+#[test]
+fn the_menu_tree_is_read_without_acting_and_twin_labels_are_ambiguous() {
+    let mut fx = gedit();
+    let bar = fx.bus.node(&fx.frame, "menu bar", "");
+    let file = fx.bus.node(&bar, "menu", "File");
+    fx.bus.set_actions(&file, &["click"]);
+    for _ in 0..2 {
+        let twin = fx.bus.node(&file, "menu item", "Export");
+        fx.bus.set_actions(&twin, &["click"]);
+    }
+    let (mut backend, handle) = fx.backend();
+
+    let tree = backend.menu_tree(GEDIT_XID).expect("tree");
+    let twin = backend
+        .select_menu(GEDIT_XID, &["File", "Export"])
+        .expect_err("two Export items");
+
+    assert_eq!(tree.len(), 1);
+    assert_eq!(tree[0].title, "File");
+    let labels: Vec<&str> = tree[0]
+        .children
+        .iter()
+        .map(|item| item.title.as_str())
+        .collect();
+    assert_eq!(labels, ["Export", "Export"]);
+    assert_eq!(twin.code(), EngineCode::AmbiguousTarget);
+    assert_eq!(
+        handle.performed(),
+        vec![(file, 0)],
+        "only the opener was pressed, never an Export"
+    );
 }
 
 #[test]

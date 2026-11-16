@@ -14,6 +14,7 @@ mod notify;
 pub mod owner;
 mod roles;
 mod secure;
+mod settle;
 pub mod types;
 
 pub use backend::{AtspiBackend, Observation, EVENTS};

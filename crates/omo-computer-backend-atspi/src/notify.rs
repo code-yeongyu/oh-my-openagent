@@ -11,7 +11,9 @@ use omo_computer_core::error::{EngineCode, Reason};
 
 use crate::backend::AtspiBackend;
 use crate::bus::{read_slice, Bus, NodeId};
-use crate::types::{AxRefusal, Fingerprint};
+use omo_computer_core::backend::NotificationFingerprint;
+
+use crate::types::AxRefusal;
 
 const BANNER_ROLES: &[&str] = &["notification", "alert"];
 const BANNER_DEPTH: u32 = 4;
@@ -24,10 +26,11 @@ fn no_surface() -> AxRefusal {
     ))
 }
 
-fn hash(text: &str) -> u64 {
+/// The body is kept only as its hash.
+fn hash(text: &str) -> String {
     let mut hasher = DefaultHasher::new();
     text.hash(&mut hasher);
-    hasher.finish()
+    format!("{:016x}", hasher.finish())
 }
 
 /// The text under a banner: every name and text below it, in document order.
@@ -61,12 +64,12 @@ fn banners<B: Bus>(bus: &mut B, node: &NodeId, depth: u32, found: &mut Vec<(Node
 }
 
 impl<B: Bus> AtspiBackend<B> {
-    /// The banners on screen, as `Fingerprint{app, title, bodyHash, arrivedAt}`.
+    /// The banners on screen, as `NotificationFingerprint{app, title, bodyHash, arrivedAt}`.
     ///
     /// # Errors
     /// No bus, or no notification daemon on the session bus / on the accessibility bus
     /// (`Internal{no_notification_surface}`).
-    pub fn notifications(&mut self) -> Result<Vec<Fingerprint>, AxRefusal> {
+    pub fn banners(&mut self) -> Result<Vec<NotificationFingerprint>, AxRefusal> {
         let bus = self.bus.as_mut().ok_or_else(AxRefusal::no_bus)?;
         if self.roster.owner.is_none() {
             self.roster.owner = Some(bus.notification_owner().ok().flatten());
@@ -86,11 +89,11 @@ impl<B: Bus> AtspiBackend<B> {
             body(bus, &node, 2, &mut text);
             let now = bus.now_ms();
             let arrived_at = *self.roster.arrivals.entry(node).or_insert(now);
-            prints.push(Fingerprint {
+            prints.push(NotificationFingerprint {
                 app: owner.name.clone(),
                 title,
                 body_hash: hash(&text.join("\n")),
-                arrived_at,
+                arrived_at_ms: arrived_at,
             });
         }
         Ok(prints)

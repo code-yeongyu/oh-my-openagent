@@ -2,7 +2,6 @@
 //! focus from events, the loading predicate (A4 `busy`) and the web document's `URI`.
 
 use omo_computer_core::backend::BackendResult;
-use omo_computer_core::observation::BusyIndicator;
 
 use super::observe::ROOT_SLICE_MS;
 use super::AtspiBackend;
@@ -103,14 +102,6 @@ impl<B: Bus> AtspiBackend<B> {
             }
             _ => false,
         }
-    }
-
-    /// The loading predicate of amendment A4: the window's frame reports `busy`.
-    pub fn busy(&mut self, window: &str) -> Option<BusyIndicator> {
-        let frame = self.frame_for(window).ok()?;
-        let bus = self.bus.as_mut()?;
-        let facts = bus.read(&frame.node, read_slice(ROOT_SLICE_MS)).ok()?;
-        facts.states.busy.then_some(BusyIndicator::AxBusy)
     }
 
     /// The `URI` of the focused `document web` object in `window` (the `url_policy` read):
