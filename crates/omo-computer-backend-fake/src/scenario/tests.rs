@@ -1,0 +1,154 @@
+use std::path::{Path, PathBuf};
+
+use omo_computer_core::backend::Backend;
+
+use super::{fixtures_dir, FakeScenario, InvalidKind};
+use crate::{FakeBackend, Persona};
+
+fn file_name(path: &Path) -> String {
+    path.file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default()
+}
+
+/// The fixture files, imported (no `v3-` prefix) or added by the v3 rows.
+fn fixture_files(imported: bool) -> Vec<PathBuf> {
+    let mut paths: Vec<PathBuf> = std::fs::read_dir(fixtures_dir())
+        .expect("the fixtures directory exists")
+        .map(|entry| entry.expect("a readable fixture entry").path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "json"))
+        .filter(|path| file_name(path).starts_with("v3-") != imported)
+        .collect();
+    paths.sort();
+    paths
+}
+
+#[test]
+fn scenario_fixtures_all_parse() {
+    let imported = fixture_files(true);
+    assert_eq!(
+        imported.len(),
+        12,
+        "the imported scenario set is exactly 12 files"
+    );
+    for path in &imported {
+        let scenario = FakeScenario::load(path);
+        assert!(scenario.is_ok(), "{}: {scenario:?}", file_name(path));
+        println!("fixture {} ok", file_name(path));
+    }
+    for path in imported.iter().chain(fixture_files(false).iter()) {
+        let scenario = FakeScenario::load(path).expect("every fixture loads");
+        for persona in Persona::ALL {
+            let backend = FakeBackend::new(scenario.clone()).with_persona(persona);
+            let capabilities = backend.capabilities();
+            assert_eq!(capabilities.backend, "fake", "{}", file_name(path));
+            assert_eq!(
+                usize::try_from(capabilities.display_count).ok(),
+                Some(scenario.displays.len()),
+                "{} as {persona:?}",
+                file_name(path)
+            );
+        }
+    }
+}
+
+#[test]
+fn unknown_scenario_key_is_scenario_invalid() {
+    let unknown = r#"{"windowz":[]}"#;
+    let invalid = FakeScenario::from_json(unknown).expect_err("an unknown key never loads");
+    assert_eq!(invalid.kind, InvalidKind::UnknownKey);
+    assert_eq!(invalid.pointer, "/windowz");
+    assert!(
+        FakeBackend::from_json(unknown).is_err(),
+        "no backend is built"
+    );
+
+    let nested = r#"{"windows":[{"id":"1","title":"t","app":"a","pid":1,"x":0,"y":0,"width":10,"height":10,"focused":true,"elevated":null,"titel":"x"}]}"#;
+    let invalid = FakeScenario::from_json(nested).expect_err("a nested unknown key never loads");
+    assert_eq!(invalid.pointer, "/windows/0/titel");
+
+    let escaped = FakeScenario::from_json(r#"{"a/b~c":1}"#).expect_err("an escaped unknown key");
+    assert_eq!(escaped.pointer, "/a~1b~0c");
+
+    let malformed = FakeScenario::from_json("{\"windows\":").expect_err("malformed JSON");
+    assert_eq!(malformed.kind, InvalidKind::Syntax);
+
+    let dangling = r#"{"identity":{"999":{"processStart":1}}}"#;
+    let reference = FakeScenario::from_json(dangling).expect_err("a window nobody lists");
+    assert_eq!(reference.kind, InvalidKind::Reference);
+    assert_eq!(reference.pointer, "/identity/999");
+}
+
+#[test]
+fn non_object_root_is_scenario_invalid() {
+    for root in ["[]", r#"[[],[{"id":"1"}]]"#, "null", "7", r#""windows""#] {
+        let invalid = FakeScenario::from_json(root).expect_err("only an object is a scenario");
+        assert_eq!(
+            (invalid.kind, invalid.pointer.as_str()),
+            (InvalidKind::Shape, ""),
+            "{root}"
+        );
+        assert!(
+            FakeBackend::from_json(root).is_err(),
+            "no backend is built from {root}"
+        );
+    }
+}
+
+#[test]
+fn zero_nth_and_unlisted_windows_are_reference_invalid() {
+    let window = r#"{"id":"101","title":"t","app":"a","pid":1,"x":0,"y":0,"width":10,"height":10,"focused":true,"elevated":null}"#;
+    let cases = [
+        (
+            r#""epoch_events":[{"after_call":"windows","nth":0,"reason":"lock"}]"#,
+            "/epoch_events/0/nth",
+        ),
+        (
+            r#""identity_changes":[{"after_call":"capture","nth":0,"window":"101","new_pid":2,"new_processStart":3}]"#,
+            "/identity_changes/0/nth",
+        ),
+        (
+            r#""target_exit":[{"after_call":"capture","nth":0,"window":"101"}]"#,
+            "/target_exit/0/nth",
+        ),
+        (
+            r#""displays_change":{"after_call":"click","nth":0,"displays":[]}"#,
+            "/displays_change/nth",
+        ),
+        (r#""ax":{"202":{"role":"window"}}"#, "/ax/202"),
+        (r#""ax_node_count":{"101":50}"#, "/ax_node_count/101"),
+    ];
+    for (member, pointer) in cases {
+        let json = format!(r#"{{"windows":[{window}],{member}}}"#);
+        let invalid = FakeScenario::from_json(&json).expect_err("a reference that cannot hold");
+        assert_eq!(
+            (invalid.kind, invalid.pointer.as_str()),
+            (InvalidKind::Reference, pointer),
+            "{member}"
+        );
+    }
+}
+
+#[test]
+fn fail_next_is_typed_through_the_error_table() {
+    let unknown_code =
+        FakeScenario::from_json(r#"{"fail_next":[{"method":"capture","code":"Exploded"}]}"#)
+            .expect_err("a code outside the closed table");
+    assert_eq!(
+        (unknown_code.kind, unknown_code.pointer.as_str()),
+        (InvalidKind::Shape, "/fail_next/0/code")
+    );
+    let unknown_reason = FakeScenario::from_json(
+        r#"{"fail_next":[{"method":"capture","code":"CaptureUnavailable","reason":"melted"}]}"#,
+    )
+    .expect_err("a reason outside the vocabulary");
+    assert_eq!(unknown_reason.pointer, "/fail_next/0/reason");
+    let no_row = FakeScenario::from_json(
+        r#"{"fail_next":[{"method":"capture","code":"Closed","reason":"minimized"}]}"#,
+    )
+    .expect_err("a pair no stage emits");
+    assert_eq!(
+        (no_row.kind, no_row.pointer.as_str()),
+        (InvalidKind::Reference, "/fail_next/0")
+    );
+}
