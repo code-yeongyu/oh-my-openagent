@@ -745,7 +745,13 @@ describe("device-service adapter: relay round trips per thread op", () => {
       // b's engine runs an open in a folder it lacks and answers it failed.
       const response =
         rpc["cwd"] === "/gone"
-          ? { type: "response", command: rpc["type"], success: false, error: "no such folder", errorCode: "cwd_not_found" }
+          ? {
+              type: "response",
+              command: rpc["type"],
+              success: false,
+              error: "no such folder",
+              errorCode: "cwd_not_found",
+            }
           : {
               type: "response",
               command: rpc["type"],
