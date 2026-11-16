@@ -118,7 +118,7 @@ fn allows_send_events(args: &[String], resources: &[u8]) -> bool {
         .lines()
         .chain(from_args)
         .filter_map(allow_send_events_value)
-        .last()
+        .next_back()
         .unwrap_or(false)
 }
 
