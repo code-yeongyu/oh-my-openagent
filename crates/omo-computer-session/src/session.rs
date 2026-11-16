@@ -49,6 +49,8 @@ pub struct Session {
     pub(crate) trace: crate::trace::Trace,
     /// The session-scoped display-awake hold (design row C22).
     pub(crate) display_awake: crate::intervention::SharedHold,
+    /// The generation of the latest `ax.snapshot` (row 24): a v1 ref `e2` names an element of it.
+    pub(crate) ax_generation: Option<u64>,
     pub(crate) settle: crate::settle::SettleState,
 }
 
@@ -78,7 +80,9 @@ impl Session {
     pub fn open(&mut self, params: SessionOpenParams) -> Result<SessionOpened, Refusal> {
         let request = read_session_open(params);
         let policy = StopPolicy::read(Transport::Local, request.allow_host_relay_only_stop);
+        self.funnel.set_url_policy(&request);
         self.opened = None;
+        crate::route_ladder::open_routes(&request, crate::route_ladder::host_os())?;
         self.guard.open(policy, HostAdditions::default())?;
         self.guard.apply_table(crate::grant::backend_os(self.backend.as_ref()));
         self.opened = Some(Opened {
@@ -229,6 +233,10 @@ const fn permission(state: PermissionState) -> &'static str {
     }
 }
 
+fn live_listener(caps: &Capabilities) -> bool {
+    caps.stop_path.kind == omo_computer_core::capabilities::StopPathKind::Global && !caps.stop_path.deaf
+}
+
 const fn known_true(state: Tristate) -> bool {
     matches!(state, Tristate::Known(true))
 }
@@ -250,8 +258,10 @@ pub fn legacy_capabilities(caps: &Capabilities, probe: &PermissionProbe) -> Lega
         ax_permission: permission(probe.accessibility).to_owned(),
         display_count: caps.display_count,
         focus_guard: caps.background_window_input,
-        stop_path: "none".to_owned(),
-        stop_reason: Some(NO_GLOBAL_LISTENER.to_owned()),
+        // The live global listener by name, as `diagnose` reports it; otherwise none (review L8
+        // of #13362, R70y(3)).
+        stop_path: if live_listener(caps) { caps.stop_path.listener.clone() } else { "none".to_owned() },
+        stop_reason: (!live_listener(caps)).then(|| NO_GLOBAL_LISTENER.to_owned()),
         integrity_level: None,
         screen_locked: known_true(caps.session.screen_locked),
         display_asleep: Some(known_true(caps.session.display_asleep)),

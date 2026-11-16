@@ -12,6 +12,7 @@ use serde_json::json;
 
 mod binding;
 mod delivered;
+mod held;
 mod lock;
 mod readmit;
 mod refusal;
@@ -24,17 +25,7 @@ use crate::budget::PermitKind;
 use crate::intervention::{Ended, MidSend, Stop};
 use crate::session_state::sample;
 use crate::{Session, NOT_OPEN};
-
-/// Row 22's admission outcome and per-call settings, and row 21's audit binding, carried into
-/// the send stages.
-struct Held {
-    admission: crate::intervention::Admission,
-    policy: omo_computer_core::settings::Intervention,
-    object: bool,
-    hold_limits: crate::intervention::HoldLimits,
-    target: Option<String>,
-    binding: Option<(bool, Option<Vec<u8>>)>,
-}
+use held::Held;
 
 impl Session {
     /// Runs one mutating call through the funnel.
@@ -63,13 +54,15 @@ impl Session {
         let mut epoch = self.guard.supervisor().stop_epoch();
         let call = (mutation.method, &mutation.call.target, mutation.route);
         let mut plan = self.funnel.control.plan(self.backend.as_mut(), call, epoch);
+        let url_detail = self.url_stages(&mut plan, &mutation);
         let pausing = object.then_some(ceiling);
-        let admission = match self.admit_call(&mutation.call, mutation.route, plan.stages, pausing) {
+        let admission = match self.admit_call(&mutation.call, mutation.route, plan.stages.clone(), pausing) {
             Ok(admission) => admission,
             Err(blocked) => {
                 let detail = match blocked.stage.as_str() {
                     "Consent" => plan.consent_detail.clone(),
                     "Lease" => plan.lease_detail.clone(),
+                    "Consequential" => url_detail,
                     _ => None,
                 };
                 let mut refused = self.stamp(*blocked.refused, object);
@@ -124,7 +117,7 @@ impl Session {
     /// The stages after the gate admitted the call and its lease and reservations are taken.
     fn admitted(
         &mut self,
-        mutation: Mutation<'_>,
+        mut mutation: Mutation<'_>,
         mut record: Record,
         (call_id, report_mode, tag): (String, omo_computer_core::params::ReportMode, u64),
         held: Held,
@@ -186,6 +179,14 @@ impl Session {
             let out = self.stamp(Refusal::bare(EngineCode::UserIntervened).into(), object);
             return Err(self.refuse(record, Some("Attribution".to_owned()), out));
         }
+        let text_cut = match self.send_on_enter(&mut mutation) {
+            Ok(cut) => cut,
+            Err(out) => {
+                drop(lock);
+                let out = self.stamp(out, object);
+                return Err(self.refuse(record, Some("Consequential".to_owned()), out));
+            }
+        };
         if let Err(error) = self.funnel.markers.create(&record.marker) {
             self.funnel.warn(format!("marker not written: {error}"));
             return Err(self.refuse(record, Some("Marker".to_owned()), MARKER_UNAVAILABLE.into()));
@@ -193,8 +194,12 @@ impl Session {
         let watch = admission
             .pid
             .and_then(|pid| MidSend::start(self.backend.as_ref(), pid, policy));
-        let outcome = self.send_watched(mutation.events, mutation.route, tag, watch, target);
+        let (outcome, read_back) = match mutation.write.clone() {
+            Some(write) => self.send_write(&write, tag),
+            None => (self.send_watched(mutation.events, mutation.route, tag, watch, target), None),
+        };
         drop(lock);
+        let outcome = crate::send_on_enter::TextCut::finish(text_cut, outcome);
         let (count, of) = (outcome.count, outcome.of);
         if count > 0 {
             if let Some(now) = self.backend.clock().map(BackendClock::now_ms) {
@@ -208,7 +213,7 @@ impl Session {
         let settled = (object && outcome.stop.is_none() && count > 0)
             .then(|| self.settle_after_send(target))
             .flatten();
-        let read_back = report::read_back(report::settle(settled.as_ref()));
+        let settle_read = report::read_back(report::settle(settled.as_ref()));
         let paused = if object { admission.paused } else { Vec::new() };
         let session = object.then(|| sample(self.backend.as_ref()));
         match outcome.stop {
@@ -240,6 +245,7 @@ impl Session {
                         sent: count,
                     }),
                     warning,
+                    detail: ended.detail,
                     ..Refused::from(ended.refusal)
                 })
             }
@@ -249,14 +255,16 @@ impl Session {
                     count,
                     of,
                     // A route that delivered fewer units than were asked reports it (R48c).
-                    effect: if count < of { omo_computer_core::report::Effect::Partial } else { read_back.effect },
+                    effect: if count < of { omo_computer_core::report::Effect::Partial } else { read_back.as_ref().map_or(settle_read.effect, |r| r.effect) },
                     user_moved_on: false,
+                    url_unknown: std::mem::take(&mut self.funnel.url_unknown),
                     warning: None,
                     settle: settled.as_ref().map(crate::settle::Settled::wire),
                     audit_id: None,
                     paused,
                     session,
                     target: None,
+                    read_back,
                 };
                 let reply = (report_mode, mutation.method);
                 Ok(self.reply_delivered(record, reply, sent, identity_unavailable))

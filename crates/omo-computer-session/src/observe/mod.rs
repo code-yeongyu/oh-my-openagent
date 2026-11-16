@@ -92,6 +92,7 @@ fn packet(generation: &Generation, nodes_observed: u32, cuts: Vec<Cut>) -> Obser
         session: unknown_session_state(),
         observation: UntrustedText,
         secure: None,
+        next_call: None,
         settle: None,
         ocr: None,
     }

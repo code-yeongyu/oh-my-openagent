@@ -1,0 +1,8 @@
+{
+  "windows": [],
+  "permissions": {
+    "capture": "Granted",
+    "input": "Denied",
+    "accessibility": "Unknown"
+  }
+}

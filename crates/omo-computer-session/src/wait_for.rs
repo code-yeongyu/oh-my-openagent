@@ -193,6 +193,7 @@ impl Session {
             session: omo_computer_core::backend::unknown_session_state(),
             observation: UntrustedText,
             secure: None,
+            next_call: None,
             settle: None,
             ocr: None,
         }
