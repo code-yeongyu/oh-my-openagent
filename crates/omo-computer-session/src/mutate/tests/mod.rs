@@ -101,7 +101,8 @@ impl Run {
     }
 
     /// Every byte the engine wrote under its roots (audit, markers, artifacts). An entry or
-    /// file that cannot be read fails the walk: a skipped file would read as clean.
+    /// file that cannot be read fails the walk (a skipped file would read as clean), except a
+    /// `.lock` file a live session holds on Windows, which carries no payload.
     pub(super) fn everything_written(&self) -> String {
         let mut text = String::new();
         let mut stack = vec![self.dir.path().to_owned()];
@@ -111,8 +112,19 @@ impl Run {
                 if path.is_dir() {
                     stack.push(path);
                 } else {
-                    let bytes = fs::read(&path)
-                        .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+                    let bytes = match fs::read(&path) {
+                        Ok(bytes) => bytes,
+                        // A `.lock` file a live session holds is byte-range locked on Windows
+                        // (os error 33); lock files carry no payload, so it holds nothing to
+                        // leak. Any other unreadable file still fails the walk.
+                        Err(error)
+                            if error.raw_os_error() == Some(33)
+                                && path.extension().is_some_and(|ext| ext == "lock") =>
+                        {
+                            continue;
+                        }
+                        Err(error) => panic!("{}: {error}", path.display()),
+                    };
                     text.push_str(&String::from_utf8_lossy(&bytes));
                 }
             }
