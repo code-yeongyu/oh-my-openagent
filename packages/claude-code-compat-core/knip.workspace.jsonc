@@ -1,0 +1,33 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/claude-code-compat-core": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+      ],
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) expandEnvVars
+    "packages/claude-code-compat-core/src/features/claude-code-mcp-loader/env-expander.ts": ["expandEnvVars"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) formatLoadedServersForToast
+    "packages/claude-code-compat-core/src/features/claude-code-mcp-loader/loader.ts": ["formatLoadedServersForToast"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) resolveActualInstallPath, loadPluginManifest
+    "packages/claude-code-compat-core/src/features/claude-code-plugin-loader/discovery.ts": ["resolveActualInstallPath", "loadPluginManifest"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) loadPluginAgents, loadPluginMcpServers, loadPluginHooksConfigs
+    "packages/claude-code-compat-core/src/features/claude-code-plugin-loader/loader.ts": ["loadPluginAgents", "loadPluginMcpServers", "loadPluginHooksConfigs"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) bunWrite
+    "packages/claude-code-compat-core/src/shared/bun-file-shim.ts": ["bunWrite"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) normalizeModel
+    "packages/claude-code-compat-core/src/shared/model-normalization.ts": ["normalizeModel"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) TAURI_APP_IDENTIFIER, TAURI_APP_IDENTIFIER_DEV, isDevBuild, getOpenCodeConfigDir, getOpenCodeConfigPaths, detectExistingConfigDir
+    "packages/claude-code-compat-core/src/shared/opencode-config-dir.ts": ["TAURI_APP_IDENTIFIER", "TAURI_APP_IDENTIFIER_DEV", "isDevBuild", "getOpenCodeConfigDir", "getOpenCodeConfigPaths", "detectExistingConfigDir"]
+  }
+}

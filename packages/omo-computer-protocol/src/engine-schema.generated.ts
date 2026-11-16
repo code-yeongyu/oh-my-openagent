@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "6bcb576fd6db0fb6d4fd5032c575cdf3c0cbdc2241d3c38c09135dbb3a1a0822" as const
+export const SCHEMA_SHA256 = "b126ec05e59159af8e527f277bf1f4d742d5d71eda158822fe4265518c9471c8" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -400,7 +400,9 @@ export type ActionReport = {
 	warning?: string | null
 	auditIds?: string[]
 	timings?: Timings | null
+	settle?: ObservationSettle | null
 	evidence: Evidence[]
+	urlPolicy?: UrlPolicyStamp | null
 	observation: UntrustedText
 	paused?: Pause[]
 	session?: SessionState | null
@@ -725,6 +727,7 @@ export type Diagnosis = {
 	stopPath: StopPathCapability
 	releaseHelper?: ReleaseHelper | null
 	observation: UntrustedText
+	checks?: ProbeCheck[]
 }
 
 export type DiffFallback = "baseline_incomplete" | "current_incomplete" | "since_expired" | "window_changed" | "menu_root" | "reordered" | "not_shorter" | "query_projection"
@@ -1061,8 +1064,18 @@ export type McpSettings = {
 	tier: Tier
 }
 
+export type MenuItem = {
+	label: string
+	enabled: boolean
+	checked: boolean
+	accelerator?: string | null
+	submenu: boolean
+	path: string[]
+	observation: UntrustedText
+}
+
 export type MenuItems = {
-	items: ElementInfo[]
+	items: MenuItem[]
 	truncated?: boolean | null
 	observation: UntrustedText
 }
@@ -1110,6 +1123,14 @@ export type MoveParams = {
 	observeAfter?: ObserveOptions | null
 }
 
+export type NotificationMatch = {
+	app: string
+	title: string
+	bodyHash: string
+	arrivedAt: number
+	observation: UntrustedText
+}
+
 export type NotificationPredicate = {
 	app?: string | null
 	title?: string | null
@@ -1139,6 +1160,7 @@ export type ObservationSettle = {
 	indicator?: BusyIndicator | null
 	quietMs: number
 	waitedMs: number
+	regime?: SettleRegime | null
 }
 
 export type ObserveAx = boolean | {
@@ -1245,6 +1267,14 @@ export type PressParams = {
 	runGeneration?: number | null
 	observeAfter?: ObserveOptions | null
 }
+
+export type ProbeCheck = {
+	name: string
+	state: ProbeState
+	reason?: string | null
+}
+
+export type ProbeState = "ok" | "unavailable" | "unknown"
 
 export type RaiseWindowParams = {
 	windowId: string
@@ -1438,6 +1468,8 @@ export type SettleOptions = {
 
 export type SettleOutcome = "settled" | "pending" | "unsupported" | "timeout"
 
+export type SettleRegime = "changed" | "unchanged" | "navigation"
+
 export type SpawnPath = "open_a" | "disclaim"
 
 export type SshHost = {
@@ -1527,6 +1559,7 @@ export type Timings = {
 	dispatch?: number | null
 	verify?: number | null
 	restore?: number | null
+	settleMs?: number | null
 }
 
 export type ToolkitClass = "canvas_gl" | "chromium_electron" | "pointer_hw" | "qt_xcb"
@@ -1563,6 +1596,8 @@ export type UnknownLiteral = "unknown"
 export type UntrustedText = {
 	untrustedText: true
 }
+
+export type UrlPolicyStamp = "unknown"
 
 export type UserActive = {
 	active: Tristate
@@ -1601,6 +1636,7 @@ export type WaitPredicate = {
 export type WaitResult = {
 	outcome: WaitOutcome
 	observation: Observation
+	notification?: NotificationMatch | null
 }
 
 export type WindowFrameParams = {

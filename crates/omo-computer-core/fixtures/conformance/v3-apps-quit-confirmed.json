@@ -1,7 +1,7 @@
 {
-  "description": "Row 24 (d-sdk-skill.md:251 apps.quit): the app resolves to one of its windows for the gate; the quit is confirmed only when no window of the app remains (value_readback intended exited).",
+  "description": "Row 24 (d-sdk-skill.md:251 apps.quit; R70h): the app resolves through row 25's app resolution and consent, the quit posts one AppQuit, and it is confirmed only when no window of the app remains (value_readback intended exited).",
   "transport": "stdio",
-  "scenario": "crates/omo-computer-backend-fake/fixtures/ax-type-text.json",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/v3-apps.json",
   "env": {
     "OMO_COMPUTER_FAKE_STOP_PATH": "live"
   },
@@ -23,7 +23,7 @@
             "result": {
               "capabilities": {
                 "backend": "fake",
-                "displayCount": 2,
+                "displayCount": 1,
                 "deliveryModes": [
                   "background",
                   "foreground"
@@ -96,7 +96,7 @@
                   "stale": false
                 }
               },
-              "resumeToken": "b3e8670d2e5bc3f2fe582aea4c256ca0"
+              "resumeToken": "e30bbb129f603ff0472d807b48ce75ed"
             }
           },
           "variable": [
@@ -163,7 +163,7 @@
         "id": 4,
         "method": "apps.quit",
         "params": {
-          "target": "Notes"
+          "target": "com.example.notes"
         }
       },
       "expect": [
@@ -181,9 +181,9 @@
                 "of": 1
               },
               "effect": "confirmed",
-              "route": "background_window",
+              "route": "background_pid",
               "auditIds": [
-                "ef4a1af9d8aeb8ab"
+                "af5debea2802705e"
               ],
               "evidence": [
                 {

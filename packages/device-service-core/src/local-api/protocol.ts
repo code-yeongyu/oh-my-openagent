@@ -111,25 +111,6 @@ export type DeviceAdopt = {
 }
 export type DeviceForget = { readonly id: string; readonly type: "device.forget" }
 export type DeviceInfo = { readonly id: string; readonly type: "device.info" }
-/** omo-service#1016: the machine binding for the account's salt; the raw machine id never crosses the local API. */
-export type DeviceMachineBinding = {
-  readonly id: string
-  readonly type: "device.machine_binding"
-  readonly machine_salt: string
-}
-/** The identity relayd already holds: its public keys, raw 32 bytes as unpadded base64url (the service's encoding). */
-export type MachineBoundDevice = {
-  readonly id: string
-  readonly signing_public_key: string
-  readonly sealing_public_key: string
-}
-export type MachineBinding = {
-  /** Unpadded base64url HMAC-SHA256; null when this machine has no readable machine id. */
-  readonly machine_hash: string | null
-  readonly device: MachineBoundDevice | null
-  /** Other device ids this machine held (prior identities, client credentials), for the service to fold in. */
-  readonly merge_device_ids: readonly string[]
-}
 export type EndpointsRegister = {
   readonly id: string
   readonly type: "endpoints.register"
@@ -191,7 +172,6 @@ export type LocalRequest =
   | DeviceAdopt
   | DeviceForget
   | DeviceInfo
-  | DeviceMachineBinding
   | EndpointsRegister
   | EndpointsUnregister
   | DevicesList
@@ -226,7 +206,6 @@ export type ResponseData = {
   readonly "device.adopt": { readonly device: DeviceRef }
   readonly "device.forget": Empty
   readonly "device.info": { readonly device: DeviceRef | null }
-  readonly "device.machine_binding": MachineBinding
   readonly "endpoints.register": Empty
   readonly "endpoints.unregister": Empty
   readonly "devices.list": { readonly devices: readonly DeviceRow[] }

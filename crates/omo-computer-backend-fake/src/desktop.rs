@@ -6,7 +6,7 @@ use omo_computer_core::backend::{
     Presence, Route, StopListener, TaggedInput, Target, WindowFilter, WindowList,
 };
 use omo_computer_core::capabilities::Capabilities;
-use omo_computer_core::intervention::{BackendClock, InterventionSource, TextDelivery};
+use omo_computer_core::intervention::{InterventionSource, TextDelivery};
 use omo_computer_core::results::DisplayInfo;
 
 use crate::backend::FakeBackend;
@@ -56,10 +56,6 @@ impl Backend for FakeBackend {
         self.scripted_presence()
     }
 
-    fn clock(&self) -> Option<&dyn BackendClock> {
-        Some(&self.clock)
-    }
-
     fn intervention(&self) -> Option<&dyn InterventionSource> {
         Some(self)
     }
@@ -91,17 +87,6 @@ impl Backend for FakeBackend {
         Some(window.map_or_else(|| FakeBackend::secure_focus_role(self).is_some(), |window| FakeBackend::secure_focus(self, window)))
     }
 
-    fn quit_app(&mut self, app: &str) -> BackendResult<Delivered> {
-        let mut state = self.lock();
-        let ids: Vec<String> = state.windows.iter().filter(|w| w.app == app).map(|w| w.id.clone()).collect();
-        for id in ids {
-            state.exited.insert(id);
-        }
-        drop(state);
-        self.sink.record(format!("quit_app app={app}"));
-        Ok(Delivered { count: 1, of: 1 })
-    }
-
     fn frame_settable(&self, window: &str) -> Option<bool> {
         self.lock().scenario.window_frame_policy.get(window).and_then(|policy| policy.settable)
     }
@@ -116,7 +101,7 @@ impl Backend for FakeBackend {
         text: &str,
         route: Route,
         tag: u64,
-        interrupt: &mut dyn FnMut(&dyn Backend) -> bool,
+        interrupt: &mut dyn FnMut(&mut dyn Backend) -> bool,
     ) -> TextDelivery {
         self.type_interruptible(text, route, tag, interrupt)
     }
@@ -131,8 +116,48 @@ impl Backend for FakeBackend {
         FakeBackend::code_identity(self, pid)
     }
 
+    fn executable_path(&self, pid: u32) -> Option<String> {
+        FakeBackend::executable_path(self, pid)
+    }
+
+    /// R70av: the fake arms any chord the consent view names (only the stop chord's source is
+    /// under test here; a backend's own refusal is the core default's).
+    fn set_stop_chord(&mut self, chord: Option<&str>) -> omo_computer_core::backend::BackendResult<()> {
+        let refused = chord.is_some_and(|chord| {
+            self.lock().scenario.unarmable_stop_chords.iter().any(|c| c.eq_ignore_ascii_case(chord))
+        });
+        if refused {
+            return Err(omo_computer_core::backend::Refusal::new(
+                omo_computer_core::error::EngineCode::StopPathUnavailable,
+                omo_computer_core::error::Reason::Deaf.wire(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn platform(&self) -> Option<omo_computer_core::report::Platform> {
+        use omo_computer_core::report::Platform;
+        Some(match self.persona {
+            crate::Persona::Macos => Platform::Macos,
+            crate::Persona::X11 => Platform::X11,
+            crate::Persona::Wayland => Platform::Wayland,
+            crate::Persona::Win32 => Platform::Windows,
+        })
+    }
+
     fn host_consent(&self) -> Option<serde_json::Value> {
         self.scripted_host_consent()
+    }
+
+    fn clock(&self) -> Option<&dyn omo_computer_core::backend::BackendClock> {
+        Some(&self.clock)
+    }
+
+    fn settle_source(&mut self) -> Option<Box<dyn omo_computer_core::backend::SettleSource>> {
+        Some(Box::new(crate::settle_source::FakeSettleSource::new(
+            self.shared.clone(),
+            self.clock.clone(),
+        )))
     }
 
     // --- Row 25: menus, apps, system surfaces and the focused web area's URL. ---
@@ -141,7 +166,6 @@ impl Backend for FakeBackend {
         Some(self)
     }
 }
-
 
 mod posts;
 mod shell;

@@ -1,6 +1,7 @@
 //! The mutate funnel, pre-input marker, audit, refs registry, settle, frames, consent and verbs.
 
 pub mod apps;
+pub mod attribution;
 pub mod audit;
 pub mod batch;
 pub mod budget;
@@ -32,9 +33,11 @@ pub mod reservation;
 pub mod surfaces;
 mod session;
 pub mod session_state;
+pub mod settle;
 pub mod trace;
 mod clipboard;
 pub(crate) mod value_verbs;
+mod wait_for;
 mod window_frame;
 
 pub use epoch::EpochChanged;

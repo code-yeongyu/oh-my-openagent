@@ -5,12 +5,16 @@
 
 mod refusal;
 mod refusing;
+mod settle_source;
 mod sources;
 mod types;
 
 pub use refusal::{BackendResult, Refusal};
 pub use refusing::{refusing_capabilities, unknown_session_state};
-pub use sources::{AxEventSource, EpochSource, NoAxEvents, NoEpochSource, Presence, StopListener};
+pub use settle_source::{NotificationFingerprint, SettleSource, NO_NOTIFICATION_SURFACE};
+pub use sources::{
+    AxEventSource, BackendClock, EpochSource, NoAxEvents, NoEpochSource, Presence, StopListener,
+};
 pub use types::{
     AxEvent, AxSnapshot, BackendProbes, CaptureOptions, Delivered, EpochChange, FrameBytes, InputEvent,
     PermissionProbe, Ref, Resolved, Route, Semantic, SnapshotRequest, TaggedInput, Target,
@@ -18,7 +22,7 @@ pub use types::{
 };
 
 use crate::capabilities::Capabilities;
-use crate::error::EngineCode;
+use crate::error::{EngineCode, Reason};
 use crate::results::{DisplayInfo, PermissionState};
 
 /// The desktop backend of one OS (or the fake).
@@ -69,17 +73,18 @@ pub trait Backend: Send {
     }
 
     /// The tri-state permission read; never prompts. Unknown by default, which is never granted.
-    /// R62: the backend's own doctor checks; `None` (the default) adds nothing to `diagnose`.
-    fn diagnose(&self) -> Option<BackendProbes> {
-        None
-    }
-
     fn probe_permissions(&self) -> PermissionProbe {
         PermissionProbe {
             capture: PermissionState::Unknown,
             input: PermissionState::Unknown,
             accessibility: PermissionState::Unknown,
         }
+    }
+
+    /// R62: the backend's own doctor checks, read only and never prompting; `None` (the default)
+    /// adds nothing to `diagnose`.
+    fn diagnose(&self) -> Option<BackendProbes> {
+        None
     }
 
     /// The epoch source; by default one whose every read refuses.
@@ -89,12 +94,6 @@ pub trait Backend: Send {
 
     /// The presence surface; `None` reads `ControlRequired{no_presence_surface}` (`COMPUTER_PRESENCE_UNAVAILABLE`).
     fn presence(&mut self) -> Option<Box<dyn Presence>> {
-        None
-    }
-
-    /// The backend's monotonic clock and its wait; `None` (the default) when it has none,
-    /// which makes an admission that would pause answer at once instead.
-    fn clock(&self) -> Option<&dyn crate::intervention::BackendClock> {
         None
     }
 
@@ -158,15 +157,6 @@ pub trait Backend: Send {
         None
     }
 
-    /// Row 24: quits the app (`apps.quit`); the gate has already refused the self set and the
-    /// protected table.
-    ///
-    /// # Errors
-    /// `AxUnsupported{perform_unsupported}` by default, with nothing sent.
-    fn quit_app(&mut self, _app: &str) -> BackendResult<Delivered> {
-        Err(Refusal::new(EngineCode::AxUnsupported, crate::error::Reason::PerformUnsupported.wire()))
-    }
-
     /// Row 24: `window.minimize` (`minimize: true`) or `window.restore` (`false`).
     ///
     /// # Errors
@@ -183,7 +173,7 @@ pub trait Backend: Send {
         text: &str,
         route: Route,
         tag: u64,
-        interrupt: &mut dyn FnMut(&dyn Backend) -> bool,
+        interrupt: &mut dyn FnMut(&mut dyn Backend) -> bool,
     ) -> crate::intervention::TextDelivery {
         let _ = interrupt;
         let of = crate::intervention::scalars(text);
@@ -192,8 +182,18 @@ pub trait Backend: Send {
             tag,
         };
         match self.post_input(&input, route) {
-            Ok(_) => crate::intervention::TextDelivery { sent: of, of, refusal: None, interrupted: false },
-            Err(refusal) => crate::intervention::TextDelivery { sent: 0, of, refusal: Some(refusal), interrupted: false },
+            Ok(_) => crate::intervention::TextDelivery {
+                sent: of,
+                of,
+                refusal: None,
+                interrupted: false,
+            },
+            Err(refusal) => crate::intervention::TextDelivery {
+                sent: 0,
+                of,
+                refusal: Some(refusal),
+                interrupted: false,
+            },
         }
     }
 
@@ -212,10 +212,50 @@ pub trait Backend: Send {
         None
     }
 
+    /// The executable path of `pid`, read without prompting. `None`: the path is unknown, and a
+    /// consent entry with no readable identity then has nothing to bind to.
+    fn executable_path(&self, pid: u32) -> Option<String> {
+        let _ = pid;
+        None
+    }
+
+    /// The platform this backend drives (A-IS-62 rev 5, R70an): its OS's documented defaults
+    /// apply. `None` (the default) is the host's OS; the fake answers its persona.
+    fn platform(&self) -> Option<crate::report::Platform> {
+        None
+    }
+
     /// The consent view the hand tool host hands the engine at `session.open`, as the host
     /// wrote it (`design/d-safety.md` '## Approval and consent'). `None`: no host view, and the
     /// session keeps its default view.
     fn host_consent(&self) -> Option<serde_json::Value> {
+        None
+    }
+
+    /// The chord the next `stop_listener` arms, `None` the backend's own. Fed only by the consent
+    /// view's `stopHotkey` (A-IS-62). By default only [`DEFAULT_STOP_CHORD`] is taken.
+    ///
+    /// # Errors
+    /// `StopPathUnavailable{deaf}` by default for any other chord, nothing armed (A-IS-62).
+    fn set_stop_chord(&mut self, chord: Option<&str>) -> BackendResult<()> {
+        match chord {
+            Some(chord) if !chord.eq_ignore_ascii_case(DEFAULT_STOP_CHORD) => Err(Refusal::new(
+                EngineCode::StopPathUnavailable,
+                Reason::Deaf.wire(),
+            )),
+            _ => Ok(()),
+        }
+    }
+
+    /// The backend's monotonic clock and its wait; `None` (the default) when it has none,
+    /// which makes an admission that would pause answer at once instead.
+    fn clock(&self) -> Option<&dyn BackendClock> {
+        None
+    }
+
+    /// The settle reads: observer events with a deadline, the busy predicate and the
+    /// notification surface; `None` (the default) makes every settle read `unsupported`.
+    fn settle_source(&mut self) -> Option<Box<dyn SettleSource>> {
         None
     }
 
@@ -309,3 +349,35 @@ pub trait AxBackend {
 /// The refusal a missing presence surface reads as.
 pub const PRESENCE_UNAVAILABLE: Refusal =
     Refusal::new(EngineCode::ControlRequired, "no_presence_surface");
+
+/// The stop chord a backend on the `set_stop_chord` default listens for: the X11, Wayland and
+/// Windows default `computer.stopHotkey` (`design/d-safety.md` '1. The physical stop chord').
+pub const DEFAULT_STOP_CHORD: &str = "ctrl+alt+shift+escape";
+
+#[cfg(test)]
+mod stop_chord_tests {
+    use super::{Backend, Refusal, DEFAULT_STOP_CHORD};
+    use crate::error::{EngineCode, Reason};
+
+    /// A backend on every default.
+    struct Defaults;
+
+    impl Backend for Defaults {}
+
+    #[test]
+    fn a_default_backend_refuses_a_foreign_stop_chord_and_takes_its_own() {
+        let mut backend = Defaults;
+        assert_eq!(
+            backend.set_stop_chord(Some("ctrl+alt+a")),
+            Err(Refusal::new(EngineCode::StopPathUnavailable, Reason::Deaf.wire())),
+            "A-IS-62: a chord it cannot arm reads deaf, never a bare or other refusal"
+        );
+        assert_eq!(
+            backend.stop_listener().err(),
+            Some(Refusal::new(EngineCode::StopPathUnavailable, "no_listener")),
+            "no listener is armed for the refused chord"
+        );
+        assert_eq!(backend.set_stop_chord(Some(DEFAULT_STOP_CHORD)), Ok(()));
+        assert_eq!(backend.set_stop_chord(None), Ok(()), "none: its own");
+    }
+}

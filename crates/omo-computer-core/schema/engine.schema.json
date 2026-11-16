@@ -1206,6 +1206,18 @@
           ],
           "default": null
         },
+        "settle": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObservationSettle"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The post-send settle: the regime picked and its outcome.",
+          "default": null
+        },
         "evidence": {
           "type": "array",
           "items": {
@@ -4740,6 +4752,37 @@
         "y"
       ]
     },
+    "NotificationMatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "app": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "bodyHash": {
+          "type": "string"
+        },
+        "arrivedAt": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observation": {
+          "$ref": "#/$defs/UntrustedText"
+        }
+      },
+      "required": [
+        "app",
+        "title",
+        "bodyHash",
+        "arrivedAt",
+        "observation"
+      ],
+      "description": "The notification a `waitFor({notification})` matched: its fingerprint only, never the body."
+    },
     "NotificationPredicate": {
       "type": "object",
       "additionalProperties": false,
@@ -4907,6 +4950,17 @@
           "type": "integer",
           "format": "uint64",
           "minimum": 0
+        },
+        "regime": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SettleRegime"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The regime of `settle_profile` the engine picked."
         }
       },
       "required": [
@@ -6529,6 +6583,26 @@
         "timeout"
       ]
     },
+    "SettleRegime": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "changed",
+          "description": "After an input whose settle saw a change."
+        },
+        {
+          "type": "string",
+          "const": "unchanged",
+          "description": "After an input with no detected change."
+        },
+        {
+          "type": "string",
+          "const": "navigation",
+          "description": "After a navigation: a new window, app, Space or desktop, web-area URL or document."
+        }
+      ],
+      "description": "Which settle numbers an input's settle picked, from what it saw."
+    },
     "SpawnPath": {
       "type": "string",
       "enum": [
@@ -6899,7 +6973,8 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the element reference took to resolve."
         },
         "capture": {
           "type": [
@@ -6907,7 +6982,8 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the capture took."
         },
         "prime": {
           "type": [
@@ -6915,7 +6991,8 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the target took to prime."
         },
         "dispatch": {
           "type": [
@@ -6923,7 +7000,8 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the dispatch of the input took."
         },
         "verify": {
           "type": [
@@ -6931,7 +7009,8 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the verification read took."
         },
         "restore": {
           "type": [
@@ -6939,10 +7018,20 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the focus restore took."
+        },
+        "settleMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0,
+          "description": "Milliseconds the post-send settle waited (its `settle.waitedMs`)."
         }
       },
-      "description": "Stage timings in microseconds; a stage that did not run is absent."
+      "description": "How long each stage took; a stage that did not run is absent. Each field names its unit."
     },
     "ToolkitClass": {
       "type": "string",
@@ -7280,6 +7369,16 @@
         },
         "observation": {
           "$ref": "#/$defs/Observation"
+        },
+        "notification": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NotificationMatch"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [

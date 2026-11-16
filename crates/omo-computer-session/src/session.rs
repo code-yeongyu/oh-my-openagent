@@ -51,6 +51,7 @@ pub struct Session {
     pub(crate) display_awake: crate::intervention::SharedHold,
     /// The generation of the latest `ax.snapshot` (row 24): a v1 ref `e2` names an element of it.
     pub(crate) ax_generation: Option<u64>,
+    pub(crate) settle: crate::settle::SettleState,
 }
 
 impl Session {
@@ -89,7 +90,9 @@ impl Session {
             settings: crate::intervention::OpenSettings::read(&request),
         });
         let resume_token = format!("{:016x}{:016x}", random_u64(), random_u64());
-        self.open_control(&resume_token[..16])?;
+        // Row 21 (A-IS-62, R70ai): the open request's stop_hotkey is compared with the consent file's.
+        let stop_hotkey = request.config.as_ref().and_then(|config| config.stop.stop_hotkey.as_deref());
+        self.open_control(&resume_token[..16], stop_hotkey)?;
         self.funnel.sweep(SweepTrigger::Open);
         self.open_trace(request.trace, &resume_token[..16]);
         Ok(SessionOpened {
@@ -100,8 +103,25 @@ impl Session {
 
     /// `stopPath.start`: arms (or re-arms a parked) stop listener.
     pub fn stop_path_start(&mut self, params: StopPathStartParams) -> StopPathStatus {
-        let StopPathStartParams { chord: _ } = params;
-        self.guard.start_on(self.backend.as_mut())
+        // Row 21 (A-IS-62 rev 5, R70aq): the wire entry is `stop_path_start_checked`; this form
+        // keeps its callers' shape and answers the status either way.
+        self.stop_path_start_checked(params)
+            .unwrap_or_else(|_| self.stop_path_status())
+    }
+
+    /// `stopPath.start{chord?}` as the engine answers it: the configured chord is armed FIRST, as
+    /// before, then a carried chord is compared through the one parser.
+    ///
+    /// # Errors
+    /// Row 21 (A-IS-62 rev 5, R70aq): a carried chord that differs from the consent file's or does
+    /// not parse: the call is refused, nothing is disarmed, and the hand reads tampered.
+    pub fn stop_path_start_checked(&mut self, params: StopPathStartParams) -> Result<StopPathStatus, Refusal> {
+        let StopPathStartParams { chord } = params;
+        // R70as(3): an unreadable configured chord arms NOTHING and refuses.
+        self.refuse_unreadable_chord()?;
+        let status = self.arm_configured_chord();
+        self.refuse_carried_chord(chord.as_deref(), "stopPath.start")?;
+        Ok(status)
     }
 
     /// `stopPath.stop{source}`: latches and commits the stop.
@@ -212,6 +232,10 @@ const fn permission(state: PermissionState) -> &'static str {
     }
 }
 
+fn live_listener(caps: &Capabilities) -> bool {
+    caps.stop_path.kind == omo_computer_core::capabilities::StopPathKind::Global && !caps.stop_path.deaf
+}
+
 const fn known_true(state: Tristate) -> bool {
     matches!(state, Tristate::Known(true))
 }
@@ -233,8 +257,10 @@ pub fn legacy_capabilities(caps: &Capabilities, probe: &PermissionProbe) -> Lega
         ax_permission: permission(probe.accessibility).to_owned(),
         display_count: caps.display_count,
         focus_guard: caps.background_window_input,
-        stop_path: "none".to_owned(),
-        stop_reason: Some(NO_GLOBAL_LISTENER.to_owned()),
+        // The live global listener by name, as `diagnose` reports it; otherwise none (review L8
+        // of #13362, R70y(3)).
+        stop_path: if live_listener(caps) { caps.stop_path.listener.clone() } else { "none".to_owned() },
+        stop_reason: (!live_listener(caps)).then(|| NO_GLOBAL_LISTENER.to_owned()),
         integrity_level: None,
         screen_locked: known_true(caps.session.screen_locked),
         display_asleep: Some(known_true(caps.session.display_asleep)),

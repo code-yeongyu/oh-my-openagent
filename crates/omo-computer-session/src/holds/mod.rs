@@ -14,7 +14,7 @@ mod tests;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use omo_computer_core::backend::{Backend, Delivered, InputEvent, Route};
-use omo_computer_core::holds::{Held, HoldLedger, MAX_HOLD_MS};
+use omo_computer_core::holds::{Held, HoldLedger};
 
 pub(crate) use hook::with_holds;
 pub(crate) use refuse::{hold_duration, scroll_steps};
@@ -24,8 +24,6 @@ struct Ledger {
     holds: HoldLedger,
     /// The tag of the session that pressed, so a release carries the engine's tag.
     tag: u64,
-    /// When each hold reaches the bound, oldest first.
-    deadlines: Vec<u64>,
 }
 
 /// The session's held inputs, shared by the session and its lease hook.
@@ -41,7 +39,6 @@ impl SharedLedger {
         let mut ledger = self.lock();
         ledger.holds.press(held, now_ms);
         ledger.tag = tag;
-        ledger.deadlines.push(now_ms.saturating_add(MAX_HOLD_MS));
     }
 
     /// Forgets a hold the caller released; `false` when the ledger no longer held it.
@@ -57,8 +54,7 @@ impl SharedLedger {
     /// The clock time the oldest hold reaches the bound, `None` with nothing held (R49).
     #[must_use]
     pub fn next_deadline(&self) -> Option<u64> {
-        let ledger = self.lock();
-        (!ledger.holds.is_empty()).then(|| ledger.deadlines.iter().copied().min()).flatten()
+        self.lock().holds.next_deadline()
     }
 
     /// Releases every hold through the single post site, last press first; a key the user
@@ -66,8 +62,17 @@ impl SharedLedger {
     pub(crate) fn release_all(&self, backend: &mut dyn Backend) -> Delivered {
         let (events, tag) = {
             let mut ledger = self.lock();
-            ledger.deadlines.clear();
             (ledger.holds.release_all(&backend.user_held_keys()), ledger.tag)
+        };
+        post(backend, events, tag)
+    }
+
+    /// Releases only `which` (the holds one call pressed), last press first; every other
+    /// hold stays held.
+    pub(crate) fn release(&self, backend: &mut dyn Backend, which: &[Held]) -> Delivered {
+        let (events, tag) = {
+            let mut ledger = self.lock();
+            (ledger.holds.release(which, &backend.user_held_keys()), ledger.tag)
         };
         post(backend, events, tag)
     }
@@ -81,13 +86,7 @@ impl SharedLedger {
             if expired.is_empty() {
                 return Delivered { count: 0, of: 0 };
             }
-            let mut released = HoldLedger::default();
-            for held in expired {
-                ledger.holds.lift(&held);
-                released.press(held, now_ms);
-            }
-            ledger.deadlines.retain(|deadline| *deadline > now_ms);
-            (released.release_all(&backend.user_held_keys()), ledger.tag)
+            (ledger.holds.release(&expired, &backend.user_held_keys()), ledger.tag)
         };
         post(backend, events, tag)
     }

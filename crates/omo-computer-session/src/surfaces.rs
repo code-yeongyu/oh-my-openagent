@@ -65,6 +65,10 @@ impl Session {
             force: false,
         };
         let events = vec![InputEvent::OpenSurface { kind }];
+        // `openSystemSurface` is a v1 verb: `OpenSystemSurfaceParams` carries only `kind`, no
+        // `callId` or `runGeneration`, so there is no caller authority to read. The default (no
+        // call id, no generation) IS this call's authority, the same one every v1 verb runs under
+        // (review L4 of #13347; prose-only, no test).
         let authority = CallAuthority::default();
         let desktop = PointTarget::new(None, Resolution::Desktop);
         self.mutate(

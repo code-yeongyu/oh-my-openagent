@@ -52,10 +52,12 @@ impl Session {
             return Err(NO_CAPTURE.into());
         }
         let request = Request::read(params);
+        let settled = self.settle_before_read(&request.target, request.settle, None);
         let private = self.private_mode(&request.target);
         let mut withholding = crate::redaction::Withholding::new(self.backend.ax_reader().ok_or(NO_READER)?);
         let reader = &mut withholding;
         let mut observation = observe(&mut self.refs, reader, &request)?;
+        observation.settle = settled.as_ref().map(crate::settle::Settled::wire);
         if private {
             crate::redaction::withhold_observation(&mut observation);
         }
