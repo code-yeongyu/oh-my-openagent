@@ -223,7 +223,7 @@ export async function listAcross(
   }
   const known = new Set(ids)
   const [here, hereName, listed, roster] = await Promise.all([
-    remote.sessions.thisDevice(),
+    remote.sessions.thisDevice().catch(() => null),
     remote.sessions.thisDeviceName?.().catch(() => null) ?? Promise.resolve(null),
     accountListing(remote).then(
       (listing) => ({ ok: true as const, listing }),
@@ -234,7 +234,8 @@ export async function listAcross(
       () => ({ ok: false as const }),
     ),
   ])
-  if (!listed.ok) return withAliases(remote, { ...local, remote_unavailable: "host_unavailable" }, ids)
+  // Without this device's id its own rows cannot be told apart from another device's, so none are merged.
+  if (!listed.ok || here === null) return withAliases(remote, { ...local, remote_unavailable: "host_unavailable" }, ids)
   const listing = listed.listing
   const others = listing.rows.filter((row) => row.device !== here && !known.has(rowThreadId(row)))
   const threads = [
