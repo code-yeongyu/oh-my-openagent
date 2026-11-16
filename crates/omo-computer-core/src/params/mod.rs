@@ -51,7 +51,7 @@ pub use reads::{
 };
 pub use v1::{
     AdvanceClockParams, AxPerformParams, AxRefParams, AxSetValueParams, AxTargetParams,
-    AxTypeTextParams, CancelParams, CaptureParams, ClickParams, ControlGrantParams, HoldKeysParams,
+    AxTypeTextParams, CancelParams, CaptureParams, ClickParams, ControlGrantParams, HandRegisterParams, HoldKeysParams,
     HoldMouseParams, KeyChordParams, ObserveAx, ObserveParams, OnOff, RaiseWindowParams,
     ReportMode, SessionOpenParams, StopPathResumeParams, StopPathStartParams, StopPathStopParams,
     TypeTextParams,
