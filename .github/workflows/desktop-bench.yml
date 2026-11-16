@@ -2,7 +2,7 @@ name: Desktop bench
 
 # Computer-use latency bench, base against head on one runner (docs/reference/computer-use-eval.md): the job builds the desktop
 # engine at both refs, runs head's cu-eval bench against each in alternating rounds, and fails when any op's
-# head wall p50 is more than 30% (and more than 0.5 ms) above the base's. Two engine builds and 10x30 bench rounds
+# head wall p50 regresses past eval-core.mjs's ratio and floor (compareBench). Two engine builds and 10x30 bench rounds
 # are too heavy for every pull request, so it runs nightly on the default branch (against the newest v* release tag)
 # and on manual dispatch (against base_ref, or that tag when base_ref is empty).
 on:
@@ -227,6 +227,6 @@ jobs:
           JOB_SUMMARY_DETAILS: |
             - Release desktop engine built at the base and at the head of this run.
             - Head's cu-eval bench, fake backend, alternating base/head rounds; the best wall p50 per op is compared.
-            - A head p50 more than 30% and more than 0.5 ms above the base's fails the job.
+            - A head p50 above the base's by more than eval-core.mjs's regression ratio and floor fails the job; the comparison line in the step summary prints both.
           JOB_SUMMARY_NEXT: Open the desktop-bench artifact; comparison.json names each regressed op with both p50 values and the host load of every round.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash head/.github/scripts/write-job-summary.sh
