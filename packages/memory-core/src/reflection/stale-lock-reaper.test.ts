@@ -748,6 +748,35 @@ describe("dead-owner runtime locks (#11976, 4.5)", () => {
     expect(result.reclaimed).toEqual([])
     expect(result.kept).toEqual([])
   })
+
+  test("#given the listing after the sweep fails #when reclaimed #then the unreclaimed locks are reported kept with that error, not dropped", async () => {
+    // given
+    const paths = reaperIdentity()
+    mkdirSync(paths.locks, { recursive: true })
+    writeJson(join(paths.locks, "notice.lock"), await createLockRecord("notice"))
+    const realReaddir = resilientFs.readdir
+    let calls = 0
+    const failSecond = spyOn(resilientFs, "readdir").mockImplementation((async (
+      ...args: Parameters<typeof resilientFs.readdir>
+    ) => {
+      calls += 1
+      if (args[0] === paths.locks && calls >= 2) throw Object.assign(new Error("EIO: listing failed"), { code: "EIO" })
+      return realReaddir(...args)
+    }) as typeof resilientFs.readdir)
+
+    // when
+    let result: Awaited<ReturnType<typeof reclaimDeadOwnerLocks>>
+    try {
+      result = await reclaimDeadOwnerLocks(paths.locks)
+    } finally {
+      failSecond.mockRestore()
+    }
+
+    // then
+    expect(result.reclaimed).toEqual([])
+    expect(result.kept.map((entry) => entry.name)).toEqual(["notice.lock"])
+    expect(result.kept[0]?.reason).toContain("EIO: listing failed")
+  })
 })
 
 describe("win32: the reaper with real process liveness and start identities (#11976 Bearmancer report, C16)", () => {
