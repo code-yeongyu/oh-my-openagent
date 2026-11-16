@@ -172,9 +172,23 @@ async function enableRemote(
   // Only the user turning remote on clears an opt-out. After login none was recorded at the re-read above, so a clear
   // could only erase one a `omo remote disable` recorded since (#13724 review L1).
   if (enabled && !afterLogin) remote.optOut.clear()
+  // A disable whose record lands after that read switches the service off after this switch-on, but its unit removal can
+  // still come before this enable's link and unit install (#14003 review L1). So the after-login enable reads once more
+  // before them, and once more after the install: a record seen there removes the unit again, and one made later is
+  // followed by that disable's own removal, which comes last.
+  const optedOutNow = (): boolean => afterLogin && remote.optOut.read()
+  if (optedOutNow()) {
+    report(false)
+    await applyColdWake(remote.coldWake, false, io.error)
+    return false
+  }
   report(enabled)
   if (outcome.status.device === null && (await remote.linkDevice()) === "signed_out") io.error(NOT_LINKED)
   await applyColdWake(remote.coldWake, enabled, io.error)
+  if (enabled && optedOutNow()) {
+    await applyColdWake(remote.coldWake, false, io.error)
+    return false
+  }
   return enabled
 }
 

@@ -96,6 +96,93 @@ describe("the background enable omo login starts", () => {
     expect([owners[0]?.state.status.enabled, record.off, record.clears]).toEqual([false, true, 0])
   })
 
+  // #14003 review L1: the disable's unit removal can land before the enable's own unit install. The unit here is real state
+  // (installed or not), and the disable runs inside a hook at a fixed point, so the order is fixed, not timed.
+  const disableOf = (record: { off: boolean }, unit: { installed: boolean }) => () => {
+    record.off = true
+    const owner = owners[0]
+    if (owner !== undefined) owner.state.status = { ...owner.state.status, enabled: false, state: "disabled" }
+    unit.installed = false
+  }
+  const unitColdWake = (unit: { installed: boolean }, duringInstall: () => void = () => {}) => ({
+    install: async () => {
+      duringInstall()
+      unit.installed = true
+      return { kind: "installed" as const, serviceRestarted: false }
+    },
+    uninstall: async () => {
+      unit.installed = false
+      return { kind: "removed" as const, serviceRestarted: false }
+    },
+    status: async () => undefined,
+  })
+  const installingBootstrap = (stateDir: string) =>
+    testBootstrap({
+      install: async () => {
+        owners.push(await startFakeOwner({ stateDir, world: defaultWorld() }))
+        return { ok: true }
+      },
+    })
+
+  test("a disable right after its read that follows the switch-on: the unit ends removed, the opt-out kept", async () => {
+    const stateDir = privateDir()
+    const { record, optOut } = optOutRecord()
+    const unit = { installed: false }
+    const disable = disableOf(record, unit)
+    let reads = 0
+    const disableAfterSecondRead = {
+      ...optOut,
+      read: () => {
+        const off = optOut.read()
+        reads += 1
+        if (reads === 2) disable()
+        return off
+      },
+    }
+    const { code } = await run(
+      ["enable", AFTER_LOGIN_FLAG, "--json"],
+      stateDir,
+      SIGNED_IN,
+      installingBootstrap(stateDir),
+      undefined,
+      {
+        optOut: disableAfterSecondRead,
+        coldWake: unitColdWake(unit),
+      },
+    )
+    expect([code, unit.installed, owners[0]?.state.status.enabled, record.off, record.clears]).toEqual([
+      REMOTE_EXIT.ok,
+      false,
+      false,
+      true,
+      0,
+    ])
+  })
+
+  test("a disable while it installs the unit: the unit ends removed, the opt-out kept", async () => {
+    const stateDir = privateDir()
+    const { record, optOut } = optOutRecord()
+    const unit = { installed: false }
+    const { code } = await run(
+      ["enable", AFTER_LOGIN_FLAG, "--json"],
+      stateDir,
+      SIGNED_IN,
+      installingBootstrap(stateDir),
+      undefined,
+      {
+        optOut,
+        coldWake: unitColdWake(unit, disableOf(record, unit)),
+      },
+    )
+    expect([code, unit.installed, owners[0]?.state.status.enabled, record.off, record.clears]).toEqual([
+      REMOTE_EXIT.ok,
+      false,
+      false,
+      true,
+      0,
+    ])
+  })
+
   // #13724 review L1: with no opt-out recorded there is nothing to clear; a clear here could only erase one a disable
   // recorded after the re-read.
   test("no opt-out recorded: it switches remote on and never clears the opt-out record", async () => {
