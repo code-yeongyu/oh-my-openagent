@@ -12,7 +12,7 @@ import {
   runLoginSetup,
 } from "../remote-bootstrap"
 import { disableNotSavedNotice, REMOTE_EXIT } from "../remote-cli"
-import { afterServiceAuth } from "../service-auth-command"
+import { afterServiceAuth, LOGIN_REMOTE_OPT_OUT_TIMED_OUT, LOGIN_REMOTE_SETUP_TIMED_OUT } from "../service-auth-command"
 import {
   owners,
   privateDir,
@@ -169,6 +169,59 @@ describe("omo login sets remote sessions up", () => {
       else process.env.OMO_SERVICE_API_URL = saved
     }
   })
+
+  // 5.1.73 review M1 (omo#13627): the bound must end the COMMAND, not just stop waiting. The setup here never settles
+  // and holds a real listening socket, which alone keeps a process alive; login must still exit with its own code,
+  // having printed what it printed before and one line on stderr.
+  test("a setup that never settles and holds a handle does not keep omo login running past the bound", async () => {
+    const module = new URL("../service-auth-command.ts", import.meta.url).pathname
+    const script = [
+      `import { createServer } from "node:net"`,
+      `import { afterServiceAuth } from ${JSON.stringify(module)}`,
+      `process.stdout.write("signed in\\n")`,
+      `const setUp = () => new Promise(() => { createServer().listen(0, "127.0.0.1") })`,
+      `await afterServiceAuth(["login"], 0, setUp, 300)`,
+      `process.stdout.write("unreachable\\n")`,
+    ].join("\n")
+    const child = Bun.spawn([process.execPath, "-e", script], { stdout: "pipe", stderr: "pipe" })
+    const started = performance.now()
+    let deadline: ReturnType<typeof setTimeout> | undefined
+    const ceiling = new Promise<"still running">((resolve) => {
+      deadline = setTimeout(() => resolve("still running"), 10_000)
+    })
+    const outcome = await Promise.race([child.exited, ceiling])
+    clearTimeout(deadline)
+    if (outcome === "still running") child.kill()
+    const [stdout, stderr] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()])
+    expect({ outcome, stdout, stderr }).toEqual({ outcome: 0, stdout: "signed in\n", stderr: LOGIN_REMOTE_SETUP_TIMED_OUT })
+    expect(performance.now() - started).toBeLessThan(5_000)
+  }, 15_000)
+
+  // #13731 review L1: for a user who ran `omo remote disable` the setup turns remote off, so the bound must not say
+  // remote sessions are being set up.
+  test("an opted-out user is told remote sessions are being turned off, not set up", async () => {
+    const home = privateDir()
+    await Bun.write(`${home}/.omo/remote-sessions.json`, `${JSON.stringify({ remote_sessions: "off" })}\n`)
+    const module = new URL("../service-auth-command.ts", import.meta.url).pathname
+    const script = [
+      `import { afterServiceAuth } from ${JSON.stringify(module)}`,
+      `await afterServiceAuth(["login"], 0, () => new Promise(() => { setInterval(() => {}, 1000) }), 300)`,
+    ].join("\n")
+    const child = Bun.spawn([process.execPath, "-e", script], {
+      env: { ...process.env, HOME: home, USERPROFILE: home },
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    let deadline: ReturnType<typeof setTimeout> | undefined
+    const ceiling = new Promise<"still running">((resolve) => {
+      deadline = setTimeout(() => resolve("still running"), 10_000)
+    })
+    const outcome = await Promise.race([child.exited, ceiling])
+    clearTimeout(deadline)
+    if (outcome === "still running") child.kill()
+    const stderr = await new Response(child.stderr).text()
+    expect({ outcome, stderr }).toEqual({ outcome: 0, stderr: LOGIN_REMOTE_OPT_OUT_TIMED_OUT })
+  }, 15_000)
 })
 
 // omo#13602 (Q: the moment login completes, remote switches on, and login says so): the setup after `omo login` turns the
