@@ -68,11 +68,7 @@ impl Session {
                 }
             }
         }
-        if let Err((refusal, detail)) = self.funnel.control.commit(self.backend.as_mut(), &plan, epoch) {
-            let out = Refused {
-                detail: detail.map(Box::new),
-                ..refusal.refusal().into()
-            };
+        if let Err(out) = self.funnel.control.commit(self.backend.as_mut(), &plan, epoch) {
             return Err(self.refuse(record, Some("Lease".to_owned()), out));
         }
         let binding = plan.audit_binding.clone();

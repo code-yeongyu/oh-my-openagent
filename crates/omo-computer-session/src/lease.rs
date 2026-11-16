@@ -118,25 +118,26 @@ impl ControlSlot {
     /// Takes the slot. A held slot is never stolen and never taken twice.
     ///
     /// # Errors
-    /// The holder, when any live session (this one included) holds it.
-    pub fn acquire(&mut self, token: &SessionToken) -> Result<(), Holder> {
+    /// The holder, when any live session (this one included) holds it; the record lock cannot
+    /// be taken (its own refusal, never a holder, review L10's second site).
+    pub fn acquire(&mut self, token: &SessionToken) -> Result<(), SlotRefusal> {
         if let Some(holder) = self.holder(token) {
-            return Err(holder);
+            return Err(SlotRefusal::Held(holder));
         }
         match token.dir() {
             None => self.memory = Some(token.holder().clone()),
             Some(dir) => {
                 // Check-and-replace under one machine-wide lock: a record is removed only when the
                 // holder read INSIDE the lock is gone, so no racer removes another's fresh record.
-                let _locked = dir_lock(dir).map_err(|_| token.holder().clone())?;
+                let _locked = dir_lock(dir).map_err(|_| SlotRefusal::LockUnavailable)?;
                 if let Some(holder) = self.holder(token) {
-                    return Err(holder);
+                    return Err(SlotRefusal::Held(holder));
                 }
                 let path = dir.join(SLOT_FILE);
                 let _ = fs::remove_file(&path);
                 let record = serde_json::to_vec(token.holder()).unwrap_or_default();
                 write_new(&path, &record).map_err(|_| {
-                    read_holder(&path).unwrap_or_else(|| token.holder().clone())
+                    SlotRefusal::Held(read_holder(&path).unwrap_or_else(|| token.holder().clone()))
                 })?;
             }
         }
@@ -155,6 +156,15 @@ impl ControlSlot {
             }
         }
     }
+}
+
+/// Why the control slot was not taken.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SlotRefusal {
+    /// A live session (this one included) holds the slot.
+    Held(Holder),
+    /// The machine-wide record lock cannot be taken (A-IS-65 L2: never `InputBusy`).
+    LockUnavailable,
 }
 
 /// The machine-wide lock every check-then-write on the lease records takes (released on drop).
@@ -289,7 +299,7 @@ mod race_tests {
         let window = Reservations::default().admit(&token, &["7".to_owned()], 0);
         assert!(matches!(window, Err(AdmitRefusal::LockUnavailable)), "{window:?}");
         let slot = ControlSlot::default().acquire(&token);
-        assert!(matches!(slot, Err(SlotRefusal::LockUnavailable)), "{slot:?}");
+        assert!(matches!(slot, Err(crate::lease::SlotRefusal::LockUnavailable)), "{slot:?}");
     }
 
     /// Review L4: release and report run under the same lock as admit, so a session whose
