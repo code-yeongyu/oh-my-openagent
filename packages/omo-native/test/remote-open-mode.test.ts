@@ -56,6 +56,7 @@ async function open(args: readonly string[], localMode: () => string = () => "wo
         status: async () => undefined,
       },
       linkDevice: async () => "linked",
+      optOut: { read: () => false, record: () => {}, clear: () => {} },
       remote: () => a.remote,
       localPermissionPreset: localMode,
     },
