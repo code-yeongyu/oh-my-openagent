@@ -9,7 +9,7 @@ import {
 } from "./factories"
 import { closeClients, failureOf, fakeClock, startOwner } from "./testing/fake-service"
 
-// The factories fix who a client acts as and which omo version it hands the device service in its hello; the conformance
+// The factories fix who a client acts as and which client version (the hello's `version` field) it hands the device service; the conformance
 // owner records each connection's hello, so the version is read where the service sees it.
 
 const clients: RemoteClient[] = []
