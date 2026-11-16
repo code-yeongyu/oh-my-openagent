@@ -87,9 +87,8 @@ pub fn probes(reads: HostReads) -> BackendProbes {
     };
     let compositor = match reads.compositor {
         CompositorRead::Present(true) => check("compositor", ProbeState::Ok, None),
-        CompositorRead::Present(false) | CompositorRead::Failed => {
-            check("compositor", ProbeState::Unavailable, Some("none_running"))
-        }
+        CompositorRead::Present(false) => check("compositor", ProbeState::Unavailable, Some("none_running")),
+        CompositorRead::Failed => check("compositor", ProbeState::Unknown, Some("read_failed")),
         CompositorRead::NoDisplay => check("compositor", ProbeState::Unknown, Some("no_display_server")),
     };
     let mut permissions = BTreeMap::new();

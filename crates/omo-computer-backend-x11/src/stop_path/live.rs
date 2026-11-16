@@ -1,16 +1,20 @@
-//! What row 50 adds to the X11 backend, held per backend: the display it arms on, the presence
-//! overlay, the lease-end signal the raw listener raises, and where the self set reads `/proc`.
+//! What row 50 adds to the X11 backend, held per backend: the display it arms on, the chord the
+//! consent view configured (A-IS-62: there is no default-chord fallback), why the last arm read
+//! deaf, the presence overlay, the lease-end signal the raw listener raises, the one epoch
+//! source the session polls, and where the self set reads `/proc`.
 
 use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex, PoisonError};
 
 use omo_computer_core::backend::{
-    BackendProbes, BackendResult, EpochSource, NoEpochSource, Presence, ProcessTable, Refusal,
-    StopListener,
+    BackendProbes, BackendResult, EpochChange, EpochSource, NoEpochSource, Presence, ProcessTable,
+    Refusal, StopListener,
 };
+use omo_computer_core::capabilities::DeafReason;
 use omo_computer_core::error::{EngineCode, Reason};
 
-use super::{arm, Armed, DeafListener, LeaseEndSignal, Xi2Server, DEFAULT_STOP_CHORD};
+use super::{arm, deaf, Armed, Hotkey, LeaseEndSignal, Xi2Server};
 use crate::capture::X11Connection;
 use crate::diagnose::{bus_reach, probes, uinput_at, CompositorRead, HostReads};
 use crate::epoch::X11EpochSource;
@@ -22,6 +26,9 @@ pub struct Live {
     pub(crate) overlay: Overlay,
     pub(crate) lease_end: LeaseEndSignal,
     proc_root: PathBuf,
+    chord: Option<String>,
+    deaf: Option<DeafReason>,
+    epoch: Option<SharedEpoch>,
     #[cfg(test)]
     keys: Option<super::fake::FakeKeys>,
     #[cfg(test)]
@@ -31,6 +38,17 @@ pub struct Live {
 /// Opens one epoch source on its own connection.
 #[cfg(test)]
 pub(crate) type EpochFactory = Box<dyn Fn() -> Option<Box<dyn EpochSource + Send>> + Send>;
+
+/// The backend's one epoch source (review M2): every `epoch_source()` hands out a handle on it,
+/// so the layout it compares with survives the session asking for a source again.
+#[derive(Clone)]
+struct SharedEpoch(Arc<Mutex<Box<dyn EpochSource + Send>>>);
+
+impl EpochSource for SharedEpoch {
+    fn next_change(&mut self) -> BackendResult<Option<EpochChange>> {
+        self.0.lock().unwrap_or_else(PoisonError::into_inner).next_change()
+    }
+}
 
 impl Live {
     #[must_use]
@@ -43,6 +61,9 @@ impl Live {
             overlay: Overlay::new(server),
             lease_end: LeaseEndSignal::default(),
             proc_root: PathBuf::from("/proc"),
+            chord: None,
+            deaf: None,
+            epoch: None,
             #[cfg(test)]
             keys: None,
             #[cfg(test)]
@@ -84,12 +105,58 @@ impl Live {
         self
     }
 
-    /// The raw listener on its own connection; a server it cannot be armed on is deaf.
-    pub fn stop_listener(&self) -> BackendResult<Box<dyn StopListener>> {
+    /// The chord the consent view configured (A-IS-62), the only one the listener arms. `None`
+    /// clears it: there is no default chord to fall back to.
+    ///
+    /// # Errors
+    /// `StopPathUnavailable{deaf}` for no chord or one that does not parse; nothing is armed.
+    pub fn set_chord(&mut self, chord: Option<&str>) -> BackendResult<()> {
+        self.chord = chord
+            .filter(|chord| Hotkey::parse(chord).is_ok())
+            .map(str::to_owned);
+        if self.chord.is_some() {
+            self.deaf = None;
+            Ok(())
+        } else {
+            self.deaf = Some(DeafReason::ChordUnarmable);
+            Err(deaf())
+        }
+    }
+
+    /// Why the stop path would read deaf: the last arm's reason, or `chord-unarmable` while no
+    /// chord is configured.
+    #[must_use]
+    pub fn deaf_reason(&self) -> Option<DeafReason> {
+        self.deaf
+            .or_else(|| self.chord.is_none().then_some(DeafReason::ChordUnarmable))
+    }
+
+    /// The raw listener for the configured chord on its own connection. A server it cannot be
+    /// armed on, or a chord it cannot arm, refuses `deaf` (review L2): the supervisor's slot then
+    /// reads deaf at once, never a fresh listener for one call.
+    ///
+    /// # Errors
+    /// `StopPathUnavailable{deaf}` as above; a bare `StopPathUnavailable` when the connection
+    /// broke, which the supervisor's ladder retries.
+    pub fn stop_listener(&mut self) -> BackendResult<Box<dyn StopListener>> {
+        let Some(chord) = self.chord.clone() else {
+            self.deaf = Some(DeafReason::ChordUnarmable);
+            return Err(deaf());
+        };
         let server = self.raw_keys()?;
-        match arm(server, DEFAULT_STOP_CHORD, self.lease_end.clone()) {
-            Ok(Armed::Live(listener)) => Ok(Box::new(listener)),
-            Ok(Armed::Deaf(_)) => Ok(Box::new(DeafListener)),
+        match arm(server, &chord, self.lease_end.clone()) {
+            Ok(Armed::Live(listener)) => {
+                self.deaf = None;
+                Ok(Box::new(listener))
+            }
+            Ok(Armed::Deaf(reason)) => {
+                if reason == DeafReason::ChordUnarmable {
+                    // R70am(4): until a refusal's data can carry it, the chord is named here.
+                    eprintln!("omo-computer-backend-x11: stop chord {chord:?} cannot be armed (chord-unarmable)");
+                }
+                self.deaf = Some(reason);
+                Err(deaf())
+            }
             Err(_) => Err(Refusal::bare(EngineCode::StopPathUnavailable)),
         }
     }
@@ -100,15 +167,24 @@ impl Live {
             .then(|| Box::new(self.overlay.clone()) as Box<dyn Presence>)
     }
 
-    pub fn epoch_source(&self) -> Box<dyn EpochSource> {
+    /// A handle on the backend's one epoch source, opened on the first call; until a display
+    /// answers there is none.
+    pub fn epoch_source(&mut self) -> Box<dyn EpochSource> {
+        if self.epoch.is_none() {
+            self.epoch = self.open_epoch().map(|source| SharedEpoch(Arc::new(Mutex::new(source))));
+        }
+        self.epoch
+            .clone()
+            .map_or_else(|| Box::new(NoEpochSource) as Box<dyn EpochSource>, |shared| Box::new(shared))
+    }
+
+    fn open_epoch(&self) -> Option<Box<dyn EpochSource + Send>> {
         #[cfg(test)]
         if let Some(epochs) = &self.epochs {
-            return epochs().map_or_else(|| Box::new(NoEpochSource) as Box<dyn EpochSource>, |source| source as Box<dyn EpochSource>);
+            return epochs();
         }
-        match self.display.as_deref().map(X11Connection::connect) {
-            Some(Ok(connection)) => Box::new(X11EpochSource::new(connection)),
-            _ => Box::new(NoEpochSource),
-        }
+        let connection = X11Connection::connect(self.display.as_deref()?).ok()?;
+        Some(Box::new(X11EpochSource::new(connection)))
     }
 
     pub fn processes(&self) -> ProcessTable {

@@ -80,9 +80,17 @@ pub fn arm(
         return Ok(Armed::Deaf(DeafReason::Xi2RawUnavailable));
     }
     let keymap = server.keymap()?;
-    let Ok(codes) = Hotkey::parse(chord).and_then(|hotkey| hotkey.resolve(&keymap)) else {
-        return Ok(Armed::Deaf(DeafReason::Xi2RawUnavailable));
+    let Ok(hotkey) = Hotkey::parse(chord) else {
+        return Ok(Armed::Deaf(DeafReason::ChordUnarmable));
     };
+    let Ok(codes) = hotkey.resolve(&keymap) else {
+        return Ok(Armed::Deaf(DeafReason::ChordUnarmable));
+    };
+    // A-IS-62: the armed chord is read back from the server's keymap after the selection; a
+    // keymap that no longer types it reads deaf rather than listening for other keys.
+    if hotkey.resolve(&server.keymap()?).as_ref() != Ok(&codes) {
+        return Ok(Armed::Deaf(DeafReason::ChordUnarmable));
+    }
     Ok(Armed::Live(X11StopListener {
         server,
         codes,
@@ -97,17 +105,11 @@ fn gone() -> Refusal {
     Refusal::bare(EngineCode::StopPathUnavailable)
 }
 
-/// A listener that exists and cannot hear: every poll refuses `deaf`.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct DeafListener;
-
-impl StopListener for DeafListener {
-    fn poll_stop(&mut self) -> BackendResult<bool> {
-        Err(Refusal::new(
-            EngineCode::StopPathUnavailable,
-            Reason::Deaf.wire(),
-        ))
-    }
+/// The refusal of a listener that exists and cannot hear: the supervisor keeps it as a deaf
+/// slot, which refuses every exec under any policy.
+#[must_use]
+pub fn deaf() -> Refusal {
+    Refusal::new(EngineCode::StopPathUnavailable, Reason::Deaf.wire())
 }
 
 /// The armed raw listener.

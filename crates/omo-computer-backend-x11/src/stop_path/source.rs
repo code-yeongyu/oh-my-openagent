@@ -42,7 +42,8 @@ pub enum AtomRead {
 pub fn xtest_property(atom: AtomRead, read: impl FnOnce(u32) -> Option<bool>) -> Option<bool> {
     match atom {
         AtomRead::Interned(atom) => read(atom),
-        AtomRead::Absent | AtomRead::Failed => Some(false),
+        AtomRead::Absent => Some(false),
+        AtomRead::Failed => None,
     }
 }
 

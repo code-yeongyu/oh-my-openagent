@@ -92,12 +92,8 @@ fn xi2_below_2_1_is_stop_path_unavailable() {
             allow_host_relay_only: true,
         },
     );
-    supervisor.arm(
-        Ok(Box::new(super::DeafListener)),
-        Some(DeafReason::Xi2RawUnavailable),
-        0,
-    );
-    supervisor.observe(0, &mut || Ok(Box::new(super::DeafListener)), &mut NoHolds);
+    supervisor.arm(Err(super::deaf()), Some(DeafReason::Xi2RawUnavailable), 0);
+    supervisor.observe(0, &mut || Err(super::deaf()), &mut NoHolds);
     supervisor.heartbeat(0);
     assert_eq!(
         supervisor.view(0).admit(),

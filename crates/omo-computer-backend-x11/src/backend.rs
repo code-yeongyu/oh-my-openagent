@@ -74,6 +74,7 @@ impl<S: XServer> Backend for X11Backend<S> {
     fn capabilities(&self) -> Capabilities {
         let mut capabilities = refusing_capabilities();
         capabilities.backend = X11_BACKEND.to_owned();
+        capabilities.stop_path.deaf_reason = self.live.deaf_reason();
         let Some(capture) = &self.capture else {
             capabilities.capture.reason = Some(Reason::NoDisplayServer.wire().to_owned());
             capabilities.window_capture.reason = Some(Reason::NoDisplayServer.wire().to_owned());
@@ -134,6 +135,14 @@ impl<S: XServer> Backend for X11Backend<S> {
 
     fn stop_listener(&mut self) -> BackendResult<Box<dyn omo_computer_core::backend::StopListener>> {
         self.live.stop_listener()
+    }
+
+    fn set_stop_chord(&mut self, chord: Option<&str>) -> BackendResult<()> {
+        self.live.set_chord(chord)
+    }
+
+    fn platform(&self) -> Option<omo_computer_core::report::Platform> {
+        Some(omo_computer_core::report::Platform::X11)
     }
 
     fn presence(&mut self) -> Option<Box<dyn omo_computer_core::backend::Presence>> {
