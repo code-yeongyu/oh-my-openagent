@@ -220,8 +220,8 @@ describe("omo login switches remote sessions on and says so", () => {
       },
     }
     const backgroundStarts: string[] = []
-    const background = () => {
-      backgroundStarts.push("enable")
+    const background = (verb: "enable" | "bootstrap") => {
+      backgroundStarts.push(verb)
     }
     return { owner, out, coldWake, io, remote, background, backgroundStarts }
   }
@@ -255,7 +255,9 @@ describe("omo login switches remote sessions on and says so", () => {
     expect([installs, backgroundStarts, out]).toEqual([[], ["enable"], [REMOTE_TURNING_ON_AFTER_SIGN_IN]])
   })
 
-  test("a recorded opt-out with no running service: login installs nothing and starts nothing", async () => {
+  // #13724 review M1: an opt-out is enforced at login on any device. With no current service (none, or an older one),
+  // the background omo remote bootstrap installs it and turns its switch off; login itself never installs.
+  test("a recorded opt-out with no current service: login installs nothing itself and hands it to a background bootstrap", async () => {
     const { io, remote, background, backgroundStarts } = await signedInDeviceWithSwitchOff(true)
     const out: string[] = []
     const noService = {
@@ -273,7 +275,7 @@ describe("omo login switches remote sessions on and says so", () => {
       },
     }
     expect(await runLoginSetup(noService, setup, remote, background)).toBe("kept_off")
-    expect([installs, backgroundStarts, out]).toEqual([[], [], [REMOTE_KEPT_OFF_AFTER_SIGN_IN]])
+    expect([installs, backgroundStarts, out]).toEqual([[], ["bootstrap"], [REMOTE_KEPT_OFF_AFTER_SIGN_IN]])
   })
 
   test("switches the service on, links the device, installs the unit and prints the one line", async () => {
