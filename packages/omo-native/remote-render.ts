@@ -5,7 +5,7 @@ import type {
   StatusState,
   UnitState,
 } from "../device-service-core/src/index.ts"
-import type { DeviceRow, FollowEvent, SendReceipt, SessionsList } from "../omo-senpi/src/components/remote/types"
+import type { DeviceRow, FollowEvent, SendReceipt, SessionsList } from "../omo-senpi/src/components/remote/index"
 import type { LocalStatus } from "./remote-cold-wake"
 
 // The human forms of `omo remote`; every command also has a --json form that prints the SDK's typed value as is.

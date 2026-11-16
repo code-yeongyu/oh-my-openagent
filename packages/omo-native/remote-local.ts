@@ -15,8 +15,7 @@ import {
 } from "../device-service-core/src/device-service.ts"
 import type { SessionFilter } from "../device-service-core/src/local-api/protocol.ts"
 import type { SessionRowState } from "../device-service-core/src/local-api/vocabulary.ts"
-import { createRemoteClient, type RemoteClient } from "../omo-senpi/src/components/remote/client"
-import type { RemoteFailure } from "../omo-senpi/src/components/remote/types"
+import { type RemoteClient, type RemoteFailure, remoteClientForPerson } from "../omo-senpi/src/components/remote/index"
 import { readAccountInProcess } from "./account-show"
 import type { LocalStatus } from "./remote-cold-wake"
 import packageJson from "./package.json" with { type: "json" }
@@ -85,15 +84,12 @@ const workerUrl = (root: string | undefined): { readonly gatewayWorkerUrl?: URL 
 }
 
 const personClient = (dependencies: RemoteCommandDependencies): RemoteClient =>
-  createRemoteClient(
-    { kind: "person", uid: String(process.getuid?.() ?? 0) },
-    {
-      version: packageJson.version,
-      stateDir: dependencies.stateDir,
-      connect: () => dependencies.connect(),
-      ...workerUrl(dependencies.packageRoot),
-    },
-  )
+  remoteClientForPerson({
+    version: packageJson.version,
+    stateDir: dependencies.stateDir,
+    connect: () => dependencies.connect(),
+    ...workerUrl(dependencies.packageRoot),
+  })
 
 const CONTROL_VALUES = ["on", "off"] as const
 type ControlValue = (typeof CONTROL_VALUES)[number]

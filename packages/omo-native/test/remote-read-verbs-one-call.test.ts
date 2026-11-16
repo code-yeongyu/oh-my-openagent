@@ -2,7 +2,7 @@
 // ONE member call on the person client, and its --json output is that call's value serialized.
 import { describe, expect, test } from "bun:test"
 
-import type { RemoteClient } from "../../omo-senpi/src/components/remote/client"
+import type { RemoteClient } from "../../omo-senpi/src/components/remote/index"
 import { REMOTE_EXIT } from "../remote-cli"
 import { privateDir, run, useRemoteCliCleanup } from "./remote-cli-harness"
 

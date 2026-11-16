@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import type { DeviceRow, SendReceipt, ThreadHandle } from "../../omo-senpi/src/components/remote/types"
+import type { DeviceRow, SendReceipt, ThreadHandle } from "../../omo-senpi/src/components/remote/index"
 import { sendWaitNotice } from "../remote-render"
 
 const device = { id: "b" } as DeviceRow

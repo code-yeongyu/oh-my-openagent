@@ -2,7 +2,7 @@ import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 
-import type { RemoteClient } from "../omo-senpi/src/components/remote/client"
+import type { RemoteClient } from "../omo-senpi/src/components/remote/index"
 import { handleOf } from "../omo-senpi/src/components/remote/seams"
 import type {
   FollowEvent,
@@ -11,7 +11,7 @@ import type {
   RemoteFailure,
   SendReceipt,
   ThreadHandle,
-} from "../omo-senpi/src/components/remote/types"
+} from "../omo-senpi/src/components/remote/index"
 import { GATEWAY_STORE_WORKER_BUNDLE_NAME } from "../omo-senpi/src/components/thread/gateway/store"
 import { packageRoot } from "./bin/lib/package-paths.js"
 import type { RemoteCommandDependencies } from "./remote-local"
