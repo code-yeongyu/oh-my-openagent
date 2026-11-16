@@ -71,3 +71,8 @@ class DragList(Gtk.EventBox):
             row.item = item
             self.rows.add(row)
         self.rows.show_all()
+        toplevel = self.get_toplevel()
+        if toplevel.get_mapped():
+            # New rows get no allocation until the next frame (GTK3 gives an unallocated widget 1x1 at -1,-1), and the
+            # report is written right after a reorder; lay them out now so it carries their real rects.
+            toplevel.check_resize()

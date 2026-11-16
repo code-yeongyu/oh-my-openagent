@@ -3,7 +3,7 @@ import { SOCKET_FILE } from "./local-api/access.ts"
 import { connectLocalApi, type ConnectOptions, type LocalApiClient } from "./local-api/client.ts"
 import { ENDPOINT_FILE } from "./local-api/transport.ts"
 import { connectLocalBackground } from "./background-transport.ts"
-import { markNotSent, NotSentError } from "./not-sent-error.ts"
+import { markNotSent, NotSentError, olderThanWakeMinimum } from "./not-sent-error.ts"
 import type { ListingResult, ListingRevision } from "./local-api/client-assembly.ts"
 import type {
   Capability,
@@ -124,6 +124,8 @@ export { SESSION_ROW_STATES } from "./local-api/protocol.ts"
 export type { AttachEnd, CommandResult, RemoteAttach, RemoteAttachEvent } from "./remote-attach.ts"
 
 export { DEVICE_SERVICE_STATE_DIR_ENV, deviceServiceStateDir } from "./state-dir.ts"
+// The clock seam, here too so a local-only caller takes it without the package barrel (which reaches the release fetch).
+export { realTimers, type Timers } from "./timers.ts"
 
 /** The file a running service publishes in its state dir: the socket on POSIX, the port file on Windows. */
 export function deviceServiceEndpointPath(stateDir: string, platform: NodeJS.Platform = process.platform): string {
@@ -358,7 +360,7 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
         ...(options?.single === true && takesSingleLocate ? { single: true as const } : {}),
       }),
     wakeCommand: async (device, durableId, rpc) => {
-      if (!carriesWakeMark) throw new NotSentError("unsupported", "this device service does not carry the wake target")
+      if (!carriesWakeMark) throw olderThanWakeMinimum(client.welcome.service_version, wakeMarkMinimum)
       return await followDelegatedCommand(client, device, timers, (commandId) =>
         client.commandTo({ wake: { device, durable_id: durableId } }, rpc, commandId).catch((error: unknown) => {
           throw error instanceof LocalApiError && error.command_id === undefined ? markNotSent(error) : error
