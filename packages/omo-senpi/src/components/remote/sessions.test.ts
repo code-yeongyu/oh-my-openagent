@@ -470,20 +470,37 @@ describe("#13756 review", () => {
     expect(sent("open_session").map((rpc) => rpc["permissionPreset"])).toEqual(["ask"])
   })
 
-  test("#given sessions.open with and without a first prompt #when each opens #then its open_session dials its own connection, closed once it settles (dev #13761 parity, M1 of 6473ed9)", async () => {
+  test("#given sessions.open with and without a first prompt #when each opens #then its open_session dials its own connection, closed once it settles, and the first prompt attaches on the shared one (dev #13761 parity, M1 of 6473ed9)", async () => {
     const { owner } = await onWorld()
-    type Dialed = { readonly endpoint: string[]; closed: boolean }
+    // Per dialed connection: its endpoint records, the sessions it attached, and the records sent on those attaches.
+    type Dialed = {
+      readonly endpoint: string[]
+      readonly attached: string[]
+      readonly commands: string[]
+      closed: boolean
+    }
     const dialed: Dialed[] = []
     const client = clientOn(owner.stateDir, fakeClock(), undefined, {
       connect: async (options) => {
         const svc = await connectDeviceService(options)
-        const entry: Dialed = { endpoint: [], closed: false }
+        const entry: Dialed = { endpoint: [], attached: [], commands: [], closed: false }
         dialed.push(entry)
         return {
           ...svc,
           endpointCommand: async (device, rpc, endpointOptions) => {
             entry.endpoint.push(String(rpc["type"]))
             return await svc.endpointCommand(device, rpc, endpointOptions)
+          },
+          attach: async (device, sessionId) => {
+            entry.attached.push(sessionId)
+            const attach = await svc.attach(device, sessionId)
+            return {
+              ...attach,
+              command: async (rpc, mark) => {
+                entry.commands.push(String(rpc["type"]))
+                return await attach.command(rpc, mark)
+              },
+            }
           },
           close: () => {
             entry.closed = true
@@ -493,18 +510,21 @@ describe("#13756 review", () => {
       },
     })
     // Opening on the shared connection attaches the host's delegated engine connection to it, so every streamed delta
-    // would arrive twice there (#12777): the open rides a connection of its own, which the shared one outlives.
+    // would arrive twice there (#12777): the open rides a connection of its own, which the shared one outlives. The
+    // attach that follows the open rides the shared one.
     await valueOf(client.sessions.open({ device: PEER }))
     expect(dialed).toEqual([
-      { endpoint: [], closed: false },
-      { endpoint: ["open_session"], closed: true },
+      { endpoint: [], attached: [NEW_KEY], commands: [], closed: false },
+      { endpoint: ["open_session"], attached: [], commands: [], closed: true },
     ])
+    // The first prompt is a send (deliverTo -> core.member -> legOf): it goes on an attach of the shared connection,
+    // which then carries one copy per delta, never on the open's own connection that just closed.
     const opened = await valueOf(client.sessions.open({ device: PEER, first: { text: "start" } }))
     expect(opened.receipt).toMatchObject({ lane: "started" })
     expect(dialed).toEqual([
-      { endpoint: [], closed: false },
-      { endpoint: ["open_session"], closed: true },
-      { endpoint: ["open_session"], closed: true },
+      { endpoint: [], attached: [NEW_KEY], commands: ["prompt"], closed: false },
+      { endpoint: ["open_session"], attached: [], commands: [], closed: true },
+      { endpoint: ["open_session"], attached: [], commands: [], closed: true },
     ])
   })
 
