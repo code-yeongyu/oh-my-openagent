@@ -2030,6 +2030,7 @@ dependencies = [
 name = "omo-computer-engine"
 version = "0.0.0"
 dependencies = [
+ "libc",
  "omo-computer-backend-atspi",
  "omo-computer-backend-fake",
  "omo-computer-backend-macos",
