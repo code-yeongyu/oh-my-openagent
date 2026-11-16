@@ -2,8 +2,12 @@
 //! that counts every round trip so tests can assert zero.
 
 mod build;
+mod log;
 
 pub use build::extents;
+pub use log::{Counts, FakeHandle};
+
+use log::FakeLog;
 
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
@@ -11,69 +15,6 @@ use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
 use crate::bus::{AppRef, Bus, BusError, BusEvent, BusResult, NodeFacts, NodeId, OwnerProcess};
-
-/// Calls per kind; `calls` counts every bus round trip.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct Counts {
-    pub calls: u32,
-    pub connects: u32,
-    pub applications: u32,
-    pub children: u32,
-    pub reads: u32,
-    pub action_names: u32,
-    pub do_actions: u32,
-    pub owner_lookups: u32,
-    pub status_writes: u32,
-}
-
-#[derive(Debug, Default)]
-struct FakeLog {
-    counts: Counts,
-    performed: Vec<(NodeId, i32)>,
-    registered: Vec<String>,
-    enabled_writes: Vec<bool>,
-    gone: Vec<NodeId>,
-}
-
-/// The test's view of the log after the bus moved into a backend.
-#[derive(Debug, Clone)]
-pub struct FakeHandle(Arc<Mutex<FakeLog>>);
-
-impl FakeHandle {
-    fn with<T>(&self, read: impl FnOnce(&FakeLog) -> T) -> T {
-        read(&self.0.lock().unwrap_or_else(PoisonError::into_inner))
-    }
-
-    #[must_use]
-    pub fn counts(&self) -> Counts {
-        self.with(|log| log.counts)
-    }
-
-    /// Every `DoAction` as `(node, index)`.
-    #[must_use]
-    pub fn performed(&self) -> Vec<(NodeId, i32)> {
-        self.with(|log| log.performed.clone())
-    }
-
-    #[must_use]
-    pub fn registered(&self) -> Vec<String> {
-        self.with(|log| log.registered.clone())
-    }
-
-    /// The object leaves the bus after the bus moved into a backend.
-    pub fn kill(&self, node: &NodeId) {
-        self.0
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .gone
-            .push(node.clone());
-    }
-
-    #[must_use]
-    pub fn enabled_writes(&self) -> Vec<bool> {
-        self.with(|log| log.enabled_writes.clone())
-    }
-}
 
 #[derive(Debug, Clone, Default)]
 struct FakeNode {
@@ -193,13 +134,25 @@ impl Bus for FakeBus {
 
     fn do_action(&mut self, node: &NodeId, index: i32, slice: Duration) -> BusResult<bool> {
         self.count(|counts| counts.do_actions += 1);
-        let declared = self.live(node, slice)?.actions.len();
-        let log = Arc::clone(&self.log);
-        log.lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .performed
-            .push((node.clone(), index));
-        Ok(usize::try_from(index).is_ok_and(|at| at < declared))
+        let found = self.live(node, slice)?;
+        let declared = found.actions.len();
+        let opens = found.facts.role == "menu";
+        let mut log = self.log.lock().unwrap_or_else(PoisonError::into_inner);
+        log.performed.push((node.clone(), index));
+        let done = usize::try_from(index).is_ok_and(|at| at < declared);
+        if done && opens && !log.open.contains(node) {
+            log.open.push(node.clone());
+        }
+        Ok(done)
+    }
+
+    fn clear_selection(&mut self, node: &NodeId, slice: Duration) -> BusResult<bool> {
+        self.count(|_| {});
+        let kids = self.live(node, slice)?.children.clone();
+        let mut log = self.log.lock().unwrap_or_else(PoisonError::into_inner);
+        log.cleared.push(node.clone());
+        log.open.retain(|open| !kids.contains(open));
+        Ok(true)
     }
 
     fn a11y_enabled(&mut self) -> BusResult<bool> {

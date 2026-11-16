@@ -3,6 +3,7 @@
 
 mod green_extra;
 mod live;
+mod menus;
 mod red_ax;
 mod red_session;
 
