@@ -803,11 +803,19 @@ describe("memory rpc bridge sync field (omo #10637)", () => {
       { state: "synced", lastSyncedAtISO: "2026-10-22T10:00:00.000Z" },
     ],
     ["never synced", async () => ({ kind: "never_synced" }), { state: "never_synced" }],
-    ["paused at a refused entry", async () => ({ kind: "paused", seq: 1, code: "signature" }), { state: "paused" }],
+    // #11056: a pause names the refused entry and its closed refusal code; unavailable names why, as a closed code.
     [
-      "unavailable on this device",
-      async () => ({ kind: "sync-unavailable", reason: "Another process holds the engine." }),
-      { state: "unavailable" },
+      "paused at a refused entry",
+      async () => ({ kind: "paused", seq: 1, code: "signature" }),
+      { state: "paused", refused: { seq: 1, code: "signature" } },
+    ],
+    [
+      "unavailable because the sync engine would not load",
+      async () => ({
+        kind: "sync-unavailable",
+        reason: "the device account sidecar could not be loaded: Error: Cannot find module",
+      }),
+      { state: "unavailable", unavailable: { code: "engine_unavailable", reason: expect.any(String) } },
     ],
     [
       "off because its configuration is invalid",
@@ -816,7 +824,10 @@ describe("memory rpc bridge sync field (omo #10637)", () => {
         variable: "OMO_SERVICE_API_URL",
         reason: "OMO_SERVICE_API_URL is not a valid service URL",
       }),
-      { state: "unavailable" },
+      {
+        state: "unavailable",
+        unavailable: { code: "config_invalid", variable: "OMO_SERVICE_API_URL", reason: expect.any(String) },
+      },
     ],
     [
       "holding files too large to sync (#12284)",
@@ -868,6 +879,7 @@ describe("memory rpc bridge sync field (omo #10637)", () => {
       }),
       {
         state: "paused",
+        refused: { seq: 1, code: "signature" },
         failure: {
           kind: "unknown",
           reason: "r",
@@ -904,6 +916,44 @@ describe("memory rpc bridge sync field (omo #10637)", () => {
         expect(["stranded_lock", "auth_expired", "offline", "unknown"]).toContain(String(snapshot.sync.failure.kind))
       expect(snapshot.sync).toEqual(expected)
       expect("sync" in snapshot).toBe(expected !== undefined)
+      bridge.dispose()
+    },
+  )
+
+  // The RPC boundary (#11056): an unavailable reason is our own copy; the runner's error text (a loader error,
+  // a path, a URL the user set) stays in the log and never reaches the desktop.
+  test.each([
+    [
+      "the engine sidecar would not load",
+      { kind: "sync-unavailable", reason: "Error: Cannot find module '/private/omo/extensions/omo-memory-sync.js'" },
+      "/private/omo/extensions",
+    ],
+    [
+      "the service URL is invalid",
+      {
+        kind: "sync-config-invalid",
+        variable: "OMO_SERVICE_API_URL",
+        reason: "OMO_SERVICE_API_URL is not a valid service URL: Invalid URL: hxxp://private.example",
+      },
+      "private.example",
+    ],
+  ] as const)(
+    "#given sync is unavailable because %s #when the status is pulled #then the runner's text does not cross",
+    async (_name, status, privateText) => {
+      const context = await contextFixture()
+      const host = rpcHost()
+      const bridge = createMemoryRpcBridge(host.pi, {
+        resolveContext: () => context,
+        activeRun: () => undefined,
+        createGitRepo: () => stubRepo(),
+        syncStatus: async () => status,
+      })
+      bridge.attach("session-1")
+
+      const snapshot = (await host.handlers.get(MEMORY_STATUS_RPC_METHOD)?.({})) as MemoryRpcSnapshot
+
+      expect(snapshot.sync?.unavailable?.reason).toEqual(expect.any(String))
+      expect(JSON.stringify(snapshot.sync)).not.toContain(privateText)
       bridge.dispose()
     },
   )
