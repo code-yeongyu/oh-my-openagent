@@ -19,8 +19,14 @@ const runningChildren = new Set<ChildProcess>()
 const OBSERVED_IDLE_EXIT_MS = 8_000
 const REQUIRED_REACHABLE_READS = 2
 
-const TEST_BUDGET_MS = 30_000
-setDefaultTimeout(TEST_BUDGET_MS)
+// Circuit breaker for one cold engine command (#9679): a `host ensure` on a loaded CI shard ran past 30 s (#13980).
+// Every test budget below is the chain of spawns it awaits plus headroom, so a breaker always fires INSIDE the awaited
+// test and names its command; a breaker equal to the test budget fired after the test had already timed out, as an
+// unhandled rejection between tests.
+const SPAWN_BUDGET_MS = 60_000
+const TEST_HEADROOM_MS = 10_000
+// ensure, then one status read
+setDefaultTimeout(SPAWN_BUDGET_MS * 2 + TEST_HEADROOM_MS)
 
 afterEach(() => {
   for (const child of runningChildren) child.kill("SIGKILL")
@@ -52,8 +58,8 @@ function sandbox() {
 }
 
 // A cold `node` start on a loaded host can take longer than any fixed per-spawn budget (#9679), so each child runs
-// until it closes; the only bound is the test's own budget, which names the command it was waiting on.
-function run(command: string, args: readonly string[], env: NodeJS.ProcessEnv, deadlineMs = TEST_BUDGET_MS) {
+// until it closes; the only bound is SPAWN_BUDGET_MS, a breaker that names the command it was waiting on.
+function run(command: string, args: readonly string[], env: NodeJS.ProcessEnv, deadlineMs = SPAWN_BUDGET_MS) {
   return new Promise<{ exitCode: number; stdout: string; stderr: string }>((resolvePromise, reject) => {
     const child = spawn(command, [...args], { env, stdio: ["ignore", "pipe", "pipe"] })
     runningChildren.add(child)
@@ -67,7 +73,11 @@ function run(command: string, args: readonly string[], env: NodeJS.ProcessEnv, d
     })
     const deadline = setTimeout(() => {
       child.kill("SIGKILL")
-      reject(new Error(`${command} ${args.join(" ")} did not exit within the ${deadlineMs} ms test budget`))
+      reject(
+        new Error(
+          `${command} ${args.join(" ")} did not exit within its ${deadlineMs} ms budget\nstdout: ${stdout}\nstderr: ${stderr}`,
+        ),
+      )
     }, deadlineMs)
     child.on("error", (error) => {
       clearTimeout(deadline)
@@ -295,7 +305,8 @@ if (process.platform !== "win32") {
         expect(reachableReads).toBe(REQUIRED_REACHABLE_READS)
         ownedPids.delete(supervisorPid)
       },
-      OBSERVED_IDLE_EXIT_MS * 6,
+      // ensure, the reachable reads and the first read past the exit deadline, plus the idle-exit wait itself
+      SPAWN_BUDGET_MS * (2 + REQUIRED_REACHABLE_READS) + OBSERVED_IDLE_EXIT_MS * 3 + TEST_HEADROOM_MS,
     )
   })
 }
