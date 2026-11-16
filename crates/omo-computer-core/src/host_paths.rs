@@ -151,6 +151,19 @@ mod tests {
         }
     }
 
+    /// Review M3 of #13882: the host (row 37) roots `computer/` at the user-database home, the
+    /// engine read `$HOME`; with the two apart a set latch was written where the engine never
+    /// looked, so it read as absent (fail OPEN). One rule for both: the user-database home.
+    #[cfg(unix)]
+    #[test]
+    fn the_config_root_never_follows_home_from_the_environment() {
+        let lookup = env(&[("HOME", "/not-the-user-database-home"), ("XDG_RUNTIME_DIR", "/run/user/501")]);
+        let paths = resolve(lookup, false, 501).expect("real paths");
+        assert!(!paths.config.starts_with("/not-the-user-database-home"), "{:?}", paths.config);
+        let tail = if cfg!(target_os = "macos") { "Library/Application Support/OmO" } else { ".config/omo" };
+        assert!(paths.config.ends_with(tail), "{:?}", paths.config);
+    }
+
     #[test]
     fn the_real_linux_name_carries_the_uid_and_no_suffix() {
         let paths = resolve(env(&[("HOME", "/home/u"), ("XDG_RUNTIME_DIR", "/run/user/501")]), false, 501)

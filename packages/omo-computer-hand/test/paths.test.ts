@@ -55,6 +55,21 @@ describe("hand paths: the same files and address the engine resolves", () => {
     })
   })
 
+  it("the config root (host latch, consent) follows the user-database home, never $HOME, exactly like the engine", () => {
+    // Given $HOME pointing somewhere else than the user database's home and no XDG_CONFIG_HOME.
+    for (const platform of ["linux", "darwin"]) {
+      const resolved = resolveHandPaths({
+        ...base,
+        platform,
+        fake: false,
+        env: { HOME: "/elsewhere", XDG_RUNTIME_DIR: "/run/user/501" },
+      })
+
+      // Then the latch the host writes is the one the engine reads: under the user-database home.
+      expect(resolved.kind === "resolved" && resolved.paths.hostLatch.startsWith("/home/u/")).toBe(true)
+    }
+  })
+
   it("real macOS paths: Application Support for config and state, a socket file in the per-uid temp root", () => {
     const resolved = resolveHandPaths({ ...base, platform: "darwin", fake: false, env: {} })
     expect(resolved).toMatchObject({
