@@ -31,22 +31,36 @@ function link(target: string, path: string): void {
  */
 type RootLayout = "first-run" | "previous-swap" | "relinked-after-swap"
 
-/** The layout bun's isolated linker leaves: the hoisted alias and every workspace link one registry store entry. */
-function isolatedLinkerClone(root: string, rootLayout: RootLayout): { omoDir: string; built: string; store: string } {
+/**
+ * The layout bun's isolated linker leaves: the hoisted alias and every workspace link one registry store entry.
+ * `senpiPaths` lists every senpi location the fixture lays out, so assertions follow the fixture instead of a count.
+ */
+function isolatedLinkerClone(
+  root: string,
+  rootLayout: RootLayout,
+): { omoDir: string; built: string; store: string; senpiPaths: string[] } {
   const omoDir = join(root, "omo")
   const store = join(omoDir, "node_modules", ".bun", "@code-yeongyu+senpi@2026.11.15-2+abc", "node_modules")
   const storeEngine = join(store, "@code-yeongyu", "senpi")
   const rootEngine = join(omoDir, "node_modules", "@code-yeongyu", "senpi")
   if (rootLayout === "relinked-after-swap") link(rootEngine, storeEngine)
   else writeEngine(storeEngine, "registry")
-  link(storeEngine, join(omoDir, "node_modules", ".bun", "node_modules", "@code-yeongyu", "senpi"))
-  for (const workspace of ["omo-native", "omo-senpi", "senpi-task"])
-    link(storeEngine, join(omoDir, "packages", workspace, "node_modules", "@code-yeongyu", "senpi"))
+  const hoistedAlias = join(omoDir, "node_modules", ".bun", "node_modules", "@code-yeongyu", "senpi")
+  link(storeEngine, hoistedAlias)
+  const workspaceLinks = ["omo-native", "omo-senpi", "senpi-task"].map((workspace) =>
+    join(omoDir, "packages", workspace, "node_modules", "@code-yeongyu", "senpi"),
+  )
+  for (const workspaceLink of workspaceLinks) link(storeEngine, workspaceLink)
   if (rootLayout === "previous-swap") writeEngine(rootEngine, "previous-swap")
   else link(storeEngine, rootEngine)
   const built = join(root, "built")
   writeEngine(built, "source-build")
-  return { omoDir, built, store: storeEngine }
+  return {
+    omoDir,
+    built,
+    store: storeEngine,
+    senpiPaths: [rootEngine, storeEngine, hoistedAlias, ...workspaceLinks],
+  }
 }
 
 describe("placeBuiltSenpi", () => {
@@ -55,12 +69,12 @@ describe("placeBuiltSenpi", () => {
     (rootLayout) => {
       const root = mkdtempSync(join(tmpdir(), "omob-senpi-swap-"))
       try {
-        const { omoDir, built } = isolatedLinkerClone(root, rootLayout)
+        const { omoDir, built, senpiPaths } = isolatedLinkerClone(root, rootLayout)
         const target = placeBuiltSenpi(omoDir, built)
         const canonical = realpathSync(target)
         expect(canonical).toBe(realpathSync(join(omoDir, "node_modules", "@code-yeongyu", "senpi")))
         const paths = senpiResolutionPaths(omoDir)
-        expect(paths.length).toBe(6)
+        expect(paths.toSorted()).toEqual(senpiPaths.toSorted())
         for (const path of paths) {
           expect(realpathSync(path)).toBe(canonical)
           expect(engineVersion(path)).toBe("source-build")
