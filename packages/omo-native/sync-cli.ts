@@ -25,6 +25,10 @@ const FIRST_DEVICE =
   "Your account has no synced memory yet. Turn memory sync on first in the OmO desktop app, which sets up the recovery passkey, " +
   "then run `omo sync enable` here to join."
 
+// Review L9: an enrollment or rotation also holds this lock, so the line must not say "turning on sync".
+const RECOVERY_CEREMONY_RUNNING =
+  "Another OmO window or terminal on this device is in the middle of a recovery setup. Finish or cancel it there, then run `omo sync enable` again."
+
 const spacedCode = (code: string): string => `${code.slice(0, 3)} ${code.slice(3)}`
 
 async function run(
@@ -53,7 +57,11 @@ async function enable(dependencies: SyncCommandDependencies, context: SyncContex
     if (outcome.rootChanged === true) dependencies.error(ROOT_CHANGED_CREATED)
     return 0
   }
-  if (outcome.kind === "needs_first_device") {
+  if (outcome.kind === "in_progress") {
+    dependencies.error(RECOVERY_CEREMONY_RUNNING)
+    return 1
+  }
+  if (outcome.kind !== "join_required") {
     dependencies.error(FIRST_DEVICE)
     return EXIT_UNSUPPORTED_HERE
   }

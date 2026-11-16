@@ -782,6 +782,7 @@ export function createCliRemoteSurface(options: {
 }
 export { claimCreatedAlias, listAcross, planCreate, renameAlias, withAlias } from "./remote/cross-device"
 export { deviceOnline } from "./remote/remote-ops"
+export { createRemoteMonitorSource } from "./remote/monitor-source"
 export { outcomeFailure } from "./remote/outcome"
 export { createRelayTransport } from "./remote/relay-transport"
 export { createRelayControl } from "./control/relay-control"
