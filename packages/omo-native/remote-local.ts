@@ -7,14 +7,16 @@ import {
 } from "../device-service-core/src/account-state.ts"
 import {
   connectDeviceService,
+  type DeviceRow,
   type DeviceService,
   deviceServiceEndpointPath,
   deviceServiceStateDir,
   LocalApiError,
   SESSION_ROW_STATES,
+  type SessionFilter,
+  type SessionRowState,
+  type Status,
 } from "../device-service-core/src/device-service.ts"
-import type { SessionFilter } from "../device-service-core/src/local-api/protocol.ts"
-import type { SessionRowState } from "../device-service-core/src/local-api/vocabulary.ts"
 import {
   exitCodeOf,
   type RemoteClient,
@@ -198,8 +200,17 @@ async function runRead(client: RemoteClient, parsed: Parsed, dependencies: Remot
     }
     case "devices":
       return show(await client.devices.list(), (devices) => deviceLines(devices, now))
-    case "sessions":
-      return show(await client.sessions.list(parsed.filter), (listing) => sessionLines(listing, now))
+    case "sessions": {
+      const listed = await client.sessions.list(parsed.filter)
+      // A typo in --device and a device with no sessions both used to list nothing: the client names the unknown device.
+      if (listed.kind === "error" && listed.code === "not_found" && listed.details?.["kind"] === "device") {
+        dependencies.error(
+          `omo remote sessions: no device ${parsed.filter.device} on this account (see omo remote devices)`,
+        )
+        return REMOTE_EXIT.usage
+      }
+      return show(listed, (listing) => sessionLines(listing, now))
+    }
     case "disable":
       return show(await client.service.setEnabled(false), ({ enabled }) => [
         `Remote sessions are ${enabled ? "on" : "off"} for this device.`,

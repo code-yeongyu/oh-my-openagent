@@ -548,13 +548,13 @@ export function createLiveThreadSurface(
       (await send<{ messages: ThreadTranscriptEntry[] }>("get_messages", { sessionId })).messages,
     getState: (sessionId) => send("get_state", { sessionId }),
     prompt: (sessionId, message, options, durableId) => send("prompt", { sessionId, message, ...options }, durableId),
-    interrupt: (sessionId, turnId, durableId) =>
-      send("interrupt", { sessionId, ...(turnId === undefined ? {} : { turnId }) }, durableId),
+    interrupt: (sessionId, request, durableId) => send("interrupt", { sessionId, ...request }, durableId),
     setSessionName: async (sessionId, name, durableId) => {
       await send("set_session_name", { sessionId, name }, durableId)
     },
+    // `scope: "session"` switches only this session; without it the engine persists the device's default model.
     setModel: (sessionId, provider, modelId, durableId) =>
-      send("set_model", { sessionId, provider, modelId }, durableId),
+      send("set_model", { sessionId, provider, modelId, scope: "session" }, durableId),
     getAvailableModels: async (sessionId) => {
       const { models } = await send<{ models: Awaited<ReturnType<ThreadHost["getAvailableModels"]>> }>(
         "get_available_models",
@@ -761,6 +761,7 @@ export { createServiceAliasRegistry } from "./remote/alias-registry"
 export { createCliRemoteSurface, remoteSessionsPort } from "../remote/port/thread-runtime"
 export { claimCreatedAlias, listAcross, planCreate, renameAlias, withAlias } from "./remote/cross-device"
 export { deviceOnline } from "./remote/remote-ops"
+export { createRemoteMonitorSource } from "./remote/monitor-source"
 export { outcomeFailure } from "./remote/outcome"
 export { createRelayTransport } from "./remote/relay-transport"
 export { createRelayControl } from "./control/relay-control"

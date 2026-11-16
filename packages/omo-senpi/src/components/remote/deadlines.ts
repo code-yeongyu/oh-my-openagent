@@ -8,9 +8,12 @@ import type { Opts, RemoteFailure } from "./types"
  * local API handshake (10,000 ms) plus `CONNECT_SLACK_MS` before it.
  */
 export const BOUNDS = {
-  /** L0 handshake (device-service-core local-api/client.ts:70). */
+  /** L0 handshake (packages/device-service-core/src/local-api/client-open.ts:100, HANDSHAKE_TIMEOUT_MS). */
   handshake: 10_000,
-  /** L0 request (local-api/client.ts:73) and the alias registry's HTTP bound. */
+  /**
+   * L0 request (packages/device-service-core/src/local-api/client-open.ts:103, REQUEST_TIMEOUT_MS) and the alias
+   * registry's HTTP bound.
+   */
   request: 30_000,
   /** relayd's listing round. */
   listingRound: 10_000,

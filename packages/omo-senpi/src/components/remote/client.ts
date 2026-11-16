@@ -5,13 +5,12 @@ import {
   deviceServiceEndpointPath,
   deviceServiceStateDir,
   realTimers,
-  type ControlSessionWakeState as WakeState,
   type DeviceService,
   type DeviceRow as WireDeviceRow,
+  type RemoteAttach,
   type ListingRow,
   type Timers,
 } from "@oh-my-opencode/device-service-core/device-service"
-import type { AliasRegistry } from "../thread/remote/ports"
 import { aliasMembers } from "./aliases"
 import { attachMember } from "./attach"
 import { failureFromError, nextActionFor, remoteFailure } from "./codes"
@@ -20,119 +19,24 @@ import { streamMembers } from "./follow"
 import { resolveMember } from "./resolve"
 import { handleOf } from "./seams"
 import { sessionMembers } from "./sessions"
+import { thisDeviceRow } from "./this-device-row"
 import type {
-  AttachHandle,
-  BootstrapResult,
-  BootstrapSetup,
-  ControlState,
   DeviceRow,
-  FollowEvent,
-  InterruptResult,
-  OpenRequest,
-  OpenResult,
   Opts,
   R,
-  ReadPage,
+  RemoteClient,
+  RemoteClientDeps as RemoteClientDepsOver,
   RemoteFailure,
   RemoteSender,
-  RemoteStream,
-  Scope,
-  SendReceipt,
-  SendRequest,
-  ServiceInfo,
-  ServiceStatus,
-  SessionDetail,
   SessionRow,
   SessionsList,
   SessionsListFilter,
-  ThreadHandle,
-  WaitResult,
 } from "./types"
+import { unknownDevice } from "./unknown-device"
 
-export type RemoteClientDeps = {
-  readonly version: string
-  readonly stateDir?: string
-  /** The clock seam: every deadline of the client and of its connection runs on it (real timers by default). */
-  readonly timers?: Timers
-  /** Runs the device service bootstrap for `service.bootstrap`; the internal bootstrap entry provides it (part 4c-3). */
-  readonly bootstrap?: (setup: BootstrapSetup) => Promise<BootstrapResult>
-  /**
-   * The account's alias registry for `aliases.*`. The caller builds it (it needs the account service access, which the
-   * client must not import); absent, the alias members answer `unsupported{feature:"aliases"}`.
-   */
-  readonly aliasRegistry?: () => Promise<AliasRegistry>
-  /**
-   * Where the gateway store's worker sidecar is (`gateway-store-worker.mjs` beside the plugin's extension bundle). The
-   * compiled binary passes its provisioned runtime's copy; from source the store resolves its own worker.
-   */
-  readonly gatewayWorkerUrl?: URL
-  /**
-   * The approval mode of the session this client acts for (a session or connector sender): an open may keep or narrow
-   * it, never widen it. Absent, only the narrowest mode passes.
-   */
-  readonly permissionPreset?: () => string | undefined
-  /** Test seam: opens the proven device-service connection (`connectDeviceService` by default). */
-  readonly connect?: (options: {
-    readonly version: string
-    readonly stateDir: string
-    readonly timers: Timers
-  }) => Promise<DeviceService>
-}
-
-/**
- * The one remote client (design v8-core r2, B1, with the #13414 W3 rows' shapes). Members of 4a-1 live in this file; each
- * later member lives in its own module (sessions.ts, follow.ts, attach.ts, aliases.ts, resolve.ts) and is built from the
- * same `ClientCore`, so every member shares the one connection, the sender and the deadlines.
- */
-export type RemoteClient = {
-  readonly service: {
-    readonly info: (opts?: Opts) => R<ServiceInfo>
-    readonly status: (opts?: Opts) => R<ServiceStatus>
-    readonly setEnabled: (on: boolean, opts?: Opts) => R<{ readonly enabled: boolean }>
-    readonly control: (opts?: Opts) => R<ControlState>
-    readonly setControl: (on: boolean, opts?: Opts) => R<ControlState>
-    readonly bootstrap: (setup: BootstrapSetup, opts?: Opts) => R<BootstrapResult>
-    /** The device's session-wake switch (omo#13037 A7.2.5); `unsupported{feature:"wake"}` below the service that carries it. */
-    readonly wake: (opts?: Opts) => R<WakeState>
-    /** Sets the switch; `null` removes the stored value (the default applies). Person only. */
-    readonly setWake: (on: boolean | null, opts?: Opts) => R<WakeState>
-  }
-  readonly devices: {
-    readonly list: (opts?: Opts) => R<readonly DeviceRow[]>
-    readonly resolve: (idOrName: string, opts?: Opts) => R<DeviceRow>
-  }
-  readonly sessions: {
-    readonly list: (filter?: SessionsListFilter, opts?: Opts) => R<SessionsList>
-    /** One address (durable id, alias, name, `<device>/<session>`) to its row, on the cached listing (no relist per op). */
-    readonly resolve: (address: string, scope?: Scope, opts?: Opts) => R<SessionRow>
-    readonly get: (thread: ThreadHandle, opts?: Opts) => R<SessionDetail>
-    readonly open: (request: OpenRequest, opts?: Opts) => R<OpenResult>
-    readonly send: (thread: ThreadHandle, request: SendRequest, opts?: Opts) => R<SendReceipt>
-    readonly read: (
-      thread: ThreadHandle,
-      page?: { readonly before?: string; readonly tail?: number },
-      opts?: Opts,
-    ) => R<ReadPage>
-    /** Status changes, turn ends and the turn's stream, from now on; survives relay, service and engine restarts. */
-    readonly follow: (thread: ThreadHandle, opts?: Opts) => RemoteStream<FollowEvent>
-    readonly wait: (thread: ThreadHandle, opts?: Opts) => R<WaitResult>
-    readonly interrupt: (thread: ThreadHandle, opts?: Opts) => R<InterruptResult>
-    /** The session's own model ("provider/id"); never a device default. */
-    readonly setModel: (thread: ThreadHandle, model: string, opts?: Opts) => R<{ readonly model: string }>
-    /** The session's own thinking level; never a device default. */
-    readonly setReasoning: (thread: ThreadHandle, level: string, opts?: Opts) => R<{ readonly reasoning: string }>
-    readonly close: (thread: ThreadHandle, opts?: Opts) => R<{ readonly closed: boolean }>
-    readonly archive: (thread: ThreadHandle, archived: boolean, opts?: Opts) => R<{ readonly archived: boolean }>
-  }
-  /** One session's live attach: its snapshot, records, pending UI requests and their answers. */
-  readonly attach: (thread: ThreadHandle, opts?: Opts) => R<AttachHandle>
-  readonly aliases: {
-    readonly resolve: (alias: string, opts?: Opts) => R<ThreadHandle>
-    readonly set: (thread: ThreadHandle, alias: string, opts?: Opts) => R<{ readonly alias: string }>
-    readonly clear: (thread: ThreadHandle, opts?: Opts) => R<{ readonly released: boolean }>
-  }
-  readonly close: () => void
-}
+/** The client's deps over the device service SDK's own connection and attach (types.ts `RemoteClientDeps`). */
+export type RemoteClientDeps = RemoteClientDepsOver<DeviceService, RemoteAttach>
+export type { RemoteClient }
 
 export type Outcome<T> = { readonly kind: "ok"; readonly value: T } | RemoteFailure
 const ok = <T>(value: T): Outcome<T> => ({ kind: "ok", value })
@@ -275,6 +179,9 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
           details: { phase: "connect" },
         },
       )
+    // Every failure before the member's own call (refused, reset, no socket, a bad proof) names the connect phase, so a
+    // caller can tell a service that is not serving from a member that failed.
+    if (outcome.kind === "error") return { ...outcome, details: { ...outcome.details, phase: "connect" } }
     return outcome
   }
 
@@ -307,17 +214,11 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
   }
 
   const listDevices = async (svc: DeviceService): Promise<readonly DeviceRow[]> => {
-    const [rows, self] = await Promise.all([svc.devices(), svc.thisDevice()])
-    const control = svc.capabilities.includes("control")
+    const [rows, self, status] = await Promise.all([svc.devices(), svc.thisDevice(), svc.status()])
     const listed = rows.map(deviceRow)
     if (self === null) return [localSelfRow(), ...listed]
     const own = listed.find((row) => row.id === self.id)
-    const selfRow: DeviceRow = {
-      ...(own ?? { ...localSelfRow(), id: self.id, name: self.name, last_seen_ms: timers.now() }),
-      self: true,
-      online: true,
-      caps: { attach: true, machine: false, control },
-    }
+    const selfRow = thisDeviceRow(self, own, status, timers.now(), svc.capabilities.includes("control"))
     return [selfRow, ...listed.filter((row) => row.id !== self.id)]
   }
 
@@ -341,6 +242,8 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
         listDevices(svc),
       ])
       const byId = new Map(devices.map((row) => [row.id, row]))
+      const unknown = unknownDevice(filter?.device, byId, listing)
+      if (unknown !== undefined) return unknown
       const deviceOf = (id: string): DeviceRow => byId.get(id) ?? unlistedDevice(id)
       const wanted = filter?.name?.toLowerCase()
       const rows = listing.rows
