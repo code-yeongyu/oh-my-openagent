@@ -20,9 +20,14 @@ describe("the request types omo sends through this package's client", () => {
     try {
       writeFileSync(join(dir, "bare.ts"), 'const sent = request(kind, {})\nconst named = request("status.get", {})\n')
       writeFileSync(join(dir, "member.ts"), "const sent = client.request(type, {})\n")
+      writeFileSync(
+        join(dir, "typed.ts"),
+        'const sent = client.request<"status.get">(kind, {})\nconst named = client.request<"device.info">("device.info", {})\n',
+      )
+      writeFileSync(join(dir, "definition.ts"), "class C { request<T extends string>(type: T, params: object) {} }\n")
       expect(scanSentRequestTypes(dir)).toEqual({
-        sent: ["status.get"],
-        unscanned: ["bare.ts: kind", "member.ts: type"],
+        sent: ["device.info", "status.get"],
+        unscanned: ["bare.ts: kind", "member.ts: type", "typed.ts: kind"],
       })
     } finally {
       rmSync(dir, { recursive: true, force: true })

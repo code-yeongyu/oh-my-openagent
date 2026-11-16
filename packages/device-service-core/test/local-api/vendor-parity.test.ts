@@ -54,7 +54,11 @@ describe("vendored device-service local-API client", () => {
         }
     }
     const port = readFileSync(join(SRC, "spec-proto.ts"), "utf8")
-    const exported = [...port.matchAll(/^export\s+(?:const|type|class|function)\s+(\w+)/gm)].map((match) => match[1])
+    // Value exports in every form come from the transpiler's scan; type-only ones (it strips types) from their declarations.
+    const exported = [
+      ...new Bun.Transpiler({ loader: "ts" }).scan(port).exports,
+      ...[...port.matchAll(/^export\s+(?:declare\s+)?(?:type|interface)\s+(\w+)/gm)].map((match) => match[1]),
+    ]
     expect(exported.toSorted()).toEqual([...imported].toSorted())
   })
 })
