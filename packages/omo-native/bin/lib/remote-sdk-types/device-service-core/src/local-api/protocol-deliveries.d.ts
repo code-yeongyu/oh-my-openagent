@@ -48,14 +48,15 @@ export type PeerAdmitted = {
 };
 export type DeliveriesRequest = DeliveriesServe | DeliveryAnswer | DeliveryHeld | DeliveryPending | DeliveryDrained | PeerAdmitted;
 export type DeliveriesResponseData = {
-    /** A7.2.3: the wake switch's effective value at the acknowledgement. */
+    /** omo#13037 A7.2.3: the wake switch's effective value at the acknowledgement. */
     readonly "deliveries.serve": {
         readonly wake: boolean;
     };
     readonly "delivery.answer": Empty;
     readonly "delivery.held": Empty;
     readonly "delivery.pending": Empty;
-    /** A5.3: kept names the command the service still expects for the pair. */
+    /** A5.3: kept names the command the service still expects for the pair; a consumer with no open row for it reports
+     * drained again with that id. */
     readonly "delivery.drained": DrainedData;
     readonly "peer.admitted": {
         readonly admitted: boolean;
@@ -71,7 +72,7 @@ export type DeliveryHolds = EventOf<"delivery.holds", {
     readonly ask_id: string;
     readonly durable_id: string;
 }>;
-/** A7.2.3: every committed change of the wake switch, to a connection with an acknowledged serve only. */
+/** omo#13037 A7.2.3: every committed change of the wake switch, to a connection with an acknowledged serve only. */
 export type DeliveryWake = EventOf<"delivery.wake", {
     readonly enabled: boolean;
 }>;

@@ -29,8 +29,12 @@ const roundTrip = async (target: DeviceRow): Promise<void> => {
   const opened = await timed(target.name, "open", () =>
     remote.sessions.open({ device: target.id, ...(workspace === undefined ? {} : { workspace }), name: marker }),
   )
-  const events = remote.sessions.follow(opened.thread)
-  await timed(target.name, "send", () => remote.sessions.send(opened.thread, { text: `Reply with exactly: ${marker}` }))
+  // Send first, then follow THAT send's turn: an attach replays every record since the session opened, so only the
+  // receipt tells this turn's end from a replayed one.
+  const receipt = await timed(target.name, "send", () =>
+    remote.sessions.send(opened.thread, { text: `Reply with exactly: ${marker}` }),
+  )
+  const events = remote.sessions.follow(opened.thread, { from: receipt })
   const started = performance.now()
   for await (const event of events) {
     if (event.kind === "failed") throw new Error(`${target.name} watch failed: ${event.failure.code}`)
