@@ -858,6 +858,38 @@ jobs:
 
       - run: git fetch --force --tags
 
+      # A run dispatched directly with prepared_release_sha (not from the tag the parent pushes) has no release
+      # tag yet, and `gh release create` would make GitHub create it from the default branch head. Tag the
+      # prepared source here, before any package is published, or refuse a tag that points elsewhere.
+      - name: Tag prepared release source
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          RELEASE_SHA: ${{ inputs.prepared_release_sha }}
+          LAZYCODEX_ONLY: ${{ inputs.lazycodex_only }}
+        run: |
+          set -euo pipefail
+
+          if [ "$(git rev-parse HEAD)" != "$RELEASE_SHA" ]; then
+            echo "::error::Checked-out source does not match prepared release SHA ${RELEASE_SHA}."
+            exit 1
+          fi
+
+          RELEASE_TAG="v${VERSION}"
+          if [ "${LAZYCODEX_ONLY:-}" = "true" ]; then
+            RELEASE_TAG="lazycodex-v${VERSION}"
+          fi
+
+          if git rev-parse -q --verify "refs/tags/${RELEASE_TAG}" >/dev/null; then
+            TAG_SHA="$(git rev-list --max-count=1 "${RELEASE_TAG}")"
+            if [ "$TAG_SHA" != "$RELEASE_SHA" ]; then
+              echo "::error::Existing tag ${RELEASE_TAG} points to ${TAG_SHA}, not prepared release SHA ${RELEASE_SHA}."
+              exit 1
+            fi
+          else
+            git tag "${RELEASE_TAG}" "$RELEASE_SHA"
+            git push origin "${RELEASE_TAG}"
+          fi
+
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.4.4"
@@ -1439,12 +1471,22 @@ jobs:
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
           DIST_TAG: ${{ needs.release-metadata.outputs.dist_tag }}
+          RELEASE_SHA: ${{ inputs.prepared_release_sha }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # pipefail matters: an empty tag list is indistinguishable from "no releases
           # exist yet" and would resolve to --latest, so a failed `gh release list`
           # must fail the step instead of silently mis-assigning the badge.
           set -euo pipefail
+
+          # --target only applies when GitHub creates the tag, so an existing tag must already be the prepared source.
+          if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
+            TAG_SHA="$(git rev-list --max-count=1 "v${VERSION}")"
+            if [ "$TAG_SHA" != "$RELEASE_SHA" ]; then
+              echo "::error::Existing tag v${VERSION} points to ${TAG_SHA}, not prepared release SHA ${RELEASE_SHA}."
+              exit 1
+            fi
+          fi
 
           LATEST_FLAG="$(gh release list --exclude-drafts --limit 1000 --json tagName --jq '.[].tagName' | bun script/release-latest-flag.ts "$VERSION")"
           if gh release view "v${VERSION}" >/dev/null 2>&1; then
@@ -1455,7 +1497,7 @@ jobs:
               printf '%s\n' "$RECOVERY_NOTICE" >> "$GITHUB_STEP_SUMMARY"
             fi
           else
-            gh release create "v${VERSION}" "$LATEST_FLAG" --title "v${VERSION}" --notes-file /tmp/changelog.md
+            gh release create "v${VERSION}" "$LATEST_FLAG" --target "$RELEASE_SHA" --title "v${VERSION}" --notes-file /tmp/changelog.md
             echo "created=true" >> "$GITHUB_OUTPUT"
           fi
 
