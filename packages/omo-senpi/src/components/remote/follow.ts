@@ -99,6 +99,8 @@ async function watchSession(
 // record its lifecycle ledger appends at each change, seen as `session_lifecycle` records, as transcript entries and as
 // get_state's `lifecycle`) moving to a state other than running.
 type Lease = { readonly state: string; readonly seq: number }
+/** An engine state as any layer hands it over (a snapshot's, an attach command's or the thread port's get_state reply). */
+type EngineState = { readonly [field: string]: unknown }
 
 const leaseOf = (value: unknown): Lease | undefined =>
   isObject(value) && typeof value["state"] === "string" && typeof value["seq"] === "number"
@@ -189,7 +191,7 @@ class SessionTurn {
   }
 
   /** An engine state (a snapshot's or a fresh get_state's): the same rule as `resync`. */
-  fresh(state: JsonObject, entries: readonly unknown[] = []): readonly Signal[] {
+  fresh(state: EngineState, entries: readonly unknown[] = []): readonly Signal[] {
     const leased = this.#lease(newer(leaseOf(state["lifecycle"]), newestLease(entries)))
     if (leased.length > 0) return leased
     const questions = state["pendingQuestions"]
@@ -290,7 +292,7 @@ class SessionTurn {
  * false` cannot hide a run the lease still holds. Read it from a fresh `get_state` (pass a snapshot's entries too when
  * there is one), never from a held reply.
  */
-export function sessionStatusOf(state: JsonObject, entries: readonly unknown[] = []): string {
+export function sessionStatusOf(state: EngineState, entries: readonly unknown[] = []): string {
   const turn = new SessionTurn()
   turn.fresh(state, entries)
   return turn.status

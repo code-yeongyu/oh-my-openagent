@@ -21,6 +21,7 @@ import { stampThisDevice } from "../thread/remote/this-device"
 import { type ClientCore, ok, type Outcome, type RemoteClient } from "./client"
 import { nextActionFor, remoteFailure } from "./codes"
 import { DEADLINES } from "./deadlines"
+import { sessionStatusOf } from "./follow"
 import { createDeviceServiceSessions } from "./port/device-service"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
 import { PERMISSION_PRESETS } from "./types"
@@ -542,6 +543,18 @@ export function sessionMembers(core: ClientCore): SessionMembers {
         outcome.kind === "ok" ? ok(replyData(outcome.response)) : fromThread(outcomeFailure(outcome, device).error),
       )
 
+  // The session's transcript entries as its attach snapshot holds them: senpi's run lease is among them. A session whose
+  // snapshot cannot be taken is read by get_state alone, whose `lifecycle` carries the same lease on a current engine.
+  const snapshotEntries = async (svc: DeviceService, { device, session }: Target): Promise<readonly unknown[]> => {
+    const attached = await svc.attach(device, session).catch(() => undefined)
+    if (attached === undefined) return []
+    try {
+      return (await attached.snapshot.catch(() => undefined))?.entries ?? []
+    } finally {
+      await attached.detach().catch(() => undefined)
+    }
+  }
+
   return {
     open,
     send,
@@ -557,6 +570,8 @@ export function sessionMembers(core: ClientCore): SessionMembers {
         const state = await engineState(svc, target)
         if (state.kind === "error") return state
         const data = state.value
+        // The rule follow and wait read a session by (#13753): a stale isStreaming false never hides a run the lease holds.
+        const status = sessionStatusOf(data, await snapshotEntries(svc, target))
         const model = isObject(data["model"]) ? data["model"] : {}
         const provider = text(model["provider"])
         const id = text(model["id"])
@@ -564,13 +579,12 @@ export function sessionMembers(core: ClientCore): SessionMembers {
         const queued = data["pendingMessageCount"]
         const detail: SessionDetail = {
           ...row,
+          state: status === "idle" ? "idle" : "running",
           cwd: text(data["cwd"]) ?? row.path,
           model: provider === undefined || id === undefined ? "" : `${provider}/${id}`,
           reasoning: text(data["thinkingLevel"]) ?? "",
           preset: text(data["permissionPreset"]) ?? "",
-          ...(turn === undefined
-            ? {}
-            : { turn: { id: turn, state: data["isStreaming"] === true ? "running" : "idle" } }),
+          ...(turn === undefined ? {} : { turn: { id: turn, state: status } }),
           pending: {
             dialogs: Array.isArray(data["pendingDialogs"]) ? data["pendingDialogs"].length : 0,
             queued: typeof queued === "number" ? queued : 0,

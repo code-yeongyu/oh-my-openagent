@@ -79,6 +79,35 @@ const world = (): World => {
   }
 }
 
+/** senpi's run lease: the `session-lifecycle` transcript entry its lifecycle ledger appends at each change. */
+const lease = (state: string, seq: number): JsonObject => ({
+  type: "custom",
+  id: `lease-${seq}`,
+  parentId: "e-3",
+  customType: "session-lifecycle",
+  data: { sessionId: ENGINE_ID, state, seq, runId: "run-1", role: "root" },
+})
+
+/** The world with every listed row idle, the engine answering `reply`, and `entries` added to the live snapshot. */
+const leasedWorld = (reply: JsonObject, entries: readonly JsonObject[]): World => {
+  const base = world()
+  return {
+    ...base,
+    listing: {
+      ...base.listing,
+      revisions: base.listing.revisions.map((revision) => ({
+        ...revision,
+        rows: revision.rows.map((row) => ({ ...row, state: "idle" as const })),
+      })),
+    },
+    sessions: base.sessions.map((session) => ({
+      ...session,
+      snapshot: { ...session.snapshot, entries: [...session.snapshot.entries, ...entries] },
+      delegated: { data: reply, frames: [] },
+    })),
+  }
+}
+
 const valueOf = async <T>(
   outcome: Promise<{ readonly kind: "ok"; readonly value: T } | { readonly kind: "error" }>,
 ): Promise<T> => {
@@ -320,13 +349,13 @@ describe("sessions controls", () => {
     expect(sent("set_thinking_level")).toEqual([expect.objectContaining({ level: "high", scope: "turn" })])
   })
 
-  test("#given the live session #when sessions.get reads #then the listing row joins the engine's state", async () => {
+  test("#given the live session #when sessions.get reads #then the listing row joins the engine's state, whose idle replaces the listing's running", async () => {
     const { owner } = await onWorld()
     const detail = await valueOf(clientOn(owner.stateDir, fakeClock()).sessions.get(LIVE))
     expect(detail).toMatchObject({
       thread: LIVE,
       title: "Live session",
-      state: "running",
+      state: "idle",
       device: { id: PEER },
       cwd: "/home/user/omo",
       model: "anthropic/claude",
@@ -336,6 +365,19 @@ describe("sessions controls", () => {
       pending: { dialogs: 0, queued: 0 },
     })
   })
+
+  // The two-device relay proof of #13414 (proof-3.log): get said idle while senpi's run lease said running.
+  test.each([
+    ["the snapshot's run lease", SESSION_REPLY, [lease("running", 4)]],
+    ["get_state's lifecycle", { ...SESSION_REPLY, lifecycle: { state: "running", seq: 4 } }, []],
+  ] as const)(
+    "#given a session the listing and isStreaming call idle while %s runs #when sessions.get reads #then it is running",
+    async (_source, reply, entries) => {
+      const owner = await startOwner(leasedWorld(reply, entries))
+      const detail = await valueOf(clientOn(owner.stateDir, fakeClock()).sessions.get(LIVE))
+      expect(detail).toMatchObject({ state: "running", turn: { id: "7", state: "running" } })
+    },
+  )
 
   test("#given no layer stores archive state #when sessions.archive runs #then unsupported{archive}", async () => {
     const { owner } = await onWorld()
