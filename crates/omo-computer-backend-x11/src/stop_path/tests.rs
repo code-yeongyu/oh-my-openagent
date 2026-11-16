@@ -191,6 +191,7 @@ fn x11_stop_listener_parks_after_the_bounded_restart_budget() {
 
 #[test]
 fn a_parked_listener_rearms_on_the_next_start() {
+    // Review L4: the listener really parks first - the ladder is spent on a dead connection.
     let keys = FakeKeys::new((2, 2));
     let mut supervisor = Supervisor::new(
         Box::new(MemoryMarker::default()),
@@ -198,15 +199,28 @@ fn a_parked_listener_rearms_on_the_next_start() {
             allow_host_relay_only: false,
         },
     );
+    supervisor.arm(boxed(live(&keys, LeaseEndSignal::default())), None, 0);
     keys.lock().alive = false;
-    supervisor.arm(
-        Err(omo_computer_core::backend::Refusal::bare(
+    let mut rearm = || match arm(keys.boxed(), DEFAULT_STOP_CHORD, LeaseEndSignal::default()) {
+        Ok(Armed::Live(listener)) => boxed(listener),
+        _ => Err(omo_computer_core::backend::Refusal::bare(
             omo_computer_core::error::EngineCode::StopPathUnavailable,
         )),
-        None,
-        0,
+    };
+    let mut now = 0;
+    supervisor.observe(now, &mut rearm, &mut NoHolds);
+    for delay in RE_ARM_LADDER_MS {
+        now += delay;
+        supervisor.observe(now, &mut rearm, &mut NoHolds);
+    }
+    assert_eq!(
+        supervisor.view(now).global,
+        GlobalListener::Deaf {
+            reason: Some(DeafReason::ListenerParked)
+        },
+        "parked"
     );
     keys.lock().alive = true;
-    supervisor.arm(boxed(live(&keys, LeaseEndSignal::default())), None, 10);
-    assert_eq!(supervisor.view(10).global, GlobalListener::Fresh);
+    supervisor.arm(boxed(live(&keys, LeaseEndSignal::default())), None, now);
+    assert_eq!(supervisor.view(now).global, GlobalListener::Fresh);
 }

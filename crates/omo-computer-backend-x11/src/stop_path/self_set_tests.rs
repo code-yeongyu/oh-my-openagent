@@ -212,3 +212,59 @@ fn self_target_terminal_is_refused() {
     );
     let _ = fs::remove_dir_all(&root);
 }
+
+/// Review M3 (R70ad(3)): the desktop app's `WM_CLASS` handed in the host's additions makes its
+/// window `SelfTarget` though its pid is in no host chain; the wire member that carries it is
+/// owed to row 37 (DEFERRED-LEGS).
+#[test]
+fn a_handed_app_key_makes_its_window_self_target_without_a_host_chain() {
+    use omo_computer_core::params::Point;
+    use omo_computer_safety::{
+        Call, Gate, Guard, HostAdditions as Additions, StopPolicy, TargetRef, VerbKind,
+    };
+
+    use crate::capture::fake::{FakeX, GREEN};
+    use crate::capture::server::PixelRect;
+    use crate::stop_path::Live;
+
+    let root = tempfile_root("app-key");
+    proc_dir(&root, 30, "omo-desktop", 1, 30, 0, &["omo-desktop"]);
+    let rect = PixelRect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 40,
+    };
+    let mut server = FakeX::single(160, 120).with_window(8, rect, GREEN);
+    server.pids = vec![(8, 30)];
+    let live = Live::for_display(None).with_proc_root(root.clone());
+    let mut backend =
+        crate::X11Backend::with_live(Some(crate::X11Capture::new(server, None)), live);
+    let mut guard = Guard::in_memory();
+    let additions = Additions {
+        pids: Vec::new(),
+        app_keys: vec!["Fake".to_owned()],
+    };
+    guard
+        .open_on(&backend, StopPolicy { allow_host_relay_only: false }, additions)
+        .expect("open");
+    let keys = crate::stop_path::fake::FakeKeys::new((2, 2));
+    let Ok(crate::stop_path::Armed::Live(listener)) = crate::stop_path::arm(
+        keys.boxed(),
+        crate::stop_path::DEFAULT_STOP_CHORD,
+        crate::stop_path::LeaseEndSignal::default(),
+    ) else {
+        panic!("armed");
+    };
+    guard.start(Ok(Box::new(listener)), None);
+    let call = Call {
+        verb: VerbKind::Pointer,
+        target: TargetRef::Window("8"),
+        points: vec![Point { x: 5.0, y: 5.0 }],
+        chord: None,
+        force: true,
+    };
+    let refused = guard.admit_on(&mut backend, &call).expect_err("the desktop app is self");
+    assert_eq!((refused.gate, refused.refusal.reason), (Gate::Target, Some("self_target")));
+    let _ = fs::remove_dir_all(&root);
+}

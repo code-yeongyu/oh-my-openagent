@@ -163,3 +163,26 @@ fn an_escape_with_no_lease_never_ends_the_lease_taken_after_it() {
     assert!(s.holds_lease(), "the Escape came before the lease");
     assert!(heard.lock().expect("heard").is_empty());
 }
+
+
+/// A-IS-62 fixture case (iv), R70an(B): a consent view without the stop key arms nothing and the
+/// stop path reads deaf with `deafReason: "chord-unarmable"`, never absent.
+#[test]
+fn a_view_without_the_stop_key_reads_deaf_chord_unarmable() {
+    let backend = FakeBackend::with_parts(
+        scenario(&json!({ "consent": { "apps": {} }, "stopHotkeyNotCarried": true })),
+        FakeClock::default(),
+        RecordingSink::default(),
+    )
+    .with_stop_path(StopPathScript::Live);
+    let mut s = Session::new(Box::new(backend));
+    s.open(params(json!({ "reportMode": "object" })))
+        .expect("open");
+    let refused = s
+        .stop_path_start_checked(params(json!({})))
+        .expect_err("nothing armed");
+    assert_eq!((refused.code.wire(), refused.reason), ("StopPathUnavailable", Some("deaf")));
+    let capabilities = serde_json::to_string(&s.capabilities()).expect("capabilities");
+    assert!(capabilities.contains(r#""deaf":true"#), "{capabilities}");
+    assert!(capabilities.contains(r#""deafReason":"chord-unarmable""#), "{capabilities}");
+}
