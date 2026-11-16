@@ -112,12 +112,18 @@ async function connectEndpoint(
   return { request, close: () => socket.end() }
 }
 
+// The engine's refusals of the caller's own arguments (get-entries-command.js: an unknown `before` is not_found, a page
+// size below one invalid_argument). The device service refuses a read's page invalid_request, so both answer alike.
+const ARGUMENT_REFUSALS: ReadonlySet<string> = new Set(["not_found", "invalid_argument"])
+
 /** A reply's data, or the engine's refusal as the local API error the client already maps. */
 function dataOf(reply: JsonObject, what: string): JsonObject {
   if (reply["success"] === true) return isObject(reply["data"]) ? reply["data"] : {}
   const code = text(reply["errorCode"]) ?? text(reply["error"]) ?? "refused"
-  const gone = code === "unknown_session" || code === "session_identity_mismatch"
-  throw new LocalApiError(gone ? "session_not_found" : "unsupported", `${what}: ${code}`)
+  const reason = `${what}: ${code}`
+  if (code === "unknown_session" || code === "session_identity_mismatch")
+    throw new LocalApiError("session_not_found", reason)
+  throw new LocalApiError(ARGUMENT_REFUSALS.has(code) ? "invalid_request" : "unsupported", reason)
 }
 
 /** get_snapshot's answer (or an older engine's get_state) as the device service's snapshot body. */
@@ -230,6 +236,11 @@ export function createLocalAttach(
     snapshotted = true
     records(early.splice(0))
     const session = (): string => routing ?? target.session
+    // Once the attach ended its socket is ended or gone, and close already failed what was pending: a request written
+    // now would wait out REQUEST_TIMEOUT_MS. read and command refuse it alike.
+    const live = (): void => {
+      if (finished) throw new LocalApiError("closed", "the attach has ended")
+    }
     return {
       device: target.device,
       sessionId: target.session,
@@ -244,6 +255,7 @@ export function createLocalAttach(
       // The engine pages the history itself (`{before, tail}`, newest first; an unknown `before` is refused), so a page
       // never carries the whole history.
       read: async (page = {}) => {
+        live()
         const data = dataOf(
           await connection.request({
             type: "get_entries",
@@ -260,7 +272,7 @@ export function createLocalAttach(
         }
       },
       command: async (rpc): Promise<CommandResult> => {
-        if (finished) throw new LocalApiError("closed", "the attach has ended")
+        live()
         const response = await connection.request({ ...rpc, sessionId: session() })
         return {
           outcome: {

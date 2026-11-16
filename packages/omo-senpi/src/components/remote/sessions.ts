@@ -20,7 +20,7 @@ import { createRelayTransport, type RelayTransportOptions } from "../thread/remo
 import { replyData } from "../thread/remote/remote-ops"
 import { stampThisDevice } from "../thread/remote/this-device"
 import { type ClientCore, ok, type Outcome, type RemoteClient } from "./client"
-import { nextActionFor, remoteFailure } from "./codes"
+import { nextActionFor, readFailureFromError, remoteFailure } from "./codes"
 import { DEADLINES } from "./deadlines"
 import { createDeviceServiceSessions } from "./port/device-service"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
@@ -579,12 +579,12 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       return core.member(stage(), DEADLINES.observeRead, false, async (svc) => {
         const attached = await svc.attach(target.device, target.session)
         try {
-          return ok(
-            await attached.read({
+          return await attached
+            .read({
               ...(page?.before === undefined ? {} : { before: page.before }),
               ...(page?.tail === undefined ? {} : { tail: page.tail }),
-            }),
-          )
+            })
+            .then(ok, readFailureFromError)
         } finally {
           await attached.detach()
         }

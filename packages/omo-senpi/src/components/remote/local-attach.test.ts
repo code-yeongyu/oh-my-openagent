@@ -2,9 +2,10 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { withContractHost } from "../../../../senpi-task/src/runners/rpc-host/testing/contract-host"
 import { defaultWorld, type World } from "../../../../device-service-core/test/local-api/conformance/world.ts"
 import { reader } from "./attach.test-support"
+import { nextActionFor } from "./codes"
 import { createLocalAttach } from "./local-attach"
 import { handleOf } from "./seams"
-import { clientOn, closeClients, fakeClock, startOwner } from "./testing/fake-service"
+import { clientOn, closeClients, failureOf, fakeClock, startOwner } from "./testing/fake-service"
 import type { DeviceRow, FollowEvent, JsonObject, SendReceipt } from "./types"
 
 // Rows of a session on THIS device (#13414 local watch): the device service cannot attach the caller to itself
@@ -82,7 +83,7 @@ describe("a session on this device (local watch)", () => {
         localAttach: createLocalAttach({ socket: host.socket, keyRoot: host.root }),
       })
       const events = reader(client.sessions.follow(THREAD, { from: receipt("cm-9") }))
-      await host.attached()
+      await host.snapshotted()
       host.push([
         { type: "agent_start", runId: "run-9" },
         { type: "turn_start", clientMessageId: "cm-9" },
@@ -136,10 +137,40 @@ describe("a session on this device (local watch)", () => {
       expect(await page({ tail: 2 })).toEqual({ ids: ["e5", "e6"], next_before: "e5" })
       expect(await page({ before: "e5", tail: 2 })).toEqual({ ids: ["e3", "e4"], next_before: "e3" })
       expect(await page({ before: "e2", tail: 2 })).toEqual({ ids: ["e1"], next_before: null })
-      expect((await opened.value.read({ before: "no-such-entry", tail: 2 })).kind).toBe("error")
+      // The caller's own page, refused by the engine (an unknown before: not_found; a page size below one:
+      // invalid_argument), answers invalid_arguments, as the device service's refusal of a read's page does.
+      for (const request of [{ before: "no-such-entry", tail: 2 }, { tail: 0 }])
+        expect(failureOf(await opened.value.read(request))).toMatchObject({
+          code: "invalid_arguments",
+          next_action: nextActionFor("invalid_arguments"),
+        })
       await opened.value.detach()
     })
   })
+
+  // Ended by this side (detach), or by the endpoint closing first (the connection lost before release answered).
+  test.each([
+    ["detached", {}],
+    ["closed by the endpoint", { afterMutation: "connection_lost" as const }],
+  ])(
+    "#given an attach %s #when read and command run #then both fail at once with the same failure, never waiting on the ended socket",
+    async (_how, ended) => {
+      const owner = await startOwner(selfWorld())
+      await withContractHost({ history: [{ type: "message", id: "e1" }], ...ended }, async (host) => {
+        const client = clientOn(owner.stateDir, fakeClock(), undefined, {
+          localAttach: createLocalAttach({ socket: host.socket, keyRoot: host.root }),
+        })
+        const opened = await client.attach(THREAD)
+        if (opened.kind !== "ok") throw new Error(`expected an attach, got ${JSON.stringify(opened)}`)
+        await opened.value.detach()
+        // Bounded by this test's own timeout: a read written to the ended socket would wait out the 30 s request timeout.
+        const read = failureOf(await opened.value.read({ tail: 1 }))
+        const command = failureOf(await opened.value.command({ type: "get_state" }))
+        expect(read).toEqual(command)
+        expect(read).toMatchObject({ code: "host_unavailable", details: { local_api_code: "closed" } })
+      })
+    },
+  )
 
   test("#given a record the engine wrote before its snapshot answer #when attach opens #then the snapshot holds it and only records after the snapshot stream as new", async () => {
     const owner = await startOwner(selfWorld())

@@ -1,7 +1,7 @@
 import { LocalApiError, type RemoteAttach } from "@oh-my-opencode/device-service-core/device-service"
 import { outcomeOf } from "../thread/remote/outcome"
 import { type ClientCore, ok, type Outcome, type RemoteClient } from "./client"
-import { engineCode, nextActionFor, remoteFailure } from "./codes"
+import { engineCode, nextActionFor, readFailureFromError, remoteFailure } from "./codes"
 import { DEADLINES, withinDeadline } from "./deadlines"
 import { attachAddressed } from "./port/device-service"
 import { canonicalizeThreadHandle } from "./seams"
@@ -330,7 +330,9 @@ function createAttachment(core: ClientCore, attached: RemoteAttach, thread: Thre
     events: events.stream,
     command,
     read: (page) =>
-      withinDeadline(core.timers, undefined, DEADLINES.observeRead, false, async () => ok(await attached.read(page))),
+      withinDeadline(core.timers, undefined, DEADLINES.observeRead, false, async () =>
+        attached.read(page).then(ok, readFailureFromError),
+      ),
     // The endpoint server is the caller's (RemoteClientDeps.serveAttach): it is a net server, and `omo remote`'s
     // local-only graph reaches no network but the local API transport (#13440).
     serveEndpoint: async () => {
