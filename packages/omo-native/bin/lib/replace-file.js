@@ -1,4 +1,4 @@
-import { renameSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { chmodSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs"
 
 /**
  * Writes `contents` to `path` through a sibling file renamed over it. Package managers may hardlink installed
@@ -14,7 +14,9 @@ export function replaceFile(path, contents) {
   }
   const temporary = `${path}.omo-${process.pid}.tmp`
   try {
-    writeFileSync(temporary, contents, mode === undefined ? undefined : { mode })
+    writeFileSync(temporary, contents)
+    // The create mode is filtered by the process umask; chmod sets the original bits exactly.
+    if (mode !== undefined) chmodSync(temporary, mode)
     renameSync(temporary, path)
   } catch (error) {
     rmSync(temporary, { force: true })
