@@ -285,6 +285,9 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
           details: { phase: "connect" },
         },
       )
+    // Every failure before the member's own call (refused, reset, no socket, a bad proof) names the connect phase, so a
+    // caller can tell a service that is not serving from a member that failed.
+    if (outcome.kind === "error") return { ...outcome, details: { ...outcome.details, phase: "connect" } }
     return outcome
   }
 
