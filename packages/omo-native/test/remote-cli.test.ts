@@ -42,23 +42,31 @@ import {
 useRemoteCliCleanup()
 
 describe("omo remote", () => {
-  test("status prints the connection state, and --json prints the service's Status", async () => {
+  test("status prints the connection state, and --json prints the person client's service.status value", async () => {
     const human = await run(["status"])
     expect(human.code).toBe(REMOTE_EXIT.ok)
     expect(human.out).toContain("State            Connected")
     expect(human.out).toContain("This device      This Mac")
+    expect(human.out).toContain("Service          1.4.0")
     const json = await run(["status", "--json"])
-    expect(JSON.parse(json.out.join(""))).toEqual(defaultWorld().status)
+    expect(JSON.parse(json.out.join(""))).toEqual({ ...defaultWorld().status, service_version: "1.4.0" })
   })
 
   test("devices lists each device with its presence", async () => {
     const { code, out } = await run(["devices"])
     expect(code).toBe(REMOTE_EXIT.ok)
     expect(out[0]).toMatch(/^DEVICE\s+NAME\s+KIND\s+PLATFORM\s+SEEN$/)
-    expect(out[1]).toMatch(new RegExp(`^${PEER}\\s+Studio\\s+desktop\\s+darwin\\s+online$`))
-    expect(out[2]).toMatch(new RegExp(`^${OFFLINE_PEER}\\s+Laptop\\s+cli\\s+linux\\s+12d ago$`))
+    // The person client lists this device first (B1 self row), then the account's other devices.
+    expect(out[1]).toMatch(/^dev-self\s+This Mac\s+/)
+    expect(out[2]).toMatch(new RegExp(`^${PEER}\\s+Studio\\s+desktop\\s+darwin\\s+online$`))
+    expect(out[3]).toMatch(new RegExp(`^${OFFLINE_PEER}\\s+Laptop\\s+cli\\s+linux\\s+12d ago$`))
     const json = await run(["devices", "--json"])
-    expect(JSON.parse(json.out.join(""))).toEqual(defaultWorld().devices)
+    const rows = JSON.parse(json.out.join("")) as { id: string; self?: true }[]
+    expect(rows.map((row) => [row.id, row.self ?? false])).toEqual([
+      ["dev-self", true],
+      [PEER, false],
+      [OFFLINE_PEER, false],
+    ])
   })
 
   test("sessions shows attach targets, marks cached rows and names devices that did not answer", async () => {
@@ -72,8 +80,9 @@ describe("omo remote", () => {
 
   test("sessions passes its filter to the service and --json prints the listing result", async () => {
     const { out } = await run(["sessions", "--device", PEER, "--json"])
-    const result = JSON.parse(out.join("")) as { rows: { device: string }[] }
-    expect(result.rows.map((row) => row.device)).toEqual([PEER])
+    const result = JSON.parse(out.join("")) as { rows: { thread: string; device: { id: string } }[] }
+    expect(result.rows.map((row) => row.device.id)).toEqual([PEER])
+    expect(result.rows.map((row) => row.thread)).toEqual([`${PEER}/${SESSION_ID}`])
   })
 
   test("disable and enable report the switch the service answers with", async () => {

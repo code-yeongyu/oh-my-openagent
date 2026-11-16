@@ -6,6 +6,7 @@ import { join } from "node:path"
 import { connectDeviceService } from "../../device-service-core/src/index.ts"
 import { type FakeOwner, startFakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
 import { defaultWorld } from "../../device-service-core/test/local-api/conformance/world.ts"
+import type { RemoteClient } from "../../omo-senpi/src/components/remote/client"
 import type { RemoteThreadSurface } from "../../omo-senpi/src/components/thread/remote/ports"
 import type { BootstrapSetup, DeviceLink } from "../remote-bootstrap"
 import { runRemoteVerb } from "../remote-cli"
@@ -56,7 +57,12 @@ export async function run(
   account = SIGNED_IN,
   bootstrap = testBootstrap(),
   remote?: RemoteThreadSurface,
-  extra: { readonly packageRoot?: string; readonly coldWake?: ColdWake; readonly linkDevice?: DeviceLink } = {},
+  extra: {
+    readonly packageRoot?: string
+    readonly coldWake?: ColdWake
+    readonly linkDevice?: DeviceLink
+    readonly client?: () => RemoteClient
+  } = {},
 ) {
   let dir = stateDir
   if (dir === undefined) {

@@ -15,6 +15,8 @@ import {
 } from "../device-service-core/src/device-service.ts"
 import type { SessionFilter } from "../device-service-core/src/local-api/protocol.ts"
 import type { SessionRowState } from "../device-service-core/src/local-api/vocabulary.ts"
+import { createRemoteClient, type RemoteClient } from "../omo-senpi/src/components/remote/client"
+import type { RemoteFailure } from "../omo-senpi/src/components/remote/types"
 import type { RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
 import { readAccountInProcess } from "./account-show"
 import type { LocalStatus } from "./remote-cold-wake"
@@ -33,6 +35,11 @@ export interface RemoteCommandDependencies {
   readonly accountShow: () => Promise<AccountShowResult>
   readonly stateDir: string
   readonly connect: () => Promise<DeviceService>
+  /**
+   * The person's remote client (design v8-core r2, L2): the read verbs make exactly one member call on it. The person
+   * client over `stateDir` by default. Test seam.
+   */
+  readonly client?: () => RemoteClient
   readonly now: () => number
   readonly output: (line: string) => void
   /** Text as it arrives, with no line ending added: `send` streams the answer through it. */
@@ -67,6 +74,13 @@ export function localRemoteDependencies(packageRoot?: string): RemoteCommandDepe
     error,
   }
 }
+
+/** The person at this terminal, over this device's service: the one client every read verb uses. */
+const personClient = (stateDir: string): RemoteClient =>
+  createRemoteClient(
+    { kind: "person", uid: String(process.getuid?.() ?? 0) },
+    { version: packageJson.version, stateDir },
+  )
 
 const CONTROL_VALUES = ["on", "off"] as const
 type ControlValue = (typeof CONTROL_VALUES)[number]
@@ -134,39 +148,6 @@ async function runOn(service: DeviceService, parsed: Parsed, dependencies: Remot
     return REMOTE_EXIT.ok
   }
   switch (parsed.command) {
-    case "status": {
-      const status = await service.status()
-      const local = dependencies.localUnits
-      return print(local === undefined ? status : { ...status, local }, () =>
-        statusLines(status, service.serviceVersion, local === undefined ? [] : localRows(local)),
-      )
-    }
-    case "devices": {
-      const devices = await service.devices()
-      return print(devices, () => deviceLines(devices, dependencies.now()))
-    }
-    case "sessions": {
-      const [result, devices] = await Promise.all([service.sessions(parsed.filter), service.devices()])
-      const labels = new Map(devices.map((device) => [device.device, device.label]))
-      return print(result, () => sessionLines(result, labels, dependencies.now()))
-    }
-    case "disable": {
-      const enabled = await service.setEnabled(false)
-      return print({ enabled }, () => [`Remote sessions are ${enabled ? "on" : "off"} for this device.`])
-    }
-    case "control": {
-      if (!service.capabilities.includes("control")) {
-        dependencies.error(
-          "The OmO device service on this device does not have remote control yet. Update OmO, then try again.",
-        )
-        return REMOTE_EXIT.unavailable
-      }
-      const state =
-        parsed.control === undefined
-          ? await service.attachControl()
-          : await service.setAttachControl(parsed.control === "on")
-      return print(state, () => controlLines(state, dependencies.now()))
-    }
     case "wake": {
       // The gate is this connection's own welcome.service_version (A7R-11), never a capability word.
       if (!service.carriesWakeMark) {
@@ -204,10 +185,105 @@ export const isServiceStopped = (error: unknown): boolean =>
     ["ENOENT", "ECONNREFUSED", "ECONNRESET"].includes(String(error.code))) ||
   (error instanceof LocalApiError && error.code === "handshake_timeout")
 
-/** Runs one parsed local verb: the account notice, the device service connection, then the verb. */
+type Answer<T> = { readonly kind: "ok"; readonly value: T } | RemoteFailure
+
+// The read verbs (design v8-core r2, 4c-1; Appendix A): each is ONE member call on the person client, and --json prints
+// that call's value as is.
+const READ_VERBS: ReadonlySet<string> = new Set(["status", "devices", "sessions", "disable", "control"])
+
+async function runRead(client: RemoteClient, parsed: Parsed, dependencies: RemoteCommandDependencies): Promise<number> {
+  const show = <T>(
+    answer: Answer<T>,
+    human: (value: T) => readonly string[],
+    json: (value: T) => unknown = (v) => v,
+  ) => {
+    if (answer.kind === "error") return renderFailure(dependencies, answer, parsed.json)
+    if (parsed.json) dependencies.output(JSON.stringify(json(answer.value)))
+    else for (const line of human(answer.value)) dependencies.output(line)
+    return REMOTE_EXIT.ok
+  }
+  const now = dependencies.now()
+  switch (parsed.command) {
+    case "status": {
+      const local = dependencies.localUnits
+      return show(
+        await client.service.status(),
+        (status) => statusLines(status, status.service_version, local === undefined ? [] : localRows(local)),
+        (status) => (local === undefined ? status : { ...status, local }),
+      )
+    }
+    case "devices":
+      return show(await client.devices.list(), (devices) => deviceLines(devices, now))
+    case "sessions":
+      return show(await client.sessions.list(parsed.filter), (listing) => sessionLines(listing, now))
+    case "disable":
+      return show(await client.service.setEnabled(false), ({ enabled }) => [
+        `Remote sessions are ${enabled ? "on" : "off"} for this device.`,
+      ])
+    default:
+      return show(
+        parsed.control === undefined
+          ? await client.service.control()
+          : await client.service.setControl(parsed.control === "on"),
+        (state) => controlLines(state, now),
+      )
+  }
+}
+
+const NOT_RUNNING = "The OmO device service is not running on this device."
+
+// A next action names an SDK member (B1, R7); the CLI shows the verb that runs it.
+const VERB_OF_MEMBER: Readonly<Record<string, string>> = {
+  "service.status": "omo remote status",
+  "devices.list": "omo remote devices",
+  "sessions.list": "omo remote sessions",
+}
+const withVerbs = (text: string): string =>
+  text.replace(/\b(service\.status|devices\.list|sessions\.list)\b/g, (member) => VERB_OF_MEMBER[member] ?? member)
+
+/** A typed failure of the person client, printed for a person; --json also prints it as is on stdout. */
+function renderFailure(dependencies: RemoteCommandDependencies, failure: RemoteFailure, json: boolean): number {
+  if (json) dependencies.output(JSON.stringify(failure))
+  const details = failure.details ?? {}
+  if (failure.code === "host_unavailable" && details["reason"] === "service_not_installed") {
+    dependencies.error(
+      existsSync(dependencies.stateDir)
+        ? NOT_RUNNING
+        : "The OmO device service is not set up on this device. Install the OmO desktop app to set it up.",
+    )
+    return REMOTE_EXIT.unavailable
+  }
+  // No local API answer at all (a stale socket, a refused or timed-out handshake): the service is not running.
+  const localCode = details["local_api_code"]
+  if (failure.code === "host_unavailable" && (localCode === undefined || localCode === "handshake_timeout")) {
+    dependencies.error(NOT_RUNNING)
+    return REMOTE_EXIT.unavailable
+  }
+  if (failure.code === "unsupported" && details["feature"] === "control") {
+    dependencies.error(
+      "The OmO device service on this device does not have remote control yet. Update OmO, then try again.",
+    )
+    return REMOTE_EXIT.unavailable
+  }
+  dependencies.error(`omo remote: ${failure.message}`)
+  dependencies.error(withVerbs(failure.next_action))
+  return failure.code === "host_unavailable" || failure.code === "relay_requires_paid_plan"
+    ? REMOTE_EXIT.unavailable
+    : REMOTE_EXIT.failed
+}
+
+/** Runs one parsed local verb: the account notice, then the read verb on the person client or the verb's connection. */
 export async function runLocalRemoteVerb(dependencies: RemoteCommandDependencies, parsed: Parsed): Promise<number> {
   const signedOut = await accountNotice(dependencies)
   if (signedOut !== undefined) return signedOut
+  if (READ_VERBS.has(parsed.command)) {
+    const client = (dependencies.client ?? (() => personClient(dependencies.stateDir)))()
+    try {
+      return await runRead(client, parsed, dependencies)
+    } finally {
+      client.close()
+    }
+  }
   if (!existsSync(dependencies.stateDir)) {
     dependencies.error("The OmO device service is not set up on this device. Install the OmO desktop app to set it up.")
     return REMOTE_EXIT.unavailable

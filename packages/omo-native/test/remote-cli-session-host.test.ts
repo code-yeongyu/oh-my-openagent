@@ -112,7 +112,7 @@ describe("omo remote enable: the one command after sign-in", () => {
       status: async () => local,
     }
     const json = await run(["status", "--json"], undefined, SIGNED_IN, testBootstrap(), undefined, { coldWake })
-    expect(JSON.parse(json.out.join(""))).toEqual({ ...defaultWorld().status, local })
+    expect(JSON.parse(json.out.join(""))).toEqual({ ...defaultWorld().status, service_version: "1.4.0", local })
     const human = await run(["status"], undefined, SIGNED_IN, testBootstrap(), undefined, { coldWake })
     expect(human.out.some((line) => line.startsWith("Session host") && line.includes("pinned"))).toBe(true)
   })
