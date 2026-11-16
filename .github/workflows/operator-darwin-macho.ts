@@ -16,6 +16,14 @@ export type SliceSignature = {
   readonly identifier: string
   readonly team: string
   readonly runtime: boolean
+  /** Mach-O cputype of the slice (0x0100000c arm64, 0x01000007 x86_64). */
+  readonly cpuType: number
+  /** Mach-O cpusubtype without the capability bits (0 ARM64_ALL, 2 arm64e, 3 X86_ALL). */
+  readonly cpuSubtype: number
+  /** sha256 hex of the requirements blob (the designated requirement), "" when the slice has none. */
+  readonly requirementsSha256: string
+  /** True when the slice carries an entitlements or DER entitlements blob. */
+  readonly entitlements: boolean
   /** Hex of the first 20 bytes of the CodeDirectory's sha256: the cdhash Apple's ticket service is keyed by. */
   readonly cdhash: string
   readonly codeDirectory: Uint8Array
@@ -120,12 +128,17 @@ function readSlice(bytes: Uint8Array, range: { start: number; end: number }): Sl
   }
   const teamOffset = version >= 0x20200 ? cdv.getUint32(48, false) : 0
   const cms = blobs.get(CMS)
+  const requirements = blobs.get(2)
   return {
     start: range.start,
     hashedEnd: range.start + codeLimit,
     identifier: cString(cd, cdv.getUint32(20, false)),
     team: teamOffset === 0 ? "" : cString(cd, teamOffset),
     runtime: (cdv.getUint32(12, false) & 0x10000) !== 0,
+    cpuType: le.getUint32(4, true),
+    cpuSubtype: le.getUint32(8, true) & 0x00ffffff,
+    requirementsSha256: requirements ? hex(sha256(requirements)) : "",
+    entitlements: blobs.has(5) || blobs.has(7),
     cdhash: hex(sha256(cd).subarray(0, 20)),
     codeDirectory: cd,
     cms: cms && cms.byteLength > 8 ? cms.subarray(8) : null,

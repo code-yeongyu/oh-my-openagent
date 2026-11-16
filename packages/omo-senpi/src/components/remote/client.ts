@@ -11,18 +11,15 @@ import {
   type ListingRow,
   type Timers,
 } from "@oh-my-opencode/device-service-core/device-service"
-import type { ThreadSocketConnect } from "../thread/live-surface"
-import type { ThreadHost } from "../thread/tools/ports"
 import { aliasMembers } from "./aliases"
 import { attachMember } from "./attach"
 import { failureFromError, nextActionFor, remoteFailure } from "./codes"
 import { BOUNDS, CONNECT_SLACK_MS, DEADLINES, withinDeadline } from "./deadlines"
 import { streamMembers } from "./follow"
 import { resolveMember } from "./resolve"
+import type { LocalSessions } from "./local-sessions"
 import { handleOf } from "./seams"
 import { sessionMembers } from "./sessions"
-import { defaultLocalThreadHost } from "./sessions-local"
-import { localSessionRows } from "./sessions-local-list"
 import { thisDeviceRow } from "./this-device-row"
 import type {
   DeviceRow,
@@ -41,10 +38,13 @@ import { unknownDevice } from "./unknown-device"
 /** The client's deps over the device service SDK's own connection and attach (types.ts `RemoteClientDeps`). */
 export type RemoteClientDeps = RemoteClientDepsOver<DeviceService, RemoteAttach> & {
   /**
-   * Test seam: this device's operator endpoint, where an open on this device lands (the engine's own host by default),
-   * built over the socket `connect` the open watches its frames on.
+   * This device's own operator endpoint (`local-sessions.ts` `createLocalSessions`), where its sessions are listed, opened
+   * and driven (#13787). It opens sockets, so a caller outside `omo remote`'s local-only graph (#13440) injects it, and
+   * may load it lazily: it is loaded once, on the first member that needs it. Absent, sessions.list names this device
+   * unanswered (its sessions are missing from the listing, as when its host does not answer), and every other session
+   * member on this device answers `unsupported{feature:"local_sessions"}`.
    */
-  readonly localThreadHost?: (connect: ThreadSocketConnect) => Promise<ThreadHost>
+  readonly localSessions?: () => Promise<LocalSessions>
 }
 export type { RemoteClient }
 
@@ -68,6 +68,8 @@ export type ClientCore = {
   ) => R<T>
   readonly sessionsList: (filter?: SessionsListFilter, opts?: Opts) => R<SessionsList>
   readonly devicesList: (opts?: Opts) => R<readonly DeviceRow[]>
+  /** This device's operator endpoint leg (RemoteClientDeps.localSessions), loaded once; undefined when not injected. */
+  readonly localSessions: () => Promise<LocalSessions | undefined>
 }
 
 /** The answer of a member whose part has not landed yet. */
@@ -154,6 +156,13 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
   const timers = deps.timers ?? realTimers
   const stateDir = deps.stateDir ?? deviceServiceStateDir()
   let service: Promise<DeviceService> | undefined
+  let localLeg: Promise<LocalSessions> | undefined
+  const localSessions = async (): Promise<LocalSessions | undefined> => {
+    const load = deps.localSessions
+    if (load === undefined) return undefined
+    localLeg ??= load()
+    return await localLeg
+  }
   const dial = (): Promise<DeviceService> =>
     (deps.connect ?? connectDeviceService)({ version: deps.version, stateDir, timers })
   const connection = (): Promise<DeviceService> => {
@@ -251,9 +260,10 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
    */
   const localRowsBefore = async (end: number, self: DeviceRow): Promise<readonly SessionRow[] | undefined> => {
     const ms = Math.max(0, Math.min(DEADLINES.sessionsListLocal, end - timers.now() - 1))
-    const answered = await withinDeadline(timers, undefined, ms, false, async () =>
-      ok(await localSessionRows(deps.localThreadHost ?? defaultLocalThreadHost, self)),
-    )
+    const answered = await withinDeadline(timers, undefined, ms, false, async () => {
+      const leg = await localSessions()
+      return ok(leg === undefined ? undefined : await leg.rows(self))
+    })
     return answered.kind === "ok" ? answered.value : undefined
   }
 
@@ -308,7 +318,7 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
       return ok({ revision: listing.revision, rows, unanswered })
     })
 
-  const core: ClientCore = { sender, timers, deps, dial, member, sessionsList, devicesList }
+  const core: ClientCore = { sender, timers, deps, dial, member, sessionsList, devicesList, localSessions }
 
   return {
     service: {
