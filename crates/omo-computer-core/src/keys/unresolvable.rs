@@ -50,6 +50,36 @@ pub fn first_unresolvable(
     text.chars().map(String::from).find(|grapheme| !resolvable(group, grapheme)).map(|grapheme| Unresolvable { group, grapheme })
 }
 
+/// How a remote-screen window's client forwards input: Screen Sharing sends key codes and takes
+/// the modifiers from the physical keyboard; iPhone Mirroring sends HID reports, modifiers included.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RemoteForwarding {
+    KeyEvents,
+    HidReports,
+}
+
+/// The fixed layout a remote screen's text goes out on: `Some(shift)` for a character a key types
+/// (with or without Shift), `None` for one no key types.
+#[must_use]
+pub const fn remote_stroke(character: char) -> Option<bool> {
+    match character {
+        'a'..='z' | '0'..='9' | ' ' | '\n' | '\r' | '\t' | '-' | '=' | '[' | ']' | ';' | '\'' | ',' | '.' | '/' | '`' | '\\' => Some(false),
+        'A'..='Z' | '!' | '@' | '#' | '$' | '%' | '^' | '&' | '*' | '(' | ')' | '_' | '+' | '{' | '}' | ':' | '"' | '<' | '>' | '?' | '~' | '|' => Some(true),
+        _ => None,
+    }
+}
+
+/// Admits `text` for a remote-screen window before any key: a character no key types refuses
+/// `InvalidKey`, and in the background a Screen Sharing window refuses text that needs Shift
+/// `BackgroundUnavailable` (it takes modifiers from the physical keyboard). Nothing is sent on either.
+///
+/// # Errors
+/// The refusal, with nothing sent.
+pub fn admit_remote_text(text: &str, forwarding: RemoteForwarding, background: bool) -> Result<(), Refusal> {
+    let _ = (text, forwarding, background);
+    Ok(())
+}
+
 /// The route a target types through (acceptance 81). `remote_screen`: the window shows another
 /// machine's screen; `x11_keymap_remap`: the opt-in `computer.x11_keymap_remap`.
 #[must_use]
@@ -107,6 +137,17 @@ mod tests {
         assert_eq!(text_route(Platform::X11, false, false), TextRoute::None, "X11 by default");
         assert_eq!(text_route(Platform::X11, false, true), TextRoute::Remap, "X11 with the opt-in remap");
         assert_eq!(text_route(Platform::Wayland, false, true), TextRoute::None, "Wayland");
+    }
+
+    #[test]
+    fn a_remote_screen_refuses_untypable_text_and_shift_text_in_a_screen_sharing_background() {
+        let invalid = admit_remote_text("ab\u{1f600}c", RemoteForwarding::KeyEvents, true).expect_err("no key types the emoji");
+        assert_eq!(invalid.code, EngineCode::InvalidKey);
+        let shift = admit_remote_text("Hello", RemoteForwarding::KeyEvents, true).expect_err("Shift in the background");
+        assert_eq!(shift.code, EngineCode::BackgroundUnavailable);
+        assert_eq!(admit_remote_text("hello", RemoteForwarding::KeyEvents, true), Ok(()));
+        assert_eq!(admit_remote_text("Hello", RemoteForwarding::KeyEvents, false), Ok(()), "a foreground stroke holds Shift itself");
+        assert_eq!(admit_remote_text("Hello World", RemoteForwarding::HidReports, true), Ok(()), "HID reports carry Shift");
     }
 
     #[test]

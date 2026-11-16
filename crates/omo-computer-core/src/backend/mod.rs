@@ -127,6 +127,12 @@ pub trait Backend: Send {
         None
     }
 
+    /// Row 26 (acceptance 81's remote leg): how `window` forwards input when it shows another
+    /// machine's screen; `None` (the default) for an ordinary window.
+    fn remote_screen(&self, _window: &str) -> Option<crate::keys::unresolvable::RemoteForwarding> {
+        None
+    }
+
     /// Row 24 (R56): the clipboard, read for `clipboard.read` and for a paste's restore; a
     /// concealed clipboard answers [`crate::clipboard::ClipboardRead::Concealed`] unread.
     ///

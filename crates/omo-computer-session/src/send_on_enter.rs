@@ -201,4 +201,28 @@ mod tests {
         press(&mut session, "return", false).expect("unlisted");
         assert!(!posts(&sink).is_empty());
     }
+
+    /// Acceptance 81's remote leg (remote-typing.json): a character no key of the remote screen's
+    /// layout types refuses InvalidKey before anything is typed; Shift text in a Screen Sharing
+    /// window's background refuses BackgroundUnavailable.
+    #[test]
+    fn a_remote_screen_window_refuses_untypable_and_background_shift_text_before_any_key() {
+        let sink = RecordingSink::default();
+        let scenario = include_str!("../../omo-computer-backend-fake/fixtures/remote-typing.json");
+        let fake = FakeBackend::with_parts(FakeScenario::from_json(scenario).expect("scenario"), FakeClock::default(), sink.clone())
+            .with_stop_path(StopPathScript::Live);
+        let mut session = Session::new(Box::new(fake));
+        session.open(serde_json::from_value(json!({ "allowHostRelayOnlyStop": true })).expect("open")).expect("open");
+        session.stop_path_start(serde_json::from_value(json!({})).expect("start"));
+        let typed = |session: &mut Session, target: &str, text: &str| {
+            session.type_text(serde_json::from_value(json!({ "target": target, "text": text })).expect("typeText"))
+        };
+        let refused = typed(&mut session, "101", "ab\u{1f600}c").expect_err("no key types the emoji");
+        assert_eq!(refused.refusal.code.wire(), "InvalidKey");
+        let refused = typed(&mut session, "101", "Hello").expect_err("Shift in a Screen Sharing background");
+        assert_eq!(refused.refusal.code.wire(), "BackgroundUnavailable");
+        assert!(posts(&sink).is_empty(), "nothing typed: {:?}", posts(&sink));
+        typed(&mut session, "101", "hello").expect("unshifted text goes out as keys");
+        typed(&mut session, "202", "Hello World").expect("HID reports carry Shift");
+    }
 }

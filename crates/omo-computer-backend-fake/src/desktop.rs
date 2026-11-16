@@ -83,6 +83,10 @@ impl Backend for FakeBackend {
         FakeBackend::clipboard_write(self, text)
     }
 
+    fn remote_screen(&self, window: &str) -> Option<omo_computer_core::keys::unresolvable::RemoteForwarding> {
+        self.remote_screen_of(window)
+    }
+
     fn secure_focus(&self, window: Option<&str>) -> Option<bool> {
         Some(window.map_or_else(|| FakeBackend::secure_focus_role(self).is_some(), |window| FakeBackend::secure_focus(self, window)))
     }
