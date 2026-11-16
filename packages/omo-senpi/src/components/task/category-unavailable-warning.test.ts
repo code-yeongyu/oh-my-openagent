@@ -49,6 +49,7 @@ function plainUnavailableError(category: string): PlanResolutionError {
 function setup(options: {
   readonly error: PlanResolutionError
   readonly omoConfig?: OmoConfig
+  readonly getOmoConfig?: () => OmoConfig
   readonly settings?: ReturnType<typeof OmoTaskSettingsSchema.parse>
   readonly sessionId?: string
   readonly withUi?: boolean
@@ -78,6 +79,7 @@ function setup(options: {
     pi,
     runtime,
     omoConfig: options.omoConfig ?? {},
+    ...(options.getOmoConfig === undefined ? {} : { getOmoConfig: options.getOmoConfig }),
     settings: options.settings ?? OmoTaskSettingsSchema.parse({}),
   })
   return { planner, messages, notifies, runtime }
@@ -232,6 +234,24 @@ describe("createCategoryUnavailableWarningPlanner", () => {
     // then
     expect(notifies).toHaveLength(0)
     expect(messages).toHaveLength(1)
+  })
+
+  test("#given a category model pinned after composition #when planned #then the live config suppresses the warning", () => {
+    // given a planner composed before the user pins a model for the category
+    let liveConfig: OmoConfig = {}
+    const { planner, messages, notifies } = setup({
+      error: deadChainError("quick"),
+      omoConfig: {},
+      getOmoConfig: () => liveConfig,
+    })
+
+    // when the category gains a user model mid-session and a dead chain is planned
+    liveConfig = { categories: { quick: { model: "user-provider/model-x" } } }
+    plan(planner, "quick")
+
+    // then no warning fires, because the plan-time read sees the pin
+    expect(notifies).toHaveLength(0)
+    expect(messages).toHaveLength(0)
   })
 
   test("#given the real child planner and a stripped registry #when a dead-chain category is planned #then the error carries chain details", () => {

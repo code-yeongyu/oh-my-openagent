@@ -1,6 +1,7 @@
 import { expect, jest, test } from "bun:test"
 import { createServer, connect, Socket } from "node:net"
 import { once } from "node:events"
+import { accountSourceFromSelection } from "../device-session/selected-account-source"
 import { attachDesktopSyncChannel } from "./channel"
 
 async function pair() {
@@ -185,6 +186,53 @@ test("an event for another child or an unknown reply id retires the channel", as
       engine.destroy()
       peer.destroy()
     }
+  }
+})
+
+test("main's refusal while signed out reads as signed out on the main thread, and the channel stays open", async () => {
+  let signedIn = false
+  const { channel, engine, peer } = await connected((packet, socket) => {
+    const op = (packet as { request?: { op?: string } }).request?.op
+    const reply = !signedIn
+      ? { id: packet.id, ok: false, reason: "refused" }
+      : {
+          id: packet.id,
+          ok: true,
+          value:
+            op === "descriptor"
+              ? {
+                  genesis: "unsupported",
+                  rpId: null,
+                  userName: null,
+                  serviceOrigin: "https://api.example.test",
+                  accountId: "account-1",
+                  serviceDeviceId: "device-1",
+                  syncPrincipalId: "principal-1",
+                  publicKeys: { signing: "signing-1", sealing: "sealing-1" },
+                  generation: "generation-1",
+                  incarnation: "incarnation-1",
+                }
+              : { handle: "handle-1" },
+        }
+    socket.write(`${JSON.stringify(reply)}\n`)
+  })
+  try {
+    const source = accountSourceFromSelection({
+      selection: async () => ({ kind: "desktop", channel }),
+      cli: () => {
+        throw new Error("the CLI credential source was constructed on a desktop host")
+      },
+    })
+    expect(await source()).toBeNull()
+    await expect(channel.request({ op: "descriptor" })).rejects.toMatchObject({ name: "DesktopSyncRefused" })
+    expect(channel.signal.aborted).toBe(false)
+    signedIn = true
+    const account = await source()
+    expect(account?.kind).toBe("desktop")
+  } finally {
+    channel.close()
+    engine.destroy()
+    peer.destroy()
   }
 })
 
