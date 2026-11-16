@@ -9,7 +9,7 @@ const ENDPOINT = "ZW5kcG9pbnQta2V5LTAwMD"
 function client(lookup: () => Promise<unknown>) {
   const calls = { endpointCommand: 0 }
   const fake = {
-    welcome: { service_version: "t", capabilities: [], state: "connected" },
+    welcome: { service_version: "0.1.0", capabilities: [], state: "connected" },
     request: async (type: string) => {
       if (type === "session.endpoints") return await lookup()
       throw new Error(`unexpected request ${type}`)
