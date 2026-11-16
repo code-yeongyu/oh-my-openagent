@@ -23,8 +23,13 @@ pub enum FrameOutcome {
 /// The outcome of a request for `requested`, from the `ConfigureNotify` the server sent.
 #[must_use]
 pub fn read_back(requested: Frame, notified: Option<Frame>) -> FrameOutcome {
-    let _ = notified;
-    FrameOutcome::Applied(requested)
+    match notified {
+        None => FrameOutcome::Unconfirmed,
+        Some(frame) if (frame.width, frame.height) == (requested.width, requested.height) => FrameOutcome::Applied(frame),
+        Some(frame) => FrameOutcome::Partial {
+            kept: (frame.width, frame.height),
+        },
+    }
 }
 
 #[cfg(test)]

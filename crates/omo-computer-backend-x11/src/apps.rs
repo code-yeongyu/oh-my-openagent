@@ -16,15 +16,66 @@ pub struct App {
 /// The applications of `data_dirs` (`$XDG_DATA_HOME` first, then `$XDG_DATA_DIRS`).
 #[must_use]
 pub fn list(data_dirs: &[PathBuf]) -> Vec<App> {
-    let _ = data_dirs;
-    Vec::new()
+    let mut apps: Vec<App> = Vec::new();
+    for dir in data_dirs {
+        let Ok(entries) = std::fs::read_dir(dir.join("applications")) else {
+            continue;
+        };
+        let mut found: Vec<App> = entries
+            .filter_map(Result::ok)
+            .filter_map(|entry| {
+                let id = entry.file_name().to_str()?.to_owned();
+                let text = std::fs::read_to_string(entry.path()).ok()?;
+                std::path::Path::new(&id)
+                    .extension()
+                    .is_some_and(|ext| ext == "desktop")
+                    .then(|| parse(&id, &text))
+                    .flatten()
+            })
+            .filter(|app| apps.iter().all(|known| known.id != app.id))
+            .collect();
+        found.sort_by(|a, b| a.id.cmp(&b.id));
+        apps.extend(found);
+    }
+    apps
+}
+
+/// One desktop entry's `[Desktop Entry]` group; `None` for a hidden or non-application entry.
+fn parse(id: &str, text: &str) -> Option<App> {
+    let mut in_entry = false;
+    let (mut name, mut exec, mut application, mut hidden) = (None, None, false, false);
+    for line in text.lines().map(str::trim) {
+        if line.starts_with('[') {
+            in_entry = line == "[Desktop Entry]";
+            continue;
+        }
+        let Some((key, value)) = line.split_once('=').filter(|_| in_entry) else {
+            continue;
+        };
+        match key.trim() {
+            "Name" => name = Some(value.trim().to_owned()),
+            "Exec" => exec = Some(value.trim().to_owned()),
+            "Type" => application = value.trim() == "Application",
+            "NoDisplay" | "Hidden" => hidden |= value.trim() == "true",
+            _ => {}
+        }
+    }
+    let argv: Vec<String> = exec?
+        .split_whitespace()
+        .filter(|word| !word.starts_with('%'))
+        .map(str::to_owned)
+        .collect();
+    (application && !hidden && !argv.is_empty()).then(|| App {
+        id: id.to_owned(),
+        name: name.unwrap_or_else(|| id.to_owned()),
+        argv,
+    })
 }
 
 /// The argv that opens the application `id`.
 #[must_use]
 pub fn open_argv(apps: &[App], id: &str) -> Option<Vec<String>> {
-    let _ = (apps, id);
-    None
+    apps.iter().find(|app| app.id == id).map(|app| app.argv.clone())
 }
 
 #[cfg(test)]

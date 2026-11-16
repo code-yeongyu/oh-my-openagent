@@ -30,16 +30,28 @@ pub struct Evidence {
 /// The toolkit the evidence names.
 #[must_use]
 pub fn classify(evidence: &Evidence) -> Toolkit {
-    let class = evidence.wm_class.to_ascii_lowercase();
-    if class.contains("qt") {
+    let maps = |needle: &str| evidence.maps.iter().any(|path| library(path).contains(needle));
+    let helpers = evidence.children.iter().any(|argv| argv.contains(" --type="));
+    if helpers {
+        let node = maps(".asar") || maps("libnode") || maps("electron");
+        return if node { Toolkit::Electron } else { Toolkit::Chromium };
+    }
+    if maps("libqxcb") && (maps("libqt5gui") || maps("libqt6gui")) {
         Toolkit::QtXcb
-    } else if class.contains("gtk") {
+    } else if maps("libgtk-4") {
+        Toolkit::Gtk4
+    } else if maps("libgtk-3") {
         Toolkit::Gtk3
-    } else if class.contains("chrom") {
-        Toolkit::Chromium
+    } else if maps("libxt.") || maps("libxm.") {
+        Toolkit::Xt
     } else {
         Toolkit::Unknown
     }
+}
+
+/// The lowercased file name of a mapped object's path.
+fn library(path: &str) -> String {
+    path.rsplit('/').next().unwrap_or(path).to_ascii_lowercase()
 }
 
 /// A background route the toolkit cannot take, as the refusal names it.
@@ -56,7 +68,13 @@ pub struct BackgroundRefusal {
 /// # Errors
 /// [`BackgroundRefusal`] naming the toolkit when its client drops synthetic events.
 pub fn background_route(toolkit: Toolkit, qt_shim: bool) -> Result<(), BackgroundRefusal> {
-    let _ = (toolkit, qt_shim);
+    if toolkit == Toolkit::QtXcb && !qt_shim {
+        return Err(BackgroundRefusal {
+            toolkit: "qt_xcb",
+            reason: "toolkit",
+            next_call: "raise",
+        });
+    }
     Ok(())
 }
 

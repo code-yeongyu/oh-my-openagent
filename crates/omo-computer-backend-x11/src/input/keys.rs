@@ -47,13 +47,24 @@ pub fn keysym(ch: char) -> u32 {
 /// The keycode and level that type `keysym` in `group`.
 #[must_use]
 pub fn resolve(map: &GroupMap, group: usize, keysym: u32) -> Option<(u8, bool)> {
-    let _ = group;
     map.keys.iter().enumerate().find_map(|(row, groups)| {
-        groups.iter().find_map(|levels| {
-            let level = levels.iter().position(|candidate| *candidate == keysym)?;
-            let code = map.min_keycode.checked_add(u8::try_from(row).ok()?)?;
-            Some((code, level == 1))
-        })
+        let level = groups.get(group)?.iter().position(|candidate| *candidate == keysym)?;
+        Some((code_of(map, row)?, level == 1))
+    })
+}
+
+fn code_of(map: &GroupMap, row: usize) -> Option<u8> {
+    map.min_keycode.checked_add(u8::try_from(row).ok()?)
+}
+
+/// A keycode that types nothing in `group`: the scratch keycode a remap may borrow.
+fn free_keycode(map: &GroupMap, group: usize) -> Option<u8> {
+    map.keys.iter().enumerate().find_map(|(row, groups)| {
+        groups
+            .get(group)
+            .is_some_and(|levels| levels.iter().all(|keysym| *keysym == 0))
+            .then(|| code_of(map, row))
+            .flatten()
     })
 }
 
@@ -62,13 +73,22 @@ pub fn resolve(map: &GroupMap, group: usize, keysym: u32) -> Option<(u8, bool)> 
 /// # Errors
 /// [`Unresolvable`] for the first grapheme outside the group, with nothing planned.
 pub fn plan(map: &GroupMap, group: usize, text: &str, remap: bool) -> Result<Vec<Step>, Unresolvable> {
-    let _ = remap;
+    let scratch = if remap { free_keycode(map, group) } else { None };
     let mut steps = Vec::new();
     for ch in text.chars() {
-        if let Some((code, shift)) = resolve(map, group, keysym(ch)) {
+        let keysym = keysym(ch);
+        if let Some((code, shift)) = resolve(map, group, keysym) {
             steps.push(Step::Key { code, shift });
+        } else if let Some(code) = scratch {
+            steps.extend([Step::Remap { code, keysym }, Step::Key { code, shift: false }, Step::Restore { code }]);
+        } else {
+            return Err(Unresolvable {
+                refusal: Refusal::new(EngineCode::InvalidKey, Reason::Unresolvable.wire()),
+                group,
+                grapheme: ch.to_string(),
+                next_call: "paste",
+            });
         }
     }
-    let _ = Refusal::new(EngineCode::InvalidKey, Reason::Unresolvable.wire());
     Ok(steps)
 }
