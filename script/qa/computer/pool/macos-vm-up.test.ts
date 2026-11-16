@@ -11,7 +11,6 @@ const plan: GuestPlan = {
   labels: ["computer-live-macos", "macos-15"],
 }
 
-// One pool host: the guest list, the processes that name a guest (held marks and booted guests), and what was removed.
 function poolHost(options: { readonly cloneFails?: boolean; readonly neverRuns?: boolean } = {}) {
   const guests = new Map<string, boolean>()
   const holds = new Set<string>()

@@ -7,12 +7,14 @@
 // The hypervisor command is POOL_HYPERVISOR (clone, run --no-graphics, list --format json, stop, delete); base images are
 // POOL_BASE_IMAGE_15 / POOL_BASE_IMAGE_26. Every run ends with the measured teardown receipts of macos-vm-ops.ts.
 
-import { deleteGuest, type Hypervisor, sweepGuests, teardown, waitUntilRunning } from "./macos-vm-ops.ts"
+import { type Hypervisor, sweepGuests, teardown } from "./macos-vm-ops.ts"
 import { type GuestListing, MACOS_MAJORS, type MacosMajor, planGuest, type PoolHost } from "./macos-vm-plan.ts"
+import { bringUp, UP_HOLD_TAG, type UpSteps } from "./macos-vm-up.ts"
 
 type Ran = { readonly code: number; readonly stdout: string; readonly stderr: string }
 
 const UP_DEADLINE_MS = 120_000
+const UP_HOLD_MAX_S = 900
 
 function run(command: string, args: readonly string[]): Ran {
   const result = Bun.spawnSync([command, ...args], { stdout: "pipe", stderr: "pipe", timeout: 600_000 })
@@ -73,9 +75,9 @@ function commandHypervisor(command: string): Hypervisor {
   }
 }
 
-// Live hypervisor processes for a guest: the clone that creates it and the run that boots it (both end in its name).
+// Live processes for a guest: an --up's hold, the clone that creates it and the run that boots it (all end in its name).
 function guestProcesses(name: string): number | null {
-  const found = run("/usr/bin/pgrep", ["-f", `(clone [^ ]+|run --no-graphics) ${name}$`])
+  const found = run("/usr/bin/pgrep", ["-f", `(${UP_HOLD_TAG}|clone [^ ]+|run --no-graphics) ${name}$`])
   if (found.code === 1) return 0
   if (found.code !== 0) return null
   return found.stdout.split("\n").filter((line) => line !== "").length
@@ -88,26 +90,29 @@ async function up(host: PoolHost, which: MacosMajor, runId: string): Promise<num
     return 2
   }
   const command = host.hypervisor ?? ""
-  const cloned = run(command, ["clone", plan.baseImage, plan.guestName])
-  if (cloned.code !== 0) {
-    console.error(`macos-vm: clone failed: ${cloned.stderr}`)
-    return 1
+  const steps: UpSteps = {
+    hold: (guestName) => {
+      // A shell that never execs, so the tag and guest name stay on its command line; on TERM it stops its own sleep.
+      // Bounded so a crashed --up cannot hold a guest forever.
+      const script = `trap 'kill $! 2>/dev/null; exit 0' TERM; sleep ${UP_HOLD_MAX_S} & wait`
+      const holder = Bun.spawn(["/bin/sh", "-c", script, UP_HOLD_TAG, guestName], {
+        stdout: "ignore",
+        stderr: "ignore",
+      })
+      return () => holder.kill()
+    },
+    clone: (baseImage, guestName) => run(command, ["clone", baseImage, guestName]),
+    startRun: (guestName) => {
+      const started = Bun.spawn([command, "run", "--no-graphics", guestName], { stdout: "ignore", stderr: "ignore" })
+      started.unref()
+      return started.pid
+    },
   }
-  const started = Bun.spawn([command, "run", "--no-graphics", plan.guestName], { stdout: "ignore", stderr: "ignore" })
-  started.unref()
-  const hypervisor = commandHypervisor(command)
-  const waited = await waitUntilRunning(hypervisor, plan.guestName, UP_DEADLINE_MS, {
-    now: Date.now,
-    sleep: (ms) => Bun.sleep(ms),
-  })
-  if (waited.status !== "running") {
-    const detail = "detail" in waited ? ` (${waited.detail})` : ` after ${UP_DEADLINE_MS / 1000} s`
-    console.error(`macos-vm: guest ${plan.guestName} is ${waited.status}${detail}`)
-    console.log(deleteGuest(hypervisor, plan.guestName))
-    return 1
-  }
-  console.log(`GUEST ${plan.guestName} macos=${plan.major} labels=${plan.labels.join(",")} running pid=${started.pid}`)
-  return 0
+  const clock = { now: Date.now, sleep: (ms: number) => Bun.sleep(ms) }
+  const result = await bringUp(commandHypervisor(command), steps, clock, plan, UP_DEADLINE_MS)
+  for (const line of result.errors) console.error(line)
+  for (const line of result.lines) console.log(line)
+  return result.exitCode
 }
 
 function down(host: PoolHost, which: MacosMajor, runId: string): number {

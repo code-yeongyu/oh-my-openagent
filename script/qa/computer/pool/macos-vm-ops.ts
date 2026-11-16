@@ -82,9 +82,15 @@ function keepReason(guest: GuestListing, processCount: ProcessCount): string | n
 }
 
 export function sweepGuests(hypervisor: Hypervisor, processCount: ProcessCount): Sweep {
+  let listing: GuestListing[]
+  try {
+    listing = hypervisor.list()
+  } catch (error) {
+    return { lines: [`sweep: list failed: ${error instanceof Error ? error.message : String(error)}`], exitCode: 1 }
+  }
   const removals: string[] = []
   const kept: string[] = []
-  for (const guest of hypervisor.list().filter((entry) => isPoolGuest(entry.name))) {
+  for (const guest of listing.filter((entry) => isPoolGuest(entry.name))) {
     const reason = keepReason(guest, processCount)
     if (reason === null) removals.push(deleteGuest(hypervisor, guest.name))
     else kept.push(`guest KEPT ${guest.name} (${reason})`)

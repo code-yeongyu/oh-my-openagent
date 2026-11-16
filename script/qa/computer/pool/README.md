@@ -41,14 +41,15 @@ procs <n>
 guest DELETED omo-cu-macos<major>-<id>
 ```
 
-`procs` counts the hypervisor's `clone` and `run` processes still serving that guest; a count that cannot be read
+`procs` counts the `--up` hold and the hypervisor's `clone` and `run` processes still serving that guest; a count that cannot be read
 prints `procs UNREAD`. Any count other than 0, `procs UNREAD`, or `guest NOT DELETED <name> (<reason>)`
 makes the teardown exit 1. A failed guest list during the delete still prints the `NOT DELETED` line with
 the list error as its reason.
 
 `--sweep` deletes stopped guests this pool minted (names matching `omo-cu-<...>`) that no hypervisor process
-serves. It keeps a guest that is running, one with a live `clone` or `run` process (an `--up` that has cloned or
-started it but has not seen it listed running yet), and one whose process count cannot be read, printing
+serves. It keeps a guest that is running, one with a live `clone` or `run` process or the `omo-pool-up-hold <name>`
+process an `--up` holds from before its clone until its wait ends (so the gap between the clone exiting and the run
+starting is covered), and one whose process count cannot be read, printing
 `guest KEPT <name> (<reason>)` for each. It never touches a guest whose name it did not mint, including the base
 images. The last line is `sweep: <n> deleted, <n> not deleted, <n> kept`, counted from the receipts above it; any
 `NOT DELETED` makes the sweep exit 1.
