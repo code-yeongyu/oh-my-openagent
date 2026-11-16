@@ -170,6 +170,10 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // bun 1.4.3, byte-identical). Ceiling = that measurement rounded up to the next 5,000 bytes (never below what is measured).
 // Batch #18 measured omo.js at 1,422,712 B with the telemetry lazy chunk; revisit this budget when a trim lands.
 // Batch #19 measured omo.js at 1,426,658 B (11 cars); budget = measured + 4 KiB (lead rule). Revisit when a trim lands.
+// Raised 1,476,000 -> 1,478,000 for the #13037 wake train (#13458): a fresh build at the W1 head 6dfefeea6c measures
+// 1,547,852 B (the committed artifact predates the train); splitting the session wake into the lazy
+// #omo-wake-runtime sidecar brings it to 1,476,860 B, so the ceiling covers the measured need with a
+// 1,140-byte margin instead of failing it by 860 bytes.
 const BUDGET_BYTES = bundleBudget.omoJsBytes
 
 describe("omo-senpi bundle size budget", () => {
