@@ -19,7 +19,7 @@ import { isHelpFlag, REMOTE_USAGE, verbUsage } from "./remote-usage"
 import { VERBS } from "./remote-verbs"
 import { parseTarget, type RemoteSessionTarget } from "./remote-session-args"
 import { resolveSessionTarget } from "./remote-session-target"
-import { attachAddressed, createDeviceServiceSessions } from "../omo-senpi/src/components/thread/remote/device-service"
+import { attachAddressed, createDeviceServiceSessions } from "../omo-senpi/src/components/remote/port/device-service"
 import type { JsonObject } from "../omo-senpi/src/components/thread/remote/ports"
 
 export type { RemoteCommandDependencies } from "./remote-local"

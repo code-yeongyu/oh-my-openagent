@@ -53,7 +53,8 @@ reason=no_windows_host` while there is none.
 ```sh
 bun script/qa/computer/pool/windows-full.ts --ledger host.jsonl session.jsonl lock.jsonl --out hosted-windows-live.tsv --host "<label>"
 bun script/qa/computer/pool/windows-full.ts --validate crates/omo-computer-backend-win32/probes/hosted-windows-live.tsv
+bun script/qa/computer/pool/windows-full.ts --compare crates/omo-computer-backend-win32/probes/hosted-windows-live.tsv hosted-windows-live.tsv
 bun script/qa/computer/pool/windows-full.ts --plan crates/omo-computer-backend-win32/probes/hosted-windows-live.tsv --guest off
 ```
 
-The facts files are the `windows-full-facts-*` artifacts of a workflow run.
+The facts files are the `windows-full-facts-*` artifacts of a workflow run. The ledger job runs `--compare` on every run: a verdict that differs from this file fails the job, so the committed ledger changes only on purpose, with the run that measured it.

@@ -36,7 +36,7 @@ export const REMOTE_IMPORT_RULES: GuardRules = {
     { names: ["connectDeviceService", "connectLocalApi", "openAttach"], modules: [DEVICE_SERVICE_CORE] },
     {
       names: ["createDeviceServiceSessions"],
-      modules: ["packages/omo-senpi/src/components/thread/remote/device-service.ts", REMOTE],
+      modules: [REMOTE],
     },
     { names: ["createRelayTransport"], modules: [BUNSHIN_TS_RELAY] },
   ],
@@ -67,18 +67,6 @@ export const S2_OFFENDERS: Readonly<Record<string, Offender>> = {
   "packages/omo-native/remote-cli.ts": { uses: ["createDeviceServiceSessions"], removedBy: "omo PR 4c-2" },
   "packages/omo-native/remote-local.ts": { uses: ["connectDeviceService"], removedBy: "omo PR 4c-1" },
   "packages/omo-native/remote-session-verbs.ts": { uses: ["createDeviceServiceSessions"], removedBy: "omo PR 4c-2" },
-  "packages/omo-senpi/src/components/thread/index.ts": {
-    uses: ["createDeviceServiceSessions"],
-    removedBy: "omo PR 4a-1/4b (the barrel re-exports live-surface.ts)",
-  },
-  "packages/omo-senpi/src/components/thread/live-surface.ts": {
-    uses: ["createDeviceServiceSessions"],
-    removedBy: "omo PR 4a-1/4b",
-  },
-  "packages/omo-senpi/src/components/thread/remote/device-service.ts": {
-    uses: ["connectDeviceService"],
-    removedBy: "omo PR 4a-1/4b (moves into components/remote)",
-  },
   "packages/omo-senpi/src/extension/bunshin-ts-pick-transport.ts": {
     uses: ["createRelayTransport"],
     removedBy: "omo PR 4c-3",
@@ -105,7 +93,7 @@ export const S3_OFFENDERS: Readonly<Record<string, Offender>> = {
     removedBy: "omo#13414 U6 (CLI + attach onto the module)",
   },
   "packages/omo-native/remote-cli.ts": {
-    uses: [DEVICE_SERVICE_CORE],
+    uses: [DEVICE_SERVICE_CORE, REMOTE],
     removedBy: "omo#13414 U6 (CLI + attach onto the module)",
   },
   "packages/omo-native/remote-cold-wake.ts": {
@@ -125,7 +113,7 @@ export const S3_OFFENDERS: Readonly<Record<string, Offender>> = {
     removedBy: "omo#13414 U6 (CLI + attach onto the module)",
   },
   "packages/omo-native/remote-session-verbs.ts": {
-    uses: [DEVICE_SERVICE_CORE],
+    uses: [DEVICE_SERVICE_CORE, REMOTE],
     removedBy: "omo#13414 U6 (CLI + attach onto the module)",
   },
   "packages/omo-senpi/src/components/thread/consumer/device-service-port.ts": {
@@ -136,8 +124,13 @@ export const S3_OFFENDERS: Readonly<Record<string, Offender>> = {
     uses: [DEVICE_SERVICE_CORE],
     removedBy: "omo#13414 U5 (thread tools onto the module)",
   },
-  "packages/omo-senpi/src/components/thread/remote/device-service.ts": {
-    uses: [DEVICE_SERVICE_CORE],
+  // Part 4a-1 moved the thread tools' device-service port into the remote module (remote/port/): these two reach it there.
+  "packages/omo-senpi/src/components/thread/live-surface.ts": {
+    uses: [REMOTE],
+    removedBy: "omo#13414 U5 (thread tools onto the module)",
+  },
+  "packages/omo-senpi/src/components/thread/remote/default-remote.ts": {
+    uses: [REMOTE],
     removedBy: "omo#13414 U5 (thread tools onto the module)",
   },
   "packages/omo-senpi/src/components/thread/remote/outcome.ts": {
