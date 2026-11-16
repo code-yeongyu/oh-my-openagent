@@ -158,7 +158,7 @@ impl Supervisor {
             host_relay_live: matches!(view.relay, RelayBeat::Fresh),
             heartbeat_fresh: admitted.is_ok(),
             stop_path: admitted.map_or("none", |kind| kind.wire()).to_owned(),
-            reason: reason.map(str::to_owned),
+            reason: reason.map(|r| r.wire().to_owned()),
         }
     }
 }
