@@ -150,7 +150,7 @@ describe("full-matrix classification", () => {
     })
   })
 
-  describe("#given a pull request that touches code a test can load but no platform-specific path", () => {
+  describe("#given a pull request that touches code a test can load", () => {
     test.each([
       ["a package source file (the #7676 shape)", "packages/omo-config-core/src/display/format-path.ts"],
       ["a prompt or skill shipped from a package src tree", "packages/omo-opencode/src/agents/prompts/README.md"],
@@ -232,67 +232,53 @@ describe("full-matrix classification", () => {
     )
   })
 
-  describe("#given a full-matrix label", () => {
-    test.each(["ci:full-matrix", "run-full-ci"])(
-      "#then %s forces the full matrix on a runtime pull request",
-      (label) => {
-        // given / when
-        const mode = classify({
-          eventName: "pull_request",
-          headRef: "feature/runtime-change",
-          changedPaths: ["packages/utils/src/index.ts"],
-          labels: ["bug", label],
-        })
+  describe("#given the opt-in label", () => {
+    test("#then ci:full-matrix forces the full matrix on a pull request", () => {
+      // given / when
+      const mode = classify({
+        eventName: "pull_request",
+        headRef: "feature/runtime-change",
+        changedPaths: ["packages/utils/src/index.ts"],
+        labels: ["bug", "ci:full-matrix"],
+      })
 
-        // then
-        expect(mode.fullMatrix).toBe(true)
-      },
-    )
+      // then
+      expect(mode.fullMatrix).toBe(true)
+    })
+
+    // run-full-ci was a second name for the label; one opt-in label is the contract (#13802).
+    test.each(["run-full-ci", "bug"])("#then %s alone keeps the pull request on Linux", (label) => {
+      // given / when
+      const mode = classify({
+        eventName: "pull_request",
+        headRef: "feature/runtime-change",
+        changedPaths: ["packages/utils/src/index.ts"],
+        labels: [label],
+      })
+
+      // then
+      expect(mode.fullMatrix).toBe(false)
+    })
   })
 
-  describe("#given a platform-sensitive changed path", () => {
+  // Pull requests run Linux only (#13802): no changed path selects macOS/Windows any more. These are the
+  // paths the retired platform rule matched, led by the ones that put 70 of 74 measured PR runs on the full
+  // matrix. The post-merge push to dev runs every OS for them.
+  describe("#given a path the retired platform rule matched", () => {
     test.each([
+      ["a native crate source", "crates/omo-computer-backend-fake/src/lib.rs"],
+      ["the Cargo lockfile", "Cargo.lock"],
+      ["the native launcher package", "packages/omo-native/bin/lib/service-auth.generated.js"],
+      ["a QA script named for an OS", "script/qa/computer/pool/macos-vm-ops.ts"],
       ["basename contains windows", "packages/senpi-task/src/runners/rpc-process.windows.test.ts"],
-      ["basename contains win32", "packages/utils/src/spawn-win32.ts"],
       ["powershell script", "script/qa/run-smoke.ps1"],
       ["ci workflow", ".github/workflows/ci.yml"],
       ["classifier itself", "script/ci-fast-path.mjs"],
-      ["windows shard bunfig", "bunfig.win2.parallel.toml"],
-      ["windows-only shard-2 remainder bunfig", "bunfig.win2.parallel.windows.toml"],
-      ["windows rpc-host panic retry runner", "script/bun-panic-retry.ts"],
-      ["shared serial quarantine", "script/root-test-serial-quarantine.ts"],
-      ["reply-listener process identity (win32 branch)", "packages/openclaw-core/src/reply-listener-process.ts"],
-      ["the label-triggered full-matrix workflow", ".github/workflows/ci-full-matrix-label.yml"],
-      ["the platform package publish workflow", ".github/workflows/publish-platform.yml"],
       ["a CI helper script the legs run", ".github/scripts/write-job-summary.sh"],
-      ["a native crate source", "crates/senpi-desktop-engine/src/lib.rs"],
-      ["the Cargo workspace manifest", "Cargo.toml"],
-      ["the Cargo lockfile", "Cargo.lock"],
-      ["the Rust toolchain pin", "rust-toolchain.toml"],
-      ["the native launcher package", "packages/omo-native/compile-entry.ts"],
-      ["a darwin platform package", "packages/oh-my-opencode-darwin-arm64/package.json"],
       ["a windows platform package", "packages/oh-my-opencode-windows-x64/package.json"],
-      ["the platform binary postinstall", "postinstall.mjs"],
-      ["the standalone binary builder", "script/build-omo-binary.ts"],
-      ["the native payload builder", "script/build-omo-native.ts"],
-      ["the native parity smoke", "script/qa/omo-native-parity-smoke.mjs"],
-      ["a macOS desktop QA script", "script/qa/desktop/macos/run.sh"],
-      ["a Codex local installer script", "packages/omo-codex/scripts/install-local.mjs"],
-      ["a platform-suffixed test", "packages/omo-opencode/src/cli/cli-installer.platform.test.ts"],
       ["the launcher platform detection", "bin/platform.js"],
-      ["the launcher entry", "bin/oh-my-opencode.js"],
-      ["the platform launcher package generator", "script/build-binaries.ts"],
-      ["the Windows Git Bash runtime", "packages/git-bash-mcp/src/index.ts"],
       ["the Codex installer source", "packages/omo-codex/src/install/codex-agent-config.ts"],
-      ["a Codex platform smoke test", "packages/omo-codex/plugin/test/node-install-surface.test.mjs"],
-      ["the other Codex platform smoke test", "packages/omo-codex/plugin/test/install-time-build-runtime.test.mjs"],
-      ["a composite action the legs could use", ".github/actions/setup/action.yml"],
-      ["the senpi-task RPC host the Windows shard isolates", "packages/senpi-task/src/runners/rpc-host/host.ts"],
-      ["the senpi-task RPC child process", "packages/senpi-task/src/runners/rpc-process.ts"],
-      ["the senpi-task record lock", "packages/senpi-task/src/store/record-lock.ts"],
-      ["basename contains darwin", "packages/utils/src/open-darwin.ts"],
-      ["basename contains macos", "script/macos-signing-workflow.test.ts"],
-    ])("#then %s forces the full matrix", (_name, changedPath) => {
+    ])("#then %s runs heavy validation on Linux only", (_name, changedPath) => {
       // given / when
       const mode = classify({
         eventName: "pull_request",
@@ -301,12 +287,13 @@ describe("full-matrix classification", () => {
       })
 
       // then
-      expect(mode.fullMatrix).toBe(true)
+      expect(mode.fullMatrix).toBe(false)
+      expect(mode.runHeavy).toBe(true)
     })
   })
 
-  describe("#given the diff is unavailable", () => {
-    test("#then the classifier fails open to the full matrix", () => {
+  describe("#given the diff is unavailable on a pull request", () => {
+    test("#then heavy validation still runs, on Linux only", () => {
       // given / when
       const mode = classify({
         eventName: "pull_request",
@@ -315,7 +302,8 @@ describe("full-matrix classification", () => {
       })
 
       // then
-      expect(mode.fullMatrix).toBe(true)
+      expect(mode.runHeavy).toBe(true)
+      expect(mode.fullMatrix).toBe(false)
     })
   })
 })

@@ -41,6 +41,8 @@ export function createDeviceSessionResolver(options: {
       profile: space.profile,
       remotes: runtime.listRemotes(space.projectDir),
     })
+    // A repository that left its per-device local: space (#13720): its older journal is that space's.
+    const legacy = resolved.legacySpaceId === null ? {} : { legacySpace: resolved.legacySpaceId }
     const ended = new Set<() => void>()
     if (account.kind === "desktop") {
       const opened = await runtime.openAccountSession({
@@ -56,6 +58,7 @@ export function createDeviceSessionResolver(options: {
       if (!opened.ok) return { idle: opened.reason }
       return {
         ...opened.session,
+        ...legacy,
         onEnded: (notify) => {
           if (account.signal.aborted) notify()
           else account.signal.addEventListener("abort", notify, { once: true })
@@ -87,6 +90,7 @@ export function createDeviceSessionResolver(options: {
     if (!opened.ok) return { idle: opened.reason }
     return {
       ...opened.session,
+      ...legacy,
       onEnded: (notify) => {
         ended.add(notify)
       },
