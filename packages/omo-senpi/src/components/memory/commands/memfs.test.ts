@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, readdir, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { CONFIG_KEY, createNodeGitExec } from "@oh-my-opencode/memory-core"
+import { CONFIG_KEY, STALE_LOCK_JOURNAL, createNodeGitExec } from "@oh-my-opencode/memory-core"
 
 import { MemoryFakeExtensionAPI } from "../memory.test-support"
 import {
@@ -51,6 +51,19 @@ async function backupNames(root: string): Promise<string[]> {
 }
 
 describe("/memfs status", () => {
+  test("#given the writer removed a stale index.lock #when status runs #then the removal is shown with its age", async () => {
+    const { identity, pi, ctx } = await harness()
+    await mkdir(identity.identityPaths.locks, { recursive: true })
+    await writeFile(
+      join(identity.identityPaths.locks, STALE_LOCK_JOURNAL),
+      `${JSON.stringify({ at: "2026-11-16T08:55:00.000Z", path: join(identity.identityPaths.repo, ".git", "index.lock"), ageMs: 70 * 60_000, mtime: "2026-11-16T07:45:00.000Z", size: 0, checks: { repoUsers: 0, openHolders: 0, unchangedForMs: 60_000 } })}\n`,
+    )
+
+    const text = await invoke(pi, "memfs", "status", ctx)
+
+    expect(text).toContain("Stale index.lock removed: 1 (last 2026-11-16T08:55:00.000Z, 70 min old)")
+  })
+
   test("#given a clean repo #when status runs #then HEAD and a clean tree are reported at info level", async () => {
     // given
     const { pi, ctx } = await harness()

@@ -1,7 +1,7 @@
 import { hostname } from "node:os"
 import { join } from "node:path"
 
-import { lstat, readFile, readdir, unlink } from "../fs/resilient"
+import { appendFile, lstat, readFile, readdir, unlink } from "../fs/resilient"
 import { memoryWriterLockPath, parseLockRecord, type LockRecord } from "../locks"
 import { isLockOwnerProvenDead } from "../locks/acquire"
 import { provenDeadTakeoverFor } from "../locks/proven-dead-takeovers"
@@ -24,6 +24,20 @@ export const GIT_LOCK_SETTLE_MS = envSettleOverride() ?? 300
 
 export type KeptGitLockReason =
   "owner-not-proven-dead" | "repo-in-use" | "changed-during-settle" | "open-holder" | "unlink-failed"
+
+/**
+ * When an index.lock whose owner cannot be proven dead is debris the writer removes itself (omo #13808):
+ * at least `staleAgeMs` old, and unchanged in size, inode and mtime across `staleSettleMs`.
+ */
+export interface StaleIndexLockPolicy {
+  readonly staleAgeMs: number
+  readonly staleSettleMs: number
+}
+
+export const STALE_INDEX_LOCK_POLICY: StaleIndexLockPolicy = { staleAgeMs: 10 * 60_000, staleSettleMs: 60_000 }
+
+/** One line per index.lock the writer removed without an owner proof, next to the identity's locks. */
+export const STALE_LOCK_JOURNAL = "stale-index-lock-removals.jsonl"
 
 export interface KeptGitLock {
   readonly path: string
@@ -77,7 +91,8 @@ async function collectRefLockPaths(gitDir: string): Promise<string[]> {
   return found
 }
 
-type LockSnapshot = ReadonlyMap<string, { readonly ino: number; readonly mtimeMs: number }>
+type LockFacts = { readonly ino: number; readonly mtimeMs: number; readonly size: number }
+type LockSnapshot = ReadonlyMap<string, LockFacts>
 
 export async function presentLockFiles(gitDir: string): Promise<LockSnapshot> {
   const candidates = [
@@ -87,10 +102,10 @@ export async function presentLockFiles(gitDir: string): Promise<LockSnapshot> {
     join(gitDir, "config.lock"),
     ...(await collectRefLockPaths(gitDir)),
   ]
-  const present = new Map<string, { ino: number; mtimeMs: number }>()
+  const present = new Map<string, LockFacts>()
   for (const candidate of candidates) {
     const status = await lstat(candidate).catch(() => undefined)
-    if (status?.isFile()) present.set(candidate, { ino: status.ino, mtimeMs: status.mtimeMs })
+    if (status?.isFile()) present.set(candidate, { ino: status.ino, mtimeMs: status.mtimeMs, size: status.size })
   }
   return present
 }
@@ -150,11 +165,12 @@ export async function sweepStrandedGitLockFiles(
   dir: string,
   settleMs = GIT_LOCK_SETTLE_MS,
   scans: GitLockScans = PRODUCTION_LOCK_SCANS,
+  stale: StaleIndexLockPolicy = STALE_INDEX_LOCK_POLICY,
 ): Promise<GitLockSweepReport> {
   const present = await presentLockFiles(join(dir, ".git"))
   if (present.size === 0) return { removed: [], kept: [] }
   const previous = await authorizedPreviousOwner(dir)
-  if (previous === null) return keepAll(present, "owner-not-proven-dead")
+  if (previous === null) return sweepOwnerlessStaleIndexLock(dir, present, scans, stale)
 
   await new Promise((resolveSleep) => setTimeout(resolveSleep, settleMs))
   // A live owner of a stranded lock stays alive from before the sweep until it removes the lock,
@@ -195,6 +211,57 @@ export async function sweepStrandedGitLockFiles(
   } finally {
     if (activity.kind === "idle") await activity.release()
   }
+}
+
+// omo #13808 (LEAD ruling): an index.lock whose owner cannot be proven dead is removed only when every
+// check holds: no process works in the repository, none holds the file open (an unanswerable scan counts
+// as held), it is at least `staleAgeMs` old, and its inode, size and mtime stay unchanged across
+// `staleSettleMs`. Each removal is journaled next to the identity's locks. Every other lock stays kept.
+async function sweepOwnerlessStaleIndexLock(
+  dir: string,
+  present: LockSnapshot,
+  scans: GitLockScans,
+  stale: StaleIndexLockPolicy,
+): Promise<GitLockSweepReport> {
+  const indexLock = join(dir, ".git", "index.lock")
+  const before = present.get(indexLock)
+  const others = [...present.keys()].filter((path) => path !== indexLock)
+  const kept: KeptGitLock[] = others.map((path) => ({ path, reason: "owner-not-proven-dead" }))
+  const keep = (reason: KeptGitLockReason): GitLockSweepReport => ({
+    removed: [],
+    kept: [...kept, { path: indexLock, reason }],
+  })
+  if (before === undefined) return { removed: [], kept }
+  const ageMs = Date.now() - before.mtimeMs
+  if (ageMs < stale.staleAgeMs) return keep("owner-not-proven-dead")
+  const users = await scans.findRepoUsers(dir)
+  if (users === null || users.length > 0) return keep("repo-in-use")
+  const holders = await scans.findHolders(indexLock)
+  if (holders === null || holders.length > 0) return keep("open-holder")
+  await new Promise((resolveSleep) => setTimeout(resolveSleep, stale.staleSettleMs))
+  const after = await lstat(indexLock).catch(() => undefined)
+  if (after === undefined || after.ino !== before.ino || after.size !== before.size || after.mtimeMs !== before.mtimeMs)
+    return keep("changed-during-settle")
+  const usersAfter = await scans.findRepoUsers(dir)
+  if (usersAfter === null || usersAfter.length > 0) return keep("repo-in-use")
+  try {
+    await unlink(indexLock)
+  } catch {
+    return keep("unlink-failed")
+  }
+  const locksDir = identityLocksDirForRepo(dir)
+  if (locksDir !== null) {
+    const entry = {
+      at: new Date().toISOString(),
+      path: indexLock,
+      ageMs,
+      mtime: new Date(before.mtimeMs).toISOString(),
+      size: before.size,
+      checks: { repoUsers: 0, openHolders: 0, unchangedForMs: stale.staleSettleMs },
+    }
+    await appendFile(join(locksDir, STALE_LOCK_JOURNAL), `${JSON.stringify(entry)}\n`, { mode: 0o600 })
+  }
+  return { removed: [indexLock], kept }
 }
 
 export async function withStrandedGitLockRecovery<T>(

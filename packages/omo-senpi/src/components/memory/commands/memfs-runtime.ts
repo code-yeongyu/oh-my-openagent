@@ -10,7 +10,7 @@ import { join } from "node:path"
 import { memoryHookChecker } from "../worker/spawn-supervisor-support"
 import { rm } from "@oh-my-opencode/memory-core/fs"
 
-import { MirrorSync, installHooks } from "@oh-my-opencode/memory-core"
+import { MirrorSync, STALE_LOCK_JOURNAL, installHooks } from "@oh-my-opencode/memory-core"
 
 import { parseCommandArgs } from "./args"
 import { createRepoBackup } from "./backup"
@@ -53,9 +53,33 @@ const memfsStatus: MemfsSubcommand = async ({ deps, ctx, identity }) => {
       "uncommitted changes present; inspect with /memfs diff or commit through the memory tools",
     )
   }
+  const staleLocks = await renderStaleLockRemovals(identity.identityPaths.locks)
+  if (staleLocks !== undefined) lines.push(staleLocks)
   const skillsBlock = await renderSkillsUsage(identity.identityPaths.runtime)
   if (skillsBlock !== undefined) lines.push(skillsBlock)
   return respond(ctx, lines.join("\n"), dirty ? "warning" : "info")
+}
+
+// #13808: the writer journals each stale index.lock it removed without an owner proof; status shows how many and the last one.
+async function renderStaleLockRemovals(locksDir: string): Promise<string | undefined> {
+  const text = await readFile(join(locksDir, STALE_LOCK_JOURNAL), "utf8").catch(() => null)
+  if (text === null) return undefined
+  const removals = text
+    .split("\n")
+    .filter((line) => line.trim().length > 0)
+    .flatMap((line): { at: string; ageMs: number }[] => {
+      try {
+        const entry: unknown = JSON.parse(line)
+        if (typeof entry !== "object" || entry === null) return []
+        const { at, ageMs } = entry as { at?: unknown; ageMs?: unknown }
+        return typeof at === "string" && typeof ageMs === "number" ? [{ at, ageMs }] : []
+      } catch {
+        return []
+      }
+    })
+  const last = removals.at(-1)
+  if (last === undefined) return undefined
+  return `Stale index.lock removed: ${removals.length} (last ${last.at}, ${Math.round(last.ageMs / 60_000)} min old)`
 }
 
 const memfsInit: MemfsSubcommand = async ({ deps, ctx, identity }) => {
