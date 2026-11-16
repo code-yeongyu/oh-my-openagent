@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { dirname, join, relative } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { omoRunner } from "./run-omo"
+import { KILL_GRACE_MS, omoRunner } from "./run-omo"
 
 const dirs: string[] = []
 afterEach(() => {
@@ -59,6 +59,24 @@ describe("omoRunner", () => {
     expect(answer.ended).toBe("deadline")
     expect(answer.stdout).toBe("started\n")
   })
+
+  it(
+    "#given a process that ignores SIGTERM #when its deadline passes #then it is killed after the grace period and the answer still comes back",
+    async () => {
+      // given
+      const omo = launcher(
+        "process.on('SIGTERM', () => {}); process.stdout.write('started\\n'); setInterval(() => {}, 1000)",
+      )
+
+      // when
+      const answer = await omoRunner(omo)(["remote", "send"], { deadlineMs: 300 })
+
+      // then
+      expect(answer.ended).toBe("deadline")
+      expect(answer.code).toBeNull()
+    },
+    KILL_GRACE_MS + 10_000,
+  )
 
   it("#given a process that never exits #when its signal aborts #then it is stopped and the answer says aborted", async () => {
     // given

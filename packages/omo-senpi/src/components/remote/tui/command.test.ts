@@ -210,6 +210,7 @@ describe("/remote", () => {
 
     // then
     expect(notesBeforeReply).toBe(1)
+    expect(ui.notes[0]?.message.startsWith("Sending to dev_mac/s1.")).toBe(true)
     expect(run.options[0]?.deadlineMs).toBe(SEND_DEADLINE_MS)
     expect((await reply).message).toBe("dev_mac/s1:\nlater")
   })

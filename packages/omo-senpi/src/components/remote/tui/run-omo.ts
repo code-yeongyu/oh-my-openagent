@@ -15,6 +15,8 @@ export type OmoRunOptions = { readonly deadlineMs: number; readonly signal?: Abo
 
 export type OmoRunner = (args: readonly string[], options: OmoRunOptions) => Promise<OmoRun>
 
+export const KILL_GRACE_MS = 2_000
+
 const STREAM_MAX_BYTES = 4 * 1024 * 1024
 
 /**
@@ -30,9 +32,12 @@ export function omoRunner(omoBin: string, execPath: string = process.execPath): 
       const stdout = collect(child.stdout)
       const stderr = collect(child.stderr)
       let ended: OmoRun["ended"]
+      let forceKill: ReturnType<typeof setTimeout> | undefined
+      // SIGTERM first so omo can close its device-service connection; a child that does not exit is killed.
       const stop = (reason: "deadline" | "aborted") => {
         ended ??= reason
         child.kill()
+        forceKill ??= setTimeout(() => child.kill("SIGKILL"), KILL_GRACE_MS)
       }
       const timer = setTimeout(() => stop("deadline"), deadlineMs)
       const onAbort = () => stop("aborted")
@@ -40,6 +45,7 @@ export function omoRunner(omoBin: string, execPath: string = process.execPath): 
       else signal?.addEventListener("abort", onAbort, { once: true })
       const settle = () => {
         clearTimeout(timer)
+        clearTimeout(forceKill)
         signal?.removeEventListener("abort", onAbort)
       }
       child.once("error", (error) => {

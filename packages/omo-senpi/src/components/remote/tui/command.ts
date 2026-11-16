@@ -126,7 +126,7 @@ function attachNotice(ui: RemoteCommandUi, target: string): void {
 // The reply arrives when the remote turn ends, which can take minutes, so the TUI is not held for it: the command
 // returns at once and the reply (or the failure) is shown when it lands. `/remote interrupt` ends the turn early.
 function send({ ui, run }: Remote, target: string, text: string): void {
-  ui.notify(`Sent to ${target}. Its reply will show here; /remote interrupt ${target} stops the turn.`, "info")
+  ui.notify(`Sending to ${target}. Its reply will show here; /remote interrupt ${target} stops the turn.`, "info")
   run(["remote", "send", "--json", target, "--", text], SEND_DEADLINE_MS).then(
     (answer) => show(ui, "send", target, answer),
     (error: unknown) => failed(ui, error),
