@@ -172,14 +172,6 @@ async function runSupervisedChild(input: {
     windowsHide: true,
   })
   supervisor.unref()
-  if (input.receiptsDir !== undefined && input.attempt === 1) {
-    await emitMemoryReceipt(
-      input.receiptsDir,
-      runReceipt(launchedRun(input.ledger), "launched"),
-      undefined,
-      input.receiptWarn,
-    )
-  }
   const outcomePath = join(input.runDir, "outcome.json")
   const launchPath = join(input.runDir, "launch.json")
   const publishingPath = join(input.runDir, "publishing.json")
@@ -214,8 +206,18 @@ async function runSupervisedChild(input: {
   const onClose = (code: number | null, signal: NodeJS.Signals | null) => {
     settle({ kind: "close", exit: { code, signal } })
   }
+  // Subscribed before the first await: a supervisor that exits during the launch receipt write has
+  // already emitted `close`, and a listener attached afterwards would wait for an outcome it cannot publish.
   supervisor.once("error", onError)
   supervisor.once("close", onClose)
+  if (input.receiptsDir !== undefined && input.attempt === 1) {
+    await emitMemoryReceipt(
+      input.receiptsDir,
+      runReceipt(launchedRun(input.ledger), "launched"),
+      undefined,
+      input.receiptWarn,
+    )
+  }
   void waitForRunCompletion(
     outcomePath,
     launchPath,

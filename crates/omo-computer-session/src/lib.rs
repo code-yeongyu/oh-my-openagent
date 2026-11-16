@@ -10,6 +10,8 @@ pub mod mutate;
 pub mod observe;
 pub mod refs;
 mod session;
+#[cfg(test)]
+mod test_process;
 
 pub use mutate::{Binding, Mutation, Refused, SecureInputProbe, SecureProbe};
 pub use refs::{RefRegistry, Unresolved};
