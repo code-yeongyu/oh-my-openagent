@@ -112,6 +112,7 @@ pub(crate) fn released_reply(mode: ReportMode, method: Method) -> Result<ExecRep
         session: None,
         target: None,
         user_moved_on: false,
+        url_unknown: false,
     };
     reply(mode, method, sent).map_err(|_| {
         super::Refused::from(omo_computer_core::backend::Refusal::bare(omo_computer_core::error::EngineCode::Internal))
