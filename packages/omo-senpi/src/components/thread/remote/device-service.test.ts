@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, jest, test } from "bun:test"
 import {
   connectDeviceService,
   LocalApiError,
@@ -1358,4 +1358,77 @@ test("#given thread_list asks for this device's id and name together #when both 
   })
   expect(await Promise.all([port.thisDevice(), port.thisDeviceName?.()])).toEqual(["here", "this mac"])
   expect(reads).toBe(1)
+})
+
+// #13873: the pool detaches an attach nobody holds once its idle bound passes. The timer is the port's: the file's double
+// answers that detach as a real attach does, and a closed port leaves no timer to fire into a later test.
+describe("device-service adapter: an idle attach's detach timer", () => {
+  const IDLE_MS = 1_000
+  const counting = (detaches: string[]) => {
+    const conn = fakeService([state({ state: "engine_applied" }, {}), state({ state: "engine_applied" }, {})], [])
+    let attaches = 0
+    const service = {
+      ...conn,
+      attach: async (device: string, sessionId: string) => {
+        attaches += 1
+        const attached = await conn.attach(device, sessionId)
+        return {
+          ...attached,
+          detach: async () => {
+            detaches.push(sessionId)
+            await attached.detach()
+          },
+        }
+      },
+    } as unknown as DeviceService
+    return { service, attaches: () => attaches }
+  }
+
+  test("#given a command released its attach #when the idle bound passes #then the attach is detached and the next command attaches again", async () => {
+    jest.useFakeTimers()
+    try {
+      const conn = fakeService([state({ state: "engine_applied" }, {}), state({ state: "engine_applied" }, {})], [])
+      let attaches = 0
+      const service = {
+        ...conn,
+        attach: async (device: string, sessionId: string) => {
+          attaches += 1
+          return await conn.attach(device, sessionId)
+        },
+      } as unknown as DeviceService
+      const port = createDeviceServiceSessions({
+        version: "0.0.0-test",
+        connect: async () => ({ conn: service, owned: true }),
+        attachIdleMs: IDLE_MS,
+      })
+      expect((await port.sessionCommand("b", "s1", { type: "get_state" })).kind).toBe("ok")
+      jest.advanceTimersByTime(IDLE_MS)
+      expect((await port.sessionCommand("b", "s1", { type: "get_state" })).kind).toBe("ok")
+      expect(attaches).toBe(2)
+      await port.close?.()
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  test("#given a command released its attach #when the port closes and the idle bound passes #then no timer is left and no detach runs", async () => {
+    jest.useFakeTimers()
+    try {
+      const detaches: string[] = []
+      const counted = counting(detaches)
+      const port = createDeviceServiceSessions({
+        version: "0.0.0-test",
+        connect: async () => ({ conn: counted.service, owned: true }),
+        attachIdleMs: IDLE_MS,
+      })
+      expect((await port.sessionCommand("b", "s1", { type: "get_state" })).kind).toBe("ok")
+      expect(jest.getTimerCount()).toBe(1)
+      await port.close?.()
+      expect(jest.getTimerCount()).toBe(0)
+      jest.advanceTimersByTime(IDLE_MS)
+      expect([detaches, counted.attaches()]).toEqual([[], 1])
+    } finally {
+      jest.useRealTimers()
+    }
+  })
 })
