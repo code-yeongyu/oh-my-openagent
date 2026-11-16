@@ -78,9 +78,10 @@ export class Presentation {
   event(event: RemoteAttachEvent): void {
     switch (event.kind) {
       case "snapshot":
-        // The first snapshot replays when the stream starts; the TUI reads its dialogs through get_state. A later one is
-        // a re-attach after a relay gap, whose dialogs the TUI never reads, so they are presented here (omo#13474).
-        if (this.snapshot !== undefined && this.snapshot !== event.snapshot) this.presentPending(event.snapshot)
+        // Every snapshot (the first and each re-attach after a relay gap) presents its pending dialogs and questions as
+        // the TUI's request frames (#13482, omo#13474); the TUI shows a request id once, so get_state's copy of the same
+        // dialogs does not show it twice.
+        this.presentPending(event.snapshot)
         this.snapshot = event.snapshot
         return
       case "records":
