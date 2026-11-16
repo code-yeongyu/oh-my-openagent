@@ -411,7 +411,7 @@
     "typescript/no-non-null-assertion": 1
   },
   "packages/omo-senpi/src/components/thread/offline-address.test.ts": {
-    "typescript/no-non-null-assertion": 4
+    "typescript/no-non-null-assertion": 3
   },
   "packages/omo-senpi/src/components/thread/tools.test.ts": {
     "typescript/no-non-null-assertion": 2
