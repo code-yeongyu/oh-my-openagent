@@ -7,7 +7,7 @@ name: Platform red tracker
 # closes it once every tracked job passed again on its own workflow's latest dev push run (close-when-green).
 on:
   workflow_run:
-    workflows: [CI, Computer conformance fixtures, Computer engine, Desktop engine, Desktop Windows QA, Engine trust helper, get.omo.dev CI, Git job helper]
+    workflows: [CI, Computer conformance fixtures, Computer engine, Computer Windows QA, Desktop engine, Desktop Windows QA, Engine trust helper, get.omo.dev CI, Git job helper]
     types: [completed]
     branches: [dev]
 
