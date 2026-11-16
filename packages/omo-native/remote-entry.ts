@@ -10,7 +10,8 @@ import { localRemoteDependencies } from "./remote-local"
 
 // The launchers' `omo remote` entries: the verbs in remote-cli.ts over this device's real service, sign-in and binary.
 
-function remoteDependencies(packageRoot?: string): RemoteVerbDependencies {
+/** This device's real service, sign-in, binary and session host unit: what every `omo remote` path runs on. */
+export function remoteDependencies(packageRoot?: string): RemoteVerbDependencies {
   const stateDir = deviceServiceStateDir()
   const binaryPath = omoBinaryPath()
   const agentDir = canonicalAgentDir()

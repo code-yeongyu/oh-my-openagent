@@ -1,8 +1,9 @@
 import { spawn } from "node:child_process"
 
-// The bootstrap itself runs in its own omo process (`omo remote bootstrap --json`), so its account read, download,
+// The bootstrap itself runs in its own omo process (the internal `omo __device-service-bootstrap --json` entry, never a
+// person's `remote` verb: design v8-core r2 G4), so its account read, download,
 // install and connection never share the engine's event loop. Its last stdout line is the report.
-const BOOTSTRAP_ARGS = ["remote", "bootstrap", "--json"] as const
+const BOOTSTRAP_ARGS = ["__device-service-bootstrap", "--json"] as const
 const REPORT_MAX_BYTES = 64 * 1024
 // The worker's own steps are each bounded: two download rounds of up to 120 s, then up to 120 s of install-service, plus
 // a 5 s account read and the local handshakes. Ten minutes outlasts all of them with room; past it the child is stopped.
@@ -20,7 +21,9 @@ const atDeadline: DeadlineScheduler = (expire) => {
 /** The worker did not finish within its deadline and was stopped. */
 export class BootstrapWorkerTimeout extends Error {
   constructor() {
-    super(`omo remote bootstrap did not finish within ${BOOTSTRAP_DEADLINE_MS / 60_000} minutes and was stopped`)
+    super(
+      `the omo device service bootstrap did not finish within ${BOOTSTRAP_DEADLINE_MS / 60_000} minutes and was stopped`,
+    )
     this.name = "BootstrapWorkerTimeout"
   }
 }
@@ -48,7 +51,7 @@ function parseBootstrapReport(stdout: string): BootstrapReport | undefined {
 }
 
 /**
- * Starts `<omo> remote bootstrap --json` and resolves with its report. An npm launcher (`bin/omo.js`) runs under
+ * Starts `<omo> __device-service-bootstrap --json` and resolves with its report. An npm launcher (`bin/omo.js`) runs under
  * this runtime; a compiled omo runs directly. The child never keeps the engine alive: a session that ends first
  * simply leaves it to finish. Rejects when the binary cannot be started, and with BootstrapWorkerTimeout once the child
  * was stopped at its deadline.

@@ -49,6 +49,7 @@ import { buildSenpiArgs, shouldPrintCompiledBanner, trustLaunchKind } from "./co
 import { runLoroSmoke } from "./loro-smoke"
 import { runAccountCommand } from "./account-cli"
 import { registerHelperCandidates } from "../omo-opencode/src/cli/service-auth/keychain-helper/darwin-backend"
+import { runDeviceServiceBootstrapCommand } from "./device-service-bootstrap-entry"
 import { runRemoteAttachCommand, runRemoteCommand } from "./remote-entry"
 import { runSyncCommand } from "./sync-cli"
 import { spawnSync } from "node:child_process"
@@ -197,6 +198,10 @@ export async function runCompiledLauncher(
     if (engineArgs === undefined) return true
     process.argv.splice(2, process.argv.length - 2, ...engineArgs)
     return false
+  }
+  if (args[0] === "__device-service-bootstrap") {
+    await runDeviceServiceBootstrapCommand()
+    return true
   }
   if (args[0] === "remote") {
     // The staged plugin (and the gateway store's worker sidecar a remote send needs) lives in the provisioned runtime dir.

@@ -6,6 +6,7 @@ import {
   DEVICE_SERVICE_VERSION,
   deviceServiceHost,
   installDeviceService,
+  type Status,
 } from "../device-service-core/src/index.ts"
 import packageJson from "./package.json" with { type: "json" }
 import { applyColdWake, type ColdWake } from "./remote-cold-wake"
@@ -120,21 +121,51 @@ export async function runEnableVerb(
   return REMOTE_EXIT.ok
 }
 
+/** What one bootstrap ended with: connected with the service's status and version, or stopped with its notice. */
+export type BootstrapOutcome =
+  | { readonly kind: "connected"; readonly status: Status; readonly serviceVersion: string }
+  | { readonly kind: "stopped"; readonly state: string; readonly notice: string }
+
+/**
+ * One bootstrap, then the session host unit to match the service's switch: the body of `omo remote bootstrap` and of the
+ * internal entry the engine starts (`device-service-bootstrap-entry.ts`). It prints nothing.
+ */
+export async function bootstrapWithColdWake(
+  io: Pick<BootstrapIo, "accountShow" | "stateDir" | "connect" | "error">,
+  setup: BootstrapSetup,
+  coldWake: ColdWake,
+): Promise<BootstrapOutcome> {
+  const outcome = await bootstrapDeviceService({
+    accountShow: io.accountShow,
+    stateDir: io.stateDir,
+    connect: io.connect,
+    ...setup,
+  })
+  if (outcome.kind === "stopped") return { kind: "stopped", state: outcome.state, notice: outcome.notice }
+  const connected = {
+    kind: "connected",
+    status: outcome.status,
+    serviceVersion: outcome.service.serviceVersion,
+  } as const
+  outcome.service.close()
+  // After the connection is closed: a changed table restarts the device service, which would cut it.
+  await applyColdWake(coldWake, outcome.status.state !== "disabled", io.error)
+  return connected
+}
+
 export async function runBootstrapVerb(
   io: BootstrapIo,
   setup: BootstrapSetup,
   coldWake: ColdWake,
   json: boolean,
 ): Promise<"connected" | "stopped"> {
-  const outcome = await bootstrap(io, setup, json)
-  if (outcome.kind === "stopped") return "stopped"
-  try {
-    if (json) io.output(JSON.stringify({ state: "connected", status: outcome.status }))
-    else for (const line of statusLines(outcome.status, outcome.service.serviceVersion)) io.output(line)
-  } finally {
-    outcome.service.close()
+  const outcome = await bootstrapWithColdWake(io, setup, coldWake)
+  if (outcome.kind === "stopped") {
+    if (json) io.output(JSON.stringify({ state: outcome.state, notice: outcome.notice }))
+    else io.error(outcome.notice)
+    return "stopped"
   }
-  // After the connection is closed: a changed table restarts the device service, which would cut it.
-  await applyColdWake(coldWake, outcome.status.state !== "disabled", io.error)
+  if (json) io.output(JSON.stringify({ state: "connected", status: outcome.status }))
+  else for (const line of statusLines(outcome.status, outcome.serviceVersion)) io.output(line)
   return "connected"
 }
