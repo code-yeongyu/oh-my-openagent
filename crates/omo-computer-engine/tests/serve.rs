@@ -251,6 +251,17 @@ fn daemon_refuses_sibling_host_terminal_self_target() {
     assert_eq!(typed["error"]["data"]["reason"], "self_target", "{typed}");
 }
 
+fn any_marker_names(dir: &std::path::Path, call_id: &str) -> bool {
+    std::fs::read_dir(dir).into_iter().flatten().filter_map(Result::ok).any(|entry| {
+        let path = entry.path();
+        if path.is_dir() {
+            any_marker_names(&path, call_id)
+        } else {
+            std::fs::read_to_string(&path).is_ok_and(|marker| marker.contains(call_id))
+        }
+    })
+}
+
 fn marker_names(runtime: &std::path::Path, call_id: &str) -> bool {
     std::fs::read_to_string(runtime.join("markers/local/default.json")).is_ok_and(|marker| marker.contains(call_id))
 }
@@ -265,8 +276,19 @@ fn marker_precedes_input_in_serve_and_oneshot_modes() {
     assert!(clicked.get("result").is_some(), "{clicked}");
     assert!(marker_names(daemon.dir.path(), "serve-marker"), "the daemon's click left its pre-input marker");
 
-    // The oneshot leg runs against the daemon (corpus case 09): a standalone oneshot has no frame
-    // across processes. It lands with case 09, after the Q4 ruling in ROW29-DECISIONS.md.
+    // The oneshot leg: registered oneshots against the daemon (corpus case 09, lead decision Q4 A)
+    // on a hand with consent; the click rides the daemon's own bridge session. The serve leg's
+    // session closes first so it no longer holds the window (another session's hold is InputBusy).
+    client.call(7, "session.close", &json!({})).expect("closed");
+    host::consent(daemon.dir.path(), true);
+    let mut authority = daemon.connect(&daemon.capability);
+    let capture = json!({"jsonrpc": "2.0", "id": 1, "method": "desktop.capture", "params": {"target": "101"}});
+    assert!(attached_oneshot(&daemon, Some(&mut authority), &capture, "").is_some_and(|r| r.get("result").is_some()));
+    let click = json!({"jsonrpc": "2.0", "id": 2, "method": "desktop.click",
+        "params": {"target": "101", "x": 10, "y": 10, "callId": "oneshot-marker"}});
+    let clicked = attached_oneshot(&daemon, Some(&mut authority), &click, "");
+    assert!(clicked.as_ref().is_some_and(|r| r.get("error").is_none()), "{clicked:?}");
+    assert!(any_marker_names(&daemon.dir.path().join("markers"), "oneshot-marker"), "the oneshot click left its pre-input marker");
 }
 
 fn alive_after(daemon: &mut Daemon, wait: Duration) -> bool {
