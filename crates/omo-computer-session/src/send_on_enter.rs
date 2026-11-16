@@ -257,6 +257,12 @@ mod tests {
         let refused = press(&mut session, "shift+return", false).expect_err("the scripted background refusal");
         assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("BackgroundUnavailable", Some(omo_computer_core::error::Reason::PostedModifierChord)));
         assert!(posts(&sink).is_empty(), "{:?}", posts(&sink));
+        // Lead ruling 2026-11-16 (acceptance 80(b)): the refusal names the foreground retry.
+        let row = refused.refusal.row().expect("the refusal has its table row");
+        assert_eq!(
+            row.next_call,
+            omo_computer_core::error::NextCall::Call("win.press(chord, { delivery: \"foreground\" })")
+        );
         session.control_grant(serde_json::from_value(json!({ "reason": "test" })).expect("grant"));
         session
             .press(serde_json::from_value(json!({ "target": "101", "chord": "shift+return", "delivery": "foreground" })).expect("press"))
