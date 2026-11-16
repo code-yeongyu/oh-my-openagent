@@ -85,12 +85,15 @@ function firstDifference(left: Json, right: Json, path = "$"): string | undefine
   return `${path}: ${show(left)} locally, ${show(right)} through the relay`
 }
 
-/** A successful reply can still report an outcome it did not apply (unload_session answers `{ outcome: "refused" }`). */
+/**
+ * A successful reply can still report that it did not act: unload_session answers `{ outcome: "refused", detail }`.
+ * Only "refused" means that; the engine's other outcomes ("unloaded", "navigated", "edited", "unchanged") are successes.
+ */
 const unappliedOutcome = (reply: JsonObject): { readonly outcome: string; readonly detail?: string } | undefined => {
   const data = reply["data"]
   if (!isObject(data)) return undefined
   const outcome = data["outcome"]
-  if (typeof outcome !== "string" || outcome === "applied") return undefined
+  if (outcome !== "refused") return undefined
   const detail = data["detail"] ?? data["reason"]
   return typeof detail === "string" ? { outcome, detail } : { outcome }
 }
