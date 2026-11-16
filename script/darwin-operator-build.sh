@@ -188,12 +188,14 @@ for f in *; do
 done
 bun -e '
 const fs = require("node:fs"), crypto = require("node:crypto")
-const [sha, version, operator] = process.argv.slice(1)
+const [sha, version, operator, runLog] = process.argv.slice(1)
+// Audit record only (#13943 LOW-1): the publish run trusts the Apple ticket lookup by cdhash, not these ids.
+const notarySubmissions = [...new Set(fs.readFileSync(runLog, "utf8").match(/notarization [0-9a-f-]{36}: Accepted/g) ?? [])].map((line) => line.split(" ")[1].slice(0, -1))
 const sha256 = {}
 for (const name of fs.readdirSync(".").filter((n) => !n.endsWith(".sha256") && !n.endsWith(".json")))
   sha256[name] = crypto.createHash("sha256").update(fs.readFileSync(name)).digest("hex")
-fs.writeFileSync("operator-darwin-manifest.json", JSON.stringify({ schema: "omo-darwin-operator-manifest/1", source_sha: sha, version, operator, built_at: new Date().toISOString(), sha256 }, null, 2) + "\n")
-' "$SHA" "$VERSION" "$OPERATOR"
+fs.writeFileSync("operator-darwin-manifest.json", JSON.stringify({ schema: "omo-darwin-operator-manifest/1", source_sha: sha, version, operator, built_at: new Date().toISOString(), notary_submissions: notarySubmissions, sha256 }, null, 2) + "\n")
+' "$SHA" "$VERSION" "$OPERATOR" "$RUN_DIR/operator-run.out"
 sha_line "$OUT/operator-darwin-manifest.json"
 log "keychains after: $(security list-keychains -d user | tr -d ' "' | xargs -n1 basename | tr '\n' ' ')"
 if [ "$UPLOAD" = --upload ]; then

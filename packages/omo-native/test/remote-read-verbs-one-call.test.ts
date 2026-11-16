@@ -74,3 +74,48 @@ describe("omo remote read verbs (G3: one person-client call per verb)", () => {
     expect(JSON.parse(out.join(""))).toEqual(VALUES[member])
   })
 })
+
+// A client whose status member answers one typed failure, as the client does for a connect or a body failure.
+const failingClient = (failure: Record<string, unknown>) => () =>
+  ({ service: { status: async () => ({ kind: "error", ...failure }) }, close: () => {} }) as unknown as RemoteClient
+
+describe("omo remote read verbs: failures of the person client", () => {
+  const fail = (failure: Record<string, unknown>) =>
+    run(["status"], privateDir(), undefined, undefined, undefined, { client: failingClient(failure) })
+
+  test("#given the connection itself failed #when status runs #then it says the service is not running, exit 3", async () => {
+    const { code, err } = await fail({
+      code: "host_unavailable",
+      message: "The device service did not answer: connect ECONNREFUSED.",
+      next_action: "Call service.status.",
+      details: { phase: "connect" },
+    })
+    expect([code, err]).toEqual([REMOTE_EXIT.unavailable, ["The OmO device service is not running on this device."]])
+  })
+
+  test("#given a failure inside the member after a good connect #when status runs #then its own message and next step are printed", async () => {
+    const { code, err } = await fail({
+      code: "host_unavailable",
+      message: "The device service did not answer: boom.",
+      next_action: "Call service.status to see why, then retry.",
+    })
+    expect(code).toBe(REMOTE_EXIT.unavailable)
+    expect(err).toEqual([
+      "omo remote: The device service did not answer: boom.",
+      "Call omo remote status to see why, then retry.",
+    ])
+  })
+
+  test.each([
+    ["timeout", 124],
+    ["cancelled", 130],
+    ["device_offline", 3],
+    ["not_found", 1],
+  ])(
+    "#given a %s failure #when status runs #then it exits with the remote module's exit code %d",
+    async (code, exit) => {
+      const result = await fail({ code, message: `${code} happened`, next_action: "Retry the call." })
+      expect(result.code).toBe(exit)
+    },
+  )
+})

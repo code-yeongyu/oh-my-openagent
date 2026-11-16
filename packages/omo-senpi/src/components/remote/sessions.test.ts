@@ -14,6 +14,7 @@ import {
 import { type ContractHost, withContractHost } from "../../../../senpi-task/src/runners/rpc-host/testing/contract-host"
 import { createLiveThreadSurface } from "../thread/live-surface"
 import { DEADLINES } from "./deadlines"
+import { createLocalSessions } from "./local-sessions"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
 import { personIdentity, resolveSessionTarget } from "./sessions"
 import {
@@ -329,6 +330,12 @@ describe("sessions.send and sessions.read", () => {
     expect(page.next_before).toBeNull()
   })
 
+  test("#given the live session #when sessions.read asks for a page the service refuses #then invalid_arguments, as attach's read answers", async () => {
+    const { owner } = await onWorld()
+    const failure = failureOf(await clientOn(owner.stateDir, fakeClock()).sessions.read(LIVE, { tail: 0 }))
+    expect(failure).toMatchObject({ code: "invalid_arguments", details: { local_api_code: "invalid_request" } })
+  })
+
   test("#given an address that names no device #when a session member runs #then invalid_arguments points at sessions.resolve", async () => {
     const { owner } = await onWorld()
     const parsed = canonicalizeThreadHandle("review", {})
@@ -465,6 +472,7 @@ describe("durable-id addressing", () => {
       member: () => Promise.reject(new Error("the listing alone resolves a listed durable id")),
       sessionsList: client.sessions.list,
       devicesList: client.devices.list,
+      localSessions: () => Promise.reject(new Error("the listing alone resolves a listed durable id")),
     } as const
     expect(await valueOf(resolveSessionTarget(core, PEER, ENGINE_ID))).toMatchObject({
       device: PEER,
@@ -659,27 +667,29 @@ describe("an open on this device", () => {
   ) => {
     const owner = await startOwner(world)
     const client = clientOn(owner.stateDir, clock, undefined, {
-      localThreadHost: async (connect) =>
-        createLiveThreadSurface(undefined, {
-          env: { OMO_CODING_AGENT_DIR: host.root, SENPI_RPC_SOCKET: socketOf(), SENPI_RPC_KEY_ROOT: host.root },
-          statusAll: async () => undefined,
-          registry: async () => [],
-          connect: (path) => {
-            const socket = connect(path)
-            if (fault === undefined) return socket
-            socket.write = new Proxy(socket.write, {
-              apply: (write, self, args: unknown[]) => {
-                const written = Reflect.apply(write, self, args)
-                const [chunk] = args
-                if (typeof chunk === "string")
-                  for (const line of chunk.split("\n").filter((text) => text.startsWith("{")))
-                    fault(JSON.parse(line) as Record<string, unknown>, socket)
-                return written
-              },
-            })
-            return socket
-          },
-        }),
+      localSessions: async () =>
+        createLocalSessions(async (connect) =>
+          createLiveThreadSurface(undefined, {
+            env: { OMO_CODING_AGENT_DIR: host.root, SENPI_RPC_SOCKET: socketOf(), SENPI_RPC_KEY_ROOT: host.root },
+            statusAll: async () => undefined,
+            registry: async () => [],
+            connect: (path) => {
+              const socket = connect(path)
+              if (fault === undefined) return socket
+              socket.write = new Proxy(socket.write, {
+                apply: (write, self, args: unknown[]) => {
+                  const written = Reflect.apply(write, self, args)
+                  const [chunk] = args
+                  if (typeof chunk === "string")
+                    for (const line of chunk.split("\n").filter((text) => text.startsWith("{")))
+                      fault(JSON.parse(line) as Record<string, unknown>, socket)
+                  return written
+                },
+              })
+              return socket
+            },
+          }),
+        ),
     })
     return { owner, client }
   }
@@ -973,6 +983,22 @@ describe("an open on this device", () => {
     })
   })
 
+  test("#given a client built without this device's operator endpoint #when sessions.list reads the whole account and members address a session here #then this device is unanswered, never dropped, and each member answers unsupported{local_sessions} with nothing sent to its host", async () => {
+    await withContractHost({}, async (host) => {
+      const { owner } = await localClient(host)
+      const client = clientOn(owner.stateDir, fakeClock(), undefined, { localSessions: undefined })
+      const listing = await valueOf(client.sessions.list())
+      expect(listing.rows.map((row) => row.device.id)).toContain(PEER)
+      expect(listing.rows.filter((row) => row.device.id === SELF)).toEqual([])
+      expect(listing.unanswered).toContainEqual(expect.objectContaining({ id: SELF, self: true }))
+      const absent = { code: "unsupported", details: { feature: "local_sessions", device: SELF } }
+      expect(failureOf(await client.sessions.open({ device: SELF, workspace: host.root }))).toMatchObject(absent)
+      expect(failureOf(await client.sessions.send(SELF_SESSION, { text: "q" }))).toMatchObject(absent)
+      expect(failureOf(await client.sessions.close(SELF_SESSION))).toMatchObject(absent)
+      expect(host.frames).toEqual([])
+    })
+  })
+
   test("#given this device's host takes list_sessions and never answers it #when sessions.list reads the whole account #then the other devices' rows come back before the listing's deadline and this device is unanswered (#13787 review L1)", async () => {
     await withContractHost({ silent: ["list_sessions"] }, async (host) => {
       const clock = fakeClock()
@@ -991,10 +1017,16 @@ describe("an open on this device", () => {
       )
       const settling = client.sessions.list()
       await within(listAsked, "this device's list_sessions")
-      // Fake time short of the listing's own deadline: only a bound inside it can let the listing answer.
-      clock.advance(DEADLINES.sessionsList - 1)
-      const flushed = new Promise<"pending">((resolve) => setImmediate(() => resolve("pending")))
-      expect(await Promise.race([settling.then((outcome) => outcome.kind), flushed])).toBe("ok")
+      const pending = () => new Promise<"pending">((resolve) => setImmediate(() => resolve("pending")))
+      // Just short of this device's own bound the listing still waits; at the bound it answers, well inside the
+      // listing's own deadline (#13787 review L3: the clamp alone would only fire at sessionsList - 1).
+      // The bound is the same 10 s the thread tools give one endpoint's list (a default contract), so it is pinned here.
+      const localListBoundMs = 10_000
+      expect(localListBoundMs).toBeLessThan(DEADLINES.sessionsList)
+      clock.advance(localListBoundMs - 1)
+      expect(await Promise.race([settling.then((outcome) => outcome.kind), pending()])).toBe("pending")
+      clock.advance(1)
+      expect(await Promise.race([settling.then((outcome) => outcome.kind), pending()])).toBe("ok")
       const listing = await valueOf(settling)
       expect(listing.rows.map((row) => row.device.id)).toContain(PEER)
       expect(listing.rows.filter((row) => row.device.id === SELF)).toEqual([])
@@ -1044,7 +1076,9 @@ describe("an open on this device", () => {
       getAvailableThinkingLevels: unused,
     }
     const owner = await startOwner(selfWorld())
-    const client = clientOn(owner.stateDir, fakeClock(), undefined, { localThreadHost: async () => fakeHost })
+    const client = clientOn(owner.stateDir, fakeClock(), undefined, {
+      localSessions: async () => createLocalSessions(async () => fakeHost),
+    })
     const held = { text: "held", idempotency_key: "held" }
     const first = client.sessions.send(SELF_SESSION, held)
     await within(heldPrompted, "the held prompt")
