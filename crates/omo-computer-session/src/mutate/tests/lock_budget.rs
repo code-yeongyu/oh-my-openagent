@@ -66,8 +66,9 @@ fn tw3_a_lock_released_during_the_wait_is_taken_and_the_call_sends() {
     assert!(!run.sink.is_empty(), "sent");
 }
 
-/// TW2 (in-process latch and a marker written by another process): a stop during the wait ends
-/// it before the budget with the stop's own refusal; nothing sent.
+/// TW2 (a marker written by another process; the in-process chord during the wait is covered by
+/// logged.rs and grant/session_tests.rs, both on the fake clock): a stop during the wait ends it
+/// before the budget with the stop's own refusal; nothing sent.
 #[test]
 fn tw2_a_stop_marker_committed_during_the_wait_ends_it_with_the_stops_refusal() {
     let run = Run::new();

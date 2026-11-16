@@ -21,17 +21,28 @@ impl Session {
     /// RUNTIME root has none; only the fake acts without it (A-IS-65 L10(b)). Answers the refusal
     /// and its stage: `Lease` at the bound, the stop's own stage when a stop ends the wait, `Lock`
     /// for an unusable lock (A-IS-65 L2).
-    pub(super) fn wait_for_interaction_lock(&mut self) -> Result<Option<LockGuard>, Box<(String, Refused)>> {
+    pub(super) fn wait_for_interaction_lock(
+        &mut self,
+    ) -> Result<Option<LockGuard>, Box<(String, Refused)>> {
         let Some(lock) = self.funnel.lock.clone() else {
             if self.backend.capabilities().backend == FAKE_BACKEND {
                 return Ok(None);
             }
             self.funnel
-                .warn("interaction lock not taken: no runtime root: a real backend acts only under the interaction lock".to_owned());
+                .warn(
+                    "interaction lock not taken: no runtime root: a real backend acts only under \
+                     the interaction lock"
+                        .to_owned(),
+                );
             return Err(Box::new(("Lock".to_owned(), TRANSACTION_FAILED.into())));
         };
         let fallback = MonotonicClock::default();
-        let now = |session: &Self| session.backend.clock().map_or_else(|| fallback.now_ms(), |clock| clock.now_ms());
+        let now = |session: &Self| {
+            session
+                .backend
+                .clock()
+                .map_or_else(|| fallback.now_ms(), |clock| clock.now_ms())
+        };
         let wait = LockWait::began(now(self));
         loop {
             match lock.try_acquire() {
@@ -47,7 +58,10 @@ impl Session {
             }
             if let Some(waited_ms) = wait.at_bound(now(self)) {
                 let out = Refused {
-                    detail: Some(Box::new(json!({ "waitedMs": waited_ms, "retryAfterMs": WAIT_BUDGET_MS }))),
+                    detail: Some(Box::new(json!({
+                        "waitedMs": waited_ms,
+                        "retryAfterMs": WAIT_BUDGET_MS,
+                    }))),
                     ..INTERACTION_LOCK_BUSY.into()
                 };
                 return Err(Box::new(("Lease".to_owned(), out)));
@@ -61,17 +75,12 @@ impl Session {
 
     /// W4: every stop source the Latch stage reads, observed without holding any lock: the
     /// listener (the chord) and this engine's latch (api, fleet, host relay), then the durable
-    /// stop marker another engine of the user may have committed.
+    /// stop marker another engine of the user may have committed, which is latched here so the
+    /// stop sticks for the session's later calls (review L1 of #13767).
     fn stop_while_waiting(&mut self) -> Option<Refusal> {
         self.reconcile_stop();
-        if let Some(latch) = self.guard.supervisor().latch() {
-            return Some(latch.refusal());
-        }
         self.guard
-            .supervisor()
-            .marker()
-            .read()
-            .stops()
-            .then(|| SuspendReason::StopMarker.refusal())
+            .latch_committed_marker()
+            .map(SuspendReason::refusal)
     }
 }

@@ -217,7 +217,6 @@ impl Session {
         }
     }
 
-
     /// The one side-effect sink: every event in order, stopping at the first refusal.
     fn send(
         &mut self,

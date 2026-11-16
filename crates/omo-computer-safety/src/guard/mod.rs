@@ -172,6 +172,11 @@ impl Guard {
         self.supervisor.status(now)
     }
 
+    /// Latches a stop marker another engine committed since this engine started.
+    pub fn latch_committed_marker(&mut self) -> Option<SuspendReason> {
+        self.supervisor.latch_committed_marker()
+    }
+
     /// `stopPath.stop{source}`.
     pub fn stop(
         &mut self,

@@ -694,7 +694,8 @@ fn the_code_built_default_consent_admits_no_exec_and_arms_no_chord() {
 fn a_stop_while_another_holder_keeps_the_lock_ends_the_lease_and_revokes_the_grant() {
     let dir = tempfile::tempdir().expect("tempdir");
     let sink = RecordingSink::default();
-    let backend = FakeBackend::with_parts(scenario(&json!({})), FakeClock::default(), sink.clone())
+    let clock = FakeClock::default();
+    let backend = FakeBackend::with_parts(scenario(&json!({})), clock.clone(), sink.clone())
         .with_stop_path(StopPathScript::Live);
     let remote = backend.handle();
     let runtime = dir.path().join("run");
@@ -706,21 +707,20 @@ fn a_stop_while_another_holder_keeps_the_lock_ends_the_lease_and_revokes_the_gra
     let other = crate::lock::InteractionLock::under(&runtime);
     let held = other.acquire().expect("the other holder takes the lock");
     let seen = sink.clone();
-    let presser = std::thread::spawn(move || {
-        // The lease is taken (its presence shows) before the exec waits on the lock; only then is
-        // the stop pressed and the lock released. Bounded: a session that never takes it fails here.
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
-        while !seen.lines().iter().any(|line| line == "presence show") {
-            assert!(std::time::Instant::now() < deadline, "the session never took the lease");
-            std::thread::yield_now();
+    // Driven on the fake clock (review M1 of #13767): on the first advance of the exec's wait
+    // after the lease is taken (its presence shows), the stop is pressed and the lock released.
+    let release = std::sync::Mutex::new(Some(held));
+    clock.on_advance(Box::new(move |_| {
+        if seen.lines().iter().any(|line| line == "presence show") {
+            if let Some(held) = release.lock().expect("hook").take() {
+                remote.press_stop_chord();
+                drop(held);
+            }
         }
-        remote.press_stop_chord();
-        drop(held);
-    });
+    }));
     let refused = s
         .click(params(json!({ "target": "1", "x": 5, "y": 5, "delivery": "foreground" })))
         .expect_err("the stop pressed while waiting refuses");
-    presser.join().expect("presser");
     assert_eq!(refused.refusal.code.wire(), "Suspended");
     // The lease's own presence lines (show, then hide at its end) are not input.
     assert!(sink.lines().iter().all(|line| !line.contains("click") && !line.contains("mouse")), "nothing sent: {:?}", sink.lines());

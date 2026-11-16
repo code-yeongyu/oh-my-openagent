@@ -170,28 +170,26 @@ fn a_stop_pressed_while_another_holder_keeps_the_lock_refuses_the_waiting_exec()
     let run = Run::new();
     let fake = run.fake();
     let remote = fake.handle();
+    let clock = fake.clock();
     let mut session = run.session(Box::new(fake));
     let other = InteractionLock::under(run.dir.path());
     let held = other.acquire().expect("the other holder takes the lock");
     let before = remote.stop_polls();
-    let presser = std::thread::spawn(move || {
-        // The session's admission polls the stop listener; once it has, the stop is pressed and
-        // only then is the lock released. Bounded: a session that never admits fails here.
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
-        while remote.stop_polls() <= before {
-            assert!(
-                std::time::Instant::now() < deadline,
-                "the session never reached admission"
-            );
-            std::thread::yield_now();
+    // Driven on the fake clock (review M1 of #13767): the exec's wait advances it, and on the
+    // first advance after the session's admission polled the listener, the stop is pressed and
+    // only then the lock released. No thread, no timing.
+    let release = std::sync::Mutex::new(Some(held));
+    clock.on_advance(Box::new(move |_| {
+        if remote.stop_polls() > before {
+            if let Some(held) = release.lock().expect("hook").take() {
+                remote.press_stop_chord();
+                drop(held);
+            }
         }
-        remote.press_stop_chord();
-        drop(held);
-    });
+    }));
     let refused = session
         .click(click("c-locked"))
         .expect_err("the stop pressed while waiting refuses");
-    presser.join().expect("presser");
     assert_eq!(wire(&refused).0, "Suspended");
     assert!(run.sink.is_empty(), "nothing sent: {:?}", run.sink.lines());
     assert!(
