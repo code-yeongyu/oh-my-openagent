@@ -227,3 +227,17 @@ fn a_stop_from_one_connection_suspends_every_session() {
     let status = idle.call(3, "stopPath.status", &json!({})).expect("status");
     assert_eq!(status["result"]["suspended"], true, "a stop is hand-wide: {status}");
 }
+
+#[test]
+fn daemon_refuses_sibling_host_terminal_self_target() {
+    let host_terminal = std::os::unix::process::parent_id();
+    let scenario = json!({"windows": [{"id": "301", "title": "the host's terminal", "app": "Terminal",
+        "pid": host_terminal, "x": 0, "y": 0, "width": 400, "height": 300, "focused": true, "elevated": null}],
+        "ax": {}});
+    let daemon = Daemon::start_with(&scenario.to_string(), &[]);
+    let mut client = opened(&daemon);
+    client.call(5, "stopPath.start", &json!({"chord": "ctrl+alt+shift+escape"})).expect("armed");
+    let typed = client.call(2, "typeText", &json!({"target": "301", "text": "rm -rf ~"})).expect("answered");
+    assert!(typed.get("error").is_some(), "{typed}");
+    assert_eq!(typed["error"]["data"]["reason"], "self_target", "{typed}");
+}
