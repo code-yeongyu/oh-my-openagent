@@ -3,6 +3,7 @@ import { outcomeOf } from "../thread/remote/outcome"
 import { type ClientCore, ok, type Outcome, type RemoteClient } from "./client"
 import { engineCode, nextActionFor, remoteFailure } from "./codes"
 import { DEADLINES, withinDeadline } from "./deadlines"
+import { attachAddressed } from "./port/device-service"
 import { canonicalizeThreadHandle } from "./seams"
 import type {
   AttachEvent,
@@ -432,7 +433,10 @@ export async function openAttachment(core: ClientCore, thread: ThreadHandle, opt
       if (durableId === undefined)
         throw new LocalApiError("session_not_found", `this device lists no session ${target.session} with a durable id`)
       attached = await local({ device: target.device, session: target.session, durableId })
-    } else attached = await svc.attach(target.device, target.session)
+    } else {
+      // A mistyped id or a durable id is located once, as the thread tools do, so it answers not_found, never unsupported.
+      attached = (await attachAddressed(svc, target.device, target.session)).attached
+    }
     opened = attached
     if (abandoned) await attached.detach()
     await attached.snapshot

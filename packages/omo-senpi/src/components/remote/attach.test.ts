@@ -96,6 +96,18 @@ describe("attach rows: open", () => {
     })
   })
 
+  test("#given a mistyped session id and an unknown durable id #when attach opens #then each is not_found, never unsupported", async () => {
+    // The device answers session.locate and holds no session by either id.
+    const owner = await startOwner({ ...worldWith(STATE), located: { [PEER]: {} } })
+    const client = clientOn(owner.stateDir, fakeClock())
+    // The service refuses an id that is no listing key as invalid_request (#1350); the attach locates it once instead.
+    for (const session of ["no such session", "0195f0c4-7a1b-7c2d-8e3f-4a5b6c7d8e9f"])
+      expect(failureOf(await client.attach(handleOf(PEER, session)))).toMatchObject({
+        code: "not_found",
+        details: { kind: "session" },
+      })
+  })
+
   test("#given a host that never sends the snapshot #when attach waits #then it answers timeout at attachOpen", async () => {
     const clock = fakeClock()
     const { owner, withheld } = await startModeOwner("attach-stall", worldWith(STATE))
