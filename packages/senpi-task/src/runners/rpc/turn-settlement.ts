@@ -158,9 +158,13 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
 
   const holdRecoveryFailure = (message: string): void => {
     clearConfirmation()
-    held = input.abortedByUser()
-      ? { status: "cancelled" }
-      : { status: "error", failure: { kind: "child-turn-failed", message } }
+    if (input.abortedByUser()) {
+      held = undefined
+      recovery = undefined
+      input.settle({ status: "cancelled" })
+      return
+    }
+    held = { status: "error", failure: { kind: "child-turn-failed", message } }
     recovery = "failed"
     unreadableProbes = 0
     rearm()
@@ -208,7 +212,12 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
           return
         case "agent_idle": {
           // Session-lifetime monitors outlive completed turns; only recovery still belongs to them.
-          if (recovery !== undefined && input.wakeSourcesLive?.() === true) return
+          if (recovery !== undefined && input.wakeSourcesLive?.() === true) {
+            // Idle ended the recovery; its held error can be confirmed when the wake source drops.
+            recovery = "failed"
+            rearm()
+            return
+          }
           clearConfirmation()
           const outcome = held
           held = undefined

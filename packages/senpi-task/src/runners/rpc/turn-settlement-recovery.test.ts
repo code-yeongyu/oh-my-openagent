@@ -8,12 +8,12 @@ import { createManualSettlementScheduler, flushSettlement } from "./turn-settlem
 const COMPACTION_ERROR = "Context remains above the compaction threshold because compaction did not complete"
 const CONTINUATION_ERROR = "Failed to continue queued messages: Cannot continue with assistant message"
 
-function fixture(wakeSourcesLive: () => boolean = () => false) {
+function fixture(wakeSourcesLive: () => boolean = () => false, abortedByUser: () => boolean = () => false) {
   const outcomes: RunnerOutcome[] = []
   const scheduler = createManualSettlementScheduler()
   const settlement = createTurnSettlement({
     settle: (outcome) => outcomes.push(outcome),
-    abortedByUser: () => false,
+    abortedByUser,
     baseline: () => undefined,
     finalText: () => undefined,
     probe: async () => ({ isStreaming: false, isCompacting: false }),
@@ -93,6 +93,27 @@ describe("recovery settlement (omo#13785)", () => {
     expect(outcomes).toEqual([])
   })
 
+  test("settles announced recovery after its idle edge and last wake source disarms", async () => {
+    // given
+    let live = true
+    const { settlement, scheduler, outcomes } = fixture(() => live)
+    settlement.observe(turnEnd())
+    settlement.observe({ type: "agent_idle" })
+    expect(outcomes).toEqual([])
+
+    // when
+    live = false
+    settlement.reconfirmHeld()
+
+    // then
+    expect(scheduler.pending()).toBe(1)
+    scheduler.runNext()
+    await flushSettlement()
+    expect(outcomes).toEqual([{ status: "error", failure: { kind: "child-turn-failed", message: COMPACTION_ERROR } }])
+    settlement.observe({ type: "agent_idle" })
+    expect(outcomes).toHaveLength(1)
+  })
+
   test("does not arm terminal confirmation for a retry that still owns recovery", () => {
     // given
     const { settlement, scheduler, outcomes } = fixture()
@@ -136,6 +157,24 @@ describe("recovery settlement (omo#13785)", () => {
     scheduler.runNext()
     await flushSettlement()
     expect(outcomes).toEqual([{ status: "error", failure: { kind: "child-turn-failed", message: COMPACTION_ERROR } }])
+  })
+
+  test("settles user-cancelled recovery without a later idle event", () => {
+    // given
+    let aborted = false
+    const { settlement, scheduler, outcomes } = fixture(
+      () => false,
+      () => aborted,
+    )
+    settlement.observe(turnEnd())
+
+    // when
+    aborted = true
+    settlement.observe({ type: "auto_retry_end", success: false, attempt: 1, finalError: COMPACTION_ERROR })
+
+    // then
+    expect(outcomes).toEqual([{ status: "cancelled" }])
+    expect(scheduler.pending()).toBe(0)
   })
 
   test("reports a continuation rejection without relying on a second agent_end", () => {
