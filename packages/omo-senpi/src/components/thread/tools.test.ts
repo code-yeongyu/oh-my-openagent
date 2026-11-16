@@ -6,6 +6,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { ThreadToolName, ThreadToolResult } from "./contracts"
 import type { GatewayEndpointRef } from "./gateway/adapter"
+import { type BindInput, normalizeBindInput } from "./gateway/bindings"
 import { GATEWAY_RECEIPT_RETENTION_MS } from "./gateway/constants"
 import { gatewayDatabasePath } from "./gateway/paths"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
@@ -131,7 +132,7 @@ describe("thread tool registration", () => {
     expect(f.setModel.mock.calls[0]).toEqual(["route-peer", "openai", "gpt-x", "dur-peer"])
   })
 
-  test("registers exactly the eighteen contract tools with eval exposure", () => {
+  test("registers exactly the fourteen contract tools with eval exposure", () => {
     const tools: Record<string, unknown>[] = []
     const f = fixture()
     registerThreadTools(
@@ -149,10 +150,6 @@ describe("thread tool registration", () => {
       "thread_rename",
       "thread_set_model",
       "thread_set_reasoning",
-      "thread_bind",
-      "thread_unbind",
-      "thread_rebind",
-      "thread_bindings",
       "thread_report",
       "thread_outbox",
       "thread_outbox_ack",
@@ -794,7 +791,15 @@ function gatewayFixture(store?: GatewayStore) {
     } as never)
     return result.details.result as ThreadToolResult
   }
-  return { f, wakes, run }
+  /** Binds a chat thread to `session` straight through the store, as the gateway does; no session tool binds. */
+  const bind = async (session: string, chat: Omit<BindInput, "session_durable_id">): Promise<string> => {
+    const binding = normalizeBindInput({ ...chat, session_durable_id: session })
+    if ("kind" in binding) throw new Error(JSON.stringify(binding))
+    const bound = await f.store.bind({ now: Date.now(), receipt: null, binding })
+    if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
+    return bound.binding.binding_id
+  }
+  return { f, wakes, run, bind }
 }
 
 describe("thread_send through the session gateway", () => {
@@ -858,19 +863,9 @@ describe("thread_send through the session gateway", () => {
 })
 
 describe("relay tools over the gateway store", () => {
-  test("#given session A binds a chat thread for session B #when B reports a milestone #then a connector reads it with the binding revision and a cursor, acks it, and a second bind of the thread is binding_conflict", async () => {
+  test("#given the gateway bound a chat thread to session B #when B reports a milestone #then a connector reads it with the binding revision and a cursor and acks it", async () => {
     const g = gatewayFixture()
-    const bound = await g.run(
-      "thread_bind",
-      { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "t1", session: "my-tui" },
-      "dur-host",
-      "call-1",
-    )
-    expect(bound).toMatchObject({
-      kind: "ok",
-      binding: { status: "active", revision: 1, session_durable_id: "dur-tui", thread_id: "t1", ttl_seconds: 604800 },
-    })
-    const bindingId = (bound as { binding: { binding_id: string } }).binding.binding_id
+    const bindingId = await g.bind("dur-tui", { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "t1" })
     const reported = await g.run(
       "thread_report",
       { binding_id: bindingId, kind: "milestone", text: "done step 1" },
@@ -895,25 +890,11 @@ describe("relay tools over the gateway store", () => {
       kind: "ok",
       rows: [],
     })
-    expect(
-      await g.run(
-        "thread_bind",
-        { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "t1", session: "dur-host" },
-        "dur-host",
-        "call-6",
-      ),
-    ).toMatchObject({ kind: "error", error: { code: "binding_conflict", details: { binding_id: bindingId } } })
   })
 
   test("#given a binding of session B #when another session reports through it #then it is scope_denied and the outbox stays empty", async () => {
     const g = gatewayFixture()
-    const bound = await g.run(
-      "thread_bind",
-      { platform: "discord", account_id: "bot", chat_id: "c9", session: "my-tui" },
-      "dur-host",
-      "call-1",
-    )
-    const bindingId = (bound as { binding: { binding_id: string } }).binding.binding_id
+    const bindingId = await g.bind("dur-tui", { platform: "discord", account_id: "bot", chat_id: "c9" })
     expect(
       await g.run("thread_report", { binding_id: bindingId, kind: "report", text: "not mine" }, "dur-host", "call-2"),
     ).toMatchObject({ kind: "error", error: { code: "scope_denied" } })
