@@ -4,6 +4,7 @@
 mod bounds;
 mod cache;
 mod client;
+mod control_type;
 mod elevated;
 mod fake;
 mod identity;

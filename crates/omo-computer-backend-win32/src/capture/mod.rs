@@ -20,7 +20,7 @@ mod window;
 #[cfg(windows)]
 mod gdi;
 #[cfg(windows)]
-mod integrity;
+pub(crate) mod integrity;
 #[cfg(all(test, windows))]
 mod live_tests;
 #[cfg(windows)]

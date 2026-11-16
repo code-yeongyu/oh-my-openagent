@@ -44,7 +44,7 @@ fn rid(process: HANDLE) -> Option<u32> {
 }
 
 /// `true` when the process owning `window` is above the engine's integrity level or will not be read.
-pub(super) fn elevated(window: HWND) -> bool {
+pub(crate) fn elevated(window: HWND) -> bool {
     let mut pid = 0u32;
     // SAFETY: plain out-parameter.
     unsafe { GetWindowThreadProcessId(window, Some(&mut pid)) };
