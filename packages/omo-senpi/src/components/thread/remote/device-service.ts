@@ -205,15 +205,23 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       return { kind: "refused", reason: "invalid_record" }
     }
     // `direct`: the device's service delivers the record to the session it lists under that key, with no attach here.
-    if (commandOptions?.direct === true)
+    // No connection means nothing was sent, as when the attach path cannot attach; the core marks every refusal before
+    // sending NotSentError, and anything else may have run on the other device.
+    if (commandOptions?.direct === true) {
+      let connected: DeviceService
       try {
-        return outcomeOf(await (await svc()).sessionCommand(device, sessionId, record))
+        connected = await svc()
       } catch (error) {
-        if (error instanceof NotSentError) return { kind: "refused", reason: sessionReason(error.code) }
-        if (error instanceof LocalApiError && error.command_id === undefined && REFUSED_BEFORE_SENDING.has(error.code))
-          return { kind: "refused", reason: sessionReason(error.code) }
-        return { kind: "uncertain", reason: "reply_lost" }
+        return { kind: "refused", reason: sessionReason(notSentReason(error)) }
       }
+      try {
+        return outcomeOf(await connected.sessionCommand(device, sessionId, record))
+      } catch (error) {
+        return error instanceof NotSentError
+          ? { kind: "refused", reason: sessionReason(error.code) }
+          : { kind: "uncertain", reason: "reply_lost" }
+      }
+    }
     try {
       held = await pool.hold(device, sessionId)
     } catch (error) {
