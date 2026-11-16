@@ -135,9 +135,10 @@ test(
     await a.engine.runCycle()
     await b.restart()
     const resumed = b.engine.runCycle().catch(() => undefined)
-    if ((await Promise.race([resumed.then(() => "done"), b.clock.untilPending().then(() => "waiting")])) === "waiting")
-      b.clock.advance(8_000)
-    await resumed
+    // The dropped first batch is not resent, so the resumed push appends directly instead of backing off on a stale base.
+    expect(await Promise.race([resumed.then(() => "appended"), b.clock.untilPending().then(() => "backing off")])).toBe(
+      "appended",
+    )
     await settle(a, b)
     expect(await b.read("system/persona.md")).toBe(note(SEED))
     expect(await a.read("system/persona.md")).toBe(note(SEED))

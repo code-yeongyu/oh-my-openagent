@@ -233,7 +233,8 @@ async function verifiedIncomingKeys(journal: SyncJournal): Promise<Set<string>> 
  * #13730 review M1: this device captured its own history-less copy of a key, its push met a stale base, and the
  * verified batches now carry the space's copy of that key. Its still-unsent first capture is wound back out
  * (the #12284 rewind, so the working file is captured afresh) and the key joins instead: the space's state lands
- * first and the next capture adopts the file insert-only. Ops already in the batch being sent are left alone.
+ * first and the next capture adopts the file insert-only. Ops in an uploaded batch may already be on the server and
+ * are left alone; a sealed or reserved batch never reached append, so one holding a rewound key is dropped (M2).
  */
 async function rewindJoining(
   deps: EngineDeps,
