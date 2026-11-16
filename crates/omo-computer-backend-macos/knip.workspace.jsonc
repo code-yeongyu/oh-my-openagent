@@ -3,10 +3,10 @@
   "workspaces": {
     ".": {
       "entry": [
-        // run by path on the QA macOS host as the SP-T spike probe (crates/omo-computer-backend-macos/probes/README.md)
-        "crates/omo-computer-backend-macos/probes/probe-sp-t.ts",
         // run by path on the QA macOS host as the SP-M spike probe (crates/omo-computer-backend-macos/probes/README.md)
         "crates/omo-computer-backend-macos/probes/probe-sp-m.ts",
+        // run by path on the QA macOS host as the SP-T spike probe (crates/omo-computer-backend-macos/probes/README.md)
+        "crates/omo-computer-backend-macos/probes/probe-sp-t.ts",
       ]
     }
   }
