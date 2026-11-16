@@ -159,9 +159,9 @@ const TARGETS: readonly SkillPointerTarget[] = [
     skillName: "bunshin",
     customType: BUNSHIN_CUSTOM_TYPE,
     // `fleet` alone is an ordinary word (a vehicle fleet, a "fleet dashboard"), so it counts only with a device
-    // sense: owned by the user (`my fleet`, `our fleet`) or naming its machines (`fleet hosts`) (#13446).
+    // sense: owned by the user (`my fleet`, `our fleet`) or naming its machines (`fleet hosts`, `fleet box`) (#13446).
     pattern: skillNamePattern(
-      String.raw`(?:bunshin|(?:my|our)\s+fleet|fleet[\s-]+(?:machines?|devices?|hosts?|nodes?|boxes)|machine[\s-]*mesh)`,
+      String.raw`(?:bunshin|(?:my|our)\s+fleet|fleet[\s-]+(?:machines?|devices?|hosts?|nodes?|box(?:es)?)|machine[\s-]*mesh)`,
     ),
     expandedBlockPattern: /<skill\s+name="bunshin"/i,
     instruction: "",
