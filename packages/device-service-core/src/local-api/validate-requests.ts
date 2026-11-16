@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@eda08c786872ad5b766b5adba76f9698d4f1cad6 packages/local-api/src/validate-requests.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@04288f856dcd224a87108cb46d62d0343ce77136 packages/local-api/src/validate-requests.ts
 import { toHex } from "./bytes-encoding.ts";
 import { SESSION_PROJECT_MAX_CHARS, SESSION_READ_TAIL_MAX } from "./spec-proto.ts";
 import type {
@@ -30,7 +30,8 @@ import {
 } from "./validate-fields.ts";
 import { MACHINE_REQUEST_VALIDATORS } from "./validate-machine.ts";
 import { DELEGATED_REQUEST_VALIDATORS, endpointRequests } from "./validate-delegated.ts";
-import { attachId, deviceId, deviceRef, sessionId } from "./validate-shapes.ts";
+import { isStreamSessionKey } from "./session-ref.ts";
+import { attachId, deviceId, deviceRef } from "./validate-shapes.ts";
 import { PRESENTER_REQUEST_VALIDATORS } from "./validate-presenter.ts";
 import { DELIVERIES_REQUEST_VALIDATORS } from "./validate-deliveries.ts";
 import { SESSION_WAKE_VALIDATORS } from "./validate-session-wake.ts";
@@ -199,15 +200,18 @@ const VALIDATORS: RequestValidators<RequestType> = {
       ...(rows === undefined ? {} : { rows }),
     };
   },
+  // #1349: the session_id is the bare stream session key (decision 0008, what session.locate answers as `key`); a durable
+  // engine id or any other text is refused here, never handed to the relay's attach.
   "session.attach": (v, id) => {
     const m = requestFields(v, ["device", "session_id"], ["seqs", "resume", "from"]);
-    const { seqs, resume, from } = m;
+    const { seqs, resume, from, session_id } = m;
     if (seqs !== undefined && seqs !== true) return fail("seqs");
+    if (!isStreamSessionKey(session_id)) return fail("session_id");
     return {
       id,
       type: "session.attach",
       device: deviceId(m["device"]),
-      session_id: sessionId(m["session_id"]),
+      session_id,
       ...(seqs === undefined ? {} : { seqs }),
       ...(resume === undefined ? {} : { resume: resumeOf(resume) }),
       ...(from === undefined ? {} : { from: fromOf(from) }),

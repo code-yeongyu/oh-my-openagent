@@ -1,4 +1,6 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@eda08c786872ad5b766b5adba76f9698d4f1cad6 packages/local-api/src/dacl.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@04288f856dcd224a87108cb46d62d0343ce77136 packages/local-api/src/dacl.ts
+import { spawn } from "node:child_process";
+
 import type { SecureFile } from "./access.ts";
 import { LocalApiError } from "./errors.ts";
 
@@ -13,24 +15,21 @@ export type PowerShellRunner = (
 
 export const runPowerShell: PowerShellRunner = async (script, env) => {
   const encoded = Buffer.from(script, "utf16le").toString("base64");
-  const proc = Bun.spawn(
-    [
-      "powershell.exe",
-      "-NoProfile",
-      "-NonInteractive",
-      "-ExecutionPolicy",
-      "Bypass",
-      "-EncodedCommand",
-      encoded,
-    ],
-    { env: { ...process.env, ...env }, stdin: "ignore", stdout: "pipe", stderr: "pipe" },
+  // node:child_process only: omo vendors this client and also runs it under Node (LA27).
+  const proc = spawn(
+    "powershell.exe",
+    ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encoded],
+    { env: { ...process.env, ...env }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true },
   );
-  const [out, , code] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
-  return { code, out };
+  const chunks: Buffer[] = [];
+  proc.stdout.on("data", (chunk: Buffer) => chunks.push(chunk));
+  proc.stderr.resume();
+  const code = await new Promise<number>((resolve, reject) => {
+    proc.once("error", reject);
+    proc.once("close", (exitCode) => resolve(exitCode ?? -1));
+  });
+  // TextDecoder drops a leading UTF-8 BOM, as the earlier stream reader did (LA28).
+  return { code, out: new TextDecoder().decode(Buffer.concat(chunks)) };
 };
 
 // The Set-Acl script applyExactDacl runs; the device-service guard runs the same text with its read-back in one process.

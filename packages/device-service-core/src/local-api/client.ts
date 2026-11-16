@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@eda08c786872ad5b766b5adba76f9698d4f1cad6 packages/local-api/src/client.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@04288f856dcd224a87108cb46d62d0343ce77136 packages/local-api/src/client.ts
 import { checkPosixAccess, readToken } from "./access.ts";
 import { type HandshakeTimer, type LocalApiClient, openLocalApiClient } from "./client-open.ts";
 import type { DeadlineTimer } from "./client-connection.ts";
