@@ -24,6 +24,8 @@ export type BootstrapOutcome =
       readonly state: BootstrapStopState
       readonly notice: string
       readonly exitCode: typeof BOOTSTRAP_STOPPED_EXIT
+      /** The install changed nothing because this machine's service manager could not confirm it (install.ts). */
+      readonly suppressed?: true
     }
 
 export type BootstrapDependencies = {
@@ -100,7 +102,11 @@ const connectInstalled = async (deps: BootstrapDependencies): Promise<DeviceServ
   const current = await connectCurrent(deps)
   if (current !== "absent") return current
   const installed = await deps.install()
-  if (!installed.ok) return stopped(installed.state, installed.action)
+  if (!installed.ok)
+    return {
+      ...stopped(installed.state, installed.action),
+      ...(installed.suppressed ? { suppressed: true as const } : {}),
+    }
   try {
     return await deps.connect()
   } catch (error) {

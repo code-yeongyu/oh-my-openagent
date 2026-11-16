@@ -7,14 +7,16 @@ import {
 } from "../device-service-core/src/account-state.ts"
 import {
   connectDeviceService,
+  type DeviceRow,
   type DeviceService,
   deviceServiceEndpointPath,
   deviceServiceStateDir,
   LocalApiError,
   SESSION_ROW_STATES,
+  type SessionFilter,
+  type SessionRowState,
+  type Status,
 } from "../device-service-core/src/device-service.ts"
-import type { DeviceRow, SessionFilter, Status } from "../device-service-core/src/local-api/protocol.ts"
-import type { SessionRowState } from "../device-service-core/src/local-api/vocabulary.ts"
 import type { RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
 import { readAccountInProcess } from "./account-show"
 import type { LocalStatus } from "./remote-cold-wake"
