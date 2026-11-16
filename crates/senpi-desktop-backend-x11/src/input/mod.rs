@@ -30,6 +30,8 @@ mod child_tests;
 #[cfg(test)]
 mod client_process_tests;
 #[cfg(test)]
+mod connection_client_tests;
+#[cfg(test)]
 pub(crate) mod fake;
 #[cfg(test)]
 mod live_tests;
