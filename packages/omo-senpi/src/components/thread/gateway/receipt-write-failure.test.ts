@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { Database } from "bun:sqlite"
 
+import { createRemoteThreadFixture } from "../thread-remote-fixture"
 import { createGatewayEngine, resolveFromEntries, type GatewayDeliverRequest } from "./engine"
 import { gatewayDatabasePath } from "./paths"
 import type { GatewayStore } from "./store"
@@ -138,4 +139,38 @@ describe("receipt_write_failures_leave_the_store_serving", () => {
       holder.close()
     }
   }, 30_000)
+})
+
+describe("#13041: a lost-ACK retry rebuilds the answer from the row, waiting_on and its device included", () => {
+  test("#given a send to B waiting on a question whose receipt write failed (the receipt stays prepared, the row is admitted) #when the same key is retried #then the rebuilt answer names waiting_on approval and the device the send stamped", async () => {
+    const h = createGatewayHarness({ remote: createRemoteThreadFixture().account().remote })
+    harness = h
+    h.session("A")
+    const b = h.session("B")
+    b.runtime.beginUserTurn()
+    b.runtime.phaseValue = "waiting_question"
+    const sender = h.store()
+    const lockWait = () =>
+      Object.assign(new Error("gateway store lock wait exceeded"), { code: "gateway_lock_wait_exceeded" })
+    const stuck = h.engineFor({
+      ...sender,
+      completeReceipt: async () => {
+        throw lockWait()
+      },
+      abandonReceipt: async () => {
+        throw lockWait()
+      },
+    } satisfies GatewayStore)
+    const waiting = { ...request("waits"), mode: "follow_up" as const }
+
+    expect((await settled(stuck.deliver(waiting))).error?.message).toBe("gateway store lock wait exceeded")
+    await h.quiesce()
+    const rebuilt = await h.engineFor(sender).deliver(waiting)
+
+    expect(rebuilt).toMatchObject({
+      kind: "ok",
+      deduplicated: true,
+      delivery: { kind: "queued", waiting_on: { kind: "approval", device: "here" } },
+    })
+  })
 })
