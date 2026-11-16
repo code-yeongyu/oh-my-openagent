@@ -33,7 +33,9 @@ fn scrolled(dx: f64, dy: f64) -> (Result<Delivered, String>, ScriptedOs) {
 }
 
 fn delta(wparam: usize) -> i16 {
-    u16::try_from(wparam >> 16).unwrap_or_default().cast_signed()
+    u16::try_from(wparam >> 16)
+        .unwrap_or_default()
+        .cast_signed()
 }
 
 #[test]

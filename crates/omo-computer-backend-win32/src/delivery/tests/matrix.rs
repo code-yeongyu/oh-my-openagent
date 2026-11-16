@@ -21,7 +21,11 @@ fn probe_ids() -> Vec<String> {
     ledger
         .lines()
         .skip(1)
-        .filter(|line| line.split('\t').nth(4).is_some_and(|verdict| verdict != "UNMEASURED"))
+        .filter(|line| {
+            line.split('\t')
+                .nth(4)
+                .is_some_and(|verdict| verdict != "UNMEASURED")
+        })
         .filter_map(|line| line.split('\t').next())
         .map(str::to_owned)
         .collect()
