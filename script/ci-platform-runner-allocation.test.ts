@@ -212,7 +212,7 @@ describe("#given native binary parity, which has no ubuntu leg", () => {
 })
 
 describe("#given the path-filtered workflows that also run macOS/Windows on dev pushes", () => {
-  test.each([
+  const devPushWorkflows = [
     "computer-engine.yml",
     "computer-fixtures.yml",
     "desktop-engine.yml",
@@ -221,21 +221,35 @@ describe("#given the path-filtered workflows that also run macOS/Windows on dev 
     "engine-trust-helper.yml",
     "get-worker-ci.yml",
     "git-job-helper.yml",
-  ])("#then %s cancels a superseded PR run but lets a dev run finish and collapses pending dev runs", (file) => {
-    const concurrency = workflow(file)["concurrency"]
-    if (!isRecord(concurrency)) throw new Error(`${file} must define concurrency`)
-    const group = (github: unknown) =>
-      String(concurrency["group"]).replace(/\$\{\{\s*(.+?)\s*\}\}/g, (_match, body: string) =>
-        String(evaluate(body, { github })),
-      )
-    const pr = { workflow: "W", event_name: "pull_request", event: { pull_request: { number: 7 } }, sha: "a" }
-    const pushAt = (sha: string) => ({ workflow: "W", event_name: "push", event: {}, ref: "refs/heads/dev", sha })
+  ]
 
-    expect(group(pr)).toBe("W-7")
-    expect(evaluate(concurrency["cancel-in-progress"], { github: pr })).toBe(true)
-    expect(group(pushAt("a"))).toBe(group(pushAt("b")))
-    expect(evaluate(concurrency["cancel-in-progress"], { github: pushAt("a") })).toBe(false)
+  // CI's own concurrency is checked with its jobs; every other workflow the tracker watches must be a row here.
+  test("#then the table covers every workflow the platform-red tracker watches except CI", () => {
+    const tracker = workflow("platform-red-tracker.yml")["on"]
+    const watched = isRecord(tracker) && isRecord(tracker["workflow_run"]) ? tracker["workflow_run"]["workflows"] : []
+    const rows = devPushWorkflows.map((file) => String(workflow(file)["name"]))
+    const missing = (Array.isArray(watched) ? watched : []).filter((name) => name !== "CI" && !rows.includes(name))
+    expect(missing).toEqual([])
   })
+
+  test.each(devPushWorkflows)(
+    "#then %s cancels a superseded PR run but lets a dev run finish and collapses pending dev runs",
+    (file) => {
+      const concurrency = workflow(file)["concurrency"]
+      if (!isRecord(concurrency)) throw new Error(`${file} must define concurrency`)
+      const group = (github: unknown) =>
+        String(concurrency["group"]).replace(/\$\{\{\s*(.+?)\s*\}\}/g, (_match, body: string) =>
+          String(evaluate(body, { github })),
+        )
+      const pr = { workflow: "W", event_name: "pull_request", event: { pull_request: { number: 7 } }, sha: "a" }
+      const pushAt = (sha: string) => ({ workflow: "W", event_name: "push", event: {}, ref: "refs/heads/dev", sha })
+
+      expect(group(pr)).toBe("W-7")
+      expect(evaluate(concurrency["cancel-in-progress"], { github: pr })).toBe(true)
+      expect(group(pushAt("a"))).toBe(group(pushAt("b")))
+      expect(evaluate(concurrency["cancel-in-progress"], { github: pushAt("a") })).toBe(false)
+    },
+  )
 })
 
 describe("#given the label-triggered full-matrix run", () => {
