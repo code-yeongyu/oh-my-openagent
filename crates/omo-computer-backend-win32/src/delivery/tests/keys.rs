@@ -26,7 +26,7 @@ pub(super) fn form(focus: Option<isize>, wants_chars: Vec<isize>) -> ScriptedOs 
             Win {
                 focus,
                 wants_chars,
-                child_at: Some(BUTTON),
+                child_at: Some(EDIT),
                 ..win("WindowsForms10.Window.8.app.0.1")
             },
         ),
@@ -127,7 +127,7 @@ fn a_click_is_posted_to_the_child_under_the_point_with_one_barrier() {
     assert!(os
         .posts
         .iter()
-        .all(|(to, posted)| *to == BUTTON && posted.lparam == point_lparam(CLIENT.x, CLIENT.y)));
+        .all(|(to, posted)| *to == EDIT && posted.lparam == point_lparam(CLIENT.x, CLIENT.y)));
     assert_eq!(os.posts[1].1.wparam, 1, "MK_LBUTTON on the press");
     assert_eq!(
         (deliverer.last_barrier(), os.invalidated.len()),

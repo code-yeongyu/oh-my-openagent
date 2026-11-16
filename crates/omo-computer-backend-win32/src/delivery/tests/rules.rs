@@ -1,7 +1,7 @@
-use omo_computer_core::error::EngineCode;
+use omo_computer_core::error::{EngineCode, Reason};
 
 use crate::barrier::{evidence, Barrier};
-use crate::delivery::family::{admit, family_of, Family, NextDelivery, Verb};
+use crate::delivery::family::{admit, admit_in, family_of, Family, NextDelivery, Verb};
 use crate::delivery::integrity;
 use crate::delivery::observation::{judge_events, Effect, EvidenceKind};
 use crate::route::{ladder, Call, Rung};
@@ -43,6 +43,40 @@ fn a_cell_the_spike_did_not_measure_refuses_every_background_verb() {
         assert_eq!(refused.next, NextDelivery::Foreground);
     }
     assert!(admit(family_of("Edit"), Verb::Text).is_ok());
+}
+
+#[test]
+fn a_class_with_no_matrix_row_refuses_every_background_verb() {
+    for class in [
+        "RICHEDIT50W",
+        "Scintilla",
+        "WindowsForms10.BUTTON.app.0.1",
+        "ChromeLikeWidgetWin",
+    ] {
+        let family = family_of(class);
+        for verb in Verb::ALL {
+            let refused = admit(family, verb).expect_err("no measured cell: refused");
+            assert_eq!(
+                refused.refusal.code,
+                EngineCode::BackgroundUnavailable,
+                "{class} {verb:?}"
+            );
+            assert_eq!(refused.next, NextDelivery::Foreground);
+        }
+    }
+}
+
+#[test]
+fn a_matrix_that_fails_to_load_refuses_every_verb_as_route_table_invalid() {
+    for verb in Verb::ALL {
+        let refused = admit_in(None, Family::Classic, verb).expect_err("fail closed");
+        assert_eq!(
+            (refused.refusal.code, refused.refusal.reason),
+            (EngineCode::Internal, Some(Reason::RouteTableInvalid)),
+            "{verb:?}"
+        );
+        assert_eq!(refused.next, NextDelivery::Foreground);
+    }
 }
 
 #[test]

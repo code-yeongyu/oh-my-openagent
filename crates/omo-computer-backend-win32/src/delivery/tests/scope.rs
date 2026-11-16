@@ -5,6 +5,7 @@
 
 use omo_computer_core::backend::{Delivered, InputEvent};
 use omo_computer_core::error::{EngineCode, Reason};
+use omo_computer_core::params::{Button, Point};
 
 use crate::delivery::post::Deliverer;
 
@@ -115,6 +116,52 @@ fn an_owner_disabled_by_a_modal_dialog_takes_no_fallback_input() {
         );
         assert!(os.posts.is_empty(), "{:?}", os.posts);
     }
+}
+
+#[test]
+fn a_disabled_addressed_window_refuses_pointer_verbs_like_the_key_path() {
+    let mut os = shared_thread(vec![MAIN_EDIT]);
+    if let Some(main) = os.windows.get_mut(&MAIN) {
+        main.child_at = Some(MAIN_EDIT);
+    }
+    let mut deliverer = Deliverer::default();
+    let at = Point { x: 10.0, y: 10.0 };
+    deliverer
+        .deliver(&mut os, "0x500", &InputEvent::PointerMove(at))
+        .expect("an enabled window takes the move");
+    os.posts.clear();
+    if let Some(main) = os.windows.get_mut(&MAIN) {
+        main.disabled = true;
+    }
+    let key = Deliverer::default()
+        .deliver(&mut os, "0x500", &InputEvent::Text("x".to_owned()))
+        .expect_err("the key path refuses a disabled owner");
+    for event in [
+        InputEvent::PointerMove(at),
+        InputEvent::Button {
+            button: Button::Left,
+            down: true,
+        },
+        InputEvent::Button {
+            button: Button::Left,
+            down: false,
+        },
+        InputEvent::Scroll { dx: 0.0, dy: 120.0 },
+    ] {
+        let refused = deliverer
+            .deliver(&mut os, "0x500", &event)
+            .expect_err("a disabled window takes no pointer input");
+        assert_eq!(
+            (refused.code, refused.reason),
+            (key.code, key.reason),
+            "{event:?}"
+        );
+    }
+    assert!(
+        os.posts.is_empty(),
+        "nothing reaches the disabled owner: {:?}",
+        os.posts
+    );
 }
 
 #[test]

@@ -5,7 +5,7 @@
 use omo_computer_core::backend::Refusal;
 use omo_computer_core::error::{EngineCode, Reason};
 
-use super::matrix::rows;
+use super::matrix::{rows, Row};
 
 /// The drop-matrix family of a window class.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -113,6 +113,7 @@ pub struct FamilyRefusal {
 #[must_use]
 pub fn family_of(class: &str) -> Family {
     rows()
+        .unwrap_or_default()
         .iter()
         .find_map(|row| row.family.filter(|_| row.matches(class)))
         .unwrap_or(Family::Unknown)
@@ -124,7 +125,24 @@ pub fn family_of(class: &str) -> Family {
 /// `BackgroundUnavailable` (`chromium_electron`, `toolkit`, or `posted_modifier_chord` for the
 /// per-route row) with the foreground as the next call, nothing sent.
 pub fn admit(family: Family, verb: Verb) -> Result<(), FamilyRefusal> {
-    let dropped = rows()
+    admit_in(rows(), family, verb)
+}
+
+/// [`admit`] over `table`, `None` for a matrix that failed to load.
+///
+/// # Errors
+/// As [`admit`]; a matrix that failed to load refuses every verb.
+pub fn admit_in(table: Option<&[Row]>, family: Family, verb: Verb) -> Result<(), FamilyRefusal> {
+    let Some(table) = table else {
+        return Err(FamilyRefusal {
+            refusal: Refusal::new(
+                EngineCode::BackgroundUnavailable,
+                Reason::PostedModifierChord,
+            ),
+            next: NextDelivery::Foreground,
+        });
+    };
+    let dropped = table
         .iter()
         .find(|row| row.family.is_none_or(|of| of == family) && row.refused.contains(&verb));
     match dropped {

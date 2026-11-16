@@ -77,19 +77,10 @@ pub fn parse() -> Result<Vec<Row>, BadRow> {
         .collect()
 }
 
-/// The matrix, parsed once. A matrix that does not parse refuses every background verb (fail
-/// closed); `matrix_rows_parse` proves the compiled-in table parses.
+/// The matrix, parsed once; `None` when the compiled-in table does not parse, and then every
+/// background verb is refused (fail closed). `matrix_rows_parse` proves the table parses.
 #[must_use]
-pub fn rows() -> &'static [Row] {
-    static ROWS: OnceLock<Vec<Row>> = OnceLock::new();
-    ROWS.get_or_init(|| {
-        parse().unwrap_or_else(|_| {
-            vec![Row {
-                family: None,
-                pattern: "*",
-                refused: Verb::ALL.to_vec(),
-                cite: "",
-            }]
-        })
-    })
+pub fn rows() -> Option<&'static [Row]> {
+    static ROWS: OnceLock<Option<Vec<Row>>> = OnceLock::new();
+    ROWS.get_or_init(|| parse().ok()).as_deref()
 }
