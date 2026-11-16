@@ -20,10 +20,17 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  platform:
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/pr-platform-decision.yml
+
   sentinel-selftest:
     name: computer sentinel self-test (${{ matrix.os }})
-    # Pull requests run Linux only; the ci:full-matrix label and dispatches run macOS (#13802).
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-matrix')
+    needs: platform
+    # macOS only when the shared platform decision allows it (pr-platform-decision.yml, #13859).
+    if: needs.platform.outputs.full_matrix == 'true'
     strategy:
       fail-fast: false
       matrix:
