@@ -38,7 +38,7 @@ impl From<Refusal> for Unresolved {
 }
 
 const fn identity_unknown() -> Refusal {
-    Refusal::new(EngineCode::Timeout, Reason::ResolutionIdentityUnknown.wire())
+    Refusal::new(EngineCode::Timeout, Reason::ResolutionIdentityUnknown)
 }
 
 /// One live element the tuple may name: in a cached generation (`Some((generation, index))`)
@@ -76,7 +76,7 @@ impl RefRegistry {
             }
         }
         if !entry.identity.unique_at_capture {
-            return Err(Refusal::new(EngineCode::StaleRef, Reason::NotUniqueAtCapture.wire()).into());
+            return Err(Refusal::new(EngineCode::StaleRef, Reason::NotUniqueAtCapture).into());
         }
         let newer = self.latest(&window).filter(|latest| latest.number > top).map(|latest| latest.number);
         let mut read = None;
@@ -97,7 +97,7 @@ impl RefRegistry {
             }
         }
         match candidates.as_slice() {
-            [] => Err(Refusal::new(EngineCode::StaleRef, Reason::SavedRefAbsent.wire()).into()),
+            [] => Err(Refusal::new(EngineCode::StaleRef, Reason::SavedRefAbsent).into()),
             [only] if only.identity.stable_text_unknown => Err(identity_unknown().into()),
             [only] => {
                 let live = only.read.clone();

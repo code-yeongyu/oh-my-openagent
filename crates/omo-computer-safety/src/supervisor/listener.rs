@@ -27,7 +27,7 @@ pub(super) enum Slot {
 }
 
 fn is_deaf(refusal: &omo_computer_core::backend::Refusal) -> bool {
-    refusal.code == EngineCode::StopPathUnavailable && refusal.reason == Some(Reason::Deaf.wire())
+    refusal.code == EngineCode::StopPathUnavailable && refusal.reason == Some(Reason::Deaf)
 }
 
 impl Slot {

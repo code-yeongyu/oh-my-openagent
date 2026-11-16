@@ -1,6 +1,7 @@
 //! The guard over the fake backend: a deaf listener refuses before any OS call, and a window
 //! owned by the self set is `SelfTarget` on every persona with the sink empty.
 
+use omo_computer_core::error::Reason;
 use std::cell::Cell;
 
 use omo_computer_backend_fake::{FakeBackend, FakeMethod, FakeScenario, Persona, StopPathScript};
@@ -94,7 +95,7 @@ fn deaf_listener_refuses_exec_before_any_os_call() {
                 refused.refusal.code.wire(),
                 refused.refusal.reason
             ),
-            (Gate::StopPath, "StopPathUnavailable", Some("deaf"))
+            (Gate::StopPath, "StopPathUnavailable", Some(Reason::Deaf))
         );
         assert_eq!(reads.get(), 0, "nothing was read for the refused call");
         assert_eq!(backend.calls(FakeMethod::Windows), 0);
@@ -160,7 +161,7 @@ fn a_self_set_window_is_refused_on_every_fake_persona() {
             let refused = admit(&mut guard, &mut backend, &Cell::new(0)).expect_err("self target");
             assert_eq!(
                 (refused.refusal.code.wire(), refused.refusal.reason),
-                ("ProtectedProcess", Some("self_target")),
+                ("ProtectedProcess", Some(Reason::SelfTarget)),
                 "{persona:?}"
             );
             assert!(backend.sink().is_empty());
@@ -201,7 +202,7 @@ fn open_refuses_suspended_while_a_marker_is_present() {
         .expect_err("stopped");
     assert_eq!(
         (refused.code.wire(), refused.reason),
-        ("Suspended", Some("stop_marker"))
+        ("Suspended", Some(Reason::StopMarker))
     );
     assert!(
         guard.self_set().contains_pid(std::process::id()),

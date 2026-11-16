@@ -75,7 +75,7 @@ impl StopListener for FakeStopListener {
         if self.script == StopPathScript::Deaf {
             return Err(Refusal::new(
                 EngineCode::StopPathUnavailable,
-                Reason::Deaf.wire(),
+                Reason::Deaf,
             ));
         }
         Ok(std::mem::take(&mut lock(&self.shared).stop_pressed))
