@@ -8,7 +8,7 @@ import { createManualSettlementScheduler, flushSettlement } from "./turn-settlem
 const COMPACTION_ERROR = "Context remains above the compaction threshold because compaction did not complete"
 const CONTINUATION_ERROR = "Failed to continue queued messages: Cannot continue with assistant message"
 
-function fixture() {
+function fixture(wakeSourcesLive: () => boolean = () => false) {
   const outcomes: RunnerOutcome[] = []
   const scheduler = createManualSettlementScheduler()
   const settlement = createTurnSettlement({
@@ -17,6 +17,7 @@ function fixture() {
     baseline: () => undefined,
     finalText: () => undefined,
     probe: async () => ({ isStreaming: false, isCompacting: false }),
+    wakeSourcesLive,
     settleConfirmMs: 100,
     scheduleConfirmation: scheduler.scheduler,
   })
@@ -27,11 +28,72 @@ function retryingEnd(): AgentSessionEvent {
   return {
     type: "agent_end",
     willRetry: true,
-    messages: [],
+    messages: [
+      {
+        role: "assistant",
+        content: [],
+        api: "anthropic-messages",
+        provider: "synthetic",
+        model: "primary",
+        usage: {
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 0,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: "error",
+        errorMessage: COMPACTION_ERROR,
+        timestamp: 1,
+      },
+    ],
   }
 }
 
 describe("recovery settlement (omo#13785)", () => {
+  test("settles the original retrying error when recovery becomes idle without a retry-end event", () => {
+    // given
+    const { settlement, outcomes } = fixture()
+    settlement.observe(retryingEnd())
+
+    // when
+    settlement.observe({ type: "agent_idle" })
+
+    // then
+    expect(outcomes).toEqual([{ status: "error", failure: { kind: "child-turn-failed", message: COMPACTION_ERROR } }])
+  })
+
+  test("does not settle a retrying error at idle while a continuation wake source is live", () => {
+    // given
+    let live = true
+    const { settlement, outcomes } = fixture(() => live)
+    settlement.observe(retryingEnd())
+
+    // when
+    settlement.observe({ type: "agent_idle" })
+    expect(outcomes).toEqual([])
+    settlement.observe({ type: "agent_start" })
+    live = false
+    settlement.observe({ type: "agent_idle" })
+
+    // then
+    expect(outcomes).toEqual([])
+  })
+
+  test("does not arm terminal confirmation for a retry that still owns recovery", () => {
+    // given
+    const { settlement, scheduler, outcomes } = fixture()
+    settlement.observe(retryingEnd())
+
+    // when
+    settlement.reconfirmHeld()
+
+    // then
+    expect(scheduler.pending()).toBe(0)
+    expect(outcomes).toEqual([])
+  })
+
   test("reports a declined retry when no further agent_end or agent_idle arrives", async () => {
     // given
     const { settlement, scheduler, outcomes } = fixture()
@@ -58,6 +120,20 @@ describe("recovery settlement (omo#13785)", () => {
 
     // then
     expect(outcomes).toEqual([{ status: "error", failure: { kind: "child-turn-failed", message: CONTINUATION_ERROR } }])
+  })
+
+  test("preserves the announced error when the declined retry omits finalError", async () => {
+    // given
+    const { settlement, scheduler, outcomes } = fixture()
+    settlement.observe(retryingEnd())
+
+    // when
+    settlement.observe({ type: "auto_retry_end", success: false, attempt: 1 })
+    scheduler.runNext()
+    await flushSettlement()
+
+    // then
+    expect(outcomes).toEqual([{ status: "error", failure: { kind: "child-turn-failed", message: COMPACTION_ERROR } }])
   })
 
   test("does not fail a retry that starts another run", async () => {

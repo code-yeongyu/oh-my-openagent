@@ -91,7 +91,7 @@ export function sessionIsIdle(state: {
 
 export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement {
   let held: RunnerOutcome | undefined
-  let retryError: string | undefined
+  let pendingRetry: RunnerOutcome | undefined
   let confirmation: SettlementTimerHandle | undefined
   let unreadableProbes = 0
   const scheduleConfirmation = input.scheduleConfirmation ?? defaultConfirmationScheduler
@@ -161,7 +161,7 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
     held = input.abortedByUser()
       ? { status: "cancelled" }
       : { status: "error", failure: { kind: "child-turn-failed", message } }
-    retryError = undefined
+    pendingRetry = undefined
     unreadableProbes = 0
     rearm()
   }
@@ -172,15 +172,17 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
         case "agent_start":
           clearConfirmation()
           held = undefined
-          retryError = undefined
+          pendingRetry = undefined
           return
         case "agent_end": {
           const outcome = endOutcome(event)
           if (event.willRetry !== false) {
-            retryError = outcome.status === "error" ? outcome.failure.message : undefined
+            clearConfirmation()
+            held = undefined
+            pendingRetry = outcome
             return
           }
-          retryError = undefined
+          pendingRetry = undefined
           // A replaced session runs nothing more for this child: its interrupt is final at once.
           if (outcome.status === "cancelled" || outcome.status === "interrupted") {
             clearConfirmation()
@@ -195,16 +197,23 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
         }
         case "auto_retry_end":
           if (!event.success) {
-            holdRecoveryFailure(event.finalError ?? retryError ?? "RPC child retry ended without completing")
+            holdRecoveryFailure(
+              event.finalError ??
+                (pendingRetry?.status === "error"
+                  ? pendingRetry.failure.message
+                  : "RPC child retry ended without completing"),
+            )
           }
           return
         case "continuation_error":
           holdRecoveryFailure(event.errorMessage)
           return
         case "agent_idle": {
+          if (input.wakeSourcesLive?.() === true) return
           clearConfirmation()
-          const outcome = held
+          const outcome = held ?? pendingRetry
           held = undefined
+          pendingRetry = undefined
           if (outcome !== undefined) input.settle(outcome)
           return
         }
@@ -212,7 +221,7 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
           return
       }
     },
-    pending: () => held,
+    pending: () => held ?? pendingRetry,
     cancelConfirmation: clearConfirmation,
     reconfirmHeld: rearm,
   }
