@@ -75,12 +75,6 @@ export type ClientCore = {
   readonly self: () => RemoteClient
 }
 
-/** The answer of a member whose part has not landed yet. */
-export const notYet = (member: string): RemoteFailure =>
-  remoteFailure("unsupported", `${member} is not available in this build.`, nextActionFor("unsupported"), {
-    details: { feature: member },
-  })
-
 const hostSlug = (): string =>
   hostname()
     .toLowerCase()
