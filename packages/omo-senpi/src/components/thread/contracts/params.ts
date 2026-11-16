@@ -50,7 +50,7 @@ export const ThreadListParams = Type.Object({
   all_scope: Type.Optional(
     Type.Boolean({
       description:
-        "List threads from every workspace on this machine; the default scope returns only the caller's workspace.",
+        "List this machine's threads from every workspace; the default returns only the caller's workspace here. The account's other devices' threads are always listed.",
     }),
   ),
 })
@@ -178,7 +178,7 @@ export const ThreadSetReasoningParams = Type.Object({
   scope: Type.Optional(
     Type.Union([Type.Literal("session"), Type.Literal("turn")], {
       description:
-        "session (default) changes the thread's remembered level for its model; turn changes only the current session level without rewriting the model's remembered level.",
+        "session (default) or turn; either changes only this thread's level and never the level the device remembers for the model.",
     }),
   ),
   all_scope: AllScope,
