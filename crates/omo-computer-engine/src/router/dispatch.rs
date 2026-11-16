@@ -31,8 +31,14 @@ pub fn dispatch(router: &mut Router, method: Method, params: Value) -> Result<Va
             json!(hello(&router.ctx.machine_key))
         }
         Method::SessionOpen => {
+            let relay_only = params.get("allowHostRelayOnlyStop") == Some(&Value::Bool(true));
             let opened = session.open(parse(params)?).map_err(|r| refused(&r))?;
             router.resume_token = Some(opened.resume_token.clone());
+            // The connection that opened the session is the host's relay channel: its open is
+            // the relay's first beat, then `stopPath.heartbeat` keeps it fresh (C14, R56a).
+            if relay_only {
+                session.stop_path_heartbeat();
+            }
             json!(opened)
         }
         Method::StopPathStart => json!(session.stop_path_start(parse(params)?)),
