@@ -16,6 +16,12 @@ export type SliceSignature = {
   readonly identifier: string
   readonly team: string
   readonly runtime: boolean
+  /** Mach-O cputype of the slice (0x0100000c arm64, 0x01000007 x86_64). */
+  readonly cpuType: number
+  /** sha256 hex of the requirements blob (the designated requirement), "" when the slice has none. */
+  readonly requirementsSha256: string
+  /** True when the slice carries an entitlements or DER entitlements blob. */
+  readonly entitlements: boolean
   /** Hex of the first 20 bytes of the CodeDirectory's sha256: the cdhash Apple's ticket service is keyed by. */
   readonly cdhash: string
   readonly codeDirectory: Uint8Array
@@ -25,7 +31,11 @@ export type SliceSignature = {
 
 const CODE_DIRECTORY = 0
 const CMS = 0x10000
-const SPECIAL_BLOBS = new Map([[2, "requirements"], [5, "entitlements"], [7, "DER entitlements"]])
+const SPECIAL_BLOBS = new Map([
+  [2, "requirements"],
+  [5, "entitlements"],
+  [7, "DER entitlements"],
+])
 const sha256 = (bytes: Uint8Array) => new Uint8Array(createHash("sha256").update(bytes).digest())
 const hex = (bytes: Uint8Array) => Buffer.from(bytes).toString("hex")
 const equal = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((value, index) => value === b[index])
@@ -98,26 +108,34 @@ function readSlice(bytes: Uint8Array, range: { start: number; end: number }): Sl
   if (version >= 0x20300 && cdv.getBigUint64(56, false) !== 0n) refuse("64-bit code limit is not supported")
   if (codeLimit !== signatureOffset) refuse("CodeDirectory does not cover every byte before the signature")
   if (pageShift < 9 || pageShift > 16 || slots !== Math.ceil(codeLimit / 2 ** pageShift)) refuse("bad page layout")
-  if (hashOffset - special * 32 < 0 || hashOffset + slots * 32 > cd.byteLength) refuse("hash slots exceed the CodeDirectory")
+  if (hashOffset - special * 32 < 0 || hashOffset + slots * 32 > cd.byteLength)
+    refuse("hash slots exceed the CodeDirectory")
   for (let page = 0; page < slots; page++) {
     const from = page * 2 ** pageShift
     const actual = sha256(slice.subarray(from, Math.min(from + 2 ** pageShift, codeLimit)))
-    if (!equal(actual, cd.subarray(hashOffset + page * 32, hashOffset + page * 32 + 32))) refuse(`code page ${page} does not match its hash`)
+    if (!equal(actual, cd.subarray(hashOffset + page * 32, hashOffset + page * 32 + 32)))
+      refuse(`code page ${page} does not match its hash`)
   }
   for (let slot = 1; slot <= Math.max(special, 7); slot++) {
-    const recorded = slot <= special ? cd.subarray(hashOffset - slot * 32, hashOffset - slot * 32 + 32) : new Uint8Array(32)
+    const recorded =
+      slot <= special ? cd.subarray(hashOffset - slot * 32, hashOffset - slot * 32 + 32) : new Uint8Array(32)
     const blob = blobs.get(slot)
     const expected = blob ? sha256(blob) : new Uint8Array(32)
-    if (!equal(recorded, expected)) refuse(`special slot ${slot} (${SPECIAL_BLOBS.get(slot) ?? "unsupported"}) does not match`)
+    if (!equal(recorded, expected))
+      refuse(`special slot ${slot} (${SPECIAL_BLOBS.get(slot) ?? "unsupported"}) does not match`)
   }
   const teamOffset = version >= 0x20200 ? cdv.getUint32(48, false) : 0
   const cms = blobs.get(CMS)
+  const requirements = blobs.get(2)
   return {
     start: range.start,
     hashedEnd: range.start + codeLimit,
     identifier: cString(cd, cdv.getUint32(20, false)),
     team: teamOffset === 0 ? "" : cString(cd, teamOffset),
     runtime: (cdv.getUint32(12, false) & 0x10000) !== 0,
+    cpuType: le.getUint32(4, true),
+    requirementsSha256: requirements ? hex(sha256(requirements)) : "",
+    entitlements: blobs.has(5) || blobs.has(7),
     cdhash: hex(sha256(cd).subarray(0, 20)),
     codeDirectory: cd,
     cms: cms && cms.byteLength > 8 ? cms.subarray(8) : null,

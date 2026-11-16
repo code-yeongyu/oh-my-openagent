@@ -1,5 +1,5 @@
 {
-  "description": "Lossless-or-full: between two observations of window 101 two toolbar buttons swap places. A reorder diff is lossy, so observe({since:1}) answers the full `tree` with `diffFallback:\"reordered\"` and no `diff`; the moved element keeps its number and its ref resolves. No step sends input.",
+  "description": "Lossless-or-full: between two observations of window 101 two toolbar buttons swap places. A reorder diff is lossy, so observe({since:1}) answers the full `tree` with `diffFallback:\"reordered\"` and no `diff`; the moved element keeps its number and its ref resolves. No step sends input. The recorded resumeToken is a synthetic placeholder: the case lists /result/resumeToken as variable, so its value is never compared.",
   "transport": "stdio",
   "scenario": "crates/omo-computer-backend-fake/fixtures/v3-ax-diff-reorder-full-tree.json",
   "env": {},
@@ -94,7 +94,7 @@
                   "stale": false
                 }
               },
-              "resumeToken": "2e460c61c6434cabea12a2e7df6aaf69"
+              "resumeToken": "00000000000000000000000000000002"
             }
           },
           "variable": [

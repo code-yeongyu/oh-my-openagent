@@ -11,19 +11,28 @@
 import { createHash } from "node:crypto"
 import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
-import { verifyDeveloperIdSigner } from "./operator-darwin-cms.ts"
+import { type TrustAnchors, verifyDeveloperIdSigner } from "./operator-darwin-cms.ts"
 import { Refusal, readBuildMeta, readSignatures, refuse } from "./operator-darwin-macho.ts"
+import { roleLookup, ticketLookup } from "./operator-darwin-services.ts"
 
 export const TEAM_ID = "523JNR86LZ"
 export const MANIFEST = "operator-darwin-manifest.json"
-const TICKET_URL =
-  "https://api.apple-cloudkit.com/database/1/com.apple.gk.ticket-delivery/production/public/records/lookup"
+// The keychain helper's exact designated requirement, as the hosted job pins it (script/keychain-helper-release.ts):
+//   identifier "com.mengmota.omo-keychain-helper" and anchor apple generic and
+//   certificate 1[field.1.2.840.113635.100.6.2.6] and certificate leaf[field.1.2.840.113635.100.6.1.13] and
+//   certificate leaf[subject.OU] = "523JNR86LZ"
+// This is the sha256 of its compiled requirements blob, read from three independently built helpers (#13943).
+const KEYCHAIN_REQUIREMENT_SHA256 = "6a3393d33529133e6c5a6c83886fc44e68297bc89170375aeca6ef7695fb98c1"
+const CPU_X86_64 = 0x01000007
+const CPU_ARM64 = 0x0100000c
 
 type Artifact = {
   readonly identifier: string
   readonly notarized: boolean
   readonly engine?: { readonly host: string; readonly rustTarget: string }
   readonly contains?: readonly string[]
+  /** Exact requirements blob, slice architectures and no entitlements, as the hosted keychain-helper job checks. */
+  readonly keychain?: { readonly requirementsSha256: string; readonly cpuTypes: readonly number[] }
 }
 
 // The hosted darwin legs this replaces: desktop-engine (engine + trust helper per host), keychain-helper, and the
@@ -42,21 +51,37 @@ export const ARTIFACTS: Readonly<Record<string, Artifact>> = {
   },
   "omo-engine-trust-helper-darwin-arm64": { identifier: "ai.sisyphuslabs.omo-engine-trust-helper", notarized: false },
   "omo-engine-trust-helper-darwin-x64": { identifier: "ai.sisyphuslabs.omo-engine-trust-helper", notarized: false },
-  "omo-keychain-darwin-universal": { identifier: "com.mengmota.omo-keychain-helper", notarized: true },
+  "omo-keychain-darwin-universal": {
+    identifier: "com.mengmota.omo-keychain-helper",
+    notarized: true,
+    keychain: { requirementsSha256: KEYCHAIN_REQUIREMENT_SHA256, cpuTypes: [CPU_X86_64, CPU_ARM64] },
+  },
   "omo-darwin-arm64": {
     identifier: "ai.sisyphuslabs.omo",
     notarized: true,
-    contains: ["senpi-desktop-engine-darwin-arm64", "omo-engine-trust-helper-darwin-arm64", "omo-keychain-darwin-universal"],
+    contains: [
+      "senpi-desktop-engine-darwin-arm64",
+      "omo-engine-trust-helper-darwin-arm64",
+      "omo-keychain-darwin-universal",
+    ],
   },
   "omo-darwin-x64": {
     identifier: "ai.sisyphuslabs.omo",
     notarized: true,
-    contains: ["senpi-desktop-engine-darwin-x64", "omo-engine-trust-helper-darwin-x64", "omo-keychain-darwin-universal"],
+    contains: [
+      "senpi-desktop-engine-darwin-x64",
+      "omo-engine-trust-helper-darwin-x64",
+      "omo-keychain-darwin-universal",
+    ],
   },
   "omo-darwin-x64-baseline": {
     identifier: "ai.sisyphuslabs.omo",
     notarized: true,
-    contains: ["senpi-desktop-engine-darwin-x64", "omo-engine-trust-helper-darwin-x64", "omo-keychain-darwin-universal"],
+    contains: [
+      "senpi-desktop-engine-darwin-x64",
+      "omo-engine-trust-helper-darwin-x64",
+      "omo-keychain-darwin-universal",
+    ],
   },
 }
 
@@ -69,6 +94,9 @@ export type SliceFacts = {
   readonly team: string
   readonly signerTeam: string
   readonly runtime: boolean
+  readonly cpuType: number
+  readonly requirementsSha256: string
+  readonly entitlements: boolean
   readonly cdhash: string
   /** File range [start, hashedEnd) covered by the CodeDirectory's page hashes. */
   readonly start: number
@@ -85,12 +113,16 @@ export type Tools = {
   readonly role: (login: string) => Promise<string | null>
 }
 
-export function inspectSignatures(bytes: Uint8Array): SliceFacts[] {
+/** `anchors` exists for tests that need a CA-valid signer; the CLI always uses Apple's pinned CAs. */
+export function inspectSignatures(bytes: Uint8Array, anchors?: TrustAnchors): SliceFacts[] {
   return readSignatures(bytes).map((slice) => ({
     identifier: slice.identifier,
     team: slice.team,
-    signerTeam: verifyDeveloperIdSigner(slice.codeDirectory, slice.cms).team,
+    signerTeam: verifyDeveloperIdSigner(slice.codeDirectory, slice.cms, anchors).team,
     runtime: slice.runtime,
+    cpuType: slice.cpuType,
+    requirementsSha256: slice.requirementsSha256,
+    entitlements: slice.entitlements,
     cdhash: slice.cdhash,
     start: slice.start,
     hashedEnd: slice.hashedEnd,
@@ -125,7 +157,10 @@ export async function verifyOperatorDarwin(input: Input, tools: Tools): Promise<
   if (input.actors.length === 0) refuse("no dispatching actor")
   for (const login of input.actors) {
     const role = /^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/.test(login) ? await tools.role(login) : "not a user login"
-    if (role !== "admin" && role !== "maintain") refuse(`${login} has repository role '${role ?? "unreadable"}'; only admin or maintain may use operator darwin artifacts`)
+    if (role !== "admin" && role !== "maintain")
+      refuse(
+        `${login} has repository role '${role ?? "unreadable"}'; only admin or maintain may use operator darwin artifacts`,
+      )
   }
 
   const expected = [MANIFEST, ...Object.keys(ARTIFACTS).flatMap((name) => [name, `${name}.sha256`])].sort()
@@ -136,11 +171,14 @@ export async function verifyOperatorDarwin(input: Input, tools: Tools): Promise<
   // Every operator-supplied file is trusted only through this manifest, whose hash the maintainer pinned at dispatch.
   const manifestBytes = readFileSync(join(input.dir, MANIFEST))
   if (sha256(manifestBytes) !== input.manifestSha256)
-    refuse(`${MANIFEST} sha256 ${sha256(manifestBytes)} is not the pinned operator_darwin_manifest_sha256 ${input.manifestSha256}`)
+    refuse(
+      `${MANIFEST} sha256 ${sha256(manifestBytes)} is not the pinned operator_darwin_manifest_sha256 ${input.manifestSha256}`,
+    )
   const manifest = record(JSON.parse(manifestBytes.toString("utf8")))
   const sourceSha = String(manifest.source_sha ?? "")
   if (!/^[0-9a-f]{40}$/.test(sourceSha)) refuse("manifest source_sha is not a 40-hex SHA")
-  if (input.tag !== `operator-darwin-${sourceSha.slice(0, 12)}`) refuse(`tag ${input.tag} does not name source ${sourceSha}`)
+  if (input.tag !== `operator-darwin-${sourceSha.slice(0, 12)}`)
+    refuse(`tag ${input.tag} does not name source ${sourceSha}`)
   if (manifest.version !== input.version) refuse(`manifest version ${String(manifest.version)} is not ${input.version}`)
   const hashes = record(manifest.sha256)
 
@@ -174,33 +212,62 @@ export async function verifyOperatorDarwin(input: Input, tools: Tools): Promise<
     facts.set(name, slices)
     if (slices.length === 0) refuse(`${name}: no code signature`)
     for (const slice of slices) {
-      if (slice.identifier !== artifact.identifier) refuse(`${name}: identifier ${slice.identifier}, expected ${artifact.identifier}`)
+      if (slice.identifier !== artifact.identifier)
+        refuse(`${name}: identifier ${slice.identifier}, expected ${artifact.identifier}`)
       if (slice.team !== TEAM_ID) refuse(`${name}: TeamIdentifier ${slice.team}, expected ${TEAM_ID}`)
       if (slice.signerTeam !== TEAM_ID) refuse(`${name}: signed by team ${slice.signerTeam}, expected ${TEAM_ID}`)
       if (!slice.runtime) refuse(`${name}: hardened runtime flag missing`)
-      if (artifact.notarized && !(await tools.ticket(slice.cdhash))) refuse(`${name}: no notarization ticket for cdhash ${slice.cdhash}`)
+      if (artifact.notarized && !(await tools.ticket(slice.cdhash)))
+        refuse(`${name}: no notarization ticket for cdhash ${slice.cdhash}`)
     }
     const cdhashes = slices.map((slice) => slice.cdhash)
+    if (artifact.keychain) {
+      const { requirementsSha256, cpuTypes } = artifact.keychain
+      if (slices.some((slice) => slice.requirementsSha256 !== requirementsSha256))
+        refuse(`${name}: designated requirement differs from the keychain helper contract`)
+      if (slices.some((slice) => slice.entitlements))
+        refuse(`${name}: carries entitlements; the keychain helper contract has none`)
+      const architectures = slices.map((slice) => slice.cpuType).sort((a, b) => a - b)
+      if (JSON.stringify(architectures) !== JSON.stringify([...cpuTypes].sort((a, b) => a - b)))
+        refuse(`${name}: slices are not exactly x86_64 + arm64`)
+    }
 
     if (artifact.engine) {
       const stamp = readBuildMeta(content)
       if (stamp === null) refuse(`${name}: no __OMO_META,__build section`)
-      if (!slices.some((slice) => stamp.end <= slice.hashedEnd)) refuse(`${name}: __OMO_META,__build lies outside the signed bytes`)
+      if (!slices.some((slice) => stamp.end <= slice.hashedEnd))
+        refuse(`${name}: __OMO_META,__build lies outside the signed bytes`)
       const meta = record(JSON.parse(stamp.text))
-      if (meta.source_sha !== sourceSha) refuse(`${name}: embedded source_sha ${String(meta.source_sha)} is not ${sourceSha}`)
+      if (meta.source_sha !== sourceSha)
+        refuse(`${name}: embedded source_sha ${String(meta.source_sha)} is not ${sourceSha}`)
       if (meta.host !== artifact.engine.host || meta.rust_target !== artifact.engine.rustTarget)
-        refuse(`${name}: embedded target ${String(meta.host)}/${String(meta.rust_target)} is not ${artifact.engine.host}`)
-      if (meta.version !== input.version) refuse(`${name}: embedded version ${String(meta.version)} is not ${input.version}`)
+        refuse(
+          `${name}: embedded target ${String(meta.host)}/${String(meta.rust_target)} is not ${artifact.engine.host}`,
+        )
+      if (meta.version !== input.version)
+        refuse(`${name}: embedded version ${String(meta.version)} is not ${input.version}`)
     }
     rows.push(`| \`${name}\` | \`${digest}\` | \`${cdhashes.join(", ")}\` |`)
   }
   for (const [name, artifact] of Object.entries(ARTIFACTS)) {
     for (const part of artifact.contains ?? []) {
-      if (!embedsHashed(bytes.get(name) ?? new Uint8Array(), facts.get(name) ?? [], bytes.get(part) ?? new Uint8Array([0])))
+      if (
+        !embedsHashed(
+          bytes.get(name) ?? new Uint8Array(),
+          facts.get(name) ?? [],
+          bytes.get(part) ?? new Uint8Array([0]),
+        )
+      )
         refuse(`${name}: does not embed the verified ${part}`)
     }
   }
-  return [`Operator: \`${String(manifest.operator ?? "")}\`; source \`${sourceSha}\``, "", "| asset | sha256 | cdhash |", "| --- | --- | --- |", ...rows]
+  return [
+    `Operator: \`${String(manifest.operator ?? "")}\`; source \`${sourceSha}\``,
+    "",
+    "| asset | sha256 | cdhash |",
+    "| --- | --- | --- |",
+    ...rows,
+  ]
 }
 
 async function main(argv: readonly string[]): Promise<number> {
@@ -215,24 +282,9 @@ async function main(argv: readonly string[]): Promise<number> {
   }
   const tools: Tools = {
     inspect: inspectSignatures,
-    ticket: async (cdhash) => {
-      const response = await fetch(TICKET_URL, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ records: [{ recordName: `2/2/${cdhash}` }] }),
-      })
-      const body = record(await response.json())
-      const first = record(Array.isArray(body.records) ? body.records[0] : undefined)
-      return response.ok && typeof record(record(first.fields).signedTicket).value === "string"
-    },
+    ticket: ticketLookup(),
     git: (args) => run(["git", "-C", repo, ...args]),
-    role: async (login) => {
-      const response = await fetch(`https://api.github.com/repos/${arg("--repository")}/collaborators/${login}/permission`, {
-        headers: { authorization: `Bearer ${process.env.GH_TOKEN ?? ""}`, accept: "application/vnd.github+json" },
-      })
-      const role = response.ok ? record(await response.json()).role_name : undefined
-      return typeof role === "string" ? role : null
-    },
+    role: roleLookup(arg("--repository"), process.env.GH_TOKEN ?? ""),
   }
   try {
     const rows = await verifyOperatorDarwin(

@@ -55,13 +55,15 @@ describe("operator darwin Mach-O signature layout", () => {
 
   test("refuses an entitlements blob the CodeDirectory does not hash", () => {
     const entitlements = new Uint8Array([0xfa, 0xde, 0x71, 0x71, 0, 0, 0, 12, 1, 2, 3, 4])
-    expect(refusal(machoSigned({ code, extraBlobs: [[5, entitlements]] }).file)).toBe("REFUSED: special slot 5 (entitlements) does not match")
+    expect(refusal(machoSigned({ code, extraBlobs: [[5, entitlements]] }).file)).toBe(
+      "REFUSED: special slot 5 (entitlements) does not match",
+    )
   })
 
   test("refuses an alternate CodeDirectory", () => {
-    expect(refusal(machoSigned({ code, extraBlobs: [[0x1000, new Uint8Array([0xfa, 0xde, 0x0c, 0x02, 0, 0, 0, 8])]] }).file)).toBe(
-      "REFUSED: unsupported signature blob type 0x1000 (alternate CodeDirectories are refused)",
-    )
+    expect(
+      refusal(machoSigned({ code, extraBlobs: [[0x1000, new Uint8Array([0xfa, 0xde, 0x0c, 0x02, 0, 0, 0, 8])]] }).file),
+    ).toBe("REFUSED: unsupported signature blob type 0x1000 (alternate CodeDirectories are refused)")
   })
 
   test("refuses a file with no code signature", () => {
