@@ -24,20 +24,33 @@ async function json(response: Response, what: string): Promise<Record<string, un
  * True when Apple serves a notarization ticket for exactly this cdhash; false when it answers that none exists.
  * Any other answer (network failure, HTTP error, a reply about another record) is refused.
  */
-export function ticketLookup(fetcher: Fetch = fetch): (cdhash: string) => Promise<boolean> {
+// Each lookup gets this long, reading the body included, so a stalled connection cannot hold the job for hours.
+const TICKET_TIMEOUT_MS = 30_000
+
+export function ticketLookup(
+  fetcher: Fetch = fetch,
+  timeoutMs = TICKET_TIMEOUT_MS,
+): (cdhash: string) => Promise<boolean> {
   return async (cdhash) => {
     const recordName = `2/2/${cdhash}`
+    const signal = AbortSignal.timeout(timeoutMs)
+    const late = () =>
+      refuse(`Apple's notarization ticket service did not answer within ${timeoutMs} ms for cdhash ${cdhash}`)
     let response: Response
     try {
       response = await fetcher(TICKET_URL, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ records: [{ recordName }] }),
+        signal,
       })
     } catch {
-      return refuse(`could not reach Apple's notarization ticket service for cdhash ${cdhash}`)
+      return signal.aborted
+        ? late()
+        : refuse(`could not reach Apple's notarization ticket service for cdhash ${cdhash}`)
     }
     const body = await json(response, "Apple's notarization ticket service")
+    if (signal.aborted) late()
     if (!response.ok)
       refuse(`Apple's notarization ticket service answered HTTP ${response.status} for cdhash ${cdhash}`)
     const records = Array.isArray(body.records) ? body.records.map(record) : []
