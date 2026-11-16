@@ -1605,6 +1605,7 @@
     "packages/omo-senpi/src/components/thread/contracts/results.ts",
     "packages/omo-senpi/src/components/thread/control/close-ladder.ts",
     "packages/omo-senpi/src/components/thread/control/create-launch.ts",
+    "packages/omo-senpi/src/components/thread/control/interrupt.ts",
     "packages/omo-senpi/src/components/thread/control/local-control.ts",
     "packages/omo-senpi/src/components/thread/control/local-open.ts",
     "packages/omo-senpi/src/components/thread/control/local-session-host.ts",
