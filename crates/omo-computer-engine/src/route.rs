@@ -77,9 +77,20 @@ pub fn backend(vars: &[(String, String)]) -> Result<Box<dyn Backend>, RouteError
         }
         // Row 55 (R35): the Windows backend, on Windows only.
         #[cfg(windows)]
-        Some(value) if value == WIN32_BACKEND => Ok(Box::new(omo_computer_backend_win32::Win32Backend::new())),
+        Some(value) if value == WIN32_BACKEND => real(omo_computer_backend_win32::Win32Backend::new()),
         other => Err(RouteError::NoBackend(other)),
     }
+}
+
+/// A backend the route selected as real, launched only through the launch gate (review L1 of
+/// #13349: every real arm takes the same gate as the LEAD's condition requires).
+///
+/// # Errors
+/// [`RouteError::PlatformMismatch`] when the backend declares another OS.
+#[cfg(any(windows, test))]
+pub fn real<B: Backend + 'static>(backend: B) -> Result<Box<dyn Backend>, RouteError> {
+    launch_gate(Selected::Real, &backend)?;
+    Ok(Box::new(backend))
 }
 
 /// Which backend the launch environment selected: decided by the route, never by anything the
@@ -181,5 +192,15 @@ mod tests {
             assert_eq!(real.is_ok(), declares_compile_target(&backend), "{persona:?}");
             assert!(launch_gate(Selected::Fake, &backend).is_ok(), "{persona:?}");
         }
+    }
+
+    /// Review L1 of #13349: a backend launched as real goes through the launch gate, so one
+    /// declaring another OS opens no session and one declaring this OS does.
+    #[test]
+    fn a_real_backend_is_launched_only_through_the_launch_gate() {
+        let other = Persona::ALL.into_iter().map(playing).find(|b| !declares_compile_target(b)).expect("another OS");
+        assert!(matches!(real(other), Err(RouteError::PlatformMismatch { declared: Some(_) })));
+        let own = Persona::ALL.into_iter().map(playing).find(|b| declares_compile_target(b)).expect("this OS");
+        assert!(real(own).is_ok());
     }
 }
