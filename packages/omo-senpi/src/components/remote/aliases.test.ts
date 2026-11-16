@@ -199,16 +199,16 @@ describe("aliases", () => {
     expect(registry.keys).toEqual([])
   })
 
-  test("#given set called twice with one thread and alias #when the keys are compared #then they repeat for the same pair and differ for another alias", async () => {
+  test("#given set called with one thread, spelled canonically and padded, and one alias #when the keys are compared #then they repeat for the same pair and differ for another alias", async () => {
     const registry = fakeRegistry()
     const client = await clientWith(async () => registry)
 
     await client.aliases.set(live, "build")
-    await client.aliases.set(live, "build")
+    await client.aliases.set(` ${live} ` as ThreadHandle, "build")
     await client.aliases.set(live, "ship")
 
     const [first, second, third] = registry.keys
-    expect(first).toBe(second)
+    expect(second).toBe(first)
     expect(third).not.toBe(first)
   })
 

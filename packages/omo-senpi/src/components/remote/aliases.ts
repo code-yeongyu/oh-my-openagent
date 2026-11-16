@@ -88,9 +88,12 @@ export function aliasMembers(core: ClientCore): RemoteClient["aliases"] {
       return aliases.kind === "error" ? aliasFailure(aliases.error) : await body(aliases.value)
     })
 
+  // A `<device>/<session>` handle's parts and its canonical spelling (seam 1), which keys a change idempotently.
   const sessionOf = (thread: ThreadHandle) => {
     const parsed = canonicalizeThreadHandle(thread, {})
-    return parsed.kind === "ok" && parsed.value.target.kind === "device_session" ? parsed.value.target : undefined
+    return parsed.kind === "ok" && parsed.value.target.kind === "device_session"
+      ? { ...parsed.value.target, handle: parsed.value.handle }
+      : undefined
   }
 
   // The row `device` lists that `matches`, else what `missing` makes of the listed rows. A device that missed the listing
@@ -208,7 +211,7 @@ export function aliasMembers(core: ClientCore): RemoteClient["aliases"] {
         const current = await aliases.aliasesOf([durable.value])
         if (current.kind === "error") return aliasFailure(current.error)
         const from = current.value.get(durable.value)
-        const idempotency_key = `aliases.set\u0000${thread}\u0000${alias}`
+        const idempotency_key = `aliases.set\u0000${target.handle}\u0000${alias}`
         const changed =
           from === undefined
             ? await aliases.claim({
