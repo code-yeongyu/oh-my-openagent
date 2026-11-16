@@ -5,6 +5,7 @@
 
 use senpi_desktop_core::backend::DeliveryMode;
 use senpi_desktop_core::error::ErrorCode;
+use senpi_desktop_core::holds::HoldControl;
 use senpi_desktop_core::keys::KeyName;
 use senpi_desktop_core::types::Target;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse as kbm;
@@ -132,6 +133,28 @@ fn background_modifier_chord_is_refused_with_nothing_posted() {
         .unwrap_err();
     // Then: refused before anything was posted, and nothing left held
     println!("code={} message={}", error.code.as_str(), error.message);
+    assert_eq!(error.code, ErrorCode::BackgroundUnavailable);
+    assert_eq!(window.drain(), []);
+    assert!(input.held.is_empty());
+}
+
+#[test]
+fn background_modifier_hold_is_refused_with_nothing_posted() {
+    // Given
+    let window = ProbeWindow::new("SenpiModifierHoldProbe");
+    let mut input = input();
+    let ready = || -> senpi_desktop_core::error::CoreResult<()> { Ok(()) };
+    let control = HoldControl { check: &ready, wait: &ready };
+    // When: ctrl+k held, the bounded-hold twin of the chord route
+    let error = input
+        .hold_keys(
+            &Target::Window(window.id()),
+            &[KeyName::Ctrl, KeyName::Char('k')],
+            DeliveryMode::Background,
+            &control,
+        )
+        .unwrap_err();
+    // Then
     assert_eq!(error.code, ErrorCode::BackgroundUnavailable);
     assert_eq!(window.drain(), []);
     assert!(input.held.is_empty());
