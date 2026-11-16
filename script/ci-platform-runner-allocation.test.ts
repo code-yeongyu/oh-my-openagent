@@ -230,6 +230,7 @@ describe("#given native binary parity, which has no ubuntu leg", () => {
 describe("#given the path-filtered workflows that also run macOS/Windows on dev pushes", () => {
   test.each([
     "computer-engine.yml",
+    "computer-windows-qa.yml",
     "desktop-engine.yml",
     "desktop-windows-qa.yml",
     "desktop-linux-qa.yml",
