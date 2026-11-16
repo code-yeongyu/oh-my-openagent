@@ -274,35 +274,43 @@ function renderProtocolCall(current: string, tables: Record<Surface, [string, Ti
   const body = (Object.keys(TABLE_DOCS) as Surface[])
     .map((surface) => {
       const [constName, doc] = TABLE_DOCS[surface]
-      const rows = tables[surface].map(([method, tier, source]) => `\t${tsKey(method)}: "${tier}", // ${source}\n`)
-      return `/** ${doc} */\nexport const ${constName}: MethodPolicies = {\n${rows.join("")}};\n`
+      const rows = tables[surface].map(([method, tier, source]) => `  ${tsKey(method)}: "${tier}", // ${source}\n`)
+      return `/** ${doc} */\nexport const ${constName}: MethodPolicies = {\n${rows.join("")}}\n`
     })
     .join("\n")
   return replaceRegion(current, protocolCallPath, body, "//", "")
 }
 
 function renderPreludeIndex(current: string): string {
-  const rows = chainMethodUnion().map((method) => `\t"${method}",\n`)
-  const body = `const METHOD_ALLOWLIST: readonly string[] = [\n${rows.join("")}];\n`
+  const rows = chainMethodUnion().map((method) => `  "${method}",\n`)
+  const body = `const METHOD_ALLOWLIST: readonly string[] = [\n${rows.join("")}]\n`
   return replaceRegion(current, "src/index.ts", body, "//", "")
 }
 
 function renderProtocolAllowlistTest(current: string): string {
-  const rows = chainMethodUnion().map((method) => `\t"${method}",\n`)
-  const body = `const CHAIN_METHOD_SNAPSHOT = [\n${rows.join("")}];\n`
+  const rows = chainMethodUnion().map((method) => `  "${method}",\n`)
+  const body = `const CHAIN_METHOD_SNAPSHOT = [\n${rows.join("")}]\n`
   return replaceRegion(current, protocolAllowlistTestPath, body, "//", "")
 }
 
+/** bunfig.toml [fmt] printWidth: a list that fits on one line is written the way `bun fmt` leaves it. */
+const PRINT_WIDTH = 120
+
 function renderHelperNames(current: string): string {
-  const list = (names: readonly string[]): string =>
-    `[${[...new Set(names)]
-      .sort()
-      .map((n) => JSON.stringify(n))
-      .join(", ")}]`
+  const list = (declaration: string, names: readonly string[]): string => {
+    const items = [...new Set(names)].sort().map((name) => JSON.stringify(name))
+    const oneLine = `${declaration} = [${items.join(", ")}]`
+    return oneLine.length <= PRINT_WIDTH
+      ? `${oneLine}\n`
+      : `${declaration} = [\n${items.map((item) => `  ${item},\n`).join("")}]\n`
+  }
   const body =
-    `export const CHAIN_METHODS: readonly string[] = ${list(chainMethodUnion())};\n` +
-    `export const ACTION_HELPERS: readonly string[] = ${list(ACTION_HELPERS)};\n` +
-    `export const COMPOSED_HELPERS: readonly string[] = ${list(COMPOSED_HELPERS.map((c) => c.helper))};\n`
+    list("export const CHAIN_METHODS: readonly string[]", chainMethodUnion()) +
+    list("export const ACTION_HELPERS: readonly string[]", ACTION_HELPERS) +
+    list(
+      "export const COMPOSED_HELPERS: readonly string[]",
+      COMPOSED_HELPERS.map((c) => c.helper),
+    )
   return replaceRegion(current, helperNamesPath, body, "//", "")
 }
 
