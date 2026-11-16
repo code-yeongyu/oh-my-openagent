@@ -35,12 +35,13 @@ const OLD_SLOTS_FULL_MESSAGE =
   'The macOS keychain holds 8 earlier OmO sign-ins that cannot be removed automatically. Open Keychain Access, delete the items whose account name ends in ".old" or ".old.1" to ".old.7" for OmO, then sign in again.'
 
 const NOT_OWNED_MESSAGE =
-  'The OmO sign-in in the macOS keychain (item "omo-cli") is owned by a different program, and macOS does not let this one remove it. Open Keychain Access, delete the "omo-cli" item for OmO, then try again.'
+  'The macOS keychain sign-in (item "omo-cli") belongs to another OmO program, for example the OmO desktop app when omo uses its sign-in, and macOS does not let this one remove it. Sign out from that program (the OmO desktop app), or delete the "omo-cli" item in Keychain Access, then try again.'
 
 const failed = (reply: HelperReply, verb: string) =>
   new HelperReadError(
-    reply.error === "locked" ? "locked" : "store",
+    reply.error === "locked" || reply.status === -25308 ? "locked" : "store",
     `The keychain helper could not ${verb} the sign-in (${reply.error ?? "no answer"}).`,
+    reply,
   )
 
 /**
@@ -112,6 +113,8 @@ export function lockedDarwinStore(deps: DarwinStoreDeps, lease: HelperLease): Lo
     },
     async clear() {
       const removed = await helper({ verb: "remove", account: deps.account })
+      if (removed.error === "store" && removed.status === -25244)
+        throw new HelperItemNotOwned(NOT_OWNED_MESSAGE, { cause: failed(removed, "remove") })
       if (removed.error === "not-owned")
         await deps.ownDelete(deps.account).catch((error: unknown) => {
           throw new HelperItemNotOwned(NOT_OWNED_MESSAGE, { cause: error })

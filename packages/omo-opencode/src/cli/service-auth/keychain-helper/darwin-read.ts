@@ -17,11 +17,19 @@ const ROW_8B_DEFAULT: Row8bChoice = "re-login"
 
 export type ReadFailure = "locked" | "store" | "pending" | "denied"
 export class HelperReadError extends Error {
+  readonly status: HelperReply["status"]
+  readonly error: HelperReply["error"]
+  readonly reason: HelperReply["reason"]
+
   constructor(
     readonly failure: ReadFailure,
     message: string,
+    reply: Pick<HelperReply, "status" | "error" | "reason"> = {},
   ) {
     super(message)
+    this.status = reply.status
+    this.error = reply.error
+    this.reason = reply.reason
   }
 }
 
