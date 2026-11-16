@@ -10,6 +10,7 @@ import {
   renameSync,
   rmSync,
   type Stats,
+  statSync,
   writeSync,
 } from "node:fs"
 import { randomUUID } from "node:crypto"
@@ -55,34 +56,45 @@ function openChecked(path: string, flags: number, allowed: number, what: string)
   return { kind: "unreadable", why }
 }
 
+/** Where Linux reaches a child THROUGH a directory descriptor (openat's effect). */
+const FD_ROUTE = "/proc/self/fd"
+
+/**
+ * `name` inside the open directory `fd`. On Linux it goes through the descriptor route, verified to
+ * BE that directory first (same device and inode), so an ENOENT there really means absent; with the
+ * route unavailable (no /proc) the answer is `undefined`, which the reader takes as unreadable.
+ */
+function childOf(fd: number, dir: string, name: string, fdRoute: string): string | undefined {
+  if (process.platform !== "linux") return join(dir, name)
+  const route = `${fdRoute}/${fd}`
+  const seen = statSync(route, { throwIfNoEntry: false })
+  const held = fstatSync(fd)
+  return seen !== undefined && seen.dev === held.dev && seen.ino === held.ino ? `${route}/${name}` : undefined
+}
+
 /**
  * Reads `host-latch` the way the engine does (host/files.rs): the config dir and `computer/` are
  * opened O_DIRECTORY|O_NOFOLLOW and must be this uid's with no group or other bits, and the file
  * is reached THROUGH the `computer/` descriptor (Linux: /proc/self/fd, openat's effect), opened
  * O_NOFOLLOW, checked owner-only on its descriptor and read from it, under 64 KiB. Anything else is
- * unreadable. One deliberate difference: a config dir that does not exist yet reads as absent (no
- * latch can be in it); the engine reads it as set, the stricter side.
+ * unreadable, and so is a descriptor route that cannot be verified. One deliberate difference: a
+ * config dir that does not exist yet reads as absent (no latch can be in it); the engine reads it as
+ * set, the stricter side. `fdRoute` is the descriptor route's root (tests point it at a missing dir).
  */
-export function readHostLatch(path: string): LatchRead {
+export function readHostLatch(path: string, fdRoute: string = FD_ROUTE): LatchRead {
   if (process.platform === "win32") return readLatchByPath(path)
   const computer = dirname(path)
   const config = openChecked(dirname(computer), constants.O_DIRECTORY, 0o700, "config_dir")
   if (config.kind !== "open") return config
   try {
-    const dir = openChecked(
-      process.platform === "linux" ? `/proc/self/fd/${config.fd}/computer` : computer,
-      constants.O_DIRECTORY,
-      0o700,
-      "computer_dir",
-    )
+    const computerPath = childOf(config.fd, dirname(computer), "computer", fdRoute)
+    if (computerPath === undefined) return { kind: "unreadable", why: "fd_route_unavailable" }
+    const dir = openChecked(computerPath, constants.O_DIRECTORY, 0o700, "computer_dir")
     if (dir.kind !== "open") return dir
     try {
-      const file = openChecked(
-        process.platform === "linux" ? `/proc/self/fd/${dir.fd}/host-latch` : path,
-        0,
-        0o600,
-        "host_latch",
-      )
+      const latchPath = childOf(dir.fd, computer, "host-latch", fdRoute)
+      if (latchPath === undefined) return { kind: "unreadable", why: "fd_route_unavailable" }
+      const file = openChecked(latchPath, 0, 0o600, "host_latch")
       if (file.kind !== "open") return file
       try {
         const stat = fstatSync(file.fd)

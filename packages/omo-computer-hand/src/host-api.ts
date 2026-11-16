@@ -1,4 +1,4 @@
-import { chmodSync, lstatSync, mkdirSync, rmSync } from "node:fs"
+import { chmodSync, lstatSync, mkdirSync, rmSync, statSync } from "node:fs"
 import { createConnection, createServer, type Socket } from "node:net"
 import { dirname } from "node:path"
 
@@ -51,12 +51,19 @@ function ownUid(): number {
 /**
  * The socket's directory is what keeps every other uid out (Node has no SO_PEERCRED): it must be a
  * real directory (not a link) this uid owns with no group or other bits, so nobody else can connect
- * to the socket, bind its name or swap it.
+ * to the socket, bind its name or swap it. Its parent must not let anyone else rename that directory
+ * away between this check and the connect: owned by this uid or root, and not group- or
+ * other-writable unless sticky (as /tmp is).
  */
 function requireOwnerOnlyDir(dir: string, uid: number): void {
   const stat = lstatSync(dir, { throwIfNoEntry: false })
   if (stat === undefined || !stat.isDirectory() || stat.uid !== uid || (stat.mode & 0o077) !== 0) {
     throw new HostApiRefused("host_api_dir_not_owner_only", dir)
+  }
+  const parent = statSync(dirname(dir))
+  const renamable = (parent.mode & 0o022) !== 0 && (parent.mode & 0o1000) === 0
+  if ((parent.uid !== uid && parent.uid !== 0) || renamable) {
+    throw new HostApiRefused("host_api_dir_not_owner_only", dirname(dir))
   }
 }
 
