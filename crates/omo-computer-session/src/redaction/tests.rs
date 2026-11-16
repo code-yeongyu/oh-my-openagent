@@ -52,7 +52,7 @@ fn every_reply_is_stamped_untrusted() {
     let mut session = session(FIELDS);
     let observation = serde_json::to_value(session.observe(serde_json::from_value(json!({"target": "101"})).expect("params")).expect("observe")).expect("json");
     assert_eq!(observation["observation"], json!({"untrustedText": true}), "{observation}");
-    let frame = serde_json::to_value(session.capture_frame("101", true, None).expect("capture")).expect("json");
+    let frame = serde_json::to_value(session.capture(serde_json::from_value(json!({"target": "101"})).expect("params")).expect("capture")).expect("json");
     assert_eq!(frame["observation"], json!({"untrustedText": true}), "{frame}");
     session.stop_path_start(serde_json::from_value(json!({})).expect("start"));
     let typed = session.type_text(serde_json::from_value(json!({"target": "101", "text": "abc"})).expect("typeText")).expect("typeText");
