@@ -53,10 +53,10 @@ describe("#given PR Automation Signal", () => {
   })
 })
 
-describe.each([
-  ["cla.yml", "CLA Assistant"],
-  ["review-claims.yml", "Review Claims"],
-])("#given %s", (file, workflow) => {
+describe("#given the folded privileged consumer, PR Automation", () => {
+  const file = "pr-automation.yml"
+  const workflow = "PR Automation"
+
   test("#then a newer signal for the same PR head branch replaces the older run, never another PR's", () => {
     const older = decide(file, signalCompleted(workflow, "feature/7", 1))
     const newer = decide(file, signalCompleted(workflow, "feature/7", 2))
@@ -66,13 +66,26 @@ describe.each([
     expect(other.group).not.toBe(older.group)
   })
 
-  test.each(["issue_comment", "workflow_dispatch", "schedule", "merge_group"])(
-    "#then a %s run keeps its own group and is never cancelled",
-    (event) => {
-      const one = decide(file, { workflow, event_name: event, run_id: 1, event: {} })
-      const two = decide(file, { workflow, event_name: event, run_id: 2, event: {} })
-      expect(one.cancels).toBe(false)
-      expect(two.group).not.toBe(one.group)
-    },
-  )
+  test("#then a dispatched recheck keeps its own group and is never cancelled", () => {
+    const one = decide(file, { workflow, event_name: "workflow_dispatch", run_id: 1, event: {} })
+    const two = decide(file, { workflow, event_name: "workflow_dispatch", run_id: 2, event: {} })
+    expect(one.cancels).toBe(false)
+    expect(two.group).not.toBe(one.group)
+  })
+})
+
+describe("#given the CLA signing path", () => {
+  test("#then every comment-triggered run keeps its own group and is never cancelled", () => {
+    const one = decide("cla.yml", { workflow: "CLA Assistant", event_name: "issue_comment", run_id: 1, event: {} })
+    const two = decide("cla.yml", { workflow: "CLA Assistant", event_name: "issue_comment", run_id: 2, event: {} })
+    expect(one.cancels).toBe(false)
+    expect(two.group).not.toBe(one.group)
+  })
+})
+
+describe.each(["review-claims.yml", "package-labels.yml"])("#given %s, which no longer runs per PR event", (file) => {
+  test("#then it declares no workflow concurrency, so nothing cancels its sweep, gate or issue runs", () => {
+    const parsed: unknown = load(readFileSync(new URL(`../.github/workflows/${file}`, import.meta.url), "utf8"))
+    expect(isRecord(parsed) && parsed["concurrency"]).toBeFalsy()
+  })
 })

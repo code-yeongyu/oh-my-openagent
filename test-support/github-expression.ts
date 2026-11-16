@@ -19,6 +19,7 @@ export interface ExpressionContext {
   readonly github: unknown
   readonly needs?: unknown
   readonly matrix?: unknown
+  readonly steps?: unknown
 }
 
 const functions = {
@@ -35,9 +36,16 @@ const functions = {
 export function evaluate(expression: unknown, context: ExpressionContext): unknown {
   const text = String(expression).trim()
   const body = /^\$\{\{\s*([\s\S]+?)\s*\}\}$/.exec(text)?.[1] ?? text
-  const names = ["github", "needs", "matrix", "inputs", ...Object.keys(functions)]
+  const names = ["github", "needs", "matrix", "steps", "inputs", ...Object.keys(functions)]
   const run = new Function(...names, `return (${toJavaScript(body)})`)
-  return run(context.github, context.needs ?? {}, context.matrix ?? {}, {}, ...Object.values(functions))
+  return run(
+    context.github,
+    context.needs ?? {},
+    context.matrix ?? {},
+    context.steps ?? {},
+    {},
+    ...Object.values(functions),
+  )
 }
 
 /** Renders a string that embeds `${{ ... }}` expressions, as GitHub does for concurrency group names. */
