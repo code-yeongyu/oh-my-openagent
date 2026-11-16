@@ -51,8 +51,25 @@ jobs:
     permissions:
       actions: read
       contents: read
+      issues: read
     steps:
       - uses: actions/checkout@v7
+
+      # Pull requests run Linux only (#13802); a macOS/Windows job that fails on dev opens the ci:platform-red
+      # issue (platform-red-tracker.yml). Both the release cut and the publish run refuse while it is open.
+      - name: Refuse while a dev macOS/Windows job is red
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          open="$(gh issue list --label ci:platform-red --state open --json number,url --jq '.[] | "#\(.number) \(.url)"')"
+          if [ -n "$open" ]; then
+            echo "::error::A macOS/Windows job is red on dev; fix it (or close the issue with the reason) before releasing: $open"
+            exit 1
+          fi
+          echo "No open ci:platform-red issue."
 
       - name: Require successful CI for prepared release source
         shell: bash
