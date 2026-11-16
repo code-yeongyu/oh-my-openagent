@@ -31,6 +31,8 @@ env:
 jobs:
   host:
     name: computer live windows-full (host)
+    # Pull requests run Linux only; the ci:full-matrix label, pushes and dispatches run every OS (#13802).
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-matrix')
     runs-on: windows-latest
     timeout-minutes: 30
     outputs:
@@ -99,6 +101,8 @@ jobs:
 
   session:
     name: computer live windows-full (session)
+    # Pull requests run Linux only; the ci:full-matrix label, pushes and dispatches run every OS (#13802).
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-matrix')
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -152,7 +156,8 @@ jobs:
   ledger:
     name: computer live windows-full (ledger and plan)
     needs: [host, session]
-    if: always()
+    # No facts exist when the label gate skipped both Windows legs.
+    if: always() && needs.host.result != 'skipped'
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
