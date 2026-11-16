@@ -186,3 +186,20 @@ fn a_view_without_the_stop_key_reads_deaf_chord_unarmable() {
     assert!(capabilities.contains(r#""deaf":true"#), "{capabilities}");
     assert!(capabilities.contains(r#""deafReason":"chord-unarmable""#), "{capabilities}");
 }
+
+
+/// Review L4 at 7ab3a2d55e: a stopPath.start that re-arms polls the armed listener first, so a
+/// stop chord already queued on it is not dropped with it.
+#[test]
+fn a_stop_queued_before_a_re_arm_still_latches() {
+    let sink = RecordingSink::default();
+    let fake = backend(StopPathScript::Live, &sink);
+    let keys = fake.handle();
+    let mut s = Session::new(Box::new(fake));
+    s.open(params(json!({ "reportMode": "object" })))
+        .expect("open");
+    s.stop_path_start(params(json!({})));
+    keys.press_stop_chord();
+    s.stop_path_start(params(json!({})));
+    assert!(s.stop_path_status().suspended, "{:?}", s.stop_path_status());
+}
