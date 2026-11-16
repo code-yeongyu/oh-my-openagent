@@ -17,8 +17,18 @@ pub const US_FR: &str = include_str!("../../testdata/us-fr.xkb");
 
 /// Two outputs side by side, as SP-W measured on GNOME.
 pub const TWO_OUTPUTS: [FakeRegion; 2] = [
-    FakeRegion { x: 0, y: 0, width: 1280, height: 800 },
-    FakeRegion { x: 1280, y: 0, width: 1024, height: 768 },
+    FakeRegion {
+        x: 0,
+        y: 0,
+        width: 1280,
+        height: 800,
+    },
+    FakeRegion {
+        x: 1280,
+        y: 0,
+        width: 1024,
+        height: 768,
+    },
 ];
 
 pub struct Rig {
@@ -29,17 +39,34 @@ pub struct Rig {
 impl Rig {
     pub fn new(keymap: &str, mode: Mode) -> Self {
         let dir = tempfile::tempdir().expect("temp dir");
-        let script = Script { keymap: keymap.to_owned(), regions: TWO_OUTPUTS.to_vec(), mode, keyboard: true };
+        let script = Script {
+            keymap: keymap.to_owned(),
+            regions: TWO_OUTPUTS.to_vec(),
+            mode,
+            keyboard: true,
+        };
         let eis = FakeEis::start(dir.path(), script).expect("fake EIS binds");
         Self { dir, eis }
     }
 
     pub fn socket_backend(&self, compositor: CompositorName) -> WaylandBackend {
-        WaylandBackend::new(options(compositor, InputRoute::Socket(self.eis.socket().to_owned()), self.state_file()))
+        WaylandBackend::new(options(
+            compositor,
+            InputRoute::Socket(self.eis.socket().to_owned()),
+            self.state_file(),
+        ))
     }
 
-    pub fn portal_backend(&self, compositor: CompositorName, portal: &FakePortal) -> WaylandBackend {
-        WaylandBackend::new(options(compositor, InputRoute::Portal(Box::new(portal.client())), self.state_file()))
+    pub fn portal_backend(
+        &self,
+        compositor: CompositorName,
+        portal: &FakePortal,
+    ) -> WaylandBackend {
+        WaylandBackend::new(options(
+            compositor,
+            InputRoute::Portal(Box::new(portal.client())),
+            self.state_file(),
+        ))
     }
 
     pub fn portal(&self) -> FakePortal {
@@ -63,14 +90,26 @@ pub fn options(compositor: CompositorName, route: InputRoute, state_file: PathBu
 }
 
 pub fn key(name: &str, down: bool) -> TaggedInput {
-    TaggedInput { event: InputEvent::Key { key: name.to_owned(), down }, tag: 7 }
+    TaggedInput {
+        event: InputEvent::Key {
+            key: name.to_owned(),
+            down,
+        },
+        tag: 7,
+    }
 }
 
 pub fn text(value: &str) -> TaggedInput {
-    TaggedInput { event: InputEvent::Text(value.to_owned()), tag: 7 }
+    TaggedInput {
+        event: InputEvent::Text(value.to_owned()),
+        tag: 7,
+    }
 }
 
-pub fn send(backend: &mut WaylandBackend, input: &TaggedInput) -> Result<omo_computer_core::backend::Delivered, omo_computer_core::backend::Refusal> {
+pub fn send(
+    backend: &mut WaylandBackend,
+    input: &TaggedInput,
+) -> Result<omo_computer_core::backend::Delivered, omo_computer_core::backend::Refusal> {
     backend.post_input(input, omo_computer_core::backend::Route::ForegroundHid)
 }
 

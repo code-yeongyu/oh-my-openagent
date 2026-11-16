@@ -36,7 +36,12 @@ pub trait RemoteDesktop: Send {
     ///
     /// # Errors
     /// The user cancelled, the portal is missing, or a call failed.
-    fn start(&mut self, restore_token: Option<&str>, persist: bool, clipboard: bool) -> Result<Started, PortalError>;
+    fn start(
+        &mut self,
+        restore_token: Option<&str>,
+        persist: bool,
+        clipboard: bool,
+    ) -> Result<Started, PortalError>;
 
     /// `ConnectToEIS` on a started session.
     ///

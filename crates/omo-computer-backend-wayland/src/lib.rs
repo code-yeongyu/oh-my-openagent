@@ -8,6 +8,8 @@
 mod backend;
 #[cfg(target_os = "linux")]
 pub mod clipboard;
+#[cfg(target_os = "linux")]
+pub mod consent;
 #[cfg(all(target_os = "linux", any(test, feature = "fake")))]
 pub mod fake;
 #[cfg(target_os = "linux")]
@@ -20,6 +22,8 @@ pub mod portal;
 pub mod release;
 #[cfg(all(target_os = "linux", test))]
 mod tests;
+#[cfg(target_os = "linux")]
+pub mod xkb;
 
 #[cfg(target_os = "linux")]
 pub use backend::{InputReport, InputRoute, Options, WaylandBackend, WAYLAND_BACKEND};

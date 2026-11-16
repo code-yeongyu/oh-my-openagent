@@ -22,9 +22,10 @@ serde_json.workspace = true
 ashpd.workspace = true
 libloading.workspace = true
 reis.workspace = true
-rustix = { version = "=0.38.44", features = ["event", "fs"] }
+rustix = { version = "=0.38.44", features = ["event", "fs", "process"] }
 tokio = { workspace = true, features = ["rt"] }
 xkbcommon-dl = "=0.4.2"
+xkeysym.workspace = true
 
 [target.'cfg(target_os = "linux")'.dev-dependencies]
 tempfile.workspace = true

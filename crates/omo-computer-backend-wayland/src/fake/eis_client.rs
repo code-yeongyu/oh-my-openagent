@@ -32,7 +32,7 @@ pub(super) struct Client {
     stage: Option<Stage>,
     keyboard: Option<Device>,
     devices: Vec<Device>,
-    resumed: bool,
+    resumed_at: Option<Instant>,
     held: Vec<u32>,
 }
 
@@ -40,17 +40,26 @@ impl Client {
     pub(super) fn accept(stream: UnixStream) -> std::io::Result<Self> {
         let context = eis::Context::new(stream)?;
         let handshaker = EisHandshaker::new(&context, 1);
-        Ok(Self { context, stage: Some(Stage::Handshake(handshaker)), keyboard: None, devices: Vec::new(), resumed: false, held: Vec::new() })
+        Ok(Self {
+            context,
+            stage: Some(Stage::Handshake(handshaker)),
+            keyboard: None,
+            devices: Vec::new(),
+            resumed_at: None,
+            held: Vec::new(),
+        })
     }
 
-    pub(super) const fn resumed(&self) -> bool {
-        self.resumed
+    /// Its devices have been resumed for long enough that the client finished discovery.
+    pub(super) fn settled(&self) -> bool {
+        self.resumed_at
+            .is_some_and(|at| at.elapsed() >= std::time::Duration::from_millis(200))
     }
 
     /// Reads and answers what the client sent; `false` once its socket closed.
     pub(super) fn pump(&mut self, script: &Script, log: &Arc<Mutex<Log>>) -> bool {
+        // `reis` answers `Ok(0)` when nothing is waiting and `UnexpectedEof` once closed.
         match self.context.read() {
-            Ok(0) => return self.closed(log),
             Ok(_) => {}
             Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {}
             Err(_) => return self.closed(log),
@@ -115,8 +124,15 @@ impl Client {
                     log.held = held;
                 });
             }
-            EisRequest::PointerMotionAbsolute(motion) => note(log, |log| log.motions.push((motion.dx_absolute, motion.dy_absolute))),
-            EisRequest::Button(button) => note(log, |log| log.buttons.push((button.button, button.state == eis::button::ButtonState::Press))),
+            EisRequest::PointerMotionAbsolute(motion) => note(log, |log| {
+                log.motions.push((motion.dx_absolute, motion.dy_absolute))
+            }),
+            EisRequest::Button(button) => note(log, |log| {
+                log.buttons.push((
+                    button.button,
+                    button.state == eis::button::ButtonState::Press,
+                ))
+            }),
             _ => {}
         }
         true
@@ -127,21 +143,34 @@ impl Client {
             self.keyboard = keyboard(seat, &script.keymap, log);
         }
         let regions = script.regions.clone();
-        let pointer = seat.add_device(Some("pointer"), eis::device::DeviceType::Virtual, &[DeviceCapability::PointerAbsolute, DeviceCapability::Button, DeviceCapability::Scroll], |device| {
-            for region in &regions {
-                device.device().region(region.x, region.y, region.width, region.height, 1.0);
-            }
-        });
+        let pointer = seat.add_device(
+            Some("pointer"),
+            eis::device::DeviceType::Virtual,
+            &[
+                DeviceCapability::PointerAbsolute,
+                DeviceCapability::Button,
+                DeviceCapability::Scroll,
+            ],
+            |device| {
+                for region in &regions {
+                    device
+                        .device()
+                        .region(region.x, region.y, region.width, region.height, 1.0);
+                }
+            },
+        );
         self.devices.push(pointer);
         for device in self.devices.iter().chain(self.keyboard.iter()) {
             device.resumed();
         }
-        self.resumed = true;
+        self.resumed_at = Some(Instant::now());
     }
 
     /// The compositor's layout change: the keyboard is removed and re-added with the new keymap.
     pub(super) fn replace_keyboard(&mut self, script: &Script, log: &Arc<Mutex<Log>>) {
-        let Some(old) = self.keyboard.take() else { return };
+        let Some(old) = self.keyboard.take() else {
+            return;
+        };
         let seat = old.seat().clone();
         old.remove();
         self.keyboard = keyboard(&seat, &script.keymap, log);
@@ -154,7 +183,11 @@ impl Client {
     }
 
     pub(super) fn send_group(&self, group: u32) {
-        if let Some(keyboard) = self.keyboard.as_ref().and_then(Device::interface::<eis::Keyboard>) {
+        if let Some(keyboard) = self
+            .keyboard
+            .as_ref()
+            .and_then(Device::interface::<eis::Keyboard>)
+        {
             keyboard.modifiers(1, 0, 0, 0, group);
         }
         if self.context.flush().is_err() {
@@ -179,23 +212,34 @@ impl Client {
 }
 
 fn keyboard(seat: &reis::request::Seat, keymap: &str, log: &Arc<Mutex<Log>>) -> Option<Device> {
-    let mut file = match rustix::fs::memfd_create("omo-fake-keymap", rustix::fs::MemfdFlags::CLOEXEC) {
-        Ok(fd) => std::fs::File::from(fd),
-        Err(error) => {
-            eprintln!("fake EIS: keymap memfd: {error}");
-            return None;
-        }
-    };
+    let mut file =
+        match rustix::fs::memfd_create("omo-fake-keymap", rustix::fs::MemfdFlags::CLOEXEC) {
+            Ok(fd) => std::fs::File::from(fd),
+            Err(error) => {
+                eprintln!("fake EIS: keymap memfd: {error}");
+                return None;
+            }
+        };
     let bytes = keymap.as_bytes();
-    if file.write_all(bytes).and_then(|()| file.write_all(b"\0")).and_then(|()| file.rewind()).is_err() {
+    if file
+        .write_all(bytes)
+        .and_then(|()| file.write_all(b"\0"))
+        .and_then(|()| file.rewind())
+        .is_err()
+    {
         return None;
     }
     let size = u32::try_from(bytes.len() + 1).ok()?;
-    let device = seat.add_device(Some("keyboard"), eis::device::DeviceType::Virtual, &[DeviceCapability::Keyboard], |device| {
-        if let Some(keyboard) = device.interface::<eis::Keyboard>() {
-            keyboard.keymap(eis::keyboard::KeymapType::Xkb, size, file.as_fd());
-        }
-    });
+    let device = seat.add_device(
+        Some("keyboard"),
+        eis::device::DeviceType::Virtual,
+        &[DeviceCapability::Keyboard],
+        |device| {
+            if let Some(keyboard) = device.interface::<eis::Keyboard>() {
+                keyboard.keymap(eis::keyboard::KeymapType::Xkb, size, file.as_fd());
+            }
+        },
+    );
     note(log, |log| log.keymaps_fed += 1);
     Some(device)
 }

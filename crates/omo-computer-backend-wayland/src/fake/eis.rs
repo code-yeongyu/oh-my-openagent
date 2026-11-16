@@ -28,7 +28,8 @@ pub struct FakeRegion {
 pub enum Mode {
     /// Every client is served.
     Serve,
-    /// The first client is dropped once its devices are resumed; later clients are served.
+    /// The first client is dropped once its devices have been resumed for 200 ms; later
+    /// clients are served.
     DropOnce,
     /// While one client is connected, a second one is refused (the libei socket of a
     /// compositor that admits one emulating client; the X2 SIGKILL leg's mode).
@@ -96,7 +97,12 @@ impl FakeEis {
         let (commands, inbox) = mpsc::channel();
         let shared = Arc::clone(&log);
         let thread = std::thread::spawn(move || serve(&listener, &script, &shared, &inbox));
-        Ok(Self { path, log, commands, thread: Some(thread) })
+        Ok(Self {
+            path,
+            log,
+            commands,
+            thread: Some(thread),
+        })
     }
 
     #[must_use]
@@ -159,7 +165,12 @@ impl Drop for FakeEis {
     }
 }
 
-fn serve(listener: &UnixListener, script: &Script, log: &Arc<Mutex<Log>>, inbox: &Receiver<Command>) {
+fn serve(
+    listener: &UnixListener,
+    script: &Script,
+    log: &Arc<Mutex<Log>>,
+    inbox: &Receiver<Command>,
+) {
     let mut clients: Vec<Client> = Vec::new();
     let mut script = script.clone();
     let mut dropped_once = false;
@@ -185,7 +196,7 @@ fn serve(listener: &UnixListener, script: &Script, log: &Arc<Mutex<Log>>, inbox:
             accept(stream, &script, &mut clients, log);
         }
         clients.retain_mut(|client| client.pump(&script, log));
-        if script.mode == Mode::DropOnce && !dropped_once && clients.iter().any(Client::resumed) {
+        if script.mode == Mode::DropOnce && !dropped_once && clients.iter().any(Client::settled) {
             dropped_once = true;
             clients.clear();
             note(log, |log| log.dropped += 1);
@@ -194,7 +205,12 @@ fn serve(listener: &UnixListener, script: &Script, log: &Arc<Mutex<Log>>, inbox:
     }
 }
 
-fn accept(stream: std::os::unix::net::UnixStream, script: &Script, clients: &mut Vec<Client>, log: &Arc<Mutex<Log>>) {
+fn accept(
+    stream: std::os::unix::net::UnixStream,
+    script: &Script,
+    clients: &mut Vec<Client>,
+    log: &Arc<Mutex<Log>>,
+) {
     if script.mode == Mode::SecondClientRefused && !clients.is_empty() {
         note(log, |log| log.refused += 1);
         return;

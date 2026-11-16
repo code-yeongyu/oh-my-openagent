@@ -50,7 +50,11 @@ impl Ledger {
                 let compositor = columns.next()?.to_owned();
                 let verdict = columns.nth(2)?.to_owned();
                 let question = id.strip_prefix(&format!("SPW-{compositor}-"))?.to_owned();
-                Some(Row { compositor, question, verdict })
+                Some(Row {
+                    compositor,
+                    question,
+                    verdict,
+                })
             })
             .collect();
         Self { rows }
@@ -81,14 +85,21 @@ impl Ledger {
     /// fixtures.
     #[must_use]
     pub fn with_release_verdict(mut self, compositor: CompositorName, proof: ReleaseProof) -> Self {
-        let Some(name) = ledger_name(compositor) else { return self };
+        let Some(name) = ledger_name(compositor) else {
+            return self;
+        };
         let verdict = match proof {
             ReleaseProof::Confirmed => "CONFIRMS",
             ReleaseProof::Unproven => "UNMEASURED",
             ReleaseProof::Contradicts => "CONTRADICTS",
         };
-        self.rows.retain(|row| !(row.compositor == name && row.question == "release-on-close"));
-        self.rows.push(Row { compositor: name.to_owned(), question: "release-on-close".to_owned(), verdict: verdict.to_owned() });
+        self.rows
+            .retain(|row| !(row.compositor == name && row.question == "release-on-close"));
+        self.rows.push(Row {
+            compositor: name.to_owned(),
+            question: "release-on-close".to_owned(),
+            verdict: verdict.to_owned(),
+        });
         self
     }
 
@@ -125,11 +136,29 @@ mod tests {
     #[test]
     fn the_shipped_ledger_reads_the_measured_release_rows() {
         let ledger = Ledger::shipped();
-        assert_eq!(ledger.release(CompositorName::Mutter), ReleaseProof::Confirmed);
-        assert_eq!(ledger.release(CompositorName::Kwin), ReleaseProof::Confirmed);
-        assert_eq!(ledger.release(CompositorName::Sway), ReleaseProof::Unproven, "sway's row is UNMEASURED");
-        assert_eq!(ledger.release(CompositorName::Weston), ReleaseProof::Unproven, "weston has no row");
-        assert_eq!(ledger.second_connect(CompositorName::Mutter), Some(false), "GNOME refuses a second ConnectToEIS");
+        assert_eq!(
+            ledger.release(CompositorName::Mutter),
+            ReleaseProof::Confirmed
+        );
+        assert_eq!(
+            ledger.release(CompositorName::Kwin),
+            ReleaseProof::Confirmed
+        );
+        assert_eq!(
+            ledger.release(CompositorName::Sway),
+            ReleaseProof::Unproven,
+            "sway's row is UNMEASURED"
+        );
+        assert_eq!(
+            ledger.release(CompositorName::Weston),
+            ReleaseProof::Unproven,
+            "weston has no row"
+        );
+        assert_eq!(
+            ledger.second_connect(CompositorName::Mutter),
+            Some(false),
+            "GNOME refuses a second ConnectToEIS"
+        );
         assert_eq!(ledger.second_connect(CompositorName::Kwin), Some(false));
     }
 }

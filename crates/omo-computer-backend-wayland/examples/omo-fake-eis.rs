@@ -11,10 +11,17 @@ use omo_computer_backend_wayland::fake::{FakeEis, FakeRegion, Log, Mode, Script}
 
 fn region(spec: &str) -> Option<FakeRegion> {
     let mut parts = spec.split(',').map(str::parse::<u32>);
-    let (Some(Ok(x)), Some(Ok(y)), Some(Ok(width)), Some(Ok(height))) = (parts.next(), parts.next(), parts.next(), parts.next()) else {
+    let (Some(Ok(x)), Some(Ok(y)), Some(Ok(width)), Some(Ok(height))) =
+        (parts.next(), parts.next(), parts.next(), parts.next())
+    else {
         return None;
     };
-    Some(FakeRegion { x, y, width, height })
+    Some(FakeRegion {
+        x,
+        y,
+        width,
+        height,
+    })
 }
 
 fn json(log: &Log) -> serde_json::Value {
@@ -55,7 +62,15 @@ fn main() -> std::process::ExitCode {
     };
     let regions = regions.iter().filter_map(|spec| region(spec)).collect();
     let dir = PathBuf::from(dir);
-    let eis = match FakeEis::start(&dir, Script { keymap, regions, mode, keyboard: true }) {
+    let eis = match FakeEis::start(
+        &dir,
+        Script {
+            keymap,
+            regions,
+            mode,
+            keyboard: true,
+        },
+    ) {
         Ok(eis) => eis,
         Err(error) => {
             eprintln!("omo-fake-eis: bind {}: {error}", dir.display());
@@ -67,7 +82,10 @@ fn main() -> std::process::ExitCode {
     let staging = dir.join("fake-eis.json.tmp");
     loop {
         let body = json(&eis.log()).to_string();
-        if std::fs::write(&staging, body).and_then(|()| std::fs::rename(&staging, &out)).is_err() {
+        if std::fs::write(&staging, body)
+            .and_then(|()| std::fs::rename(&staging, &out))
+            .is_err()
+        {
             eprintln!("omo-fake-eis: cannot write {}", out.display());
         }
         std::thread::sleep(Duration::from_millis(50));

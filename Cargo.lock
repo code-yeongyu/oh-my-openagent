@@ -2012,6 +2012,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "xkbcommon-dl",
+ "xkeysym",
 ]
 
 [[package]]

@@ -48,7 +48,10 @@ pub struct FakePortal {
 impl FakePortal {
     #[must_use]
     pub fn new(eis_socket: &Path) -> Self {
-        Self { socket: eis_socket.to_owned(), shared: Arc::default() }
+        Self {
+            socket: eis_socket.to_owned(),
+            shared: Arc::default(),
+        }
     }
 
     #[must_use]
@@ -79,12 +82,17 @@ impl FakePortal {
 
     #[must_use]
     pub fn log(&self) -> PortalLog {
-        self.shared.lock().map(|shared| shared.log.clone()).unwrap_or_default()
+        self.shared
+            .lock()
+            .map(|shared| shared.log.clone())
+            .unwrap_or_default()
     }
 
     #[must_use]
     pub fn client(&self) -> FakePortalClient {
-        FakePortalClient { portal: self.clone() }
+        FakePortalClient {
+            portal: self.clone(),
+        }
     }
 
     fn with(self, change: impl FnOnce(&mut Shared)) -> Self {
@@ -107,10 +115,16 @@ pub struct FakePortalClient {
 }
 
 impl RemoteDesktop for FakePortalClient {
-    fn start(&mut self, restore_token: Option<&str>, persist: bool, clipboard: bool) -> Result<Started, PortalError> {
+    fn start(
+        &mut self,
+        restore_token: Option<&str>,
+        persist: bool,
+        clipboard: bool,
+    ) -> Result<Started, PortalError> {
         self.portal.update(|shared| {
             shared.log.starts += 1;
-            let honoured = restore_token.is_some_and(|token| shared.issued.iter().any(|issued| issued == token));
+            let honoured = restore_token
+                .is_some_and(|token| shared.issued.iter().any(|issued| issued == token));
             if restore_token.is_some() {
                 shared.log.restore_tokens_presented += 1;
             }
@@ -121,9 +135,14 @@ impl RemoteDesktop for FakePortalClient {
             shared.log.clipboard_requested_before_start |= granted;
             shared.behaviour.closed = false;
             shared.session_connects = 0;
-            let restore_token = (persist && shared.behaviour.tokens).then(|| format!("token-{}", shared.log.starts));
+            let restore_token = (persist && shared.behaviour.tokens)
+                .then(|| format!("token-{}", shared.log.starts));
             shared.issued.extend(restore_token.clone());
-            Ok(Started { session: SessionHandle(format!("/session/{}", shared.log.starts)), restore_token, clipboard: granted })
+            Ok(Started {
+                session: SessionHandle(format!("/session/{}", shared.log.starts)),
+                restore_token,
+                clipboard: granted,
+            })
         })
     }
 
@@ -131,15 +150,22 @@ impl RemoteDesktop for FakePortalClient {
         let (second_refused, inheritable) = self.portal.update(|shared| {
             shared.log.connects += 1;
             shared.session_connects += 1;
-            (shared.session_connects > 1 && !shared.behaviour.second_connect, shared.behaviour.inheritable)
+            (
+                shared.session_connects > 1 && !shared.behaviour.second_connect,
+                shared.behaviour.inheritable,
+            )
         });
         if second_refused {
-            return Err(PortalError::Refused("Session is already connected".to_owned()));
+            return Err(PortalError::Refused(
+                "Session is already connected".to_owned(),
+            ));
         }
-        let stream = UnixStream::connect(&self.portal.socket).map_err(|error| PortalError::Unavailable(error.to_string()))?;
+        let stream = UnixStream::connect(&self.portal.socket)
+            .map_err(|error| PortalError::Unavailable(error.to_string()))?;
         let fd = OwnedFd::from(stream);
         if inheritable {
-            rustix::io::fcntl_setfd(&fd, rustix::io::FdFlags::empty()).map_err(|error| PortalError::Unavailable(error.to_string()))?;
+            rustix::io::fcntl_setfd(&fd, rustix::io::FdFlags::empty())
+                .map_err(|error| PortalError::Unavailable(error.to_string()))?;
         }
         Ok(fd)
     }
@@ -149,11 +175,13 @@ impl RemoteDesktop for FakePortalClient {
     }
 
     fn clipboard_version(&mut self) -> Option<u32> {
-        self.portal.update(|shared| shared.behaviour.clipboard_version)
+        self.portal
+            .update(|shared| shared.behaviour.clipboard_version)
     }
 
     fn clipboard_write(&mut self, _session: &SessionHandle, text: &str) -> Result<(), PortalError> {
-        self.portal.update(|shared| shared.log.clipboard = text.to_owned());
+        self.portal
+            .update(|shared| shared.log.clipboard = text.to_owned());
         Ok(())
     }
 
