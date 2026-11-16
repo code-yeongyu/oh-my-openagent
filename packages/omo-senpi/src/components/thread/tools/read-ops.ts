@@ -75,9 +75,8 @@ export async function readThread(
     if (control.waitSettled === undefined)
       return failure(
         "unsupported",
-        `thread_read cannot wait on thread ${control.thread_id}: it is on this device, where the wait is the monitor tool.`,
-        `Call monitor({ type: "rpc", target: "${control.thread_id}" }) to be woken when it stops, then thread_read it.`,
-        { command: "wait" },
+        "wait_ms waits only on a thread on another device.",
+        `Use monitor({ type: "rpc", target: "${control.thread_id}" }).`,
       )
     try {
       wait = await control.waitSettled(value.wait_ms, signal)

@@ -77,7 +77,8 @@ export const ThreadReadParams = Type.Object({
     Type.Integer({
       minimum: 1,
       maximum: THREAD_READ_WAIT_MAX_MS,
-      description: `Wait up to this many milliseconds (at most ${THREAD_READ_WAIT_MAX_MS}) for a thread on another device to stop running before reading; the result's wait says settled, timeout, cancelled or ended. A thread on this device answers unsupported: watch it with monitor({ type: "rpc", target: "<thread id>" }).`,
+      description:
+        "Wait up to this many ms for a thread on another device to end its turn, then read; result.wait says how it ended.",
     }),
   ),
   all_scope: AllScope,
