@@ -33,9 +33,40 @@ export class MirroredDialogs {
     if (record["type"] !== "ui_request_pending") return undefined
     const request = record["request"]
     if (!isObject(request) || raiserOnly(request)) return null
+    this.#remember(uiRequestId)
+    return { ...request, type: "extension_ui_request", id: uiRequestId, sessionId }
+  }
+
+  /**
+   * A snapshot's pending dialogs or questions (`state.pendingDialogs` / `state.pendingQuestions`, whose `id` is the
+   * uiRequestId): the ones this TUI may answer, in the local shape, each remembered so its answer names it (omo#13474).
+   */
+  pending(requests: unknown, sessionId: string): JsonObject[] {
+    if (!Array.isArray(requests)) return []
+    return requests.flatMap((request) => {
+      if (!isObject(request) || typeof request["id"] !== "string" || request["id"] === "" || raiserOnly(request))
+        return []
+      this.#remember(request["id"])
+      return [{ ...request, type: "extension_ui_request", sessionId }]
+    })
+  }
+
+  /**
+   * After a later snapshot (a re-attach): the resolution of each dialog this TUI was shown that the snapshot no longer
+   * holds. It settled while the attach was away and its settle record was lost with the gap, so the TUI dismisses it.
+   */
+  settledAway(pending: readonly JsonObject[], sessionId: string): JsonObject[] {
+    const still = new Set(pending.map((request) => request["id"]))
+    return [...this.#shown].flatMap((uiRequestId) => {
+      if (still.has(uiRequestId)) return []
+      this.#shown.delete(uiRequestId)
+      return [{ type: "question_resolved", id: uiRequestId, outcome: "cancelled", sessionId }]
+    })
+  }
+
+  #remember(uiRequestId: string): void {
     this.#shown.add(uiRequestId)
     for (const oldest of this.#shown) if (this.#shown.size > SHOWN_KEPT) this.#shown.delete(oldest)
-    return { ...request, type: "extension_ui_request", id: uiRequestId, sessionId }
   }
 
   /** The TUI answers a presented dialog by the id it was shown, its uiRequestId: the answer names it so. Others go as they are. */
