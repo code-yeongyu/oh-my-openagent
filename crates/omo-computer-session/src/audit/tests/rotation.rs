@@ -16,15 +16,8 @@ const SMALL: AuditLimits = AuditLimits {
 };
 
 /// The retired file's identity: a completed rotation replaces it.
-fn retired_id(hand: &Hand) -> Option<u64> {
-    let meta = fs::metadata(hand.retired()).ok()?;
-    #[cfg(unix)]
-    let id = std::os::unix::fs::MetadataExt::ino(&meta);
-    #[cfg(windows)]
-    let id = std::os::windows::fs::MetadataExt::creation_time(&meta);
-    #[cfg(not(any(unix, windows)))]
-    let id = meta.len();
-    Some(id)
+fn retired_id(hand: &Hand) -> Option<(u64, u64)> {
+    crate::audit::scan_identity(&hand.retired())
 }
 
 /// The authority appends until it has completed `n` more rotations.

@@ -23,20 +23,39 @@ pub(super) struct Seen {
 }
 
 #[cfg(unix)]
-fn id_of(meta: &fs::Metadata) -> FileId {
+fn id_of(_path: &Path, meta: &fs::Metadata) -> Result<FileId, Tamper> {
     use std::os::unix::fs::MetadataExt;
-    FileId(meta.dev(), meta.ino())
+    Ok(FileId(meta.dev(), meta.ino()))
 }
 
+/// Windows: the volume serial and file index of an open handle (a creation time would not do:
+/// file-name tunneling hands a new file the creation time of the one renamed away).
 #[cfg(windows)]
-fn id_of(meta: &fs::Metadata) -> FileId {
-    use std::os::windows::fs::MetadataExt;
-    FileId(meta.creation_time(), 0)
+fn id_of(path: &Path, _meta: &fs::Metadata) -> Result<FileId, Tamper> {
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Storage::FileSystem::{
+        GetFileInformationByHandle, BY_HANDLE_FILE_INFORMATION,
+    };
+    let file = File::open(path).map_err(|_| Tamper::Unreadable)?;
+    let mut info = BY_HANDLE_FILE_INFORMATION::default();
+    // SAFETY: the handle is open for the call and `info` is a live, writable out-parameter.
+    if unsafe { GetFileInformationByHandle(file.as_raw_handle(), &raw mut info) } == 0 {
+        return Err(Tamper::Unreadable);
+    }
+    let index = (u64::from(info.nFileIndexHigh) << 32) | u64::from(info.nFileIndexLow);
+    Ok(FileId(u64::from(info.dwVolumeSerialNumber), index))
 }
 
 #[cfg(not(any(unix, windows)))]
-const fn id_of(_meta: &fs::Metadata) -> FileId {
-    FileId(0, 0)
+fn id_of(_path: &Path, _meta: &fs::Metadata) -> Result<FileId, Tamper> {
+    Err(Tamper::Unreadable)
+}
+
+/// The identity of the regular file at `path` (tests use it to tell rotations apart).
+#[cfg(test)]
+pub(crate) fn identity(path: &Path) -> Option<(u64, u64)> {
+    let meta = fs::symlink_metadata(path).ok()?;
+    id_of(path, &meta).ok().map(|FileId(a, b)| (a, b))
 }
 
 /// Stats `path` without following a link: `None` when it is absent; a link, a non-regular
@@ -54,7 +73,7 @@ pub(super) fn stat(path: &Path, cap: u64) -> Result<Option<Seen>, Tamper> {
         return Err(Tamper::OverCap);
     }
     Ok(Some(Seen {
-        id: id_of(&meta),
+        id: id_of(path, &meta)?,
         len: meta.len(),
     }))
 }
