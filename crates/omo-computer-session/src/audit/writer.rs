@@ -1,13 +1,13 @@
 //! ONE audit file per hand, `<auditDir>/computer/<handId>/audit.jsonl` (0600), written by
 //! every writer of the uid as per-writer segments keyed `(writerPid, writerProcStartMs, seq)`
-//! under the per-append lock (A-IS-65 L7: `flock` on the data file on unix; on Windows the
-//! hand's `audit.lock`, never the data file, so a reader never fails on a byte-range lock),
-//! taken through the session crate's one lock helper. Each segment opens with `audit.meta`; the AUTHORITY host's segment
+//! under the hand's lock (`audit.lock`, A-IS-62 R7-3), which every writer also holds for its size
+//! checks and the rotation, on every OS; the data file itself is never locked, so a reader never
+//! fails on a byte-range lock (A-IS-65 L7). Each segment opens with `audit.meta`; the AUTHORITY host's segment
 //! follows it with a `rotation_anchor` grant. Only the authority host rotates (at
 //! `rotate_at`, to `audit.1.jsonl`); any other writer keeps appending up to `hard_cap` and
 //! then refuses exec `audit_unavailable`.
 
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
@@ -16,14 +16,14 @@ use omo_computer_core::backend::Refusal;
 use serde_json::json;
 
 use super::line::{now_ms, AuditEvent};
+use super::handlock::HandLock;
 use super::segment::{anchor_event, chain_link, stamp, truncated, Segment};
 use super::sink::{AuditSink, AUDIT_UNAVAILABLE};
-use crate::lock::file;
 
 pub const AUDIT_FILE: &str = "audit.jsonl";
 pub const ROTATED_FILE: &str = "audit.1.jsonl";
-/// The hand's append lock on Windows, beside the data file (A-IS-62.md:243, A-IS-65 L7).
-pub const AUDIT_LOCK_FILE: &str = "audit.lock";
+/// The hand's lock, beside the data file (A-IS-62.md:243, A-IS-65 L7).
+pub const AUDIT_LOCK_FILE: &str = super::handlock::LOCK_FILE;
 const MIB: u64 = 1024 * 1024;
 
 /// `<auditDir>/computer/<handId>/audit.jsonl`.
@@ -130,6 +130,7 @@ impl AuditWriter {
             .parent()
             .ok_or_else(|| io::Error::other("no audit dir"))?;
         crate::marker::private_dir(dir)?;
+        let _held = HandLock::take(dir)?;
         let mut this = Self {
             path,
             segment: Segment::new(hand_id, generation, writer),
@@ -168,10 +169,11 @@ impl AuditWriter {
             text.push_str(&line.to_string());
             text.push('\n');
         }
-        self.write_locked(text.as_bytes())
+        self.write_held(text.as_bytes())
     }
 
-    fn write_locked(&self, bytes: &[u8]) -> io::Result<()> {
+    /// Appends `bytes` to the hand's file; the caller holds the hand's lock.
+    fn write_held(&self, bytes: &[u8]) -> io::Result<()> {
         let mut options = OpenOptions::new();
         options.create(true).append(true);
         #[cfg(unix)]
@@ -179,7 +181,15 @@ impl AuditWriter {
             use std::os::unix::fs::OpenOptionsExt;
             options.mode(0o600).custom_flags(libc::O_NOFOLLOW);
         }
-        append_locked(&self.path, &options, bytes)
+        let mut file = options.open(&self.path)?;
+        file.write_all(bytes)?;
+        file.sync_data()
+    }
+
+    fn hand_dir(&self) -> io::Result<&Path> {
+        self.path
+            .parent()
+            .ok_or_else(|| io::Error::other("no audit dir"))
     }
 
     fn size(&self) -> u64 {
@@ -196,7 +206,9 @@ impl AuditWriter {
 
 impl AuditSink for AuditWriter {
     fn admit(&self) -> Result<(), Refusal> {
-        if self.degraded || (self.authority.is_none() && self.size() >= self.limits.hard_cap) {
+        // The size is read under the hand's lock (R7-7); a lock that cannot be taken refuses.
+        let held = self.hand_dir().and_then(HandLock::take);
+        if self.degraded || held.is_err() || self.size() >= self.limits.hard_cap {
             Err(AUDIT_UNAVAILABLE)
         } else {
             Ok(())
@@ -216,10 +228,16 @@ impl AuditSink for AuditWriter {
 
 impl AuditWriter {
     fn append_line(&mut self, event: AuditEvent) -> io::Result<String> {
+        // R7-3 / R7-7: the size checks, the rotation and the append run under the hand's lock,
+        // so two writers can never both find room and overshoot together. A writer that cannot
+        // rotate does not, and is refused at hard_cap like any other, the authority included.
+        let _held = HandLock::take(self.hand_dir()?)?;
         if self.authority.is_some() && self.size() >= self.limits.rotate_at {
-            self.rotate()?;
+            if let Err(error) = self.rotate() {
+                eprintln!("omo-computer-engine: warn audit not rotated, refused at its hard cap: {error}");
+            }
         }
-        if self.authority.is_none() && self.size() >= self.limits.hard_cap {
+        if self.size() >= self.limits.hard_cap {
             return Err(io::Error::other("the audit file is at its hard cap"));
         }
         let mut segment = self.segment.clone();
@@ -229,31 +247,8 @@ impl AuditWriter {
             line = stamp(&mut segment, &truncated(&event))?.to_string();
         }
         line.push('\n');
-        self.write_locked(line.as_bytes())?;
+        self.write_held(line.as_bytes())?;
         self.segment = segment;
         Ok(self.segment.prev.clone())
     }
-}
-
-/// Unix: the per-append lock is `flock` on the data file itself, through the crate's one lock
-/// helper; it drops with the append's handle (unchanged at row 17).
-#[cfg(unix)]
-fn append_locked(path: &Path, options: &OpenOptions, bytes: &[u8]) -> io::Result<()> {
-    let held = file::lock(options.open(path)?)?;
-    write_synced(held.file(), bytes)
-}
-
-/// Windows (and any other target, where the helper refuses): the per-append lock is taken on
-/// the hand's `audit.lock`, never on the data file, whose byte-range lock would fail every
-/// concurrent read (A-IS-65 L7). A lock that cannot be created, opened or taken fails the
-/// append: the writer never appends unlocked.
-#[cfg(not(unix))]
-fn append_locked(path: &Path, options: &OpenOptions, bytes: &[u8]) -> io::Result<()> {
-    let _append_lock = file::lock(file::open(&path.with_file_name(AUDIT_LOCK_FILE))?)?;
-    write_synced(&options.open(path)?, bytes)
-}
-
-fn write_synced(mut file: &File, bytes: &[u8]) -> io::Result<()> {
-    file.write_all(bytes)?;
-    file.sync_data()
 }
