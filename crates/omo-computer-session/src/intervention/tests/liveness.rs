@@ -47,10 +47,10 @@ impl Backend for ExitsAt {
         text: &str,
         route: Route,
         tag: u64,
-        interrupt: &mut dyn FnMut(&dyn Backend) -> bool,
+        interrupt: &mut dyn FnMut(&mut dyn Backend) -> bool,
     ) -> TextDelivery {
         let (clock, exit_at_ms) = (self.inner.clock(), self.exit_at_ms);
-        let mut exits = |backend: &dyn Backend| {
+        let mut exits = |backend: &mut dyn Backend| {
             Self::liveness(&clock, exit_at_ms).is_some() || interrupt(backend)
         };
         self.inner.post_text(text, route, tag, &mut exits)
