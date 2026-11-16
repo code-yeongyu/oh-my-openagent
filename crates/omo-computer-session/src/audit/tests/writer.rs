@@ -79,15 +79,15 @@ fn audit_is_one_file_per_hand_with_per_writer_segments() {
     first.append(event("click")).expect("append");
     second.append(event("typeText")).expect("append");
     first.append(event("click")).expect("append");
-    assert_eq!(
-        files_under(dir.path()),
-        vec![vec![
-            "computer".to_owned(),
-            "hand-1".to_owned(),
-            "audit.jsonl".to_owned()
-        ]],
-        "one file per hand"
-    );
+    let mut files = files_under(dir.path());
+    files.sort();
+    let hand = |name: &str| vec!["computer".to_owned(), "hand-1".to_owned(), name.to_owned()];
+    // One data file per hand; on Windows its append lock audit.lock sits beside it (A-IS-65 L7).
+    let mut expected = vec![hand("audit.jsonl")];
+    if cfg!(windows) {
+        expected.push(hand("audit.lock"));
+    }
+    assert_eq!(files, expected, "one data file per hand");
     let all = lines(first.path());
     let metas: Vec<&Value> = all
         .iter()
