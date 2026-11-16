@@ -192,6 +192,71 @@ describe("engine RPC local-versus-relay parity table (#13478)", () => {
     expect(namesRecordType('expect(sent.map(({ type: t }) => other)).toEqual(["prompt"])', "prompt")).toBe(false)
   })
 
+  test("a record built under ! or inside a subject asserted false still counts (#13961 review L1)", () => {
+    expect(namesRecordType('expect(isRelayed({ type: "prompt" })).toBe(false)', "prompt")).toBe(true)
+    expect(namesRecordType('await expect(relay({ type: "prompt" })).resolves.toBe(false)', "prompt")).toBe(true)
+    expect(namesRecordType('if (!client.send({ type: "prompt" })) throw new Error("not sent")', "prompt")).toBe(true)
+  })
+
+  test("a throw guard and a double negation are positive claims (#13961 review L1)", () => {
+    const guard = 'if (!sent.some((e) => e.type === "prompt")) throw new Error("missing")'
+    expect(namesRecordType(guard, "prompt")).toBe(true)
+    expect(
+      namesRecordType('if (!sent.some((e) => e.type === "prompt")) { throw new Error("missing") }', "prompt"),
+    ).toBe(true)
+    expect(namesRecordType('if (frame.type !== "prompt") throw new Error("wrong type")', "prompt")).toBe(true)
+    expect(namesRecordType('if (frame.type != "prompt") throw new Error("wrong type")', "prompt")).toBe(true)
+    expect(namesRecordType('expect(!!sent.find((e) => e.type === "prompt")).toBe(true)', "prompt")).toBe(true)
+    expect(namesRecordType('if (frame.type === "prompt") throw new Error("unexpected")', "prompt")).toBe(false)
+    expect(namesRecordType('if (!sent.some((e) => e.type === "prompt")) skip()', "prompt")).toBe(false)
+  })
+
+  test("absence assertions negate their subject: assert twins, undefined, null, empty, -1, 0 (#13961 review L2)", () => {
+    const has = 'sent.some((e) => e.type === "prompt")'
+    const find = 'sent.find((e) => e.type === "prompt")'
+    const filter = 'sent.filter((e) => e.type === "prompt")'
+    expect(namesRecordType(`assert.equal(${has}, false)`, "prompt")).toBe(false)
+    expect(namesRecordType(`assert.strictEqual(false, ${has})`, "prompt")).toBe(false)
+    expect(namesRecordType(`expect(${find}).toBeUndefined()`, "prompt")).toBe(false)
+    expect(namesRecordType(`expect(${find}).toBeNull()`, "prompt")).toBe(false)
+    expect(namesRecordType(`expect(${find}).not.toBeDefined()`, "prompt")).toBe(false)
+    expect(namesRecordType(`expect(${filter}).toHaveLength(0)`, "prompt")).toBe(false)
+    expect(namesRecordType(`expect(${filter}).toEqual([])`, "prompt")).toBe(false)
+    expect(namesRecordType(`expect(${filter}.length).toBe(0)`, "prompt")).toBe(false)
+    expect(namesRecordType('expect(sent.findIndex((e) => e.type === "prompt")).toBe(-1)', "prompt")).toBe(false)
+    expect(namesRecordType(`const has = ${has}\nexpect(has).toBe(false)`, "prompt")).toBe(false)
+    // Only an expect(...) subject is asserted absent: an unrelated check(...).toBe(false) leaves the comparison positive.
+    expect(namesRecordType(`check(${has}).toBe(false)`, "prompt")).toBe(true)
+  })
+
+  test("the presence twins of the absence assertions still count (#13961 review L2)", () => {
+    const has = 'sent.some((e) => e.type === "prompt")'
+    expect(namesRecordType(`const has = ${has}\nexpect(has).toBe(true)`, "prompt")).toBe(true)
+    expect(namesRecordType(`assert.equal(${has}, true)`, "prompt")).toBe(true)
+    expect(namesRecordType('expect(sent.find((e) => e.type === "prompt")).toBeDefined()', "prompt")).toBe(true)
+    expect(namesRecordType('expect(sent.filter((e) => e.type === "prompt")).toHaveLength(1)', "prompt")).toBe(true)
+  })
+
+  test("a quoted destructured key binds the type field like usesRecordType's quoted key (#13961 review L3)", () => {
+    expect(namesRecordType('expect(sent.map(({ "type": t }) => t)).toEqual(["prompt"])', "prompt")).toBe(true)
+  })
+
+  test("the reviewer's mapped-list probes keep their verdicts (#13961 review)", () => {
+    const listed = (cb: string, matcher = 'toEqual(["prompt"])'): boolean =>
+      namesRecordType(`expect(sent.map(${cb})).${matcher}`, "prompt")
+    expect(listed("({ kind: type }) => type")).toBe(false)
+    expect(listed("({ type: { t } }) => t")).toBe(false)
+    expect(listed("({ [k]: t }) => t")).toBe(false)
+    expect(listed("({ ...type }) => type")).toBe(false)
+    expect(listed("({ type: a, type: b }) => b")).toBe(false)
+    expect(listed("(e) => { e = other; return e.type }")).toBe(false)
+    expect(listed("({ type }) => type", 'toBe(["prompt"])')).toBe(false)
+    expect(listed("({ type }) => type", 'not.toEqual(["prompt"])')).toBe(false)
+    expect(listed("function ({ type }) { return type }")).toBe(true)
+    expect(namesRecordType('expect(sent.map?.((e) => e.type)).toEqual(["prompt"])', "prompt")).toBe(true)
+    expect(namesRecordType('expect(sent?.filter(Boolean).map((e) => e.type)).toEqual(["prompt"])', "prompt")).toBe(true)
+  })
+
   test("a rows file with a misspelled key is refused", () => {
     expect(() => curatedRows(rowsFile({ prompt: { relaay: "differs" } }))).toThrow('unknown key "relaay"')
   })

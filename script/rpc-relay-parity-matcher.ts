@@ -1,6 +1,5 @@
 // The pair-test matcher of script/rpc-relay-parity.ts: whether a curated pair-test file uses an RPC method as a record
-// type in code (namesRecordType). It walks the oxc AST; the namesRecordType doc comment lists every counted and refused
-// form.
+// type in code (namesRecordType). It walks the oxc AST; the namesRecordType doc comment states the rule.
 import { parseSync } from "oxc-parser"
 
 type AstNode = { readonly type: string; readonly [key: string]: unknown }
@@ -55,7 +54,10 @@ const memberObjectName = (value: unknown): unknown => {
   return isNode(object) && object.type === "Identifier" ? object["name"] : undefined
 }
 
-/** The name a destructured parameter binds the `type` field to: `t` for `({ type: t })`, `type` for `({ type })`. */
+/**
+ * The name a destructured parameter binds the `type` field to: `t` for `({ type: t })`, `({ "type": t })` or
+ * `({ ["type"]: t })`, `type` for `({ type })`.
+ */
 const boundTypeName = (param: unknown): unknown => {
   const props =
     isNode(param) && param.type === "ObjectPattern" && Array.isArray(param["properties"]) ? param["properties"] : []
@@ -64,7 +66,9 @@ const boundTypeName = (param: unknown): unknown => {
       isNode(p) &&
       p.type === "Property" &&
       isNode(p["key"]) &&
-      (p["computed"] === true ? isLiteral(p["key"], "type") : p["key"]["name"] === "type"),
+      (p["computed"] === true
+        ? isLiteral(p["key"], "type")
+        : p["key"]["name"] === "type" || p["key"]["value"] === "type"),
   )
   const value = isNode(field) ? field["value"] : undefined
   return isNode(value) && value.type === "Identifier" ? value["name"] : undefined
@@ -130,85 +134,141 @@ function assertsRecordType(node: AstNode, method: string): boolean {
   )
 }
 
-/** Whether one AST node uses `method` as a record type (see namesRecordType). */
-function usesRecordType(node: AstNode, method: string): boolean {
-  if (node.type === "Property") {
-    const key = node["key"]
-    // A computed key `{ [type]: "m" }` names whatever the variable holds, not the `type` field.
-    const named =
-      isNode(key) &&
-      (node["computed"] === true ? isLiteral(key, "type") : key["name"] === "type" || key["value"] === "type")
-    return named && isLiteral(node["value"], method)
-  }
+/** A record built with `method` as its type: an object property `type: "m"` (also `"type": "m"`, `["type"]: "m"`). */
+function buildsRecord(node: AstNode, method: string): boolean {
+  if (node.type !== "Property") return false
+  const key = node["key"]
+  // A computed key `{ [type]: "m" }` names whatever the variable holds, not the `type` field.
+  const named =
+    isNode(key) &&
+    (node["computed"] === true ? isLiteral(key, "type") : key["name"] === "type" || key["value"] === "type")
+  return named && isLiteral(node["value"], method)
+}
+
+/** A type test of a `type` field against `method`: "is" (`===`, `==`, a switch case, an assertion), "isNot" (`!==`, `!=`). */
+function typeTest(node: AstNode, method: string): "is" | "isNot" | undefined {
   if (node.type === "SwitchStatement" && isTypeMember(node["discriminant"])) {
     const cases = node["cases"]
-    return Array.isArray(cases) && cases.some((c) => isNode(c) && isLiteral(c["test"], method))
+    return Array.isArray(cases) && cases.some((c) => isNode(c) && isLiteral(c["test"], method)) ? "is" : undefined
   }
-  // Only equality counts: `x.type !== "m"` (as in `filter((f) => f.type !== "m")`) excludes the method (as `.not.toBe`
-  // does).
-  if (node.type === "BinaryExpression" && ["===", "=="].includes(String(node["operator"]))) {
+  if (node.type === "BinaryExpression") {
     const [left, right] = [node["left"], node["right"]]
-    return (isTypeMember(left) && isLiteral(right, method)) || (isTypeMember(right) && isLiteral(left, method))
+    if (!((isTypeMember(left) && isLiteral(right, method)) || (isTypeMember(right) && isLiteral(left, method)))) return
+    const op = String(node["operator"])
+    return op === "===" || op === "==" ? "is" : op === "!==" || op === "!=" ? "isNot" : undefined
   }
-  if (node.type === "CallExpression") return assertsRecordType(node, method)
-  return false
+  return node.type === "CallExpression" && assertsRecordType(node, method) ? "is" : undefined
 }
 
-const FALSE_MATCHERS: ReadonlySet<string> = new Set(["toBeFalse", "toBeFalsy"])
-const TRUE_MATCHERS: ReadonlySet<string> = new Set(["toBeTrue", "toBeTruthy"])
-
-/**
- * An exclusion: the operand of `!` (`!(f.type === "m")`), or an assertion that its subject is false
- * (`expect(...).toBe(false)` or toEqual/toStrictEqual(false), `.toBeFalse()`, `.toBeFalsy()`, `.not.toBe(true)`,
- * `.not.toBeTrue()`, `.not.toBeTruthy()`). Nothing inside one names the method.
- */
-function excludes(node: AstNode): boolean {
-  if (node.type === "UnaryExpression") return node["operator"] === "!"
-  const callee = node["callee"]
-  if (node.type !== "CallExpression" || !isNode(callee) || callee.type !== "MemberExpression") return false
-  const name = isNode(callee["property"]) ? callee["property"]["name"] : undefined
-  const [arg] = Array.isArray(node["arguments"]) ? node["arguments"] : []
-  const literal = (value: boolean): boolean => {
-    const bare = unwrap(arg)
-    return isNode(bare) && bare.type === "Literal" && bare["value"] === value
-  }
-  const object = callee["object"]
-  const property = isNode(object) && object.type === "MemberExpression" ? object["property"] : undefined
-  const not = isNode(property) && property["name"] === "not"
-  if (typeof name !== "string") return false
-  if (not) return TRUE_MATCHERS.has(name) || (EXPECT_MATCHERS.has(name) && literal(true))
-  return FALSE_MATCHERS.has(name) || (EXPECT_MATCHERS.has(name) && literal(false))
+const literalIs = (node: unknown, value: unknown): boolean => {
+  const bare = unwrap(node)
+  return isNode(bare) && bare.type === "Literal" && bare["value"] === value
 }
 
-/** Whether `value` holds a node that uses `method` as a record type outside an exclusion (see excludes). */
-function someCounted(value: unknown, method: string): boolean {
-  if (Array.isArray(value)) return value.some((item) => someCounted(item, method))
-  if (!isNode(value) || excludes(value)) return false
-  if (usesRecordType(value, method)) return true
-  return Object.entries(value).some(
-    ([key, child]) => key !== "type" && typeof child === "object" && someCounted(child, method),
+/** `false`, `0`, `-1` or `[]`: what an absence assertion compares its subject with. */
+const isAbsentValue = (node: unknown): boolean => {
+  const bare = unwrap(node)
+  if (literalIs(bare, false) || literalIs(bare, 0)) return true
+  if (isNode(bare) && bare.type === "UnaryExpression") return bare["operator"] === "-" && literalIs(bare["argument"], 1)
+  return (
+    isNode(bare) && bare.type === "ArrayExpression" && Array.isArray(bare["elements"]) && bare["elements"].length === 0
   )
 }
 
+const ABSENT_MATCHERS: ReadonlySet<string> = new Set(["toBeFalse", "toBeFalsy", "toBeUndefined", "toBeNull"])
+const PRESENT_MATCHERS: ReadonlySet<string> = new Set(["toBeTrue", "toBeTruthy", "toBeDefined"])
+
 /**
- * Whether `source` (parsed as TypeScript) uses `method` as a record type in code. These count:
- * - the quoted name as the value of a `type` property in an object (`{ type: "m" }`, also `{ ["type"]: "m" }`);
- * - a `type` member (`x.type`, `x["type"]`, optional chains) compared equal with it (`===`, `==`), or switched on with
- *   a `case "m":`;
- * - an assertion on a `type` member: `expect(x.type).toBe("m")` (or `toEqual`, `toStrictEqual`),
- *   `expect(list.map((e) => e.type)).toEqual(["m"])` (or `toStrictEqual`; also `list?.map`; the callback's own
- *   parameter, `e.type` or destructured `({ type }) => type`, from an expression or single-return block body), or
- *   `assert.equal(x.type, "m")` (or `strictEqual`, either argument order).
- * The literal may be a quoted string or a template literal with no substitutions. A literal, a `type` member and a
- * switch discriminant may each sit in parentheses or under `as`, `satisfies`, a non-null `!` or a `<T>` assertion.
- * These do not count: a computed key (`{ [type]: "m" }`); a negative comparison (`!==`, `!=`, such as the exclusion
- * `filter((f) => f.type !== "m")`); anything inside an exclusion (see excludes), such as
- * `filter((f) => !(f.type === "m"))` or `expect(list.some((e) => e.type === "m")).toBe(false)`; an assertion whose
- * subject is not a bare `expect(...)` or whose object is not `assert`; a mapped list that projects anything but the
- * callback parameter's `type`, a computed `list[map](...)`, or `.toBe([...])` on a mapped list; comments, strings (a
- * test title), regex literals, type declarations, other properties such as `$type`; and a source that does not parse.
+ * The subject a call asserts absent, or undefined: `expect(s)` with toBe/toEqual/toStrictEqual(false, 0, -1 or []),
+ * toBeFalse, toBeFalsy, toBeUndefined, toBeNull or toHaveLength(0); `.not` with toBe/toEqual/toStrictEqual(true),
+ * toBeTrue, toBeTruthy or toBeDefined; `assert.equal(s, false)` or strictEqual, either argument order.
+ */
+function absentSubject(node: AstNode): unknown {
+  const callee = node["callee"]
+  if (node.type !== "CallExpression" || !isNode(callee) || callee.type !== "MemberExpression") return undefined
+  const name = isNode(callee["property"]) ? String(callee["property"]["name"]) : ""
+  const args = Array.isArray(node["arguments"]) ? node["arguments"] : []
+  const object = callee["object"]
+  if (isNode(object) && object.type === "Identifier" && object["name"] === "assert") {
+    const [a, b] = args
+    if (!ASSERT_METHODS.has(name)) return undefined
+    return literalIs(b, false) ? a : literalIs(a, false) ? b : undefined
+  }
+  const inner = isNode(object) && object.type === "MemberExpression" ? object : undefined
+  const not = inner !== undefined && isNode(inner["property"]) && inner["property"]["name"] === "not"
+  const call = not && inner !== undefined ? inner["object"] : object
+  if (!isNode(call) || call.type !== "CallExpression" || !isNode(call["callee"])) return undefined
+  if (call["callee"]["name"] !== "expect" || !Array.isArray(call["arguments"])) return undefined
+  const [arg] = args
+  const asserted = not
+    ? PRESENT_MATCHERS.has(name) || (EXPECT_MATCHERS.has(name) && literalIs(arg, true))
+    : ABSENT_MATCHERS.has(name) ||
+      (name === "toHaveLength" && literalIs(arg, 0)) ||
+      (EXPECT_MATCHERS.has(name) && isAbsentValue(arg))
+  return asserted ? call["arguments"][0] : undefined
+}
+
+/** Whether a statement only throws: `throw ...` or a block holding just that. */
+const onlyThrows = (node: unknown): boolean =>
+  isNode(node) &&
+  (node.type === "ThrowStatement" ||
+    (node.type === "BlockStatement" &&
+      Array.isArray(node["body"]) &&
+      node["body"].length === 1 &&
+      onlyThrows(node["body"][0])))
+
+const children = (node: AstNode): unknown[] =>
+  Object.entries(node).flatMap(([key, child]) => (key !== "type" && typeof child === "object" ? [child] : []))
+
+/** Names the file asserts absent (`expect(has).toBe(false)`): their initializers are negated (see counts). */
+function absentNames(value: unknown, names: Set<string>): Set<string> {
+  if (Array.isArray(value)) for (const item of value) absentNames(item, names)
+  if (!isNode(value)) return names
+  const subject = unwrap(absentSubject(value))
+  if (isNode(subject) && subject.type === "Identifier") names.add(String(subject["name"]))
+  for (const child of children(value)) absentNames(child, names)
+  return names
+}
+
+/** Whether `value` builds a `method` record, or makes a positive type test of it under the `negated` parity. */
+function counts(value: unknown, method: string, negated: boolean, absent: ReadonlySet<string>): boolean {
+  const walk = (child: unknown, flip = false): boolean => counts(child, method, flip !== negated, absent)
+  if (Array.isArray(value)) return value.some((item) => walk(item))
+  if (!isNode(value)) return false
+  if (buildsRecord(value, method)) return true
+  const test = typeTest(value, method)
+  if (test !== undefined && (test === "is") !== negated) return true
+  if (value.type === "UnaryExpression" && value["operator"] === "!") return walk(value["argument"], true)
+  if (value.type === "IfStatement" && onlyThrows(value["consequent"]))
+    return walk(value["test"], true) || walk(value["consequent"]) || walk(value["alternate"])
+  const subject = absentSubject(value)
+  const others = (Array.isArray(value["arguments"]) ? value["arguments"] : []).filter((arg) => arg !== subject)
+  if (subject !== undefined) return walk(subject, true) || walk(others)
+  const id = value.type === "VariableDeclarator" && isNode(value["id"]) ? value["id"]["name"] : undefined
+  if (typeof id === "string" && absent.has(id)) return walk(value["init"], true)
+  return children(value).some((child) => walk(child))
+}
+
+/**
+ * Whether `source` (parsed as TypeScript) uses `method` as a record type in code. The rule: the file BUILDS a record of
+ * that type, or makes a POSITIVE claim that a record is of that type.
+ * - Building: an object whose `type` property is the method (`{ type: "m" }`, `{ "type": "m" }`, `{ ["type"]: "m" }`).
+ *   A built record counts wherever it sits, negated or not.
+ * - Claiming: a type test of a record's `type` field: an equality (`x.type === "m"`, `==`), a `case "m":` of a switch
+ *   on it, or an assertion that it is the method (`expect(x.type).toBe("m")` or toEqual/toStrictEqual,
+ *   `assert.equal(x.type, "m")` or strictEqual in either order, `expect(list.map((e) => e.type)).toEqual(["m"])`).
+ *   An inequality (`!==`, `!=`) is the negated test. A test counts when the number of negations around it is even.
+ *   Each of these negates: `!`; the test of an `if` whose branch only throws (a guard asserts the opposite of its
+ *   test); a subject asserted absent (see absentSubject); and the initializer of a variable asserted absent (see
+ *   absentNames).
+ * Forms: a `type` field is `x.type`, `x["type"]` or an optional chain; a mapped list is `list.map(cb)` or
+ * `list?.map(cb)` whose callback returns its own parameter's `type` field (`(e) => e.type`, `({ type }) => type`, or a
+ * block that only returns it); a literal is a quoted string or a template literal without substitutions. Literals,
+ * fields and switch discriminants may sit under parentheses, `as`, `satisfies`, a non-null `!` or `<T>`.
+ * Nothing else counts: a computed key from a variable (`{ [type]: "m" }`), other fields (`$type`), comments, strings,
+ * regex literals, type declarations, and a source that does not parse.
  */
 export function namesRecordType(source: string, method: string): boolean {
   const parsed = parseSync("pair-test.ts", source)
-  return parsed.errors.length === 0 && someCounted(parsed.program, method)
+  return parsed.errors.length === 0 && counts(parsed.program, method, false, absentNames(parsed.program, new Set()))
 }
