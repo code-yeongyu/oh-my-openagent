@@ -7,6 +7,7 @@ import { canonicalizeThreadHandle, handleOf } from "./seams"
 import { clientOn, closeClients, failureOf, type FakeClock, fakeClock, startOwner } from "./testing/fake-service"
 import type { RemoteClient } from "./client"
 import type { ThreadHandle } from "./types"
+import type { DeviceService } from "@oh-my-opencode/device-service-core/device-service"
 
 // The alias members over the account's alias registry the caller injects (deps.aliasRegistry). The registry holds a
 // session by its DURABLE id, as the thread tools do; the client maps it to and from the listed session's handle. The
@@ -248,5 +249,46 @@ describe("aliases", () => {
     expect(failureOf(await resolving)).toMatchObject({ code: "timeout", details: { deadline_ms: DEADLINES.aliases } })
     expect(failureOf(await resolving).uncertain).toBeUndefined()
     expect(failureOf(await setting)).toMatchObject({ code: "timeout", uncertain: true })
+  })
+})
+
+describe("aliases when the holder's device missed the listing round", () => {
+  // Review M1 at 15dcf94: a device that did not answer the round is an outage, not a missing session (thread tools:
+  // remote-ops.ts holderTarget answers device_offline there).
+  const silentDevice = {
+    serviceVersion: "0.1.37",
+    capabilities: ["sessions", "devices"],
+    closed: new Promise<void>(() => {}),
+    close: () => {},
+    thisDevice: async () => ({ id: "dev-self", name: "self" }),
+    devices: async () => [],
+    sessions: async () => ({ revision: 1, rows: [], devices: { "dev-b": "timeout" }, incomplete: [] }),
+  } as unknown as DeviceService
+  const registry: AliasRegistry = {
+    resolve: async () => ({ kind: "ok", value: { device: "dev-b", session_id: "dur-b" } }),
+    aliasesOf: async () => ({ kind: "ok", value: new Map() }),
+    claim: async () => ({ kind: "error", error: { code: "alias_registry_unavailable", message: "unreached" } }),
+    rename: async () => ({ kind: "error", error: { code: "alias_registry_unavailable", message: "unreached" } }),
+    release: async () => ({ kind: "error", error: { code: "alias_registry_unavailable", message: "unreached" } }),
+  }
+  test("#given the holder's device timed out on the round #when resolve or set runs #then device_offline naming it, never not_found", async () => {
+    const owner = await startOwner()
+    const client = clientOn(owner.stateDir, fakeClock(), undefined, {
+      connect: async () => silentDevice,
+      aliasRegistry: async () => registry,
+    })
+    const thread = handleOf("dev-b", "key-b")
+    expect(failureOf(await client.aliases.resolve("lane-b"))).toMatchObject({
+      code: "device_offline",
+      details: { device: "dev-b" },
+    })
+    expect(failureOf(await client.aliases.set(thread, "lane-b"))).toMatchObject({
+      code: "device_offline",
+      details: { device: "dev-b" },
+    })
+    expect(failureOf(await client.aliases.clear(thread))).toMatchObject({
+      code: "device_offline",
+      details: { device: "dev-b" },
+    })
   })
 })

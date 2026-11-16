@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { PEER } from "../../../../device-service-core/test/local-api/conformance/world.ts"
 import { pushDetached, pushFrame, pushRecords, pushSnapshot, reader, THREAD, worldWith } from "./attach.test-support"
 import { DEADLINES } from "./deadlines"
+import { sessionStatusOf } from "./follow"
 import { handleOf } from "./seams"
 import { clientOn, closeClients, fakeClock, startOwner } from "./testing/fake-service"
 import type { RemoteClient } from "./client"
@@ -27,8 +28,17 @@ const DIALOG = {
   message: "rm -rf build",
 }
 
-const on = async (state: JsonObject, sender?: RemoteSender) => {
-  const owner = await startOwner(worldWith(state))
+/** senpi's run lease: the `session-lifecycle` transcript entry its lifecycle ledger appends at each change. */
+const lease = (state: string, seq: number): JsonObject => ({
+  type: "custom",
+  id: `lease-${seq}`,
+  parentId: "e-3",
+  customType: "session-lifecycle",
+  data: { sessionId: "engine-1", state, seq, runId: "run-1", role: "root", since: "2026-11-16T07:13:22Z" },
+})
+
+const on = async (state: JsonObject, sender?: RemoteSender, extra?: Parameters<typeof worldWith>[2]) => {
+  const owner = await startOwner(worldWith(state, [], extra))
   const clock = fakeClock()
   return { owner, clock, client: clientOn(owner.stateDir, clock, sender) }
 }
@@ -107,10 +117,10 @@ describe("sessions.follow rows", () => {
     })
   })
 
-  test("#given a running turn #when a re-attach snapshot shows it idle #then the turn that settled in the gap ends settled", async () => {
+  test("#given a running turn #when a re-attach snapshot's run lease shows it done #then the turn that settled in the gap ends settled", async () => {
     const { owner, client } = await on(RUNNING)
     const { events } = await following(client)
-    pushSnapshot(owner, IDLE)
+    pushSnapshot(owner, IDLE, 2, [lease("running", 4), lease("done", 5)])
     expect(await drain(events)).toEqual([{ kind: "end", outcome: { reason: "settled" } }])
   })
 
@@ -150,6 +160,51 @@ describe("sessions.follow rows", () => {
 const listening = async (client: RemoteClient): Promise<void> => {
   await reader(client.sessions.follow(THREAD)).next("a follow opened after the wait")
 }
+
+/** Whether a wait has settled yet, read after the fixture had every chance to settle it. */
+const settledYet = (settling: Promise<unknown>) => {
+  let settled = false
+  void settling.then(() => (settled = true))
+  return () => settled
+}
+
+describe("sessions.wait rows: a running turn behind an idle snapshot (live relay bug)", () => {
+  test("#given a snapshot that says idle while its run lease says running #when wait runs #then it settles only on the turn's agent_settled", async () => {
+    const { owner, client } = await on(IDLE, undefined, { entries: [lease("running", 4)] })
+    const settling = client.sessions.wait(THREAD)
+    const settled = settledYet(settling)
+    await listening(client)
+    await listening(client)
+    expect(settled()).toBe(false)
+    pushRecords(owner, [{ type: "agent_end", messages: [], willRetry: false }, { type: "agent_settled" }])
+    expect(await settling).toMatchObject({ kind: "ok", value: { outcome: "settled", status: "idle" } })
+  })
+
+  test("#given a snapshot that says idle while a fresh get_state says the run is running #when wait runs #then it settles only when the run lease records the run done", async () => {
+    const { owner, client } = await on(IDLE, undefined, {
+      reply: { isStreaming: false, lifecycle: { state: "running", seq: 4, runId: "run-1" } },
+    })
+    const settling = client.sessions.wait(THREAD)
+    const settled = settledYet(settling)
+    await listening(client)
+    await listening(client)
+    expect(settled()).toBe(false)
+    pushRecords(owner, [{ type: "entry_appended", entry: lease("done", 5) }])
+    expect(await settling).toMatchObject({ kind: "ok", value: { outcome: "settled", status: "idle" } })
+  })
+
+  test("#given a running wait #when a re-attach snapshot only says idle #then it does not settle; a session_lifecycle record that ends the run does", async () => {
+    const { owner, client } = await on(RUNNING)
+    const settling = client.sessions.wait(THREAD)
+    const settled = settledYet(settling)
+    await listening(client)
+    pushSnapshot(owner, IDLE)
+    await listening(client)
+    expect(settled()).toBe(false)
+    pushRecords(owner, [{ type: "session_lifecycle", sessionId: "engine-1", lifecycle: { state: "done", seq: 6 } }], 2)
+    expect(await settling).toMatchObject({ kind: "ok", value: { outcome: "settled", status: "idle" } })
+  })
+})
 
 describe("sessions.wait rows", () => {
   test("#given an idle session #when wait runs #then settled at once", async () => {
@@ -200,5 +255,24 @@ describe("sessions.wait rows", () => {
     await listening(client)
     pushDetached(owner, "session_closed")
     expect(await settling).toMatchObject({ kind: "ok", value: { outcome: "ended", status: "closed" } })
+  })
+})
+
+describe("sessionStatusOf: the rule sessions.get reads an engine state by (#13753)", () => {
+  test.each([
+    ["an idle state with no run lease", IDLE, [], "idle"],
+    ["isStreaming false while the run lease still runs", IDLE, [lease("running", 4)], "running"],
+    [
+      "isStreaming false while get_state's lifecycle runs",
+      { ...IDLE, lifecycle: { state: "running", seq: 4 } },
+      [],
+      "running",
+    ],
+    ["a run lease that moved off running", IDLE, [lease("running", 4), lease("done", 5)], "idle"],
+    ["a run lease waiting on a person", IDLE, [lease("waiting_human", 5)], "waiting_input"],
+    ["a pending dialog", { ...RUNNING, pendingDialogs: [DIALOG] }, [], "waiting_input"],
+    ["isStreaming true", RUNNING, [], "running"],
+  ] as const)("#given %s #then %s", (_name, state, entries, status) => {
+    expect(sessionStatusOf(state, entries)).toBe(status)
   })
 })

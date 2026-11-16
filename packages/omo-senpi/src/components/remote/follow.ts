@@ -1,7 +1,9 @@
+import { outcomeOf } from "../thread/remote/outcome"
 import { eventStream, openAttachment } from "./attach"
 import { type ClientCore, ok, type RemoteClient } from "./client"
 import { nextActionFor, remoteFailure } from "./codes"
 import { DEADLINES } from "./deadlines"
+import { canonicalizeThreadHandle } from "./seams"
 import type {
   AttachEvent,
   AttachHandle,
@@ -23,15 +25,29 @@ type WatchHandlers = {
   readonly event: (event: AttachEvent) => void
   /** A later snapshot: the attach was re-established after a gap, and this is the session now. */
   readonly snapshot: (snapshot: SnapshotBody) => void
+  /** A fresh `get_state` of the session's engine: read once at the start and again after each later snapshot. */
+  readonly fresh: (state: JsonObject) => void
   /** The attach's events ended (after `session_closed` when the session closed). */
   readonly ended: () => void
 }
-type SessionWatch = { readonly initial: SnapshotBody; readonly handle: AttachHandle; readonly stop: () => void }
+type SessionWatch = {
+  readonly initial: SnapshotBody
+  readonly handle: AttachHandle
+  /** The first fresh read, started once the caller can take it; settles once it was delivered to `fresh` or told nothing. */
+  readonly baseline: () => Promise<void>
+  readonly stop: () => void
+}
+
+const isObject = (value: unknown): value is JsonObject =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+const nonEmpty = (value: unknown): string | undefined =>
+  typeof value === "string" && value.length > 0 ? value : undefined
 
 /**
  * The ONE place follow and wait take a session's events: today the attach this module opens (attach.ts), which ends at a
- * relay, service or engine restart. rt-monitor-wait's attach pool and watch v2 (feat/remote-session-wait) re-attach and
- * resync across those; switching to it replaces only this function.
+ * relay, service or engine restart, plus one fresh `get_state` at the start and after each re-attach, since a snapshot's
+ * `isStreaming` can be stale while a turn runs. rt-monitor-wait's attach pool and watch v2 (feat/remote-session-wait)
+ * re-attach and resync across restarts with the same baseline read; switching to it replaces only this function.
  */
 async function watchSession(
   core: ClientCore,
@@ -42,9 +58,23 @@ async function watchSession(
   const opened = await openAttachment(core, thread, signal === undefined ? undefined : { signal })
   if (opened.kind === "error") return opened
   const { handle, onSnapshot } = opened.value
+  const parsed = canonicalizeThreadHandle(thread, {})
+  const target = parsed.kind === "ok" ? parsed.value.target : undefined
+  const record: JsonObject =
+    target?.kind === "device_session" ? { type: "get_state", sessionId: target.session } : { type: "get_state" }
   let stopped = false
+  // A read that fails, or that the host answers without the engine's reply, tells nothing; the records still do.
+  const readFresh = async (): Promise<void> => {
+    const sent = await handle.command(record)
+    if (stopped || sent.kind === "error") return
+    const outcome = outcomeOf(sent.value)
+    const data = outcome.kind === "ok" ? outcome.response["data"] : undefined
+    if (isObject(data)) handlers.fresh(data)
+  }
   const stopSnapshots = onSnapshot((snapshot) => {
-    if (!stopped) handlers.snapshot(snapshot)
+    if (stopped) return
+    handlers.snapshot(snapshot)
+    void readFresh()
   })
   void (async () => {
     for await (const event of handle.events) if (!stopped) handlers.event(event)
@@ -53,6 +83,7 @@ async function watchSession(
   return ok({
     initial: handle.snapshot,
     handle,
+    baseline: readFresh,
     stop: () => {
       stopped = true
       stopSnapshots()
@@ -61,35 +92,37 @@ async function watchSession(
   })
 }
 
-const isObject = (value: unknown): value is JsonObject =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
-const nonEmpty = (value: unknown): string | undefined =>
-  typeof value === "string" && value.length > 0 ? value : undefined
+// Lifted from rt-monitor-wait (feat/remote-session-wait, thread/remote/session-state.ts `sessionStateOf` and `statusOf`),
+// with one rule added for the live relay bug of #13753: a snapshot or a get_state can claim idle while a turn runs (the
+// engine's in-memory state changes with no record on the attach), so `isStreaming: false` never ends a run. A run ends
+// only on an observed end: `agent_settled`, a `session_status` idle, or senpi's run lease (the `session-lifecycle`
+// record its lifecycle ledger appends at each change, seen as `session_lifecycle` records, as transcript entries and as
+// get_state's `lifecycle`) moving to a state other than running.
+type Lease = { readonly state: string; readonly seq: number }
 
-// Lifted from rt-monitor-wait (feat/remote-session-wait, thread/remote/session-state.ts `sessionStateOf` and `statusOf`):
-// the status a snapshot's state implies, and the status a record moves the session to. A `session_status` record names
-// it; a stream that never carried one moves it by the run's lifecycle: `agent_start` runs, `agent_settled` idles.
-const snapshotStatus = (snapshot: SnapshotBody): string => {
-  const state = isObject(snapshot.state) ? snapshot.state : {}
-  const questions = state["pendingQuestions"]
-  const dialogs = state["pendingDialogs"]
-  return state["isCompacting"] === true
-    ? "compacting"
-    : (Array.isArray(questions) && questions.length > 0) || (Array.isArray(dialogs) && dialogs.length > 0)
-      ? "waiting_input"
-      : state["isStreaming"] === true
-        ? "running"
-        : "idle"
-}
-const recordStatus = (record: JsonObject, sawStatusRecord: boolean): string | undefined => {
-  const type = record["type"]
-  if (type === "session_status") return nonEmpty(record["status"])
-  if (sawStatusRecord) return undefined
-  return type === "agent_start" ? "running" : type === "agent_settled" ? "idle" : undefined
-}
+const leaseOf = (value: unknown): Lease | undefined =>
+  isObject(value) && typeof value["state"] === "string" && typeof value["seq"] === "number"
+    ? { state: value["state"], seq: value["seq"] }
+    : undefined
+
+const newer = (a: Lease | undefined, b: Lease | undefined): Lease | undefined =>
+  a === undefined || (b !== undefined && b.seq > a.seq) ? b : a
+
+/** The newest run lease among transcript entries (`custom` entries of type `session-lifecycle`). */
+const newestLease = (entries: readonly unknown[]): Lease | undefined =>
+  entries.reduce<Lease | undefined>(
+    (newest, entry) =>
+      newer(
+        newest,
+        isObject(entry) && entry["customType"] === "session-lifecycle" ? leaseOf(entry["data"]) : undefined,
+      ),
+    undefined,
+  )
 
 type Signal =
   | { readonly kind: "status"; readonly status: string }
+  /** The run this tracker saw in flight ended, observed. */
+  | { readonly kind: "run_ended" }
   | { readonly kind: "text"; readonly delta: string }
   | { readonly kind: "tool"; readonly event: ToolEvent }
   | { readonly kind: "frame"; readonly request: PendingRequest }
@@ -122,17 +155,15 @@ const toolEvent = (record: JsonObject): Signal | undefined => {
 
 /** One session's status and its current turn, moved by the attach's events; what follow and wait both read. */
 class SessionTurn {
-  status: string
-  ran: boolean
+  status = "idle"
+  /** A run is in flight: a source showed it running and no end was observed since. Only `#end` clears it. */
+  running = false
+  /** A run was seen in flight since the follow or wait started. */
+  ran = false
   text = ""
   turnId: string | undefined
   aborted = false
-  #sawStatusRecord = false
-
-  constructor(initial: SnapshotBody) {
-    this.status = snapshotStatus(initial)
-    this.ran = this.status !== "idle"
-  }
+  #leaseSeq = -1
 
   /** What an attach event changes, in order; `closed` once the session left its engine. */
   apply(event: AttachEvent): readonly Signal[] | "closed" {
@@ -140,7 +171,7 @@ class SessionTurn {
       case "record":
         return this.#record(event.record)
       case "frame":
-        return [{ kind: "frame", request: event.request }, ...this.#move("waiting_input", true)]
+        return [{ kind: "frame", request: event.request }, ...this.#show("waiting_input", true)]
       case "frame_settled":
         return []
       case "approvals_unobservable":
@@ -152,8 +183,21 @@ class SessionTurn {
     }
   }
 
+  /** A snapshot (the first, or a re-attach's): what it shows in flight, and its run lease. Its idle alone ends nothing. */
   resync(snapshot: SnapshotBody): readonly Signal[] {
-    return this.#move(snapshotStatus(snapshot))
+    return this.fresh(isObject(snapshot.state) ? snapshot.state : {}, snapshot.entries)
+  }
+
+  /** An engine state (a snapshot's or a fresh get_state's): the same rule as `resync`. */
+  fresh(state: JsonObject, entries: readonly unknown[] = []): readonly Signal[] {
+    const leased = this.#lease(newer(leaseOf(state["lifecycle"]), newestLease(entries)))
+    if (leased.length > 0) return leased
+    const questions = state["pendingQuestions"]
+    const dialogs = state["pendingDialogs"]
+    if (state["isCompacting"] === true) return this.#show("compacting")
+    if ((Array.isArray(questions) && questions.length > 0) || (Array.isArray(dialogs) && dialogs.length > 0))
+      return this.#show("waiting_input")
+    return state["isStreaming"] === true ? this.#run() : []
   }
 
   outcome(): FollowOutcome {
@@ -164,18 +208,25 @@ class SessionTurn {
     }
   }
 
+  /** A run lease newer than the last one seen: running runs, waiting_human asks, any other state ends the run. */
+  #lease(lease: Lease | undefined): readonly Signal[] {
+    if (lease === undefined || lease.seq <= this.#leaseSeq) return []
+    this.#leaseSeq = lease.seq
+    if (lease.state === "running") return this.#run()
+    if (lease.state === "waiting_human") return this.#show("waiting_input")
+    return this.#end()
+  }
+
   #record(record: JsonObject): readonly Signal[] | "closed" {
     const type = record["type"]
-    if (type === "session_status") this.#sawStatusRecord = true
     if (type === "agent_start") {
       this.text = ""
       this.aborted = false
       this.turnId = nonEmpty(record["runId"])
     }
     if (type === "agent_end") this.aborted = record["aborted"] === true
-    const status = recordStatus(record, this.#sawStatusRecord)
-    if (status === "closed") return "closed"
-    const moved = status === undefined ? [] : this.#move(status)
+    const moved = this.#moved(record)
+    if (moved === "closed") return "closed"
     const update = record["assistantMessageEvent"]
     if (type === "message_update" && isObject(update) && update["type"] === "text_delta") {
       const delta = typeof update["delta"] === "string" ? update["delta"] : ""
@@ -186,12 +237,63 @@ class SessionTurn {
     return tool === undefined ? moved : [...moved, tool]
   }
 
-  #move(status: string, always = false): readonly Signal[] {
+  #moved(record: JsonObject): readonly Signal[] | "closed" {
+    switch (record["type"]) {
+      case "agent_start":
+        return this.#run()
+      case "agent_settled":
+        return this.#end()
+      case "session_lifecycle":
+        return this.#lease(leaseOf(record["lifecycle"]))
+      case "entry_appended":
+        return this.#lease(newestLease([record["entry"]]))
+      case "session_status": {
+        const status = nonEmpty(record["status"])
+        if (status === "closed") return "closed"
+        if (status === "running") return this.#run()
+        if (status === "idle") return this.#end()
+        return status === undefined ? [] : this.#show(status)
+      }
+      default:
+        return []
+    }
+  }
+
+  #run(): readonly Signal[] {
+    this.running = true
+    this.ran = true
+    return this.#show("running")
+  }
+
+  /** An observed end of the run: the only way `running` goes false. */
+  #end(): readonly Signal[] {
+    const was = this.running
+    this.running = false
+    if (was) {
+      this.status = "idle"
+      return [{ kind: "run_ended" }]
+    }
+    return this.#show("idle")
+  }
+
+  #show(status: string, always = false): readonly Signal[] {
     if (status === this.status && !always) return []
     this.status = status
-    if (status === "running") this.ran = true
     return [{ kind: "status", status }]
   }
+}
+
+/**
+ * One engine state as `sessions.get` reports it, by the rule follow and wait apply (#13753): `running` when the state
+ * shows a run in flight (`isStreaming`, or a run lease, `state.lifecycle` or the newest `session-lifecycle` entry among
+ * `entries`, still running); `waiting_input` when it asks a person; `compacting`; else `idle`. A stale `isStreaming:
+ * false` cannot hide a run the lease still holds. Read it from a fresh `get_state` (pass a snapshot's entries too when
+ * there is one), never from a held reply.
+ */
+export function sessionStatusOf(state: JsonObject, entries: readonly unknown[] = []): string {
+  const turn = new SessionTurn()
+  turn.fresh(state, entries)
+  return turn.status
 }
 
 const WAITING: Readonly<Record<string, Extract<FollowEvent, { readonly kind: "waiting" }>["state"]>> = {
@@ -264,8 +366,8 @@ export function streamMembers(core: ClientCore): StreamMembers {
       if (turn === undefined || finished) return
       if (signals === "closed") return finish({ kind: "end", outcome: { reason: "session_closed" } })
       for (const signal of signals) {
+        if (signal.kind === "run_ended") return finish({ kind: "end", outcome: turn.outcome() })
         if (signal.kind === "status") {
-          if (signal.status === "idle" && turn.ran) return finish({ kind: "end", outcome: turn.outcome() })
           const event = waiting(signal.status)
           if (event !== undefined) output.push(event)
         } else if (signal.kind === "text") output.push({ kind: "text", delta: signal.delta })
@@ -279,15 +381,18 @@ export function streamMembers(core: ClientCore): StreamMembers {
     void watchSession(core, thread, opts?.signal, {
       event: (event) => deliver(turn?.apply(event) ?? []),
       snapshot: (snapshot) => deliver(turn?.resync(snapshot) ?? []),
+      fresh: (state) => deliver(turn?.fresh(state) ?? []),
       ended: () => fail(attachEnded()),
     }).then((opened) => {
       if (opened.kind === "error") return fail(opened)
       watch = opened.value
       if (finished) return watch.stop()
-      turn = new SessionTurn(opened.value.initial)
+      turn = new SessionTurn()
+      turn.resync(opened.value.initial)
       if (person) for (const request of watch.handle.pending()) output.push({ kind: "frame", request })
       const first = waiting(turn.status)
       if (first !== undefined) output.push(first)
+      void watch.baseline()
     })
     return output.stream
   }
@@ -297,6 +402,8 @@ export function streamMembers(core: ClientCore): StreamMembers {
     return new Promise((resolve) => {
       let watch: SessionWatch | undefined
       let turn: SessionTurn | undefined
+      // "No run" is believed only once the fresh read came back: the snapshot's idle can be stale (#13753).
+      let confirmed = false
       let settled = false
       const done = (outcome: Awaited<R<WaitResult>>): void => {
         if (settled) return
@@ -312,20 +419,28 @@ export function streamMembers(core: ClientCore): StreamMembers {
       const cancelTimer = core.timers.after(opts?.deadlineMs ?? DEADLINES.followTotal, () => result("timeout"))
       if (opts?.signal?.aborted === true) return onAbort()
       opts?.signal?.addEventListener("abort", onAbort, { once: true })
-      // A session that is idle, or waits on a person's answer, has nothing left to wait for.
+      // Settled: the session waits on a person's answer, or holds no run. A run it was seen holding ends only on an
+      // observed end (a record or the run lease), never on an idle snapshot or get_state.
       const check = (signals: readonly Signal[] | "closed"): void => {
         if (signals === "closed") return result("ended", "closed")
-        if (turn?.status === "idle" || turn?.status === "waiting_input") result("settled")
+        if (turn === undefined) return
+        if (turn.status === "waiting_input") return result("settled")
+        if (!turn.running && (confirmed || signals.some((signal) => signal.kind === "run_ended"))) result("settled")
       }
       void watchSession(core, thread, opts?.signal, {
         event: (event) => check(turn?.apply(event) ?? []),
         snapshot: (snapshot) => check(turn?.resync(snapshot) ?? []),
+        fresh: (state) => check(turn?.fresh(state) ?? []),
         ended: () => done(attachEnded()),
-      }).then((opened) => {
+      }).then(async (opened) => {
         if (opened.kind === "error") return done(opened)
         watch = opened.value
         if (settled) return watch.stop()
-        turn = new SessionTurn(opened.value.initial)
+        turn = new SessionTurn()
+        turn.resync(opened.value.initial)
+        check([])
+        await opened.value.baseline()
+        confirmed = true
         check([])
       })
     })
