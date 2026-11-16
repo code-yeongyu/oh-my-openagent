@@ -131,6 +131,8 @@ export function createRemoteThreadFixture() {
       openRefuse?: string
       /** b knows a session it just opened only by its relay key (relayKeys), not by its durable id: a listing that has not caught up yet. */
       relayKeyOnly?: boolean
+      /** The device service throws on b's admit_external_message (a lost connection mid-delivery). */
+      admitThrows?: string
     } = {},
   ) {
     const engine = options.engine ?? ENGINE
@@ -374,6 +376,8 @@ export function createRemoteThreadFixture() {
         },
         sessionCommand: async (device, session, rpc) => {
           sent.push({ via: "session", device, session, rpc })
+          if (rpc["type"] === "admit_external_message" && options.admitThrows !== undefined)
+            throw new Error(options.admitThrows)
           const outcome = answer(rpc, session)
           if (rpc["type"] === "prompt" && outcome.kind === "ok") {
             answeredPrompt = true

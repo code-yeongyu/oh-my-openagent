@@ -467,16 +467,30 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
       message: value.prompt ?? "",
       ...(value.delivery === undefined ? {} : { delivery: value.delivery }),
     }
-    const sent = await deliverThrough(
-      options,
-      pipeline,
-      current,
-      target,
-      send,
-      `${operationId}:prompt`,
-      callerId,
-      undefined,
-    )
+    // The thread exists from here on: a delivery that throws (a store or connection failure, not a typed refusal) is the
+    // prompt's outcome, never the create's, so the caller still gets the thread it made (review L1 at 0571de8).
+    let sent: ThreadToolResult
+    try {
+      sent = await deliverThrough(
+        options,
+        pipeline,
+        current,
+        target,
+        send,
+        `${operationId}:prompt`,
+        callerId,
+        undefined,
+      )
+    } catch (error) {
+      return {
+        error: threadToolFailure(
+          "internal_error",
+          `The thread was created, but its first prompt was not delivered: ${error instanceof Error ? error.message : String(error)}.`,
+          `Send it with thread_send to ${thread.thread_id}; read the thread first if the prompt may have arrived.`,
+          { thread_id: thread.thread_id },
+        ),
+      }
+    }
     if (sent.kind === "error") return { error: sent.error }
     const { delivery, deduplicated, delivery_id, effective_mode, endpoint } = sent as Extract<
       ThreadSendResult,

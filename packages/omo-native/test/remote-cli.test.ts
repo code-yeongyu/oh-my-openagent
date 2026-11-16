@@ -888,7 +888,7 @@ describe("omo remote session verbs", () => {
   test.each([
     [
       ["send", "/session", "hi"],
-      "omo remote send: name the session as <device>/<session> (the SESSION column of omo remote sessions)",
+      "omo remote send: name the session as <device>/<session> (the SESSION column of omo remote sessions) or by the thread_id open printed",
     ],
     [["send", "b/dur-on-b"], "omo remote send: the message text is required"],
     [["send", "b/dur-on-b", "hi", "--steer", "--follow-up"], "omo remote send: pass --steer or --follow-up, not both"],
