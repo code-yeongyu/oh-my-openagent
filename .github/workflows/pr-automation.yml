@@ -376,17 +376,20 @@ jobs:
               return;
             }
             // A push cancels the signal of the head it replaced: only a head that is still an open PR's head is a gap.
+            // A deleted fork has no head repository to look up: keep the warning.
             const signal = context.payload.workflow_run;
-            const { data: open } = await github.rest.pulls.list({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              head: `${signal.head_repository.owner.login}:${signal.head_branch}`,
-              per_page: 100,
-            });
-            if (!open.some((pr) => pr.head.sha === head)) {
-              core.info(`Head ${head.slice(0, 10)} is no longer an open PR head; its superseded signal needs no checks.`);
-              return;
+            if (signal.head_repository) {
+              const { data: open } = await github.rest.pulls.list({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                head: `${signal.head_repository.owner.login}:${signal.head_branch}`,
+                per_page: 100,
+              });
+              if (!open.some((pr) => pr.head.sha === head)) {
+                core.info(`Head ${head.slice(0, 10)} is no longer an open PR head; its superseded signal needs no checks.`);
+                return;
+              }
             }
             core.warning(`No newer PR Automation Signal run for head ${head.slice(0, 10)}: the ${context.workflow} checks have NOT run for this head. Re-run with workflow_dispatch (pr_number) if this head still needs them.`);
             await core.summary
