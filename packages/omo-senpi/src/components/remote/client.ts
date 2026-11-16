@@ -21,7 +21,7 @@ import { streamMembers } from "./follow"
 import { resolveMember } from "./resolve"
 import { handleOf } from "./seams"
 import { sessionMembers } from "./sessions"
-import { defaultLocalThreadHost } from "./sessions-local"
+import { listingLocalThreadHost } from "./sessions-local"
 import { localSessionRows } from "./sessions-local-list"
 import { thisDeviceRow } from "./this-device-row"
 import type {
@@ -252,7 +252,7 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
   const localRowsBefore = async (end: number, self: DeviceRow): Promise<readonly SessionRow[] | undefined> => {
     const ms = Math.max(0, Math.min(DEADLINES.sessionsListLocal, end - timers.now() - 1))
     const answered = await withinDeadline(timers, undefined, ms, false, async () =>
-      ok(await localSessionRows(deps.localThreadHost ?? defaultLocalThreadHost, self)),
+      ok(await localSessionRows(deps.localThreadHost ?? listingLocalThreadHost, self)),
     )
     return answered.kind === "ok" ? answered.value : undefined
   }
