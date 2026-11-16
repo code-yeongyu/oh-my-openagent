@@ -15,7 +15,7 @@ use crate::{Refused, Session};
 
 /// `InputBusy{reason:"target_busy"}`: the target was still busy at the regime's cap, and
 /// nothing was sent.
-pub const TARGET_BUSY: Refusal = Refusal::new(EngineCode::InputBusy, Reason::TargetBusy.wire());
+pub const TARGET_BUSY: Refusal = Refusal::new(EngineCode::InputBusy, Reason::TargetBusy);
 
 /// What a busy-at-cap exec refusal carries on the wire beside `InputBusy{target_busy}`: the
 /// indicator still shown, how long the wait ran, and when the same call may be retried (the cap
