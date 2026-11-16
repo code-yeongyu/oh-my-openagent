@@ -460,8 +460,9 @@ class SessionTurn {
   }
 
   /** The followed send's turn began: the session runs it (its agent_start carries no client id). */
-  markRunning(): void {
+  markRunning(): readonly Signal[] {
     this.#markRunning()
+    return this.#update()
   }
 
   #markRunning(): void {
@@ -511,6 +512,9 @@ export function sessionStatusOf(state: JsonObject, entries: readonly unknown[] =
   return turn.status
 }
 
+/** A run lease that says the run is over: neither running nor waiting on a person's answer in the middle of a turn. */
+const runOver = (lease: Lease): boolean => lease.state !== "running" && lease.state !== "waiting_human"
+
 /** A record's client message ids: the one it carries, and every input of its turn when it names several. */
 const clientIdsOf = (record: JsonObject): readonly string[] => {
   const list = record["clientMessages"]
@@ -540,14 +544,32 @@ class SendTurn {
     this.#id = id
   }
 
-  /** What `record` is to this send: one of its turn's records, its turn's end, the next input taking over, or none. */
-  classify(record: JsonObject): "ours" | "end" | "over" | "other" {
+  /**
+   * What `record` is to this send: one of its turn's records; its turn's end (its own agent_end); "over" (another input's
+   * turn started: a turn_start without this id, stamped with another input's id or with none at all, since an id-less
+   * input such as an extension's custom-message follow-up clears the correlation); "ran_out" (the run ended after the
+   * send's turn with no record of its own saying so: an agent_end or agent_settled without this id, an idle status, a
+   * run lease neither running nor waiting on a person); or none of these.
+   */
+  classify(record: JsonObject): "ours" | "end" | "over" | "ran_out" | "other" {
     const ids = clientIdsOf(record)
+    const type = record["type"]
     if (ids.includes(this.#id)) {
       this.#seen = true
-      return record["type"] === "agent_end" ? "end" : "ours"
+      return type === "agent_end" ? "end" : "ours"
     }
-    return this.#seen && ids.length > 0 && record["type"] === "turn_start" ? "over" : "other"
+    if (!this.#seen) return "other"
+    if (type === "turn_start") return "over"
+    if (type === "agent_end" || type === "agent_settled") return "ran_out"
+    if (type === "session_status" && record["status"] === "idle") return "ran_out"
+    const lease = recordLease(record)
+    return lease !== undefined && runOver(lease) ? "ran_out" : "other"
+  }
+
+  /** A fresh state after a relay gap: the run lease off running means the send's turn ended in the gap. */
+  ranOutIn(state: JsonObject): boolean {
+    const lease = leaseOf(state["lifecycle"])
+    return this.#seen && lease !== undefined && runOver(lease)
   }
 
   get started(): boolean {
@@ -656,11 +678,9 @@ export function streamMembers(core: ClientCore): StreamMembers {
       const seen = send.started
       const verdict = send.classify(event.record)
       if (verdict === "other") return
-      if (verdict === "over") return finish({ kind: "end", outcome: sendOutcome(turn, from) })
-      if (!seen) {
-        turn.markRunning()
-        output.push({ kind: "waiting", state: "turn_running" })
-      }
+      // Another turn's records are never applied: its agent_end must not mark this turn interrupted.
+      if (verdict === "over" || verdict === "ran_out") return finish({ kind: "end", outcome: sendOutcome(turn, from) })
+      if (!seen) deliver(turn.markRunning())
       deliver(turn.apply(event))
       if (verdict === "end" && !finished) finish({ kind: "end", outcome: sendOutcome(turn, from) })
     }
@@ -675,7 +695,12 @@ export function streamMembers(core: ClientCore): StreamMembers {
         if (send === undefined) deliver(turn?.resync(snapshot) ?? [])
       },
       fresh: (state) => {
-        if (send !== undefined) return
+        // From a send, only a re-attach reads the state: its run lease off running ends a turn whose end fell in the gap.
+        if (send !== undefined) {
+          if (turn !== undefined && from !== undefined && send.ranOutIn(state))
+            finish({ kind: "end", outcome: sendOutcome(turn, from) })
+          return
+        }
         deliver(turn?.fresh(state) ?? [])
         release(anchor?.baseline(leaseOf(state["lifecycle"])) ?? [])
       },
@@ -749,7 +774,7 @@ export function streamMembers(core: ClientCore): StreamMembers {
         if (turn === undefined || send === undefined) return
         if (event.kind !== "record") return check(turn.apply(event))
         const verdict = send.classify(event.record)
-        if (verdict === "end") return result("settled", "idle")
+        if (verdict === "end" || verdict === "ran_out") return result("settled", "idle")
         if (verdict === "over") return result("settled", "running")
         if (verdict === "ours") turn.markRunning()
       }
@@ -759,7 +784,11 @@ export function streamMembers(core: ClientCore): StreamMembers {
           if (send === undefined) check(turn?.resync(snapshot) ?? [])
         },
         fresh: (state) => {
-          if (send !== undefined) return
+          // From a send, only a re-attach reads the state: its run lease off running ends a turn whose end fell in the gap.
+          if (send !== undefined) {
+            if (send.ranOutIn(state)) result("settled", "idle")
+            return
+          }
           check(turn?.fresh(state) ?? [])
           release(anchor?.baseline(leaseOf(state["lifecycle"])) ?? [])
         },

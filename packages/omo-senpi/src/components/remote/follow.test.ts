@@ -348,6 +348,11 @@ const promptRun = (runId: string, seq: number, inputs: readonly (readonly [strin
     { type: "turn_start", clientMessageId: id },
     { type: "message_start", clientMessageId: id, message: { role: "user" } },
     { type: "message_end", clientMessageId: id, message: { role: "user" } },
+    {
+      type: "entry_appended",
+      clientMessageId: id,
+      entry: { type: "message", id: `entry-${id}`, message: { role: "user" } },
+    },
     { ...textDelta(text), clientMessageId: id },
     { type: "turn_end", clientMessageId: id },
   ]
@@ -455,6 +460,118 @@ describe("sessions.follow rows: from one send (#13753, the live relay shapes)", 
       { kind: "text", delta: "pong" },
       { kind: "end", outcome: { reason: "settled", text: "pong", turn_id: "1" } },
     ])
+  })
+})
+
+// A turn answering an input with no client id (an extension's custom-message follow-up, a prompt typed on the device):
+// senpi clears the active correlation for it, so its turn_start and the run's agent_end carry no clientMessageId.
+const idlessTurn = (text: string): JsonObject[] => [
+  { type: "turn_start" },
+  { type: "message_start", message: { role: "custom" } },
+  { type: "message_end", message: { role: "custom" } },
+  textDelta(text),
+  { type: "turn_end" },
+]
+const runWithIdlessTurn = (runId: string, seq: number, id: string, text: string): JsonObject[] => {
+  const run = promptRun(runId, seq, [[id, text]])
+  const end = run.findIndex((record) => record["type"] === "agent_end")
+  return [
+    ...run.slice(0, end),
+    ...idlessTurn("task finished"),
+    { type: "agent_end", messages: [], willRetry: false },
+    ...run.slice(end + 1),
+  ]
+}
+
+describe("sessions.follow rows: from one send, its run going on into an id-less turn (#13753 review M1)", () => {
+  test("#given a send whose run goes on into an id-less turn #when that turn starts #then the send's turn has ended", async () => {
+    const owner = await startOwner(
+      worldWith(IDLE, [], { reply: { lifecycle: { state: "running", seq: 3, runId: "run-2" } } }),
+    )
+    const client = clientOn(owner.stateDir, fakeClock())
+    const events = reader(client.sessions.follow(THREAD, { from: receiptOf("cm-2", "started", "2") }))
+    await listening(client)
+    pushRecords(owner, runWithIdlessTurn("run-2", 3, "cm-2", "ping"))
+    expect(await drain(events)).toEqual([
+      { kind: "waiting", state: "turn_running" },
+      { kind: "text", delta: "ping" },
+      { kind: "end", outcome: { reason: "settled", text: "ping", turn_id: "2" } },
+    ])
+  })
+
+  test("#given the same run #when wait runs from the send #then it settles at the id-less turn's start", async () => {
+    const owner = await startOwner(
+      worldWith(IDLE, [], { reply: { lifecycle: { state: "running", seq: 3, runId: "run-2" } } }),
+    )
+    const client = clientOn(owner.stateDir, fakeClock())
+    const settling = client.sessions.wait(THREAD, { from: receiptOf("cm-2", "started", "2") })
+    await listening(client)
+    pushRecords(owner, runWithIdlessTurn("run-2", 3, "cm-2", "ping"))
+    expect(await settling).toMatchObject({ kind: "ok", value: { outcome: "settled", status: "running" } })
+  })
+
+  test("#given a send's turn whose run ends with no further turn and no stamped agent_end #when the run settles #then the send's turn has ended", async () => {
+    const owner = await startOwner(
+      worldWith(IDLE, [], { reply: { lifecycle: { state: "running", seq: 3, runId: "run-2" } } }),
+    )
+    const client = clientOn(owner.stateDir, fakeClock())
+    const events = reader(client.sessions.follow(THREAD, { from: receiptOf("cm-2", "started", "2") }))
+    await listening(client)
+    const run = promptRun("run-2", 3, [["cm-2", "ping"]]).map((record) =>
+      record["type"] === "agent_end" ? { type: "agent_end", messages: [], willRetry: false } : record,
+    )
+    pushRecords(owner, run)
+    expect(await drain(events)).toEqual([
+      { kind: "waiting", state: "turn_running" },
+      { kind: "text", delta: "ping" },
+      { kind: "end", outcome: { reason: "settled", text: "ping", turn_id: "2" } },
+    ])
+  })
+})
+
+describe("sessions.follow rows: from one send, waiting on a person", () => {
+  test("#given a send's turn #when its run lease goes to waiting_human and the turn then answers #then it ends on its own end, not on the lease", async () => {
+    const owner = await startOwner(
+      worldWith(IDLE, [], { reply: { lifecycle: { state: "running", seq: 3, runId: "run-2" } } }),
+    )
+    const client = clientOn(owner.stateDir, fakeClock())
+    const events = reader(client.sessions.follow(THREAD, { from: receiptOf("cm-2", "started", "2") }))
+    await listening(client)
+    pushRecords(owner, [
+      { type: "turn_start", clientMessageId: "cm-2" },
+      { type: "session_lifecycle", lifecycle: { state: "waiting_human", seq: 4, runId: "run-2" } },
+      { type: "session_lifecycle", lifecycle: { state: "running", seq: 5, runId: "run-2" } },
+      { ...textDelta("approved"), clientMessageId: "cm-2" },
+      { type: "agent_end", messages: [], willRetry: false, clientMessageId: "cm-2" },
+    ])
+    expect(await drain(events)).toEqual([
+      { kind: "waiting", state: "turn_running" },
+      { kind: "text", delta: "approved" },
+      { kind: "end", outcome: { reason: "settled", text: "approved", turn_id: "2" } },
+    ])
+  })
+})
+
+describe("sessions.follow rows: from one send, across a relay gap (#13753 review L1)", () => {
+  test("#given a send's turn under way #when a re-attach after a gap lost its agent_end and the run lease is done #then the turn has ended", async () => {
+    const owner = await startOwner(
+      worldWith(IDLE, [], { reply: { lifecycle: { state: "done", seq: 4, runId: "run-2" } } }),
+    )
+    const client = clientOn(owner.stateDir, fakeClock())
+    const events = reader(client.sessions.follow(THREAD, { from: receiptOf("cm-2", "started", "2") }))
+    await listening(client)
+    const run = promptRun("run-2", 3, [["cm-2", "ping"]])
+    pushRecords(
+      owner,
+      run.slice(
+        0,
+        run.findIndex((record) => record["type"] === "turn_end"),
+      ),
+    )
+    expect(await events.next("turn_running")).toEqual({ kind: "waiting", state: "turn_running" })
+    expect(await events.next("the text")).toEqual({ kind: "text", delta: "ping" })
+    pushSnapshot(owner, IDLE)
+    expect(await drain(events)).toEqual([{ kind: "end", outcome: { reason: "settled", text: "ping", turn_id: "2" } }])
   })
 })
 
