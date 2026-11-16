@@ -9,6 +9,9 @@ import { isGitLockError, withGitLockRetry } from "./config-lock"
 import { GitError } from "./errors"
 import { identityLocksDirForRepo, probeGitActivityIdle } from "./git-activity-lock"
 import { PRODUCTION_LOCK_SCANS, type GitLockScans } from "./lock-scans"
+import { removeJournaled } from "./stale-lock-journal"
+
+export { STALE_LOCK_JOURNAL } from "./stale-lock-journal"
 
 // Settle window between observing an idle lock candidate and re-checking it. The crash-
 // consistency fixture child shortens its OWN process's window through the
@@ -24,6 +27,17 @@ export const GIT_LOCK_SETTLE_MS = envSettleOverride() ?? 300
 
 export type KeptGitLockReason =
   "owner-not-proven-dead" | "repo-in-use" | "changed-during-settle" | "open-holder" | "unlink-failed"
+
+/**
+ * When an index.lock whose owner cannot be proven dead is debris the writer removes itself (omo #13808):
+ * at least `staleAgeMs` old, and unchanged in size, inode and mtime across `staleSettleMs`.
+ */
+export interface StaleIndexLockPolicy {
+  readonly staleAgeMs: number
+  readonly staleSettleMs: number
+}
+
+const STALE_INDEX_LOCK_POLICY: StaleIndexLockPolicy = { staleAgeMs: 10 * 60_000, staleSettleMs: 60_000 }
 
 export interface KeptGitLock {
   readonly path: string
@@ -77,7 +91,8 @@ async function collectRefLockPaths(gitDir: string): Promise<string[]> {
   return found
 }
 
-type LockSnapshot = ReadonlyMap<string, { readonly ino: number; readonly mtimeMs: number }>
+type LockFacts = { readonly ino: number; readonly mtimeMs: number; readonly size: number }
+type LockSnapshot = ReadonlyMap<string, LockFacts>
 
 export async function presentLockFiles(gitDir: string): Promise<LockSnapshot> {
   const candidates = [
@@ -87,10 +102,10 @@ export async function presentLockFiles(gitDir: string): Promise<LockSnapshot> {
     join(gitDir, "config.lock"),
     ...(await collectRefLockPaths(gitDir)),
   ]
-  const present = new Map<string, { ino: number; mtimeMs: number }>()
+  const present = new Map<string, LockFacts>()
   for (const candidate of candidates) {
     const status = await lstat(candidate).catch(() => undefined)
-    if (status?.isFile()) present.set(candidate, { ino: status.ino, mtimeMs: status.mtimeMs })
+    if (status?.isFile()) present.set(candidate, { ino: status.ino, mtimeMs: status.mtimeMs, size: status.size })
   }
   return present
 }
@@ -111,10 +126,19 @@ async function settledVerdict(
   return holders.length > 0 ? "open-holder" : "removable"
 }
 
-// A repo outside the identity layout has no writer lock to authorize with, so it is never swept.
+// A repo outside the identity layout has no writer lock to authorize with; its stranded locks are always kept.
 export function writerLockPathForRepo(repoDir: string): string | null {
   const locksDir = identityLocksDirForRepo(repoDir)
   return locksDir === null ? null : memoryWriterLockPath(locksDir)
+}
+
+// The ownerless index.lock path (#13808) runs only while this process holds the identity's memory-write lock.
+async function callerHoldsWriterLock(repoDir: string): Promise<boolean> {
+  const writerLockPath = writerLockPathForRepo(repoDir)
+  if (writerLockPath === null) return false
+  const raw = await readFile(writerLockPath, "utf8").catch(() => undefined)
+  const current = raw === undefined ? null : parseLockRecord(raw)
+  return current !== null && current.pid === process.pid && current.hostname === hostname()
 }
 
 // The sweep's contract changed with omo #10199 review HIGH 1: a git process killed
@@ -125,6 +149,8 @@ export function writerLockPathForRepo(repoDir: string): string | null {
 // only when the lock protocol proved the recorded previous owner dead (pid + start identity;
 // provenDeadTakeoverFor keeps that proof across the republish). Unknown ownership keeps the lock
 // and the caller surfaces it through StrandedGitLockError instead of deleting on no evidence.
+// One exception (#13808): an index.lock with no owner record at all is removed by sweepOwnerlessStaleIndexLock
+// only when every check there proves it is debris (age, no holder, no repo user, unchanged across a settle).
 // Both gates must hold, in order: (1) THIS process holds the identity's memory-write lock right
 // now, and (2) the lock protocol proved the previous owner dead when this process took it over,
 // re-verified here so a pid recycled since the takeover cannot pass.
@@ -150,11 +176,12 @@ export async function sweepStrandedGitLockFiles(
   dir: string,
   settleMs = GIT_LOCK_SETTLE_MS,
   scans: GitLockScans = PRODUCTION_LOCK_SCANS,
+  stale: StaleIndexLockPolicy = STALE_INDEX_LOCK_POLICY,
 ): Promise<GitLockSweepReport> {
   const present = await presentLockFiles(join(dir, ".git"))
   if (present.size === 0) return { removed: [], kept: [] }
   const previous = await authorizedPreviousOwner(dir)
-  if (previous === null) return keepAll(present, "owner-not-proven-dead")
+  if (previous === null) return sweepOwnerlessStaleIndexLock(dir, present, scans, stale)
 
   await new Promise((resolveSleep) => setTimeout(resolveSleep, settleMs))
   // A live owner of a stranded lock stays alive from before the sweep until it removes the lock,
@@ -192,6 +219,58 @@ export async function sweepStrandedGitLockFiles(
       }
     }
     return { removed, kept }
+  } finally {
+    if (activity.kind === "idle") await activity.release()
+  }
+}
+
+// omo #13808 (LEAD ruling): an index.lock whose owner cannot be proven dead is removed only when every
+// check holds: no process works in the repository, none holds the file open (an unanswerable scan counts
+// as held), it is at least `staleAgeMs` old, and its inode, size and mtime stay unchanged across
+// `staleSettleMs`. Each removal is journaled next to the identity's locks. Every other lock stays kept.
+async function sweepOwnerlessStaleIndexLock(
+  dir: string,
+  present: LockSnapshot,
+  scans: GitLockScans,
+  stale: StaleIndexLockPolicy,
+): Promise<GitLockSweepReport> {
+  const indexLock = join(dir, ".git", "index.lock")
+  const before = present.get(indexLock)
+  const others = [...present.keys()].filter((path) => path !== indexLock)
+  const kept: KeptGitLock[] = others.map((path) => ({ path, reason: "owner-not-proven-dead" }))
+  const keep = (reason: KeptGitLockReason): GitLockSweepReport => ({
+    removed: [],
+    kept: [...kept, { path: indexLock, reason }],
+  })
+  if (before === undefined) return { removed: [], kept }
+  // A removal must be journaled (#13808 ruling); a repository outside the identity layout has nowhere to record it.
+  const locksDir = identityLocksDirForRepo(dir)
+  if (locksDir === null || !(await callerHoldsWriterLock(dir))) return keep("owner-not-proven-dead")
+  const ageMs = Date.now() - before.mtimeMs
+  if (ageMs < stale.staleAgeMs) return keep("owner-not-proven-dead")
+  const users = await scans.findRepoUsers(dir)
+  if (users === null || users.length > 0) return keep("repo-in-use")
+  const holders = await scans.findHolders(indexLock)
+  if (holders === null || holders.length > 0) return keep("open-holder")
+  await new Promise((resolveSleep) => setTimeout(resolveSleep, stale.staleSettleMs))
+  const after = await lstat(indexLock).catch(() => undefined)
+  if (after === undefined || after.ino !== before.ino || after.size !== before.size || after.mtimeMs !== before.mtimeMs)
+    return keep("changed-during-settle")
+  const usersAfter = await scans.findRepoUsers(dir)
+  if (usersAfter === null || usersAfter.length > 0) return keep("repo-in-use")
+  // As on the authorized path, the exclusive git-activity hold spans the final check and unlink, so no memory-core git starts in between.
+  const activity = await probeGitActivityIdle(dir)
+  if (activity.kind === "busy") return keep("repo-in-use")
+  try {
+    const final = await lstat(indexLock).catch(() => undefined)
+    if (
+      final === undefined ||
+      final.ino !== before.ino ||
+      final.size !== before.size ||
+      final.mtimeMs !== before.mtimeMs
+    )
+      return keep("changed-during-settle")
+    return await removeJournaled(indexLock, locksDir, { ageMs, before, settleMs: stale.staleSettleMs }, keep, kept)
   } finally {
     if (activity.kind === "idle") await activity.release()
   }

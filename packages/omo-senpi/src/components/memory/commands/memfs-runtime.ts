@@ -16,6 +16,7 @@ import { parseCommandArgs } from "./args"
 import { createRepoBackup } from "./backup"
 import { memfsBackup, memfsDiff, memfsRestore, memfsTokens } from "./memfs-extra"
 import { requireExistingRepo, type MemfsSubcommand, type MemfsSubcommandInput } from "./memfs-shared"
+import { renderStaleLockRemovals } from "./memfs-stale-locks"
 import { formatSkillNameFrontmatterRepairReport, repairMissingSkillNameFrontmatter } from "./skill-frontmatter"
 import { hasGitRepo, openRepo, shortSha } from "./repo"
 import {
@@ -53,6 +54,8 @@ const memfsStatus: MemfsSubcommand = async ({ deps, ctx, identity }) => {
       "uncommitted changes present; inspect with /memfs diff or commit through the memory tools",
     )
   }
+  const staleLocks = await renderStaleLockRemovals(identity.identityPaths.locks)
+  if (staleLocks !== undefined) lines.push(staleLocks)
   const skillsBlock = await renderSkillsUsage(identity.identityPaths.runtime)
   if (skillsBlock !== undefined) lines.push(skillsBlock)
   return respond(ctx, lines.join("\n"), dirty ? "warning" : "info")
