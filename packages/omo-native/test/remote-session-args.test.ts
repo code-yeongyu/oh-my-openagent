@@ -14,6 +14,7 @@ describe("omo remote session verbs and the -- terminator", () => {
       text: "--verbose is the flag I mean",
       delivery: "auto",
       wait: true,
+      jsonl: false,
     })
   })
 

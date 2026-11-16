@@ -3,13 +3,11 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { connectDeviceService } from "../../device-service-core/src/index.ts"
-import { startFakeOwner, type FakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
-import { defaultWorld } from "../../device-service-core/test/local-api/conformance/world.ts"
-import { createRemoteThreadFixture } from "../../omo-senpi/src/components/thread/thread-remote-fixture"
+import type { RemoteClient } from "../../omo-senpi/src/components/remote/client"
+import type { OpenRequest } from "../../omo-senpi/src/components/remote/types"
 import { REMOTE_EXIT, runRemoteVerb } from "../remote-cli"
 import { UsageError } from "../remote-exit"
-import { localPermissionPreset } from "../remote-permission-preset"
+import { localPermissionPreset, type PermissionPreset } from "../remote-permission-preset"
 
 // #6189: `omo remote open` names the mode the new session runs in - --permission-preset, else this device's own
 // engine setting - so the session never falls into the engine's delegated `ask` default with nobody to answer.
@@ -18,28 +16,34 @@ const SIGNED_IN = {
   exitCode: 0,
   stdout: JSON.stringify({ signedIn: true, device: { id: "dev-self", name: "This Mac" }, refreshState: "ok" }),
 }
-const fixture = createRemoteThreadFixture()
 const dirs: string[] = []
-const owners: FakeOwner[] = []
-afterEach(async () => {
-  fixture.cleanup()
-  for (const owner of owners.splice(0)) await owner.stop()
+afterEach(() => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
 
-async function open(args: readonly string[], localMode: () => string = () => "workspace") {
-  const a = fixture.account()
-  const stateDir = mkdtempSync(join(tmpdir(), "omo-6189-owner-"))
+async function open(args: readonly string[], localMode: () => PermissionPreset = () => "workspace") {
+  const stateDir = mkdtempSync(join(tmpdir(), "omo-6189-"))
   chmodSync(stateDir, 0o700)
   dirs.push(stateDir)
-  const owner = await startFakeOwner({ stateDir, world: defaultWorld() })
-  owners.push(owner)
   const err: string[] = []
+  const opened: OpenRequest[] = []
+  const client = {
+    sessions: {
+      open: async (request: OpenRequest) => {
+        opened.push(request)
+        return { kind: "ok", value: { thread: `${request.device}/s-new`, device: { id: request.device } } }
+      },
+    },
+    close: () => {},
+  } as unknown as RemoteClient
   const code = await runRemoteVerb(
     {
       accountShow: async () => SIGNED_IN,
-      stateDir: owner.stateDir,
-      connect: () => connectDeviceService({ version: "5.1.52", stateDir: owner.stateDir }),
+      stateDir,
+      connect: async () => {
+        throw new Error("open runs on the person client, never its own connection")
+      },
+      client: () => client,
       now: () => 0,
       output: () => {},
       write: () => {},
@@ -56,15 +60,11 @@ async function open(args: readonly string[], localMode: () => string = () => "wo
         status: async () => undefined,
       },
       linkDevice: async () => "linked",
-      remote: () => a.remote,
       localPermissionPreset: localMode,
     },
     ["open", "b", ...args],
   )
-  const modes = a.sent
-    .filter((entry) => entry.rpc?.["type"] === "open_session")
-    .map((entry) => entry.rpc?.["permissionPreset"])
-  return { code, err, modes }
+  return { code, err, modes: opened.map((request) => request.preset) }
 }
 
 describe("omo remote open and the approval mode", () => {

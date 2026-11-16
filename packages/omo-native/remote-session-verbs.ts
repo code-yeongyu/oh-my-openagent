@@ -1,9 +1,35 @@
+import { existsSync } from "node:fs"
+import { join } from "node:path"
+import { pathToFileURL } from "node:url"
+
 import type { RemoteClient } from "../omo-senpi/src/components/remote/client"
-import type { FollowEvent, R, RemoteFailure, SendReceipt } from "../omo-senpi/src/components/remote/types"
+import { handleOf } from "../omo-senpi/src/components/remote/seams"
+import type {
+  FollowEvent,
+  PermissionPreset,
+  R,
+  RemoteFailure,
+  SendReceipt,
+  ThreadHandle,
+} from "../omo-senpi/src/components/remote/types"
+import { GATEWAY_STORE_WORKER_BUNDLE_NAME } from "../omo-senpi/src/components/thread/gateway/store"
+import { packageRoot } from "./bin/lib/package-paths.js"
 import type { RemoteCommandDependencies } from "./remote-local"
-import { REMOTE_EXIT } from "./remote-exit"
+import { REMOTE_EXIT, UsageError } from "./remote-exit"
+import { localPermissionPreset } from "./remote-permission-preset"
 import { awaitingApprovalLines, sendWaitNotice, sessionVerbLines } from "./remote-render"
 import type { SessionArgs } from "./remote-session-args"
+
+/**
+ * Where the gateway store's worker is in the shipped `omo`: the `gateway-store-worker.mjs` sidecar beside the plugin's
+ * extension bundle (`<package>/plugin/extensions/`), the one place the payload carries it; `bin/lib` holds no worker, so
+ * the store's default (a worker beside the module it runs in) finds nothing there. From source the sidecar is absent and
+ * the store resolves `store-worker.ts` itself. Returns the anchor the store resolves the sidecar from, or undefined.
+ */
+export function gatewayWorkerAnchor(root: string = packageRoot): URL | undefined {
+  const anchor = pathToFileURL(join(root, "plugin", "extensions", "omo.js"))
+  return existsSync(new URL(`./${GATEWAY_STORE_WORKER_BUNDLE_NAME}`, anchor)) ? anchor : undefined
+}
 
 type Fail = (failure: RemoteFailure, label: string) => number
 type Answer<T> = Awaited<R<T>>
@@ -26,15 +52,25 @@ export async function runSession(
     return REMOTE_EXIT.ok
   }
   if (args.verb === "open") {
+    // A session this person starts on another device gets this device's own approval mode unless named (#6189): the
+    // person's setting lives here, not on the device that hosts the session.
+    let preset: PermissionPreset
+    try {
+      preset = args.permissionPreset ?? (dependencies.localPermissionPreset ?? localPermissionPreset)()
+    } catch (error) {
+      if (!(error instanceof UsageError)) throw error
+      dependencies.error(error.message)
+      return REMOTE_EXIT.usage
+    }
     const opened = await client.sessions.open({
       device: args.device,
+      preset,
       ...(args.project === undefined ? {} : { workspace: args.project }),
       ...(args.model === undefined ? {} : { model: args.model }),
-      ...(args.permissionPreset === undefined ? {} : { preset: args.permissionPreset }),
     })
     return show(opened, "", (value) => sessionVerbLines({ verb: "open", thread: value.thread }))
   }
-  const thread = `${args.target.device}/${args.target.session}`
+  const thread = handleOf(args.target.device, args.target.session)
   switch (args.verb) {
     case "send":
       return args.wait
@@ -63,13 +99,16 @@ export async function runSession(
  */
 async function sendAndFollow(
   client: RemoteClient,
-  thread: string,
+  thread: ThreadHandle,
   args: Extract<SessionArgs, { readonly verb: "send" }>,
   json: boolean,
   dependencies: RemoteCommandDependencies,
   fail: Fail,
 ): Promise<number> {
-  const stream = client.sessions.follow(thread, args.timeoutMs === undefined ? undefined : { deadlineMs: args.timeoutMs })
+  const stream = client.sessions.follow(
+    thread,
+    args.timeoutMs === undefined ? undefined : { deadlineMs: args.timeoutMs },
+  )
   try {
     const sent = await client.sessions.send(thread, { text: args.text, mode: args.delivery })
     if (sent.kind === "error") return fail(sent, thread)

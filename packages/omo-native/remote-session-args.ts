@@ -1,5 +1,5 @@
 import { UsageError } from "./remote-exit"
-import { isPermissionPreset, PERMISSION_PRESETS } from "./remote-permission-preset"
+import { isPermissionPreset, PERMISSION_PRESETS, type PermissionPreset } from "./remote-permission-preset"
 
 // The arguments of `omo remote open|send|model|interrupt|close`, parsed before the service is contacted.
 export const SESSION_VERBS = ["open", "send", "model", "interrupt", "close"] as const
@@ -15,7 +15,7 @@ export type SessionArgs =
       readonly device: string
       readonly project?: string
       readonly model?: string
-      readonly permissionPreset?: string
+      readonly permissionPreset?: PermissionPreset
     }
   | {
       readonly verb: "send"
@@ -23,6 +23,10 @@ export type SessionArgs =
       readonly text: string
       readonly delivery: "auto" | "steer" | "follow_up"
       readonly wait: boolean
+      /** One FollowEvent per line on stdout (the TUI's side panel reads it). */
+      readonly jsonl: boolean
+      /** The waited send's total deadline in ms; the client's own default when absent. */
+      readonly timeoutMs?: number
     }
   | { readonly verb: "model"; readonly target: Target; readonly model: string }
   | { readonly verb: "interrupt" | "close"; readonly target: Target }
@@ -40,7 +44,7 @@ const SESSION_FLAGS: Readonly<
   Record<SessionVerb, { readonly values: readonly string[]; readonly switches: readonly string[] }>
 > = {
   open: { values: ["--project", "--model", "--permission-preset"], switches: [] },
-  send: { values: [], switches: ["--steer", "--follow-up", "--no-wait"] },
+  send: { values: ["--timeout"], switches: ["--steer", "--follow-up", "--no-wait", "--jsonl"] },
   model: { values: [], switches: [] },
   interrupt: { values: [], switches: [] },
   close: { values: [], switches: [] },
@@ -101,7 +105,27 @@ export function parseSession(
     if (switches.has("--steer") && switches.has("--follow-up"))
       throw new UsageError("omo remote send: pass --steer or --follow-up, not both")
     const delivery = switches.has("--steer") ? "steer" : switches.has("--follow-up") ? "follow_up" : "auto"
-    return { json, session: { verb, target, text, delivery, wait: !switches.has("--no-wait") } }
+    const wait = !switches.has("--no-wait")
+    const jsonl = switches.has("--jsonl")
+    if (jsonl && (json || !wait))
+      throw new UsageError("omo remote send: --jsonl streams a waited send; drop --json and --no-wait")
+    const timeout = values.get("--timeout")
+    if (timeout !== undefined && (!wait || !/^[1-9]\d*$/.test(timeout)))
+      throw new UsageError(
+        "omo remote send: --timeout <ms> is a positive whole number of milliseconds on a waited send",
+      )
+    return {
+      json,
+      session: {
+        verb,
+        target,
+        text,
+        delivery,
+        wait,
+        jsonl,
+        ...(timeout === undefined ? {} : { timeoutMs: Number(timeout) }),
+      },
+    }
   }
   if (verb === "model") {
     const model = positional[1]

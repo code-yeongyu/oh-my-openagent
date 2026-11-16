@@ -17,12 +17,12 @@ import type { SessionFilter } from "../device-service-core/src/local-api/protoco
 import type { SessionRowState } from "../device-service-core/src/local-api/vocabulary.ts"
 import { createRemoteClient, type RemoteClient } from "../omo-senpi/src/components/remote/client"
 import type { RemoteFailure } from "../omo-senpi/src/components/remote/types"
-import type { RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
 import { readAccountInProcess } from "./account-show"
 import type { LocalStatus } from "./remote-cold-wake"
 import packageJson from "./package.json" with { type: "json" }
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
 import { controlLines, deviceLines, localRows, sessionLines, statusLines, wakeLines } from "./remote-render"
+import type { PermissionPreset } from "./remote-permission-preset"
 import { isSessionVerb, parseSession, type SessionArgs } from "./remote-session-args"
 import { runSession } from "./remote-session-verbs"
 
@@ -45,10 +45,8 @@ export interface RemoteCommandDependencies {
   /** Text as it arrives, with no line ending added: `send` streams the answer through it. */
   readonly write: (text: string) => void
   readonly error: (line: string) => void
-  /** The thread tools' remote surface over a connected service; the device service's own by default. Test seam. */
-  readonly remote?: (service: DeviceService) => RemoteThreadSurface
   /** The mode `open` names when no --permission-preset is given; this device's engine settings by default. Test seam. */
-  readonly localPermissionPreset?: () => string
+  readonly localPermissionPreset?: () => PermissionPreset
   /**
    * Where this omo's staged plugin payload lives (`<root>/plugin/extensions/` holds the gateway store's worker sidecar):
    * the npm package root by default; the compiled binary passes its provisioned runtime directory, because its own
@@ -76,6 +74,10 @@ export function localRemoteDependencies(packageRoot?: string): RemoteCommandDepe
 }
 
 /** The person at this terminal, over this device's service: the one client every read verb uses. */
+/** The person client a verb runs on: the test seam's, else this device's. */
+export const personClientOf = (dependencies: RemoteCommandDependencies): RemoteClient =>
+  (dependencies.client ?? (() => personClient(dependencies.stateDir)))()
+
 const personClient = (stateDir: string): RemoteClient =>
   createRemoteClient(
     { kind: "person", uid: String(process.getuid?.() ?? 0) },
@@ -164,13 +166,6 @@ async function runOn(service: DeviceService, parsed: Parsed, dependencies: Remot
         parsed.wake === undefined ? await service.sessionWake() : await service.setSessionWake(storedWake(parsed.wake))
       return print(state, () => wakeLines(state))
     }
-    case "open":
-    case "send":
-    case "model":
-    case "interrupt":
-    case "close":
-      if (parsed.session !== undefined) return runSession(service, parsed.session, parsed.json, dependencies)
-      throw new UsageError(`omo remote ${parsed.command}: arguments were not parsed`)
     default:
       throw new UsageError(
         parsed.command === "" ? "omo remote: a command is required" : `omo remote: unknown command ${parsed.command}`,
@@ -242,9 +237,24 @@ const withVerbs = (text: string): string =>
   text.replace(/\b(service\.status|devices\.list|sessions\.list)\b/g, (member) => VERB_OF_MEMBER[member] ?? member)
 
 /** A typed failure of the person client, printed for a person; --json also prints it as is on stdout. */
-function renderFailure(dependencies: RemoteCommandDependencies, failure: RemoteFailure, json: boolean): number {
+export function renderFailure(
+  dependencies: RemoteCommandDependencies,
+  failure: RemoteFailure,
+  json: boolean,
+  label = "",
+): number {
   if (json) dependencies.output(JSON.stringify(failure))
   const details = failure.details ?? {}
+  if (!json && label !== "" && failure.code === "not_found" && details["kind"] === "session") {
+    dependencies.error(`omo remote: no session ${label} on this account.`)
+    dependencies.error("Run omo remote sessions to see them.")
+    return REMOTE_EXIT.failed
+  }
+  if (!json && label !== "" && failure.code === "not_steerable") {
+    dependencies.error(`omo remote: nothing is running on ${label} to steer.`)
+    dependencies.error("Send without --steer to start a turn.")
+    return REMOTE_EXIT.failed
+  }
   if (failure.code === "host_unavailable" && details["reason"] === "service_not_installed") {
     dependencies.error(
       existsSync(dependencies.stateDir)
@@ -276,10 +286,15 @@ function renderFailure(dependencies: RemoteCommandDependencies, failure: RemoteF
 export async function runLocalRemoteVerb(dependencies: RemoteCommandDependencies, parsed: Parsed): Promise<number> {
   const signedOut = await accountNotice(dependencies)
   if (signedOut !== undefined) return signedOut
-  if (READ_VERBS.has(parsed.command)) {
-    const client = (dependencies.client ?? (() => personClient(dependencies.stateDir)))()
+  const session = parsed.session
+  if (READ_VERBS.has(parsed.command) || session !== undefined) {
+    const client = personClientOf(dependencies)
     try {
-      return await runRead(client, parsed, dependencies)
+      return session === undefined
+        ? await runRead(client, parsed, dependencies)
+        : await runSession(client, session, parsed.json, dependencies, (failure, label) =>
+            renderFailure(dependencies, failure, parsed.json, label),
+          )
     } finally {
       client.close()
     }
