@@ -602,6 +602,23 @@ describe("an open on this device", () => {
   const SELF = "dev-self"
   const SELF_SESSION = handleOf(SELF, "dur-selected")
   const selfWorld = world
+  // The same world with this device on the account's roster, under the kind and platform the roster reports.
+  const listedSelfWorld = (): World => {
+    const base = selfWorld()
+    const here = {
+      device: SELF,
+      label: "This Mac",
+      kind: "desktop",
+      platform: "darwin",
+      last_seen_ms: 1_790_000_000_000,
+      online: true,
+    }
+    return { ...base, devices: [here, ...base.devices] }
+  }
+  const rosters = [
+    ["omits this device", selfWorld],
+    ["lists this device", listedSelfWorld],
+  ] as const
 
   test("#given a connected service whose device listing omits this device #when devices.list reads #then the self row is not the no-service row", async () => {
     const owner = await startOwner(selfWorld())
@@ -648,18 +665,24 @@ describe("an open on this device", () => {
   }
   const opensOn = (host: ContractHost) => host.frames.filter(({ frame }) => frame["type"] === "open_session")
 
-  test("#given a connected service #when sessions.open names this device #then it opens on this device's own host, never through the relay to itself", async () => {
-    await withContractHost({}, async (host) => {
-      const { owner, client } = await localClient(host)
-      const opened = await valueOf(client.sessions.open({ device: SELF, workspace: host.root, preset: "read-only" }))
-      expect(opened.thread).toBe(SELF_SESSION)
-      expect(opened.device).toMatchObject({ id: SELF, self: true })
-      expect(owner.state.commands.filter((rpc) => rpc["type"] === "open_session")).toEqual([])
-      expect(opensOn(host)).toEqual([
-        expect.objectContaining({ frame: expect.objectContaining({ cwd: host.root, permissionPreset: "read-only" }) }),
-      ])
+  for (const [roster, worldOf] of rosters)
+    test(`#given a connected service whose roster ${roster} #when sessions.open names this device's own id #then it opens on this device's own host, never not_found and never through the relay to itself`, async () => {
+      await withContractHost({}, async (host) => {
+        const { owner, client } = await localClient(host, worldOf())
+        const opened = await valueOf(client.sessions.open({ device: SELF, workspace: host.root, preset: "read-only" }))
+        expect(opened.thread).toBe(SELF_SESSION)
+        // The device it names is devices.list's own row for this device, as an open elsewhere names that device's row.
+        const [self] = await valueOf(client.devices.list())
+        expect(opened.device).toEqual(self)
+        expect(self).toMatchObject({ id: SELF, self: true })
+        expect(owner.state.commands.filter((rpc) => rpc["type"] === "open_session")).toEqual([])
+        expect(opensOn(host)).toEqual([
+          expect.objectContaining({
+            frame: expect.objectContaining({ cwd: host.root, permissionPreset: "read-only" }),
+          }),
+        ])
+      })
     })
-  })
 
   test("#given the open's connection drops after the open_session frame was written #when sessions.open runs #then it is uncertain and the same key does not open twice (#13787 M1)", async () => {
     await withContractHost({}, async (host) => {
@@ -891,6 +914,23 @@ describe("an open on this device", () => {
       expect(host.mutations.filter((frame) => frame["type"] === "prompt")).toHaveLength(1)
     })
   })
+
+  for (const [roster, worldOf] of rosters)
+    test(`#given a roster that ${roster} #when sessions.list reads the whole account #then each row's device is devices.list's row for that id, this device's own sessions as another device's`, async () => {
+      await withContractHost({}, async (host) => {
+        const { client } = await localClient(host, worldOf())
+        const devices = new Map((await valueOf(client.devices.list())).map((row) => [row.id, row]))
+        const { rows } = await valueOf(client.sessions.list())
+        const here = rows.filter((row) => row.device.id === SELF)
+        const there = rows.filter((row) => row.device.id === PEER)
+        expect(here.length).toBeGreaterThan(0)
+        expect(there.length).toBeGreaterThan(0)
+        for (const row of rows) expect(devices.get(row.device.id)).toEqual(row.device)
+        // The same row fields on both legs: a remote row its device publishes a durable id for, and a local one.
+        const remote = there.find((row) => row.durable_id !== undefined)
+        expect(Object.keys(here[0] ?? {}).sort()).toEqual(Object.keys(remote ?? {}).sort())
+      })
+    })
 
   test("#given a session this device's host holds #when sessions.list reads this device #then the local host's session is listed, the relay's listing aside", async () => {
     await withContractHost({}, async (host) => {
