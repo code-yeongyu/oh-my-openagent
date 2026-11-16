@@ -285,6 +285,36 @@ describe("omo login switches remote sessions on and says so", () => {
     expect(out).toEqual([`stderr: ${stop.action}`])
   })
 
+  // #14008 review L1: the opt-out branch on such a platform. The setup runs inline there too; its install is a pure
+  // platform lookup that stops at once, so login prints the platform notice, then the kept-off line, and starts nothing.
+  test("a recorded opt-out on a platform the device service does not run on: the notice, then the kept-off line", async () => {
+    const { io, remote } = await signedInDeviceWithSwitchOff(true)
+    const out: string[] = []
+    const noService = {
+      ...io,
+      stateDir: privateDir(),
+      connect: () => connectDeviceService({ version: "5.1.52", stateDir: privateDir() }),
+      output: (line: string) => out.push(line),
+      error: (line: string) => out.push(`stderr: ${line}`),
+    }
+    const real = deviceServiceBootstrapSetup({
+      stateDir: noService.stateDir,
+      binaryPath: "/opt/omo/omo",
+      agentDir: "/home/user/.omo/agent",
+      platform: "freebsd",
+      arch: "x64",
+    })
+    const stop = await real.install()
+    if (stop.ok) throw new Error("an unsupported platform's install must stop")
+    let installs = 0
+    const setup = { ...real, install: () => ((installs += 1), real.install()) }
+
+    expect(await runLoginSetup(noService, setup, remote, loginBackground("/opt/omo/omo", "freebsd", "x64"))).toBe(
+      "kept_off",
+    )
+    expect([out, installs]).toEqual([[`stderr: ${stop.action}`, REMOTE_KEPT_OFF_AFTER_SIGN_IN], 1])
+  })
+
   // #13724 review M1: an opt-out is enforced at login on any device. With no current service (none, or an older one),
   // the background omo remote bootstrap installs it and turns its switch off; login itself never installs.
   test("a recorded opt-out with no current service: login installs nothing itself and hands it to a background bootstrap", async () => {
