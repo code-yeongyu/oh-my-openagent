@@ -9,7 +9,7 @@ import type {
   SnapshotBody,
 } from "../device-service-core/src/index.ts"
 import { outcomeFailure, outcomeOf } from "../omo-senpi/src/components/thread/remote/outcome"
-import { MirroredDialogs } from "./remote-attach-dialogs"
+import { MirroredDialogs, pendingIds } from "./remote-attach-dialogs"
 
 // One authenticated attach TUI connection to the `omo remote attach` endpoint (remote-attach.ts): the attach's session
 // presented as the one row LOCAL_SESSION_ID, its plumbing answered here, every other record forwarded to the host.
@@ -115,7 +115,9 @@ export class Presentation {
   private presentPending(snapshot: SnapshotBody): void {
     const { pendingDialogs, pendingQuestions } = this.pendingOf(snapshot)
     const pending = [...pendingDialogs, ...pendingQuestions]
-    for (const resolved of this.dialogs.settledAway(pending, LOCAL_SESSION_ID)) this.send(resolved)
+    const state = isRecord(snapshot.state) ? snapshot.state : {}
+    const still = pendingIds(state.pendingDialogs, state.pendingQuestions)
+    for (const resolved of this.dialogs.settledAway(still, LOCAL_SESSION_ID)) this.send(resolved)
     for (const dialog of pending) this.send(dialog)
   }
 
