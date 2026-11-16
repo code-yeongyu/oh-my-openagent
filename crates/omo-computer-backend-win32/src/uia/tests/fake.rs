@@ -93,9 +93,18 @@ impl UiaSource for FakeUia {
     ) -> Slice<Vec<UiaElement>> {
         self.calls.push("children".to_owned());
         self.requests.push(request.clone());
-        let ids = self.children.get(&parent.runtime_id).cloned().unwrap_or_default();
+        let ids = self
+            .children
+            .get(&parent.runtime_id)
+            .cloned()
+            .unwrap_or_default();
         let from = usize::try_from(from).unwrap_or(usize::MAX);
-        Slice::Read(ids.iter().skip(from).filter_map(|id| self.get(id)).collect())
+        Slice::Read(
+            ids.iter()
+                .skip(from)
+                .filter_map(|id| self.get(id))
+                .collect(),
+        )
     }
 
     fn refresh(&mut self, element: &UiaElement, _slice_ms: u64) -> Slice<Option<UiaElement>> {
@@ -103,8 +112,14 @@ impl UiaSource for FakeUia {
         Slice::Read(self.get(&element.runtime_id))
     }
 
-    fn find_runtime_id(&mut self, _hwnd: isize, runtime_id: &[i32]) -> Vec<UiaElement> {
-        self.elements.iter().filter(|e| e.runtime_id == runtime_id).cloned().collect()
+    /// Answers only from the top-level window it is asked to search, like the live client.
+    fn find_runtime_id(&mut self, hwnd: isize, runtime_id: &[i32]) -> Vec<UiaElement> {
+        self.calls.push(format!("find_runtime_id {hwnd}"));
+        self.elements
+            .iter()
+            .filter(|e| e.top_level == hwnd && e.runtime_id == runtime_id)
+            .cloned()
+            .collect()
     }
 
     fn focused(&self) -> Option<UiaElement> {

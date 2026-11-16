@@ -13,8 +13,7 @@ use super::identity::native_object;
 use super::source::UiaSource;
 
 /// `AxUnsupported{elevated_target}`: an elevated target is not read, before any walk.
-pub const ELEVATED: Refusal =
-    Refusal::new(EngineCode::AxUnsupported, Reason::ElevatedTarget);
+pub const ELEVATED: Refusal = Refusal::new(EngineCode::AxUnsupported, Reason::ElevatedTarget);
 
 /// The reader over one UI Automation client.
 pub struct UiaReader<S> {
@@ -120,16 +119,20 @@ impl<S: UiaSource> UiaReader<S> {
     }
 
     /// Children of `parent` from `from`, read with the walk's cache request.
-    pub fn read_children(&mut self, parent: AxHandle, from: u32, slice_ms: u64) -> Slice<Vec<NodeRead>> {
+    pub fn read_children(
+        &mut self,
+        parent: AxHandle,
+        from: u32,
+        slice_ms: u64,
+    ) -> Slice<Vec<NodeRead>> {
         let Some(element) = self.element(parent) else {
             return Slice::Read(Vec::new());
         };
-        let request = self
-            .request
-            .clone()
-            .unwrap_or_else(|| cache_request(""));
+        let request = self.request.clone().unwrap_or_else(|| cache_request(""));
         match self.source.children(&element, &request, from, slice_ms) {
-            Slice::Read(children) => Slice::Read(children.into_iter().map(|c| self.keep(c)).collect()),
+            Slice::Read(children) => {
+                Slice::Read(children.into_iter().map(|c| self.keep(c)).collect())
+            }
             Slice::Hung => Slice::Hung,
         }
     }

@@ -16,9 +16,17 @@ fn one_uia_client_per_session() {
         let reader = host.reader().expect("the client starts");
         reader.root_of("4660").expect("root");
     }
-    assert_eq!(made.load(Ordering::SeqCst), 1, "one CoCreateInstance for the whole session");
+    assert_eq!(
+        made.load(Ordering::SeqCst),
+        1,
+        "one CoCreateInstance for the whole session"
+    );
     assert_eq!(host.clients_created(), 1);
     host.end_session();
     host.reader().expect("a new session starts its own client");
-    assert_eq!(made.load(Ordering::SeqCst), 2, "the next session makes its own");
+    assert_eq!(
+        made.load(Ordering::SeqCst),
+        2,
+        "the next session makes its own"
+    );
 }

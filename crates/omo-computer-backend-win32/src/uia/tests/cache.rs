@@ -9,10 +9,33 @@ const CLIENT_SIDE_INPROC: &str =
 
 #[test]
 fn cache_request_batches_by_provider_class() {
-    assert_eq!(cache_request(MSAA_PROXY).batching, Batching::Batch, "a WinForms MSAA proxy named by pid");
-    assert_eq!(cache_request(CLIENT_SIDE_INPROC).batching, Batching::Skip, "client-side in-process providers only");
-    assert_eq!(cache_request("[pid:900,providerId:0x0 Main:Nested [pid:900] (managed:UIAutomationProvider)]").batching, Batching::Batch);
-    for property in ["Name", "ControlType", "AutomationId", "IsPassword", "RuntimeId", "Value.Value", "BoundingRectangle", "HasKeyboardFocus"] {
+    assert_eq!(
+        cache_request(MSAA_PROXY).batching,
+        Batching::Batch,
+        "a WinForms MSAA proxy named by pid"
+    );
+    assert_eq!(
+        cache_request(CLIENT_SIDE_INPROC).batching,
+        Batching::Skip,
+        "client-side in-process providers only"
+    );
+    assert_eq!(
+        cache_request(
+            "[pid:900,providerId:0x0 Main:Nested [pid:900] (managed:UIAutomationProvider)]"
+        )
+        .batching,
+        Batching::Batch
+    );
+    for property in [
+        "Name",
+        "ControlType",
+        "AutomationId",
+        "IsPassword",
+        "RuntimeId",
+        "Value.Value",
+        "BoundingRectangle",
+        "HasKeyboardFocus",
+    ] {
         assert!(PROPERTIES.contains(&property), "{property} is cached");
     }
     let mut reader = UiaReader::new(FakeUia::winforms());
@@ -24,5 +47,9 @@ fn cache_request_batches_by_provider_class() {
     assert_eq!(children.len(), 2);
     let requests = &reader.source().requests;
     assert_eq!(requests.len(), 1, "one cache request for the read");
-    assert_eq!(requests[0].batching, Batching::Batch, "the root's provider chose it");
+    assert_eq!(
+        requests[0].batching,
+        Batching::Batch,
+        "the root's provider chose it"
+    );
 }

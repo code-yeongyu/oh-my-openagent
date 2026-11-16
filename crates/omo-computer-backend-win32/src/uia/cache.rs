@@ -58,9 +58,11 @@ fn client_side_only(description: &str) -> bool {
         .filter_map(|group| group.split(')').next())
         .collect();
     !modules.is_empty()
-        && modules
-            .iter()
-            .all(|module| module.to_ascii_lowercase().ends_with(":uiautomationcore.dll"))
+        && modules.iter().all(|module| {
+            module
+                .to_ascii_lowercase()
+                .ends_with(":uiautomationcore.dll")
+        })
 }
 
 /// The cache request a walk under a root with `provider_description` uses.
@@ -68,7 +70,11 @@ fn client_side_only(description: &str) -> bool {
 pub fn cache_request(provider_description: &str) -> CacheRequest {
     let skip = client_side_only(provider_description) && !names_a_process(provider_description);
     CacheRequest {
-        batching: if skip { Batching::Skip } else { Batching::Batch },
+        batching: if skip {
+            Batching::Skip
+        } else {
+            Batching::Batch
+        },
         properties: PROPERTIES,
     }
 }

@@ -56,7 +56,10 @@ impl UiaThread {
         })
     }
 
-    fn call<R: Send + 'static>(&self, job: impl FnOnce(&mut ComUia) -> R + Send + 'static) -> Option<R> {
+    fn call<R: Send + 'static>(
+        &self,
+        job: impl FnOnce(&mut ComUia) -> R + Send + 'static,
+    ) -> Option<R> {
         let (reply, answer) = channel();
         self.jobs
             .as_ref()?
@@ -79,7 +82,8 @@ impl Drop for UiaThread {
 
 impl UiaSource for UiaThread {
     fn now_ms(&self) -> u64 {
-        self.call(|client| client.now_ms()).unwrap_or(self.started_ms)
+        self.call(|client| client.now_ms())
+            .unwrap_or(self.started_ms)
     }
 
     fn elevated(&mut self, hwnd: isize) -> Option<bool> {
@@ -97,7 +101,13 @@ impl UiaSource for UiaThread {
             .unwrap_or_default()
     }
 
-    fn children(&mut self, parent: &UiaElement, request: &CacheRequest, from: u32, _slice_ms: u64) -> Slice<Vec<UiaElement>> {
+    fn children(
+        &mut self,
+        parent: &UiaElement,
+        request: &CacheRequest,
+        from: u32,
+        _slice_ms: u64,
+    ) -> Slice<Vec<UiaElement>> {
         let (parent, request) = (parent.clone(), request.clone());
         self.call(move |client| client.children(&parent, &request, from))
             .unwrap_or(Slice::Hung)
@@ -116,7 +126,8 @@ impl UiaSource for UiaThread {
     }
 
     fn focused(&self) -> Option<UiaElement> {
-        self.call(|client| client.focused(&cache_request(""))).flatten()
+        self.call(|client| client.focused(&cache_request("")))
+            .flatten()
     }
 
     fn toasts(&mut self) -> Option<Vec<Toast>> {
