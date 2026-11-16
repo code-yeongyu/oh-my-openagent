@@ -12,15 +12,21 @@ const scenario = path.resolve(here, "../../../crates/senpi-desktop-backend-fake/
 const repoRoot = path.resolve(here, "../../..")
 
 /**
- * The engine built from this checkout, or why there is none. Under CI the Desktop package tests step stages this
- * tree's engine in OMO_PACKAGE_DIR, which the locator reads first, and a fresh runner has no other engine installed.
- * Elsewhere the locator also accepts an installed runtime's older engine (#13625), so only the repository's own
- * release build counts.
+ * The engine built from this checkout, or why there is none. The Desktop package tests step stages this tree's
+ * engine in OMO_PACKAGE_DIR and names that directory in OMO_DESKTOP_STAGED_ENGINE_DIR; only then does the located
+ * engine count, and it must be the staged one. Everywhere else, `CI=true` included, the locator also accepts an
+ * installed runtime's older engine (#13625), so only the repository's own release build counts.
  */
 function engineUnderTest(): { readonly path: string } | { readonly skip: string } {
-  if (process.env.CI === "true") {
+  const staged = process.env.OMO_DESKTOP_STAGED_ENGINE_DIR
+  if (staged !== undefined && staged !== "") {
     const location = locateDesktopEngine()
-    return location.path === null ? { skip: location.diagnostic.message } : { path: location.path }
+    if (location.path === null) return { skip: location.diagnostic.message }
+    const relative = path.relative(path.resolve(staged), path.resolve(location.path))
+    if (relative.startsWith("..") || path.isAbsolute(relative)) {
+      throw new Error(`the located engine ${location.path} is not the one staged under ${staged}`)
+    }
+    return { path: location.path }
   }
   const devBuild = path.join(repoRoot, "target", "release", getDesktopEngineFileName())
   return existsSync(devBuild)

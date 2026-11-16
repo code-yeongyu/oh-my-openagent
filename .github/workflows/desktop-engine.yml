@@ -104,6 +104,7 @@ jobs:
       - name: Desktop package tests
         env:
           OMO_PACKAGE_DIR: ${{ runner.temp }}/omo-desktop-ci-engine
+          OMO_DESKTOP_STAGED_ENGINE_DIR: ${{ runner.temp }}/omo-desktop-ci-engine
           OMO_DESKTOP_PRELUDE_PYTHON_DIAGNOSTICS: ${{ runner.os == 'Windows' && '1' || '0' }}
         run: bun run test:desktop
 
