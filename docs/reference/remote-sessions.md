@@ -44,7 +44,9 @@ The canonical session identity is the durable `thread.thread_id` that `open --js
 directly to `send`, `model`, `interrupt`, `close` or `attach`; the CLI finds its device in the account
 listing. All five also take `<device>/<session>`, with either the durable id or the listing key in the
 `SESSION` column; an explicit device skips the account listing, and a durable id that device has not
-listed yet (a session opened a moment ago) is located on that device.
+listed yet (a session opened a moment ago) is located on that device. A bare id is found through the
+account listing, which can lag a session opened a moment ago: right after `open`, use
+`<device>/<thread_id>`.
 
 `send`
 with `--steer` goes into the running turn, and `--no-wait` returns once the session took the message
