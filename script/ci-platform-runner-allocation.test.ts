@@ -72,7 +72,7 @@ function matrixLegs(job: Record<string, unknown>, context: ExpressionContext): R
 function scheduledRunners(file: string, github: Record<string, unknown>, fullMatrix: string): string[] {
   const needs = new Proxy(
     { "ci-mode": { outputs: { full_matrix: fullMatrix, run_heavy: "true" } } },
-    { get: (target, key) => Reflect.get(target, key) ?? { result: "skipped", outputs: {} } },
+    { get: (target, key) => Reflect.get(target, key) ?? { result: "success", outputs: { full_matrix: fullMatrix } } },
   )
   const runners: string[] = []
   for (const [name, definition] of Object.entries(jobs(file))) {
@@ -115,6 +115,28 @@ describe("#given every workflow a pull request triggers", () => {
       nonLinux(scheduledRunners(file, pullRequest(["bug"]), "false")).map((runner) => `${file} ${runner}`),
     )
     expect(scheduled).toEqual([])
+  })
+
+  // The label is honored only through the one platform decision (#13859): a refused label must not reach a runner.
+  test("#then a refused ci:full-matrix label schedules no macOS or Windows runner in any workflow", () => {
+    const scheduled = pullRequestWorkflows().flatMap((file) =>
+      nonLinux(scheduledRunners(file, pullRequest([OPT_IN_LABEL]), "false")).map((runner) => `${file} ${runner}`),
+    )
+    expect(scheduled).toEqual([])
+  })
+
+  test("#then only the decision's inputs read the PR labels; no workflow tests the raw label name", () => {
+    const readers = readdirSync(workflowsDir)
+      .filter((file) => /\.ya?ml$/.test(file))
+      .filter((file) => /pull_request\.labels|'ci:full-matrix'/.test(readFileSync(new URL(file, workflowsDir), "utf8")))
+    // ci.yml and pr-platform-decision.yml feed the labels to the classifier; changelog-gate.yml reads changelog labels;
+    // the label workflow's trigger tests the labeled event's own label name.
+    expect(readers.sort()).toEqual([
+      "changelog-gate.yml",
+      "ci-full-matrix-label.yml",
+      "ci.yml",
+      "pr-platform-decision.yml",
+    ])
   })
 
   test.each(pullRequestWorkflows())("#then the opt-in label gives %s the same macOS/Windows legs as a push", (file) => {
