@@ -55,17 +55,39 @@ export function curatedRows(path: string = ROWS_PATH): Readonly<Record<string, C
   return Object.fromEntries(Object.entries(parsed).map(([method, row]) => [method, parseRow(path, method, row)]))
 }
 
-/** A curated pair test must be a file in this repository that names its method as a quoted record type. */
+/**
+ * Whether `source` uses `method` as a record type: the quoted name as the value of a `type` field (`type: "m"`), compared
+ * with one (`["type"] === "m"`, `.type === "m"`), or asserted on one (`.type).toBe("m")`). A mention anywhere else (a
+ * comment, a test title, an unrelated string) does not count.
+ */
+export function namesRecordType(source: string, method: string): boolean {
+  const name = `["']${method}["']`
+  return new RegExp(`\\btype["']?\\]?\\s*(?::|===?)\\s*${name}|\\btype\\)\\.toBe\\(\\s*${name}\\s*\\)`).test(source)
+}
+
+/** A curated pair test must be a file in this repository that uses its method as a record type (namesRecordType). */
 export function pairTestProblems(rows: Readonly<Record<string, CuratedRow>>): string[] {
   return Object.entries(rows).flatMap(([method, row]) => {
     if (row.test === undefined) return []
     const file = row.test.split(" (")[0] ?? row.test
     const path = join(root, file)
     if (!existsSync(path)) return [`${method}: pair test ${file} does not exist`]
-    return readFileSync(path, "utf8").includes(`"${method}"`)
+    return namesRecordType(readFileSync(path, "utf8"), method)
       ? []
-      : [`${method}: pair test ${file} never names "${method}"`]
+      : [`${method}: pair test ${file} never uses "${method}" as a record type`]
   })
+}
+
+/** What `--check` fails on: a committed table that differs from the rendered one, and every broken pair-test row. */
+export function checkProblems(
+  committed: string,
+  rendered: string,
+  rows: Readonly<Record<string, CuratedRow>>,
+): string[] {
+  return [
+    ...(committed === rendered ? [] : [`${TABLE_PATH} is stale; run: bun script/rpc-relay-parity.ts`]),
+    ...pairTestProblems(rows),
+  ]
 }
 
 // The engine's own definition of connection_local: it configures the sender's own connection, so it is never
@@ -109,13 +131,12 @@ ${lines.join("\n")}
 }
 
 if (import.meta.main) {
-  const rendered = renderTable(await engineMethodClasses(), curatedRows())
-  if (process.argv.includes("--check")) {
-    if (readFileSync(TABLE_PATH, "utf8") !== rendered) {
-      console.error(`${TABLE_PATH} is stale; run: bun script/rpc-relay-parity.ts`)
-      process.exit(1)
-    }
-  } else {
-    writeFileSync(TABLE_PATH, rendered)
-  }
+  const rows = curatedRows()
+  const rendered = renderTable(await engineMethodClasses(), rows)
+  const problems = process.argv.includes("--check")
+    ? checkProblems(readFileSync(TABLE_PATH, "utf8"), rendered, rows)
+    : pairTestProblems(rows)
+  for (const problem of problems) console.error(problem)
+  if (problems.length > 0) process.exit(1)
+  if (!process.argv.includes("--check")) writeFileSync(TABLE_PATH, rendered)
 }
