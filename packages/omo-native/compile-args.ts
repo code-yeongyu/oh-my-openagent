@@ -57,7 +57,8 @@ export function trustLaunchKind(
 
 /**
  * The shared host child the engine's supervisor spawns (`--mode rpc --multi-session --listen` plus its launch spec's
- * own `--extension` paths) already names everything it loads, and the engine identifies it by exactly that list
+ * `--session-runtime` and `--extension` paths; a spec listing no extensions gives only the former) already names
+ * everything it loads, and the engine identifies it by exactly that list
  * (`runtimeBuildId`, `launch_profile`), while `host ensure` predicts the id (`clientRuntimeBuildId`) from the spec
  * alone. Prepending the plugin here made one binary report two ids whenever the spec's plugin was not this runtime's
  * own folder (a user-owned copy, a discovered plugin): the desktop judged the host `build_mismatch` and every
@@ -70,7 +71,7 @@ function carriesLaunchProfile(options: readonly string[]): boolean {
     options[mode + 1] === "rpc" &&
     options.includes("--multi-session") &&
     options.includes("--listen") &&
-    options.includes("--extension")
+    (options.includes("--extension") || options.includes("--session-runtime"))
   )
 }
 

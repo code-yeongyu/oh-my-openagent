@@ -88,7 +88,9 @@ describe("attach rows: open", () => {
     const name = canonicalizeThreadHandle("my-thread", {})
     if (name.kind !== "ok") throw new Error("a name parses")
     expect(failureOf(await client.attach(name.value.handle)).code).toBe("invalid_arguments")
-    expect(failureOf(await client.attach(handleOf(PEER, "no-such-session")))).toMatchObject({
+    // A well-formed listing key the device does not hold: a service with #1350 refuses an id that is no key at all as
+    // invalid_request before any lookup.
+    expect(failureOf(await client.attach(handleOf(PEER, "bm90LWhlbGQta2V5LTAwMQ")))).toMatchObject({
       code: "not_found",
       details: { kind: "session" },
     })

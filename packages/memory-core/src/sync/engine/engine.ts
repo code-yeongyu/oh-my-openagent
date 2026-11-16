@@ -211,15 +211,26 @@ export class SyncEngine {
   /**
    * A journal names the device peer it was created under. One from another peer arrived with a
    * copied repo: its pending ops are that device's to push, so it is retired, never resumed.
+   * A journal also names the space it syncs: the account feed carries every space, so its cursor,
+   * outbox and item docs mean nothing in another one. After the repository moves to a new space
+   * (#13720) the journal is retired and the item store reloaded empty, so the next capture adopts
+   * the whole working tree into the new space. Answers whether the store must be reloaded.
    */
-  private async claimJournal(): Promise<void> {
+  private async claimJournal(): Promise<boolean> {
+    const { space, legacySpace } = this.deps
     const peer = this.deps.store.peer()
-    const owner = (await this.journal.state()).peer
+    const state = await this.journal.state()
+    const owner = state.peer
+    const otherSpace = state.space !== null ? state.space !== space : owner !== null && legacySpace !== undefined
     if (owner !== null && owner !== peer) {
       this.deps.log?.(`sync: journal belongs to peer ${owner}, this device is ${peer}; retiring it`)
       await this.journal.retire()
+    } else if (otherSpace) {
+      this.deps.log?.("sync: journal belongs to another memory space; retiring it and adopting the working tree")
+      await this.journal.retire()
     }
-    if (owner !== peer) await this.journal.updateState({ peer })
+    if (owner !== peer || state.space !== space || otherSpace) await this.journal.updateState({ peer, space })
+    return otherSpace && !(owner !== null && owner !== peer)
   }
 
   private sleep(ms: number): Promise<void> {
@@ -244,18 +255,18 @@ export class SyncEngine {
     const { deps, journal } = this
     if (!this.loaded) {
       await deps.store.load()
-      await this.claimJournal()
+      if (await this.claimJournal()) await deps.store.load()
       this.loaded = true
     }
     const before = await journal.updateState({ eventHead: Math.max(this.eventHead, (await journal.state()).eventHead) })
-    let holds: CaptureHolds = { held: new Map(), withheld: new Set() }
+    let holds: CaptureHolds = { held: new Map(), withheld: new Set(), joining: new Set() }
     if (before.cycle !== null) {
       const resumed = before.cycle
       await deps.lock.withLock(async () => {
         // A cycle resumed at merged re-renders its keys over the working files: capture any edit made
         // since the crash first, so it merges into the doc instead of being overwritten.
         if (resumed.stage === "merged") holds = await capture(deps, journal, resumed)
-        await advance(deps, journal, resumed, new Set(holds.held.keys()))
+        await advance(deps, journal, resumed, notRenderedNow(holds))
       })
     }
     let applied = 0
@@ -268,7 +279,10 @@ export class SyncEngine {
       snapshot = got.snapshot ?? snapshot
       const done = await deps.lock.withLock(async () => {
         holds = await capture(deps, journal)
-        return applyVerified(deps, journal, new Set(holds.held.keys()))
+        const appliedNow = await applyVerified(deps, journal, notRenderedNow(holds))
+        // A joining file adopts the space's state in this same cycle, so its edit goes out with this push.
+        if (holds.joining.size > 0) holds = await capture(deps, journal)
+        return appliedNow
       })
       applied += done.batches
       memories += done.memories
@@ -299,3 +313,6 @@ export class SyncEngine {
 }
 
 const failureKey = (failure: SyncFailure): string => `${failure.kind}\n${failure.action}`
+
+/** Keys whose render this cycle owes instead of landing: held edits, and files of keys the device is joining. */
+const notRenderedNow = (holds: CaptureHolds): Set<string> => new Set([...holds.held.keys(), ...holds.joining])

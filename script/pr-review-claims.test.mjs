@@ -71,9 +71,9 @@ function fixture() {
 test("a fork claim requests the actual label owner and blocks the exact head", async () => {
   const f = fixture()
   const workflow = Bun.YAML.parse(
-    readFileSync(new URL("../.github/workflows/review-claims.yml", import.meta.url), "utf8"),
+    readFileSync(new URL("../.github/workflows/pr-automation.yml", import.meta.url), "utf8"),
   )
-  const step = workflow.jobs.reconcile.steps.find((step) => step.with?.script)
+  const step = workflow.jobs.automation.steps.find((step) => step.id === "review_claims")
   const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor
   const oldWorkspace = process.env.GITHUB_WORKSPACE
   try {
