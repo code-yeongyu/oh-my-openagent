@@ -16,7 +16,7 @@
 //! the design does not defend against.
 
 use std::collections::BTreeSet;
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, OpenOptions};
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -77,7 +77,9 @@ impl Poisoned {
                     Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
                     Err(error) => return Err(error),
                 }
-                File::open(dir)?.sync_all()
+                // The OS's own directory flush: a directory cannot be opened as a file on
+                // Windows (os error 5), where the durable helper flushes it its own way.
+                omo_computer_safety::durable::sync_dir(dir)
             }
         }
     }
