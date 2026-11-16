@@ -6,7 +6,7 @@ import type { LockRecord } from "./lock-record"
 import { isSameOwner, readOwner, releaseLock, type OwnerSnapshot } from "./lock-owner"
 import { getPidLiveness, getProcessStartIdentity, startIdentitiesConflict } from "./process-identity"
 import { recordProvenDeadTakeover } from "./proven-dead-takeovers"
-import { isUnlinkSharingError, publishExclusive } from "./publish"
+import { currentCandidateFs, isUnlinkSharingError, publishExclusive } from "./publish"
 
 function errorCode(error: unknown): string | undefined {
   if (!(error instanceof Error) || !("code" in error)) return undefined
@@ -114,7 +114,18 @@ export async function recoverStaleOwner(
     // a third contender's publish; in that case the critical section is no longer ours.
     const fence = await readOwner(recoveryPath)
     if (fence === null || fence.record?.nonce !== recoveryRecord.nonce) return false
-    await unlink(lockPath)
+    try {
+      await unlink(lockPath)
+    } catch (error) {
+      // A dead record can still be its live owner's to release: a counting lease retained for a
+      // child records the child's pid, so once the child exits its supervisor releases a record this
+      // contender has just proven dead (#12089). Losing that unlink race reclaims nothing: ENOENT
+      // means the owner already removed it, and a Windows sharing error means its release (or a
+      // reader) still holds it open or delete-pending, so it is left to that holder for the next poll.
+      if (errorCode(error) === "ENOENT") return true
+      if (isUnlinkSharingError(error, currentCandidateFs().isSharingError)) return false
+      throw error
+    }
     // Record the reclaimed previous owner so consumers that gate on dead-owner evidence (the
     // stranded-git-lock sweep) can prove reclamation after the lock file itself is republished;
     // the proof is bound to the contender's acquisition nonce (omo #10199 r5 MEDIUM 3).
