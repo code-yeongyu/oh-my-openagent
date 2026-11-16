@@ -81,15 +81,21 @@ impl<W: Write> Executor<W> {
                 Some(wait) => received.recv_timeout(wait),
                 None => received.recv().map_err(|_| RecvTimeoutError::Disconnected),
             };
-            match next {
-                Ok(line) => self.handle(&line)?,
+            let served = match next {
+                Ok(line) => self.handle(&line),
                 Err(RecvTimeoutError::Timeout) => {
                     self.router.session_mut().release_due_holds();
                     self.stream_holds();
+                    Ok(())
                 }
                 Err(RecvTimeoutError::Disconnected) => return self.drain(),
+            };
+            if let Err(error) = served.and_then(|()| self.flush_due(Instant::now())) {
+                // A peer that dies mid-reply still gets the close that releases its holds.
+                self.router.session_mut().close();
+                self.stream_holds();
+                return Err(error);
             }
-            self.flush_due(Instant::now())?;
         }
     }
 
