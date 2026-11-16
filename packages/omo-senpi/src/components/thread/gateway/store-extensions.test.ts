@@ -45,6 +45,10 @@ describe("store extension migrations", () => {
       db.exec("DROP TABLE extension_registrations")
       db.exec("DROP TABLE toolkit_replay_receipts")
       db.exec("ALTER TABLE deliveries DROP COLUMN wait_kind")
+      db.exec("DROP INDEX deliveries_ledger")
+      db.exec("ALTER TABLE deliveries DROP COLUMN ledger_id")
+      db.exec("ALTER TABLE deliveries DROP COLUMN verbatim_text")
+      db.exec("ALTER TABLE deliveries DROP COLUMN verbatim_display_text")
       db.exec("DELETE FROM extension_objects WHERE owner IS NULL AND name NOT IN (SELECT name FROM sqlite_schema)")
       db.exec("PRAGMA user_version = 6")
     } finally {
@@ -98,6 +102,10 @@ describe("store extension migrations", () => {
         )
         db.exec(rewind as string)
         db.exec("ALTER TABLE deliveries DROP COLUMN wait_kind")
+        db.exec("DROP INDEX deliveries_ledger")
+        db.exec("ALTER TABLE deliveries DROP COLUMN ledger_id")
+        db.exec("ALTER TABLE deliveries DROP COLUMN verbatim_text")
+        db.exec("ALTER TABLE deliveries DROP COLUMN verbatim_display_text")
         db.exec("DELETE FROM extension_objects WHERE owner IS NULL AND name NOT IN (SELECT name FROM sqlite_schema)")
         db.exec(`PRAGMA user_version = ${version}`)
       } finally {

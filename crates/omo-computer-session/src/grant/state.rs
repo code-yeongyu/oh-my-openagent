@@ -13,10 +13,11 @@ use serde_json::{json, Value};
 
 use super::{is_global_target, ForegroundGrant, LeaseHook, NoLeaseHook};
 use crate::consent::{AppTarget, BoundIdentity, Consent, Part};
-use crate::lease::{ControlSlot, Holder, SessionToken};
+use crate::lease::{ControlSlot, Holder, SessionToken, SlotRefusal};
+use crate::mutate::{Refused, TRANSACTION_FAILED};
 use crate::presence::PresenceState;
 use crate::preview::Preview;
-use crate::reservation::Reservations;
+use crate::reservation::{AdmitRefusal, Reservations};
 
 /// A millisecond clock every session of the machine reads alike (reservations compare across
 /// sessions); tests install a scripted one.
@@ -220,27 +221,36 @@ impl Control {
     /// The gate admitted the call: take the lease (showing presence) and the reservations.
     ///
     /// # Errors
-    /// Another session took the slot or a window between the plan and now.
+    /// Another session took the slot or a window between the plan and now (`InputBusy`); the
+    /// record lock cannot be taken (`TransactionFailed`, review L10); nothing is sent.
     pub(crate) fn commit(
         &mut self,
         backend: &mut dyn Backend,
         plan: &Plan,
         stop_epoch: u64,
-    ) -> Result<(), (LeaseRefusal, Option<Value>)> {
+    ) -> Result<(), Refused> {
+        let lease = |refusal: LeaseRefusal, detail: Option<Value>| Refused {
+            detail: detail.map(Box::new),
+            ..refusal.refusal().into()
+        };
         if plan.foreground && !self.slot.is_mine(&self.token) {
-            self.slot
-                .acquire(&self.token)
-                .map_err(|holder| (LeaseRefusal::InputBusy, Some(holder_detail(&holder))))?;
+            self.slot.acquire(&self.token).map_err(|refused| match refused {
+                SlotRefusal::Held(holder) => lease(LeaseRefusal::InputBusy, Some(holder_detail(&holder))),
+                SlotRefusal::LockUnavailable => TRANSACTION_FAILED.into(),
+            })?;
             if let Err(refusal) = self.presence.begin(backend) {
                 self.slot.release(&self.token);
-                return Err((refusal, None));
+                return Err(lease(refusal, None));
             }
             self.lease_epoch = Some(stop_epoch);
         }
         let now = self.now_ms();
         self.reservations
             .admit(&self.token, &plan.windows, now)
-            .map_err(|busy| (LeaseRefusal::Window, Some(busy.detail())))
+            .map_err(|refused| match refused {
+                AdmitRefusal::Busy(busy) => lease(LeaseRefusal::Window, Some(busy.detail())),
+                AdmitRefusal::LockUnavailable => TRANSACTION_FAILED.into(),
+            })
     }
 
     /// The call's report went out.

@@ -109,7 +109,15 @@ impl ConsentView {
     pub fn stop_chord(&self, os: omo_computer_safety::protected::Os) -> StopChord {
         match &self.stop_hotkey {
             None => StopChord::Unreadable,
-            Some(None) => StopChord::Chord(default_stop_hotkey(os).to_owned()),
+            // Review L9: the default in the parser's canonical spelling too, so "key absent" and
+            // "the default written out" are one chord on every OS persona.
+            Some(None) => {
+                let default = default_stop_hotkey(os);
+                StopChord::Chord(
+                    omo_computer_safety::protected::Chord::parse(default)
+                        .map_or_else(|| default.to_owned(), |chord| chord.canonical()),
+                )
+            }
             // Review L6: the parser's canonical spelling, the one the backend is sent and the
             // re-arm compares.
             Some(Some(text)) => omo_computer_safety::protected::Chord::parse(text)
