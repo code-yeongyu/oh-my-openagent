@@ -4,7 +4,7 @@ import type { RemoteFailure } from "./types"
 
 /**
  * The one code list of the remote module (design v8-core r2, B1): the thread taxonomy's codes with their names unchanged
- * (thread/errors.ts), plus exactly the five below. `unsupported` is reused with `details.feature`.
+ * (thread/errors.ts), plus exactly the codes below. `unsupported` is reused with `details.feature`.
  */
 export const REMOTE_CODES = [
   ...THREAD_ERROR_CODES,
@@ -13,6 +13,15 @@ export const REMOTE_CODES = [
   "session_ended",
   "sender_not_allowed",
   "local_only",
+  // #13414 W3, silent devices (relay-daemon#1137, omo#13406): the first three ran nothing; `undelivered` is safe to resend
+  // under a new op id; `transport_expired`, `unconfirmed` and `host_error` may have run (uncertain).
+  "host_not_answering",
+  "no_transport",
+  "device_offline",
+  "undelivered",
+  "transport_expired",
+  "unconfirmed",
+  "host_error",
 ] as const
 export type RemoteCode = (typeof REMOTE_CODES)[number]
 
@@ -37,7 +46,7 @@ const LOCAL_API_CODES: Readonly<Record<LocalApiCode, Mapped>> = {
   server_proof_invalid: { code: "host_unavailable" },
   refused: { code: "host_unavailable" },
   read_failed: { code: "host_unavailable" },
-  host_not_answering: { code: "host_unavailable" },
+  host_not_answering: { code: "host_not_answering" },
   signed_out: { code: "host_unavailable" },
   sign_in_required: { code: "host_unavailable" },
   service_disabled: { code: "host_unavailable" },
@@ -100,6 +109,13 @@ const NEXT_ACTION: Partial<Record<RemoteCode, string>> = {
   message_too_large: "Send less in one call.",
   idempotency_conflict: "Retry with a new idempotency key.",
   internal_error: "Retry; if it fails again, report it with the details.",
+  host_not_answering: "Call devices.list to see whether the device is online, then retry.",
+  no_transport: "Call service.status to see why this device has no relay transport, then retry.",
+  device_offline: "Call devices.list; retry once the device is online.",
+  undelivered: "Nothing ran; resend with a new idempotency key.",
+  transport_expired: "It may have run; read the session's current state before resending.",
+  unconfirmed: "It may have run; read the session's current state before resending.",
+  host_error: "It may have run; read the session's current state before resending.",
   invalid_arguments: "Fix the arguments and call it again.",
 }
 
@@ -131,13 +147,17 @@ export const failureFromError = (error: unknown, mutating: boolean): RemoteFailu
 
 /**
  * Exit codes (B1): 0 ok, 1 a typed refusal, 3 unavailable (host_unavailable, relay_requires_paid_plan, the
- * device service not installed), 4 session_ended, 124 timeout, 130 cancelled. 2 (usage) is the CLI's own, never a failure.
+ * device service not installed, a device that does not answer or cannot be reached), 4 session_ended, 124 timeout, 130
+ * cancelled. 2 (usage) is the CLI's own, never a failure.
  */
 export const exitCodeOf = (failure: RemoteFailure | undefined): 0 | 1 | 3 | 4 | 124 | 130 => {
   if (failure === undefined) return 0
   switch (failure.code) {
     case "host_unavailable":
     case "relay_requires_paid_plan":
+    case "host_not_answering":
+    case "no_transport":
+    case "device_offline":
       return 3
     case "session_ended":
       return 4
