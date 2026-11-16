@@ -1,12 +1,13 @@
 //! The macOS window seam over `AXUIElement`: the window's AX element found by its number
 //! (private `_AXUIElementGetWindow`, probed), `AXPosition` / `AXSize` / `AXMinimized` /
-//! `AXFullScreen`, and the app's AX windows.
+//! `AXFullScreen`, and the window query's reads (the app's AX windows, AX children, the
+//! window list on every Space).
 
 use std::ffi::{c_void, CStr};
 
 use omo_computer_core::listing::Rect;
 
-use super::seam::{FoundWindow, WindowOs};
+use super::seam::{FoundWindow, QueryNode, WindowOs};
 use crate::capture::os::cf::{self, cf_string, CfRef, CgPoint, CgSize, Owned};
 use crate::capture::os::{listing, symbols};
 
@@ -30,13 +31,20 @@ unsafe extern "C" {
     static kCFBooleanTrue: CfRef;
     static kCFBooleanFalse: CfRef;
     fn CFRetain(value: CfRef) -> CfRef;
+    fn CFArrayGetTypeID() -> usize;
 }
 
 type GetWindow = unsafe extern "C" fn(CfRef, *mut u32) -> i32;
 
-/// The live window seam.
-#[derive(Debug, Default)]
-pub struct Os;
+/// The live window seam; `nodes` holds the elements of the current window query.
+#[derive(Default)]
+pub struct Os {
+    nodes: Vec<Owned>,
+}
+
+// SAFETY: CoreFoundation reference counting is thread-safe and AX calls may be made from any
+// thread; the seam is used by one thread at a time (`&mut self`).
+unsafe impl Send for Os {}
 
 fn copy(element: CfRef, name: &CStr) -> Option<Owned> {
     let key = cf_string(name)?;
@@ -61,26 +69,62 @@ fn number_of(element: CfRef) -> Option<u32> {
     (unsafe { get(element, &raw mut number) } == AX_SUCCESS).then_some(number)
 }
 
-fn windows_of(pid: u32) -> Vec<Owned> {
-    // SAFETY: plain call; +1 application element.
-    let Some(app) = i32::try_from(pid)
-        .ok()
-        .and_then(|p| Owned::new(unsafe { AXUIElementCreateApplication(p) }))
-    else {
+/// The elements of an attribute the app answers; anything but a CFArray reads as none.
+fn elements(element: CfRef, name: &CStr) -> Vec<Owned> {
+    let Some(list) = copy(element, name) else {
         return Vec::new();
     };
-    let Some(list) = copy(app.get(), c"AXWindows") else {
+    // SAFETY: plain type-id reads on a live value.
+    if unsafe { cf::CFGetTypeID(list.get()) != CFArrayGetTypeID() } {
         return Vec::new();
-    };
-    // SAFETY: a CFArray of AXUIElements; each element retained by `copy`'s caller below.
+    }
+    // SAFETY: `list` is a CFArray (checked above).
     let count = unsafe { cf::CFArrayGetCount(list.get()) };
     (0..count)
         .filter_map(|i| {
             // SAFETY: in bounds; retained for the returned guard.
-            let element = unsafe { cf::CFArrayGetValueAtIndex(list.get(), i) };
-            Owned::new(unsafe { CFRetain(element) })
+            let item = unsafe { cf::CFArrayGetValueAtIndex(list.get(), i) };
+            // SAFETY: a live item of the array.
+            Owned::new(unsafe { CFRetain(item) })
         })
         .collect()
+}
+
+fn windows_of(pid: u32) -> Vec<Owned> {
+    // SAFETY: plain call; +1 application element.
+    i32::try_from(pid)
+        .ok()
+        .and_then(|p| Owned::new(unsafe { AXUIElementCreateApplication(p) }))
+        .map_or_else(Vec::new, |app| elements(app.get(), c"AXWindows"))
+}
+
+fn found_of(element: CfRef) -> FoundWindow {
+    FoundWindow {
+        number: number_of(element),
+        role: copy(element, c"AXRole")
+            .and_then(|v| cf::string(v.get()))
+            .unwrap_or_default(),
+        subrole: copy(element, c"AXSubrole").and_then(|v| cf::string(v.get())),
+        title: copy(element, c"AXTitle").and_then(|v| cf::string(v.get())),
+        frame: frame_of(element),
+    }
+}
+
+impl Os {
+    /// Keeps `elements` for the query's children reads and answers their nodes.
+    fn keep(&mut self, elements: Vec<Owned>) -> Vec<QueryNode> {
+        elements
+            .into_iter()
+            .map(|element| {
+                let found = found_of(element.get());
+                self.nodes.push(element);
+                QueryNode {
+                    id: u64::try_from(self.nodes.len() - 1).unwrap_or(u64::MAX),
+                    found,
+                }
+            })
+            .collect()
+    }
 }
 
 fn element(window: u32) -> Option<Owned> {
@@ -167,17 +211,32 @@ impl WindowOs for Os {
         element(window).is_some_and(|e| set(e.get(), c"AXMinimized", boolean(minimized)))
     }
 
-    fn ax_windows(&mut self, pid: u32) -> Vec<FoundWindow> {
-        windows_of(pid)
+    fn app_windows(&mut self, pid: u32) -> Vec<QueryNode> {
+        // A new query: the previous one's elements are released.
+        self.nodes.clear();
+        let windows = windows_of(pid);
+        self.keep(windows)
+    }
+
+    fn children(&mut self, node: u64) -> Vec<QueryNode> {
+        let children = usize::try_from(node)
+            .ok()
+            .and_then(|i| self.nodes.get(i))
+            .map_or_else(Vec::new, |element| elements(element.get(), c"AXChildren"));
+        self.keep(children)
+    }
+
+    fn listed_windows(&mut self, pid: u32) -> Vec<FoundWindow> {
+        listing::windows()
+            .unwrap_or_default()
             .into_iter()
-            .map(|e| FoundWindow {
-                number: number_of(e.get()),
-                role: copy(e.get(), c"AXRole")
-                    .and_then(|v| cf::string(v.get()))
-                    .unwrap_or_default(),
-                subrole: copy(e.get(), c"AXSubrole").and_then(|v| cf::string(v.get())),
-                title: copy(e.get(), c"AXTitle").and_then(|v| cf::string(v.get())),
-                frame: frame_of(e.get()),
+            .filter(|w| w.pid == pid && w.layer == 0)
+            .map(|w| FoundWindow {
+                number: Some(w.number),
+                role: "AXWindow".into(),
+                subrole: None,
+                title: (!w.title.is_empty()).then_some(w.title),
+                frame: Some(w.bounds),
             })
             .collect()
     }

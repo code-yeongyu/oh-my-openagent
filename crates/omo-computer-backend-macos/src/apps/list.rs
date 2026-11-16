@@ -1,6 +1,6 @@
-//! `apps.list()` on macOS: running regular applications (with windows or a regular policy)
-//! plus the installed applications from LaunchServices, de-duplicated by bundle id with the
-//! running record kept, sorted by `(name, appKey)`.
+//! `apps.list()` on macOS: the running window owners plus the running apps with the regular
+//! activation policy, then the installed applications, de-duplicated by bundle id with the
+//! running record kept, sorted by `(name, appKey)`. A windowless background agent is not listed.
 
 use std::collections::BTreeSet;
 
@@ -13,7 +13,11 @@ use super::seam::AppsOs;
 pub fn list(os: &mut dyn AppsOs) -> Vec<AppInfo> {
     let mut seen = BTreeSet::new();
     let mut out = Vec::new();
-    for app in os.running().into_iter().filter(|a| a.regular) {
+    for app in os
+        .running()
+        .into_iter()
+        .filter(|a| a.has_windows || a.regular)
+    {
         let app_key = app.bundle_id.clone().unwrap_or_else(|| app.name.clone());
         if !seen.insert(app_key.clone()) {
             continue;

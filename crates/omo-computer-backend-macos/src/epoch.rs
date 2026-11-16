@@ -48,10 +48,15 @@ impl<O: EpochOs> MacEpochSource<O> {
 }
 
 fn moved(last: &EpochState, now: &EpochState) -> Vec<EpochReason> {
+    // Sleeping displays leave the active list: the display change is the sleep's own.
+    let slept = last.asleep != now.asleep;
     let pairs = [
-        (last.displays != now.displays, EpochReason::Display),
         (
-            last.displays == now.displays && last.pixels != now.pixels,
+            last.displays != now.displays && !slept,
+            EpochReason::Display,
+        ),
+        (
+            last.displays == now.displays && last.pixels != now.pixels && !slept,
             EpochReason::Scale,
         ),
         (last.space != now.space, EpochReason::Space),
@@ -101,6 +106,20 @@ pub mod os {
     unsafe extern "C" {
         fn CGSessionCopyCurrentDictionary() -> CfRef;
         fn CGDisplayIsAsleep(display: u32) -> bool;
+        fn CGGetOnlineDisplayList(max: u32, displays: *mut u32, count: *mut u32) -> i32;
+    }
+
+    /// Displays that may sleep: the online list (the active list drops a sleeping display).
+    fn online_displays() -> Vec<u32> {
+        let mut ids = [0u32; 32];
+        let mut count = 0u32;
+        // SAFETY: `ids` holds 32 entries; `count` receives how many were written.
+        if unsafe { CGGetOnlineDisplayList(32, ids.as_mut_ptr(), &raw mut count) } != 0 {
+            return Vec::new();
+        }
+        ids.into_iter()
+            .take(usize::try_from(count).unwrap_or(0))
+            .collect()
     }
 
     /// The live epoch reads.
@@ -117,9 +136,10 @@ pub mod os {
     impl EpochOs for Os {
         fn state(&mut self) -> EpochState {
             let displays = listing::displays().unwrap_or_default();
-            // SAFETY: display ids from the active list.
-            let asleep = (!displays.is_empty())
-                .then(|| displays.iter().all(|d| unsafe { CGDisplayIsAsleep(d.id) }));
+            let online = online_displays();
+            // SAFETY: display ids from the online list.
+            let asleep = (!online.is_empty())
+                .then(|| online.iter().all(|id| unsafe { CGDisplayIsAsleep(*id) }));
             EpochState {
                 displays: displays.iter().map(|d| (d.id, d.bounds)).collect(),
                 pixels: displays.iter().map(|d| (d.id, d.pixel_width)).collect(),
