@@ -285,8 +285,8 @@
     "script/qa/omo-native-parity-compare.mjs": ["DOCTOR_EXPECTED_ONLY", "sectionKey", "compareLines", "BINARY_ONLY_REQUIRED_STEPS", "memoryReceiptFailures"],
     // pre-existing at origin dev 4686e425b5: unused export(s) GOVERNED_SURFACES
     "script/retired-agent-names.test.ts": ["GOVERNED_SURFACES"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) ROOT_TEST_SERIAL_QUARANTINE, POSIX_TEST_TIMEOUT_MS
-    "script/root-test-serial-quarantine.ts": ["ROOT_TEST_SERIAL_QUARANTINE", "POSIX_TEST_TIMEOUT_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ROOT_TEST_SERIAL_QUARANTINE
+    "script/root-test-serial-quarantine.ts": ["ROOT_TEST_SERIAL_QUARANTINE"],
     // pre-existing at origin dev 4686e425b5: unused export(s) runStats
     "script/stats.ts": ["runStats"],
     // added on dev after the last merge (origin dev 2b5831715e): unused export(s) keyAssignments
