@@ -6,8 +6,8 @@ export const SESSION_VERBS = ["open", "send", "model", "interrupt", "close"] as 
 export type SessionVerb = (typeof SESSION_VERBS)[number]
 export const isSessionVerb = (value: string): value is SessionVerb => SESSION_VERBS.some((verb) => verb === value)
 
-/** `<device>/<session>`: the SESSION column of `omo remote sessions`. */
-type Target = { readonly device: string; readonly session: string }
+/** A durable thread id, optionally qualified with the device that holds it. */
+export type RemoteSessionTarget = { readonly device?: string; readonly session: string }
 
 export type SessionArgs =
   | {
@@ -19,21 +19,21 @@ export type SessionArgs =
     }
   | {
       readonly verb: "send"
-      readonly target: Target
+      readonly target: RemoteSessionTarget
       readonly text: string
       readonly delivery: "auto" | "steer" | "follow_up"
       readonly wait: boolean
     }
-  | { readonly verb: "model"; readonly target: Target; readonly model: string }
-  | { readonly verb: "interrupt" | "close"; readonly target: Target }
+  | { readonly verb: "model"; readonly target: RemoteSessionTarget; readonly model: string }
+  | { readonly verb: "interrupt" | "close"; readonly target: RemoteSessionTarget }
 
-function parseTarget(verb: string, value: string | undefined): Target {
+export function parseTarget(verb: string, value: string | undefined): RemoteSessionTarget {
   const slash = value?.indexOf("/") ?? -1
-  if (value === undefined || slash <= 0 || slash === value.length - 1)
+  if (value === undefined || value === "" || slash === 0 || slash === value.length - 1)
     throw new UsageError(
       `omo remote ${verb}: name the session as <device>/<session> (the SESSION column of omo remote sessions)`,
     )
-  return { device: value.slice(0, slash), session: value.slice(slash + 1) }
+  return slash === -1 ? { session: value } : { device: value.slice(0, slash), session: value.slice(slash + 1) }
 }
 
 const SESSION_FLAGS: Readonly<
@@ -57,6 +57,11 @@ export function parseSession(
   const { values: valueFlags, switches: switchFlags } = SESSION_FLAGS[verb]
   for (let index = 0; index < rest.length; index++) {
     const arg = rest[index] ?? ""
+    // `--` ends option parsing, as in `omo thread send`: a text or a value that starts with `--` can still be given.
+    if (arg === "--") {
+      positional.push(...rest.slice(index + 1))
+      break
+    }
     if (arg === "--json") json = true
     else if (valueFlags.includes(arg)) {
       const value = rest[++index]

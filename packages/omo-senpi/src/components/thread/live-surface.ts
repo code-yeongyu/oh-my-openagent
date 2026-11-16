@@ -35,7 +35,7 @@ import { createDeviceServiceSessions } from "./remote/device-service"
 import { createLazyRemoteSurface } from "./remote/lazy-remote"
 import type { RemoteThreadSurface } from "./remote/ports"
 
-type RpcFrame = {
+export type RpcFrame = {
   readonly success?: boolean
   readonly data?: unknown
   readonly error?: unknown
@@ -110,7 +110,7 @@ type RequestOptions = {
  * 32-byte secret, which is written before the request. The correlation id is written last: no
  * command field can overwrite it.
  */
-async function requestFrame(
+export async function requestFrame(
   socketPath: string,
   command: Record<string, unknown>,
   connect: ThreadSocketConnect,
@@ -557,8 +557,9 @@ export function createLiveThreadSurface(
     setSessionName: async (sessionId, name, durableId) => {
       await send("set_session_name", { sessionId, name }, durableId)
     },
+    // `scope: "session"` switches only this session; without it the engine persists the device's default model.
     setModel: (sessionId, provider, modelId, durableId) =>
-      send("set_model", { sessionId, provider, modelId }, durableId),
+      send("set_model", { sessionId, provider, modelId, scope: "session" }, durableId),
     getAvailableModels: async (sessionId) => {
       const { models } = await send<{ models: Awaited<ReturnType<ThreadHost["getAvailableModels"]>> }>(
         "get_available_models",
@@ -784,3 +785,6 @@ export { deviceOnline } from "./remote/remote-ops"
 export { outcomeFailure } from "./remote/outcome"
 export { createRelayTransport } from "./remote/relay-transport"
 export { createRelayControl } from "./control/relay-control"
+// thread_create's folder and worktree code (#13450): the local open and the worktree request another device sends.
+export { openLocally } from "./control/local-open"
+export { answerWorktreeRequest } from "./worktree/worktree-rpc"
