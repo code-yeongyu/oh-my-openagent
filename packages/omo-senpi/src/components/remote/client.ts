@@ -11,6 +11,7 @@ import {
   type ListingRow,
   type Timers,
 } from "@oh-my-opencode/device-service-core/device-service"
+import type { AliasRegistry } from "../thread/remote/ports"
 import { aliasMembers } from "./aliases"
 import { attachMember } from "./attach"
 import { failureFromError, nextActionFor, remoteFailure } from "./codes"
@@ -55,6 +56,11 @@ export type RemoteClientDeps = {
   readonly timers?: Timers
   /** Runs the device service bootstrap for `service.bootstrap`; the internal bootstrap entry provides it (part 4c-3). */
   readonly bootstrap?: (setup: BootstrapSetup) => Promise<BootstrapResult>
+  /**
+   * The account's alias registry for `aliases.*`. The caller builds it (it needs the account service access, which the
+   * client must not import); absent, the alias members answer `unsupported{feature:"aliases"}`.
+   */
+  readonly aliasRegistry?: () => Promise<AliasRegistry>
 }
 
 /**
