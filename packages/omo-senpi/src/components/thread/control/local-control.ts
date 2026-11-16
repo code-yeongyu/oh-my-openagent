@@ -1,6 +1,7 @@
 import { routingId, sessionPort } from "../tools/internals"
 import type { ThreadHostSession, ThreadToolSurfaceOptions } from "../tools/ports"
 import type { ThreadSummary } from "../contracts"
+import { interruptOver } from "./interrupt"
 import { refuse, type SessionControl } from "./port"
 
 const THINKING_LEVEL_UNSUPPORTED = "thinking_level_unsupported:"
@@ -19,13 +20,7 @@ export function createLocalControl(
     thread_id: threadId,
     title,
     visible: async () => visible(),
-    interrupt: async (turnId) => {
-      const result = await port.interrupt(routing, turnId, threadId)
-      return {
-        interrupted: result.interrupted === true,
-        ...(result.turnId === undefined ? {} : { turn_id: result.turnId }),
-      }
-    },
+    interrupt: (turnId) => interruptOver((request) => port.interrupt(routing, request, threadId), turnId),
     close: async () => {
       if (session.endpoint_kind === "tui")
         throw refuse(
