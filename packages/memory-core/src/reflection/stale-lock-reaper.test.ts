@@ -1,7 +1,8 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
+import * as resilientFs from "../fs/resilient"
 import { withLock } from "../locks/acquire"
 import { runFinalizationLockPath } from "../locks/domains"
 import { createLockRecord } from "../locks/lock-record"
@@ -710,6 +711,42 @@ describe("dead-owner runtime locks (#11976, 4.5)", () => {
     expect([...result.reclaimed].sort()).toEqual(["finalize-facts-1.lock", "recall-sidecar.c2Vzc2lvbg.lock"])
     expect(result.kept.map((entry) => entry.name)).toEqual(["notice.lock"])
     expect(existsSync(join(paths.locks, "notice.lock"))).toBe(true)
+  })
+
+  test("#given a dead owner's lock that another process removes while the sweep reaches it #when reclaimed #then it is reported neither reclaimed nor kept", async () => {
+    // given
+    const paths = reaperIdentity()
+    mkdirSync(paths.locks, { recursive: true })
+    const dead = await killedChild()
+    const lockPath = join(paths.locks, "finalize-facts-2.lock")
+    writeJson(lockPath, {
+      ...(await createLockRecord("facts-finalize")),
+      pid: dead.pid,
+      process_start: dead.start ?? "unreadable-start",
+    })
+    const realUnlink = resilientFs.unlink
+    let vanished = false
+    const vanishFirst = spyOn(resilientFs, "unlink").mockImplementation((async (target: string) => {
+      if (target === lockPath && !vanished) {
+        vanished = true
+        await realUnlink(lockPath)
+      }
+      return realUnlink(target)
+    }) as typeof resilientFs.unlink)
+
+    // when
+    let result: Awaited<ReturnType<typeof reclaimDeadOwnerLocks>>
+    try {
+      result = await reclaimDeadOwnerLocks(paths.locks)
+    } finally {
+      vanishFirst.mockRestore()
+    }
+
+    // then
+    // The doctor --fix line counts kept locks; one that no longer exists is not kept.
+    expect(vanished).toBe(true)
+    expect(result.reclaimed).toEqual([])
+    expect(result.kept).toEqual([])
   })
 })
 
