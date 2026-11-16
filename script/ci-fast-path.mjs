@@ -11,7 +11,8 @@ const releaseStateHeadRef = /^release\/v.+-source-state$/
 // No changed path selects the platform matrix: the post-merge push to dev proves every OS.
 const fullMatrixLabel = "ci:full-matrix"
 // The label costs macOS/Windows runners, so it is honored only for a diff that can change how a non-Linux runner
-// behaves, or with an explicit reason line in the PR body. Anything else is refused, never guessed from keywords.
+// behaves, a diff too long to list (it may hide one), or an explicit reason line in the PR body. Anything else is
+// refused, never guessed from keywords.
 const platformReasonLine = /^Platform-reason:[ \t]*\S.*$/m
 const platformSensitiveExactPaths = new Set([
   ".github/workflows/ci.yml",

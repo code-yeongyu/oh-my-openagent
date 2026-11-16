@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 // The platform decision (#13859) reads a pull request's files from the pulls/files API, which lists at most 3000.
-// A truncated list must never be judged as if complete: the step says so and asks for the Platform-reason line.
+// A truncated list may hide a platform path, so a labelled pull request fails toward the full matrix (the lead's ruling).
 
 import { afterAll, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
@@ -10,6 +10,9 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { load } from "js-yaml"
+
+// The step runs against a PATH stub for gh, which Windows bash cannot shadow reliably.
+const posixBashTest = test.skipIf(process.platform === "win32" || spawnSync("bash", ["-c", "exit 0"]).status !== 0)
 
 const root = mkdtempSync(join(tmpdir(), "pr-platform-decision-"))
 afterAll(() => rmSync(root, { recursive: true, force: true }))
@@ -66,7 +69,7 @@ function decide(
   return { status: run.status, stdout: run.stdout, output: readFileSync(join(dir, "output"), "utf8") }
 }
 
-test("#given a complete file list with a platform path #then the label is honored", () => {
+posixBashTest("#given a complete file list with a platform path #then the label is honored", () => {
   const result = decide("complete", ["crates/x/src/lib.rs", "README.md"], 2)
   expect(result.status).toBe(0)
   expect(result.output).toContain("full_matrix=true")
@@ -74,15 +77,19 @@ test("#given a complete file list with a platform path #then the label is honore
 })
 
 // A capped list may hide a platform path, so a labelled pull request fails toward the full matrix (the lead's ruling).
-test("#given the label and more changed files than the API listed #then the label is honored and the cap is named", () => {
-  const result = decide("truncated", ["packages/utils/src/a.ts"], 3500)
-  expect(result.status).toBe(0)
-  expect(result.output).toContain("full_matrix=true")
-  expect(result.stdout).toContain("::warning title=ci:full-matrix file list truncated::")
-})
+posixBashTest(
+  "#given the label and more changed files than the API listed #then the label is honored and the cap is named",
+  () => {
+    const result = decide("truncated", ["packages/utils/src/a.ts"], 3500)
+    expect(result.status).toBe(0)
+    expect(result.output).toContain("full_matrix=true")
+    expect(result.stdout).toContain("::warning title=ci:full-matrix file list truncated::")
+  },
+)
 
-test("#given no label and a truncated list #then the pull request stays on Linux", () => {
+posixBashTest("#given no label and a truncated list #then the pull request stays on Linux", () => {
   const result = decide("truncated-unlabelled", ["packages/utils/src/a.ts"], 3500, [])
   expect(result.status).toBe(0)
   expect(result.output).toContain("full_matrix=false")
+  expect(result.stdout).not.toContain("file list truncated")
 })

@@ -1,8 +1,8 @@
 name: PR platform decision
 
 # The one ci:full-matrix decision for every pull-request workflow that can run macOS/Windows (#13859). A pull request
-# gets them only when script/ci-fast-path.mjs honors the label (a platform path in the diff, or a body line
-# 'Platform-reason: <why>') or its head is a release source-state branch; every other event gets the full matrix.
+# gets them only when script/ci-fast-path.mjs honors the label (a platform path in the diff, a body line
+# 'Platform-reason: <why>', or a file list too long to check) or its head is a release source-state branch; every other event gets the full matrix.
 on:
   workflow_call:
     inputs:
@@ -62,7 +62,9 @@ jobs:
           complete=true
           if [ "$listed" -lt "$changed" ]; then
             complete=false
-            echo "::warning title=ci:full-matrix file list truncated::The API listed $listed of $changed changed files, so ci:full-matrix is honored without a path check."
+            if jq -e '[.pull_request.labels[].name] | index("ci:full-matrix")' "$GITHUB_EVENT_PATH" > /dev/null; then
+              echo "::warning title=ci:full-matrix file list truncated::The API listed $listed of $changed changed files, so ci:full-matrix is honored without a path check."
+            fi
           fi
           # Read from the event file: a PR body can exceed the per-variable environment limit.
           jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH" > "$body"
@@ -88,6 +90,6 @@ jobs:
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
             - May use macOS/Windows: `${{ steps.decide.outputs.full_matrix || 'unknown' }}`.
-            - A pull request gets them only for a platform path in the diff, a `Platform-reason: <why>` body line with `ci:full-matrix`, or a release source-state head.
+            - A pull request gets them only with `ci:full-matrix` plus a platform path in the diff, a `Platform-reason: <why>` body line, or a file list too long to check (over 3000 files), or for a release source-state head.
           JOB_SUMMARY_NEXT: Add the Platform-reason line to the PR body and re-apply the label, or remove the label.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
