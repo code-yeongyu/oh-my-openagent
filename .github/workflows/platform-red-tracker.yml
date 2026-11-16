@@ -14,14 +14,60 @@ permissions:
   contents: read
   issues: write
 
-# One writer at a time, so two red runs finishing together still produce one issue.
-concurrency:
-  group: platform-red-tracker
-  cancel-in-progress: false
-
 jobs:
-  track:
+  # No concurrency here: every red dev run is inspected, however many finish together.
+  detect:
     if: github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    outputs:
+      failed: ${{ steps.failed.outputs.failed }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: List the failed macOS/Windows jobs
+        id: failed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          failed="$(gh api "repos/$GH_REPO/actions/runs/$RUN_ID/jobs?filter=latest&per_page=100" --jq '
+            [.jobs[]
+              | select(.conclusion == "failure")
+              | select(((.labels | join(" ")) + " " + .name) | test("macos|windows"; "i"))
+              | "- [\(.name)](\(.html_url)) on `\(.labels | join(", "))`"]
+            | join("\n")')"
+          {
+            echo "failed<<PLATFORM_RED_EOF"
+            echo "$failed"
+            echo "PLATFORM_RED_EOF"
+          } >> "$GITHUB_OUTPUT"
+          [ -n "$failed" ] || echo "Only Linux jobs failed; the platform-red issue is for macOS/Windows legs."
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Platform red tracker - detect
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Reads the failed jobs of `${{ github.event.workflow_run.name }}` on `dev` at `${{ github.event.workflow_run.head_sha }}`.
+            - Hands any failed macOS/Windows job to the issue writer.
+          JOB_SUMMARY_NEXT: If this fails, the jobs API could not be read; re-run it so a red platform job is not missed.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  file-issue:
+    needs: detect
+    if: needs.detect.outputs.failed != ''
+    # Only writers enter this group, one at a time, so concurrent reds still produce one issue. A pending writer
+    # replaced by a newer one is harmless: the running writer has already opened or commented on the issue.
+    concurrency:
+      group: platform-red-tracker
+      cancel-in-progress: false
     runs-on: ubuntu-26.04
     timeout-minutes: 5
     steps:
@@ -33,22 +79,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
-          RUN_ID: ${{ github.event.workflow_run.id }}
           RUN_URL: ${{ github.event.workflow_run.html_url }}
           RUN_NAME: ${{ github.event.workflow_run.name }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          FAILED: ${{ needs.detect.outputs.failed }}
         run: |
           set -euo pipefail
-          failed="$(gh api "repos/$GH_REPO/actions/runs/$RUN_ID/jobs?filter=latest&per_page=100" --jq '
-            [.jobs[]
-              | select(.conclusion == "failure")
-              | select(((.labels | join(" ")) + " " + .name) | test("macos|windows"; "i"))
-              | "- [\(.name)](\(.html_url)) on `\(.labels | join(", "))`"]
-            | join("\n")')"
-          if [ -z "$failed" ]; then
-            echo "Only Linux jobs failed in $RUN_NAME; the platform-red issue is for macOS/Windows legs."
-            exit 0
-          fi
           merged="$(gh api "repos/$GH_REPO/commits/$HEAD_SHA/pulls" --jq '[.[] | select(.merged_at != null) | "#\(.number)"] | join(", ")')"
           body="$RUNNER_TEMP/platform-red.md"
           {
@@ -56,7 +92,7 @@ jobs:
             echo
             echo "Workflow run: [$RUN_NAME]($RUN_URL)"
             echo
-            echo "$failed"
+            echo "$FAILED"
             echo
             echo "Pull requests run Linux only (#13802), so this is the first platform signal for that change."
             echo "Fix it in a pull request that says \`Fixes #<this issue>\`; releases are refused while this issue is open."
@@ -75,10 +111,9 @@ jobs:
         if: always()
         shell: bash
         env:
-          JOB_SUMMARY_TITLE: Platform red tracker
+          JOB_SUMMARY_TITLE: Platform red tracker - issue
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
-            - Reads the failed jobs of `${{ github.event.workflow_run.name }}` on `dev` at `${{ github.event.workflow_run.head_sha }}`.
-            - Files or comments on the one open `ci:platform-red` issue when a macOS/Windows job failed.
+            - Files or comments on the one open `ci:platform-red` issue for `${{ github.event.workflow_run.name }}` at `${{ github.event.workflow_run.head_sha }}`.
           JOB_SUMMARY_NEXT: Fix the listed macOS/Windows job; publish.yml refuses a release while the issue is open.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
