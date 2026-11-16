@@ -92,7 +92,11 @@ export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: 
   }
   const localUnits = parsed.command === "status" ? await dependencies.coldWake.status() : undefined
   const code = await runLocalRemoteVerb(
-    localUnits === undefined ? dependencies : { ...dependencies, localUnits },
+    {
+      ...dependencies,
+      localSessions: dependencies.localSessions ?? thisDeviceSessions,
+      ...(localUnits === undefined ? {} : { localUnits }),
+    },
     parsed,
   )
   // After the verb's connection is closed (a changed table restarts the device service, which would cut it), and whatever
@@ -114,6 +118,11 @@ export function disableNotSavedNotice(reason: string, switchedOff: boolean): str
     ? `omo remote disable: remote is off now, but the choice could not be saved (${reason}); the next omo login will turn it on again.`
     : `omo remote disable: the choice could not be saved (${reason}) and remote could not be turned off, so it may still be on. Fix the error above, then run omo remote disable again.`
 }
+
+// This device's own sessions (`sessions` lists them) come from its operator endpoint, a socket: loaded here, on first
+// use, outside remote-local's graph (omo#13440), and handed to the person client.
+const thisDeviceSessions = async () =>
+  (await import("../omo-senpi/src/components/remote/local-sessions")).createLocalSessions()
 
 export type RemoteAttachLaunch = { readonly engineArgs: readonly string[] }
 

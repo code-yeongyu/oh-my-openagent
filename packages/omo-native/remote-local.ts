@@ -17,7 +17,12 @@ import {
   type SessionRowState,
   type Status,
 } from "../device-service-core/src/device-service.ts"
-import { type RemoteClient, type RemoteFailure, remoteClientForPerson } from "../omo-senpi/src/components/remote/index"
+import {
+  type LocalSessions,
+  type RemoteClient,
+  type RemoteFailure,
+  remoteClientForPerson,
+} from "../omo-senpi/src/components/remote/index"
 import type { RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
 import { readAccountInProcess } from "./account-show"
 import type { LocalStatus } from "./remote-cold-wake"
@@ -41,6 +46,8 @@ export interface RemoteCommandDependencies {
    * client over `stateDir` by default. Test seam.
    */
   readonly client?: () => RemoteClient
+  /** This device's operator endpoint for the person client (its own sessions in `sessions`); remote-cli loads it. */
+  readonly localSessions?: () => Promise<LocalSessions>
   readonly now: () => number
   readonly output: (line: string) => void
   /** Text as it arrives, with no line ending added: `send` streams the answer through it. */
@@ -82,6 +89,7 @@ const personClient = (dependencies: RemoteCommandDependencies): RemoteClient =>
     version: packageJson.version,
     stateDir: dependencies.stateDir,
     connect: () => dependencies.connect(),
+    localSessions: dependencies.localSessions,
   })
 
 const CONTROL_VALUES = ["on", "off"] as const
