@@ -89,3 +89,6 @@ A-IS-65 L1	the interaction lock is still held at this OS's foreground restore (m
 A-IS-65 L1	the interaction lock is still held at this OS's foreground restore (Windows, foreground lease and guard): the funnel drops the lock after the send and the send returns only after the restore (R70cp(1)); the row proves the hold with its own test	17	57	owed
 A-IS-65 L1	the interaction lock is still held at this OS's foreground restore (X11, the first X11 row that sends input): the funnel drops the lock after the send and the send returns only after the restore (R70cp(1)); the row proves the hold with its own test	17	49	owed
 A-IS-65 L1	the interaction lock is still held at this OS's foreground restore (the remote leg): the funnel drops the lock after the send and the send returns only after the restore (R70cp(1)); the row proves the hold with its own test	17	67	owed
+L9	session.open{selfSet} host additions reach the self set: the omo desktop app's WM_CLASS handed by the host is SelfTarget on X11 (host-only, additive, brain-supplied members ignored; R70ad(3) erratum)	50	37	owed
+L7	the stop chord that cannot be armed is named in the StopPathUnavailable{deaf} refusal's data; until then the X11 backend names it on the engine's log line (R70am(4))	50	27	owed
+L11	omo doctor computer prints the X11 checks that Backend::diagnose returns (R62(b))	50	39	owed
