@@ -10,7 +10,11 @@ export type UpSteps = {
   readonly startRun: (guestName: string) => number
 }
 
-export type UpResult = { readonly lines: readonly string[]; readonly errors: readonly string[]; readonly exitCode: number }
+export type UpResult = {
+  readonly lines: readonly string[]
+  readonly errors: readonly string[]
+  readonly exitCode: number
+}
 
 // Holds the guest from before the clone until the wait ends, so a concurrent --sweep sees a live process for it in
 // the gap between the clone exiting and the run process starting.

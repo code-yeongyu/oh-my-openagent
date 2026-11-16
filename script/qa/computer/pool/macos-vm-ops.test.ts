@@ -66,7 +66,9 @@ describe("up waits for the guest to be listed running", () => {
 
   test("the wait returns running once the guest is listed running", async () => {
     const hypervisor = fakeHypervisor([[], [{ name: "omo-cu-macos26-9", running: true }]])
-    expect(await waitUntilRunning(hypervisor, "omo-cu-macos26-9", 120_000, instantClock())).toEqual({ status: "running" })
+    expect(await waitUntilRunning(hypervisor, "omo-cu-macos26-9", 120_000, instantClock())).toEqual({
+      status: "running",
+    })
   })
 
   test("the wait gives up at the deadline with the last status", async () => {

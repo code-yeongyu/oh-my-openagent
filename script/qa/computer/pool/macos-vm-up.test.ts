@@ -58,7 +58,10 @@ describe("up holds its guest from before the clone until the wait ends", () => {
     const host = poolHost()
     const result = await bringUp(host.hypervisor, host.steps, instantClock(), plan, 120_000)
     expect(host.sweepsInGap).toEqual([
-      ["guest KEPT omo-cu-macos15-5 (1 hypervisor process live: a run may be starting it)", "sweep: 0 deleted, 0 not deleted, 1 kept"],
+      [
+        "guest KEPT omo-cu-macos15-5 (1 hypervisor process live: a run may be starting it)",
+        "sweep: 0 deleted, 0 not deleted, 1 kept",
+      ],
     ])
     expect(host.removed).toEqual([])
     expect(result).toEqual({
