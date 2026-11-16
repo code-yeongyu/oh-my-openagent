@@ -9,7 +9,7 @@ use omo_computer_core::error::{EngineCode, Reason};
 
 use super::exclusion::{self, UNTRUSTED};
 use super::helper::{FilterKind, HelperRequest, ShotTarget};
-use super::pixels::{decode_png, fully_transparent, from_raw};
+use super::pixels::{decode_png, from_raw, fully_transparent};
 use super::seam::CaptureOs;
 use super::types::CaptureFault;
 
@@ -81,8 +81,16 @@ fn helper_still(
     exclude: &[u32],
     expected: FilterKind,
 ) -> Result<RgbaImage, Refusal> {
-    let request = HelperRequest::Screenshot { id, target, cursor, exclude: exclude.to_vec() };
-    let frame = os.helper().and_then(|helper| helper.call(&request)).map_err(refusal)?;
+    let request = HelperRequest::Screenshot {
+        id,
+        target,
+        cursor,
+        exclude: exclude.to_vec(),
+    };
+    let frame = os
+        .helper()
+        .and_then(|helper| helper.call(&request))
+        .map_err(refusal)?;
     exclusion::prove(&frame.reply, expected, exclude)?;
     let image = decode_png(&frame.png).map_err(refusal)?;
     if image.width() == 0 || fully_transparent(&image) {

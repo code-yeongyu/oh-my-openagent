@@ -39,9 +39,20 @@ unsafe extern "C" {
     pub fn CFNumberGetValue(number: CfRef, kind: i32, out: *mut c_void) -> bool;
     pub fn CFBooleanGetValue(boolean: CfRef) -> bool;
     pub fn CFStringGetLength(string: CfRef) -> isize;
-    pub fn CFStringGetCString(string: CfRef, buffer: *mut c_char, size: isize, encoding: u32) -> bool;
-    pub fn CFStringCreateWithCString(allocator: CfRef, text: *const c_char, encoding: u32) -> CfRef;
-    pub fn CFURLCreateFromFileSystemRepresentation(allocator: CfRef, path: *const u8, length: isize, directory: bool) -> CfRef;
+    pub fn CFStringGetCString(
+        string: CfRef,
+        buffer: *mut c_char,
+        size: isize,
+        encoding: u32,
+    ) -> bool;
+    pub fn CFStringCreateWithCString(allocator: CfRef, text: *const c_char, encoding: u32)
+        -> CfRef;
+    pub fn CFURLCreateFromFileSystemRepresentation(
+        allocator: CfRef,
+        path: *const u8,
+        length: isize,
+        directory: bool,
+    ) -> CfRef;
     pub fn CFBundleCreate(allocator: CfRef, url: CfRef) -> CfRef;
     pub fn CFBundleGetIdentifier(bundle: CfRef) -> CfRef;
 }
@@ -92,7 +103,9 @@ pub fn string(value: CfRef) -> Option<String> {
     if !ok {
         return None;
     }
-    CStr::from_bytes_until_nul(&buffer).ok().map(|s| s.to_string_lossy().into_owned())
+    CStr::from_bytes_until_nul(&buffer)
+        .ok()
+        .map(|s| s.to_string_lossy().into_owned())
 }
 
 /// An integer CFNumber; `None` for null.

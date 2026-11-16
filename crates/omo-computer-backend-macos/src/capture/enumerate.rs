@@ -42,11 +42,16 @@ pub fn listing(os: &mut dyn CaptureOs, own_pid: u32) -> BackendResult<Vec<Listed
             continue;
         };
         let ax = os.ax_window(window).unwrap_or_default();
-        let app_key = os.bundle_id(window.pid).unwrap_or_else(|| window.owner.clone());
+        let app_key = os
+            .bundle_id(window.pid)
+            .unwrap_or_else(|| window.owner.clone());
         let space = os.space_of(window.number);
         let z = u32::try_from(listed.len()).unwrap_or(u32::MAX);
         let info = record(window, process_start, &ax, app_key, space, &displays, z);
-        listed.push(Listed { info, minimized: ax.minimized });
+        listed.push(Listed {
+            info,
+            minimized: ax.minimized,
+        });
     }
     Ok(listed)
 }
@@ -55,7 +60,11 @@ pub fn listing(os: &mut dyn CaptureOs, own_pid: u32) -> BackendResult<Vec<Listed
 ///
 /// # Errors
 /// The window server answered no list.
-pub fn list(os: &mut dyn CaptureOs, own_pid: u32, filter: &WindowFilter) -> BackendResult<WindowList> {
+pub fn list(
+    os: &mut dyn CaptureOs,
+    own_pid: u32,
+    filter: &WindowFilter,
+) -> BackendResult<WindowList> {
     let matching: Vec<WindowInfo> = listing(os, own_pid)?
         .into_iter()
         .map(|l| l.info)
@@ -102,7 +111,10 @@ fn eligible(window: &CgWindow, own_pid: u32) -> bool {
 }
 
 fn matches(filter: &WindowFilter, window: &WindowInfo) -> bool {
-    filter.app.as_ref().is_none_or(|app| &window.app == app || &window.app_key == app)
+    filter
+        .app
+        .as_ref()
+        .is_none_or(|app| &window.app == app || &window.app_key == app)
         && filter
             .title
             .as_ref()
@@ -136,7 +148,9 @@ fn record(
         app_key,
         title,
         bounds: window.bounds,
-        display: display_of(displays, &window.bounds).map(|d| d.id.to_string()).unwrap_or_default(),
+        display: display_of(displays, &window.bounds)
+            .map(|d| d.id.to_string())
+            .unwrap_or_default(),
         focused: ax.focused,
         is_on_screen: window.on_screen,
         space,

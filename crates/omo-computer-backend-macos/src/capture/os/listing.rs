@@ -28,7 +28,12 @@ unsafe extern "C" {
 }
 
 pub const fn rect(r: CgRect) -> Rect {
-    Rect { x: r.origin.x, y: r.origin.y, width: r.size.width, height: r.size.height }
+    Rect {
+        x: r.origin.x,
+        y: r.origin.y,
+        width: r.size.width,
+        height: r.size.height,
+    }
 }
 
 /// Every window record, front to back; `None` when the window server answers nothing.
@@ -51,7 +56,15 @@ pub fn windows() -> Option<Vec<CgWindow>> {
 fn window(entry: CfRef) -> Option<CgWindow> {
     // SAFETY: the keys are CoreGraphics constants valid for the process lifetime.
     let (number, pid, owner, name, bounds, layer, on_screen) = unsafe {
-        (kCGWindowNumber, kCGWindowOwnerPID, kCGWindowOwnerName, kCGWindowName, kCGWindowBounds, kCGWindowLayer, kCGWindowIsOnscreen)
+        (
+            kCGWindowNumber,
+            kCGWindowOwnerPID,
+            kCGWindowOwnerName,
+            kCGWindowName,
+            kCGWindowBounds,
+            kCGWindowLayer,
+            kCGWindowIsOnscreen,
+        )
     };
     Some(CgWindow {
         number: u32::try_from(cf::int(cf::get(entry, number))?).ok()?,
@@ -86,7 +99,12 @@ fn display(id: u32, main: bool) -> DisplayRecord {
     let mode = Owned::new(unsafe { CGDisplayCopyDisplayMode(id) });
     let (width, height) = mode.map_or((0, 0), |mode| {
         // SAFETY: `mode` is a valid CGDisplayMode.
-        unsafe { (CGDisplayModeGetPixelWidth(mode.get()), CGDisplayModeGetPixelHeight(mode.get())) }
+        unsafe {
+            (
+                CGDisplayModeGetPixelWidth(mode.get()),
+                CGDisplayModeGetPixelHeight(mode.get()),
+            )
+        }
     });
     DisplayRecord {
         id,

@@ -28,7 +28,13 @@ impl<O: CaptureOs> Capturer<O> {
     /// `own_pid` is the engine's pid: its windows (overlay, receipt) are never listed and are
     /// excluded from every still.
     pub const fn new(os: O, own_pid: u32) -> Self {
-        Self { os, own_pid, skylight_opt_in: false, next_id: 0, last_route: None }
+        Self {
+            os,
+            own_pid,
+            skylight_opt_in: false,
+            next_id: 0,
+            last_route: None,
+        }
     }
 
     /// Lets the SkyLight window route run when its symbol resolved.
@@ -68,7 +74,11 @@ impl<O: CaptureOs> Capturer<O> {
     /// # Errors
     /// `WindowNotFound`, `CaptureUnavailable{minimized}` with nothing captured, `InvalidTarget`
     /// for an unknown display, or the route's refusal.
-    pub fn capture(&mut self, target: &Target, options: &CaptureOptions) -> BackendResult<FrameBytes> {
+    pub fn capture(
+        &mut self,
+        target: &Target,
+        options: &CaptureOptions,
+    ) -> BackendResult<FrameBytes> {
         self.last_route = None;
         let (mut image, scale) = match target {
             Target::Window(id) => self.window(id, options.cursor)?,
@@ -82,7 +92,12 @@ impl<O: CaptureOs> Capturer<O> {
             draw_crosshair(&mut image, point, scale);
         }
         let bytes = encode_png(&image).map_err(refusal)?;
-        Ok(FrameBytes { width: image.width(), height: image.height(), mime: ImageMime::Png, bytes })
+        Ok(FrameBytes {
+            width: image.width(),
+            height: image.height(),
+            mime: ImageMime::Png,
+            bytes,
+        })
     }
 
     fn id(&mut self) -> u64 {
@@ -93,16 +108,27 @@ impl<O: CaptureOs> Capturer<O> {
     fn window(&mut self, id: &str, cursor: bool) -> BackendResult<(RgbaImage, f64)> {
         let listed = enumerate::find(&mut self.os, self.own_pid, id)?;
         if listed.minimized {
-            return Err(Refusal::new(EngineCode::CaptureUnavailable, Reason::Minimized));
+            return Err(Refusal::new(
+                EngineCode::CaptureUnavailable,
+                Reason::Minimized,
+            ));
         }
-        let number = listed.info.identity.window_number.and_then(|n| u32::try_from(n).ok());
+        let number = listed
+            .info
+            .identity
+            .window_number
+            .and_then(|n| u32::try_from(n).ok());
         let number = number.ok_or(Refusal::bare(EngineCode::WindowNotFound))?;
         let request = self.id();
         let (image, taken) =
             route::window_still(&mut self.os, request, number, cursor, self.skylight_opt_in)?;
         self.last_route = Some(taken);
         let points = listed.info.bounds.width;
-        let scale = if points > 0.0 { f64::from(image.width()) / points } else { 1.0 };
+        let scale = if points > 0.0 {
+            f64::from(image.width()) / points
+        } else {
+            1.0
+        };
         Ok((image, scale))
     }
 
@@ -129,7 +155,10 @@ impl<O: CaptureOs> Capturer<O> {
         for record in &records {
             let request = self.id();
             let image = route::display_still(&mut self.os, request, record.id, cursor, &exclude)?;
-            tiles.push(Tile { bounds: record.bounds, image });
+            tiles.push(Tile {
+                bounds: record.bounds,
+                image,
+            });
         }
         let top = records.iter().map(scale).fold(1.0, f64::max);
         self.last_route = Some(CaptureRouteTaken::Helper);

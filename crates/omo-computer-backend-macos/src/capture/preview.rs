@@ -62,9 +62,16 @@ impl PreviewLane {
     ///
     /// # Errors
     /// The helper's fault; a reply that is not a stream frame is [`CaptureFault::Protocol`].
-    pub fn tick(&mut self, now_ms: u64, helper: &mut dyn CaptureHelper) -> Result<Option<PreviewPush>, CaptureFault> {
+    pub fn tick(
+        &mut self,
+        now_ms: u64,
+        helper: &mut dyn CaptureHelper,
+    ) -> Result<Option<PreviewPush>, CaptureFault> {
         let wanted = self.lease.filter(|_| !self.subscribers.is_empty());
-        if let Some(window) = self.streaming.filter(|w| Some(*w) != wanted.map(|t| t.window)) {
+        if let Some(window) = self
+            .streaming
+            .filter(|w| Some(*w) != wanted.map(|t| t.window))
+        {
             self.streaming = None;
             self.last_push_ms = None;
             let id = self.id();
@@ -73,18 +80,29 @@ impl PreviewLane {
         let Some(target) = wanted else {
             return Ok(None);
         };
-        if self.last_push_ms.is_some_and(|last| now_ms.saturating_sub(last) < MIN_INTERVAL_MS) {
+        if self
+            .last_push_ms
+            .is_some_and(|last| now_ms.saturating_sub(last) < MIN_INTERVAL_MS)
+        {
             return Ok(None);
         }
         let long_edge = long_edge(target.points_long_edge);
         if self.streaming.is_none() {
             let id = self.id();
-            let start = HelperRequest::StreamStart { id, window: target.window, long_edge, fps: PREVIEW_MAX_FPS };
+            let start = HelperRequest::StreamStart {
+                id,
+                window: target.window,
+                long_edge,
+                fps: PREVIEW_MAX_FPS,
+            };
             helper.call(&start)?;
             self.streaming = Some(target.window);
         }
         let id = self.id();
-        let frame = helper.call(&HelperRequest::StreamFrame { id, window: target.window })?;
+        let frame = helper.call(&HelperRequest::StreamFrame {
+            id,
+            window: target.window,
+        })?;
         if frame.reply.source != Some(FrameSource::Stream) {
             return Err(CaptureFault::Protocol);
         }

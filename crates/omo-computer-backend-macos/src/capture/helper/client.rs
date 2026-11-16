@@ -1,6 +1,6 @@
 //! The line client of the capture helper over any byte pipe (the helper's stdio on macOS).
 
-use std::io::{BufRead, Read, Write};
+use std::io::{BufRead, Write};
 
 use super::protocol::{HelperError, HelperFrame, HelperReply, HelperRequest};
 use crate::capture::seam::CaptureHelper;

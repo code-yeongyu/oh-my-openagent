@@ -27,13 +27,19 @@ impl Os {
     /// Probes the SkyLight capture symbols once, at session open.
     #[must_use]
     pub fn open() -> Self {
-        Self { skylight: skylight::Skylight::probe(), helper: helper_process::HelperProcess::default() }
+        Self {
+            skylight: skylight::Skylight::probe(),
+            helper: helper_process::HelperProcess::default(),
+        }
     }
 }
 
 impl CaptureOs for Os {
     fn window_list(&mut self) -> Result<Vec<CgWindow>, Refusal> {
-        listing::windows().ok_or(Refusal::new(EngineCode::Internal, Reason::WindowsUnsupported))
+        listing::windows().ok_or(Refusal::new(
+            EngineCode::Internal,
+            Reason::WindowsUnsupported,
+        ))
     }
 
     fn process_start(&mut self, pid: u32) -> Option<u64> {
@@ -54,11 +60,16 @@ impl CaptureOs for Os {
     }
 
     fn displays(&mut self) -> Result<Vec<DisplayRecord>, Refusal> {
-        listing::displays().ok_or(Refusal::new(EngineCode::Internal, Reason::DisplaysUnsupported))
+        listing::displays().ok_or(Refusal::new(
+            EngineCode::Internal,
+            Reason::DisplaysUnsupported,
+        ))
     }
 
     fn skylight(&mut self) -> Option<&mut dyn SkylightCapture> {
-        self.skylight.as_mut().map(|s| s as &mut dyn SkylightCapture)
+        self.skylight
+            .as_mut()
+            .map(|s| s as &mut dyn SkylightCapture)
     }
 
     fn helper(&mut self) -> Result<&mut dyn CaptureHelper, CaptureFault> {

@@ -13,7 +13,13 @@ pub fn start(pid: u32) -> Option<u64> {
     let size = i32::try_from(std::mem::size_of::<libc::proc_bsdinfo>()).ok()?;
     // SAFETY: `info` is a proc_bsdinfo of `size` bytes.
     let read = unsafe {
-        libc::proc_pidinfo(pid, libc::PROC_PIDTBSDINFO, 0, (&raw mut info).cast::<c_void>(), size)
+        libc::proc_pidinfo(
+            pid,
+            libc::PROC_PIDTBSDINFO,
+            0,
+            (&raw mut info).cast::<c_void>(),
+            size,
+        )
     };
     (read == size).then(|| info.pbi_start_tvsec * 1_000_000 + info.pbi_start_tvusec)
 }

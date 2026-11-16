@@ -61,5 +61,9 @@ fn contains(bounds: &Rect, x: f64, y: f64) -> bool {
 fn overlap(a: &Rect, b: &Rect) -> f64 {
     let w = (a.x + a.width).min(b.x + b.width) - a.x.max(b.x);
     let h = (a.y + a.height).min(b.y + b.height) - a.y.max(b.y);
-    if w > 0.0 && h > 0.0 { w * h } else { 0.0 }
+    if w > 0.0 && h > 0.0 {
+        w * h
+    } else {
+        0.0
+    }
 }

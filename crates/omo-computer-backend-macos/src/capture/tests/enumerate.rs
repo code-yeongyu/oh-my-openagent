@@ -6,26 +6,47 @@ use super::kit::{window, FakeOs, OWN_PID};
 use crate::capture::enumerate::MAX_LISTED;
 use crate::capture::{CaptureRouteTaken, Capturer};
 
-const NO_CURSOR: CaptureOptions = CaptureOptions { cursor: false, crosshair: None, region: None };
+const NO_CURSOR: CaptureOptions = CaptureOptions {
+    cursor: false,
+    crosshair: None,
+    region: None,
+};
 
 #[test]
 fn window_identity_survives_pid_reuse() {
     let mut os = FakeOs::with_windows(vec![window(7, 42), window(8, 42)]);
     os.starts.insert(42, 1_000);
     let mut capturer = Capturer::new(os, OWN_PID);
-    let first = capturer.windows(&WindowFilter::default()).expect("first listing");
+    let first = capturer
+        .windows(&WindowFilter::default())
+        .expect("first listing");
     assert_eq!(first.windows.len(), 2);
-    assert!(first.windows.iter().all(|w| w.identity.process_start == 1_000));
-    assert_eq!(capturer.os().start_reads.get(&42), Some(&1), "one proc_pidinfo per pid per listing");
+    assert!(first
+        .windows
+        .iter()
+        .all(|w| w.identity.process_start == 1_000));
+    assert_eq!(
+        capturer.os().start_reads.get(&42),
+        Some(&1),
+        "one proc_pidinfo per pid per listing"
+    );
 
     // pid 42 exits and the pid is reused by a new process with one window.
     capturer.os_mut().windows = vec![window(9, 42)];
     capturer.os_mut().starts.insert(42, 2_000);
-    let second = capturer.windows(&WindowFilter::default()).expect("second listing");
+    let second = capturer
+        .windows(&WindowFilter::default())
+        .expect("second listing");
     assert_eq!(second.windows.len(), 1);
     let identity = &second.windows[0].identity;
-    assert_eq!((identity.window_number, identity.pid, identity.process_start), (Some(9), 42, 2_000));
-    assert_ne!(identity, &first.windows[0].identity, "a reused pid is a different identity");
+    assert_eq!(
+        (identity.window_number, identity.pid, identity.process_start),
+        (Some(9), 42, 2_000)
+    );
+    assert_ne!(
+        identity, &first.windows[0].identity,
+        "a reused pid is a different identity"
+    );
 }
 
 #[test]
@@ -34,9 +55,17 @@ fn no_listing_record_has_identity_none() {
     os.starts.remove(&99); // exited between the list and the proc_pidinfo read
     let mut capturer = Capturer::new(os, OWN_PID);
     let list = capturer.windows(&WindowFilter::default()).expect("listing");
-    let numbers: Vec<_> = list.windows.iter().map(|w| w.identity.window_number).collect();
+    let numbers: Vec<_> = list
+        .windows
+        .iter()
+        .map(|w| w.identity.window_number)
+        .collect();
     assert_eq!(numbers, vec![Some(1), Some(3)]);
-    assert!(list.windows.iter().all(|w| w.identity.process_start > 0 && w.id == w.identity.window_number.unwrap().to_string()));
+    assert!(list
+        .windows
+        .iter()
+        .all(|w| w.identity.process_start > 0
+            && w.id == w.identity.window_number.unwrap().to_string()));
 }
 
 #[test]
@@ -45,9 +74,15 @@ fn windows_60_truncated_all_ids_reachable() {
     let mut capturer = Capturer::new(FakeOs::with_windows(windows), OWN_PID);
     let list = capturer.windows(&WindowFilter::default()).expect("listing");
     assert_eq!(list.windows.len(), MAX_LISTED);
-    assert!(list.truncated, "a cut listing says so instead of hard-capping silently");
+    assert!(
+        list.truncated,
+        "a cut listing says so instead of hard-capping silently"
+    );
     let frame = capturer.capture(&Target::Window("60".into()), &NO_CURSOR);
-    assert!(frame.is_ok(), "an id past the cut is still reachable: {frame:?}");
+    assert!(
+        frame.is_ok(),
+        "an id past the cut is still reachable: {frame:?}"
+    );
 }
 
 #[test]
@@ -57,9 +92,19 @@ fn own_windows_and_non_application_layers_are_not_listed() {
     let os = FakeOs::with_windows(vec![window(1, OWN_PID), menubar, window(3, 78)]);
     let mut capturer = Capturer::new(os, OWN_PID);
     let list = capturer.windows(&WindowFilter::default()).expect("listing");
-    assert_eq!(list.windows.iter().map(|w| w.id.as_str()).collect::<Vec<_>>(), vec!["3"]);
+    assert_eq!(
+        list.windows
+            .iter()
+            .map(|w| w.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["3"]
+    );
     let filtered = capturer
-        .windows(&WindowFilter { app: None, title: Some("nothing".into()), pid: None })
+        .windows(&WindowFilter {
+            app: None,
+            title: Some("nothing".into()),
+            pid: None,
+        })
         .expect("filtered");
     assert!(filtered.windows.is_empty());
 }
@@ -74,7 +119,13 @@ fn space_move_never_switches_user_space() {
     let list = capturer.windows(&WindowFilter::default()).expect("listing");
     assert_eq!(list.windows[0].space.as_deref(), Some("3"));
     assert!(!list.windows[0].is_on_screen);
-    capturer.capture(&Target::Window("5".into()), &NO_CURSOR).expect("off-Space capture");
+    capturer
+        .capture(&Target::Window("5".into()), &NO_CURSOR)
+        .expect("off-Space capture");
     assert_eq!(capturer.last_route(), Some(CaptureRouteTaken::Helper));
-    assert_eq!(capturer.os().helper.requests.len(), 1, "one desktop-independent still, nothing else");
+    assert_eq!(
+        capturer.os().helper.requests.len(),
+        1,
+        "one desktop-independent still, nothing else"
+    );
 }

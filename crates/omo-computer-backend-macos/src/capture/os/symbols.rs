@@ -26,7 +26,11 @@ pub fn lookup<F: Copy>(name: &CStr) -> Option<F> {
     assert_eq!(std::mem::size_of::<F>(), std::mem::size_of::<*mut c_void>());
     let handle = skylight();
     // SAFETY: `name` is NUL-terminated; dlsym on a null handle is never called.
-    let mut symbol = if handle.is_null() { std::ptr::null_mut() } else { unsafe { libc::dlsym(handle, name.as_ptr()) } };
+    let mut symbol = if handle.is_null() {
+        std::ptr::null_mut()
+    } else {
+        unsafe { libc::dlsym(handle, name.as_ptr()) }
+    };
     if symbol.is_null() {
         // SAFETY: as above, on the default search scope.
         symbol = unsafe { libc::dlsym(libc::RTLD_DEFAULT, name.as_ptr()) };

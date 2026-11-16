@@ -67,10 +67,22 @@ pub struct Tile {
 /// The desktop composite at the largest display scale; each tile is resized to its bounds.
 #[must_use]
 pub fn composite(tiles: &[Tile], scale: f64) -> RgbaImage {
-    let min_x = tiles.iter().map(|t| t.bounds.x).fold(f64::INFINITY, f64::min);
-    let min_y = tiles.iter().map(|t| t.bounds.y).fold(f64::INFINITY, f64::min);
-    let max_x = tiles.iter().map(|t| t.bounds.x + t.bounds.width).fold(f64::NEG_INFINITY, f64::max);
-    let max_y = tiles.iter().map(|t| t.bounds.y + t.bounds.height).fold(f64::NEG_INFINITY, f64::max);
+    let min_x = tiles
+        .iter()
+        .map(|t| t.bounds.x)
+        .fold(f64::INFINITY, f64::min);
+    let min_y = tiles
+        .iter()
+        .map(|t| t.bounds.y)
+        .fold(f64::INFINITY, f64::min);
+    let max_x = tiles
+        .iter()
+        .map(|t| t.bounds.x + t.bounds.width)
+        .fold(f64::NEG_INFINITY, f64::max);
+    let max_y = tiles
+        .iter()
+        .map(|t| t.bounds.y + t.bounds.height)
+        .fold(f64::NEG_INFINITY, f64::max);
     let size = |v: f64| clamp_px(v * scale, u32::MAX).max(1);
     let mut canvas = RgbaImage::new(size(max_x - min_x), size(max_y - min_y));
     for tile in tiles {

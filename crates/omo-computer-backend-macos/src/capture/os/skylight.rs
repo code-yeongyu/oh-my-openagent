@@ -3,7 +3,7 @@
 
 use std::ffi::c_void;
 
-use super::cf::{self, CfRef, CgRect, CgPoint, CgSize, Owned};
+use super::cf::{self, CfRef, CgPoint, CgRect, CgSize, Owned};
 use super::symbols;
 use crate::capture::seam::SkylightCapture;
 use crate::capture::types::{CaptureFault, RawFrame};
@@ -21,7 +21,15 @@ unsafe extern "C" {
     fn CGImageGetWidth(image: CfRef) -> usize;
     fn CGImageGetHeight(image: CfRef) -> usize;
     fn CGColorSpaceCreateDeviceRGB() -> CfRef;
-    fn CGBitmapContextCreate(data: *mut c_void, width: usize, height: usize, bits: usize, row: usize, space: CfRef, info: u32) -> CfRef;
+    fn CGBitmapContextCreate(
+        data: *mut c_void,
+        width: usize,
+        height: usize,
+        bits: usize,
+        row: usize,
+        space: CfRef,
+        info: u32,
+    ) -> CfRef;
     fn CGContextDrawImage(context: CfRef, rect: CgRect, image: CfRef);
 }
 
@@ -63,14 +71,29 @@ fn rgba(image: CfRef) -> Result<RawFrame, CaptureFault> {
     let row = width.checked_mul(4).ok_or(CaptureFault::NullFrame)?;
     let mut buffer = vec![0u8; row.checked_mul(height).ok_or(CaptureFault::NullFrame)?];
     // SAFETY: plain call; +1 color space.
-    let space = Owned::new(unsafe { CGColorSpaceCreateDeviceRGB() }).ok_or(CaptureFault::NullFrame)?;
+    let space =
+        Owned::new(unsafe { CGColorSpaceCreateDeviceRGB() }).ok_or(CaptureFault::NullFrame)?;
     // SAFETY: `buffer` holds `row * height` bytes laid out as RGBA_BITMAP_INFO.
     let context = Owned::new(unsafe {
-        CGBitmapContextCreate(buffer.as_mut_ptr().cast(), width, height, 8, row, space.get(), RGBA_BITMAP_INFO)
+        CGBitmapContextCreate(
+            buffer.as_mut_ptr().cast(),
+            width,
+            height,
+            8,
+            row,
+            space.get(),
+            RGBA_BITMAP_INFO,
+        )
     })
     .ok_or(CaptureFault::NullFrame)?;
     #[allow(clippy::cast_precision_loss)]
-    let rect = CgRect { origin: CgPoint::default(), size: CgSize { width: width as f64, height: height as f64 } };
+    let rect = CgRect {
+        origin: CgPoint::default(),
+        size: CgSize {
+            width: width as f64,
+            height: height as f64,
+        },
+    };
     // SAFETY: the context draws into `buffer`, which outlives it.
     unsafe { CGContextDrawImage(context.get(), rect, image) };
     drop(context);

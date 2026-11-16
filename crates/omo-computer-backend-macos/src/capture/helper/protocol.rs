@@ -24,11 +24,23 @@ pub enum HelperRequest {
         fps: u32,
     },
     /// The newest frame of a running preview stream.
-    StreamFrame { id: u64, window: u32 },
-    StreamStop { id: u64, window: u32 },
+    StreamFrame {
+        id: u64,
+        window: u32,
+    },
+    StreamStop {
+        id: u64,
+        window: u32,
+    },
     /// `computer.record`: the stream feeds an H.264 file at no more than [`RECORD_MAX_FPS`].
-    RecordStart { id: u64, path: String, fps: u32 },
-    RecordStop { id: u64 },
+    RecordStart {
+        id: u64,
+        path: String,
+        fps: u32,
+    },
+    RecordStop {
+        id: u64,
+    },
 }
 
 /// Frames per second the recording stream never exceeds (design row K13's macOS stream).

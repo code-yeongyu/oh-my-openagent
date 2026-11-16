@@ -16,7 +16,12 @@ use crate::capture::types::{AxWindowFacts, CaptureFault, CgWindow, DisplayRecord
 pub const OWN_PID: u32 = 4242;
 
 pub fn rect(x: f64, y: f64, width: f64, height: f64) -> Rect {
-    Rect { x, y, width, height }
+    Rect {
+        x,
+        y,
+        width,
+        height,
+    }
 }
 
 pub fn window(number: u32, pid: u32) -> CgWindow {
@@ -50,7 +55,12 @@ pub struct FakeHelper {
 }
 
 impl FakeHelper {
-    fn reply(id: u64, source: Option<FrameSource>, filter: Option<FilterKind>, png: Vec<u8>) -> HelperFrame {
+    fn reply(
+        id: u64,
+        source: Option<FrameSource>,
+        filter: Option<FilterKind>,
+        png: Vec<u8>,
+    ) -> HelperFrame {
         HelperFrame {
             reply: HelperReply {
                 id,
@@ -78,8 +88,17 @@ impl CaptureHelper for FakeHelper {
         self.requests.push(request.clone());
         let (w, h) = self.frame.unwrap_or((8, 4));
         Ok(match request {
-            HelperRequest::Screenshot { id, target, exclude, .. } => {
-                let source = Some(if self.stills_from_stream { FrameSource::Stream } else { FrameSource::Screenshot });
+            HelperRequest::Screenshot {
+                id,
+                target,
+                exclude,
+                ..
+            } => {
+                let source = Some(if self.stills_from_stream {
+                    FrameSource::Stream
+                } else {
+                    FrameSource::Screenshot
+                });
                 let filter = Some(match target {
                     ShotTarget::Window { .. } => FilterKind::Window,
                     ShotTarget::Display { .. } => FilterKind::Display,
@@ -90,9 +109,12 @@ impl CaptureHelper for FakeHelper {
                 }
                 frame
             }
-            HelperRequest::StreamFrame { id, .. } => {
-                Self::reply(*id, Some(FrameSource::Stream), Some(FilterKind::Window), png(w, h, 255))
-            }
+            HelperRequest::StreamFrame { id, .. } => Self::reply(
+                *id,
+                Some(FrameSource::Stream),
+                Some(FilterKind::Window),
+                png(w, h, 255),
+            ),
             other => Self::reply(other.id(), None, None, Vec::new()),
         })
     }
@@ -106,7 +128,11 @@ pub struct FakeSkylight {
 impl SkylightCapture for FakeSkylight {
     fn capture_window(&mut self, _number: u32, _cursor: bool) -> Result<RawFrame, CaptureFault> {
         self.calls += 1;
-        Ok(RawFrame { width: 4, height: 2, rgba: [10, 20, 30, self.alpha].repeat(8) })
+        Ok(RawFrame {
+            width: 4,
+            height: 2,
+            rgba: [10, 20, 30, self.alpha].repeat(8),
+        })
     }
 }
 
@@ -125,7 +151,10 @@ pub struct FakeOs {
 
 impl FakeOs {
     pub fn with_windows(windows: Vec<CgWindow>) -> Self {
-        let starts = windows.iter().map(|w| (w.pid, 1_000 + u64::from(w.pid))).collect();
+        let starts = windows
+            .iter()
+            .map(|w| (w.pid, 1_000 + u64::from(w.pid)))
+            .collect();
         Self {
             windows,
             starts,
@@ -168,7 +197,9 @@ impl CaptureOs for FakeOs {
     }
 
     fn skylight(&mut self) -> Option<&mut dyn SkylightCapture> {
-        self.skylight.as_mut().map(|s| s as &mut dyn SkylightCapture)
+        self.skylight
+            .as_mut()
+            .map(|s| s as &mut dyn SkylightCapture)
     }
 
     fn helper(&mut self) -> Result<&mut dyn CaptureHelper, CaptureFault> {
