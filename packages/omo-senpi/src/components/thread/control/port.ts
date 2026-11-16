@@ -2,7 +2,7 @@ import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from 
 import type { ThreadTranscriptEntry } from "../reader"
 import type { ModelChoice } from "../tools/model-match"
 import type { ThreadCloseOutcome } from "../tools/ports"
-import type { ThreadSummary } from "../contracts"
+import type { ThreadSummary, ThreadWaitOutcome } from "../contracts"
 
 /**
  * One live thread's controls, wherever it is held: the session on this device's endpoint, or the session on another
@@ -38,6 +38,11 @@ export type SessionControl = {
    */
   readonly setThinkingLevel: (level: string, scope?: "turn") => Promise<void>
   readonly getMessages: () => Promise<readonly ThreadTranscriptEntry[]>
+  /**
+   * Waits, bounded, until the thread stops running, on the leg's own status events (never a polling loop). Absent: the
+   * leg has no such event source here, and a waiting read answers `unsupported`.
+   */
+  readonly waitSettled?: (timeoutMs: number, signal?: AbortSignal) => Promise<ThreadWaitOutcome>
 }
 
 /**

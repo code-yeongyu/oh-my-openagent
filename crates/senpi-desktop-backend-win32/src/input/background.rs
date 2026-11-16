@@ -74,6 +74,13 @@ pub(super) fn post(window: Window, message: u32, wparam: WPARAM, lparam: LPARAM)
     )))
 }
 
+/// Posts one key transition. `alt_down` (Alt held on this route) makes it a
+/// `WM_SYS*` message with the context bit. Since [`posted_chord_refusal`]
+/// refuses a chord in which a non-modifier key goes down under a held
+/// modifier, that happens only for modifier-only chords (such as alt+shift),
+/// for the releases `release_all` replays, and while a failed Alt release is
+/// still held in the ledger (any later key on that window route then goes
+/// out as a `WM_SYS*` message).
 pub(super) fn post_key(window: Window, vk: u16, down: bool, alt_down: bool) -> CoreResult<()> {
     let (message, lparam) = key_message(vk, native::scan_code(vk), down, alt_down);
     post(window, message, usize::from(vk), lparam)

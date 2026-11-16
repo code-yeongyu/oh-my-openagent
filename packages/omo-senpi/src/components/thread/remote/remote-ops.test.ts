@@ -15,8 +15,8 @@ function followSurface(transcript: JsonObject[], before: JsonObject[] = []) {
   const remote = {
     sessions: {
       devices: async () => [{ device: "b", label: "b", online: true }],
-      watch: async (_device: string, _session: string, records: RecordListener) => {
-        listener = records
+      watch: async (_device: string, _session: string, handlers: { readonly record: RecordListener }) => {
+        listener = handlers.record
         return {
           kind: "ok" as const,
           watch: { ended: new Promise<string>(() => {}), stop: () => (listener = undefined) },
