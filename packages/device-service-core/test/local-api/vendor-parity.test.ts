@@ -60,10 +60,10 @@ describe("vendored device-service local-API client", () => {
       ...new Bun.Transpiler({ loader: "ts" }).scan(port).exports,
       ...[
         ...port.matchAll(
-          /^export\s+(?:declare\s+)?(?:type|interface|const|let|var|function|class|enum|namespace|module)\s+(\w+)/gm,
+          /(?:^|;)\s*export\s+(?:declare\s+)?(?:type|interface|const|let|var|function|class|enum|namespace|module)\s+(\w+)/gm,
         ),
       ].map((match) => match[1]),
-      ...[...port.matchAll(/^export\s+(?:type\s+)?\{([^}]*)\}/gm)].flatMap((match) =>
+      ...[...port.matchAll(/(?:^|;)\s*export\s+(?:type\s+)?\{([^}]*)\}/gm)].flatMap((match) =>
         (match[1] ?? "")
           .split(",")
           .map(
