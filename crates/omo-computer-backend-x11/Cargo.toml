@@ -11,3 +11,7 @@ crate-type = ["rlib"]
 omo-computer-core = { path = "../omo-computer-core" }
 omo-computer-safety = { path = "../omo-computer-safety" }
 omo-computer-backend-atspi = { path = "../omo-computer-backend-atspi" }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+image.workspace = true
+x11rb = { workspace = true, features = ["composite", "damage", "xfixes"] }

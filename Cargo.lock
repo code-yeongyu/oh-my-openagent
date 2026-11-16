@@ -1968,7 +1968,16 @@ dependencies = [
 name = "omo-computer-backend-atspi"
 version = "0.0.0"
 dependencies = [
+ "atspi",
+ "futures-lite",
  "omo-computer-core",
+ "omo-computer-safety",
+ "regex",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "zbus",
 ]
 
 [[package]]
@@ -2009,9 +2018,11 @@ dependencies = [
 name = "omo-computer-backend-x11"
 version = "0.0.0"
 dependencies = [
+ "image",
  "omo-computer-backend-atspi",
  "omo-computer-core",
  "omo-computer-safety",
+ "x11rb",
 ]
 
 [[package]]

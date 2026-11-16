@@ -70,3 +70,17 @@ fn a_digest_that_is_not_a_plain_component_is_refused_and_touches_nothing_outside
     assert_eq!(std::fs::read(&outside).expect("still there"), b"keep");
     assert!(store.record("0123abcd", "png", b"x", 0).is_ok(), "a plain digest is written");
 }
+
+/// Review L1 of #13367 (at d68eaa25fe): the extension is a plain path component too; one with a
+/// separator or `..` is refused before any join, and nothing outside the directory is written.
+#[test]
+fn an_extension_that_is_not_a_plain_component_is_refused() {
+    let root = tempfile::tempdir().expect("tempdir");
+    let dir = root.path().join("artifacts");
+    let mut store = ArtifactStore::new(dir.clone(), GcLimits::default());
+    for ext in ["png/../../x", "../x", "a/b", "..", ""] {
+        assert!(store.record("0123abcd", ext, b"x", 0).is_err(), "record refuses ext {ext:?}");
+    }
+    assert!(!root.path().join("x").exists(), "nothing escaped the artifact directory");
+    assert!(store.record("0123abcd", "png", b"x", 0).is_ok(), "a plain extension is written");
+}
