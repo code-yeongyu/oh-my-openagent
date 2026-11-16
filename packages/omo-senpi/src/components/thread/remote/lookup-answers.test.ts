@@ -19,7 +19,10 @@ function serviceAnswering(answer: () => Promise<{ readonly key: string }>): Devi
 }
 
 const lookupWith = async (answer: () => Promise<{ readonly key: string }>) => {
-  const port = createDeviceServiceSessions({ version: "5.1.70", connect: async () => ({ conn: serviceAnswering(answer), owned: true }) })
+  const port = createDeviceServiceSessions({
+    version: "5.1.70",
+    connect: async () => ({ conn: serviceAnswering(answer), owned: true }),
+  })
   return await port.lookup?.("dev-c", "0195f0c2-1a2b-7c3d-8e4f-00000000c001")
 }
 
