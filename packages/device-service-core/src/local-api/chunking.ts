@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@eda08c786872ad5b766b5adba76f9698d4f1cad6 packages/local-api/src/chunking.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@04288f856dcd224a87108cb46d62d0343ce77136 packages/local-api/src/chunking.ts
 import { fromBase64 } from "./bytes-encoding.ts";
 import { protocolViolation } from "./errors.ts";
 import { chunkPayload, LOCAL_BLOB_MAX, LOCAL_CHUNK_MAX, sha256Hex } from "./limits.ts";
