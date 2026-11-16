@@ -29,6 +29,7 @@
 !/plugin/extensions/omo-task.js
 !/plugin/extensions/omo-telemetry-recovery.js
 !/plugin/extensions/omo-thread-client.js
+!/plugin/extensions/omo-wake.js
 !/plugin/extensions/omo-feedback.js
 !/plugin/extensions/omo-claim-receipt.js
 !/plugin/extensions/omo.js

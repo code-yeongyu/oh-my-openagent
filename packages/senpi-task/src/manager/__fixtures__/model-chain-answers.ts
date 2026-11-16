@@ -15,16 +15,16 @@ const ERRORS = { quota: QUOTA_ERROR, refusal: REFUSAL_ERROR, auth: AUTH_ERROR } 
 
 export type Step = keyof typeof ERRORS | "complete" | { readonly tool: string } | { readonly partialTool: string }
 
-// `claude-opus-5-5` and `claude-opus-5` are the ids senpi's shipped default chain names
-// (`claude-opus-5-5` -> `claude-opus-5:max`). The rung lives on another account, so a usage limit on the
+// `claude-opus-5-5` and `claude-fable-5-2` are the ids senpi's shipped default chain names
+// (`claude-opus-5-5` -> `claude-fable-5-2:medium`, senpi 2026.11.15-2). The rung lives on another account, so a usage limit on the
 // first never makes the default unreachable by itself: only the child's own fallback policy can.
 export const MODELS: Readonly<Record<string, readonly string[]>> = {
   [CLAUDE]: ["primary", "sibling", "claude-opus-5-5"],
   [GPT]: ["parent", "gpt-6-astra"],
-  [ALT]: ["rung", "claude-opus-5"],
+  [ALT]: ["rung", "claude-fable-5-2"],
 }
 
-const REASONING = new Set(["claude-opus-5-5", "claude-opus-5"])
+const REASONING = new Set(["claude-opus-5-5", "claude-fable-5-2"])
 
 export function testModel(id: string) {
   return {
