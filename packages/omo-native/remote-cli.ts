@@ -1,16 +1,14 @@
-import { existsSync } from "node:fs"
-
-import { type DeviceService, deviceServiceEndpointPath } from "../device-service-core/src/index.ts"
-import { serveRemoteAttach } from "./remote-attach"
+import { handleOf } from "../omo-senpi/src/components/remote/index"
 import { type BootstrapSetup, type DeviceLink, runBootstrapVerb, runEnableVerb } from "./remote-bootstrap"
 import { applyColdWake, type ColdWake } from "./remote-cold-wake"
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
 import {
   accountNotice,
-  isServiceStopped,
   type Parsed,
   parse,
+  personClientOf,
   type RemoteCommandDependencies,
+  renderFailure,
   reportFailure,
   runLocalRemoteVerb,
 } from "./remote-local"
@@ -92,8 +90,8 @@ export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: 
 export type RemoteAttachLaunch = { readonly engineArgs: readonly string[] }
 
 /**
- * `omo remote attach <device>/<session>`: attaches through the device service and serves the session on a private
- * endpoint for the engine's attach TUI. Returns the engine arguments to launch, or the exit code when it cannot.
+ * `omo remote attach <device>/<session>`: attaches on the person client and serves the session on a private endpoint for
+ * the engine's attach TUI. Returns the engine arguments to launch, or the exit code when it cannot.
  */
 export async function prepareRemoteAttach(
   dependencies: RemoteCommandDependencies,
@@ -109,32 +107,22 @@ export async function prepareRemoteAttach(
     dependencies.error("usage: omo remote attach <device>/<session>   (the SESSION column of omo remote sessions)")
     return REMOTE_EXIT.usage
   }
-  const device = target.slice(0, slash)
-  const sessionId = target.slice(slash + 1)
   const signedOut = await accountNotice(dependencies)
   if (signedOut !== undefined) return signedOut
-  if (!existsSync(dependencies.stateDir) || !existsSync(deviceServiceEndpointPath(dependencies.stateDir))) {
-    dependencies.error("The OmO device service is not running on this device.")
-    return REMOTE_EXIT.unavailable
+  // The client stays open while the engine's attach TUI runs on the endpoint it serves.
+  const client = personClientOf(dependencies)
+  const attached = await client.attach(handleOf(target.slice(0, slash), target.slice(slash + 1)))
+  if (attached.kind === "error") {
+    client.close()
+    return renderFailure(dependencies, attached, false, target)
   }
-  let service: DeviceService
-  try {
-    service = await dependencies.connect()
-  } catch (error) {
-    if (isServiceStopped(error)) {
-      dependencies.error("The OmO device service is not running on this device.")
-      return REMOTE_EXIT.unavailable
-    }
-    return reportFailure(dependencies, error)
+  const endpoint = await attached.value.serveEndpoint()
+  if (endpoint.kind === "error") {
+    await attached.value.detach()
+    client.close()
+    return renderFailure(dependencies, endpoint, false, target)
   }
-  try {
-    const attach = await service.attach(device, sessionId)
-    await attach.snapshot
-    const endpoint = await serveRemoteAttach(attach, { label: target })
-    void service.closed.then(() => endpoint.close())
-    return { engineArgs: ["--attach", endpoint.socketPath, "--session", endpoint.sessionRef, "--no-extensions"] }
-  } catch (error) {
-    service.close()
-    return reportFailure(dependencies, error)
+  return {
+    engineArgs: ["--attach", endpoint.value.socketPath, "--session", endpoint.value.sessionRef, "--no-extensions"],
   }
 }

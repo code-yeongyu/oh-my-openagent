@@ -5,8 +5,7 @@ import type {
   StatusState,
   UnitState,
 } from "../device-service-core/src/index.ts"
-import type { DeviceRow, SessionsList } from "../omo-senpi/src/components/remote/index"
-import type { ThreadDelivery, ThreadToolResult } from "../omo-senpi/src/components/thread/contracts"
+import type { DeviceRow, FollowEvent, SendReceipt, SessionsList } from "../omo-senpi/src/components/remote/index"
 import type { LocalStatus } from "./remote-cold-wake"
 
 // The human forms of `omo remote`; every command also has a --json form that prints the SDK's typed value as is.
@@ -135,44 +134,66 @@ export function sessionLines(listing: SessionsList, now: number): string[] {
  * The queued-fate line shared by the send verb's human forms (#13268). A receiver parked on an approval its person must
  * answer on that device holds the message behind it, and the line says so instead of reading as a plain queue.
  */
-const queuedLine = (label: string, delivery: Extract<ThreadDelivery, { readonly queue_position: number }>): string => {
-  const waitingOn = "waiting_on" in delivery ? delivery.waiting_on : undefined
+const queuedLine = (label: string, receipt: Extract<SendReceipt, { readonly queue_position: number }>): string => {
+  const waitingOn = "waiting_on" in receipt ? receipt.waiting_on : undefined
   if (waitingOn?.kind === "approval")
-    return `Queued on ${label} at position ${delivery.queue_position}, waiting for an approval on ${waitingOn.device ?? "that device"}.`
-  return `Queued on ${label} at position ${delivery.queue_position}.`
+    return `Queued on ${label} at position ${receipt.queue_position}, waiting for an approval on ${waitingOn.device ?? "that device"}.`
+  return `Queued on ${label} at position ${receipt.queue_position}.`
 }
 
-/** The human answer of a session verb that succeeded; `label` is the `<device>/<session>` it named. */
-export function sessionVerbLines(
-  verb: "open" | "send" | "model" | "interrupt" | "close",
-  label: string,
-  result: ThreadToolResult,
-): string[] {
-  if (result.kind !== "ok") return []
-  if (verb === "open" && "thread" in result) return [`${result.thread.device ?? ""}/${result.thread.thread_id}`]
-  if (verb === "send" && "delivery" in result) {
-    const { delivery } = result
-    if (delivery.kind === "queued" || delivery.kind === "queued_offline") return [queuedLine(label, delivery)]
-    if (delivery.kind === "steered") return [`Steered turn ${delivery.turn_id} on ${label}.`]
-    return [`Sent to ${label}: turn ${delivery.turn_id} started.`]
+/** What a session verb answered, as its human form needs it. */
+export type SessionVerbAnswer =
+  | { readonly verb: "open"; readonly thread: string }
+  | { readonly verb: "send"; readonly thread: string; readonly receipt: SendReceipt }
+  | { readonly verb: "model"; readonly thread: string; readonly model: string }
+  | { readonly verb: "interrupt"; readonly thread: string; readonly interrupted: boolean }
+  | { readonly verb: "close"; readonly thread: string; readonly closed: boolean }
+
+/** The human answer of a session verb that succeeded. */
+export function sessionVerbLines(answer: SessionVerbAnswer): string[] {
+  const label = answer.thread
+  switch (answer.verb) {
+    case "open":
+      return [label]
+    case "send": {
+      const { receipt } = answer
+      if (receipt.lane === "queued" || receipt.lane === "queued_offline") return [queuedLine(label, receipt)]
+      if (receipt.lane === "steered") return [`Steered turn ${receipt.turn_id ?? ""} on ${label}.`]
+      return [`Sent to ${label}: turn ${receipt.turn_id ?? ""} started.`]
+    }
+    case "model":
+      return [`${label} now uses ${answer.model}.`]
+    case "interrupt":
+      return [answer.interrupted ? `Interrupted ${label}.` : `Nothing was running on ${label}.`]
+    case "close":
+      return [answer.closed ? `Closed ${label}.` : `${label} was not open.`]
   }
-  if (verb === "model" && "model" in result) return [`${label} now uses ${result.model.provider}/${result.model.id}.`]
-  if (verb === "interrupt" && "interrupted" in result)
-    return [result.interrupted ? `Interrupted ${label}.` : `Nothing was running on ${label}.`]
-  if (verb === "close" && "closed" in result) return [result.closed ? `Closed ${label}.` : `${label} was not open.`]
-  return []
 }
 
 /**
  * The wait-mode status line for a send that waits behind a running turn (#13268): stdout stays the streamed answer
- * alone, so the CLI writes this to stderr once, when the send's own reply names the position the message joined at (it
- * is not updated as the queue drains). A send that started or steered a turn answers nothing here - its answer is
- * already streaming.
+ * alone, so the CLI writes this to stderr once, when the send's receipt names the position the message joined at.
  */
-export function sendWaitNotice(label: string, result: ThreadToolResult): string | null {
-  if (result.kind !== "ok" || !("delivery" in result)) return null
-  const { delivery } = result
-  return delivery.kind === "queued" || delivery.kind === "queued_offline" ? queuedLine(label, delivery) : null
+export function sendWaitNotice(label: string, receipt: SendReceipt): string | null {
+  return receipt.lane === "queued" || receipt.lane === "queued_offline" ? queuedLine(label, receipt) : null
+}
+
+/** A followed turn waiting on an approval this client cannot answer (design v8-core r2 B3, C-05). */
+export function awaitingApprovalLines(
+  label: string,
+  event: Extract<FollowEvent, { readonly kind: "waiting" }>,
+): string[] {
+  const device = label.slice(0, Math.max(0, label.indexOf("/")))
+  const lines = (event.pending ?? []).map(
+    (request) =>
+      `omo remote: ${label} is waiting for an answer to a ${request.kind} request: ${request.title} (request ${request.request_id}).`,
+  )
+  if (lines.length === 0) lines.push(`omo remote: ${label} is waiting for an answer to a request.`)
+  lines.push(`omo remote cannot answer it. Answer it on ${device}, where it was asked.`)
+  lines.push(
+    `Or stop it with omo remote interrupt ${label} or omo remote close ${label}; these end a waiting turn only on engines with that fix.`,
+  )
+  return lines
 }
 
 export function wakeLines(state: ControlSessionWakeState): string[] {

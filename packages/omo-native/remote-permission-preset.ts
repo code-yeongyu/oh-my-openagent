@@ -9,7 +9,9 @@ import { UsageError } from "./remote-exit"
 export const PERMISSION_PRESETS = ["full-access", "workspace", "accept-edits", "auto", "read-only", "ask"] as const
 const DEFAULT_PERMISSION_PRESET = "full-access"
 
-export const isPermissionPreset = (value: string): boolean => PERMISSION_PRESETS.some((preset) => preset === value)
+export type PermissionPreset = (typeof PERMISSION_PRESETS)[number]
+export const isPermissionPreset = (value: string): value is PermissionPreset =>
+  PERMISSION_PRESETS.some((preset) => preset === value)
 
 /**
  * The mode a session this person starts on this device gets: the global `permissionPreset` of this device's engine
@@ -17,7 +19,7 @@ export const isPermissionPreset = (value: string): boolean => PERMISSION_PRESETS
  * it, so a session started from this terminal on another device behaves as one started here (#6189). A settings file
  * that does not parse, or names a mode this build does not know, is a usage error: it never falls back to the loosest mode.
  */
-export function localPermissionPreset(agentDir: string = canonicalAgentDir()): string {
+export function localPermissionPreset(agentDir: string = canonicalAgentDir()): PermissionPreset {
   for (const name of ["settings.jsonc", "settings.json"]) {
     const path = join(agentDir, name)
     if (!existsSync(path)) continue

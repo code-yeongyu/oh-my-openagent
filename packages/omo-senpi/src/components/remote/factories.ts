@@ -21,6 +21,12 @@ export const remoteClientForSession = (sessionId: string, deps: RemoteClientFact
 export const remoteClientForConnector = (binding: string, deps: RemoteClientFactoryDeps): RemoteClient =>
   build({ kind: "connector", binding }, deps)
 
-/** The `omo remote` CLI, run by the OS user `uid`. */
+/**
+ * The thread SDK's own principal (`createThreadSdk`), run by the OS user `uid`. `omo remote` is a person, not this: it
+ * uses remoteClientForPerson.
+ */
 export const remoteClientForCli = (uid: string, deps: RemoteClientFactoryDeps): RemoteClient =>
   build({ kind: "cli", uid }, deps)
+
+/** The device service's own bootstrap entry (design B4): it may run service.bootstrap, never a person's mutators. */
+export const remoteClientForService = (deps?: RemoteClientFactoryDeps): RemoteClient => build({ kind: "service" }, deps)

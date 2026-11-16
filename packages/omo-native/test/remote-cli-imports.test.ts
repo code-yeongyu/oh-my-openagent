@@ -9,8 +9,7 @@ import { join } from "node:path"
 const NATIVE = join(import.meta.dir, "..")
 
 const OFFENDERS: readonly string[] = [
-  // 4c-1 leaves these: `wake`, `enable` and the session verbs still run on their own connection.
-  "remote-cli.ts -> ../device-service-core/src/index.ts",
+  // Infrastructure callers that stay CLI-side (design Appendix A: sign-in hand-off, enable, cold wake, the account read).
   "remote-cold-wake.ts -> ../device-service-core/src/index.ts",
   "remote-entry.ts -> ../device-service-core/src/device-service.ts",
   "remote-entry.ts -> ../omo-opencode/src/cli/service-auth/keystore",
@@ -23,24 +22,10 @@ const OFFENDERS: readonly string[] = [
   "remote-local.ts -> ./package.json",
   "remote-permission-preset.ts -> ./bin/lib/agent-dir.js",
   "remote-permission-preset.ts -> ./bin/lib/jsonc.js",
-  // 4c-2: the session verbs and attach move onto sessions.* and attach().
-  "remote-attach.ts -> ../omo-senpi/src/components/thread/remote/outcome",
-  "remote-session-verbs.ts -> ../omo-senpi/src/components/remote/port/device-service",
-  "remote-session-verbs.ts -> ../omo-senpi/src/components/thread/control/operations",
-  "remote-session-verbs.ts -> ../omo-senpi/src/components/thread/control/relay-control",
-  "remote-session-verbs.ts -> ../omo-senpi/src/components/thread/control/relay-session-host",
-  "remote-session-verbs.ts -> ../omo-senpi/src/components/thread/gateway/engine",
-  "remote-session-verbs.ts -> ../omo-senpi/src/components/thread/gateway/local-transport",
-  "remote-session-verbs.ts -> ../omo-senpi/src/components/thread/gateway/pipeline",
-  "remote-session-verbs.ts -> ../omo-senpi/src/components/thread/gateway/provenance-resolver",
   "remote-session-verbs.ts -> ../omo-senpi/src/components/thread/gateway/store",
-  "remote-session-verbs.ts -> ../omo-senpi/src/components/thread/remote/address-book",
-  "remote-session-verbs.ts -> ../omo-senpi/src/components/thread/remote/relay-transport",
-  "remote-session-verbs.ts -> ../omo-senpi/src/components/thread/remote/remote-ops",
-  "remote-session-verbs.ts -> ../omo-senpi/src/components/thread/remote/this-device",
-  "remote-session-verbs.ts -> ../omo-senpi/src/components/thread/thread-link",
-  "remote-session-verbs.ts -> ./bin/lib/agent-dir.js",
   "remote-session-verbs.ts -> ./bin/lib/package-paths.js",
+  // U2 (#13414): the attach endpoint moves into components/remote/attach.ts.
+  "remote-attach.ts -> ../omo-senpi/src/components/thread/remote/outcome",
   // 4c-3: the bootstrap internal entry takes service.bootstrap on the service client.
   "remote-bootstrap.ts -> ../device-service-core/src/index.ts",
   "remote-bootstrap.ts -> ./package.json",
