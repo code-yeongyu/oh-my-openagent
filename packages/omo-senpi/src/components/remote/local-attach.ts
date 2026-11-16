@@ -15,6 +15,7 @@ import {
 } from "@oh-my-opencode/senpi-task/rpc-socket-client"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { resolveThreadSocket } from "../thread/live-surface-paths"
+import { LocalEngineUnavailable } from "./codes"
 import type { JsonObject, SnapshotBody } from "./types"
 
 // A session on THIS device, attached through its engine's operator endpoint (#13414 local watch). The device service
@@ -34,6 +35,8 @@ export type LocalAttachTarget = { readonly device: string; readonly session: str
 
 const REQUEST_TIMEOUT_MS = 30_000
 const READ_TAIL = 50
+// A connect failure that means no engine serves the endpoint: no socket there, or a stale one its engine left behind.
+const NO_ENGINE: ReadonlySet<unknown> = new Set(["ENOENT", "ECONNREFUSED"])
 
 const isObject = (value: unknown): value is JsonObject =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -50,11 +53,14 @@ async function connectEndpoint(
   onClose: () => void,
 ): Promise<Connection> {
   const transport = await resolveRpcSocketTransport(endpoint)
-  if (transport === undefined) throw new LocalApiError("refused", `no operator endpoint answers at ${endpoint}`)
+  if (transport === undefined) throw new LocalEngineUnavailable(`no operator endpoint answers at ${endpoint}`)
   const socket = connect(transport.address)
   await new Promise<void>((resolve, reject) => {
     socket.once("connect", resolve)
     socket.once("error", reject)
+  }).catch((error: unknown) => {
+    const code = error instanceof Error && "code" in error ? error.code : undefined
+    throw NO_ENGINE.has(code) ? new LocalEngineUnavailable(`no engine answers at ${endpoint}: ${String(code)}`) : error
   })
   if (transport.secret !== undefined) socket.write(transport.secret)
   const pending = new Map<

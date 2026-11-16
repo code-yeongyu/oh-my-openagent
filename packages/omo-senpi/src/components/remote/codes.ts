@@ -126,6 +126,17 @@ const NEXT_ACTION: Partial<Record<RemoteCode, string>> = {
 export const nextActionFor = (code: RemoteCode): string => NEXT_ACTION[code] ?? "Retry the call."
 
 /**
+ * This device's own engine does not answer at its operator endpoint (local-attach.ts: none there, or a stale one nobody
+ * listens on), so a session on this device cannot be followed or attached. The device service is not at fault: it is
+ * refused like any other unreachable local endpoint, and failureFromError names the engine (details.feature local_engine).
+ */
+export class LocalEngineUnavailable extends LocalApiError {
+  constructor(reason: string) {
+    super("refused", reason)
+  }
+}
+
+/**
  * A thrown error from L0/L1 as a typed failure. `mutating`: the call may have changed something on the service, so a
  * timeout or cancellation after it was sent is uncertain.
  */
@@ -135,6 +146,13 @@ export const failureFromError = (error: unknown, mutating: boolean): RemoteFailu
       "host_unavailable",
       `The device service did not answer: ${error instanceof Error ? error.message : String(error)}.`,
       nextActionFor("host_unavailable"),
+    )
+  if (error instanceof LocalEngineUnavailable)
+    return remoteFailure(
+      "host_unavailable",
+      `This device's engine is not running, so its sessions cannot be followed or attached here (${error.reason}).`,
+      "Start omo on this device, then retry.",
+      { details: { feature: "local_engine", local_api_code: error.code } },
     )
   const mapped = LOCAL_API_CODES[error.code]
   const uncertain = mapped.code === "timeout" && (mutating || error.command_id !== undefined)

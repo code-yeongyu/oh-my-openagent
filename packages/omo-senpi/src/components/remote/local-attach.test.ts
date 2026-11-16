@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { mkdtemp, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { withContractHost } from "../../../../senpi-task/src/runners/rpc-host/testing/contract-host"
 import { defaultWorld, type World } from "../../../../device-service-core/test/local-api/conformance/world.ts"
 import { reader } from "./attach.test-support"
@@ -219,6 +222,46 @@ describe("a session on this device (local watch)", () => {
       await opened.value.detach()
     })
   })
+
+  // No engine runs on this device: no operator endpoint at all (ENOENT), or the stale one a killed engine left behind
+  // (ECONNREFUSED). The device service answered (it listed the session); only the engine is missing.
+  const staleEndpoint = async (socket: string): Promise<void> => {
+    const engine = Bun.spawn(
+      [
+        process.execPath,
+        "-e",
+        `require("node:net").createServer().listen(${JSON.stringify(socket)}, () => console.log("listening"))`,
+      ],
+      { stdout: "pipe" },
+    )
+    await engine.stdout.getReader().read()
+    engine.kill("SIGKILL")
+    await engine.exited
+  }
+  test.each([
+    ["no operator endpoint", async (_socket: string) => undefined],
+    ["a stale operator endpoint", staleEndpoint],
+  ])(
+    "#given %s on this device #when attach and follow open a self session #then host_unavailable{local_engine}, not the device service",
+    async (_how, prepare) => {
+      const owner = await startOwner(selfWorld())
+      const dir = await mkdtemp(join(tmpdir(), "omo-le-"))
+      try {
+        const socket = join(dir, "rpc.sock")
+        await prepare(socket)
+        const client = clientOn(owner.stateDir, fakeClock(), undefined, {
+          localAttach: createLocalAttach({ socket, keyRoot: dir }),
+        })
+        const engineDown = { code: "host_unavailable", details: { feature: "local_engine", local_api_code: "refused" } }
+        expect(failureOf(await client.attach(THREAD))).toMatchObject(engineDown)
+        expect(await drain(reader(client.sessions.follow(THREAD, { from: receipt("cm-9") })))).toEqual([
+          { kind: "failed", failure: expect.objectContaining(engineDown) },
+        ])
+      } finally {
+        await rm(dir, { recursive: true, force: true })
+      }
+    },
+  )
 
   test("#given a client built without a local attach #when it follows a self session #then unsupported{local_attach}, not the relay's peer_not_found", async () => {
     const owner = await startOwner(selfWorld())
