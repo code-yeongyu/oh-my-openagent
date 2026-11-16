@@ -1,6 +1,7 @@
 //! The engine-computed self set: the own chain, every sibling engine's host chain and its TTY
 //! owner, and every brain session without an engine, found by its lock file.
 
+use omo_computer_core::error::Reason;
 use std::fs;
 
 use serde::Deserialize;
@@ -199,5 +200,7 @@ fn self_set_includes_a_brain_only_session_terminal() {
     })
     .expect_err("SelfTarget");
     assert_eq!(refused.refusal.code.wire(), fixture.expect.code);
-    assert_eq!(refused.refusal.reason, Some(fixture.expect.reason.as_str()));
+    assert_eq!(refused.refusal.reason.map(Reason::wire),
+        Some(fixture.expect.reason.as_str())
+    );
 }

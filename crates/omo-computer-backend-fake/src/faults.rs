@@ -50,7 +50,7 @@ impl Fault {
     #[must_use]
     pub const fn refusal(code: EngineCode, reason: Option<Reason>) -> Refusal {
         match reason {
-            Some(reason) => Refusal::new(code, reason.wire()),
+            Some(reason) => Refusal::new(code, reason),
             None => Refusal::bare(code),
         }
     }

@@ -129,7 +129,7 @@ fn a_bare_never_minted_ref_is_unqualified_on_object_mode() {
     let mut tree = Tree::default().window("w", 1, vec![window(vec![el("button", "Send").obj(3)])]);
     let mut refs = RefRegistry::default();
     snap(&mut tree, &mut refs, "w");
-    let unqualified = Refusal::new(EngineCode::InvalidTarget, Reason::RefUnqualified.wire());
+    let unqualified = Refusal::new(EngineCode::InvalidTarget, Reason::RefUnqualified);
     for token in ["e999", "e1", "e3"] {
         assert_eq!(refs.resolve(token, true, &mut tree).err().map(|u| u.refusal), Some(unqualified.clone()), "{token} on object mode");
     }

@@ -1,0 +1,11 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    ".": {
+      "entry": [
+        // SP-B spike probe, run by path (plan row 11)
+        "crates/omo-computer-engine/probes/probe-sp-b.ts",
+      ]
+    }
+  }
+}
