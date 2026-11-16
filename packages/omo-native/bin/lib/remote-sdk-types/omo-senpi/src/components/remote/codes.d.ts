@@ -20,6 +20,12 @@ export declare const nextActionFor: (code: RemoteCode) => string;
  */
 export declare const failureFromError: (error: unknown, mutating: boolean) => RemoteFailure;
 /**
+ * A history read's thrown error as a typed failure. session.read carries nothing of the caller's but its page (`before`,
+ * `tail`), so the device service refusing it invalid_request is the caller's argument, as the engine's own refusal of
+ * an unknown `before` or a bad page size is for a session on this device (local-attach.ts): both are invalid_arguments.
+ */
+export declare const readFailureFromError: (error: unknown) => RemoteFailure;
+/**
  * Exit codes (B1): 0 ok, 1 a typed refusal, 3 unavailable (host_unavailable, relay_requires_paid_plan, the
  * device service not installed, a device that does not answer or cannot be reached), 4 session_ended, 124 timeout, 130
  * cancelled. 2 (usage) is the CLI's own, never a failure.

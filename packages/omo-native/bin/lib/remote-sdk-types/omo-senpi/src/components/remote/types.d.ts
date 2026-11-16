@@ -442,6 +442,17 @@ export type RemoteClientDeps<Connection extends DeviceServiceConnection = Device
         readonly close: () => Promise<void>;
     }>;
     /**
+     * Attaches to a session on THIS device through its engine's operator endpoint (`remote/local-attach.ts`
+     * `createLocalAttach`): the device service cannot attach a device to itself (peer_not_found). It opens a socket, so a
+     * caller outside omo remote's local-only graph (#13440) injects it. Absent, attach, follow and wait on a session of
+     * this device answer `unsupported{feature:"local_attach"}`.
+     */
+    readonly localAttach?: (target: {
+        readonly device: string;
+        readonly session: string;
+        readonly durableId: string;
+    }) => Promise<Attach>;
+    /**
      * The approval mode of the session this client acts for (a session or connector sender): an open may keep or narrow
      * it, never widen it. Absent, only the narrowest mode passes.
      */
