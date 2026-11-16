@@ -43,8 +43,11 @@ import { runSession } from "./remote-session-verbs"
  */
 function withThisDevice(roster: readonly DeviceRow[], status: Status): readonly ListedDevice[] {
   const self = status.device
-  const peers = roster.map((row) => ({ ...row, this_device: row.device === self?.id }))
-  if (self === null || roster.some((row) => row.device === self.id)) return peers
+  const rows = roster.map((row) => ({ ...row, this_device: row.device === self?.id }))
+  if (self === null) return rows
+  const peers = rows.filter((row) => !row.this_device)
+  // A roster that already lists this device keeps that row, moved first.
+  if (peers.length < rows.length) return [...rows.filter((row) => row.this_device), ...peers]
   const here: ListedDevice = {
     device: self.id,
     label: self.name,

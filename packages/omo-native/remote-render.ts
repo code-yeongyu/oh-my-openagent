@@ -105,7 +105,7 @@ export function deviceLines(devices: readonly ListedDevice[], now: number): stri
     devices.map((device) => [
       device.device,
       device.label,
-      device.kind ?? "this device",
+      device.this_device || device.kind === undefined ? "this device" : device.kind,
       device.platform,
       device.online ? "online" : ago(device.last_seen_ms, now),
     ]),
