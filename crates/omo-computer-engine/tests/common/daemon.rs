@@ -12,6 +12,8 @@ use serde_json::{json, Value};
 
 use super::peer::{engine, runtime_dir};
 
+pub const ONE_WINDOW: &str = r#"{"windows":[{"id":"101","title":"Notes","app":"Notes","pid":4242,"x":0,"y":0,"width":800,"height":600,"focused":true,"elevated":null}]}"#;
+
 pub struct Daemon {
     pub child: Child,
     pub dir: tempfile::TempDir,
@@ -24,14 +26,14 @@ pub fn hex(bytes: &[u8]) -> String {
 
 impl Daemon {
     pub fn start(extra_env: &[(&str, &str)]) -> Self {
+        Self::start_with(ONE_WINDOW, extra_env)
+    }
+
+    pub fn start_with(scenario_json: &str, extra_env: &[(&str, &str)]) -> Self {
         let dir = runtime_dir();
         let capability: [u8; 32] = std::array::from_fn(|i| u8::try_from(i * 7 % 251).expect("byte"));
         let scenario = dir.path().join("scenario.json");
-        std::fs::write(
-            &scenario,
-            r#"{"windows":[{"id":"101","title":"Notes","app":"Notes","pid":4242,"x":0,"y":0,"width":800,"height":600,"focused":true,"elevated":null}]}"#,
-        )
-        .expect("scenario");
+        std::fs::write(&scenario, scenario_json).expect("scenario");
         let mut command = Command::new(engine());
         for (name, _) in std::env::vars().filter(|(name, _)| name.starts_with("OMO_COMPUTER_")) {
             command.env_remove(name);
