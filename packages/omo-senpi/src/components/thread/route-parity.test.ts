@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { existsSync } from "node:fs"
+import { join } from "node:path"
+import { createInboxDrain } from "./gateway/drain"
 import { gatewayInboxDirectory } from "./gateway/paths"
+import { FakeSessionRuntime } from "./gateway/testing/fake-runtime"
 import type { RemoteSessionRow } from "./remote/ports"
+import { LOCAL_FRAME_OF, type LegFrames, pairTest, uncoveredMethods } from "./testing/pair-test"
+import { ROUTE_PARITY } from "./testing/route-parity.pair"
 import type { ThreadHostSession } from "./tools"
 import { B_ROW, createRemoteThreadFixture } from "./thread-remote-fixture"
 
@@ -238,5 +243,45 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
       ["sessionId", "different"],
     ])
     expect(woken["sessionId"]).toBe(NOT_RUNNING)
+  })
+
+  // #13961: the methods this file declares (testing/route-parity.pair.ts) are proven here. One send runs on each leg; the
+  // relay leg's frames are the RPC records b received, the local leg's the runtime calls the receiving session's own
+  // gateway drain makes for the delivery (LOCAL_FRAME_OF).
+  async function sentFrames(): Promise<LegFrames> {
+    const a = fixture.account({ rows: [B_ROW], live: [B_ROW.session_id] })
+    const { run, store, agentDir } = fixture.surface(a.remote)
+    expect(await run("thread_send", { thread: TARGET.local.id, message: "hello" })).toMatchObject({ kind: "ok" })
+    expect(await run("thread_send", { thread: TARGET.remote.id, message: "hello" })).toMatchObject({ kind: "ok" })
+    const local: string[] = []
+    const runtime = new FakeSessionRuntime(join(agentDir, "dur-local.jsonl"), "dur-local", process.cwd())
+    const admit = runtime.admitExternalMessage
+    runtime.admitExternalMessage = (input) => {
+      local.push(LOCAL_FRAME_OF.admitExternalMessage)
+      return admit(input)
+    }
+    const drain = createInboxDrain({ store, runtime, durableId: "dur-local", sessionPath: () => runtime.sessionPath })
+    try {
+      await drain.drain({ reason: "start" })
+    } finally {
+      drain.stop()
+    }
+    const relay = a.sent.flatMap((entry) => {
+      const type = entry.rpc?.["type"]
+      return typeof type === "string" ? [type] : []
+    })
+    return { local, relay }
+  }
+
+  test("#13961: #given the methods route-parity.pair.ts declares #when one send runs on each leg #then each declared method was sent as a frame on both legs", async () => {
+    expect(uncoveredMethods(ROUTE_PARITY, await sentFrames())).toEqual([])
+  })
+
+  test("#13961: #given a declaration of a method this file never sends #when the same sends run #then the coverage check names it on both legs", async () => {
+    const overclaimed = pairTest({ test: ROUTE_PARITY.test, covers: [...ROUTE_PARITY.covers, "prompt"] })
+    expect(uncoveredMethods(overclaimed, await sentFrames())).toEqual([
+      "prompt: no frame on the local leg",
+      "prompt: no frame on the relay leg",
+    ])
   })
 })

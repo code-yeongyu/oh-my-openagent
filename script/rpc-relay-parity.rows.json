@@ -1,7 +1,6 @@
 {
   "admit_external_message": {
-    "relay": "differs (draft code reading, not measured; #13004, #13011, #13037)",
-    "test": "packages/omo-senpi/src/components/thread/route-parity.test.ts (fakes)"
+    "relay": "differs (draft code reading, not measured; #13004, #13011, #13037)"
   },
   "claim_session": {
     "relay": "differs (draft code reading, not measured)"
