@@ -46,6 +46,9 @@ try {
         },
         exit: () => process.exit(),
       })
+    } else if (process.argv[2] === "__device-service-bootstrap") {
+      const { runDeviceServiceBootstrapCommand } = await import("./lib/service-auth.generated.js")
+      await runDeviceServiceBootstrapCommand()
     } else if (process.argv[2] === "remote") {
       const { runRemoteCommand } = await import("./lib/service-auth.generated.js")
       await runRemoteCommand(process.argv.slice(2))

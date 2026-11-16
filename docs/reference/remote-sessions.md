@@ -145,8 +145,8 @@ The text of one command is limited to 1,000,000 characters and 3,000,000 bytes o
 
 ## Install and update
 
-An interactive `omo` start (a TUI session started by the `omo` launcher) runs `omo remote bootstrap` in
-the background, once per process, in its own process with a 10-minute deadline
+An interactive `omo` start (a TUI session started by the `omo` launcher) runs the same bootstrap as
+`omo remote bootstrap`, through the internal `omo __device-service-bootstrap --json` entry, in the background, once per process, in its own process with a 10-minute deadline
 (`packages/omo-senpi/src/components/device-service/runner.ts`). It does not run under CI or in task
 children, and `device_service.enabled: false` in `omo.json` turns it off. When you are signed in, it
 connects to a running device service at the pinned version or newer; only when none runs, or the
@@ -168,7 +168,7 @@ fails verification is not installed and the command says so. The state dir is `~
 
 ## Session host unit and cold wake
 
-`omo remote bootstrap` (every omo start) and `omo remote enable` install and start one fixed, always-on
+`omo remote bootstrap` (and the same bootstrap at every omo start) and `omo remote enable` install and start one fixed, always-on
 per-user unit that runs the omo session host next to the device service, and record it in the device service's
 service table as the only unit it may start for a cold wake: a message another device sends to a session that is
 not running (`packages/device-service-core/src/cold-wake/`).
@@ -194,7 +194,7 @@ command prints a notice instead. Nothing runs as root, and neither the unit's na
 configured.
 
 The device service's installer rewrites its macOS plist on every install and update, which drops the entry;
-the next `omo remote bootstrap` (every omo start) writes it back. The Linux drop-in survives an install.
+the next bootstrap (every omo start, or `omo remote bootstrap`) writes it back. The Linux drop-in survives an install.
 
 `omo remote disable` disables and removes the unit and the entry, and while remote sessions are off,
 `omo remote bootstrap` removes them again instead of installing them. Removing the unit also stops the host

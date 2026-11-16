@@ -1,4 +1,5 @@
 export { runServiceAuthCommand } from "./service-auth-command"
 export { runAccountCommand } from "./account-cli"
 export { runSyncCommand } from "./sync-cli"
+export { runDeviceServiceBootstrapCommand } from "./device-service-bootstrap-entry"
 export { runRemoteAttachCommand, runRemoteCommand } from "./remote-entry"

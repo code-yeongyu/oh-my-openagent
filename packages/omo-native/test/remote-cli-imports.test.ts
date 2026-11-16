@@ -26,7 +26,7 @@ const OFFENDERS: readonly string[] = [
   "remote-session-verbs.ts -> ./bin/lib/package-paths.js",
   // U2 (#13414): the attach endpoint moves into components/remote/attach.ts.
   "remote-attach.ts -> ../omo-senpi/src/components/thread/remote/outcome",
-  // 4c-3: the bootstrap internal entry takes service.bootstrap on the service client.
+  // The bootstrap body the internal entry hands the service client (service.bootstrap runs it; design B4).
   "remote-bootstrap.ts -> ../device-service-core/src/index.ts",
   "remote-bootstrap.ts -> ./package.json",
 ]
