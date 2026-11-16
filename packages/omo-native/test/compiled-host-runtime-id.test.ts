@@ -134,7 +134,10 @@ describe("a spec with no extensions, and every host command the wrapper gives th
     mkdirSync(bare, { recursive: true, mode: 0o755 })
     chmodSync(bare, 0o755)
     const spec = join(bare, "daemon-launch-spec.json")
-    writeFileSync(spec, JSON.stringify({ spec_version: 1, core: { session_runtime: "in-process", multi_session: true, extensions: [] } }))
+    writeFileSync(
+      spec,
+      JSON.stringify({ spec_version: 1, core: { session_runtime: "in-process", multi_session: true, extensions: [] } }),
+    )
     chmodSync(spec, 0o644)
     // when
     const ids = await bothIds(runtime, ["--launch-spec", spec])
