@@ -412,6 +412,13 @@ describe("#13756 review", () => {
     expect(sent("open_session").map((rpc) => rpc["permissionPreset"])).toEqual(["full-access"])
   })
 
+  test("#given a session client not told its own mode #when it opens without a preset #then the frame asks for ask, never the device default (M1)", async () => {
+    const { owner, sent } = await onWorld()
+    const session = clientOn(owner.stateDir, fakeClock(), { kind: "session", id: "dur-caller" })
+    await valueOf(session.sessions.open({ device: PEER }))
+    expect(sent("open_session").map((rpc) => rpc["permissionPreset"])).toEqual(["ask"])
+  })
+
   test("#given a person's uid #when the client builds its sender #then it is the CLI's one identity: that uid and this user's name (L1)", () => {
     expect(personIdentity("501")).toEqual({
       sender: { kind: "person", uid: 501, user: userInfo().username },
