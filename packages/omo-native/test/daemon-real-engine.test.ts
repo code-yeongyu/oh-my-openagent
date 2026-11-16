@@ -35,7 +35,9 @@ function sandbox() {
   roots.push(agentDir)
   const socket = join(agentDir, "rpc", "shards", "p-aaaaaaaaaaaaaaaa.sock")
   expect(Buffer.byteLength(`${socket}.next-99`)).toBeLessThanOrEqual(103)
-  mkdirSync(join(agentDir, "rpc", "shards"), { recursive: true })
+  // The engine refuses an agent dir any group or other user can write (unsafe_key_record), as a real ~/.omo/agent never
+  // is; mkdirSync otherwise takes the process umask, so on a host with umask 002 every shard here failed to start.
+  mkdirSync(join(agentDir, "rpc", "shards"), { recursive: true, mode: 0o700 })
   const env = {
     ...process.env,
     TMPDIR: agentDir,
