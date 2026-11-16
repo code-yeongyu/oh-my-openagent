@@ -95,6 +95,21 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     expect("devices" in listed).toBe(false)
   })
 
+  test.each(["throws", "unknown"] as const)(
+    "#given this device's own id read %s #when thread_list runs #then it answers the local threads with remote_unavailable, never a failed call or this device's rows as another device's",
+    async (selfDevice) => {
+      const own = { ...B_ROW, device: "here", session_id: "rk-here-other", durable_id: "dur-here-other" }
+      const { run } = surface(account({ selfDevice, rows: [B_ROW, own] }).remote)
+      for (const args of [{}, { all_scope: true }]) {
+        const listed = await run("thread_list", args)
+        expect(listed).toMatchObject({ kind: "ok", remote_unavailable: "host_unavailable" })
+        expect(listed.kind === "ok" && "threads" in listed && listed.threads.map((t) => t.thread_id)).toEqual([
+          "dur-local",
+        ])
+      }
+    },
+  )
+
   test("#given an ended thread on b #when thread_list runs #then it is listed resumable, as every other path reports an ended row, never live", async () => {
     const a = account({ rowState: "ended" })
     const { run } = surface(a.remote)

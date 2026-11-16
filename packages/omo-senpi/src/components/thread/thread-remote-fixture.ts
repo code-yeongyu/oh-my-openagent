@@ -127,6 +127,8 @@ export function createRemoteThreadFixture() {
       withoutLookup?: boolean
       /** omo#13037 review: the account's device list cannot be read. */
       devicesFail?: boolean
+      /** This device's own id read (device.info): it fails, or the service answers without an id. */
+      selfDevice?: "throws" | "unknown"
       /** omo#13037: this device's service cannot carry the wake target (no wake is sent; today's path). */
       noWake?: boolean
       /** omo#13037: the wake path's answer; default the consumer's queued envelope with `waiting_on: {kind: "wake"}`. */
@@ -347,7 +349,8 @@ export function createRemoteThreadFixture() {
         status: async () => ({ state: options.plan ?? "connected" }),
         thisDevice: async () => {
           deviceReads.thisDevice += 1
-          return "here"
+          if (options.selfDevice === "throws") throw new Error("device.info failed")
+          return options.selfDevice === "unknown" ? null : "here"
         },
         thisDeviceName: async () => "this mac",
         devices: async () => {
