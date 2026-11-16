@@ -41,6 +41,9 @@ script/knip-preexisting-exports.ts
 packages/omo-opencode/src/cli/cli-program.ts
 packages/omo-codex/plugin/scripts/auto-update-release-notes.mjs
 packages/omo-senpi/src/components/ultrawork/generated-directive.ts
+# The computer prelude's published assets: assets.generated.json embeds these bytes and test/assets.sha256.json pins them.
+packages/senpi-desktop-prelude/src/prelude.js
+packages/senpi-desktop-prelude/declarations.d.ts
 # The re-export shim audit (script/package-registration-audit.test.ts) reads a shim from its first line only;
 # joining or wrapping these exports changes the audited inventory.
 packages/omo-opencode/src/hooks/delegate-task-retry/patterns.ts
