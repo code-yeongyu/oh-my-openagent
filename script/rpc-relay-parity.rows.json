@@ -1,0 +1,66 @@
+{
+  "admit_external_message": {
+    "relay": "differs (draft code reading, not measured; #13004, #13011, #13037)",
+    "test": "packages/omo-senpi/src/components/thread/route-parity.test.ts (fakes)"
+  },
+  "claim_session": {
+    "relay": "differs (draft code reading, not measured)"
+  },
+  "close_session": {
+    "relay": "differs (draft code reading, not measured)"
+  },
+  "extension_ui_response": {
+    "relay": "differs (draft code reading, not measured; #13011)"
+  },
+  "get_messages": {
+    "relay": "differs (draft code reading, not measured; #13215)"
+  },
+  "get_project_settings": {
+    "relay": "differs (draft code reading, not measured)"
+  },
+  "get_project_trust": {
+    "relay": "differs (draft code reading, not measured)"
+  },
+  "list_hands": {
+    "relay": "differs (draft code reading, not measured)"
+  },
+  "open_session": {
+    "relay": "differs: created on the target but unlisted, then session_not_found (measured on 5.1.69; #13393)"
+  },
+  "park_session": {
+    "relay": "differs (draft code reading, not measured)"
+  },
+  "prompt": {
+    "relay": "differs (draft code reading, not measured; #13011)"
+  },
+  "read_project_file": {
+    "relay": "differs (draft code reading, not measured)"
+  },
+  "select_hand": {
+    "relay": "differs (draft code reading, not measured)"
+  },
+  "set_model": {
+    "relay": "differs (draft code reading, not measured)"
+  },
+  "set_permission_preset": {
+    "relay": "differs (draft code reading, not measured; #13011)"
+  },
+  "set_project_setting": {
+    "relay": "differs (draft code reading, not measured)"
+  },
+  "set_project_trust": {
+    "relay": "differs (draft code reading, not measured)"
+  },
+  "set_session_name": {
+    "relay": "differs (draft code reading, not measured; #13438)"
+  },
+  "unload_session": {
+    "relay": "differs (draft code reading, not measured)"
+  },
+  "wake": {
+    "relay": "missing: no remote counterpart (#13037)"
+  },
+  "write_project_file": {
+    "relay": "differs (draft code reading, not measured)"
+  }
+}
