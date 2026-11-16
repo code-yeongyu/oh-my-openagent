@@ -69,7 +69,7 @@ pub struct FakeScenario {
     pub stop_marker: Option<String>,
     pub user_input_timeline: Vec<TimedUserInput>,
     pub user_presses: Vec<UserPress>,
-    /// The OS the fake plays; absent follows the host.
+    /// The OS the fake plays; absent plays x11 on every host (A-IS-64 item 2).
     pub persona: Option<Persona>,
     /// Observer events by fake-clock time: the quiet window the settle waits on.
     pub ax_notification_timeline: Vec<AxNotification>,

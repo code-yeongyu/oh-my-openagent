@@ -1,5 +1,7 @@
 //! The mutate funnel, pre-input marker, audit, refs registry, settle, frames, consent and verbs.
 
+#[cfg(test)]
+mod a_is_64_tests;
 pub mod apps;
 pub mod attribution;
 pub mod audit;
@@ -30,6 +32,8 @@ pub mod surfaces;
 mod session;
 pub mod session_state;
 pub mod settle;
+#[cfg(test)]
+mod test_process;
 pub mod trace;
 mod clipboard;
 pub(crate) mod value_verbs;

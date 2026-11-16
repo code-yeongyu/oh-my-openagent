@@ -34,7 +34,7 @@ fn v3_fields_change_behaviour_against_their_null_control() {
     let (set, null) = pair("persona");
     assert_eq!(
         (set.persona(), null.persona()),
-        (Persona::Wayland, Persona::host())
+        (Persona::Wayland, Persona::X11)
     );
 
     let (mut set, mut null) = pair("ax_notification_timeline");

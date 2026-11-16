@@ -80,8 +80,13 @@ fn a_world_readable_directory_is_narrowed_to_the_owner() {
 /// makes the real call on the runner's volume.
 #[test]
 fn the_marker_filesystem_is_ntfs_or_refs_and_anything_else_refuses_naming_it() {
-    use super::{admit_filesystem, UnsupportedFilesystem};
-    let named = |name: &str| admit_filesystem(Ok(name.to_owned()));
+    use crate::durable::{admit_filesystem, UnsupportedFilesystem, Volume};
+    let named = |name: &str| {
+        admit_filesystem(Ok(Volume {
+            filesystem: name.to_owned(),
+            remote: false,
+        }))
+    };
     assert!(named("NTFS").is_ok(), "NTFS");
     assert!(named("ReFS").is_ok(), "ReFS");
     for refused in ["FAT", "FAT32", "exFAT", "NFS", "", "ntfs"] {
@@ -132,4 +137,26 @@ fn a_refused_rename_leaves_no_temp_file_behind() {
         vec!["global-stop".to_owned()],
         "no temp file remains: {left:?}"
     );
+}
+
+/// A-IS-65 L9 (T7's pure leg): a lock, stop marker or pre-input marker relies on its volume only
+/// when that volume is LOCAL and NTFS or ReFS. A remote device refuses even when it reports
+/// NTFS or ReFS, with a typed error that says it is remote. The hosted Windows legs make the
+/// real volume read on the runner's local disk.
+#[test]
+fn a_remote_volume_refuses_even_when_it_reports_ntfs_or_refs() {
+    use crate::durable::{admit_filesystem, UnsupportedFilesystem, Volume};
+    for name in ["NTFS", "ReFS"] {
+        let error = admit_filesystem(Ok(Volume {
+            filesystem: name.to_owned(),
+            remote: true,
+        }))
+        .expect_err(name);
+        let typed = error
+            .get_ref()
+            .and_then(|inner| inner.downcast_ref::<UnsupportedFilesystem>())
+            .unwrap_or_else(|| panic!("{name}: a typed error, got {error:?}"));
+        assert_eq!((typed.name.as_str(), typed.remote), (name, true));
+        assert!(error.to_string().contains("remote"), "{error}");
+    }
 }

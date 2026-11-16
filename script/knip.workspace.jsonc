@@ -44,12 +44,6 @@
         "script/qa/computer/pool/xorg-uinput-probe.ts",
         // run by path as the computer-use v3 corpus replay driver
         "script/qa/computer/replay.ts",
-        // run by path as the computer-use v3 Linux QA driver (row 47)
-        "script/qa/computer/linux.ts",
-        // run by path as the computer-use v3 Windows QA driver and its probes (row 55)
-        "script/qa/computer/windows.ts",
-        "script/qa/computer/windows/capture-marker-pixels.ts",
-        "script/qa/computer/windows/capture-session0-refused.ts",
         // run by path as the live GNOME Wayland window-input QA (docs/guide/computer-use.md)
         "script/qa/desktop/gnome.ts",
         "script/qa/desktop/hyprland.ts",
@@ -293,8 +287,8 @@
     "script/qa/omo-native-parity-compare.mjs": ["DOCTOR_EXPECTED_ONLY", "sectionKey", "compareLines", "BINARY_ONLY_REQUIRED_STEPS", "memoryReceiptFailures"],
     // pre-existing at origin dev 4686e425b5: unused export(s) GOVERNED_SURFACES
     "script/retired-agent-names.test.ts": ["GOVERNED_SURFACES"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) ROOT_TEST_SERIAL_QUARANTINE, POSIX_TEST_TIMEOUT_MS
-    "script/root-test-serial-quarantine.ts": ["ROOT_TEST_SERIAL_QUARANTINE", "POSIX_TEST_TIMEOUT_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ROOT_TEST_SERIAL_QUARANTINE
+    "script/root-test-serial-quarantine.ts": ["ROOT_TEST_SERIAL_QUARANTINE"],
     // pre-existing at origin dev 4686e425b5: unused export(s) runStats
     "script/stats.ts": ["runStats"],
     // added on dev after the last merge (origin dev 2b5831715e): unused export(s) keyAssignments

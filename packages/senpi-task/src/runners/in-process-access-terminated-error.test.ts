@@ -28,7 +28,7 @@ describe("in-process access_terminated_error fallback", () => {
         limit: "account",
       })
     } finally {
-      harness.dispose()
+      await harness.dispose()
     }
   }, 20_000)
 
@@ -54,7 +54,7 @@ describe("in-process access_terminated_error fallback", () => {
       expect(harness.events.some((event) => event.type === "retry_fallback_applied")).toBe(false)
       expect(harness.session.getLastAssistantText()).toBeUndefined()
     } finally {
-      harness.dispose()
+      await harness.dispose()
     }
   })
 })
