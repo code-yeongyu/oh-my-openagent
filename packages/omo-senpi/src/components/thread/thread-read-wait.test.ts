@@ -6,7 +6,7 @@ afterEach(cleanup)
 
 // #13417: thread_read wait_ms waits, bounded, for a thread on another device to stop running, on the watch's events.
 describe("thread_read wait_ms (#13417)", () => {
-  test("#given b's thread is idle #when thread_read waits #then it settles at once with idle and returns the transcript", async () => {
+  test("#given b's thread reads idle and shows no run at all #when thread_read waits #then it settles idle only after the quiet window, and returns the transcript", async () => {
     const a = account({ engine: { ...ENGINE, streaming: false } })
     const { run } = surface(a.remote)
     const read = await run("thread_read", { thread: "dur-on-b", wait_ms: 60_000 })
@@ -16,7 +16,31 @@ describe("thread_read wait_ms (#13417)", () => {
       device: "b",
       wait: { outcome: "settled", status: "idle" },
     })
+    expect((read as { wait?: { waited_ms: number } }).wait?.waited_ms).toBeGreaterThanOrEqual(2_900)
     expect(a.watchers.size).toBe(0)
+  }, 15_000)
+
+  test("#given a send b's snapshot still reads idle for #when the run's records arrive #then the wait settles only at the observed turn end, never on the stale idle", async () => {
+    const a = account({ engine: { ...ENGINE, streaming: false } })
+    const { run } = surface(a.remote)
+    let endEmitted = false
+    let settledEarly = false
+    const reading = run("thread_read", { thread: "dur-on-b", wait_ms: 60_000 })
+    void reading.then(() => {
+      settledEarly = !endEmitted
+    })
+    await a.watching
+    for (const handlers of [...a.watchers]) {
+      handlers.record({ type: "agent_start", turnId: "7" })
+      handlers.status?.({ from: "idle", to: "running", derived: true, cause: "agent_start" })
+    }
+    endEmitted = true
+    for (const handlers of [...a.watchers]) {
+      handlers.record({ type: "agent_settled", turnId: "7" })
+      handlers.status?.({ from: "running", to: "idle", derived: true, cause: "agent_settled" })
+    }
+    expect(await reading).toMatchObject({ kind: "ok", wait: { outcome: "settled", status: "idle", turn_id: "7" } })
+    expect(settledEarly).toBe(false)
   })
 
   test("#given b's thread is running #when its status changes to idle during the wait #then the read settles with idle, and the watch is stopped", async () => {
