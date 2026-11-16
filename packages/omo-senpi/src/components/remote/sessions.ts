@@ -540,7 +540,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
             asked,
           )
           if (local.kind === "ok") return ok({ device: device.value, key: local.key, warnings: [] })
-          return "error" in local ? fromThread(local.error) : local
+          return "error" in local ? fromThread(local.error) : modelUnavailable(local, request.model)
         }
         const outcome = await createRelaySessionHost(legOf(svc).remote, device.value.id).open(asked)
         if (outcome.kind === "error") return modelUnavailable(fromThread(outcome.error), request.model)

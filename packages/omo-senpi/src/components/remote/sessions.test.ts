@@ -507,12 +507,17 @@ describe("an open on this device", () => {
   type Fault = (frame: Record<string, unknown>, socket: Socket) => void
   // This device's operator endpoint (the contract host), over the socket the open watches, with a fault injected after a
   // frame of a given type is written.
-  const localClient = async (host: ContractHost, world: World = selfWorld(), fault?: Fault) => {
+  const localClient = async (
+    host: ContractHost,
+    world: World = selfWorld(),
+    fault?: Fault,
+    socketOf: () => string = () => host.socket,
+  ) => {
     const owner = await startOwner(world)
     const client = clientOn(owner.stateDir, fakeClock(), undefined, {
       localThreadHost: async (connect) =>
         createLiveThreadSurface(undefined, {
-          env: { OMO_CODING_AGENT_DIR: host.root, SENPI_RPC_SOCKET: host.socket, SENPI_RPC_KEY_ROOT: host.root },
+          env: { OMO_CODING_AGENT_DIR: host.root, SENPI_RPC_SOCKET: socketOf(), SENPI_RPC_KEY_ROOT: host.root },
           statusAll: async () => undefined,
           registry: async () => [],
           connect: (path) => {
@@ -588,19 +593,65 @@ describe("an open on this device", () => {
       const failure = failureOf(
         await client.sessions.open({ device: SELF, workspace: host.root, model: "anthropic/nope" }),
       )
-      expect(failure).toMatchObject({ code: "model_not_found", details: { device: SELF, reason: refusal } })
+      // The same details the relay leg answers (#13787 review L4): the reason code and the model asked for.
+      expect(failure).toMatchObject({
+        code: "model_not_found",
+        details: { device: SELF, reason: "model_unavailable", model: "anthropic/nope" },
+      })
       expect(failure.uncertain).toBeUndefined()
+    })
+  })
+
+  test("#given a worktree open whose connection drops after open_session and whose worktree cannot be removed #when sessions.open runs #then it is uncertain, never a certain failure (#13787 review L5)", async () => {
+    const repo = mkdtempSync(join(tmpdir(), "rs-repo-"))
+    emptyDirs.push(repo)
+    const git = (...args: string[]) => {
+      const run = Bun.spawnSync(["git", ...args], {
+        cwd: repo,
+        env: {
+          ...process.env,
+          GIT_AUTHOR_NAME: "t",
+          GIT_AUTHOR_EMAIL: "t@t",
+          GIT_COMMITTER_NAME: "t",
+          GIT_COMMITTER_EMAIL: "t@t",
+        },
+      })
+      if (run.exitCode !== 0) throw new Error(`git ${args.join(" ")}: ${run.stderr.toString()}`)
+    }
+    git("init", "-q")
+    git("commit", "-q", "--allow-empty", "-m", "base")
+    // The host takes the open and never answers it, as one whose reply is lost.
+    await withContractHost({ silent: ["open_session"] }, async (host) => {
+      let worktree = ""
+      // The open was written; the worktree is then locked, so the open's cleanup cannot remove it.
+      const { client } = await localClient(host, selfWorld(), (frame, socket) => {
+        if (frame["type"] !== "open_session") return
+        worktree = String(frame["cwd"])
+        socket.destroy()
+        git("worktree", "lock", worktree)
+      })
+      const failure = failureOf(
+        await client.sessions.open({ device: SELF, workspace: repo, worktree: { branch: "rs-l5" } }),
+      )
+      expect(failure).toMatchObject({ code: "unconfirmed", uncertain: true })
+      git("worktree", "unlock", worktree)
+      git("worktree", "remove", "--force", worktree)
     })
   })
 
   test("#given no operator endpoint answers on this device #when sessions.open runs #then host_unavailable, certain, and the key stays free (#13787 L1)", async () => {
     await withContractHost({}, async (host) => {
-      const { client } = await localClient({ ...host, socket: join(host.root, "absent.sock") })
+      // The endpoint is missing for the first open, then up: the retry under the same key reaches it.
+      let socket = join(host.root, "absent.sock")
+      const { client } = await localClient(host, selfWorld(), undefined, () => socket)
       const request = { device: SELF, workspace: host.root, idempotency_key: "local-2" }
       const failure = failureOf(await client.sessions.open(request))
       expect(failure).toMatchObject({ code: "host_unavailable", details: { device: SELF } })
       expect(failure.uncertain).toBeUndefined()
       expect(opensOn(host)).toEqual([])
+      socket = host.socket
+      expect((await valueOf(client.sessions.open(request))).thread).toBe(SELF_SESSION)
+      expect(opensOn(host)).toHaveLength(1)
     })
   })
 

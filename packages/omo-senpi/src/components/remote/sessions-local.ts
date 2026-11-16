@@ -33,6 +33,12 @@ export async function openOnThisDevice(
   } catch (error) {
     return wireFailure(probe, error, self, "opened a session")
   }
+  // A typed failure after the open was written (a worktree open whose open failed and whose worktree could not be
+  // removed) may still have made a session: it is judged by the wire too, naming what was left (#13787 review L5).
+  if (opened.kind === "error" && probe.sent) {
+    const judged = wireFailure(probe, new Error(opened.error.message), self, "opened a session")
+    return { ...judged, details: { ...judged.details, left: opened.error } }
+  }
   if (opened.kind === "error") return opened
   // The session's durable id is its handle: this device's own endpoint serves every member on it by that id, while the
   // service's listing (which may not carry this device's sessions at all) and its relay never reach it.
