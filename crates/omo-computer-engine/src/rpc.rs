@@ -69,7 +69,18 @@ fn dispatch(session: &mut Session, name: &str, params: Value) -> Result<Value, F
     let not_found = || failure(METHOD_NOT_FOUND, "Method not found", Some(json!({ "method": name })));
     let method = Method::from_name(name).ok_or_else(not_found)?;
     let value = match method {
-        Method::SessionOpen => json!(session.open(parse(params)?)),
+        Method::SessionOpen => json!(session.open(parse(params)?).map_err(|r| refused(&r))?),
+        Method::StopPathStart => json!(session.stop_path_start(parse(params)?)),
+        Method::StopPathStop => json!(session.stop_path_stop(parse(params)?)),
+        Method::StopPathStatus => {
+            parse::<omo_computer_core::params::EmptyParams>(params)?;
+            json!(session.stop_path_status())
+        }
+        Method::StopPathHeartbeat => {
+            parse::<omo_computer_core::params::EmptyParams>(params)?;
+            session.stop_path_heartbeat();
+            Value::Null
+        }
         Method::SessionClose => {
             parse::<omo_computer_core::params::EmptyParams>(params)?;
             session.close();

@@ -105,6 +105,8 @@ jobs:
           created="${created##*/}"
           # Two red runs finishing together can each find no issue and both create one: the oldest open issue wins.
           issue="$(oldest_open)"
+          # The issue list can briefly lag a create; with nothing listed, the issue just created is the one.
+          issue="${issue:-$created}"
           if [ "$issue" != "$created" ]; then
             gh issue comment "$issue" --body-file "$body"
             gh issue close "$created" --reason "not planned" --comment "Duplicate of #$issue."
