@@ -3,7 +3,7 @@ import type { ClientCore, Outcome, RemoteClient } from "./client"
 import { nextActionFor, type RemoteCode, remoteFailure } from "./codes"
 import { DEADLINES, withinDeadline } from "./deadlines"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
-import type { Opts, RemoteFailure, ThreadHandle } from "./types"
+import type { Opts, RemoteFailure, SessionRow, ThreadHandle } from "./types"
 
 const noServiceAccess = (): RemoteFailure =>
   remoteFailure(
@@ -73,7 +73,9 @@ export function aliasMembers(core: ClientCore): RemoteClient["aliases"] {
     }
   }
 
-  // Every member runs under DEADLINES.aliases with no device-service connection; set and clear may change the account.
+  // The registry calls of a member run under DEADLINES.aliases (set and clear may change the account). The listing
+  // lookups run before or after them under the listing's own deadline (DEADLINES.sessionsList), never nested inside the
+  // aliases window, so each layer's own typed failure surfaces first.
   const run = <T>(
     opts: Opts | undefined,
     mutating: boolean,
@@ -89,22 +91,48 @@ export function aliasMembers(core: ClientCore): RemoteClient["aliases"] {
     return parsed.kind === "ok" && parsed.value.target.kind === "device_session" ? parsed.value.target : undefined
   }
 
+  // The row `device` lists that `matches`. A device that missed the listing round is an outage, not a missing session:
+  // device_offline, as the thread tools answer it (thread/remote/remote-ops.ts holderTarget).
+  const listedRow = async (
+    device: string,
+    matches: (row: SessionRow) => boolean,
+    missing: () => RemoteFailure,
+    opts: Opts | undefined,
+  ): Promise<Outcome<SessionRow>> => {
+    const listed = await core.sessionsList({ device }, opts)
+    if (listed.kind === "error") return listed
+    const row = listed.value.rows.find(matches)
+    if (row !== undefined) return { kind: "ok", value: row }
+    if (listed.value.unanswered.some((unanswered) => unanswered.id === device))
+      return remoteFailure(
+        "device_offline",
+        `Device ${device} did not answer the session listing.`,
+        nextActionFor("device_offline"),
+        { details: { device } },
+      )
+    return missing()
+  }
+
   // The registry holds a session by its durable id, as the thread tools do (cross-device.ts), never by its session key:
   // the listed row on the handle's device names it.
   const durableIdOf = async (
     target: { readonly device: string; readonly session: string },
     opts: Opts | undefined,
   ): Promise<Outcome<string>> => {
-    const listed = await core.sessionsList({ device: target.device }, opts)
-    if (listed.kind === "error") return listed
-    const row = listed.value.rows.find((candidate) => {
-      const listedAt = sessionOf(candidate.thread)
-      return listedAt?.device === target.device && listedAt.session === target.session
-    })
-    if (row === undefined)
-      return remoteFailure("not_found", "No listed session has that handle.", nextActionFor("not_found"), {
-        details: { kind: "session" },
-      })
+    const found = await listedRow(
+      target.device,
+      (candidate) => {
+        const listedAt = sessionOf(candidate.thread)
+        return listedAt?.device === target.device && listedAt.session === target.session
+      },
+      () =>
+        remoteFailure("not_found", "No listed session has that handle.", nextActionFor("not_found"), {
+          details: { kind: "session" },
+        }),
+      opts,
+    )
+    if (found.kind === "error") return found
+    const row = found.value
     if (row.durable_id === undefined)
       return remoteFailure(
         "unsupported",
@@ -117,28 +145,29 @@ export function aliasMembers(core: ClientCore): RemoteClient["aliases"] {
 
   return {
     // The holder's durable id back to the handle of the row its device lists with it.
-    resolve: async (alias, opts) =>
-      run(opts, false, async (aliases) => {
-        const holder = await aliases.resolve(alias)
-        if (holder.kind === "error") return aliasFailure(holder.error)
-        const { device, session_id: durableId } = holder.value
-        const listed = await core.sessionsList({ device }, opts)
-        if (listed.kind === "error") return listed
-        const row = listed.value.rows.find((candidate) => candidate.durable_id === durableId)
-        const session = row === undefined ? undefined : sessionOf(row.thread)
-        return session === undefined
-          ? remoteFailure("not_found", "No listed session holds that alias's durable id.", nextActionFor("not_found"), {
-              details: { kind: "session", durable_id: durableId },
-            })
-          : { kind: "ok", value: handleOf(session.device, session.session) }
-      }),
+    resolve: async (alias, opts) => {
+      const holder = await run(opts, false, async (aliases) => {
+        const resolved = await aliases.resolve(alias)
+        return resolved.kind === "error" ? aliasFailure(resolved.error) : { kind: "ok" as const, value: resolved.value }
+      })
+      if (holder.kind === "error") return holder
+      const { device, session_id: durableId } = holder.value
+      const missing = () =>
+        remoteFailure("not_found", "No listed session holds that alias's durable id.", nextActionFor("not_found"), {
+          details: { kind: "session", durable_id: durableId },
+        })
+      const found = await listedRow(device, (candidate) => candidate.durable_id === durableId, missing, opts)
+      if (found.kind === "error") return found
+      const session = sessionOf(found.value.thread)
+      return session === undefined ? missing() : { kind: "ok", value: handleOf(session.device, session.session) }
+    },
     // Claim when the thread holds no alias, else rename it (thread/remote/cross-device.ts renameAlias).
     set: async (thread, alias, opts) => {
       const target = sessionOf(thread)
       if (target === undefined) return notASession()
+      const durable = await durableIdOf(target, opts)
+      if (durable.kind === "error") return durable
       return run(opts, true, async (aliases) => {
-        const durable = await durableIdOf(target, opts)
-        if (durable.kind === "error") return durable
         const current = await aliases.aliasesOf([durable.value])
         if (current.kind === "error") return aliasFailure(current.error)
         const from = current.value.get(durable.value)
@@ -159,9 +188,9 @@ export function aliasMembers(core: ClientCore): RemoteClient["aliases"] {
     clear: async (thread, opts) => {
       const target = sessionOf(thread)
       if (target === undefined) return notASession()
+      const durable = await durableIdOf(target, opts)
+      if (durable.kind === "error") return durable
       return run(opts, true, async (aliases) => {
-        const durable = await durableIdOf(target, opts)
-        if (durable.kind === "error") return durable
         const current = await aliases.aliasesOf([durable.value])
         if (current.kind === "error") return aliasFailure(current.error)
         const alias = current.value.get(durable.value)

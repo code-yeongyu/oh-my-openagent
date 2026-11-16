@@ -66,6 +66,11 @@ export type RemoteClientDeps = {
    * compiled binary passes its provisioned runtime's copy; from source the store resolves its own worker.
    */
   readonly gatewayWorkerUrl?: URL
+  /**
+   * The approval mode of the session this client acts for (a session or connector sender): an open may keep or narrow
+   * it, never widen it. Absent, only the narrowest mode passes.
+   */
+  readonly permissionPreset?: () => string | undefined
   /** Test seam: opens the proven device-service connection (`connectDeviceService` by default). */
   readonly connect?: (options: {
     readonly version: string

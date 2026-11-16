@@ -209,8 +209,9 @@ export type SessionsList = {
 
 // What the members of part 4a-2 take and answer (#13414 W3: the rows' confirmed shapes, recorded in remote-tools SEAMS.md).
 
-/** The engine's approval modes, as `open_session` takes them (`permissionPreset`; omo-native PERMISSION_PRESETS). */
-export type PermissionPreset = "full-access" | "workspace" | "accept-edits" | "auto" | "read-only" | "ask"
+/** senpi's approval modes (permission-system/types.ts), as `open_session` takes them (`permissionPreset`): the one list. */
+export const PERMISSION_PRESETS = ["full-access", "workspace", "accept-edits", "auto", "read-only", "ask"] as const
+export type PermissionPreset = (typeof PERMISSION_PRESETS)[number]
 
 /**
  * One new session, opened through the shared create path (thread SessionHost.open): `workspace` is its cwd, `model` is
@@ -236,13 +237,16 @@ export type OpenResult = {
   readonly device: DeviceRow
   /** The first prompt's receipt, when `first` was given. */
   readonly receipt?: SendReceipt
+  /** Steps after the session existed that did not apply (its name, its listing key); the session is still created. */
+  readonly warnings?: readonly string[]
 }
 
 /** A background job of the interrupted turn (#13444). */
 export type InterruptJob = { readonly kind: string; readonly id: string; readonly description?: string }
 /**
- * #13444's ThreadInterruptResult, unchanged: `background` is always present; `not_supported` is an engine before senpi#6675,
- * whose jobs were left running with no per-job list.
+ * The interrupt answer, in the background shape #13444 adds to the thread tools' ThreadInterruptResult: `background` is
+ * always present; `not_supported` is an engine before senpi#6675, whose jobs were left running with no per-job list. This
+ * is a mirror, not the thread type itself: derive it from thread/contracts/results.ts once #13444 lands on dev.
  */
 export type InterruptResult = {
   readonly thread_id: string
