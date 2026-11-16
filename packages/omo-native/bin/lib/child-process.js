@@ -14,6 +14,10 @@ const HANDLED_SIGNALS = [
   ["SIGINT", false],
 ]
 
+// Signals the launcher only relays: the engine uses them as wake-ups (senpi's supervisor wakes a draining host
+// child with SIGUSR1), so a waiting launcher must neither die of one nor start a shutdown grace window.
+const RELAYED_SIGNALS = ["SIGUSR1"]
+
 // The engine's own shutdown drains in ~1.5-2.5s. Ten seconds is the ceiling before the launcher
 // stops waiting on a child that is not going to leave and reports the death it was asked for.
 const DEFAULT_GRACE_MS = 10_000
@@ -119,6 +123,17 @@ export function runChild(command, args, options = {}) {
               process.kill(process.pid, signal)
             })
           }, graceMs(env))
+        }
+        listeners.push([signal, listener])
+        process.on(signal, listener)
+      }
+      for (const signal of RELAYED_SIGNALS) {
+        const listener = () => {
+          try {
+            child.kill(signal)
+          } catch {
+            // The child is already gone; its exit event carries the real answer.
+          }
         }
         listeners.push([signal, listener])
         process.on(signal, listener)
