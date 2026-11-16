@@ -2,8 +2,7 @@ import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 
-import type { RemoteClient } from "../omo-senpi/src/components/remote/index"
-import { handleOf } from "../omo-senpi/src/components/remote/seams"
+import { handleOf, type RemoteClient } from "../omo-senpi/src/components/remote/index"
 import type {
   FollowEvent,
   PermissionPreset,
