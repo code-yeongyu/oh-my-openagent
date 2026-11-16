@@ -175,6 +175,12 @@ describe("plugin payload allowlist parity", () => {
     expect(REQUIRED_PLUGIN_ARTIFACTS).toContain(join("skills", "browser", "runtime", "omowright", "index.js"))
     expect(REQUIRED_PLUGIN_ARTIFACTS).toContain(join("skills", "browser", "runtime", "omowright", "page-bundle.js"))
   })
+
+  // Regression (#13511 review M1): the wake runtime moved into a lazy sidecar, and every sidecar must
+  // be a required installation artifact or a payload installs an omo.js whose wake shells can never load.
+  test("#given the wake runtime sidecar #when checking the payload #then it is required", () => {
+    expect(REQUIRED_PLUGIN_ARTIFACTS).toContain(join("extensions", "omo-wake.js"))
+  })
 })
 
 describe("payload completeness gate", () => {

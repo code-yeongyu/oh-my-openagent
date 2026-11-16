@@ -6,6 +6,9 @@ on:
     paths:
       - "script/qa/computer/conformance/fixtures/**"
       - ".github/workflows/computer-fixtures.yml"
+      - "script/qa/computer/conformance/catalog.ts"
+      - "script/qa/computer/conformance/declarations.ts"
+      - "script/qa/computer/conformance/vocabulary.ts"
   workflow_dispatch:
 
 concurrency:
@@ -200,6 +203,17 @@ jobs:
             --a11y "/usr/bin/python3 script/qa/computer/conformance/fixtures/a11y/linux.py {pid} 'Conformance Document'" -- \
             "${{ steps.electron.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs
 
+
+      - name: Accessibility sabotage (a page hidden from assistive technology must turn the a11y leg red)
+        shell: bash
+        env:
+          ACCESSIBILITY_ENABLED: "1"
+        run: |
+          dbus-run-session -- xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts \
+            --fixture electron-linux --app-key dev.omo.conformance-fixture.electron \
+            --sabotage a11y --a11y "/usr/bin/python3 script/qa/computer/conformance/fixtures/a11y/linux.py {pid} 'Conformance Document'" -- \
+            "${{ steps.electron.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs
+
       - name: Sabotage legs (each must turn the self-test red)
         shell: bash
         run: |
@@ -262,6 +276,14 @@ jobs:
         run: |
           bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-windows --app-key dev.omo.conformance-fixture.electron \
             --a11y "powershell -NoProfile -ExecutionPolicy Bypass -File script/qa/computer/conformance/fixtures/a11y/windows.ps1 -TargetPid {pid} -Title 'Conformance Document'" -- \
+            "${{ steps.electron.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs
+
+
+      - name: Accessibility sabotage (a page hidden from assistive technology must turn the a11y leg red)
+        shell: bash
+        run: |
+          bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-windows --app-key dev.omo.conformance-fixture.electron \
+            --sabotage a11y --a11y "powershell -NoProfile -ExecutionPolicy Bypass -File script/qa/computer/conformance/fixtures/a11y/windows.ps1 -TargetPid {pid} -Title 'Conformance Document'" -- \
             "${{ steps.electron.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs
 
       - name: Sabotage legs (each must turn the self-test red)
@@ -331,6 +353,15 @@ jobs:
           dbus-run-session -- xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts \
             --fixture webview-linux --app-key dev.omo.conformance-fixture.webview \
             --a11y "/usr/bin/python3 script/qa/computer/conformance/fixtures/a11y/linux.py {pid} 'Conformance Document'" -- \
+            /usr/bin/python3 script/qa/computer/conformance/fixtures/webview/fixture.py
+
+
+      - name: Accessibility sabotage (a page hidden from assistive technology must turn the a11y leg red)
+        shell: bash
+        run: |
+          dbus-run-session -- xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts \
+            --fixture webview-linux --app-key dev.omo.conformance-fixture.webview \
+            --sabotage a11y --a11y "/usr/bin/python3 script/qa/computer/conformance/fixtures/a11y/linux.py {pid} 'Conformance Document'" -- \
             /usr/bin/python3 script/qa/computer/conformance/fixtures/webview/fixture.py
 
       - name: Sabotage legs (each must turn the self-test red)
@@ -466,6 +497,14 @@ jobs:
             --a11y "\"$RUNNER_TEMP/a11y-probe\" {pid} 'Conformance Document'" -- \
             "${{ steps.bundle.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs
 
+
+      - name: Accessibility sabotage (a page hidden from assistive technology must turn the a11y leg red)
+        shell: bash
+        run: |
+          bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-macos --app-key dev.omo.conformance-fixture.electron \
+            --sabotage a11y --a11y "\"$RUNNER_TEMP/a11y-probe\" {pid} 'Conformance Document'" -- \
+            "${{ steps.bundle.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs
+
       - name: Sabotage legs (each must turn the self-test red)
         shell: bash
         run: |
@@ -526,6 +565,14 @@ jobs:
         run: |
           bun script/qa/computer/conformance/fixtures/self-test.ts --fixture webview-macos --app-key dev.omo.conformance-fixture.webview \
             --a11y "\"$RUNNER_TEMP/a11y-probe\" {pid} 'Conformance Document'" -- \
+            "${{ steps.build.outputs.binary }}"
+
+
+      - name: Accessibility sabotage (a page hidden from assistive technology must turn the a11y leg red)
+        shell: bash
+        run: |
+          bun script/qa/computer/conformance/fixtures/self-test.ts --fixture webview-macos --app-key dev.omo.conformance-fixture.webview \
+            --sabotage a11y --a11y "\"$RUNNER_TEMP/a11y-probe\" {pid} 'Conformance Document'" -- \
             "${{ steps.build.outputs.binary }}"
 
       - name: Sabotage legs (each must turn the self-test red)
@@ -604,6 +651,14 @@ jobs:
         run: |
           bun script/qa/computer/conformance/fixtures/self-test.ts --fixture webview-windows --app-key dev.omo.conformance-fixture.webview \
             --a11y "powershell -NoProfile -ExecutionPolicy Bypass -File script/qa/computer/conformance/fixtures/a11y/windows.ps1 -TargetPid {pid} -Title 'Conformance Document'" -- \
+            "$RUNNER_TEMP/webview/ConformanceFixtureWeb.exe"
+
+
+      - name: Accessibility sabotage (a page hidden from assistive technology must turn the a11y leg red)
+        shell: bash
+        run: |
+          bun script/qa/computer/conformance/fixtures/self-test.ts --fixture webview-windows --app-key dev.omo.conformance-fixture.webview \
+            --sabotage a11y --a11y "powershell -NoProfile -ExecutionPolicy Bypass -File script/qa/computer/conformance/fixtures/a11y/windows.ps1 -TargetPid {pid} -Title 'Conformance Document'" -- \
             "$RUNNER_TEMP/webview/ConformanceFixtureWeb.exe"
 
       - name: Sabotage legs (each must turn the self-test red)

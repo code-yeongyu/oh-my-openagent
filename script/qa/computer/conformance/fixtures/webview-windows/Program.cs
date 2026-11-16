@@ -17,8 +17,8 @@ namespace ConformanceFixtureWeb
     // with native menus; same report and stdin control protocol as native-linux/fixture.py.
     public sealed class Host
     {
-        private const string Bridge =
-            "window.conformanceHost = { post: (json) => window.chrome.webview.postMessage(json) }";
+        private static readonly string Bridge =
+            "window.conformanceHost = { hideA11y: " + (Environment.GetEnvironmentVariable("CONFORMANCE_FIXTURE_SABOTAGE") == "a11y" ? "true" : "false") + ", post: (json) => window.chrome.webview.postMessage(json) }";
         private readonly string reportPath;
         private readonly string sabotage = Environment.GetEnvironmentVariable("CONFORMANCE_FIXTURE_SABOTAGE") ?? "";
         private readonly JavaScriptSerializer json = new JavaScriptSerializer();
@@ -27,6 +27,7 @@ namespace ConformanceFixtureWeb
         private Dictionary<string, object> initialSaved;
         public readonly List<Form> Windows = new List<Form>();
         public readonly List<WebView2> Views = new List<WebView2>();
+        public readonly string DataDir = Path.Combine(Path.GetTempPath(), "conformance-fixture-web-" + Process.GetCurrentProcess().Id);
         private readonly string appKey = AppUserModelId.Set("dev.omo.conformance-fixture.webview");
 
         public Host(string reportPath)
@@ -45,7 +46,7 @@ namespace ConformanceFixtureWeb
             Windows.Add(form);
             Views.Add(view);
             form.Show();
-            string data = Path.Combine(Path.GetTempPath(), "conformance-fixture-web-" + Process.GetCurrentProcess().Id);
+            string data = DataDir;
             // The baseline run (43237342972) found the page absent from the UIA tree: with no assistive client
             // detected, the WebView2 renderer ships no accessibility tree. Force it on so the UIA probe sees
             // the page's controls.
@@ -181,6 +182,14 @@ namespace ConformanceFixtureWeb
             host = new Host(args[1]);
             Application.Idle += Start;
             Application.Run(new ApplicationContext());
+            // The WebView2 user-data folder is this fixture's own; remove it once the browser processes let go.
+            foreach (WebView2 view in host.Views) view.Dispose();
+            for (int attempt = 0; attempt < 20 && Directory.Exists(host.DataDir); attempt++)
+            {
+                try { Directory.Delete(host.DataDir, true); }
+                catch (IOException) { Thread.Sleep(250); }
+                catch (UnauthorizedAccessException) { Thread.Sleep(250); }
+            }
             return 0;
         }
 

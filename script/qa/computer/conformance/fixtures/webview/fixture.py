@@ -20,7 +20,7 @@ SCHEMA = "omo-conformance-fixture/1"
 APP_KEY = "dev.omo.conformance-fixture.webview"
 SABOTAGE = os.environ.get("CONFORMANCE_FIXTURE_SABOTAGE", "")
 PAGE = (Path(__file__).resolve().parent.parent / "web" / "index.html").as_uri()
-BRIDGE = "window.conformanceHost = { post: (json) => window.webkit.messageHandlers.report.postMessage(json) }"
+BRIDGE = "window.conformanceHost = { hideA11y: " + ("true" if SABOTAGE == "a11y" else "false") + ", post: (json) => window.webkit.messageHandlers.report.postMessage(json) }"
 MENUS = (
     ("File", ("Save", "Rename…", "New Window")),
     ("Edit", ("Undo",)),
@@ -52,7 +52,7 @@ class Host:
         )
         content.register_script_message_handler("report")
         content.connect("script-message-received::report", self.on_post, window)
-        view = WebKit2.WebView.new_with_user_content_manager(content)
+        view = WebKit2.WebView(user_content_manager=content, is_ephemeral=True)  # no profile data on disk
         # Touch the ATK accessible now: the baseline run (43237342972) found only the menu bar in the tree,
         # and forcing the accessible early makes WebKit build the web-content subtree as soon as the
         # AT-SPI bridge (started by the workflow's dbus session) is reachable.

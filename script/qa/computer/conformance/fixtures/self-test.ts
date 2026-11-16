@@ -6,6 +6,7 @@ import { catalogFor, SESSIONS } from "../catalog.ts"
 import { type Action, OS_NAMES, type Oracle } from "../vocabulary.ts"
 import { FixtureProcess } from "./fixture-process.ts"
 import { geometryProblems, withoutGeometry } from "./geometry-check.ts"
+import { fixtureDataEntries, leftoversSince } from "./hermetic-check.ts"
 
 type Field = Oracle["field"]
 const MAIN_WINDOW = "Conformance Document"
@@ -70,6 +71,7 @@ function legs(
   appKey: string,
   a11yProbe: string | undefined,
   withGeometry: boolean,
+  baseline: ReadonlySet<string>,
 ): Leg[] {
   const { effect, initial } = catalogOracles()
   const untouched: Record<string, unknown> = Object.fromEntries(initial)
@@ -107,15 +109,19 @@ function legs(
       }),
   }
   const savedFields = ["title", "savedDocuments"]
-  // The a11y leg proves the page's controls are visible to the OS accessibility tree; it pins no report
-  // field, so it cannot be a sabotage target and is skipped in sabotage runs (which stay field-scoped).
+  // The a11y leg proves the page's controls are visible to the OS accessibility tree. Its sabotage target
+  // "a11y" makes the page hide itself from assistive technology (aria-hidden on body), so the probe must go red.
+  // The hermetic leg (web-hosting fixtures, the ones given --a11y) runs last and fails when any leg of this run left
+  // fixture or Electron data in a user profile or temp location, counted against the baseline main() takes before
+  // the first leg, so a fixed-name folder every run rewrites is caught too.
+  const webHosted = a11yProbe !== undefined
   const a11y: Leg[] =
-    a11yProbe === undefined || sabotage !== ""
+    a11yProbe === undefined || (sabotage !== "" && sabotage !== "a11y")
       ? []
       : [
           {
             name: "a11y:controls-visible",
-            fields: [],
+            fields: ["a11y"],
             run: (dir) =>
               withFixture(command, sabotage, dir, async (fixture) => {
                 await runA11yProbe(a11yProbe, fixture.pid)
@@ -137,6 +143,23 @@ function legs(
               }),
           },
         ]
+  const hermetic: Leg[] =
+    !webHosted || sabotage !== ""
+      ? []
+      : [
+          {
+            name: "hermetic:no-profile-data-left",
+            fields: [],
+            run: async (dir) => {
+              const text = await withFixture(command, sabotage, dir, async () => {})
+              check(
+                leftoversSince(baseline).map((entry) => `left ${entry}`),
+                "after every leg's fixture exited",
+              )
+              return text
+            },
+          },
+        ]
   return [
     ...actionLegs,
     ...a11y,
@@ -153,6 +176,7 @@ function legs(
         return second
       },
     },
+    ...hermetic,
   ]
 }
 
@@ -171,17 +195,18 @@ async function main(): Promise<number> {
   const appKey = values["app-key"]
   if (name === undefined || appKey === undefined || positionals.length === 0) {
     console.error(
-      "usage: self-test.ts --fixture <name> --app-key <key> [--sabotage <field>] [--a11y <probe command with {pid}>] [--geometry] -- <fixture command...>",
+      "usage: self-test.ts --fixture <name> --app-key <key> [--sabotage <field|a11y>] [--a11y <probe command with {pid}>] [--geometry] -- <fixture command...>",
     )
     return 2
   }
   const sabotage = values.sabotage
   const a11yProbe = values.a11y
   const root = mkdtempSync(join(tmpdir(), `fixture-self-test-${name}-`))
+  const baseline = fixtureDataEntries()
   const failed: Leg[] = []
   let passed = 0
   try {
-    for (const leg of legs(positionals, sabotage, appKey, a11yProbe, values.geometry)) {
+    for (const leg of legs(positionals, sabotage, appKey, a11yProbe, values.geometry, baseline)) {
       const dir = join(root, leg.name.replace(/[^a-zA-Z0-9.-]/g, "_"))
       try {
         for (const sub of ["first", "second"]) mkdirSync(join(dir, sub), { recursive: true })
