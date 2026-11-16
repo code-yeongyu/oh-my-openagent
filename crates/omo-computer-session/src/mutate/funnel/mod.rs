@@ -7,11 +7,11 @@ use omo_computer_core::backend::{Delivered, Refusal};
 use omo_computer_core::error::EngineCode;
 use omo_computer_core::intervention::BackendClock;
 use omo_computer_core::params::ReportMode;
-use omo_computer_core::report::Disposition;
 use omo_computer_core::results::ExecReply;
 use serde_json::json;
 
 mod binding;
+mod delivered;
 mod readmit;
 mod refusal;
 
@@ -250,41 +250,21 @@ impl Session {
                 })
             }
             None => {
-                record.sent(
-                    count,
-                    of,
-                    Disposition::DELIVERED_UNVERIFIED,
-                    "unverifiable",
-                    None,
-                );
-                let appended = self.funnel.audit().append(record.event.clone());
-                if let Err(error) = &appended {
-                    self.funnel.warn(format!("audit line not written: {error}"));
-                }
                 let sent = Sent {
                     route: mutation.route,
                     count,
                     of,
                     effect: read_back.effect,
-                    user_moved_on: self.funnel.control.presence.take_ended().is_some(),
-                    // A lost audit line outranks the binding note: one warning slot, integrity first.
-                    warning: appended.is_err().then(|| "write_failed".to_owned()).or_else(|| {
-                        identity_unavailable.then(|| crate::consent::IDENTITY_UNAVAILABLE.to_owned())
-                    }),
+                    user_moved_on: false,
+                    warning: None,
                     settle: settled.as_ref().map(crate::settle::Settled::wire),
-                    audit_id: appended.ok(),
+                    audit_id: None,
                     paused,
                     session,
                     target: None,
                 };
-                let reply =
-                    report::reply(report_mode, mutation.method, sent).unwrap_or_else(|rejection| {
-                        eprintln!("omo-computer-engine: action report rejected: {rejection:?}");
-                        ExecReply(None)
-                    });
-                let receipt = self.funnel.receipt_of(&reply);
-                self.store_receipt(&mut record, receipt);
-                Ok(reply)
+                let reply = (report_mode, mutation.method);
+                Ok(self.reply_delivered(record, reply, sent, identity_unavailable))
             }
         }
     }
