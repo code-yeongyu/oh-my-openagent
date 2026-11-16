@@ -355,6 +355,7 @@ Digest-verified centrality (refs unmeasured unless noted):
 - **Prompt/prose contract tests are forbidden.** Never assert authored agent prompt, `SKILL.md`, rule, `AGENTS.md`, or markdown-instruction wording, headings, section order, fragments, snapshots, negative past wording, or authored text length. Test only machine-consumed fields/sentinels/tool names, byte or shipped-copy equality between real artifacts, or observable runtime behavior such as parsing, routing, dispatch, state, security, and dynamic input propagation. Pure prose has no automated-test seam; review and QA-by-read are the correct verification.
 - Never dump business logic into `index.ts` — barrel exports only.
 - Prometheus may ONLY edit `.md` files (enforced by `prometheus-md-only` hook); FORBIDDEN paths: `packages/*/src/`, `package.json`, config files.
+- **Corollary of the QA mandate: AI authorship is disclosed, never laundered.** An agent may write any part of a patch, but the PR template's `## AI Assistance` section records it. `pair-programming` is the common case and means the human drove, corrected, and owns the result; `fully AI-authored` still needs a human who read the diff and can answer for it. Evidence written by the agent that produced the change is not evidence: the human runs the surface and pastes what it actually printed. The CLA signature stays personal to the human contributor. See [CONTRIBUTING.md](CONTRIBUTING.md) `AI-generated commits`.
 
 ## COMMANDS
 

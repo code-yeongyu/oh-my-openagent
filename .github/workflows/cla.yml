@@ -7,6 +7,30 @@ on:
         description: "Open pull request to recheck"
         required: true
         type: string
+      # Authoritative on workflow_dispatch only when it names a disclosure: a maintainer
+      # declaring or correcting one. Defaults to "no" so a plain recheck records nothing new and
+      # non-AI authors are unaffected; "no" also means "nothing declared", so the PR body's own
+      # answer is still consulted. Named ai_assisted, not ai-assisted, to match the sibling
+      # pr_number id and because a hyphenated id needs inputs['...'] in every expression.
+      ai_assisted:
+        description: "AI-assistance disclosure to record for this PR"
+        required: false
+        type: choice
+        default: "no"
+        options:
+          - "no"
+          - "pair-programming"
+          - "fully-ai-authored"
+      # Maintainer discretion on whether an absent disclosure is a failure or a note.
+      # "advisory" (the default) keeps this informational and non-blocking.
+      ai_disclosure_mode:
+        description: "Whether an undisclosed AI-assisted PR fails the ai-attribution check"
+        required: false
+        type: choice
+        default: "advisory"
+        options:
+          - "advisory"
+          - "required"
   issue_comment:
     types: [created]
   workflow_run:
@@ -268,6 +292,288 @@ jobs:
             echo "### If this fails"
             echo
             echo "Check the signature file on \`dev\`, contributor allowlist, and GitHub token permissions."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  ai-attribution:
+    # Records the author's AI-assistance disclosure into signatures/ai-attribution.json on the
+    # cla-signatures branch, the bot-managed branch the CLA signature registry already lives on.
+    # It is a sibling file rather than a new key inside signatures/cla.json because the pinned
+    # contributor-assistant action rewrites cla.json wholesale; a key stored there would be
+    # destroyed by the next unrelated signature.
+    #
+    # Non-blocking by default: an undisclosed PR gets a "neutral" ai-attribution check, so no
+    # merge is gated on this until a maintainer dispatches with ai_disclosure_mode=required.
+    #
+    # Source of truth: on workflow_dispatch a named ai_assisted value wins (a maintainer declaring
+    # or correcting a disclosure); its "no" default means "nothing declared", so it falls through
+    # to the PR body rather than erasing the author's answer. On every other trigger the value is
+    # parsed from the PR body's "## AI Assistance" section. A write that would not change the
+    # stored value is skipped, so unrelated re-runs never grow the record.
+    if: >-
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request &&
+        (github.event.comment.body == 'recheck' ||
+          github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA')) ||
+      (github.event_name == 'workflow_run' &&
+        (github.event.workflow_run.event == 'pull_request' ||
+          github.event.workflow_run.event == 'pull_request_review') &&
+        github.event.workflow_run.conclusion != 'cancelled' &&
+        github.event.workflow_run.conclusion != 'skipped') ||
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      checks: write
+      pull-requests: read
+    steps:
+      - name: Check out trusted automation helper
+        if: github.event_name != 'issue_comment'
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+          sparse-checkout: script/pr-automation-context.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Resolve current PR from GitHub run metadata
+        if: github.event_name != 'issue_comment'
+        id: pr
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { pathToFileURL } = await import('node:url');
+            const { prepareCLAEvent } = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/script/pr-automation-context.mjs`).href);
+            try {
+              const pr = await prepareCLAEvent({ github, context, core, eventPath: `${process.env.RUNNER_TEMP}/ai-attribution-pr-event.json` });
+              if (pr) core.setOutput('head_sha', pr.head.sha);
+            } catch (error) {
+              // An advisory job must never go red because the signal was not usable.
+              core.info(`No pull request resolved for AI attribution: ${error.message}`);
+            }
+
+      - name: Resolve AI-assistance disclosure
+        id: disclosure
+        if: github.event_name == 'issue_comment' || steps.pr.outputs.pr_number != ''
+        uses: actions/github-script@v9
+        env:
+          DECLARED: ${{ inputs.ai_assisted }}
+          MODE: ${{ inputs.ai_disclosure_mode }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number || github.event.issue.number }}
+        with:
+          script: |
+            const { readFile } = await import('node:fs/promises');
+            let payload = context.payload;
+            if (context.eventName !== 'issue_comment') {
+              try {
+                payload = JSON.parse(await readFile(`${process.env.RUNNER_TEMP}/ai-attribution-pr-event.json`, 'utf8'));
+              } catch (error) {
+                core.info(`No pull request payload on disk: ${error.message}`);
+                payload = null;
+              }
+            }
+            const pullRequest = payload?.pull_request ?? payload;
+            const prNumber = Number(pullRequest?.number ?? process.env.PR_NUMBER);
+            if (!Number.isSafeInteger(prNumber) || prNumber <= 0) {
+              core.info('No usable pull request; nothing to disclose against.');
+              return;
+            }
+
+            const VALID = ['no', 'pair-programming', 'fully-ai-authored'];
+            const HEADING = /^\s*#{1,6}\s/;
+            const SECTION = /^\s*#{1,6}\s*AI Assistance\s*$/i;
+            // The template writes "fully AI-authored"; the dispatch input writes
+            // "fully-ai-authored". Accept both spellings, store the hyphenated one.
+            const OPTION = /^\s*[-*]\s*\[( |x|X)\]\s*(none|no|pair-programming|fully[\s-]+ai-authored)\s*$/i;
+            const normalize = value => {
+              const candidate = String(value ?? '').trim().toLowerCase().replace(/[\s_]+/g, '-');
+              if (candidate === 'none') return 'no';
+              return VALID.includes(candidate) ? candidate : '';
+            };
+
+            // The PR body is untrusted contributor text. Strip HTML comments first so an
+            // unrendered example box can never be read as a ticked answer.
+            const fromBody = body => {
+              if (typeof body !== 'string') return '';
+              let inSection = false;
+              const ticked = [];
+              for (const line of body.replace(/<!--[\s\S]*?-->/g, '').split('\n')) {
+                if (HEADING.test(line)) {
+                  inSection = SECTION.test(line);
+                  continue;
+                }
+                if (!inSection) continue;
+                const option = OPTION.exec(line);
+                if (option && option[1].toLowerCase() === 'x') ticked.push(normalize(option[2]));
+              }
+              // Exactly one ticked box is a disclosure. Zero, or several at once, is not an answer.
+              return ticked.length === 1 ? ticked[0] : '';
+            };
+
+            const declared = normalize(process.env.DECLARED);
+            const fromPrBody = fromBody(pullRequest.body);
+            // The input default is "no", meaning "no disclosure declared on this run", so it
+            // must not silently erase what the author wrote. Only a named disclosure overrides.
+            const override = declared && declared !== 'no' ? declared : '';
+            const value = override || fromPrBody;
+            const source = override ? 'workflow-dispatch-input' : 'pr-body';
+
+            core.setOutput('pr_number', String(prNumber));
+            core.setOutput('value', value || 'none-recorded');
+            core.setOutput('source', value ? source : 'none');
+            core.setOutput('mode', process.env.MODE === 'required' ? 'required' : 'advisory');
+            core.setOutput('body_value', fromPrBody || 'none-recorded');
+
+      - name: Record the disclosure and report the ai-attribution check
+        if: always() && steps.disclosure.outputs.pr_number != ''
+        uses: actions/github-script@v9
+        env:
+          PR_NUMBER: ${{ steps.disclosure.outputs.pr_number }}
+          VALUE: ${{ steps.disclosure.outputs.value }}
+          SOURCE: ${{ steps.disclosure.outputs.source }}
+          MODE: ${{ steps.disclosure.outputs.mode }}
+          EXPECTED_SHA: ${{ steps.pr.outputs.head_sha }}
+        with:
+          script: |
+            const RECORD_PATH = 'signatures/ai-attribution.json';
+            const RECORD_BRANCH = 'cla-signatures';
+            const { owner, repo } = context.repo;
+            const pullNumber = Number(process.env.PR_NUMBER);
+            const value = process.env.VALUE;
+            const disclosed = value !== 'none-recorded';
+
+            const { data: current } = await github.rest.pulls.get({ owner, repo, pull_number: pullNumber });
+            if (current.state !== 'open' || (process.env.EXPECTED_SHA && current.head.sha !== process.env.EXPECTED_SHA)) {
+              core.info('The pull request closed or advanced; leaving the record untouched.');
+              return;
+            }
+
+            let outcome = 'not-recorded';
+            if (disclosed) {
+              const readRecord = async () => {
+                try {
+                  const { data } = await github.rest.repos.getContent({
+                    owner, repo, path: RECORD_PATH, ref: RECORD_BRANCH,
+                  });
+                  if (Array.isArray(data) || data.type !== 'file') {
+                    core.warning(`${RECORD_PATH} on ${RECORD_BRANCH} is not a file; leaving it untouched.`);
+                    return undefined;
+                  }
+                  const parsed = JSON.parse(Buffer.from(data.content, data.encoding).toString('utf8'));
+                  return { sha: data.sha, disclosures: Array.isArray(parsed.disclosures) ? parsed.disclosures : [] };
+                } catch (error) {
+                  if (error.status === 404) return { sha: undefined, disclosures: [] };
+                  throw error;
+                }
+              };
+
+              const entry = {
+                pullRequest: pullNumber,
+                headSha: current.head.sha,
+                author: current.user?.login ?? 'unknown',
+                value,
+                source: process.env.SOURCE,
+                recordedAt: new Date().toISOString(),
+              };
+
+              outcome = 'unchanged';
+              for (let attempt = 1; attempt <= 3; attempt += 1) {
+                const record = await readRecord();
+                if (!record) {
+                  outcome = 'skipped-unreadable-record';
+                  break;
+                }
+                const previous = record.disclosures.find(item => Number(item.pullRequest) === pullNumber);
+                if (previous?.value === entry.value && previous?.source === entry.source) break;
+                const next = [...record.disclosures.filter(item => Number(item.pullRequest) !== pullNumber), entry];
+                try {
+                  await github.rest.repos.createOrUpdateFileContents({
+                    owner, repo, path: RECORD_PATH, branch: RECORD_BRANCH,
+                    message: `record AI-assistance disclosure for #${pullNumber} (${entry.value})`,
+                    content: Buffer.from(`${JSON.stringify({ schemaVersion: 1, disclosures: next }, null, 2)}\n`).toString('base64'),
+                    ...(record.sha ? { sha: record.sha } : {}),
+                  });
+                  outcome = 'recorded';
+                  break;
+                } catch (error) {
+                  // Another CLA run committed first; re-read and rebase onto its entry.
+                  if (error.status !== 409 && error.status !== 422) throw error;
+                  core.info(`${RECORD_PATH} moved under this run; retrying (attempt ${attempt}).`);
+                  if (attempt === 3) outcome = 'skipped-contention';
+                }
+              }
+            }
+
+            // The check carries the gate, never the job status, so an advisory run stays green.
+            const mode = process.env.MODE === 'required' ? 'required' : 'advisory';
+            const persisted = outcome === 'recorded' || outcome === 'unchanged';
+            let conclusion;
+            let title;
+            if (!disclosed) {
+              conclusion = mode === 'required' ? 'failure' : 'neutral';
+              title = mode === 'required'
+                ? 'AI assistance: disclosure required'
+                : 'AI assistance: not disclosed (advisory)';
+            } else if (persisted) {
+              conclusion = 'success';
+              title = `AI assistance: ${value}`;
+            } else {
+              // Answered, but the bot-managed record could not be written. Report that plainly
+              // instead of a clean success that claims a record nobody can read.
+              conclusion = mode === 'required' ? 'failure' : 'neutral';
+              title = `AI assistance: ${value} (branch record not updated)`;
+            }
+
+            await github.rest.checks.create({
+              owner, repo, name: 'ai-attribution', head_sha: current.head.sha,
+              status: 'completed', conclusion,
+              output: {
+                title,
+                summary: [
+                  `Mode: \`${mode}\` (dispatch input \`ai_disclosure_mode\`).`,
+                  '',
+                  `- Disclosure: \`${disclosed ? value : 'none recorded'}\``,
+                  `- Source: \`${disclosed ? process.env.SOURCE : 'none'}\``,
+                  `- Record: \`${disclosed ? `${RECORD_PATH} on ${RECORD_BRANCH} (${outcome})` : 'nothing to write'}\``,
+                  '',
+                  'Informational. The check only fails when a maintainer dispatches this',
+                  'workflow with `ai_disclosure_mode=required`.',
+                ].join('\n'),
+              },
+            });
+
+      - name: Write job summary
+        if: always()
+        env:
+          AI_PR: ${{ steps.disclosure.outputs.pr_number }}
+          AI_VALUE: ${{ steps.disclosure.outputs.value }}
+          AI_SOURCE: ${{ steps.disclosure.outputs.source }}
+          AI_MODE: ${{ steps.disclosure.outputs.mode }}
+          AI_BODY_VALUE: ${{ steps.disclosure.outputs.body_value }}
+        run: |
+          {
+            echo "## AI assistance disclosure"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Pull request | \`${AI_PR:-none resolved}\` |"
+            echo "| Recorded value | \`${AI_VALUE:-none recorded}\` |"
+            echo "| Source | \`${AI_SOURCE:-none}\` |"
+            echo "| PR-body value | \`${AI_BODY_VALUE:-none recorded}\` |"
+            echo "| Mode | \`${AI_MODE:-advisory}\` |"
+            echo "| Workflow | \`${{ github.workflow }}\` |"
+            echo "| Event | \`${{ github.event_name }}\` |"
+            echo
+            echo "### What this job checks"
+            echo
+            echo "- Reads the \`## AI Assistance\` section of the PR body, or the \`ai_assisted\` dispatch input."
+            echo "- Upserts the answer into \`signatures/ai-attribution.json\` on \`cla-signatures\`."
+            echo "- Publishes an \`ai-attribution\` check: \`success\` when disclosed, otherwise \`neutral\`."
+            echo
+            echo "### If this fails"
+            echo
+            echo "Advisory mode never fails the job. A \`failure\` conclusion means a maintainer"
+            echo "dispatched with \`ai_disclosure_mode=required\` and the PR carries no disclosure."
           } >> "$GITHUB_STEP_SUMMARY"
 
   notice-skipped-signal:
