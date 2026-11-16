@@ -324,7 +324,9 @@ fn a_secure_window_that_exits_after_the_type_leaves_no_digest_on_the_wire() {
     scenario["target_exit"] = json!([{"after_call": "type_text", "nth": 1, "window": "101"}]);
     let path = dir.path().join("secure-exits.json");
     fs::write(&path, scenario.to_string()).expect("scenario written");
-    let left = run_engine(&case, &path);
-    assert_eq!(left.typed_line()["text"], json!({ "length": secret.chars().count() }), "the disk audit is length-only");
-    assert_eq!([left.on_wire(&needle), left.on_wire(&secret)], [0, 0], "wire {:?}", left.wire);
+    for persona in PERSONAS {
+        let left = run_engine(&case, &as_persona(path.to_str().expect("utf-8 path"), persona, dir.path()));
+        assert_eq!(left.typed_line()["text"], json!({ "length": secret.chars().count() }), "{persona}: the disk audit is length-only");
+        assert_eq!([left.on_wire(&needle), left.on_wire(&secret)], [0, 0], "{persona}: wire {:?}", left.wire);
+    }
 }
