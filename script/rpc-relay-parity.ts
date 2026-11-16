@@ -61,25 +61,48 @@ type AstNode = { readonly type: string; readonly [key: string]: unknown }
 const isNode = (value: unknown): value is AstNode =>
   typeof value === "object" && value !== null && typeof Reflect.get(value, "type") === "string"
 
-const isLiteral = (node: unknown, value: string): boolean =>
-  isNode(node) && node.type === "Literal" && node["value"] === value
+const WRAPPERS: ReadonlySet<string> = new Set([
+  "TSAsExpression",
+  "TSSatisfiesExpression",
+  "TSNonNullExpression",
+  "TSTypeAssertion",
+  "ParenthesizedExpression",
+])
+
+/** `node` with type assertions and parentheses removed (`("m" as const)` is the literal `"m"`). */
+const unwrap = (node: unknown): unknown => (isNode(node) && WRAPPERS.has(node.type) ? unwrap(node["expression"]) : node)
+
+const isLiteral = (node: unknown, value: string): boolean => {
+  const bare = unwrap(node)
+  return isNode(bare) && bare.type === "Literal" && bare["value"] === value
+}
 
 /** `x.type`, `x["type"]` or their optional-chain forms (not `x.$type`, not `x.typeName`). */
-const isTypeMember = (node: unknown): boolean =>
-  isNode(node) && node.type === "ChainExpression"
-    ? isTypeMember(node["expression"])
-    : isNode(node) &&
-      node.type === "MemberExpression" &&
-      (node["computed"] === true
-        ? isLiteral(node["property"], "type")
-        : isNode(node["property"]) && node["property"]["name"] === "type")
+const isTypeMember = (value: unknown): boolean => {
+  const node = unwrap(value)
+  if (isNode(node) && node.type === "ChainExpression") return isTypeMember(node["expression"])
+  return (
+    isNode(node) &&
+    node.type === "MemberExpression" &&
+    (node["computed"] === true
+      ? isLiteral(node["property"], "type")
+      : isNode(node["property"]) && node["property"]["name"] === "type")
+  )
+}
 
 /** Whether one AST node uses `method` as a record type (see namesRecordType). */
 function usesRecordType(node: AstNode, method: string): boolean {
   if (node.type === "Property") {
     const key = node["key"]
-    const named = isNode(key) && (key["name"] === "type" || key["value"] === "type")
+    // A computed key `{ [type]: "m" }` names whatever the variable holds, not the `type` field.
+    const named =
+      isNode(key) &&
+      (node["computed"] === true ? isLiteral(key, "type") : key["name"] === "type" || key["value"] === "type")
     return named && isLiteral(node["value"], method)
+  }
+  if (node.type === "SwitchStatement" && isTypeMember(node["discriminant"])) {
+    const cases = node["cases"]
+    return Array.isArray(cases) && cases.some((c) => isNode(c) && isLiteral(c["test"], method))
   }
   if (node.type === "BinaryExpression" && ["===", "=="].includes(String(node["operator"]))) {
     const [left, right] = [node["left"], node["right"]]
@@ -96,6 +119,8 @@ function usesRecordType(node: AstNode, method: string): boolean {
       isLiteral(args[0], method) &&
       isNode(subject) &&
       subject.type === "CallExpression" &&
+      isNode(subject["callee"]) &&
+      subject["callee"]["name"] === "expect" &&
       Array.isArray(subject["arguments"]) &&
       isTypeMember(subject["arguments"][0])
     )
@@ -114,8 +139,9 @@ function someNode(value: unknown, test: (node: AstNode) => boolean): boolean {
 
 /**
  * Whether `source` (parsed as TypeScript) uses `method` as a record type in code: the quoted name as the value of a `type`
- * property in an object (`{ type: "m" }`), compared with a `type` member (`x.type === "m"`, `x["type"] === "m"`), or
- * asserted on one (`expect(x.type).toBe("m")`). Comments, strings (a test title), regex literals, type declarations,
+ * property in an object (`{ type: "m" }`), compared with a `type` member (`x.type === "m"`, `x["type"] === "m"`), a case of a
+ * `switch` on one, or asserted on one (`expect(x.type).toBe("m")`); `as const`, `satisfies` and parentheses around the literal
+ * are allowed. A computed key (`{ [type]: "m" }`) and an assertion whose subject is not `expect(...)` do not count. Comments, strings (a test title), regex literals, type declarations,
  * other properties such as `$type`, and a source that does not parse do not count.
  */
 export function namesRecordType(source: string, method: string): boolean {

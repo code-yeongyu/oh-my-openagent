@@ -87,6 +87,24 @@ describe("engine RPC local-versus-relay parity table (#13478)", () => {
     expect(namesRecordType('if (frame?.type === "prompt") relay()', "prompt")).toBe(true)
   })
 
+  test("a case of a switch on a type member counts as a pair test (#13826 review L4)", () => {
+    expect(namesRecordType('switch (frame.type) { case "prompt": relay() }', "prompt")).toBe(true)
+  })
+
+  test("'as const', parenthesized and 'as string' forms of the literal count as a pair test (#13826 review L5)", () => {
+    expect(namesRecordType('send({ type: "prompt" as const })', "prompt")).toBe(true)
+    expect(namesRecordType('send({ type: ("prompt") })', "prompt")).toBe(true)
+    expect(namesRecordType('if (frame.type === ("prompt" as string)) relay()', "prompt")).toBe(true)
+  })
+
+  test("a computed key { [type]: m } does not count as a pair test (#13826 review L6)", () => {
+    expect(namesRecordType('const record = { [type]: "prompt" }', "prompt")).toBe(false)
+  })
+
+  test("toBe on a subject that is not expect(...) does not count as a pair test (#13826 review L6)", () => {
+    expect(namesRecordType('check(frame.type).toBe("prompt")', "prompt")).toBe(false)
+  })
+
   test("a rows file with a misspelled key is refused", () => {
     expect(() => curatedRows(rowsFile({ prompt: { relaay: "differs" } }))).toThrow('unknown key "relaay"')
   })
