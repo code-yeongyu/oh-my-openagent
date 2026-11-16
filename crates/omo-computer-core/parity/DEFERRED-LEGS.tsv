@@ -1,7 +1,7 @@
 design row	leg	recorded by row	owed to row	status
 C1	`trace_full_literal_accepted_true_is_jsonl_only` on the fake (needs the session trace writer)	12	20	passed:omo-computer-session::frames::trace_tests::trace_full_literal_accepted_true_is_jsonl_only
 C2	`hello_generation_quarantines_stale_reply` (restart-mid-call: 1 quarantined reply, `delivery_uncertain/unsafe`); AC-39 quarantine leg	12	17	passed:omo-computer-session::mutate::tests::recovery::hello_generation_quarantines_stale_reply
-C17	the `admissionKeys` set K8 fingerprints equals the rows the table marks (k-safety N5)	12	37	owed
+C17	the `admissionKeys` set K8 fingerprints equals the rows the table marks (k-safety N5)	12	37	passed:packages/omo-computer-hand/test/consent-chain.test.ts
 C3	the AC-75 `suspected_noop` fixtures of C19 run in this suite and assert membership in `ALL`	13	27	owed
 C3	a `confirmed` pointer / key report from the macOS, X11 or Wayland fake (the report produced by the fake's persona, not only built under that platform)	13	23	owed
 C4	`computer-error-table.test.ts`: every `(code, reason)` pair has a row, enumerated from `method_table!` + the gate table + the ref-resolution verdicts of `d-a11y-model.md` + the per-OS preflight refusals + the SDK's typed failures	13	31	owed
@@ -99,3 +99,4 @@ A-IS-65 L1	the interaction lock is still held at this OS's foreground restore (X
 A-IS-65 L1	the interaction lock is still held at this OS's foreground restore (the remote leg): the funnel drops the lock after the send and the send returns only after the restore (R70cp(1)); the row proves the hold with its own test	17	67	owed
 C17	A-IS-64 item 6: the protected-table version entering the permission fingerprint (deniedTableVersion) and the consent file's protectedTableVersion are the session's applied table's; at row 23 no code reads a table version (grant/state.rs ChordTamper::fingerprint hashes the consent view only), ruling R70bp(1)	23	37	owed
 C24	the engine compares a live host's `hand.status{consentFingerprint}` with the host's 0600 fingerprint sidecar at session.open and narrows to tampered on a difference (review L1 of #13373; the sidecar and its fingerprint are written by the row 37 host, so no fingerprint exists to compare at row 28)	28	37	owed
+K8	the host killed mid-hold: the engine releases the held key within 2 s of the host's death (on the fake backend a hold records its key-down and key-up together, so only a live leg can tell a death-path release from a normal one)	37	69	owed
