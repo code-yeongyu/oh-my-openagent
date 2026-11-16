@@ -57,6 +57,18 @@ fn near(a: Extents, b: Extents) -> bool {
     .all(|(left, right)| (left - right).abs() <= GEOMETRY_TOLERANCE)
 }
 
+/// Whether at most one of `twins` sits within the tolerance of the placed frame `facts`.
+fn fits_one(facts: &NodeFacts, twins: &[NativeWindow]) -> bool {
+    let Some(frame) = trusted(facts.extents) else {
+        return false;
+    };
+    twins
+        .iter()
+        .filter(|twin| trusted(Some(twin.bounds)).is_some_and(|b| near(frame, b)))
+        .count()
+        <= 1
+}
+
 /// Joins `target` to one of `frames` (the frames of the application owning its pid). `twins`
 /// is every native window of the same pid and exact title, `target` included.
 #[must_use]
@@ -80,7 +92,8 @@ pub fn join(target: &NativeWindow, twins: &[NativeWindow], frames: &[(NodeId, No
         .filter(|(_, facts)| trusted(facts.extents).is_some_and(|e| near(e, target.bounds)))
         .collect();
     match placed.as_slice() {
-        [(node, _)] => return Join::Frame(node.clone()),
+        [(node, facts)] if fits_one(facts, twins) => return Join::Frame(node.clone()),
+        [_] => return ambiguous(),
         [_, _, ..] => return ambiguous(),
         [] => {}
     }

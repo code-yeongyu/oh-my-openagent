@@ -7,7 +7,8 @@
 pub enum ExecRefusal {
     /// An unquoted shell operator, a command substitution, or an unterminated quote.
     ShellOperator(char),
-    /// The program is a shell asked to run a command string.
+    /// A shell asked to run a command string, as the program or behind a wrapper (`env sh -c`),
+    /// or `env -S` splitting one string into a command line.
     ShellCommand(String),
     Empty,
 }
@@ -80,6 +81,15 @@ fn fields(word: &str) -> Option<String> {
     (!code_only).then_some(out)
 }
 
+/// A cluster of short options (`-iS`) that carries `flag`.
+fn short_flag(arg: &str, flag: char) -> bool {
+    arg.starts_with('-') && !arg.starts_with("--") && arg.contains(flag)
+}
+
+fn base(word: &str) -> &str {
+    word.rsplit('/').next().unwrap_or(word)
+}
+
 /// The argument vector an `Exec` value (already through the string-value unescape) runs as.
 ///
 /// # Errors
@@ -94,14 +104,23 @@ pub fn argv(exec: &str) -> Result<Vec<String>, ExecRefusal> {
         }
     }
     let program = argv.first().ok_or(ExecRefusal::Empty)?;
-    let base = program.rsplit('/').next().unwrap_or(program);
-    if SHELLS.contains(&base)
+    if base(program) == "env"
         && argv
             .iter()
             .skip(1)
-            .any(|arg| arg.starts_with('-') && arg.contains('c'))
+            .any(|arg| short_flag(arg, 'S') || arg.starts_with("--split-string"))
     {
-        return Err(ExecRefusal::ShellCommand(base.to_owned()));
+        return Err(ExecRefusal::ShellCommand("env".to_owned()));
+    }
+    for (at, word) in argv.iter().enumerate() {
+        let shell = base(word);
+        if SHELLS.contains(&shell)
+            && argv[at + 1..]
+                .iter()
+                .any(|arg| arg.starts_with('-') && arg.contains('c'))
+        {
+            return Err(ExecRefusal::ShellCommand(shell.to_owned()));
+        }
     }
     Ok(argv)
 }

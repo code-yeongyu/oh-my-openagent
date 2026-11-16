@@ -2,8 +2,9 @@
 //! and `select` matched by EXACT label through the core's `prove` (a missing step is
 //! `StaleRef`, two items with one label `AmbiguousTarget`), then pressed level by level through
 //! the action ladder. A submenu that appears only once opened is waited for on the bus's
-//! events, never with a sleep. A refused select leaves the UI as it found it: every menu its
-//! walk opened is closed again (`ClearSelection` on the opener's container, innermost first).
+//! events, never with a sleep. A refused select leaves the UI as it found it: a path the listed
+//! tree disproves presses nothing, and after a press every menu the walk may have opened is
+//! closed again (`ClearSelection` on the opener's container, innermost first).
 
 use std::time::Duration;
 
@@ -77,6 +78,24 @@ fn nodes(reads: &[MenuRead]) -> Vec<MenuNode> {
     reads.iter().map(|read| read.node.clone()).collect()
 }
 
+/// How many levels of `path` the read tree can judge: a level counts once its container listed
+/// any children, so a submenu populated only when opened is left to the walk.
+fn listed(tree: &[MenuNode], path: &[String]) -> usize {
+    let mut level = tree;
+    let mut judged = 0;
+    for label in path {
+        if level.is_empty() {
+            break;
+        }
+        judged += 1;
+        match level.iter().find(|node| node.title == *label) {
+            Some(node) => level = &node.children,
+            None => break,
+        }
+    }
+    judged
+}
+
 fn step<'a>(reads: &'a [MenuRead], label: &str) -> Option<&'a MenuRead> {
     reads.iter().find(|read| read.node.title == label)
 }
@@ -111,7 +130,8 @@ impl<B: Bus> AtspiBackend<B> {
 }
 
 /// Proves and presses `path` level by level from `container`, recording in `opened` the
-/// container of every item it pressed.
+/// container of every item it is about to press (before the press: a press that times out may
+/// still have opened its menu). What the read tree already disproves is refused unpressed.
 fn walk<B: Bus>(
     bus: &mut B,
     mut container: NodeId,
@@ -120,7 +140,12 @@ fn walk<B: Bus>(
 ) -> Result<Delivered, AxRefusal> {
     let mut level = read_level(bus, &container, 0, &mut 0);
     let full: Vec<String> = path.iter().map(|label| (*label).to_owned()).collect();
-    match prove(&nodes(&level), &full) {
+    let tree = nodes(&level);
+    let judged = listed(&tree, &full);
+    if judged > 0 {
+        prove(&tree, &full[..judged]).map_err(AxRefusal::plain)?;
+    }
+    match prove(&tree, &full) {
         Err(refusal) if refusal.code != EngineCode::StaleRef => {
             return Err(AxRefusal::plain(refusal))
         }
@@ -151,8 +176,8 @@ fn walk<B: Bus>(
             .ok()
             .flatten()
             .unwrap_or_else(|| container.clone());
-        delivered = press(bus, &item.id, &item.role)?;
         opened.push(holder);
+        delivered = press(bus, &item.id, &item.role)?;
         container = item.id.clone();
         level = read_level(bus, &container, 0, &mut 0);
     }

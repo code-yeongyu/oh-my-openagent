@@ -45,7 +45,8 @@ fn a_menu_item_is_selected_by_its_exact_label() {
     assert_eq!(delivered, Delivered { count: 1, of: 1 });
     assert_eq!(
         handle.performed(),
-        vec![(file.clone(), 0), (close, 0), (file, 0)]
+        vec![(file, 0), (close, 0)],
+        "the near miss is refused before File is pressed again"
     );
     assert_eq!(
         missing.code(),
