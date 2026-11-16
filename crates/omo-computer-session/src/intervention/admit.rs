@@ -46,6 +46,33 @@ impl Session {
             .map(|info| info.identity.pid)
     }
 
+    /// The takeover hold checked again right before delivery (review M2 of #13355): in object
+    /// mode a user working in the target pauses the send again under the call's ceiling, and
+    /// the pauses join the admission's.
+    ///
+    /// # Errors
+    /// The hold outlasted the ceiling, with nothing sent.
+    pub(crate) fn recheck_takeover(
+        &mut self,
+        admission: &mut Admission,
+        ceiling_ms: Option<u64>,
+    ) -> Result<(), Refused> {
+        let Some(ceiling_ms) = ceiling_ms else {
+            return Ok(());
+        };
+        match self.pause_admission(admission.pid, ceiling_ms) {
+            Ok(waited) => {
+                admission.paused.extend(waited);
+                Ok(())
+            }
+            Err(ended) => {
+                let mut paused = std::mem::take(&mut admission.paused);
+                paused.extend(ended.paused);
+                Err(Refused::from(ended.refusal).with_paused(paused))
+            }
+        }
+    }
+
     /// Admits `call` on `route`, pausing up to `ceiling_ms`.
     ///
     /// # Errors
@@ -58,16 +85,22 @@ impl Session {
         ceiling_ms: Option<u64>,
     ) -> Result<Admission, Blocked> {
         let window = window_of(&call.target);
-        let mut admitted = self.guard.admit_on_with(self.backend.as_mut(), call, stages.clone());
+        let mut admitted = self
+            .guard
+            .admit_on_with(self.backend.as_mut(), call, stages.clone());
         let mut paused = Vec::new();
         let mut pid = None;
-        let may_pause = admitted.as_ref().map_or_else(|r| r.gate == Gate::Lock, |_| true);
+        let may_pause = admitted
+            .as_ref()
+            .map_or_else(|r| r.gate == Gate::Lock, |_| true);
         if let Some(ceiling_ms) = ceiling_ms.filter(|_| may_pause) {
             pid = self.window_pid(window);
             match self.pause_admission(pid, ceiling_ms) {
                 Ok(waited) => {
                     if !waited.is_empty() || admitted.is_err() {
-                        admitted = self.guard.admit_on_with(self.backend.as_mut(), call, stages);
+                        admitted = self
+                            .guard
+                            .admit_on_with(self.backend.as_mut(), call, stages);
                     }
                     paused = waited;
                 }
@@ -80,8 +113,8 @@ impl Session {
             }
         }
         if let Err(refused) = admitted {
-            let crashed = refused.gate == Gate::Target
-                && exited(self.backend.as_ref(), window).is_some();
+            let crashed =
+                refused.gate == Gate::Target && exited(self.backend.as_ref(), window).is_some();
             let refusal = if crashed { WINDOW_NOT_FOUND } else { refused.refusal };
             let mut out = Refused::from(refusal).with_paused(paused);
             // R54, R60b: a refused drag point names the point and the refusing stage's pair, its

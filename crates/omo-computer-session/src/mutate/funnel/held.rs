@@ -10,4 +10,7 @@ pub(super) struct Held {
     pub(super) hold_limits: crate::intervention::HoldLimits,
     pub(super) target: Option<String>,
     pub(super) binding: Option<(bool, Option<Vec<u8>>)>,
+    /// The call's pause ceiling in object mode; the takeover hold is checked again under it
+    /// right before delivery (review M2 of #13355).
+    pub(super) pausing: Option<u64>,
 }
