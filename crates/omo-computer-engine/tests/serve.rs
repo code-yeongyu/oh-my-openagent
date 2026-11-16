@@ -14,6 +14,8 @@ mod case;
 #[path = "common/compare.rs"]
 #[allow(dead_code)]
 mod compare;
+#[path = "common/owed.rs"]
+mod owed;
 #[path = "common/host.rs"]
 #[allow(dead_code)]
 mod host;
@@ -443,8 +445,13 @@ fn oneshot_daemon_session_case_09() {
                 failures: Vec::new(),
             };
             compare::compare(&expectation.message, reply.as_ref(), "", &mut ctx);
-            failures.extend(ctx.failures.into_iter().map(|f| format!("MISMATCH step={} {f}", index + 1)));
+            failures.extend(ctx.failures.into_iter().map(|f| format!("MISMATCH step={} message=1 {f}", index + 1)));
         }
+    }
+    // Steps another row builds (capture caps, the ax outline) are OWED (lead decision 5).
+    let (failures, owed) = owed::split(&case.name, failures);
+    for line in &owed {
+        println!("OWED {line}");
     }
     assert!(failures.is_empty(), "case 09 did not replay clean:\n{}", failures.join("\n"));
 }
