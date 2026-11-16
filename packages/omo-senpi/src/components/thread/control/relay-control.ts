@@ -150,6 +150,8 @@ const RUN_RECORDS: ReadonlySet<string> = new Set([
   "tool_execution_end",
   "turn_end",
   "agent_end",
+  "auto_retry_start",
+  "auto_retry_end",
 ])
 
 const turnOf = (record: JsonObject): string | undefined =>

@@ -82,4 +82,32 @@ describe("thread_read wait on another device: deadline and abort cover the attac
       process.off("unhandledRejection", onUnhandled)
     }
   })
+
+  test.each(["auto_retry_start", "auto_retry_end"])(
+    "#given %s record arrives #when an idle snapshot follows #then the retry keeps the wait open",
+    async (type) => {
+      let record: Parameters<RemoteThreadSurface["sessions"]["watch"]>[2]["record"] = () => {}
+      const remote = {
+        sessions: {
+          watch: async (
+            _device: string,
+            _sessionId: string,
+            handlers: Parameters<RemoteThreadSurface["sessions"]["watch"]>[2],
+          ) => {
+            record = handlers.record
+            return {
+              kind: "ok",
+              watch: { ended: new Promise(() => {}), initial: { status: "idle" }, stop: () => {} },
+            }
+          },
+        },
+        chain: { stamp: (entry: Readonly<Record<string, unknown>>) => entry },
+      } as unknown as RemoteThreadSurface
+      const waiting = createRelayControl(remote, ROW).waitSettled(5_000, undefined)
+      record({ type, turnId: "retry-turn" })
+      await new Promise<void>((resolve) => setTimeout(resolve, 3_050))
+      record({ type: "agent_settled", turnId: "retry-turn" })
+      expect(await waiting).toMatchObject({ outcome: "settled", turn_id: "retry-turn" })
+    },
+  )
 })
