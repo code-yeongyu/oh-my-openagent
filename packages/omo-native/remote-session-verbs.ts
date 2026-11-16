@@ -8,7 +8,7 @@ import {
   setModelOn,
 } from "../omo-senpi/src/components/thread/control/operations"
 import { createRelayControl } from "../omo-senpi/src/components/thread/control/relay-control"
-import { createDeviceServiceSessions } from "../omo-senpi/src/components/thread/remote/device-service"
+import { createDeviceServiceSessions } from "../omo-senpi/src/components/remote/port/device-service"
 import { randomUUID } from "node:crypto"
 import { existsSync } from "node:fs"
 import { userInfo } from "node:os"

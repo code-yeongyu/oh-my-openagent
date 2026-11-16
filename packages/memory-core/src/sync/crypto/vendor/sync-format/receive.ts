@@ -41,6 +41,7 @@ export type KeyringReceiver = {
    * otherwise why it is refused. A refused entry changes nothing, so the receiver stays at the
    * last accepted entry. For any accepted history `h`, this refuses exactly what
    * `receiveKeyringChain([...h, entry])` refuses, with the same reason. Calls run in order.
+   * Unlike a list holding the refused entry, a later entry at that refused seq is still received.
    */
   readonly receive: (entry: ChainEntry) => Promise<ReceiverRefusal | null>;
   /** The authority folded from the accepted entries, as a copy. */
