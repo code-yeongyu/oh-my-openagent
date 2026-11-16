@@ -145,7 +145,7 @@ fn descriptor_text(text: &str) -> io::Result<Local> {
 }
 
 /// `sid` as SDDL text writes it back (an alias such as `LA` for the local Administrator).
-fn canonical(sid: &str) -> io::Result<String> {
+pub fn canonical(sid: &str) -> io::Result<String> {
     let sd = descriptor_text(&format!("O:{sid}"))?;
     let mut text: *mut u16 = std::ptr::null_mut();
     // SAFETY: a live descriptor; the out-parameter is live and writable.

@@ -10,6 +10,7 @@ crate-type = ["rlib"]
 [dependencies]
 omo-computer-core = { path = "../omo-computer-core" }
 omo-computer-safety = { path = "../omo-computer-safety" }
+omo-computer-session = { path = "../omo-computer-session" }
 image = { workspace = true }
 
 [dev-dependencies]
