@@ -13,6 +13,7 @@ import {
   ThreadAddress,
   ThreadDeliveryMode,
   RelayText,
+  thinkingLevel,
 } from "./fields"
 import { ThreadCreateParams } from "./create-params"
 
@@ -160,20 +161,8 @@ export const ThreadSetModelParams = Type.Object({
 
 export const ThreadSetReasoningParams = Type.Object({
   thread: ThreadAddress,
-  level: Type.Union(
-    [
-      Type.Literal("off"),
-      Type.Literal("minimal"),
-      Type.Literal("low"),
-      Type.Literal("medium"),
-      Type.Literal("high"),
-      Type.Literal("xhigh"),
-      Type.Literal("max"),
-    ],
-    {
-      description:
-        "Thinking level to apply; a level the thread's active model cannot run returns thinking_level_unsupported with the supported list and leaves the thread unchanged.",
-    },
+  level: thinkingLevel(
+    "Thinking level to apply; a level the thread's active model cannot run returns thinking_level_unsupported with the supported list and leaves the thread unchanged.",
   ),
   scope: Type.Optional(
     Type.Union([Type.Literal("session"), Type.Literal("turn")], {

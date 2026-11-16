@@ -45,6 +45,13 @@ export const Message = Type.String({
   description: `Instruction to deliver to the target thread; longer than ${THREAD_MESSAGE_MAX_BYTES} UTF-8 bytes returns message_too_large.`,
 })
 
+export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const
+export const thinkingLevel = (description: string) =>
+  Type.Union(
+    THINKING_LEVELS.map((level) => Type.Literal(level)),
+    { description },
+  )
+
 export const BindingId = Type.String({
   minLength: 1,
   description: "Binding id as returned by thread_bind or thread_bindings.",

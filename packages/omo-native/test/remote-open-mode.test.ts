@@ -10,6 +10,7 @@ import { createRemoteThreadFixture } from "../../omo-senpi/src/components/thread
 import { REMOTE_EXIT, runRemoteVerb } from "../remote-cli"
 import { UsageError } from "../remote-exit"
 import { localPermissionPreset } from "../remote-permission-preset"
+import { parseSession } from "../remote-session-args"
 
 // #6189: `omo remote open` names the mode the new session runs in - --permission-preset, else this device's own
 // engine setting - so the session never falls into the engine's delegated `ask` default with nobody to answer.
@@ -27,8 +28,13 @@ afterEach(async () => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
 
-async function open(args: readonly string[], localMode: () => string = () => "workspace") {
-  const a = fixture.account()
+async function open(
+  args: readonly string[],
+  localMode: () => string = () => "workspace",
+  accountOptions: Parameters<typeof fixture.account>[0] = {},
+) {
+  const a = fixture.account(accountOptions)
+  const out: string[] = []
   const stateDir = mkdtempSync(join(tmpdir(), "omo-6189-owner-"))
   chmodSync(stateDir, 0o700)
   dirs.push(stateDir)
@@ -41,7 +47,7 @@ async function open(args: readonly string[], localMode: () => string = () => "wo
       stateDir: owner.stateDir,
       connect: () => connectDeviceService({ version: "5.1.52", stateDir: owner.stateDir }),
       now: () => 0,
-      output: () => {},
+      output: (line) => out.push(line),
       write: () => {},
       error: (line) => err.push(line),
       bootstrap: {
@@ -64,8 +70,63 @@ async function open(args: readonly string[], localMode: () => string = () => "wo
   const modes = a.sent
     .filter((entry) => entry.rpc?.["type"] === "open_session")
     .map((entry) => entry.rpc?.["permissionPreset"])
-  return { code, err, modes }
+  const frames = a.sent.filter((entry) => entry.rpc?.["type"] === "open_session").map((entry) => entry.rpc)
+  const types = a.sent.map((entry) => entry.rpc?.["type"])
+  return { code, err, out, modes, frames, types, sent: a.sent }
 }
+
+// omo#13409 / omo#13410 / omo#13399: `omo remote open` names the model, the thinking level, a new worktree and the first
+// prompt in the one open, through the same create path as thread_create.
+describe("omo remote open with create options", () => {
+  test("#given --model and --thinking #when opened #then the open_session frame carries them and no set_model follows", async () => {
+    const result = await open(["--model", "anthropic/claude-opus-5-5", "--thinking", "high"])
+    expect(result.code).toBe(REMOTE_EXIT.ok)
+    expect(result.frames).toEqual([
+      expect.objectContaining({ provider: "anthropic", modelId: "claude-opus-5-5", thinkingLevel: "high" }),
+    ])
+    expect(result.types).toEqual(["open_session"])
+  })
+
+  test("#given a model b cannot run #when opened #then it fails with model_not_found and no session is left", async () => {
+    const result = await open(["--model", "anthropic/nope", "--json"], undefined, {
+      openRefuse: "model_unavailable: no model anthropic/nope",
+    })
+    expect(result.code).toBe(REMOTE_EXIT.failed)
+    expect(JSON.parse(result.out[0] ?? "{}")).toMatchObject({
+      kind: "error",
+      error: { code: "model_not_found", details: { reason: "model_unavailable" } },
+    })
+    expect(result.types).toEqual(["open_session"])
+  })
+
+  test("#given --prompt #when opened #then the new session is prompted once and the result names the delivery", async () => {
+    const result = await open(["--prompt", "build it", "--json"])
+    expect(result.code).toBe(REMOTE_EXIT.ok)
+    expect(result.types.filter((type) => type === "prompt")).toHaveLength(1)
+    expect(JSON.parse(result.out[0] ?? "{}")).toMatchObject({
+      kind: "ok",
+      thread: { thread_id: "dur-new-on-b" },
+      prompt: { delivery: expect.any(Object) },
+    })
+  })
+
+  test("#given malformed create options #when parsed #then each is a usage error and nothing is opened", async () => {
+    for (const args of [["--model", "opus"], ["--thinking", "huge"], ["--branch", "x"], ["--worktree"], ["--steer"]]) {
+      const result = await open(args)
+      expect(result.code).toBe(REMOTE_EXIT.usage)
+      expect(result.sent).toEqual([])
+    }
+  })
+})
+
+describe("omo remote open --worktree parsing", () => {
+  test("#given --worktree with a branch and base #when parsed #then the open names the worktree request", () => {
+    expect(
+      parseSession("open", ["b", "--project", "/repo", "--worktree", "--branch", "feat/x", "--base", "main"]).session,
+    ).toMatchObject({ verb: "open", project: "/repo", worktree: { branch: "feat/x", base: "main" } })
+    expect(parseSession("open", ["b", "--project", "/repo", "--worktree"]).session).toMatchObject({ worktree: {} })
+  })
+})
 
 describe("omo remote open and the approval mode", () => {
   test("#given no flag #when a session is opened #then it names this device's own mode", async () => {

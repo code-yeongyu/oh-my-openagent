@@ -20,7 +20,8 @@ omo remote control [on|off]      # whether your other devices may view and comma
 omo remote wake [on|off|default] # whether a message from your other devices may start a session here that is not running
 omo remote bootstrap [--json]    # set up the device service for your sign-in (every omo start runs it)
 omo remote attach <device>/<session>   # open a session on another device in the terminal UI, to watch and type
-omo remote open <device> [--project P] [--model M] [--permission-preset MODE] [--json]
+omo remote open <device> [--project P] [--model provider/id] [--thinking LEVEL] [--permission-preset MODE]
+                [--worktree [--branch B] [--base REF]] [--prompt TEXT [--steer|--follow-up]] [--json]
                                  # start a session on another device; prints <device>/<session>
 omo remote send <device>/<session> <text> [--steer|--follow-up] [--no-wait] [--json]
                                  # send a message and print the answer as it arrives
@@ -29,7 +30,15 @@ omo remote interrupt <device>/<session> [--json]   # stop the session's running 
 omo remote close <device>/<session> [--json]       # end the session on its device
 ```
 
-`open` runs the new session in `MODE` (default: this device's own setting, else full-access). `send`
+`open` runs the new session in `MODE` (default: this device's own setting, else full-access), on the
+model and thinking level given (default: that device's own); a model that device cannot run opens
+nothing and fails with `model_not_found`. `--worktree` starts the session in a new git worktree of the
+repository at `--project` on that device, on branch `B` (default `omo/thread-<time>`) at `REF` (default
+its HEAD). `--prompt` hands the new session its first message, delivered as `send --no-wait` delivers
+it; with `--json` the result's `prompt` field names that delivery or its failure (the session stays
+open). The agent tool `thread_create` takes the same options as `model`, `reasoning`,
+`permission_preset`, `worktree`, `prompt` and `delivery`; there `permission_preset` may only keep or
+narrow the calling session's own mode. `send`
 with `--steer` goes into the running turn, and `--no-wait` returns once the session took the message
 instead of printing the answer.
 

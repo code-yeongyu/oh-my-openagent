@@ -41,9 +41,12 @@ const USAGE_ENTRIES: readonly { readonly verbs: readonly string[]; readonly text
   },
   {
     verbs: ["open"],
-    text: `  open <device> [--project P] [--model M] [--permission-preset MODE]
+    text: `  open <device> [--project P] [--model provider/id] [--thinking LEVEL] [--permission-preset MODE]
+       [--worktree [--branch B] [--base REF]] [--prompt TEXT [--steer|--follow-up]]
                                            start a session on another device; prints <device>/<session>; it runs
-                                           in MODE (default: this device's own setting, else full-access)`,
+                                           in MODE (default: this device's own setting, else full-access), on the
+                                           model and thinking level given (a model it cannot run opens nothing),
+                                           in a new git worktree of P with --worktree, and is handed TEXT first`,
   },
   {
     verbs: ["send"],

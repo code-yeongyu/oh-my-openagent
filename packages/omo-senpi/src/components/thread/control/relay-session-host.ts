@@ -84,7 +84,8 @@ export function createRelaySessionHost(
       const reopens = request.sessionPath !== undefined
       const outcome = await remote.sessions.endpointCommand(device, frame, reopens ? undefined : { locate: true })
       if (outcome.kind !== "ok") {
-        const refused = openRefusal(outcome, device, open.cwd)
+        const model = request.provider === undefined ? undefined : `${request.provider}/${request.modelId ?? ""}`
+        const refused = openRefusal(outcome, device, open.cwd, model)
         // A refused open ran nothing on b: undo the worktree this call made there. An uncertain one may have opened in
         // it, so the worktree stays and the failure names it.
         if (made === undefined) return refused

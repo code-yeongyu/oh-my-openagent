@@ -101,11 +101,20 @@ export type ThreadLocalAliasNote = {
  */
 export type ThreadWorkspaceNote = { readonly workspace_scope?: "outside"; readonly scope_next_action?: string }
 
+/**
+ * The first message a `thread_create` with `prompt` delivered to the thread it made (#13410): the delivery as thread_send
+ * reports it, or the failure that stopped it. The thread exists either way.
+ */
+export type ThreadCreatePrompt =
+  | ({ readonly delivery: ThreadDelivery; readonly deduplicated: boolean } & ThreadGatewayDeliveryFacts)
+  | { readonly error: ThreadToolFailure }
+
 export type ThreadCreateResult =
   | ({
       readonly kind: "ok"
       readonly thread: ThreadResultSummary
       readonly deduplicated: boolean
+      readonly prompt?: ThreadCreatePrompt
     } & ThreadLocalAliasNote &
       ThreadWorkspaceNote)
   | ThreadDataError

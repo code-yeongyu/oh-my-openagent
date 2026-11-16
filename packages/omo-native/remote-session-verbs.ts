@@ -123,55 +123,56 @@ async function openOn(
     dependencies.error(error.message)
     return REMOTE_EXIT.usage
   }
+  // One open through the shared create path (#13409): the model and thinking level are the engine's launch profile on the
+  // open_session frame, so a model the device cannot run refuses the open and no session is left behind.
   const open = await createRelaySessionHost(remote, args.device).open({
     permissionPreset: mode,
     ...(args.project === undefined ? {} : { cwd: args.project }),
+    ...(args.model === undefined ? {} : { provider: args.model.provider, modelId: args.model.modelId }),
+    ...(args.thinking === undefined ? {} : { thinkingLevel: args.thinking }),
+    ...(args.worktree === undefined ? {} : { worktree: args.worktree }),
   })
-  const opened: ThreadToolResult = open.kind === "ok" ? { kind: "ok", thread: open.thread, deduplicated: false } : open
-  const wanted = args.model
-  if (opened.kind !== "ok" || !("thread" in opened) || wanted === undefined) return show(opened, "")
+  if (open.kind !== "ok") return show(open, "")
+  const opened = { kind: "ok", thread: open.thread, deduplicated: false } as const
+  if (args.prompt === undefined) return show(opened, "")
+  // The first prompt (#13410) goes to the session just opened, by its own id, as `omo remote send --no-wait` sends it.
   const label = `${args.device}/${opened.thread.thread_id}`
-  const created: RemoteSessionRow = {
+  const row: RemoteSessionRow = {
     ...namedDeviceRow(args.device, opened.thread.thread_id),
     title: opened.thread.name,
     project: opened.thread.cwd,
   }
-  const model = await answered(() => setModelOn(createRelayControl(remote, created), wanted, undefined))
-  if (model.kind === "error") {
-    // The session exists on its device (opened to be kept), so the failure names it: a retry must not leave another one
-    // behind unseen. --json: the model's typed error with the thread that was opened.
-    if (json) dependencies.output(JSON.stringify({ ...model, thread: opened.thread }))
-    else {
-      dependencies.output(label)
-      dependencies.error(`omo remote: opened ${label}, but its model was not set: ${model.error.message}`)
-      dependencies.error(`${model.error.next_action} The session is still open; end it with omo remote close ${label}.`)
-    }
-    return REMOTE_EXIT.failed
+  const delivery = personDelivery(remote, dependencies)
+  let sent: ThreadToolResult
+  try {
+    sent = await delivery.deliver(row, label, args.prompt, args.delivery)
+  } finally {
+    await delivery.dispose()
   }
-  if (!("model" in model)) return show(model, label)
-  return show({ ...opened, model: model.model } as ThreadToolResult, "")
+  const prompt =
+    sent.kind === "error"
+      ? { error: sent.error }
+      : "delivery" in sent
+        ? { delivery: sent.delivery, deduplicated: sent.deduplicated }
+        : {}
+  if (json) dependencies.output(JSON.stringify({ ...opened, prompt }))
+  else {
+    for (const line of sessionVerbLines("open", "", opened)) dependencies.output(line)
+    if (sent.kind === "error") {
+      dependencies.error(`omo remote: opened ${label}, but its first prompt was not delivered: ${sent.error.message}`)
+      dependencies.error(`${sent.error.next_action} Send it again with omo remote send ${label} <text>.`)
+    }
+  }
+  return sent.kind === "error" ? REMOTE_EXIT.failed : REMOTE_EXIT.ok
 }
 
-/** The provenance a person's `omo remote send` carries: this device stamped as on every delivery path (#13004). */
-export function personSenderProvenance(
-  remote: RemoteThreadSurface,
-  cwd = process.cwd(),
-  env: NodeJS.ProcessEnv = process.env,
-): () => Promise<Provenance> {
-  return () => stampThisDevice(resolveProvenance({ cwd, env }), remote)
-}
-
-async function sendTo(
-  remote: RemoteThreadSurface,
-  row: RemoteSessionRow,
-  args: Extract<SessionArgs, { readonly verb: "send" }>,
-  { label, json, show }: { readonly label: string; readonly json: boolean; readonly show: Show },
-  dependencies: RemoteCommandDependencies,
-): Promise<number> {
-  // The person at this terminal sends their own input through the one delivery pipeline the thread tools use (#12885,
-  // #13016): the target's kind picks the transport, and the relay keeps a `person` sender on the engine's prompt record.
-  // Its receipt is written to this device's gateway store under a key minted per invocation (a person's retry is a new
-  // send, so nothing dedupes it). A steer names no turn: the transport reads the running one once and steers it.
+/**
+ * The person at this terminal sends their own input through the one delivery pipeline the thread tools use (#12885,
+ * #13016): the target's kind picks the transport, and the relay keeps a `person` sender on the engine's prompt record.
+ * Its receipt is written to this device's gateway store under a key minted per invocation (a person's retry is a new
+ * send, so nothing dedupes it). A steer names no turn: the transport reads the running one once and steers it.
+ */
+function personDelivery(remote: RemoteThreadSurface, dependencies: RemoteCommandDependencies) {
   const anchor = gatewayWorkerAnchor(dependencies.packageRoot ?? packageRoot)
   const store = createGatewayStore({
     agentDir: canonicalAgentDir(),
@@ -198,18 +199,22 @@ async function sendTo(
     relay: createRelayTransport({ remote, store, senderProvenance }),
   })
   const person = { kind: "person" as const, uid: process.getuid?.() ?? 0, user: userInfo().username }
-  // A waiting send names its prompt, so the follow finds the entry senpi stores for it whatever text it holds.
-  const clientMessageId = args.wait ? randomUUID() : undefined
-  const deliver = async (): Promise<ThreadToolResult> => {
+  const deliver = async (
+    row: RemoteSessionRow,
+    label: string,
+    text: string,
+    mode: "auto" | "steer" | "follow_up",
+    clientMessageId?: string,
+  ): Promise<ThreadToolResult> => {
     const sent = await pipeline.deliver({
       sender: person,
       caller_id: `person:${person.uid}`,
       target: { kind: "remote", row },
-      text: args.text,
-      mode: args.delivery,
+      text,
+      mode,
       idempotency_key: randomUUID(),
       ...(clientMessageId === undefined ? {} : { client_message_id: clientMessageId }),
-      args: { target: label, text: args.text, delivery: args.delivery },
+      args: { target: label, text, delivery: mode },
     })
     if (sent.kind === "error") return sent
     if (!("device" in sent))
@@ -230,6 +235,33 @@ async function sendTo(
       device: row.device,
     }
   }
+  const dispose = async () => {
+    pipeline.dispose()
+    await store.dispose()
+  }
+  return { deliver, dispose }
+}
+
+/** The provenance a person's `omo remote send` carries: this device stamped as on every delivery path (#13004). */
+export function personSenderProvenance(
+  remote: RemoteThreadSurface,
+  cwd = process.cwd(),
+  env: NodeJS.ProcessEnv = process.env,
+): () => Promise<Provenance> {
+  return () => stampThisDevice(resolveProvenance({ cwd, env }), remote)
+}
+
+async function sendTo(
+  remote: RemoteThreadSurface,
+  row: RemoteSessionRow,
+  args: Extract<SessionArgs, { readonly verb: "send" }>,
+  { label, json, show }: { readonly label: string; readonly json: boolean; readonly show: Show },
+  dependencies: RemoteCommandDependencies,
+): Promise<number> {
+  const delivery = personDelivery(remote, dependencies)
+  // A waiting send names its prompt, so the follow finds the entry senpi stores for it whatever text it holds.
+  const clientMessageId = args.wait ? randomUUID() : undefined
+  const deliver = () => delivery.deliver(row, label, args.text, args.delivery, clientMessageId)
   const nothingToSteer = (result: ThreadToolResult): number | undefined => {
     if (result.kind !== "error" || result.error.code !== "not_steerable" || json) return undefined
     dependencies.error(`omo remote: nothing is running on ${label} to steer.`)
@@ -282,7 +314,6 @@ async function sendTo(
   } finally {
     // Every exit, early refusals included, releases the follow and the store worker this send opened.
     if (follow !== undefined && !("kind" in follow)) follow.stop()
-    pipeline.dispose()
-    await store.dispose()
+    await delivery.dispose()
   }
 }

@@ -127,6 +127,8 @@ export function createRemoteThreadFixture() {
       wakeOutcome?: RemoteCommandOutcome
       /** The `get_state` fields a live session reports beyond the engine defaults (`paused`, `holds`). */
       liveState?: JsonObject
+      /** b's engine refuses every open_session with this error text (senpi names an unresolvable model `model_unavailable: ...`). */
+      openRefuse?: string
     } = {},
   ) {
     const engine = options.engine ?? ENGINE
@@ -187,6 +189,8 @@ export function createRemoteThreadFixture() {
         live.delete(attachedTo)
         return ok({ outcome: "unloaded", sessionPath: B_ROW.path })
       }
+      if (rpc["type"] === "open_session" && options.openRefuse !== undefined)
+        return { kind: "refused", reason: options.openRefuse }
       if (rpc["type"] === "open_session") {
         const opened = rpc["sessionPath"] === undefined ? "dur-new-on-b" : "dur-on-b"
         for (const id of [opened, options.relayKeys?.get(opened) ?? opened]) live.add(id)
@@ -468,6 +472,8 @@ export function createRemoteThreadFixture() {
       closeOutcome?: ThreadCloseOutcome
       /** Look session files up where senpi writes them, `<agentDir>/sessions`, as the component does. */
       sessionsDirectory?: boolean
+      /** This device's engine refuses every open_session with this error text, as its host client throws it. */
+      openThrows?: string
     } = {},
   ) {
     const engine = extra.engine ?? ENGINE
@@ -480,6 +486,7 @@ export function createRemoteThreadFixture() {
     }
     const sessions = extra.sessions ?? [local]
     const openSession = mock(async (_request: Parameters<ThreadHost["openSession"]>[0]) => {
+      if (extra.openThrows !== undefined) throw new Error(extra.openThrows)
       const created: ThreadHostSession = {
         sessionId: "route-created",
         durableSessionId: "dur-created-here",

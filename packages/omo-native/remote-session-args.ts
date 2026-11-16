@@ -1,3 +1,5 @@
+import { THINKING_LEVELS } from "../omo-senpi/src/components/thread/contracts/fields"
+import type { WorktreeRequest } from "../omo-senpi/src/components/thread/worktree/thread-worktree"
 import { UsageError } from "./remote-exit"
 import { isPermissionPreset, PERMISSION_PRESETS } from "./remote-permission-preset"
 
@@ -14,8 +16,13 @@ export type SessionArgs =
       readonly verb: "open"
       readonly device: string
       readonly project?: string
-      readonly model?: string
+      /** provider/id, split on its first slash. */
+      readonly model?: { readonly provider: string; readonly modelId: string }
+      readonly thinking?: string
       readonly permissionPreset?: string
+      readonly worktree?: WorktreeRequest
+      readonly prompt?: string
+      readonly delivery: "auto" | "steer" | "follow_up"
     }
   | {
       readonly verb: "send"
@@ -39,7 +46,10 @@ function parseTarget(verb: string, value: string | undefined): Target {
 const SESSION_FLAGS: Readonly<
   Record<SessionVerb, { readonly values: readonly string[]; readonly switches: readonly string[] }>
 > = {
-  open: { values: ["--project", "--model", "--permission-preset"], switches: [] },
+  open: {
+    values: ["--project", "--model", "--thinking", "--permission-preset", "--branch", "--base", "--prompt"],
+    switches: ["--worktree", "--steer", "--follow-up"],
+  },
   send: { values: [], switches: ["--steer", "--follow-up", "--no-wait"] },
   model: { values: [], switches: [] },
   interrupt: { values: [], switches: [] },
@@ -79,18 +89,42 @@ export function parseSession(
       throw new UsageError("omo remote open: the device is required (the DEVICE column of omo remote devices)")
     const project = values.get("--project")
     const model = values.get("--model")
+    const slash = model?.indexOf("/") ?? -1
+    if (model !== undefined && (slash <= 0 || slash === model.length - 1))
+      throw new UsageError("omo remote open: --model is provider/id (omo remote model lists them)")
+    const thinking = values.get("--thinking")
+    if (thinking !== undefined && !THINKING_LEVELS.some((level) => level === thinking))
+      throw new UsageError(`omo remote open: --thinking is one of ${THINKING_LEVELS.join(", ")}`)
     const permissionPreset = values.get("--permission-preset")
     if (permissionPreset !== undefined && !isPermissionPreset(permissionPreset))
       throw new UsageError(`omo remote open: --permission-preset is one of ${PERMISSION_PRESETS.join(", ")}`)
-    const named = permissionPreset === undefined ? {} : { permissionPreset }
+    const branch = values.get("--branch")
+    const base = values.get("--base")
+    if (!switches.has("--worktree") && (branch !== undefined || base !== undefined))
+      throw new UsageError("omo remote open: --branch and --base name the worktree; pass --worktree")
+    // The worktree is made from the repository at --project on that device; nothing else names a folder there.
+    if (switches.has("--worktree") && project === undefined)
+      throw new UsageError("omo remote open: --worktree needs --project, the repository folder on that device")
+    const prompt = values.get("--prompt")
+    if (switches.has("--steer") && switches.has("--follow-up"))
+      throw new UsageError("omo remote open: pass --steer or --follow-up, not both")
+    if (prompt === undefined && (switches.has("--steer") || switches.has("--follow-up")))
+      throw new UsageError("omo remote open: --steer and --follow-up name how --prompt is delivered; pass --prompt")
+    const delivery = switches.has("--steer") ? "steer" : switches.has("--follow-up") ? "follow_up" : "auto"
     return {
       json,
       session: {
         verb,
         device,
+        delivery,
         ...(project === undefined ? {} : { project }),
-        ...(model === undefined ? {} : { model }),
-        ...named,
+        ...(model === undefined ? {} : { model: { provider: model.slice(0, slash), modelId: model.slice(slash + 1) } }),
+        ...(thinking === undefined ? {} : { thinking }),
+        ...(permissionPreset === undefined ? {} : { permissionPreset }),
+        ...(switches.has("--worktree")
+          ? { worktree: { ...(branch === undefined ? {} : { branch }), ...(base === undefined ? {} : { base }) } }
+          : {}),
+        ...(prompt === undefined ? {} : { prompt }),
       },
     }
   }
