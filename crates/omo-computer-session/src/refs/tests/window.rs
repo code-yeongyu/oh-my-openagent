@@ -19,7 +19,7 @@ fn token(refs: &RefRegistry, number: u64) -> String {
 }
 
 const fn stale(reason: Reason) -> Refusal {
-    Refusal::new(EngineCode::StaleRef, reason.wire())
+    Refusal::new(EngineCode::StaleRef, reason)
 }
 
 #[test]
@@ -43,7 +43,7 @@ fn refs_older_than_8_generations_are_stale() {
     }
     for marks in [Effect::Partial, Effect::Unverifiable, Effect::SuspectedNoop, Effect::Refused] {
         refs.after_report("w", marks);
-        assert_eq!(refs.exec_gate("w"), Err(Refusal::new(EngineCode::ControlRequired, Reason::NeedsObserve.wire())), "{marks:?}");
+        assert_eq!(refs.exec_gate("w"), Err(Refusal::new(EngineCode::ControlRequired, Reason::NeedsObserve)), "{marks:?}");
         snap(&mut tree, &mut refs, "w");
         assert_eq!(refs.exec_gate("w"), Ok(()), "a new observation clears {marks:?}");
     }
@@ -64,7 +64,7 @@ fn refs_older_than_8_generations_are_stale() {
     for (token, refusal) in [
         ("s1:e999999", Refusal::bare(EngineCode::StaleRef)),
         ("button", Refusal::bare(EngineCode::InvalidTarget)),
-        ("e1", Refusal::new(EngineCode::InvalidTarget, Reason::RefUnqualified.wire())),
+        ("e1", Refusal::new(EngineCode::InvalidTarget, Reason::RefUnqualified)),
     ] {
         assert_eq!(refs.resolve(token, true, &mut tree).map_err(|u| u.refusal), Err(refusal), "{token}");
     }

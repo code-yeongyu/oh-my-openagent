@@ -209,7 +209,7 @@ impl Session {
             Ok(reply) => json!({ "result": reply }),
             Err(refused) => json!({ "error": {
                 "code": refused.refusal.code.wire(),
-                "reason": refused.refusal.reason,
+                "reason": refused.refusal.reason.map(|reason| reason.wire()),
                 "callId": refused.call_id,
             } }),
         };

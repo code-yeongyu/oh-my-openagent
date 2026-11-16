@@ -75,7 +75,7 @@ fn exec_on_busy_target_at_cap_sends_nothing_and_is_input_busy() {
     let refused = rig.click().expect_err("a busy target is not sent to");
     assert_eq!(
         (refused.refusal.code, refused.refusal.reason),
-        (EngineCode::InputBusy, Some(Reason::TargetBusy.wire()))
+        (EngineCode::InputBusy, Some(Reason::TargetBusy))
     );
     assert!(rig.sink.is_empty(), "nothing sent: {:?}", rig.sink.lines());
     assert_eq!(

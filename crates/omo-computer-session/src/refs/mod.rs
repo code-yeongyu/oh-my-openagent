@@ -114,7 +114,7 @@ impl RefRegistry {
         let stale = Refusal::bare(EngineCode::StaleRef);
         let parsed = RefToken::parse(token).ok_or(Refusal::bare(EngineCode::InvalidTarget))?;
         if object_mode && matches!(parsed, RefToken::Bare { .. }) {
-            return Err(Refusal::new(EngineCode::InvalidTarget, Reason::RefUnqualified.wire()));
+            return Err(Refusal::new(EngineCode::InvalidTarget, Reason::RefUnqualified));
         }
         let window_id = self.owner.get(&parsed.n()).ok_or_else(|| stale.clone())?.clone();
         let window = self.windows.get_mut(&window_id).ok_or_else(|| stale.clone())?;
@@ -130,7 +130,7 @@ impl RefRegistry {
         };
         let Some(generation) = window.generations.get_mut(&number) else {
             return Err(match window.wiped {
-                Some((below, reason)) if number < below => Refusal::new(EngineCode::StaleRef, reason.wire()),
+                Some((below, reason)) if number < below => Refusal::new(EngineCode::StaleRef, reason),
                 _ => stale,
             });
         };
