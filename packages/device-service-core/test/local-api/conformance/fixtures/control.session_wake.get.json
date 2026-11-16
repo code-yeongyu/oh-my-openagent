@@ -1,0 +1,76 @@
+{
+  "request": "control.session_wake.get",
+  "cases": [
+    {
+      "name": "control.session_wake.get answers the wake switch",
+      "outcome": "ok",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "control.session_wake.get"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "enabled": false,
+              "stored": null,
+              "changedAt": "",
+              "overridden": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "control.session_wake.get with a stray field is refused",
+      "outcome": "refusal",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "control.session_wake.get",
+            "enabled": true
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "invalid_request"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "refused before the client proof",
+      "outcome": "refusal",
+      "handshake": "welcome_only",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "control.session_wake.get"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "unauthenticated"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -434,17 +434,18 @@ describe("resolveCategory", () => {
 })
 
 describe("builtin category defaults", () => {
-  test.each(["architect", "artistry", "visual-engineering"])(
-    "%s prefers 5.2 and falls back to 5.1 at the same effort",
-    (name) => {
-      // given / when / then
-      for (const ids of [["claude-fable-5-2", "claude-fable-5-1"], ["claude-fable-5-1"]]) {
-        const result = expectResolved(resolveCategory(name, {}, registry(ids.map((id) => model("anthropic", id)))))
-        const expected = ids[0]
-        expect([result.spec.provider, result.spec.modelId, result.spec.variant]).toEqual(["anthropic", expected, "max"])
-      }
-    },
-  )
+  test.each([
+    ["architect", "xhigh"],
+    ["artistry", "max"],
+    ["visual-engineering", "max"],
+  ])("%s prefers 5.2 and falls back to 5.1 at the same effort", (name: string, variant: string) => {
+    // given / when / then
+    for (const ids of [["claude-fable-5-2", "claude-fable-5-1"], ["claude-fable-5-1"]]) {
+      const result = expectResolved(resolveCategory(name, {}, registry(ids.map((id) => model("anthropic", id)))))
+      const expected = ids[0]
+      expect([result.spec.provider, result.spec.modelId, result.spec.variant]).toEqual(["anthropic", expected, variant])
+    }
+  })
 
   test("#given ported builtin defaults #when inspected #then machine routing fields stay pinned without prose wording", () => {
     // given
@@ -460,7 +461,7 @@ describe("builtin category defaults", () => {
       ["quick", "chatgpt-subscription/gpt-6-luna-fast", "low"],
       ["unspecified-low", "anthropic/claude-sonnet-5-5", "medium"],
       ["unspecified-high", "anthropic/claude-opus-5-5", "medium"],
-      ["architect", "anthropic/claude-fable-5-2", "max"],
+      ["architect", "anthropic/claude-fable-5-2", "xhigh"],
       ["writing", "google/gemini-4-argon", "low"],
     ])
 
