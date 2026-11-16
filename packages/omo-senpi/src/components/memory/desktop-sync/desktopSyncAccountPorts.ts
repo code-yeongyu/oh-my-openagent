@@ -11,12 +11,13 @@ import {
   SyncDevices,
   SyncInteger,
   SyncPending,
+  SYNC_REPLY_MAX_ITEMS,
   syncJson,
   type SyncDescriptor,
 } from "./desktopSyncPortSchema"
 
 export type SyncServiceCall = (request: Readonly<Record<string, unknown>>) => Promise<unknown>
-const pendingList = z.object({ pending: z.array(SyncPending) })
+const pendingList = z.object({ pending: z.array(SyncPending).max(SYNC_REPLY_MAX_ITEMS) })
 const appendReply = z.object({ seq: SyncInteger })
 const stateReply = z.object({
   head: z.object({ seq: SyncInteger, link: z.string(), keyring_link: z.string() }),

@@ -1,7 +1,7 @@
 {
   "description": "A capture of window 101 (800x600 at 100,120 on the 1x display), then a click at frame point (10,10): the click is delivered and its pointer move carries the native point the frame record maps it to, (110,130). The step counts the click's three sink lines (move, down, up); the QA scenario shows the move line itself.",
   "transport": "stdio",
-  "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/v3-two-displays-one-window-consent.json",
   "env": {
     "OMO_COMPUTER_FAKE_STOP_PATH": "live"
   },

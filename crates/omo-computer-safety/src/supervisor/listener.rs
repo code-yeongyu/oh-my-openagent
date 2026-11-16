@@ -30,6 +30,19 @@ fn is_deaf(refusal: &omo_computer_core::backend::Refusal) -> bool {
     refusal.code == EngineCode::StopPathUnavailable && refusal.reason == Some(Reason::Deaf.wire())
 }
 
+/// What a deaf arm leaves in the slot: a listener that exists and cannot hear, so gate 2 refuses
+/// `deaf` under every policy instead of reading "no listener", which a live relay would answer.
+struct Unhearing;
+
+impl StopListener for Unhearing {
+    fn poll_stop(&mut self) -> BackendResult<bool> {
+        Err(omo_computer_core::backend::Refusal::new(
+            EngineCode::StopPathUnavailable,
+            Reason::Deaf.wire(),
+        ))
+    }
+}
+
 impl Slot {
     pub(super) fn arm(
         listener: BackendResult<Box<dyn StopListener>>,
@@ -41,6 +54,10 @@ impl Slot {
                 listener,
                 beat_ms: now_ms,
                 deaf_reason,
+            },
+            Err(refusal) if is_deaf(&refusal) => Self::Deaf {
+                listener: Box::new(Unhearing),
+                reason: deaf_reason,
             },
             Err(_) => Self::Absent,
         }
@@ -100,6 +117,10 @@ impl Slot {
                             beat_ms: now_ms,
                             deaf_reason,
                         },
+                        Err(refusal) if is_deaf(&refusal) => Self::Deaf {
+                            listener: Box::new(Unhearing),
+                            reason: deaf_reason,
+                        },
                         Err(_) => {
                             ladder.failed(now_ms);
                             match ladder.step(now_ms) {
@@ -141,3 +162,6 @@ impl Slot {
         }
     }
 }
+
+#[cfg(test)]
+mod deaf_arm_tests;
