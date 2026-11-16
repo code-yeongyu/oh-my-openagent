@@ -544,6 +544,16 @@ jobs:
         id: build
         run: echo "binary=$(bash script/qa/computer/conformance/fixtures/webview-macos/build.sh "$RUNNER_TEMP" | tail -n 1)" >> "$GITHUB_OUTPUT"
 
+      # The temp-folder cleanup must fail closed (delete nothing) when it cannot tell its own WebKit helpers apart;
+      # checked against a scratch TMPDIR only.
+      - name: Temp cleanup fails closed without the fixture's start time
+        shell: bash
+        run: |
+          here=script/qa/computer/conformance/fixtures/webview-macos
+          swiftc -swift-version 5 -O -warnings-as-errors -o "$RUNNER_TEMP/cleanup-check" "$here/cleanup-check/main.swift" "$here/webkit-temp-cleanup.swift"
+          scratch=$(mktemp -d "$RUNNER_TEMP/cleanup-check.XXXXXX")
+          TMPDIR="$scratch/" "$RUNNER_TEMP/cleanup-check"
+
       # The a11y leg reads the AX tree of another process, which needs accessibility trust: build the
       # probe, ad-hoc sign it and grant it in TCC. A runner that refuses the grant makes the probe exit 3
       # (ENVIRONMENT), never a fixture failure.

@@ -24,12 +24,17 @@ enum WebKitTempCleanup {
         case failed(String)
     }
 
-    static func run(bound: TimeInterval) -> Outcome {
+    /// `startTimeOf` reads a process's start time; cleanup-check/main.swift passes one that cannot.
+    static func run(bound: TimeInterval, startTimeOf: @escaping (pid_t) -> timeval? = WebKitTempCleanup.startTime) -> Outcome {
         guard let responsibleFor else {
             return .failed("this macOS does not export responsibility_get_pid_responsible_for_pid")
         }
         let deadline = DispatchTime.now() + bound
-        let owner = Owner(fixture: getpid(), responsibleFor: responsibleFor)
+        // Without the fixture's own start time every WebKit helper under its responsible process would count as its
+        // own; fail closed (wait for nothing, delete nothing) instead of guessing.
+        guard let owner = Owner(fixture: getpid(), responsibleFor: responsibleFor, startTimeOf: startTimeOf) else {
+            return .failed("cannot read this fixture's start time; deleted nothing")
+        }
         var owned = Set<pid_t>()
         var holders = Set<pid_t>()
         while true {
@@ -61,23 +66,29 @@ enum WebKitTempCleanup {
         let responsible: pid_t
         let started: timeval
         let responsibleFor: (pid_t) -> pid_t
+        let startTimeOf: (pid_t) -> timeval?
 
-        init(fixture: pid_t, responsibleFor: @escaping (pid_t) -> pid_t) {
+        init?(
+            fixture: pid_t, responsibleFor: @escaping (pid_t) -> pid_t,
+            startTimeOf: @escaping (pid_t) -> timeval?
+        ) {
+            guard let started = startTimeOf(fixture) else { return nil }
             self.fixture = fixture
             self.responsible = responsibleFor(fixture)
-            self.started = WebKitTempCleanup.startTime(fixture) ?? timeval(tv_sec: 0, tv_usec: 0)
+            self.started = started
             self.responsibleFor = responsibleFor
+            self.startTimeOf = startTimeOf
         }
 
         func owns(_ pid: pid_t) -> Bool {
             let responsible = responsibleFor(pid)
             if responsible == fixture { return true }
-            guard responsible == self.responsible, let started = WebKitTempCleanup.startTime(pid) else { return false }
+            guard responsible == self.responsible, let started = startTimeOf(pid) else { return false }
             return (started.tv_sec, started.tv_usec) >= (self.started.tv_sec, self.started.tv_usec)
         }
     }
 
-    private static func startTime(_ pid: pid_t) -> timeval? {
+    static func startTime(_ pid: pid_t) -> timeval? {
         var info = proc_bsdinfo()
         let size = Int32(MemoryLayout<proc_bsdinfo>.size)
         guard proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, size) == size else { return nil }
