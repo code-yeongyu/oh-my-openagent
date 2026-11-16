@@ -1,4 +1,4 @@
-import { describe, expect, jest, spyOn, test } from "bun:test"
+import { afterAll, beforeAll, describe, expect, jest, spyOn, test } from "bun:test"
 import {
   connectDeviceService,
   LocalApiError,
@@ -1441,5 +1441,29 @@ describe("device-service adapter: an idle attach's detach timer", () => {
     } finally {
       jest.useRealTimers()
     }
+  })
+})
+
+// #13873, the path the shards hit: a test's idle detach timer outlived its test. The second test runs after the first
+// one's teardown; with each port closed in teardown no timer is left for it, so none can fire into a later test.
+describe("device-service adapter: a test's teardown leaves no idle detach timer", () => {
+  beforeAll(() => {
+    jest.useFakeTimers()
+  })
+  afterAll(() => {
+    jest.useRealTimers()
+  })
+
+  test("#given a command released its attach #when the test ends #then its idle timer is armed until teardown", async () => {
+    const port = sessionsPort({
+      version: "0.0.0-test",
+      connect: async () => ({ conn: fakeService([state({ state: "engine_applied" }, {})], []), owned: true }),
+    })
+    expect((await port.sessionCommand("b", "s1", { type: "get_state" })).kind).toBe("ok")
+    expect(jest.getTimerCount()).toBe(1)
+  })
+
+  test("#given the previous test's teardown ran #then no idle detach timer is left to fire", () => {
+    expect(jest.getTimerCount()).toBe(0)
   })
 })
