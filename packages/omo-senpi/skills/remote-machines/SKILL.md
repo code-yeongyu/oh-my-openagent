@@ -117,7 +117,9 @@ const sent = (await tool.thread_send({ thread, message: "Report free disk space 
 if (sent.kind === "error") throw new Error(`${sent.error.code}: ${sent.error.next_action}`)
 // Wait up to 5 minutes for its turn to end, then read:
 const read = (await tool.thread_read({ thread, wait_ms: 300_000, all_scope: true })).details.result
-if (read.kind === "ok" && read.wait?.outcome === "timeout") throw new Error("still running; read again later")
+if (read.kind === "error") throw new Error(`${read.error.code}: ${read.error.next_action}`)
+// Close only after a settled wait; timeout (still running), cancelled or ended (status says why) leave it open:
+if (read.wait?.outcome !== "settled") throw new Error(`wait ${read.wait?.outcome}: ${read.wait?.status}; read again later`)
 // read.items is the transcript; close the thread once the answer is in:
 await tool.thread_close({ thread, all_scope: true })
 ```
