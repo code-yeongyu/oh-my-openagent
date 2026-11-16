@@ -98,22 +98,42 @@ fn background_key_chord_releases_every_key_it_pressed() {
     // When
     let sent = input.key_chord(
         &Target::Window(window.id()),
-        &[KeyName::Ctrl, KeyName::F5],
+        &[KeyName::Escape, KeyName::F5],
         DeliveryMode::Background,
     );
     // Then: down in order, up in reverse, and nothing left held
     assert_eq!(sent, Ok(()));
     let f5 = usize::from(keys::VK_F1 + 4);
-    let ctrl = usize::from(keys::VK_CONTROL);
+    let escape = usize::from(keys::VK_ESCAPE);
     assert_eq!(
         window.drain(),
         [
-            (wm::WM_KEYDOWN, ctrl),
+            (wm::WM_KEYDOWN, escape),
             (wm::WM_KEYDOWN, f5),
             (wm::WM_KEYUP, f5),
-            (wm::WM_KEYUP, ctrl)
+            (wm::WM_KEYUP, escape)
         ]
     );
+    assert!(input.held.is_empty());
+}
+
+#[test]
+fn background_modifier_chord_is_refused_with_nothing_posted() {
+    // Given: a window of a class the matrix does not list
+    let window = ProbeWindow::new("SenpiModifierChordProbe");
+    let mut input = input();
+    // When: ctrl+k, whose Ctrl a posted WM_KEYDOWN can never set (omo#13297)
+    let error = input
+        .key_chord(
+            &Target::Window(window.id()),
+            &[KeyName::Ctrl, KeyName::Char('k')],
+            DeliveryMode::Background,
+        )
+        .unwrap_err();
+    // Then: refused before anything was posted, and nothing left held
+    println!("code={} message={}", error.code.as_str(), error.message);
+    assert_eq!(error.code, ErrorCode::BackgroundUnavailable);
+    assert_eq!(window.drain(), []);
     assert!(input.held.is_empty());
 }
 
