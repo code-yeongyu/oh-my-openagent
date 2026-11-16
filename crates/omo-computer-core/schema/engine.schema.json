@@ -2581,7 +2581,8 @@
       },
       "required": [
         "active"
-      ]
+      ],
+      "description": "The foreground-control grant (`control.grant`, `control.acquire`, `control.changed`)."
     },
     "CuaAdapter": {
       "anyOf": [
@@ -3665,7 +3666,7 @@
       "required": [
         "capability"
       ],
-      "description": "The foreground-control grant (`control.grant`, `control.acquire`, `control.changed`).\n`hand.register`'s reply: the 32-byte capability (hex) bound to the registered peer's one\nfuture connection."
+      "description": "`hand.register`'s reply: the 32-byte capability (hex) bound to the registered peer's one\nfuture connection."
     },
     "HandSelector": {
       "anyOf": [
