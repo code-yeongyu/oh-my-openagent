@@ -189,11 +189,13 @@ mod tests {
     #[test]
     fn diagnose_names_the_interim_consent_binding_line_and_the_unbound_count() {
         use super::{CONSENT_BINDING_CHECK, CONSENT_BINDING_INTERIM, UNBOUND_ALLOW_CHECK};
-        let mut scripted = FakeScenario::default();
-        scripted.consent = Some(serde_json::json!({ "apps": { "allow": [
-            { "appKey": "Notes" },
-            { "appKey": "Mail", "path": "/usr/bin/mail" }
-        ] } }));
+        let scripted = FakeScenario {
+            consent: Some(serde_json::json!({ "apps": { "allow": [
+                { "appKey": "Notes" },
+                { "appKey": "Mail", "path": "/usr/bin/mail" }
+            ] } })),
+            ..FakeScenario::default()
+        };
         let mut session = Session::new(Box::new(FakeBackend::new(scripted)));
         session.open(serde_json::from_value(serde_json::json!({ "reportMode": "null" })).expect("params")).expect("open");
         let wire = serde_json::to_value(session.diagnose()).expect("wire");
