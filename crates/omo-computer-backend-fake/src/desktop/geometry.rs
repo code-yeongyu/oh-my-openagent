@@ -43,7 +43,7 @@ pub(super) fn capture_rect(state: &FakeState, target: &Target) -> BackendResult<
     match target {
         Target::Window(id) if state.exited.contains(id) => Err(Refusal::new(
             EngineCode::CaptureUnavailable,
-            Reason::Unmapped.wire(),
+            Reason::Unmapped,
         )),
         Target::Window(id) => {
             let window = state

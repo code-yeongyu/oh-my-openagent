@@ -128,6 +128,7 @@ fn reply(id: &Value, outcome: Result<Value, Failure>) -> String {
 
 #[cfg(test)]
 mod tests {
+    use omo_computer_core::error::Reason;
     use omo_computer_backend_fake::{FakeBackend, FakeClock, FakeScenario, RecordingSink};
     use omo_computer_core::backend::{Backend, Refusal};
     use omo_computer_core::error::EngineCode;
@@ -191,14 +192,14 @@ mod tests {
             detail: None,
             busy: None,
             warning: Some("write_failed".to_owned()),
-            ..Refusal::new(EngineCode::TransactionFailed, "recovery_required").into()
+            ..Refusal::new(EngineCode::TransactionFailed, Reason::RecoveryRequired).into()
         };
         let Failure { data, .. } = refused_call(&interrupted);
         let data = data.expect("data");
         assert_eq!(data["warning"], json!("write_failed"), "an unwritten audit line is surfaced");
         assert_eq!(data["callId"], json!("k-1"));
         assert_eq!(data["disposition"], json!({ "delivery": "delivery_uncertain", "retry": "unsafe" }));
-        let plain = refused_call(&Refusal::new(EngineCode::TransactionFailed, "marker_unavailable").into());
+        let plain = refused_call(&Refusal::new(EngineCode::TransactionFailed, Reason::MarkerUnavailable).into());
         assert!(plain.data.expect("data").get("disposition").is_none(), "a refusal before any send carries none");
     }
 
@@ -247,7 +248,7 @@ mod tests {
 
     #[test]
     fn a_reasoned_refusal_carries_its_reason() {
-        let refusal = Refusal::new(EngineCode::InvalidTarget, "drag_destination");
+        let refusal = Refusal::new(EngineCode::InvalidTarget, Reason::DragDestination);
         assert!(refusal.computer_code().is_ok(), "the pair has a table row");
         let Failure { code, data, .. } = refused(&refusal);
         assert_eq!(code, EngineCode::InvalidTarget.number());

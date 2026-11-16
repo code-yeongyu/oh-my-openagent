@@ -44,7 +44,7 @@ fn gone() -> Refusal {
 }
 
 fn deaf() -> Refusal {
-    Refusal::new(EngineCode::StopPathUnavailable, Reason::Deaf.wire())
+    Refusal::new(EngineCode::StopPathUnavailable, Reason::Deaf)
 }
 
 fn never_rearms() -> BackendResult<Box<dyn StopListener>> {
