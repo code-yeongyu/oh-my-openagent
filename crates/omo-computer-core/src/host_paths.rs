@@ -1,6 +1,7 @@
 //! Where a host-less engine finds the live hand tool host (DESIGN-GAPS-ROW28 revision 2, G1
 //! item 1; R70k): the host's local-API address, the persisted `host-latch` file and the hand's
-//! `consent.json`. One resolver, so the engine (row 28) and the host (row 37) cannot diverge.
+//! `consent.json`. One resolver, so the engine (row 28) and the host (row 37) cannot diverge;
+//! the config root is built from the user-database home, never `$HOME` (#13882 M3).
 //!
 //! Linux names an abstract socket instead of a path: an abstract name cannot be unlinked, and
 //! once the host holds it no other process can bind it. Under the fake-backend test seam the
@@ -12,6 +13,18 @@ use std::path::{Path, PathBuf};
 use sha2::{Digest, Sha256};
 
 use crate::paths::RUNTIME_DIR_SEAM;
+
+/// The user-database home (paths.rs), never `$HOME`: the config root must not move with the
+/// environment, or the host's latch and the engine's read of it name different files (#13882 M3).
+#[cfg(unix)]
+fn user_home() -> Option<PathBuf> {
+    crate::paths::user_home()
+}
+
+#[cfg(not(unix))]
+const fn user_home() -> Option<PathBuf> {
+    None
+}
 
 const ABSTRACT_PREFIX: &str = "omo-host-api";
 const SOCKET_FILE: &str = "host-api.sock";
@@ -104,7 +117,7 @@ fn seam_suffix(dir: &Path) -> String {
 
 fn real(lookup: &impl Fn(&str) -> Option<String>, uid: u32) -> Result<HostPaths, HostPathsUnavailable> {
     let absolute = |name: &str| lookup(name).map(PathBuf::from).filter(|path| path.is_absolute());
-    let home = absolute("HOME");
+    let home = user_home();
     let config = if cfg!(target_os = "macos") {
         home.map(|home| home.join("Library/Application Support/OmO"))
     } else if cfg!(windows) {
@@ -170,7 +183,8 @@ mod tests {
             .expect("real paths");
         if cfg!(target_os = "linux") {
             assert_eq!(paths.address, HostAddress::Abstract("omo-host-api-501".to_owned()));
-            assert_eq!(paths.consent(), Path::new("/home/u/.config/omo/computer/consent.json"));
+            let home = crate::paths::user_home().expect("the user database names a home");
+            assert_eq!(paths.consent(), home.join(".config/omo/computer/consent.json"));
         }
     }
 }

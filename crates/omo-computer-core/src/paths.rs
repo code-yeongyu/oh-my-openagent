@@ -78,6 +78,14 @@ fn absolute(lookup: &impl Fn(&str) -> Option<String>, name: &str) -> Option<Path
         .filter(|path| path.is_absolute())
 }
 
+/// The effective user's home from the user database, never `$HOME`: the one home every per-user
+/// root is built from, so the engine and the hand host (row 37) name the same files.
+#[cfg(unix)]
+#[must_use]
+pub fn user_home() -> Option<PathBuf> {
+    unix::home()
+}
+
 #[cfg(unix)]
 fn per_uid(base: &Path) -> PathBuf {
     base.join("omo-computer").join(unix::euid().to_string())
