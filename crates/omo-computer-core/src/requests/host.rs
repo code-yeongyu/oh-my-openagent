@@ -2,7 +2,7 @@
 //! the fake clock.
 
 use crate::params::{
-    AdvanceClockParams, CancelParams, ControlGrantParams, RequestId, StopPathResumeParams,
+    AdvanceClockParams, CancelParams, ControlGrantParams, HandRegisterParams, RequestId, StopPathResumeParams,
     StopPathStartParams, StopPathStopParams,
 };
 
@@ -28,6 +28,16 @@ pub enum HostRequest {
     AdvanceClock {
         ms: u64,
     },
+    HandRegister {
+        pid: u32,
+        process_start: u64,
+    },
+}
+
+#[must_use]
+pub fn read_hand_register(params: HandRegisterParams) -> HostRequest {
+    let HandRegisterParams { pid, process_start } = params;
+    HostRequest::HandRegister { pid, process_start }
 }
 
 #[must_use]

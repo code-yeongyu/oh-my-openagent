@@ -8,15 +8,15 @@ mod v1;
 
 pub use diagnosis::{
     AttachVia, ChainLink, ChainRole, ConsentAuthority, Diagnosis, IdentityMatch, IdentityReport,
-    PermissionReport, PermissionState, SpawnPath,
+    PermissionReport, PermissionState, ProbeCheck, ProbeState, SpawnPath,
 };
 pub use exec::ExecReply;
 pub use notifications::{AuditLine, EpochChanged, ForegroundConsent, HandConsent, HandStatus};
 pub use reads::{
-    CaptureReply, ClipboardContent, ConcealedReason, DisplayInfo, MenuItems, ObserveReply,
-    PointerPosition, WaitOutcome, WaitResult, WindowsReply,
+    CaptureReply, ClipboardContent, ClipboardReadReply, ConcealedReason, DisplayInfo, MenuItems, NotificationMatch,
+    ObserveReply, PointerPosition, WaitOutcome, WaitResult, WindowsReply,
 };
 pub use v1::{
-    AxNode, AxSnapshotText, AxTypeTextReply, CapabilitiesReply, CaptureMode, ControlState,
+    AxNode, AxSnapshotText, AxTypeTextReply, CapabilitiesReply, CaptureMode, ControlState, HandRegistered,
     LegacyFrame, LegacyObservation, LegacyWindow, SessionOpened, StopPathStatus, TypeTextMethod,
 };

@@ -20,6 +20,9 @@ omo-computer-backend-x11 = { path = "../omo-computer-backend-x11" }
 omo-computer-backend-wayland = { path = "../omo-computer-backend-wayland" }
 omo-computer-backend-win32 = { path = "../omo-computer-backend-win32" }
 
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
 [dev-dependencies]
 sha2.workspace = true
 tempfile.workspace = true

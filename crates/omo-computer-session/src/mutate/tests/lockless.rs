@@ -53,6 +53,20 @@ impl Backend for Real {
     fn presence(&mut self) -> Option<Box<dyn Presence>> {
         self.0.presence()
     }
+
+    // Row 21's three forwarders (R70ci(1)): the wrapper hands the fake's consent, persona and
+    // chord seam through, so it reads as a real backend WITH a consent file, as T9 means.
+    fn host_consent(&self) -> Option<serde_json::Value> {
+        self.0.host_consent()
+    }
+
+    fn platform(&self) -> Option<omo_computer_core::report::Platform> {
+        self.0.platform()
+    }
+
+    fn set_stop_chord(&mut self, chord: Option<&str>) -> BackendResult<()> {
+        self.0.set_stop_chord(chord)
+    }
 }
 
 #[test]
