@@ -65,7 +65,7 @@ const r = (await tool.thread_list({ all_scope: true })).details.result
 | fanout | `skipped` with reason `machine_unsupported` | That device's service build cannot run machine operations. If it is THIS device, run the step locally with `tool.bash`; otherwise ask for omo to be updated there. |
 | direct call | `CapabilityUnavailableError` (`capability unavailable on machine <id>: shell`) | The machine is offline or unsupported; check its row's `state` / `unsupported`. |
 | `getMachine` | `MachineNotFoundError` | Wrong id or alias: call `listMachines()` and use an id it returned. |
-| any machine op | `e.code === "policy_denied"` (`... is outside the scope root`) | The path is outside the device's home. Use a path under the home directory (`/tmp` is refused). |
+| any machine op | `e.code === "policy_denied"` (`... is outside the scope root`) | The path is outside the device's home. Use a path under the home directory; a path under `/tmp/` is refused. |
 | any machine op | `e.code === "invoke_deadline"` / `"budget_exceeded"` | Too slow for one call: use `spawn` or `exec_command` instead of `shell`. |
 | first `bunshin` call | `BunshinSessionError`, `e.code === "no_transport"` | This device's device service is not connected to the relay. Tell the user to sign in and turn remote control on; do not retry. |
 | relay | `RelayTransportError`, `e.code` `not_connected` / `closed` / `request_timeout` | The relay link dropped. Retry once; if it repeats, report it. |
