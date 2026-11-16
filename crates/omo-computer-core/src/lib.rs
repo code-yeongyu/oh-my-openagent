@@ -10,6 +10,7 @@ pub mod env;
 pub mod error;
 pub mod frame;
 pub mod hello;
+pub mod host_paths;
 pub mod intervention;
 pub mod listing;
 pub mod menus;
