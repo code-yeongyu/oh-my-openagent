@@ -44,7 +44,9 @@ describe("keychain helper release workflows (#11262)", () => {
 
     expect(job?.["runs-on"]).toBe("macos-latest")
     // Skipped only when verified operator-built darwin artifacts replace it (#13921).
-    expect(job?.if).toBe("github.repository == 'code-yeongyu/oh-my-openagent' && inputs.operator_darwin_artifacts == ''")
+    expect(job?.if).toBe(
+      "github.repository == 'code-yeongyu/oh-my-openagent' && inputs.operator_darwin_artifacts == ''",
+    )
     expect(workflow.jobs.build?.needs).toEqual(["desktop-engine", "keychain-helper", "operator-darwin"])
     expect([build.index, sign.index, verify.index, pack.index, tarball.index, asset.index]).toEqual(
       [build.index, sign.index, verify.index, pack.index, tarball.index, asset.index].slice().sort((a, b) => a - b),

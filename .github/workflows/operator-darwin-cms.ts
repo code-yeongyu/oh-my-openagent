@@ -17,7 +17,13 @@ import { refuse } from "./operator-darwin-macho.ts"
 
 // `end` is past the element; `stop` is where its content ends (before the end-of-contents octets of a BER
 // indefinite-length element, which codesign uses for the outer CMS layers).
-type Tlv = { readonly tag: number; readonly start: number; readonly body: number; readonly stop: number; readonly end: number }
+type Tlv = {
+  readonly tag: number
+  readonly start: number
+  readonly body: number
+  readonly stop: number
+  readonly end: number
+}
 
 // Deeper nesting than any CMS needs is refused, so a crafted blob cannot exhaust the stack.
 const MAX_INDEFINITE_DEPTH = 32
@@ -48,7 +54,7 @@ function tlv(bytes: Uint8Array, at: number, depth = 0): Tlv {
 
 function children(bytes: Uint8Array, parent: Tlv): Tlv[] {
   const items: Tlv[] = []
-  for (let at = parent.body; at < parent.stop; ) {
+  for (let at = parent.body; at < parent.stop;) {
     const item = tlv(bytes, at)
     if (item.end > parent.stop) refuse("DER element exceeds its parent")
     items.push(item)
@@ -64,7 +70,7 @@ function oid(bytes: Uint8Array, node: Tlv | undefined): string {
   let value = 0
   for (const byte of raw.subarray(1)) {
     value = value * 128 + (byte & 0x7f)
-    if (!(byte & 0x80)) parts.push(value), (value = 0)
+    if (!(byte & 0x80)) (parts.push(value), (value = 0))
   }
   return parts.join(".")
 }
@@ -115,7 +121,13 @@ function certificateParts(bytes: Uint8Array, certificate: Tlv) {
     }
   const usage = valueOf.get("2.5.29.37")
   const usages = usage ? children(bytes, tlv(bytes, usage.body)).map((node) => oid(bytes, node)) : []
-  return { serial: raw(bytes, at(tbs, offset, "serial")), issuer: raw(bytes, at(tbs, offset + 2, "issuer")), subjectOus, extensionOids, usages }
+  return {
+    serial: raw(bytes, at(tbs, offset, "serial")),
+    issuer: raw(bytes, at(tbs, offset + 2, "issuer")),
+    subjectOus,
+    extensionOids,
+    usages,
+  }
 }
 
 /** Verifies the signer of `codeDirectory` and returns the team of the Developer ID Application certificate. */
@@ -140,11 +152,16 @@ export function verifyDeveloperIdSigner(
   const sid = at(signer, 1, "signer identifier")
   if (sid.tag !== 0x30) refuse("signer must be identified by issuer and serial")
   const [sidIssuer, sidSerial] = children(cms, sid)
-  if (!sidIssuer || !sidSerial || oid(cms, at(children(cms, at(signer, 2, "digestAlgorithm")), 0, "digest OID")) !== SHA256)
+  if (
+    !sidIssuer ||
+    !sidSerial ||
+    oid(cms, at(children(cms, at(signer, 2, "digestAlgorithm")), 0, "digest OID")) !== SHA256
+  )
     refuse("signer must use sha256")
   const attributes = at(signer, 3, "signed attributes")
   if (attributes.tag !== 0xa0) refuse("CMS signer has no signed attributes")
-  if (!RSA_SIGNATURES.has(oid(cms, at(children(cms, at(signer, 4, "signatureAlgorithm")), 0, "signature OID")))) refuse("unsupported signature algorithm")
+  if (!RSA_SIGNATURES.has(oid(cms, at(children(cms, at(signer, 4, "signatureAlgorithm")), 0, "signature OID"))))
+    refuse("unsupported signature algorithm")
   const signature = content(cms, at(signer, 5, "signature"))
 
   const matching = (certificates ? children(cms, certificates) : []).filter((node) => {
@@ -168,7 +185,8 @@ export function verifyDeveloperIdSigner(
     refuse("the CMS signature covers a different CodeDirectory")
   const signedAttributes = Buffer.from(cms.subarray(attributes.start, attributes.end))
   signedAttributes[0] = 0x31
-  if (!verifySignature("sha256", signedAttributes, leaf.publicKey, signature)) refuse("CMS signature does not verify with the signing certificate")
+  if (!verifySignature("sha256", signedAttributes, leaf.publicKey, signature))
+    refuse("CMS signature does not verify with the signing certificate")
 
   if (!leaf.checkIssued(anchors.developerIdCa) || !leaf.verify(anchors.developerIdCa.publicKey))
     refuse("signing certificate is not issued by Apple's Developer ID Certification Authority")
