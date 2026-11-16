@@ -33,7 +33,17 @@ pub(super) fn client_process(conn: &RustConnection, window: Window) -> Result<Cl
 ///
 /// # Errors
 /// Why the pid cannot be used against this engine's `/proc`.
-pub(super) fn trusted_pid(window_pid: Option<u32>, _own_pid_seen: Option<u32>, _own_pid: u32) -> Result<u32, String> {
+pub(super) fn trusted_pid(window_pid: Option<u32>, own_pid_seen: Option<u32>, own_pid: u32) -> Result<u32, String> {
+    match own_pid_seen {
+        Some(seen) if seen == own_pid => {}
+        Some(seen) => {
+            return Err(format!(
+                "the X server sees this engine as pid {seen}, not {own_pid}: it runs in another pid \
+                 namespace, so its pids do not name processes here"
+            ))
+        }
+        None => return Err("the X server knows no local pid for this engine's own connection".to_owned()),
+    }
     window_pid.ok_or_else(|| "the X server knows no local process for the window's client".to_owned())
 }
 
