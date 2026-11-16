@@ -12,9 +12,9 @@ import {
   deviceServiceStateDir,
   LocalApiError,
   SESSION_ROW_STATES,
+  type SessionFilter,
+  type SessionRowState,
 } from "../device-service-core/src/device-service.ts"
-import type { SessionFilter } from "../device-service-core/src/local-api/protocol.ts"
-import type { SessionRowState } from "../device-service-core/src/local-api/vocabulary.ts"
 import type { RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
 import { readAccountInProcess } from "./account-show"
 import type { LocalStatus } from "./remote-cold-wake"
