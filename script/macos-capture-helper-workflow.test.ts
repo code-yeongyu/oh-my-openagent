@@ -24,8 +24,12 @@ describe("embedded macOS capture helper release workflow", () => {
     const run = runBlock(engine, helperMarker, engineMarker)
 
     const legs = desktopEngineLegs(workflow)
-    expect(legs).toContainEqual(expect.objectContaining({ host: "darwin-arm64", rust_target: "aarch64-apple-darwin", clang_arch: "arm64" }))
-    expect(legs).toContainEqual(expect.objectContaining({ host: "darwin-x64", rust_target: "x86_64-apple-darwin", clang_arch: "x86_64" }))
+    expect(legs).toContainEqual(
+      expect.objectContaining({ host: "darwin-arm64", rust_target: "aarch64-apple-darwin", clang_arch: "arm64" }),
+    )
+    expect(legs).toContainEqual(
+      expect.objectContaining({ host: "darwin-x64", rust_target: "x86_64-apple-darwin", clang_arch: "x86_64" }),
+    )
     expect(helper).toContain("if: startsWith(matrix.host, 'darwin-')")
     expect(helper).toContain("CLANG_ARCH: ${{ matrix.clang_arch }}")
     expect(run).toContain('/usr/bin/clang -arch "$CLANG_ARCH"')
