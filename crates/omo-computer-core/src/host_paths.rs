@@ -151,12 +151,32 @@ mod tests {
         }
     }
 
+    /// Linux names the uid's abstract socket under `~/.config/omo`; macOS names a socket file in
+    /// its per-user runtime root under `~/Library/Application Support/OmO`.
     #[test]
-    #[cfg(target_os = "linux")]
-    fn the_real_linux_name_carries_the_uid_and_no_suffix() {
-        let paths = resolve(env(&[("HOME", "/home/u"), ("XDG_RUNTIME_DIR", "/run/user/501")]), false, 501)
-            .expect("real paths");
-        assert_eq!(paths.address, HostAddress::Abstract("omo-host-api-501".to_owned()));
-        assert_eq!(paths.consent(), Path::new("/home/u/.config/omo/computer/consent.json"));
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    fn the_real_unix_paths_name_the_platform_config_root_and_host_address() {
+        let lookup = env(&[("HOME", "/home/u"), ("XDG_RUNTIME_DIR", "/run/user/501")]);
+        let paths = resolve(&lookup, false, 501).expect("real paths");
+        if cfg!(target_os = "macos") {
+            let runtime = crate::paths::resolve(&lookup).expect("the runtime root").runtime;
+            assert_eq!(paths.address, HostAddress::Socket(runtime.join("host-api.sock")));
+            assert_eq!(paths.consent(), Path::new("/home/u/Library/Application Support/OmO/computer/consent.json"));
+        } else {
+            assert_eq!(paths.address, HostAddress::Abstract("omo-host-api-501".to_owned()));
+            assert_eq!(paths.consent(), Path::new("/home/u/.config/omo/computer/consent.json"));
+        }
+    }
+
+    /// Windows roots everything at `%APPDATA%\OmO` and names the host by its endpoint file; without
+    /// `APPDATA` (a `HOME`-only environment) no config root is named.
+    #[test]
+    #[cfg(windows)]
+    fn the_real_windows_paths_sit_under_appdata() {
+        let paths = resolve(env(&[("APPDATA", r"C:\Users\u\AppData\Roaming")]), false, 501).expect("real paths");
+        let computer = Path::new(r"C:\Users\u\AppData\Roaming\OmO\computer");
+        assert_eq!(paths.consent(), computer.join("consent.json"));
+        assert_eq!(paths.address, HostAddress::Endpoint(computer.join("host-endpoint")));
+        assert_eq!(resolve(env(&[("HOME", "/home/u")]), false, 501), Err(HostPathsUnavailable::NoConfigRoot));
     }
 }
