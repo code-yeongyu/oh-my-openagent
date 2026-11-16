@@ -29,7 +29,7 @@ pub(super) fn refused(refusal: &Refusal) -> Failure {
     }
     let mut data = json!({ "code": refusal.code.wire(), "hint": null });
     if let Some(reason) = refusal.reason {
-        data["reason"] = json!(reason);
+        data["reason"] = json!(reason.wire());
     }
     failure(refusal.code.number(), refusal.code.wire(), Some(data))
 }

@@ -59,7 +59,7 @@ fn a_dangerous_chord_of_the_personas_own_list_is_refused_and_another_oss_is_not(
             .host_call(Method::KeyDown, json!({"target": "101", "chord": chord}))
             .expect("served")
         {
-            Err(HostCallError::Refused(refused)) => refused.refusal.reason,
+            Err(HostCallError::Refused(refused)) => refused.refusal.reason.map(omo_computer_core::error::Reason::wire),
             Err(HostCallError::Params(error)) => panic!("{chord}: {error}"),
             Ok(_) => None,
         };

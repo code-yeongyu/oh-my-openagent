@@ -1,6 +1,7 @@
 //! The Target stage and the chord stage: the self set and the protected table refuse before
 //! send, `force` included; `force` admits exactly the listed chords.
 
+use omo_computer_core::error::Reason;
 use omo_computer_core::backend::Refusal;
 
 use super::super::verdicts::LeaseRefusal;
@@ -17,7 +18,7 @@ fn refused(verb: VerbKind, targets: Vec<PointTarget>, force: bool) -> Option<(Ga
 }
 
 fn wire(refusal: &Refusal) -> (&'static str, Option<&'static str>) {
-    (refusal.code.wire(), refusal.reason)
+    (refusal.code.wire(), refusal.reason.map(Reason::wire))
 }
 
 #[test]
