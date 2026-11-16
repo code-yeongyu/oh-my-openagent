@@ -9,6 +9,7 @@ mod cap_refusal;
 mod clearing;
 mod gc;
 mod healthy_hand;
+#[cfg(target_os = "linux")]
 mod lock;
 mod redaction;
 mod rotation;
