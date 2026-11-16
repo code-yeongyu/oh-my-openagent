@@ -208,11 +208,11 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       ),
     // create / open / fork on another device: relay daemon #393's attach-less `session.command {device, endpoint, rpc}`.
     // The endpoint lookup and every refusal answered before sending ran nothing; anything after sending may have.
-    // The record goes on the endpoint dialer (a fresh owned connection per call by default), closed once it settles
-    // if owned (#12777): opening the session on the long-lived connection attaches the host's delegated engine
+    // An open_session goes on the endpoint dialer (a fresh owned connection per call by default), closed once it
+    // settles if owned (#12777): opening the session on the long-lived connection attaches the host's delegated engine
     // connection to it as well, so the engine writes each streamed delta twice, once to the attach stream and once
     // to the delegated connection. The attach that follows still rides the long-lived connection, which then
-    // carries one copy per delta.
+    // carries one copy per delta. Every other record rides the long-lived connection.
     endpointCommand: async (device, rpc, endpointOptions) => {
       let record: WireRpc
       try {
@@ -222,7 +222,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       }
       let dialed: { readonly conn: DeviceService; readonly owned: boolean }
       try {
-        dialed = await dialEndpoint()
+        dialed = record["type"] === "open_session" ? await dialEndpoint() : { conn: await svc(), owned: false }
       } catch (error) {
         return { kind: "refused", reason: notSentReason(error) }
       }
@@ -237,7 +237,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
           return { kind: "refused", reason: error.code }
         return { kind: "uncertain", reason: "reply_lost" }
       } finally {
-        // Only a connection this call owns is closed here: a borrowed one stays open for its owner.
+        // Only a connection this call owns is closed here: the long-lived one and a borrowed one stay open.
         if (dialed.owned) connected.close()
       }
     },
