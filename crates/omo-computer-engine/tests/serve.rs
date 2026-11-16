@@ -259,3 +259,25 @@ fn marker_precedes_input_in_serve_and_oneshot_modes() {
     // The oneshot leg runs against the daemon (corpus case 09): a standalone oneshot has no frame
     // across processes. It lands with case 09, after the Q4 ruling in ROW29-DECISIONS.md.
 }
+
+fn alive_after(daemon: &mut Daemon, wait: Duration) -> bool {
+    let deadline = Instant::now() + wait;
+    while Instant::now() < deadline {
+        if daemon.child.try_wait().expect("wait").is_some() {
+            return false;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    true
+}
+
+#[test]
+fn idle_exit_only_without_open_session() {
+    let mut daemon = Daemon::start(&[("OMO_COMPUTER_FAKE_CLOCK", "1")]);
+    let mut client = opened(&daemon);
+    client.call(2, "$/test.advanceClock", &json!({"ms": 301_000})).expect("advanced");
+    assert!(alive_after(&mut daemon, Duration::from_millis(1500)), "an open session keeps the daemon up");
+    client.call(3, "session.close", &json!({})).expect("closed");
+    client.call(4, "$/test.advanceClock", &json!({"ms": 301_000})).expect("advanced");
+    assert!(!alive_after(&mut daemon, Duration::from_secs(3)), "300 s idle with no open session ends the daemon");
+}
