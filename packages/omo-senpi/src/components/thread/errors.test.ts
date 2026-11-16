@@ -9,27 +9,23 @@ describe("gatewaySchemaRefusal", () => {
       details: { found: 17, supported: 14 },
     })
 
-  test.each([
-    ["no launcher brand", undefined, "omo update"],
-    [
-      "a launcher brand naming its update command",
-      JSON.stringify({ update: { command: "bun add -g omo-ai@beta" } }),
-      "bun add -g omo-ai@beta",
-    ],
-    ["an unreadable launcher brand", "{", "omo update"],
-  ])(
-    "#given %s #when the refusal is built #then it names both schemas and the command that updates this omo",
-    (_case, brand, command) => {
-      const refusal = gatewaySchemaRefusal(tooNew(), brand === undefined ? {} : { SENPI_BRAND: brand })
+  test("#given a launcher brand naming another command #when the refusal is built #then it still names omo update, which every omo build answers (the engine strips SENPI_BRAND at startup and the omo thread CLI never has it)", () => {
+    const prior = process.env.SENPI_BRAND
+    process.env.SENPI_BRAND = JSON.stringify({ update: { command: "bun add -g omo-ai@beta" } })
+    try {
+      const refusal = gatewaySchemaRefusal(tooNew())
       expect(refusal).toMatchObject({
         code: "gateway_schema_too_new",
-        details: { gateway_schema: 17, binary_schema: 14, update_command: command },
+        details: { gateway_schema: 17, binary_schema: 14, update_command: "omo update" },
       })
-      expect(refusal?.next_action).toContain(command)
-    },
-  )
+      expect(refusal?.next_action).toContain("`omo update`")
+    } finally {
+      if (prior === undefined) delete process.env.SENPI_BRAND
+      else process.env.SENPI_BRAND = prior
+    }
+  })
 
   test("#given any other store failure #when mapped #then it is not a schema refusal", () => {
-    expect(gatewaySchemaRefusal(new Error("disk I/O error"), {})).toBeUndefined()
+    expect(gatewaySchemaRefusal(new Error("disk I/O error"))).toBeUndefined()
   })
 })

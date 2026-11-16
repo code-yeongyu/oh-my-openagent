@@ -242,7 +242,7 @@ describe("thread SDK: a gateway store a newer omo build migrated", () => {
         details: {
           gateway_schema: versions.gateway,
           binary_schema: versions.binary,
-          update_command: expect.any(String),
+          update_command: "omo update",
         },
       },
     })

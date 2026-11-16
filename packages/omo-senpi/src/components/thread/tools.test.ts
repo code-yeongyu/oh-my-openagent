@@ -1237,7 +1237,7 @@ describe("thread tools over a gateway store a newer omo build migrated", () => {
         kind: "error",
         error: {
           code: "gateway_schema_too_new",
-          details: { gateway_schema: n.gateway, binary_schema: n.binary, update_command: expect.any(String) },
+          details: { gateway_schema: n.gateway, binary_schema: n.binary, update_command: "omo update" },
         },
       }
 
@@ -1259,6 +1259,28 @@ describe("thread tools over a gateway store a newer omo build migrated", () => {
       } finally {
         db.close()
       }
+    },
+  )
+
+  test.each([
+    [
+      "thread_bind",
+      { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "t1", session: "my-tui", ttl_seconds: null },
+    ],
+    ["thread_report", { kind: "milestone", text: "done step 1" }],
+    ["thread_outbox", { binding_id: "bnd-1", after_cursor: 0 }],
+  ] as const)(
+    "#given the agent dir's store is one schema version past this binary's #when the relay tool %s runs #then it answers gateway_schema_too_new naming both schemas and omo update",
+    async (name, args) => {
+      const n = newerStore(1)
+      const g = gatewayFixture(n.store)
+      expect(await g.run(name, args, "dur-host", "call-relay")).toMatchObject({
+        kind: "error",
+        error: {
+          code: "gateway_schema_too_new",
+          details: { gateway_schema: n.gateway, binary_schema: n.binary, update_command: "omo update" },
+        },
+      })
     },
   )
 })
