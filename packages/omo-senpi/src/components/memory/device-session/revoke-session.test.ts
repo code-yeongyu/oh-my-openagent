@@ -108,6 +108,20 @@ async function revokedDevice(
   const paths = buildIdentityPaths(join(root, "memory"), "agent")
   const project = join(root, "project")
   for (const dir of [paths.repo, project]) execFileSync("git", ["init", "-q", dir])
+  // Sync binds a memory repository only after its first commit (#13486).
+  execFileSync("git", [
+    "-C",
+    paths.repo,
+    "-c",
+    "user.name=t",
+    "-c",
+    "user.email=t@example.invalid",
+    "commit",
+    "-q",
+    "--allow-empty",
+    "-m",
+    "first",
+  ])
   try {
     await runner.acquire("agent", paths, { enabled: true }, { profile: "auto", projectDir: project })
     expect(tokenFn).toBeDefined()
