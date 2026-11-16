@@ -58,7 +58,18 @@ for every stop, including a failed verification or install.
 
 ## Set up a device
 
-After `omo login`, one command sets the device up:
+Remote sessions are **on by default**. The moment `omo login` completes, it switches them on for this device and
+prints one line:
+
+```text
+Remote is on for this device: other signed-in devices can reach it. Turn off: omo remote disable
+```
+
+Every omo start then keeps the device set up (`omo remote bootstrap`). `omo remote disable` turns remote sessions
+off and records that in `~/.omo/remote-sessions.json`, so neither `omo login` nor an omo start turns them on again;
+`omo login` then says so (`Remote is off for this device, as you set it with omo remote disable. Turn on: omo remote
+enable`). The bootstrap never turns the device service's switch on by itself: a switch turned off another way (the
+OmO desktop app) stays off. `omo remote enable` turns remote sessions back on and clears the record:
 
 ```bash
 omo remote enable
@@ -66,8 +77,8 @@ omo remote enable
 
 It runs the bootstrap first (`packages/omo-native/remote-bootstrap.ts`): it installs the pinned device service when
 none runs, connects, and registers this omo's agent dir with it (the service only creates endpoints and delivery
-consumers for agent dirs it knows). It then turns remote sessions on, and installs and starts the always-on session host
-unit (see [Session host unit and cold wake](#session-host-unit-and-cold-wake)). Each step is idempotent, so running it
+consumers for agent dirs it knows). It then turns remote sessions on, links a sign-in the service has not seen (a sign-in made before the service was
+installed), and installs and starts the always-on session host unit (see [Session host unit and cold wake](#session-host-unit-and-cold-wake)). Each step is idempotent, so running it
 again changes nothing that is already in place. Signed out, it stops before anything is installed, with exit `3`.
 
 `omo remote status` reads the result back. Besides the service's own state it shows this device's two units as the
