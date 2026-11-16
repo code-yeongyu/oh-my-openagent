@@ -49,6 +49,9 @@ import type {
   ThreadHandle,
   WaitResult,
 } from "./types"
+import type { RemoteClient } from "./types"
+
+export type { RemoteClient }
 
 export type RemoteClientDeps = {
   readonly version: string
@@ -87,61 +90,6 @@ export type RemoteClientDeps = {
     readonly stateDir: string
     readonly timers: Timers
   }) => Promise<DeviceService>
-}
-
-/**
- * The one remote client (design v8-core r2, B1, with the #13414 W3 rows' shapes). Members of 4a-1 live in this file; each
- * later member lives in its own module (sessions.ts, follow.ts, attach.ts, aliases.ts, resolve.ts) and is built from the
- * same `ClientCore`, so every member shares the one connection, the sender and the deadlines.
- */
-export type RemoteClient = {
-  readonly service: {
-    readonly info: (opts?: Opts) => R<ServiceInfo>
-    readonly status: (opts?: Opts) => R<ServiceStatus>
-    readonly setEnabled: (on: boolean, opts?: Opts) => R<{ readonly enabled: boolean }>
-    readonly control: (opts?: Opts) => R<ControlState>
-    readonly setControl: (on: boolean, opts?: Opts) => R<ControlState>
-    readonly bootstrap: (setup: BootstrapSetup, opts?: Opts) => R<BootstrapResult>
-    /** The device's session-wake switch (omo#13037 A7.2.5); `unsupported{feature:"wake"}` below the service that carries it. */
-    readonly wake: (opts?: Opts) => R<WakeState>
-    /** Sets the switch; `null` removes the stored value (the default applies). Person only. */
-    readonly setWake: (on: boolean | null, opts?: Opts) => R<WakeState>
-  }
-  readonly devices: {
-    readonly list: (opts?: Opts) => R<readonly DeviceRow[]>
-    readonly resolve: (idOrName: string, opts?: Opts) => R<DeviceRow>
-  }
-  readonly sessions: {
-    readonly list: (filter?: SessionsListFilter, opts?: Opts) => R<SessionsList>
-    /** One address (durable id, alias, name, `<device>/<session>`) to its row, on the cached listing (no relist per op). */
-    readonly resolve: (address: string, scope?: Scope, opts?: Opts) => R<SessionRow>
-    readonly get: (thread: ThreadHandle, opts?: Opts) => R<SessionDetail>
-    readonly open: (request: OpenRequest, opts?: Opts) => R<OpenResult>
-    readonly send: (thread: ThreadHandle, request: SendRequest, opts?: Opts) => R<SendReceipt>
-    readonly read: (
-      thread: ThreadHandle,
-      page?: { readonly before?: string; readonly tail?: number },
-      opts?: Opts,
-    ) => R<ReadPage>
-    /** Status changes, turn ends and the turn's stream, from now on; survives relay, service and engine restarts. */
-    readonly follow: (thread: ThreadHandle, opts?: Opts) => RemoteStream<FollowEvent>
-    readonly wait: (thread: ThreadHandle, opts?: Opts) => R<WaitResult>
-    readonly interrupt: (thread: ThreadHandle, opts?: Opts) => R<InterruptResult>
-    /** The session's own model ("provider/id"); never a device default. */
-    readonly setModel: (thread: ThreadHandle, model: string, opts?: Opts) => R<{ readonly model: string }>
-    /** The session's own thinking level; never a device default. */
-    readonly setReasoning: (thread: ThreadHandle, level: string, opts?: Opts) => R<{ readonly reasoning: string }>
-    readonly close: (thread: ThreadHandle, opts?: Opts) => R<{ readonly closed: boolean }>
-    readonly archive: (thread: ThreadHandle, archived: boolean, opts?: Opts) => R<{ readonly archived: boolean }>
-  }
-  /** One session's live attach: its snapshot, records, pending UI requests and their answers. */
-  readonly attach: (thread: ThreadHandle, opts?: Opts) => R<AttachHandle>
-  readonly aliases: {
-    readonly resolve: (alias: string, opts?: Opts) => R<ThreadHandle>
-    readonly set: (thread: ThreadHandle, alias: string, opts?: Opts) => R<{ readonly alias: string }>
-    readonly clear: (thread: ThreadHandle, opts?: Opts) => R<{ readonly released: boolean }>
-  }
-  readonly close: () => void
 }
 
 export type Outcome<T> = { readonly kind: "ok"; readonly value: T } | RemoteFailure
