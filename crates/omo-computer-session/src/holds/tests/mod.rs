@@ -4,6 +4,7 @@
 mod click;
 mod exit_paths;
 mod pointer;
+mod release_helper;
 mod review_4acc6ab;
 
 use omo_computer_backend_fake::{FakeBackend, FakeClock, FakeScenario, RecordingSink, StopPathScript};
