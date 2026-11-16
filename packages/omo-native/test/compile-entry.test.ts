@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
+import * as fs from "node:fs"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
-import { createHash } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import { homedir } from "node:os"
-import { delimiter, dirname, join } from "node:path"
+import { basename, delimiter, dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import {
   compiledBannerLines,
@@ -390,6 +391,12 @@ describe("pre-provisioning fast paths", () => {
 })
 
 describe("embedded runtime provisioning", () => {
+  const temporaryPaths = (destination: string) =>
+    fs
+      .readdirSync(dirname(destination))
+      .filter((name) => name.startsWith(`${basename(destination)}.tmp-`))
+      .map((name) => join(dirname(destination), name))
+
   test("materializes the executable directly on Windows", () => {
     const root = temp()
     const source = join(root, "source.exe")
@@ -453,10 +460,164 @@ describe("embedded runtime provisioning", () => {
     mkdirSync(join(root, "runtime"), { recursive: true })
     writeFileSync(source, "compiled binary")
 
-    materializeProvisionedExecutable(source, destination, "darwin")
+    // given: observe the actual copy path rather than the obsolete PID-only name
+    const copyFile = fs.copyFileSync
+    let temporaryPath = ""
+    const copy = spyOn(fs, "copyFileSync").mockImplementation((from, to, flags) => {
+      temporaryPath = String(to)
+      copyFile(from, to, flags)
+    })
+    // when: the POSIX executable is published
+    try {
+      materializeProvisionedExecutable(source, destination, "darwin")
+    } finally {
+      copy.mockRestore()
+    }
 
+    // then: the copied UUID path is gone and the published bytes are complete
     expect(readFileSync(destination, "utf8")).toBe("compiled binary")
-    expect(existsSync(`${destination}.tmp-${process.pid}`)).toBe(false)
+    expect(temporaryPath).toStartWith(`${destination}.tmp-${process.pid}-`)
+    expect(temporaryPath).toMatch(/\.tmp-\d+-[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/)
+    expect(existsSync(temporaryPath)).toBe(false)
+    expect(temporaryPaths(destination)).toEqual([])
+  })
+
+  test.each(["copy", "chmod", "rename"] as const)("removes the actual unique temp after %s fails", (phase) => {
+    // given: a replacement must preserve the previously published executable
+    const root = temp()
+    const source = join(root, "source")
+    const destination = join(root, "omo")
+    writeFileSync(source, "new executable")
+    writeFileSync(destination, "previous executable with different length")
+    const copyFile = fs.copyFileSync
+    let temporaryPath = ""
+    const failure = new Error(`fixture ${phase} failure`)
+    const copy = spyOn(fs, "copyFileSync").mockImplementation((from, to, flags) => {
+      temporaryPath = String(to)
+      copyFile(from, to, flags)
+      if (phase === "copy") throw failure
+    })
+    const operation =
+      phase === "copy"
+        ? undefined
+        : spyOn(fs, phase === "chmod" ? "chmodSync" : "renameSync").mockImplementation(() => {
+            throw failure
+          })
+    // when: publication fails after the actual temporary copy exists
+    try {
+      expect(() => materializeProvisionedExecutable(source, destination, "linux")).toThrow(failure)
+    } finally {
+      copy.mockRestore()
+      operation?.mockRestore()
+    }
+    // then: that exact temp is removed without changing the old destination
+    expect(temporaryPath).toStartWith(`${destination}.tmp-${process.pid}-`)
+    expect(existsSync(temporaryPath)).toBe(false)
+    expect(temporaryPaths(destination)).toEqual([])
+    expect(readFileSync(destination, "utf8")).toBe("previous executable with different length")
+  })
+
+  test("concurrent provisioners sharing a PID cannot consume each other's temporary executable", () => {
+    // given: workers or separate PID namespaces can share a PID and destination
+    const root = temp()
+    const source = join(root, "source")
+    const destination = join(root, "omo")
+    writeFileSync(source, "complete executable\n")
+    const copyFile = fs.copyFileSync
+    let competing = false
+    const copy = spyOn(fs, "copyFileSync").mockImplementation((from, to, flags) => {
+      copyFile(from, to, flags)
+      if (!competing) {
+        competing = true
+        materializeProvisionedExecutable(source, destination, "linux")
+      }
+    })
+    // when: the second provisioner publishes after the first copies, before chmod
+    try {
+      expect(() => materializeProvisionedExecutable(source, destination, "linux")).not.toThrow()
+    } finally {
+      copy.mockRestore()
+    }
+    // then: both finish, no temp remains, and the stable coordinator is retained
+    expect(competing).toBe(true)
+    expect(readFileSync(destination, "utf8")).toBe("complete executable\n")
+    if (process.platform !== "win32") expect(statSync(destination).mode & 0o777).toBe(0o755)
+    expect(fs.readdirSync(root).sort()).toEqual(["omo", "omo.provisioning-lock", "source"])
+  })
+
+  test.each([false, true])("reclaims abandoned unique temps when a complete destination exists: %s", (published) => {
+    // given: an abandoned name may contain the PID of a currently live process
+    const root = temp()
+    const source = join(root, "source")
+    const destination = join(root, "omo")
+    writeFileSync(source, "complete executable")
+    if (published) writeFileSync(destination, "complete executable")
+    const abandoned = `${destination}.tmp-${process.pid}-${randomUUID()}`
+    writeFileSync(abandoned, "interrupted executable")
+    const unrelated = join(root, "omo.tmp-user-notes")
+    writeFileSync(unrelated, "keep this")
+
+    // when: provision with or without an already matching destination
+    materializeProvisionedExecutable(source, destination, "linux")
+
+    // then: reclaim the abandoned executable and preserve unrelated files
+    expect(existsSync(abandoned)).toBe(false)
+    expect(readFileSync(destination, "utf8")).toBe("complete executable")
+    expect(readFileSync(unrelated, "utf8")).toBe("keep this")
+  })
+
+  test("keeps a live writer's temp, then reclaims it after SIGKILL even when another writer published", async () => {
+    // given: a real process pauses after copying while its shared lock is held
+    const root = temp()
+    const source = join(root, "source")
+    const destination = join(root, "omo")
+    writeFileSync(source, "complete executable")
+    const child = Bun.spawn(
+      [process.execPath, join(import.meta.dir, "fixtures", "provisioning-interrupt.ts"), source, destination],
+      { stdout: "pipe", stderr: "pipe" },
+    )
+    let deadline: ReturnType<typeof setTimeout> | undefined
+    try {
+      const reader = child.stdout.getReader()
+      const ready = (async () => {
+        let output = ""
+        try {
+          while (!output.includes("PROVISION_READY\n")) {
+            const part = await reader.read()
+            if (part.done) throw new Error(`writer exited before readiness: ${output}`)
+            output += new TextDecoder().decode(part.value)
+          }
+        } finally {
+          reader.releaseLock()
+        }
+      })()
+      await Promise.race([
+        ready,
+        new Promise<never>((_, reject) => {
+          deadline = setTimeout(() => reject(new Error("writer did not signal copied temp within 10s")), 10_000)
+        }),
+      ])
+      const [active] = temporaryPaths(destination)
+      expect(active).toBeDefined()
+      // when: a second provisioner publishes alongside the paused writer
+      materializeProvisionedExecutable(source, destination, "linux")
+      // then: collection leaves the active writer's temp alone
+      expect(temporaryPaths(destination)).toEqual([active])
+      expect(readFileSync(destination, "utf8")).toBe("complete executable")
+      // when: that writer dies after its peer has published
+      child.kill("SIGKILL")
+      await child.exited
+
+      // then: even the cache-match path reclaims the now abandoned executable
+      materializeProvisionedExecutable(source, destination, "linux")
+
+      expect(temporaryPaths(destination)).toEqual([])
+    } finally {
+      clearTimeout(deadline)
+      if (child.exitCode === null) child.kill("SIGKILL")
+      await child.exited
+      await new Response(child.stderr).text()
+    }
   })
 
   test("keeps an existing destination when the deleted Linux source cannot be read", () => {
@@ -544,7 +705,13 @@ describe("embedded runtime provisioning", () => {
     }
     try {
       await runCompiledLauncher(["doctor"], root, "2026.8.28", root, {
-        env: { PATH: [join(root, "local-bin"), join(bunRoot, "bin")].join(delimiter), BUN_INSTALL: bunRoot },
+        // The doctor reads only this env, so it must name the fixture's memory root: without OMO_MEMORY_HOME the memory
+        // report falls back to os.homedir() and measures the runner's real memory store (#12930).
+        env: {
+          PATH: [join(root, "local-bin"), join(bunRoot, "bin")].join(delimiter),
+          BUN_INSTALL: bunRoot,
+          OMO_MEMORY_HOME: join(home, ".omo", "memory"),
+        },
         homeDir: home,
         platform: "linux",
       })
