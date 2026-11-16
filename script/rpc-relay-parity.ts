@@ -56,13 +56,44 @@ export function curatedRows(path: string = ROWS_PATH): Readonly<Record<string, C
 }
 
 /**
- * Whether `source` uses `method` as a record type: the quoted name as the value of a `type` field (`type: "m"`), compared
- * with one (`["type"] === "m"`, `.type === "m"`), or asserted on one (`.type).toBe("m")`). A mention anywhere else (a
- * comment, a test title, an unrelated string) does not count.
+ * `source` with comments removed and every string literal blanked except a literal that is exactly one of `keep`
+ * (`"type"` and the method name), so a record-type shape inside a comment, a test title or any other string is gone.
+ */
+function codeOnly(source: string, keep: ReadonlySet<string>): string {
+  let out = ""
+  for (let i = 0; i < source.length; i++) {
+    const ch = source.charAt(i)
+    const next = source.charAt(i + 1)
+    if (ch === "/" && next === "/") {
+      while (i < source.length && source.charAt(i) !== "\n") i++
+      out += "\n"
+    } else if (ch === "/" && next === "*") {
+      const end = source.indexOf("*/", i + 2)
+      i = end === -1 ? source.length : end + 1
+      out += " "
+    } else if (ch === '"' || ch === "'" || ch === "`") {
+      let text = ""
+      for (i++; i < source.length && source.charAt(i) !== ch; i++)
+        text += source.charAt(i) === "\\" ? source.charAt(++i) : source.charAt(i)
+      out += keep.has(text) ? `"${text}"` : '""'
+    } else {
+      out += ch
+    }
+  }
+  return out
+}
+
+/**
+ * Whether `source` uses `method` as a record type in code: the quoted name as the value of a `type` field (`type: "m"`),
+ * compared with one (`["type"] === "m"`, `.type === "m"`), or asserted on one (`.type).toBe("m")`). A mention inside a
+ * comment or a string (a test title), or on another property such as `$type`, does not count.
  */
 export function namesRecordType(source: string, method: string): boolean {
-  const name = `["']${method}["']`
-  return new RegExp(`\\btype["']?\\]?\\s*(?::|===?)\\s*${name}|\\btype\\)\\.toBe\\(\\s*${name}\\s*\\)`).test(source)
+  const code = codeOnly(source, new Set(["type", method]))
+  const name = `"${method}"`
+  return new RegExp(
+    `(?<![\\w$])"?type"?\\]?\\s*(?::|===?)\\s*${name}|(?<![\\w$])type\\)\\.toBe\\(\\s*${name}\\s*\\)`,
+  ).test(code)
 }
 
 /** A curated pair test must be a file in this repository that uses its method as a record type (namesRecordType). */

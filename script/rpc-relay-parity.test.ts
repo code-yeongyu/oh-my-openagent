@@ -54,6 +54,15 @@ describe("engine RPC local-versus-relay parity table (#13478)", () => {
     expect(namesRecordType('{ type: "prompt_template" }', "prompt")).toBe(false)
   })
 
+  test("a record-type shape inside a comment, a string or a $type property does not count as a pair test", () => {
+    expect(namesRecordType('// sends { type: "prompt" }\n', "prompt")).toBe(false)
+    expect(namesRecordType('/* expects record.type === "prompt" */', "prompt")).toBe(false)
+    expect(namesRecordType(`test('type: "prompt" relays', () => {})`, "prompt")).toBe(false)
+    expect(namesRecordType('const title = `type: "prompt"`', "prompt")).toBe(false)
+    expect(namesRecordType('if (frame.$type === "prompt") relay()', "prompt")).toBe(false)
+    expect(namesRecordType('// comment first\nsend({ type: "prompt" })', "prompt")).toBe(true)
+  })
+
   test("--check reports a broken pair-test row even when the committed table is current", async () => {
     const rows = { prompt: { test: "no/such/pair.test.ts (fakes)" } }
     const rendered = renderTable(await engineMethodClasses(), rows)
