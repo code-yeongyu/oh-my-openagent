@@ -1,6 +1,7 @@
 {
   "reason": "knip 6.43.0 adds these files as exports-unchecked entries while it analyzes source that loads them by path (graph/build.js: entryFiles, script strings, import globs); that flag overrides an explicit entry, so a probe appended here is never reported. `knip --trace-file <file> --trace-export <probe>` shows the file as an entry with no importers. The probe test fails when one of these probes IS reported (stale row) or the file is no longer a knip entry.",
   "files": [
+    "packages/device-service-core/test/local-api/sent-request-types.ts",
     "packages/isolation-core/src/backend.ts",
     "packages/isolation-core/src/backends/apfs.ts",
     "packages/isolation-core/src/backends/block-clone.ts",
