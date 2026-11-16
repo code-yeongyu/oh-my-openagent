@@ -276,7 +276,7 @@ impl Session {
         self.guard.start(
             Err(Refusal::new(
                 omo_computer_core::error::EngineCode::StopPathUnavailable,
-                omo_computer_core::error::Reason::Deaf.wire(),
+                omo_computer_core::error::Reason::Deaf,
             )),
             None,
         )
@@ -305,7 +305,7 @@ impl Session {
         self.arm_configured_chord();
         Err(Refusal::new(
             omo_computer_core::error::EngineCode::StopPathUnavailable,
-            omo_computer_core::error::Reason::Deaf.wire(),
+            omo_computer_core::error::Reason::Deaf,
         ))
     }
 
@@ -379,7 +379,7 @@ fn check_stop_hotkey(view: &ConsentView, os: Os, requested: Option<&str>) -> Res
     } else {
         Err(Refusal::new(
             omo_computer_core::error::EngineCode::ControlRequired,
-            omo_computer_core::error::Reason::Tampered.wire(),
+            omo_computer_core::error::Reason::Tampered,
         ))
     }
 }

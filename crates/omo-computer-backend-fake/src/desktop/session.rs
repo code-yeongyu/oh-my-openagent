@@ -45,7 +45,7 @@ impl FakeBackend {
         match self.stop_path {
             StopPathScript::None => Err(Refusal::new(
                 EngineCode::StopPathUnavailable,
-                Reason::NoListener.wire(),
+                Reason::NoListener,
             )),
             script => Ok(Box::new(FakeStopListener::new(self.shared.clone(), script))),
         }
