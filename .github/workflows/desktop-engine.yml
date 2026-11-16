@@ -139,6 +139,7 @@ jobs:
             dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24" cargo test -p senpi-desktop-backend-atspi --locked --lib -- --ignored --exact "live_tests::$test"
           done
           dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24" cargo test -p senpi-desktop-backend-atspi --locked --lib -- --ignored --exact --nocapture menus_live_tests::menu_listing_and_select_against_a_real_gtk_menu_bar
+          dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24" cargo test -p senpi-desktop-backend-atspi --locked --lib -- --ignored --exact --nocapture hit_live_tests::element_at_names_the_deepest_element_of_a_real_gtk_window
           env -u AT_SPI_BUS_ADDRESS DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent/senpi-no-bus cargo test -p senpi-desktop-backend-atspi --locked --lib -- --ignored --exact live_tests::no_bus_reports_bus_unreachable
 
       - name: Write job summary
