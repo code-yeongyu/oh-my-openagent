@@ -153,7 +153,11 @@ impl<S: XServer> Backend for X11Backend<S> {
     }
 
     fn diagnose(&self) -> Option<omo_computer_core::backend::BackendProbes> {
-        let compositor = self.capture.as_ref().map(|c| c.server().compositor_present().unwrap_or(false));
+        let compositor = match self.capture.as_ref().map(|c| c.server().compositor_present()) {
+            None => crate::diagnose::CompositorRead::NoDisplay,
+            Some(Ok(present)) => crate::diagnose::CompositorRead::Present(present),
+            Some(Err(_)) => crate::diagnose::CompositorRead::Failed,
+        };
         Some(self.live.diagnose(self.capture.is_some(), compositor))
     }
 }

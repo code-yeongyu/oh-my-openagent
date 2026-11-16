@@ -12,7 +12,7 @@ use omo_computer_core::error::{EngineCode, Reason};
 
 use super::{arm, Armed, DeafListener, LeaseEndSignal, Xi2Server, DEFAULT_STOP_CHORD};
 use crate::capture::X11Connection;
-use crate::diagnose::{bus_reach, probes, uinput_at, HostReads};
+use crate::diagnose::{bus_reach, probes, uinput_at, CompositorRead, HostReads};
 use crate::epoch::X11EpochSource;
 use crate::overlay::{Overlay, OverlayServer, XOverlay};
 use crate::self_set::read_processes;
@@ -22,7 +22,15 @@ pub struct Live {
     pub(crate) overlay: Overlay,
     pub(crate) lease_end: LeaseEndSignal,
     proc_root: PathBuf,
+    #[cfg(test)]
+    keys: Option<super::fake::FakeKeys>,
+    #[cfg(test)]
+    epochs: Option<EpochFactory>,
 }
+
+/// Opens one epoch source on its own connection.
+#[cfg(test)]
+pub(crate) type EpochFactory = Box<dyn Fn() -> Option<Box<dyn EpochSource + Send>> + Send>;
 
 impl Live {
     #[must_use]
@@ -35,7 +43,39 @@ impl Live {
             overlay: Overlay::new(server),
             lease_end: LeaseEndSignal::default(),
             proc_root: PathBuf::from("/proc"),
+            #[cfg(test)]
+            keys: None,
+            #[cfg(test)]
+            epochs: None,
         }
+    }
+
+    /// The raw listener arms on `keys` instead of a display.
+    #[cfg(test)]
+    pub(crate) fn with_keys(mut self, keys: super::fake::FakeKeys) -> Self {
+        self.keys = Some(keys);
+        self
+    }
+
+    /// Epoch sources come from `epochs` instead of a display.
+    #[cfg(test)]
+    pub(crate) fn with_epochs(mut self, epochs: EpochFactory) -> Self {
+        self.epochs = Some(epochs);
+        self
+    }
+
+    fn raw_keys(&self) -> BackendResult<Box<dyn super::RawKeyServer>> {
+        #[cfg(test)]
+        if let Some(keys) = &self.keys {
+            return Ok(keys.boxed());
+        }
+        let display = self.display.as_deref().ok_or(Refusal::new(
+            EngineCode::StopPathUnavailable,
+            Reason::NoListener.wire(),
+        ))?;
+        Xi2Server::connect(display)
+            .map(|server| Box::new(server) as Box<dyn super::RawKeyServer>)
+            .map_err(|_| Refusal::bare(EngineCode::StopPathUnavailable))
     }
 
     #[cfg(test)]
@@ -46,13 +86,8 @@ impl Live {
 
     /// The raw listener on its own connection; a server it cannot be armed on is deaf.
     pub fn stop_listener(&self) -> BackendResult<Box<dyn StopListener>> {
-        let display = self.display.as_deref().ok_or(Refusal::new(
-            EngineCode::StopPathUnavailable,
-            Reason::NoListener.wire(),
-        ))?;
-        let server = Xi2Server::connect(display)
-            .map_err(|_| Refusal::bare(EngineCode::StopPathUnavailable))?;
-        match arm(Box::new(server), DEFAULT_STOP_CHORD, self.lease_end.clone()) {
+        let server = self.raw_keys()?;
+        match arm(server, DEFAULT_STOP_CHORD, self.lease_end.clone()) {
             Ok(Armed::Live(listener)) => Ok(Box::new(listener)),
             Ok(Armed::Deaf(_)) => Ok(Box::new(DeafListener)),
             Err(_) => Err(Refusal::bare(EngineCode::StopPathUnavailable)),
@@ -66,6 +101,10 @@ impl Live {
     }
 
     pub fn epoch_source(&self) -> Box<dyn EpochSource> {
+        #[cfg(test)]
+        if let Some(epochs) = &self.epochs {
+            return epochs().map_or_else(|| Box::new(NoEpochSource) as Box<dyn EpochSource>, |source| source as Box<dyn EpochSource>);
+        }
         match self.display.as_deref().map(X11Connection::connect) {
             Some(Ok(connection)) => Box::new(X11EpochSource::new(connection)),
             _ => Box::new(NoEpochSource),
@@ -77,7 +116,7 @@ impl Live {
         read_processes(&self.proc_root, uid)
     }
 
-    pub fn diagnose(&self, display: bool, compositor: Option<bool>) -> BackendProbes {
+    pub fn diagnose(&self, display: bool, compositor: CompositorRead) -> BackendProbes {
         let at_spi = std::env::var("AT_SPI_BUS_ADDRESS").ok();
         let session = std::env::var("DBUS_SESSION_BUS_ADDRESS").ok();
         probes(HostReads {

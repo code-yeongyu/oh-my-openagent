@@ -26,6 +26,26 @@ pub fn classify(found: Option<&DeviceFacts>) -> (bool, bool) {
     (!xtest, device.xtest_property.is_some())
 }
 
+/// What interning the `XTEST Device` property atom found (review L6 of #13357).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AtomRead {
+    /// The atom exists: ask the device for the property.
+    Interned(u32),
+    /// The server has no such atom, so no device carries the property.
+    Absent,
+    /// The intern request itself failed.
+    Failed,
+}
+
+/// The device's XTEST property as [`DeviceFacts::xtest_property`] records it: `Some(true)` when
+/// it carries the property, `Some(false)` when it does not, `None` when it could not be read.
+pub fn xtest_property(atom: AtomRead, read: impl FnOnce(u32) -> Option<bool>) -> Option<bool> {
+    match atom {
+        AtomRead::Interned(atom) => read(atom),
+        AtomRead::Absent | AtomRead::Failed => Some(false),
+    }
+}
+
 /// Per-connection cache of source classifications, cleared on every hierarchy change because
 /// device ids are reused after removal.
 #[derive(Debug, Default)]

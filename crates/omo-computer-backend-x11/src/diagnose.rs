@@ -18,8 +18,17 @@ pub struct HostReads {
     pub display: bool,
     pub bus: BusReach,
     pub uinput: Uinput,
-    /// `None` when there is no display to ask.
-    pub compositor: Option<bool>,
+    pub compositor: CompositorRead,
+}
+
+/// What asking the display for a compositor found.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CompositorRead {
+    /// There is no display to ask.
+    NoDisplay,
+    /// The read itself failed (review L7 of #13357).
+    Failed,
+    Present(bool),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -77,9 +86,11 @@ pub fn probes(reads: HostReads) -> BackendProbes {
         Uinput::Denied | Uinput::Absent => check("mpx", ProbeState::Unavailable, Some("uinput")),
     };
     let compositor = match reads.compositor {
-        Some(true) => check("compositor", ProbeState::Ok, None),
-        Some(false) => check("compositor", ProbeState::Unavailable, Some("none_running")),
-        None => check("compositor", ProbeState::Unknown, Some("no_display_server")),
+        CompositorRead::Present(true) => check("compositor", ProbeState::Ok, None),
+        CompositorRead::Present(false) | CompositorRead::Failed => {
+            check("compositor", ProbeState::Unavailable, Some("none_running"))
+        }
+        CompositorRead::NoDisplay => check("compositor", ProbeState::Unknown, Some("no_display_server")),
     };
     let mut permissions = BTreeMap::new();
     permissions.insert(
@@ -158,7 +169,7 @@ mod tests {
             display: false,
             bus: bus_reach(Some(&gone), None),
             uinput: uinput_at(&dir.join("uinput")),
-            compositor: None,
+            compositor: CompositorRead::NoDisplay,
         };
         let probes = probes(reads);
         let unknown = |r: &str| Some(r.to_owned());
@@ -197,7 +208,7 @@ mod tests {
             display: true,
             bus: BusReach::Answered,
             uinput: Uinput::Writable,
-            compositor: Some(true),
+            compositor: CompositorRead::Present(true),
         });
         assert!(ok
             .checks
@@ -211,7 +222,7 @@ mod tests {
             display: true,
             bus: BusReach::SessionOnly,
             uinput: Uinput::Denied,
-            compositor: Some(false),
+            compositor: CompositorRead::Present(false),
         });
         assert_eq!(
             states(&partial)[1..],

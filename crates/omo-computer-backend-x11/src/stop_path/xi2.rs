@@ -7,6 +7,7 @@ use x11rb::protocol::Event;
 use x11rb::rust_connection::RustConnection;
 
 use super::server::{DeviceFacts, KeyMap, Lost, RawKey, RawKeyServer};
+use super::source::{xtest_property, AtomRead};
 
 /// The property the X server sets on every XTEST device it creates.
 const XTEST_PROPERTY: &[u8] = b"XTEST Device";
@@ -37,18 +38,22 @@ impl Xi2Server {
         })
     }
 
-    fn xtest_atom(&mut self) -> Option<u32> {
+    fn xtest_atom(&mut self) -> AtomRead {
         if let Some(atom) = self.xtest_atom {
-            return atom;
+            return atom.map_or(AtomRead::Absent, AtomRead::Interned);
         }
-        let reply = self
+        let Some(reply) = self
             .conn
             .intern_atom(true, XTEST_PROPERTY)
             .ok()
-            .and_then(|cookie| cookie.reply().ok())?;
+            .and_then(|cookie| cookie.reply().ok())
+        else {
+            // Not cached: the next description asks again.
+            return AtomRead::Failed;
+        };
         let atom = (reply.atom != u32::from(AtomEnum::NONE)).then_some(reply.atom);
         self.xtest_atom = Some(atom);
-        atom
+        atom.map_or(AtomRead::Absent, AtomRead::Interned)
     }
 
     fn has_property(&self, device: u16, property: u32) -> Option<bool> {
@@ -143,10 +148,8 @@ impl RawKeyServer for Xi2Server {
             .ok()
             .and_then(|cookie| cookie.reply().ok())
             .and_then(|reply| reply.infos.into_iter().find(|info| info.deviceid == device))?;
-        let xtest_property = match self.xtest_atom() {
-            Some(atom) => self.has_property(device, atom),
-            None => Some(false),
-        };
+        let atom = self.xtest_atom();
+        let xtest_property = xtest_property(atom, |atom| self.has_property(device, atom));
         Some(DeviceFacts {
             slave_keyboard: info.type_ == DeviceType::SLAVE_KEYBOARD,
             name: info.name,
