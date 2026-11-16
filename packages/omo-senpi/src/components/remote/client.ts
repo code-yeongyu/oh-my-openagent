@@ -8,6 +8,7 @@ import {
   type ControlSessionWakeState as WakeState,
   type DeviceService,
   type DeviceRow as WireDeviceRow,
+  type RemoteAttach,
   type ListingRow,
   type Timers,
 } from "@oh-my-opencode/device-service-core/device-service"
@@ -66,6 +67,15 @@ export type RemoteClientDeps = {
    * compiled binary passes its provisioned runtime's copy; from source the store resolves its own worker.
    */
   readonly gatewayWorkerUrl?: URL
+  /**
+   * Serves an attach as a local engine endpoint (`AttachHandle.serveEndpoint`): the caller hands in omo-native's
+   * `serveRemoteAttach`, so the client never imports a net server into `omo remote`'s local-only graph (#13440). Absent,
+   * `serveEndpoint` answers `unsupported{feature:"serve_endpoint"}`.
+   */
+  readonly serveAttach?: (
+    attach: RemoteAttach,
+    label: string,
+  ) => Promise<{ readonly socketPath: string; readonly sessionRef: string; readonly close: () => Promise<void> }>
   /**
    * The approval mode of the session this client acts for (a session or connector sender): an open may keep or narrow
    * it, never widen it. Absent, only the narrowest mode passes.
@@ -275,6 +285,9 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
           details: { phase: "connect" },
         },
       )
+    // Every failure before the member's own call (refused, reset, no socket, a bad proof) names the connect phase, so a
+    // caller can tell a service that is not serving from a member that failed.
+    if (outcome.kind === "error") return { ...outcome, details: { ...outcome.details, phase: "connect" } }
     return outcome
   }
 

@@ -30,7 +30,11 @@ if (process.platform === "linux") {
   chmodSync(join(bin, "gdbus"), 0o755)
   process.env.PATH = `${bin}:${process.env.PATH ?? ""}`
 }
-Object.assign(globalThis, { [Symbol.for("omo.test.serviceAccountsOpen")]: true })
+Object.assign(globalThis, {
+  [Symbol.for("omo.test.serviceAccountsOpen")]: true,
+  // A test login must not install or link a device service on the host running the suite (omo#13627).
+  [Symbol.for("omo.test.skipRemoteLoginSetup")]: true,
+})
 
 const failure = process.env.OMO_TEST_FETCH_FAILURE
 if (failure === "offline" || failure === "lost-response" || failure === "timeout") {
