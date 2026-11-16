@@ -7,7 +7,7 @@ import { engineCode, exitCodeOf, failureFromError, REMOTE_CODES, remoteFailure }
 // the CLI maps them to exit codes, so a renamed, dropped or remapped code is a breaking change.
 
 describe("the remote code list", () => {
-  test("#given the thread taxonomy #then the list is it, names unchanged, plus exactly the five new codes", () => {
+  test("#given the thread taxonomy #then the list is it, names unchanged, plus exactly the new codes", () => {
     expect(REMOTE_CODES.slice(0, THREAD_ERROR_CODES.length)).toEqual([...THREAD_ERROR_CODES])
     expect(THREAD_ERROR_CODES).toHaveLength(42)
     expect(REMOTE_CODES.slice(THREAD_ERROR_CODES.length)).toEqual([
@@ -16,7 +16,20 @@ describe("the remote code list", () => {
       "session_ended",
       "sender_not_allowed",
       "local_only",
+      // #13414 W3, silent devices (relay-daemon#1137, omo#13406): who did not answer, and whether the call may have run.
+      "host_not_answering",
+      "no_transport",
+      "device_offline",
+      "undelivered",
+      "transport_expired",
+      "unconfirmed",
+      "host_error",
     ])
+  })
+
+  test("#given a device that did not answer #then host_not_answering, not host_unavailable", () => {
+    const failure = failureFromError(new LocalApiError("host_not_answering", "no answer"), false)
+    expect(failure.code).toBe("host_not_answering")
   })
 })
 
@@ -70,6 +83,9 @@ describe("exit codes", () => {
   test.each([
     ["host_unavailable", 3],
     ["relay_requires_paid_plan", 3],
+    ["host_not_answering", 3],
+    ["no_transport", 3],
+    ["device_offline", 3],
     ["session_ended", 4],
     ["timeout", 124],
     ["cancelled", 130],

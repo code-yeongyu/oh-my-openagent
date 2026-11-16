@@ -5,27 +5,46 @@ import {
   deviceServiceEndpointPath,
   deviceServiceStateDir,
   realTimers,
+  type ControlSessionWakeState as WakeState,
   type DeviceService,
   type DeviceRow as WireDeviceRow,
   type ListingRow,
   type Timers,
-} from "@oh-my-opencode/device-service-core"
+} from "@oh-my-opencode/device-service-core/device-service"
+import { aliasMembers } from "./aliases"
+import { attachMember } from "./attach"
 import { failureFromError, nextActionFor, remoteFailure } from "./codes"
 import { BOUNDS, CONNECT_SLACK_MS, DEADLINES, withinDeadline } from "./deadlines"
+import { streamMembers } from "./follow"
+import { resolveMember } from "./resolve"
+import { sessionMembers } from "./sessions"
 import type {
+  AttachHandle,
   BootstrapResult,
   BootstrapSetup,
   ControlState,
   DeviceRow,
+  FollowEvent,
+  InterruptResult,
+  OpenRequest,
+  OpenResult,
   Opts,
   R,
+  ReadPage,
   RemoteFailure,
   RemoteSender,
+  RemoteStream,
+  Scope,
+  SendReceipt,
+  SendRequest,
   ServiceInfo,
   ServiceStatus,
+  SessionDetail,
   SessionRow,
   SessionsList,
   SessionsListFilter,
+  ThreadHandle,
+  WaitResult,
 } from "./types"
 
 export type RemoteClientDeps = {
@@ -37,7 +56,11 @@ export type RemoteClientDeps = {
   readonly bootstrap?: (setup: BootstrapSetup) => Promise<BootstrapResult>
 }
 
-/** The members of part 4a-1 (design v8-core r2, B1); sessions.get onward land with their parts. */
+/**
+ * The one remote client (design v8-core r2, B1, with the #13414 W3 rows' shapes). Members of 4a-1 live in this file; each
+ * later member lives in its own module (sessions.ts, follow.ts, attach.ts, aliases.ts, resolve.ts) and is built from the
+ * same `ClientCore`, so every member shares the one connection, the sender and the deadlines.
+ */
 export type RemoteClient = {
   readonly service: {
     readonly info: (opts?: Opts) => R<ServiceInfo>
@@ -46,17 +69,73 @@ export type RemoteClient = {
     readonly control: (opts?: Opts) => R<ControlState>
     readonly setControl: (on: boolean, opts?: Opts) => R<ControlState>
     readonly bootstrap: (setup: BootstrapSetup, opts?: Opts) => R<BootstrapResult>
+    /** The device's session-wake switch (omo#13037 A7.2.5); `unsupported{feature:"wake"}` below the service that carries it. */
+    readonly wake: (opts?: Opts) => R<WakeState>
+    /** Sets the switch; `null` removes the stored value (the default applies). Person only. */
+    readonly setWake: (on: boolean | null, opts?: Opts) => R<WakeState>
   }
   readonly devices: {
     readonly list: (opts?: Opts) => R<readonly DeviceRow[]>
     readonly resolve: (idOrName: string, opts?: Opts) => R<DeviceRow>
   }
-  readonly sessions: { readonly list: (filter?: SessionsListFilter, opts?: Opts) => R<SessionsList> }
+  readonly sessions: {
+    readonly list: (filter?: SessionsListFilter, opts?: Opts) => R<SessionsList>
+    /** One address (durable id, alias, name, `<device>/<session>`) to its row, on the cached listing (no relist per op). */
+    readonly resolve: (address: string, scope?: Scope, opts?: Opts) => R<SessionRow>
+    readonly get: (thread: ThreadHandle, opts?: Opts) => R<SessionDetail>
+    readonly open: (request: OpenRequest, opts?: Opts) => R<OpenResult>
+    readonly send: (thread: ThreadHandle, request: SendRequest, opts?: Opts) => R<SendReceipt>
+    readonly read: (
+      thread: ThreadHandle,
+      page?: { readonly before?: string; readonly tail?: number },
+      opts?: Opts,
+    ) => R<ReadPage>
+    /** Status changes, turn ends and the turn's stream, from now on; survives relay, service and engine restarts. */
+    readonly follow: (thread: ThreadHandle, opts?: Opts) => RemoteStream<FollowEvent>
+    readonly wait: (thread: ThreadHandle, opts?: Opts) => R<WaitResult>
+    readonly interrupt: (thread: ThreadHandle, opts?: Opts) => R<InterruptResult>
+    /** The session's own model ("provider/id"); never a device default. */
+    readonly setModel: (thread: ThreadHandle, model: string, opts?: Opts) => R<{ readonly model: string }>
+    /** The session's own thinking level; never a device default. */
+    readonly setReasoning: (thread: ThreadHandle, level: string, opts?: Opts) => R<{ readonly reasoning: string }>
+    readonly close: (thread: ThreadHandle, opts?: Opts) => R<{ readonly closed: boolean }>
+    readonly archive: (thread: ThreadHandle, archived: boolean, opts?: Opts) => R<{ readonly archived: boolean }>
+  }
+  /** One session's live attach: its snapshot, records, pending UI requests and their answers. */
+  readonly attach: (thread: ThreadHandle, opts?: Opts) => R<AttachHandle>
+  readonly aliases: {
+    readonly resolve: (alias: string, opts?: Opts) => R<ThreadHandle>
+    readonly set: (thread: ThreadHandle, alias: string, opts?: Opts) => R<{ readonly alias: string }>
+    readonly clear: (thread: ThreadHandle, opts?: Opts) => R<{ readonly released: boolean }>
+  }
   readonly close: () => void
 }
 
-type Outcome<T> = { readonly kind: "ok"; readonly value: T } | RemoteFailure
+export type Outcome<T> = { readonly kind: "ok"; readonly value: T } | RemoteFailure
 const ok = <T>(value: T): Outcome<T> => ({ kind: "ok", value })
+
+/** What every member module is built from: the client's sender, clock, deps, connection and member runner. */
+export type ClientCore = {
+  readonly sender: RemoteSender
+  readonly timers: Timers
+  readonly deps: RemoteClientDeps
+  /** Runs `body` on the proven connection under the member's deadline; settles with data, never throws. */
+  readonly member: <T>(
+    opts: Opts | undefined,
+    defaultMs: number,
+    mutating: boolean,
+    body: (svc: DeviceService) => Promise<Outcome<T>>,
+    absent?: () => Outcome<T>,
+  ) => R<T>
+  readonly sessionsList: (filter?: SessionsListFilter, opts?: Opts) => R<SessionsList>
+  readonly devicesList: (opts?: Opts) => R<readonly DeviceRow[]>
+}
+
+/** The answer of a member whose part has not landed yet. */
+export const notYet = (member: string): RemoteFailure =>
+  remoteFailure("unsupported", `${member} is not available in this build.`, nextActionFor("unsupported"), {
+    details: { feature: member },
+  })
 
 const hostSlug = (): string =>
   hostname()
@@ -97,6 +176,22 @@ const unlistedDevice = (id: string): DeviceRow => ({
   last_seen_ms: null,
   caps: { attach: true, machine: false, control: false },
 })
+
+const controlUnsupported = (): RemoteFailure =>
+  remoteFailure(
+    "unsupported",
+    "The device service on this device does not have remote control yet.",
+    nextActionFor("unsupported"),
+    { details: { feature: "control" } },
+  )
+
+const wakeUnsupported = (): RemoteFailure =>
+  remoteFailure(
+    "unsupported",
+    "The device service on this device cannot wake sessions for other devices yet.",
+    nextActionFor("unsupported"),
+    { details: { feature: "wake" } },
+  )
 
 const notPerson = (member: string): RemoteFailure =>
   remoteFailure(
@@ -206,22 +301,65 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
       () => ok([localSelfRow()]),
     )
 
+  const sessionsList = (filter?: SessionsListFilter, opts?: Opts): R<SessionsList> =>
+    member(opts, DEADLINES.sessionsList, false, async (svc) => {
+      const [listing, devices] = await Promise.all([
+        svc.sessions({
+          ...(filter?.device === undefined ? {} : { device: filter.device }),
+          ...(filter?.project === undefined ? {} : { project: filter.project }),
+          ...(filter?.state === undefined ? {} : { state: filter.state }),
+        }),
+        listDevices(svc),
+      ])
+      const byId = new Map(devices.map((row) => [row.id, row]))
+      const deviceOf = (id: string): DeviceRow => byId.get(id) ?? unlistedDevice(id)
+      const wanted = filter?.name?.toLowerCase()
+      const rows = listing.rows
+        .map((row) => sessionRow(row, deviceOf(row.device)))
+        .filter(
+          (row) =>
+            (filter?.archived === undefined || row.archived === filter.archived) &&
+            (wanted === undefined || row.name.toLowerCase() === wanted),
+        )
+      // A device that missed the round, or whose answer was cut short (incomplete), lists cached rows at most.
+      const unanswered = [
+        ...new Set([
+          ...listing.incomplete,
+          ...Object.entries(listing.devices)
+            .filter(([, state]) => state !== "answered")
+            .map(([id]) => id),
+        ]),
+      ].map(deviceOf)
+      return ok({ revision: listing.revision, rows, unanswered })
+    })
+
+  const core: ClientCore = { sender, timers, deps, member, sessionsList, devicesList }
+
   return {
     service: {
       info: (opts) =>
         member(opts, DEADLINES.service, false, async (svc) =>
           ok({ service_version: svc.serviceVersion, capabilities: svc.capabilities }),
         ),
-      status: (opts) => member(opts, DEADLINES.service, false, async (svc) => ok(await svc.status())),
+      // One call answers both: the state and the version of the service that reported it.
+      status: (opts) =>
+        member(opts, DEADLINES.service, false, async (svc) =>
+          ok({ ...(await svc.status()), service_version: svc.serviceVersion }),
+        ),
       setEnabled: async (on, opts) =>
         sender.kind !== "person"
           ? notPerson("service.setEnabled")
           : member(opts, DEADLINES.service, true, async (svc) => ok({ enabled: await svc.setEnabled(on) })),
-      control: (opts) => member(opts, DEADLINES.service, false, async (svc) => ok(await svc.attachControl())),
+      control: (opts) =>
+        member(opts, DEADLINES.service, false, async (svc) =>
+          svc.capabilities.includes("control") ? ok(await svc.attachControl()) : controlUnsupported(),
+        ),
       setControl: async (on, opts) =>
         sender.kind !== "person"
           ? notPerson("service.setControl")
-          : member(opts, DEADLINES.service, true, async (svc) => ok(await svc.setAttachControl(on))),
+          : member(opts, DEADLINES.service, true, async (svc) =>
+              svc.capabilities.includes("control") ? ok(await svc.setAttachControl(on)) : controlUnsupported(),
+            ),
       // The bootstrap installs and connects the service itself, so it holds no connection of this client. Its caller is
       // a person or the internal bootstrap entry's service client (B4).
       bootstrap: async (setup, opts) => {
@@ -236,6 +374,17 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
           )
         return await withinDeadline(timers, opts, DEADLINES.bootstrap, true, async () => ok(await run(setup)))
       },
+      // The gate is this connection's own service version (A7R-11), never a capability word.
+      wake: (opts) =>
+        member(opts, DEADLINES.service, false, async (svc) =>
+          svc.carriesWakeMark ? ok(await svc.sessionWake()) : wakeUnsupported(),
+        ),
+      setWake: async (on, opts) =>
+        sender.kind !== "person"
+          ? notPerson("service.setWake")
+          : member(opts, DEADLINES.service, true, async (svc) =>
+              svc.carriesWakeMark ? ok(await svc.setSessionWake(on)) : wakeUnsupported(),
+            ),
     },
     devices: {
       list: devicesList,
@@ -262,32 +411,13 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
       },
     },
     sessions: {
-      list: (filter, opts) =>
-        member(opts, DEADLINES.sessionsList, false, async (svc) => {
-          const [listing, devices] = await Promise.all([
-            svc.sessions({
-              ...(filter?.device === undefined ? {} : { device: filter.device }),
-              ...(filter?.project === undefined ? {} : { project: filter.project }),
-              ...(filter?.state === undefined ? {} : { state: filter.state }),
-            }),
-            listDevices(svc),
-          ])
-          const byId = new Map(devices.map((row) => [row.id, row]))
-          const deviceOf = (id: string): DeviceRow => byId.get(id) ?? unlistedDevice(id)
-          const wanted = filter?.name?.toLowerCase()
-          const rows = listing.rows
-            .map((row) => sessionRow(row, deviceOf(row.device)))
-            .filter(
-              (row) =>
-                (filter?.archived === undefined || row.archived === filter.archived) &&
-                (wanted === undefined || row.name.toLowerCase() === wanted),
-            )
-          const unanswered = Object.entries(listing.devices)
-            .filter(([, state]) => state !== "answered")
-            .map(([id]) => deviceOf(id))
-          return ok({ revision: listing.revision, rows, unanswered })
-        }),
+      list: sessionsList,
+      resolve: resolveMember(core),
+      ...sessionMembers(core),
+      ...streamMembers(core),
     },
+    attach: attachMember(core),
+    aliases: aliasMembers(core),
     close: () => {
       const open = service
       service = undefined
@@ -303,6 +433,7 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
 // row is unarchived. The handle is the `<device>/<session>` form seam 1 parses.
 const sessionRow = (row: ListingRow, device: DeviceRow): SessionRow => ({
   thread: `${row.device}/${row.session_id}`,
+  ...durableIdOf(row),
   name: row.title,
   title: row.title,
   device,
@@ -313,3 +444,9 @@ const sessionRow = (row: ListingRow, device: DeviceRow): SessionRow => ({
   updated_ms: row.updated_ms,
   source: row.source,
 })
+
+// The listing's optional durable_id (#12996); a service that predates it lists none.
+const durableIdOf = (row: object): { readonly durable_id?: string } => {
+  const value = Reflect.get(row, "durable_id")
+  return typeof value === "string" && value !== "" ? { durable_id: value } : {}
+}

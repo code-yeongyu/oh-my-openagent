@@ -1,6 +1,6 @@
 import type { AliasRegistry, AliasResult, RemoteSessionsPort, RemoteThreadSurface } from "../../thread/remote/ports"
 import type { RemoteClient } from "../client"
-import type { R, RemoteSender } from "../types"
+import type { R, RemoteFailure, RemoteSender } from "../types"
 
 type Runtime = Pick<typeof import("./thread-runtime"), "remoteSessionsPort" | "remoteClient">
 
@@ -37,20 +37,44 @@ function createLazyRemoteClient(options: LazyRemoteOptions): RemoteClient {
         throw error
       },
     ))
+  const unloaded = (error: unknown): RemoteFailure => ({
+    kind: "error",
+    code: "host_unavailable",
+    message: `The remote client could not be loaded: ${error instanceof Error ? error.message : String(error)}.`,
+    next_action: "Reinstall omo, then retry.",
+    details: { reason: "client_unavailable" },
+  })
   const call = async <T>(use: (loaded: RemoteClient) => R<T>): R<T> => {
     let loaded: RemoteClient
     try {
       loaded = await load()
     } catch (error) {
-      return {
-        kind: "error",
-        code: "host_unavailable",
-        message: `The remote client could not be loaded: ${error instanceof Error ? error.message : String(error)}.`,
-        next_action: "Reinstall omo, then retry.",
-        details: { reason: "client_unavailable" },
-      }
+      return unloaded(error)
     }
     return await use(loaded)
+  }
+  // `follow` answers a stream at once, so the load happens on its first read; a stop before then ends it unread.
+  const follow: RemoteClient["sessions"]["follow"] = (thread, opts) => {
+    let stopped = false
+    let inner: ReturnType<RemoteClient["sessions"]["follow"]> | undefined
+    return {
+      [Symbol.asyncIterator]: async function* () {
+        let loaded: RemoteClient
+        try {
+          loaded = await load()
+        } catch (error) {
+          yield { kind: "failed" as const, failure: unloaded(error) }
+          return
+        }
+        if (stopped) return
+        inner = loaded.sessions.follow(thread, opts)
+        yield* inner
+      },
+      stop: () => {
+        stopped = true
+        inner?.stop()
+      },
+    }
   }
   return {
     service: {
@@ -60,12 +84,34 @@ function createLazyRemoteClient(options: LazyRemoteOptions): RemoteClient {
       control: (opts) => call((loaded) => loaded.service.control(opts)),
       setControl: (on, opts) => call((loaded) => loaded.service.setControl(on, opts)),
       bootstrap: (setup, opts) => call((loaded) => loaded.service.bootstrap(setup, opts)),
+      wake: (opts) => call((loaded) => loaded.service.wake(opts)),
+      setWake: (on, opts) => call((loaded) => loaded.service.setWake(on, opts)),
     },
     devices: {
       list: (opts) => call((loaded) => loaded.devices.list(opts)),
       resolve: (idOrName, opts) => call((loaded) => loaded.devices.resolve(idOrName, opts)),
     },
-    sessions: { list: (filter, opts) => call((loaded) => loaded.sessions.list(filter, opts)) },
+    sessions: {
+      list: (filter, opts) => call((loaded) => loaded.sessions.list(filter, opts)),
+      resolve: (address, scope, opts) => call((loaded) => loaded.sessions.resolve(address, scope, opts)),
+      get: (thread, opts) => call((loaded) => loaded.sessions.get(thread, opts)),
+      open: (request, opts) => call((loaded) => loaded.sessions.open(request, opts)),
+      send: (thread, request, opts) => call((loaded) => loaded.sessions.send(thread, request, opts)),
+      read: (thread, page, opts) => call((loaded) => loaded.sessions.read(thread, page, opts)),
+      follow,
+      wait: (thread, opts) => call((loaded) => loaded.sessions.wait(thread, opts)),
+      interrupt: (thread, opts) => call((loaded) => loaded.sessions.interrupt(thread, opts)),
+      setModel: (thread, model, opts) => call((loaded) => loaded.sessions.setModel(thread, model, opts)),
+      setReasoning: (thread, level, opts) => call((loaded) => loaded.sessions.setReasoning(thread, level, opts)),
+      close: (thread, opts) => call((loaded) => loaded.sessions.close(thread, opts)),
+      archive: (thread, archived, opts) => call((loaded) => loaded.sessions.archive(thread, archived, opts)),
+    },
+    attach: (thread, opts) => call((loaded) => loaded.attach(thread, opts)),
+    aliases: {
+      resolve: (alias, opts) => call((loaded) => loaded.aliases.resolve(alias, opts)),
+      set: (thread, alias, opts) => call((loaded) => loaded.aliases.set(thread, alias, opts)),
+      clear: (thread, opts) => call((loaded) => loaded.aliases.clear(thread, opts)),
+    },
     close: () => {
       const open = client
       client = undefined
