@@ -76,10 +76,13 @@ pub(super) fn post(window: Window, message: u32, wparam: WPARAM, lparam: LPARAM)
 
 /// Posts one key transition. `alt_down` is the caller's claim that Alt is
 /// down on this window route, and makes the message a `WM_SYS*` one with the
-/// context bit. Posted input never changes the key state the target reads
-/// through `GetKeyState`, so this flag is all the target learns about Alt.
-/// Keeping a non-modifier key from being posted under a held modifier is
-/// [`posted_chord_refusal`]'s job, checked before a chord or hold is posted.
+/// context bit, as an Alt key's own transition always is. Posted input never
+/// changes the key state the target reads through `GetKeyState`, so for any
+/// other key this flag is all the target learns about Alt.
+/// [`posted_chord_refusal`] refuses a chord or hold that would post a
+/// non-modifier key under a held modifier before anything is posted. It sees
+/// only that chord's keys, so while a failed Alt release is still held in the
+/// ledger, a later plain key on this route goes out as a `WM_SYS*` message.
 pub(super) fn post_key(window: Window, vk: u16, down: bool, alt_down: bool) -> CoreResult<()> {
     let (message, lparam) = key_message(vk, native::scan_code(vk), down, alt_down);
     post(window, message, usize::from(vk), lparam)
