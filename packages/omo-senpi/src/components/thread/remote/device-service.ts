@@ -123,7 +123,12 @@ function createCatalogHold(attached: RemoteAttach) {
   }
 }
 
-type Session = { readonly attached: RemoteAttach; readonly catalog: ReturnType<typeof createCatalogHold> }
+/** `key`: the address the device attached the session on (a located key when the caller named a durable id). */
+type Session = {
+  readonly attached: RemoteAttach
+  readonly key: string
+  readonly catalog: ReturnType<typeof createCatalogHold>
+}
 
 const recordKey = (record: WireRpc): string =>
   JSON.stringify(Object.entries(record).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
@@ -158,7 +163,8 @@ export async function attachAddressed(
   connected: DeviceService,
   device: string,
   sessionId: string,
-): Promise<RemoteAttach> {
+): Promise<{ readonly attached: RemoteAttach; readonly key: string }> {
+  const on = async (key: string) => ({ attached: await connected.attach(device, key), key })
   const locate = () =>
     Promise.resolve()
       .then(() => connected.locate(device, sessionId))
@@ -166,17 +172,16 @@ export async function attachAddressed(
   if (DURABLE_ID.test(sessionId)) {
     // Only a locate that answered "none" means the session is gone; any other failure (b not answering, a lost connection)
     // is the refusal as it came, so a close never reports a running session not_live (review M1 of 6ce7397).
-    const located = await connected.locate(device, sessionId)
-    return await connected.attach(device, located.key)
+    return await on((await connected.locate(device, sessionId)).key)
   }
   try {
-    return await connected.attach(device, sessionId)
+    return await on(sessionId)
   } catch (error) {
     if (!(error instanceof LocalApiError && (error.code === "session_not_found" || error.code === "invalid_request")))
       throw error
     const located = await locate()
     if (located === undefined || located.key === sessionId) throw error
-    return await connected.attach(device, located.key)
+    return await on(located.key)
   }
 }
 
@@ -209,11 +214,11 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     const opened = svc()
       .then((connected) => attachAddressed(connected, device, sessionId))
       .then(
-        (attached) => {
+        ({ attached, key: attachedOn }) => {
           void attached.detached.then(() => {
             if (attaches.get(key) === opened) attaches.delete(key)
           })
-          return { attached, catalog: createCatalogHold(attached) }
+          return { attached, key: attachedOn, catalog: createCatalogHold(attached) }
         },
         (error: unknown) => {
           attaches.delete(key)
@@ -282,6 +287,10 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       } catch (error) {
         return { kind: "refused", reason: sessionReason(notSentReason(error)) }
       }
+      // A record naming the session by the address the caller typed names it by the key the device attached it on: the
+      // receiving endpoint refuses a record whose sessionId is not its attached session (`malformed`, relay proof 6ce7397).
+      if (session.key !== sessionId && rpc["sessionId"] === sessionId)
+        record = wireRecord({ ...rpc, sessionId: session.key })
       const { attached, catalog } = session
       const readOnly = READ_ONLY_RECORDS.has(String(rpc["type"]))
       const isCatalog = rpc["type"] === CATALOG_RECORD

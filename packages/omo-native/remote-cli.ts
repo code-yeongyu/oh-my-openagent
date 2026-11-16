@@ -150,7 +150,7 @@ export async function prepareRemoteAttach(
       dependencies.error(resolved.error.next_action)
       return REMOTE_EXIT.failed
     }
-    const attach = await attachAddressed(service, resolved.row.device, resolved.row.session_id)
+    const { attached: attach } = await attachAddressed(service, resolved.row.device, resolved.row.session_id)
     await attach.snapshot
     const endpoint = await serveRemoteAttach(attach, { label: target ?? parsedTarget.session })
     void service.closed.then(() => endpoint.close())
