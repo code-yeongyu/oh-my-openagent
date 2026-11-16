@@ -57,4 +57,29 @@ describe("thread_read wait on another device: deadline and abort cover the attac
     await stoppedOnce
     expect(state.stopped).toBe(1)
   })
+
+  test("#given a watch that fails after the wait timed out #when it rejects #then the rejection is handled and nothing escapes", async () => {
+    let fail: (error: Error) => void = () => {}
+    const remote = {
+      sessions: {
+        watch: () =>
+          new Promise<RemoteWatchOutcome>((_resolve, reject) => {
+            fail = reject
+          }),
+      },
+      chain: { stamp: (record: Readonly<Record<string, unknown>>) => record },
+    } as unknown as RemoteThreadSurface
+    const escaped: unknown[] = []
+    const onUnhandled = (reason: unknown) => escaped.push(reason)
+    process.on("unhandledRejection", onUnhandled)
+    try {
+      expect(await createRelayControl(remote, ROW).waitSettled(20, undefined)).toMatchObject({ outcome: "timeout" })
+      fail(new Error("runtime load failed"))
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      expect(escaped).toEqual([])
+    } finally {
+      process.off("unhandledRejection", onUnhandled)
+    }
+  })
 })

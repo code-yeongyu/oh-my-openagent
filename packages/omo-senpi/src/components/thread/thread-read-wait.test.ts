@@ -55,6 +55,19 @@ describe("thread_read wait_ms (#13417)", () => {
     expect(await reading).toMatchObject({ kind: "ok", wait: { outcome: "settled", status: "idle", turn_id: "9" } })
   }, 15_000)
 
+  test("#given b's idle session writes records that belong to no run (agent_idle, entry_appended) #when thread_read waits #then it still settles idle at the quiet window instead of timing out", async () => {
+    const a = account({ engine: { ...ENGINE, streaming: false } })
+    const { run } = surface(a.remote)
+    const reading = run("thread_read", { thread: "dur-on-b", wait_ms: 8_000 })
+    await a.watching
+    for (const handlers of [...a.watchers]) {
+      handlers.record({ type: "agent_idle" })
+      handlers.record({ type: "entry_appended" })
+      handlers.record({ type: "thinking_level_changed" })
+    }
+    expect(await reading).toMatchObject({ kind: "ok", wait: { outcome: "settled", status: "idle" } })
+  }, 15_000)
+
   test("#given b's thread is running #when its status changes to idle during the wait #then the read settles with idle, and the watch is stopped", async () => {
     const a = account({ engine: { ...ENGINE, streaming: true } })
     const { run } = surface(a.remote)
