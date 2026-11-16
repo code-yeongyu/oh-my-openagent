@@ -6,9 +6,14 @@
 use std::io::{Read, Write};
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use super::admit::{constant_time_eq, Capability, CAPABILITY_LEN};
+
+/// The id of the daemon's own `stopPath.stop` call; its reply is never written to the client.
+pub const INJECTED_STOP: &str = "$daemon/stop";
 
 /// The channel a connection's capability came over; it decides the `HostOnly(authority)` methods.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -31,6 +36,8 @@ pub struct Shared {
     host_pids: Vec<i32>,
     registered: Mutex<Vec<Registered>>,
     subscribers: Mutex<Vec<(usize, UnixStream)>>,
+    injectors: Mutex<Vec<(usize, Sender<Vec<u8>>)>>,
+    stopped: AtomicBool,
 }
 
 impl Shared {
@@ -43,6 +50,8 @@ impl Shared {
             host_pids,
             registered: Mutex::new(Vec::new()),
             subscribers: Mutex::new(Vec::new()),
+            injectors: Mutex::new(Vec::new()),
+            stopped: AtomicBool::new(false),
         })
     }
 
@@ -104,6 +113,35 @@ impl Shared {
 
     pub fn unsubscribe(&self, connection: usize) {
         self.subscribers.lock().unwrap_or_else(PoisonError::into_inner).retain(|(id, _)| *id != connection);
+        self.injectors.lock().unwrap_or_else(PoisonError::into_inner).retain(|(id, _)| *id != connection);
+    }
+
+    /// The input of `connection`'s executor, for the daemon's own stop of that session.
+    pub fn inject_into(&self, connection: usize, input: Sender<Vec<u8>>) {
+        self.injectors.lock().unwrap_or_else(PoisonError::into_inner).push((connection, input));
+    }
+
+    /// A stop is hand-wide: the first `stopPath.changed{suspended:true}` from any session stops
+    /// every other session once; a resume clears the flag.
+    pub fn stop_changed(&self, from: usize, suspended: bool) {
+        if !suspended {
+            self.stopped.store(false, Ordering::SeqCst);
+            return;
+        }
+        if self.stopped.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        let mut line = serde_json::json!({
+            "jsonrpc": "2.0", "id": INJECTED_STOP, "method": "stopPath.stop", "params": {"source": "peer"}
+        })
+        .to_string()
+        .into_bytes();
+        line.push(b'\n');
+        for (id, input) in self.injectors.lock().unwrap_or_else(PoisonError::into_inner).iter() {
+            if *id != from {
+                let _ = input.send(line.clone());
+            }
+        }
     }
 
     /// The push outbox: a notification line reaches every OTHER subscribed connection now (the

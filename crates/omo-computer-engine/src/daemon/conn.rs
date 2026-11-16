@@ -15,7 +15,7 @@ use omo_computer_core::results::HandRegistered;
 use serde_json::{json, Value};
 
 use super::admit::constant_time_eq;
-use super::state::{Grant, Shared};
+use super::state::{Grant, Shared, INJECTED_STOP};
 use crate::executor::Executor;
 use crate::launch::launch;
 
@@ -43,8 +43,15 @@ impl Write for Tee {
         self.pending.extend_from_slice(bytes);
         while let Some(end) = self.pending.iter().position(|b| *b == b'\n') {
             let line: Vec<u8> = self.pending.drain(..=end).collect();
+            let message = serde_json::from_slice::<Value>(&line).unwrap_or_default();
+            if message.get("id") == Some(&json!(INJECTED_STOP)) {
+                continue;
+            }
             self.out.lock().unwrap_or_else(PoisonError::into_inner).write_all(&line)?;
-            if serde_json::from_slice::<Value>(&line).is_ok_and(|v| v.get("id").is_none()) {
+            if message.get("id").is_none() {
+                if message["method"] == "stopPath.changed" {
+                    self.shared.stop_changed(self.connection, message["params"]["suspended"] == true);
+                }
                 self.shared.push(self.connection, &line);
             }
         }
@@ -85,6 +92,7 @@ pub fn serve(stream: UnixStream, grant: Grant, shared: &Arc<Shared>, connection:
     }
     let out: Out = Arc::new(Mutex::new(stream));
     let (forward, lines) = mpsc::channel();
+    shared.inject_into(connection, forward.clone());
     let executor = {
         let (out, shared) = (Arc::clone(&out), Arc::clone(shared));
         std::thread::spawn(move || run_executor(out, shared, connection, lines))
