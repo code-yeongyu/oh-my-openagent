@@ -1,6 +1,7 @@
 import type { ThreadAddressEntry } from "../addressing"
 import type { ThreadStatus } from "../contracts/results"
 import type { ThreadToolFailure } from "../errors"
+import { accountDevices } from "./account"
 import { rowThreadId, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
 import { holderTarget, remoteAvailable } from "./remote-ops"
 
@@ -73,8 +74,7 @@ export async function relayAddressBook(remote: RemoteThreadSurface, address: str
       return { entries: [] }
     return { entries: [], unavailable: unavailable.error }
   }
-  const here = await remote.sessions.thisDevice()
-  const rows = await remote.sessions.sessions()
+  const [{ here }, rows] = await Promise.all([accountDevices(remote.client), remote.sessions.sessions()])
   const entries = rows.filter((row) => row.device !== here).map((row) => relayAddressEntry(row))
   if (remote.aliases === undefined) return { entries }
   const alias = await remote.aliases.resolve(address).catch(() => undefined)

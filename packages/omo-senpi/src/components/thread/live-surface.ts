@@ -758,7 +758,7 @@ export function createLiveThreadSurface(
 }
 
 export { createServiceAliasRegistry } from "./remote/alias-registry"
-export { createCliRemoteSurface, remoteSessionsPort } from "../remote/port/thread-runtime"
+export { createCliRemoteSurface, remoteClient, remoteSessionsPort } from "../remote/port/thread-runtime"
 export { claimCreatedAlias, listAcross, planCreate, renameAlias, withAlias } from "./remote/cross-device"
 export { deviceOnline } from "./remote/remote-ops"
 export { outcomeFailure } from "./remote/outcome"

@@ -10,7 +10,8 @@ function lazySurface(loadAliasRegistry: () => Promise<AliasRegistry>) {
   const a = account()
   const remote = createLazyRemoteSurface({
     version: "0.0.0",
-    loadRuntime: async () => ({ remoteSessionsPort: () => a.remote.sessions }),
+    sender: { kind: "session", id: "caller" },
+    loadRuntime: async () => ({ remoteSessionsPort: () => a.remote.sessions, remoteClient: () => a.remote.client }),
     loadAliasRegistry,
   })
   return { a, remote }

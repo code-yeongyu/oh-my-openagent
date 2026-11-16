@@ -1,5 +1,7 @@
 import { createServiceAliasRegistry, type ServiceAccess } from "../../thread/remote/alias-registry"
 import type { RemoteSessionsPort, RemoteThreadSurface } from "../../thread/remote/ports"
+import { createRemoteClient, type RemoteClient } from "../client"
+import type { RemoteSender } from "../types"
 import { createDeviceServiceSessions } from "./device-service"
 import { createLazyRemoteSurface } from "./lazy-remote"
 
@@ -8,6 +10,8 @@ import { createLazyRemoteSurface } from "./lazy-remote"
 // connection itself (guard G1, design v8-core r2).
 
 export const remoteSessionsPort = (version: string): RemoteSessionsPort => createDeviceServiceSessions({ version })
+
+export const remoteClient = (version: string, sender: RemoteSender): RemoteClient => createRemoteClient(sender, { version })
 
 /**
  * The remote surface the `omo thread` CLI hands its SDK (#12833), from this sidecar's own device-service and alias clients;
@@ -20,7 +24,9 @@ export function createCliRemoteSurface(options: {
 }): RemoteThreadSurface {
   return createLazyRemoteSurface({
     version: options.version,
-    loadRuntime: async () => ({ remoteSessionsPort }),
+    // The `omo thread` CLI's principal is `cli:<uid>` (sdk.ts), the uid omo-native's thread.js names.
+    sender: { kind: "cli", uid: String(process.getuid?.() ?? 0) },
+    loadRuntime: async () => ({ remoteSessionsPort, remoteClient }),
     loadAliasRegistry: async () => createServiceAliasRegistry(await options.loadAccess()),
   })
 }

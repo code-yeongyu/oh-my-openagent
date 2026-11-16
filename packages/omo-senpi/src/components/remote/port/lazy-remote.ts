@@ -1,9 +1,13 @@
 import type { AliasRegistry, AliasResult, RemoteSessionsPort, RemoteThreadSurface } from "../../thread/remote/ports"
+import type { RemoteClient } from "../client"
+import type { R, RemoteSender } from "../types"
 
-type Runtime = Pick<typeof import("./thread-runtime"), "remoteSessionsPort">
+type Runtime = Pick<typeof import("./thread-runtime"), "remoteSessionsPort" | "remoteClient">
 
 export type LazyRemoteOptions = {
   readonly version: string
+  /** Who the surface's remote client acts as, fixed when it is built (design B2). */
+  readonly sender: RemoteSender
   readonly loadRuntime: () => Promise<Runtime>
   /** The account's alias registry, loaded on its first use; absent, the surface has no registry and aliases are refused typed. */
   readonly loadAliasRegistry?: () => Promise<AliasRegistry>
@@ -18,7 +22,63 @@ export type LazyRemoteOptions = {
  * The alias registry loads the same way on its first use; a load that fails answers alias_registry_unavailable and is
  * retried on the next call. `sessions.close` ends the device-service connection a short-lived caller opened.
  */
+/**
+ * The remote client, loaded with the runtime on its first member call. A failed load is not cached and settles as a typed
+ * host_unavailable, since no member throws. The failure is written here, not through codes.ts, because codes.ts brings
+ * the device-service code into omo.js.
+ */
+function createLazyRemoteClient(options: LazyRemoteOptions): RemoteClient {
+  let client: Promise<RemoteClient> | undefined
+  const load = () =>
+    (client ??= options.loadRuntime().then(
+      ({ remoteClient }) => remoteClient(options.version, options.sender),
+      (error: unknown) => {
+        client = undefined
+        throw error
+      },
+    ))
+  const call = async <T>(use: (loaded: RemoteClient) => R<T>): R<T> => {
+    let loaded: RemoteClient
+    try {
+      loaded = await load()
+    } catch (error) {
+      return {
+        kind: "error",
+        code: "host_unavailable",
+        message: `The remote client could not be loaded: ${error instanceof Error ? error.message : String(error)}.`,
+        next_action: "Reinstall omo, then retry.",
+        details: { reason: "client_unavailable" },
+      }
+    }
+    return await use(loaded)
+  }
+  return {
+    service: {
+      info: (opts) => call((loaded) => loaded.service.info(opts)),
+      status: (opts) => call((loaded) => loaded.service.status(opts)),
+      setEnabled: (on, opts) => call((loaded) => loaded.service.setEnabled(on, opts)),
+      control: (opts) => call((loaded) => loaded.service.control(opts)),
+      setControl: (on, opts) => call((loaded) => loaded.service.setControl(on, opts)),
+      bootstrap: (setup, opts) => call((loaded) => loaded.service.bootstrap(setup, opts)),
+    },
+    devices: {
+      list: (opts) => call((loaded) => loaded.devices.list(opts)),
+      resolve: (idOrName, opts) => call((loaded) => loaded.devices.resolve(idOrName, opts)),
+    },
+    sessions: { list: (filter, opts) => call((loaded) => loaded.sessions.list(filter, opts)) },
+    close: () => {
+      const open = client
+      client = undefined
+      void open?.then(
+        (loaded) => loaded.close(),
+        () => undefined,
+      )
+    },
+  }
+}
+
 export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThreadSurface {
+  const client = createLazyRemoteClient(options)
   let port: Promise<RemoteSessionsPort> | undefined
   const load = () =>
     (port ??= options.loadRuntime().then(
@@ -40,6 +100,7 @@ export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThrea
     read: async (device, sessionId, tail) => await (await load()).read(device, sessionId, tail),
     watch: async (device, sessionId, listener) => await (await load()).watch(device, sessionId, listener),
     close: async () => {
+      client.close()
       const loaded = port
       port = undefined
       if (loaded !== undefined) await (await loaded.catch(() => undefined))?.close?.()
@@ -47,7 +108,7 @@ export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThrea
   }
   const preset = options.permissionPreset === undefined ? {} : { permissionPreset: options.permissionPreset }
   const loadAliasRegistry = options.loadAliasRegistry
-  if (loadAliasRegistry === undefined) return { sessions, chain: { stamp: (record) => record }, ...preset }
+  if (loadAliasRegistry === undefined) return { sessions, client, chain: { stamp: (record) => record }, ...preset }
   let registry: Promise<AliasRegistry> | undefined
   const withRegistry = async <T>(use: (loaded: AliasRegistry) => Promise<AliasResult<T>>): Promise<AliasResult<T>> => {
     let loaded: AliasRegistry
@@ -75,5 +136,5 @@ export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThrea
     resolve: async (alias) => await withRegistry((loaded) => loaded.resolve(alias)),
     aliasesOf: async (sessionIds) => await withRegistry((loaded) => loaded.aliasesOf(sessionIds)),
   }
-  return { sessions, aliases, chain: { stamp: (record) => record }, ...preset }
+  return { sessions, client, aliases, chain: { stamp: (record) => record }, ...preset }
 }

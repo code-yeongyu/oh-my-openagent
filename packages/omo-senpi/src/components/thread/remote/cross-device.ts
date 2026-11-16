@@ -10,7 +10,8 @@ import {
   type RemoteSessionRow,
   type RemoteThreadSurface,
 } from "./ports"
-import { aliasFailure, deviceOnline, remoteAvailable } from "./remote-ops"
+import { accountDevices } from "./account"
+import { aliasFailure, deviceRefusal, remoteAvailable } from "./remote-ops"
 
 type LocalEntry = {
   readonly thread_id: string
@@ -48,13 +49,11 @@ async function targetDevice(
   remote: RemoteThreadSurface,
   device: string,
 ): Promise<{ readonly id?: string } | { readonly result: ThreadToolResult }> {
-  const here = await remote.sessions.thisDevice()
-  const row = (await remote.sessions.devices()).find(
-    (candidate) => candidate.device === device || candidate.label === device,
-  )
+  const { here, devices } = await accountDevices(remote.client)
+  const row = devices.find((candidate) => candidate.device === device || candidate.label === device)
   if (row !== undefined && row.device === here) return {}
   if (row === undefined) {
-    const missing = await deviceOnline(remote, device)
+    const missing = deviceRefusal(devices, device)
     return {
       result:
         missing ?? invalid(`No device ${device}.`, "Call thread_list with all_scope to see the account's devices."),
@@ -299,7 +298,7 @@ export async function claimCreatedAlias(
     return result
   let claimed: Awaited<ReturnType<AliasRegistry["claim"]>>
   try {
-    const holderDevice = device ?? (await remote.sessions.thisDevice()) ?? ""
+    const holderDevice = device ?? (await accountDevices(remote.client)).here ?? ""
     claimed = await remote.aliases.claim({
       alias,
       holder: { session_id: result.thread.thread_id, device: holderDevice },
@@ -342,7 +341,7 @@ export async function renameAlias(
   const current = await remote.aliases.aliasesOf([threadId])
   if (current.kind === "error") return signedOut(current.error) ? { local: "sign_in" } : aliasFailure(current.error)
   const from = current.value.get(threadId)
-  const holderDevice = device ?? (await remote.sessions.thisDevice()) ?? ""
+  const holderDevice = device ?? (await accountDevices(remote.client)).here ?? ""
   const changed =
     from === undefined
       ? await remote.aliases.claim({
@@ -367,7 +366,7 @@ export async function listAcross(
   const unavailable = await remoteAvailable(remote)
   if (!allScope) return unavailable === undefined ? withAliases(remote, local, ids) : local
   if (unavailable !== undefined) return { ...local, remote_unavailable: unavailable.error.code }
-  const here = await remote.sessions.thisDevice()
+  const { here } = await accountDevices(remote.client)
   const known = new Set(ids)
   let listed: readonly RemoteSessionRow[]
   try {

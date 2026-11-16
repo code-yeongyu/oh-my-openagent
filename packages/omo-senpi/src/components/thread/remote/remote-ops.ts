@@ -1,7 +1,8 @@
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import type { CommandResult } from "@oh-my-opencode/device-service-core"
+import { accountDevices, accountState } from "./account"
 import { outcomeFailure, READ_UNCERTAIN } from "./outcome"
-import type { AliasError, AliasHolder, JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
+import type { AliasError, AliasHolder, JsonObject, RemoteDevice, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 
 type Failure = { readonly kind: "error"; readonly error: ThreadToolFailure }
 const fail = (
@@ -13,17 +14,15 @@ const fail = (
 
 /** A5: the relay is paid only; on any other plan the remote path answers this, never a silent failure or a queue. */
 export async function remoteAvailable(remote: RemoteThreadSurface): Promise<Failure | undefined> {
-  let state: string
-  try {
-    state = (await remote.sessions.status()).state
-  } catch (error) {
+  const status = await accountState(remote.client)
+  if ("kind" in status)
     return fail(
       "host_unavailable",
       "This device's device service is not reachable.",
       "Install or start the device service, then retry.",
-      { reason: error instanceof Error ? error.message : String(error) },
+      { reason: status.message },
     )
-  }
+  const state = status.state
   if (state === "plan_required")
     return fail(
       "relay_requires_paid_plan",
@@ -88,7 +87,7 @@ export async function holderTarget(
       row.device === holder.device && (row.durable_id === holder.session_id || row.session_id === holder.session_id),
   )
   if (listed !== undefined) return { where: "remote", row: listed }
-  const device = (await remote.sessions.devices()).find((candidate) => candidate.device === holder.device)
+  const device = (await accountDevices(remote.client)).devices.find((candidate) => candidate.device === holder.device)
   if (device !== undefined && !device.online)
     return fail(
       "device_offline",
@@ -116,7 +115,11 @@ export async function holderTarget(
 
 /** A typed `device_offline` when the device is known and not online; nothing is ever queued for it (A3). */
 export async function deviceOnline(remote: RemoteThreadSurface, device: string): Promise<Failure | undefined> {
-  const devices = await remote.sessions.devices()
+  return deviceRefusal((await accountDevices(remote.client)).devices, device)
+}
+
+/** deviceOnline over a device list the caller already read: not_found for an unknown id, device_offline for an offline one. */
+export function deviceRefusal(devices: readonly RemoteDevice[], device: string): Failure | undefined {
   const row = devices.find((candidate) => candidate.device === device)
   if (row === undefined)
     return fail(
