@@ -30,6 +30,11 @@ impl Daemon {
     }
 
     pub fn start_with(scenario_json: &str, extra_env: &[(&str, &str)]) -> Self {
+        Self::start_with_args(scenario_json, extra_env, &[])
+    }
+
+    /// `--serve` with `extra_args` after its endpoint and lock (row 29b: `--start-stopped`).
+    pub fn start_with_args(scenario_json: &str, extra_env: &[(&str, &str)], extra_args: &[&str]) -> Self {
         let dir = runtime_dir();
         let capability: [u8; 32] = std::array::from_fn(|i| u8::try_from(i * 7 % 251).expect("byte"));
         let scenario = dir.path().join("scenario.json");
@@ -43,9 +48,10 @@ impl Daemon {
             .arg(dir.path().join("engine.sock"))
             .arg("--lock")
             .arg(dir.path().join("engine.lock"))
+            .args(extra_args)
             .stdin(Stdio::piped())
             .stdout(Stdio::null())
-            .stderr(Stdio::inherit())
+            .stderr(std::fs::File::create(dir.path().join("daemon.stderr")).expect("the stderr file"))
             .env("OMO_COMPUTER_BACKEND", "fake")
             .env("OMO_COMPUTER_FAKE_SCENARIO", &scenario)
             .env("OMO_COMPUTER_FAKE_STOP_PATH", "live")
@@ -58,6 +64,11 @@ impl Daemon {
         let daemon = Self { child, dir, capability };
         daemon.wait_for_socket();
         daemon
+    }
+
+    /// What the daemon wrote to stderr so far (its audit lines for refused own methods).
+    pub fn stderr(&self) -> String {
+        std::fs::read_to_string(self.dir.path().join("daemon.stderr")).unwrap_or_default()
     }
 
     pub fn socket(&self) -> PathBuf {
