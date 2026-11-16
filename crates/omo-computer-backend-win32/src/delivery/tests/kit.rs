@@ -40,7 +40,10 @@ impl ScriptedOs {
     pub(super) fn with(windows: Vec<(isize, Win)>) -> Self {
         Self {
             windows: windows.into_iter().collect(),
-            integrity: Integrity::Rids { target: 0x2000, engine: 0x2000 },
+            integrity: Integrity::Rids {
+                target: 0x2000,
+                engine: 0x2000,
+            },
             posts: Vec::new(),
             deny_after: None,
             paintable: true,
@@ -56,12 +59,17 @@ impl ScriptedOs {
 }
 
 pub(super) fn win(class: &'static str) -> Win {
-    Win { class, ..Win::default() }
+    Win {
+        class,
+        ..Win::default()
+    }
 }
 
 impl FocusOs for ScriptedOs {
     fn window_thread(&self, window: isize) -> Option<u32> {
-        self.windows.contains_key(&window).then(|| u32::try_from(window).unwrap_or_default())
+        self.windows
+            .contains_key(&window)
+            .then(|| u32::try_from(window).unwrap_or_default())
     }
 
     fn thread_focus(&self, thread: u32) -> Option<isize> {
@@ -103,7 +111,10 @@ impl DeliveryOs for ScriptedOs {
     }
 
     fn wants_chars(&self, window: isize) -> Vec<isize> {
-        self.windows.get(&window).map(|w| w.wants_chars.clone()).unwrap_or_default()
+        self.windows
+            .get(&window)
+            .map(|w| w.wants_chars.clone())
+            .unwrap_or_default()
     }
 
     fn child_at(&self, window: isize, _at: Point) -> Option<(isize, ClientPoint)> {
@@ -112,7 +123,10 @@ impl DeliveryOs for ScriptedOs {
     }
 
     fn post(&mut self, window: isize, message: &Posted) -> Result<(), PostFailure> {
-        if self.deny_after.is_some_and(|limit| self.posts.len() >= limit) {
+        if self
+            .deny_after
+            .is_some_and(|limit| self.posts.len() >= limit)
+        {
             return Err(PostFailure::AccessDenied);
         }
         self.posts.push((window, *message));

@@ -120,13 +120,17 @@ pub fn family_of(class: &str) -> Family {
 /// `BackgroundUnavailable` (`chromium_electron`, `toolkit`, or `posted_modifier_chord` for the
 /// per-route row) with the foreground as the next call, nothing sent.
 pub fn admit(family: Family, verb: Verb) -> Result<(), FamilyRefusal> {
-    let dropped = rows().iter().find(|row| {
-        row.family.is_none_or(|of| of == family) && row.refused.contains(&verb)
-    });
+    let dropped = rows()
+        .iter()
+        .find(|row| row.family.is_none_or(|of| of == family) && row.refused.contains(&verb));
     match dropped {
         None => Ok(()),
         Some(row) => {
-            let reason = if row.family.is_none() { Reason::PostedModifierChord } else { family.reason() };
+            let reason = if row.family.is_none() {
+                Reason::PostedModifierChord
+            } else {
+                family.reason()
+            };
             Err(FamilyRefusal {
                 refusal: Refusal::new(EngineCode::BackgroundUnavailable, reason),
                 next: NextDelivery::Foreground,

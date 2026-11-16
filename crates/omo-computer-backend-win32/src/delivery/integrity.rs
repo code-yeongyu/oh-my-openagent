@@ -20,7 +20,11 @@ pub const ABOVE_ENGINE: Refusal = Refusal::bare(EngineCode::PermissionDenied);
 /// # Errors
 /// `PermissionDenied` when the target runs above the engine.
 pub const fn admit(target_rid: u32, engine_rid: u32) -> Result<(), Refusal> {
-    if target_rid > engine_rid { Err(ABOVE_ENGINE) } else { Ok(()) }
+    if target_rid > engine_rid {
+        Err(ABOVE_ENGINE)
+    } else {
+        Ok(())
+    }
 }
 
 /// Admits a post after an [`Integrity`] read.

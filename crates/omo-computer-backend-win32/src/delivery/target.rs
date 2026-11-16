@@ -50,7 +50,8 @@ pub trait DeliveryOs: FocusOs + PaintOs + Send {
 }
 
 /// The refusal of a background route whose window is not a live window.
-pub const TARGET_UNKNOWN: Refusal = Refusal::new(EngineCode::BackgroundUnavailable, Reason::TargetUnknown);
+pub const TARGET_UNKNOWN: Refusal =
+    Refusal::new(EngineCode::BackgroundUnavailable, Reason::TargetUnknown);
 
 /// The window a `Route::BackgroundWindow` names: its HWND in decimal or `0x` hex, never 0.
 #[must_use]
@@ -69,7 +70,7 @@ pub fn coordinate(value: f64) -> Option<i16> {
     // In range by the check, so the cast neither truncates nor saturates.
     (f64::from(i16::MIN)..=f64::from(i16::MAX))
         .contains(&rounded)
-        .then(|| rounded as i16)
+        .then_some(rounded as i16)
 }
 
 /// The window keys and text are posted to for the top-level `window`.

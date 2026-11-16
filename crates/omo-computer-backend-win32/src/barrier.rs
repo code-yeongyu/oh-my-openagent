@@ -43,7 +43,10 @@ pub struct BarrierEvidence {
 #[must_use]
 pub const fn evidence(barrier: Barrier) -> Option<BarrierEvidence> {
     match barrier {
-        Barrier::Consumed => Some(BarrierEvidence { kind: "barrier_consumed", confirms_effect: false }),
+        Barrier::Consumed => Some(BarrierEvidence {
+            kind: "barrier_consumed",
+            confirms_effect: false,
+        }),
         Barrier::Pending | Barrier::Unpaintable | Barrier::HangGuard => None,
     }
 }

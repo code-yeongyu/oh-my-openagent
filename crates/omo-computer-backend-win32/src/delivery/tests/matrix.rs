@@ -11,35 +11,73 @@ const BARRIER: &str = include_str!("../../barrier.rs");
 const LEDGER: &str = "probes/win32-delivery.tsv";
 
 fn probe_ids() -> Vec<String> {
-    let ledger = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/probes/win32-delivery.tsv"))
-        .unwrap_or_default();
-    ledger.lines().skip(1).filter_map(|line| line.split('\t').next()).map(str::to_owned).collect()
+    let ledger = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/probes/win32-delivery.tsv"
+    ))
+    .unwrap_or_default();
+    ledger
+        .lines()
+        .skip(1)
+        .filter_map(|line| line.split('\t').next())
+        .map(str::to_owned)
+        .collect()
 }
 
 #[test]
 fn matrix_constants_cite_probe_rows() {
     let probe_ids = probe_ids();
-    assert!(!probe_ids.is_empty(), "{LEDGER} has rows (it lands with spike row 7, #13145)");
-    let rows: Vec<&str> = MATRIX.lines().skip(1).filter(|line| !line.trim().is_empty()).collect();
+    assert!(
+        !probe_ids.is_empty(),
+        "{LEDGER} has rows (it lands with spike row 7, #13145)"
+    );
+    let rows: Vec<&str> = MATRIX
+        .lines()
+        .skip(1)
+        .filter(|line| !line.trim().is_empty())
+        .collect();
     assert!(!rows.is_empty(), "the matrix is data");
     for row in rows {
         let cite = row.rsplit('\t').next().unwrap_or_default();
         let refuses = row.split('\t').nth(2).is_some_and(|verbs| verbs != "-");
-        match (cite.strip_prefix("win32-delivery:"), cite.strip_prefix("design:")) {
-            (Some(id), _) => assert!(probe_ids.iter().any(|known| known == id), "{row}: cites no ledger row"),
-            (None, Some(id)) => assert!(refuses && !id.is_empty(), "{row}: only a refusal may rest on the design"),
+        match (
+            cite.strip_prefix("win32-delivery:"),
+            cite.strip_prefix("design:"),
+        ) {
+            (Some(id), _) => assert!(
+                probe_ids.iter().any(|known| known == id),
+                "{row}: cites no ledger row"
+            ),
+            (None, Some(id)) => assert!(
+                refuses && !id.is_empty(),
+                "{row}: only a refusal may rest on the design"
+            ),
             (None, None) => panic!("{row}: cites nothing"),
         }
     }
-    let cited: Vec<&str> = BARRIER.split("win32-delivery:").skip(1).filter_map(|rest| rest.split([',', ')', ' ', '\n']).next()).collect();
+    let cited: Vec<&str> = BARRIER
+        .split("win32-delivery:")
+        .skip(1)
+        .filter_map(|rest| rest.split([',', ')', ' ', '\n']).next())
+        .collect();
     assert!(cited.len() >= 3, "the barrier's constants cite the ledger");
     for id in cited {
-        assert!(probe_ids.iter().any(|known| known == id), "barrier.rs cites {id}, not a ledger row");
+        assert!(
+            probe_ids.iter().any(|known| known == id),
+            "barrier.rs cites {id}, not a ledger row"
+        );
     }
 }
 
 #[test]
 fn matrix_rows_parse() {
     let rows = parse().expect("every line of matrix.tsv is a row");
-    assert_eq!(rows.len(), MATRIX.lines().skip(1).filter(|line| !line.trim().is_empty()).count());
+    assert_eq!(
+        rows.len(),
+        MATRIX
+            .lines()
+            .skip(1)
+            .filter(|line| !line.trim().is_empty())
+            .count()
+    );
 }

@@ -39,20 +39,32 @@ pub fn button(button: Button, down: bool, at: ClientPoint) -> Posted {
         (Button::Middle, true) => (WM_MBUTTONDOWN, 0x0010),
         (Button::Middle, false) => (WM_MBUTTONUP, 0),
     };
-    Posted { msg, wparam: mk, lparam: point_lparam(at.x, at.y) }
+    Posted {
+        msg,
+        wparam: mk,
+        lparam: point_lparam(at.x, at.y),
+    }
 }
 
 /// A pointer move to `at`.
 #[must_use]
 pub fn moved(at: ClientPoint) -> Posted {
-    Posted { msg: WM_MOUSEMOVE, wparam: 0, lparam: point_lparam(at.x, at.y) }
+    Posted {
+        msg: WM_MOUSEMOVE,
+        wparam: 0,
+        lparam: point_lparam(at.x, at.y),
+    }
 }
 
 /// One wheel notch at the screen point `screen`: `delta` in the high word of wParam.
 #[must_use]
 pub fn wheel(horizontal: bool, delta: i16, screen: ClientPoint) -> Posted {
     Posted {
-        msg: if horizontal { WM_MOUSEHWHEEL } else { WM_MOUSEWHEEL },
+        msg: if horizontal {
+            WM_MOUSEHWHEEL
+        } else {
+            WM_MOUSEWHEEL
+        },
         wparam: usize::from(delta.cast_unsigned()) << 16,
         lparam: point_lparam(screen.x, screen.y),
     }

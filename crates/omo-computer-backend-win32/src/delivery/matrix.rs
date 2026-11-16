@@ -29,7 +29,9 @@ impl Row {
     #[must_use]
     pub fn matches(&self, class: &str) -> bool {
         match self.pattern.strip_suffix('*') {
-            Some(prefix) => class.strip_prefix(prefix).is_some_and(|rest| !rest.is_empty()),
+            Some(prefix) => class
+                .strip_prefix(prefix)
+                .is_some_and(|rest| !rest.is_empty()),
             None => class == self.pattern,
         }
     }
@@ -55,7 +57,12 @@ fn row(line: &'static str) -> Result<Row, BadRow> {
             .map(|verb| Verb::from_wire(verb).ok_or_else(bad))
             .collect::<Result<_, _>>()?,
     };
-    Ok(Row { family, pattern, refused, cite })
+    Ok(Row {
+        family,
+        pattern,
+        refused,
+        cite,
+    })
 }
 
 /// Every row of `matrix.tsv`, header skipped.
@@ -63,7 +70,11 @@ fn row(line: &'static str) -> Result<Row, BadRow> {
 /// # Errors
 /// The first line that is not a row.
 pub fn parse() -> Result<Vec<Row>, BadRow> {
-    TSV.lines().skip(1).filter(|line| !line.trim().is_empty()).map(row).collect()
+    TSV.lines()
+        .skip(1)
+        .filter(|line| !line.trim().is_empty())
+        .map(row)
+        .collect()
 }
 
 /// The matrix, parsed once. A matrix that does not parse refuses every background verb (fail
@@ -73,7 +84,12 @@ pub fn rows() -> &'static [Row] {
     static ROWS: OnceLock<Vec<Row>> = OnceLock::new();
     ROWS.get_or_init(|| {
         parse().unwrap_or_else(|_| {
-            vec![Row { family: None, pattern: "*", refused: Verb::ALL.to_vec(), cite: "" }]
+            vec![Row {
+                family: None,
+                pattern: "*",
+                refused: Verb::ALL.to_vec(),
+                cite: "",
+            }]
         })
     })
 }

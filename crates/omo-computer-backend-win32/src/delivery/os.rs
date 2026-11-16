@@ -4,16 +4,18 @@
 use std::time::{Duration, Instant};
 
 use omo_computer_core::params::Point;
+use windows::core::BOOL;
 use windows::Win32::Foundation::{CloseHandle, E_ACCESSDENIED, HWND, LPARAM, POINT, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::{GetUpdateRect, InvalidateRect, ScreenToClient};
-use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
+use windows::Win32::System::Threading::{
+    GetCurrentProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
+};
 use windows::Win32::UI::Input::KeyboardAndMouse::IsWindowEnabled;
 use windows::Win32::UI::WindowsAndMessaging::{
-    ChildWindowFromPointEx, EnumChildWindows, GetClassNameW, GetWindowThreadProcessId, IsIconic, IsWindow,
-    IsWindowVisible, SendMessageTimeoutW, CWP_SKIPDISABLED, CWP_SKIPINVISIBLE, CWP_SKIPTRANSPARENT, DLGC_WANTCHARS,
-    SMTO_ABORTIFHUNG, WM_GETDLGCODE,
+    ChildWindowFromPointEx, EnumChildWindows, GetClassNameW, GetWindowThreadProcessId, IsIconic,
+    IsWindow, IsWindowVisible, SendMessageTimeoutW, CWP_SKIPDISABLED, CWP_SKIPINVISIBLE,
+    CWP_SKIPTRANSPARENT, DLGC_WANTCHARS, SMTO_ABORTIFHUNG, WM_GETDLGCODE,
 };
-use windows::core::BOOL;
 
 use crate::barrier::PaintOs;
 use crate::capture::integrity::rid;
@@ -52,7 +54,12 @@ impl PaintOs for Os {
     }
 
     fn invalidate_pixel(&mut self, window: isize) -> bool {
-        let pixel = RECT { left: 0, top: 0, right: 1, bottom: 1 };
+        let pixel = RECT {
+            left: 0,
+            top: 0,
+            right: 1,
+            bottom: 1,
+        };
         // SAFETY: `pixel` outlives the call.
         unsafe { InvalidateRect(Some(hwnd(window)), Some(&raw const pixel), false) }.as_bool()
     }
@@ -75,7 +82,16 @@ unsafe extern "system" fn collect(child: HWND, found: LPARAM) -> BOOL {
     let answered = unsafe {
         IsWindowVisible(child).as_bool()
             && IsWindowEnabled(child).as_bool()
-            && SendMessageTimeoutW(child, WM_GETDLGCODE, WPARAM(0), LPARAM(0), SMTO_ABORTIFHUNG, DLGCODE_TIMEOUT_MS, Some(&raw mut code)).0 != 0
+            && SendMessageTimeoutW(
+                child,
+                WM_GETDLGCODE,
+                WPARAM(0),
+                LPARAM(0),
+                SMTO_ABORTIFHUNG,
+                DLGCODE_TIMEOUT_MS,
+                Some(&raw mut code),
+            )
+            .0 != 0
     };
     if answered && code & DLGC_WANTCHARS as usize != 0 {
         // SAFETY: `found` is the `Vec` `wants_chars` passed, alive for the whole enumeration.
@@ -104,7 +120,8 @@ impl DeliveryOs for Os {
         // SAFETY: a pseudo-handle for this process; no close needed.
         let engine = rid(unsafe { GetCurrentProcess() });
         // SAFETY: a query-only open; closed below.
-        let Ok(process) = (unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) }) else {
+        let Ok(process) = (unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) })
+        else {
             return Integrity::Unreadable;
         };
         let target = rid(process);
@@ -121,16 +138,27 @@ impl DeliveryOs for Os {
     fn wants_chars(&self, window: isize) -> Vec<isize> {
         let mut found: Vec<isize> = Vec::new();
         // SAFETY: `collect` writes only into `found`, which outlives the synchronous enumeration.
-        let _done = unsafe { EnumChildWindows(Some(hwnd(window)), Some(collect), LPARAM(&raw mut found as isize)) };
+        let _done = unsafe {
+            EnumChildWindows(
+                Some(hwnd(window)),
+                Some(collect),
+                LPARAM(&raw mut found as isize),
+            )
+        };
         found
     }
 
     fn child_at(&self, window: isize, at: Point) -> Option<(isize, ClientPoint)> {
-        let screen = POINT { x: i32::from(coordinate(at.x)?), y: i32::from(coordinate(at.y)?) };
+        let screen = POINT {
+            x: i32::from(coordinate(at.x)?),
+            y: i32::from(coordinate(at.y)?),
+        };
         let to_client = |of: HWND| {
             let mut point = screen;
             // SAFETY: `point` outlives the call.
-            unsafe { ScreenToClient(of, &raw mut point) }.as_bool().then_some(point)
+            unsafe { ScreenToClient(of, &raw mut point) }
+                .as_bool()
+                .then_some(point)
         };
         let mut current = hwnd(window);
         let mut client = to_client(current)?;
@@ -151,7 +179,11 @@ impl DeliveryOs for Os {
 
     fn post(&mut self, window: isize, message: &Posted) -> Result<(), PostFailure> {
         crate::input::os::post(window, message).map_err(|error| {
-            if error.code() == E_ACCESSDENIED { PostFailure::AccessDenied } else { PostFailure::Failed }
+            if error.code() == E_ACCESSDENIED {
+                PostFailure::AccessDenied
+            } else {
+                PostFailure::Failed
+            }
         })
     }
 }
