@@ -10,6 +10,8 @@ import {
   SESSION_ID,
   type World,
 } from "../../../../device-service-core/test/local-api/conformance/world.ts"
+import { withContractHost } from "../../../../senpi-task/src/runners/rpc-host/testing/contract-host"
+import { createLiveThreadSurface } from "../thread/live-surface"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
 import { personIdentity, resolveSessionTarget } from "./sessions"
 import { clientOn, closeClients, failureOf, fakeClock, startModeOwner, startOwner } from "./testing/fake-service"
@@ -498,7 +500,8 @@ describe("an open on this device", () => {
     return {
       ...base,
       endpoints: { ...base.endpoints, [SELF]: ["ZW5kcG9pbnQta2V5LTAwMD"] },
-      located: { ...base.located, [SELF]: { [ENGINE_ID]: NEW_KEY } },
+      // The contract host names the session it opens dur-selected.
+      located: { ...base.located, [SELF]: { "dur-selected": NEW_KEY } },
       sessions: [...base.sessions, { ...live, device: SELF, session_id: NEW_KEY }],
     }
   }
@@ -509,14 +512,24 @@ describe("an open on this device", () => {
     expect(self).toMatchObject({ id: SELF, self: true, kind: "cli" })
   })
 
-  test("#given a connected service whose device listing omits this device #when sessions.open names this device #then it opens through the relay host", async () => {
-    const owner = await startOwner(selfWorld())
-    const opened = await valueOf(
-      clientOn(owner.stateDir, fakeClock()).sessions.open({ device: SELF, workspace: "/work" }),
-    )
-    expect(opened.thread).toBe(handleOf(SELF, NEW_KEY))
-    expect(owner.state.commands.filter((rpc) => rpc["type"] === "open_session")).toEqual([
-      expect.objectContaining({ cwd: "/work" }),
-    ])
+  test("#given a connected service #when sessions.open names this device #then it opens on this device's own host, never through the relay to itself", async () => {
+    await withContractHost({}, async (host) => {
+      const owner = await startOwner(selfWorld())
+      const client = clientOn(owner.stateDir, fakeClock(), undefined, {
+        localThreadHost: async () =>
+          createLiveThreadSurface(undefined, {
+            env: { OMO_CODING_AGENT_DIR: host.root, SENPI_RPC_SOCKET: host.socket, SENPI_RPC_KEY_ROOT: host.root },
+            statusAll: async () => undefined,
+            registry: async () => [],
+          }),
+      })
+      const opened = await valueOf(client.sessions.open({ device: SELF, workspace: host.root, preset: "read-only" }))
+      expect(opened.thread).toBe(handleOf(SELF, NEW_KEY))
+      expect(opened.device).toMatchObject({ id: SELF, self: true })
+      expect(owner.state.commands.filter((rpc) => rpc["type"] === "open_session")).toEqual([])
+      expect(host.frames.filter(({ frame }) => frame["type"] === "open_session")).toEqual([
+        expect.objectContaining({ frame: expect.objectContaining({ cwd: host.root, permissionPreset: "read-only" }) }),
+      ])
+    })
   })
 })

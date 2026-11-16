@@ -13,6 +13,7 @@ import {
   type Timers,
 } from "@oh-my-opencode/device-service-core/device-service"
 import type { AliasRegistry } from "../thread/remote/ports"
+import type { ThreadHost } from "../thread/tools/ports"
 import { aliasMembers } from "./aliases"
 import { attachMember } from "./attach"
 import { failureFromError, nextActionFor, remoteFailure } from "./codes"
@@ -81,6 +82,8 @@ export type RemoteClientDeps = {
    * it, never widen it. Absent, only the narrowest mode passes.
    */
   readonly permissionPreset?: () => string | undefined
+  /** Test seam: this device's operator endpoint, where an open on this device lands (the engine's own host by default). */
+  readonly localThreadHost?: () => Promise<ThreadHost>
   /** Test seam: opens the proven device-service connection (`connectDeviceService` by default). */
   readonly connect?: (options: {
     readonly version: string

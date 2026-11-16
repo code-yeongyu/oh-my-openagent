@@ -23,6 +23,7 @@ import { nextActionFor, remoteFailure } from "./codes"
 import { DEADLINES } from "./deadlines"
 import { createDeviceServiceSessions } from "./port/device-service"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
+import { defaultLocalThreadHost, openOnThisDevice } from "./sessions-local"
 import { PERMISSION_PRESETS } from "./types"
 import type {
   DeviceRow,
@@ -513,6 +514,13 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       async (svc) => {
         const device = await deviceRow(request.device, stage(DEADLINES.devices))
         if (device.kind === "error") return device
+        // This device opens on its own operator endpoint, never through the relay to itself (#13787).
+        if (device.value.self === true) {
+          const host = await (core.deps.localThreadHost ?? defaultLocalThreadHost)()
+          const local = await openOnThisDevice(svc, host, device.value.id, asked)
+          if (local.kind === "error") return modelUnavailable(fromThread(local.error), request.model)
+          return ok({ device: device.value, key: local.key, warnings: local.warnings })
+        }
         const outcome = await createRelaySessionHost(legOf(svc).remote, device.value.id).open(asked)
         if (outcome.kind === "error") return modelUnavailable(fromThread(outcome.error), request.model)
         return ok({
