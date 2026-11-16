@@ -40,4 +40,43 @@ describe("vendored device-service local-API client", () => {
     const present = readdirSync(SRC).filter((name) => !NOT_VENDORED.includes(name))
     expect(present.toSorted()).toEqual(pinned.toSorted())
   })
+
+  // spec-proto.ts is omo's own port, not byte-vendored, and knip skips the whole directory: this pins its exports to
+  // exactly the relay-spec names the vendored files import from it, so a stale or missing port fails here.
+  test("#given spec-proto.ts #then it exports exactly what the vendored files import from it", () => {
+    const imported = new Set<string>()
+    for (const file of pin.files) {
+      const text = readFileSync(join(SRC, file.upstreamPath.split("/").at(-1) ?? ""), "utf8")
+      for (const [, names] of text.matchAll(/import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+"\.\/spec-proto\.ts"/g))
+        for (const name of (names ?? "").split(",")) {
+          const bare = name.trim().replace(/^type\s+/, "")
+          if (bare !== "") imported.add(bare)
+        }
+    }
+    const port = readFileSync(join(SRC, "spec-proto.ts"), "utf8")
+    // Value exports in every form come from the transpiler's scan; what it strips (type-only and `declare` declarations,
+    // type-only names in an export list) from their own syntax.
+    const exported = new Set([
+      ...new Bun.Transpiler({ loader: "ts" }).scan(port).exports,
+      ...[
+        ...port.matchAll(
+          /(?:^|;)\s*export\s+(?:declare\s+)?(?:type|interface|const|let|var|function|class|enum|namespace|module)\s+(\w+)/gm,
+        ),
+      ].map((match) => match[1]),
+      ...[...port.matchAll(/(?:^|;)\s*export\s+(?:type\s+)?\{([^}]*)\}/gm)].flatMap((match) =>
+        (match[1] ?? "")
+          .split(",")
+          .map(
+            (entry) =>
+              entry
+                .trim()
+                .replace(/^type\s+/, "")
+                .split(/\s+as\s+/)
+                .at(-1) ?? "",
+          )
+          .filter(Boolean),
+      ),
+    ])
+    expect([...exported].toSorted()).toEqual([...imported].toSorted())
+  })
 })
