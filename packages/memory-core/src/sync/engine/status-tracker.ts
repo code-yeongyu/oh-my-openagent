@@ -3,7 +3,7 @@
 // key the engine compares to announce transitions only.
 
 import { describeSyncFailure, isFailureShown, type SyncFailure } from "./failure"
-import type { SyncStage } from "./failure-cause"
+import { gitSubcommandOf, type SyncStage } from "./failure-cause"
 import type { Frozen } from "./push-cycle"
 
 interface Failing {
@@ -16,10 +16,22 @@ export type TrackedStatus =
   | { readonly kind: "failing"; readonly failure: SyncFailure; readonly since: number; readonly attempts: number }
   | ({ readonly kind: "frozen" } & Frozen)
 
+/**
+ * What the warning names about a failure's cause: every cause field, plus the git subcommand the warning
+ * prints for a failed git step (kept off the status). A failure without a cause has none to change.
+ */
+const warnedCauseKey = (failure: SyncFailure, error: unknown): string => {
+  if (!("cause" in failure)) return ""
+  const { errorClass, code, httpStatus, exitCode, stage } = failure.cause
+  return JSON.stringify([errorClass, code ?? null, httpStatus ?? null, exitCode ?? null, stage, gitSubcommandOf(error) ?? null])
+}
+
 export class StatusTracker {
   private failing: Failing | null = null
   /** The failure a UI shows: set once a failure crosses its visibility threshold, cleared only by a successful cycle. */
   private shown: Failing | null = null
+  /** The cause key the last warning named for the shown failure. */
+  private shownCauseKey = ""
   frozen: Frozen | null = null
 
   constructor(private readonly now: () => number) {}
@@ -41,7 +53,10 @@ export class StatusTracker {
     this.shown = null
   }
 
-  /** Records a failed cycle; true when the shown failure appeared or changed (#13635), the only time it is worth a warning. */
+  /**
+   * Records a failed cycle; true when the shown failure appeared or changed (#13635), or kept its kind and
+   * action but names another cause, any cause field included (#13689): the only times it is worth a warning.
+   */
   failed(error: unknown, stage: SyncStage): boolean {
     const failure = describeSyncFailure(error, stage)
     const previous = this.failing
@@ -56,6 +71,9 @@ export class StatusTracker {
     const shown = this.shown
     const same = shown !== null && shown.failure.kind === failure.kind && shown.failure.action === failure.action
     this.shown = same ? { failure, since: shown.since, attempts: shown.attempts + 1 } : failing
-    return !same
+    const causeKey = warnedCauseKey(failure, error)
+    const causeChanged = causeKey !== this.shownCauseKey
+    this.shownCauseKey = causeKey
+    return !same || causeChanged
   }
 }

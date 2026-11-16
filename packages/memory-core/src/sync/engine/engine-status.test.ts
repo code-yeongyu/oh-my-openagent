@@ -1,6 +1,8 @@
 import { afterEach, expect, spyOn, test } from "bun:test"
 
+import { GitCommandError } from "../../git/errors"
 import { StrandedGitLockError } from "../../git/repo-lock-sweep"
+import { SyncCommitError } from "./adapters/git-sync-repo"
 import { SyncAuthError, SyncHttpError, SyncNetworkError } from "./adapters/http-transport"
 import { OFFLINE_SHOWN_AFTER_ATTEMPTS } from "./failure"
 import { type Device, GIT_TEST_TIMEOUT, makeDevice } from "./engine-harness.test-support"
@@ -158,6 +160,99 @@ test(
 
     expect(warnings()).toHaveLength(2)
     expect(warnings()[1]?.line).toContain("SyncHttpError")
+    load.mockRestore()
+  },
+  GIT_TEST_TIMEOUT,
+)
+
+test(
+  "two unknown failures in a row with different causes warn twice; the same cause again does not (#13689)",
+  async () => {
+    const lines: { readonly line: string; readonly level: string }[] = []
+    const b = await makeDevice(new FakeSyncServer(), "b", undefined, {
+      log: (line, level = "info") => lines.push({ line, level }),
+    })
+    devices.push(b)
+    let error: Error = new SyncCommitError("git write-tree failed (128): fatal: bad tree")
+    const load = spyOn(b.store, "load").mockImplementation(async () => {
+      throw error
+    })
+    const warnings = () => lines.filter(({ line, level }) => line.startsWith("sync cycle failed") && level === "warn")
+
+    expect(await failedCycle(b)).toBe(error)
+    expect(await b.engine.status()).toMatchObject({ failure: { kind: "unknown", cause: { errorClass: "SyncCommitError" } } })
+    error = new TypeError("x is not a function")
+    expect(await failedCycle(b)).toBe(error)
+    expect(await b.engine.status()).toMatchObject({ failure: { kind: "unknown", cause: { errorClass: "TypeError" } } })
+    expect(await failedCycle(b)).toBe(error)
+
+    expect(warnings()).toHaveLength(2)
+    expect(warnings()[1]?.line).toContain("TypeError")
+    load.mockRestore()
+  },
+  GIT_TEST_TIMEOUT,
+)
+
+test(
+  "a sync-repo git failure warns again when its subcommand or exit code changes, and its cause names the exit code (#13690 review)",
+  async () => {
+    const lines: { readonly line: string; readonly level: string }[] = []
+    const b = await makeDevice(new FakeSyncServer(), "b", undefined, {
+      log: (line, level = "info") => lines.push({ line, level }),
+    })
+    devices.push(b)
+    const gitFailure = (subcommand: string, exitCode: number) =>
+      new SyncCommitError(`git ${subcommand} failed (${exitCode}): fatal: x`, { subcommand, exitCode })
+    let error: Error = gitFailure("update-ref", 1)
+    const load = spyOn(b.store, "load").mockImplementation(async () => {
+      throw error
+    })
+    const warnings = () => lines.filter(({ line, level }) => line.startsWith("sync cycle failed") && level === "warn")
+
+    await failedCycle(b)
+    error = gitFailure("commit-tree", 128)
+    await failedCycle(b)
+    expect(await b.engine.status()).toMatchObject({
+      failure: { kind: "unknown", cause: { errorClass: "SyncCommitError", exitCode: 128 } },
+    })
+    error = gitFailure("write-tree", 128)
+    await failedCycle(b)
+    await failedCycle(b)
+
+    expect(warnings().map(({ line }) => line)).toEqual([
+      expect.stringContaining("git update-ref exited 1"),
+      expect.stringContaining("git commit-tree exited 128"),
+      expect.stringContaining("git write-tree exited 128"),
+    ])
+    load.mockRestore()
+  },
+  GIT_TEST_TIMEOUT,
+)
+
+test(
+  "a git failure whose exit code changes at the same stage warns again, naming the new exit code (#13690 review)",
+  async () => {
+    const lines: { readonly line: string; readonly level: string }[] = []
+    const b = await makeDevice(new FakeSyncServer(), "b", undefined, {
+      log: (line, level = "info") => lines.push({ line, level }),
+    })
+    devices.push(b)
+    let error: Error = new GitCommandError(["commit", "-m", "x"], 128, "", "fatal: x")
+    const load = spyOn(b.store, "load").mockImplementation(async () => {
+      throw error
+    })
+    const warnings = () => lines.filter(({ line, level }) => line.startsWith("sync cycle failed") && level === "warn")
+
+    await failedCycle(b)
+    error = new GitCommandError(["commit", "-m", "x"], 1, "", "fatal: x")
+    await failedCycle(b)
+    expect(await b.engine.status()).toMatchObject({ failure: { kind: "unknown", cause: { exitCode: 1, stage: "load" } } })
+    await failedCycle(b)
+
+    expect(warnings().map(({ line }) => line)).toEqual([
+      expect.stringContaining("git commit exited 128"),
+      expect.stringContaining("git commit exited 1"),
+    ])
     load.mockRestore()
   },
   GIT_TEST_TIMEOUT,
