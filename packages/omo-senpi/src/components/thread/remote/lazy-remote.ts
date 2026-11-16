@@ -12,7 +12,9 @@ export type LazyRemoteOptions = {
 
 /**
  * A remote surface whose device-service client loads on the first call that needs another device. A failed load is not
- * cached and surfaces as the tools' typed host_unavailable, so a device without the service keeps today's local behavior.
+ * cached. A missing service, signed-out account or disabled relay leaves a local address miss as not_found; an explicit
+ * device operation, a configured relay in any failing state (offline, connecting, keychain locked, authorization stale, degraded, update
+ * required) or a failed account lookup surfaces typed unavailability.
  * The alias registry loads the same way on its first use; a load that fails answers alias_registry_unavailable and is
  * retried on the next call. `sessions.close` ends the device-service connection a short-lived caller opened.
  */
@@ -29,14 +31,20 @@ export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThrea
   const sessions: RemoteSessionsPort = {
     status: async () => await (await load()).status(),
     thisDevice: async () => await (await load()).thisDevice(),
+    thisDeviceName: async () => (await (await load()).thisDeviceName?.()) ?? null,
     devices: async () => await (await load()).devices(),
-    sessions: async () => await (await load()).sessions(),
+    sessions: async (filter) => await (await load()).sessions(filter),
+    listing: async () => {
+      const loaded = await load()
+      return loaded.listing === undefined ? { rows: await loaded.sessions(), incomplete: [] } : await loaded.listing()
+    },
     endpointCommand: async (device, rpc, options) => await (await load()).endpointCommand(device, rpc, options),
     locate: async (device, engineId, knownKey) => await (await load()).locate(device, engineId, knownKey),
     sessionCommand: async (device, sessionId, rpc, options) =>
       await (await load()).sessionCommand(device, sessionId, rpc, options),
     read: async (device, sessionId, tail) => await (await load()).read(device, sessionId, tail),
-    watch: async (device, sessionId, listener) => await (await load()).watch(device, sessionId, listener),
+    watch: async (device, sessionId, handlers, watchOptions) =>
+      await (await load()).watch(device, sessionId, handlers, watchOptions),
     close: async () => {
       const loaded = port
       port = undefined

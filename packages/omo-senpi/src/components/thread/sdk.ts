@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 
+import { askHost } from "../../../../senpi-task/src/runners/rpc-host/host-request"
+import { classifyWarmReply, type WarmAnswer } from "../../../../senpi-task/src/runners/rpc-host/host-warm-reply"
+
 import { toThreadAddressEntries, type AddressEntry } from "./address-book"
 import type { ThreadToolResult } from "./contracts"
 import { threadToolFailure, type ThreadToolFailure } from "./errors"
@@ -24,6 +27,7 @@ export type {
 import type { DeliveryTarget } from "./gateway/transport"
 import type { ExternalAuthor, GatewayDeliveryMode, GatewayDeliveryResult } from "./gateway/types"
 import { createLiveThreadSurface, parseHostStatusAll } from "./live-surface"
+import { resolveThreadSocket } from "./live-surface-paths"
 import { createGatewayResolver, createGatewayServices } from "./tools/gateway-services"
 import {
   addressBook,
@@ -36,6 +40,7 @@ import {
 } from "./tools/internals"
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "./tools/ports"
 import { listThreads, readThread } from "./tools/read-ops"
+import { listAcross } from "./remote/cross-device"
 import type { RemoteThreadSurface } from "./remote/ports"
 import { stampThisDevice } from "./remote/this-device"
 
@@ -172,8 +177,16 @@ export type ThreadSdk = StoreExtensionApi & {
     thread: LocatedThread,
     request: Omit<ReleaseSessionRequest, "reason">,
   ) => Promise<ReleaseSessionReply>
+  /**
+   * senpi's `warm` on the operator daemon (`omo daemon run`, after its ensure): the host loads omo with no session open,
+   * so its thread component starts the wake and declares the delivery consumer at once (#13037 cold wake).
+   */
+  readonly warmDaemon: () => Promise<WarmAnswer>
   readonly dispose: () => Promise<void>
 }
+
+// The first load compiles the extension graph; a loaded host answers in well under a second (the task host's bound).
+const DAEMON_WARM_TIMEOUT_MS = 60_000
 
 function fail(
   code: Parameters<typeof threadToolFailure>[0],
@@ -349,7 +362,10 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     registerStoreExtension: store.registerStoreExtension,
     extensionCall: store.extensionCall,
     principal,
-    list: (request) => guarded(async () => listThreads(surface, await view(), request.all_scope)),
+    list: (request) =>
+      guarded(async () =>
+        listAcross(options.remote, listThreads(surface, await view(), request.all_scope), request.all_scope === true),
+      ),
     read: (request) =>
       guarded(async () =>
         readThread(
@@ -554,6 +570,15 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
         return { success: false, error: failure.error.code, errorData: { hint: failure.error.message } }
       }
     },
+    warmDaemon: async () =>
+      classifyWarmReply(
+        await askHost(
+          resolveThreadSocket(env),
+          { id: `omo-daemon-warm-${randomUUID()}`, type: "warm" },
+          DAEMON_WARM_TIMEOUT_MS,
+          { agentDir: options.agentDir },
+        ),
+      ),
     dispose: async () => {
       relay.dispose()
       await options.remote?.sessions.close?.().catch(() => undefined)

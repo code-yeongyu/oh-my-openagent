@@ -13,7 +13,11 @@ import {
   ThreadAddress,
   ThreadDeliveryMode,
   RelayText,
+  thinkingLevel,
 } from "./fields"
+import { ThreadCreateParams } from "./create-params"
+
+export { ThreadCreateParams }
 
 const BINDING_PLATFORM = Type.Union(
   [
@@ -43,66 +47,17 @@ const BoundSession = Type.Optional(
   }),
 )
 
-export const ThreadCreateParams = Type.Object({
-  thread: Type.Optional(
-    Type.String({
-      minLength: 1,
-      description:
-        "Id or alias of an EXISTING thread to open, on whichever of the account's devices holds it; leave unset to create a new thread. Never combined with device.",
-    }),
-  ),
-  device: Type.Optional(
-    Type.String({
-      minLength: 1,
-      description:
-        "Account device to create the new thread on (from thread_list with all_scope); leave unset to create it on this device. Only for a new thread.",
-    }),
-  ),
-  alias: Type.Optional(
-    Type.String({
-      minLength: 1,
-      maxLength: 64,
-      description:
-        "Account-wide alias for the new thread, usable instead of its id in every thread tool; an alias another thread holds returns alias_taken naming the holder.",
-    }),
-  ),
-  name: Type.Optional(
-    Type.String({
-      description:
-        "Display label for the new thread; an existing thread with the same normalized name returns name_conflict, and later renames change only the label while thread_id stays the address.",
-    }),
-  ),
-  cwd: Type.Optional(
-    Type.String({
-      description:
-        "Working directory the new thread runs in; leaving it unset keeps the thread inside the caller's workspace.",
-    }),
-  ),
-  fork_from: Type.Optional(
-    Type.String({
-      description:
-        "Durable id of an existing thread to fork; the new thread starts with that transcript as prior context.",
-    }),
-  ),
-  skills: Type.Optional(
-    Type.Array(Type.String({ minLength: 1, maxLength: 64 }), {
-      minItems: 1,
-      maxItems: 16,
-      description:
-        "Names of installed skills the new thread follows from its first turn, as if each were loaded with /skill. A path or text that is not a skill name refuses the create. The new session applies each name its own skill registry holds and logs any it does not; the result's thread.requested_skills echoes the names passed.",
-    }),
-  ),
-  idempotency_key: IdempotencyKey,
-})
-
 export const ThreadListParams = Type.Object({
   all_scope: Type.Optional(
     Type.Boolean({
       description:
-        "List threads from every workspace on this machine; the default scope returns only the caller's workspace.",
+        "List this machine's threads from every workspace; the default returns only the caller's workspace here. The account's other devices' threads are always listed.",
     }),
   ),
 })
+
+/** The longest a `thread_read` waits for its thread to settle (#13417). */
+export const THREAD_READ_WAIT_MAX_MS = 600_000
 
 export const ThreadReadParams = Type.Object({
   thread: ThreadAddress,
@@ -117,6 +72,13 @@ export const ThreadReadParams = Type.Object({
       minimum: 1,
       maximum: THREAD_READ_MAX_BYTES,
       description: `Byte budget for the returned transcript slice, default ${THREAD_READ_DEFAULT_BYTES} and capped at ${THREAD_READ_MAX_BYTES}; a longer transcript returns truncated with next_cursor.`,
+    }),
+  ),
+  wait_ms: Type.Optional(
+    Type.Integer({
+      minimum: 1,
+      maximum: THREAD_READ_WAIT_MAX_MS,
+      description: "Wait up to this many ms for a remote thread's turn to end, then read; see result.wait.",
     }),
   ),
   all_scope: AllScope,
@@ -183,7 +145,7 @@ export const ThreadRenameParams = Type.Object({
       minLength: 1,
       maxLength: 64,
       description:
-        "New account-wide alias for the thread; an alias another thread holds returns alias_taken naming the holder, and the old alias is freed.",
+        'New account-wide alias for the thread; an alias another thread holds returns alias_taken naming the holder, and the old alias is freed. With no signed-in account it becomes the thread\'s local name instead (unless name is set) and the result carries alias_scope "local".',
     }),
   ),
   all_scope: AllScope,
@@ -209,25 +171,13 @@ export const ThreadSetModelParams = Type.Object({
 
 export const ThreadSetReasoningParams = Type.Object({
   thread: ThreadAddress,
-  level: Type.Union(
-    [
-      Type.Literal("off"),
-      Type.Literal("minimal"),
-      Type.Literal("low"),
-      Type.Literal("medium"),
-      Type.Literal("high"),
-      Type.Literal("xhigh"),
-      Type.Literal("max"),
-    ],
-    {
-      description:
-        "Thinking level to apply; a level the thread's active model cannot run returns thinking_level_unsupported with the supported list and leaves the thread unchanged.",
-    },
+  level: thinkingLevel(
+    "Thinking level to apply; a level the thread's active model cannot run returns thinking_level_unsupported with the supported list and leaves the thread unchanged.",
   ),
   scope: Type.Optional(
     Type.Union([Type.Literal("session"), Type.Literal("turn")], {
       description:
-        "session (default) changes the thread's remembered level for its model; turn changes only the current session level without rewriting the model's remembered level.",
+        "session (default) or turn; either changes only this thread's level and never the level the device remembers for the model.",
     }),
   ),
   all_scope: AllScope,

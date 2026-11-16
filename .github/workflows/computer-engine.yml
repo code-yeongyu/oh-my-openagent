@@ -9,7 +9,6 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "rust-toolchain.toml"
-      - "script/qa/computer/**"
       - ".github/workflows/computer-engine.yml"
       - "package.json"
       - "bun.lock"
@@ -22,7 +21,6 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "rust-toolchain.toml"
-      - "script/qa/computer/**"
       - ".github/workflows/computer-engine.yml"
       - "package.json"
       - "bun.lock"
@@ -38,13 +36,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { os: macos-26, rust_target: aarch64-apple-darwin }
-          - { os: macos-15, rust_target: aarch64-apple-darwin }
-          - { os: ubuntu-22.04, rust_target: x86_64-unknown-linux-gnu }
-          - { os: ubuntu-22.04-arm, rust_target: aarch64-unknown-linux-gnu }
-          - { os: windows-latest, rust_target: x86_64-pc-windows-msvc }
-          - { os: windows-11-arm, rust_target: aarch64-pc-windows-msvc }
+        # Pull requests run Linux only; the ci:full-matrix label, pushes and dispatches run every OS (#13802).
+        include: >-
+          ${{ fromJSON(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'ci:full-matrix') && '[{"os": "ubuntu-22.04", "rust_target": "x86_64-unknown-linux-gnu"},
+          {"os": "ubuntu-22.04-arm", "rust_target": "aarch64-unknown-linux-gnu"}]' || '[{"os": "macos-26", "rust_target": "aarch64-apple-darwin"},
+          {"os": "macos-15", "rust_target": "aarch64-apple-darwin"},
+          {"os": "ubuntu-22.04", "rust_target": "x86_64-unknown-linux-gnu"},
+          {"os": "ubuntu-22.04-arm", "rust_target": "aarch64-unknown-linux-gnu"},
+          {"os": "windows-latest", "rust_target": "x86_64-pc-windows-msvc"},
+          {"os": "windows-11-arm", "rust_target": "aarch64-pc-windows-msvc"}]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:

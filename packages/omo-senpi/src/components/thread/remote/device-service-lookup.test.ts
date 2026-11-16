@@ -7,14 +7,14 @@ import { createDeviceServiceSessions } from "./device-service"
 function portFor(lookup: "timeout" | "closed" | "answers") {
   const calls = { endpointCommand: 0 }
   const fake = {
-    welcome: { service_version: "t", capabilities: [], state: "connected" },
+    welcome: { service_version: "0.1.0", capabilities: [], state: "connected" },
     request: async (type: string) => {
       if (type !== "session.endpoints") throw new Error(`unexpected request ${type}`)
       if (lookup === "timeout") throw new LocalApiError("request_timeout", "no answer")
       if (lookup === "closed") throw new LocalApiError("closed", "the connection closed")
       return { endpoints: ["ZW5kcG9pbnQta2V5LTAwMD"] }
     },
-    endpointCommand: async (_device: string, _endpoint: string, _rpc: unknown, commandId: string) => {
+    commandTo: async (_target: unknown, _rpc: unknown, commandId: string) => {
       calls.endpointCommand += 1
       throw new LocalApiError("request_timeout", `command ${commandId} may have been dispatched`, {
         command_id: commandId,
@@ -27,7 +27,11 @@ function portFor(lookup: "timeout" | "closed" | "answers") {
   const port = createDeviceServiceSessions({
     version: "0.0.0-test",
     connect: () =>
-      connectDeviceService({ version: "0.0.0-test", stateDir: "/nonexistent", connect: async () => fake as never }),
+      connectDeviceService({
+        version: "0.0.0-test",
+        stateDir: "/nonexistent",
+        connect: async () => fake as never,
+      }).then((conn) => ({ conn, owned: true })),
   })
   return { port, calls }
 }
