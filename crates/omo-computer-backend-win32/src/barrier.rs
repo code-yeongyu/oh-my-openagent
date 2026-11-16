@@ -62,9 +62,6 @@ pub trait PaintOs {
 
 /// The consumed hop on `window`.
 pub fn consumed_hop(os: &mut dyn PaintOs, window: isize) -> Barrier {
-    if window != 0 {
-        return Barrier::Pending;
-    }
     if !os.paintable(window) || !os.invalidate_pixel(window) {
         return Barrier::Unpaintable;
     }
