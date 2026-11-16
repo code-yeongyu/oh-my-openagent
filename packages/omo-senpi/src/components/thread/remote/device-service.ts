@@ -8,7 +8,7 @@ import {
   type DeviceService,
   type RemoteAttach,
 } from "@oh-my-opencode/device-service-core/device-service"
-import type { DeviceServiceDial, JsonObject, RemoteCommandOutcome, RemoteSessionsPort } from "./ports"
+import type { DeviceServiceDial, JsonObject, RemoteCommandOutcome, RemoteListing, RemoteSessionsPort } from "./ports"
 
 export type DeviceServiceSessionsOptions = {
   readonly version: string
@@ -189,24 +189,49 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     attaches.set(key, opened)
     return opened
   }
+  const listing = async (filter?: { readonly device?: string }): Promise<RemoteListing> => {
+    const listed = await (await svc()).sessions(filter?.device === undefined ? undefined : { device: filter.device })
+    return {
+      rows: listed.rows.map((row) => ({
+        device: row.device,
+        session_id: row.session_id,
+        ...durableIdOf(row),
+        title: row.title,
+        project: row.project,
+        path: row.path,
+        state: row.state,
+        updated_ms: row.updated_ms,
+      })),
+      incomplete: listed.incomplete,
+    }
+  }
+  // thread_list asks for this device's id and name in parallel: overlapping asks share one device.info read.
+  let info: ReturnType<DeviceService["thisDevice"]> | undefined
+  const deviceInfo = (): ReturnType<DeviceService["thisDevice"]> => {
+    if (info !== undefined) return info
+    const asked = svc().then((connected) => connected.thisDevice())
+    info = asked
+    const clear = () => {
+      if (info === asked) info = undefined
+    }
+    asked.then(clear, clear)
+    return asked
+  }
   return {
     status: async () => ({ state: (await (await svc()).status()).state }),
-    thisDevice: async () => (await (await svc()).thisDevice())?.id ?? null,
+    thisDevice: async () => (await deviceInfo())?.id ?? null,
+    thisDeviceName: async () => (await deviceInfo())?.name ?? null,
     devices: async () =>
-      (await (await svc()).devices()).map((row) => ({ device: row.device, label: row.label, online: row.online })),
-    sessions: async (filter) =>
-      (await (await svc()).sessions(filter?.device === undefined ? undefined : { device: filter.device })).rows.map(
-        (row) => ({
-          device: row.device,
-          session_id: row.session_id,
-          ...durableIdOf(row),
-          title: row.title,
-          project: row.project,
-          path: row.path,
-          state: row.state,
-          updated_ms: row.updated_ms,
-        }),
-      ),
+      (await (await svc()).devices()).map((row) => ({
+        device: row.device,
+        label: row.label,
+        online: row.online,
+        platform: row.platform,
+        kind: row.kind,
+        last_seen_ms: row.last_seen_ms,
+      })),
+    sessions: async (filter) => (await listing(filter)).rows,
+    listing: () => listing(),
     // create / open / fork on another device: relay daemon #393's attach-less `session.command {device, endpoint, rpc}`.
     // The endpoint lookup and every refusal answered before sending ran nothing; anything after sending may have.
     // An open_session goes on the endpoint dialer (a fresh owned connection per call by default), closed once it
