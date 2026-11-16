@@ -14,6 +14,8 @@ const fullMatrixLabel = "ci:full-matrix"
 // behaves, a diff too long to list (it may hide one), or an explicit reason line in the PR body. Anything else is
 // refused, never guessed from keywords.
 const platformReasonLine = /^Platform-reason:[ \t]*\S.*$/m
+// The pulls/files API lists at most this many files; a larger pull request counts as platform-sensitive when labelled.
+const apiFileListCap = 3000
 const platformSensitiveExactPaths = new Set([
   ".github/workflows/ci.yml",
   ".github/workflows/ci-full-matrix-label.yml",
@@ -137,6 +139,7 @@ export function classifyCiMode({
   headRef = "",
   labels = [],
   body = "",
+  changedFiles = 0,
 }) {
   // Queue commits never use generated-release push policy.
   const classificationEvent = eventName === "merge_group" ? "pull_request" : eventName
@@ -151,7 +154,11 @@ export function classifyCiMode({
   const labelled = classificationEvent === "pull_request" && labels.includes(fullMatrixLabel)
   // A diff that cannot be fully listed may hide a platform path, so the label is honored (fails toward the full matrix).
   const labelHonored =
-    labelled && (!diffAvailable || changedPaths.some(isPlatformSensitivePath) || platformReasonLine.test(body))
+    labelled &&
+    (!diffAvailable ||
+      changedFiles > apiFileListCap ||
+      changedPaths.some(isPlatformSensitivePath) ||
+      platformReasonLine.test(body))
   const fullMatrix =
     eventName === "merge_group" || classificationEvent === "push" || releaseStateHeadRef.test(headRef) || labelHonored
 
@@ -189,6 +196,7 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
     headRef: args.get("head-ref") ?? "",
     labels: parseLabels(args.get("labels") ?? "[]"),
     body: args.has("body-file") ? readFileSync(args.get("body-file"), "utf8") : "",
+    changedFiles: Number(args.get("changed-files") ?? "0"),
   })
   process.stdout.write(`${JSON.stringify(mode)}\n`)
 }
