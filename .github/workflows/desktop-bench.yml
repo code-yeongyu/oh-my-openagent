@@ -149,7 +149,7 @@ jobs:
           import { pathToFileURL } from "node:url"
 
           const [evalCore, out] = process.argv.slice(2)
-          const { compareBench, REGRESSION_RATIO, REGRESSION_FLOOR_MS } = await import(pathToFileURL(evalCore).href)
+          const { compareBench } = await import(pathToFileURL(evalCore).href)
           const rounds = (side) =>
             readdirSync(out)
               .filter((name) => new RegExp(`^${side}-\\d+\\.json$`).test(name))
@@ -198,7 +198,7 @@ jobs:
           const line =
             `bench comparison: base ${short(process.env.BASE_SHA)} vs head ${short(process.env.HEAD_SHA)}: ` +
             `${comparison.ok ? "PASS" : "FAIL"} (${rows.length} ops, ${failed.size} regressed, best p50 of ${rounds("head").length} rounds, ${lost} samples lost, ` +
-            `fail above x${REGRESSION_RATIO} and +${REGRESSION_FLOOR_MS} ms)`
+            `fail above x${comparison.ratio} and +${comparison.floorMs} ms)`
           console.log(line)
           writeFileSync(join(out, "comparison.json"), `${JSON.stringify({ line, comparison, rows, load: { base: base.load, head: head.load } }, null, 2)}\n`)
           if (process.env.GITHUB_STEP_SUMMARY) {
