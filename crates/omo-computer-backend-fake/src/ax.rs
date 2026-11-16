@@ -136,7 +136,7 @@ impl AxBackend for FakeBackend {
         self.call(FakeMethod::AxSetValue, |state, outcome| {
             let (node, window, _) = lookup(state, reference)?;
             if !supports(node, "set_value") {
-                return Err(Refusal::new(EngineCode::AxUnsupported, Reason::PerformUnsupported.wire()));
+                return Err(Refusal::new(EngineCode::AxUnsupported, Reason::PerformUnsupported));
             }
             let key = value_key(reference, &window);
             state.ax_values.insert(key, value.to_owned());
@@ -161,7 +161,7 @@ impl AxBackend for FakeBackend {
         self.call(FakeMethod::AxTypeText, |state, outcome| {
             let (node, window, _) = lookup(state, reference)?;
             if !supports(node, "type_text") {
-                return Err(Refusal::new(EngineCode::AxUnsupported, Reason::PerformUnsupported.wire()));
+                return Err(Refusal::new(EngineCode::AxUnsupported, Reason::PerformUnsupported));
             }
             let key = value_key(reference, &window);
             let before = state.ax_values.get(&key).cloned().or_else(|| node.value.clone()).unwrap_or_default();
