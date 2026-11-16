@@ -327,7 +327,7 @@ impl Session {
                     outcome: crate::audit::GateOutcome::Refused,
                     stage: Some("Consent".to_owned()),
                     code: Some(refusal.code.wire().to_owned()),
-                    reason: refusal.reason.map(str::to_owned),
+                    reason: refusal.reason.map(|reason| reason.wire().to_owned()),
                 },
                 status: crate::audit::Status::Refused,
                 primary_error: Some(refusal.code.wire().to_owned()),
