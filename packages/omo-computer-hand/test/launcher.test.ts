@@ -1,9 +1,9 @@
-import { existsSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
 import { DaemonLauncher, type DaemonLink } from "../src/index.ts"
-import { fakeAuthority, fakeChild, type FakeChild } from "./support/fakes.ts"
+import { exitedChild, fakeAuthority, fakeChild, type FakeChild } from "./support/fakes.ts"
 import { tempDirs } from "./support/tmp.ts"
 
 const temp = tempDirs("omo-hand-launcher-")
@@ -117,5 +117,51 @@ describe("daemon launcher (spawning profile)", () => {
     })
     expect(strangers).toEqual([])
     expect(existsSync(join(owned, "engine.lock"))).toBe(true)
+  })
+
+  it("a daemon that exits before reading its capability (a latched host's daemon today) is a typed refusal, never a host crash", async () => {
+    // Given a daemon that is gone before the capability write: the write fails with EPIPE.
+    const root = temp()
+    const launcher = new DaemonLauncher({
+      engine: "/opt/omo-computer-engine",
+      endpoint: join(root, "engine.sock"),
+      lock: join(root, "engine.lock"),
+      env: {},
+      latch: () => ({ suspended: true, stopEpoch: 1 }),
+      isListening: async () => false,
+      spawnDaemon: () => exitedChild(),
+    })
+
+    // When the host ensures the daemon, then the ensure is refused with its reason and the host keeps running.
+    await expect(launcher.ensure()).rejects.toMatchObject({ reason: "daemon_never_listened" })
+  })
+
+  it("an engine binary that cannot start is a typed refusal through the real spawn, never a host crash", async () => {
+    const root = temp()
+    const launcher = new DaemonLauncher({
+      engine: join(root, "no-such-engine"),
+      endpoint: join(root, "engine.sock"),
+      lock: join(root, "engine.lock"),
+      env: {},
+      latch: () => ({ suspended: false, stopEpoch: 0 }),
+      listenTimeoutMs: 5_000,
+    })
+    await expect(launcher.ensure()).rejects.toMatchObject({ reason: "engine_spawn_failed" })
+  })
+
+  it("an engine that exits at once is refused through the real spawn, whether or not its capability write hit EPIPE", async () => {
+    const root = temp()
+    const engine = join(root, "exits-at-once")
+    writeFileSync(engine, "#!/bin/sh\nexit 1\n")
+    chmodSync(engine, 0o755)
+    const launcher = new DaemonLauncher({
+      engine,
+      endpoint: join(root, "engine.sock"),
+      lock: join(root, "engine.lock"),
+      env: {},
+      latch: () => ({ suspended: true, stopEpoch: 1 }),
+      listenTimeoutMs: 5_000,
+    })
+    await expect(launcher.ensure()).rejects.toMatchObject({ reason: "daemon_never_listened" })
   })
 })

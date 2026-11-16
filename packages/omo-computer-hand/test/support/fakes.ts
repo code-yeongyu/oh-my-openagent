@@ -1,6 +1,6 @@
-import { PassThrough } from "node:stream"
+import { PassThrough, Writable } from "node:stream"
 
-import type { DaemonChild, DaemonLink, RpcReply } from "../../src/index.ts"
+import type { DaemonChild, DaemonExit, DaemonLink, RpcReply } from "../../src/index.ts"
 
 export interface FakeChild extends DaemonChild {
   readonly written: () => string
@@ -15,8 +15,8 @@ export function fakeChild(pid = 7): FakeChild {
   })
   let killed = false
   let exit: () => void = () => undefined
-  const exited = new Promise<void>((resolve) => {
-    exit = resolve
+  const exited = new Promise<DaemonExit>((resolve) => {
+    exit = () => resolve({ kind: "exited" })
   })
   return {
     pid,
@@ -29,6 +29,14 @@ export function fakeChild(pid = 7): FakeChild {
     written: () => text,
     killed: () => killed,
   }
+}
+
+/** A daemon that exited before reading its capability: its stdin write fails with EPIPE. */
+export function exitedChild(pid = 9): DaemonChild {
+  const stdin = new Writable({
+    write: (_chunk, _encoding, done) => done(Object.assign(new Error("write EPIPE"), { code: "EPIPE" })),
+  })
+  return { pid, stdin, exited: Promise.resolve({ kind: "exited" }), kill: () => undefined }
 }
 
 /** An authority link that mints a distinct capability per hand.register and records every call. */
