@@ -35,6 +35,14 @@ pub struct FrameArtifact {
     pub ttl_ms: u64,
 }
 
+/// What a frame's pixels had masked. Frames are declared unredacted (G3): only `none` exists, and
+/// a desktop or display frame says so, so no caller believes a secure field on it was masked (IS-6).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum FrameRedaction {
+    None,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Frame {
@@ -50,6 +58,9 @@ pub struct Frame {
     pub path: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub artifact: Option<FrameArtifact>,
+    /// Row 26 (plan owner 2026-11-16): present on a desktop or display frame, always `none`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub redaction: Option<FrameRedaction>,
     pub session: SessionState,
     pub observation: UntrustedText,
 }
