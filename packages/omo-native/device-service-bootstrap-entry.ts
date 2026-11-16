@@ -1,6 +1,7 @@
 import { remoteClientForService } from "../omo-senpi/src/components/remote/index"
 import packageJson from "./package.json" with { type: "json" }
 import { bootstrapWithColdWake } from "./remote-bootstrap"
+import type { RemoteVerbDependencies } from "./remote-cli"
 import { remoteDependencies } from "./remote-entry"
 import { REMOTE_EXIT } from "./remote-exit"
 
@@ -13,7 +14,11 @@ const BOOTSTRAP_DEADLINE_MS = 570_000
 
 /** The launchers' entry for `omo __device-service-bootstrap`; sets the exit code. */
 export async function runDeviceServiceBootstrapCommand(): Promise<void> {
-  const dependencies = remoteDependencies()
+  process.exitCode = await runDeviceServiceBootstrap(remoteDependencies())
+}
+
+/** One bootstrap on the service client over `dependencies`; prints the report line and answers the exit code. */
+export async function runDeviceServiceBootstrap(dependencies: RemoteVerbDependencies): Promise<number> {
   const client = remoteClientForService({
     version: packageJson.version,
     stateDir: dependencies.stateDir,
@@ -29,13 +34,12 @@ export async function runDeviceServiceBootstrapCommand(): Promise<void> {
     const answer = await client.service.bootstrap({}, { deadlineMs: BOOTSTRAP_DEADLINE_MS })
     if (answer.kind === "error") {
       dependencies.output(JSON.stringify({ state: answer.code, notice: `${answer.message} ${answer.next_action}` }))
-      process.exitCode = REMOTE_EXIT.unavailable
-      return
+      return REMOTE_EXIT.unavailable
     }
     const result = answer.value
     if (result.kind === "connected") dependencies.output(JSON.stringify({ state: "connected", status: result.status }))
     else dependencies.output(JSON.stringify({ state: result.state, notice: result.notice }))
-    process.exitCode = result.kind === "connected" ? REMOTE_EXIT.ok : REMOTE_EXIT.unavailable
+    return result.kind === "connected" ? REMOTE_EXIT.ok : REMOTE_EXIT.unavailable
   } finally {
     client.close()
   }
