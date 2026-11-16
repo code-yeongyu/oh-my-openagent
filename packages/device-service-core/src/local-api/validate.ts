@@ -32,6 +32,7 @@ import {
   uint,
 } from "./validate-fields.ts"
 import { endpointsData, locateData } from "./validate-delegated.ts"
+import { DELIVERIES_DATA } from "./validate-deliveries.ts"
 import { isRequestType, REQUEST_TYPES, validateRequestFields } from "./validate-requests.ts"
 import { deviceRef, deviceRowOf, errorBodyOf, snapshotBlobOf, statusOf } from "./validate-shapes.ts"
 import { CAPABILITIES, CLIENT_NAMES, LOCAL_API_VERSION, OPTIONAL_CAPABILITIES, REFUSED_REASONS } from "./vocabulary.ts"
@@ -142,6 +143,17 @@ const attachState = (v: unknown) => {
     changedAt: typeof changedAt === "string" ? changedAt : fail("changedAt"),
   }
 }
+const sessionWakeState = (v: unknown): ResponseData["control.session_wake.get"] => {
+  const m = known(v, ["enabled", "stored", "changedAt", "overridden"], [], "data")
+  const s = m["stored"]
+  const changedAt = m["changedAt"]
+  return {
+    enabled: bool(m["enabled"], "enabled"),
+    stored: s === null || typeof s === "boolean" ? s : s === "unreadable" ? "unreadable" : fail("stored"),
+    changedAt: typeof changedAt === "string" ? changedAt : fail("changedAt"),
+    overridden: bool(m["overridden"], "overridden"),
+  }
+}
 const DATA: { readonly [T in RequestType]: (v: unknown) => ResponseData[T] } = {
   authenticate: empty,
   "status.get": statusOf,
@@ -171,6 +183,9 @@ const DATA: { readonly [T in RequestType]: (v: unknown) => ResponseData[T] } = {
   "owner.shutdown_for_upgrade": empty,
   "session.endpoints": endpointsData,
   "session.locate": locateData,
+  ...DELIVERIES_DATA,
+  "control.session_wake.get": sessionWakeState,
+  "control.session_wake.set": sessionWakeState,
   "control.attach.get": attachState,
   "control.attach.set": attachState,
 }
