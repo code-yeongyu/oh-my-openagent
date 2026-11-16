@@ -102,4 +102,47 @@ describe("release-state staging of the committed Senpi bundles", () => {
       rmSync(root, { recursive: true, force: true })
     }
   })
+
+  // Release contract (#13413): the omo-ai/remote SDK bundle inlines the same version, so the release
+  // commit must rebuild it after the bump and stage it with its declarations, or the release-state PR
+  // fails `build-remote-sdk --check` as stale.
+  test("rebuilds the remote SDK bundle after the version bump and stages it with its declarations", () => {
+    const bundle = "packages/omo-native/bin/lib/remote-sdk.generated.js"
+    const declaration = "packages/omo-native/bin/lib/remote-sdk-types/omo-native/remote-sdk-api.d.ts"
+    const lines = prepareStep.split("\n")
+    const bump = lines.findIndex((line) => line.includes("packages/omo-native/package.json > tmp.json"))
+    const build = lines.findIndex((line) => /^bun (run )?script\/build-remote-sdk\.ts\b/.test(line))
+    const commit = lines.findIndex((line) => line.includes("git commit"))
+    const isStaging = (line: string) => /^git add\b/.test(line) && line.includes("packages/omo-native/bin")
+    const stagingAt = lines.flatMap((line, index) => (isStaging(line) ? [index] : []))
+    expect(bump).toBeGreaterThanOrEqual(0)
+    expect(build).toBeGreaterThan(bump)
+    expect(stagingAt.length).toBeGreaterThan(0)
+    for (const at of stagingAt) {
+      expect(at).toBeGreaterThan(build)
+      expect(commit).toBeGreaterThan(at)
+    }
+
+    const root = mkdtempSync(join(tmpdir(), "omo-release-state-"))
+    try {
+      git(root, "init", "-q")
+      for (const path of [bundle, declaration]) {
+        mkdirSync(join(root, dirname(path)), { recursive: true })
+        writeFileSync(join(root, path), "version 1\n")
+      }
+      git(root, "add", "-A")
+      git(root, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "base")
+      for (const path of [bundle, declaration]) writeFileSync(join(root, path), "version 2\n")
+      const staging = lines.filter(isStaging)
+
+      const result = spawnSync("bash", ["-e", "-c", staging.join("\n")], { cwd: root, encoding: "utf8" })
+
+      expect(result.status, result.stderr).toBe(0)
+      expect(git(root, "diff", "--cached", "--name-only").trim().split("\n").sort()).toEqual(
+        [bundle, declaration].sort(),
+      )
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
 })
