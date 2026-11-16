@@ -412,6 +412,13 @@ pub trait AxBackend {
     fn owner(&mut self, _h: &AxHandle, _windows: &[DesktopWindow]) -> CoreResult<AxOwner> {
         Ok(AxOwner::Unknown)
     }
+
+    /// Whether `a` and `b` name the same element. Backends that cannot
+    /// compare their platform elements keep this default, which compares
+    /// numeric ids only and answers `false` for anything else.
+    fn same_element(&mut self, a: &AxHandle, b: &AxHandle) -> bool {
+        matches!((a, b), (AxHandle::Id(a), AxHandle::Id(b)) if a == b)
+    }
 }
 
 #[cfg(test)]
