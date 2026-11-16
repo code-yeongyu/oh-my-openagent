@@ -64,7 +64,7 @@ const NO_SESSION: ReadonlySet<string> = new Set(["unknown_session", "session_not
  * The engine's refusal of a frame, mapped as on the relay leg: its code comes first or after `open_failed:`
  * (`open_failed: model_unavailable: ...`), and the first part the shared engine mapping knows decides it.
  */
-export function engineRefusal(text: string, self: string): RemoteFailure {
+function engineRefusal(text: string, self: string): RemoteFailure {
   const parts = text.split(/:\s*/)
   if (parts.some((part) => NO_SESSION.has(part)))
     return remoteFailure(
