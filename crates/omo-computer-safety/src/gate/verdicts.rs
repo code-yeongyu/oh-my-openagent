@@ -42,7 +42,8 @@ verdicts! {
         ConsentOff => ControlRequired(ConsentOff),
         // Row 21: the consent file differs from the host's last write; no stored exec tier.
         Tampered => ControlRequired(Tampered),
-        TierMissing => ControlRequired,
+        // Row 28 (lead decision 1): no exec tier in the consent view (no file, a read tier).
+        TierMissing => ControlRequired(TierMissing),
     }
 }
 
