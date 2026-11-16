@@ -6,6 +6,14 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { type CommitName, createGitOrigin, type GitOrigin } from "./fixtures/publish-gate-reuse-origin"
+import {
+  needsOf,
+  PRE_TAG_WRITERS,
+  publishersOf,
+  type Step,
+  upstreamOf,
+  type Workflow,
+} from "./fixtures/publish-workflow-graph"
 
 /**
  * Release contract: a publish run dispatched with prepared_release_sha (the provenance-safe child) owns its
@@ -19,53 +27,17 @@ import { type CommitName, createGitOrigin, type GitOrigin } from "./fixtures/pub
 
 const TAG_JOB = "tag-prepared-source"
 const TAG_STEP = { job: TAG_JOB, name: "Tag prepared release source" } as const
-const PLATFORM_WORKFLOW = "./.github/workflows/publish-platform.yml"
 const RELEASE_STEP = { job: "release", name: "Create GitHub release" } as const
 const VERSION = "9.9.9"
 const TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
 
-interface Step {
-  readonly name?: string
-  readonly run?: string
-  readonly env?: Record<string, string>
-}
-
-interface Job {
-  readonly needs?: string | string[]
-  readonly if?: string
-  readonly uses?: string
-  readonly steps?: Step[]
-}
-
 const workflow = Bun.YAML.parse(
   readFileSync(new URL("../.github/workflows/publish.yml", import.meta.url), "utf8").replace(/\r\n/g, "\n"),
-) as { jobs: Record<string, Job> }
+) as Workflow
 
-function stepsOf(job: string): Step[] {
+function stepsOf(job: string): readonly Step[] {
   return workflow.jobs[job]?.steps ?? []
 }
-
-function needsOf(job: string): string[] {
-  const needs = workflow.jobs[job]?.needs ?? []
-  return typeof needs === "string" ? [needs] : [...needs]
-}
-
-/** Every job `job` waits for, directly or through another job. */
-function upstreamOf(job: string): Set<string> {
-  const seen = new Set<string>()
-  const pending = needsOf(job)
-  for (let next = pending.pop(); next !== undefined; next = pending.pop()) {
-    if (seen.has(next)) continue
-    seen.add(next)
-    pending.push(...needsOf(next))
-  }
-  return seen
-}
-
-/** Jobs that put a package on npm: an `npm publish` step, or the reusable platform publish. */
-const PUBLISHERS = Object.entries(workflow.jobs)
-  .filter(([, job]) => job.uses === PLATFORM_WORKFLOW || (job.steps ?? []).some((s) => s.run?.includes("npm publish")))
-  .map(([name]) => name)
 
 function step(where: { readonly job: string; readonly name: string }): Step & { readonly run: string } {
   const found = stepsOf(where.job).find((candidate) => candidate.name === where.name)
@@ -171,16 +143,21 @@ describe("publish.yml child path release tag", () => {
     }
   })
 
-  test("#given every job that publishes a package #then it waits for the tag job and runs only after it succeeded", () => {
-    expect(PUBLISHERS).toEqual(expect.arrayContaining(["publish-platform", "publish-main"]))
-    for (const publisher of PUBLISHERS) {
-      expect({ publisher, waitsForTag: upstreamOf(publisher).has(TAG_JOB) }).toEqual({ publisher, waitsForTag: true })
-      expect({ publisher, tagJobPublishes: upstreamOf(TAG_JOB).has(publisher) }).toEqual({
+  test("#given every job that publishes #then it waits for the tag job and runs only after it succeeded", () => {
+    const { publishers, unclassified } = publishersOf(workflow)
+    expect(unclassified).toEqual([])
+    expect(publishers).toEqual(expect.arrayContaining(["publish-platform", "publish-main", "release"]))
+    const beforeTag = publishers.filter((name) => name !== TAG_JOB && !upstreamOf(workflow, name).has(TAG_JOB))
+    expect(beforeTag.sort()).toEqual(Object.keys(PRE_TAG_WRITERS).sort())
+    for (const publisher of publishers.filter((name) => !(name in PRE_TAG_WRITERS))) {
+      expect({ publisher, tagJobWaitsForIt: upstreamOf(workflow, TAG_JOB).has(publisher) }).toEqual({
         publisher,
-        tagJobPublishes: false,
+        tagJobWaitsForIt: false,
       })
     }
-    for (const [name, job] of Object.entries(workflow.jobs).filter(([name]) => needsOf(name).includes(TAG_JOB))) {
+    for (const [name, job] of Object.entries(workflow.jobs).filter(([name]) =>
+      needsOf(workflow, name).includes(TAG_JOB),
+    )) {
       expect({ name, gate: job.if?.includes(`needs.${TAG_JOB}.result == 'success'`) }).toEqual({ name, gate: true })
     }
   })
