@@ -110,33 +110,6 @@ export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
     exposure: THREAD_TOOL_EXPOSURE,
   },
   {
-    name: "thread_bind",
-    label: "Bind session to chat thread",
-    description:
-      "Attaches a session to an external chat thread on Discord, Telegram, Slack, Notion, Feishu, herdr or a custom connector, for when the user wants a chat conversation connected to a session",
-    exposure: THREAD_TOOL_EXPOSURE,
-  },
-  {
-    name: "thread_unbind",
-    label: "Unbind chat thread",
-    description: "Detaches a session from its bound chat thread, for when the user wants that chat connection closed",
-    exposure: THREAD_TOOL_EXPOSURE,
-  },
-  {
-    name: "thread_rebind",
-    label: "Rebind chat thread",
-    description:
-      "Moves a bound chat thread over to another session, for when the user wants that chat served by a different session",
-    exposure: THREAD_TOOL_EXPOSURE,
-  },
-  {
-    name: "thread_bindings",
-    label: "List chat bindings",
-    description:
-      "Shows which chat threads are bound to which sessions with their revisions, for when the user needs a binding id or its revision",
-    exposure: THREAD_TOOL_EXPOSURE,
-  },
-  {
     name: "thread_report",
     label: "Report to chat thread",
     description:
