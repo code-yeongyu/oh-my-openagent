@@ -145,7 +145,7 @@ mod backend_default_tests {
     fn default_post_text_is_one_uninterruptible_post_input() {
         let mut bare = Bare::default();
         let asked = Cell::new(0);
-        let mut interrupt = |_: &dyn Backend| {
+        let mut interrupt = |_: &mut dyn Backend| {
             asked.set(asked.get() + 1);
             true
         };

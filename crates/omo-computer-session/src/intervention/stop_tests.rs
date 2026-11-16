@@ -82,7 +82,7 @@ impl Backend for StopAtTextStart {
         text: &str,
         route: Route,
         tag: u64,
-        interrupt: &mut dyn FnMut(&dyn Backend) -> bool,
+        interrupt: &mut dyn FnMut(&mut dyn Backend) -> bool,
     ) -> omo_computer_core::intervention::TextDelivery {
         self.inner.press_stop_chord();
         self.inner.post_text(text, route, tag, interrupt)

@@ -107,7 +107,7 @@ pub trait Backend: Send {
         text: &str,
         route: Route,
         tag: u64,
-        interrupt: &mut dyn FnMut(&dyn Backend) -> bool,
+        interrupt: &mut dyn FnMut(&mut dyn Backend) -> bool,
     ) -> crate::intervention::TextDelivery {
         let _ = interrupt;
         let of = crate::intervention::scalars(text);

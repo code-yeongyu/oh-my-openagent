@@ -69,7 +69,7 @@ impl Backend for FakeBackend {
         text: &str,
         route: Route,
         tag: u64,
-        interrupt: &mut dyn FnMut(&dyn Backend) -> bool,
+        interrupt: &mut dyn FnMut(&mut dyn Backend) -> bool,
     ) -> TextDelivery {
         self.type_interruptible(text, route, tag, interrupt)
     }
