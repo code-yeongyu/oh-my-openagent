@@ -18,6 +18,13 @@ const updatedMs = (session: ThreadHostSession): number => {
 const notRunning = (host: AddressBookHost): boolean =>
   host.reason === "dead" || String(host.error).startsWith("host_unavailable:")
 
+// The same two answers as the failure a one-endpoint host raises.
+const notListening = (error: unknown): boolean => {
+  if (!(error instanceof Error)) return false
+  const code = Reflect.get(error, "code")
+  return error.message.startsWith("host_unavailable:") || code === "ENOENT" || code === "ECONNREFUSED"
+}
+
 /**
  * This device's sessions as listing rows, read from its own endpoints (#13787): the operator endpoint and every endpoint
  * registered on disk. The service's listing does not carry the asking device's sessions, and every member serves them
@@ -33,7 +40,12 @@ export async function localSessionRows(
   let sessions: readonly ThreadHostSession[]
   try {
     const host = await hostOn((path) => createConnection(path))
-    if (host.listView === undefined) sessions = await host.listSessions()
+    if (host.listView === undefined)
+      // A host with one endpoint raises its failure: no socket there, or one nobody listens on, holds no session.
+      sessions = await host.listSessions().catch((error: unknown) => {
+        if (notListening(error)) return []
+        throw error
+      })
     else {
       // Every endpoint's own outcome: the listing alone raises only the first endpoint's failure.
       const view = await host.listView({ offline: true })
@@ -41,9 +53,8 @@ export async function localSessionRows(
         return view.hosts.every(notRunning) ? [] : undefined
       sessions = view.sessions
     }
-  } catch (error) {
-    // A host with one endpoint raises its failure: no socket there holds no session.
-    return error instanceof Error && error.message.startsWith("host_unavailable:") ? [] : undefined
+  } catch {
+    return undefined
   }
   return sessions.map((session) => {
     const durable = session.durableSessionId ?? session.sessionId

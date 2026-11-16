@@ -1101,6 +1101,34 @@ describe("an open on this device", () => {
     expect(listing.unanswered.map((row) => row.id)).toContain(SELF)
   })
 
+  test("#given a one-endpoint host whose socket refuses the connect #when sessions.list reads the whole account #then this device holds no session, not that it missed the round", async () => {
+    // A ThreadHost without listView raises its one endpoint's failure from listSessions.
+    const unused = async (): Promise<never> => {
+      throw new Error("not used by a listing")
+    }
+    const refusing: ThreadHost = {
+      socket: "refused.sock",
+      listSessions: async () => {
+        throw Object.assign(new Error("connect ECONNREFUSED refused.sock"), { code: "ECONNREFUSED" })
+      },
+      openSession: unused,
+      getMessages: unused,
+      getState: unused,
+      prompt: unused,
+      interrupt: unused,
+      setSessionName: unused,
+      setModel: unused,
+      getAvailableModels: unused,
+      setThinkingLevel: unused,
+      getAvailableThinkingLevels: unused,
+    }
+    const owner = await startOwner(selfWorld())
+    const client = clientOn(owner.stateDir, fakeClock(), undefined, { localThreadHost: async () => refusing })
+    const listing = await valueOf(client.sessions.list())
+    expect(listing.rows.map((row) => row.device.id)).toContain(PEER)
+    expect(listing.unanswered.map((row) => row.id)).not.toContain(SELF)
+  })
+
   test("#given a keyed send on this device still in flight #when more than 256 other keyed sends settle #then its retry joins it instead of sending again, and the oldest settled key is the one forgotten (#13787 review L2)", async () => {
     // This device's host, controllable: the prompt "held" is answered only when the test releases it.
     const prompts: string[] = []
