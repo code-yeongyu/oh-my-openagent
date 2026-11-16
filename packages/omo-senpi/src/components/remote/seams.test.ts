@@ -63,9 +63,10 @@ describe("describeThread", () => {
 
 describe("ThreadHandle", () => {
   test("#given a plain string #then the type system refuses it as a handle (only the seam or a listed row makes one)", () => {
-    // @ts-expect-error a ThreadHandle is branded: callers cannot build one from text without the seam
-    const built: ThreadHandle = "studio/c2Vz"
-    const parsed = canonicalizeThreadHandle(String(built), {})
+    // A ThreadHandle is branded: this line compiles only while a plain string is NOT assignable to it.
+    const plainStringIsHandle: string extends ThreadHandle ? true : false = false
+    expect(plainStringIsHandle).toBe(false)
+    const parsed = canonicalizeThreadHandle("studio/c2Vz", {})
     expect(parsed.kind === "ok" ? String(parsed.value.handle) : undefined).toBe("studio/c2Vz")
   })
 })

@@ -5,7 +5,8 @@ import type { RemoteFailure, RemoteSender } from "../types"
 
 // The device service fakes (device-service-core's conformance owner and its failure modes) and the one clock both layers
 // run on, for the remote module's conformance and deadline rows. They move to relay-daemon's shared
-// `@sisyphuslabs/relay-daemon-local-api/testing` once relay-daemon#1142 is vendored.
+// `@sisyphuslabs/relay-daemon-local-api/testing` once relay-daemon#1142 is vendored; two import sites switch then: this
+// file and conformance.test.ts's import of the conformance world.
 
 export { fakeClock, startModeOwner, startOwner, type FakeClock }
 

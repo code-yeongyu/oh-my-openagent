@@ -139,3 +139,13 @@ describe("members whose part has not landed", () => {
     ])
   })
 })
+
+describe("the connect phase", () => {
+  test("#given a service that refuses the connection #when any member runs #then its failure says phase connect, so a caller can tell a stopped service from a member's own failure", async () => {
+    const owner = await startOwner()
+    const refused = Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" })
+    const client = clientOn(owner.stateDir, fakeClock(), undefined, { connect: async () => Promise.reject(refused) })
+    expect(failureOf(await client.service.status())).toMatchObject({ details: { phase: "connect" } })
+    expect(failureOf(await client.devices.list())).toMatchObject({ details: { phase: "connect" } })
+  })
+})
