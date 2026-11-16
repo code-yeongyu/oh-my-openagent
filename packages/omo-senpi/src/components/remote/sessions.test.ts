@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { connectDeviceService } from "@oh-my-opencode/device-service-core/device-service"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -140,6 +141,35 @@ describe("sessions.open", () => {
       details: { model: "claude" },
     })
     expect(owner.state.commands).toEqual([])
+  })
+
+  test("#given an engine that cannot run the model #when sessions.open runs #then model_not_found{model_unavailable} and no session is named", async () => {
+    const { owner, sent } = await onWorld()
+    // The peer's engine refuses the open as senpi does (open-session-model.ts): the real command outcome, the engine's
+    // failed reply in place of the conformance owner's fixed one.
+    const refusing = clientOn(owner.stateDir, fakeClock(), undefined, {
+      connect: async (options) => {
+        const svc = await connectDeviceService(options)
+        return {
+          ...svc,
+          endpointCommand: async (device, rpc, endpointOptions) => ({
+            ...(await svc.endpointCommand(device, rpc, endpointOptions)),
+            response: {
+              type: "response",
+              command: "open_session",
+              success: false,
+              error: "open_failed: model_unavailable: anthropic/nope is not available",
+            },
+          }),
+        }
+      },
+    })
+    expect(failureOf(await refusing.sessions.open({ device: PEER, model: "anthropic/nope" }))).toMatchObject({
+      code: "model_not_found",
+      details: { reason: "model_unavailable", model: "anthropic/nope" },
+    })
+    expect(sent("open_session")).toHaveLength(1)
+    expect(sent("set_session_name")).toEqual([])
   })
 
   test("#given a session client whose own mode is unknown #when it asks for a wider preset #then scope_denied permission_preset_wider and nothing is sent", async () => {
