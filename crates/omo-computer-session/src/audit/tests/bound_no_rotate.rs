@@ -7,7 +7,6 @@ use std::fs;
 use super::bound_fixture::{Big, HAND, LIMITS};
 use crate::audit::{Anchor, AuditEvent, AuditSink, AuditWriter, WriterId, AUDIT_UNAVAILABLE};
 
-#[cfg(unix)]
 #[test]
 fn bound_5_an_authority_that_cannot_read_the_retired_file_does_not_rotate_and_is_refused_at_the_cap() {
     use std::os::unix::fs::PermissionsExt;
