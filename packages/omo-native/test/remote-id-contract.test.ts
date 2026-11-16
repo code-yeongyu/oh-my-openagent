@@ -105,6 +105,31 @@ describe("#13010 remote CLI session identity", () => {
     }
   })
 
+  test("attach by durable ID resolves on the CLI's own connection as a borrowed dial and leaves it open (#13761)", async () => {
+    const fake = await owner()
+    const service = await connectDeviceService({ version: "5.1.72", stateDir: fake.stateDir })
+    try {
+      const prepared = await prepareRemoteAttach(
+        {
+          accountShow: async () => SIGNED_IN,
+          stateDir: fake.stateDir,
+          connect: async () => service,
+          now: () => 0,
+          output: () => {},
+          write: () => {},
+          error: () => {},
+        },
+        [DURABLE],
+      )
+      expect(typeof prepared).toBe("object")
+      // The thread port borrowed the CLI's connection ({ conn, owned: false }), so resolving the durable ID left it open:
+      // a request on it still answers.
+      expect((await service.status()).state).toBe("connected")
+    } finally {
+      service.close()
+    }
+  })
+
   test("attach accepts the durable ID and both device-prefixed ID forms", async () => {
     const fake = await owner()
     for (const target of [DURABLE, `${PEER}/${DURABLE}`, `${PEER}/${SESSION_ID}`]) {
