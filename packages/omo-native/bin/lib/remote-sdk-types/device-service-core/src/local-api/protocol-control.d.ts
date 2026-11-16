@@ -8,6 +8,27 @@ export type ControlAttachSet = {
     readonly type: "control.attach.set";
     readonly attached: boolean;
 };
+export type ControlSessionWakeGet = {
+    readonly id: string;
+    readonly type: "control.session_wake.get";
+};
+export type ControlSessionWakeSet = {
+    readonly id: string;
+    readonly type: "control.session_wake.set";
+    /** null removes the stored value, so the device follows the build default. */
+    readonly enabled: boolean | null;
+};
+/**
+ * `stored` is what the device has: true, false, null (nothing stored, so the build default) or "unreadable" (a stored
+ * value that does not parse, or a failed read; a set repairs it). `overridden` is true when this run of the service
+ * cannot list the feature whatever the switch says.
+ */
+export type ControlSessionWakeState = {
+    readonly enabled: boolean;
+    readonly stored: boolean | null | "unreadable";
+    readonly changedAt: string;
+    readonly overridden: boolean;
+};
 /** changedAt is the RFC 3339 UTC time of the last set, or "" when the device never stored one (attached). */
 export type ControlAttachState = {
     readonly attached: boolean;

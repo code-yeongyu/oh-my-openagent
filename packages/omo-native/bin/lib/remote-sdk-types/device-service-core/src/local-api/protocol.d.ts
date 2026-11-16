@@ -3,11 +3,13 @@ import type { Capability, ClientName, ErrorCode, PathRefusalProblem, PolicyState
 export * from "./vocabulary.js";
 export * from "./protocol-events.js";
 export type * from "./protocol-delegated.js";
+export * from "./protocol-deliveries.js";
+import type { DeliveriesRequest, DeliveriesResponseData } from "./protocol-deliveries.js";
 import type { SessionCandidate, SessionEndpoints, SessionEndpointsData, SessionLocate } from "./protocol-delegated.js";
 import type { SessionCommand, SessionCommandPart } from "./protocol-command.js";
 export type * from "./protocol-command.js";
 export type * from "./protocol-control.js";
-import type { ControlAttachGet, ControlAttachSet, ControlAttachState } from "./protocol-control.js";
+import type { ControlAttachGet, ControlAttachSet, ControlAttachState, ControlSessionWakeGet, ControlSessionWakeSet, ControlSessionWakeState } from "./protocol-control.js";
 export type JsonValue = null | boolean | number | string | readonly JsonValue[] | {
     readonly [key: string]: JsonValue;
 };
@@ -179,7 +181,7 @@ export type ShutdownForUpgrade = {
     readonly type: "owner.shutdown_for_upgrade";
     readonly target_version: string;
 };
-export type LocalRequest = Authenticate | StatusGet | StatusSubscribe | SetEnabled | RefresherRegister | DeviceAdopt | DeviceForget | DeviceInfo | EndpointsRegister | EndpointsUnregister | DevicesList | SessionsList | SessionAttach | SessionDetach | SessionCommand | SessionCommandPart | SessionRead | EnforcementReport | ShutdownForUpgrade | SessionEndpoints | SessionLocate | ControlAttachGet | ControlAttachSet;
+export type LocalRequest = Authenticate | StatusGet | StatusSubscribe | SetEnabled | RefresherRegister | DeviceAdopt | DeviceForget | DeviceInfo | EndpointsRegister | EndpointsUnregister | DevicesList | SessionsList | SessionAttach | SessionDetach | SessionCommand | SessionCommandPart | SessionRead | EnforcementReport | ShutdownForUpgrade | SessionEndpoints | SessionLocate | ControlAttachGet | ControlAttachSet | ControlSessionWakeGet | ControlSessionWakeSet | DeliveriesRequest;
 export type RequestType = LocalRequest["type"];
 export type DeviceRow = {
     readonly device: string;
@@ -189,7 +191,7 @@ export type DeviceRow = {
     readonly last_seen_ms: number | null;
     readonly online: boolean;
 };
-export type ResponseData = {
+export type ResponseData = DeliveriesResponseData & {
     readonly authenticate: Empty;
     readonly "status.get": Status;
     readonly "status.subscribe": Empty;
@@ -231,6 +233,8 @@ export type ResponseData = {
     readonly "session.locate": SessionCandidate;
     readonly "control.attach.get": ControlAttachState;
     readonly "control.attach.set": ControlAttachState;
+    readonly "control.session_wake.get": ControlSessionWakeState;
+    readonly "control.session_wake.set": ControlSessionWakeState;
 };
 export type PathRefusal = {
     readonly component: string;

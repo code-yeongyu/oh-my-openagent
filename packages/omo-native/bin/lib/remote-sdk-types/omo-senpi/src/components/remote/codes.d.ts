@@ -2,9 +2,9 @@
 import type { RemoteFailure } from "./types";
 /**
  * The one code list of the remote module (design v8-core r2, B1): the thread taxonomy's codes with their names unchanged
- * (thread/errors.ts), plus exactly the five below. `unsupported` is reused with `details.feature`.
+ * (thread/errors.ts), plus exactly the codes below. `unsupported` is reused with `details.feature`.
  */
-export declare const REMOTE_CODES: readonly ["invalid_arguments", "caller_context_missing", "not_found", "reply_target_mismatch", "ambiguous_target", "scope_denied", "name_conflict", "not_resumable", "orphaned", "foreign_live_owner", "no_active_turn", "turn_conflict", "not_steerable", "message_too_large", "queue_full", "cursor_invalid", "cursor_stale", "idempotency_conflict", "idempotency_in_progress", "idempotency_uncertain", "approval_unavailable", "approval_route_locked", "partial_commit", "unsupported", "overloaded", "transport_closed", "host_unavailable", "internal_error", "model_not_found", "model_ambiguous", "thinking_level_unsupported", "loop_detected", "binding_conflict", "binding_mismatch", "binding_inactive", "stale_revision", "stale_token", "already_answered", "answer_in_progress", "device_offline", "relay_requires_paid_plan", "alias_taken", "timeout", "cancelled", "session_ended", "sender_not_allowed", "local_only"];
+export declare const REMOTE_CODES: readonly ["invalid_arguments", "caller_context_missing", "not_found", "reply_target_mismatch", "ambiguous_target", "scope_denied", "name_conflict", "not_resumable", "orphaned", "foreign_live_owner", "no_active_turn", "turn_conflict", "not_steerable", "message_too_large", "queue_full", "cursor_invalid", "cursor_stale", "idempotency_conflict", "idempotency_in_progress", "idempotency_uncertain", "approval_unavailable", "approval_route_locked", "partial_commit", "unsupported", "overloaded", "transport_closed", "host_unavailable", "internal_error", "model_not_found", "model_ambiguous", "thinking_level_unsupported", "loop_detected", "binding_conflict", "binding_mismatch", "binding_inactive", "stale_revision", "stale_token", "already_answered", "answer_in_progress", "device_offline", "relay_requires_paid_plan", "alias_taken", "timeout", "cancelled", "session_ended", "sender_not_allowed", "local_only", "host_not_answering", "no_transport", "device_offline", "undelivered", "transport_expired", "unconfirmed", "host_error"];
 export type RemoteCode = (typeof REMOTE_CODES)[number];
 export declare const remoteFailure: (code: RemoteCode, message: string, next_action: string, extra?: Omit<RemoteFailure, "kind" | "code" | "message" | "next_action">) => RemoteFailure;
 type Mapped = {
@@ -21,7 +21,8 @@ export declare const nextActionFor: (code: RemoteCode) => string;
 export declare const failureFromError: (error: unknown, mutating: boolean) => RemoteFailure;
 /**
  * Exit codes (B1): 0 ok, 1 a typed refusal, 3 unavailable (host_unavailable, relay_requires_paid_plan, the
- * device service not installed), 4 session_ended, 124 timeout, 130 cancelled. 2 (usage) is the CLI's own, never a failure.
+ * device service not installed, a device that does not answer or cannot be reached), 4 session_ended, 124 timeout, 130
+ * cancelled. 2 (usage) is the CLI's own, never a failure.
  */
 export declare const exitCodeOf: (failure: RemoteFailure | undefined) => 0 | 1 | 3 | 4 | 124 | 130;
 export {};

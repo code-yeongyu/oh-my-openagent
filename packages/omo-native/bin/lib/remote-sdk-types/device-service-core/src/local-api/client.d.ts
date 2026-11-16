@@ -2,6 +2,7 @@
 import { type ListingResult, type ListingRevision, type ReadPage } from "./client-assembly.js";
 import { type DeadlineTimer, type RequestParams } from "./client-connection.js";
 import type { ClientInfo, CommandRpc, DelegatedRoute, LocalEvent, RequestType, ResponseData, SessionFilter, Welcome } from "./protocol.js";
+import type { WakeAccepts } from "./protocol-command.js";
 import { type Transport } from "./transport.js";
 export type { ListingResult, ListingRevision, ReadPage, ReadPageEntry } from "./client-assembly.js";
 export type { DeadlineTimer, RequestParams } from "./client-connection.js";
@@ -22,7 +23,10 @@ export type LocalApiClient = {
     readonly welcome: Welcome;
     readonly request: <T extends RequestType>(type: T, params: RequestParams<T>) => Promise<ResponseData[T]>;
     readonly onEvent: (listener: (event: LocalEvent) => void) => () => void;
-    readonly command: (attach: string, rpc: CommandRpc, command_id?: string, route?: DelegatedRoute) => Promise<string>;
+    readonly command: (attach: string, rpc: CommandRpc, command_id?: string, route?: DelegatedRoute, options?: {
+        readonly accepts?: WakeAccepts;
+    }) => Promise<string>;
+    readonly wakeCommand: (device: string, durableId: string, rpc: CommandRpc, command_id?: string) => Promise<string>;
     readonly endpointCommand: (device: string, endpoint: string, rpc: CommandRpc, command_id?: string, options?: {
         readonly locate?: boolean;
     }) => Promise<string>;

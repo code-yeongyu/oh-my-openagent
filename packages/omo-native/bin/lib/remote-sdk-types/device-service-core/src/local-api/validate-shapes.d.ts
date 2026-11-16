@@ -3,6 +3,7 @@ import type { DeviceRef, DeviceRow, ErrorBody, ListingRow, ReadEntry, SnapshotBo
 import { type FieldCheck } from "./validate-fields.js";
 export declare const deviceId: (v: unknown, what?: string) => string;
 export declare const sessionId: (v: unknown) => string;
+export declare const durableId: (v: unknown, what?: string) => string;
 export declare const attachId: (v: unknown) => number;
 export declare const millis: (v: unknown, what: string) => number;
 export declare const deviceRef: (v: unknown, what?: string, fields?: FieldCheck) => DeviceRef;

@@ -11,6 +11,7 @@ export type InstallOutcome = {
     readonly state: "update_required" | "service_degraded" | "not_published";
     readonly action: string;
 };
+export declare const runCommand: RunCommand;
 /**
  * Acquires the pinned release, then hands it to the service's own installer: `<binary> install-service --from
  * <release dir>`, which registers, starts and version-checks the service.
