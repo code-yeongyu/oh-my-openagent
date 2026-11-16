@@ -1,0 +1,285 @@
+import { describe, expect, it } from "bun:test"
+
+import { FakeExtensionAPI } from "../../../../test-support/fake-extension-api"
+import { registerRemoteCommand } from "./command"
+import type { OmoRun, OmoRunner } from "./run-omo"
+
+const DEVICES = [
+  { device: "dev_mac", label: "mengmota-mac", kind: "desktop", platform: "darwin", last_seen_ms: 1, online: true },
+  { device: "dev_ny2", label: "ny2", kind: "server", platform: "linux", last_seen_ms: null, online: false },
+]
+const LISTING = {
+  query_id: "q1",
+  revision: 1,
+  incomplete: [],
+  devices: {},
+  rows: [
+    {
+      device: "dev_mac",
+      session_id: "s1",
+      title: "fix the build",
+      project: "omo",
+      path: "/w/omo",
+      state: "running",
+      updated_ms: 1,
+      source: "live",
+      as_of: 1,
+    },
+  ],
+}
+
+type Script = Readonly<Record<string, OmoRun>>
+
+function fakeRunner(script: Script): OmoRunner & { readonly calls: string[][] } {
+  const calls: string[][] = []
+  const run = (args: readonly string[]) => {
+    calls.push([...args])
+    const answer = script[args[1] ?? ""]
+    return Promise.resolve(answer ?? { code: 0, stdout: "{}\n", stderr: "" })
+  }
+  return Object.assign(run, { calls })
+}
+
+const ok = (value: unknown): OmoRun => ({ code: 0, stdout: `${JSON.stringify(value)}\n`, stderr: "" })
+
+interface FakeUi {
+  readonly notes: Array<{ readonly message: string; readonly type: string | undefined }>
+  readonly selects: string[][]
+  notify(message: string, type?: "info" | "warning" | "error"): void
+  select(title: string, options: string[]): Promise<string | undefined>
+  input(title: string): Promise<string | undefined>
+}
+
+function fakeUi(picks: Array<(options: readonly string[]) => string | undefined> = [], typed?: string): FakeUi {
+  const notes: FakeUi["notes"][number][] = []
+  const selects: string[][] = []
+  return {
+    notes,
+    selects,
+    notify: (message, type) => notes.push({ message, type }),
+    select: (_title, options) => {
+      selects.push(options)
+      return Promise.resolve(picks.shift()?.(options))
+    },
+    input: () => Promise.resolve(typed),
+  }
+}
+
+async function invoke(run: OmoRunner | undefined, args: string, ui: FakeUi): Promise<void> {
+  const pi = new FakeExtensionAPI()
+  registerRemoteCommand(pi, run === undefined ? { env: {} } : { run })
+  const command = pi.commands.find((entry) => entry.name === "remote")
+  if (command === undefined) throw new Error("/remote is not registered")
+  const handler = command.options["handler"] as (args: string, ctx: unknown) => Promise<void>
+  await handler(args, { ui })
+}
+
+describe("/remote", () => {
+  it("#given the component registers #when inspecting the api #then /remote exists", () => {
+    // given
+    const pi = new FakeExtensionAPI()
+
+    // when
+    registerRemoteCommand(pi, { env: {} })
+
+    // then
+    expect(pi.commands.map((entry) => entry.name)).toEqual(["remote"])
+  })
+
+  it("#given two devices #when /remote devices runs #then one omo remote devices --json process runs and each device is listed with its state", async () => {
+    // given
+    const run = fakeRunner({ devices: ok(DEVICES) })
+    const ui = fakeUi()
+
+    // when
+    await invoke(run, "devices", ui)
+
+    // then
+    expect(run.calls).toEqual([["remote", "devices", "--json"]])
+    const printed = ui.notes.map((note) => note.message).join("\n")
+    expect(printed).toContain("mengmota-mac")
+    expect(printed).toContain("online")
+    expect(printed).toContain("ny2")
+    expect(printed).toContain("offline")
+  })
+
+  it("#given filters #when /remote sessions runs #then the flags pass through and each row names <device>/<session>", async () => {
+    // given
+    const run = fakeRunner({ sessions: ok(LISTING) })
+    const ui = fakeUi()
+
+    // when
+    await invoke(run, "sessions --device dev_mac --state running", ui)
+
+    // then
+    expect(run.calls).toEqual([["remote", "sessions", "--device", "dev_mac", "--state", "running", "--json"]])
+    expect(ui.notes.map((note) => note.message).join("\n")).toContain("dev_mac/s1")
+  })
+
+  it("#given a text that starts with -- #when /remote send runs #then the text is sent verbatim after the -- terminator", async () => {
+    // given
+    const run = fakeRunner({
+      send: ok({ kind: "ok", thread_id: "s1", device: "dev_mac", delivery: { kind: "started" }, reply: "done." }),
+    })
+    const ui = fakeUi()
+
+    // when
+    await invoke(run, "send dev_mac/s1 --steer  keep   going", ui)
+
+    // then
+    expect(run.calls).toEqual([["remote", "send", "--json", "dev_mac/s1", "--", "--steer  keep   going"]])
+    expect(ui.notes.map((note) => note.message).join("\n")).toContain("done.")
+  })
+
+  it("#given a running session #when /remote interrupt runs #then the CLI's result is shown", async () => {
+    // given
+    const run = fakeRunner({ interrupt: ok({ kind: "ok", thread_id: "s1", device: "dev_mac", interrupted: true }) })
+    const ui = fakeUi()
+
+    // when
+    await invoke(run, "interrupt dev_mac/s1", ui)
+
+    // then
+    expect(run.calls).toEqual([["remote", "interrupt", "dev_mac/s1", "--json"]])
+    expect(ui.notes).toEqual([{ message: "Interrupted dev_mac/s1.", type: "info" }])
+  })
+
+  it("#given the CLI answers a typed error #when the verb fails #then its message and next action are shown as an error", async () => {
+    // given
+    const failure = {
+      kind: "error",
+      error: { code: "device_offline", message: "ny2 is offline.", next_action: "Wake ny2." },
+    }
+    const run = fakeRunner({ close: { code: 1, stdout: `${JSON.stringify(failure)}\n`, stderr: "" } })
+    const ui = fakeUi()
+
+    // when
+    await invoke(run, "close dev_ny2/s9", ui)
+
+    // then
+    expect(ui.notes).toEqual([{ message: "ny2 is offline.\nWake ny2.", type: "error" }])
+  })
+
+  it("#given the device service is stopped #when a verb fails with no JSON #then the CLI's own stderr is shown", async () => {
+    // given
+    const run = fakeRunner({
+      devices: { code: 3, stdout: "", stderr: "The OmO device service is not running on this device.\n" },
+    })
+    const ui = fakeUi()
+
+    // when
+    await invoke(run, "devices", ui)
+
+    // then
+    expect(ui.notes).toEqual([{ message: "The OmO device service is not running on this device.", type: "error" }])
+  })
+
+  it("#given a session #when /remote attach runs #then no process starts and the new-terminal command is named", async () => {
+    // given
+    const run = fakeRunner({})
+    const ui = fakeUi()
+
+    // when
+    await invoke(run, "attach dev_mac/s1", ui)
+
+    // then
+    expect(run.calls).toEqual([])
+    expect(ui.notes.map((note) => note.message).join("\n")).toContain("omo remote attach dev_mac/s1")
+  })
+
+  it("#given an unknown verb #when /remote runs #then the usage is shown and nothing runs", async () => {
+    // given
+    const run = fakeRunner({})
+    const ui = fakeUi()
+
+    // when
+    await invoke(run, "frobnicate", ui)
+
+    // then
+    expect(run.calls).toEqual([])
+    expect(ui.notes[0]?.type).toBe("warning")
+    expect(ui.notes[0]?.message).toContain("/remote sessions")
+  })
+
+  it("#given omo was not started by its launcher #when /remote runs #then it says why and nothing runs", async () => {
+    // given
+    const ui = fakeUi()
+
+    // when
+    await invoke(undefined, "devices", ui)
+
+    // then
+    expect(ui.notes).toHaveLength(1)
+    expect(ui.notes[0]?.type).toBe("error")
+    expect(ui.notes[0]?.message).toContain("omo")
+  })
+
+  it("#given a device and a session are picked #when the person sends from the picker #then the typed text goes to that session", async () => {
+    // given
+    const run = fakeRunner({
+      devices: ok(DEVICES),
+      sessions: ok(LISTING),
+      send: ok({ kind: "ok", thread_id: "s1", device: "dev_mac", delivery: { kind: "started" }, reply: "on it" }),
+    })
+    const ui = fakeUi(
+      [
+        (options) => options.find((option) => option.includes("mengmota-mac")),
+        (options) => options.find((option) => option.includes("dev_mac/s1")),
+        (options) => options.find((option) => option.startsWith("Send")),
+      ],
+      "ship it",
+    )
+
+    // when
+    await invoke(run, "", ui)
+
+    // then
+    expect(run.calls).toEqual([
+      ["remote", "devices", "--json"],
+      ["remote", "sessions", "--device", "dev_mac", "--json"],
+      ["remote", "send", "--json", "dev_mac/s1", "--", "ship it"],
+    ])
+    expect(ui.notes.map((note) => note.message).join("\n")).toContain("on it")
+  })
+
+  it("#given a device is picked #when the person opens a new session from the picker #then omo remote open runs on that device", async () => {
+    // given
+    const run = fakeRunner({
+      devices: ok(DEVICES),
+      sessions: ok(LISTING),
+      open: ok({ kind: "ok", thread: { thread_id: "s2", device: "dev_mac" }, deduplicated: false }),
+    })
+    const ui = fakeUi([
+      (options) => options.find((option) => option.includes("mengmota-mac")),
+      (options) => options.find((option) => option.startsWith("Open a new session")),
+    ])
+
+    // when
+    await invoke(run, "", ui)
+
+    // then
+    expect(run.calls.at(-1)).toEqual(["remote", "open", "dev_mac", "--json"])
+    expect(ui.notes.map((note) => note.message).join("\n")).toContain("dev_mac/s2")
+  })
+
+  it("#given a picked session #when the person interrupts it from the picker #then omo remote interrupt runs on it", async () => {
+    // given
+    const run = fakeRunner({
+      devices: ok(DEVICES),
+      sessions: ok(LISTING),
+      interrupt: ok({ kind: "ok", thread_id: "s1", device: "dev_mac", interrupted: false }),
+    })
+    const ui = fakeUi([
+      (options) => options.find((option) => option.includes("mengmota-mac")),
+      (options) => options.find((option) => option.includes("dev_mac/s1")),
+      (options) => options.find((option) => option.startsWith("Interrupt")),
+    ])
+
+    // when
+    await invoke(run, "", ui)
+
+    // then
+    expect(run.calls.at(-1)).toEqual(["remote", "interrupt", "dev_mac/s1", "--json"])
+    expect(ui.notes.at(-1)).toEqual({ message: "Nothing was running on dev_mac/s1.", type: "info" })
+  })
+})

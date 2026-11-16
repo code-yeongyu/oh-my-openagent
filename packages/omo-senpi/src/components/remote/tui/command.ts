@@ -1,0 +1,259 @@
+import { isAbsolute } from "node:path"
+
+import type { SenpiExtensionAPI } from "../../../extension/types"
+import { type OmoRun, type OmoRunner, omoRunner } from "./run-omo"
+
+// TUI `/remote` (omo#13412, design v8-core r2 B5): person input inside the TUI. Each action runs ONE
+// `omo remote <verb> --json` process and renders its typed answer, so the TUI, the CLI and the agent's thread tools
+// reach another device's session through the same verb bodies.
+
+type NoteType = "info" | "warning" | "error"
+
+interface RemoteCommandUi {
+  notify(message: string, type?: NoteType): void
+  select?(title: string, options: string[]): Promise<string | undefined>
+  input?(title: string, placeholder?: string): Promise<string | undefined>
+}
+
+export const REMOTE_COMMAND_USAGE = [
+  "/remote                                   pick a device, then a session, then what to do",
+  "/remote status | devices",
+  "/remote sessions [--device <d>] [--project <p>] [--state <s>]",
+  "/remote enable | disable | control [on|off]",
+  "/remote open <device> [--project <p>] [--model <m>] [--permission-preset <preset>]",
+  "/remote send <device>/<session> <text>",
+  "/remote interrupt | close <device>/<session>",
+  "/remote model <device>/<session> <provider/id>",
+  "/remote attach <device>/<session>",
+].join("\n")
+
+const PASS_THROUGH_VERBS = new Set([
+  "status",
+  "devices",
+  "sessions",
+  "enable",
+  "disable",
+  "control",
+  "open",
+  "model",
+  "interrupt",
+  "close",
+])
+
+const NO_LAUNCHER =
+  "/remote runs omo remote, and this session was not started by the omo launcher, so there is no omo to run. Start OmO with the omo command, or run omo remote in a terminal."
+
+export function registerRemoteCommand(
+  pi: SenpiExtensionAPI,
+  options: { readonly run?: OmoRunner; readonly env?: Readonly<Record<string, string | undefined>> } = {},
+): void {
+  const run = options.run ?? launcherRunner(options.env ?? process.env)
+  pi.registerCommand("remote", {
+    description: "Devices and sessions on this account's other devices: list, open, send, interrupt, attach.",
+    argumentHint: "[devices|sessions|open|send|interrupt|close|attach ...]",
+    handler: async (args: string, ctx: unknown) => {
+      const ui = Reflect.get(Object(ctx), "ui") as RemoteCommandUi | undefined
+      if (ui === undefined) return
+      if (run === undefined) {
+        ui.notify(NO_LAUNCHER, "error")
+        return
+      }
+      try {
+        await runRemoteCommand(run, args, ui)
+      } catch (error) {
+        ui.notify(`/remote: ${error instanceof Error ? error.message : String(error)}`, "error")
+      }
+    },
+  })
+}
+
+function launcherRunner(env: Readonly<Record<string, string | undefined>>): OmoRunner | undefined {
+  const omoBin = env["OMO_BIN"]?.trim()
+  return omoBin !== undefined && omoBin !== "" && isAbsolute(omoBin) ? omoRunner(omoBin) : undefined
+}
+
+async function runRemoteCommand(run: OmoRunner, args: string, ui: RemoteCommandUi): Promise<void> {
+  const trimmed = args.trim()
+  if (trimmed === "") return pick(run, ui)
+  const [verb = "", ...rest] = trimmed.split(/\s+/)
+  if (verb === "send") {
+    const match = /^\S+\s+(\S+)\s+([\s\S]+)$/.exec(trimmed)
+    if (match?.[1] === undefined || match[2] === undefined) return usage(ui, "/remote send needs a session and a text.")
+    return send(run, ui, match[1], match[2])
+  }
+  if (verb === "attach") {
+    const [target] = rest
+    if (target === undefined || rest.length > 1) return usage(ui, "/remote attach needs one <device>/<session>.")
+    return attachNotice(ui, target)
+  }
+  if (!PASS_THROUGH_VERBS.has(verb)) return usage(ui, verb === "help" ? undefined : `Unknown /remote command: ${verb}`)
+  const answer = await run(["remote", verb, ...rest, "--json"])
+  show(ui, verb, rest[0] ?? "", answer)
+}
+
+function usage(ui: RemoteCommandUi, problem: string | undefined): void {
+  ui.notify(problem === undefined ? REMOTE_COMMAND_USAGE : `${problem}\n${REMOTE_COMMAND_USAGE}`, "warning")
+}
+
+function attachNotice(ui: RemoteCommandUi, target: string): void {
+  ui.notify(
+    `Attaching opens that session's own screen, which cannot run inside this one. In a new terminal, run:\n  omo remote attach ${target}`,
+    "info",
+  )
+}
+
+async function send(run: OmoRunner, ui: RemoteCommandUi, target: string, text: string): Promise<void> {
+  ui.notify(`Sending to ${target} and waiting for its reply...`, "info")
+  show(ui, "send", target, await run(["remote", "send", "--json", target, "--", text]))
+}
+
+type Device = { readonly device: string; readonly label: string; readonly online: boolean }
+type Row = { readonly device: string; readonly session_id: string; readonly title: string; readonly state: string }
+
+const OPEN_NEW = "Open a new session"
+const ACTIONS = ["Send a message", "Interrupt", "Close", "Attach (new terminal)"] as const
+
+async function pick(run: OmoRunner, ui: RemoteCommandUi): Promise<void> {
+  if (ui.select === undefined) return usage(ui, undefined)
+  const devicesAnswer = await run(["remote", "devices", "--json"])
+  const devices = succeeded(ui, devicesAnswer) ? devicesOf(parsed(devicesAnswer)) : undefined
+  if (devices === undefined) return
+  if (devices.length === 0) return ui.notify("No devices on this account.", "info")
+  const deviceOptions = devices.map(deviceLine)
+  const device = devices[deviceOptions.indexOf((await ui.select("Which device?", deviceOptions)) ?? "")]
+  if (device === undefined) return
+  const sessionsAnswer = await run(["remote", "sessions", "--device", device.device, "--json"])
+  const rows = succeeded(ui, sessionsAnswer) ? rowsOf(parsed(sessionsAnswer)) : undefined
+  if (rows === undefined) return
+  const rowOptions = rows.map(rowLine)
+  const choice = await ui.select(`Sessions on ${device.label}`, [`${OPEN_NEW} on ${device.label}`, ...rowOptions])
+  if (choice === undefined) return
+  if (choice.startsWith(OPEN_NEW))
+    return show(ui, "open", device.device, await run(["remote", "open", device.device, "--json"]))
+  const row = rows[rowOptions.indexOf(choice)]
+  if (row === undefined) return
+  const target = `${row.device}/${row.session_id}`
+  const action = await ui.select(`${target}: what now?`, [...ACTIONS])
+  if (action === "Send a message") {
+    const text = await ui.input?.(`Message to ${target}`)
+    if (text === undefined || text.trim() === "") return
+    return send(run, ui, target, text)
+  }
+  if (action === "Interrupt") return show(ui, "interrupt", target, await run(["remote", "interrupt", target, "--json"]))
+  if (action === "Close") return show(ui, "close", target, await run(["remote", "close", target, "--json"]))
+  if (action === "Attach (new terminal)") attachNotice(ui, target)
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+
+function parsed(answer: OmoRun): unknown {
+  const line = answer.stdout.trim().split("\n").at(-1) ?? ""
+  if (line === "") return undefined
+  try {
+    return JSON.parse(line)
+  } catch (error) {
+    if (error instanceof SyntaxError) return undefined
+    throw error
+  }
+}
+
+function typedFailure(value: unknown): string | undefined {
+  if (!isRecord(value) || value["kind"] !== "error" || !isRecord(value["error"])) return undefined
+  const { message, next_action: next } = value["error"]
+  if (typeof message !== "string") return undefined
+  return typeof next === "string" && next !== "" ? `${message}\n${next}` : message
+}
+
+function succeeded(ui: RemoteCommandUi, answer: OmoRun): boolean {
+  const failure = typedFailure(parsed(answer))
+  if (answer.code === 0 && failure === undefined) return true
+  const stderr = answer.stderr.trim()
+  ui.notify(failure ?? (stderr !== "" ? stderr : `omo remote exited with code ${String(answer.code)}`), "error")
+  return false
+}
+
+function show(ui: RemoteCommandUi, verb: string, target: string, answer: OmoRun): void {
+  if (!succeeded(ui, answer)) return
+  ui.notify(rendered(verb, target, parsed(answer)).join("\n"), "info")
+}
+
+function rendered(verb: string, target: string, value: unknown): readonly string[] {
+  if (verb === "devices") {
+    const devices = devicesOf(value) ?? []
+    return devices.length === 0 ? ["No devices on this account."] : devices.map(deviceLine)
+  }
+  if (verb === "sessions") {
+    const rows = rowsOf(value) ?? []
+    const lines = rows.length === 0 ? ["No sessions."] : rows.map(rowLine)
+    const incomplete = isRecord(value) && Array.isArray(value["incomplete"]) ? value["incomplete"] : []
+    return incomplete.length === 0 ? lines : [...lines, `No answer from: ${incomplete.join(", ")}`]
+  }
+  if (verb === "status" && isRecord(value)) return statusLines(value)
+  if (!isRecord(value) || value["kind"] !== "ok") return [JSON.stringify(value)]
+  return sessionVerbLines(verb, target, value)
+}
+
+function sessionVerbLines(verb: string, target: string, result: Record<string, unknown>): readonly string[] {
+  if (verb === "open" && isRecord(result["thread"])) {
+    const { device, thread_id: id } = result["thread"]
+    return [`Opened ${typeof device === "string" ? `${device}/` : ""}${String(id)}.`]
+  }
+  if (verb === "send") {
+    const reply = result["reply"]
+    return typeof reply === "string" && reply !== "" ? [`${target}:`, reply] : [`Sent to ${target}.`]
+  }
+  if (verb === "interrupt")
+    return [result["interrupted"] === true ? `Interrupted ${target}.` : `Nothing was running on ${target}.`]
+  if (verb === "close") return [result["closed"] === true ? `Closed ${target}.` : `${target} was not open.`]
+  if (verb === "model" && isRecord(result["model"]))
+    return [`${target} now uses ${String(result["model"]["provider"])}/${String(result["model"]["id"])}.`]
+  return [JSON.stringify(result)]
+}
+
+function statusLines(status: Record<string, unknown>): readonly string[] {
+  const device = isRecord(status["device"]) ? status["device"]["name"] : undefined
+  const lines = [
+    `State: ${String(status["state"])}`,
+    `Remote sessions: ${status["enabled"] === true ? "on" : "off"}`,
+    `This device: ${typeof device === "string" ? device : "not set up"}`,
+  ]
+  const action = isRecord(status["detail"]) ? status["detail"]["action"] : undefined
+  return typeof action === "string" && action !== "" ? [...lines, `Action: ${action}`] : lines
+}
+
+function devicesOf(value: unknown): readonly Device[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  return value.flatMap((entry: unknown) =>
+    isRecord(entry) && typeof entry["device"] === "string"
+      ? [
+          {
+            device: entry["device"],
+            label: typeof entry["label"] === "string" && entry["label"] !== "" ? entry["label"] : entry["device"],
+            online: entry["online"] === true,
+          },
+        ]
+      : [],
+  )
+}
+
+function rowsOf(value: unknown): readonly Row[] | undefined {
+  if (!isRecord(value) || !Array.isArray(value["rows"])) return undefined
+  return value["rows"].flatMap((entry: unknown) =>
+    isRecord(entry) && typeof entry["device"] === "string" && typeof entry["session_id"] === "string"
+      ? [
+          {
+            device: entry["device"],
+            session_id: entry["session_id"],
+            title: typeof entry["title"] === "string" ? entry["title"] : "",
+            state: typeof entry["state"] === "string" ? entry["state"] : "",
+          },
+        ]
+      : [],
+  )
+}
+
+const deviceLine = (device: Device): string =>
+  `${device.label}  ${device.device}  ${device.online ? "online" : "offline"}`
+
+const rowLine = (row: Row): string => `${row.device}/${row.session_id}  ${row.state}  ${row.title}`.trimEnd()
