@@ -6,7 +6,7 @@ use omo_computer_core::methods::{Effect, Method, MethodSpec};
 use serde_json::{json, Value};
 use omo_computer_session::audit::sha256_16;
 
-use super::wire::{notification, WireError, METHOD_NOT_FOUND};
+use super::wire::{notification, WireError, INVALID_REQUEST, PARSE_ERROR};
 
 const TEXT_MEMBERS: &[&str] = &["text", "value"];
 
@@ -57,10 +57,12 @@ fn is_unaudited(method: Method) -> bool {
     )
 }
 
-/// A call refused before any session existed (`Closed`) or that no row serves (`-32601`).
+/// A call refused before it reached a session: a JSON-RPC protocol error (bad params, no such
+/// method, the -32600..-32700 range) or `Closed` (no session open).
 fn never_reached(outcome: &Result<Value, WireError>) -> bool {
     outcome.as_ref().err().is_some_and(|error| {
-        error.code == METHOD_NOT_FOUND || error.data.as_ref().is_some_and(|data| data["code"] == "Closed")
+        (PARSE_ERROR..=INVALID_REQUEST).contains(&error.code)
+            || error.data.as_ref().is_some_and(|data| data["code"] == "Closed")
     })
 }
 
@@ -97,6 +99,14 @@ mod tests {
         assert_eq!(audit["params"]["textSha256"], json!("2cf24dba5fb0a30e"));
         assert_eq!((audit["params"]["textLength"].clone(), audit["params"]["textDelivered"].clone()), (json!(5), json!(5)));
         assert!(!audit.to_string().contains("hello"), "{audit}");
+    }
+
+    #[test]
+    fn a_call_that_never_reached_a_session_is_not_audited() {
+        let bad = Err(WireError::invalid_params(&serde_json::from_str::<u8>("x").expect_err("bad")));
+        assert!(notify(spec(Method::Click), &json!({}), &bad).is_none());
+        let closed = Err(WireError::bare(omo_computer_core::error::EngineCode::Closed));
+        assert!(notify(spec(Method::Click), &json!({}), &closed).is_none());
     }
 
     #[test]

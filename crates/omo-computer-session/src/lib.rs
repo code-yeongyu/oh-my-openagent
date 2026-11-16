@@ -35,6 +35,7 @@ pub mod trace;
 mod clipboard;
 pub(crate) mod value_verbs;
 mod window_frame;
+mod v1_reads;
 
 pub use epoch::EpochChanged;
 pub use frames::CapturedFrame;

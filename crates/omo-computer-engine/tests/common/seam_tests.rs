@@ -162,6 +162,12 @@ fn sigkill_mid_type_releases_key_within_2s() {
         )
         .get("result")
         .is_some());
+    // A hold needs the foreground lease, which needs the human grant (row 23).
+    assert!(live
+        .call(4, "control.grant", &json!({"reason": "row 28 sigkill test"}))
+        .get("result")
+        .is_some());
+    assert!(live.call(5, "control.acquire", &json!({})).get("result").is_some());
     let held = live.call(3, "key.down", &json!({"target": "101", "chord": "shift"}));
     assert!(held.get("result").is_some(), "the key is held: {held}");
     let pid = live.peer.child.id().to_string();
