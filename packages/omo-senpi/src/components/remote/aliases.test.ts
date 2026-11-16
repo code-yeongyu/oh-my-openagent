@@ -260,6 +260,7 @@ describe("aliases when the holder's device missed the listing round", () => {
     capabilities: ["sessions", "devices"],
     closed: new Promise<void>(() => {}),
     close: () => {},
+    status: async () => ({ state: "connected" }),
     thisDevice: async () => ({ id: "dev-self", name: "self" }),
     devices: async () => [],
     sessions: async () => ({ revision: 1, rows: [], devices: { "dev-b": "timeout" }, incomplete: [] }),
