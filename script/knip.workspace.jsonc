@@ -40,6 +40,7 @@
         "script/published-install-smoke.mjs",
         "script/qa/computer/conformance/report.ts",
         "script/qa/computer/conformance/run.ts",
+        "script/qa/computer/pool/macos-vm.ts",
         "script/qa/computer/pool/windows-full.ts",
         "script/qa/computer/pool/xorg-uinput-probe.ts",
         // run by path as the live GNOME Wayland window-input QA (docs/guide/computer-use.md)
