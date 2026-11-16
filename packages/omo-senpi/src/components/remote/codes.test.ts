@@ -9,7 +9,9 @@ import { engineCode, exitCodeOf, failureFromError, REMOTE_CODES, remoteFailure }
 describe("the remote code list", () => {
   test("#given the thread taxonomy #then the list is it, names unchanged, plus exactly the new codes", () => {
     expect(REMOTE_CODES.slice(0, THREAD_ERROR_CODES.length)).toEqual([...THREAD_ERROR_CODES])
-    expect(THREAD_ERROR_CODES).toHaveLength(42)
+    // #13927: the thread taxonomy gained gateway_schema_too_new (a newer omo build migrated the gateway store), so the remote list carries it too.
+    expect(THREAD_ERROR_CODES).toHaveLength(43)
+    expect(exitCodeOf(remoteFailure("gateway_schema_too_new", "refused", "update omo"))).toBe(1)
     expect(REMOTE_CODES.slice(THREAD_ERROR_CODES.length)).toEqual([
       "timeout",
       "cancelled",
