@@ -106,4 +106,17 @@ describe("host latch file", () => {
       expect(effectiveLatch(readHostLatch(latchPath(root)))).toMatchObject({ suspended: true })
     }
   })
+
+  it("a SET latch never reads as absent when the descriptor route (/proc/self/fd) is unavailable: it reads unreadable", () => {
+    // Given a set latch in an owner-only computer/ dir.
+    const path = latchPath(temp())
+    writeHostLatch(path, { suspended: true, stopEpoch: 6 })
+
+    // When the descriptor route cannot be used (no /proc in a minimal sandbox).
+    const read = readHostLatch(path, join(temp(), "no-proc-fd"))
+
+    // Then the reader fails closed: unreadable, i.e. STOPPED, never "absent".
+    expect(read.kind).toBe("unreadable")
+    expect(effectiveLatch(read)).toMatchObject({ suspended: true })
+  })
 })

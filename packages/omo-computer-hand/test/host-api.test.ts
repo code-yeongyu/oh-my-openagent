@@ -128,4 +128,40 @@ describe("the host's local API", () => {
       expect(ensured).toEqual([])
     })
   })
+
+  it("a socket directory whose parent other users can rename entries in (writable, not sticky) is refused on both sides", async () => {
+    // Given an owner-only socket dir inside a parent others can write and rename in (0777, no sticky bit).
+    const parent = join(temp(), "open-parent")
+    mkdirSync(parent, { mode: 0o700 })
+    const dir = join(parent, "rt")
+    mkdirSync(dir, { mode: 0o700 })
+    const path = join(dir, "host-api.sock")
+    const server = await serveHostApi(
+      { kind: "socket", path },
+      {
+        status: () => ({ consentFingerprint: "x", latch: { suspended: false, stopEpoch: 0 } }),
+        ensure: async () => ({ kind: "refused", code: "RemoteCommandsDisabled" }),
+      },
+    )
+    try {
+      chmodSync(parent, 0o777)
+
+      // Then the client refuses before dialing, and a host refuses to bind there.
+      await expect(callHostApi({ kind: "socket", path }, "hand.status", {})).rejects.toMatchObject({
+        reason: "host_api_dir_not_owner_only",
+      })
+      await expect(
+        serveHostApi(
+          { kind: "socket", path: join(dir, "second.sock") },
+          {
+            status: () => ({ consentFingerprint: "x", latch: { suspended: false, stopEpoch: 0 } }),
+            ensure: async () => ({ kind: "refused", code: "RemoteCommandsDisabled" }),
+          },
+        ),
+      ).rejects.toMatchObject({ reason: "host_api_dir_not_owner_only" })
+    } finally {
+      chmodSync(parent, 0o700)
+      await server.close()
+    }
+  })
 })
