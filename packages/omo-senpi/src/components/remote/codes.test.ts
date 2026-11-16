@@ -64,6 +64,11 @@ describe("the engine mapping (R-05 restored)", () => {
       expect(engineCode(code)).toEqual({ code })
   })
 
+  test("#given a wire code that names an Object prototype member #then unsupported naming it, never the member", () => {
+    for (const code of ["toString", "constructor", "__proto__", "hasOwnProperty"])
+      expect(engineCode(code)).toEqual({ code: "unsupported", details: { engine_code: code } })
+  })
+
   test("#given an engine code the remote list does not have #then unsupported naming it", () => {
     expect(engineCode("some_new_engine_code")).toEqual({
       code: "unsupported",
