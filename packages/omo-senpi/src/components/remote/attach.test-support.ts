@@ -33,7 +33,7 @@ export const worldWith = (state: JsonObject, records: readonly JsonObject[] = []
 }
 
 /** Sends `kind` with `body` on every attach the owner holds, as its host would after the attach opened. */
-export const pushToAttach = (owner: FakeOwner, kind: string, body: JsonObject): void => {
+const pushToAttach = (owner: FakeOwner, kind: string, body: JsonObject): void => {
   for (const conn of owner.state.conns)
     for (const attach of conn.attaches) conn.send(eventOf(kind, { attach, ...body }))
 }
