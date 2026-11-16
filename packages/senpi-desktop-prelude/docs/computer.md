@@ -1,8 +1,13 @@
 computer → host desktop facade, experimental (present while the `computer` tool is active)
     Drives the REAL desktop: windows, screenshots, native input, OS accessibility (AX), clipboard. Not a browser; no DOM.
     Find it with tool_search ("computer") or call `computer` by name; the global appears in the NEXT cell. The user controls it with `/computer on|off|status|stop|resume` and `/computer cursor on|off` (default on, display-only).
-    Every helper is one `tool.computer({ action: "call", chain })` call. Permission tiers: inspection needs `computer:read`, input and mutation need `computer:exec`; a denied call throws.
+    Every helper is one `tool.computer({ action: "call", chain })` call. Read-tier helpers need `computer:read`, exec-tier helpers `computer:exec`.
     JS: `await` every helper. Python: sync, same names, keyword args become the trailing options object, `win.raise_()` stands in for `raise`.
+Permission tier per helper (from the SDK facade manifest; a denied call throws):
+    computer: read capabilities, displays, display, windows, window, focusedWindow, screenshot, zoom, elementAt, focusedElement, ref, clipboard.read, control.state, verify; exec click, doubleClick, move, drag, scroll, type, press, holdKeys, holdMouse, clipboard.write, control.acquire, control.release
+    display: read screenshot, zoom; exec click, doubleClick, move, drag, scroll, type, press, holdKeys, holdMouse
+    win: read screenshot, observe, zoom, ax, find, ref, menu.items, drill; exec click, doubleClick, move, drag, scroll, type, press, holdKeys, holdMouse, raise, menu.select
+    el: read value, bounds, attributes, actions, parent, children; exec setValue, perform, press, click, type, focus
 computer.displays() → ComputerDisplay[]
     All known monitors; pixel rectangles describe the all-display composite, not the default active screenshot.
 computer.display(id | "active" | "all") → ComputerDisplayTarget
@@ -33,12 +38,16 @@ win.menu.select(path, { delivery? }?) → None
     Exec tier: invokes the leaf command `path` names. Matching prefers a case-insensitive exact title, otherwise compares titles ignoring a trailing `...` or `…`; each tier must match exactly one item. An ambiguous label, a disabled item anywhere in the path, a submenu as the leaf, or an untitled separator is refused and NOTHING is dispatched; the engine revalidates the command before the press. Background delivery (the default) refuses an app that has several windows, because the command would act on whichever window that app treats as key; pass `{ delivery: "foreground" }` (Python: `delivery='foreground'`) to raise and key this window first, which needs the human-confirmed grant (`computer.control.acquire`).
 win.ax({ all?, maxDepth? }?) → str
     One formatted TEXT tree, one node per line with `[ref=eN]` tags; NEVER iterate or `.map` it.
+win.drill(ref, { all?, maxDepth? }?) → str
+    The AX text under one element of this window; the parent snapshot's refs stay valid.
 win.observe({ silent?, all?, maxDepth?, maxNodes? }?) → ComputerObserveResult
     Read tier: one atomic window screenshot plus AX text, nodeCount and truncated. Displays the screenshot then AX text unless silent. The input frame and AX refs change only when both succeed and the reply can be delivered; failure or cancellation preserves the previous frame and delivered ref generations. Window handles only. An older engine without observe refuses it without changing screenshot() or ax().
 win.find({ role?, title?, value?, limit? }) → ComputerElement[]
 win.ref("e5") / computer.ref("e5") → ComputerElement | null
 computer.elementAt(x, y) / computer.focusedElement() → ComputerElement | null
     `elementAt` takes GLOBAL desktop coordinates, not screenshot pixels.
+computer.verify({ kind, … }, { timeoutMs?, intervalMs? }?) → { status, reads, elapsedMs, cause? }
+    Repeats reads until the expectation holds or `timeoutMs` (default 2000) passes; no input. Kinds: elementExists, elementValue, elementEnabled, elementSelected (`ref`); windowExists, windowGone, windowBounds (`window`). `unknown` when a read failed. Use it instead of sleeps.
 el.value() / el.bounds() / el.attributes() / el.actions() / el.parent() / el.children() → reads
 el.setValue(text) / el.perform(action) / el.press() / el.click({ delivery? }?) / el.focus() → mutations
 el.type(text, { delivery? }?) → { method: "inserted" | "keys" }

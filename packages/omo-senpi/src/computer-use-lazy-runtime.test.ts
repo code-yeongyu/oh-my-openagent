@@ -47,9 +47,19 @@ const PRELUDE_ASSET_FIELDS: readonly (readonly [field: string, marker: string, s
   [
     "COMPUTER_DOCUMENTATION",
     "host desktop facade, experimental (present while the `computer` tool is active)",
-    "8fb70219cda48931723fa62096e69a0ae71f1fc0a8f9df980ad34eaa4455feaa",
+    "9c196bdb4f18a829deb4d43882112d03e09e53e86e3e34fa2e34c9da88bc7038",
   ],
   ["COMPUTER_SAFETY", "<critical>", "bd44e5231c66f4b65c9ac41f8e37234bf6ec70dea6242042ec7246b1a8658db2"],
+  [
+    "COMPUTER_GUIDE",
+    "Native app windows, menus and fields.",
+    "020c56e5f710999a492c41a6290dc5dbc8cc7415582e219835fcc719b3eeed1e",
+  ],
+  [
+    "COMPUTER_METHOD_TABLE",
+    "| SDK method | Returns | Tier, policy | Kernel helper |",
+    "0b97203504e0850746b9225c258d715b7aae0af34001495baec18ee8ece1b328",
+  ],
 ]
 
 const roots: string[] = []
