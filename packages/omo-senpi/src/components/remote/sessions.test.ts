@@ -3,7 +3,7 @@ import { connectDeviceService } from "@oh-my-opencode/device-service-core/device
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { JsonObject } from "../../../../device-service-core/src/local-api/protocol.ts"
+import type { JsonObject, ListingRow } from "../../../../device-service-core/src/local-api/protocol.ts"
 import {
   defaultWorld,
   PEER,
@@ -11,6 +11,7 @@ import {
   type World,
 } from "../../../../device-service-core/test/local-api/conformance/world.ts"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
+import { resolveSessionTarget } from "./sessions"
 import { clientOn, closeClients, failureOf, fakeClock, startOwner } from "./testing/fake-service"
 import type { ThreadHandle } from "./types"
 
@@ -48,6 +49,12 @@ const SESSION_REPLY: JsonObject = {
   id: "claude",
 }
 
+const openedRow = (rows: readonly ListingRow[]): ListingRow => {
+  const live = rows.find((row) => row.device === PEER)
+  if (live === undefined) throw new Error("the default world lists the peer's live session")
+  return { ...live, session_id: NEW_KEY, title: "review", durable_id: ENGINE_ID }
+}
+
 const world = (): World => {
   const base = defaultWorld()
   const live = base.sessions[0]
@@ -61,6 +68,13 @@ const world = (): World => {
       outcome: [{ state: "engine_applied", retryable: false }],
     },
     located: { [PEER]: { [ENGINE_ID]: NEW_KEY } },
+    // The opened session as its device lists it once the listing caught up: its key, and its durable id beside it.
+    listing: {
+      ...base.listing,
+      revisions: base.listing.revisions.map((revision, index, all) =>
+        index < all.length - 1 ? revision : { ...revision, rows: [...revision.rows, openedRow(revision.rows)] },
+      ),
+    },
     sessions: [replying, { ...replying, session_id: NEW_KEY }],
   }
 }
@@ -183,6 +197,32 @@ describe("sessions.open", () => {
     expect((await valueOf(session.sessions.open({ device: PEER, preset: "ask" }))).thread).toBe(handleOf(PEER, NEW_KEY))
   })
 
+  test("#given a session client told its own mode #when it opens #then it may keep or narrow it, never widen it, and keeps it by default", async () => {
+    const { owner, sent } = await onWorld()
+    const session = clientOn(
+      owner.stateDir,
+      fakeClock(),
+      { kind: "session", id: "dur-caller" },
+      {
+        permissionPreset: () => "accept-edits",
+      },
+    )
+    expect(failureOf(await session.sessions.open({ device: PEER, preset: "workspace" }))).toMatchObject({
+      code: "scope_denied",
+      details: { reason: "permission_preset_wider", requested: "workspace", own: "accept-edits" },
+    })
+    await valueOf(session.sessions.open({ device: PEER, preset: "read-only" }))
+    await valueOf(session.sessions.open({ device: PEER }))
+    expect(sent("open_session").map((rpc) => rpc["permissionPreset"])).toEqual(["read-only", "accept-edits"])
+  })
+
+  test("#given a device that cannot name the new session's listing key #when sessions.open runs #then the session is answered with a warning", async () => {
+    const owner = await startOwner({ ...world(), located: { [PEER]: {} } })
+    const opened = await valueOf(clientOn(owner.stateDir, fakeClock()).sessions.open({ device: PEER }))
+    expect(opened.thread).toBe(handleOf(PEER, ENGINE_ID))
+    expect(opened.warnings).toEqual([expect.stringContaining("did not name its relay key")])
+  })
+
   test("#given no device service on this device #when sessions.open runs #then local_only names the SDK step", async () => {
     const stateDir = mkdtempSync(join(tmpdir(), "rs-"))
     emptyDirs.push(stateDir)
@@ -302,6 +342,64 @@ describe("sessions controls", () => {
     expect(failureOf(await clientOn(owner.stateDir, fakeClock()).sessions.archive(LIVE, true))).toMatchObject({
       code: "unsupported",
       details: { feature: "archive" },
+    })
+  })
+})
+
+describe("durable-id addressing", () => {
+  // A handle's session part is the device's listing key or the session's durable id (what open's engine reply names);
+  // every session member resolves it through resolveSessionTarget to the key the device lists it by.
+  const opened = async () => {
+    const { owner, sent } = await onWorld()
+    const client = clientOn(owner.stateDir, fakeClock())
+    expect((await valueOf(client.sessions.open({ device: PEER }))).thread).toBe(handleOf(PEER, NEW_KEY))
+    return { client, sent }
+  }
+
+  for (const [label, session] of [
+    ["durable id", ENGINE_ID],
+    ["listing key", NEW_KEY],
+  ] as const)
+    test(`#given a session just opened #when send, setModel, interrupt and close address it by its ${label} #then every record reaches its listing key`, async () => {
+      const { client, sent } = await opened()
+      const thread = handleOf(PEER, session)
+      expect(await valueOf(client.sessions.send(thread, { text: "go" }))).toMatchObject({ lane: "started" })
+      expect(await valueOf(client.sessions.setModel(thread, "anthropic/claude"))).toEqual({ model: "anthropic/claude" })
+      expect(await valueOf(client.sessions.interrupt(thread))).toMatchObject({ interrupted: true })
+      expect(await valueOf(client.sessions.close(thread))).toEqual({ closed: true })
+      for (const type of ["prompt", "set_model", "interrupt", "unload_session"])
+        expect(sent(type).map((rpc) => rpc["sessionId"])).toEqual([NEW_KEY])
+    })
+
+  test("#given a session its device does not hold #when a member addresses it #then not_found{session} names sessions.list, never an update", async () => {
+    const { client } = await opened()
+    for (const settled of [
+      await client.sessions.interrupt(handleOf(PEER, "dur-nowhere")),
+      await client.sessions.setModel(handleOf(PEER, "dur-nowhere"), "anthropic/claude"),
+      await client.sessions.get(handleOf(PEER, "dur-nowhere")),
+    ]) {
+      const failure = failureOf(settled)
+      expect(failure).toMatchObject({ code: "not_found", details: { kind: "session", device: PEER } })
+      expect(failure.next_action).toContain("sessions.list")
+    }
+  })
+
+  test("#given resolveSessionTarget #when it takes a durable id the listing carries #then it answers the listing key and row", async () => {
+    // The resolver resolve.ts reuses, at its own seam: a person client's core is what sessionMembers is built from.
+    const { owner } = await onWorld()
+    const client = clientOn(owner.stateDir, fakeClock())
+    const core = {
+      sender: { kind: "person", uid: "user-1" },
+      timers: fakeClock(),
+      deps: { version: "5.1.70" },
+      member: () => Promise.reject(new Error("the listing alone resolves a listed durable id")),
+      sessionsList: client.sessions.list,
+      devicesList: client.devices.list,
+    } as const
+    expect(await valueOf(resolveSessionTarget(core, PEER, ENGINE_ID))).toMatchObject({
+      device: PEER,
+      session: NEW_KEY,
+      row: { title: "review", durable_id: ENGINE_ID },
     })
   })
 })

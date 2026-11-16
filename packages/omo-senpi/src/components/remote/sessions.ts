@@ -24,6 +24,7 @@ import { createDeviceServiceSessions } from "./port/device-service"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
 import type {
   DeviceRow,
+  SessionRow,
   InterruptJob,
   InterruptResult,
   OpenRequest,
@@ -51,11 +52,13 @@ const text = (value: unknown): string | undefined => (typeof value === "string" 
 
 /** A thread tools failure as the remote module answers it: the same code and details, an SDK next action. */
 const fromThread = (error: ThreadToolFailure, extra: Partial<RemoteFailure> = {}): RemoteFailure =>
-  remoteFailure(error.code, error.message, nextActionFor(error.code), {
-    ...(error.code === "idempotency_uncertain" ? { uncertain: true } : {}),
-    ...(error.details === undefined ? {} : { details: error.details }),
-    ...extra,
-  })
+  NO_SESSION.has(error.details?.["reason"]) && typeof error.details?.["device"] === "string"
+    ? { ...unknownSession(error.details["device"]), ...extra }
+    : remoteFailure(error.code, error.message, nextActionFor(error.code), {
+        ...(error.code === "idempotency_uncertain" ? { uncertain: true } : {}),
+        ...(error.details === undefined ? {} : { details: error.details }),
+        ...extra,
+      })
 
 /** A session handle names its device; any other address is resolved first (sessions.resolve). */
 const targetOf = (thread: ThreadHandle): Target | RemoteFailure => {
@@ -83,7 +86,8 @@ const splitModel = (model: string): { readonly provider: string; readonly modelI
   return { provider: model.slice(0, slash), modelId: model.slice(slash + 1) }
 }
 
-// #13748: thread/contracts/permission-presets.ts `presetWithin` replaces this table (the same senpi preset rules).
+// #13748: thread/contracts/permission-presets.ts `isPermissionPreset` and `presetWithin` replace these (the same senpi
+// preset rules).
 const AT_MOST: Readonly<Record<PermissionPreset, readonly PermissionPreset[]>> = {
   "full-access": ["full-access", "workspace", "accept-edits", "auto", "read-only", "ask"],
   workspace: ["workspace", "accept-edits", "read-only", "ask"],
@@ -92,6 +96,7 @@ const AT_MOST: Readonly<Record<PermissionPreset, readonly PermissionPreset[]>> =
   auto: ["auto", "ask"],
   ask: ["ask"],
 }
+const isPermissionPreset = (value: string): value is PermissionPreset => Object.hasOwn(AT_MOST, value)
 const presetWithin = (requested: PermissionPreset, creator: PermissionPreset | undefined): boolean =>
   creator === undefined ? requested === "ask" : AT_MOST[creator].includes(requested)
 
@@ -142,6 +147,44 @@ const backgroundOf = (value: unknown): InterruptResult["background"] => {
         isObject(job) && typeof job["reason"] === "string" && isJob(job),
     ),
   }
+}
+
+const unknownSession = (device: string, session?: string): RemoteFailure =>
+  remoteFailure(
+    "not_found",
+    `Device ${device} holds no session${session === undefined ? " by that handle" : ` ${session}`}.`,
+    "Call sessions.list or sessions.resolve for the session's current handle.",
+    { details: { kind: "session", device } },
+  )
+
+// The engine's and the device service's words for a session the device does not hold (port/device-service.ts reports
+// session_not_found as unknown_session): a member answers them not_found{session}, never as a refusal to update for.
+const NO_SESSION: ReadonlySet<unknown> = new Set(["unknown_session", "session_not_found"])
+
+/** A resolved session: the session part a member sends to its device, and its listing row when the device lists it. */
+export type SessionTarget = { readonly device: string; readonly session: string; readonly row?: SessionRow }
+
+/**
+ * The one resolution of a handle's session part (the device's listing key or the session's durable id), for every session
+ * member and resolve.ts: the listed row with that key, else the listed row with that durable id; a session the listing
+ * does not carry (yet) goes to its device as named, where the port's attach locates it (#13748).
+ */
+export async function resolveSessionTarget(
+  core: ClientCore,
+  device: string,
+  session: string,
+  opts?: Opts,
+): Promise<Outcome<SessionTarget>> {
+  const listed = await core.sessionsList({ device }, opts)
+  if (listed.kind === "error") return listed
+  const rows = listed.value.rows.filter((row) => row.device.id === device)
+  const byKey = rows.find((row) => row.thread === handleOf(device, session))
+  if (byKey !== undefined) return ok({ device, session, row: byKey })
+  const byDurable = rows.find((row) => row.durable_id === session)
+  const keyed = byDurable === undefined ? undefined : canonicalizeThreadHandle(byDurable.thread, {})
+  if (byDurable !== undefined && keyed?.kind === "ok" && keyed.value.target.kind === "device_session")
+    return ok({ device, session: keyed.value.target.session, row: byDurable })
+  return ok({ device, session })
 }
 
 /** The receipts of this client's sends and opens: a repeat under one idempotency key replays the first answer. */
@@ -227,14 +270,20 @@ export function sessionMembers(core: ClientCore): SessionMembers {
   const controlOf = (svc: DeviceService, { device, session }: Target): SessionControl =>
     createRelayControl(legOf(svc).remote, namedDeviceRow(device, session))
 
-  const controlled = <T>(
+  const resolve = async (thread: ThreadHandle, opts: Opts | undefined): Promise<Outcome<SessionTarget>> => {
+    const named = targetOf(thread)
+    return "kind" in named ? named : await resolveSessionTarget(core, named.device, named.session, opts)
+  }
+
+  const controlled = async <T>(
     thread: ThreadHandle,
     opts: Opts | undefined,
     body: (control: SessionControl, target: Target, svc: DeviceService) => Promise<ThreadToolResult>,
     value: (result: ThreadToolResult) => T,
   ): R<T> => {
-    const target = targetOf(thread)
-    if ("kind" in target) return Promise.resolve(target)
+    const resolved = await resolve(thread, opts)
+    if (resolved.kind === "error") return resolved
+    const target = resolved.value
     return core.member(opts, DEADLINES.drive, true, async (svc) => {
       const result = await answered(() => body(controlOf(svc, target), target, svc))
       return result.kind === "error" ? fromThread(result.error) : ok(value(result))
@@ -268,8 +317,18 @@ export function sessionMembers(core: ClientCore): SessionMembers {
   }
 
   const send = async (thread: ThreadHandle, request: SendRequest, opts?: Opts): R<SendReceipt> => {
-    const target = targetOf(thread)
-    if ("kind" in target) return target
+    const resolved = await resolve(thread, opts)
+    if (resolved.kind === "error") return resolved
+    return await deliverTo(thread, resolved.value, request, opts)
+  }
+
+  /** One send to the session the device lists under `target` (already resolved); `thread` is the caller's handle. */
+  const deliverTo = async (
+    thread: ThreadHandle,
+    target: Target,
+    request: SendRequest,
+    opts: Opts | undefined,
+  ): R<SendReceipt> => {
     if (request.author !== undefined && sender.kind !== "connector")
       return remoteFailure(
         "invalid_arguments",
@@ -344,18 +403,24 @@ export function sessionMembers(core: ClientCore): SessionMembers {
   }
 
   const open = async (request: OpenRequest, opts?: Opts): R<OpenResult> => {
-    const asked = openRequestOf(request)
-    if ("kind" in asked) return asked
+    const translated = openRequestOf(request)
+    if ("kind" in translated) return translated
+    let asked = translated
     const preset = request.preset
-    // A person opens in any mode; any other caller may keep or narrow its own. This client is not told its sender's
-    // own mode, so it is unknown here and only `ask` (below every other) passes.
-    if (preset !== undefined && sender.kind !== "person" && !presetWithin(preset, undefined))
-      return remoteFailure(
-        "scope_denied",
-        `This client's approval mode is unknown; a session it opens cannot run in ${preset}, which may allow more.`,
-        "Call sessions.open with preset ask, or without a preset.",
-        { details: { reason: "permission_preset_wider", requested: preset } },
-      )
+    // A person opens in any mode (absent, the engine's own default). Any other caller acts for a session and may keep
+    // or narrow that session's mode; absent, it keeps it. A mode this client is not told passes only `ask`.
+    if (sender.kind !== "person") {
+      const told = core.deps.permissionPreset?.()
+      const own = told !== undefined && isPermissionPreset(told) ? told : undefined
+      if (preset !== undefined && !presetWithin(preset, own))
+        return remoteFailure(
+          "scope_denied",
+          `This client acts in ${own ?? "an unknown approval mode"}; a session it opens cannot run in ${preset}, which allows more.`,
+          "Call sessions.open with this session's own mode or a narrower one (ask is always allowed), or without a preset.",
+          { details: { reason: "permission_preset_wider", requested: preset, ...(own === undefined ? {} : { own }) } },
+        )
+      if (preset === undefined && own !== undefined) asked = { ...asked, permissionPreset: own }
+    }
     const key = request.idempotency_key
     if (key === undefined) return await openOnce(request, asked, opts)
     // A repeat under the key replays the first open (in flight or settled); one with other arguments conflicts. An
@@ -395,13 +460,24 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     const made = await core.member(opts, DEADLINES.openEndpoint, true, async (svc) => {
       const outcome = await createRelaySessionHost(legOf(svc).remote, device.value.id).open(asked)
       if (outcome.kind === "error") return modelUnavailable(fromThread(outcome.error), request.model)
-      return ok(handleOf(device.value.id, outcome.thread.sessionId))
+      return ok({
+        key: outcome.thread.sessionId,
+        warnings: (outcome.thread.warnings ?? []).map((warning) => warning.message),
+      })
     })
     if (made.kind === "error") return made
-    const result: OpenResult = { thread: made.value, device: device.value }
+    const target = { device: device.value.id, session: made.value.key }
+    const thread = handleOf(target.device, target.session)
+    const result: OpenResult = {
+      thread,
+      device: device.value,
+      ...(made.value.warnings.length === 0 ? {} : { warnings: made.value.warnings }),
+    }
     if (request.first === undefined) return ok(result)
-    const first = await send(
-      made.value,
+    // The session's own key, as its device named it: a just-created session is not in the listing yet.
+    const first = await deliverTo(
+      thread,
+      target,
       {
         ...request.first,
         ...(request.idempotency_key === undefined ? {} : { idempotency_key: request.idempotency_key }),
@@ -424,20 +500,12 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     open,
     send,
     get: async (thread, opts) => {
-      const target = targetOf(thread)
-      if ("kind" in target) return target
-      const listed = await core.sessionsList({ device: target.device }, opts)
-      if (listed.kind === "error") return listed
-      const row = listed.value.rows.find((candidate) => candidate.thread === thread)
-      if (row === undefined)
-        return remoteFailure(
-          "not_found",
-          `Device ${target.device} lists no session ${target.session}.`,
-          nextActionFor("not_found"),
-          {
-            details: { kind: "session" },
-          },
-        )
+      const resolved = await resolve(thread, opts)
+      if (resolved.kind === "error") return resolved
+      const target = resolved.value
+      const { row } = target
+      // Not listed (yet): there is no row to report it with.
+      if (row === undefined) return unknownSession(target.device, target.session)
       return core.member(opts, DEADLINES.observeRead, false, async (svc) => {
         const state = await engineState(svc, target)
         if (state.kind === "error") return state
@@ -465,8 +533,9 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       })
     },
     read: async (thread, page, opts) => {
-      const target = targetOf(thread)
-      if ("kind" in target) return target
+      const resolved = await resolve(thread, opts)
+      if (resolved.kind === "error") return resolved
+      const target = resolved.value
       return core.member(opts, DEADLINES.observeRead, false, async (svc) => {
         const attached = await svc.attach(target.device, target.session)
         try {
@@ -483,8 +552,9 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     },
     // The engine's interrupt record itself (relay-control's body drops the background report InterruptResult carries).
     interrupt: async (thread, opts) => {
-      const target = targetOf(thread)
-      if ("kind" in target) return target
+      const resolved = await resolve(thread, opts)
+      if (resolved.kind === "error") return resolved
+      const target = resolved.value
       return core.member(opts, DEADLINES.drive, true, async (svc) => {
         const { device, session } = target
         const outcome = await legOf(svc).remote.sessions.sessionCommand(device, session, {
@@ -545,8 +615,9 @@ export function sessionMembers(core: ClientCore): SessionMembers {
         () => ({ reasoning: level }),
       ),
     close: async (thread, opts) => {
-      const target = targetOf(thread)
-      if ("kind" in target) return target
+      const resolved = await resolve(thread, opts)
+      if (resolved.kind === "error") return resolved
+      const target = resolved.value
       return core.member(opts, DEADLINES.close, true, async (svc) => {
         const result = await answered(() => closeThread(controlOf(svc, target)))
         if (result.kind === "error") return fromThread(result.error)
