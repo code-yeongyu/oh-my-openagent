@@ -74,7 +74,7 @@ describe("/memfs status", () => {
     await mkdir(identity.identityPaths.locks, { recursive: true })
     await writeFile(
       join(identity.identityPaths.locks, STALE_LOCK_JOURNAL),
-      `${JSON.stringify({ at: "2026-11-16T08:55:00.000Z", path: join(identity.identityPaths.repo, ".git", "index.lock"), ageMs: 70 * 60_000, mtime: "2026-11-16T07:45:00.000Z", size: 0, checks: { repoUsers: 0, openHolders: 0, unchangedForMs: 60_000 } })}\n`,
+      `${JSON.stringify({ outcome: "removed", at: "2026-11-16T08:55:00.000Z", path: join(identity.identityPaths.repo, ".git", "index.lock"), ageMs: 70 * 60_000, mtime: "2026-11-16T07:45:00.000Z", size: 0, checks: { repoUsers: 0, openHolders: 0, unchangedForMs: 60_000 } })}\n`,
     )
 
     const text = await invoke(pi, "memfs", "status", ctx)

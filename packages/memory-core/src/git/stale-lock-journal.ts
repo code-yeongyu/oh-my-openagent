@@ -41,5 +41,9 @@ export async function removeJournaled(
     ).catch(() => undefined)
     return keep("unlink-failed")
   }
+  // Only this line counts as a removal, so a crash or a failed append between the two never overstates it.
+  await appendFile(journal, `${JSON.stringify({ ...entry, outcome: "removed", at: new Date().toISOString() })}\n`, {
+    mode: 0o600,
+  })
   return { removed: [indexLock], kept }
 }

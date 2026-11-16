@@ -67,9 +67,9 @@ test("#given a 0-byte index.lock 70 minutes old with no owner record, no holder 
       .trim()
       .split("\n")
       .map((line) => JSON.parse(line))
-    expect(journal).toHaveLength(1)
-    expect(journal[0]).toMatchObject({ path: fixture.lock, size: 0, checks: { repoUsers: 0, openHolders: 0 } })
-    expect(journal[0].ageMs).toBeGreaterThanOrEqual(70 * 60_000)
+    expect(journal.map((entry) => entry.outcome)).toEqual(["removing", "removed"])
+    expect(journal[1]).toMatchObject({ path: fixture.lock, size: 0, checks: { repoUsers: 0, openHolders: 0 } })
+    expect(journal[1].ageMs).toBeGreaterThanOrEqual(70 * 60_000)
   } finally {
     await fixture.release()
   }

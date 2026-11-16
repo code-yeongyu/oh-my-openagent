@@ -10,12 +10,13 @@ import { join } from "node:path"
 import { memoryHookChecker } from "../worker/spawn-supervisor-support"
 import { rm } from "@oh-my-opencode/memory-core/fs"
 
-import { MirrorSync, STALE_LOCK_JOURNAL, installHooks } from "@oh-my-opencode/memory-core"
+import { MirrorSync, installHooks } from "@oh-my-opencode/memory-core"
 
 import { parseCommandArgs } from "./args"
 import { createRepoBackup } from "./backup"
 import { memfsBackup, memfsDiff, memfsRestore, memfsTokens } from "./memfs-extra"
 import { requireExistingRepo, type MemfsSubcommand, type MemfsSubcommandInput } from "./memfs-shared"
+import { renderStaleLockRemovals } from "./memfs-stale-locks"
 import { formatSkillNameFrontmatterRepairReport, repairMissingSkillNameFrontmatter } from "./skill-frontmatter"
 import { hasGitRepo, openRepo, shortSha } from "./repo"
 import {
@@ -58,48 +59,6 @@ const memfsStatus: MemfsSubcommand = async ({ deps, ctx, identity }) => {
   const skillsBlock = await renderSkillsUsage(identity.identityPaths.runtime)
   if (skillsBlock !== undefined) lines.push(skillsBlock)
   return respond(ctx, lines.join("\n"), dirty ? "warning" : "info")
-}
-
-// #13808: the writer journals each stale index.lock it removed without an owner proof; status shows how many and the last one.
-async function renderStaleLockRemovals(locksDir: string): Promise<string | undefined> {
-  const text = await readFile(join(locksDir, STALE_LOCK_JOURNAL), "utf8").catch(() => null)
-  if (text === null) return undefined
-  const entries = text
-    .split("\n")
-    .filter((line) => line.trim().length > 0)
-    .flatMap((line): { outcome: string; at: string; path: string; ageMs: number | undefined }[] => {
-      try {
-        const entry: unknown = JSON.parse(line)
-        if (typeof entry !== "object" || entry === null) return []
-        const { outcome, at, path, ageMs } = entry as {
-          outcome?: unknown
-          at?: unknown
-          path?: unknown
-          ageMs?: unknown
-        }
-        if (typeof at !== "string" || typeof path !== "string") return []
-        return [
-          {
-            outcome: typeof outcome === "string" ? outcome : "removing",
-            at,
-            path,
-            ageMs: typeof ageMs === "number" ? ageMs : undefined,
-          },
-        ]
-      } catch {
-        return []
-      }
-    })
-  // An intent line followed by an "unlink-failed" line for the same lock was not a removal.
-  const removals = entries.filter(
-    (entry, index) =>
-      entry.outcome === "removing" &&
-      !(entries[index + 1]?.outcome === "unlink-failed" && entries[index + 1]?.path === entry.path) &&
-      entry.ageMs !== undefined,
-  )
-  const last = removals.at(-1)
-  if (last === undefined || last.ageMs === undefined) return undefined
-  return `Stale index.lock removed: ${removals.length} (last ${last.at}, ${Math.round(last.ageMs / 60_000)} min old)`
 }
 
 const memfsInit: MemfsSubcommand = async ({ deps, ctx, identity }) => {
