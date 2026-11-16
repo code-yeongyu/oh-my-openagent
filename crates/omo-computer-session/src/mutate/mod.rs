@@ -73,7 +73,8 @@ pub struct Refused {
     pub detail: Option<Box<Value>>,
     /// What row 22 stamps on a refusal, boxed so the error type stays small.
     pub stamps: Box<Stamps>,
-    pub busy: Option<crate::settle::BusyDetail>,
+    /// Boxed so the error type stays small (R70cg).
+    pub busy: Option<Box<crate::settle::BusyDetail>>,
     /// `write_failed` when the refusal's own audit line could not be written.
     pub warning: Option<String>,
 }
