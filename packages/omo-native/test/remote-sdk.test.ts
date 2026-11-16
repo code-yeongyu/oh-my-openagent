@@ -3,7 +3,13 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { cleanup, startOwner } from "../../device-service-core/test/local-api/support.ts"
-import { OFFLINE_PEER, PEER } from "../../device-service-core/test/local-api/conformance/world.ts"
+import {
+  defaultWorld,
+  OFFLINE_PEER,
+  PEER,
+  type World,
+} from "../../device-service-core/test/local-api/conformance/world.ts"
+import { withContractHost } from "../../senpi-task/src/runners/rpc-host/testing/contract-host.ts"
 import {
   canonicalizeThreadHandle,
   describeThread,
@@ -99,5 +105,71 @@ describe("omo-ai/remote: sessions", () => {
     expect(Object.keys(remote.sessions).sort()).toEqual(
       expect.arrayContaining(["archive", "close", "follow", "get", "interrupt", "list", "open", "read", "send"]),
     )
+  })
+})
+
+// The device service cannot attach a device to itself, so a session on the script's own device is reached through this
+// device's engine (its operator endpoint, found as the thread tools find it). openRemote must wire that in by default:
+// without it, watching or attaching to a session the same script just opened here fails (#13868).
+describe("omo-ai/remote: a session on this device", () => {
+  const SELF = "dev-self"
+  const SESSION = "c2VsZi1zZXNzaW9uLWtleQ"
+  const ENV = ["OMO_RPC_SOCKET", "SENPI_RPC_KEY_ROOT"] as const
+  const saved = ENV.map((name) => [name, process.env[name]] as const)
+  afterEach(() => {
+    for (const [name, value] of saved) {
+      if (value === undefined) delete process.env[name]
+      else process.env[name] = value
+    }
+  })
+
+  const selfWorld = (): World => {
+    const world = defaultWorld()
+    const [revision] = world.listing.revisions.slice(-1)
+    if (revision === undefined) throw new Error("the default world has a listing")
+    const row = {
+      device: SELF,
+      session_id: SESSION,
+      durable_id: "dur-selected",
+      title: "Self session",
+      project: "omo",
+      path: "/home/user/omo",
+      state: "running" as const,
+      updated_ms: 1_790_000_000_000,
+      source: "live" as const,
+      as_of: 1_790_000_100_000,
+    }
+    const revisions = [...world.listing.revisions.slice(0, -1), { ...revision, rows: [...revision.rows, row] }]
+    return { ...world, listing: { ...world.listing, revisions } }
+  }
+
+  test("#given a session on this device's own engine #when a script attaches to it #then the snapshot comes from that engine's operator endpoint", async () => {
+    const owner = await startOwner(selfWorld())
+    await withContractHost({}, async (host) => {
+      process.env["OMO_RPC_SOCKET"] = host.socket
+      process.env["SENPI_RPC_KEY_ROOT"] = host.root
+      const remote = open(owner.stateDir)
+
+      const attached = await valueOf(remote.attach(handleOf(SELF, SESSION)))
+
+      expect(attached.snapshot.state).toMatchObject({ sessionId: "rpc-1" })
+      await attached.detach()
+      expect(host.frames.map(({ frame }) => frame["type"])).toContain("release_attachment")
+    })
+  })
+
+  test("#given an engine running on this device #when a script lists every session #then this device's sessions come from that engine and the device is answered", async () => {
+    const owner = await startOwner()
+    await withContractHost({}, async (host) => {
+      process.env["OMO_RPC_SOCKET"] = host.socket
+      process.env["SENPI_RPC_KEY_ROOT"] = host.root
+      const remote = open(owner.stateDir)
+
+      const listing = await valueOf(remote.sessions.list({ all_scope: true }))
+
+      expect(listing.rows.filter((row) => row.device.id === SELF).length).toBeGreaterThan(0)
+      expect(listing.unanswered.map((device) => device.id)).not.toContain(SELF)
+      expect(host.frames.map(({ frame }) => frame["type"])).toContain("list_sessions")
+    })
   })
 })

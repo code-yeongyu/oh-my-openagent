@@ -73,10 +73,6 @@ const ENGINE_NAME_ALLOWLIST: readonly { readonly why: string; readonly pattern: 
     pattern: /\bsenpi(?:\s+(?:extension(?:\s+events)?|RPC(?:\s+host)?|release|process(?:es)?|host))/gi,
   },
   { why: "quoted harness id", pattern: /(['"])senpi\1/g },
-  {
-    why: "bundler module-init identifiers in generated bin bundles (init_<module path>), e.g. init_senpi_command",
-    pattern: /\binit_\w*senpi\w*/g,
-  },
   { why: "telemetry env prefix (an identifier value the dashboards join on)", pattern: /OMO_SENPI\b/g },
   {
     why: "compound source identifiers such as resolveSenpi or senpiRoot; a bare senpi is deliberately excluded",
