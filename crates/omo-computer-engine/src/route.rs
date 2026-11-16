@@ -79,6 +79,11 @@ pub fn backend(vars: &[(String, String)]) -> Result<Box<dyn Backend>, RouteError
                 lookup("GDK_SCALE").as_deref(),
             ),
         )),
+        // Row 51: the Wayland backend on Linux: libei input through `LIBEI_SOCKET` or the portal.
+        #[cfg(target_os = "linux")]
+        Some(value) if value == omo_computer_backend_wayland::WAYLAND_BACKEND => {
+            Ok(Box::new(omo_computer_backend_wayland::WaylandBackend::from_env(&lookup)))
+        }
         other => Err(RouteError::NoBackend(other)),
     }
 }

@@ -23,6 +23,10 @@ use crate::{Session, POINT_REQUIRED};
 
 const BAD_KEY: omo_computer_core::backend::Refusal =
     omo_computer_core::backend::Refusal::bare(omo_computer_core::error::EngineCode::InvalidKey);
+const RELEASE_HELPER_UNAVAILABLE: omo_computer_core::backend::Refusal = omo_computer_core::backend::Refusal::new(
+    omo_computer_core::error::EngineCode::StopPathUnavailable,
+    omo_computer_core::error::Reason::ReleaseHelperUnavailable,
+);
 
 impl Session {
     /// The backend's clock, or the session's machine clock when the backend has none (the
@@ -36,6 +40,15 @@ impl Session {
 
     fn session_tag(&self) -> u64 {
         self.opened.as_ref().map_or(0, |opened| opened.tag)
+    }
+
+    /// Rows 51/57: with the release helper unavailable nothing lifts what the engine's death
+    /// leaves down, so a hold is refused before anything is sent.
+    fn release_helper_gate(&self) -> Result<(), Refused> {
+        match self.backend.capabilities().release_helper {
+            Some(helper) if !helper.available => Err(Refused::from(RELEASE_HELPER_UNAVAILABLE)),
+            Some(_) | None => Ok(()),
+        }
     }
 
     fn hold_call(&mut self, method: Method, target: &str, call: (Vec<Point>, Option<String>, bool), events: Vec<InputEvent>, frame: (Option<String>, FrameCheck), authority: &CallAuthority) -> Result<ExecReply, Refused> {
@@ -77,6 +90,7 @@ impl Session {
     /// # Errors
     /// The frame check or the funnel's refusal.
     pub fn mouse_down(&mut self, params: MouseDownParams) -> Result<ExecReply, Refused> {
+        self.release_helper_gate()?;
         let button = params.button.unwrap_or(Button::Left);
         let at = params.x.zip(params.y).map(|(x, y)| At { x, y });
         let (origin, check) = self.press_point(&params.target, at, params.frame_id.as_deref())?;
@@ -115,6 +129,7 @@ impl Session {
     /// # Errors
     /// `InvalidKey` for a chord that does not parse, or the funnel's refusal.
     pub fn key_down(&mut self, params: KeyDownParams) -> Result<ExecReply, Refused> {
+        self.release_helper_gate()?;
         let keys = chord_keys(&params.chord).map_err(|_| Refused::from(BAD_KEY))?;
         let authority = CallAuthority { call_id: params.call_id.clone(), run_generation: params.run_generation };
         let events = keys.iter().map(|key| key_event(key, true)).collect();
