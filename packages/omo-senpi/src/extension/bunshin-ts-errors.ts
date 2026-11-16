@@ -168,7 +168,7 @@ const ruleFor = (error: unknown, name: string | undefined, wireCode: string | un
   return name === undefined ? undefined : NAMED_RULES[name]
 }
 
-/** `requestId` names the request when the error carries none, as for `resultOf`, whose argument is the request id. */
+/** `requestId` defaults to the error's own request id; a caller that passes one (`resultOf`, whose argument is that id) overrides it. */
 export function deviceOperationError(
   error: unknown,
   operation: string,
