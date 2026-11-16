@@ -160,6 +160,8 @@ export function createRemoteThreadFixture() {
       openRefuse?: string
       /** b knows a session it just opened only by its relay key (relayKeys), not by its durable id: a listing that has not caught up yet. */
       relayKeyOnly?: boolean
+      /** The device service throws on b's admit_external_message (a lost connection mid-delivery). */
+      admitThrows?: string
     } = {},
   ) {
     const engine = options.engine ?? ENGINE
@@ -423,6 +425,8 @@ export function createRemoteThreadFixture() {
         },
         sessionCommand: async (device, session, rpc) => {
           sent.push({ via: "session", device, session, rpc })
+          if (rpc["type"] === "admit_external_message" && options.admitThrows !== undefined)
+            throw new Error(options.admitThrows)
           const outcome = answer(rpc, session)
           if (rpc["type"] === "prompt" && outcome.kind === "ok") {
             answeredPrompt = true
@@ -579,6 +583,8 @@ export function createRemoteThreadFixture() {
       return created
     })
     const closed: Array<readonly [string, string | undefined]> = []
+    // The interrupt records this device's endpoint received, as b's engine's arrive in `sent`.
+    const interrupts: JsonObject[] = []
     const setSessionName = mock(async (_sessionId: string, _name: string) => {})
     // How often this device's endpoints were listed (the local enumeration a send can cost).
     let localListings = 0
@@ -597,7 +603,10 @@ export function createRemoteThreadFixture() {
         localPrompts += 1
         return { turnId: "turn-local" }
       },
-      interrupt: async () => engine.interrupt,
+      interrupt: async (_sessionId, request) => {
+        interrupts.push({ type: "interrupt", ...request })
+        return engine.interrupt
+      },
       setSessionName,
       setModel: async (_s, provider, id) => ({ provider, id }),
       getAvailableModels: async () => [],
@@ -675,6 +684,7 @@ export function createRemoteThreadFixture() {
       setSessionName,
       store,
       closed,
+      interrupts,
       agentDir,
       listings: () => localListings,
       prompts: () => localPrompts,

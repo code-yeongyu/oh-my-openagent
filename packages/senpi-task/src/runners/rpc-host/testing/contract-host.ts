@@ -38,6 +38,19 @@ export type ContractHostOptions = {
   readonly unwritten?: boolean
   /** unload_session answers `{outcome: "refused", reason}` with this reason, as data, whatever else is set. */
   readonly unloadRefusal?: string
+  /**
+   * The session's history (entries with an `id`): get_entries pages it backward as the engine does (`{before, tail}`,
+   * answering `next_before`; an unknown `before` is refused not_found), and get_snapshot answers its newest `tail`
+   * entries (100 by default) with history_truncated and next_before, as the engine does.
+   */
+  readonly history?: readonly Frame[]
+  /** Refuse an unpaged get_entries over this many entries `response_too_large` (the engine's 48 MiB answer cap). */
+  readonly unpagedCap?: number
+  /**
+   * Records of the session written ahead of get_snapshot's answer, then the engine's `snapshot_marker`: the snapshot
+   * already holds them, as the engine takes it before it writes the marker and the answer (get-snapshot.js).
+   */
+  readonly beforeSnapshot?: readonly Frame[]
 }
 export type ContractHost = {
   readonly socket: string
@@ -54,6 +67,13 @@ export type ContractHost = {
   readonly drain: () => void
   /** Whether the session is still on the host: false once a close or an unload ended it. */
   readonly live: () => boolean
+  /**
+   * Settles once an attached connection's get_snapshot was answered: a test awaits it before it pushes records that must
+   * stream, since the records written before the snapshot's marker are the snapshot's own (get-snapshot.js).
+   */
+  readonly snapshotted: () => Promise<void>
+  /** Writes these records of the session (`sessionId` "rpc-1") to every connection attached to it, as a live host does. */
+  readonly push: (records: readonly Frame[]) => void
 }
 
 /**
@@ -128,6 +148,8 @@ export async function withContractHost(
   const frames: ContractHost["frames"] = []
   const mutations: Frame[] = []
   const sockets = new Set<Socket>()
+  const attachedClients = new Set<Socket>()
+  const firstSnapshot = Promise.withResolvers<void>()
   let nextConnection = 0
   let preset = "read-only"
   const durableId = options.durableId ?? "dur-selected"
@@ -153,7 +175,8 @@ export async function withContractHost(
       let attached = false
       let expectedProof = ""
       let released = false
-      const respond = (frame: Frame, data: unknown = {}, error?: string, errorData?: Frame) =>
+      // A refusal's errorCode is its error, unless the engine sends a message with a code of its own (`errorCode`).
+      const respond = (frame: Frame, data: unknown = {}, error?: string, errorData?: Frame, errorCode = error) =>
         client.write(
           `${options.strayLine ? "not json\n" : ""}${JSON.stringify({
             id: frame.id,
@@ -162,7 +185,7 @@ export async function withContractHost(
             success: error === undefined,
             ...(error === undefined
               ? { data }
-              : { error, errorCode: error, ...(errorData === undefined ? {} : { errorData }) }),
+              : { error, errorCode, ...(errorData === undefined ? {} : { errorData }) }),
           })}\n`,
         )
       // Wire frames 4 and 5: an auth refusal is answered, then the host closes the connection.
@@ -227,6 +250,8 @@ export async function withContractHost(
               respond(frame, undefined, "session_identity_mismatch", {})
             } else {
               attached = true
+              attachedClients.add(client)
+              client.once("close", () => attachedClients.delete(client))
               respond(frame, { sessionId: "rpc-1", attached: true })
             }
             continue
@@ -343,6 +368,60 @@ export async function withContractHost(
             respond(frame, { isStreaming: false })
             continue
           }
+          // senpi modes/rpc/get-entries-command.js: an unknown `before` is refused RPC_ERROR_ENTRY_NOT_FOUND ("not_found"),
+          // a page size below one RPC_ERROR_INVALID_ARGUMENT; only a paged (tail) answer carries hasMore.
+          if (frame.type === "get_entries" && options.history !== undefined) {
+            const all = options.history
+            const before =
+              typeof frame.before === "string" ? all.findIndex((entry) => entry.id === frame.before) : all.length
+            if (before < 0) {
+              respond(frame, undefined, `Entry not found: ${String(frame.before)}`, undefined, "not_found")
+              continue
+            }
+            const tail = frame.tail
+            if (tail !== undefined && !(typeof tail === "number" && Number.isInteger(tail) && tail > 0)) {
+              respond(frame, undefined, "tail must be a positive integer", undefined, "invalid_argument")
+              continue
+            }
+            if (tail === undefined && options.unpagedCap !== undefined && before > options.unpagedCap) {
+              respond(frame, undefined, "response_too_large")
+              continue
+            }
+            const page = all.slice(tail === undefined ? 0 : Math.max(0, before - tail), before)
+            const older = before - page.length > 0
+            respond(frame, {
+              entries: page,
+              ...(tail === undefined ? {} : { hasMore: older }),
+              ...(older ? { next_before: page[0]?.id } : {}),
+            })
+            continue
+          }
+          // senpi modes/rpc/get-snapshot.js: the newest `tail` entries (100 by default), history_truncated when older ones
+          // remain, next_before the oldest one sent; connection-handler.js writes the marker on every routed connection
+          // (each of this host's is), after what the snapshot already holds and before the answer.
+          if (frame.type === "get_snapshot") {
+            const tail = frame.tail ?? 100
+            if (!(typeof tail === "number" && Number.isSafeInteger(tail) && tail >= 0)) {
+              respond(frame, undefined, "tail must be a non-negative integer", undefined, "invalid_argument")
+              continue
+            }
+            const history = options.history ?? []
+            const entries = tail === 0 ? [] : history.slice(-tail)
+            const truncated = entries.length < history.length
+            const markerId = randomUUID()
+            for (const record of options.beforeSnapshot ?? [])
+              client.write(`${JSON.stringify({ ...record, sessionId: "rpc-1" })}\n`)
+            client.write(`${JSON.stringify({ type: "snapshot_marker", markerId, sessionId: "rpc-1" })}\n`)
+            respond(frame, {
+              state: { sessionId: "rpc-1", isStreaming: false, pendingDialogs: [] },
+              entries,
+              history_truncated: truncated,
+              next_before: truncated ? (entries[0]?.id ?? null) : null,
+              markerId,
+            })
+            if (attached) firstSnapshot.resolve()
+            continue
+          }
           if (frame.type === "get_available_models") {
             respond(frame, { models: [{ provider: "p", id: "m" }] })
             continue
@@ -398,6 +477,11 @@ export async function withContractHost(
         draining = true
       },
       live: () => !ended,
+      snapshotted: () => firstSnapshot.promise,
+      push: (records) => {
+        for (const client of attachedClients)
+          for (const record of records) client.write(`${JSON.stringify({ ...record, sessionId: "rpc-1" })}\n`)
+      },
     })
   } finally {
     const closed = once(server, "close", { signal: AbortSignal.timeout(2000) })

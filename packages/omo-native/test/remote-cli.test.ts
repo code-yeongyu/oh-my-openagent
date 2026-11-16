@@ -42,33 +42,30 @@ import {
 useRemoteCliCleanup()
 
 describe("omo remote", () => {
-  test("status prints the connection state, and --json prints the service's Status", async () => {
+  test("status prints the connection state, and --json prints the person client's service.status value", async () => {
     const human = await run(["status"])
     expect(human.code).toBe(REMOTE_EXIT.ok)
     expect(human.out).toContain("State            Connected")
     expect(human.out).toContain("This device      This Mac")
+    expect(human.out).toContain("Service          1.4.0")
     const json = await run(["status", "--json"])
-    expect(JSON.parse(json.out.join(""))).toEqual(defaultWorld().status)
+    expect(JSON.parse(json.out.join(""))).toEqual({ ...defaultWorld().status, service_version: "1.4.0" })
   })
 
   test("devices lists this device first and then each peer with its presence (the service's roster leaves this device out, #13402)", async () => {
     const { code, out } = await run(["devices"])
     expect(code).toBe(REMOTE_EXIT.ok)
     expect(out[0]).toMatch(/^DEVICE\s+NAME\s+KIND\s+PLATFORM\s+SEEN$/)
+    // The person client lists this device first (B1 self row), then the account's other devices.
     expect(out[1]).toMatch(new RegExp(`^dev-self\\s+This Mac\\s+this device\\s+${process.platform}\\s+online$`))
     expect(out[2]).toMatch(new RegExp(`^${PEER}\\s+Studio\\s+desktop\\s+darwin\\s+online$`))
     expect(out[3]).toMatch(new RegExp(`^${OFFLINE_PEER}\\s+Laptop\\s+cli\\s+linux\\s+12d ago$`))
     const json = await run(["devices", "--json"])
-    expect(JSON.parse(json.out.join(""))).toEqual([
-      {
-        device: "dev-self",
-        label: "This Mac",
-        platform: process.platform,
-        last_seen_ms: null,
-        online: true,
-        this_device: true,
-      },
-      ...defaultWorld().devices.map((device) => ({ ...device, this_device: false })),
+    const rows = JSON.parse(json.out.join("")) as { id: string; self?: true }[]
+    expect(rows.map((row) => [row.id, row.self ?? false])).toEqual([
+      ["dev-self", true],
+      [PEER, false],
+      [OFFLINE_PEER, false],
     ])
   })
 
@@ -84,14 +81,8 @@ describe("omo remote", () => {
     expect(out[1]).toMatch(new RegExp(`^dev-self\\s+This Mac\\s+this device\\s+${process.platform}\\s+never$`))
     const json = await run(["devices", "--json"], owner.stateDir)
     const [here] = JSON.parse(json.out.join("")) as Record<string, unknown>[]
-    expect(here).toEqual({
-      device: "dev-self",
-      label: "This Mac",
-      platform: process.platform,
-      last_seen_ms: null,
-      online: false,
-      this_device: true,
-    })
+    expect(here).toMatchObject({ id: "dev-self", name: "This Mac", online: false, last_seen_ms: null, self: true })
+    expect(here).not.toHaveProperty("kind")
   })
 
   test("sessions shows attach targets, marks cached rows and names devices that did not answer", async () => {
@@ -105,8 +96,9 @@ describe("omo remote", () => {
 
   test("sessions passes its filter to the service and --json prints the listing result", async () => {
     const { out } = await run(["sessions", "--device", PEER, "--json"])
-    const result = JSON.parse(out.join("")) as { rows: { device: string }[] }
-    expect(result.rows.map((row) => row.device)).toEqual([PEER])
+    const result = JSON.parse(out.join("")) as { rows: { thread: string; device: { id: string } }[] }
+    expect(result.rows.map((row) => row.device.id)).toEqual([PEER])
+    expect(result.rows.map((row) => row.thread)).toEqual([`${PEER}/${SESSION_ID}`])
   })
 
   test("sessions --device naming no device of the account is a usage error, not an empty list (#13402)", async () => {
@@ -128,8 +120,8 @@ describe("omo remote", () => {
     const { code, out, err } = await run(["sessions", "--device", PEER, "--json"], owner.stateDir)
     expect(err).toEqual([])
     expect(code).toBe(REMOTE_EXIT.ok)
-    const result = JSON.parse(out.join("")) as { rows: { device: string }[] }
-    expect(result.rows.map((row) => row.device)).toEqual([PEER])
+    const result = JSON.parse(out.join("")) as { rows: { device: { id: string } }[] }
+    expect(result.rows.map((row) => row.device.id)).toEqual([PEER])
   })
 
   test("disable and enable report the switch the service answers with", async () => {
@@ -652,7 +644,12 @@ describe("omo remote session verbs", () => {
       a.remote,
     )
     expect(code).toBe(REMOTE_EXIT.ok)
-    expect(JSON.parse(out.join(""))).toMatchObject({ kind: "ok", thread: { thread_id: "dur-new-on-b", device: "b" } })
+    // Review LOW at c09a616: --json still names the model the session opened on, as it did before #13409.
+    expect(JSON.parse(out.join(""))).toMatchObject({
+      kind: "ok",
+      thread: { thread_id: "dur-new-on-b", device: "b" },
+      model: { provider: "openai", id: "gpt-6" },
+    })
     expect(types(a.sent, "open_session").map((entry) => [entry.rpc?.["provider"], entry.rpc?.["modelId"]])).toEqual([
       ["openai", "gpt-6"],
     ])
@@ -938,14 +935,44 @@ describe("omo remote session verbs", () => {
       thread_id: "dur-on-b",
       turn_id: "turn-b",
       interrupted: true,
+      background: { status: "not_supported" },
       device: "b",
     })
   })
 
   test.each([
     [
+      {
+        turnId: "turn-b",
+        interrupted: true,
+        background: {
+          stopped: [{ kind: "bash", id: "bash_3", description: "bun test" }],
+          failed: [{ kind: "bash", id: "bash_4", reason: "permission denied" }],
+        },
+      },
+      [
+        "Interrupted b/dur-on-b.",
+        "Stopped 1 background job: bun test.",
+        "Could not stop background job bash_4: permission denied.",
+      ],
+    ],
+    [
+      { turnId: "turn-b", interrupted: true },
+      [
+        "Interrupted b/dur-on-b.",
+        "Background jobs that turn started were left running: the engine on b/dur-on-b cannot stop them.",
+      ],
+    ],
+  ])("interrupt without --json names the background jobs it stopped or left (%#)", async (interrupt, lines) => {
+    const a = fixture.account({ engine: { ...ENGINE, interrupt } })
+    const { code, out } = await run(["interrupt", "b/dur-on-b"], undefined, SIGNED_IN, testBootstrap(), a.remote)
+    expect([code, out]).toEqual([REMOTE_EXIT.ok, lines])
+  })
+
+  test.each([
+    [
       ["send", "/session", "hi"],
-      "omo remote send: name the session as <device>/<session> (the SESSION column of omo remote sessions)",
+      "omo remote send: name the session as <device>/<session> (the SESSION column of omo remote sessions) or by the thread_id open printed",
     ],
     [["send", "b/dur-on-b"], "omo remote send: the message text is required"],
     [["send", "b/dur-on-b", "hi", "--steer", "--follow-up"], "omo remote send: pass --steer or --follow-up, not both"],
