@@ -5,6 +5,7 @@
 import type { Principal } from "../crypto/parse.ts"
 import { AccountHttpError, type AccountHttpOptions } from "./http.ts"
 import { admitSyncOperation, syncOperationSignal, type SyncOperationOptions } from "../operation-authority.ts"
+import { syncHeaders } from "../contract-version.ts"
 
 export interface PendingApproval {
   readonly id: string
@@ -79,7 +80,7 @@ export function createPairingHttp(options: AccountHttpOptions): PairingHttp {
     body: unknown,
     operation: SyncOperationOptions = options,
   ): Promise<unknown> => {
-    const headers: Record<string, string> = { authorization: `Bearer ${await options.token()}` }
+    const headers: Record<string, string> = { ...syncHeaders(), authorization: `Bearer ${await options.token()}` }
     if (body !== undefined) headers["content-type"] = "application/json"
     const signal = syncOperationSignal(operation)
     const response = await admitSyncOperation(operation, () =>

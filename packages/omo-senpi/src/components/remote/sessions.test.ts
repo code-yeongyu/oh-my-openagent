@@ -373,10 +373,13 @@ describe("durable-id addressing", () => {
 
   test("#given a session its device does not hold #when a member addresses it #then not_found{session} names sessions.list, never an update", async () => {
     const { client } = await opened()
+    // A well-formed listing key the device does not hold: a service with #1350 refuses an id that is no key at all as
+    // invalid_request before any lookup.
+    const nowhere = handleOf(PEER, "bm90LWhlbGQta2V5LTAwMQ")
     for (const settled of [
-      await client.sessions.interrupt(handleOf(PEER, "dur-nowhere")),
-      await client.sessions.setModel(handleOf(PEER, "dur-nowhere"), "anthropic/claude"),
-      await client.sessions.get(handleOf(PEER, "dur-nowhere")),
+      await client.sessions.interrupt(nowhere),
+      await client.sessions.setModel(nowhere, "anthropic/claude"),
+      await client.sessions.get(nowhere),
     ]) {
       const failure = failureOf(settled)
       expect(failure).toMatchObject({ code: "not_found", details: { kind: "session", device: PEER } })
@@ -410,6 +413,13 @@ describe("#13756 review", () => {
     const cli = clientOn(owner.stateDir, fakeClock(), { kind: "cli", uid: "501" })
     await valueOf(cli.sessions.open({ device: PEER, preset: "full-access" }))
     expect(sent("open_session").map((rpc) => rpc["permissionPreset"])).toEqual(["full-access"])
+  })
+
+  test("#given a session client not told its own mode #when it opens without a preset #then the frame asks for ask, never the device default (M1)", async () => {
+    const { owner, sent } = await onWorld()
+    const session = clientOn(owner.stateDir, fakeClock(), { kind: "session", id: "dur-caller" })
+    await valueOf(session.sessions.open({ device: PEER }))
+    expect(sent("open_session").map((rpc) => rpc["permissionPreset"])).toEqual(["ask"])
   })
 
   test("#given a person's uid #when the client builds its sender #then it is the CLI's one identity: that uid and this user's name (L1)", () => {

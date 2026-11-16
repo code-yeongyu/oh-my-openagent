@@ -1,10 +1,9 @@
 import { randomBytes } from "node:crypto"
 
 import { type DelegatedChannel, followDelegatedChannel } from "./delegated-channel.ts"
-import type { LocalApiClient } from "./local-api/client.ts"
+import type { CommandMark, LocalApiClient } from "./local-api/client.ts"
 import type { ReadPage } from "./local-api/client-assembly.ts"
 import { LocalApiError } from "./local-api/errors.ts"
-import type { WakeAccepts } from "./local-api/protocol-command.ts"
 import type { CommandLocated } from "./local-api/protocol-delegated.ts"
 import type {
   AttachPendingReason,
@@ -23,7 +22,13 @@ export type AttachEnd = DetachReason | "closed" | "detached" | "listener_failed"
 export type RemoteAttachEvent =
   | { readonly kind: "pending"; readonly reason: AttachPendingReason }
   | { readonly kind: "snapshot"; readonly snapshot: SnapshotBody }
-  | { readonly kind: "records"; readonly attach_id: number; readonly records: readonly JsonObject[] }
+  /** `seqs`: each record's stream seq, when the service sends them (one per record, increasing within the attach_id). */
+  | {
+      readonly kind: "records"
+      readonly attach_id: number
+      readonly records: readonly JsonObject[]
+      readonly seqs?: readonly number[]
+    }
   | { readonly kind: "detached"; readonly reason: DetachReason }
 
 /**
@@ -58,7 +63,7 @@ export type RemoteAttach = {
    * within ENDED_COMMAND_WAIT_MS: a command that ends its own session (close_session, unload_session) settles with its
    * state after the attach ends.
    */
-  readonly command: (rpc: CommandRpc, options?: { readonly accepts?: WakeAccepts }) => Promise<CommandResult>
+  readonly command: (rpc: CommandRpc, options?: CommandMark) => Promise<CommandResult>
   /** The frames the host's engine writes unasked on the delegated channel (dialog requests, session events). */
   readonly onFrame: (listener: (frame: JsonObject) => void) => () => void
   /** A delegated reply or frame that was lost, or the channel closing, with the reason. */
@@ -107,7 +112,12 @@ const toRemote = (event: AttachEvent): RemoteAttachEvent => {
       return { kind: "snapshot", snapshot }
     }
     case "session.records":
-      return { kind: "records", attach_id: event.attach_id, records: event.records }
+      return {
+        kind: "records",
+        attach_id: event.attach_id,
+        records: event.records,
+        ...(event.seqs === undefined ? {} : { seqs: event.seqs }),
+      }
     case "session.attach_pending":
       return { kind: "pending", reason: event.reason }
     case "session.detached":
@@ -238,7 +248,7 @@ export function openAttach(
               resolve(response === undefined ? { outcome: event } : { outcome: event, response })
             })
             commands.add(end)
-            client.command(attach, rpc, commandId, { delegated: true }, options).catch((error: unknown) => {
+            client.commandTo({ attach }, rpc, commandId, { delegated: true }, options).catch((error: unknown) => {
               settle()
               reject(error)
             })

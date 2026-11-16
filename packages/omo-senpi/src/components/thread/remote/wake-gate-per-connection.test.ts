@@ -46,7 +46,7 @@ describe("omo#13037: the wake gate is read per connection", () => {
         const fake = services[next]
         next += 1
         if (fake === undefined) throw new Error("no more connections")
-        return fake.service
+        return { conn: fake.service, owned: true }
       },
     })
     const admit = { type: "admit_external_message", sessionId: "s", deliveryId: "d", text: "t" }
