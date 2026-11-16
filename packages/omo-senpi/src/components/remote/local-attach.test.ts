@@ -6,7 +6,7 @@ import { nextActionFor } from "./codes"
 import { createLocalAttach } from "./local-attach"
 import { handleOf } from "./seams"
 import { clientOn, closeClients, failureOf, fakeClock, startOwner } from "./testing/fake-service"
-import type { DeviceRow, FollowEvent, JsonObject, SendReceipt } from "./types"
+import type { AttachEvent, DeviceRow, JsonObject, SendReceipt } from "./types"
 
 // Rows of a session on THIS device (#13414 local watch): the device service cannot attach the caller to itself
 // (peer_not_found), so follow, wait and attach reach its own sessions through the engine's operator endpoint, served
@@ -68,8 +68,8 @@ const textDelta = (delta: string, id: string): JsonObject => ({
   assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta, partial: {} },
 })
 
-const drain = async (events: { readonly next: (what: string) => Promise<FollowEvent | "done"> }) => {
-  const seen: FollowEvent[] = []
+const drain = async <E>(events: { readonly next: (what: string) => Promise<E | "done"> }) => {
+  const seen: E[] = []
   for (let event = await events.next("an event"); event !== "done"; event = await events.next("an event"))
     seen.push(event)
   return seen
@@ -168,6 +168,36 @@ describe("a session on this device (local watch)", () => {
         const command = failureOf(await opened.value.command({ type: "get_state" }))
         expect(read).toEqual(command)
         expect(read).toMatchObject({ code: "host_unavailable", details: { local_api_code: "closed" } })
+      })
+    },
+  )
+
+  // Ended by the engine: the session closed, or it left this engine (session_released). The session is gone, not the
+  // host, so both answer as the engine would for a session it no longer has (unknown_session), still without waiting.
+  test.each<[string, AttachEvent]>([
+    ["session_closed", { kind: "session_closed" }],
+    ["session_released", { kind: "channel_lost", reason: "peer_detached" }],
+  ])(
+    "#given an attach whose session the engine ended (%s) #when read and command run #then both fail at once with not_found{session}, not host_unavailable",
+    async (type, end) => {
+      const owner = await startOwner(selfWorld())
+      await withContractHost({ history: [{ type: "message", id: "e1" }] }, async (host) => {
+        const client = clientOn(owner.stateDir, fakeClock(), undefined, {
+          localAttach: createLocalAttach({ socket: host.socket, keyRoot: host.root }),
+        })
+        const opened = await client.attach(THREAD)
+        if (opened.kind !== "ok") throw new Error(`expected an attach, got ${JSON.stringify(opened)}`)
+        const events = reader(opened.value.events)
+        host.push([{ type }])
+        expect(await drain(events)).toEqual([end])
+        const read = failureOf(await opened.value.read({ tail: 1 }))
+        const command = failureOf(await opened.value.command({ type: "get_state" }))
+        expect(read).toEqual(command)
+        expect(read).toMatchObject({
+          code: "not_found",
+          next_action: nextActionFor("not_found"),
+          details: { kind: "session", local_api_code: "session_not_found" },
+        })
       })
     },
   )
