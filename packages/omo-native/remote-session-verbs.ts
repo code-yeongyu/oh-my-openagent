@@ -9,7 +9,7 @@ import {
 } from "../omo-senpi/src/components/thread/control/operations"
 import { createRelayControl } from "../omo-senpi/src/components/thread/control/relay-control"
 import { createDeviceServiceSessions } from "../omo-senpi/src/components/remote/port/device-service"
-import { remoteClientForPerson } from "../omo-senpi/src/components/remote"
+import { remoteClientForPerson } from "../omo-senpi/src/components/remote/index"
 import { randomUUID } from "node:crypto"
 import { existsSync } from "node:fs"
 import { userInfo } from "node:os"

@@ -1,5 +1,5 @@
 import { borrowedService } from "./remote-session-verbs"
-import { remoteClientForPerson } from "../omo-senpi/src/components/remote"
+import { remoteClientForPerson } from "../omo-senpi/src/components/remote/index"
 import { existsSync } from "node:fs"
 
 import { type DeviceService, deviceServiceEndpointPath } from "../device-service-core/src/index.ts"
