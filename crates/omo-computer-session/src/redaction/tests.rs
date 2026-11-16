@@ -91,14 +91,18 @@ fn observe_on_a_denied_app_window_is_refused_with_no_tree_and_no_frame() {
 }
 
 /// d-safety.md 'Per-app scope' / d-a11y-model.md 'Capture masking' (G3): a display or desktop frame
-/// is not app-scoped, so it is served while a denied app is visible on it, unredacted as frames are
-/// declared to be.
+/// is not app-scoped, so it is served while a denied app is visible on it, and it says it is not
+/// redacted (`redaction: "none"`, plan owner 2026-11-16) so no caller believes a secure field on it
+/// was masked (IS-6); it carries no `secure` member.
 #[test]
 fn display_frame_with_a_denied_app_visible_states_its_pixel_limit() {
     let mut scenario: serde_json::Value = serde_json::from_str(FIELDS).expect("scenario json");
     scenario["consent"] = json!({ "stopHotkey": null, "apps": { "deny": ["Notes"] } });
     let mut session = session(&scenario.to_string());
-    let frame = serde_json::to_value(session.capture(serde_json::from_value(json!({"target": "desktop"})).expect("params")).expect("the desktop frame is served"))
-        .expect("json");
-    assert!(frame.get("secure").is_none(), "frames are declared unredacted (G3): {frame}");
+    for target in ["desktop", "display:active"] {
+        let frame = serde_json::to_value(session.capture(serde_json::from_value(json!({"target": target})).expect("params")).expect("the frame is served"))
+            .expect("json");
+        assert_eq!(frame["redaction"], json!("none"), "{target}: {frame}");
+        assert!(frame.get("secure").is_none(), "{target}: {frame}");
+    }
 }
