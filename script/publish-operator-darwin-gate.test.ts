@@ -23,7 +23,14 @@ type Step = {
   with?: Record<string, unknown>
   "continue-on-error"?: unknown
 }
-type Job = { if?: string; needs?: string[]; "runs-on"?: string; steps?: Step[]; with?: Record<string, string> }
+type Job = {
+  "timeout-minutes"?: number
+  if?: string
+  needs?: string[]
+  "runs-on"?: string
+  steps?: Step[]
+  with?: Record<string, string>
+}
 type Workflow = { on: { workflow_call?: { inputs: Record<string, unknown> } }; jobs: Record<string, Job> }
 
 const load = (file: string): Workflow =>
@@ -213,6 +220,8 @@ describe("operator darwin wiring", () => {
     expect(job(platform, "keychain-helper").if).toContain("inputs.operator_darwin_artifacts == ''")
     expect(job(platform, "operator-darwin").if).toContain("inputs.operator_darwin_artifacts != ''")
     expect(job(platform, "operator-darwin")["runs-on"]).toBe("ubuntu-24.04")
+    // LOW-3 (#13945 review): the job is capped well below the 6 h default; each lookup inside it is bounded too.
+    expect(job(platform, "operator-darwin")["timeout-minutes"]).toBe(30)
   })
 
   test("build waits for the verified operator artifacts and leaves macOS only for the hosted mode", () => {
