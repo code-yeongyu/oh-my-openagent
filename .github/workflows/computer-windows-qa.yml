@@ -36,10 +36,17 @@ env:
   ENGINE: target/x86_64-pc-windows-msvc/release/omo-computer-engine.exe
 
 jobs:
+  platform:
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/pr-platform-decision.yml
+
   interactive:
     name: Windows interactive-desktop QA
-    # Pull requests run Linux only; the ci:full-matrix label, pushes and dispatches run every OS (#13802).
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-matrix')
+    needs: platform
+    # macOS/Windows only when the shared platform decision allows it (pr-platform-decision.yml, #13859).
+    if: needs.platform.outputs.full_matrix == 'true'
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
@@ -115,9 +122,9 @@ jobs:
 
   session0:
     name: Windows Session 0 QA
-    needs: interactive
-    # Pull requests run Linux only; the ci:full-matrix label, pushes and dispatches run every OS (#13802).
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-matrix')
+    needs: [platform, interactive]
+    # macOS/Windows only when the shared platform decision allows it (pr-platform-decision.yml, #13859).
+    if: needs.platform.outputs.full_matrix == 'true'
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
