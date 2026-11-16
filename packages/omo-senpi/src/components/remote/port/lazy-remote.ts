@@ -107,10 +107,17 @@ function createLazyRemoteClient(options: LazyRemoteOptions): {
 }
 
 export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThreadSurface {
-  const { client, loaded } = createLazyRemoteClient(options)
+  // One runtime load serves the client and the port (the port rides the client's connection); a failed load is not kept.
+  let runtime: ReturnType<LazyRemoteOptions["loadRuntime"]> | undefined
+  const loadRuntime: LazyRemoteOptions["loadRuntime"] = () =>
+    (runtime ??= options.loadRuntime().catch((error: unknown) => {
+      runtime = undefined
+      throw error
+    }))
+  const { client, loaded } = createLazyRemoteClient({ ...options, loadRuntime })
   let port: Promise<RemoteSessionsPort> | undefined
   const load = () =>
-    (port ??= options.loadRuntime().then(
+    (port ??= loadRuntime().then(
       async ({ remoteSessionsPort }) => remoteSessionsPort(options.version, await loaded()),
       (error: unknown) => {
         port = undefined
