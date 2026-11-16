@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -21,6 +21,10 @@ def on_name(conn, name):
 Gio.bus_own_name(Gio.BusType.SESSION, "org.freedesktop.secrets", Gio.BusNameOwnerFlags.NONE, on_bus, on_name, None)
 GLib.MainLoop().run()
 `
+
+// What such a host looks like to a session bus that does read service dirs: an activatable Secret Service that never
+// answers. Every probe runs with it on its XDG data path.
+const HANGING_SECRET_SERVICE = "[D-BUS Service]\nName=org.freedesktop.secrets\nExec=/bin/sleep 600\n"
 
 const has = (cmd: string, args: string[]) => spawnSync(cmd, args, { stdio: "ignore" }).status === 0
 const canRun =
@@ -61,6 +65,9 @@ describe.skipIf(!canRun)(
       try {
         const fakePath = join(dir, "fake.py")
         writeFileSync(fakePath, FAKE_SECRET_SERVICE)
+        const services = join(dir, "data", "dbus-1", "services")
+        mkdirSync(services, { recursive: true })
+        writeFileSync(join(services, "org.freedesktop.secrets.service"), HANGING_SECRET_SERVICE)
         const probeModule = join(import.meta.dir, "secret-service-lock.ts")
         const start =
           fake === "none"
@@ -74,7 +81,7 @@ describe.skipIf(!canRun)(
             "-c",
             `D=${JSON.stringify(dir)}; ${start} bun -e 'const { probeSecretServiceLock } = await import(${JSON.stringify(probeModule)}); console.log(await probeSecretServiceLock())'`,
           ],
-          { encoding: "utf8", timeout: 20_000 },
+          { encoding: "utf8", timeout: 20_000, env: { ...process.env, XDG_DATA_HOME: join(dir, "data") } },
         )
         return run.stdout.trim().split("\n").at(-1) ?? ""
       } finally {
@@ -88,7 +95,7 @@ describe.skipIf(!canRun)(
     test("an unlocked default collection is unlocked", () => {
       expect(probeIn("unlocked")).toBe("unlocked")
     })
-    test("no Secret Service on the bus is absent", () => {
+    test("no Secret Service on the bus is absent, also where the host could activate one (#12643)", () => {
       expect(probeIn("none")).toBe("absent")
     })
   },
