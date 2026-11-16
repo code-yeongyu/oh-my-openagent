@@ -23,6 +23,7 @@ import { nextActionFor, remoteFailure } from "./codes"
 import { DEADLINES } from "./deadlines"
 import { createDeviceServiceSessions } from "./port/device-service"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
+import { PERMISSION_PRESETS } from "./types"
 import type {
   DeviceRow,
   SessionRow,
@@ -92,14 +93,15 @@ const splitModel = (model: string): { readonly provider: string; readonly modelI
 // #13748: thread/contracts/permission-presets.ts `isPermissionPreset` and `presetWithin` replace these (the same senpi
 // preset rules).
 const AT_MOST: Readonly<Record<PermissionPreset, readonly PermissionPreset[]>> = {
-  "full-access": ["full-access", "workspace", "accept-edits", "auto", "read-only", "ask"],
+  "full-access": PERMISSION_PRESETS,
   workspace: ["workspace", "accept-edits", "read-only", "ask"],
   "accept-edits": ["accept-edits", "read-only", "ask"],
   "read-only": ["read-only", "ask"],
   auto: ["auto", "ask"],
   ask: ["ask"],
 }
-const isPermissionPreset = (value: string): value is PermissionPreset => Object.hasOwn(AT_MOST, value)
+const isPermissionPreset = (value: string): value is PermissionPreset =>
+  PERMISSION_PRESETS.some((preset) => preset === value)
 const presetWithin = (requested: PermissionPreset, creator: PermissionPreset | undefined): boolean =>
   creator === undefined ? requested === "ask" : AT_MOST[creator].includes(requested)
 
