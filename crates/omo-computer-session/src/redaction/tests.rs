@@ -76,3 +76,16 @@ fn secret_typing_never_uses_paste_and_never_echoes_the_value() {
     let lines = sink.lines();
     assert!(!lines.iter().any(|line| line.contains("clipboard")), "no paste route: {lines:?}");
 }
+
+/// d-safety.md 'Per-app scope' (FOLD-13 k-safety row 3): a window-targeted read of a denied app is
+/// refused like its exec, with no tree and no frame in any reply.
+#[test]
+fn observe_on_a_denied_app_window_is_refused_with_no_tree_and_no_frame() {
+    let mut scenario: serde_json::Value = serde_json::from_str(FIELDS).expect("scenario json");
+    scenario["consent"] = json!({ "stopHotkey": null, "apps": { "deny": ["Notes"] } });
+    let mut session = session(&scenario.to_string());
+    let refused = session.observe(serde_json::from_value(json!({"target": "101"})).expect("params")).expect_err("denied");
+    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("ControlRequired", Some("denied_app")));
+    let text = format!("{refused:?}");
+    assert!(!text.contains("cats") && !text.contains("hunter2"), "no tree content: {text}");
+}
