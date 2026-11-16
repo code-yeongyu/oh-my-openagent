@@ -1976,6 +1976,8 @@ name = "omo-computer-backend-fake"
 version = "0.0.0"
 dependencies = [
  "omo-computer-core",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
