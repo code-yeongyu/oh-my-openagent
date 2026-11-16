@@ -90,7 +90,15 @@ export function describe(answer: Answer): string {
   switch (answer.kind) {
     case "reply": {
       const code = answer.reply["errorCode"]
-      if (answer.reply["success"] === true) return "reply ok"
+      // #13895 review: a reply can succeed while reporting an outcome it did not apply (unload_session answers
+      // { outcome: "refused", detail }); show that outcome so a table row never reads it as a plain ok.
+      if (answer.reply["success"] === true) {
+        const data = answer.reply["data"]
+        const outcome = isObject(data) ? data["outcome"] : undefined
+        if (typeof outcome !== "string" || outcome === "applied") return "reply ok"
+        const detail = isObject(data) ? (data["detail"] ?? data["reason"]) : undefined
+        return `reply ok (outcome ${outcome}${typeof detail === "string" ? `: ${detail}` : ""})`
+      }
       return `reply ${typeof code === "string" ? code : JSON.stringify(answer.reply["error"] ?? null).slice(0, 60)}`
     }
     case "outcome":

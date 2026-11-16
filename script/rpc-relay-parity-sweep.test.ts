@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { engineMethodClasses } from "./rpc-relay-parity"
-import { type Answer, compareAnswers } from "./rpc-relay-parity-compare"
+import { type Answer, compareAnswers, describe as describeAnswer } from "./rpc-relay-parity-compare"
 import { probeRecord } from "./rpc-relay-parity-probes"
 import { type SweepLeg, sweepMethods, verdictLine } from "./rpc-relay-parity-sweep"
 
@@ -144,6 +144,16 @@ describe("compareAnswers", () => {
       kind: "missing",
       error: "unsupported",
     })
+  })
+
+  test("a reply that succeeds but reports an outcome it did not apply is shown with that outcome (unload_session)", () => {
+    const refusedUnload: Answer = {
+      kind: "reply",
+      reply: { success: true, data: { outcome: "refused", reason: "unsupported", detail: "unknown_session" } },
+    }
+    expect(describeAnswer(refusedUnload)).toBe("reply ok (outcome refused: unknown_session)")
+    expect(describeAnswer({ kind: "reply", reply: { success: true, data: { outcome: "applied" } } })).toBe("reply ok")
+    expect(describeAnswer({ kind: "reply", reply: { success: true, data: {} } })).toBe("reply ok")
   })
 
   test("the same typed refusal on both legs is the same answer", () => {
