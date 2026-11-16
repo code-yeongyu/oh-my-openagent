@@ -58,3 +58,48 @@ describe("#12833: the default remote surface reaches the account's alias registr
     expect(loads).toBe(2)
   })
 })
+
+describe("the lazy surface forwards the lookup and wake path (omo#13037) to the loaded port", () => {
+  test("#given a loaded port that can look up and wake #when the lazy surface is asked #then both capabilities and both calls reach the port", async () => {
+    const a = account()
+    const woken: string[] = []
+    const remote = createLazyRemoteSurface({
+      version: "0.0.0",
+      sender: { kind: "session", id: "caller" },
+      loadRuntime: async () => ({
+        remoteSessionsPort: () => ({
+          ...a.remote.sessions,
+          canLookup: async () => true,
+          lookup: async (_device, durableId) => ({ kind: "found", key: `key-of-${durableId}` }),
+          canWake: async () => true,
+          wake: async (device, durableId) => {
+            woken.push(`${device}/${durableId}`)
+            return { kind: "ok", response: {} }
+          },
+        }),
+        remoteClient: () => a.remote.client,
+      }),
+    })
+    expect(await remote.sessions.canLookup?.()).toBe(true)
+    expect(await remote.sessions.lookup?.("b", "dur-gone")).toEqual({ kind: "found", key: "key-of-dur-gone" })
+    expect(await remote.sessions.canWake?.()).toBe(true)
+    expect(await remote.sessions.wake?.("b", "dur-gone", { type: "admit_external_message" })).toEqual({
+      kind: "ok",
+      response: {},
+    })
+    expect(woken).toEqual(["b/dur-gone"])
+  })
+
+  test("#given a loaded port without lookup or wake #when the lazy surface is asked #then it answers as an absent member does: no capability, unavailable", async () => {
+    const a = account()
+    const remote = createLazyRemoteSurface({
+      version: "0.0.0",
+      sender: { kind: "session", id: "caller" },
+      loadRuntime: async () => ({ remoteSessionsPort: () => a.remote.sessions, remoteClient: () => a.remote.client }),
+    })
+    expect(await remote.sessions.canLookup?.()).toBe(false)
+    expect(await remote.sessions.lookup?.("b", "dur-gone")).toEqual({ kind: "unavailable" })
+    expect(await remote.sessions.canWake?.()).toBe(false)
+    expect(await remote.sessions.wake?.("b", "dur-gone", {})).toEqual({ kind: "unavailable" })
+  })
+})
