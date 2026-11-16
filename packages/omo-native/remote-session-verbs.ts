@@ -1,6 +1,5 @@
 import type { DeviceService } from "../device-service-core/src/index.ts"
 import type { ThreadToolResult } from "../omo-senpi/src/components/thread/contracts"
-import { createRelaySessionHost } from "../omo-senpi/src/components/thread/control/relay-session-host"
 import {
   answered,
   closeThread,
@@ -20,19 +19,23 @@ import { createRelayTransport } from "../omo-senpi/src/components/thread/remote/
 import { createGatewayEngine, resolveFromEntries } from "../omo-senpi/src/components/thread/gateway/engine"
 import { createLocalTransport } from "../omo-senpi/src/components/thread/gateway/local-transport"
 import { createDeliveryPipeline } from "../omo-senpi/src/components/thread/gateway/pipeline"
-import { namedDeviceRow } from "../omo-senpi/src/components/thread/remote/address-book"
 import { stampThisDevice } from "../omo-senpi/src/components/thread/remote/this-device"
 import type { Provenance } from "../omo-senpi/src/components/thread/gateway/types"
 import { threadLink } from "../omo-senpi/src/components/thread/thread-link"
 import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { packageRoot } from "./bin/lib/package-paths.js"
-import type { RemoteSessionRow, RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
+import {
+  rowThreadId,
+  type RemoteSessionRow,
+  type RemoteThreadSurface,
+} from "../omo-senpi/src/components/thread/remote/ports"
 import { deviceOnline, followRemote, remoteAvailable } from "../omo-senpi/src/components/thread/remote/remote-ops"
 import type { RemoteCommandDependencies } from "./remote-local"
-import { REMOTE_EXIT, UsageError } from "./remote-exit"
+import { REMOTE_EXIT } from "./remote-exit"
 import { sendWaitNotice, sessionVerbLines } from "./remote-render"
-import { localPermissionPreset } from "./remote-permission-preset"
 import type { SessionArgs } from "./remote-session-args"
+import { openOn } from "./remote-open"
+import { resolveSessionTarget } from "./remote-session-target"
 
 /**
  * Where the gateway store's worker is in the shipped `omo`: the `gateway-store-worker.mjs` sidecar beside the plugin's
@@ -46,9 +49,15 @@ export function gatewayWorkerAnchor(root: string = packageRoot): URL | undefined
 }
 
 // The surface the agent's thread tools reach other devices through, on this command's own connection. The chain count
-// (K8) starts at its first hop: a person at a terminal is no thread chain.
-const deviceServiceSurface = (service: DeviceService): RemoteThreadSurface => ({
-  sessions: createDeviceServiceSessions({ version: service.serviceVersion, connect: async () => service }),
+// (K8) starts at its first hop: a person at a terminal is no thread chain. The command's one connection is shared:
+// the port borrows it (never closes it) and endpoint commands ride a fresh connection per call, so `open_session`
+// never closes the CLI's only connection (#13075).
+const deviceServiceSurface = (service: DeviceService, dial: () => Promise<DeviceService>): RemoteThreadSurface => ({
+  sessions: createDeviceServiceSessions({
+    version: service.serviceVersion,
+    connect: async () => ({ conn: service, owned: false }),
+    dialEndpoint: async () => ({ conn: await dial(), owned: true }),
+  }),
   chain: { stamp: (record) => record },
 })
 
@@ -69,7 +78,7 @@ export async function runSession(
   json: boolean,
   dependencies: RemoteCommandDependencies,
 ): Promise<number> {
-  const remote = (dependencies.remote ?? deviceServiceSurface)(service)
+  const remote = (dependencies.remote ?? ((service) => deviceServiceSurface(service, dependencies.connect)))(service)
   const show: Show = (result, label) => {
     if (json) dependencies.output(JSON.stringify(result))
     if (result.kind === "error") {
@@ -88,12 +97,10 @@ export async function runSession(
   const unavailable = await remoteAvailable(remote)
   if (unavailable !== undefined) return show(unavailable, "")
   if (args.verb === "open") return await openOn(remote, args, { json, show }, dependencies)
-  const label = `${args.target.device}/${args.target.session}`
-  // Addressed directly, as the SDK does: its device refuses a session it does not hold (unknown_session). The
-  // account listing settles only with the slowest device (seconds) and lags a session just opened.
-  // The id a caller types is the id above the port (decision 0027 D2); the relay address book turns the device-named
-  // address into its transport reference.
-  const row = namedDeviceRow(args.target.device, args.target.session)
+  const label = args.target.device === undefined ? args.target.session : `${args.target.device}/${args.target.session}`
+  const resolved = await resolveSessionTarget(remote, args.target)
+  if (resolved.kind === "error") return show(resolved, label)
+  const { row } = resolved
   if (args.verb === "send") return sendTo(remote, row, args, { label, json, show }, dependencies)
   // The device is found online once, before its control is used, as the thread tools' locate does (A3).
   const offline = await deviceOnline(remote, row.device)
@@ -107,49 +114,6 @@ export async function runSession(
     case "close":
       return show(await answered(() => closeThread(control)), label)
   }
-}
-
-async function openOn(
-  remote: RemoteThreadSurface,
-  args: Extract<SessionArgs, { readonly verb: "open" }>,
-  { json, show }: { readonly json: boolean; readonly show: Show },
-  dependencies: RemoteCommandDependencies,
-): Promise<number> {
-  let mode: string
-  try {
-    mode = args.permissionPreset ?? (dependencies.localPermissionPreset ?? localPermissionPreset)()
-  } catch (error) {
-    if (!(error instanceof UsageError)) throw error
-    dependencies.error(error.message)
-    return REMOTE_EXIT.usage
-  }
-  const open = await createRelaySessionHost(remote, args.device).open({
-    permissionPreset: mode,
-    ...(args.project === undefined ? {} : { cwd: args.project }),
-  })
-  const opened: ThreadToolResult = open.kind === "ok" ? { kind: "ok", thread: open.thread, deduplicated: false } : open
-  const wanted = args.model
-  if (opened.kind !== "ok" || !("thread" in opened) || wanted === undefined) return show(opened, "")
-  const label = `${args.device}/${opened.thread.thread_id}`
-  const created: RemoteSessionRow = {
-    ...namedDeviceRow(args.device, opened.thread.thread_id),
-    title: opened.thread.name,
-    project: opened.thread.cwd,
-  }
-  const model = await answered(() => setModelOn(createRelayControl(remote, created), wanted, undefined))
-  if (model.kind === "error") {
-    // The session exists on its device (opened to be kept), so the failure names it: a retry must not leave another one
-    // behind unseen. --json: the model's typed error with the thread that was opened.
-    if (json) dependencies.output(JSON.stringify({ ...model, thread: opened.thread }))
-    else {
-      dependencies.output(label)
-      dependencies.error(`omo remote: opened ${label}, but its model was not set: ${model.error.message}`)
-      dependencies.error(`${model.error.next_action} The session is still open; end it with omo remote close ${label}.`)
-    }
-    return REMOTE_EXIT.failed
-  }
-  if (!("model" in model)) return show(model, label)
-  return show({ ...opened, model: model.model } as ThreadToolResult, "")
 }
 
 /** The provenance a person's `omo remote send` carries: this device stamped as on every delivery path (#13004). */
@@ -223,8 +187,8 @@ async function sendTo(
       }
     return {
       kind: "ok",
-      thread_id: row.session_id,
-      link: threadLink(row.session_id, row.title),
+      thread_id: rowThreadId(row),
+      link: threadLink(rowThreadId(row), row.title),
       delivery: sent.delivery,
       deduplicated: sent.deduplicated,
       device: row.device,

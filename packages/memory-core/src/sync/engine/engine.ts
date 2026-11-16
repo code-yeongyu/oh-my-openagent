@@ -238,7 +238,7 @@ export class SyncEngine {
     this.stage = "load"
     if (!this.loaded) {
       await deps.store.load()
-      await journal.claim(deps.store.peer(), deps.log)
+      if (await journal.claim(deps.store.peer(), deps.space, deps.legacySpace, deps.log)) await deps.store.load()
       this.loaded = true
     }
     const before = await journal.updateState({ eventHead: Math.max(this.eventHead, (await journal.state()).eventHead) })
