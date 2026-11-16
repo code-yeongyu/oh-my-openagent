@@ -42,6 +42,23 @@ export function namedDeviceRow(device: string, durableId: string): RemoteSession
   }
 }
 
+/**
+ * The session a create just made on another device (thread_create, `omo remote open`), addressed by the relay key its open
+ * reply named (`sessionId`) and only failing that by its durable id: the device has not listed the new session yet, so its
+ * service cannot resolve the durable id and answers unknown_session (measured over the relay, omo#13748).
+ */
+export function createdDeviceRow(
+  device: string,
+  thread: { readonly thread_id: string; readonly sessionId?: string; readonly name: string; readonly cwd: string },
+): RemoteSessionRow {
+  return {
+    ...namedDeviceRow(device, thread.thread_id),
+    session_id: thread.sessionId ?? thread.thread_id,
+    title: thread.name,
+    project: thread.cwd,
+  }
+}
+
 export type RelayAddressBook = {
   readonly entries: readonly ThreadAddressEntry[]
   /** A configured relay's connection failure or plan refusal; absent remote setup contributes no entries. */
@@ -63,7 +80,7 @@ export type RelayAddressBook = {
  */
 const REMOTE_NOT_SET_UP: ReadonlySet<string> = new Set(["not_configured", "disabled", "signed_out", "sign_in_required"])
 /** No state at all = no device service answered (not installed or not running): the relay is not set up either. */
-const remoteNotSetUp = (state: unknown): boolean =>
+export const remoteNotSetUp = (state: unknown): boolean =>
   state === undefined || (typeof state === "string" && REMOTE_NOT_SET_UP.has(state))
 
 export async function relayAddressBook(remote: RemoteThreadSurface, address: string): Promise<RelayAddressBook> {
