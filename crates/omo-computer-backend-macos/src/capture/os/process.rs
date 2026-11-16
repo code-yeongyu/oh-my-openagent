@@ -9,6 +9,7 @@ use super::cf::{self, Owned};
 /// The process start in microseconds since the epoch; `None` when the process is gone.
 pub fn start(pid: u32) -> Option<u64> {
     let pid = i32::try_from(pid).ok()?;
+    // SAFETY: proc_bsdinfo is plain integer and byte-array data; all-zero is a valid value.
     let mut info: libc::proc_bsdinfo = unsafe { std::mem::zeroed() };
     let size = i32::try_from(std::mem::size_of::<libc::proc_bsdinfo>()).ok()?;
     // SAFETY: `info` is a proc_bsdinfo of `size` bytes.

@@ -13,11 +13,22 @@ pub const MAX_FRAME_BYTES: usize = 64 * 1024 * 1024;
 pub struct LineHelper<R, W> {
     reader: R,
     writer: W,
+    desynced: bool,
 }
 
 impl<R: BufRead + Send, W: Write + Send> LineHelper<R, W> {
     pub const fn new(reader: R, writer: W) -> Self {
-        Self { reader, writer }
+        Self {
+            reader,
+            writer,
+            desynced: false,
+        }
+    }
+
+    /// The pipe lost its framing (a reply it could not parse, a foreign id or an oversized
+    /// frame): the bytes that follow are not a reply line, so the helper must be restarted.
+    pub const fn needs_restart(&self) -> bool {
+        self.desynced
     }
 
     /// The reader and the writer, for a caller that inspects what was sent.
@@ -40,11 +51,13 @@ impl<R: BufRead + Send, W: Write + Send> LineHelper<R, W> {
             Ok(0) | Err(_) => return Err(CaptureFault::HelperGone),
             Ok(_) => {}
         }
-        let reply: HelperReply =
-            serde_json::from_str(line.trim_end()).map_err(|_| CaptureFault::Protocol)?;
-        if reply.id != id || reply.png_bytes > MAX_FRAME_BYTES {
+        let reply = serde_json::from_str::<HelperReply>(line.trim_end())
+            .ok()
+            .filter(|reply| reply.id == id && reply.png_bytes <= MAX_FRAME_BYTES);
+        let Some(reply) = reply else {
+            self.desynced = true;
             return Err(CaptureFault::Protocol);
-        }
+        };
         let mut png = vec![0; reply.png_bytes];
         self.reader
             .read_exact(&mut png)
@@ -63,6 +76,9 @@ impl<R: BufRead + Send, W: Write + Send> LineHelper<R, W> {
 
 impl<R: BufRead + Send, W: Write + Send> CaptureHelper for LineHelper<R, W> {
     fn call(&mut self, request: &HelperRequest) -> Result<HelperFrame, CaptureFault> {
+        if self.desynced {
+            return Err(CaptureFault::HelperGone);
+        }
         self.send(request)?;
         self.receive(request.id())
     }

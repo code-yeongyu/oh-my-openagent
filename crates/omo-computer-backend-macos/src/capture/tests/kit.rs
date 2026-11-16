@@ -126,7 +126,7 @@ pub struct FakeSkylight {
 }
 
 impl SkylightCapture for FakeSkylight {
-    fn capture_window(&mut self, _number: u32, _cursor: bool) -> Result<RawFrame, CaptureFault> {
+    fn capture_window(&mut self, _number: u32) -> Result<RawFrame, CaptureFault> {
         self.calls += 1;
         Ok(RawFrame {
             width: 4,
@@ -143,6 +143,7 @@ pub struct FakeOs {
     pub starts: BTreeMap<u32, u64>,
     pub start_reads: BTreeMap<u32, u32>,
     pub ax: BTreeMap<u32, AxWindowFacts>,
+    pub frontmost: Option<u32>,
     pub spaces: BTreeMap<u32, String>,
     pub displays: Vec<DisplayRecord>,
     pub skylight: Option<FakeSkylight>,
@@ -182,6 +183,10 @@ impl CaptureOs for FakeOs {
 
     fn bundle_id(&mut self, pid: u32) -> Option<String> {
         Some(format!("com.example.app{pid}"))
+    }
+
+    fn frontmost_pid(&mut self) -> Option<u32> {
+        self.frontmost
     }
 
     fn ax_window(&mut self, window: &CgWindow) -> Option<AxWindowFacts> {

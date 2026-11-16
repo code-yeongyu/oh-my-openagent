@@ -38,6 +38,8 @@ unsafe extern "C" {
     pub fn CFDictionaryGetValue(dictionary: CfRef, key: CfRef) -> CfRef;
     pub fn CFNumberGetValue(number: CfRef, kind: i32, out: *mut c_void) -> bool;
     pub fn CFBooleanGetValue(boolean: CfRef) -> bool;
+    pub fn CFGetTypeID(value: CfRef) -> usize;
+    pub fn CFStringGetTypeID() -> usize;
     pub fn CFStringGetLength(string: CfRef) -> isize;
     pub fn CFStringGetCString(
         string: CfRef,
@@ -91,10 +93,11 @@ pub fn cf_string(text: &CStr) -> Option<Owned> {
 
 /// The UTF-8 text of a CFString; `None` for null or a non-string.
 pub fn string(value: CfRef) -> Option<String> {
-    if value.is_null() {
+    // SAFETY: `value` is a live CF reference owned by its container for this call.
+    if value.is_null() || unsafe { CFGetTypeID(value) != CFStringGetTypeID() } {
         return None;
     }
-    // SAFETY: `value` is a CFString owned by its container for this call.
+    // SAFETY: `value` is a CFString (checked above) owned by its container for this call.
     let length = unsafe { CFStringGetLength(value) };
     let size = length.checked_mul(4)?.checked_add(1)?;
     let mut buffer = vec![0u8; usize::try_from(size).ok()?];

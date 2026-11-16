@@ -71,3 +71,33 @@ fn recording_never_exceeds_15_fps() {
         }
     ));
 }
+
+#[test]
+fn protocol_fault_desyncs_the_pipe_until_restart() {
+    // A reply for another id, its frame bytes, then a well-formed reply for the next call.
+    let mut wire =
+        b"{\"id\":2,\"ok\":true,\"source\":\"screenshot\",\"filter\":\"window\",\"pngBytes\":4}\n"
+            .to_vec();
+    wire.extend_from_slice(b"\x89PNG");
+    wire.extend_from_slice(
+        b"{\"id\":4,\"ok\":true,\"source\":\"screenshot\",\"filter\":\"window\",\"pngBytes\":0}\n",
+    );
+    let mut helper = helper(&wire);
+    assert!(!helper.needs_restart());
+    assert_eq!(helper.call(&still(3)).err(), Some(CaptureFault::Protocol));
+    assert!(
+        helper.needs_restart(),
+        "the frame bytes after a foreign reply are not a reply line"
+    );
+    assert_eq!(
+        helper.call(&still(4)).err(),
+        Some(CaptureFault::HelperGone),
+        "a desynced pipe answers nothing until the helper restarts"
+    );
+    let (_, sent) = helper.into_parts();
+    assert_eq!(
+        sent.iter().filter(|b| **b == b'\n').count(),
+        1,
+        "nothing is written to a desynced pipe"
+    );
+}

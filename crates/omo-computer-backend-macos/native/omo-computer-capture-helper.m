@@ -130,15 +130,28 @@ static void Screenshot(NSDictionary *request) {
   SCStreamConfiguration *config = Config(filter, 0, [request[@"cursor"] boolValue]);
   __block CGImageRef image = NULL;
   __block NSError *failure = nil;
+  __block BOOL abandoned = NO;
+  NSObject *guard = [NSObject new];
   dispatch_semaphore_t done = dispatch_semaphore_create(0);
   [SCScreenshotManager captureImageWithFilter:filter
                                 configuration:config
                             completionHandler:^(CGImageRef captured, NSError *e) {
-                              if (captured != NULL) image = CGImageRetain(captured);
-                              failure = e;
+                              @synchronized(guard) {
+                                // After the timeout nobody reads the image: retain nothing.
+                                if (abandoned) return;
+                                if (captured != NULL) image = CGImageRetain(captured);
+                                failure = e;
+                              }
                               dispatch_semaphore_signal(done);
                             }];
-  if (!Wait(done)) return Fail(ident, @"timeout");
+  if (!Wait(done)) {
+    @synchronized(guard) {
+      abandoned = YES;
+      if (image != NULL) CGImageRelease(image);
+      image = NULL;
+    }
+    return Fail(ident, @"timeout");
+  }
   if (image == NULL) return Fail(ident, ErrorName(failure));
   NSData *png = PNGData(image);
   CGImageRelease(image);

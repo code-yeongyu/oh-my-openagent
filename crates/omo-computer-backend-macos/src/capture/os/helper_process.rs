@@ -1,5 +1,6 @@
 //! The persistent capture helper process: `omo-computer-capture-helper` beside the engine
-//! (or `OMO_COMPUTER_CAPTURE_HELPER`), started on first use and restarted when it exited.
+//! (or `OMO_COMPUTER_CAPTURE_HELPER`), started on first use and restarted when it exited or
+//! its pipe lost the reply framing.
 
 use std::io::BufReader;
 use std::path::PathBuf;
@@ -34,12 +35,15 @@ impl HelperProcess {
     /// # Errors
     /// [`CaptureFault::HelperGone`] when it cannot be started.
     pub fn pipe(&mut self) -> Result<&mut dyn CaptureHelper, CaptureFault> {
-        let exited = self
-            .running
-            .as_mut()
-            .is_none_or(|(child, _)| !matches!(child.try_wait(), Ok(None)));
-        if exited {
-            self.running = None;
+        let stale = self.running.as_mut().is_none_or(|(child, pipe)| {
+            pipe.needs_restart() || !matches!(child.try_wait(), Ok(None))
+        });
+        if stale {
+            if let Some((mut child, pipe)) = self.running.take() {
+                drop(pipe);
+                let _ = child.kill();
+                let _ = child.wait();
+            }
             let mut child = Command::new(path().ok_or(CaptureFault::HelperGone)?)
                 .stdin(Stdio::piped())
                 .stdout(Stdio::piped())
