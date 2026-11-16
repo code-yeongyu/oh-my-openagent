@@ -124,6 +124,23 @@ fn xterm_is_refused_until_its_resources_allow_send_events() {
 }
 
 #[test]
+fn xterm_is_refused_even_when_the_resources_the_engine_can_read_allow_send_events() {
+    // Given: -xrm sets allowSendEvents true, then the abbreviated -xr (Xt accepts it) sets it false;
+    // XENVIRONMENT, ~/.Xdefaults-<host>, app-defaults and the runtime menu can override it unseen.
+    let xterm = |args: &[&str]| {
+        FakeInputServer::new(Some(EDITOR))
+            .window(FIXTURE, (2, 40), b"xterm\0XTerm\0")
+            .process(FIXTURE, &["libXaw.so.7", "libXt.so.6"], args)
+    };
+    // When / Then: whatever the visible sources say, delivery to xterm is not known.
+    assert_refused(
+        xterm(&["xterm", "-xrm", "XTerm*allowSendEvents: true", "-xr", "XTerm*allowSendEvents: false"]),
+        "synthetic_input_dropped",
+    );
+    assert_refused(xterm(&["xterm", "-xrm", "XTerm*allowSendEvents: true"]), "synthetic_input_dropped");
+}
+
+#[test]
 fn a_window_embedded_from_a_gtk_process_is_refused_inside_an_accepting_shell() {
     // Given: a Tk shell whose area under the point is a plug window of a GTK process.
     const PLUG: Window = 0x90_0002;
