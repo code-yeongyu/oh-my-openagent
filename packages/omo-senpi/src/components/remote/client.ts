@@ -11,6 +11,7 @@ import {
   type ListingRow,
   type Timers,
 } from "@oh-my-opencode/device-service-core/device-service"
+import type { AliasRegistry } from "../thread/remote/ports"
 import { aliasMembers } from "./aliases"
 import { attachMember } from "./attach"
 import { failureFromError, nextActionFor, remoteFailure } from "./codes"
@@ -55,6 +56,22 @@ export type RemoteClientDeps = {
   readonly timers?: Timers
   /** Runs the device service bootstrap for `service.bootstrap`; the internal bootstrap entry provides it (part 4c-3). */
   readonly bootstrap?: (setup: BootstrapSetup) => Promise<BootstrapResult>
+  /**
+   * The account's alias registry for `aliases.*`. The caller builds it (it needs the account service access, which the
+   * client must not import); absent, the alias members answer `unsupported{feature:"aliases"}`.
+   */
+  readonly aliasRegistry?: () => Promise<AliasRegistry>
+  /**
+   * Where the gateway store's worker sidecar is (`gateway-store-worker.mjs` beside the plugin's extension bundle). The
+   * compiled binary passes its provisioned runtime's copy; from source the store resolves its own worker.
+   */
+  readonly gatewayWorkerUrl?: URL
+  /** Test seam: opens the proven device-service connection (`connectDeviceService` by default). */
+  readonly connect?: (options: {
+    readonly version: string
+    readonly stateDir: string
+    readonly timers: Timers
+  }) => Promise<DeviceService>
 }
 
 /**
@@ -218,7 +235,7 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
   let service: Promise<DeviceService> | undefined
   const connection = (): Promise<DeviceService> => {
     if (service !== undefined) return service
-    const opening = connectDeviceService({ version: deps.version, stateDir, timers }).then(
+    const opening = (deps.connect ?? connectDeviceService)({ version: deps.version, stateDir, timers }).then(
       (connected) => {
         void connected.closed.then(() => {
           if (service === opening) service = undefined
