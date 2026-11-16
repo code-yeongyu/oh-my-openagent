@@ -48,40 +48,14 @@ describe("dag definition lint", () => {
     expect(warnings[0]).toContain("STOP WHEN")
   })
 
-  test("#given a multi-node run without a verification node #when linted #then one run-level warning fires", () => {
-    // given
+  test("#given a multi-node run of producers with no verification-shaped node #when linted #then no warning", () => {
+    // given: the orchestrator may run the final check itself, so a graph owes no verification node
     const producerPrompt =
       "TASK: Draft the release notes. DELIVERABLE: docs/RELEASE.md updated. SCOPE: write docs/RELEASE.md only. STOP WHEN: the file lists every merged PR."
     const nodes = [
       { id: "plan", prompt: producerPrompt },
       { id: "build", prompt: producerPrompt, dependsOn: ["plan"] },
     ]
-
-    // when
-    const warnings = lintDagDefinitionNodes(nodes)
-
-    // then
-    expect(warnings).toHaveLength(1)
-    expect(warnings[0]).toContain("verification")
-  })
-
-  test("#given a multi-node run whose verification lives in a node id #when linted #then no run-level warning", () => {
-    // given
-    const nodes = [
-      { id: "plan", prompt: CONTRACT_PROMPT },
-      { id: "qa-gate", prompt: CONTRACT_PROMPT, dependsOn: ["plan"] },
-    ]
-
-    // when
-    const warnings = lintDagDefinitionNodes(nodes)
-
-    // then
-    expect(warnings).toEqual([])
-  })
-
-  test("#given a single-node run without verification shape #when linted #then no run-level warning", () => {
-    // given
-    const nodes = [{ id: "plan", prompt: CONTRACT_PROMPT }]
 
     // when
     const warnings = lintDagDefinitionNodes(nodes)

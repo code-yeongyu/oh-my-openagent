@@ -474,7 +474,8 @@ describe("dag tool start warnings", () => {
     expect(result.details.warnings?.some((warning) => warning.includes('"plan"') && warning.includes("TASK:"))).toBe(
       true,
     )
-    expect(result.details.warnings?.some((warning) => warning.includes("verification"))).toBe(true)
+    // two markers per node, and nothing about the graph's shape: a run owes no verification node
+    expect(result.details.warnings).toHaveLength(4)
     const text = result.content[0]
     if (text?.type !== "text") throw new Error("Expected text content")
     expect(text.text).toContain("warning")
