@@ -211,8 +211,16 @@ fn layout_vk_reads_the_given_layout_not_the_calling_threads() {
     let azerty = unsafe { LoadKeyboardLayoutW(w!("0000040C"), KLF_NOTELLSHELL) }.expect("AZERTY");
     // SAFETY: as above.
     let us = unsafe { LoadKeyboardLayoutW(w!("00000409"), KLF_NOTELLSHELL) }.expect("US");
-    assert_eq!(azerty.0 as usize & 0xFFFF, 0x040C, "the AZERTY layout itself is loaded, not a substitute");
-    assert_eq!(us.0 as usize & 0xFFFF, 0x0409, "the US layout itself is loaded, not a substitute");
+    assert_eq!(
+        azerty.0 as usize & 0xFFFF,
+        0x040C,
+        "the AZERTY layout itself is loaded, not a substitute"
+    );
+    assert_eq!(
+        us.0 as usize & 0xFFFF,
+        0x0409,
+        "the US layout itself is loaded, not a substitute"
+    );
     assert_eq!(
         layout_vk_in('a', azerty),
         Some(0x51),

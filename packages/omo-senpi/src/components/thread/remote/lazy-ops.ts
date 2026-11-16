@@ -1,4 +1,6 @@
+import type { RpcRemoteSource, SenpiExtensionAPI } from "../../../extension/types"
 import type * as CrossDevice from "./cross-device"
+import type * as MonitorSource from "./monitor-source"
 import { rowThreadId } from "./ports"
 import type * as RemoteOps from "./remote-ops"
 import type * as RelayTransport from "./relay-transport"
@@ -13,7 +15,8 @@ type Runtime = Pick<
 > &
   Pick<typeof RemoteOps, "deviceOnline"> &
   Pick<typeof RelayTransport, "createRelayTransport"> &
-  Pick<typeof RelayControl, "createRelayControl">
+  Pick<typeof RelayControl, "createRelayControl"> &
+  Pick<typeof MonitorSource, "createRemoteMonitorSource">
 
 // The cross-device half ships in the thread client sidecar (`#omo-thread-client-runtime`), which every thread
 // operation already loads for the live host, so `omo.js` carries none of it.
@@ -70,5 +73,23 @@ export const createRelayControl = (remote: RemoteThreadSurface, row: RemoteSessi
     getAvailableThinkingLevels: async () => await (await built).getAvailableThinkingLevels(),
     setThinkingLevel: async (level, scope) => await (await built).setThinkingLevel(level, scope),
     getMessages: async () => await (await built).getMessages(),
+    waitSettled: async (timeoutMs, signal) => await (await built).waitSettled(timeoutMs, signal),
   }
+}
+
+/**
+ * monitor({type: "rpc", target: "<device>/<session>"}): an engine with senpi's remote-target seam (#12719) gets this
+ * device's sessions on other devices as monitor targets; an older one keeps local targets only (false). The sidecar
+ * loads on the first remote target a monitor arms.
+ */
+export function registerRemoteMonitorTargets(
+  pi: Pick<SenpiExtensionAPI, "registerRpcRemoteSource">,
+  remote: RemoteThreadSurface,
+): boolean {
+  if (typeof pi.registerRpcRemoteSource !== "function") return false
+  const source: RpcRemoteSource = {
+    open: async (...args) => await (await runtime()).createRemoteMonitorSource(remote).open(...args),
+  }
+  pi.registerRpcRemoteSource(source)
+  return true
 }
