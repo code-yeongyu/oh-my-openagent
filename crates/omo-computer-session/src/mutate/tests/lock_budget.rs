@@ -66,9 +66,8 @@ fn tw3_a_lock_released_during_the_wait_is_taken_and_the_call_sends() {
     assert!(!run.sink.is_empty(), "sent");
 }
 
-/// TW2 (a marker written by another process; the in-process chord during the wait is covered by
-/// logged.rs and grant/session_tests.rs, both on the fake clock): a stop during the wait ends it
-/// before the budget with the stop's own refusal; nothing sent.
+/// TW2 (a marker written by another process; the in-process chord during the wait is TW2c): a
+/// stop during the wait ends it before the budget with the stop's own refusal; nothing sent.
 #[test]
 fn tw2_a_stop_marker_committed_during_the_wait_ends_it_with_the_stops_refusal() {
     let run = Run::new();
@@ -114,6 +113,34 @@ fn tw2b_a_stop_marker_seen_during_the_wait_stays_latched_for_the_next_call() {
     let next = session.click(click("c-stop-2")).expect_err("the stop stays latched");
     assert_eq!(next.refusal.code.wire(), "Suspended", "{next:?}");
     assert!(run.sink.is_empty(), "nothing sent: {:?}", run.sink.lines());
+}
+
+/// Review L1 of #13767 (at 22ad891b7b): the stop chord pressed while the other holder STILL
+/// holds the lock ends the wait at its own stop check (stage Latch), not at the re-admission
+/// after the lock frees; the hook presses only on an advance that moved time (the fake's
+/// zero-length advances run under its state lock).
+#[test]
+fn tw2c_a_chord_while_the_other_holder_keeps_the_lock_ends_the_wait_at_the_latch() {
+    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+    let run = Run::new();
+    let fake = run.fake();
+    let remote = fake.handle();
+    let clock = fake.clock();
+    let mut session = run.session(Box::new(fake));
+    let held = holder(&run);
+    let last = AtomicU64::new(clock.now_ms());
+    let pressed = AtomicBool::new(false);
+    clock.on_advance(Box::new(move |now| {
+        if last.swap(now, Ordering::SeqCst) != now && !pressed.swap(true, Ordering::SeqCst) {
+            remote.press_stop_chord();
+        }
+    }));
+    let refused = session.click(click("c-chord")).expect_err("the chord ends the wait");
+    assert_eq!(refused.refusal.code.wire(), "Suspended");
+    assert!(run.sink.is_empty(), "nothing sent: {:?}", run.sink.lines());
+    let line = run.audit_lines().into_iter().find(|line| line["callId"] == "c-chord").expect("its audit line");
+    assert_eq!(line["gate"]["stage"], "Latch", "{line}");
+    drop(held);
 }
 
 /// TW6: an unusable lock refuses as A-IS-65 L2 (TransactionFailed), never InputBusy.
