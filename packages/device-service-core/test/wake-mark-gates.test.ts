@@ -134,4 +134,18 @@ describe("omo#13037: the wake mark and the single-probe locate are gated on the 
       locates: [{ device: PEER, engine_id: "dur-1" }],
     })
   })
+
+  test("#given a service below the minimum #when a wake is asked #then it is refused unsent, naming the service's version, the minimum and an action", async () => {
+    // omo#13763: a bare `unsupported` left the user no way to tell an outdated device service from a missing feature.
+    const { service, calls } = await spiedService({ wakeMark: "1.5.0", singleLocate: null })
+    const refused = await service.wakeCommand(PEER, "dur-1", ADMIT).catch((error: unknown) => error)
+    expect(refused).toBeInstanceOf(NotSentError)
+    const { code, reason, action } = refused as NotSentError
+    expect({ code, names: [reason.includes("1.4.0"), reason.includes("1.5.0")], hasAction: action !== null }).toEqual({
+      code: "unsupported",
+      names: [true, true],
+      hasAction: true,
+    })
+    expect(calls.wakes).toEqual([])
+  })
 })

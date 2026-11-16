@@ -20,6 +20,7 @@ interface FullMatrixMode {
   readonly fullMatrix: boolean
   readonly runtimeTouching: boolean
   readonly labelRefused: boolean
+  readonly labelHonoredOverFileCap: boolean
 }
 
 interface ClassifyInput {
@@ -31,6 +32,7 @@ interface ClassifyInput {
   readonly headRef?: string
   readonly labels?: readonly string[]
   readonly body?: string
+  readonly changedFiles?: number
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -56,6 +58,7 @@ function classify(input: ClassifyInput): FullMatrixMode {
       "--labels",
       JSON.stringify(input.labels ?? []),
       ...(input.body === undefined ? [] : ["--body-file", writeBody(input.body)]),
+      ...(input.changedFiles === undefined ? [] : ["--changed-files", String(input.changedFiles)]),
     ],
     {
       encoding: "utf8",
@@ -70,7 +73,9 @@ function classify(input: ClassifyInput): FullMatrixMode {
   const fullMatrix = parsed["fullMatrix"]
   const runtimeTouching = parsed["runtimeTouching"]
   const labelRefused = parsed["labelRefused"]
+  const labelHonoredOverFileCap = parsed["labelHonoredOverFileCap"]
   if (
+    typeof labelHonoredOverFileCap !== "boolean" ||
     typeof labelRefused !== "boolean" ||
     typeof generatedReleasePush !== "boolean" ||
     typeof webOnly !== "boolean" ||
@@ -80,7 +85,7 @@ function classify(input: ClassifyInput): FullMatrixMode {
   ) {
     throw new Error("classifier output must contain boolean CI mode fields including fullMatrix")
   }
-  return { generatedReleasePush, webOnly, runHeavy, fullMatrix, runtimeTouching, labelRefused }
+  return { generatedReleasePush, webOnly, runHeavy, fullMatrix, runtimeTouching, labelRefused, labelHonoredOverFileCap }
 }
 
 const bodyDir = mkdtempSync(join(tmpdir(), "ci-fast-path-body-"))
@@ -151,6 +156,7 @@ describe("full-matrix classification", () => {
         fullMatrix: true,
         runtimeTouching: true,
         labelRefused: false,
+        labelHonoredOverFileCap: false,
       })
       expect(classify({ ...input, message: "fix: normal push", eventName: "push" }).runHeavy).toBe(true)
       expect(classify({ ...input, eventName: "merge_group" }).runHeavy).toBe(true)
@@ -268,6 +274,41 @@ describe("full-matrix classification", () => {
         body: "This could affect Windows and macOS.\nplatform-reason: lower case is not the syntax",
       })
       expect(mode.labelRefused).toBe(true)
+      expect(mode.fullMatrix).toBe(false)
+    })
+
+    test("#then a diff that cannot be fully listed honors the label (fails toward the full matrix)", () => {
+      const mode = classify({ ...labelled, changedPaths: ["packages/utils/src/index.ts"], diffAvailable: false })
+      expect(mode.fullMatrix).toBe(true)
+      expect(mode.labelRefused).toBe(false)
+    })
+
+    // The pulls/files API lists at most 3000 files, so every caller decides the same way above that (#13891).
+    test("#then a pull request over the API file cap honors the label even when its listed paths are complete", () => {
+      const mode = classify({ ...labelled, changedPaths: ["packages/utils/src/index.ts"], changedFiles: 3500 })
+      expect(mode.fullMatrix).toBe(true)
+      expect(mode.labelRefused).toBe(false)
+    })
+
+    // The workflow's truncation warning reads this field, so the cap lives in one place (#13903 review).
+    test.each([
+      [3000, false],
+      [3001, true],
+    ])("#then %i changed files report labelHonoredOverFileCap %p", (changedFiles, overCap) => {
+      const mode = classify({ ...labelled, changedPaths: ["packages/utils/src/index.ts"], changedFiles })
+      expect(mode.labelHonoredOverFileCap).toBe(overCap)
+      expect(mode.labelRefused).toBe(!overCap)
+    })
+
+    test("#then an unlabelled pull request over the cap reports no label honored", () => {
+      const mode = classify({
+        eventName: "pull_request",
+        headRef: "feature/runtime-change",
+        changedPaths: ["packages/utils/src/index.ts"],
+        labels: [],
+        changedFiles: 3500,
+      })
+      expect(mode.labelHonoredOverFileCap).toBe(false)
       expect(mode.fullMatrix).toBe(false)
     })
 

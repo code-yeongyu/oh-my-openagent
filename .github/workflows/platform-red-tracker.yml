@@ -5,7 +5,7 @@ name: Platform red tracker
 # pull request, or comments on the open one. publish.yml refuses to cut a release while that issue is open.
 on:
   workflow_run:
-    workflows: [CI, Computer engine, Computer Windows QA, Desktop engine, Desktop Windows QA, Engine trust helper, get.omo.dev CI, Git job helper]
+    workflows: [CI, Computer conformance fixtures, Computer engine, Computer Windows QA, Desktop engine, Desktop Windows QA, Engine trust helper, get.omo.dev CI, Git job helper]
     types: [completed]
     branches: [dev]
 
@@ -105,6 +105,8 @@ jobs:
           created="${created##*/}"
           # Two red runs finishing together can each find no issue and both create one: the oldest open issue wins.
           issue="$(oldest_open)"
+          # The issue list can briefly lag a create; with nothing listed, the issue just created is the one.
+          issue="${issue:-$created}"
           if [ "$issue" != "$created" ]; then
             gh issue comment "$issue" --body-file "$body"
             gh issue close "$created" --reason "not planned" --comment "Duplicate of #$issue."
