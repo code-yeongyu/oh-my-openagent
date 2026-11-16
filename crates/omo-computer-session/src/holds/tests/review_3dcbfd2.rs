@@ -30,8 +30,7 @@ fn l7_a_bounded_button_hold_keeps_an_earlier_hold_of_the_same_button() {
     f.grant();
     let frame = f.frame();
     f.call(Method::MouseDown, json!({"target": "101", "x": 30, "y": 40, "frameId": frame})).expect("mouse.down");
-    let frame = f.frame();
-    f.call(Method::HoldMouse, json!({"target": "101", "x": 50, "y": 50, "duration": 0, "frameId": frame})).expect("holdMouse");
+    f.call(Method::HoldMouse, json!({"target": "101", "x": 50, "y": 50, "duration": 0})).expect("holdMouse");
     let held = f.session.funnel.control.holds.held();
     assert_eq!(held.len(), 1, "{held:?}");
     assert!(matches!(&held[0], Held::Button { origin, .. } if (origin.x, origin.y) == (30.0, 40.0)), "{held:?}");
