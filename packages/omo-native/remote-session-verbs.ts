@@ -106,7 +106,7 @@ export async function runSession(
   const remote = (
     dependencies.remote ?? ((service) => deviceServiceSurface(service, dependencies.connect, dependencies.stateDir))
   )(service)
-  // The client holds its own device-service connection; a command that left it open would keep the process alive.
+  // The client borrows the command's connection; closing it releases the client and leaves that connection to the command.
   try {
     return await runSessionOn(remote, args, json, dependencies)
   } finally {
