@@ -99,6 +99,12 @@ export function createDeviceItemStore(options: DeviceItemStoreOptions): ItemStor
     },
     peer: () => theDevice().peer,
     keys: () => [...new Set([...docs.keys(), ...baselines.keys()])].sort(),
+    ownHistoryOnly(key) {
+      const doc = docs.get(key)
+      if (doc === undefined) return false
+      const peers = [...doc.oplogVersion().toJSON().keys()]
+      return peers.length > 0 && peers.every((peer) => peer === theDevice().peer)
+    },
     async capture(key, workingText) {
       const doc = await docOf(key)
       const base = baselines.get(key) ?? { text: null, frontier: [] }
@@ -114,7 +120,7 @@ export function createDeviceItemStore(options: DeviceItemStoreOptions): ItemStor
       // #13725: the space holds this item and this device never materialised it (it joined the space with
       // its own copy of the file), so the working text has no shared history with the doc. Adopt it
       // insert-only (sync-design section 3): text the space already holds is not sent again.
-      if (!baselines.has(key) && doc.oplogVersion().toJSON().size > 0) {
+      if (base.text === null && doc.oplogVersion().toJSON().size > 0) {
         const current = renderItem(doc) ?? ""
         const plan = planAdoption([{ path: key, text: workingText }], {
           currentText: current,

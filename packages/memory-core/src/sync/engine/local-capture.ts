@@ -166,8 +166,13 @@ export async function capture(
   const files = await workingFiles(deps, journal)
   // Resuming a cycle at merged: every render that landed is the base of any edit made since.
   if (resuming !== null) await adoptLandedRenders(deps, journal, resuming, files)
+  const incoming = await verifiedIncomingKeys(journal)
+  const rewoundJoining = await rewindJoining(deps, journal, incoming)
   const known = await acceptedKeys(deps, journal, "capture", deps.store.keys())
-  const joining = await joiningKeys(deps, journal, new Set(known), files.byKey)
+  const joining = new Set([
+    ...rewoundJoining,
+    ...[...incoming].filter((key) => !known.includes(key) && files.byKey.has(key)),
+  ])
   const keys = [...new Set([...known, ...files.byKey.keys()])].filter((key) => !joining.has(key)).sort()
   const prints = (await journal.state()).held?.prints ?? {}
   const captured: PendingItem[] = []
@@ -216,16 +221,43 @@ export async function capture(
   return { held, withheld, joining }
 }
 
-async function joiningKeys(
+/** Item keys the verified incoming batches carry, read once per capture (#13730 review L1). */
+async function verifiedIncomingKeys(journal: SyncJournal): Promise<Set<string>> {
+  const keys = new Set<string>()
+  for (const record of await journal.incoming())
+    if (record.stage === "verified") for (const item of record.items) keys.add(item.key)
+  return keys
+}
+
+/**
+ * #13730 review M1: this device captured its own history-less copy of a key, its push met a stale base, and the
+ * verified batches now carry the space's copy of that key. Its still-unsent first capture is wound back out
+ * (the #12284 rewind, so the working file is captured afresh) and the key joins instead: the space's state lands
+ * first and the next capture adopts the file insert-only. Ops already in the batch being sent are left alone.
+ */
+async function rewindJoining(
   deps: EngineDeps,
   journal: SyncJournal,
-  known: ReadonlySet<string>,
-  working: ReadonlyMap<string, unknown>,
+  incoming: ReadonlySet<string>,
 ): Promise<Set<string>> {
   const joining = new Set<string>()
-  for (const record of await journal.incoming()) {
-    if (record.stage !== "verified") continue
-    for (const item of record.items) if (!known.has(item.key) && working.has(item.key)) joining.add(item.key)
+  if (incoming.size === 0) return joining
+  const pending = await journal.pending()
+  const carried = new Set((pending.outgoing?.items ?? []).map((item) => item.digest))
+  const rewound = new Set<string>()
+  for (const key of [...new Set(pending.items.map((item) => item.key))]) {
+    if (!incoming.has(key)) continue
+    const items = pending.items.filter((item) => item.key === key)
+    if (items.some((item) => carried.has(item.digest)) || !deps.store.ownHistoryOnly(key)) continue
+    const ops: Uint8Array[] = []
+    for (const item of items) ops.push(await journal.outbox.readOps(item))
+    if ((await deps.store.rewind(key, ops)) === "kept") continue
+    for (const item of items) rewound.add(item.digest)
+    joining.add(key)
   }
+  if (rewound.size === 0) return joining
+  await deps.store.persist()
+  const now = await journal.pending()
+  await journal.setPending({ ...now, items: now.items.filter((item) => !rewound.has(item.digest)) })
   return joining
 }

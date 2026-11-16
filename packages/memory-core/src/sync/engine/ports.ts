@@ -180,6 +180,8 @@ export interface ItemStore {
   peer(): string
   /** Item keys the store knows, live or dead. */
   keys(): readonly string[]
+  /** True when the key's doc holds ops and every one of them is this device's own (no other device's history). */
+  ownHistoryOnly(key: string): boolean
   /** captureOnDevice: the working text against the item's materialised baseline; null = no edit. */
   capture(key: string, workingText: string | null): Promise<Uint8Array | null>
   /** Import a verified remote update (or this device's own captured ops). */

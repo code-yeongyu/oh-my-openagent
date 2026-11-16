@@ -21,7 +21,10 @@ async function commitSeed(device: Device): Promise<void> {
   await Bun.$`${git} commit -q -m seed`.quiet()
 }
 
-async function twoSeededDevices(a: string, b: string): Promise<{ readonly a: Device; readonly b: Device }> {
+async function twoSeededDevices(
+  a: string,
+  b: string,
+): Promise<{ readonly a: Device; readonly b: Device; readonly server: FakeSyncServer }> {
   const server = new FakeSyncServer()
   const da = await makeDevice(server, "a", undefined, { realStore: true })
   const db = await makeDevice(server, "b", undefined, { realStore: true })
@@ -30,7 +33,7 @@ async function twoSeededDevices(a: string, b: string): Promise<{ readonly a: Dev
   await commitSeed(da)
   await db.write("system/persona.md", note(b))
   await commitSeed(db)
-  return { a: da, b: db }
+  return { a: da, b: db, server }
 }
 
 async function settle(a: Device, b: Device): Promise<void> {
@@ -60,6 +63,25 @@ test(
     await a.engine.runCycle()
     await a.engine.runCycle()
     await settle(b, a)
+    expect(await b.read("system/persona.md")).toBe(note(SEED))
+    expect(await a.read("system/persona.md")).toBe(note(SEED))
+  },
+  GIT_TEST_TIMEOUT,
+)
+
+test(
+  "#given a device that captured its identical seed before the other device's batch landed #when its push meets a stale base #then the text lands once on both",
+  async () => {
+    const { a, b, server } = await twoSeededDevices(SEED, SEED)
+    server.beforeNextAppend = async () => {
+      server.beforeNextAppend = null
+      await a.engine.runCycle()
+    }
+    const pushed = b.engine.runCycle()
+    await b.clock.untilPending()
+    b.clock.advance(8_000)
+    await pushed
+    await settle(a, b)
     expect(await b.read("system/persona.md")).toBe(note(SEED))
     expect(await a.read("system/persona.md")).toBe(note(SEED))
   },
