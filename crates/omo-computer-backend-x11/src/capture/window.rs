@@ -54,10 +54,10 @@ impl<S: XServer> X11Capture<S> {
             .map_err(|error| failed(&error))?
             .ok_or(Refusal::bare(EngineCode::WindowNotFound))?;
         if placement.minimized {
-            return Err(Refusal::new(EngineCode::CaptureUnavailable, Reason::Minimized.wire()));
+            return Err(Refusal::new(EngineCode::CaptureUnavailable, Reason::Minimized));
         }
         if !placement.viewable {
-            return Err(Refusal::new(EngineCode::CaptureUnavailable, Reason::Unmapped.wire()));
+            return Err(Refusal::new(EngineCode::CaptureUnavailable, Reason::Unmapped));
         }
         let read = self
             .server()
@@ -69,7 +69,7 @@ impl<S: XServer> X11Capture<S> {
                 (self.root_crop(&placement)?, CaptureRoute::RootCrop, true)
             }
             PixmapRead::Unmapped => {
-                return Err(Refusal::new(EngineCode::CaptureUnavailable, Reason::Unmapped.wire()));
+                return Err(Refusal::new(EngineCode::CaptureUnavailable, Reason::Unmapped));
             }
         };
         let mut cursor = CursorMode::None;
@@ -116,7 +116,7 @@ impl<S: XServer> X11Capture<S> {
         let screen = self.server().screen();
         let rect = placement.rect;
         let visible = clip_to_screen(rect, screen.width, screen.height)
-            .ok_or(Refusal::new(EngineCode::CaptureUnavailable, Reason::Unmapped.wire()))?;
+            .ok_or(Refusal::new(EngineCode::CaptureUnavailable, Reason::Unmapped))?;
         let raw = self.server().root_image(visible).map_err(|error| failed(&error))?;
         let pixels = decode(&raw).map_err(|error| failed(&error))?;
         let mut image = RgbaImage::new(rect.width, rect.height);
