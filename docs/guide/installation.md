@@ -667,7 +667,7 @@ Not all models behave the same way. Understanding "similar" families helps you m
 
 #### What each role does and which model it gets
 
-**The main agent** is the session you are talking to. It runs on your session model; there is no separate agent chain for it. Claude Opus 5.5 is the recommended choice, with GPT-6 Astra, GPT-6.1 Sol or GPT-6 Sol as the recommended GPT configuration. With no `model_profile`, a fresh OmO Native session picks the first model you have connected from the Recommended list (Opus 5.5, Fable 5.1, Kimi K3, GPT-6 Astra, GPT-6.1 Sol, GPT-6 Sol, GLM 5.3). Models with tuned prompt presets are listed in [Agent Model Matching](./agent-model-matching.md).
+**The main agent** is the session you are talking to. It runs on your session model; there is no separate agent chain for it. Claude Opus 5.5 is the recommended choice, with GPT-6 Astra or GPT-6.1 Sol as the recommended GPT configuration. With no `model_profile`, a fresh OmO Native session picks the first model you have connected from the Recommended list (Opus 5.5, Fable 5.2, Kimi K3.1 Pro, GPT-6 Astra, GPT-6.1 Sol, GLM 5.3). Models with tuned prompt presets are listed in [Agent Model Matching](./agent-model-matching.md).
 
 **Curated agents** (read-only helpers the main agent delegates to through `task(subagent_type: ...)`; chains from `packages/senpi-task/src/agents/builtin/fallback-chains.ts`):
 
@@ -705,7 +705,7 @@ If the user wants to override which model a curated agent or category uses, edit
 }
 ```
 
-**Lower-risk overrides** (compatible behavior): main agent Opus 5.5 → Fable 5.1/Kimi K3/GLM 5.3 (each is on the Recommended list and has a tuned prompt preset); Plan Consultant Fable 5.2 → Fable 5.1/Opus 5.5/Kimi K3; Plan Reviewer GPT-6 Astra → Opus 5.5 (max).
+**Lower-risk overrides** (compatible behavior): main agent Opus 5.5 → Fable 5.2/Kimi K3.1 Pro/GLM 5.3 (each is on the Recommended list and has a tuned prompt preset); Plan Consultant Fable 5.2 → Fable 5.1/Opus 5.5/Kimi K3; Plan Reviewer GPT-6 Astra → Opus 5.5 (max).
 
 **GLM 5.2 as the session model:** GLM 5.2 gets the GLM-calibrated prompt preset because its model ID is recognized as GLM. It still has less maintainer validation than Claude or Kimi.
 

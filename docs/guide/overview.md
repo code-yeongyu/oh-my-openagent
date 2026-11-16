@@ -101,10 +101,10 @@ The main agent is your session. It runs on your session model (a profile, a pin,
 
 Recommended models, named plainly:
 
-- **Claude Opus 5.5** (or Claude Fable 5.1). The reference configuration. The orchestration prompt was built against Claude's habit of following long, mechanics-driven instructions.
-- **GPT-6 Astra, GPT-6.1 Sol or GPT-6 Sol**. The GPT-recommended configuration. It gets the GPT-native `gpt-6-astra` prompt preset built for autonomous, principle-driven work: give it a goal, not a recipe. Over-orchestration on small bounded tasks is a known risk.
+- **Claude Opus 5.5** (or Claude Fable 5.2). The reference configuration. The orchestration prompt was built against Claude's habit of following long, mechanics-driven instructions.
+- **GPT-6 Astra or GPT-6.1 Sol**. The GPT-recommended configuration. It gets the GPT-native `gpt-6-astra` prompt preset built for autonomous, principle-driven work: give it a goal, not a recipe. Over-orchestration on small bounded tasks is a known risk.
 
-Kimi K3 and GLM 5.3 are on the Recommended list too, lower down and with lighter validation. Models outside it aren't supported as the main agent. You don't have to choose: with no `model_profile`, a fresh session runs **Recommended** (Opus 5.5, Fable 5.1, Kimi K3, GPT-6 Astra, GPT-6.1 Sol, GPT-6 Sol, GLM 5.3) and takes the first one you have connected. The Daily lanes lead with Claude; Obsessive · Normal runs GPT-6 Astra at medium (then GPT-6.1 Sol Fast, plain GPT-6.1 Sol, and GPT-5.6 Sol where Astra isn't served) and Obsessive · Heavy GPT-6 Astra at high. Details in the [Agent-Model Matching Guide](./agent-model-matching.md).
+Kimi K3.1 Pro and GLM 5.3 are on the Recommended list too, lower down and with lighter validation. Models outside it aren't supported as the main agent. You don't have to choose: with no `model_profile`, a fresh session runs **Recommended** (Opus 5.5, Fable 5.2, Kimi K3.1 Pro, GPT-6 Astra, GPT-6.1 Sol, GLM 5.3) and takes the first one you have connected. The Daily lanes lead with Claude; Obsessive · Normal runs GPT-6 Astra at medium (then GPT-6.1 Sol Fast, plain GPT-6.1 Sol, and GPT-5.6 Sol where Astra isn't served) and Obsessive · Heavy GPT-6 Astra at high. Details in the [Agent-Model Matching Guide](./agent-model-matching.md).
 
 ### The category worker
 

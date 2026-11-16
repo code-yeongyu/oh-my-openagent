@@ -39,9 +39,9 @@ You can still pick with `/model` and switch mid-session; the main agent switches
 
 ### The recommended models
 
-We tune the orchestration prompt against Claude Opus 5.5, Claude Fable 5.1, Kimi K3, GPT-6 Astra, GPT-6.1 Sol, GPT-6 Sol and GLM 5.3, in that order of preference. The Daily lanes and Obsessive · Heavy are slices of it; Obsessive · Normal runs GPT-6 Astra at medium, falling back to GPT-6.1 Sol Fast, plain GPT-6.1 Sol and GPT-5.6 Sol where Astra isn't served.
+We tune the orchestration prompt against Claude Opus 5.5, Claude Fable 5.2, Kimi K3.1 Pro, GPT-6 Astra, GPT-6.1 Sol and GLM 5.3, in that order of preference. The Daily lanes and Obsessive · Heavy are slices of it; Obsessive · Normal runs GPT-6 Astra at medium, falling back to GPT-6.1 Sol Fast, plain GPT-6.1 Sol and GPT-5.6 Sol where Astra isn't served.
 
-- **Claude Opus 5.5 and Claude Fable 5.1** are the reference configuration for the orchestration prompt: long nested todos, delegation tables, many tool calls in a row.
+- **Claude Opus 5.5 and Claude Fable 5.2** are the reference configuration for the orchestration prompt: long nested todos, delegation tables, many tool calls in a row.
 - **GPT-6 Astra, GPT-6.1 Sol and GPT-6 Sol** get the GPT-native `gpt-6-astra` preset, built for autonomous, principle-driven work. Over-orchestration on small bounded tasks is a known risk on GPT; give it a goal, not a recipe.
 - **Kimi K3 and GLM 5.3** follow instructions much like Claude and sit lower on the ladder. Kimi K3 spends more thinking tokens. GLM has had less maintainer validation on the nested todo, delegation, and long-context paths.
 
@@ -57,7 +57,8 @@ The harness ships a prompt preset per model family. When your session model matc
 
 | Preset | Picked for | Notes |
 | --- | --- | --- |
-| `claude-fable-5-1` | Claude Fable 5.1 | Top tier, above Opus. The Fable 5 core with the Fable 5.1 adjustments. |
+| `claude-fable-5-2` | Claude Fable 5.2 | Top tier, above Opus. The Fable 5.1 core with the Fable 5.2 adjustments. |
+| `claude-fable-5-1` | Claude Fable 5.1 | The Fable 5 core with the Fable 5.1 adjustments. |
 | `claude-fable-5` | Claude Fable 5 | Highest compliance with long, mechanics-driven prompts. |
 | `claude-opus-5-5` | Claude Opus 5.5 | Current best Opus. Steerable and literal. The reference configuration. |
 | `claude-opus-5` | Other Claude Opus 5 ids | The Opus 5 core. |
