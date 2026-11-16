@@ -330,6 +330,12 @@ describe("sessions.send and sessions.read", () => {
     expect(page.next_before).toBeNull()
   })
 
+  test("#given the live session #when sessions.read asks for a page the service refuses #then invalid_arguments, as attach's read answers", async () => {
+    const { owner } = await onWorld()
+    const failure = failureOf(await clientOn(owner.stateDir, fakeClock()).sessions.read(LIVE, { tail: 0 }))
+    expect(failure).toMatchObject({ code: "invalid_arguments", details: { local_api_code: "invalid_request" } })
+  })
+
   test("#given an address that names no device #when a session member runs #then invalid_arguments points at sessions.resolve", async () => {
     const { owner } = await onWorld()
     const parsed = canonicalizeThreadHandle("review", {})
@@ -992,10 +998,16 @@ describe("an open on this device", () => {
       )
       const settling = client.sessions.list()
       await within(listAsked, "this device's list_sessions")
-      // Fake time short of the listing's own deadline: only a bound inside it can let the listing answer.
-      clock.advance(DEADLINES.sessionsList - 1)
-      const flushed = new Promise<"pending">((resolve) => setImmediate(() => resolve("pending")))
-      expect(await Promise.race([settling.then((outcome) => outcome.kind), flushed])).toBe("ok")
+      const pending = () => new Promise<"pending">((resolve) => setImmediate(() => resolve("pending")))
+      // Just short of this device's own bound the listing still waits; at the bound it answers, well inside the
+      // listing's own deadline (#13787 review L3: the clamp alone would only fire at sessionsList - 1).
+      // The bound is the same 10 s the thread tools give one endpoint's list (a default contract), so it is pinned here.
+      const localListBoundMs = 10_000
+      expect(localListBoundMs).toBeLessThan(DEADLINES.sessionsList)
+      clock.advance(localListBoundMs - 1)
+      expect(await Promise.race([settling.then((outcome) => outcome.kind), pending()])).toBe("pending")
+      clock.advance(1)
+      expect(await Promise.race([settling.then((outcome) => outcome.kind), pending()])).toBe("ok")
       const listing = await valueOf(settling)
       expect(listing.rows.map((row) => row.device.id)).toContain(PEER)
       expect(listing.rows.filter((row) => row.device.id === SELF)).toEqual([])
