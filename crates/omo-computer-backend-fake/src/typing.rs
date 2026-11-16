@@ -14,7 +14,7 @@ impl FakeBackend {
         text: &str,
         route: Route,
         tag: u64,
-        interrupt: &mut dyn FnMut(&dyn Backend) -> bool,
+        interrupt: &mut dyn FnMut(&mut dyn Backend) -> bool,
     ) -> TextDelivery {
         let of = scalars(text);
         let unit_ms = self.lock().scenario.typing_unit_ms.unwrap_or(0);
@@ -89,7 +89,7 @@ mod tests {
             "abcdefghij",
             Route::BackgroundWindow,
             1,
-            &mut |b: &dyn Backend| {
+            &mut |b: &mut dyn Backend| {
                 asked.set(asked.get() + 1);
                 b.clock().is_some_and(|clock| clock.now_ms() >= start + 30)
             },

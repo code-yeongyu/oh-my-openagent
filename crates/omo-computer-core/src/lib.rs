@@ -28,6 +28,7 @@ pub mod results;
 pub mod schema;
 pub mod session_state;
 pub mod settings;
+pub mod settle_profile;
 pub mod surface;
 pub mod untrusted;
 pub mod window_frame;

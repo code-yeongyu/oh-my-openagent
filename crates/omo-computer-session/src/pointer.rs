@@ -86,9 +86,10 @@ impl Session {
         let origin = points[0];
         let mut events: Vec<InputEvent> = vec![InputEvent::PointerMove(origin)];
         events.extend(modifiers.iter().map(|key| key_event(key, true)));
-        let pressed_at = events.len() + 1;
+        let pressed_at = events.len();
         events.push(InputEvent::Button { button, down: true });
         events.extend(points[1..].iter().map(|point| InputEvent::PointerMove(*point)));
+        let released_at = events.len();
         events.push(InputEvent::Button { button, down: false });
         events.extend(modifiers.iter().rev().map(|key| key_event(key, false)));
         let authority = CallAuthority { call_id: params.call_id.clone(), run_generation: params.run_generation };
@@ -97,16 +98,14 @@ impl Session {
             .with_frame_check(check.0, check.1)
             .with_keys(modifiers.clone());
         let result = self.traced(dispatched, &key, mutation);
-        let sent = result.as_ref().err().and_then(|refused| refused.stamps.delivered).map_or(0, |d| usize::try_from(d.count).unwrap_or(0));
-        if sent > 1 {
+        if result.is_err() {
+            let sent = Self::sent_before(&result);
+            let stuck = stuck_after(sent, &modifiers, (pressed_at, released_at), Held::Button { button, origin });
             let tag = self.opened.as_ref().map_or(0, |opened| opened.tag);
-            for key in modifiers.iter().take(sent - 1) {
-                self.funnel.control.holds.press(Held::Key { key: key.clone() }, 0, tag);
+            for held in &stuck {
+                self.funnel.control.holds.press(held.clone(), 0, tag);
             }
-            if sent >= pressed_at {
-                self.funnel.control.holds.press(Held::Button { button, origin }, 0, tag);
-            }
-            self.funnel.control.holds.release_all(self.backend.as_mut());
+            self.funnel.control.holds.release(self.backend.as_mut(), &stuck);
         }
         result
     }
@@ -118,4 +117,19 @@ impl Session {
     pub fn pointer(&self) -> Result<PointerPosition, Refusal> {
         self.backend.pointer().map(|p| PointerPosition { x: p.x, y: p.y }).ok_or(Refusal::bare(EngineCode::Internal))
     }
+}
+
+/// What a drag stopped after `sent` events left down: each modifier whose down went out and
+/// whose up did not, and the button between its down (`pressed_at`) and its up (`released_at`).
+fn stuck_after(sent: usize, modifiers: &[String], (pressed_at, released_at): (usize, usize), button: Held) -> Vec<Held> {
+    let mut stuck: Vec<Held> = modifiers
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| sent > 1 + index && sent <= released_at + modifiers.len() - index)
+        .map(|(_, key)| Held::Key { key: key.clone() })
+        .collect();
+    if sent > pressed_at && sent <= released_at {
+        stuck.push(button);
+    }
+    stuck
 }

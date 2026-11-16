@@ -1,4 +1,4 @@
-import type { ThreadToolFailure } from "../errors"
+import type { ThreadErrorCode, ThreadToolFailure } from "../errors"
 import type { BindingRecord, OutboxRow } from "../gateway/bindings"
 
 // Discriminated result unions. The error branch is shared data, never an exception: a caller
@@ -76,8 +76,28 @@ export type ThreadTranscriptItem = {
   readonly content: string
 }
 
+/**
+ * `alias_scope: "local"` (#13104): no account could hold the alias (`alias_unavailable` says why), so it is only the
+ * thread's name on its device - addressable there like any name, never account-wide.
+ */
+export type ThreadLocalAliasNote = {
+  readonly alias_scope?: "local"
+  readonly alias_unavailable?: "sign_in" | "no_registry" | "no_remote"
+  /**
+   * Set only when the account was gone by the alias claim, after thread_create had made the thread: the alias could
+   * not become its local name (`name_conflict` with another thread, or the code that refused the rename), so the
+   * thread keeps the name it was created with.
+   */
+  readonly local_name_unavailable?: ThreadErrorCode
+}
+
 export type ThreadCreateResult =
-  { readonly kind: "ok"; readonly thread: ThreadResultSummary; readonly deduplicated: boolean } | ThreadDataError
+  | ({
+      readonly kind: "ok"
+      readonly thread: ThreadResultSummary
+      readonly deduplicated: boolean
+    } & ThreadLocalAliasNote)
+  | ThreadDataError
 
 export type ThreadListResult =
   | {
@@ -151,13 +171,13 @@ export type ThreadThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" 
 export type ThreadReasoningScope = "session" | "turn"
 
 export type ThreadRenameResult =
-  | {
+  | ({
       readonly kind: "ok"
       readonly thread_id: string
       readonly name: string
       readonly alias?: string
       readonly device?: string
-    }
+    } & ThreadLocalAliasNote)
   | ThreadDataError
 
 export type ThreadSetModelResult =

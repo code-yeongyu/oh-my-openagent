@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::intervention::{Pause, TargetLiveness};
 use crate::listing::Surface;
 use crate::session_state::SessionState;
+use crate::observation::ObservationSettle;
 use crate::untrusted::UntrustedText;
 
 use super::disposition::Disposition;
@@ -51,6 +52,9 @@ pub struct ReportParts {
     pub audit_ids: Vec<String>,
     #[serde(default)]
     pub timings: Option<Timings>,
+    /// The post-send settle: the regime picked and its outcome.
+    #[serde(default)]
+    pub settle: Option<ObservationSettle>,
     pub evidence: Vec<Evidence>,
     /// Row 25: `"unknown"` when a browser window's URL could not be read under a non-empty
     /// `computer.url_policy` (the send was delivered, fail-open).
@@ -97,6 +101,8 @@ pub struct ActionReport {
     audit_ids: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     timings: Option<Timings>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    settle: Option<ObservationSettle>,
     evidence: Vec<Evidence>,
     #[serde(skip_serializing_if = "Option::is_none")]
     url_policy: Option<crate::url_policy::UrlPolicyStamp>,
@@ -186,6 +192,11 @@ impl ActionReport {
         self.target
     }
 
+    #[must_use]
+    pub const fn settle(&self) -> Option<&ObservationSettle> {
+        self.settle.as_ref()
+    }
+
     fn from_checked(parts: ReportParts) -> Self {
         Self {
             disposition: parts.disposition,
@@ -202,6 +213,7 @@ impl ActionReport {
             warning: parts.warning,
             audit_ids: parts.audit_ids,
             timings: parts.timings,
+            settle: parts.settle,
             evidence: parts.evidence,
             url_policy: parts.url_policy,
             observation: parts.observation,

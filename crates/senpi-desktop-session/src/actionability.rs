@@ -27,6 +27,32 @@ pub(crate) const AUTO_WAIT: Duration = Duration::from_secs(5);
 
 const POLL: Duration = Duration::from_millis(50);
 
+/// The time the battery waits on: the host's in a session; a test swaps in
+/// its fake's clock so the wait does not depend on how busy the host is.
+pub(crate) trait BatteryClock {
+    fn now(&self) -> Duration;
+    fn sleep(&self, pause: Duration);
+}
+
+/// The host's monotonic time, from when the worker was built.
+pub(crate) struct HostClock(Instant);
+
+impl HostClock {
+    pub(crate) fn new() -> Self {
+        Self(Instant::now())
+    }
+}
+
+impl BatteryClock for HostClock {
+    fn now(&self) -> Duration {
+        self.0.elapsed()
+    }
+
+    fn sleep(&self, pause: Duration) {
+        std::thread::sleep(pause);
+    }
+}
+
 /// A state the battery waits out.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Pending {
@@ -106,7 +132,7 @@ impl Worker {
         mut previous: Option<AxBounds>,
         wait: bool,
     ) -> CoreResult<Option<AxBounds>> {
-        let deadline = Instant::now() + AUTO_WAIT;
+        let deadline = self.battery_clock.now() + AUTO_WAIT;
         loop {
             interrupted().map_err(nothing_sent)?;
             let props = self.ax_parts().and_then(|(ax, _)| ax.props(handle)).map_err(nothing_sent)?;
@@ -142,7 +168,7 @@ impl Worker {
                 Some(bounds) if self.occluded(handle, &bounds) => Pending::Occluded,
                 Some(bounds) => return Ok(Some(bounds)),
             };
-            let now = Instant::now();
+            let now = self.battery_clock.now();
             if !wait || now >= deadline {
                 return Err(refusal(
                     pending.reason(),
@@ -153,7 +179,7 @@ impl Worker {
                     ),
                 ));
             }
-            std::thread::sleep(POLL.min(deadline - now));
+            self.battery_clock.sleep(POLL.min(deadline - now));
         }
     }
 
