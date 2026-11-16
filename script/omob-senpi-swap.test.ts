@@ -110,7 +110,7 @@ describe("placeBuiltSenpi", () => {
     (_name, escapeTarget) => {
       const root = mkdtempSync(join(tmpdir(), "omob-senpi-swap-outside-"))
       try {
-        const { omoDir, built, store } = isolatedLinkerClone(root, "previous-swap")
+        const { omoDir, built, store, senpiPaths } = isolatedLinkerClone(root, "previous-swap")
         const outside = escapeTarget(root)
         writeEngine(outside, "outside")
         const escaping = join(omoDir, "packages", "omo-senpi", "node_modules", "@code-yeongyu", "senpi")
@@ -122,7 +122,8 @@ describe("placeBuiltSenpi", () => {
         const rootEngine = join(omoDir, "node_modules", "@code-yeongyu", "senpi")
         expect(engineVersion(rootEngine)).toBe("previous-swap")
         const untouched = senpiResolutionPaths(omoDir).filter((path) => path !== escaping && path !== rootEngine)
-        expect(untouched.length).toBe(4)
+        const expectedUntouched = senpiPaths.filter((path) => path !== escaping && path !== rootEngine)
+        expect(untouched.toSorted()).toEqual(expectedUntouched.toSorted())
         for (const path of untouched) {
           expect(realpathSync(path)).toBe(realpathSync(store))
           expect(engineVersion(path)).toBe("registry")
