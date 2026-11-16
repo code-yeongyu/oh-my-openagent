@@ -43,11 +43,10 @@ function launchFor(
   spawned: string[],
   platform = "linux",
   runCodesign = () => 0,
-  // `null`: the package's own pinned table (no override).
-  pinnedDigests: Readonly<Record<string, string>> | null = pinnedRelease(),
+  pinnedDigests: Readonly<Record<string, string>> = pinnedRelease(),
 ) {
   return createLaunch({
-    ...(pinnedDigests === null ? {} : { pinnedDigests }),
+    pinnedDigests,
     locator: {
       platform,
       arch: "x64",
@@ -99,13 +98,12 @@ describe("launch trust", () => {
     stagePrebuild(SHIPPED, SHIPPED)
     const spawned: string[] = []
 
-    // When it is launched with an empty pinned table, and with the package's own (no release pinned yet).
-    const unpinned = launchFor(spawned, "linux", () => 0, {})(["--version"], { env: {} })
-    const packaged = launchFor(spawned, "linux", () => 0, null)(["--version"], { env: {} })
+    // When it is launched with a pinned table that has no entry for the host (an explicit empty table:
+    // the package's shipped table fills in at release, so the test never depends on its contents).
+    const attempt = launchFor(spawned, "linux", () => 0, {})(["--version"], { env: {} })
 
-    // Then both are refused before any spawn.
-    await expect(unpinned).rejects.toMatchObject({ reason: "no_pinned_digest", host })
-    await expect(packaged).rejects.toMatchObject({ reason: "no_pinned_digest", host })
+    // Then it is refused before any spawn.
+    await expect(attempt).rejects.toMatchObject({ reason: "no_pinned_digest", host })
     expect(spawned).toEqual([])
   })
 
