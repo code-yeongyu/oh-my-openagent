@@ -133,7 +133,8 @@ async function replay(argv: readonly string[]): Promise<number> {
 
 // A case as its result lines name it: the repository-relative path, else the path given.
 function caseName(casePath: string): string {
-  const rel = relative(ROOT, casePath)
+  // Case names print with forward slashes on every OS, so the output is the same on Windows.
+  const rel = relative(ROOT, casePath).replaceAll("\\", "/")
   return rel.startsWith("..") ? casePath : rel
 }
 

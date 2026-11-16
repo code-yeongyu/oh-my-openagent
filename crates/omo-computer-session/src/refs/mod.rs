@@ -134,6 +134,11 @@ impl RefRegistry {
         let index = generation.position(parsed.n()).ok_or(stale)?;
         self.tick += 1;
         generation.last_used = self.tick;
+        // A hit on a drill also uses the full observation it hangs under: the LRU prune looks
+        // only at full observations, and drops the drill with its parent.
+        if let Some(parent) = generation.parent.and_then(|top| window.generations.get_mut(&top)) {
+            parent.last_used = self.tick;
+        }
         Ok((window_id, number, index))
     }
 }

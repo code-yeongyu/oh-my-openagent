@@ -110,7 +110,8 @@ impl ArtifactStore {
     /// Writes one artifact; a write that crosses a cap sweeps.
     ///
     /// # Errors
-    /// The artifact itself could not be written (a sweep error only warns).
+    /// `digest` is not a plain path component, or the artifact itself could not be written (a
+    /// sweep error only warns).
     pub fn record(
         &mut self,
         digest: &str,
@@ -118,6 +119,7 @@ impl ArtifactStore {
         bytes: &[u8],
         now_ms: u64,
     ) -> io::Result<PathBuf> {
+        let digest = crate::marker::component(digest)?;
         fs::create_dir_all(&self.dir)?;
         let path = self.dir.join(artifact_name(digest, ext));
         fs::write(&path, bytes)?;
@@ -132,6 +134,10 @@ impl ArtifactStore {
     /// A removal that fails for any reason but "not there" reads as not released, never as a
     /// quiet second release: it is logged once, now, and carried into the next sweep's report.
     pub fn release(&mut self, digest: &str) -> bool {
+        // A digest is a plain path component, never a way out of the artifact directory.
+        if crate::marker::component(digest).is_err() {
+            return false;
+        }
         let mut released = false;
         for suffix in SUFFIXES {
             let path = self.dir.join(format!("{ARTIFACT_PREFIX}{digest}{suffix}"));

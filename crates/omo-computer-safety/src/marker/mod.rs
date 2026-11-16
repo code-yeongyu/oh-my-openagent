@@ -83,8 +83,7 @@ impl MarkerStore for FileMarker {
             let _ = fs::remove_file(&temp);
             return Err(error);
         }
-        fs::rename(&temp, &self.path)?;
-        File::open(dir)?.sync_all()
+        durable_rename(&temp, &self.path, dir)
     }
 
     fn path(&self) -> Option<&Path> {
@@ -191,6 +190,155 @@ fn owner_ok(file: &File) -> bool {
 #[cfg(not(unix))]
 fn owner_ok(_file: &File) -> bool {
     true
+}
+
+/// The marker's last step (d-safety.md: exclusive tmp, fsync, rename, directory fsync): the
+/// rename made durable. Unix renames, then fsyncs the directory that holds the marker.
+#[cfg(unix)]
+fn durable_rename(temp: &Path, path: &Path, dir: &Path) -> io::Result<()> {
+    fs::rename(temp, path)?;
+    File::open(dir)?.sync_all()
+}
+
+/// Windows (amendment A-IS-60, its security read): the temp file was flushed before this call;
+/// the directory handle opens first (backup semantics, write access), so an access or
+/// filesystem failure surfaces before anything changes; the rename is write-through; then the
+/// directory is flushed, which is the step that makes the entry durable. Ok only when every
+/// call succeeded; any failure is an error carrying its \`GetLastError\` code (no code reads as
+/// "unsupported, skip"); a flush that fails after the rename leaves the marker in place; both
+/// handles close on every path.
+#[cfg(windows)]
+fn durable_rename(temp: &Path, path: &Path, dir: &Path) -> io::Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Foundation::{
+        CloseHandle, GENERIC_WRITE, HANDLE, INVALID_HANDLE_VALUE,
+    };
+    use windows_sys::Win32::Storage::FileSystem::{
+        CreateFileW, FlushFileBuffers, GetVolumeInformationByHandleW, MoveFileExW,
+        FILE_FLAG_BACKUP_SEMANTICS, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE,
+        MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH, OPEN_EXISTING,
+    };
+
+    /// Closes the handle on every path.
+    struct Owned(HANDLE);
+    impl Drop for Owned {
+        fn drop(&mut self) {
+            // SAFETY: the handle came from a successful CreateFileW and is closed once, here.
+            unsafe { CloseHandle(self.0) };
+        }
+    }
+
+    let wide = |p: &Path| -> Vec<u16> {
+        p.as_os_str()
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect()
+    };
+    let (directory, from, to) = (wide(dir), wide(temp), wide(path));
+    // SAFETY: a NUL-terminated UTF-16 path that lives across the call; no security attributes
+    // and no template handle.
+    let handle = unsafe {
+        CreateFileW(
+            directory.as_ptr(),
+            GENERIC_WRITE,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            std::ptr::null(),
+            OPEN_EXISTING,
+            FILE_FLAG_BACKUP_SEMANTICS,
+            std::ptr::null_mut(),
+        )
+    };
+    if handle == INVALID_HANDLE_VALUE {
+        return Err(io::Error::last_os_error());
+    }
+    let directory = Owned(handle);
+    // The filesystem is read from the directory's own handle, never from a drive letter, and
+    // anything but NTFS or ReFS refuses before any state changes.
+    let mut name = [0_u16; 64];
+    // SAFETY: the handle is open; only the filesystem-name buffer is asked for, with its length.
+    let read = unsafe {
+        GetVolumeInformationByHandleW(
+            directory.0,
+            std::ptr::null_mut(),
+            0,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            name.as_mut_ptr(),
+            u32::try_from(name.len()).unwrap_or(0),
+        )
+    };
+    let filesystem = if read == 0 {
+        Err(io::Error::last_os_error())
+    } else {
+        let end = name.iter().position(|unit| *unit == 0).unwrap_or(name.len());
+        Ok(String::from_utf16_lossy(&name[..end]))
+    };
+    admit_filesystem(filesystem)?;
+    // SAFETY: both arguments are NUL-terminated UTF-16 paths that live across the call.
+    let moved = unsafe {
+        MoveFileExW(
+            from.as_ptr(),
+            to.as_ptr(),
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+        )
+    };
+    if moved == 0 {
+        return Err(io::Error::last_os_error());
+    }
+    // SAFETY: the directory handle is open until \`directory\` drops.
+    if unsafe { FlushFileBuffers(directory.0) } == 0 {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(())
+}
+
+/// The filesystem a Windows stop marker may be committed on: NTFS or ReFS, the two whose
+/// directory flush the arm relies on. Anything else, or a name that could not be read, is an
+/// error naming what was read: an Ok the arm cannot back would be fail-open.
+#[cfg(any(windows, test))]
+fn admit_filesystem(read: io::Result<String>) -> io::Result<()> {
+    match read {
+        Ok(name) if name == "NTFS" || name == "ReFS" => Ok(()),
+        Ok(name) => Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            UnsupportedFilesystem { name },
+        )),
+        Err(error) => Err(io::Error::new(
+            error.kind(),
+            UnsupportedFilesystem {
+                name: format!("unreadable ({error})"),
+            },
+        )),
+    }
+}
+
+/// The stop marker's filesystem is not one whose directory flush makes a rename durable.
+#[cfg(any(windows, test))]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnsupportedFilesystem {
+    /// What the volume reported: its filesystem name, or why it could not be read.
+    pub name: String,
+}
+
+#[cfg(any(windows, test))]
+impl std::fmt::Display for UnsupportedFilesystem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "the stop marker's filesystem is {:?}, not NTFS or ReFS",
+            self.name
+        )
+    }
+}
+
+#[cfg(any(windows, test))]
+impl std::error::Error for UnsupportedFilesystem {}
+
+/// Any other target has no durable rename this crate knows: the marker cannot be committed.
+#[cfg(not(any(unix, windows)))]
+fn durable_rename(_temp: &Path, _path: &Path, _dir: &Path) -> io::Result<()> {
+    Err(io::Error::other("no durable rename on this target"))
 }
 
 #[cfg(unix)]

@@ -63,7 +63,7 @@ export const ThreadCreateParams = Type.Object({
       minLength: 1,
       maxLength: 64,
       description:
-        "Account-wide alias for the new thread, usable instead of its id in every thread tool; an alias another thread holds returns alias_taken naming the holder.",
+        'Account-wide alias for the new thread, usable instead of its id in every thread tool; an alias another thread holds returns alias_taken naming the holder. With no signed-in account it becomes the thread\'s local name instead (unless name is set) and the result carries alias_scope "local".',
     }),
   ),
   name: Type.Optional(
@@ -183,7 +183,7 @@ export const ThreadRenameParams = Type.Object({
       minLength: 1,
       maxLength: 64,
       description:
-        "New account-wide alias for the thread; an alias another thread holds returns alias_taken naming the holder, and the old alias is freed.",
+        'New account-wide alias for the thread; an alias another thread holds returns alias_taken naming the holder, and the old alias is freed. With no signed-in account it becomes the thread\'s local name instead (unless name is set) and the result carries alias_scope "local".',
     }),
   ),
   all_scope: AllScope,
