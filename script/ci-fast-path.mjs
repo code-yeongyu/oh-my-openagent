@@ -11,8 +11,11 @@ const releaseStateHeadRef = /^release\/v.+-source-state$/
 // No changed path selects the platform matrix: the post-merge push to dev proves every OS.
 const fullMatrixLabel = "ci:full-matrix"
 // The label costs macOS/Windows runners, so it is honored only for a diff that can change how a non-Linux runner
-// behaves, or with an explicit reason line in the PR body. Anything else is refused, never guessed from keywords.
+// behaves, a diff too long to list (it may hide one), or an explicit reason line in the PR body. Anything else is
+// refused, never guessed from keywords.
 const platformReasonLine = /^Platform-reason:[ \t]*\S.*$/m
+// The pulls/files API lists at most this many files; a larger pull request counts as platform-sensitive when labelled.
+const apiFileListCap = 3000
 const platformSensitiveExactPaths = new Set([
   ".github/workflows/ci.yml",
   ".github/workflows/ci-full-matrix-label.yml",
@@ -136,6 +139,7 @@ export function classifyCiMode({
   headRef = "",
   labels = [],
   body = "",
+  changedFiles = 0,
 }) {
   // Queue commits never use generated-release push policy.
   const classificationEvent = eventName === "merge_group" ? "pull_request" : eventName
@@ -148,7 +152,14 @@ export function classifyCiMode({
   const webOnly = diffAvailable && changedPaths.length > 0 && changedPaths.every(isWebPath)
   const runtimeTouching = !diffAvailable || changedPaths.some(isRuntimePath)
   const labelled = classificationEvent === "pull_request" && labels.includes(fullMatrixLabel)
-  const labelHonored = labelled && (changedPaths.some(isPlatformSensitivePath) || platformReasonLine.test(body))
+  // A diff that cannot be fully listed may hide a platform path, so the label is honored (fails toward the full matrix).
+  const labelHonoredOverFileCap = labelled && changedFiles > apiFileListCap
+  const labelHonored =
+    labelled &&
+    (!diffAvailable ||
+      labelHonoredOverFileCap ||
+      changedPaths.some(isPlatformSensitivePath) ||
+      platformReasonLine.test(body))
   const fullMatrix =
     eventName === "merge_group" || classificationEvent === "push" || releaseStateHeadRef.test(headRef) || labelHonored
 
@@ -159,6 +170,7 @@ export function classifyCiMode({
     fullMatrix,
     runtimeTouching,
     labelRefused: labelled && !fullMatrix,
+    labelHonoredOverFileCap,
   }
 }
 
@@ -186,6 +198,7 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
     headRef: args.get("head-ref") ?? "",
     labels: parseLabels(args.get("labels") ?? "[]"),
     body: args.has("body-file") ? readFileSync(args.get("body-file"), "utf8") : "",
+    changedFiles: Number(args.get("changed-files") ?? "0"),
   })
   process.stdout.write(`${JSON.stringify(mode)}\n`)
 }
