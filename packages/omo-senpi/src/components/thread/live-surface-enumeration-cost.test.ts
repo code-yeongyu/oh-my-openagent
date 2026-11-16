@@ -2,50 +2,52 @@
 // `host status --all --include-workers --json`, a full diagnostic pass (a /proc walk per endpoint, crash records,
 // stale-engine checks) that took 8.4-8.7 s on a host with 49 endpoints, so a local-only thread_list took 9.3 s.
 // The enumeration now reads the endpoint registry on disk and never starts a process. The test counts what the
-// view does instead of timing it: a stand-in engine that leaves a marker when it is started, and a registry spy.
-import { afterEach, describe, expect, test } from "bun:test"
-import { chmodSync, existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
+// view does instead of timing it: every child-process entry point is spied, so a spawn is seen whether or not the
+// view waits for it, and a registry spy counts the reads.
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
+import * as childProcess from "node:child_process"
 import { createLiveThreadSurface } from "./live-surface"
 
-const dirs: string[] = []
+const SPAWN_ENTRY_POINTS = ["spawn", "spawnSync", "exec", "execSync", "execFile", "execFileSync", "fork"] as const
+
+const restores: Array<() => void> = []
 afterEach(() => {
-  for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
+  for (const restore of restores.splice(0)) restore()
 })
 
-function engineStandIn(): { readonly bin: string; readonly started: string } {
-  const dir = mkdtempSync(join(tmpdir(), "omo-enum-cost-"))
-  dirs.push(dir)
-  const started = join(dir, "engine-started")
-  const bin = join(dir, "senpi")
-  writeFileSync(bin, `#!/bin/sh\n: > '${started}'\n`)
-  chmodSync(bin, 0o755)
-  return { bin, started }
+function spawnSpy(): readonly string[] {
+  const started: string[] = []
+  for (const name of SPAWN_ENTRY_POINTS) {
+    const spy = spyOn(childProcess, name).mockImplementation(((...args: unknown[]) => {
+      started.push(`${name} ${String(args[0])}`)
+      const callback = args.findLast((arg) => typeof arg === "function")
+      if (typeof callback === "function") callback(new Error("spawn blocked by the test"), "", "")
+      return undefined
+    }) as never)
+    restores.push(() => spy.mockRestore())
+  }
+  return started
 }
 
 describe("live thread surface enumeration cost", () => {
-  test.skipIf(process.platform === "win32")(
-    "#given an engine CLI on the launch path #when a view is listed #then the registry is read once and the engine is never started",
-    async () => {
-      // given
-      const engine = engineStandIn()
-      let registryReads = 0
-      const surface = createLiveThreadSurface({} as never, {
-        env: { ...process.env, SENPI_BIN: engine.bin, SENPI_RPC_SOCKET: "/tmp/omo-enum-cost-missing.sock" },
-        exists: () => false,
-        registry: async () => {
-          registryReads += 1
-          return []
-        },
-      })
+  test("#given an engine CLI on the launch path #when a view is listed #then the registry is read once and no process is started", async () => {
+    // given
+    const started = spawnSpy()
+    let registryReads = 0
+    const surface = createLiveThreadSurface({} as never, {
+      env: { ...process.env, SENPI_RPC_SOCKET: "/tmp/omo-enum-cost-missing.sock" },
+      exists: () => false,
+      registry: async () => {
+        registryReads += 1
+        return []
+      },
+    })
 
-      // when
-      await surface.listView({ offline: true })
+    // when
+    await surface.listView({ offline: true })
 
-      // then
-      expect(existsSync(engine.started)).toBe(false)
-      expect(registryReads).toBe(1)
-    },
-  )
+    // then
+    expect(started).toEqual([])
+    expect(registryReads).toBe(1)
+  })
 })
