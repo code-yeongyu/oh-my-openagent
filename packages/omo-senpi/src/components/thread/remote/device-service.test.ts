@@ -286,7 +286,15 @@ describe("device-service adapter of the thread tools' account surface", () => {
       response: { type: "response", command: "open_session", success: true, data: { sessionId: "s-new" } },
     })
     expect(closed).toBe(false)
-    const surface: RemoteThreadSurface = { sessions: port, chain: { stamp: (record: JsonObject) => record } }
+    const surface: RemoteThreadSurface = {
+      sessions: port,
+      client: fakeRemoteClient({
+        state: () => "connected",
+        here: "a",
+        devices: () => [{ device: "b", label: "b", online: true }],
+      }),
+      chain: { stamp: (record: JsonObject) => record },
+    }
     expect(
       await setModelRemote(
         surface,

@@ -1,3 +1,5 @@
+import { createRemoteClient } from "../omo-senpi/src/components/remote/client"
+import { userInfo } from "node:os"
 import { existsSync } from "node:fs"
 
 import { type DeviceService, deviceServiceEndpointPath } from "../device-service-core/src/index.ts"
@@ -165,10 +167,16 @@ export async function prepareRemoteAttach(
           version: connected.serviceVersion,
           connect: async () => ({ conn: connected, owned: false }),
         }),
+        // `omo remote` is a person at this device; the account reads go through the one remote client (#13414).
+        client: createRemoteClient(
+          { kind: "person", uid: String(userInfo().uid) },
+          { version: connected.serviceVersion },
+        ),
         chain: { stamp: (record: JsonObject) => record },
       }))
     )(service)
-    const resolved = await resolveSessionTarget(remote, parsedTarget)
+    // Only the resolve reads through the surface; its client's own connection must not outlive it.
+    const resolved = await resolveSessionTarget(remote, parsedTarget).finally(() => remote.client.close())
     if (resolved.kind === "error") {
       service.close()
       dependencies.error(`omo remote: ${resolved.error.message}`)
