@@ -139,8 +139,11 @@ async function enableRemote(
   return enabled
 }
 
-/** Starts `omo remote enable` in its own detached process, which outlives `omo login` (omo#13722). */
-export type BackgroundEnable = () => void
+/**
+ * Starts `omo remote <verb>` in its own detached process, which outlives `omo login` (omo#13722): enable turns remote
+ * on; bootstrap enforces a recorded opt-out (the switch off, the unit removed) on the service it installs.
+ */
+export type BackgroundRemote = (verb: "enable" | "bootstrap") => void
 
 /** What `omo login` prints when this device has no current device service yet and remote is turned on in the background. */
 export const REMOTE_TURNING_ON_AFTER_SIGN_IN =
@@ -161,28 +164,27 @@ export async function runLoginSetup(
   io: BootstrapIo,
   setup: BootstrapSetup,
   remote: RemoteSetup,
-  enableInBackground: BackgroundEnable,
+  inBackground: BackgroundRemote,
 ): Promise<"on" | "kept_off" | "not_on" | "background"> {
   // Login never installs the device service itself (omo#13722): the download, the platform's permission steps and the
   // service registration can take minutes (on Windows: Task Scheduler, PowerShell), and children of the login process
   // would keep it from exiting. A device whose current service already runs is set up here; any other is handed to a
   // detached `omo remote enable`. The install's "changed nothing" outcome keeps the bootstrap quiet about it.
   let handedOff = false
-  const noInstall = (start: boolean): BootstrapSetup => ({
+  const handOff = (verb: "enable" | "bootstrap"): BootstrapSetup => ({
     ...setup,
     install: async () => {
-      if (start) {
-        enableInBackground()
-        handedOff = true
-      }
+      inBackground(verb)
+      handedOff = true
       return { ok: false, state: "service_degraded", action: "", suppressed: true }
     },
   })
   if (remote.optOut.read()) {
     // Enforced now, not at the next omo start (#13602 security review M1): a switch that came back on is turned off and
     // the unit removed, as the bootstrap does for an opt-out. A setup that stops still leaves the record in charge.
-    // With no service running there is nothing to turn off, and nothing is installed for a user who turned remote off.
-    const outcome = await bootstrap(io, noInstall(false), false, true)
+    // A device with no current service (none, or an older one) gets it from a background omo remote bootstrap, which
+    // turns the switch off and removes the unit on the service it installs, as login did inline before (#13724 M1).
+    const outcome = await bootstrap(io, handOff("bootstrap"), false, true)
     if (outcome.kind === "connected") {
       try {
         if (outcome.status.enabled) await outcome.service.setEnabled(false)
@@ -194,7 +196,7 @@ export async function runLoginSetup(
     io.output(REMOTE_KEPT_OFF_AFTER_SIGN_IN)
     return "kept_off"
   }
-  const enabled = await enableRemote(io, noInstall(true), remote, false, () => {}, true)
+  const enabled = await enableRemote(io, handOff("enable"), remote, false, () => {}, true)
   if (handedOff) {
     io.output(REMOTE_TURNING_ON_AFTER_SIGN_IN)
     return "background"
