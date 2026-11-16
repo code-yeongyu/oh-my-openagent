@@ -54,11 +54,29 @@ describe("vendored device-service local-API client", () => {
         }
     }
     const port = readFileSync(join(SRC, "spec-proto.ts"), "utf8")
-    // Value exports in every form come from the transpiler's scan; type-only ones (it strips types) from their declarations.
-    const exported = [
+    // Value exports in every form come from the transpiler's scan; what it strips (type-only and `declare` declarations,
+    // type-only names in an export list) from their own syntax.
+    const exported = new Set([
       ...new Bun.Transpiler({ loader: "ts" }).scan(port).exports,
-      ...[...port.matchAll(/^export\s+(?:declare\s+)?(?:type|interface)\s+(\w+)/gm)].map((match) => match[1]),
-    ]
-    expect(exported.toSorted()).toEqual([...imported].toSorted())
+      ...[
+        ...port.matchAll(
+          /^export\s+(?:declare\s+)?(?:type|interface|const|let|var|function|class|enum|namespace|module)\s+(\w+)/gm,
+        ),
+      ].map((match) => match[1]),
+      ...[...port.matchAll(/^export\s+(?:type\s+)?\{([^}]*)\}/gm)].flatMap((match) =>
+        (match[1] ?? "")
+          .split(",")
+          .map(
+            (entry) =>
+              entry
+                .trim()
+                .replace(/^type\s+/, "")
+                .split(/\s+as\s+/)
+                .at(-1) ?? "",
+          )
+          .filter(Boolean),
+      ),
+    ])
+    expect([...exported].toSorted()).toEqual([...imported].toSorted())
   })
 })
