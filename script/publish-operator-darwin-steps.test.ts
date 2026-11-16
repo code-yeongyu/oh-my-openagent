@@ -80,7 +80,54 @@ describe("Verify operator darwin artifacts step", () => {
     const outcome = run("real")
     expect(outcome.status).toBe(0)
     expect(outcome.calls.split("\n")[0]).toStartWith("jq -r .source_sha // empty")
-    expect(outcome.calls).toContain("bun .github/workflows/operator-darwin-verify.ts")
+    expect(outcome.calls).toMatch(/^bun --config=\S+ \.github\/workflows\/operator-darwin-verify\.ts/m)
+  })
+})
+
+describe("Verify operator darwin artifacts step with the real bun", () => {
+  test("#13964 L1: a top-level preload in the checkout's bunfig.toml does not run before the verifier", () => {
+    const root = tempDir("operator-darwin-preload-")
+    const marker = join(root, "PRELOAD_RAN")
+    const verified = join(root, "VERIFIER_RAN")
+    writeFileSync(join(root, "bunfig.toml"), 'preload = ["./probe.ts"]\n')
+    writeFileSync(join(root, "probe.ts"), `await Bun.write(${JSON.stringify(marker)}, "ran")\n`)
+    mkdirSync(join(root, ".github/workflows"), { recursive: true })
+    // Stand-in verifier: proves bun ran the step's command and writes the summary rows the step cats.
+    writeFileSync(
+      join(root, ".github/workflows/operator-darwin-verify.ts"),
+      `await Bun.write(${JSON.stringify(verified)}, "ran")\nawait Bun.write(process.env.RUNNER_TEMP + "/operator-darwin-rows.md", "| rows |\\n")\n`,
+    )
+    const manifest = '{"source_sha":"1111111111111111111111111111111111111111"}'
+    writeFileSync(join(root, "operator-darwin-manifest.json"), manifest)
+    const result = spawnSync(
+      "bash",
+      [
+        "-c",
+        `jq() { echo 1111111111111111111111111111111111111111; }\ngit() { :; }\n${stepRun("Verify operator darwin artifacts")}`,
+      ],
+      {
+        cwd: root,
+        encoding: "utf8",
+        env: {
+          PATH: process.env.PATH ?? "",
+          OPERATOR_DARWIN_DIR: root,
+          MANIFEST_SHA256: createHash("sha256").update(manifest).digest("hex"),
+          PREPARED_RELEASE_SHA: "2".repeat(40),
+          TAG: "operator-darwin-111111111111",
+          VERSION: "5.1.75",
+          ACTOR: "maintainer",
+          TRIGGERING_ACTOR: "maintainer",
+          REPOSITORY: "o/r",
+          RUNNER_TEMP: root,
+          GITHUB_STEP_SUMMARY: join(root, "summary"),
+        },
+      },
+    )
+    expect({ status: result.status, verifierRan: existsSync(verified), preloadRan: existsSync(marker) }).toEqual({
+      status: 0,
+      verifierRan: true,
+      preloadRan: false,
+    })
   })
 })
 
@@ -114,6 +161,7 @@ describe("Refuse operator darwin verifier code that differs from the default bra
       'export const TEAM_ID = "523JNR86LZ"\n',
     )
     writeFileSync(join(checkout, ".github/workflows/publish.yml"), "name: publish\n")
+    writeFileSync(join(checkout, "bunfig.toml"), "[test]\n")
     git(checkout, "add", "-A")
     git(checkout, "commit", "-q", "-m", "dev")
     git(checkout, "remote", "add", "origin", origin)
@@ -142,8 +190,14 @@ describe("Refuse operator darwin verifier code that differs from the default bra
     )
     expect(outcome.status).toBe(1)
     expect(outcome.stdout).toContain(
-      "::error::operator_darwin_artifacts refused: .github/workflows/operator-darwin-*.ts differ from dev",
+      "::error::operator_darwin_artifacts refused: .github/workflows/operator-darwin-*.ts or bunfig.toml differ from dev",
     )
+  })
+
+  test("#13964 L1: a release ref that changes bunfig.toml is refused", () => {
+    const outcome = dispatch((checkout) => writeFileSync(join(checkout, "bunfig.toml"), 'preload = ["./probe.ts"]\n'))
+    expect(outcome.status).toBe(1)
+    expect(outcome.stdout).toContain("operator-darwin-*.ts or bunfig.toml differ from dev")
   })
 
   test("a release ref carrying the merged verifier (other workflow files may differ) is admitted", () => {

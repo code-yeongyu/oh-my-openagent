@@ -356,8 +356,8 @@ jobs:
   operator-darwin:
     if: github.repository == 'code-yeongyu/oh-my-openagent' && inputs.operator_darwin_artifacts != ''
     runs-on: ubuntu-24.04
-    # The verifier's own lookups (Apple ticket, GitHub role) are bounded per call; the gh/git/curl steps around them
-    # are not, so this caps the whole job well below the 6 h default.
+    # The verifier's two network lookups (Apple ticket, GitHub role) time out per call. The gh, git and curl
+    # commands in the other steps have no per-call bound, so this caps the whole job well below the 6 h default.
     timeout-minutes: 30
     permissions:
       # Draft releases are listed only to tokens with push access; nothing here writes.
@@ -375,8 +375,11 @@ jobs:
         with:
           bun-version: "1.4.4"
 
-      # The verifier and its pins run from the dispatched ref (#13943): refuse one that differs from the default
-      # branch's, so a release branch cannot carry its own trust rules. A release branch takes the merged files.
+      # The verifier and its pins run from the dispatched ref (#13943). This step refuses a ref whose
+      # operator-darwin-*.ts or bunfig.toml differ from the default branch's; the verifier also runs with an empty
+      # Bun config, so no ref-supplied preload executes before it. It does NOT pin this workflow file itself: a ref
+      # that edits publish-platform.yml can drop this step, which only a protected environment or a branch rule on
+      # .github/workflows/** closes (owner setting, #13964).
       - name: Refuse operator darwin verifier code that differs from the default branch
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch || 'dev' }}
@@ -386,9 +389,9 @@ jobs:
             echo "::error::operator_darwin_artifacts refused: could not fetch ${DEFAULT_BRANCH} to compare the verifier."
             exit 1
           fi
-          if ! git diff --quiet FETCH_HEAD HEAD -- '.github/workflows/operator-darwin-*.ts'; then
-            echo "::error::operator_darwin_artifacts refused: .github/workflows/operator-darwin-*.ts differ from ${DEFAULT_BRANCH}; the dispatched ref must carry the merged verifier unchanged."
-            git diff --stat FETCH_HEAD HEAD -- '.github/workflows/operator-darwin-*.ts'
+          if ! git diff --quiet FETCH_HEAD HEAD -- '.github/workflows/operator-darwin-*.ts' bunfig.toml; then
+            echo "::error::operator_darwin_artifacts refused: .github/workflows/operator-darwin-*.ts or bunfig.toml differ from ${DEFAULT_BRANCH}; the dispatched ref must carry the merged verifier unchanged."
+            git diff --stat FETCH_HEAD HEAD -- '.github/workflows/operator-darwin-*.ts' bunfig.toml
             exit 1
           fi
           echo "The operator darwin verifier equals ${DEFAULT_BRANCH}."
@@ -441,7 +444,10 @@ jobs:
             echo "::error::operator_darwin_artifacts refused: could not fetch source ${SOURCE_SHA} and prepared_release_sha ${PREPARED_RELEASE_SHA}."
             exit 1
           fi
-          bun .github/workflows/operator-darwin-verify.ts --dir "$OPERATOR_DARWIN_DIR" --tag "$TAG" \
+          # An empty Bun config: no bunfig.toml preload from the checkout runs before the verifier.
+          : > "${RUNNER_TEMP}/operator-darwin-bunfig.toml"
+          bun --config="${RUNNER_TEMP}/operator-darwin-bunfig.toml" .github/workflows/operator-darwin-verify.ts \
+            --dir "$OPERATOR_DARWIN_DIR" --tag "$TAG" \
             --manifest-sha256 "$MANIFEST_SHA256" --prepared-sha "$PREPARED_RELEASE_SHA" --version "$VERSION" --repo . \
             --actor "$ACTOR" --triggering-actor "$TRIGGERING_ACTOR" --repository "$REPOSITORY" \
             --summary "${RUNNER_TEMP}/operator-darwin-rows.md"

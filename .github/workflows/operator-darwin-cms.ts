@@ -28,7 +28,8 @@ type Tlv = {
 // Deeper nesting than any CMS needs is refused, so a crafted blob cannot exhaust the stack.
 const MAX_INDEFINITE_DEPTH = 32
 
-function tlv(bytes: Uint8Array, at: number, depth = 0): Tlv {
+// `depth` counts the indefinite-length elements already open around this one, so the outermost is level 1.
+function tlv(bytes: Uint8Array, at: number, depth = 1): Tlv {
   if (depth > MAX_INDEFINITE_DEPTH) refuse(`DER nesting exceeds ${MAX_INDEFINITE_DEPTH} indefinite-length levels`)
   const tag = bytes[at] ?? refuse("truncated DER")
   let length = bytes[at + 1] ?? refuse("truncated DER")

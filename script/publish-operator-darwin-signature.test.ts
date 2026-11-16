@@ -233,6 +233,15 @@ describe("operator darwin CMS signer", () => {
     )
   })
 
+  test("#13964 L7: 32 nested indefinite-length levels are parsed, 33 are refused", () => {
+    const nested = (levels: number) =>
+      Uint8Array.from([...Array.from({ length: levels }, () => [0x30, 0x80]).flat(), ...new Array(levels * 2).fill(0)])
+    expect(refusal(() => verifyDeveloperIdSigner(realCodeDirectory, nested(32)))).not.toContain("DER nesting exceeds")
+    expect(refusal(() => verifyDeveloperIdSigner(realCodeDirectory, nested(33)))).toBe(
+      "REFUSED: DER nesting exceeds 32 indefinite-length levels",
+    )
+  })
+
   test("review NIT-2: 200k nested indefinite-length elements are a typed refusal, not a stack overflow", () => {
     const bomb = new Uint8Array(400_000)
     for (let index = 0; index < bomb.length; index += 2) bomb.set([0x30, 0x80], index)

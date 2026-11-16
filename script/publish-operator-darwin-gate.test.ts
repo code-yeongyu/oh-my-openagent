@@ -234,6 +234,14 @@ describe("operator darwin wiring", () => {
     )
   })
 
+  test("#13964 L2: the pinned-verifier guard runs before any operator-supplied input is downloaded or read", () => {
+    const names = (job(platform, "operator-darwin").steps ?? []).map((step) => step.name ?? step.uses ?? "")
+    const guard = names.indexOf("Refuse operator darwin verifier code that differs from the default branch")
+    expect(guard).toBeGreaterThan(-1)
+    expect(guard).toBeLessThan(names.indexOf("Download operator darwin artifacts"))
+    expect(guard).toBeLessThan(names.indexOf("Verify operator darwin artifacts"))
+  })
+
   test("no operator-darwin step can be skipped or soft-fail (only the job summary runs always)", () => {
     for (const step of job(platform, "operator-darwin").steps ?? []) {
       const allowed = step.name === "Write job summary" ? "always()" : undefined
