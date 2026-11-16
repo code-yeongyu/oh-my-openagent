@@ -117,7 +117,10 @@ impl Drop for Player {
 }
 
 /// `work` on its own thread, failing the test when it has not finished within `BOUND`.
-pub(crate) fn within<T: Send + 'static>(what: &str, work: impl FnOnce() -> T + Send + 'static) -> T {
+pub(crate) fn within<T: Send + 'static>(
+    what: &str,
+    work: impl FnOnce() -> T + Send + 'static,
+) -> T {
     let (send, done) = mpsc::channel();
     std::thread::spawn(move || {
         let _receiver_gone = send.send(work());

@@ -36,7 +36,9 @@ fn role_appender() {
         println!("{READY}");
         until_released();
         for index in 0..LINES {
-            writer.append(event(&format!("append-{index}"))).expect("appended");
+            writer
+                .append(event(&format!("append-{index}")))
+                .expect("appended");
         }
     }
 }
@@ -58,13 +60,19 @@ fn two_processes_appending_at_once_leave_parseable_lines_and_gapless_segments() 
     for line in text.lines() {
         let line: Value = serde_json::from_str(line).expect("every line parses");
         if let Some(seq) = line.get("seq").and_then(Value::as_u64) {
-            let pid = line["writerPid"].as_u64().expect("a stamped line names its writer");
+            let pid = line["writerPid"]
+                .as_u64()
+                .expect("a stamped line names its writer");
             segments.entry(pid).or_default().push(seq);
         }
     }
     assert_eq!(segments.len(), 2, "one segment per writer: {segments:?}");
     for (pid, seqs) in segments {
-        assert_eq!(seqs, (1..=LINES).collect::<Vec<_>>(), "writer {pid}'s seq has no gap");
+        assert_eq!(
+            seqs,
+            (1..=LINES).collect::<Vec<_>>(),
+            "writer {pid}'s seq has no gap"
+        );
     }
 }
 
@@ -91,7 +99,8 @@ fn an_append_in_one_process_does_not_fail_a_read_of_the_audit_file_in_another() 
     holder.wait_for(&[READY]);
     let read = fs::read_to_string(audit_path(dir.path(), HAND));
     assert!(
-        read.as_deref().is_ok_and(|text| text.contains("audit.meta")),
+        read.as_deref()
+            .is_ok_and(|text| text.contains("audit.meta")),
         "the data file reads while another process holds the append lock: {read:?}"
     );
     let pending = std::thread::spawn(move || writer.append(event("after-release")).map(drop));

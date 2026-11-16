@@ -1,11 +1,13 @@
 //! ONE audit file per hand, `<auditDir>/computer/<handId>/audit.jsonl` (0600), written by
 //! every writer of the uid as per-writer segments keyed `(writerPid, writerProcStartMs, seq)`
-//! under the file lock. Each segment opens with `audit.meta`; the AUTHORITY host's segment
+//! under the per-append lock (A-IS-65 L7: `flock` on the data file on unix; on Windows the
+//! hand's `audit.lock`, never the data file, so a reader never fails on a byte-range lock),
+//! taken through the session crate's one lock helper. Each segment opens with `audit.meta`; the AUTHORITY host's segment
 //! follows it with a `rotation_anchor` grant. Only the authority host rotates (at
 //! `rotate_at`, to `audit.1.jsonl`); any other writer keeps appending up to `hard_cap` and
 //! then refuses exec `audit_unavailable`.
 
-use std::fs::{self, OpenOptions};
+use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
@@ -14,11 +16,14 @@ use omo_computer_core::backend::Refusal;
 use serde_json::json;
 
 use super::line::{now_ms, AuditEvent};
-use super::segment::{anchor_event, chain_link, lock, stamp, truncated, Segment};
+use super::segment::{anchor_event, chain_link, stamp, truncated, Segment};
 use super::sink::{AuditSink, AUDIT_UNAVAILABLE};
+use crate::lock::file;
 
 pub const AUDIT_FILE: &str = "audit.jsonl";
 pub const ROTATED_FILE: &str = "audit.1.jsonl";
+/// The hand's append lock on Windows, beside the data file (A-IS-62.md:243, A-IS-65 L7).
+pub const AUDIT_LOCK_FILE: &str = "audit.lock";
 const MIB: u64 = 1024 * 1024;
 
 /// `<auditDir>/computer/<handId>/audit.jsonl`.
@@ -174,10 +179,7 @@ impl AuditWriter {
             use std::os::unix::fs::OpenOptionsExt;
             options.mode(0o600).custom_flags(libc::O_NOFOLLOW);
         }
-        let mut file = options.open(&self.path)?;
-        lock(&file)?;
-        file.write_all(bytes)?;
-        file.sync_data()
+        append_locked(&self.path, &options, bytes)
     }
 
     fn size(&self) -> u64 {
@@ -231,4 +233,27 @@ impl AuditWriter {
         self.segment = segment;
         Ok(self.segment.prev.clone())
     }
+}
+
+/// Unix: the per-append lock is `flock` on the data file itself, through the crate's one lock
+/// helper; it drops with the append's handle (unchanged at row 17).
+#[cfg(unix)]
+fn append_locked(path: &Path, options: &OpenOptions, bytes: &[u8]) -> io::Result<()> {
+    let held = file::lock(options.open(path)?)?;
+    write_synced(held.file(), bytes)
+}
+
+/// Windows (and any other target, where the helper refuses): the per-append lock is taken on
+/// the hand's `audit.lock`, never on the data file, whose byte-range lock would fail every
+/// concurrent read (A-IS-65 L7). A lock that cannot be created, opened or taken fails the
+/// append: the writer never appends unlocked.
+#[cfg(not(unix))]
+fn append_locked(path: &Path, options: &OpenOptions, bytes: &[u8]) -> io::Result<()> {
+    let _append_lock = file::lock(file::open(&path.with_file_name(AUDIT_LOCK_FILE))?)?;
+    write_synced(&options.open(path)?, bytes)
+}
+
+fn write_synced(mut file: &File, bytes: &[u8]) -> io::Result<()> {
+    file.write_all(bytes)?;
+    file.sync_data()
 }

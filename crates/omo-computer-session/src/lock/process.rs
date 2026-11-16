@@ -12,7 +12,9 @@ const SLEEPING: &str = "SLEEPING";
 #[test]
 fn role_holder() {
     if let Some(dir) = playing("holder") {
-        let held = InteractionLock::under(&dir).acquire().expect("the holder takes the lock");
+        let held = InteractionLock::under(&dir)
+            .acquire()
+            .expect("the holder takes the lock");
         println!("{HELD}");
         until_released();
         drop(held);
@@ -22,9 +24,13 @@ fn role_holder() {
 #[test]
 fn role_spawner() {
     if let Some(dir) = playing("spawner") {
-        let held = InteractionLock::under(&dir).acquire().expect("the spawner takes the lock");
+        let held = InteractionLock::under(&dir)
+            .acquire()
+            .expect("the spawner takes the lock");
         let path = concat!(module_path!(), "::role_sleeper");
-        let _sleeper = command(path, "sleeper", &dir).spawn().expect("spawn the sleeper");
+        let _sleeper = command(path, "sleeper", &dir)
+            .spawn()
+            .expect("spawn the sleeper");
         println!("{HELD}");
         std::mem::forget(held);
         std::process::exit(0);
@@ -58,9 +64,15 @@ fn a_lock_held_by_another_process_is_held_here_until_that_process_releases_it() 
     let mut holder = holder("holder", dir.path());
     holder.wait_for(&[HELD]);
     let probe = InteractionLock::under(dir.path()).try_acquire();
-    assert!(matches!(probe, Ok(None)), "held by the other process: {probe:?}");
+    assert!(
+        matches!(probe, Ok(None)),
+        "held by the other process: {probe:?}"
+    );
     holder.release();
-    assert!(acquired_within_bound(dir.path()), "free once the holder released it");
+    assert!(
+        acquired_within_bound(dir.path()),
+        "free once the holder released it"
+    );
     assert!(holder.exited().success());
 }
 
@@ -71,13 +83,18 @@ fn a_killed_holder_frees_the_lock_for_the_next_acquire() {
     holder.wait_for(&[HELD]);
     holder.kill();
     holder.exited();
-    assert!(acquired_within_bound(dir.path()), "the OS freed a dead holder's lock");
+    assert!(
+        acquired_within_bound(dir.path()),
+        "the OS freed a dead holder's lock"
+    );
 }
 
 #[test]
 fn try_acquire_on_a_held_lock_is_held_not_an_error() {
     let dir = tempfile::tempdir().expect("tempdir");
-    let held = InteractionLock::under(dir.path()).acquire().expect("first holder");
+    let held = InteractionLock::under(dir.path())
+        .acquire()
+        .expect("first holder");
     let probe = InteractionLock::under(dir.path()).try_acquire();
     assert!(matches!(probe, Ok(None)), "{probe:?}");
     drop(held);
@@ -104,10 +121,14 @@ fn a_link_at_the_lock_file_refuses_and_is_never_held() {
     #[cfg(unix)]
     std::os::unix::fs::symlink(&elsewhere, &link).expect("symlink");
     #[cfg(windows)]
-    std::os::windows::fs::symlink_file(&elsewhere, &link).expect("symlink (the runner has the privilege)");
+    std::os::windows::fs::symlink_file(&elsewhere, &link)
+        .expect("symlink (the runner has the privilege)");
     let lock = InteractionLock::under(dir.path());
     assert!(lock.acquire().is_err(), "acquire refuses a link");
-    assert!(lock.try_acquire().is_err(), "try_acquire refuses a link, never 'held'");
+    assert!(
+        lock.try_acquire().is_err(),
+        "try_acquire refuses a link, never 'held'"
+    );
 }
 
 #[cfg(windows)]
@@ -116,7 +137,10 @@ fn a_held_lock_file_cannot_be_deleted_or_renamed() {
     let dir = tempfile::tempdir().expect("tempdir");
     let lock = InteractionLock::under(dir.path());
     let held = lock.acquire().expect("held");
-    assert!(fs::remove_file(lock.path()).is_err(), "no delete while held (L12)");
+    assert!(
+        fs::remove_file(lock.path()).is_err(),
+        "no delete while held (L12)"
+    );
     assert!(
         fs::rename(lock.path(), dir.path().join("moved")).is_err(),
         "no rename while held (L12)"
