@@ -15,6 +15,8 @@ pub mod reader;
 pub mod seam;
 pub mod settle;
 
+#[cfg(target_os = "macos")]
+pub mod os;
 #[cfg(test)]
 mod tests;
 
