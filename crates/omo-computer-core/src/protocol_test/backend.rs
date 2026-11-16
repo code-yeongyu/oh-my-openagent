@@ -61,7 +61,7 @@ fn backend_defaults_refuse() {
         Reason::CaptureUnsupported,
     );
     assert_refused(
-        bare.post_input(&input, Route::BackgroundPid),
+        bare.post_input(&input, Route::BackgroundPid { pid: 4242 }),
         EngineCode::Internal,
         "COMPUTER_UNAVAILABLE",
         Reason::InputUnsupported,

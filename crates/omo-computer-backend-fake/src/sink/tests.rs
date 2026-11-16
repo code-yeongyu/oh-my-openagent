@@ -26,7 +26,7 @@ fn recording_sink_is_empty_after_refusal() {
         .inject(FakeMethod::Key, Fault::fail(EngineCode::InputFailed))
         .expect("InputFailed has a bare row");
 
-    let refused = backend.post_input(&key_down(), Route::BackgroundWindow);
+    let refused = backend.post_input(&key_down(), Route::BackgroundWindow { window: "101".to_owned() });
     assert_eq!(
         refused.map_err(|refusal| refusal.code),
         Err(EngineCode::InputFailed)
@@ -46,7 +46,7 @@ fn recording_sink_is_empty_after_refusal() {
         sink.lines()
     );
 
-    let delivered = backend.post_input(&key_down(), Route::BackgroundWindow);
+    let delivered = backend.post_input(&key_down(), Route::BackgroundWindow { window: "101".to_owned() });
     assert!(delivered.is_ok(), "{delivered:?}");
     assert_eq!(
         sink.lines().len(),

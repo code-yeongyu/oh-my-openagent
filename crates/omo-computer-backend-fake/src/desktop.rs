@@ -36,7 +36,7 @@ impl Backend for FakeBackend {
     }
 
     fn post_input(&mut self, input: &TaggedInput, route: Route) -> BackendResult<Delivered> {
-        self.record_input(input, route)
+        self.record_input(input, &route)
     }
 
     fn stop_listener(&mut self) -> BackendResult<Box<dyn StopListener>> {

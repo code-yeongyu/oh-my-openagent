@@ -32,7 +32,7 @@ impl Session {
     ) -> Result<(Plan, u64), Box<(String, Refused)>> {
         self.reconcile_stop();
         let epoch = self.guard.supervisor().stop_epoch();
-        let call = (mutation.method, &mutation.call.target, mutation.route);
+        let call = (mutation.method, &mutation.call.target, mutation.route.clone());
         let plan = self.funnel.control.plan(self.backend.as_mut(), call, epoch);
         match self
             .guard
@@ -81,7 +81,7 @@ mod tests {
             Method::Click,
             call,
             Vec::new(),
-            Route::BackgroundWindow,
+            Route::BackgroundWindow { window: "101".to_owned() },
             &CallAuthority::default(),
         );
         let refused = s

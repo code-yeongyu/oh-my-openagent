@@ -28,6 +28,8 @@ pub struct FakeState {
     pub displays: Vec<FakeDisplay>,
     pub process_start: BTreeMap<String, u64>,
     pub exited: BTreeSet<String>,
+    /// The window the last background input was addressed to (row 21a).
+    pub last_input_window: Option<String>,
     pub calls: CallCounter,
     pub faults: FaultQueue,
     pub pending_presses: Vec<UserPress>,
@@ -83,6 +85,7 @@ impl FakeState {
             displays: scenario.displays.clone(),
             process_start,
             exited: BTreeSet::new(),
+            last_input_window: None,
             calls: CallCounter::default(),
             faults,
             pending_presses: scenario.user_presses.clone(),

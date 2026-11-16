@@ -55,7 +55,7 @@ fn identity_epoch_and_display_scripts_fire_after_their_call() {
         epochs.next_change().ok().flatten().map(|e| e.reason),
         Some("lock".to_owned())
     );
-    fake.post_input(&click(), Route::BackgroundWindow)
+    fake.post_input(&click(), Route::BackgroundWindow { window: "101".to_owned() })
         .expect("delivered");
     assert_eq!(
         fake.displays().map(|d| d.len()),

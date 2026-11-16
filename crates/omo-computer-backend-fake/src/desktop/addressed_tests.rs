@@ -42,7 +42,7 @@ fn ta3_a_background_input_to_an_unlisted_window_is_refused_with_nothing_sent() {
 #[test]
 fn ta3b_a_background_input_to_an_exited_window_is_refused_with_nothing_sent() {
     let mut fake = load("v3-target-exit.json");
-    let _ = fake.capture(&Target::Window("101".to_owned()), &CaptureOptions::default());
+    let _ = fake.capture(&Target::Window("101".to_owned()), &CaptureOptions { cursor: true, crosshair: None, region: None });
     assert!(fake.exited("101"), "the script exits 101 on its first capture");
     let refused = fake.post_input(&click(), background("101")).expect_err("exited");
     assert_eq!(

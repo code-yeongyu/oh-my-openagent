@@ -1,6 +1,9 @@
 //! Input: the one sink every posted event lands in, with the cursor and held keys it moves.
 
-use omo_computer_core::backend::{BackendResult, Delivered, InputEvent, Route, TaggedInput};
+use omo_computer_core::backend::{
+    BackendResult, Delivered, InputEvent, Refusal, Route, TaggedInput,
+};
+use omo_computer_core::error::{EngineCode, Reason};
 
 use crate::backend::FakeBackend;
 use crate::method::FakeMethod;
@@ -22,7 +25,7 @@ impl FakeBackend {
     pub(super) fn record_input(
         &mut self,
         input: &TaggedInput,
-        route: Route,
+        route: &Route,
     ) -> BackendResult<Delivered> {
         self.call(FakeMethod::of_input(&input.event), |state, _| {
             match &input.event {
@@ -35,7 +38,28 @@ impl FakeBackend {
                 }
                 _ => {}
             }
-            let route = format!("{route:?}").to_lowercase();
+            if let Route::BackgroundWindow { window } = route {
+                if !state.windows.iter().any(|w| &w.id == window)
+                    || state.exited.contains(window)
+                {
+                    return Err(Refusal::new(
+                        EngineCode::BackgroundUnavailable,
+                        Reason::TargetUnknown,
+                    ));
+                }
+            }
+            state.last_input_window = match route {
+                Route::BackgroundWindow { window } => Some(window.clone()),
+                _ => None,
+            };
+            // The sink line keeps its pre-21a spelling; the address is read through
+            // `last_input_window`.
+            let route = match route {
+                Route::Ax => "ax",
+                Route::BackgroundWindow { .. } => "backgroundwindow",
+                Route::BackgroundPid { .. } => "backgroundpid",
+                Route::ForegroundHid => "foregroundhid",
+            };
             self.sink.record(format!(
                 "post_input route={route} tag={} {}",
                 input.tag,

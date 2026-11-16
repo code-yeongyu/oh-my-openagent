@@ -39,7 +39,7 @@ impl Session {
         let record = Record::new(&self.funnel, &mutation, &call_id, secure);
         self.reconcile_stop();
         let mut epoch = self.guard.supervisor().stop_epoch();
-        let call = (mutation.method, &mutation.call.target, mutation.route);
+        let call = (mutation.method, &mutation.call.target, mutation.route.clone());
         let mut plan = self.funnel.control.plan(self.backend.as_mut(), call, epoch);
         if let Err(refused) =
             self.guard
@@ -135,7 +135,7 @@ impl Session {
             return Err(self.refuse(record, Some("Marker".to_owned()), MARKER_UNAVAILABLE.into()));
         }
         let of = u32::try_from(mutation.events.len()).unwrap_or(u32::MAX);
-        let (count, failure) = self.send(mutation.events, mutation.route, tag);
+        let (count, failure) = self.send(mutation.events, mutation.route.clone(), tag);
         drop(lock);
         if let Some((target, frame_id)) = mutation.consume.as_ref().filter(|_| count > 0) {
             self.frames.consume(target, frame_id);
@@ -189,7 +189,7 @@ impl Session {
                     self.funnel.warn(format!("audit line not written: {error}"));
                 }
                 let sent = Sent {
-                    route: mutation.route,
+                    route: mutation.route.clone(),
                     count,
                     of,
                     effect: read_back.effect,
@@ -234,7 +234,7 @@ impl Session {
     ) -> (u32, Option<Refusal>) {
         let mut count = 0;
         for event in events {
-            match self.backend.post_input(&TaggedInput { event, tag }, route) {
+            match self.backend.post_input(&TaggedInput { event, tag }, route.clone()) {
                 Ok(_) => count += 1,
                 Err(refusal) => return (count, Some(refusal)),
             }

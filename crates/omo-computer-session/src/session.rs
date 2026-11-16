@@ -193,7 +193,7 @@ impl Session {
             chord: None,
             force: false,
         };
-        let route = route_for(request.target.as_deref(), request.policy.delivery);
+        let route = route_for(request.target.as_deref(), request.policy.delivery)?;
         let button = button.unwrap_or(Button::Left);
         let mut events = vec![InputEvent::PointerMove(point)];
         events.extend(modifiers.iter().map(|key| key_event(key, true)));
@@ -223,7 +223,7 @@ impl Session {
             chord: None,
             force: false,
         };
-        let route = route_for(Some(target.as_str()), None);
+        let route = route_for(Some(target.as_str()), None)?;
         self.traced(dispatched, &target, Mutation::typed(Method::TypeText, call, route, text))
     }
 }

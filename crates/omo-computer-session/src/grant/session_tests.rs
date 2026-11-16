@@ -187,10 +187,10 @@ fn only_global_input_on_the_desktop_takes_the_lease_and_reserves_every_window() 
     use omo_computer_safety::TargetRef;
     let mut backend = FakeBackend::new(scenario(&json!({})));
     let mut control = crate::grant::Control::default();
-    let click = control.plan(&mut backend, (Method::Click, &TargetRef::Desktop, Route::BackgroundWindow), 0);
+    let click = control.plan(&mut backend, (Method::Click, &TargetRef::Desktop, Route::BackgroundWindow { window: "101".to_owned() }), 0);
     assert!(click.foreground);
     assert_eq!(click.windows, ["1", "2"]);
-    let launch = control.plan(&mut backend, (Method::AppsOpen, &TargetRef::Desktop, Route::BackgroundPid), 0);
+    let launch = control.plan(&mut backend, (Method::AppsOpen, &TargetRef::Desktop, Route::BackgroundPid { pid: 4242 }), 0);
     assert!(!launch.foreground, "a launch lands on no pointer");
     assert!(launch.windows.is_empty(), "and reserves no window");
     let foreground = control.plan(&mut backend, (Method::AppsOpen, &TargetRef::Desktop, Route::ForegroundHid), 0);
