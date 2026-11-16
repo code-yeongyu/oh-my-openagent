@@ -186,7 +186,7 @@ fn launcher_killed_alone_ends_the_daemon_within_2s() {
     }
 }
 
-fn machine_id_over(args: &[&str], daemon: &Daemon) -> serde_json::Value {
+fn machine_id_over(args: &[&str], method: &str, daemon: &Daemon) -> serde_json::Value {
     let env: Vec<(String, String)> = vec![
         ("OMO_COMPUTER_BACKEND".to_owned(), "fake".to_owned()),
         ("OMO_COMPUTER_RUNTIME_DIR".to_owned(), daemon.dir.path().to_string_lossy().into_owned()),
@@ -194,7 +194,7 @@ fn machine_id_over(args: &[&str], daemon: &Daemon) -> serde_json::Value {
         ("OMO_COMPUTER_FAKE_STOP_PATH".to_owned(), "live".to_owned()),
     ];
     let mut engine = peer::Peer::spawn(args, &env, daemon.dir.path());
-    engine.send(&json!({"jsonrpc": "2.0", "id": 1, "method": "engine.hello", "params": {}}));
+    engine.send(&json!({"jsonrpc": "2.0", "id": 1, "method": method, "params": {}}));
     let reply = engine.next().expect("hello is answered");
     drop(engine.close());
     reply["result"]["machineId"].clone()
@@ -205,6 +205,7 @@ fn hello_machine_id_matches_across_stdio_serve_and_oneshot() {
     let daemon = Daemon::start(&[]);
     let served = daemon.connect(&daemon.capability).call(1, "engine.hello", &json!({})).expect("hello")["result"]["machineId"].clone();
     assert!(served.is_string(), "{served}");
-    assert_eq!(machine_id_over(&["--stdio"], &daemon), served);
-    assert_eq!(machine_id_over(&["--oneshot"], &daemon), served);
+    assert_eq!(machine_id_over(&["--stdio"], "engine.hello", &daemon), served);
+    // --oneshot speaks the v1 `desktop.*` names (corpus case 09).
+    assert_eq!(machine_id_over(&["--oneshot"], "desktop.engine.hello", &daemon), served);
 }
