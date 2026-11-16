@@ -85,4 +85,20 @@ describe("#given required CI and an optional full-matrix label run", () => {
     expect(run).toContain("Platform-reason:")
     expect(run).toContain("GITHUB_EVENT_PATH")
   })
+
+  // A step that runs a repository script needs the workspace: an earlier checkout must run whenever that step runs.
+  test("#then the platform decision never runs a repository script without a checkout", () => {
+    const decide = record(record(workflow("pr-platform-decision.yml")["jobs"])["decide"])
+    const steps = (decide["steps"] as unknown[]).map(record)
+    const checkout = steps.findIndex((step) => String(step["uses"] ?? "").startsWith("actions/checkout@"))
+    expect(checkout).toBeGreaterThanOrEqual(0)
+    expect(steps[checkout]?.["if"]).toBeUndefined()
+    steps.forEach((step, index) => {
+      if (/(^|\s)(bash \.github\/scripts\/|node script\/)/.test(String(step["run"] ?? ""))) {
+        expect(index).toBeGreaterThan(checkout)
+      }
+    })
+    // One boolean is not worth a full clone: the decision reads the PR's files from the API.
+    expect(record(steps[checkout]?.["with"])["fetch-depth"]).toBeUndefined()
+  })
 })

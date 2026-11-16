@@ -34,6 +34,7 @@ jobs:
   platform:
     permissions:
       contents: read
+      pull-requests: read
     uses: ./.github/workflows/pr-platform-decision.yml
 
   native-contract:

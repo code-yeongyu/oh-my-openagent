@@ -18,6 +18,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   decide:
@@ -27,17 +28,22 @@ jobs:
     outputs:
       full_matrix: ${{ steps.decide.outputs.full_matrix }}
     steps:
+      # Only the classifier and the summary helper are needed: a sparse depth-1 checkout on every event, so no path
+      # runs a repository script in an empty workspace and no pull request pays for a full clone.
       - uses: actions/checkout@v7
-        if: github.event_name == 'pull_request'
         with:
-          fetch-depth: 0
           persist-credentials: false
+          sparse-checkout: |
+            script/ci-fast-path.mjs
+            .github/scripts/write-job-summary.sh
+          sparse-checkout-cone-mode: false
 
       - name: Decide whether this run may use macOS/Windows
         id: decide
         shell: bash
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_REF: ${{ github.head_ref }}
           FAIL_ON_REFUSAL: ${{ inputs.fail-on-refusal }}
         run: |
@@ -48,7 +54,8 @@ jobs:
           fi
           paths="$RUNNER_TEMP/paths"
           body="$RUNNER_TEMP/pr-body.md"
-          git diff --name-only -z "$(git merge-base "$BASE_SHA" HEAD)" HEAD > "$paths"
+          # The PR's changed files (the merge-base diff) from the API: no history is checked out.
+          gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100" --jq '.[].filename' | tr '\n' '\0' > "$paths"
           # Read from the event file: a PR body can exceed the per-variable environment limit.
           jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH" > "$body"
           labels="$(jq -c '[.pull_request.labels[].name]' "$GITHUB_EVENT_PATH")"
