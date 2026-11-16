@@ -3,7 +3,7 @@ import { SOCKET_FILE } from "./local-api/access.ts"
 import { connectLocalApi, type ConnectOptions, type LocalApiClient } from "./local-api/client.ts"
 import { ENDPOINT_FILE } from "./local-api/transport.ts"
 import { connectLocalBackground } from "./background-transport.ts"
-import { markNotSent, NotSentError } from "./not-sent-error.ts"
+import { markNotSent, NotSentError, olderThanWakeMinimum } from "./not-sent-error.ts"
 import type { ListingResult, ListingRevision } from "./local-api/client-assembly.ts"
 import type {
   Capability,
@@ -24,6 +24,7 @@ import { randomBytes } from "node:crypto"
 import { minimumInEffect, type MinimumsOption } from "./minimum-in-effect.ts"
 import { compareVersions } from "./release/version.ts"
 import { deviceServiceStateDir } from "./state-dir.ts"
+import { deadlineTimerOf, realTimers, type Timers } from "./timers.ts"
 
 // A host sends no command state at all for a route it does not list toward a sender it does not grant (docs/local-api.md
 // "Delegated commands"), so the client bounds its own wait.
@@ -35,11 +36,12 @@ function sendToEndpoint(
   endpoint: string,
   rpc: CommandRpc,
   locate: boolean,
+  timers: Timers,
 ): Promise<CommandResult> {
   // A service before decision 0018's 2026-11-06 amendment refuses the unknown `locate` field with invalid_request
   // before routing anything, so the command id is still unbound and the same command goes again without it; its
   // reply then names no `located` and the caller locates as before.
-  return followDelegatedCommand(client, device, (commandId) => {
+  return followDelegatedCommand(client, device, timers, (commandId) => {
     const send = (asked: boolean): Promise<unknown> =>
       client.commandTo({ device, endpoint }, rpc, commandId, asked ? { locate: true } : {})
     return send(locate).catch((error: unknown) =>
@@ -57,6 +59,7 @@ function sendToEndpoint(
 function followDelegatedCommand(
   client: LocalApiClient,
   device: string,
+  timers: Timers,
   send: (commandId: string) => Promise<unknown>,
 ): Promise<CommandResult> {
   return new Promise<CommandResult>((resolve, reject) => {
@@ -68,7 +71,7 @@ function followDelegatedCommand(
       done = true
       stop()
       channel.stop()
-      clearTimeout(timer)
+      cancelTimer()
     }
     const fail = (error: unknown): void => {
       if (done) return
@@ -88,11 +91,9 @@ function followDelegatedCommand(
         ...(located === undefined ? {} : { located }),
       })
     })
-    const timer = setTimeout(
-      () => fail(new Error(`no final state for endpoint command ${commandId} within ${ENDPOINT_COMMAND_WAIT_MS} ms`)),
-      ENDPOINT_COMMAND_WAIT_MS,
+    const cancelTimer = timers.after(ENDPOINT_COMMAND_WAIT_MS, () =>
+      fail(new Error(`no final state for endpoint command ${commandId} within ${ENDPOINT_COMMAND_WAIT_MS} ms`)),
     )
-    timer.unref?.()
     void client.closed.then(() => fail(new Error("the connection closed before the endpoint command settled")))
     send(commandId).catch(fail)
   })
@@ -123,6 +124,8 @@ export { SESSION_ROW_STATES } from "./local-api/protocol.ts"
 export type { AttachEnd, CommandResult, RemoteAttach, RemoteAttachEvent } from "./remote-attach.ts"
 
 export { DEVICE_SERVICE_STATE_DIR_ENV, deviceServiceStateDir } from "./state-dir.ts"
+// The clock seam, here too so a local-only caller takes it without the package barrel (which reaches the release fetch).
+export { realTimers, type Timers } from "./timers.ts"
 
 /** The file a running service publishes in its state dir: the socket on POSIX, the port file on Windows. */
 export function deviceServiceEndpointPath(stateDir: string, platform: NodeJS.Platform = process.platform): string {
@@ -259,6 +262,11 @@ export type ConnectDeviceServiceOptions = {
   readonly background?: boolean
   /** Test seam: the local API connection (the vendored v1 client by default). */
   readonly connect?: (options: ConnectOptions) => Promise<LocalApiClient>
+  /**
+   * Test seam: the clock every wait of this connection runs on, the local API's handshake and request bounds included.
+   * Real timers by default; the local API then keeps its own.
+   */
+  readonly timers?: Timers
   /** Test seam: the two omo#13037 minimum versions (WAKE_MARK_MIN_SERVICE_VERSION, LOCATE_SINGLE_MIN_SERVICE_VERSION). */
   readonly minimums?: MinimumsOption
 }
@@ -266,9 +274,12 @@ export type ConnectDeviceServiceOptions = {
 /** Opens a proven connection to this device's service (mutual proof before any request) and returns the typed SDK. */
 export async function connectDeviceService(options: ConnectDeviceServiceOptions): Promise<DeviceService> {
   const stateDir = options.stateDir ?? deviceServiceStateDir()
+  const timers = options.timers ?? realTimers
+  const deadline = options.timers === undefined ? undefined : deadlineTimerOf(options.timers)
   const client = await (options.connect ?? connectLocalApi)({
     stateDir,
     client: { name: "omo", version: options.version },
+    ...(deadline === undefined ? {} : { handshakeTimer: deadline, requestTimer: deadline }),
     ...(options.background === true ? { transport: () => connectLocalBackground(stateDir) } : {}),
   })
   const wakeMarkMinimum = minimumInEffect(options.minimums, "wakeMark", WAKE_MARK_MIN_SERVICE_VERSION)
@@ -325,7 +336,7 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
     sessions: newestRowsListing(client),
     // The mark rides only to a service that carries it; below that, every command keeps today's bytes.
     attach: async (device, sessionId) => {
-      const attached = await openAttach(client, device, sessionId)
+      const attached = await openAttach(client, device, sessionId, timers)
       return carriesWakeMark ? attached : { ...attached, command: (rpc) => attached.command(rpc) }
     },
     endpointCommand: async (device, rpc, options) => {
@@ -338,7 +349,7 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
         throw markNotSent(error)
       }
       if (endpoint === undefined) throw new NotSentError("unsupported", "the device lists no engine endpoint")
-      return await sendToEndpoint(client, device, endpoint, rpc, options?.locate === true)
+      return await sendToEndpoint(client, device, endpoint, rpc, options?.locate === true, timers)
     },
     close: () => client.close(),
     closed: client.closed,
@@ -349,8 +360,8 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
         ...(options?.single === true && takesSingleLocate ? { single: true as const } : {}),
       }),
     wakeCommand: async (device, durableId, rpc) => {
-      if (!carriesWakeMark) throw new NotSentError("unsupported", "this device service does not carry the wake target")
-      return await followDelegatedCommand(client, device, (commandId) =>
+      if (!carriesWakeMark) throw olderThanWakeMinimum(client.welcome.service_version, wakeMarkMinimum)
+      return await followDelegatedCommand(client, device, timers, (commandId) =>
         client.commandTo({ wake: { device, durable_id: durableId } }, rpc, commandId).catch((error: unknown) => {
           throw error instanceof LocalApiError && error.command_id === undefined ? markNotSent(error) : error
         }),

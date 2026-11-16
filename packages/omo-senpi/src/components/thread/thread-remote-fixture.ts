@@ -583,6 +583,8 @@ export function createRemoteThreadFixture() {
       return created
     })
     const closed: Array<readonly [string, string | undefined]> = []
+    // The interrupt records this device's endpoint received, as b's engine's arrive in `sent`.
+    const interrupts: JsonObject[] = []
     const setSessionName = mock(async (_sessionId: string, _name: string) => {})
     // How often this device's endpoints were listed (the local enumeration a send can cost).
     let localListings = 0
@@ -601,7 +603,10 @@ export function createRemoteThreadFixture() {
         localPrompts += 1
         return { turnId: "turn-local" }
       },
-      interrupt: async () => engine.interrupt,
+      interrupt: async (_sessionId, request) => {
+        interrupts.push({ type: "interrupt", ...request })
+        return engine.interrupt
+      },
       setSessionName,
       setModel: async (_s, provider, id) => ({ provider, id }),
       getAvailableModels: async () => [],
@@ -679,6 +684,7 @@ export function createRemoteThreadFixture() {
       setSessionName,
       store,
       closed,
+      interrupts,
       agentDir,
       listings: () => localListings,
       prompts: () => localPrompts,

@@ -11,6 +11,7 @@ pub mod methods;
 mod nullable;
 pub mod observation;
 pub mod params;
+pub mod paths;
 pub mod report;
 pub mod requests;
 pub mod results;

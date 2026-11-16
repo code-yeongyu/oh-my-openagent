@@ -10,6 +10,48 @@ const releaseStateHeadRef = /^release\/v.+-source-state$/
 // pull request's own run as the release's platform validation), pushes and merge groups run macOS and Windows.
 // No changed path selects the platform matrix: the post-merge push to dev proves every OS.
 const fullMatrixLabel = "ci:full-matrix"
+// The label costs macOS/Windows runners, so it is honored only for a diff that can change how a non-Linux runner
+// behaves, a diff too long to list (it may hide one), or an explicit reason line in the PR body. Anything else is
+// refused, never guessed from keywords.
+const platformReasonLine = /^Platform-reason:[ \t]*\S.*$/m
+// The pulls/files API lists at most this many files; a larger pull request counts as platform-sensitive when labelled.
+const apiFileListCap = 3000
+const platformSensitiveExactPaths = new Set([
+  ".github/workflows/ci.yml",
+  ".github/workflows/ci-full-matrix-label.yml",
+  ".github/workflows/publish-platform.yml",
+  "Cargo.toml",
+  "Cargo.lock",
+  "rust-toolchain.toml",
+  "postinstall.mjs",
+  "script/build-binaries.ts",
+  "script/build-omo-native.ts",
+  "script/ci-fast-path.mjs",
+  "script/ci-leg-tests-guard.mjs",
+  "script/root-test-serial-quarantine.ts",
+  "packages/openclaw-core/src/reply-listener-process.ts",
+])
+const platformSensitivePrefixes = [
+  "crates/",
+  "bin/",
+  ".github/actions/",
+  ".github/scripts/",
+  "packages/git-bash-mcp/",
+  "packages/omo-codex/src/install/",
+  "packages/omo-native/",
+  "packages/omo-codex/scripts/install-",
+  "script/qa/desktop/macos/",
+  "script/qa/desktop/windows/",
+]
+const platformPackagePath = /^packages\/oh-my-opencode-(?:darwin|linux|windows)-/
+const platformBasename = /windows|win32|darwin|macos|\.platform\./
+
+function isPlatformSensitivePath(path) {
+  if (platformSensitiveExactPaths.has(path)) return true
+  if (platformSensitivePrefixes.some((prefix) => path.startsWith(prefix))) return true
+  if (platformPackagePath.test(path) || path.endsWith(".ps1")) return true
+  return platformBasename.test(path.slice(path.lastIndexOf("/") + 1).toLowerCase())
+}
 
 function parseArguments(argv) {
   const values = new Map()
@@ -96,6 +138,8 @@ export function classifyCiMode({
   mergeParentCount,
   headRef = "",
   labels = [],
+  body = "",
+  changedFiles = 0,
 }) {
   // Queue commits never use generated-release push policy.
   const classificationEvent = eventName === "merge_group" ? "pull_request" : eventName
@@ -107,11 +151,17 @@ export function classifyCiMode({
     classificationEvent === "push" && diffAvailable && isRealMerge && generatedReleaseMerge.test(subject)
   const webOnly = diffAvailable && changedPaths.length > 0 && changedPaths.every(isWebPath)
   const runtimeTouching = !diffAvailable || changedPaths.some(isRuntimePath)
+  const labelled = classificationEvent === "pull_request" && labels.includes(fullMatrixLabel)
+  // A diff that cannot be fully listed may hide a platform path, so the label is honored (fails toward the full matrix).
+  const labelHonoredOverFileCap = labelled && changedFiles > apiFileListCap
+  const labelHonored =
+    labelled &&
+    (!diffAvailable ||
+      labelHonoredOverFileCap ||
+      changedPaths.some(isPlatformSensitivePath) ||
+      platformReasonLine.test(body))
   const fullMatrix =
-    eventName === "merge_group" ||
-    classificationEvent === "push" ||
-    releaseStateHeadRef.test(headRef) ||
-    labels.includes(fullMatrixLabel)
+    eventName === "merge_group" || classificationEvent === "push" || releaseStateHeadRef.test(headRef) || labelHonored
 
   return {
     generatedReleasePush,
@@ -119,6 +169,8 @@ export function classifyCiMode({
     runHeavy: eventName === "merge_group" || !(generatedReleasePush || webOnly),
     fullMatrix,
     runtimeTouching,
+    labelRefused: labelled && !fullMatrix,
+    labelHonoredOverFileCap,
   }
 }
 
@@ -145,6 +197,8 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
     mergeParentCount: parseMergeParents(mergeParents),
     headRef: args.get("head-ref") ?? "",
     labels: parseLabels(args.get("labels") ?? "[]"),
+    body: args.has("body-file") ? readFileSync(args.get("body-file"), "utf8") : "",
+    changedFiles: Number(args.get("changed-files") ?? "0"),
   })
   process.stdout.write(`${JSON.stringify(mode)}\n`)
 }
