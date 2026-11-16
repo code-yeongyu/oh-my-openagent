@@ -2,8 +2,9 @@
 //! runs on every OS. The posted route's window for keys and text is the target thread's focus
 //! window when it is the addressed window or one of its descendants (a focus in another top-level
 //! window of the same thread, such as a dialog, is never posted to), else the SOLE visible, enabled
-//! descendant that wants characters (`DLGC_WANTCHARS`); two candidates or none refuse
-//! `no_focus_target` with nothing sent.
+//! descendant that wants characters (`DLGC_WANTCHARS`) of an ENABLED addressed window (an owner a
+//! modal dialog disabled takes no real input); two candidates or none refuse `no_focus_target` with
+//! nothing sent.
 
 use omo_computer_core::backend::Refusal;
 use omo_computer_core::error::{EngineCode, Reason};
@@ -87,6 +88,7 @@ pub fn coordinate(value: f64) -> Option<i16> {
 pub fn key_target(os: &dyn DeliveryOs, window: isize) -> Result<isize, Refusal> {
     match focus_child(os, window) {
         Ok(focus) if os.within(focus, window) => Ok(focus),
+        _ if !os.enabled(window) => Err(NO_FOCUS_TARGET),
         _ => match os.wants_chars(window).as_slice() {
             [only] => Ok(*only),
             _ => Err(NO_FOCUS_TARGET),
