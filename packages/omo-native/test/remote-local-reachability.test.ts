@@ -72,7 +72,11 @@ const SPAWN_CALL_SITES = [
   'packages/omo-native/bin/lib/process-list.js: node:child_process#spawnSync("ps"; ["-ww", "-axo", "pid=,ppid=,etime=,tty=,args="])',
   "packages/omo-native/remote-local.ts: packages/omo-native/remote-session-verbs.ts#runSession(service; parsed.session)",
   "packages/omo-native/remote-local.ts: runOn(service; parsed)",
+  // omo#13748: `open --prompt` hands the new session its first message through the same person pipeline as `send`.
+  "packages/omo-native/remote-session-verbs.ts: openOn(remote; args)",
   "packages/omo-native/remote-session-verbs.ts: packages/omo-senpi/src/components/thread/gateway/provenance-resolver.ts#resolveProvenance({cwd,env}; -)",
+  "packages/omo-native/remote-session-verbs.ts: personDelivery(remote; dependencies)",
+  "packages/omo-native/remote-session-verbs.ts: personDelivery(remote; dependencies)",
   "packages/omo-native/remote-session-verbs.ts: personSenderProvenance(remote; -)",
   "packages/omo-native/remote-session-verbs.ts: sendTo(remote; row)",
   'packages/omo-opencode/src/cli/service-auth/account-home.ts: facts.run("/usr/bin/id"; ["-P"])',

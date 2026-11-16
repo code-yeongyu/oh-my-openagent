@@ -147,25 +147,41 @@ const LOOKUP_CAP_MS = 3_500
  * Attaches to a session another device holds, by the address a caller typed. A thread is addressed by its durable id
  * (decision 0027 D2), which the device's listing may not name yet for a session it opened a moment ago: an attach refused
  * session_not_found locates the id once and attaches on the key the device names (omo#13748, omo#13707; measured over
- * the relay as `omo remote open` then `omo remote model <device>/<id>` answering no session). A locate that cannot
- * answer leaves the attach's own refusal as the answer. The thread tools' port and `omo remote attach` both use it.
+ * the relay as `omo remote open` then `omo remote model <device>/<id>` answering no session). A durable id (a UUID) is
+ * never sent to session.attach: the device service refuses it invalid_request (relay-daemon#1350; before that the
+ * attach crashed the service), so it is located first and attached on the key the device names. Any other address is
+ * attached as typed and located once when the attach refuses it (session_not_found, or invalid_request from a service
+ * with #1350). A locate that cannot answer leaves the attach's own refusal as the answer. The thread tools' port and
+ * `omo remote attach` both use it.
  */
 export async function attachAddressed(
   connected: DeviceService,
   device: string,
   sessionId: string,
 ): Promise<RemoteAttach> {
+  const locate = () =>
+    Promise.resolve()
+      .then(() => connected.locate(device, sessionId))
+      .catch(() => undefined)
+  if (DURABLE_ID.test(sessionId)) {
+    const located = await locate()
+    if (located === undefined)
+      throw new LocalApiError("session_not_found", `device ${device} names no session ${sessionId}`)
+    return await connected.attach(device, located.key)
+  }
   try {
     return await connected.attach(device, sessionId)
   } catch (error) {
-    if (!(error instanceof LocalApiError && error.code === "session_not_found")) throw error
-    const located = await Promise.resolve()
-      .then(() => connected.locate(device, sessionId))
-      .catch(() => undefined)
+    if (!(error instanceof LocalApiError && (error.code === "session_not_found" || error.code === "invalid_request")))
+      throw error
+    const located = await locate()
     if (located === undefined || located.key === sessionId) throw error
     return await connected.attach(device, located.key)
   }
 }
+
+// The shape of an omo durable session id (a UUID, v7 in practice); a device's listing key is never one.
+const DURABLE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export function createDeviceServiceSessions(options: DeviceServiceSessionsOptions): RemoteSessionsPort {
   let service: Promise<DeviceService> | undefined
