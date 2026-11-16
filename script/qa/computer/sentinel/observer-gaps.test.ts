@@ -44,6 +44,39 @@ describe("an app that failed registration as a background agent and later activa
     ])
   })
 
+  test("an app that activated before start and registered again inside the recording is judged from start", () => {
+    const summary = summarize(cleanRun([quietFailure, { ...activation, t: 900 }, { ...reRegistered, t: 2_500 }]))
+    expect(summary.faults).toEqual([
+      "dialog: window observer for pid 300 was missing after the app activated (it had failed as accessory; 1500 ms without one inside the recording)",
+    ])
+  })
+
+  test("an app that activated before start and never registered again is blind for the whole recording", () => {
+    expect(summarize(cleanRun([quietFailure, { ...activation, t: 900 }])).faults).toEqual([
+      "dialog: window observer for pid 300 was missing after the app activated (it had failed as accessory; 2000 ms without one inside the recording)",
+    ])
+  })
+
+  test("an app that activated and registered again before start has no gap inside the recording", () => {
+    expect(summarize(cleanRun([quietFailure, { ...activation, t: 700 }, { ...reRegistered, t: 800 }])).faults).toEqual(
+      [],
+    )
+  })
+
+  test("a registration on activation that failed again, now as a regular app, is counted once", () => {
+    const failedAgain = {
+      ...quietFailure,
+      t: 2_500,
+      origin: "activation",
+      policy: "regular",
+      attempts: 10,
+      regular: true,
+    } as const
+    expect(summarize(cleanRun([quietFailure, activation, failedAgain])).faults).toEqual([
+      "dialog: window observer for pid 300 was missing after the app activated (it had failed as accessory; 2000 ms without one inside the recording)",
+    ])
+  })
+
   test("a background agent that never activates, or activates after stop, is not judged", () => {
     expect(summarize(cleanRun([quietFailure])).faults).toEqual([])
     expect(summarize(cleanRun([quietFailure, { ...activation, t: 3_500 }])).faults).toEqual([])

@@ -196,21 +196,22 @@ describe("observer registration failures are listed per app", () => {
   })
 })
 
-// Apps already running when the recorder arms are past their launch: one registration attempt each, so a crowd of
-// background agents that refuse registration cannot run retry chains on the main thread into the 20 Hz sampler's
-// tick gap. Launched and activated apps may still retry; the self-test fails when an arm-time app was retried.
-describe("arm-time registration is tried once", () => {
-  const failedAt = (pid: number, origin: "arm" | "launch" | "activation", attempts: number) =>
+// Apps already running when the recorder arms are past their launch: a background app gets one registration attempt,
+// so a crowd of background agents that refuse registration cannot run retry chains on the main thread into the 20 Hz
+// sampler's tick gap. A regular app found at arm time, and launched or activated apps, may still retry; the self-test
+// fails when an arm-time background app was retried.
+describe("arm-time registration of a background app is tried once", () => {
+  const failedAt = (pid: number, origin: "arm" | "launch" | "activation", attempts: number, regular = false) =>
     ({
       t: 10,
       kind: "observer_failed",
       origin,
       pid,
       app: `com.example.agent${pid}`,
-      policy: "prohibited",
+      policy: regular ? "regular" : "prohibited",
       axError: "cannotComplete",
       attempts,
-      regular: false,
+      regular,
       since: 5,
     }) as const
 
@@ -222,6 +223,13 @@ describe("arm-time registration is tried once", () => {
     expect(observerRetryProblems([failedAt(41, "arm", 1), failedAt(42, "arm", 10)])).toEqual([
       "window observer for pid 42 was retried 10 times although it was found at arm time",
     ])
+  })
+
+  test("a regular app found at arm time may retry a transient refusal", () => {
+    expect(observerRetryProblems([failedAt(43, "arm", 10, true)])).toEqual([])
+    expect(
+      observerRetryProblems([{ t: 400, kind: "observer_late", origin: "arm", pid: 44, attempts: 3, regular: true, since: 5 }]),
+    ).toEqual([])
   })
 
   test("a launched or activated app may retry", () => {
