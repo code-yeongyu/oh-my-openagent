@@ -64,6 +64,12 @@ impl FakeMethod {
             InputEvent::Key { .. } => Self::Key,
             InputEvent::Scroll { .. } => Self::Scroll,
             InputEvent::Text(_) => Self::TypeText,
+            // Row 25: a menu select is the fake's menu_select call; an app launch or quit and a
+            // surface open count as an AX action (no other fake call names them).
+            InputEvent::MenuSelect { .. } => Self::MenuSelect,
+            InputEvent::AppLaunch { .. } | InputEvent::AppQuit { .. } | InputEvent::OpenSurface { .. } => {
+                Self::AxPerform
+            }
         }
     }
 

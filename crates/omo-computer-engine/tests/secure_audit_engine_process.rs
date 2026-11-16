@@ -72,9 +72,15 @@ struct Left {
     /// `<root>/fake-sink-<engine pid>.log`: the one file the engine's fake backend records
     /// its delivered input to (engine `route.rs`, `SINK_FILE_PREFIX` + the process id).
     sink_path: PathBuf,
+    /// Every line the engine wrote to its stdout: replies AND notifications (the v1 `audit`).
+    wire: Vec<String>,
 }
 
 impl Left {
+    fn on_wire(&self, needle: &str) -> usize {
+        self.wire.iter().filter(|line| line.contains(needle)).count()
+    }
+
     /// An engine-state file that MUST exist and be non-empty: a missing one fails the test,
     /// never reads as clean.
     fn state(&self, relative: &str) -> String {
@@ -177,6 +183,11 @@ fn as_persona(scenario: &str, persona: &str, dir: &Path) -> PathBuf {
 /// checks the typeText was delivered.
 fn run_engine(case: &Value, scenario: &Path) -> Left {
     let root = tempfile::tempdir().expect("runtime root");
+    // Owner-only like every runtime root the resolver creates: row 28's host-latch read
+    // validates the dir's mode (R70k D-1) and reads a permissive one as latch SET.
+    #[cfg(unix)]
+    std::fs::set_permissions(root.path(), <std::fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o700))
+        .expect("0700");
     let mut command = Command::new(engine());
     command
         .arg("--stdio")
@@ -205,23 +216,32 @@ fn run_engine(case: &Value, scenario: &Path) -> Left {
         }
     });
     let mut typed = Value::Null;
+    let mut wire = Vec::new();
     for step in case["steps"].as_array().expect("steps") {
         writeln!(stdin, "{}", step["send"]).expect("a request line");
         stdin.flush().expect("flushed");
-        let line = replies
-            .recv_timeout(REPLY_TIMEOUT)
-            .expect("a reply within the bound");
+        let reply: Value = loop {
+            let line = replies
+                .recv_timeout(REPLY_TIMEOUT)
+                .expect("a reply within the bound");
+            let message: Value = serde_json::from_str(&line).expect("every line is JSON");
+            wire.push(line);
+            if message.get("id") == step["send"].get("id") {
+                break message;
+            }
+        };
         if step["send"]["method"] == "typeText" {
-            typed = serde_json::from_str(&line).expect("a reply is JSON");
+            typed = reply;
         }
     }
     drop(stdin);
     let status = child.wait().expect("the engine exits");
     reader.join().expect("the reader ends");
+    wire.extend(replies.try_iter());
     assert!(status.success(), "engine exit: {status}");
     let delivered = typed["result"].is_null() && typed.get("error").is_none();
     assert!(delivered, "delivered: {typed}");
-    Left { root, sink_path }
+    Left { root, sink_path, wire }
 }
 
 /// The case's type into a secure context on `scenario`, on every fake persona: length
@@ -246,6 +266,8 @@ fn assert_length_only(case: &Value, scenario: &str) {
         // [digest, secret] x [audit, marker, rest]: all zero.
         let counts = [left.on_disk(&needle), left.on_disk(&secret)];
         assert_eq!(counts, [[0; 3]; 2], "{persona}: {needle}");
+        // Review M1 of #13373: the v1 `audit` notification on stdout is redacted the same way.
+        assert_eq!([left.on_wire(&needle), left.on_wire(&secret)], [0, 0], "{persona}: wire {:?}", left.wire);
         assert!(left.sink().contains(&secret), "{persona}: no delivery");
     }
 }
@@ -271,16 +293,40 @@ fn engine_process_plain_type_keeps_the_digest_the_grep_looks_for() {
     let (typed, marker) = (left.typed_line(), left.marker());
     let got = [&typed["text"]["sha256_16"], &marker["text"]["sha256_16"]];
     assert_eq!(got, [&json!(digest), &json!(digest)]);
+    // C2: the marker carries the engine's hello.generation (Session::with_generation).
+    assert_eq!(marker["binding"]["generation"], json!(1), "{marker}");
     // The grep sees a digest when one is there: in the audit and the marker.
     assert_eq!(
         left.on_disk(&digest).map(|count| count > 0),
         [true, true, false]
     );
     left.assert_no_trace();
+    assert!(left.on_wire(&digest) > 0, "the wire carries the digest of a plain type: {:?}", left.wire);
     assert_eq!(
         left.on_disk(&secret),
         [0; 3],
         "the plain text is never on disk"
     );
     assert!(left.sink().contains(&secret), "no delivery");
+}
+
+/// Review M1 (fix round) of #13373: the secure field's window exits right after the type. The
+/// session decided "secure" before the send; the wire audit must use that decision, not a
+/// fresh read after the call, so neither the digest nor the secret reaches stdout.
+#[test]
+fn a_secure_window_that_exits_after_the_type_leaves_no_digest_on_the_wire() {
+    let case = case();
+    let secret = secret(&case);
+    let needle = sha256_16(&secret);
+    let dir = tempfile::tempdir().expect("scenario dir");
+    let base = repo().join(case["scenario"].as_str().expect("scenario"));
+    let mut scenario: Value = serde_json::from_str(&fs::read_to_string(&base).expect("scenario file")).expect("JSON");
+    scenario["target_exit"] = json!([{"after_call": "type_text", "nth": 1, "window": "101"}]);
+    let path = dir.path().join("secure-exits.json");
+    fs::write(&path, scenario.to_string()).expect("scenario written");
+    for persona in PERSONAS {
+        let left = run_engine(&case, &as_persona(path.to_str().expect("utf-8 path"), persona, dir.path()));
+        assert_eq!(left.typed_line()["text"], json!({ "length": secret.chars().count() }), "{persona}: the disk audit is length-only");
+        assert_eq!([left.on_wire(&needle), left.on_wire(&secret)], [0, 0], "{persona}: wire {:?}", left.wire);
+    }
 }

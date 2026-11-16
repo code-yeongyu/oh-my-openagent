@@ -1,5 +1,5 @@
 {
-  "description": "the --mcp stdio server over the same daemon (no session flags): initialize, then tools/call results; null inputs are a text block 'null', objects add structuredContent, an engine error is isError with the engine error object as text, host-only tools do not exist.",
+  "description": "the --mcp stdio server over the same daemon (no session flags): initialize, then tools/call results; null inputs are a text block 'null', objects add structuredContent, an engine error is isError with the engine error object as text, host-only tools do not exist. Row 28 (lead decisions 1-2): with no --tier exec and no consent file the shim is read-only, so click/typeText/keyChord answer ControlRequired{tier_missing} (next call computer.hands()); StaleRef is asserted by its typed code, never v1's message text.",
   "transport": "mcp",
   "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
   "env": {
@@ -130,9 +130,10 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "null"
+                  "text": "{\"code\":-32022,\"message\":\"ControlRequired\",\"data\":{\"code\":\"ControlRequired\",\"hint\":null,\"reason\":\"tier_missing\"}}"
                 }
-              ]
+              ],
+              "isError": true
             }
           },
           "variable": []
@@ -161,9 +162,10 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "null"
+                  "text": "{\"code\":-32022,\"message\":\"ControlRequired\",\"data\":{\"code\":\"ControlRequired\",\"hint\":null,\"reason\":\"tier_missing\"}}"
                 }
-              ]
+              ],
+              "isError": true
             }
           },
           "variable": []
@@ -195,9 +197,10 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "null"
+                  "text": "{\"code\":-32022,\"message\":\"ControlRequired\",\"data\":{\"code\":\"ControlRequired\",\"hint\":null,\"reason\":\"tier_missing\"}}"
                 }
-              ]
+              ],
+              "isError": true
             }
           },
           "variable": []
@@ -260,7 +263,7 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "{\"code\":-32008,\"message\":\"e9999 expired; re-run ax()/find()\",\"data\":{\"code\":\"StaleRef\",\"hint\":null}}"
+                  "text": "{\"code\":-32008,\"message\":\"StaleRef\",\"data\":{\"code\":\"StaleRef\",\"hint\":null}}"
                 }
               ],
               "isError": true
