@@ -54,7 +54,8 @@ result as one object: `threads`, `devices` (each device's name, platform, kind, 
 its thread count and `listing`: `listed`, `incomplete` when it did not answer this listing, or `offline`) and
 `remote_unavailable` when other devices could not be listed, and `aliases_unavailable` when a thread listed without an
 alias may still hold one: `sign_in` or `host_unavailable` when the account's aliases could not be read, `not_asked` when
-this device's device service is not connected (aliases are only read while it is).
+the account's other devices cannot be reached from here: this device's device service is not connected, or it answered
+that the account's plan has no relay (a Free plan). Aliases are only read while other devices can be reached.
 
 `omo thread` does not create or resume sessions: session lifecycle belongs to the engine's host
 API, and a connector cannot start a session for a new chat thread through `omo thread` alone. To
