@@ -197,10 +197,14 @@ const selfDelivery = (device: string): RemoteFailure =>
     { details: { device } },
   )
 
-/** How many keyed opens a client remembers for replay. */
-const OPENS_KEPT = 256
+/** How many idempotency keys a client remembers for replay, in each of its stores (opens, sends, send receipts). */
+const KEYS_KEPT = 256
 
-/** The receipts of this client's sends and opens: a repeat under one idempotency key replays the first answer. */
+/**
+ * The receipts of this client's sends and opens: a repeat under one idempotency key replays the first answer. A send
+ * without a key keeps a receipt under a fresh one nobody can retry, so past KEYS_KEPT the oldest settled receipt is
+ * forgotten; one still in flight is never dropped, or its repeat would run again.
+ */
 function createReceipts(now: () => number): RelayTransportOptions["store"] {
   type Receipt = { readonly hash: string; settled: boolean; result?: unknown; note?: string }
   const held = new Map<string, Receipt>()
@@ -212,6 +216,10 @@ function createReceipts(now: () => number): RelayTransportOptions["store"] {
       const known = held.get(keyOf(request))
       if (known === undefined) {
         held.set(keyOf(request), { hash: request.args_hash, settled: false })
+        for (const [key, receipt] of held) {
+          if (held.size <= KEYS_KEPT) break
+          if (receipt.settled) held.delete(key)
+        }
         return { kind: "accepted" }
       }
       if (known.hash !== request.args_hash) return { kind: "conflict" }
@@ -245,7 +253,7 @@ function createReceipts(now: () => number): RelayTransportOptions["store"] {
 export function sessionMembers(core: ClientCore): SessionMembers {
   const { sender } = core
   const receipts = createReceipts(() => core.timers.now())
-  // Keyed opens, newest last: a repeat replays (and refreshes) one; past OPENS_KEPT the oldest is forgotten.
+  // Keyed opens, newest last: a repeat replays (and refreshes) one; past KEYS_KEPT the oldest is forgotten.
   const opens = new Map<string, { readonly hash: string; readonly result: R<OpenResult> }>()
   const legs = new WeakMap<
     DeviceService,
@@ -347,7 +355,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     const result = run()
     localSends.set(key, { hash, result })
     for (const oldest of localSends.keys()) {
-      if (localSends.size <= OPENS_KEPT) break
+      if (localSends.size <= KEYS_KEPT) break
       localSends.delete(oldest)
     }
     const settled = await result
@@ -548,7 +556,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     const result = openOnce(request, asked, openBudget(request, opts))
     opens.set(key, { hash, result })
     for (const oldest of opens.keys()) {
-      if (opens.size <= OPENS_KEPT) break
+      if (opens.size <= KEYS_KEPT) break
       opens.delete(oldest)
     }
     const settled = await result

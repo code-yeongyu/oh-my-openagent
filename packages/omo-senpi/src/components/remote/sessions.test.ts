@@ -547,6 +547,21 @@ describe("#13756 review", () => {
     expect(sent("open_session")).toHaveLength(258)
   })
 
+  test("#given a keyed send then a long run of unkeyed sends #when the key is retried #then it replays within the last 256 receipts and reaches the device again past them (L37)", async () => {
+    // Every unkeyed send keeps a receipt under a fresh key nobody can retry: the store keeps the newest 256 settled ones.
+    const { owner, sent } = await onWorld()
+    const client = clientOn(owner.stateDir, fakeClock())
+    const keyed = { text: "keep", idempotency_key: "k-keep" }
+    await valueOf(client.sessions.send(LIVE, keyed))
+    for (let index = 0; index < 255; index++) await valueOf(client.sessions.send(LIVE, { text: `run ${index}` }))
+    expect(sent("prompt")).toHaveLength(256)
+    await valueOf(client.sessions.send(LIVE, keyed))
+    expect(sent("prompt")).toHaveLength(256)
+    await valueOf(client.sessions.send(LIVE, { text: "one more" }))
+    await valueOf(client.sessions.send(LIVE, keyed))
+    expect(sent("prompt")).toHaveLength(258)
+  })
+
   test("#given a slow listing then a command with no final state #when close runs with deadlineMs N #then it settles timeout by N (L3)", async () => {
     const clock = fakeClock()
     const { owner, withheld } = await startModeOwner("ack-no-final", world())
