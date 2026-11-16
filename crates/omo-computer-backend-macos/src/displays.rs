@@ -8,8 +8,23 @@ use crate::capture::types::DisplayRecord;
 /// The display records as `displays()` answers them: the main display first, then by origin.
 #[must_use]
 pub fn infos(records: &[DisplayRecord]) -> Vec<DisplayInfo> {
-    let _ = records;
-    Vec::new()
+    let mut sorted: Vec<&DisplayRecord> = records.iter().collect();
+    sorted.sort_by(|a, b| {
+        b.main
+            .cmp(&a.main)
+            .then(a.bounds.x.total_cmp(&b.bounds.x))
+            .then(a.bounds.y.total_cmp(&b.bounds.y))
+    });
+    sorted
+        .into_iter()
+        .map(|d| DisplayInfo {
+            id: d.id.to_string(),
+            bounds: d.bounds,
+            scale: scale(d),
+            primary: d.main,
+            truncated: None,
+        })
+        .collect()
 }
 
 /// Backing pixels per point.

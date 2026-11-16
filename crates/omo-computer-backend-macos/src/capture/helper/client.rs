@@ -63,7 +63,7 @@ impl<R: BufRead + Send, W: Write + Send> LineHelper<R, W> {
 
 impl<R: BufRead + Send, W: Write + Send> CaptureHelper for LineHelper<R, W> {
     fn call(&mut self, request: &HelperRequest) -> Result<HelperFrame, CaptureFault> {
-        let _ = request;
-        Err(CaptureFault::Protocol)
+        self.send(request)?;
+        self.receive(request.id())
     }
 }

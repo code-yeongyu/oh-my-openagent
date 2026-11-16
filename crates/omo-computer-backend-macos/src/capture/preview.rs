@@ -63,10 +63,6 @@ impl PreviewLane {
     /// # Errors
     /// The helper's fault; a reply that is not a stream frame is [`CaptureFault::Protocol`].
     pub fn tick(&mut self, now_ms: u64, helper: &mut dyn CaptureHelper) -> Result<Option<PreviewPush>, CaptureFault> {
-        if now_ms < u64::MAX {
-            let _ = helper;
-            return Ok(None);
-        }
         let wanted = self.lease.filter(|_| !self.subscribers.is_empty());
         if let Some(window) = self.streaming.filter(|w| Some(*w) != wanted.map(|t| t.window)) {
             self.streaming = None;

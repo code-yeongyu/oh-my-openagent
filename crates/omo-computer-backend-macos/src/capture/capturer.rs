@@ -70,12 +70,6 @@ impl<O: CaptureOs> Capturer<O> {
     /// for an unknown display, or the route's refusal.
     pub fn capture(&mut self, target: &Target, options: &CaptureOptions) -> BackendResult<FrameBytes> {
         self.last_route = None;
-        if self.next_id == u64::MAX {
-            return Err(Refusal::new(EngineCode::CaptureUnavailable, Reason::CaptureUnsupported));
-        }
-        let _ = (target, options);
-        return Err(Refusal::new(EngineCode::CaptureUnavailable, Reason::CaptureUnsupported));
-        #[allow(unreachable_code)]
         let (mut image, scale) = match target {
             Target::Window(id) => self.window(id, options.cursor)?,
             Target::Display(id) => self.display(id, options.cursor)?,

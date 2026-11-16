@@ -17,6 +17,8 @@ pub mod route;
 pub mod seam;
 pub mod types;
 
+#[cfg(target_os = "macos")]
+pub mod os;
 #[cfg(test)]
 mod tests;
 

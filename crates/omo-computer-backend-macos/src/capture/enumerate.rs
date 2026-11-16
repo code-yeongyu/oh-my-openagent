@@ -29,9 +29,26 @@ pub struct Listed {
 /// # Errors
 /// The window server answered no list.
 pub fn listing(os: &mut dyn CaptureOs, own_pid: u32) -> BackendResult<Vec<Listed>> {
-    let _ = (os, own_pid, record as fn(&CgWindow, u64, &AxWindowFacts, String, Option<String>, &[DisplayRecord], u32) -> WindowInfo, eligible as fn(&CgWindow, u32) -> bool);
-    let _ = BTreeMap::<u32, u64>::new();
-    Ok(Vec::new())
+    let windows = os.window_list()?;
+    let displays = os.displays()?;
+    let mut starts: BTreeMap<u32, Option<u64>> = BTreeMap::new();
+    let mut listed = Vec::new();
+    for window in windows.iter().filter(|w| eligible(w, own_pid)) {
+        let start = *starts
+            .entry(window.pid)
+            .or_insert_with(|| os.process_start(window.pid));
+        // The process exited between the list and the read: no identity, no record.
+        let Some(process_start) = start.filter(|s| *s > 0) else {
+            continue;
+        };
+        let ax = os.ax_window(window).unwrap_or_default();
+        let app_key = os.bundle_id(window.pid).unwrap_or_else(|| window.owner.clone());
+        let space = os.space_of(window.number);
+        let z = u32::try_from(listed.len()).unwrap_or(u32::MAX);
+        let info = record(window, process_start, &ax, app_key, space, &displays, z);
+        listed.push(Listed { info, minimized: ax.minimized });
+    }
+    Ok(listed)
 }
 
 /// `windows()`: the filtered listing cut at [`MAX_LISTED`].
