@@ -1,6 +1,6 @@
 import { type ConnectOptions, connectLocalApi, type LocalApiClient } from "./local-api/client.ts"
 import type { DeliveryHolds, DeliveryInbound, DrainedData, JsonObject, PendingPair } from "./local-api/protocol.ts"
-import { connectLocal } from "./local-api/transport.ts"
+import { connectLocalBackground } from "./background-transport.ts"
 import { deviceServiceStateDir } from "./device-service.ts"
 
 /**
@@ -43,7 +43,7 @@ export async function connectDeliveryConsumer(
   const client = await (options.connect ?? connectLocalApi)({
     stateDir,
     client: { name: "omo", version: options.version },
-    transport: () => connectLocal(stateDir, { background: true }),
+    transport: () => connectLocalBackground(stateDir),
   })
   return {
     serviceVersion: client.welcome.service_version,
