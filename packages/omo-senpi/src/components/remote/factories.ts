@@ -3,7 +3,7 @@ import { createRemoteClient, type RemoteClient, type RemoteClientDeps } from "./
 import type { RemoteSender } from "./types"
 
 /**
- * A factory's deps are the client's own. The caller names its omo version (the version the device service sees in the
+ * A factory's deps are the client's own. The caller names its client version (the `version` the device service sees in the
  * hello): reading a default here would pull the product-config graph into every consumer of the module.
  */
 type RemoteClientFactoryDeps = RemoteClientDeps
