@@ -17,6 +17,7 @@ import { failureFromError, nextActionFor, remoteFailure } from "./codes"
 import { BOUNDS, CONNECT_SLACK_MS, DEADLINES, withinDeadline } from "./deadlines"
 import { streamMembers } from "./follow"
 import { resolveMember } from "./resolve"
+import { handleOf } from "./seams"
 import { sessionMembers } from "./sessions"
 import type {
   AttachHandle,
@@ -185,13 +186,19 @@ const controlUnsupported = (): RemoteFailure =>
     { details: { feature: "control" } },
   )
 
-const wakeUnsupported = (): RemoteFailure =>
-  remoteFailure(
-    "unsupported",
-    "The device service on this device cannot wake sessions for other devices yet.",
-    nextActionFor("unsupported"),
-    { details: { feature: "wake" } },
-  )
+// Two causes, two answers: this build carries no wake switch at all (no service update enables it), or the device
+// service is older than the release that carries it (updating does).
+const wakeUnsupported = (svc: DeviceService): RemoteFailure =>
+  svc.wakeMarkMinimum === null
+    ? remoteFailure("unsupported", "This build of omo does not carry the wake switch yet.", "Update omo, then retry.", {
+        details: { feature: "wake", reason: "not_in_build" },
+      })
+    : remoteFailure(
+        "unsupported",
+        "The device service on this device cannot wake sessions for other devices yet.",
+        nextActionFor("unsupported"),
+        { details: { feature: "wake", reason: "service_too_old" } },
+      )
 
 const notPerson = (member: string): RemoteFailure =>
   remoteFailure(
@@ -377,13 +384,13 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
       // The gate is this connection's own service version (A7R-11), never a capability word.
       wake: (opts) =>
         member(opts, DEADLINES.service, false, async (svc) =>
-          svc.carriesWakeMark ? ok(await svc.sessionWake()) : wakeUnsupported(),
+          svc.carriesWakeMark ? ok(await svc.sessionWake()) : wakeUnsupported(svc),
         ),
       setWake: async (on, opts) =>
         sender.kind !== "person"
           ? notPerson("service.setWake")
           : member(opts, DEADLINES.service, true, async (svc) =>
-              svc.carriesWakeMark ? ok(await svc.setSessionWake(on)) : wakeUnsupported(),
+              svc.carriesWakeMark ? ok(await svc.setSessionWake(on)) : wakeUnsupported(svc),
             ),
     },
     devices: {
@@ -432,7 +439,7 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
 // The listing carries one display name per session (its title); archive state has no layer yet (E-archive), so every
 // row is unarchived. The handle is the `<device>/<session>` form seam 1 parses.
 const sessionRow = (row: ListingRow, device: DeviceRow): SessionRow => ({
-  thread: `${row.device}/${row.session_id}`,
+  thread: handleOf(row.device, row.session_id),
   ...durableIdOf(row),
   name: row.title,
   title: row.title,

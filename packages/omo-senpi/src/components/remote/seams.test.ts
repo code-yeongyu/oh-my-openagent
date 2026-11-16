@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { canonicalizeThreadHandle, describeThread } from "./seams"
-import type { SessionRow } from "./types"
+import { canonicalizeThreadHandle, describeThread, handleOf } from "./seams"
+import type { SessionRow, ThreadHandle } from "./types"
 
 // Seam 1 (the only thread-address parser) and seam 2 (the only thread-naming helper), design v8-core r2 B1. The
 // `<device>/<session>` form must match senpi's remote monitor target shape, and a local path must never read as a device.
@@ -10,7 +10,7 @@ describe("canonicalizeThreadHandle", () => {
     expect(canonicalizeThreadHandle("  studio/c2Vz  ", { all_scope: true })).toEqual({
       kind: "ok",
       value: {
-        handle: "studio/c2Vz",
+        handle: handleOf("studio", "c2Vz"),
         target: { kind: "device_session", device: "studio", session: "c2Vz" },
         scope: { all_scope: true },
       },
@@ -34,7 +34,7 @@ describe("canonicalizeThreadHandle", () => {
 
 describe("describeThread", () => {
   const row = (name: string, title: string): SessionRow => ({
-    thread: "studio/c2Vz",
+    thread: handleOf("studio", "c2Vz"),
     name,
     title,
     device: {
@@ -58,5 +58,14 @@ describe("describeThread", () => {
     expect(describeThread(row("build", "Fix CI"))).toBe('"build" on Studio (studio/c2Vz)')
     expect(describeThread(row("", "Fix CI"))).toBe('"Fix CI" on Studio (studio/c2Vz)')
     expect(describeThread(row("", ""))).toBe('"untitled thread" on Studio (studio/c2Vz)')
+  })
+})
+
+describe("ThreadHandle", () => {
+  test("#given a plain string #then the type system refuses it as a handle (only the seam or a listed row makes one)", () => {
+    // @ts-expect-error a ThreadHandle is branded: callers cannot build one from text without the seam
+    const built: ThreadHandle = "studio/c2Vz"
+    const parsed = canonicalizeThreadHandle(String(built), {})
+    expect(parsed.kind === "ok" ? String(parsed.value.handle) : undefined).toBe("studio/c2Vz")
   })
 })
