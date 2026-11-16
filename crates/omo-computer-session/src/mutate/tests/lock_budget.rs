@@ -89,6 +89,32 @@ fn tw2_a_stop_marker_committed_during_the_wait_ends_it_with_the_stops_refusal() 
     drop(held);
 }
 
+/// Review L1 of #13767 (at 43d7da90ec): a stop marker another engine commits while this exec
+/// waits latches this engine's stop, as the marker read at engine start does: once the holder
+/// lets go, the session's next exec is refused too, never sent.
+#[test]
+fn tw2b_a_stop_marker_seen_during_the_wait_stays_latched_for_the_next_call() {
+    let run = Run::new();
+    let fake = run.fake();
+    let clock = fake.clock();
+    let mut session = run.session(Box::new(fake));
+    let held = holder(&run);
+    let marker = run.dir.path().join(omo_computer_core::paths::STOP_MARKER_FILE);
+    clock.on_advance(Box::new(move |_| {
+        if !marker.exists() {
+            use omo_computer_safety::marker::MarkerStore;
+            let mut other = omo_computer_safety::marker::FileMarker::at(marker.clone());
+            other.commit().expect("another engine stops");
+        }
+    }));
+    let first = session.click(click("c-stop-1")).expect_err("stopped while waiting");
+    assert_eq!(first.refusal.code.wire(), "Suspended");
+    drop(held);
+    let next = session.click(click("c-stop-2")).expect_err("the stop stays latched");
+    assert_eq!(next.refusal.code.wire(), "Suspended", "{next:?}");
+    assert!(run.sink.is_empty(), "nothing sent: {:?}", run.sink.lines());
+}
+
 /// TW6: an unusable lock refuses as A-IS-65 L2 (TransactionFailed), never InputBusy.
 #[test]
 fn tw6_an_unusable_lock_is_transaction_failed_never_input_busy() {
