@@ -2,7 +2,7 @@
 //! notification banners and the XDG app entries (AC-84(b), AC-24, GAP-10).
 
 use omo_computer_core::backend::Backend;
-use omo_computer_core::error::EngineCode;
+use omo_computer_core::error::{EngineCode, Reason};
 use omo_computer_core::listing::AppSource;
 use omo_computer_core::results::PermissionState;
 
@@ -161,7 +161,7 @@ fn desktop_entry_exec_with_a_shell_operator_is_refused_and_nothing_is_launched()
     for key in ["semi", "pipe", "subst", "shell"] {
         let refused = backend.apps_open(key, &mut launcher).expect_err(key);
         assert_eq!(refused.refusal.code, EngineCode::Internal, "{key}");
-        assert_eq!(refused.refusal.reason, Some("launch_needs_user"), "{key}");
+        assert_eq!(refused.refusal.reason, Some(Reason::LaunchNeedsUser), "{key}");
     }
 
     assert!(launcher.0.is_empty(), "nothing was launched");

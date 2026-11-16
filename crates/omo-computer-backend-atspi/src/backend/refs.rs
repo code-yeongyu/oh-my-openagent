@@ -110,7 +110,7 @@ impl RefTable {
         let Some(RefToken::Qualified { generation, n }) = RefToken::parse(token) else {
             return Err(AxRefusal::plain(Refusal::new(
                 EngineCode::InvalidTarget,
-                Reason::RefUnqualified.wire(),
+                Reason::RefUnqualified,
             )));
         };
         let found = self.generations.get(&generation).ok_or_else(stale)?;

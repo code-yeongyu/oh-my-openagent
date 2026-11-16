@@ -20,7 +20,7 @@ const SLICE_MS: u64 = 250;
 fn no_surface() -> AxRefusal {
     AxRefusal::plain(Refusal::new(
         EngineCode::Internal,
-        Reason::NoNotificationSurface.wire(),
+        Reason::NoNotificationSurface,
     ))
 }
 

@@ -68,19 +68,19 @@ impl<B: Bus> AtspiBackend<B> {
         let entry = self.entries().remove(app_key).ok_or_else(|| {
             AxRefusal::plain(Refusal::new(
                 EngineCode::InvalidTarget,
-                Reason::AppUnknown.wire(),
+                Reason::AppUnknown,
             ))
         })?;
         let argv = exec::argv(&entry.exec).map_err(|_| {
             AxRefusal::plain(Refusal::new(
                 EngineCode::Internal,
-                Reason::LaunchNeedsUser.wire(),
+                Reason::LaunchNeedsUser,
             ))
         })?;
         let (program, args) = argv.split_first().ok_or_else(|| {
             AxRefusal::plain(Refusal::new(
                 EngineCode::Internal,
-                Reason::LaunchNeedsUser.wire(),
+                Reason::LaunchNeedsUser,
             ))
         })?;
         let plan = LaunchPlan {

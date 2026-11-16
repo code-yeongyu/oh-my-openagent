@@ -1,7 +1,7 @@
 //! RED-first behaviour of the tree, refs, actions and focus (AC-89, L8, GAP-7).
 
 use omo_computer_core::backend::{Delivered, Semantic};
-use omo_computer_core::error::EngineCode;
+use omo_computer_core::error::{EngineCode, Reason};
 use omo_computer_core::observation::BusyIndicator;
 
 use super::{gedit, observe, ref_of, GEDIT_XID};
@@ -127,7 +127,7 @@ fn twin_title_windows_are_ambiguous() {
     let refused = observe(&mut backend, "0x1").expect_err("two frames fit the window");
 
     assert_eq!(refused.refusal.code, EngineCode::InvalidTarget);
-    assert_eq!(refused.refusal.reason, Some("ambiguous"));
+    assert_eq!(refused.refusal.reason, Some(Reason::Ambiguous));
     let candidates = vec!["0x1".to_owned(), "0x2".to_owned()];
     assert_eq!(refused.detail, Some(Detail::AmbiguousWindow { candidates }));
 }
@@ -167,7 +167,7 @@ fn linux_app_not_on_bus_is_refused_typed_with_zero_bus_calls() {
     let refused = observe(&mut backend, "0x9000001").expect_err("slack is not on the bus");
 
     assert_eq!(refused.refusal.code, EngineCode::AxUnsupported);
-    assert_eq!(refused.refusal.reason, Some("not_on_bus"));
+    assert_eq!(refused.refusal.reason, Some(Reason::NotOnBus));
     assert!(matches!(refused.detail, Some(Detail::NotOnBus { ref app, .. }) if app == "slack"));
     assert_eq!(
         handle.counts().calls,

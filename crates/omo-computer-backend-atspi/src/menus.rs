@@ -78,7 +78,7 @@ impl<B: Bus> AtspiBackend<B> {
                 [one] => one.clone(),
                 many => {
                     let candidates = many.iter().map(|(node, _)| node.object_id()).collect();
-                    let refusal = Refusal::new(EngineCode::InvalidTarget, Reason::Ambiguous.wire());
+                    let refusal = Refusal::new(EngineCode::InvalidTarget, Reason::Ambiguous);
                     return Err(AxRefusal::new(
                         refusal,
                         Detail::AmbiguousItem { candidates },

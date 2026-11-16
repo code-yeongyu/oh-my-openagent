@@ -92,7 +92,7 @@ impl<B: Bus> AtspiBackend<B> {
         if action.0 != "press" {
             return Err(AxRefusal::plain(Refusal::new(
                 EngineCode::AxUnsupported,
-                Reason::PerformUnsupported.wire(),
+                Reason::PerformUnsupported,
             )));
         }
         let (_, entry) = self.refs.entry(&reference.0)?;
@@ -138,7 +138,7 @@ impl<B: Bus> AtspiBackend<B> {
         if facts.role != entry.native_role {
             return Err(AxRefusal::plain(Refusal::new(
                 EngineCode::StaleRef,
-                Reason::IdentityChanged.wire(),
+                Reason::IdentityChanged,
             )));
         }
         let read = &entry.read;

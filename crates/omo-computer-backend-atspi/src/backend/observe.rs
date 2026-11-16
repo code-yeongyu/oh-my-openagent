@@ -54,7 +54,7 @@ impl<B: Bus> AtspiBackend<B> {
             target.ok_or_else(|| AxRefusal::plain(Refusal::bare(EngineCode::WindowNotFound)))?;
         let not_on_bus = || {
             AxRefusal::new(
-                Refusal::new(EngineCode::AxUnsupported, Reason::NotOnBus.wire()),
+                Refusal::new(EngineCode::AxUnsupported, Reason::NotOnBus),
                 Detail::NotOnBus {
                     app: target.app.clone(),
                     hint: NOT_ON_BUS_HINT,
@@ -88,7 +88,7 @@ impl<B: Bus> AtspiBackend<B> {
             }),
             Join::Unknown => Err(AxRefusal::plain(Refusal::bare(EngineCode::AxFailed))),
             Join::Ambiguous(candidates) => Err(AxRefusal::new(
-                Refusal::new(EngineCode::InvalidTarget, Reason::Ambiguous.wire()),
+                Refusal::new(EngineCode::InvalidTarget, Reason::Ambiguous),
                 Detail::AmbiguousWindow { candidates },
             )),
         }
