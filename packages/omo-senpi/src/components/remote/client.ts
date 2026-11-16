@@ -12,6 +12,7 @@ import {
 } from "@oh-my-opencode/device-service-core"
 import { failureFromError, nextActionFor, remoteFailure } from "./codes"
 import { BOUNDS, CONNECT_SLACK_MS, DEADLINES, withinDeadline } from "./deadlines"
+import { handleOf } from "./seams"
 import type {
   BootstrapResult,
   BootstrapSetup,
@@ -302,7 +303,7 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
 // The listing carries one display name per session (its title); archive state has no layer yet (E-archive), so every
 // row is unarchived. The handle is the `<device>/<session>` form seam 1 parses.
 const sessionRow = (row: ListingRow, device: DeviceRow): SessionRow => ({
-  thread: `${row.device}/${row.session_id}`,
+  thread: handleOf(row.device, row.session_id),
   name: row.title,
   title: row.title,
   device,

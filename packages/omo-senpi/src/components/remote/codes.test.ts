@@ -59,6 +59,18 @@ describe("the engine mapping (R-05 restored)", () => {
     expect(engineCode("invalid_level").code).toBe("thinking_level_unsupported")
   })
 
+  test("#given an engine code that is already a remote code #then it keeps its name", () => {
+    for (const code of ["not_found", "model_not_found", "turn_conflict", "not_resumable"] as const)
+      expect(engineCode(code)).toEqual({ code })
+  })
+
+  test("#given an engine code the remote list does not have #then unsupported naming it", () => {
+    expect(engineCode("some_new_engine_code")).toEqual({
+      code: "unsupported",
+      details: { engine_code: "some_new_engine_code" },
+    })
+  })
+
   test("#given worktree_failed, not_running and handle_lost #then unsupported{worktree}, not_resumable and not_found{handle}", () => {
     expect(engineCode("worktree_failed")).toEqual({ code: "unsupported", details: { feature: "worktree" } })
     expect(engineCode("not_running").code).toBe("not_resumable")
