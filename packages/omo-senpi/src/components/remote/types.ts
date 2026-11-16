@@ -8,7 +8,7 @@ import type {
   SnapshotBody as WireSnapshotBody,
   Status,
 } from "@oh-my-opencode/device-service-core"
-import { PERMISSION_PRESETS, type PermissionPreset } from "../thread/contracts/permission-presets"
+import type { PermissionPreset } from "../thread/contracts/permission-presets"
 import type { ExternalAuthor } from "../thread/gateway/types"
 import type { RemoteCode } from "./codes"
 
@@ -211,10 +211,10 @@ export type SessionsList = {
 // What the members of part 4a-2 take and answer (#13414 W3: the rows' confirmed shapes, recorded in remote-tools SEAMS.md).
 
 /**
- * senpi's approval modes (permission-system/types.ts), as `open_session` takes them (`permissionPreset`): the one list,
- * owned by the thread contracts (thread_create narrows by it) and re-exported here.
+ * senpi's approval modes (permission-system/types.ts), as `open_session` takes them (`permissionPreset`): the one list
+ * is the thread contracts' PERMISSION_PRESETS (thread_create narrows by it); its type is re-exported here.
  */
-export { PERMISSION_PRESETS, type PermissionPreset }
+export type { PermissionPreset }
 
 /**
  * One new session, opened through the shared create path (thread SessionHost.open): `workspace` is its cwd, `model` is
