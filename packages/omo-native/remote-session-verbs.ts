@@ -20,7 +20,7 @@ import { createRelayTransport } from "../omo-senpi/src/components/thread/remote/
 import { createGatewayEngine, resolveFromEntries } from "../omo-senpi/src/components/thread/gateway/engine"
 import { createLocalTransport } from "../omo-senpi/src/components/thread/gateway/local-transport"
 import { createDeliveryPipeline } from "../omo-senpi/src/components/thread/gateway/pipeline"
-import { namedDeviceRow } from "../omo-senpi/src/components/thread/remote/address-book"
+import { createdDeviceRow, namedDeviceRow } from "../omo-senpi/src/components/thread/remote/address-book"
 import { stampThisDevice } from "../omo-senpi/src/components/thread/remote/this-device"
 import type { Provenance } from "../omo-senpi/src/components/thread/gateway/types"
 import { threadLink } from "../omo-senpi/src/components/thread/thread-link"
@@ -137,11 +137,7 @@ async function openOn(
   if (args.prompt === undefined) return show(opened, "")
   // The first prompt (#13410) goes to the session just opened, by its own id, as `omo remote send --no-wait` sends it.
   const label = `${args.device}/${opened.thread.thread_id}`
-  const row: RemoteSessionRow = {
-    ...namedDeviceRow(args.device, opened.thread.thread_id),
-    title: opened.thread.name,
-    project: opened.thread.cwd,
-  }
+  const row = createdDeviceRow(args.device, opened.thread)
   const delivery = personDelivery(remote, dependencies)
   let sent: ThreadToolResult
   try {

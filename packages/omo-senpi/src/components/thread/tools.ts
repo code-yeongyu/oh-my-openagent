@@ -28,7 +28,7 @@ import {
 } from "./contracts"
 import { THREAD_FAMILY_PROMPT_GUIDELINES } from "./metadata"
 import { createLaunch } from "./control/create-launch"
-import { namedDeviceRow } from "./remote/address-book"
+import { createdDeviceRow } from "./remote/address-book"
 import { threadLink } from "./thread-link"
 export type { ThreadTranscriptEntry } from "./reader"
 import { hashArgs } from "./gateway/bindings"
@@ -460,7 +460,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         ? { kind: "local", thread_id: thread.thread_id, all_scope: true }
         : {
             kind: "remote",
-            row: { ...namedDeviceRow(thread.device, thread.thread_id), title: thread.name, project: thread.cwd },
+            row: createdDeviceRow(thread.device, thread),
           }
     const send = {
       thread: thread.thread_id,

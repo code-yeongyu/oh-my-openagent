@@ -130,6 +130,19 @@ describe("thread_create with a first prompt (#13410)", () => {
     expect(JSON.stringify(admitted[0]?.rpc)).toContain("build it")
   })
 
+  // Found by the two-device relay proof: b knows a session it opened a moment ago only by the relay key its open reply named.
+  test("#given b knows the new session only by its relay key #when created with a prompt #then the prompt is admitted on that key", async () => {
+    const a = account({ relayKeys: new Map([["dur-new-on-b", "relay-key-9"]]), relayKeyOnly: true })
+    const { run } = surface(a.remote)
+    const result = (await run("thread_create", { device: "studio", prompt: "build it" })) as {
+      prompt?: Record<string, unknown>
+    }
+    expect(result.prompt).toMatchObject({ delivery: { kind: "started" } })
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message")).toEqual([
+      expect.objectContaining({ session: "relay-key-9" }),
+    ])
+  })
+
   test("#given a prompt #when created here #then the gateway takes one delivery for the new thread", async () => {
     const a = account()
     const { run, enqueuedFor } = surface(a.remote)

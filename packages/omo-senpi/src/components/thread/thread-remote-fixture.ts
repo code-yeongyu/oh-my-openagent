@@ -129,6 +129,8 @@ export function createRemoteThreadFixture() {
       liveState?: JsonObject
       /** b's engine refuses every open_session with this error text (senpi names an unresolvable model `model_unavailable: ...`). */
       openRefuse?: string
+      /** b knows a session it just opened only by its relay key (relayKeys), not by its durable id: a listing that has not caught up yet. */
+      relayKeyOnly?: boolean
     } = {},
   ) {
     const engine = options.engine ?? ENGINE
@@ -193,7 +195,8 @@ export function createRemoteThreadFixture() {
         return { kind: "refused", reason: options.openRefuse }
       if (rpc["type"] === "open_session") {
         const opened = rpc["sessionPath"] === undefined ? "dur-new-on-b" : "dur-on-b"
-        for (const id of [opened, options.relayKeys?.get(opened) ?? opened]) live.add(id)
+        const key = options.relayKeys?.get(opened) ?? opened
+        for (const id of options.relayKeyOnly === true ? [key] : [opened, key]) live.add(id)
         return ok(options.openData ?? { sessionId: "rpc-9", state: { durableSessionId: opened } })
       }
       if (rpc["type"] === "get_state")

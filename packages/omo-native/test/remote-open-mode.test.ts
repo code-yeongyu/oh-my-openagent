@@ -95,6 +95,17 @@ describe("omo remote open with create options", () => {
     })
   })
 
+  test("#given b knows the new session only by its relay key #when opened with --prompt #then the prompt goes to that key", async () => {
+    const result = await open(["--prompt", "build it", "--json"], undefined, {
+      relayKeys: new Map([["dur-new-on-b", "relay-key-9"]]),
+      relayKeyOnly: true,
+    })
+    expect(result.code).toBe(REMOTE_EXIT.ok)
+    expect(result.sent.filter((entry) => entry.rpc?.["type"] === "prompt")).toEqual([
+      expect.objectContaining({ session: "relay-key-9" }),
+    ])
+  })
+
   test("#given malformed create options #when parsed #then each is a usage error and nothing is opened", async () => {
     for (const args of [["--model", "opus"], ["--thinking", "huge"], ["--branch", "x"], ["--worktree"], ["--steer"]]) {
       const result = await open(args)
