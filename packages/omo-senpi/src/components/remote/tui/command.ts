@@ -263,6 +263,17 @@ function sessionVerbLines(verb: string, target: string, result: Record<string, u
   if (verb === "close") return [result["closed"] === true ? `Closed ${target}.` : `${target} was not open.`]
   if (verb === "model" && isRecord(result["model"]))
     return [`${target} now uses ${String(result["model"]["provider"])}/${String(result["model"]["id"])}.`]
+  if (verb === "model" && typeof result["model"] === "string") return [`${target} now uses ${result["model"]}.`]
+  if ((verb === "enable" || verb === "disable") && typeof result["enabled"] === "boolean")
+    return [`Remote sessions are ${result["enabled"] ? "on" : "off"} for this device.`]
+  if (verb === "enable" && result["state"] === "connected") return ["Remote sessions are on for this device."]
+  if (verb === "enable" && typeof result["notice"] === "string") return [result["notice"]]
+  if (verb === "control" && typeof result["attached"] === "boolean")
+    return [
+      result["attached"]
+        ? "Remote control is on: your other signed-in devices can view and command sessions on this device."
+        : "Remote control is off: your other devices cannot view or command sessions on this device.",
+    ]
   return [JSON.stringify(result)]
 }
 
