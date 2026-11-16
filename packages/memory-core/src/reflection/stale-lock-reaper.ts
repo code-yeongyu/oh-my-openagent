@@ -896,11 +896,22 @@ export async function reclaimDeadOwnerLocks(locksDir: string): Promise<DeadOwner
       failures.set(basename(lockPath), error instanceof Error ? error.message : String(error))
     },
   })
-  // A lock another process removed while the sweep reached it is neither reclaimed nor kept: it is gone.
-  const remaining = new Set(await readdir(locksDir).catch(() => [] as string[]))
+  // A lock another process removed while the sweep reached it is neither reclaimed nor kept: it is gone. When
+  // the directory cannot be listed again, every unreclaimed lock stays reported as kept, with that error.
+  const listing = await readdir(locksDir).then(
+    (entries) => ({ remaining: new Set(entries), error: undefined }),
+    (error: unknown) => ({ remaining: undefined, error: error instanceof Error ? error.message : String(error) }),
+  )
   const kept = names
-    .filter((name) => !reclaimed.includes(name) && remaining.has(name))
-    .map((name) => ({ name, reason: failures.get(name) ?? "owner is alive or not provably dead" }))
+    .filter((name) => !reclaimed.includes(name) && (listing.remaining === undefined || listing.remaining.has(name)))
+    .map((name) => ({
+      name,
+      reason:
+        failures.get(name) ??
+        (listing.error === undefined
+          ? "owner is alive or not provably dead"
+          : `could not list the locks after the sweep: ${listing.error}`),
+    }))
   return { reclaimed, kept }
 }
 
