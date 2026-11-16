@@ -29,7 +29,7 @@ const USAGE_ENTRIES: readonly { readonly verbs: readonly string[]; readonly text
   {
     verbs: ["wake"],
     text: `  wake [on|off|default]                    whether sessions on this device that are not running may be started
-                                           by a message from your other signed-in devices; off unless turned on`,
+                                           by a message from your other signed-in devices; on unless turned off`,
   },
   {
     verbs: ["bootstrap"],
