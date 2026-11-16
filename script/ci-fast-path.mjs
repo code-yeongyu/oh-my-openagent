@@ -153,10 +153,11 @@ export function classifyCiMode({
   const runtimeTouching = !diffAvailable || changedPaths.some(isRuntimePath)
   const labelled = classificationEvent === "pull_request" && labels.includes(fullMatrixLabel)
   // A diff that cannot be fully listed may hide a platform path, so the label is honored (fails toward the full matrix).
+  const labelHonoredOverFileCap = labelled && changedFiles > apiFileListCap
   const labelHonored =
     labelled &&
     (!diffAvailable ||
-      changedFiles > apiFileListCap ||
+      labelHonoredOverFileCap ||
       changedPaths.some(isPlatformSensitivePath) ||
       platformReasonLine.test(body))
   const fullMatrix =
@@ -169,6 +170,7 @@ export function classifyCiMode({
     fullMatrix,
     runtimeTouching,
     labelRefused: labelled && !fullMatrix,
+    labelHonoredOverFileCap,
   }
 }
 
