@@ -186,6 +186,15 @@
               "auditIds": [
                 "d46b81e79e1e25e9"
               ],
+              "timings": {
+                "settleMs": 500
+              },
+              "settle": {
+                "outcome": "settled",
+                "quietMs": 500,
+                "waitedMs": 500,
+                "regime": "unchanged"
+              },
               "evidence": [
                 {
                   "kind": "value_readback",
