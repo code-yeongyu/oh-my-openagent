@@ -45,6 +45,23 @@ export const Message = Type.String({
   description: `Instruction to deliver to the target thread; longer than ${THREAD_MESSAGE_MAX_BYTES} UTF-8 bytes returns message_too_large.`,
 })
 
+export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const
+// Spelled out, not mapped from THINKING_LEVELS: a mapped array loses the literal types, and the level's static type then
+// reads as never wherever a parsed level is passed on (setThinkingLevelOn).
+export const thinkingLevel = (description: string) =>
+  Type.Union(
+    [
+      Type.Literal("off"),
+      Type.Literal("minimal"),
+      Type.Literal("low"),
+      Type.Literal("medium"),
+      Type.Literal("high"),
+      Type.Literal("xhigh"),
+      Type.Literal("max"),
+    ],
+    { description },
+  )
+
 export const BindingId = Type.String({
   minLength: 1,
   description: "Binding id as returned by thread_bind or thread_bindings.",
