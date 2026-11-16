@@ -180,6 +180,7 @@
               "coordinateHeight": 1080,
               "scale": 1,
               "cursor": "os",
+              "redaction": "none",
               "session": {
                 "screenLocked": "unknown",
                 "displayAsleep": "unknown",
