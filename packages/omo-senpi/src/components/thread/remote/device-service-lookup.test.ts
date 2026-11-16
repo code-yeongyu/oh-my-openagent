@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { connectDeviceService, LocalApiError } from "@oh-my-opencode/device-service-core"
-import { createDeviceServiceSessions } from "./device-service"
+import { createDeviceServiceSessions } from "../../remote/port/device-service"
 
 // The adapter over the real SDK: an endpoint command whose endpoint lookup fails sent nothing and is refused (a create
 // or fork may be retried); the same timeout after session.command was written may have run and stays uncertain.
@@ -14,7 +14,7 @@ function portFor(lookup: "timeout" | "closed" | "answers") {
       if (lookup === "closed") throw new LocalApiError("closed", "the connection closed")
       return { endpoints: ["ZW5kcG9pbnQta2V5LTAwMD"] }
     },
-    endpointCommand: async (_device: string, _endpoint: string, _rpc: unknown, commandId: string) => {
+    commandTo: async (_target: unknown, _rpc: unknown, commandId: string) => {
       calls.endpointCommand += 1
       throw new LocalApiError("request_timeout", `command ${commandId} may have been dispatched`, {
         command_id: commandId,
@@ -27,7 +27,11 @@ function portFor(lookup: "timeout" | "closed" | "answers") {
   const port = createDeviceServiceSessions({
     version: "0.0.0-test",
     connect: () =>
-      connectDeviceService({ version: "0.0.0-test", stateDir: "/nonexistent", connect: async () => fake as never }),
+      connectDeviceService({
+        version: "0.0.0-test",
+        stateDir: "/nonexistent",
+        connect: async () => fake as never,
+      }).then((conn) => ({ conn, owned: true })),
   })
   return { port, calls }
 }
