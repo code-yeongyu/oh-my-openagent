@@ -1,10 +1,18 @@
 //! The omo-computer-engine binary: router, entry modes, exposure bridge, MCP shim, daemon and launcher.
 
+mod bridge;
 mod cli;
+mod executor;
+mod helpers;
+mod host;
+mod launch;
+mod mcp;
 mod route;
-mod rpc;
+mod router;
 mod schema;
 mod selftest;
+#[cfg(unix)]
+mod serve;
 mod stdio;
 
 use std::process::ExitCode;
@@ -27,6 +35,14 @@ fn main() -> ExitCode {
         }
         Mode::Schema => schema::run(),
         Mode::Selftest { json } => selftest::run(json),
+        Mode::PresenceHelper => helpers::presence::run(),
+        Mode::ReleaseHelper => helpers::release::run(),
         Mode::Stdio => stdio::run(),
+        Mode::Oneshot => stdio::oneshot(),
+        Mode::Mcp { tier } => stdio::mcp(tier),
+        #[cfg(unix)]
+        Mode::Serve { endpoint, lock } => serve::run(&endpoint, &lock),
+        #[cfg(not(unix))]
+        Mode::Serve { .. } => ExitCode::from(2),
     }
 }

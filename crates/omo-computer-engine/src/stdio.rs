@@ -1,79 +1,77 @@
-//! `--stdio`: one JSON-RPC message per line in, one reply line out, until stdin closes. Lines
-//! are read as raw bytes, so a line that is not UTF-8 answers -32700 and the loop goes on.
+//! The standard-stream entry modes: `--stdio` (the executor over the router), `--oneshot` and
+//! the `--mcp` shim (the bridges over a standalone session). Each builds its router from the
+//! launch environment and prints one stderr line when it cannot.
 
-use std::io::{self, BufRead, Write};
+use std::io;
 use std::process::ExitCode;
 
-use omo_computer_core::paths;
-use omo_computer_session::Session;
+use crate::bridge::{oneshot, BridgeSession};
+use crate::executor::Executor;
+use crate::launch::{launch, Launched};
+use crate::mcp::tier::{self, Tier};
+use crate::mcp::Server;
 
-use crate::{route, rpc};
+fn launched() -> Result<Launched, ExitCode> {
+    launch(std::env::vars().collect()).map_err(|error| {
+        eprintln!("omo-computer-engine: {error}");
+        ExitCode::from(2)
+    })
+}
 
-pub fn run() -> ExitCode {
-    let vars: Vec<(String, String)> = std::env::vars().collect();
-    let backend = match route::backend(&vars) {
-        Ok(backend) => backend,
-        Err(error) => {
-            eprintln!("omo-computer-engine: {error}");
-            return ExitCode::from(2);
-        }
-    };
-    let lookup = |name: &str| vars.iter().find(|(key, _)| key == name).map(|(_, value)| value.clone());
-    let roots = match paths::resolve(lookup) {
-        Ok(roots) => roots,
-        Err(error) => {
-            eprintln!("omo-computer-engine: state directory unavailable: {error}");
-            return ExitCode::from(2);
-        }
-    };
-    match serve(&mut Session::for_roots(backend, &roots), io::stdin().lock(), &mut io::stdout().lock()) {
+fn finish(mode: &str, outcome: io::Result<()>) -> ExitCode {
+    match outcome {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
-            eprintln!("omo-computer-engine: stdio: {error}");
+            eprintln!("omo-computer-engine: {mode}: {error}");
             ExitCode::FAILURE
         }
     }
 }
 
-/// # Errors
-/// Reading the input or writing a reply failed.
-pub fn serve(session: &mut Session, input: impl BufRead, output: &mut impl Write) -> io::Result<()> {
-    for line in input.split(b'\n') {
-        let line = line?;
-        if line.trim_ascii().is_empty() {
-            continue;
+pub fn run() -> ExitCode {
+    match launched() {
+        Ok(launched) => {
+            let executor = Executor::new(launched.router, io::stdout().lock(), launched.pace);
+            #[cfg(unix)]
+            let executor = match crate::helpers::release_link::ReleaseLink::spawn() {
+                Ok(link) => executor.with_release(link),
+                Err(error) => {
+                    eprintln!("omo-computer-engine: release helper: {error}");
+                    executor
+                }
+            };
+            finish("stdio", executor.run(io::BufReader::new(io::stdin())).map(drop))
         }
-        if let Some(reply) = rpc::handle_line(session, &line) {
-            writeln!(output, "{reply}")?;
-            output.flush()?;
-        }
+        Err(code) => code,
     }
-    Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use omo_computer_backend_fake::FakeBackend;
-    use serde_json::Value;
+fn narrowing(launched: &Launched, requested: Tier) -> omo_computer_session::host_view::ConsentNarrowing {
+    let vars = launched.vars.clone();
+    tier::narrowing(
+        move |name| vars.iter().find(|(key, _)| key == name).map(|(_, value)| value.clone()),
+        launched.fake,
+        requested,
+    )
+}
 
-    use super::*;
+pub fn oneshot() -> ExitCode {
+    match launched() {
+        Ok(launched) => {
+            let narrowing = narrowing(&launched, Tier::Exec);
+            finish("oneshot", oneshot::run(launched.router, narrowing, io::stdin().lock(), &mut io::stdout().lock()))
+        }
+        Err(code) => code,
+    }
+}
 
-    #[test]
-    fn a_non_utf8_line_answers_a_parse_error_and_the_loop_goes_on() {
-        let backend = FakeBackend::from_json("{}").expect("empty scenario");
-        let mut session = Session::new(Box::new(backend));
-        let mut input = vec![0xff, 0xfe, b'\n'];
-        input.extend_from_slice(br#"{"jsonrpc":"2.0","id":2,"method":"capabilities","params":{}}"#);
-        input.push(b'\n');
-        let mut output = Vec::new();
-        serve(&mut session, input.as_slice(), &mut output).expect("the loop survives the bad line");
-        let replies: Vec<Value> = String::from_utf8(output)
-            .expect("replies are UTF-8")
-            .lines()
-            .map(|line| serde_json::from_str(line).expect("each reply is JSON"))
-            .collect();
-        assert_eq!(replies.len(), 2, "{replies:?}");
-        assert_eq!(replies[0]["error"]["code"], rpc::PARSE_ERROR);
-        assert_eq!((replies[1]["id"].clone(), replies[1]["result"]["backend"].clone()), (2.into(), "fake".into()));
+pub fn mcp(requested: Tier) -> ExitCode {
+    match launched() {
+        Ok(launched) => {
+            let narrowing = narrowing(&launched, requested);
+            let server = Server::new(BridgeSession::new(launched.router, narrowing));
+            finish("mcp", server.run(io::stdin().lock(), &mut io::stdout().lock()))
+        }
+        Err(code) => code,
     }
 }

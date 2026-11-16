@@ -230,7 +230,7 @@
         "$ref": "#/$defs/EmptyParams"
       },
       "result": {
-        "$ref": "#/$defs/ClipboardContent"
+        "$ref": "#/$defs/ClipboardReadReply"
       }
     },
     "menu.items": {
@@ -1163,6 +1163,24 @@
           ],
           "default": null
         },
+        "reason": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RefusalReason"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Row 24 (R60): why an `effect:\"refused\"` report sent nothing."
+        },
+        "nothingSent": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "Row 24 (R60): `true` on a refused report: nothing was sent."
+        },
         "warning": {
           "type": [
             "string",
@@ -1188,15 +1206,71 @@
           ],
           "default": null
         },
+        "settle": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObservationSettle"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The post-send settle: the regime picked and its outcome.",
+          "default": null
+        },
         "evidence": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/Evidence"
           }
         },
+        "urlPolicy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UrlPolicyStamp"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Row 25: `\"unknown\"` when a browser window's URL could not be read under a non-empty\n`computer.url_policy` (the send was delivered, fail-open).",
+          "default": null
+        },
         "observation": {
           "$ref": "#/$defs/UntrustedText",
           "description": "Required on the wire: a report without `{untrustedText: true}` does not parse."
+        },
+        "paused": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Pause"
+          },
+          "description": "What the admission waited for before the send.",
+          "default": []
+        },
+        "session": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionState"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The session state sampled for this call (object mode).",
+          "default": null
+        },
+        "target": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TargetLiveness"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Present only when the target exited or stopped answering during the call.",
+          "default": null
         }
       },
       "required": [
@@ -2344,6 +2418,17 @@
       ],
       "description": "`clipboard.read`: a concealed clipboard answers `{secure:true, text:null, reason:\"concealed\"}`."
     },
+    "ClipboardReadReply": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ClipboardContent"
+        },
+        {
+          "$ref": "#/$defs/ActionReport"
+        }
+      ],
+      "description": "`clipboard.read`'s reply (R60a(b), repin item 52): the content, or under a secure focus the\nrefused report (`effect:\"refused\"`, `reason:\"secure_focus\"`, `nothingSent:true`), never a\n`ClipboardContent`."
+    },
     "ClipboardWriteParams": {
       "type": "object",
       "additionalProperties": false,
@@ -2689,6 +2774,13 @@
         },
         "observation": {
           "$ref": "#/$defs/UntrustedText"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ProbeCheck"
+          },
+          "description": "R62: a backend's own doctor checks that are not permissions (an X11 display, the\naccessibility bus, MPX, the compositor). They never feed `ok`; absent when there are none."
         }
       },
       "required": [
@@ -2703,6 +2795,48 @@
         "stopPath",
         "observation"
       ]
+    },
+    "DiffFallback": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "baseline_incomplete",
+            "current_incomplete"
+          ]
+        },
+        {
+          "type": "string",
+          "const": "since_expired",
+          "description": "`since` names no generation in the window's 8-generation window."
+        },
+        {
+          "type": "string",
+          "const": "window_changed",
+          "description": "The window identity (pid, process start, window) changed since the baseline."
+        },
+        {
+          "type": "string",
+          "const": "menu_root",
+          "description": "The baseline or the current root is an open menu."
+        },
+        {
+          "type": "string",
+          "const": "reordered",
+          "description": "The surviving elements changed their relative order."
+        },
+        {
+          "type": "string",
+          "const": "not_shorter",
+          "description": "The diff text is not shorter than the full tree text."
+        },
+        {
+          "type": "string",
+          "const": "query_projection",
+          "description": "A `query` projection keeps its own baseline and never diffs."
+        }
+      ],
+      "description": "Why an `observe({since})` answered the full tree instead of a diff."
     },
     "DisplayAwake": {
       "type": "object",
@@ -3316,6 +3450,11 @@
           "type": "string",
           "const": "ax_change",
           "description": "A window-wide accessibility change during the settle window."
+        },
+        {
+          "type": "string",
+          "const": "frame_readback",
+          "description": "Row 24 (R59): a window frame read back after a frame verb; a receipt when every edge is\nwithin 1 px of the frame asked for (design row C8), both recorded raw."
         }
       ],
       "description": "What an evidence entry read."
@@ -3441,6 +3580,17 @@
             }
           ]
         },
+        "redaction": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FrameRedaction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Row 26 (plan owner 2026-11-16): present on a desktop or display frame, always `none`."
+        },
         "session": {
           "$ref": "#/$defs/SessionState"
         },
@@ -3489,6 +3639,13 @@
         "ttlMs"
       ],
       "description": "Present only when the bytes did not ride inline (size above `limits.maxResponseBytes`)."
+    },
+    "FrameRedaction": {
+      "type": "string",
+      "enum": [
+        "none"
+      ],
+      "description": "What a frame's pixels had masked. Frames are declared unredacted (G3): only `none` exists, and\na desktop or display frame says so, so no caller believes a secure field on it was masked (IS-6)."
     },
     "FullLiteral": {
       "type": "string",
@@ -4307,6 +4464,48 @@
       ],
       "description": "`mcp`: the `--mcp` shim's consent view."
     },
+    "MenuItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "checked": {
+          "type": "boolean"
+        },
+        "accelerator": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "submenu": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "observation": {
+          "$ref": "#/$defs/UntrustedText"
+        }
+      },
+      "required": [
+        "label",
+        "enabled",
+        "checked",
+        "submenu",
+        "path",
+        "observation"
+      ],
+      "description": "One `menu.items()` record."
+    },
     "MenuItems": {
       "type": "object",
       "additionalProperties": false,
@@ -4314,7 +4513,7 @@
         "items": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/ElementInfo"
+            "$ref": "#/$defs/MenuItem"
           }
         },
         "truncated": {
@@ -4571,6 +4770,37 @@
         "y"
       ]
     },
+    "NotificationMatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "app": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "bodyHash": {
+          "type": "string"
+        },
+        "arrivedAt": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observation": {
+          "$ref": "#/$defs/UntrustedText"
+        }
+      },
+      "required": [
+        "app",
+        "title",
+        "bodyHash",
+        "arrivedAt",
+        "observation"
+      ],
+      "description": "The notification a `waitFor({notification})` matched: its fingerprint only, never the body."
+    },
     "NotificationPredicate": {
       "type": "object",
       "additionalProperties": false,
@@ -4614,6 +4844,26 @@
             "string",
             "null"
           ]
+        },
+        "diffFallback": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DiffFallback"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why a read that named `since` answered the full tree."
+        },
+        "baseline": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0,
+          "description": "The generation `diff` is against."
         },
         "focused": {
           "anyOf": [
@@ -4661,6 +4911,13 @@
             "boolean",
             "null"
           ]
+        },
+        "nextCall": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Row 26 (R70f(1), R70g(1)): present only when `secure` is true; names the user."
         },
         "settle": {
           "anyOf": [
@@ -4718,6 +4975,17 @@
           "type": "integer",
           "format": "uint64",
           "minimum": 0
+        },
+        "regime": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SettleRegime"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The regime of `settle_profile` the engine picked."
         }
       },
       "required": [
@@ -5082,6 +5350,47 @@
         "text"
       ]
     },
+    "Pause": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "$ref": "#/$defs/PauseReason"
+        },
+        "ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "description": "Milliseconds on the hand's clock the admission waited for this reason."
+        }
+      },
+      "required": [
+        "reason",
+        "ms"
+      ],
+      "description": "One pause: `ActionReport.paused[]` per call, `RunResult.pauses[]` per run."
+    },
+    "PauseReason": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "screen_locked"
+          ]
+        },
+        {
+          "type": "string",
+          "const": "user_active",
+          "description": "The user worked in the frontmost target within [`TAKEOVER_WINDOW_MS`]."
+        },
+        {
+          "type": "string",
+          "const": "system_suspended",
+          "description": "A local hand's system went to sleep."
+        }
+      ],
+      "description": "Why a call (or a run) waited before it was admitted."
+    },
     "PermissionReport": {
       "type": "object",
       "additionalProperties": false,
@@ -5224,6 +5533,37 @@
         "chord"
       ]
     },
+    "ProbeCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/ProbeState"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "state"
+      ],
+      "description": "R62: one backend doctor check, e.g. `{name: \"ax_bus\", state: \"unavailable\", reason: \"unreachable\"}`."
+    },
+    "ProbeState": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "unavailable",
+        "unknown"
+      ]
+    },
     "RaiseWindowParams": {
       "type": "object",
       "additionalProperties": false,
@@ -5264,6 +5604,15 @@
         "height"
       ],
       "description": "A rectangle in the coordinate space of the reply that carries it."
+    },
+    "RefusalReason": {
+      "type": "string",
+      "enum": [
+        "secure_focus",
+        "concealed_clipboard",
+        "secret_no_clipboard_route"
+      ],
+      "description": "Row 24 (R60): the pinned reasons a report is `effect:\"refused\"` with nothing sent\n(`design/d-sdk-skill.md`:555). A closed enum until the design lane rules its type."
     },
     "ReleaseHelper": {
       "type": "object",
@@ -6259,6 +6608,26 @@
         "timeout"
       ]
     },
+    "SettleRegime": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "changed",
+          "description": "After an input whose settle saw a change."
+        },
+        {
+          "type": "string",
+          "const": "unchanged",
+          "description": "After an input with no detected change."
+        },
+        {
+          "type": "string",
+          "const": "navigation",
+          "description": "After a navigation: a new window, app, Space or desktop, web-area URL or document."
+        }
+      ],
+      "description": "Which settle numbers an input's settle picked, from what it saw."
+    },
     "SpawnPath": {
       "type": "string",
       "enum": [
@@ -6527,6 +6896,55 @@
         "gone"
       ]
     },
+    "TargetLiveness": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/TargetState"
+        },
+        "pid": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "exitCode": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "signal": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        }
+      },
+      "required": [
+        "state",
+        "pid"
+      ],
+      "description": "`ActionReport.target`: present only when the target exited or stopped answering."
+    },
+    "TargetState": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "exited"
+          ]
+        },
+        {
+          "type": "string",
+          "const": "unresponsive",
+          "description": "The process stopped answering (AX / bus / message timeout)."
+        }
+      ],
+      "description": "The state of a target whose process stopped serving the call. A healthy target has no\n`target` member at all: `running` is never emitted."
+    },
     "TextRange": {
       "anyOf": [
         {
@@ -6580,7 +6998,8 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the element reference took to resolve."
         },
         "capture": {
           "type": [
@@ -6588,7 +7007,8 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the capture took."
         },
         "prime": {
           "type": [
@@ -6596,7 +7016,8 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the target took to prime."
         },
         "dispatch": {
           "type": [
@@ -6604,7 +7025,8 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the dispatch of the input took."
         },
         "verify": {
           "type": [
@@ -6612,7 +7034,8 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the verification read took."
         },
         "restore": {
           "type": [
@@ -6620,10 +7043,20 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the focus restore took."
+        },
+        "settleMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0,
+          "description": "Milliseconds the post-send settle waited (its `settle.waitedMs`)."
         }
       },
-      "description": "Stage timings in microseconds; a stage that did not run is absent."
+      "description": "How long each stage took; a stage that did not run is absent. Each field names its unit."
     },
     "ToolkitClass": {
       "type": "string",
@@ -6785,6 +7218,13 @@
         "untrustedText"
       ],
       "additionalProperties": false
+    },
+    "UrlPolicyStamp": {
+      "type": "string",
+      "enum": [
+        "unknown"
+      ],
+      "description": "The `urlPolicy` member of an `ActionReport`."
     },
     "UserActive": {
       "type": "object",
@@ -6954,6 +7394,16 @@
         },
         "observation": {
           "$ref": "#/$defs/Observation"
+        },
+        "notification": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NotificationMatch"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [

@@ -1,0 +1,88 @@
+{
+  "description": "A same-uid --serve under a caller-chosen lock and endpoint, marker deleted, live host latched: its first session.open answers Suspended{host_latch}, nothing sent. Driven by rogue_serve_starts_suspended_when_the_live_hosts_latch_is_set over the scratch endpoint (the transport field names the client's framing).",
+  "transport": "stdio",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
+  "env": {
+    "OMO_COMPUTER_FAKE_STOP_PATH": "live"
+  },
+  "host": {
+    "replies": [
+      {
+        "consentFingerprint": "fp-test",
+        "latch": {
+          "suspended": true,
+          "stopEpoch": 7
+        }
+      }
+    ]
+  },
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "error": {
+              "code": -32015,
+              "message": "Suspended",
+              "data": {
+                "code": "Suspended",
+                "hint": null,
+                "reason": "host_latch",
+                "nothingSent": true
+              }
+            }
+          },
+          "variable": [
+            "/error/data/path",
+            "/error/data/disposition",
+            "/error/data/nextCall"
+          ]
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "typeText",
+        "params": {
+          "target": "101",
+          "text": "x"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "error": {
+              "code": -32015,
+              "message": "Suspended",
+              "data": {
+                "code": "Suspended",
+                "hint": null,
+                "reason": "host_latch",
+                "nothingSent": true
+              }
+            }
+          },
+          "variable": [
+            "/error/data/path",
+            "/error/data/disposition",
+            "/error/data/nextCall"
+          ]
+        }
+      ],
+      "sink": 0
+    }
+  ]
+}
