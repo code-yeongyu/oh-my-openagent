@@ -2040,6 +2040,8 @@ dependencies = [
  "omo-computer-session",
  "serde",
  "serde_json",
+ "sha2",
+ "tempfile",
 ]
 
 [[package]]
@@ -2061,11 +2063,15 @@ dependencies = [
 name = "omo-computer-session"
 version = "0.0.0"
 dependencies = [
+ "libc",
  "omo-computer-backend-fake",
  "omo-computer-core",
  "omo-computer-safety",
  "serde",
  "serde_json",
+ "sha2",
+ "tempfile",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

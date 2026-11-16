@@ -5,7 +5,7 @@
 
 use omo_computer_core::backend::Refusal;
 use omo_computer_core::methods::Method;
-use omo_computer_session::Session;
+use omo_computer_session::{Refused, Session};
 use serde::de::DeserializeOwned;
 use serde_json::{json, Map, Value};
 
@@ -90,8 +90,8 @@ fn dispatch(session: &mut Session, name: &str, params: Value) -> Result<Value, F
             parse::<omo_computer_core::params::EmptyParams>(params)?;
             json!(session.capabilities())
         }
-        Method::Click => json!(session.click(parse(params)?).map_err(|r| refused(&r))?),
-        Method::TypeText => json!(session.type_text(parse(params)?).map_err(|r| refused(&r))?),
+        Method::Click => json!(session.click(parse(params)?).map_err(|r| refused_call(&r))?),
+        Method::TypeText => json!(session.type_text(parse(params)?).map_err(|r| refused_call(&r))?),
         _ => return Err(not_found()),
     };
     Ok(value)
@@ -110,6 +110,30 @@ fn refused(refusal: &Refusal) -> Failure {
         data["reason"] = json!(reason.wire());
     }
     failure(refusal.code.number(), refusal.code.wire(), Some(data))
+}
+
+/// A funnel refusal: the refusal's members plus the `callId` it concerns, for a replay the
+/// stored `receipt` (`TransactionFailed{reason:"replayed", callId, receipt}`), and for a call
+/// whose send was interrupted its `disposition` (`delivery_uncertain/unsafe`): without it
+/// the code's own row would read `not_delivered/safe` and invite a resend; `warning:"write_failed"`
+/// when the refusal's own audit line could not be written.
+fn refused_call(refused: &Refused) -> Failure {
+    let mut failure = self::refused(&refused.refusal);
+    if let Some(data) = failure.data.as_mut() {
+        if let Some(call_id) = &refused.call_id {
+            data["callId"] = json!(call_id);
+        }
+        if let Some(receipt) = &refused.receipt {
+            data["receipt"] = (**receipt).clone();
+        }
+        if let Some(disposition) = refused.interrupted {
+            data["disposition"] = json!(disposition);
+        }
+        if let Some(warning) = &refused.warning {
+            data["warning"] = json!(warning);
+        }
+    }
+    failure
 }
 
 fn reply(id: &Value, outcome: Result<Value, Failure>) -> String {
@@ -182,6 +206,24 @@ mod tests {
         let error = &reply["error"];
         assert_eq!(error["code"], json!(EngineCode::Closed.number()));
         assert_eq!(error["data"], json!({ "code": "Closed", "hint": null }));
+    }
+
+    #[test]
+    fn an_interrupted_call_carries_its_disposition_on_the_wire() {
+        let interrupted = omo_computer_session::Refused {
+            refusal: Refusal::new(EngineCode::TransactionFailed, Reason::RecoveryRequired),
+            call_id: Some("k-1".to_owned()),
+            receipt: None,
+            interrupted: Some(omo_computer_core::report::Disposition::UNCERTAIN_UNSAFE),
+            warning: Some("write_failed".to_owned()),
+        };
+        let Failure { data, .. } = refused_call(&interrupted);
+        let data = data.expect("data");
+        assert_eq!(data["warning"], json!("write_failed"), "an unwritten audit line is surfaced");
+        assert_eq!(data["callId"], json!("k-1"));
+        assert_eq!(data["disposition"], json!({ "delivery": "delivery_uncertain", "retry": "unsafe" }));
+        let plain = refused_call(&Refusal::new(EngineCode::TransactionFailed, Reason::MarkerUnavailable).into());
+        assert!(plain.data.expect("data").get("disposition").is_none(), "a refusal before any send carries none");
     }
 
     #[test]
