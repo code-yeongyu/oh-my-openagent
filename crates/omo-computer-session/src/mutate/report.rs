@@ -147,6 +147,7 @@ pub(crate) fn refused_reply(method: Method, reason: omo_computer_core::report::R
         warning: None,
         audit_ids: Vec::new(),
         timings: None,
+        settle: None,
         evidence: Vec::new(),
         observation: UntrustedText,
         paused: Vec::new(),
