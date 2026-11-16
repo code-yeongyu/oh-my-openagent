@@ -632,3 +632,67 @@ fn a_second_engine_is_refused_input_busy_while_the_first_holds_the_lock_then_pro
     first.drain();
     second.drain();
 }
+
+/// A 900 KiB text, under the engine's 1 MiB request line cap with its envelope.
+const UNDER_CAP_BYTES: usize = 900 * 1024;
+const OVER_CAP_BYTES: usize = 2 * 1024 * 1024;
+
+#[test]
+fn a_null_mode_session_takes_a_900_kib_request_and_refuses_a_2_mib_one_and_stays_usable() {
+    // Given
+    let dir = LockDir::new();
+    let mut engine = null_mode_engine(&Scenario::two_displays_with(&json!({})), &dir);
+    let under = "a".repeat(UNDER_CAP_BYTES);
+    // When
+    let written = engine.invoke("clipboard.write", json!({"text": under}));
+    // Then: today's v1 reply
+    assert_eq!(written["result"], Value::Null, "{}", written["error"]);
+    // When: a request line over the cap
+    engine.request(7, "clipboard.write", json!({"text": "b".repeat(OVER_CAP_BYTES)}));
+    let refused = loop {
+        let message = engine.next();
+        if message.get("id").is_some() {
+            break message;
+        }
+    };
+    // Then: a structured error under the request's own id; the request never ran
+    assert_eq!(refused["id"], json!(7), "{refused}");
+    assert_eq!(refused["error"]["data"]["code"], json!("Internal"), "{refused}");
+    assert_eq!(refused["error"]["data"]["reason"], json!("request_too_large"), "{refused}");
+    let read = engine.invoke("clipboard.read", json!({}));
+    assert_eq!(read["result"]["text"].as_str().map(str::len), Some(UNDER_CAP_BYTES));
+    engine.drain();
+}
+
+#[test]
+fn an_oversized_request_whose_id_follows_its_params_is_still_answered_under_that_id() {
+    // Given
+    let dir = LockDir::new();
+    let mut engine = null_mode_engine(&Scenario::two_displays_with(&json!({})), &dir);
+    let text = "c".repeat(OVER_CAP_BYTES);
+    // When: the id is the last member, past the cap
+    engine.send_raw(format!(r#"{{"jsonrpc":"2.0","method":"clipboard.write","params":{{"text":"{text}"}},"id":"late"}}"#).as_bytes());
+    engine.send_raw(b"\n");
+    let refused = engine.next();
+    // Then
+    assert_eq!(refused["id"], json!("late"), "{refused}");
+    assert_eq!(refused["error"]["data"]["reason"], json!("request_too_large"), "{refused}");
+    engine.drain();
+}
+
+#[test]
+fn an_oversized_line_without_a_readable_id_is_refused_and_the_connection_closes() {
+    // Given
+    let dir = LockDir::new();
+    let mut engine = null_mode_engine(&Scenario::two_displays_with(&json!({})), &dir);
+    // When: an object cut short, so no id can be read from it
+    let text = "d".repeat(OVER_CAP_BYTES);
+    engine.send_raw(format!(r#"{{"jsonrpc":"2.0","method":"clipboard.write","params":{{"text":"{text}"#).as_bytes());
+    engine.send_raw(b"\n");
+    // Then: one typed refusal, then the engine closes its output with stdin still open
+    let written = engine.until_closed();
+    let refusals: Vec<&Value> = written.iter().filter(|message| message.get("id").is_some()).collect();
+    assert_eq!(refusals.len(), 1, "{written:?}");
+    assert_eq!(refusals[0]["id"], Value::Null, "{written:?}");
+    assert_eq!(refusals[0]["error"]["data"]["reason"], json!("request_too_large"), "{written:?}");
+}
