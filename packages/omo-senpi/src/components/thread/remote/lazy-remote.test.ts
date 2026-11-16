@@ -57,3 +57,16 @@ describe("#12833: the default remote surface reaches the account's alias registr
     expect(loads).toBe(2)
   })
 })
+
+describe("the default remote surface passes a one-device listing through", () => {
+  test("#given a lazy surface #when sessions is asked for one device #then the loaded port answers that device's rows from a one-device read, never an account-wide round", async () => {
+    const a = account()
+    const remote = createLazyRemoteSurface({
+      version: "0.0.0",
+      loadRuntime: async () => ({ createDeviceServiceSessions: () => a.remote.sessions }),
+    })
+    const rows = await remote.sessions.sessions({ device: "b" })
+    expect(rows.map((row) => row.device)).toEqual(["b"])
+    expect(a.listings).toEqual({ all: 0, device: 1 })
+  })
+})

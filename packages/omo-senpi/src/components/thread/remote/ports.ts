@@ -1,3 +1,5 @@
+import type { DeviceService } from "@oh-my-opencode/device-service-core/device-service"
+
 export type JsonObject = { readonly [key: string]: unknown }
 
 /** One row of the account-scoped session list (the device service's `sessions.list` listing). */
@@ -14,7 +16,17 @@ export type RemoteSessionRow = {
   readonly updated_ms: number
 }
 
-export type RemoteDevice = { readonly device: string; readonly label: string; readonly online: boolean }
+export type RemoteDevice = {
+  readonly device: string
+  readonly label: string
+  readonly online: boolean
+  readonly platform?: string
+  readonly kind?: string
+  readonly last_seen_ms?: number | null
+}
+
+/** One account listing: its rows, and the devices whose rows this listing could not include (timed out, unanswered). */
+export type RemoteListing = { readonly rows: readonly RemoteSessionRow[]; readonly incomplete: readonly string[] }
 
 /**
  * How a command sent to another device ended. `refused` carries the receiving side's reason
@@ -44,6 +56,12 @@ export type RemoteLookupOutcome =
 
 export type RemoteServiceState = { readonly state: string }
 
+/**
+ * A dialer of one device-service connection, naming whether the caller owns it: an owned connection is closed
+ * once its work settles, a borrowed one stays open for its owner to close.
+ */
+export type DeviceServiceDial = () => Promise<{ readonly conn: DeviceService; readonly owned: boolean }>
+
 export type RemoteLocateOutcome =
   { readonly kind: "ok"; readonly sessionId: string } | { readonly kind: "refused"; readonly reason: string }
 
@@ -61,13 +79,22 @@ export type RemoteSessionsPort = {
   /** The device service state; `plan_required` means the account's plan has no relay (A5: paid only). */
   readonly status: () => Promise<RemoteServiceState>
   readonly thisDevice: () => Promise<string | null>
+  /** This device's own name. The account roster (`devices`) leaves this device out. Absent: the id stands in for it. */
+  readonly thisDeviceName?: () => Promise<string | null>
   readonly devices: () => Promise<readonly RemoteDevice[]>
   /** The account's session list; with `device`, that one device's rows only (no account-wide round). */
   readonly sessions: (filter?: { readonly device?: string }) => Promise<readonly RemoteSessionRow[]>
+  /** The account-wide list as `sessions` gives it, with the devices it could not include. Absent: every device counts as listed. */
+  readonly listing?: () => Promise<RemoteListing>
   /**
    * A session-less engine record (`open_session`, `list_sessions`) on `device`'s engine endpoint, with no
    * attach: the attach-less `session.command {device, endpoint, rpc}` shape (relay daemon #393). `locate` asks a
    * create or fork for its new session's listing key on the reply (`located`), so no session.locate follows it.
+   * An `open_session` rides the endpoint dialer: a fresh owned connection per call by default, closed once the
+   * record settles (#12777). Sent on the long-lived connection it would attach the host's delegated engine
+   * connection to the session as well, and the engine would write each streamed delta twice; the attach that
+   * follows rides the long-lived connection, which then carries one copy per delta. Every other record rides the
+   * long-lived connection.
    */
   readonly endpointCommand: (
     device: string,
