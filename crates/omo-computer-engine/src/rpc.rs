@@ -211,7 +211,7 @@ mod tests {
     #[test]
     fn an_interrupted_call_carries_its_disposition_on_the_wire() {
         let interrupted = omo_computer_session::Refused {
-            refusal: Refusal::new(EngineCode::TransactionFailed, "recovery_required"),
+            refusal: Refusal::new(EngineCode::TransactionFailed, Reason::RecoveryRequired),
             call_id: Some("k-1".to_owned()),
             receipt: None,
             interrupted: Some(omo_computer_core::report::Disposition::UNCERTAIN_UNSAFE),
@@ -222,7 +222,7 @@ mod tests {
         assert_eq!(data["warning"], json!("write_failed"), "an unwritten audit line is surfaced");
         assert_eq!(data["callId"], json!("k-1"));
         assert_eq!(data["disposition"], json!({ "delivery": "delivery_uncertain", "retry": "unsafe" }));
-        let plain = refused_call(&Refusal::new(EngineCode::TransactionFailed, "marker_unavailable").into());
+        let plain = refused_call(&Refusal::new(EngineCode::TransactionFailed, Reason::MarkerUnavailable).into());
         assert!(plain.data.expect("data").get("disposition").is_none(), "a refusal before any send carries none");
     }
 
