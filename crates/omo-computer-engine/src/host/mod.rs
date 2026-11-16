@@ -7,9 +7,9 @@
 #[cfg(unix)]
 mod dial;
 #[cfg(unix)]
-mod files;
+pub mod files;
 #[cfg(unix)]
-mod identity;
+pub mod identity;
 
 use omo_computer_core::backend::Refusal;
 use omo_computer_core::error::EngineCode;

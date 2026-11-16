@@ -1,0 +1,113 @@
+//! What every connection of one daemon generation shares: the generation capability (authority:
+//! the spawning host's and the launcher's connections), the peers registered by `hand.register`
+//! with the capability minted for each (one connection each), and the subscribers of the push
+//! outbox.
+
+use std::io::{Read, Write};
+use std::os::unix::net::UnixStream;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex, PoisonError};
+
+use super::admit::{constant_time_eq, Capability, CAPABILITY_LEN};
+
+/// The channel a connection's capability came over; it decides the `HostOnly(authority)` methods.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Grant {
+    Authority,
+    AttachHost { minted: usize },
+}
+
+struct Registered {
+    pid: i32,
+    capability: Capability,
+    bound: bool,
+}
+
+pub struct Shared {
+    pub runtime: PathBuf,
+    pub fake: bool,
+    generation: Capability,
+    host_pids: Vec<i32>,
+    registered: Mutex<Vec<Registered>>,
+    subscribers: Mutex<Vec<(usize, UnixStream)>>,
+}
+
+impl Shared {
+    #[must_use]
+    pub fn new(runtime: PathBuf, fake: bool, generation: Capability, host_pids: Vec<i32>) -> Arc<Self> {
+        Arc::new(Self {
+            runtime,
+            fake,
+            generation,
+            host_pids,
+            registered: Mutex::new(Vec::new()),
+            subscribers: Mutex::new(Vec::new()),
+        })
+    }
+
+    #[must_use]
+    pub fn allows_pid(&self, pid: i32) -> bool {
+        self.host_pids.contains(&pid) || self.registry().iter().any(|peer| peer.pid == pid)
+    }
+
+    fn registry(&self) -> std::sync::MutexGuard<'_, Vec<Registered>> {
+        self.registered.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// The grant a preamble earns: the generation capability, or a minted one not yet bound to
+    /// another connection (it binds now).
+    #[must_use]
+    pub fn bind(&self, preamble: &Capability) -> Option<Grant> {
+        if constant_time_eq(preamble, &self.generation) {
+            return Some(Grant::Authority);
+        }
+        let mut registry = self.registry();
+        let (minted, peer) = registry
+            .iter_mut()
+            .enumerate()
+            .find(|(_, peer)| constant_time_eq(preamble, &peer.capability))?;
+        if peer.bound {
+            return None;
+        }
+        peer.bound = true;
+        Some(Grant::AttachHost { minted })
+    }
+
+    /// The capability a request must carry on a connection holding `grant`.
+    #[must_use]
+    pub fn expected(&self, grant: Grant) -> Capability {
+        match grant {
+            Grant::Authority => self.generation,
+            Grant::AttachHost { minted } => self.registry()[minted].capability,
+        }
+    }
+
+    /// `hand.register{pid}`: a fresh capability for that peer's one future connection.
+    ///
+    /// # Errors
+    /// The OS random source could not be read.
+    pub fn register(&self, pid: i32) -> std::io::Result<Capability> {
+        let mut capability: Capability = [0; CAPABILITY_LEN];
+        std::fs::File::open("/dev/urandom")?.read_exact(&mut capability)?;
+        self.registry().push(Registered { pid, capability, bound: false });
+        Ok(capability)
+    }
+
+    pub fn subscribe(&self, connection: usize, stream: UnixStream) {
+        self.subscribers.lock().unwrap_or_else(PoisonError::into_inner).push((connection, stream));
+    }
+
+    pub fn unsubscribe(&self, connection: usize) {
+        self.subscribers.lock().unwrap_or_else(PoisonError::into_inner).retain(|(id, _)| *id != connection);
+    }
+
+    /// The push outbox: a notification line reaches every OTHER subscribed connection now (the
+    /// writer flushes per line, well inside the 500 ms idle flush).
+    pub fn push(&self, from: usize, line: &[u8]) {
+        for (id, stream) in self.subscribers.lock().unwrap_or_else(PoisonError::into_inner).iter_mut() {
+            if *id != from {
+                let _ = stream.write_all(line).and_then(|()| stream.flush());
+            }
+        }
+    }
+}
