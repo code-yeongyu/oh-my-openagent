@@ -1,5 +1,6 @@
 import { afterEach, expect, spyOn, test } from "bun:test"
 
+import { awaitWithinTestBudget, useTestTimeout } from "../../../../../test-support/test-deadline"
 import { LOCAL_DEBOUNCE_MS } from "./engine"
 import { type Device, GIT_TEST_TIMEOUT, makeDevice } from "./engine-harness.test-support"
 import { FakeSyncServer } from "./fake-server.test-support"
@@ -179,6 +180,61 @@ test(
     expect(a.engine.cyclesRun).toBe(2)
   },
   GIT_TEST_TIMEOUT,
+)
+
+test(
+  "#given a device held inside its cycle after its receive #when another device appends and the stream advertises the new head #then the held cycle reruns exactly once and the rerun applies the new file (omo #11778)",
+  async () => {
+    useTestTimeout(GIT_TEST_TIMEOUT * 2)
+    // given: B started and synced with A's first file
+    const { server, a, b } = await started()
+    await a.write("x.md", "x\n")
+    await a.engine.runCycle()
+    const startup = b.engine.nextCycle()
+    b.engine.start()
+    await startup
+    expect(await b.read("x.md")).toBe("x\n")
+    const cyclesBefore = b.engine.cyclesRun
+
+    // B's next cycle is held at its local capture: its receive already pulled head 1, and it has not applied yet
+    const entered = Promise.withResolvers<null>()
+    const release = Promise.withResolvers<null>()
+    const original = b.store.capture.bind(b.store)
+    let gated = false
+    const capture = spyOn(b.store, "capture").mockImplementation(async (key, text) => {
+      if (!gated) {
+        gated = true
+        entered.resolve(null)
+        await release.promise
+      }
+      return original(key, text)
+    })
+    const held = b.engine.runCycle()
+    try {
+      await awaitWithinTestBudget(entered.promise, "B's cycle reaching its capture")
+
+      // when: A appends y.md; the server advertises head 2 on B's stream while B's cycle is still held
+      await a.write("y.md", "y\n")
+      await a.engine.runCycle()
+      expect(server.head).toBe(2)
+    } finally {
+      release.resolve(null)
+    }
+
+    // then: the held cycle applied nothing (it pulled before A's append), so the advertised head reruns it once.
+    // The rerun starts as the held cycle settles, so it is taken before anything else is awaited.
+    const heldReport = await held
+    const rerunCycle = b.engine.nextCycle()
+    expect(heldReport.applied).toBe(0)
+    const rerun = await awaitWithinTestBudget(rerunCycle, "B's rerun after the mid-cycle advertised head")
+    expect(rerun.applied).toBe(1)
+    expect(await b.read("y.md")).toBe("y\n")
+    await b.engine.stop()
+    expect(b.engine.cyclesRun).toBe(cyclesBefore + 2)
+    expect(await b.engine.state()).toMatchObject({ eventHead: 2, applied: 2 })
+    capture.mockRestore()
+  },
+  GIT_TEST_TIMEOUT * 2,
 )
 
 test(
