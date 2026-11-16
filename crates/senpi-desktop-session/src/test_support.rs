@@ -1,28 +1,34 @@
 //! A worker over the fake backend with a live stop path, its op log, its
 //! failure and panic injection, its clock, and every audit event it emitted.
 
+mod builders;
+mod fake_time;
 mod panicky;
 mod screen;
 
 use std::sync::Arc;
 
+pub(crate) use builders::{
+    click_window, delivery, foreground_click, foreground_click_mutation, grant_control, op_names,
+    two_windows,
+};
+pub(crate) use fake_time::harness_on_fake_time;
 pub(crate) use panicky::{AfterPointer, Panics, Watches};
 pub(crate) use screen::{AwakeHolds, FakeScreen};
 use parking_lot::Mutex;
 use senpi_desktop_backend_fake::{
-    FakeBackend, FakeClock as AxClock, FakeScenario, FakeUserInput, Faults, RecordingSink, SinkOp,
+    FakeBackend, FakeClock as AxClock, FakeScenario, FakeUserInput, Faults, RecordingSink,
 };
-use senpi_desktop_core::backend::{Backend, DeliveryMode, Modifiers, MouseButton, PointerEvent};
+use senpi_desktop_core::backend::Backend;
 use senpi_desktop_core::error::CoreResult;
-use senpi_desktop_core::frame::FrameGeometry;
-use senpi_desktop_core::protocol_params::{CaptureParams, ControlGrantParams, PointParams};
+use senpi_desktop_core::protocol_params::CaptureParams;
 use senpi_desktop_core::protocol_results::AuditEvent;
 use senpi_desktop_core::user_input::UserPressKind;
-use senpi_desktop_core::types::{DesktopCapabilities, DesktopSessionOptions, PointerOptions, Target};
-use senpi_desktop_safety::{Clock, FakeClock, MutatingAction, StopPathId, Supervisor};
+use senpi_desktop_core::types::{DesktopCapabilities, DesktopSessionOptions};
+use senpi_desktop_safety::{Clock, FakeClock, StopPathId, Supervisor};
 use serde_json::{json, Value};
 
-use crate::mutate::{Mutation, SessionSafety};
+use crate::mutate::SessionSafety;
 use crate::request::{Op, Response};
 use crate::selection::BackendFactory;
 use crate::worker::Worker;
@@ -41,8 +47,10 @@ pub(crate) struct Harness {
     pub(crate) awake: AwakeHolds,
     pub(crate) screen: FakeScreen,
     pub(crate) after_pointer: AfterPointer,
-    /// The fake's time for `ready_after_ms`, moved only by the test.
-    pub(crate) ax_clock: AxClock,
+    /// `Some` only in a [`harness_on_fake_time`] harness: the one clock the
+    /// fake measures `ready_after_ms` on and the battery waits on, moved only
+    /// by the battery's polls. `None`: both read host time.
+    pub(crate) ax_clock: Option<AxClock>,
     user_input: Arc<FakeUserInput>,
 }
 
@@ -112,11 +120,20 @@ pub(crate) fn harness_with_slot(overlay: &Value, slot: Arc<crate::grant::Control
     harness_opened(overlay, slot, DesktopSessionOptions::default())
 }
 
-/// A harness whose session was opened with `options`.
+/// A harness whose session was opened with `options`, on host time.
 pub(crate) fn harness_opened(
     overlay: &Value,
     slot: Arc<crate::grant::ControlSlot>,
     options: DesktopSessionOptions,
+) -> Harness {
+    open_with(overlay, slot, options, None)
+}
+
+fn open_with(
+    overlay: &Value,
+    slot: Arc<crate::grant::ControlSlot>,
+    options: DesktopSessionOptions,
+    ax_clock: Option<AxClock>,
 ) -> Harness {
     let scenario = scenario(overlay);
     let built = Built::default();
@@ -134,9 +151,8 @@ pub(crate) fn harness_opened(
     let (awake, screen) = (AwakeHolds::default(), FakeScreen::default());
     let watches = Watches::default();
     let after_pointer = AfterPointer::default();
-    let ax_clock = AxClock::new(0);
     let factory = Factory {
-        ax_clock: Some(ax_clock.clone()),
+        ax_clock: ax_clock.clone(),
         after_pointer: after_pointer.clone(),
         scenario,
         built: Arc::clone(&built),
@@ -241,80 +257,4 @@ impl Harness {
     pub(crate) fn grant_generation(&self) -> Option<u64> {
         self.worker.control.as_ref().map(|grant| grant.generation)
     }
-}
-
-pub(crate) fn delivery(mode: &str) -> Option<PointerOptions> {
-    Some(PointerOptions {
-        delivery_mode: Some(mode.to_owned()),
-        ..PointerOptions::default()
-    })
-}
-
-/// A `control.grant` request for `reason` with a fixed confirmation id.
-pub(crate) fn grant_control(reason: &str) -> Op {
-    Op::ControlGrant(ControlGrantParams {
-        reason: reason.to_owned(),
-        confirmation_id: "confirm-1".to_owned(),
-    })
-}
-
-/// A click at pixel (10, 10) of `frame_id`, a capture of window `101`.
-pub(crate) fn click_window(frame_id: &str, opts: Option<PointerOptions>) -> Op {
-    Op::Click(PointParams {
-        target: "101".to_owned(),
-        x: 10.0,
-        y: 10.0,
-        frame_id: Some(frame_id.to_owned()),
-        opts,
-    })
-}
-
-/// Window `101` behind the focused window `202`; the cursor rests at (960, 540).
-pub(crate) fn two_windows() -> Value {
-    let window = |id: &str, x: u32, focused: bool| {
-        json!({"id": id, "title": id, "app": "App", "pid": 7, "x": x, "y": 120,
-               "width": 400, "height": 300, "focused": focused, "elevated": null})
-    };
-    json!({"windows": [window("101", 100, false), window("202", 600, true)], "ax": {}})
-}
-
-pub(crate) fn op_names(harness: &Harness) -> Vec<&'static str> {
-    harness
-        .sink
-        .ops()
-        .iter()
-        .map(|op| match op {
-            SinkOp::QueryFrontWindow => "front",
-            SinkOp::Pointer { .. } => "pointer",
-            SinkOp::TypeText { .. } => "type",
-            SinkOp::KeyChord { .. } => "key",
-            SinkOp::RestoreFrontWindow(_) => "restore-front",
-            SinkOp::RestoreKeyFocus(_) => "restore-key-focus",
-            SinkOp::WarpCursor(_) => "warp",
-            SinkOp::ReleaseAll => "release",
-            _ => "other",
-        })
-        .collect()
-}
-
-/// A real foreground click into window `101`, run as a transaction's action.
-pub(crate) fn foreground_click(worker: &mut Worker) -> CoreResult<()> {
-    let event = PointerEvent::Click {
-        x: 150.0,
-        y: 150.0,
-        button: MouseButton::Left,
-        count: 1,
-        modifiers: Modifiers::default(),
-    };
-    let target = Target::Window("101".to_owned());
-    worker.backend()?.pointer(
-        &target,
-        event,
-        &FrameGeometry::identity_global(),
-        DeliveryMode::Foreground,
-    )
-}
-
-pub(crate) fn foreground_click_mutation() -> Mutation<'static> {
-    Mutation::new(MutatingAction::Click, "101".to_owned(), DeliveryMode::Foreground)
 }

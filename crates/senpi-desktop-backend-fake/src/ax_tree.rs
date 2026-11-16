@@ -2,36 +2,13 @@
 
 use std::cell::Cell;
 use std::collections::BTreeMap;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use senpi_desktop_core::ax::{AxBounds, AxHandle, AxProps};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 
-use crate::clock::FakeClock;
+use crate::ax_time::AxTime;
 use crate::scenario::FakeAxNode;
-
-/// The clock `ready_after_ms` is measured on: the host's by default, or a
-/// [`FakeClock`] that only a test moves.
-#[derive(Debug, Clone)]
-pub(crate) enum AxTime {
-    Host(Instant),
-    Fake(FakeClock),
-}
-
-impl Default for AxTime {
-    fn default() -> Self {
-        Self::Host(Instant::now())
-    }
-}
-
-impl AxTime {
-    fn now(&self) -> Duration {
-        match self {
-            Self::Host(origin) => origin.elapsed(),
-            Self::Fake(clock) => Duration::from_millis(clock.now_ms()),
-        }
-    }
-}
 
 struct AxEntry {
     props: AxProps,
