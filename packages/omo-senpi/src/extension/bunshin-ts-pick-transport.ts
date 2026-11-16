@@ -5,24 +5,17 @@ import { deviceServiceStateDir } from "@oh-my-opencode/device-service-core/state
 import type { MachineHubTransport } from "../../vendor/bunshin-ts/index.js"
 import { createRelayTransport, relayStatus } from "../../vendor/bunshin-ts-relay/index.js"
 
+import { BunshinSessionError } from "./bunshin-ts-errors"
+
+export { BunshinSessionError }
+export type { BunshinFailure, BunshinSessionErrorCode } from "./bunshin-ts-errors"
+
 const TRANSPORT_CHOICE_ENV = "BUNSHIN_TS_TRANSPORT"
 // The host session id, sent with each relay batch as attribution only.
 const SESSION_REF_ENV = "PI_SESSION_ID"
 
 export type TransportChoice = "auto" | "relay" | "hub"
 const CHOICES: readonly TransportChoice[] = ["auto", "relay", "hub"]
-
-export type BunshinSessionErrorCode = "no_transport" | "hub_not_bundled" | "bad_choice"
-
-export class BunshinSessionError extends Error {
-  readonly code: BunshinSessionErrorCode
-
-  constructor(code: BunshinSessionErrorCode, message: string) {
-    super(message)
-    this.name = "BunshinSessionError"
-    this.code = code
-  }
-}
 
 export type PickTransportDeps = Readonly<{
   relayStatus: (options?: { stateDir?: string }) => Promise<{ connected: boolean }>
@@ -58,7 +51,11 @@ const parseChoice = (raw: string | undefined): TransportChoice => {
   const value = nonEmpty(raw)?.toLowerCase() ?? "auto"
   const choice = CHOICES.find((candidate) => candidate === value)
   if (choice === undefined) {
-    throw new BunshinSessionError("bad_choice", `${TRANSPORT_CHOICE_ENV}=${raw} is not one of ${CHOICES.join(", ")}`)
+    throw new BunshinSessionError(
+      "bad_choice",
+      `${TRANSPORT_CHOICE_ENV}=${raw} is not one of ${CHOICES.join(", ")}`,
+      `set ${TRANSPORT_CHOICE_ENV} to one of ${CHOICES.join(", ")}, or unset it for auto`,
+    )
   }
   return choice
 }
@@ -74,7 +71,11 @@ export async function pickTransport(env: Env, deps: PickTransportDeps = BUNDLED)
   if (choice === "relay") return relayTransport(env, stateDir)
   if (choice === "hub") {
     if (deps.hub === undefined)
-      throw new BunshinSessionError("hub_not_bundled", "hub transport is not bundled in this build")
+      throw new BunshinSessionError(
+        "hub_not_bundled",
+        "hub transport is not bundled in this build",
+        `set ${TRANSPORT_CHOICE_ENV}=relay (or unset it) to reach devices through this device's device service`,
+      )
     return deps.hub.create()
   }
   const status = await deps.relayStatus({ stateDir })
@@ -83,5 +84,6 @@ export async function pickTransport(env: Env, deps: PickTransportDeps = BUNDLED)
   throw new BunshinSessionError(
     "no_transport",
     "no transport: the device service is not connected and no hub transport is available",
+    "start this device's device service and sign in (`omo remote status` shows its state), then retry",
   )
 }

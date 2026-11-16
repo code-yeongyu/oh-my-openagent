@@ -97,8 +97,6 @@
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "script/ci-fast-path.d.mts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "script/ci-platform-invocations.d.mts",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "script/fixtures/senpi-hooks-state-error-runner.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "script/fixtures/senpi-hooks-state-legacy-reader.ts",
@@ -230,8 +228,6 @@
     "script/ci-fast-path.mjs": ["isRuntimePath", "classifyCiMode"],
     // pre-existing at origin dev 4686e425b5: unused export(s) judgeLeg
     "script/ci-leg-tests-guard.mjs": ["judgeLeg"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) platformOnlyStepTexts
-    "script/ci-platform-invocations.mjs": ["platformOnlyStepTexts"],
     // pre-existing at origin dev 4686e425b5: unused export(s) claudeCodePackageFor, lockfileIntegrity
     "script/claude-code-pin.ts": ["claudeCodePackageFor", "lockfileIntegrity"],
     // pre-existing at origin dev 4686e425b5: unused export(s) proveStagedDesktopEngine
