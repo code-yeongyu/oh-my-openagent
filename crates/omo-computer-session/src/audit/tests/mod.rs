@@ -1,7 +1,11 @@
 mod append_lock;
 mod cap_refusal;
+mod clearing;
 mod gc;
 mod lock;
 mod redaction;
+mod scan_fixture;
 mod segment;
+mod tamper_files;
+mod tamper_lines;
 mod writer;
