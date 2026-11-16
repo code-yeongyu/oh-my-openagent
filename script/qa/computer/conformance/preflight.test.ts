@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { removeTreeSync } from "../../../../test-support/remove-tree"
 import { type Environment, repoPath } from "./preflight.ts"
 
 const runScript = join(import.meta.dir, "run.ts")
@@ -12,7 +13,9 @@ function withDir(body: (dir: string) => void): void {
   try {
     body(dir)
   } finally {
-    rmSync(dir, { recursive: true, force: true })
+    // Windows keeps a just-run compiled engine image locked briefly after it exits, and Bun ignores rmSync's
+    // retries (omo#11135), so the bounded EBUSY/EPERM retry lives in the shared helper.
+    removeTreeSync(dir, { maxRetries: 10, retryDelay: 500 })
   }
 }
 
@@ -88,5 +91,8 @@ describe("environment preflight [ADP-3]", () => {
       expect(environment.checks.find((check) => check.name === "engine-stdio")?.ok).toBe(true)
       expect(environment.checks.find((check) => check.name === "engine-binary")?.ok).toBe(true)
     })
-  }, 60_000)
+    // 60 s for the compile and the run, plus withDir's worst-case cleanup: removeTreeSync's linear backoff
+    // sleeps 500 ms x (1 + ... + 10) = 27.5 s synchronously, so a slow Windows cleanup surfaces as its own
+    // error instead of as this test's timeout.
+  }, 90_000)
 })

@@ -165,8 +165,24 @@ export type ThreadReadResult =
       readonly source_incomplete?: boolean
       readonly error_note?: string
       readonly device?: string
+      /** Set when the read asked to wait (`wait_ms`): how the wait ended, read before the transcript. */
+      readonly wait?: ThreadWaitOutcome
     }
   | ThreadDataError
+
+/**
+ * A `thread_read` wait (#13417). `settled`: a turn end was observed (`turn_id`), or the thread showed no run for the
+ * quiet window and is idle (no `turn_id`); a snapshot's idle alone never settles it.
+ * `timeout`: `wait_ms` passed with the thread still running. `cancelled`: the call was aborted. `ended`: the watch
+ * could not continue (the session closed for good or the access ended; `status` names why).
+ */
+export type ThreadWaitOutcome = {
+  readonly outcome: "settled" | "timeout" | "cancelled" | "ended"
+  readonly status: string
+  readonly waited_ms: number
+  /** The turn whose observed end settled the wait; absent when the session showed no run and settled on its idle. */
+  readonly turn_id?: string
+}
 
 export type ThreadSendResult =
   | ({
@@ -181,12 +197,31 @@ export type ThreadSendResult =
     } & ThreadGatewayDeliveryFacts)
   | ThreadDataError
 
+export type ThreadInterruptBackgroundJob = {
+  readonly kind: string
+  readonly id: string
+  readonly description?: string
+}
+
+/**
+ * The background jobs the interrupted turn started (background bash sessions): `stopped` ended them, so none of them
+ * wakes the thread later; `not_supported` is an engine that predates the stop, where they were left running.
+ */
+export type ThreadInterruptBackground =
+  | {
+      readonly status: "stopped"
+      readonly stopped: readonly ThreadInterruptBackgroundJob[]
+      readonly failed: readonly (ThreadInterruptBackgroundJob & { readonly reason: string })[]
+    }
+  | { readonly status: "not_supported" }
+
 export type ThreadInterruptResult =
   | {
       readonly kind: "ok"
       readonly thread_id: string
       readonly turn_id?: string
       readonly interrupted: boolean
+      readonly background: ThreadInterruptBackground
       readonly device?: string
     }
   | ThreadDataError
