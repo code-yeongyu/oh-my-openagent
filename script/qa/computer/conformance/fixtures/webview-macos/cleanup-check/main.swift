@@ -17,8 +17,10 @@ do {
 }
 let outcome = WebKitTempCleanup.run(bound: 1, startTimeOf: { _ in nil })
 let kept = FileManager.default.fileExists(atPath: folder)
+// Only the start-time branch may pass: any other failure (for example a missing responsibility lookup) is not this proof.
+let startTimeFailure = "cannot read this fixture's start time; deleted nothing"
 switch outcome {
-case .failed(let reason) where kept:
+case .failed(let reason) where kept && reason == startTimeFailure:
     print("CLEANUP_CHECK pass: failed closed (\(reason)), folder kept")
     exit(0)
 default:
