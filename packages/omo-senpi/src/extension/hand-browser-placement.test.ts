@@ -7,7 +7,7 @@
 
 import { afterEach, describe, expect, test } from "bun:test"
 import { spawn } from "node:child_process"
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
+import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -67,7 +67,8 @@ describe("browser work on a split session runs on the hand (Q 2026-11-04: browse
     "#given a session linked to a hand #when the browser skill's shell command runs #then it executes on the hand, in the hand scope's root",
     async () => {
       // given
-      const scratch = mkdtempSync(join(tmpdir(), "omo-hand-browser-"))
+      // realpath: on macOS tmpdir() is under /var, a symlink to /private/var, and the hand's shell reports the real path
+      const scratch = realpathSync(mkdtempSync(join(tmpdir(), "omo-hand-browser-")))
       tempDirs.push(scratch)
       const handRoot = join(scratch, "hand-root")
       for (const dir of [handRoot, join(scratch, "agent"), join(scratch, "home")]) mkdirSync(dir, { recursive: true })
