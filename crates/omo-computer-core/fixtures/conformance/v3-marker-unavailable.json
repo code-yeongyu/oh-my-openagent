@@ -1,7 +1,7 @@
 {
   "description": "With the markers directory under the runtime root this case names made read-only (chmod 500) before the run, a click answers TransactionFailed{reason:\"marker_unavailable\"} and nothing is sent: the fake sink file under that root stays empty. Without the read-only directory the click is delivered and this case mismatches. The QA scenario creates that directory (the fake sink file is created in it at engine start) and its markers directory with mode 0500, and restores the mode after the run.",
   "transport": "stdio",
-  "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/v3-two-displays-one-window-consent.json",
   "env": {
     "OMO_COMPUTER_FAKE_STOP_PATH": "live",
     "OMO_COMPUTER_RUNTIME_DIR": "target/qa-computer-v3/marker-unavailable"

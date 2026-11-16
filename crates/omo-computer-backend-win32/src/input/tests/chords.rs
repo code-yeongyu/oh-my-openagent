@@ -102,3 +102,56 @@ fn win_posted_press_capital_a_posts_the_shifted_character_as_wm_char() {
         "a shifted character is not a chord"
     );
 }
+
+/// Review M1 and L1 (#13349): the posted route never guesses a virtual key and never drops a
+/// modifier the chord asked for.
+fn chord(mods: Mods, c: char) -> Chord {
+    Chord {
+        mods,
+        key: Key::Char(c),
+    }
+}
+
+const ALT: Mods = Mods {
+    alt: true,
+    ..Mods::NONE
+};
+const SHIFT: Mods = Mods {
+    shift: true,
+    ..Mods::NONE
+};
+
+#[test]
+fn win_posted_alt_letter_digit_and_space_post_their_own_virtual_key() {
+    for (c, vk) in [('f', 0x46usize), ('F', 0x46), ('7', 0x37), (' ', 0x20)] {
+        let posted =
+            posted_press(&chord(ALT, c)).expect("alt chord on a letter, digit or space posts");
+        assert_eq!(posted.len(), 2);
+        assert_eq!(posted[0].wparam, vk, "alt+{c:?}");
+    }
+}
+
+#[test]
+fn win_posted_alt_on_punctuation_or_non_ascii_is_refused_never_guessed() {
+    for c in ['.', '-', ',', '\'', '!', 'é', '한'] {
+        refused(chord(ALT, c));
+    }
+}
+
+#[test]
+fn win_posted_alt_shift_and_shift_on_a_non_letter_are_refused() {
+    refused(chord(
+        Mods {
+            alt: true,
+            shift: true,
+            ..Mods::NONE
+        },
+        'a',
+    ));
+    for c in ['1', '/', ' ', '한'] {
+        refused(chord(SHIFT, c));
+    }
+    let posted = posted_press(&chord(SHIFT, 'a')).expect("shift+a is 'A'");
+    assert_eq!(posted.len(), 1);
+    assert_eq!(posted[0].wparam, usize::from(b'A'));
+}

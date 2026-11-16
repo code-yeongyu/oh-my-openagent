@@ -1,25 +1,12 @@
 //! The reads the session's intervention, pause and liveness stages take from the fake: the
 //! scripted session state, the last physical input per pid, and the exited targets.
 
-use omo_computer_core::intervention::{
-    BackendClock, InterventionSource, TargetLiveness, TargetState,
-};
+use omo_computer_core::intervention::{InterventionSource, TargetLiveness, TargetState};
 use omo_computer_core::capabilities::Capabilities;
 use omo_computer_core::session_state::SessionState;
 
 use crate::backend::FakeBackend;
-use crate::clock::FakeClock;
 use crate::scenario::state_at;
-
-impl BackendClock for FakeClock {
-    fn now_ms(&self) -> u64 {
-        Self::now_ms(self)
-    }
-
-    fn wait_ms(&self, ms: u64) {
-        self.advance(ms);
-    }
-}
 
 impl InterventionSource for FakeBackend {
     fn frontmost_pid(&self) -> Option<u32> {

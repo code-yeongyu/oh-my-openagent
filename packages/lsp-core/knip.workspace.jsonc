@@ -1,0 +1,41 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/lsp-core": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+      ],
+      "ignoreFiles": [
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/qa/local-binary-resolution-e2e.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/lsp/fixtures/workspace-edit-server.mjs",
+      ],
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) loadAllConfigs
+    "packages/lsp-core/src/lsp/config-loader.ts": ["loadAllConfigs"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_FORMATTING_OPTIONS
+    "packages/lsp-core/src/lsp/format-document.ts": ["DEFAULT_FORMATTING_OPTIONS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) uriToPath, formatSymbolKind, formatSeverity
+    "packages/lsp-core/src/lsp/formatters.ts": ["uriToPath", "formatSymbolKind", "formatSeverity"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) validateCwd
+    "packages/lsp-core/src/lsp/process.ts": ["validateCwd"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) errorMessage
+    "packages/lsp-core/src/lsp/utils.ts": ["errorMessage"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isPathInsideWorkspace
+    "packages/lsp-core/src/lsp/workspace-edit-path.ts": ["isPathInsideWorkspace"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) fingerprintWorkspaceEdit, workspaceEditFingerprint
+    "packages/lsp-core/src/lsp/workspace-edit.ts": ["fingerprintWorkspaceEdit", "workspaceEditFingerprint"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) executeLspDiagnostics, executeLspFormat, executeLspInstallDecision, executeLspFindReferences, executeLspGotoDefinition, isRecord, executeLspPrepareRename, executeLspRename, executeLspStatus, executeLspSymbols
+    "packages/lsp-core/src/tools/index.ts": ["executeLspDiagnostics", "executeLspFormat", "executeLspInstallDecision", "executeLspFindReferences", "executeLspGotoDefinition", "isRecord", "executeLspPrepareRename", "executeLspRename", "executeLspStatus", "executeLspSymbols"]
+  }
+}

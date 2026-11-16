@@ -14,6 +14,7 @@
 
 mod display;
 mod pixels;
+mod session;
 mod window;
 
 #[cfg(windows)]
@@ -28,6 +29,8 @@ pub(crate) mod os;
 mod tests;
 #[cfg(windows)]
 mod wgc;
+
+pub use session::SessionCondition;
 
 pub use pixels::{
     composite, crop, draw_crosshair, encode_png, is_blank, is_near_black, NEAR_BLACK_CHANNEL_MAX,
@@ -82,6 +85,8 @@ pub trait CaptureOs: Send {
     fn session_id(&self) -> u32;
     /// `GraphicsCaptureSession::IsSupported()`.
     fn wgc_supported(&mut self) -> bool;
+    /// The session facts of [`SessionCondition`]; the real OS reads unknown until row 60.
+    fn session(&mut self) -> SessionCondition;
     /// # Errors
     /// The monitors cannot be enumerated.
     fn monitors(&mut self) -> Result<Vec<Monitor>, Refusal>;
@@ -163,7 +168,7 @@ pub(super) fn from_fault(fault: CaptureFault) -> Refusal {
 ///
 /// # Errors
 /// `PermissionDenied{not_interactive}` in Session 0; `WindowNotFound`; `InvalidTarget` for an
-/// unknown display; `CaptureUnavailable{minimized|other_desktop}`;
+/// unknown display; `CaptureUnavailable{minimized|other_desktop|elevated_target}`;
 /// `CaptureFailed{black_frame|null_frame|timeout}`.
 pub fn capture<O: CaptureOs + ?Sized>(
     os: &mut O,
@@ -174,17 +179,18 @@ pub fn capture<O: CaptureOs + ?Sized>(
     if os.session_id() == 0 {
         return Err(SESSION0);
     }
+    let dark = os.session().is_dark();
     let monitors = os.monitors()?;
     let mut record = match target {
-        Target::Window(id) => window::capture(os, wgc, id, options.cursor, &monitors)?,
+        Target::Window(id) => window::capture(os, wgc, id, options.cursor, &monitors, dark)?,
         Target::Display(id) => {
             let monitor = monitors
                 .iter()
                 .find(|monitor| monitor.device_name == *id)
                 .ok_or(Refusal::bare(EngineCode::InvalidTarget))?;
-            display::capture(os, wgc, std::slice::from_ref(monitor), options.cursor)?
+            display::capture(os, wgc, std::slice::from_ref(monitor), options.cursor, dark)?
         }
-        Target::Desktop => display::capture(os, wgc, &monitors, options.cursor)?,
+        Target::Desktop => display::capture(os, wgc, &monitors, options.cursor, dark)?,
     };
     if let Some(region) = options.region {
         record = crop_record(record, region)?;

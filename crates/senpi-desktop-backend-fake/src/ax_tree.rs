@@ -7,7 +7,31 @@ use std::time::{Duration, Instant};
 use senpi_desktop_core::ax::{AxBounds, AxHandle, AxProps};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 
+use crate::clock::FakeClock;
 use crate::scenario::FakeAxNode;
+
+/// The clock `ready_after_ms` is measured on: the host's by default, or a
+/// [`FakeClock`] that only a test moves.
+#[derive(Debug, Clone)]
+pub(crate) enum AxTime {
+    Host(Instant),
+    Fake(FakeClock),
+}
+
+impl Default for AxTime {
+    fn default() -> Self {
+        Self::Host(Instant::now())
+    }
+}
+
+impl AxTime {
+    fn now(&self) -> Duration {
+        match self {
+            Self::Host(origin) => origin.elapsed(),
+            Self::Fake(clock) => Duration::from_millis(clock.now_ms()),
+        }
+    }
+}
 
 struct AxEntry {
     props: AxProps,
@@ -16,7 +40,7 @@ struct AxEntry {
     parent: Option<u64>,
     children: Vec<u64>,
     ready_after: Option<Duration>,
-    first_read: Cell<Option<Instant>>,
+    first_read: Cell<Option<Duration>>,
     moving_reads: Cell<u32>,
 }
 
@@ -25,6 +49,7 @@ pub(crate) struct AxTree {
     nodes: BTreeMap<u64, AxEntry>,
     roots: BTreeMap<String, u64>,
     next_id: u64,
+    pub(crate) time: AxTime,
 }
 
 impl AxTree {
@@ -134,9 +159,10 @@ impl AxTree {
         let entry = self.entry(id)?;
         let mut props = entry.props.clone();
         if let Some(ready_after) = entry.ready_after {
-            let first = *entry.first_read.get().get_or_insert_with(Instant::now);
+            let now = self.time.now();
+            let first = *entry.first_read.get().get_or_insert(now);
             entry.first_read.set(Some(first));
-            if first.elapsed() < ready_after {
+            if now.saturating_sub(first) < ready_after {
                 props.bounds = None;
                 props.enabled = false;
             }
