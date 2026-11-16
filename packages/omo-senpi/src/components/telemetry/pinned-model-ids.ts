@@ -1,4 +1,4 @@
-// The collector pin's model vocabulary: sisyphuslabs/omo-telemetry 13c6e61b40c4
+// The collector pin's model vocabulary: the telemetry collector's schema at 13c6e61b40c4
 // packages/schema-registry/artifacts/omo-senpi.json, the enum shared by omo.model_id, gen_ai.request.model,
 // gen_ai.response.model and the other model keys (session_summary's omo.m1..m3_model add "none"). The client
 // vocabulary (ALL_KNOWN_MODEL_IDS) can run ahead of the pin, and the collector rejects a whole record or span

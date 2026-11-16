@@ -3,11 +3,11 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { validateResponse, validateWelcome } from "../../vendor/omo-5.1.66-decoder/validate.ts"
 
-// #12981 review, #914(a): an omo through 5.1.66 pins device service 0.1.3 but keeps any running service at or above its
+// #12981 review, the unknown-field change (a): an omo through 5.1.66 pins device service 0.1.3 but keeps any running service at or above its
 // pin (bootstrap.ts), so it talks to a 0.1.25 service that a newer omo installed. Its local API decoders refuse every
-// field they do not know; this tree's decoders ignore unknown reply fields since #914, so the test reads the frames with
+// field they do not know; this tree's decoders ignore unknown reply fields since the device service's unknown-field change, so the test reads the frames with
 // the v5.1.66 decoders vendored in vendor/omo-5.1.66-decoder (pinned in old-pin-client-0127-service.test.ts). The fixture holds the frames a 0.1.25 local API server wrote to an omo 5.1.66 hello
-// whose session.endpoints request did not ask for environments (relayd #915 sends them only when negotiated).
+// whose session.endpoints request did not ask for environments (the device service sends them only when negotiated).
 type Recording = {
   readonly client_frames: readonly unknown[]
   readonly service_frames: readonly unknown[]

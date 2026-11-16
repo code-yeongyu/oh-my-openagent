@@ -11,7 +11,7 @@ for f in "$dir"/*.sql; do
   grep -qxF "$name" "$dir/applied.txt" || pending+=("$name")
 done
 if [ "${#pending[@]}" -gt 0 ]; then
-  echo "D1 migration pending: ${pending[*]}. Apply it via the reviewed infra path first (sisyphuslabs/common-infra docs/cutover-workers.md), then list it in $dir/applied.txt."
+  echo "D1 migration pending: ${pending[*]}. Apply it via the reviewed infra path first (the shared infrastructure runbook for Workers), then list it in $dir/applied.txt."
   exit 1
 fi
 echo "D1 migrations: none pending"

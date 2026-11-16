@@ -1,8 +1,8 @@
 # Vendored sync-format v1 library and sync-v1 fixtures
 
-Source: `sisyphuslabs/omo-service`, commit `5de1455489ea972ef2912e90b88f50628db09359`
+Source: `the OmO service`, commit `5de1455489ea972ef2912e90b88f50628db09359`
 (`main`: #600 as merged, the incremental keyring receiver `createKeyringReceiver`). The contract package is not yet published
-(omo-service #387), so the memory sync client consumes the format library and its golden
+(the OmO service's crypto vendoring), so the memory sync client consumes the format library and its golden
 fixtures as this vendored copy until it is (work plan memory-sync-e2ee-20261015, todo 13).
 
 - `sync-format/` — byte-identical copy of `packages/contract/src/sync-format/`: the

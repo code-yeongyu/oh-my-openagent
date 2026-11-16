@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Live QA for the desktop toolkit channel (sisyphuslabs/omo-desktop-app#3292) through senpi's REAL multi-session rpc
+// Live QA for the desktop toolkit channel (the desktop's toolkit token channel) through senpi's REAL multi-session rpc
 // host, the BUILT omo plugin (seedSandbox's plugin root; run `bun run build:senpi-plugin` first) and the omo mock provider. This driver plays the desktop: it opens a session with
 // `open_session.context.omo_toolkits`, answers the session's `omo.toolkit.request` event with an
 // `extension_request omo.toolkit.grant`, and checks what the eval cell got.

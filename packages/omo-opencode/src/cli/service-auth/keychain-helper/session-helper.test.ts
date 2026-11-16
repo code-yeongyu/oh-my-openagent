@@ -171,7 +171,7 @@ describe("creator hand-off across two processes (#11262 addendum rows 7, 8)", ()
     keychain.put(A, stored, "runtime", "ours")
     const root = await mkdtemp(join(tmpdir(), "old-runtime-"))
     onTestFinished(() => rm(root, { recursive: true, force: true }))
-    // The desktop layout written out literally (desktop#5057); an omo-ai 5.1.48 runtime ships no capability file.
+    // The desktop layout written out literally (the desktop app's keychain helper); an omo-ai 5.1.48 runtime ships no capability file.
     const runtimeDir = join(root, "Applications/OmO.app/Contents/Resources/omo-runtime/darwin-arm64")
     await mkdir(runtimeDir, { recursive: true })
     await writeFile(join(runtimeDir, "omo"), "omo 5.1.48")

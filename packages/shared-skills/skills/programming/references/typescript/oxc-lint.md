@@ -123,7 +123,7 @@ Built-in names below were checked against oxlint **1.89.0**'s installed `configu
 
 ## Provenance and license
 
-Source: **pingdotgg/t3code oxlint plugin at d7f3b72**; `no-em-dash-copy` from **t3code#23799**, `require-suppression-reason` from **t3code#16294**. This plain-JS port uses `sisyphuslabs/omo-relay`'s `lint/oxlint-plugin/{index,no-em-dash-copy,require-suppression-reason}.js`, with the local plugin namespace renamed to `programming`.
+Source: **pingdotgg/t3code oxlint plugin at d7f3b72**; `no-em-dash-copy` from **t3code#23799**, `require-suppression-reason` from **t3code#16294**. This plain-JS port uses an internal repository's `lint/oxlint-plugin/{index,no-em-dash-copy,require-suppression-reason}.js`, with the local plugin namespace renamed to `programming`.
 
 The upstream [license at d7f3b72](https://github.com/pingdotgg/t3code/blob/d7f3b72/LICENSE) is **MIT**, copyright (c) 2026 T3 Tools Inc. The full notice is shipped in the plugin's `LICENSE` and copied by the scaffold.
 

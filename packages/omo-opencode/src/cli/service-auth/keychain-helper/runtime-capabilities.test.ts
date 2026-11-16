@@ -15,7 +15,7 @@ afterEach(() => {
 
 describe("runtime capability file (RULING-74)", () => {
   test("#given the release build #when it writes the capability file #then the name and bytes are the cross-repo contract", () => {
-    // desktop#5057 copies exactly this file, by this name, beside the runtime.
+    // the desktop app's keychain helper copies exactly this file, by this name, beside the runtime.
     expect(RUNTIME_CAPABILITIES_FILE).toBe("omo-runtime-capabilities.json")
     expect(runtimeCapabilitiesText()).toBe('{"keychainHandoff":1}\n')
   })
