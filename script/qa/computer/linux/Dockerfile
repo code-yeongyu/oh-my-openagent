@@ -8,7 +8,8 @@ RUN curl -fsSL https://bun.sh/install | bash -s "bun-v1.4.4" \
  && bun --version
 
 # Xvfb + xfwm4 + xcompmgr for the xvfb sessions, the private bus and the AT-SPI registry,
-# the xwd/xdotool/xprop/xrdb oracles, and GTK3 for the fixture windows.
+# the xwd/xdotool/xprop/xrdb oracles, GTK3 for the fixture windows, and headless sway and
+# weston with xkbcli for the Wayland sessions' keymaps.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       xvfb \
@@ -26,6 +27,10 @@ RUN apt-get update \
       python3-gi \
       python3-gi-cairo \
       gir1.2-gtk-3.0 \
+      sway \
+      weston \
+      libxkbcommon-tools \
+      xkb-data \
  && rm -rf /var/lib/apt/lists/*
 
 USER node
