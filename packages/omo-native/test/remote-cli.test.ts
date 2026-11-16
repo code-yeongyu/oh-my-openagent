@@ -57,7 +57,7 @@ describe("omo remote", () => {
     expect(code).toBe(REMOTE_EXIT.ok)
     expect(out[0]).toMatch(/^DEVICE\s+NAME\s+KIND\s+PLATFORM\s+SEEN$/)
     // The person client lists this device first (B1 self row), then the account's other devices.
-    expect(out[1]).toMatch(/^dev-self\s+This Mac\s+/)
+    expect(out[1]).toMatch(new RegExp(`^dev-self\\s+This Mac\\s+this device\\s+${process.platform}\\s+online$`))
     expect(out[2]).toMatch(new RegExp(`^${PEER}\\s+Studio\\s+desktop\\s+darwin\\s+online$`))
     expect(out[3]).toMatch(new RegExp(`^${OFFLINE_PEER}\\s+Laptop\\s+cli\\s+linux\\s+12d ago$`))
     const json = await run(["devices", "--json"])
@@ -78,10 +78,11 @@ describe("omo remote", () => {
     owners.push(owner)
     const { code, out } = await run(["devices"], owner.stateDir)
     expect(code).toBe(REMOTE_EXIT.ok)
-    expect(out[1]).toMatch(/^dev-self\s+This Mac\s+.*\s+never$/)
+    expect(out[1]).toMatch(new RegExp(`^dev-self\\s+This Mac\\s+this device\\s+${process.platform}\\s+never$`))
     const json = await run(["devices", "--json"], owner.stateDir)
     const [here] = JSON.parse(json.out.join("")) as Record<string, unknown>[]
-    expect(here).toMatchObject({ id: "dev-self", name: "This Mac", online: false, self: true })
+    expect(here).toMatchObject({ id: "dev-self", name: "This Mac", online: false, last_seen_ms: null, self: true })
+    expect(here).not.toHaveProperty("kind")
   })
 
   test("sessions shows attach targets, marks cached rows and names devices that did not answer", async () => {
