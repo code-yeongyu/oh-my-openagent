@@ -1,10 +1,18 @@
-//! Windows UI Automation (row 59): the pure rules first - which providers self-activate, ref identity
-//! from `RuntimeId`, the walk's bounds. The client, cache requests, change counters and secure
-//! fields follow once rows 19 (settle) and 26 (secure mode) land.
+//! Windows UI Automation (row 59): one client per session, cached batched reads, `RuntimeId`
+//! identity and re-identification, the reader the bounded walk takes, change counters feeding
+//! settle, the secure (password) focus, and the pure rules (pattern safety, walk bounds).
 
 pub mod bounds;
+pub mod cache;
+pub mod client;
+pub mod counters;
+pub mod element;
 pub mod identity;
+pub mod reach;
+pub mod reader;
+pub mod reidentify;
 pub mod safety;
+pub mod source;
 
 #[cfg(test)]
 mod tests;

@@ -1,0 +1,53 @@
+use omo_computer_core::ax::Slice;
+
+use super::fake::FakeUia;
+use crate::uia::client::UiaHost;
+use crate::uia::reader::UiaReader;
+
+fn password_focused() -> FakeUia {
+    let mut source = FakeUia::winforms();
+    source.focused = Some(vec![42, 3]);
+    source
+}
+
+fn children(reader: &mut UiaReader<FakeUia>) -> Vec<omo_computer_core::ax::NodeRead> {
+    let root = reader.root_of("4660").expect("root");
+    let Slice::Read(children) = reader.read_children(root.node.handle.expect("handle"), 0, 250) else {
+        panic!("children answered");
+    };
+    children
+}
+
+#[test]
+fn password_value_is_withheld() {
+    let mut reader = UiaReader::new(FakeUia::winforms());
+    let children = children(&mut reader);
+    let password = children.iter().find(|n| n.title.as_deref() == Some("Password")).expect("password box");
+    assert!(password.secure, "IsPassword is the secure classification");
+    assert_eq!(password.value, None, "the value never leaves the reader");
+    let text = children.iter().find(|n| n.title.as_deref() == Some("Name")).expect("text box");
+    assert!(!text.secure);
+    assert_eq!(text.value.as_deref(), Some("hello"));
+}
+
+/// The backend's half of AC-62: the focus reads secure (so the session admits the keystrokes and
+/// withholds what was typed) and the value read-back the report would carry is never the secret.
+#[test]
+fn typing_into_a_password_box_is_admitted_by_keystrokes_and_reports_no_value() {
+    let mut host = UiaHost::new(Box::new(|| Ok(password_focused())));
+    assert_eq!(host.secure_focus(None), Some(true), "a password box has focus");
+    assert_eq!(host.value_readback(&[42, 3]), None, "no value read back to report");
+    assert_eq!(host.value_readback(&[42, 2]).as_deref(), Some("hello"));
+}
+
+#[test]
+fn paste_and_clipboard_read_on_a_password_focus_are_refused_secure_focus() {
+    let mut host = UiaHost::new(Box::new(|| Ok(password_focused())));
+    assert_eq!(host.secure_focus(Some("4660")), Some(true), "the clipboard gate refuses on this answer");
+    let mut plain = FakeUia::winforms();
+    plain.focused = Some(vec![42, 2]);
+    let mut host = UiaHost::new(Box::new(move || Ok(std::mem::take(&mut plain))));
+    assert_eq!(host.secure_focus(None), Some(false), "a plain text box: paste and clipboard read go ahead");
+    let mut nothing = UiaHost::new(Box::new(|| Ok(FakeUia::winforms())));
+    assert_eq!(nothing.secure_focus(None), None, "no focus read: unknown, which the gate refuses");
+}
