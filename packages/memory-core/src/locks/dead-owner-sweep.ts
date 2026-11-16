@@ -6,6 +6,7 @@ import { LockContentionError, acquireWithoutDirectorySweep } from "./acquire-cor
 import { releaseLock } from "./lock-owner"
 import { isLockOwnerProvenDead } from "./stale-owner"
 import { createLockRecord, parseLockRecord, type LockRecord } from "./lock-record"
+import { provenDeadTakeoverFor } from "./proven-dead-takeovers"
 import { getPidLiveness } from "./process-identity"
 
 const LOCK_FILE_SUFFIX = ".lock"
@@ -48,7 +49,11 @@ async function reclaimIfDeadOwner(lockPath: string, options: DeadOwnerSweepOptio
     if (error instanceof LockContentionError) return false
     throw error
   }
+  // The sweeper reclaimed from the dead owner only if its own recovery bound the takeover proof: when the
+  // lock was already gone at the fenced unlink, someone else removed it and there is nothing to hand on.
+  const reclaimed = provenDeadTakeoverFor(lockPath, sweeper.nonce) !== undefined
   await releaseLock(lockPath, sweeper)
+  if (!reclaimed) return false
   options.onReclaimed?.(lockPath, previousOwner)
   return true
 }
