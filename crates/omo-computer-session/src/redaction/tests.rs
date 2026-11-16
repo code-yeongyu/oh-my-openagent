@@ -89,3 +89,16 @@ fn observe_on_a_denied_app_window_is_refused_with_no_tree_and_no_frame() {
     let text = format!("{refused:?}");
     assert!(!text.contains("cats") && !text.contains("hunter2"), "no tree content: {text}");
 }
+
+/// d-safety.md 'Per-app scope' / d-a11y-model.md 'Capture masking' (G3): a display or desktop frame
+/// is not app-scoped, so it is served while a denied app is visible on it, unredacted as frames are
+/// declared to be.
+#[test]
+fn display_frame_with_a_denied_app_visible_states_its_pixel_limit() {
+    let mut scenario: serde_json::Value = serde_json::from_str(FIELDS).expect("scenario json");
+    scenario["consent"] = json!({ "stopHotkey": null, "apps": { "deny": ["Notes"] } });
+    let mut session = session(&scenario.to_string());
+    let frame = serde_json::to_value(session.capture(serde_json::from_value(json!({"target": "desktop"})).expect("params")).expect("the desktop frame is served"))
+        .expect("json");
+    assert!(frame.get("secure").is_none(), "frames are declared unredacted (G3): {frame}");
+}

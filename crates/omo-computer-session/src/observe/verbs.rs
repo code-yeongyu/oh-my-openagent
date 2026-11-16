@@ -52,6 +52,7 @@ impl Session {
             return Err(NO_CAPTURE.into());
         }
         let request = Request::read(params);
+        crate::redaction::admit_window_read(self, &request.target)?;
         let settled = self.settle_before_read(&request.target, request.settle, None);
         let private = self.private_mode(&request.target);
         let mut withholding = crate::redaction::Withholding::new(self.backend.ax_reader().ok_or(NO_READER)?);
