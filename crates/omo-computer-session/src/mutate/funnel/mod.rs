@@ -192,6 +192,7 @@ impl Session {
                         paused,
                         session,
                         target: ended.target,
+                        sent: count,
                     }),
                     warning,
                     ..Refused::from(ended.refusal)

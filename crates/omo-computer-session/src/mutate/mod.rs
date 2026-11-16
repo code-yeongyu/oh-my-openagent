@@ -88,6 +88,9 @@ pub struct Stamps {
     pub session: Option<SessionState>,
     /// The target that exited or stopped answering.
     pub target: Option<TargetLiveness>,
+    /// In either report mode, the units an interrupted send got out before it stopped; 0 for
+    /// a refusal before any send. Never on the wire: the hold ledger reads it.
+    pub sent: u32,
 }
 
 impl From<Refusal> for Refused {
