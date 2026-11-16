@@ -114,6 +114,9 @@ pub enum PixmapRead {
     RedirectRefused,
     /// The window has no pixmap (unmapped between the placement read and the capture).
     Unmapped,
+    /// The window was redirected for the read but did not repaint before the Damage deadline
+    /// (or Damage is absent), so its fresh pixmap may still hold the parent's pixels.
+    NotRepainted,
 }
 
 /// A failed X request, as text for the engine log.
@@ -165,8 +168,8 @@ pub trait XServer: Send {
     /// The request failed.
     fn compositor_present(&self) -> Result<bool, XError>;
 
-    /// The window's own pixmap after one Damage round trip. With `redirect` the window is
-    /// redirected `CompositeRedirectAutomatic` for the read and unredirected after.
+    /// The window's own pixmap after one Damage round trip; the window is redirected
+    /// `CompositeRedirectAutomatic` for the read and unredirected after.
     ///
     /// # Errors
     /// The request failed.
@@ -174,7 +177,6 @@ pub trait XServer: Send {
         &self,
         window: u32,
         placement: &WindowPlacement,
-        redirect: bool,
     ) -> Result<PixmapRead, XError>;
 
     /// `_NET_CLIENT_LIST_STACKING` (else `_NET_CLIENT_LIST`), topmost first; a client that

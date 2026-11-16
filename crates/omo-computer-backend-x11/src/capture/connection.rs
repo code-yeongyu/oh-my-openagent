@@ -13,6 +13,7 @@ use x11rb::protocol::xproto::{AtomEnum, ConnectionExt as _, ImageFormat, ImageOr
 use x11rb::protocol::Event;
 use x11rb::rust_connection::RustConnection;
 
+use super::damage_wait::{DamageWait, DamageWatch};
 use super::server::{
     ChannelMasks, ClientWindow, CursorImage, Monitor, PixelRect, PixmapRead, Screen, WindowPlacement, XError,
     XServer, ZImage,
@@ -141,33 +142,45 @@ impl X11Connection {
         Ok(states.value32().is_some_and(|mut values| values.any(|atom| atom == hidden)))
     }
 
-    fn wait_damage(&self, damage_id: u32) -> Result<(), XError> {
+    /// Whether the client repainted before the deadline: a notify carrying the `ClearArea`'s
+    /// own sequence number is the server's background paint, any later one the client's repaint.
+    fn wait_damage(&self, damage_id: u32, watch: DamageWatch) -> Result<bool, XError> {
         let deadline = Instant::now() + DAMAGE_WAIT;
         while Instant::now() < deadline {
             while let Some(event) = self.conn.poll_for_event()? {
-                if matches!(event, Event::DamageNotify(notify) if notify.damage == damage_id) {
-                    return Ok(());
+                let repaint = matches!(event, Event::DamageNotify(notify)
+                    if notify.damage == damage_id && watch.after_notify(notify.sequence) == DamageWait::Repainted);
+                if repaint {
+                    return Ok(true);
                 }
             }
             std::thread::sleep(DAMAGE_POLL);
         }
-        Ok(())
+        Ok(false)
     }
 
-    fn read_pixmap(&self, window: u32, placement: &WindowPlacement, redirected: bool) -> Result<PixmapRead, XError> {
+    fn read_pixmap(&self, window: u32, placement: &WindowPlacement) -> Result<PixmapRead, XError> {
         let damage_id = if self.damage {
             let id = self.conn.generate_id()?;
-            self.conn.damage_create(id, window, damage::ReportLevel::NON_EMPTY)?.check()?;
+            self.conn.damage_create(id, window, damage::ReportLevel::RAW_RECTANGLES)?.check()?;
             Some(id)
         } else {
             None
         };
-        if redirected {
-            self.conn.clear_area(true, window, 0, 0, 0, 0)?;
-            self.conn.flush()?;
+        let clear = self.conn.clear_area(true, window, 0, 0, 0, 0)?.sequence_number();
+        // The round trip right behind the ClearArea: every event generated after it carries a
+        // later sequence number than the ClearArea's own.
+        self.conn.get_input_focus()?.reply()?;
+        let watch = DamageWatch::new(u16::try_from(clear & u64::from(u16::MAX)).unwrap_or_default());
+        let repainted = match damage_id {
+            Some(id) => self.wait_damage(id, watch)?,
+            None => false,
+        };
+        if !repainted {
             if let Some(id) = damage_id {
-                self.wait_damage(id)?;
+                self.conn.damage_destroy(id)?;
             }
+            return Ok(PixmapRead::NotRepainted);
         }
         let pixmap = self.conn.generate_id()?;
         let named = self.conn.composite_name_window_pixmap(window, pixmap)?.check();
@@ -296,21 +309,17 @@ impl XServer for X11Connection {
         Ok(self.conn.get_selection_owner(selection)?.reply()?.owner != x11rb::NONE)
     }
 
-    fn window_pixmap(&self, window: u32, placement: &WindowPlacement, redirect: bool) -> Result<PixmapRead, XError> {
+    fn window_pixmap(&self, window: u32, placement: &WindowPlacement) -> Result<PixmapRead, XError> {
         if !self.composite {
             return Ok(PixmapRead::RedirectRefused);
         }
-        if redirect {
-            match self.conn.composite_redirect_window(window, composite::Redirect::AUTOMATIC)?.check() {
-                Ok(()) => {}
-                Err(error) if is_x11_error(&error) => return Ok(PixmapRead::RedirectRefused),
-                Err(error) => return Err(error.into()),
-            }
+        match self.conn.composite_redirect_window(window, composite::Redirect::AUTOMATIC)?.check() {
+            Ok(()) => {}
+            Err(error) if is_x11_error(&error) => return Ok(PixmapRead::RedirectRefused),
+            Err(error) => return Err(error.into()),
         }
-        let read = self.read_pixmap(window, placement, redirect);
-        if redirect {
-            self.conn.composite_unredirect_window(window, composite::Redirect::AUTOMATIC)?.check()?;
-        }
+        let read = self.read_pixmap(window, placement);
+        self.conn.composite_unredirect_window(window, composite::Redirect::AUTOMATIC)?.check()?;
         read
     }
 

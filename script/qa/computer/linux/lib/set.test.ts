@@ -4,7 +4,7 @@
 import { expect, test } from "bun:test"
 
 import { verdict, type Scenario } from "./scenario.ts"
-import { admission, type Outcome, setExitCode, setLine } from "./set.ts"
+import { ALL_BLOCKED_EXIT, admission, type Outcome, setExitCode, setLine } from "./set.ts"
 
 function scenario(name: string, sessions: Scenario["sessions"], requires: readonly string[] = []): Scenario {
   return {
@@ -49,4 +49,15 @@ test("a scenario whose host tool is missing counts blocked naming the tool, neve
   expect(reason).toContain("xdotool")
   expect(reason).not.toContain("xwd")
   expect(admission(needs, "xvfb", undefined, () => true)).toBeUndefined()
+})
+
+test("a set in which nothing passed and nothing failed exits non-zero with its own code, so it never reads as green", () => {
+  const blocked: Outcome[] = [
+    { kind: "blocked", scenario: "a", reason: "this host lacks xfwm4" },
+    { kind: "blocked", scenario: "b", reason: "this host lacks xfwm4" },
+  ]
+  expect(setLine("xvfb", blocked)).toBe("SET linux/xvfb pass=0 fail=0 blocked=2")
+  expect(setExitCode(blocked)).toBe(ALL_BLOCKED_EXIT)
+  expect(setExitCode([ran("a", false), ...blocked])).toBe(1)
+  expect(setExitCode([])).toBe(ALL_BLOCKED_EXIT)
 })

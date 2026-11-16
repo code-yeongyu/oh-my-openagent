@@ -1,9 +1,12 @@
 //! `--selftest`: drives a fake-backend session through the RPC layer and reports each check;
-//! exits 1 when one fails.
+//! exits 1 when one fails. It also prints where this engine takes the interaction lock, from
+//! the one RUNTIME-root resolver (A-IS-65 L3), or why no lock path resolves.
 
 use std::process::ExitCode;
 
 use omo_computer_backend_fake::{FakeBackend, FakeClock, FakeScenario, RecordingSink, StopPathScript};
+use omo_computer_core::paths;
+use omo_computer_session::lock::InteractionLock;
 use omo_computer_session::Session;
 use serde_json::{json, Value};
 
@@ -47,18 +50,34 @@ fn checks() -> Vec<(String, bool)> {
     results
 }
 
+/// The interaction lock's path under the RUNTIME root this engine resolves, or why none does.
+fn interaction_lock() -> Result<String, String> {
+    paths::resolve(|name| std::env::var(name).ok())
+        .map(|roots| InteractionLock::under(&roots.runtime).path().display().to_string())
+        .map_err(|unavailable| unavailable.to_string())
+}
+
 pub fn run(as_json: bool) -> ExitCode {
     let results = checks();
+    let lock = interaction_lock();
     let ok = results.iter().all(|(_, passed)| *passed);
     if as_json {
         let list: Vec<Value> = results
             .iter()
             .map(|(name, passed)| json!({ "check": name, "ok": passed }))
             .collect();
-        println!("{}", json!({ "ok": ok, "backend": "fake", "checks": list }));
+        let lock = lock.map_or(Value::Null, Value::String);
+        println!(
+            "{}",
+            json!({ "ok": ok, "backend": "fake", "checks": list, "interactionLock": lock })
+        );
     } else {
         for (name, passed) in &results {
             println!("{name}: {}", if *passed { "ok" } else { "FAILED" });
+        }
+        match &lock {
+            Ok(path) => println!("interaction lock: {path}"),
+            Err(why) => println!("interaction lock: unavailable ({why})"),
         }
         println!("engine: selftest {}", if ok { "ok" } else { "FAILED" });
     }

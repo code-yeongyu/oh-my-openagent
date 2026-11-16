@@ -5,6 +5,7 @@
 import { mkdirSync } from "node:fs"
 import { join } from "node:path"
 import { until, type Processes } from "../lib/procs.ts"
+import { compositorOwnerArgv, ownsCompositorSelection } from "../lib/compositor.ts"
 import { privateDirs } from "../lib/runtime-dirs.ts"
 import { missingTools, wmOwnsRoot } from "../lib/session-checks.ts"
 import { resolveTool } from "../lib/tools.ts"
@@ -20,6 +21,7 @@ export async function startXvfb(procs: Processes, runDir: string, nobus: boolean
     "xprop",
     "xfwm4",
     "xcompmgr",
+    "python3",
     ...(nobus ? [] : ["dbus-daemon", "dbus-send", "at-spi-bus-launcher"]),
   ]
   const found = new Map(tools.map((tool) => [tool, resolveTool(tool)]))
@@ -66,6 +68,13 @@ export async function startXvfb(procs: Processes, runDir: string, nobus: boolean
     "xfwm4 to own the root window",
   )
   procs.start("xcompmgr", [bin("xcompmgr"), "-d", DISPLAY], env)
+  await until(
+    () =>
+      procs
+        .run(compositorOwnerArgv(bin("python3")), env)
+        .then((ran) => ran.code === 0 && ownsCompositorSelection(ran.stdout)),
+    "xcompmgr to own _NET_WM_CM_S0",
+  )
   return { session: nobus ? "xvfb-nobus" : "xvfb", display: DISPLAY, env, runDir }
 }
 

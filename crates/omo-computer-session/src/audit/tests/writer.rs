@@ -25,7 +25,8 @@ fn lines(path: &Path) -> Vec<Value> {
         .collect()
 }
 
-fn files_under(dir: &Path) -> Vec<String> {
+/// Every file under `dir`, as its path components below `dir` (the separator never matters).
+fn files_under(dir: &Path) -> Vec<Vec<String>> {
     let mut found = Vec::new();
     let mut stack = vec![dir.to_owned()];
     while let Some(next) = stack.pop() {
@@ -39,8 +40,9 @@ fn files_under(dir: &Path) -> Vec<String> {
                         .path()
                         .strip_prefix(dir)
                         .expect("under")
-                        .display()
-                        .to_string(),
+                        .components()
+                        .map(|part| part.as_os_str().to_string_lossy().into_owned())
+                        .collect(),
                 );
             }
         }
@@ -77,11 +79,15 @@ fn audit_is_one_file_per_hand_with_per_writer_segments() {
     first.append(event("click")).expect("append");
     second.append(event("typeText")).expect("append");
     first.append(event("click")).expect("append");
-    assert_eq!(
-        files_under(dir.path()),
-        vec!["computer/hand-1/audit.jsonl".to_owned()],
-        "one file per hand"
-    );
+    let mut files = files_under(dir.path());
+    files.sort();
+    let hand = |name: &str| vec!["computer".to_owned(), "hand-1".to_owned(), name.to_owned()];
+    // One data file per hand; on Windows its append lock audit.lock sits beside it (A-IS-65 L7).
+    let mut expected = vec![hand("audit.jsonl")];
+    if cfg!(windows) {
+        expected.push(hand("audit.lock"));
+    }
+    assert_eq!(files, expected, "one data file per hand");
     let all = lines(first.path());
     let metas: Vec<&Value> = all
         .iter()

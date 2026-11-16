@@ -43,9 +43,9 @@ export const occluderOracle: Scenario = {
     const oracleMagenta = countColour(oracle, MAGENTA)
 
     await engine.open("os", "null")
-    const listed = (await engine.call("windows", {})) as { id: string; title: string }[]
-    const target = listed.find((entry) => entry.title === TARGET.title)
-    const capture = (await engine.call("capture", { target: target?.id ?? under, cursor: false })) as {
+    // The window id comes from the xdotool oracle: the engine's `windows` listing is routed by
+    // a later row, and the id is the same X client window either way.
+    const capture = (await engine.call("capture", { target: under, cursor: false })) as {
       data: string
     }
     const frame: Raster = decodePng(new Uint8Array(Buffer.from(capture.data ?? "", "base64")))

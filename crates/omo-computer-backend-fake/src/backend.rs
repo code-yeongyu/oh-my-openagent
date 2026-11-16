@@ -116,6 +116,25 @@ impl FakeBackend {
         Ok(())
     }
 
+    /// Another handle on this same fake (shared state, sink and clock): what a second thread
+    /// presses the stop chord or reads call counts through.
+    #[must_use]
+    pub fn handle(&self) -> Self {
+        Self {
+            shared: Arc::clone(&self.shared),
+            sink: self.sink.clone(),
+            clock: self.clock.clone(),
+            persona: self.persona,
+            stop_path: self.stop_path,
+        }
+    }
+
+    /// How many times a live stop listener of this fake was polled.
+    #[must_use]
+    pub fn stop_polls(&self) -> u32 {
+        self.lock().stop_polls
+    }
+
     /// How often `method` ran.
     #[must_use]
     pub fn calls(&self, method: FakeMethod) -> u32 {
@@ -145,5 +164,27 @@ impl FakeBackend {
             .and_then(|outcome| body(&mut state, outcome));
         state.end_call(method);
         result
+    }
+}
+
+// --- Row 21 (R70at(5)): test support, additive. A handle that changes the consent view the fake
+// hands the engine mid-session; no scenario's behaviour changes unless a test uses it. ---
+
+/// Changes the fake host's handed consent view (`scenario.consent`) from a test.
+#[derive(Debug, Clone)]
+pub struct FakeConsentHandle(Arc<Mutex<FakeState>>);
+
+impl FakeConsentHandle {
+    /// The view the next `session.open` reads.
+    pub fn set(&self, view: serde_json::Value) {
+        self.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner).scenario.consent = Some(view);
+    }
+}
+
+impl FakeBackend {
+    /// A handle on this fake's handed consent view (test support, R70at(5)).
+    #[must_use]
+    pub fn consent_handle(&self) -> FakeConsentHandle {
+        FakeConsentHandle(Arc::clone(&self.shared))
     }
 }

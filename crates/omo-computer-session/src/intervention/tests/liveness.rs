@@ -42,15 +42,24 @@ impl Backend for ExitsAt {
     fn intervention(&self) -> Option<&dyn InterventionSource> {
         Some(self)
     }
+    fn host_consent(&self) -> Option<serde_json::Value> {
+        self.inner.host_consent()
+    }
+    fn platform(&self) -> Option<omo_computer_core::report::Platform> {
+        self.inner.platform()
+    }
+    fn set_stop_chord(&mut self, chord: Option<&str>) -> omo_computer_core::backend::BackendResult<()> {
+        self.inner.set_stop_chord(chord)
+    }
     fn post_text(
         &mut self,
         text: &str,
         route: Route,
         tag: u64,
-        interrupt: &mut dyn FnMut(&dyn Backend) -> bool,
+        interrupt: &mut dyn FnMut(&mut dyn Backend) -> bool,
     ) -> TextDelivery {
         let (clock, exit_at_ms) = (self.inner.clock(), self.exit_at_ms);
-        let mut exits = |backend: &dyn Backend| {
+        let mut exits = |backend: &mut dyn Backend| {
             Self::liveness(&clock, exit_at_ms).is_some() || interrupt(backend)
         };
         self.inner.post_text(text, route, tag, &mut exits)

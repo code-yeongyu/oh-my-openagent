@@ -72,7 +72,7 @@ fn dispatch(session: &mut Session, name: &str, params: Value) -> Result<Value, F
     let method = Method::from_name(name).ok_or_else(not_found)?;
     let value = match method {
         Method::SessionOpen => json!(session.open(parse(params)?).map_err(|r| refused(&r))?),
-        Method::StopPathStart => json!(session.stop_path_start(parse(params)?)),
+        Method::StopPathStart => json!(session.stop_path_start_checked(parse(params)?).map_err(|r| refused(&r))?),
         Method::StopPathStop => json!(session.stop_path_stop(parse(params)?)),
         Method::StopPathStatus => {
             parse::<omo_computer_core::params::EmptyParams>(params)?;
@@ -188,6 +188,8 @@ mod tests {
         let interrupted = omo_computer_session::Refused {
             call_id: Some("k-1".to_owned()),
             interrupted: Some(omo_computer_core::report::Disposition::UNCERTAIN_UNSAFE),
+            detail: None,
+            busy: None,
             warning: Some("write_failed".to_owned()),
             ..Refusal::new(EngineCode::TransactionFailed, "recovery_required").into()
         };
