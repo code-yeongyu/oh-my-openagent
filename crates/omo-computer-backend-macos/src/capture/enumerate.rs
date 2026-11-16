@@ -151,7 +151,7 @@ fn record(
         display: display_of(displays, &window.bounds)
             .map(|d| d.id.to_string())
             .unwrap_or_default(),
-        focused: ax.focused,
+        focused: ax.focused_in_app,
         is_on_screen: window.on_screen,
         space,
         minimized: ax.minimized,

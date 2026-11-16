@@ -4,6 +4,7 @@ use omo_computer_core::backend::{CaptureOptions, Target, WindowFilter};
 
 use super::kit::{window, FakeOs, OWN_PID};
 use crate::capture::enumerate::MAX_LISTED;
+use crate::capture::types::AxWindowFacts;
 use crate::capture::{CaptureRouteTaken, Capturer};
 
 const NO_CURSOR: CaptureOptions = CaptureOptions {
@@ -127,5 +128,41 @@ fn space_move_never_switches_user_space() {
         capturer.os().helper.requests.len(),
         1,
         "one desktop-independent still, nothing else"
+    );
+}
+
+#[test]
+fn background_app_focused_window_is_not_focused() {
+    let mut os = FakeOs::with_windows(vec![window(1, 10), window(2, 20), window(3, 20)]);
+    // Every running app keeps its own AXFocusedWindow; only app 20 is frontmost.
+    for number in [1, 2] {
+        os.ax.insert(
+            number,
+            AxWindowFacts {
+                focused_in_app: true,
+                ..AxWindowFacts::default()
+            },
+        );
+    }
+    os.frontmost = Some(20);
+    let mut capturer = Capturer::new(os, OWN_PID);
+    let focused = |capturer: &mut Capturer<FakeOs>| -> Vec<String> {
+        let list = capturer.windows(&WindowFilter::default()).expect("listing");
+        list.windows
+            .into_iter()
+            .filter(|w| w.focused)
+            .map(|w| w.id)
+            .collect()
+    };
+    assert_eq!(
+        focused(&mut capturer),
+        vec!["2".to_string()],
+        "a background app's focused window is not the focused window"
+    );
+
+    capturer.os_mut().frontmost = None;
+    assert!(
+        focused(&mut capturer).is_empty(),
+        "no frontmost app, no focused window"
     );
 }

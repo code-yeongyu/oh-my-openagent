@@ -20,6 +20,12 @@ impl<R: BufRead + Send, W: Write + Send> LineHelper<R, W> {
         Self { reader, writer }
     }
 
+    /// The pipe lost its framing (a reply it could not parse, a foreign id or an oversized
+    /// frame): the bytes that follow are not a reply line, so the helper must be restarted.
+    pub const fn needs_restart(&self) -> bool {
+        false
+    }
+
     /// The reader and the writer, for a caller that inspects what was sent.
     pub fn into_parts(self) -> (R, W) {
         (self.reader, self.writer)

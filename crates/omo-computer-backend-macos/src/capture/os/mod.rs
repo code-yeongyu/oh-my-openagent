@@ -50,6 +50,10 @@ impl CaptureOs for Os {
         process::bundle_id(pid)
     }
 
+    fn frontmost_pid(&mut self) -> Option<u32> {
+        None
+    }
+
     fn ax_window(&mut self, window: &CgWindow) -> Option<AxWindowFacts> {
         ax::facts(window)
     }

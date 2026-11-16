@@ -18,6 +18,9 @@ pub trait CaptureOs: Send {
     fn process_start(&mut self, pid: u32) -> Option<u64>;
     /// The bundle id of `pid`'s application; `None` for a bare executable.
     fn bundle_id(&mut self, pid: u32) -> Option<String>;
+    /// The pid of the frontmost application (the system-wide `AXFocusedApplication`); `None`
+    /// when no application is frontmost or AX cannot read it.
+    fn frontmost_pid(&mut self) -> Option<u32>;
     /// The accessibility facts of the window; `None` when AX cannot match it.
     fn ax_window(&mut self, window: &CgWindow) -> Option<AxWindowFacts>;
     /// The Space of the window through the probed SkyLight symbol; `None` when unresolved.

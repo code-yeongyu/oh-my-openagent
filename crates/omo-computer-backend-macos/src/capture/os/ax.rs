@@ -73,7 +73,7 @@ pub fn facts(window: &CgWindow) -> Option<AxWindowFacts> {
         same_window(element, window).then(|| AxWindowFacts {
             minimized: attribute(element, c"AXMinimized").is_some_and(|v| cf::boolean(v.get())),
             // SAFETY: both are AXUIElements; AX hands out distinct references to one window.
-            focused: focused
+            focused_in_app: focused
                 .as_ref()
                 .is_some_and(|f| unsafe { cf::CFEqual(f.get(), element) }),
             title: attribute(element, c"AXTitle").and_then(|v| cf::string(v.get())),
