@@ -63,8 +63,10 @@ fn an_attach_host_runs_public_and_session_methods_on_its_own_session_as_remote()
         let reply = peer.call(id, name, &json!({})).unwrap_or_else(|| panic!("{name}: answered"));
         assert!(reply.get("result").is_some(), "{name}: {reply}");
     }
+    let capture = peer.call(4, "capture", &json!({"target": "101"})).expect("answered");
+    assert!(capture.get("result").is_some(), "a frame to click in: {capture}");
     let click = peer
-        .call(4, "click", &json!({"target": "101", "x": 10, "y": 10, "callId": "attach-host-probe"}))
+        .call(5, "click", &json!({"target": "101", "x": 10, "y": 10, "callId": "attach-host-probe"}))
         .expect("answered");
     assert!(click.get("error").is_none(), "{click}");
     let audit = audit_lines(daemon.dir.path(), "attach-host-probe");
