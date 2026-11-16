@@ -1,6 +1,6 @@
 //! Batched reads under the deadline and the Chromium wake (design rows M8).
 
-use omo_computer_core::ax::{walk, AxReader, Limits};
+use omo_computer_core::ax::{is_wrapper, walk, AxReader, Limits, DEADLINE_MS};
 
 use super::kit::{node, FakeAx, OnPoke};
 use crate::ax::seam::AxValue;
@@ -114,4 +114,79 @@ fn unknown_window_is_refused() {
     let mut ax = reader(FakeAx::default());
     assert!(ax.root("7").is_err());
     assert!(ax.root("not-a-window").is_err());
+}
+
+#[test]
+fn electron_tree_arrives_after_manual_accessibility_within_the_wake_budget() {
+    let mut fake = FakeAx::default();
+    fake.window(7, 70, 1_000, 100);
+    fake.add(100, node("AXWindow"), Vec::new());
+    fake.add(101, node("AXWebArea"), Vec::new());
+    fake.electron.push(70);
+    fake.on_manual = Some(OnPoke {
+        delay: 40,
+        node: 100,
+        children: vec![101],
+    });
+    let mut ax = reader(fake);
+    let root = ax.root("7").expect("root");
+    assert_eq!(
+        root.node.child_count, 1,
+        "the tree the write asked for is waited for"
+    );
+    let fake = ax.server();
+    assert_eq!(fake.writes.len(), 1);
+    assert!(
+        fake.now < DEADLINE_MS,
+        "the wake leaves the walk its own deadline: woke at {}",
+        fake.now
+    );
+}
+
+#[test]
+fn empty_window_wakes_once() {
+    let mut fake = FakeAx::default();
+    fake.window(7, 70, 1_000, 100);
+    fake.add(100, node("AXWindow"), Vec::new());
+    fake.electron.push(70);
+    let mut ax = reader(fake);
+    ax.root("7").expect("first observe");
+    let after_first = ax.server().now;
+    ax.root("7").expect("second observe");
+    assert_eq!(
+        ax.server().now,
+        after_first,
+        "a window that stayed empty is not waited on again"
+    );
+    assert_eq!(
+        ax.server().writes.len(),
+        1,
+        "AXManualAccessibility is written once"
+    );
+}
+
+#[test]
+fn blank_container_actions_are_read_before_it_counts_as_a_wrapper() {
+    let mut fake = FakeAx::default();
+    fake.window(7, 70, 1_000, 100);
+    fake.add(100, node("AXWindow"), vec![101]);
+    fake.add(101, node("AXGroup"), vec![102]);
+    fake.add(102, node("AXStaticText"), Vec::new());
+    fake.action_names.insert(101, vec!["AXPress".into()]);
+    let mut ax = reader(fake);
+    let root = ax.root("7").expect("root");
+    let limits = Limits::of(&ax);
+    let walked = walk(&mut ax, root.node, &limits);
+    let group = walked
+        .nodes
+        .iter()
+        .map(|n| &n.read)
+        .find(|n| n.role == "AXGroup")
+        .expect("group read");
+    assert_eq!(group.actions, vec!["AXPress".to_owned()]);
+    assert!(!is_wrapper(group), "a pressable group is not a wrapper");
+    assert!(
+        ax.server().reads.values().all(|n| *n == 1),
+        "still one attribute IPC per node"
+    );
 }

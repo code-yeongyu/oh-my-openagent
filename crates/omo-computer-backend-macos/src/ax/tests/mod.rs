@@ -5,3 +5,4 @@ mod kit;
 mod reads;
 mod refs;
 mod settle;
+mod table;

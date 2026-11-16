@@ -150,8 +150,11 @@ fn macos_notification_banner_fingerprint_and_unavailable_when_absent() {
     );
     assert_eq!(
         ax.wait_event(60),
-        Ok(None),
-        "a banner event is the surface's, not a window's"
+        Ok(Some(AxEvent {
+            kind: "notification_posted".into(),
+            window: "notification-surface".into(),
+        })),
+        "a banner's arrival wakes waitFor({{notification}}) on the surface, not a window"
     );
     let banners = ax.notifications().expect("surface");
     assert_eq!(banners.len(), 1);
@@ -163,4 +166,19 @@ fn macos_notification_banner_fingerprint_and_unavailable_when_absent() {
     assert_eq!(banner.body_hash, body_hash(&["Hello there"]));
     assert_eq!(banner.body_hash.len(), 32, "sha256_16");
     assert_eq!(banner.arrived_at_ms, 40, "the AXWindowCreated time");
+}
+
+#[test]
+fn failed_observer_registration_is_retried() {
+    let mut fake = window_with(node("AXTextField"));
+    fake.refuse_observe = 1;
+    let mut ax = MacAx::new(fake);
+    ax.busy("7").expect("first read");
+    ax.busy("7").expect("second read");
+    ax.busy("7").expect("third read");
+    assert_eq!(
+        ax.server().observed,
+        vec![70, 70],
+        "a refused registration is tried again on the next read, a granted one never again"
+    );
 }

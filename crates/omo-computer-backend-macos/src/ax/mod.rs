@@ -14,6 +14,7 @@ pub mod notifications;
 pub mod reader;
 pub mod seam;
 pub mod settle;
+pub mod table;
 
 #[cfg(target_os = "macos")]
 pub mod os;

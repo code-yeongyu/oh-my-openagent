@@ -98,6 +98,9 @@ pub trait AxServer: Send {
     fn menu_bar(&mut self, pid: u32) -> Option<Element>;
     /// ONE IPC: the node's attribute set; `Read(None)` when the element is gone.
     fn read(&mut self, element: Element, slice_ms: u64) -> Slice<Option<Attributes>>;
+    /// `AXUIElementCopyActionNames`: a second IPC, made only for an unlabelled container
+    /// whose actions decide whether the walk may treat it as a wrapper.
+    fn actions(&mut self, element: Element, slice_ms: u64) -> Slice<Vec<String>>;
     /// `kAXChildrenAttribute` values `[from, from + count)`.
     fn children(
         &mut self,
@@ -108,7 +111,8 @@ pub trait AxServer: Send {
     ) -> Slice<Vec<Element>>;
     /// Reads the app's `AXRole`: Chromium starts building its web tree on it.
     fn poke_role(&mut self, app: Element);
-    /// Registers the eleven notifications on `pid` once; `false` when it cannot.
+    /// Registers the eleven notifications on `pid`; `false` when the observer could not be
+    /// created or took none of them (the caller retries on its next read).
     fn observe(&mut self, pid: u32) -> bool;
     /// The next observer callback, waited for on the observer feed until `until_ms` and never
     /// past it (no polling, no sleep); `None` at the deadline.

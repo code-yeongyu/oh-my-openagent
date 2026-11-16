@@ -167,6 +167,10 @@ impl AxServer for Server {
         }
     }
 
+    fn actions(&mut self, _element: Element, _slice_ms: u64) -> Slice<Vec<String>> {
+        Slice::Read(Vec::new())
+    }
+
     fn children(
         &mut self,
         element: Element,
