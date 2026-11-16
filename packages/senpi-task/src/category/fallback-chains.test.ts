@@ -56,12 +56,12 @@ describe("CATEGORY_FALLBACK_CHAINS", () => {
         {
           providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
           model: "claude-fable-5-2",
-          variant: "max",
+          variant: "xhigh",
         },
         {
           providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
           model: "claude-fable-5-1",
-          variant: "max",
+          variant: "xhigh",
         },
       ],
       ultrabrain: [

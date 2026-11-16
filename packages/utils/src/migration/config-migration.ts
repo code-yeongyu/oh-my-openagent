@@ -160,7 +160,7 @@ export function migrateConfigFile(configPath: string, rawConfig: Record<string, 
     let finalConfig = JSON.parse(JSON.stringify(copy)) as Record<string, unknown>
     const newContent = JSON.stringify(finalConfig, null, 2) + "\n"
 
-    // Compare with existing file content to skip backup when unchanged.
+    // Compare with existing file content to skip the backup and the rewrite when unchanged.
     // The config may still need an in-memory migration even if the file
     // content is identical (e.g. removing a deleted hook from disabled_hooks
     // results in content that was already written by a prior migration).
@@ -178,6 +178,9 @@ export function migrateConfigFile(configPath: string, rawConfig: Record<string, 
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
     const backupPath = `${configPath}.bak.${timestamp}`
     let backupSucceeded = false
+    // An unchanged file counts as written: replacing it would only swap its inode and wait on two fsyncs,
+    // which is what made this path load-sensitive (#11839).
+    let writeSucceeded = !contentChanged
     if (contentChanged) {
       try {
         fs.copyFileSync(configPath, backupPath)
@@ -188,17 +191,16 @@ export function migrateConfigFile(configPath: string, rawConfig: Record<string, 
         }
         backupSucceeded = false
       }
-    }
 
-    let writeSucceeded = false
-    try {
-      writeFileAtomically(configPath, newContent)
-      writeSucceeded = true
-    } catch (error) {
-      if (!(error instanceof Error)) {
-        throw error
+      try {
+        writeFileAtomically(configPath, newContent)
+        writeSucceeded = true
+      } catch (error) {
+        if (!(error instanceof Error)) {
+          throw error
+        }
+        log(`Failed to write migrated config to ${configPath}:`, error)
       }
-      log(`Failed to write migrated config to ${configPath}:`, error)
     }
 
     if (writeSucceeded && shouldWriteSidecar) {
