@@ -29,7 +29,13 @@ fn fixtures() -> ScriptedOs {
                 ..win("Notepad")
             },
         ),
-        (NOTEPAD_EDIT, win("RichEditD2DPT")),
+        (
+            NOTEPAD_EDIT,
+            Win {
+                parent: Some(NOTEPAD),
+                ..win("RichEditD2DPT")
+            },
+        ),
         (
             WEBVIEW2,
             Win {
@@ -38,7 +44,13 @@ fn fixtures() -> ScriptedOs {
                 ..win("WindowsForms10.Window.8.app.0.1")
             },
         ),
-        (WEBVIEW2_RENDER, win("Chrome_RenderWidgetHostHWND")),
+        (
+            WEBVIEW2_RENDER,
+            Win {
+                parent: Some(WEBVIEW2),
+                ..win("Chrome_RenderWidgetHostHWND")
+            },
+        ),
         (
             WPF,
             Win {
@@ -132,6 +144,26 @@ fn a_background_route_needs_a_live_window() {
         Ok(Delivered { count: 1, of: 1 })
     );
     assert!(os.posts.iter().all(|(to, _)| *to == NOTEPAD_EDIT));
+}
+
+#[test]
+fn a_refusal_leaves_no_barrier_of_an_earlier_verb() {
+    let mut os = fixtures();
+    let mut deliverer = Deliverer::default();
+    deliverer
+        .deliver(&mut os, &id(NOTEPAD), &InputEvent::Text("a".to_owned()))
+        .expect("delivered");
+    assert_eq!(deliverer.last_barrier(), Some(Barrier::Consumed));
+    let dead = deliverer.deliver(&mut os, "0x999", &InputEvent::Text("a".to_owned()));
+    assert!(dead.is_err());
+    assert_eq!(deliverer.last_barrier(), None, "after target_unknown");
+    deliverer
+        .deliver(&mut os, &id(NOTEPAD), &InputEvent::Text("a".to_owned()))
+        .expect("delivered");
+    os.integrity = Integrity::Unreadable;
+    let above = deliverer.deliver(&mut os, &id(NOTEPAD), &InputEvent::Text("a".to_owned()));
+    assert!(above.is_err());
+    assert_eq!(deliverer.last_barrier(), None, "after PermissionDenied");
 }
 
 #[test]

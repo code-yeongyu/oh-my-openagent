@@ -21,6 +21,11 @@ pub(super) struct Win {
     pub(super) focus: Option<isize>,
     pub(super) wants_chars: Vec<isize>,
     pub(super) child_at: Option<isize>,
+    /// The parent window (`None` for a top-level window).
+    pub(super) parent: Option<isize>,
+    /// The GUI thread, when it is another window's (two top-levels on one thread); by default each
+    /// window's thread is its own id, and the thread's focus is that window's `focus`.
+    pub(super) thread: Option<u32>,
 }
 
 pub(super) struct ScriptedOs {
@@ -67,9 +72,12 @@ pub(super) fn win(class: &'static str) -> Win {
 
 impl FocusOs for ScriptedOs {
     fn window_thread(&self, window: isize) -> Option<u32> {
-        self.windows
-            .contains_key(&window)
-            .then(|| u32::try_from(window).unwrap_or_default())
+        let scripted = self.windows.get(&window)?;
+        Some(
+            scripted
+                .thread
+                .unwrap_or_else(|| u32::try_from(window).unwrap_or_default()),
+        )
     }
 
     fn thread_focus(&self, thread: u32) -> Option<isize> {
@@ -108,6 +116,17 @@ impl DeliveryOs for ScriptedOs {
 
     fn integrity(&self, _window: isize) -> Integrity {
         self.integrity
+    }
+
+    fn within(&self, window: isize, top: isize) -> bool {
+        let mut current = Some(window);
+        while let Some(at) = current {
+            if at == top {
+                return true;
+            }
+            current = self.windows.get(&at).and_then(|w| w.parent);
+        }
+        false
     }
 
     fn wants_chars(&self, window: isize) -> Vec<isize> {

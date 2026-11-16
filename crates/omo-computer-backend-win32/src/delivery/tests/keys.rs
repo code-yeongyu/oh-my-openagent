@@ -19,7 +19,7 @@ const FORM: isize = 0x400;
 const BUTTON: isize = 0x401;
 const EDIT: isize = 0x402;
 
-fn form(focus: Option<isize>, wants_chars: Vec<isize>) -> ScriptedOs {
+pub(super) fn form(focus: Option<isize>, wants_chars: Vec<isize>) -> ScriptedOs {
     ScriptedOs::with(vec![
         (
             FORM,
@@ -30,8 +30,20 @@ fn form(focus: Option<isize>, wants_chars: Vec<isize>) -> ScriptedOs {
                 ..win("WindowsForms10.Window.8.app.0.1")
             },
         ),
-        (BUTTON, win("WindowsForms10.BUTTON.app.0.1")),
-        (EDIT, win("WindowsForms10.EDIT.app.0.1")),
+        (
+            BUTTON,
+            Win {
+                parent: Some(FORM),
+                ..win("WindowsForms10.BUTTON.app.0.1")
+            },
+        ),
+        (
+            EDIT,
+            Win {
+                parent: Some(FORM),
+                ..win("WindowsForms10.EDIT.app.0.1")
+            },
+        ),
     ])
 }
 

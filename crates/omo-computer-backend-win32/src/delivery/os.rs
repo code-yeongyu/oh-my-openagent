@@ -12,9 +12,10 @@ use windows::Win32::System::Threading::{
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::IsWindowEnabled;
 use windows::Win32::UI::WindowsAndMessaging::{
-    ChildWindowFromPointEx, EnumChildWindows, GetClassNameW, GetWindowThreadProcessId, IsIconic,
-    IsWindow, IsWindowVisible, SendMessageTimeoutW, CWP_SKIPDISABLED, CWP_SKIPINVISIBLE,
-    CWP_SKIPTRANSPARENT, DLGC_WANTCHARS, SMTO_ABORTIFHUNG, WM_GETDLGCODE,
+    ChildWindowFromPointEx, EnumChildWindows, GetClassNameW, GetClientRect,
+    GetWindowThreadProcessId, IsChild, IsIconic, IsWindow, IsWindowVisible, SendMessageTimeoutW,
+    CWP_SKIPDISABLED, CWP_SKIPINVISIBLE, CWP_SKIPTRANSPARENT, DLGC_WANTCHARS, SMTO_ABORTIFHUNG,
+    WM_GETDLGCODE,
 };
 
 use crate::barrier::PaintOs;
@@ -22,11 +23,9 @@ use crate::capture::integrity::rid;
 use crate::input::focus_child::{self, FocusOs};
 use crate::input::Posted;
 
+use super::hit::{deepest_child, HitOs};
 use super::integrity::Integrity;
-use super::target::{coordinate, ClientPoint, DeliveryOs, PostFailure};
-
-/// The deepest child walk stops after this many levels.
-const MAX_DEPTH: usize = 32;
+use super::target::{ClientPoint, DeliveryOs, PostFailure};
 /// `WM_GETDLGCODE` answer budget per child; a hung child is not a candidate.
 const DLGCODE_TIMEOUT_MS: u32 = 100;
 
@@ -73,6 +72,37 @@ impl PaintOs for Os {
         let start = Instant::now();
         std::thread::sleep(period);
         start.elapsed()
+    }
+}
+
+impl HitOs for Os {
+    fn to_client(&self, window: isize, screen: (i32, i32)) -> Option<(i32, i32)> {
+        let mut point = POINT {
+            x: screen.0,
+            y: screen.1,
+        };
+        // SAFETY: `point` outlives the call.
+        unsafe { ScreenToClient(hwnd(window), &raw mut point) }
+            .as_bool()
+            .then_some((point.x, point.y))
+    }
+
+    fn client_size(&self, window: isize) -> Option<(i32, i32)> {
+        let mut rect = RECT::default();
+        // SAFETY: `rect` outlives the call.
+        unsafe { GetClientRect(hwnd(window), &raw mut rect) }.ok()?;
+        Some((rect.right - rect.left, rect.bottom - rect.top))
+    }
+
+    fn child_from_point(&self, window: isize, client: (i32, i32)) -> Option<isize> {
+        let flags = CWP_SKIPINVISIBLE | CWP_SKIPDISABLED | CWP_SKIPTRANSPARENT;
+        let point = POINT {
+            x: client.0,
+            y: client.1,
+        };
+        // SAFETY: a plain hit-test in `window`'s client coordinates.
+        let child = unsafe { ChildWindowFromPointEx(hwnd(window), point, flags) };
+        (!child.is_invalid()).then_some(child.0 as isize)
     }
 }
 
@@ -135,6 +165,11 @@ impl DeliveryOs for Os {
         }
     }
 
+    fn within(&self, window: isize, top: isize) -> bool {
+        // SAFETY: plain reads; any HWND value is accepted.
+        window == top || unsafe { IsChild(hwnd(top), hwnd(window)) }.as_bool()
+    }
+
     fn wants_chars(&self, window: isize) -> Vec<isize> {
         let mut found: Vec<isize> = Vec::new();
         // SAFETY: `collect` writes only into `found`, which outlives the synchronous enumeration.
@@ -149,32 +184,7 @@ impl DeliveryOs for Os {
     }
 
     fn child_at(&self, window: isize, at: Point) -> Option<(isize, ClientPoint)> {
-        let screen = POINT {
-            x: i32::from(coordinate(at.x)?),
-            y: i32::from(coordinate(at.y)?),
-        };
-        let to_client = |of: HWND| {
-            let mut point = screen;
-            // SAFETY: `point` outlives the call.
-            unsafe { ScreenToClient(of, &raw mut point) }
-                .as_bool()
-                .then_some(point)
-        };
-        let mut current = hwnd(window);
-        let mut client = to_client(current)?;
-        for _ in 0..MAX_DEPTH {
-            let flags = CWP_SKIPINVISIBLE | CWP_SKIPDISABLED | CWP_SKIPTRANSPARENT;
-            // SAFETY: a plain hit-test in `current`'s client coordinates.
-            let child = unsafe { ChildWindowFromPointEx(current, client, flags) };
-            if child.is_invalid() || child == current {
-                break;
-            }
-            current = child;
-            client = to_client(current)?;
-        }
-        let x = i16::try_from(client.x).ok()?;
-        let y = i16::try_from(client.y).ok()?;
-        Some((current.0 as isize, ClientPoint { x, y }))
+        deepest_child(self, window, at)
     }
 
     fn post(&mut self, window: isize, message: &Posted) -> Result<(), PostFailure> {

@@ -5,6 +5,7 @@
 //! accessibility notification saw.
 
 pub mod family;
+pub mod hit;
 pub mod integrity;
 pub mod matrix;
 pub mod messages;

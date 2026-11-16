@@ -37,6 +37,9 @@ pub trait DeliveryOs: FocusOs + PaintOs + Send {
     fn class(&self, window: isize) -> Option<String>;
     /// The integrity RIDs of the window's process and of the engine.
     fn integrity(&self, window: isize) -> Integrity;
+    /// Whether `window` is `top` or one of its descendants (`IsChild`): input posted to it lands
+    /// in the addressed window.
+    fn within(&self, window: isize, top: isize) -> bool;
     /// The visible, enabled descendants answering `WM_GETDLGCODE` with `DLGC_WANTCHARS`.
     fn wants_chars(&self, window: isize) -> Vec<isize>;
     /// The deepest enabled, visible child of `window` under the screen point, with the point in
