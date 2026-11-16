@@ -157,9 +157,11 @@ export type GatewayRelayOptions = {
 
 const SELF = "thread_report without binding_id uses the chat binding the gateway keeps for this session."
 
-// The relay does not know its caller here. A session reaches every code below except binding_conflict and stale_revision
-// (only bind/rebind/unbind return them, and only the gateway or the CLI calls those), so every other text names session
-// tools and never a shell command.
+// The default next action per code. The relay does not know its caller here, and a session reaches every code below
+// through its relay tools except binding_conflict and stale_revision (only bind/rebind/unbind return them, and only the
+// gateway or the CLI calls those), so every other text names session tools and never a shell command. A refusal that only
+// the gateway, the CLI or a connector can get, or one whose cause the code alone does not tell, carries its own next
+// action where it is returned (`fromStore`'s overrides, `failure`'s nextAction).
 const NEXT_ACTION: Partial<Record<ThreadErrorCode, string>> = {
   binding_conflict:
     "Find the binding that holds this thread with `omo thread bindings`, then rebind it with its revision, or unbind it first.",
@@ -202,9 +204,18 @@ function failure(
   }
 }
 
-function fromStore<T extends object>(outcome: RelayOutcome<T> | StoreRefusal): RelayResult<T> {
-  if (outcome.kind === "refused") return failure(outcome.code, outcome.message, outcome.details)
+function fromStore<T extends object>(
+  outcome: RelayOutcome<T> | StoreRefusal,
+  nextAction?: Partial<Record<ThreadErrorCode, string>>,
+): RelayResult<T> {
+  if (outcome.kind === "refused")
+    return failure(outcome.code, outcome.message, outcome.details, nextAction?.[outcome.code])
   return outcome as RelayResult<T>
+}
+
+/** unbind and rebind run only as the gateway or the CLI, which can list the bindings. */
+const BINDING_ADMIN_NEXT_ACTION: Partial<Record<ThreadErrorCode, string>> = {
+  not_found: "List the binding ids that exist with `omo thread bindings`.",
 }
 
 function checkedAuthor(
@@ -278,6 +289,7 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
       const args = { binding_id: request.binding_id, expected_revision: request.expected_revision }
       return fromStore(
         await store.unbind({ now: now(), receipt: receipt(request, "thread_unbind", args), ...args }),
+        BINDING_ADMIN_NEXT_ACTION,
       ) as RelayResult<{
         binding: BindingRecord
         already_closed: boolean
@@ -293,6 +305,7 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
       }
       return fromStore(
         await store.rebind({ now: now(), receipt: receipt(request, "thread_rebind", args), ...args }),
+        BINDING_ADMIN_NEXT_ACTION,
       ) as RelayResult<{ binding: BindingRecord; closed: readonly string[]; deduplicated: boolean }>
     },
     bindings: async (request) => fromStore(await store.listBindings({ now: now(), ...request })),
@@ -328,7 +341,12 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
         answer: request.answer,
         answered_by: answeredBy,
       })
-      if (claim.kind !== "ok") return fromStore(claim)
+      // The token named this binding, so not_found here means its question left the outbox, not an unknown binding.
+      if (claim.kind !== "ok")
+        return fromStore(claim, {
+          not_found:
+            "The question this token belongs to is gone from the outbox: read thread_outbox for a newer question and answer that one.",
+        })
       const own: AnswerClaimRef = { reply_token: request.reply_token, claimed_at: claim.claimed_at }
       const respond = options.endpoints.respondUi
       let endpoint: GatewayEndpointRef | null = null
@@ -433,7 +451,13 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
       const author = checkedAuthor(request.author)
       if (author !== undefined && "kind" in author) return author
       const binding = await store.bindingView({ now: now(), binding_id: request.binding_id })
-      if (binding === null) return failure("not_found", "No binding has this id.", { binding_id: request.binding_id })
+      if (binding === null)
+        return failure(
+          "not_found",
+          "No binding has this id.",
+          { binding_id: request.binding_id },
+          "Deliver the message through the binding the gateway keeps for this chat now; this one no longer exists.",
+        )
       // An event the session already took keeps its stored result whatever the binding did since (a
       // connector that lost the ACK retries it): the receipt is checked against the target and
       // revision it was delivered under BEFORE the binding's current status or revision, so neither an
