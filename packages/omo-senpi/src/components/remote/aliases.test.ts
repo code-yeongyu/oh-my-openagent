@@ -18,7 +18,8 @@ afterEach(closeClients)
 // Each listed session's durable id differs from its session key, so a registry fed the key instead is caught.
 const LIVE = "c2Vzc2lvbi1saXZl"
 const OTHER = "c2Vzc2lvbi1vdGhlcg"
-const OLD = "c2Vzc2lvbi1vbGQ"
+// A key session.locate can answer (22 base64url characters).
+const OLD = "c2Vzc2lvbi1vbGQtMDAwMQ"
 const listingRow = (session_id: string, durable_id?: string): ListingRow => ({
   device: PEER,
   session_id,
@@ -151,6 +152,29 @@ describe("aliases", () => {
     expect(failureOf(await client.aliases.resolve("gone"))).toMatchObject({
       code: "not_found",
       details: { kind: "session", durable_id: "dur-gone" },
+    })
+  })
+
+  // Parity with the thread tools' holderTarget (thread/remote/remote-ops.ts): a holder recorded by its listing key matches
+  // its row, and one no row names (its device lists no durable id) is mapped by the holder's device (session.locate).
+  test("#given holders recorded by a listing key and by a durable id no row lists #when resolve reads them #then the key matches its row and the durable id is located on its device", async () => {
+    const registry = fakeRegistry()
+    registry.holders.set("by-key", { session_id: OTHER, device: PEER })
+    registry.holders.set("located", { session_id: "dur-old", device: PEER })
+    registry.holders.set("unlisted", { session_id: "dur-unlisted", device: PEER })
+    const located: World = {
+      ...world(),
+      located: { [PEER]: { "dur-old": OLD, "dur-unlisted": "a2V5LW5vdC1saXN0ZWQtMQ" } },
+    }
+    const client = clientOn((await startOwner(located)).stateDir, fakeClock(), undefined, {
+      aliasRegistry: async () => registry,
+    })
+
+    expect(await client.aliases.resolve("by-key")).toEqual({ kind: "ok", value: handleOf(PEER, OTHER) })
+    expect(await client.aliases.resolve("located")).toEqual({ kind: "ok", value: handleOf(PEER, OLD) })
+    expect(failureOf(await client.aliases.resolve("unlisted"))).toMatchObject({
+      code: "not_found",
+      details: { kind: "session", durable_id: "dur-unlisted" },
     })
   })
 

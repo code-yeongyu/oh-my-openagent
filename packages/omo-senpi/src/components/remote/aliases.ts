@@ -1,7 +1,8 @@
+import { LocalApiError } from "@oh-my-opencode/device-service-core/device-service"
 import type { AliasError, AliasRegistry, AliasResult } from "../thread/remote/ports"
 import type { RemoteClient } from "./client"
 import { nextActionFor, type RemoteCode, remoteFailure } from "./codes"
-import type { ClientCore, Outcome } from "./core"
+import { type ClientCore, ok, type Outcome } from "./core"
 import { DEADLINES, withinDeadline } from "./deadlines"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
 import type { Opts, RemoteFailure, SessionRow, ThreadHandle } from "./types"
@@ -92,12 +93,13 @@ export function aliasMembers(core: ClientCore): RemoteClient["aliases"] {
     return parsed.kind === "ok" && parsed.value.target.kind === "device_session" ? parsed.value.target : undefined
   }
 
-  // The row `device` lists that `matches`. A device that missed the listing round is an outage, not a missing session:
-  // device_offline, as the thread tools answer it (thread/remote/remote-ops.ts holderTarget).
+  // The row `device` lists that `matches`, else what `missing` makes of the listed rows. A device that missed the listing
+  // round is an outage, not a missing session: device_offline, as the thread tools answer it (thread/remote/remote-ops.ts
+  // holderTarget).
   const listedRow = async (
     device: string,
     matches: (row: SessionRow) => boolean,
-    missing: () => RemoteFailure,
+    missing: (rows: readonly SessionRow[]) => Promise<Outcome<SessionRow>>,
     opts: Opts | undefined,
   ): Promise<Outcome<SessionRow>> => {
     const listed = await core.sessionsList({ device }, opts)
@@ -111,7 +113,7 @@ export function aliasMembers(core: ClientCore): RemoteClient["aliases"] {
         nextActionFor("device_offline"),
         { details: { device } },
       )
-    return missing()
+    return await missing(listed.value.rows)
   }
 
   // The registry holds a session by its durable id, as the thread tools do (cross-device.ts), never by its session key:
@@ -126,7 +128,7 @@ export function aliasMembers(core: ClientCore): RemoteClient["aliases"] {
         const listedAt = sessionOf(candidate.thread)
         return listedAt?.device === target.device && listedAt.session === target.session
       },
-      () =>
+      async () =>
         remoteFailure("not_found", "No listed session has that handle.", nextActionFor("not_found"), {
           details: { kind: "session" },
         }),
@@ -144,23 +146,57 @@ export function aliasMembers(core: ClientCore): RemoteClient["aliases"] {
     return { kind: "ok", value: row.durable_id }
   }
 
+  // A holder no listed row names (its device lists no durable id, or the row moved): the holder's device maps it to the
+  // session's listing key (session.locate), as thread_* holderTarget does. A device that refuses the probe answers
+  // `missing` with its reason; the located key must still be a listed row.
+  const locatedRow = async (
+    device: string,
+    held: string,
+    rows: readonly SessionRow[],
+    missing: (reason?: string) => RemoteFailure,
+    opts: Opts | undefined,
+  ): Promise<Outcome<SessionRow>> => {
+    const located = await core.member(opts, DEADLINES.openLocate, false, async (svc): Promise<Outcome<string>> => {
+      try {
+        return ok((await svc.locate(device, held)).key)
+      } catch (error) {
+        if (error instanceof LocalApiError) return missing(error.code)
+        throw error
+      }
+    })
+    if (located.kind === "error") return located
+    const row = rows.find((candidate) => {
+      const listedAt = sessionOf(candidate.thread)
+      return listedAt?.device === device && listedAt.session === located.value
+    })
+    return row === undefined ? missing() : ok(row)
+  }
+
   return {
-    // The holder's durable id back to the handle of the row its device lists with it.
+    // The holder (a durable id, or a listing key) back to the handle of the row its device lists for it.
     resolve: async (alias, opts) => {
       const holder = await run(opts, false, async (aliases) => {
         const resolved = await aliases.resolve(alias)
-        return resolved.kind === "error" ? aliasFailure(resolved.error) : { kind: "ok" as const, value: resolved.value }
+        return resolved.kind === "error" ? aliasFailure(resolved.error) : ok(resolved.value)
       })
       if (holder.kind === "error") return holder
-      const { device, session_id: durableId } = holder.value
-      const missing = () =>
+      const { device, session_id: held } = holder.value
+      const missing = (reason?: string) =>
         remoteFailure("not_found", "No listed session holds that alias's durable id.", nextActionFor("not_found"), {
-          details: { kind: "session", durable_id: durableId },
+          details: { kind: "session", durable_id: held, ...(reason === undefined ? {} : { reason }) },
         })
-      const found = await listedRow(device, (candidate) => candidate.durable_id === durableId, missing, opts)
+      const found = await listedRow(
+        device,
+        (candidate) => {
+          const listedAt = sessionOf(candidate.thread)
+          return listedAt?.device === device && (candidate.durable_id === held || listedAt.session === held)
+        },
+        (rows) => locatedRow(device, held, rows, missing, opts),
+        opts,
+      )
       if (found.kind === "error") return found
       const session = sessionOf(found.value.thread)
-      return session === undefined ? missing() : { kind: "ok", value: handleOf(session.device, session.session) }
+      return session === undefined ? missing() : ok(handleOf(session.device, session.session))
     },
     // Claim when the thread holds no alias, else rename it (thread/remote/cross-device.ts renameAlias).
     set: async (thread, alias, opts) => {
