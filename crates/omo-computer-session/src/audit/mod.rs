@@ -8,6 +8,7 @@ mod line;
 mod mark;
 mod memory;
 mod redact;
+mod scan;
 mod segment;
 mod sink;
 mod writer;
@@ -17,6 +18,7 @@ mod tests;
 
 pub use chain::{line_hash, sha256_16};
 pub use handlock::LOCK_FILE;
+pub use scan::{HandScan, ScanRead, ScanStats, Tamper, LINE_STAMP_BYTES};
 pub use line::{
     now_ms, rfc3339_ms, AuditEvent, AuditLatch, Consent, DeliveredRecord, DeliveryKind,
     DispositionRecord, Gate, GateOutcome, Grant, GrantKind, GrantVerdict, Status, TextRecord, Tier,
