@@ -7,8 +7,9 @@ import type { ThreadWorktree, WorktreeRequest } from "../worktree/thread-worktre
 /**
  * One `open_session` as thread_create asks for it, on whichever device the host stands for: a new session (`cwd`),
  * an existing session's file (`sessionPath`), or a fork (`forkFrom`); `initialSkills` ride on the frame's context and
- * `permissionPreset` is the approval mode the new session starts in (its creator's). Every field crosses the wire
- * unchanged on both legs.
+ * `permissionPreset` is the approval mode the new session starts in (its creator's, or one it narrowed to);
+ * `provider` + `modelId` and `thinkingLevel` are the engine's launch profile (a model it cannot resolve refuses the open
+ * with `model_unavailable`). Every field crosses the wire unchanged on both legs.
  */
 export type SessionOpenRequest = {
   readonly cwd?: string
@@ -17,6 +18,9 @@ export type SessionOpenRequest = {
   readonly name?: string
   readonly initialSkills?: readonly string[]
   readonly permissionPreset?: string
+  readonly provider?: string
+  readonly modelId?: string
+  readonly thinkingLevel?: string
   /** A new git worktree to create from the repository at `cwd` on the opening device; the session starts in it. */
   readonly worktree?: WorktreeRequest
 }

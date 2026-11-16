@@ -42,7 +42,7 @@ impl crate::Session {
         guard: omo_computer_safety::Guard,
         funnel: crate::mutate::Funnel,
     ) -> Self {
-        with_display_awake(Self {
+        crate::holds::with_holds(with_display_awake(Self {
             backend,
             guard,
             opened: None,
@@ -52,6 +52,7 @@ impl crate::Session {
             trace: crate::trace::Trace::default(),
             settle: crate::settle::SettleState::default(),
             display_awake: crate::intervention::SharedHold::default(),
-        })
+            ax_generation: None,
+        }))
     }
 }

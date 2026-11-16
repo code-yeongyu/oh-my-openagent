@@ -38,7 +38,11 @@ pub fn units(events: &[InputEvent]) -> u32 {
             InputEvent::PointerMove(_)
             | InputEvent::Button { .. }
             | InputEvent::Key { .. }
-            | InputEvent::Scroll { .. } => 1,
+            | InputEvent::Scroll { .. }
+            | InputEvent::MenuSelect { .. }
+            | InputEvent::AppLaunch { .. }
+            | InputEvent::AppQuit { .. }
+            | InputEvent::OpenSurface { .. } => 1,
         })
         .fold(0, u32::saturating_add)
 }
@@ -99,7 +103,7 @@ impl Ended {
 impl Session {
     /// A stop is never held (R53): the listener is polled between units, and a set latch ends
     /// the stroke there with the latch's own `Suspended{reason}`.
-    fn latched(&mut self) -> Option<Stop> {
+    pub(crate) fn latched(&mut self) -> Option<Stop> {
         let backend = &mut self.backend;
         self.guard.observe(&mut || backend.stop_listener(), &mut omo_computer_safety::NoHolds);
         self.guard.latch().map(|reason| Stop::Refused(reason.refusal()))
@@ -113,7 +117,7 @@ impl Session {
         watch: Option<MidSend>,
         window: Option<&str>,
     ) -> Outcome {
-        let of = units(&events);
+        let mut of = units(&events);
         let mut count: u32 = 0;
         for (index, event) in events.into_iter().enumerate() {
             if index > 0 {
@@ -142,8 +146,12 @@ impl Session {
                 }
                 continue;
             }
-            match self.backend.post_input(&TaggedInput { event, tag }, route) {
-                Ok(_) => count = count.saturating_add(1),
+            match post_one(self.backend.as_mut(), event, tag, route) {
+                // A route reports what it delivered of the unit (R48c): a capped step is 0 of 1.
+                Ok(delivered) => {
+                    count = count.saturating_add(delivered.count);
+                    of = of.saturating_sub(1).saturating_add(delivered.of);
+                }
                 Err(refusal) => {
                     return Outcome { count, of, stop: Some(Stop::Refused(refusal)) }
                 }
@@ -151,4 +159,15 @@ impl Session {
         }
         Outcome { count, of, stop: None }
     }
+}
+
+/// The one site an engine input reaches the OS: every send, and the held-input ledger's release
+/// on a lease end (row 23), go through it.
+pub(crate) fn post_one(
+    backend: &mut dyn Backend,
+    event: InputEvent,
+    tag: u64,
+    route: Route,
+) -> omo_computer_core::backend::BackendResult<omo_computer_core::backend::Delivered> {
+    backend.post_input(&TaggedInput { event, tag }, route)
 }

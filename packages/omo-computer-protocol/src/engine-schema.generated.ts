@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "43e5abfc6de370d22e12af6865f9dcf266732b86a9dc464ccada503396be4406" as const
+export const SCHEMA_SHA256 = "345bf273fcc34784a6bac19e45e8ed1d147145af2af5a018b5a2c5b5503baf81" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -395,11 +395,14 @@ export type ActionReport = {
 	openedSurfaces?: Surface[]
 	nextCall?: string | null
 	note?: string | null
+	reason?: RefusalReason | null
+	nothingSent?: boolean | null
 	warning?: string | null
 	auditIds?: string[]
 	timings?: Timings | null
 	settle?: ObservationSettle | null
 	evidence: Evidence[]
+	urlPolicy?: UrlPolicyStamp | null
 	observation: UntrustedText
 	paused?: Pause[]
 	session?: SessionState | null
@@ -645,6 +648,8 @@ export type ClipboardContent = {
 	observation: UntrustedText
 }
 
+export type ClipboardReadReply = ClipboardContent | ActionReport
+
 export type ClipboardWriteParams = {
 	text: string
 	format?: PasteFormat | null
@@ -840,7 +845,7 @@ export type Evidence = {
 
 export type EvidenceClass = "receipt" | "observation"
 
-export type EvidenceKind = "barrier_consumed" | "xi2_raw_confirm" | "value_readback" | "focus_readback" | "menu_readback" | "ax_notification" | "settle_frame_diff" | "ax_change"
+export type EvidenceKind = "barrier_consumed" | "xi2_raw_confirm" | "value_readback" | "focus_readback" | "menu_readback" | "ax_notification" | "settle_frame_diff" | "ax_change" | "frame_readback"
 
 export type ExecReply = null | ActionReport
 
@@ -1061,8 +1066,18 @@ export type McpSettings = {
 	tier: Tier
 }
 
+export type MenuItem = {
+	label: string
+	enabled: boolean
+	checked: boolean
+	accelerator?: string | null
+	submenu: boolean
+	path: string[]
+	observation: UntrustedText
+}
+
 export type MenuItems = {
-	items: ElementInfo[]
+	items: MenuItem[]
 	truncated?: boolean | null
 	observation: UntrustedText
 }
@@ -1273,6 +1288,8 @@ export type Rect = {
 	width: number
 	height: number
 }
+
+export type RefusalReason = "secure_focus" | "concealed_clipboard" | "secret_no_clipboard_route"
 
 export type ReleaseHelper = {
 	available: boolean
@@ -1582,6 +1599,8 @@ export type UntrustedText = {
 	untrustedText: true
 }
 
+export type UrlPolicyStamp = "unknown"
+
 export type UserActive = {
 	active: Tristate
 	lastInputAgeMs?: number | null
@@ -1779,7 +1798,7 @@ export type MethodResults = {
 	"ax.focused": AxNode | null
 	"elementAt": ElementInfo | null
 	"waitFor": WaitResult
-	"clipboard.read": ClipboardContent
+	"clipboard.read": ClipboardReadReply
 	"menu.items": MenuItems
 	"surface": Surface
 	"click": ExecReply

@@ -6,6 +6,25 @@ import { deliveryHandler } from "./fake-owner-deliveries.ts"
 import { sessionHandler } from "./fake-owner-sessions.ts"
 import { type Conn, eventOf, ok, type Outcome, type OwnerState, refuse } from "./fake-owner-state.ts"
 
+// The requests the vendored client added that no omo test drives: this owner refuses them unsupported.
+export const UNSERVED_REQUEST_TYPES: readonly string[] = [
+  "control.remote_commands.get",
+  "control.remote_commands.set",
+  "endpoints.list",
+  "machine.batch",
+  "machine.batch_part",
+  "machine.cancel",
+  "machine.credit",
+  "machine.describe",
+  "machine.events.subscribe",
+  "machine.list",
+  "machine.result_of",
+  "owner.update_committed",
+  "session.presenter_open",
+  "session.presenter_send",
+  "sessions.events.subscribe",
+]
+
 const setStatus = (state: OwnerState, status: Status): void => {
   state.status = status
   for (const conn of state.conns) if (conn.subscribed) conn.send(eventOf("status.changed", { status }))
@@ -50,9 +69,11 @@ export const dispatch = (state: OwnerState, conn: Conn, request: LocalRequest): 
     case "device.info":
       return ok({ device: state.status.device })
     case "endpoints.register":
+      if (!("agent_dir" in request)) return refuse("unsupported", "this test owner registers agent dirs only")
       state.endpoints.add(request.agent_dir)
       return ok()
     case "endpoints.unregister":
+      if (!("agent_dir" in request)) return refuse("unsupported", "this test owner registers agent dirs only")
       state.endpoints.delete(request.agent_dir)
       return ok()
     case "devices.list":
@@ -117,6 +138,6 @@ export const dispatch = (state: OwnerState, conn: Conn, request: LocalRequest): 
     case "peer.admitted":
       return deliveryHandler(state, conn, request)
     default:
-      return assertNever(request)
+      return refuse("unsupported", `this test owner does not serve ${request.type}`)
   }
 }
