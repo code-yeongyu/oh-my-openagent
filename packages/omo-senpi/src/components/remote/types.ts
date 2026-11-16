@@ -165,6 +165,10 @@ export type AttachEvent =
   | { readonly kind: "session_closed" }
 export type AttachHandle = {
   readonly snapshot: SnapshotBody
+  /**
+   * The attach's events, for ONE reader: a second iteration while one is reading throws at its start (its first
+   * `next()`), and the first keeps reading.
+   */
   readonly events: RemoteStream<AttachEvent>
   readonly command: (rpc: EngineRecord) => R<CommandResult>
   readonly read: (page: { readonly before?: string; readonly tail?: number }) => R<ReadPage>
