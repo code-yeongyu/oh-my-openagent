@@ -1,4 +1,9 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
+import { existsSync } from "node:fs"
+import * as fs from "node:fs/promises"
+import { basename, dirname } from "node:path"
+
+import { awaitWithinTestBudget, useTestTimeout } from "../../../../test-support/test-deadline"
 
 import type { ChildDialogForwarder } from "./child-dialogs/forwarder"
 import type { ForwardableDialog } from "./child-dialogs/forwardable-dialog"
@@ -49,7 +54,9 @@ async function runChild(
   })
   await handle.waitForIdle()
   await handle.abort()
-  parent?.dispose()
+  // Both sessions that were started on this machine's agent dir reach their barrier before the root goes (#13520).
+  await handle.dispose()
+  await parent?.dispose()
   return { machine, seen }
 }
 
@@ -132,4 +139,47 @@ describe("InProcessRunner with a parent session", () => {
     },
     30_000,
   )
+})
+
+describe("child session teardown (#13520)", () => {
+  test("#given a child whose engine first-start writer is still pending #when its handle is disposed #then the writer cannot outlive the machine root", async () => {
+    useTestTimeout(30_000)
+    const machine = await createGatedChildMachine({ settingsPreset: "ask" })
+    machines.push(machine)
+    const root = dirname(machine.spec("st_6189w").cwd)
+    const access = fs.access
+    const started = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const accessSpy = spyOn(fs, "access").mockImplementation(async (path, mode) => {
+      if (basename(String(path)) === ".fallback-log-v2") {
+        started.resolve()
+        await release.promise
+      }
+      return access(path, mode)
+    })
+    let disposing: Promise<void> | undefined
+    let disposeSettled = false
+    try {
+      const handle = await new InProcessRunner({ dialogs: answering("Allow once").forwarder }).start(
+        machine.spec("st_6189w"),
+      )
+      await handle.waitForIdle()
+      await awaitWithinTestBudget(started.promise, "the child's first-start step to reach .fallback-log-v2")
+
+      disposing = Promise.resolve(handle.dispose()).finally(() => {
+        disposeSettled = true
+      })
+      for (let turn = 0; turn < 200; turn++) await new Promise((done) => setImmediate(done))
+      expect(disposeSettled).toBe(false)
+
+      release.resolve()
+      await disposing
+      machine.cleanup()
+      expect(existsSync(root)).toBe(false)
+    } finally {
+      release.resolve()
+      if (disposing !== undefined) await disposing.catch(() => {})
+      accessSpy.mockRestore()
+    }
+  }, 30_000)
 })
