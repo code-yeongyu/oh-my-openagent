@@ -3,3 +3,6 @@
 
 pub mod parent;
 pub mod presence;
+pub mod release;
+#[cfg(unix)]
+pub mod release_link;

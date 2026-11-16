@@ -36,6 +36,7 @@ fn main() -> ExitCode {
         Mode::Schema => schema::run(),
         Mode::Selftest { json } => selftest::run(json),
         Mode::PresenceHelper => helpers::presence::run(),
+        Mode::ReleaseHelper => helpers::release::run(),
         Mode::Stdio => stdio::run(),
         Mode::Oneshot => stdio::oneshot(),
         Mode::Mcp { tier } => stdio::mcp(tier),

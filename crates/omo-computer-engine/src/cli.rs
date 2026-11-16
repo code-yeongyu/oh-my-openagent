@@ -16,6 +16,8 @@ pub enum Mode {
     Mcp { tier: Tier },
     /// The detached presence renderer.
     PresenceHelper,
+    /// Lifts the engine's held inputs after the engine dies (G3).
+    ReleaseHelper,
     /// A same-uid server on a caller-chosen endpoint and lock (row 29 builds the daemon).
     Serve { endpoint: PathBuf, lock: PathBuf },
     /// Prints the committed protocol schema.
@@ -34,6 +36,7 @@ pub fn parse(args: &[String]) -> Result<Mode, String> {
         ["--oneshot"] => Ok(Mode::Oneshot),
         ["--mcp", rest @ ..] => tier::parse(rest).map(|tier| Mode::Mcp { tier }),
         ["--presence-helper"] => Ok(Mode::PresenceHelper),
+        ["--release-helper"] => Ok(Mode::ReleaseHelper),
         ["--enable-daemon", "--serve", "--endpoint", endpoint, "--lock", lock] => Ok(Mode::Serve {
             endpoint: PathBuf::from(endpoint),
             lock: PathBuf::from(lock),

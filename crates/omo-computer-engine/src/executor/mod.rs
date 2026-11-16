@@ -32,6 +32,8 @@ pub struct Executor<W: Write> {
     output: W,
     pending: Vec<Pending>,
     pace: bool,
+    #[cfg(unix)]
+    release: Option<crate::helpers::release_link::ReleaseLink>,
 }
 
 impl<W: Write> Executor<W> {
@@ -42,7 +44,17 @@ impl<W: Write> Executor<W> {
             output,
             pending: Vec::new(),
             pace,
+            #[cfg(unix)]
+            release: None,
         }
+    }
+
+    /// Streams the session's held inputs to the release helper after every call.
+    #[cfg(unix)]
+    #[must_use]
+    pub fn with_release(mut self, link: crate::helpers::release_link::ReleaseLink) -> Self {
+        self.release = Some(link);
+        self
     }
 
     /// Serves until the input closes and every due reply is written; hands the router back.
@@ -59,14 +71,22 @@ impl<W: Write> Executor<W> {
             }
         });
         loop {
-            let wait = self.next_due().map(|due| due.saturating_duration_since(Instant::now()));
+            let due = self.next_due().map(|due| due.saturating_duration_since(Instant::now()));
+            let hold = self.router.session().hold_wait();
+            let wait = match (due, hold) {
+                (Some(due), Some(hold)) => Some(due.min(hold)),
+                (due, hold) => due.or(hold),
+            };
             let next = match wait {
                 Some(wait) => received.recv_timeout(wait),
                 None => received.recv().map_err(|_| RecvTimeoutError::Disconnected),
             };
             match next {
                 Ok(line) => self.handle(&line)?,
-                Err(RecvTimeoutError::Timeout) => {}
+                Err(RecvTimeoutError::Timeout) => {
+                    self.router.session_mut().release_due_holds();
+                    self.stream_holds();
+                }
                 Err(RecvTimeoutError::Disconnected) => return self.drain(),
             }
             self.flush_due(Instant::now())?;
@@ -96,6 +116,7 @@ impl<W: Write> Executor<W> {
         let stop_epoch = self.router.stop_epoch();
         let outcome = self.router.call(Peer::Host, method, params);
         let notes = self.router.take_notifications();
+        self.stream_holds();
         let held = match (self.pace, before, self.router.fake_now_ms()) {
             (true, Some(before), Some(after)) => after.saturating_sub(before),
             _ => 0,
@@ -131,11 +152,22 @@ impl<W: Write> Executor<W> {
         Ok(())
     }
 
+    fn stream_holds(&mut self) {
+        #[cfg(unix)]
+        if let Some(link) = self.release.as_mut() {
+            link.update(&self.router.session().held_inputs());
+        }
+    }
+
+    /// The input closed: due replies are written, then the session closes, which releases
+    /// every hold (row 23, R49).
     fn drain(mut self) -> io::Result<Router> {
         while let Some(due) = self.next_due() {
             std::thread::sleep(due.saturating_duration_since(Instant::now()));
             self.flush_due(Instant::now())?;
         }
+        self.router.session_mut().close();
+        self.stream_holds();
         Ok(self.router)
     }
 

@@ -30,12 +30,18 @@ fn finish(mode: &str, outcome: io::Result<()>) -> ExitCode {
 
 pub fn run() -> ExitCode {
     match launched() {
-        Ok(launched) => finish(
-            "stdio",
-            Executor::new(launched.router, io::stdout().lock(), launched.pace)
-                .run(io::BufReader::new(io::stdin()))
-                .map(drop),
-        ),
+        Ok(launched) => {
+            let executor = Executor::new(launched.router, io::stdout().lock(), launched.pace);
+            #[cfg(unix)]
+            let executor = match crate::helpers::release_link::ReleaseLink::spawn() {
+                Ok(link) => executor.with_release(link),
+                Err(error) => {
+                    eprintln!("omo-computer-engine: release helper: {error}");
+                    executor
+                }
+            };
+            finish("stdio", executor.run(io::BufReader::new(io::stdin())).map(drop))
+        }
         Err(code) => code,
     }
 }
