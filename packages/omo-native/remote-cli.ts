@@ -139,7 +139,10 @@ export async function prepareRemoteAttach(
     const remote = (
       dependencies.remote ??
       ((connected: DeviceService) => ({
-        sessions: createDeviceServiceSessions({ version: connected.serviceVersion, connect: async () => connected }),
+        sessions: createDeviceServiceSessions({
+          version: connected.serviceVersion,
+          connect: async () => ({ conn: connected, owned: false }),
+        }),
         chain: { stamp: (record: JsonObject) => record },
       }))
     )(service)
