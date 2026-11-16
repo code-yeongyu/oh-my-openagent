@@ -43,6 +43,18 @@ describe("thread_read wait_ms (#13417)", () => {
     expect(settledEarly).toBe(false)
   })
 
+  test("#given a run that started before the wait attached (only its mid-run records arrive) #when the quiet window passes #then the wait keeps waiting and settles at the run's turn end with the baseline status kept", async () => {
+    const a = account({ engine: { ...ENGINE, streaming: false } })
+    const { run } = surface(a.remote)
+    const reading = run("thread_read", { thread: "dur-on-b", wait_ms: 60_000 })
+    await a.watching
+    for (const handlers of [...a.watchers]) handlers.record({ type: "message_update", turnId: "9" })
+    // Time is the behavior here: the end arrives after the 3 s quiet window a run-less session settles on.
+    await new Promise<void>((resolve) => setTimeout(resolve, 3_500))
+    for (const handlers of [...a.watchers]) handlers.record({ type: "agent_settled", turnId: "9" })
+    expect(await reading).toMatchObject({ kind: "ok", wait: { outcome: "settled", status: "idle", turn_id: "9" } })
+  }, 15_000)
+
   test("#given b's thread is running #when its status changes to idle during the wait #then the read settles with idle, and the watch is stopped", async () => {
     const a = account({ engine: { ...ENGINE, streaming: true } })
     const { run } = surface(a.remote)
