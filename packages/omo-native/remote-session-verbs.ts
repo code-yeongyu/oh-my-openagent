@@ -52,8 +52,8 @@ export function gatewayWorkerAnchor(root: string = packageRoot): URL | undefined
 
 // The surface the agent's thread tools reach other devices through, on this command's own connection. The chain count
 // (K8) starts at its first hop: a person at a terminal is no thread chain. The command's one connection is shared:
-// the port borrows it (never closes it) and endpoint commands ride a fresh connection per call, so `open_session`
-// never closes the CLI's only connection (#13075).
+// the port borrows it (never closes it); only `open_session` rides a fresh connection per call (#12777), so opening a
+// session never closes the CLI's only connection (#13075).
 const deviceServiceSurface = (service: DeviceService, dial: () => Promise<DeviceService>): RemoteThreadSurface => ({
   sessions: createDeviceServiceSessions({
     version: service.serviceVersion,
