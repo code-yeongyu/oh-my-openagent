@@ -19,5 +19,7 @@ pub mod source;
 #[cfg(windows)]
 pub mod thread;
 
+#[cfg(all(windows, test))]
+mod live_tests;
 #[cfg(test)]
 mod tests;
