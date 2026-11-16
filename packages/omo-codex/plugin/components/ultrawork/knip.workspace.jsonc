@@ -1,0 +1,33 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/omo-codex/plugin/components/ultrawork": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "scripts/sync-directive.mjs",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "test/codex-hook-test-helpers.ts",
+      ],
+      "ignoreFiles": [
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/ulw-plan/scripts/plan-templates.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/ulw-plan/scripts/scaffold-plan.mjs",
+      ],
+      "ignoreDependencies": [
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@biomejs/biome",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@vitest/coverage-v8",
+      ],
+      // pre-existing at origin dev 4686e425b5: executables this package runs that it does not declare
+      "ignoreBinaries": ["biome", "vitest"],
+    }
+  }
+}

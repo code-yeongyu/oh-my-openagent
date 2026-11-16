@@ -28,6 +28,7 @@ export function outputPathsIn(root) {
     telemetryOtlpOutputPath: join(root, "omo-telemetry-otlp.js"),
     memorySyncOutputPath: join(root, "omo-memory-sync.js"),
     threadClientOutputPath: join(root, "omo-thread-client.js"),
+    wakeOutputPath: join(root, "omo-wake.js"),
     telemetryRecoveryOutputPath: join(root, "omo-telemetry-recovery.js"),
     feedbackOutputPath: join(root, "omo-feedback.js"),
     desktopToolkitOutputPath: join(root, "omo-desktop-toolkit.js"),
