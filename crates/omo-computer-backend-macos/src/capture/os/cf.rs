@@ -1,5 +1,5 @@
 //! The CoreFoundation and CoreGraphics calls the macOS seam makes, declared once, with the
-//! owned-reference guard and the dictionary readers.
+//! owned-reference guard and the dictionary readers. Shared with the AX side (row 43).
 
 use std::ffi::{c_char, c_void, CStr};
 

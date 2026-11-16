@@ -1,7 +1,7 @@
 //! The macOS implementation of [`CaptureOs`].
 
 mod ax;
-mod cf;
+pub(crate) mod cf;
 mod helper_process;
 mod listing;
 mod process;
