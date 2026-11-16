@@ -40,4 +40,21 @@ describe("vendored device-service local-API client", () => {
     const present = readdirSync(SRC).filter((name) => !NOT_VENDORED.includes(name))
     expect(present.toSorted()).toEqual(pinned.toSorted())
   })
+
+  // spec-proto.ts is omo's own port, not byte-vendored, and knip skips the whole directory: this pins its exports to
+  // exactly the relay-spec names the vendored files import from it, so a stale or missing port fails here.
+  test("#given spec-proto.ts #then it exports exactly what the vendored files import from it", () => {
+    const imported = new Set<string>()
+    for (const file of pin.files) {
+      const text = readFileSync(join(SRC, file.upstreamPath.split("/").at(-1) ?? ""), "utf8")
+      for (const [, names] of text.matchAll(/import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+"\.\/spec-proto\.ts"/g))
+        for (const name of (names ?? "").split(",")) {
+          const bare = name.trim().replace(/^type\s+/, "")
+          if (bare !== "") imported.add(bare)
+        }
+    }
+    const port = readFileSync(join(SRC, "spec-proto.ts"), "utf8")
+    const exported = [...port.matchAll(/^export\s+(?:const|type|class|function)\s+(\w+)/gm)].map((match) => match[1])
+    expect(exported.toSorted()).toEqual([...imported].toSorted())
+  })
 })

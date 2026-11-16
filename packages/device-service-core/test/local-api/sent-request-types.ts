@@ -42,7 +42,7 @@ export type OmoSentRequestType = (typeof OMO_SENT_REQUEST_TYPES)[number]
 
 const SRC = join(import.meta.dir, "../../src")
 const LITERAL_SEND = /\brequest\(\s*"([^"]+)"/g
-const OTHER_SEND = /\.request\(\s*(?!")([^\s,)]+)/g
+const OTHER_SEND = /\brequest\(\s*(?!")([^\s,)]+)/g
 
 const sourceFiles = (dir: string): string[] =>
   readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -53,17 +53,18 @@ const sourceFiles = (dir: string): string[] =>
 
 export type SentScan = {
   readonly sent: readonly RequestType[]
-  /** `<file>: <argument>` for each `.request(` call whose type is not a string literal, so the scan cannot see it. */
+  /** `<file>: <argument>` for each `request(` call (bare or a member) whose type is not a string literal, so the scan cannot see it. */
   readonly unscanned: readonly string[]
 }
 
-export const scanSentRequestTypes = (): SentScan => {
+export const scanSentRequestTypes = (root: string = SRC): SentScan => {
   const sent = new Set<RequestType>()
   const unscanned: string[] = []
-  for (const file of sourceFiles(SRC)) {
+  for (const file of sourceFiles(root)) {
     const text = readFileSync(file, "utf8")
     for (const [, type] of text.matchAll(LITERAL_SEND)) if (isRequestType(type)) sent.add(type)
-    for (const [, argument] of text.matchAll(OTHER_SEND)) unscanned.push(`${relative(SRC, file)}: ${argument}`)
+    for (const [, argument] of text.matchAll(OTHER_SEND)) unscanned.push(`${relative(root, file)}: ${argument}`)
   }
-  return { sent: [...sent].toSorted(), unscanned }
+  // readdir order differs between file systems, so both lists are sorted.
+  return { sent: [...sent].toSorted(), unscanned: unscanned.toSorted() }
 }

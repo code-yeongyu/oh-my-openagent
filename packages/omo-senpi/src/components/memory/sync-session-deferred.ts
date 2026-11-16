@@ -1,5 +1,6 @@
 // The device session cannot be resolved now for a reason that clears without a configuration change: the OS
-// credential store is waiting for a person to answer its approval dialog (#11262). Thrown from the device account
+// credential store is waiting for a person to answer its approval dialog (#11262), or the memory repository has no
+// first commit yet (#13486). Thrown from the device account
 // sidecar and recognized in the entry bundle by code, like SyncConfigError: each bundle carries its own copy of this class.
 
 export const SYNC_SESSION_DEFERRED = "sync-session-deferred"
