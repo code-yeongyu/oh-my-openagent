@@ -158,8 +158,24 @@ export function sessionVerbLines(
     return [`Sent to ${label}: turn ${delivery.turn_id} started.`]
   }
   if (verb === "model" && "model" in result) return [`${label} now uses ${result.model.provider}/${result.model.id}.`]
-  if (verb === "interrupt" && "interrupted" in result)
-    return [result.interrupted ? `Interrupted ${label}.` : `Nothing was running on ${label}.`]
+  if (verb === "interrupt" && "interrupted" in result) {
+    if (!result.interrupted) return [`Nothing was running on ${label}.`]
+    const { background } = result
+    if (background.status === "not_supported")
+      return [
+        `Interrupted ${label}.`,
+        `Background jobs that turn started were left running: the engine on ${label} cannot stop them.`,
+      ]
+    const jobName = (job: { readonly id: string; readonly description?: string }) => job.description ?? job.id
+    const count = background.stopped.length
+    return [
+      `Interrupted ${label}.`,
+      ...(count === 0
+        ? []
+        : [`Stopped ${count} background job${count === 1 ? "" : "s"}: ${background.stopped.map(jobName).join(", ")}.`]),
+      ...background.failed.map((job) => `Could not stop background job ${jobName(job)}: ${job.reason}.`),
+    ]
+  }
   if (verb === "close" && "closed" in result) return [result.closed ? `Closed ${label}.` : `${label} was not open.`]
   return []
 }
