@@ -8,7 +8,9 @@ use std::borrow::Cow;
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
 
+use crate::intervention::{Pause, TargetLiveness};
 use crate::listing::Surface;
+use crate::session_state::SessionState;
 use crate::observation::ObservationSettle;
 use crate::untrusted::UntrustedText;
 
@@ -38,6 +40,12 @@ pub struct ReportParts {
     pub next_call: Option<String>,
     #[serde(default)]
     pub note: Option<String>,
+    /// Row 24 (R60): why an `effect:"refused"` report sent nothing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<RefusalReason>,
+    /// Row 24 (R60): `true` on a refused report: nothing was sent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nothing_sent: Option<bool>,
     #[serde(default)]
     pub warning: Option<String>,
     #[serde(default)]
@@ -48,8 +56,21 @@ pub struct ReportParts {
     #[serde(default)]
     pub settle: Option<ObservationSettle>,
     pub evidence: Vec<Evidence>,
+    /// Row 25: `"unknown"` when a browser window's URL could not be read under a non-empty
+    /// `computer.url_policy` (the send was delivered, fail-open).
+    #[serde(default)]
+    pub url_policy: Option<crate::url_policy::UrlPolicyStamp>,
     /// Required on the wire: a report without `{untrustedText: true}` does not parse.
     pub observation: UntrustedText,
+    /// What the admission waited for before the send.
+    #[serde(default)]
+    pub paused: Vec<Pause>,
+    /// The session state sampled for this call (object mode).
+    #[serde(default)]
+    pub session: Option<SessionState>,
+    /// Present only when the target exited or stopped answering during the call.
+    #[serde(default)]
+    pub target: Option<TargetLiveness>,
 }
 
 /// A validated `ActionReport`.
@@ -72,6 +93,10 @@ pub struct ActionReport {
     #[serde(skip_serializing_if = "Option::is_none")]
     note: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    reason: Option<RefusalReason>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    nothing_sent: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     warning: Option<String>,
     audit_ids: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -79,7 +104,15 @@ pub struct ActionReport {
     #[serde(skip_serializing_if = "Option::is_none")]
     settle: Option<ObservationSettle>,
     evidence: Vec<Evidence>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    url_policy: Option<crate::url_policy::UrlPolicyStamp>,
     observation: UntrustedText,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    paused: Vec<Pause>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    session: Option<SessionState>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    target: Option<TargetLiveness>,
 }
 
 impl ActionReport {
@@ -89,6 +122,7 @@ impl ActionReport {
     /// The typed rejection of the first rule the shape breaks.
     pub fn new(context: ReportContext, parts: ReportParts) -> Result<Self, ReportRejection> {
         check(&shape_of(&parts), Some(context))?;
+        refused_members(&parts)?;
         Ok(Self::from_checked(parts))
     }
 
@@ -144,6 +178,21 @@ impl ActionReport {
     }
 
     #[must_use]
+    pub fn paused(&self) -> &[Pause] {
+        &self.paused
+    }
+
+    #[must_use]
+    pub const fn session(&self) -> Option<&SessionState> {
+        self.session.as_ref()
+    }
+
+    #[must_use]
+    pub const fn target(&self) -> Option<TargetLiveness> {
+        self.target
+    }
+
+    #[must_use]
     pub const fn settle(&self) -> Option<&ObservationSettle> {
         self.settle.as_ref()
     }
@@ -159,12 +208,18 @@ impl ActionReport {
             opened_surfaces: parts.opened_surfaces,
             next_call: parts.next_call,
             note: parts.note,
+            reason: parts.reason,
+            nothing_sent: parts.nothing_sent,
             warning: parts.warning,
             audit_ids: parts.audit_ids,
             timings: parts.timings,
             settle: parts.settle,
             evidence: parts.evidence,
+            url_policy: parts.url_policy,
             observation: parts.observation,
+            paused: parts.paused,
+            session: parts.session,
+            target: parts.target,
         }
     }
 }
@@ -183,6 +238,7 @@ impl TryFrom<ReportParts> for ActionReport {
 
     fn try_from(parts: ReportParts) -> Result<Self, Self::Error> {
         check(&shape_of(&parts), None)?;
+        refused_members(&parts)?;
         Ok(Self::from_checked(parts))
     }
 }
@@ -195,4 +251,24 @@ impl JsonSchema for ActionReport {
     fn json_schema(generator: &mut SchemaGenerator) -> Schema {
         ReportParts::json_schema(generator)
     }
+}
+
+/// R60a: `reason` and `nothingSent: true` are present exactly when the effect is `refused`.
+fn refused_members(parts: &ReportParts) -> Result<(), ReportRejection> {
+    let refused = parts.effect == Effect::Refused;
+    let members = (parts.reason.is_some(), parts.nothing_sent);
+    match (refused, members) {
+        (true, (true, Some(true))) | (false, (false, None)) => Ok(()),
+        _ => Err(ReportRejection::RefusedMembersMismatch),
+    }
+}
+
+/// Row 24 (R60): the pinned reasons a report is `effect:"refused"` with nothing sent
+/// (`design/d-sdk-skill.md`:555). A closed enum until the design lane rules its type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RefusalReason {
+    SecureFocus,
+    ConcealedClipboard,
+    SecretNoClipboardRoute,
 }

@@ -117,11 +117,11 @@ impl Session {
                 indicator,
                 waited_ms,
             } => Err(Refused {
-                busy: Some(BusyDetail {
+                busy: Some(Box::new(BusyDetail {
                     indicator,
                     waited_ms,
                     retry_after_ms: cap_ms,
-                }),
+                })),
                 ..TARGET_BUSY.into()
             }),
         }

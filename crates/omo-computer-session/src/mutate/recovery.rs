@@ -51,13 +51,12 @@ impl Funnel {
         };
         let same = marker.binding.call_id == call_id;
         let refused = |refusal, interrupted| Refused {
-            refusal,
             call_id: Some(marker.binding.call_id.clone()),
-            receipt: None,
             interrupted,
             detail: None,
             busy: None,
             warning: None,
+            ..Refused::from(refusal)
         };
         Ok(match (marker.receipt.as_ref(), same) {
             (Some(receipt), true) => Verdict::Refuse {
@@ -109,12 +108,11 @@ impl Funnel {
 /// The answer to every re-drive of a crashed callId.
 fn uncertain(call_id: &str) -> Refused {
     Refused {
-        refusal: RECOVERY_REQUIRED,
         call_id: Some(call_id.to_owned()),
-        receipt: None,
         interrupted: Some(Disposition::UNCERTAIN_UNSAFE),
         detail: None,
         busy: None,
         warning: None,
+        ..Refused::from(RECOVERY_REQUIRED)
     }
 }

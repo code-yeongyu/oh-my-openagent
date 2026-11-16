@@ -35,6 +35,7 @@ pub const POINT_REQUIRED: Refusal = Refusal::bare(EngineCode::InvalidTarget);
 pub(crate) struct Opened {
     pub(crate) report_mode: ReportMode,
     pub(crate) tag: u64,
+    pub(crate) settings: crate::intervention::OpenSettings,
 }
 
 /// The session state of one engine process.
@@ -46,6 +47,10 @@ pub struct Session {
     pub(crate) refs: crate::refs::RefRegistry,
     pub(crate) frames: crate::frames::FrameStore,
     pub(crate) trace: crate::trace::Trace,
+    /// The session-scoped display-awake hold (design row C22).
+    pub(crate) display_awake: crate::intervention::SharedHold,
+    /// The generation of the latest `ax.snapshot` (row 24): a v1 ref `e2` names an element of it.
+    pub(crate) ax_generation: Option<u64>,
     pub(crate) settle: crate::settle::SettleState,
 }
 
@@ -60,23 +65,12 @@ impl Session {
     /// pre-input markers and the interaction lock under its RUNTIME root.
     #[must_use]
     pub fn for_roots(backend: Box<dyn Backend>, roots: &Roots) -> Self {
-        let mut session = Self::with_guard(backend, Guard::for_roots(roots));
-        session.funnel = Funnel::for_roots(roots);
-        session
+        Self::build(backend, Guard::for_roots(roots), Funnel::for_roots(roots))
     }
 
     #[must_use]
     pub fn with_guard(backend: Box<dyn Backend>, guard: Guard) -> Self {
-        Self {
-            backend,
-            guard,
-            opened: None,
-            funnel: Funnel::in_memory(),
-            refs: crate::refs::RefRegistry::default(),
-            frames: crate::frames::FrameStore::default(),
-            trace: crate::trace::Trace::default(),
-            settle: crate::settle::SettleState::default(),
-        }
+        Self::build(backend, guard, Funnel::in_memory())
     }
 
     /// Opens (or re-opens) the session and answers its capabilities and a fresh resume token.
@@ -86,11 +80,14 @@ impl Session {
     pub fn open(&mut self, params: SessionOpenParams) -> Result<SessionOpened, Refusal> {
         let request = read_session_open(params);
         let policy = StopPolicy::read(Transport::Local, request.allow_host_relay_only_stop);
+        self.funnel.set_url_policy(&request);
         self.opened = None;
         self.guard.open(policy, HostAdditions::default())?;
+        self.guard.apply_table(crate::grant::backend_os(self.backend.as_ref()));
         self.opened = Some(Opened {
             report_mode: request.report_mode,
             tag: random_u64(),
+            settings: crate::intervention::OpenSettings::read(&request),
         });
         let resume_token = format!("{:016x}{:016x}", random_u64(), random_u64());
         // Row 21 (A-IS-62, R70ai): the open request's stop_hotkey is compared with the consent file's.
@@ -145,8 +142,7 @@ impl Session {
     /// The capabilities in the open session's report mode; with no session, the v1 shape.
     #[must_use]
     pub fn capabilities(&self) -> CapabilitiesReply {
-        let mut capabilities = self.backend.capabilities();
-        self.guard.describe(&mut capabilities.stop_path);
+        let capabilities = self.sampled_capabilities();
         match self.opened.as_ref().map(|opened| opened.report_mode) {
             Some(ReportMode::Object) => CapabilitiesReply::Object(Box::new(capabilities)),
             Some(ReportMode::Null) | None => CapabilitiesReply::Legacy(Box::new(legacy_capabilities(

@@ -23,9 +23,10 @@ pub(super) const fn granted_permissions() -> PermissionProbe {
 
 impl FakeBackend {
     pub(super) fn scripted_capabilities(&self) -> Capabilities {
-        let state = self.lock();
+        let displays = self.lock().displays.len();
         let mut capabilities =
-            fake_capabilities(self.persona, state.displays.len(), self.stop_path);
+            self.with_scripted_session(fake_capabilities(self.persona, displays, self.stop_path));
+        let state = self.lock();
         // Secure Input: scripted on (`secure_input_on`), or a scripted secure focus while its
         // window is the focused, live one. Neither declared keeps today's value.
         let input_on = state.scenario.secure_input_on;

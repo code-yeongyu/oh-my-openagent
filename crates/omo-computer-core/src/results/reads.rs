@@ -4,7 +4,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use super::v1::{LegacyFrame, LegacyObservation, LegacyWindow};
-use crate::listing::{ElementInfo, Rect, WindowInfo};
+use crate::listing::{Rect, WindowInfo};
 use crate::observation::{Frame, Observation};
 use crate::untrusted::UntrustedText;
 
@@ -82,7 +82,7 @@ pub struct ClipboardContent {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct MenuItems {
-    pub items: Vec<ElementInfo>,
+    pub items: Vec<crate::menus::MenuItem>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub truncated: Option<bool>,
     pub observation: UntrustedText,
@@ -117,4 +117,14 @@ pub struct WaitResult {
     pub observation: Box<Observation>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub notification: Option<NotificationMatch>,
+}
+
+/// `clipboard.read`'s reply (R60a(b), repin item 52): the content, or under a secure focus the
+/// refused report (`effect:"refused"`, `reason:"secure_focus"`, `nothingSent:true`), never a
+/// `ClipboardContent`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum ClipboardReadReply {
+    Content(ClipboardContent),
+    Refused(Box<crate::report::ActionReport>),
 }

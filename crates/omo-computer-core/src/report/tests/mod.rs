@@ -1,6 +1,8 @@
 //! The result contract's tests: the disposition table, the receipt rule by verb, the wire
 //! shapes, and the imported corpus values against the contract's types.
 
+mod frame_readback;
+mod refused;
 mod imported;
 mod receipt_delivery;
 mod receipts;
@@ -26,12 +28,18 @@ fn parts(disposition: Disposition, effect: Effect, evidence: Vec<Evidence>) -> R
         opened_surfaces: Vec::new(),
         next_call: None,
         note: None,
+        reason: None,
+        nothing_sent: None,
         warning: None,
         audit_ids: Vec::new(),
         timings: None,
         settle: None,
         evidence,
+        url_policy: None,
         observation: UntrustedText,
+        paused: Vec::new(),
+        session: None,
+        target: None,
     }
 }
 

@@ -41,6 +41,8 @@ pub struct Control {
     pub(crate) lease_epoch: Option<u64>,
     pub(crate) clock: MachineClock,
     pub(crate) lease_hook: Box<dyn LeaseHook>,
+    /// Row 23's held-input ledger: holds need the foreground lease, and every lease end releases them.
+    pub(crate) holds: crate::holds::SharedLedger,
     /// A-IS-62 rev 5 (R70an C): the hand reads tampered after a refused chord.
     pub(crate) chord_tamper: ChordTamper,
     /// The stop chord armed at stopPath.start (R70av); `None` before the first arm.
@@ -91,6 +93,7 @@ impl Default for Control {
             lease_epoch: None,
             clock: wall_clock(),
             lease_hook: Box::new(NoLeaseHook),
+            holds: crate::holds::SharedLedger::default(),
             chord_tamper: ChordTamper::default(),
             armed_chord: None,
         }

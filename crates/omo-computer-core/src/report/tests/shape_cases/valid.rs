@@ -81,7 +81,7 @@ pub(in crate::report::tests) fn valid_shapes() -> Vec<(&'static str, Value, Opti
         (
             "refused",
             shape(
-                &json!({ "effect": "refused", "disposition": { "delivery": "not_delivered", "retry": "safe" } }),
+                &json!({ "effect": "refused", "reason": "secure_focus", "nothingSent": true, "disposition": { "delivery": "not_delivered", "retry": "safe" } }),
             ),
             ctx(CLICK, Platform::Macos),
         ),

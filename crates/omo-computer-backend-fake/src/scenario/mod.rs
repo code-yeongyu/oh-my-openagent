@@ -7,6 +7,7 @@ mod events;
 mod invalid;
 mod records;
 mod references;
+mod session_timeline;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -22,6 +23,7 @@ pub use additions::{
 };
 pub use events::{DisplaysChange, EpochEvent, EpochReason, IdentityChange};
 pub use invalid::{field_names, InvalidKind, ScenarioInvalid};
+pub use session_timeline::{state_at, SessionMark};
 pub use records::{
     DelayMs, FakeAxNode, FakeDisplay, FakeMenuNode, FakeWindow, FocusRead, FocusRecordKind,
     FocusRecordOutcome, RemoteForwarding, ScriptedFailure, ScriptedHit, TimedUserInput,
@@ -67,7 +69,7 @@ pub struct FakeScenario {
     pub stop_marker: Option<String>,
     pub user_input_timeline: Vec<TimedUserInput>,
     pub user_presses: Vec<UserPress>,
-    /// The OS the fake plays; absent follows the host.
+    /// The OS the fake plays; absent plays x11 on every host (A-IS-64 item 2).
     pub persona: Option<Persona>,
     /// Observer events by fake-clock time: the quiet window the settle waits on.
     pub ax_notification_timeline: Vec<AxNotification>,
@@ -89,6 +91,14 @@ pub struct FakeScenario {
     pub window_frame_policy: BTreeMap<String, FramePolicy>,
     /// Keys the user holds physically at start.
     pub held_keys: Vec<String>,
+    /// The route's wheel-step cap per scroll: steps past it deliver 0 of 1 (row 23, R48c).
+    pub scroll_cap: Option<u32>,
+    /// The user presses the stop chord right after the engine's Nth input post (row 23, R53:
+    /// a stop between the units of one stroke).
+    pub stop_chord_after_posts: Option<u32>,
+    /// Row 24: what an element's value read-back answers, by ref (`e2`): a string, or null for
+    /// a value that cannot be read back. An absent ref reads the value written.
+    pub value_readback: Option<BTreeMap<String, Option<String>>>,
     pub full_access_preset: bool,
     pub target_exit: Vec<TargetExit>,
     /// Window id -> the session or hand that holds its reservation.
@@ -101,8 +111,33 @@ pub struct FakeScenario {
     pub unarmable_stop_chords: Vec<String>,
     /// The hand identity the fleet harness reads.
     pub hand: Option<HandIdentity>,
+    /// Session-state fields (lock, sleep, console, saver, Secure Input, suspend) by fake-clock time.
+    pub session_timeline: Vec<SessionMark>,
+    /// Fake-clock milliseconds between two typed Unicode scalars of one text.
+    pub typing_unit_ms: Option<u64>,
     // --- Row 21: the fake host's consent view handed to the engine at `session.open`. ---
     pub consent: Option<serde_json::Value>,
+    // --- Row 25: apps, system surfaces and the browser windows' focused URLs. ---
+    pub apps: Vec<FakeApp>,
+    /// Surface kind (`dock`, `start_menu`, ...) -> its element tree.
+    pub surfaces: BTreeMap<String, FakeAxNode>,
+    /// Window id -> the focused web area's URL; `null` scripts an unreadable one.
+    pub browser_urls: BTreeMap<String, Option<String>>,
+}
+
+/// One scripted `apps.list()` entry; its identity is the pid's scripted code identity.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FakeApp {
+    pub app_key: String,
+    pub name: String,
+    #[serde(default)]
+    pub pid: Option<u32>,
+    #[serde(default)]
+    pub running: bool,
+    pub source: omo_computer_core::listing::AppSource,
+    #[serde(default)]
+    pub path: Option<String>,
 }
 
 impl FakeScenario {

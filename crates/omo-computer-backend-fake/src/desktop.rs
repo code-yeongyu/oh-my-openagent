@@ -6,6 +6,7 @@ use omo_computer_core::backend::{
     Presence, Route, StopListener, TaggedInput, Target, WindowFilter, WindowList,
 };
 use omo_computer_core::capabilities::Capabilities;
+use omo_computer_core::intervention::{InterventionSource, TextDelivery};
 use omo_computer_core::results::DisplayInfo;
 
 use crate::backend::FakeBackend;
@@ -53,6 +54,56 @@ impl Backend for FakeBackend {
 
     fn presence(&mut self) -> Option<Box<dyn Presence>> {
         self.scripted_presence()
+    }
+
+    fn intervention(&self) -> Option<&dyn InterventionSource> {
+        Some(self)
+    }
+
+    fn user_held_keys(&self) -> Vec<String> {
+        self.lock().scenario.held_keys.clone()
+    }
+
+    fn pointer(&self) -> Option<omo_computer_core::params::Point> {
+        self.lock().cursor
+    }
+
+    fn ax(&mut self) -> Option<&mut dyn omo_computer_core::backend::AxBackend> {
+        Some(self)
+    }
+
+    fn clipboard_read(&mut self) -> BackendResult<omo_computer_core::clipboard::ClipboardRead> {
+        Ok(match FakeBackend::clipboard_read(self)? {
+            crate::scripting::ClipboardRead::Concealed => omo_computer_core::clipboard::ClipboardRead::Concealed,
+            crate::scripting::ClipboardRead::Text(text) => omo_computer_core::clipboard::ClipboardRead::Text(text),
+        })
+    }
+
+    fn clipboard_write(&mut self, text: &str) -> BackendResult<()> {
+        FakeBackend::clipboard_write(self, text)
+    }
+
+    fn secure_focus(&self, window: Option<&str>) -> Option<bool> {
+        Some(window.map_or_else(|| FakeBackend::secure_focus_role(self).is_some(), |window| FakeBackend::secure_focus(self, window)))
+    }
+
+    fn frame_settable(&self, window: &str) -> Option<bool> {
+        self.lock().scenario.window_frame_policy.get(window).and_then(|policy| policy.settable)
+    }
+
+    fn set_frame(&mut self, window: &str, frame: omo_computer_core::listing::Rect) -> BackendResult<omo_computer_core::window_frame::FrameApplied> {
+        let applied = FakeBackend::set_frame(self, window, frame)?;
+        Ok(omo_computer_core::window_frame::FrameApplied { frame: applied.frame, immovable: applied.immovable })
+    }
+
+    fn post_text(
+        &mut self,
+        text: &str,
+        route: Route,
+        tag: u64,
+        interrupt: &mut dyn FnMut(&mut dyn Backend) -> bool,
+    ) -> TextDelivery {
+        self.type_interruptible(text, route, tag, interrupt)
     }
 
     fn ax_reader(&mut self) -> Option<&mut dyn omo_computer_core::ax::AxReader> {
@@ -108,7 +159,16 @@ impl Backend for FakeBackend {
             self.clock.clone(),
         )))
     }
+
+    // --- Row 25: menus, apps, system surfaces and the focused web area's URL. ---
+
+    fn shell_reader(&mut self) -> Option<&mut dyn omo_computer_core::surface::ShellReader> {
+        Some(self)
+    }
 }
+
+mod posts;
+mod shell;
 
 #[cfg(test)]
 mod extent_tests;
