@@ -693,6 +693,16 @@
         "type": "null"
       }
     },
+    "hand.register": {
+      "effect": "exec",
+      "exposure": "hostOnly(authority)",
+      "params": {
+        "$ref": "#/$defs/HandRegisterParams"
+      },
+      "result": {
+        "$ref": "#/$defs/HandRegistered"
+      }
+    },
     "$/cancel": {
       "effect": "read",
       "exposure": "public",
@@ -2571,8 +2581,7 @@
       },
       "required": [
         "active"
-      ],
-      "description": "The foreground-control grant (`control.grant`, `control.acquire`, `control.changed`)."
+      ]
     },
     "CuaAdapter": {
       "anyOf": [
@@ -3624,6 +3633,39 @@
         "remoteCommands",
         "foreground"
       ]
+    },
+    "HandRegisterParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pid": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "processStart": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "pid",
+        "processStart"
+      ]
+    },
+    "HandRegistered": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "capability": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "capability"
+      ],
+      "description": "The foreground-control grant (`control.grant`, `control.acquire`, `control.changed`).\n`hand.register`'s reply: the 32-byte capability (hex) bound to the registered peer's one\nfuture connection."
     },
     "HandSelector": {
       "anyOf": [
