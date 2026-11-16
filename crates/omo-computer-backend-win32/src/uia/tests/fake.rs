@@ -28,6 +28,7 @@ pub fn element(runtime_id: &[i32], control_type: &str, name: &str) -> UiaElement
         control_type: control_type.to_owned(),
         name: Some(name.to_owned()).filter(|n| !n.is_empty()),
         hwnd: 0x1234,
+        top_level: 0x1234,
         pid: 4242,
         process_start: 77,
         enabled: true,
@@ -44,6 +45,8 @@ impl FakeUia {
         let mut text = element(&[42, 2], "Edit", "Name");
         text.value = Some("hello".to_owned());
         let mut password = element(&[42, 3], "Edit", "Password");
+        // A WinForms/Win32 edit box is its own child window under the form (review M1 of #13837).
+        password.hwnd = 0x5678;
         password.value = Some("hunter2".to_owned());
         password.is_password = true;
         let mut children = BTreeMap::new();
