@@ -25,7 +25,8 @@ export type LazyRemoteOptions = {
 /**
  * The remote client, loaded with the runtime on its first member call. A failed load is not cached and settles as a typed
  * host_unavailable, since no member throws. Every member forwards by name, so this stays small inside omo.js (its byte
- * budget) and needs no change when the client gains a member; `follow` answers a stream at once and loads on its first read.
+ * budget) and needs no change when the client gains a member; `sessions.follow` answers a stream at once and starts the load
+ * when called, even if the stream is never read.
  */
 function createLazyRemoteClient(options: LazyRemoteOptions): RemoteClient {
   let client: Promise<RemoteClient> | undefined
@@ -57,7 +58,7 @@ function createLazyRemoteClient(options: LazyRemoteOptions): RemoteClient {
         get: (_, member) =>
           typeof member !== "string" || member === "then"
             ? undefined
-            : member === "follow"
+            : name === "sessions" && member === "follow"
               ? follow
               : forward((loaded) => (loaded[name] as unknown as Record<string, Member>)[member] as Member),
       },
