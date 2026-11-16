@@ -125,3 +125,49 @@ describe("one compiled binary reports one runtime id for the host it starts", ()
     expect(ids.hostExtensions).not.toContain(runtime.plugin)
   })
 })
+
+describe("a spec with no extensions, and every host command the wrapper gives this runtime's spec", () => {
+  test("#given a launch spec that lists no extensions #when the host starts #then its id is the CLI's and no plugin is added", async () => {
+    // given
+    const runtime = compiledRuntime()
+    const bare = join(runtime.root, "bare-spec")
+    mkdirSync(bare, { recursive: true, mode: 0o755 })
+    chmodSync(bare, 0o755)
+    const spec = join(bare, "daemon-launch-spec.json")
+    writeFileSync(spec, JSON.stringify({ spec_version: 1, core: { session_runtime: "in-process", multi_session: true, extensions: [] } }))
+    chmodSync(spec, 0o644)
+    // when
+    const ids = await bothIds(runtime, ["--launch-spec", spec])
+    // then
+    expect(ids.host).toBe(ids.client)
+    expect(ids.hostExtensions).toEqual([])
+  })
+
+  test("#given host handoff and host session open without a spec #when the wrapper builds their argv #then each gets this runtime's spec", () => {
+    // given
+    const runtime = compiledRuntime()
+    const own = join(runtime.plugin, "daemon-launch-spec.json")
+    // when
+    const handoff = buildSenpiArgs(["host", "handoff", "--json"], runtime.execDir)
+    const open = buildSenpiArgs(["host", "session", "open", "--json"], runtime.execDir)
+    // then
+    expect({ handoff, open }).toEqual({
+      handoff: ["host", "handoff", "--json", "--launch-spec", own],
+      open: ["host", "session", "open", "--json", "--launch-spec", own],
+    })
+  })
+
+  test("#given --launch-spec=<path> or a -- tail #when the wrapper builds the argv #then the caller's spec is kept and the tail stays last", () => {
+    // given
+    const runtime = compiledRuntime()
+    const own = join(runtime.plugin, "daemon-launch-spec.json")
+    // when
+    const inline = buildSenpiArgs(["host", "ensure", "--launch-spec=/elsewhere/spec.json"], runtime.execDir)
+    const tail = buildSenpiArgs(["host", "ensure", "--json", "--", "--launch-spec", "literal"], runtime.execDir)
+    // then
+    expect({ inline, tail }).toEqual({
+      inline: ["host", "ensure", "--launch-spec=/elsewhere/spec.json"],
+      tail: ["host", "ensure", "--json", "--launch-spec", own, "--", "--launch-spec", "literal"],
+    })
+  })
+})
