@@ -9,12 +9,11 @@ import { REMOTE_EXIT, UsageError } from "./remote-exit"
 import {
   accountNotice,
   isServiceStopped,
-  type Parsed,
-  parse,
   type RemoteCommandDependencies,
   reportFailure,
   runLocalRemoteVerb,
 } from "./remote-local"
+import { type Parsed, parse } from "./remote-args"
 import { isHelpFlag, REMOTE_USAGE, verbUsage } from "./remote-usage"
 import { VERBS } from "./remote-verbs"
 import { parseTarget, type RemoteSessionTarget } from "./remote-session-args"
