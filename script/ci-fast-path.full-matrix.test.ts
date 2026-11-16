@@ -31,6 +31,7 @@ interface ClassifyInput {
   readonly headRef?: string
   readonly labels?: readonly string[]
   readonly body?: string
+  readonly changedFiles?: number
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -56,6 +57,7 @@ function classify(input: ClassifyInput): FullMatrixMode {
       "--labels",
       JSON.stringify(input.labels ?? []),
       ...(input.body === undefined ? [] : ["--body-file", writeBody(input.body)]),
+      ...(input.changedFiles === undefined ? [] : ["--changed-files", String(input.changedFiles)]),
     ],
     {
       encoding: "utf8",
@@ -269,6 +271,24 @@ describe("full-matrix classification", () => {
       })
       expect(mode.labelRefused).toBe(true)
       expect(mode.fullMatrix).toBe(false)
+    })
+
+    test("#then a diff that cannot be fully listed honors the label (fails toward the full matrix)", () => {
+      const mode = classify({ ...labelled, changedPaths: ["packages/utils/src/index.ts"], diffAvailable: false })
+      expect(mode.fullMatrix).toBe(true)
+      expect(mode.labelRefused).toBe(false)
+    })
+
+    // The pulls/files API lists at most 3000 files, so every caller decides the same way above that (#13891).
+    test("#then a pull request over the API file cap honors the label even when its listed paths are complete", () => {
+      const mode = classify({ ...labelled, changedPaths: ["packages/utils/src/index.ts"], changedFiles: 3500 })
+      expect(mode.fullMatrix).toBe(true)
+      expect(mode.labelRefused).toBe(false)
+    })
+
+    test("#then a pull request at the API file cap is judged by its paths", () => {
+      const mode = classify({ ...labelled, changedPaths: ["packages/utils/src/index.ts"], changedFiles: 3000 })
+      expect(mode.labelRefused).toBe(true)
     })
 
     test("#then it runs the full matrix when the diff touches a platform path", () => {

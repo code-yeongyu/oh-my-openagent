@@ -5,7 +5,7 @@ import {
   type DeviceService,
   type RemoteAttach,
 } from "@oh-my-opencode/device-service-core/device-service"
-import { createDeviceServiceSessions } from "./device-service"
+import { createDeviceServiceSessions } from "../../remote/port/device-service"
 import type { JsonObject, RemoteResync, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 import { followRemote } from "./remote-ops"
 
