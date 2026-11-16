@@ -128,7 +128,7 @@ mod tests {
     fn text_route_none_refuses_unresolvable_before_any_key() {
         let first = first_unresolvable(TextRoute::None, TEXT, 0, two_level_us_map).expect("refused");
         assert_eq!(first, Unresolvable { group: 0, grapheme: "\u{d55c}".to_owned() }, "the FIRST unresolvable grapheme");
-        assert_eq!((first.refusal().code, first.refusal().reason), (EngineCode::InvalidKey, Some("unresolvable")));
+        assert_eq!((first.refusal().code, first.refusal().reason), (EngineCode::InvalidKey, Some(Reason::Unresolvable)));
         assert_eq!(first.detail(), json!({ "group": 0, "grapheme": "\u{d55c}" }));
         assert_eq!(first_unresolvable(TextRoute::None, "plain text", 0, two_level_us_map), None, "a resolvable text is not refused");
     }

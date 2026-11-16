@@ -145,7 +145,7 @@ mod tests {
     #[test]
     fn the_refusal_names_the_app_the_composer_and_the_line_break_call() {
         let composer = Composer { app: "com.example.chat".to_owned(), role: "AXTextArea".to_owned(), label: Some("Message".to_owned()) };
-        assert_eq!(Composer::refusal().reason, Some("send_on_enter"));
+        assert_eq!(Composer::refusal().reason, Some(crate::error::Reason::SendOnEnter));
         assert_eq!(
             composer.detail(),
             json!({ "app": "com.example.chat", "composer": { "role": "AXTextArea", "label": "Message" }, "nextCall": NEXT_CALL })
