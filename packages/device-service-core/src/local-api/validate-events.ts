@@ -16,6 +16,7 @@ import {
   uint,
 } from "./validate-fields.ts"
 import { DELEGATED_EVENT_VALIDATORS } from "./validate-delegated.ts"
+import { DELIVERIES_EVENT_VALIDATORS } from "./validate-deliveries.ts"
 import { deviceId, listingRowOf, readEntryOf, statusOf } from "./validate-shapes.ts"
 import {
   attachOf,
@@ -87,6 +88,7 @@ const commandStateOf = (v: Fields): CommandStateEvent => {
 const VALIDATORS: EventValidators<EventKind> = {
   ...STREAM_EVENT_VALIDATORS,
   ...DELEGATED_EVENT_VALIDATORS,
+  ...DELIVERIES_EVENT_VALIDATORS,
   "status.changed": (v) => ({
     type: "event",
     kind: "status.changed",

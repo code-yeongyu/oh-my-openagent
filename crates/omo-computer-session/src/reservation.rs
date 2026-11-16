@@ -34,6 +34,15 @@ pub struct WindowBusy {
     pub retry_after_ms: u64,
 }
 
+/// Why a window reservation was not taken.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AdmitRefusal {
+    /// Another live session holds a window.
+    Busy(WindowBusy),
+    /// The machine-wide record lock cannot be taken (A-IS-65 L2: its own refusal, never busy).
+    LockUnavailable,
+}
+
 impl WindowBusy {
     /// The members the refusal carries on the wire.
     #[must_use]
@@ -56,26 +65,27 @@ impl Reservations {
     /// Reserves every window in `windows` for this session until its report.
     ///
     /// # Errors
-    /// The first window another live session holds at `now_ms`; nothing is reserved then.
+    /// The first window another live session holds at `now_ms`, or the record lock cannot be
+    /// taken; nothing is reserved then.
     pub fn admit(
         &mut self,
         token: &SessionToken,
         windows: &[String],
         now_ms: u64,
-    ) -> Result<(), WindowBusy> {
+    ) -> Result<(), AdmitRefusal> {
+        // A call that reserves no window takes no lock (review L10).
+        if windows.is_empty() {
+            return Ok(());
+        }
         // Check-then-take under the machine-wide record lock, so two sessions never both take one
-        // window. A lock that cannot be taken refuses (fail closed, as the control slot; review L4).
-        let _locked = match token.dir().map(crate::lease::dir_lock).transpose() {
-            Ok(locked) => locked,
-            Err(_) => {
-                return Err(WindowBusy {
-                    window: windows.first().cloned().unwrap_or_default(),
-                    holder: token.holder().clone(),
-                    retry_after_ms: AFTER_REPORT_MS,
-                })
-            }
-        };
-        self.check(token, windows, now_ms)?;
+        // window. A lock that cannot be taken refuses on its own terms (fail closed, review L4;
+        // never a busy window naming this session, review L10).
+        let _locked = token
+            .dir()
+            .map(crate::lease::dir_lock)
+            .transpose()
+            .map_err(|_| AdmitRefusal::LockUnavailable)?;
+        self.check(token, windows, now_ms).map_err(AdmitRefusal::Busy)?;
         for window in windows {
             self.put(token, window, None);
         }
