@@ -573,7 +573,9 @@ fn a_is_62_a_chord_the_backend_cannot_arm_reads_deaf() {
 }
 
 fn busy_with_stop(stop: bool) -> Value {
+    // Object mode: a null-mode call never waits on a busy target (review L5 of #13355).
     let mut extra = json!({
+        "object": true,
         "busy_timeline": [
             { "t_ms": 0, "window": "1", "busy": true, "indicator": "spinner" },
             { "t_ms": 400, "window": "1", "busy": false }
