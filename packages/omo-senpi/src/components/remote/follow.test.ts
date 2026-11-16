@@ -552,12 +552,102 @@ describe("sessions.follow rows: from one send, waiting on a person", () => {
   })
 })
 
+describe("sessions.follow rows: a Stop, a hold, a provider retry (#13753 review M4, M5)", () => {
+  const live = async (reply: JsonObject = { lifecycle: { state: "running", seq: 3, runId: "run-2" } }) => {
+    const owner = await startOwner(worldWith(IDLE, [], { reply }))
+    const client = clientOn(owner.stateDir, fakeClock())
+    return { owner, client }
+  }
+  const stopped: JsonObject[] = [
+    { type: "turn_start", clientMessageId: "cm-2" },
+    { ...textDelta("par"), clientMessageId: "cm-2" },
+    // A user Stop writes a paused lease (a session hold ranks ahead of running) before the send's own aborted agent_end.
+    { type: "session_lifecycle", lifecycle: { state: "paused", seq: 4, runId: "run-2" } },
+    { type: "agent_end", messages: [], willRetry: false, aborted: true, clientMessageId: "cm-2" },
+    { type: "agent_settled" },
+  ]
+
+  test("#given a send's turn #when the user stops it #then the end is interrupted, decided by its own aborted agent_end", async () => {
+    const { owner, client } = await live()
+    const events = reader(client.sessions.follow(THREAD, { from: receiptOf("cm-2", "started", "2") }))
+    await listening(client)
+    pushRecords(owner, stopped)
+    expect(await drain(events)).toEqual([
+      { kind: "waiting", state: "turn_running" },
+      { kind: "text", delta: "par" },
+      { kind: "end", outcome: { reason: "interrupted", turn_id: "2" } },
+    ])
+  })
+
+  test("#given a send's turn #when an unattended hold makes its lease held mid-turn #then the turn goes on to its own end", async () => {
+    const { owner, client } = await live()
+    const events = reader(client.sessions.follow(THREAD, { from: receiptOf("cm-2", "started", "2") }))
+    await listening(client)
+    pushRecords(owner, [
+      { type: "turn_start", clientMessageId: "cm-2" },
+      { type: "session_lifecycle", lifecycle: { state: "held", seq: 4, runId: "run-2" } },
+      { ...textDelta("still here"), clientMessageId: "cm-2" },
+      { type: "agent_end", messages: [], willRetry: false, clientMessageId: "cm-2" },
+    ])
+    expect(await drain(events)).toEqual([
+      { kind: "waiting", state: "turn_running" },
+      { kind: "text", delta: "still here" },
+      { kind: "end", outcome: { reason: "settled", text: "still here", turn_id: "2" } },
+    ])
+  })
+
+  test("#given a send's turn #when the provider fails and senpi retries (agent_end willRetry) #then the retried answer, then the end", async () => {
+    const { owner, client } = await live()
+    const events = reader(client.sessions.follow(THREAD, { from: receiptOf("cm-2", "started", "2") }))
+    await listening(client)
+    pushRecords(owner, [
+      { type: "turn_start", clientMessageId: "cm-2" },
+      { type: "agent_end", messages: [], willRetry: true, clientMessageId: "cm-2" },
+      { type: "turn_start", clientMessageId: "cm-2" },
+      { ...textDelta("answer"), clientMessageId: "cm-2" },
+      { type: "agent_end", messages: [], willRetry: false, clientMessageId: "cm-2" },
+    ])
+    expect(await drain(events)).toEqual([
+      { kind: "waiting", state: "turn_running" },
+      { kind: "text", delta: "answer" },
+      { kind: "end", outcome: { reason: "settled", text: "answer", turn_id: "2" } },
+    ])
+  })
+
+  test("#given a wait from a send #when the user stops it #then it settles only once the turn has ended", async () => {
+    const { owner, client } = await live()
+    const settling = client.sessions.wait(THREAD, { from: receiptOf("cm-2", "started", "2") })
+    const settled = settledYet(settling)
+    await listening(client)
+    pushRecords(owner, stopped.slice(0, 3))
+    await listening(client)
+    expect(settled()).toBe(false)
+    pushRecords(owner, stopped.slice(3))
+    expect(await settling).toMatchObject({ kind: "ok", value: { outcome: "settled", status: "idle" } })
+  })
+
+  test("#given a follow without a send #when the user stops the run #then the end is interrupted, not settled at the paused lease", async () => {
+    const { owner, client } = await live()
+    const { events } = await following(client)
+    pushRecords(owner, [
+      { type: "session_lifecycle", lifecycle: { state: "paused", seq: 4, runId: "run-2" } },
+      { type: "agent_end", messages: [], willRetry: false, aborted: true },
+      { type: "agent_settled" },
+    ])
+    expect(await drain(events)).toEqual([
+      { kind: "waiting", state: "turn_running" },
+      { kind: "end", outcome: { reason: "interrupted" } },
+    ])
+  })
+})
+
 describe("sessions.follow rows: from one send, across a relay gap (#13753 review L1)", () => {
   test("#given a send's turn under way #when a re-attach after a gap lost its agent_end and the run lease is done #then the turn has ended", async () => {
     const owner = await startOwner(
       worldWith(IDLE, [], { reply: { lifecycle: { state: "done", seq: 4, runId: "run-2" } } }),
     )
-    const client = clientOn(owner.stateDir, fakeClock())
+    const clock = fakeClock()
+    const client = clientOn(owner.stateDir, clock)
     const events = reader(client.sessions.follow(THREAD, { from: receiptOf("cm-2", "started", "2") }))
     await listening(client)
     const run = promptRun("run-2", 3, [["cm-2", "ping"]])
@@ -571,7 +661,41 @@ describe("sessions.follow rows: from one send, across a relay gap (#13753 review
     expect(await events.next("turn_running")).toEqual({ kind: "waiting", state: "turn_running" })
     expect(await events.next("the text")).toEqual({ kind: "text", delta: "ping" })
     pushSnapshot(owner, IDLE)
+    // Two round trips on the connection: the re-attach's get_state has been answered.
+    await listening(client)
+    await listening(client)
+    clock.advance(5_000) // past the resync grace: no record of the send came, so the read decides
     expect(await drain(events)).toEqual([{ kind: "end", outcome: { reason: "settled", text: "ping", turn_id: "2" } }])
+  })
+
+  test("#given a re-attach whose get_state says the run is over #when the send's own end still streams after the reply #then that end, with its last text, decides (review L3)", async () => {
+    const owner = await startOwner(
+      worldWith(IDLE, [], { reply: { lifecycle: { state: "done", seq: 4, runId: "run-2" } } }),
+    )
+    const client = clientOn(owner.stateDir, fakeClock())
+    const events = reader(client.sessions.follow(THREAD, { from: receiptOf("cm-2", "started", "2") }))
+    await listening(client)
+    pushRecords(owner, [
+      { type: "turn_start", clientMessageId: "cm-2" },
+      { ...textDelta("pi"), clientMessageId: "cm-2" },
+    ])
+    expect(await events.next("turn_running")).toEqual({ kind: "waiting", state: "turn_running" })
+    expect(await events.next("the text")).toEqual({ kind: "text", delta: "pi" })
+    pushSnapshot(owner, IDLE)
+    await listening(client)
+    await listening(client)
+    pushRecords(
+      owner,
+      [
+        { ...textDelta("ng"), clientMessageId: "cm-2" },
+        { type: "agent_end", messages: [], willRetry: false, aborted: true, clientMessageId: "cm-2" },
+      ],
+      2,
+    )
+    expect(await drain(events)).toEqual([
+      { kind: "text", delta: "ng" },
+      { kind: "end", outcome: { reason: "interrupted", turn_id: "2" } },
+    ])
   })
 })
 

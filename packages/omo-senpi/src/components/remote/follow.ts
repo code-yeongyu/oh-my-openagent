@@ -398,7 +398,7 @@ class SessionTurn {
     this.#leaseSeq = lease.seq
     this.#asksElsewhere = lease.state === "waiting_human"
     if (lease.state === "running") this.#markRunning()
-    else if (lease.state !== "waiting_human") return this.#markEnded()
+    else if (runOver(lease)) return this.#markEnded()
     return false
   }
 
@@ -512,8 +512,15 @@ export function sessionStatusOf(state: JsonObject, entries: readonly unknown[] =
   return turn.status
 }
 
-/** A run lease that says the run is over: neither running nor waiting on a person's answer in the middle of a turn. */
-const runOver = (lease: Lease): boolean => lease.state !== "running" && lease.state !== "waiting_human"
+/**
+ * The lease states that say the run is over: the ones senpi ranks below running (session-lifecycle-reducer). A Stop or a
+ * hold ranks paused and held ahead of running, so they say nothing about the turn: its own records end it (a Stop's
+ * aborted agent_end), and waiting_human is a turn waiting on a person.
+ */
+const RUN_OVER: ReadonlySet<string> = new Set(["waiting_children", "waiting_background", "done", "failed", "cancelled"])
+
+/** A run lease that says the run is over (RUN_OVER). */
+const runOver = (lease: Lease): boolean => RUN_OVER.has(lease.state)
 
 /** A record's client message ids: the one it carries, and every input of its turn when it names several. */
 const clientIdsOf = (record: JsonObject): readonly string[] => {
@@ -556,7 +563,8 @@ class SendTurn {
     const type = record["type"]
     if (ids.includes(this.#id)) {
       this.#seen = true
-      return type === "agent_end" ? "end" : "ours"
+      // An agent_end before a provider retry (willRetry) is not the end: the retried run answers under the same id.
+      return type === "agent_end" && record["willRetry"] !== true ? "end" : "ours"
     }
     if (!this.#seen) return "other"
     if (type === "turn_start") return "over"
@@ -591,6 +599,9 @@ const WAITING: Readonly<Record<string, Extract<FollowEvent, { readonly kind: "wa
   opening: "queued",
 }
 
+// How long a re-attach's get_state that says a send's run is over waits for that turn's own records (#13753 review L3).
+const RESYNC_GRACE_MS = 2_000
+
 const RETRY_WAIT = "Call sessions.get for the session's state, then sessions.wait again."
 
 const ANSWER_ELSEWHERE = "A person answers it with attach(thread).answer on a person client."
@@ -620,6 +631,7 @@ export function streamMembers(core: ClientCore): StreamMembers {
       if (last !== undefined) output.push(last)
       output.end()
       cancelTimer()
+      resyncEnd?.()
       opts?.signal?.removeEventListener("abort", onAbort)
       watch?.stop()
     }
@@ -672,12 +684,17 @@ export function streamMembers(core: ClientCore): StreamMembers {
     // From one send: only the records that carry its id (SendTurn); the session's state and leases are not consulted.
     const from = opts?.from
     const send = from?.delivery_id === undefined ? undefined : new SendTurn(from.delivery_id)
+    // A re-attach's get_state that says the run is over ends the turn only if no record of the send follows it within
+    // RESYNC_GRACE_MS: the turn's own end, with its last text and its aborted flag, wins when it still streams.
+    let resyncEnd: (() => void) | undefined
     const ofSend = (event: AttachEvent): void => {
       if (turn === undefined || from === undefined || send === undefined) return
       if (event.kind !== "record") return deliver(turn.apply(event))
       const seen = send.started
       const verdict = send.classify(event.record)
       if (verdict === "other") return
+      resyncEnd?.()
+      resyncEnd = undefined
       // Another turn's records are never applied: its agent_end must not mark this turn interrupted.
       if (verdict === "over" || verdict === "ran_out") return finish({ kind: "end", outcome: sendOutcome(turn, from) })
       if (!seen) deliver(turn.markRunning())
@@ -697,8 +714,11 @@ export function streamMembers(core: ClientCore): StreamMembers {
       fresh: (state) => {
         // From a send, only a re-attach reads the state: its run lease off running ends a turn whose end fell in the gap.
         if (send !== undefined) {
-          if (turn !== undefined && from !== undefined && send.ranOutIn(state))
-            finish({ kind: "end", outcome: sendOutcome(turn, from) })
+          const ending = turn
+          if (ending !== undefined && from !== undefined && resyncEnd === undefined && send.ranOutIn(state))
+            resyncEnd = core.timers.after(RESYNC_GRACE_MS, () =>
+              finish({ kind: "end", outcome: sendOutcome(ending, from) }),
+            )
           return
         }
         deliver(turn?.fresh(state) ?? [])
@@ -744,6 +764,7 @@ export function streamMembers(core: ClientCore): StreamMembers {
         if (settled) return
         settled = true
         cancelTimer()
+        resyncEnd?.()
         opts?.signal?.removeEventListener("abort", onAbort)
         watch?.stop()
         resolve(outcome)
@@ -770,10 +791,15 @@ export function streamMembers(core: ClientCore): StreamMembers {
       }
       // From one send: settled on its turn's end (idle) or on the next input taking over (running), nothing else.
       const send = opts?.from?.delivery_id === undefined ? undefined : new SendTurn(opts.from.delivery_id)
+      let resyncEnd: (() => void) | undefined
       const ofSend = (event: AttachEvent): void => {
         if (turn === undefined || send === undefined) return
         if (event.kind !== "record") return check(turn.apply(event))
         const verdict = send.classify(event.record)
+        if (verdict !== "other") {
+          resyncEnd?.()
+          resyncEnd = undefined
+        }
         if (verdict === "end" || verdict === "ran_out") return result("settled", "idle")
         if (verdict === "over") return result("settled", "running")
         if (verdict === "ours") turn.markRunning()
@@ -786,7 +812,8 @@ export function streamMembers(core: ClientCore): StreamMembers {
         fresh: (state) => {
           // From a send, only a re-attach reads the state: its run lease off running ends a turn whose end fell in the gap.
           if (send !== undefined) {
-            if (send.ranOutIn(state)) result("settled", "idle")
+            if (resyncEnd === undefined && send.ranOutIn(state))
+              resyncEnd = core.timers.after(RESYNC_GRACE_MS, () => result("settled", "idle"))
             return
           }
           check(turn?.fresh(state) ?? [])
