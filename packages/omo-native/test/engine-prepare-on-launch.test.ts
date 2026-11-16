@@ -14,6 +14,7 @@ import {
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { ENGINE_PREPARED_STAMP, ensureEnginePrepared } from "../bin/lib/engine-prepare.js"
+import { guardedSerialization, serialization } from "../bin/lib/rpc-stream-errors.js"
 
 const RPC_MODE = "dist/modes/rpc/rpc-mode.js"
 const OMO_VERSION = "5.0.0-0.beta.86"
@@ -30,9 +31,14 @@ function createEngine(): string {
   )
   const rpcPath = join(root, RPC_MODE)
   mkdirSync(dirname(rpcPath), { recursive: true })
+  // An install with prepare has already guarded the installed engine; start from the unguarded serializer so
+  // every preparation here really rewrites the file.
   writeFileSync(
     rpcPath,
-    readFileSync(new URL("./modes/rpc/rpc-mode.js", import.meta.resolve("@code-yeongyu/senpi")), "utf8"),
+    readFileSync(new URL("./modes/rpc/rpc-mode.js", import.meta.resolve("@code-yeongyu/senpi")), "utf8").replace(
+      guardedSerialization,
+      serialization,
+    ),
   )
   return root
 }
