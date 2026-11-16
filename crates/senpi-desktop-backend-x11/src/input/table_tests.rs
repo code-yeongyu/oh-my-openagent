@@ -10,7 +10,7 @@ use super::fake::{keymap, KEY_A, KEY_ALT_L, KEY_ESCAPE, KEY_SHIFT_L};
 use super::held::{Held, HeldButton, HeldKey, Route};
 use super::keys::{keysym, keysym_variants, modifier_keys, modifiers_mask, Stroke};
 use super::server::Spot;
-use super::toolkit_filter::{filtering_toolkit, Toolkit};
+use super::toolkit_filter::{accepting_library, dropping_library, filtering_toolkit, Toolkit};
 
 #[test]
 fn key_names_map_to_their_x_keysyms() {
@@ -92,13 +92,14 @@ fn gesture_modifiers_become_state_bits_and_press_order() {
 
 #[test]
 fn the_toolkit_filter_recognises_the_toolkits_that_drop_send_event() {
-    let cases: [(&[u8], Option<Toolkit>); 8] = [
+    let cases: [(&[u8], Option<Toolkit>); 9] = [
         (b"gtk3-demo\0Gtk3-demo\0", Some(Toolkit::Gtk)),
         (b"gedit\0Gdk-app\0", Some(Toolkit::Gtk)),
         (b"qterminal\0QTerminal\0", Some(Toolkit::Qt)),
         (b"google-chrome\0Google-chrome\0", Some(Toolkit::Chromium)),
         (b"chromium\0Chromium\0", Some(Toolkit::Chromium)),
         (b"Navigator\0firefox\0", Some(Toolkit::Firefox)),
+        (b"code\0Electron\0", Some(Toolkit::Chromium)),
         (b"xterm\0XTerm\0", None),
         (b"", None),
     ];
@@ -110,6 +111,29 @@ fn the_toolkit_filter_recognises_the_toolkits_that_drop_send_event() {
             String::from_utf8_lossy(class)
         );
     }
+}
+
+#[test]
+fn each_toolkit_family_is_named_by_the_library_its_process_maps() {
+    let cases = [
+        ("libgtk-3.so.0.2409.32", Some(Toolkit::Gtk)),
+        ("libgtk-4.so.1", Some(Toolkit::Gtk)),
+        ("libQt5Gui.so.5.15.13", Some(Toolkit::Qt)),
+        ("libQt6Gui.so.6", Some(Toolkit::Qt)),
+        ("libvcllo.so", Some(Toolkit::Vcl)),
+        ("libmergedlo.so", Some(Toolkit::Vcl)),
+        ("libxul.so", Some(Toolkit::Firefox)),
+        ("libcef.so", Some(Toolkit::Chromium)),
+        ("libgtk-x11-2.0.so.0", None),
+        ("libX11.so.6", None),
+    ];
+    for (library, expected) in cases {
+        let libraries = [library.to_owned()];
+        assert_eq!(dropping_library(&libraries).map(|(_, toolkit)| toolkit), expected, "{library}");
+    }
+    let accepting = |library: &str| accepting_library(&[library.to_owned()]).is_some();
+    assert!(["libXt.so.6", "libXm.so.4", "libtk8.6.so", "libtk9.0.so"].into_iter().all(accepting));
+    assert!(!["libX11.so.6", "libgtk-3.so.0"].into_iter().any(accepting));
 }
 
 #[test]
