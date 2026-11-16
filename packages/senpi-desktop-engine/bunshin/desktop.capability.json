@@ -389,7 +389,7 @@
 							],
 							"format": "uint64",
 							"minimum": 0,
-							"description": "Only nodes changed since this generation.",
+							"description": "Reserved: no snapshot implements it, so any value fails with `AxUnsupported` (#13175).",
 							"default": null
 						},
 						"skeleton": {
@@ -1259,7 +1259,7 @@
 							],
 							"format": "uint64",
 							"minimum": 0,
-							"description": "Only nodes changed since this generation.",
+							"description": "Reserved: no snapshot implements it, so any value fails with `AxUnsupported` (#13175).",
 							"default": null
 						},
 						"skeleton": {

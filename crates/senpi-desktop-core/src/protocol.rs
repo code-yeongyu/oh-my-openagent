@@ -201,7 +201,8 @@ pub struct EngineErrorData {
     /// `pointer_reading_toolkit`, `electron_select`,
     /// `wayland_window_targeting`; `InvalidKey`: `dangerous_chord`;
     /// `AxUnsupported`: `disabled`, `action_unsupported`, `not_visible`,
-    /// `unstable`, `occluded` (the actionability battery);
+    /// `unstable`, `occluded` (the actionability battery), `unsupported_option`
+    /// (an ax snapshot option the read cannot honour, #13175);
     /// `ControlRequired`: `headless_host`, `spawn_inside_session`,
     /// `lease_missing`; `Suspended`: `stop_marker`; `Internal`:
     /// `request_too_large`, `other`.

@@ -1656,7 +1656,7 @@
           ],
           "format": "uint64",
           "minimum": 0,
-          "description": "Only nodes changed since this generation.",
+          "description": "Reserved: no snapshot implements it, so any value fails with `AxUnsupported` (#13175).",
           "default": null
         },
         "skeleton": {
@@ -3710,7 +3710,7 @@
             "string",
             "null"
           ],
-          "description": "Machine-readable cause, an open token set per code (object mode),\ne.g. `InvalidCoordinateFrame`: `resized`, `consumed`, `zoom`,\n`wrong_target`, `out_of_bounds`; `WindowNotFound`: `identity_changed`;\n`InvalidTarget`: `ambiguous`; `BackgroundUnavailable`:\n`key_route_unproven`, `user_active_in_target`,\n`pointer_reading_toolkit`, `electron_select`,\n`wayland_window_targeting`; `InvalidKey`: `dangerous_chord`;\n`AxUnsupported`: `disabled`, `action_unsupported`, `not_visible`,\n`unstable`, `occluded` (the actionability battery);\n`ControlRequired`: `headless_host`, `spawn_inside_session`,\n`lease_missing`; `Suspended`: `stop_marker`; `Internal`:\n`request_too_large`, `other`."
+          "description": "Machine-readable cause, an open token set per code (object mode),\ne.g. `InvalidCoordinateFrame`: `resized`, `consumed`, `zoom`,\n`wrong_target`, `out_of_bounds`; `WindowNotFound`: `identity_changed`;\n`InvalidTarget`: `ambiguous`; `BackgroundUnavailable`:\n`key_route_unproven`, `user_active_in_target`,\n`pointer_reading_toolkit`, `electron_select`,\n`wayland_window_targeting`; `InvalidKey`: `dangerous_chord`;\n`AxUnsupported`: `disabled`, `action_unsupported`, `not_visible`,\n`unstable`, `occluded` (the actionability battery), `unsupported_option`\n(an ax snapshot option the read cannot honour, #13175);\n`ControlRequired`: `headless_host`, `spawn_inside_session`,\n`lease_missing`; `Suspended`: `stop_marker`; `Internal`:\n`request_too_large`, `other`."
         },
         "disposition": {
           "anyOf": [

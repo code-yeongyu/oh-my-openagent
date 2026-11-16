@@ -110,7 +110,7 @@ export interface AxSnapshot {
   readonly cuts: readonly AxCut[]
 }
 
-/** Narrows an AX snapshot; `since` returns only nodes changed after that generation. */
+/** Narrows an AX snapshot. `since` is reserved: no snapshot implements it, so passing it fails with `AxUnsupported`. */
 export interface AxSnapshotOptions {
   readonly maxDepth?: number
   readonly maxNodes?: number

@@ -57,7 +57,7 @@ interface ComputerAxOptions {
   all?: boolean
   maxDepth?: number
   maxNodes?: number
-  /** Only nodes changed after this snapshot generation. */
+  /** Reserved: no snapshot implements it, so passing it fails with `AxUnsupported`. */
   since?: number
 }
 

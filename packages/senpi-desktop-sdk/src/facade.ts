@@ -123,7 +123,7 @@ export interface Target {
    */
   observe(options?: ObserveOptions): Promise<Observation>
   /**
-   * The accessibility tree; `options.since` returns only nodes changed after that generation.
+   * The accessibility tree. `options.since` is reserved: no snapshot implements it, so passing it fails with `AxUnsupported`.
    * @tier read
    * @policy none
    * @wire ax.snapshot

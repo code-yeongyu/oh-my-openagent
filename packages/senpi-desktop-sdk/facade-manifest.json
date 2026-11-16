@@ -159,7 +159,7 @@
 			"wire": [
 				"ax.snapshot"
 			],
-			"summary": "The accessibility tree; `options.since` returns only nodes changed after that generation."
+			"summary": "The accessibility tree. `options.since` is reserved: no snapshot implements it, so passing it fails with `AxUnsupported`."
 		},
 		{
 			"method": "Frame.zoom",

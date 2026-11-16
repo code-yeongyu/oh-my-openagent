@@ -188,6 +188,8 @@ pub struct AxRegistry {
     /// The session's `reportMode`: core and session code read it here so
     /// object-mode-only members are filled in one place.
     report_mode: ReportMode,
+    /// Whether the session named its `reportMode` (see `DesktopSessionOptions`).
+    report_mode_explicit: bool,
 }
 
 impl Default for AxRegistry {
@@ -197,6 +199,7 @@ impl Default for AxRegistry {
             generations: HashMap::new(),
             entries: HashMap::new(),
             report_mode: ReportMode::Null,
+            report_mode_explicit: false,
         }
     }
 }
@@ -214,6 +217,18 @@ impl AxRegistry {
     #[must_use]
     pub const fn report_mode(&self) -> ReportMode {
         self.report_mode
+    }
+
+    /// The same registry, recording whether the session named its `reportMode`.
+    #[must_use]
+    pub const fn with_explicit_mode(mut self, explicit: bool) -> Self {
+        self.report_mode_explicit = explicit;
+        self
+    }
+
+    #[must_use]
+    pub const fn report_mode_explicit(&self) -> bool {
+        self.report_mode_explicit
     }
 
     /// Restores delivered generations without recycling refs from an abandoned reply.
