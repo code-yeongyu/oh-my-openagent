@@ -194,7 +194,11 @@ describe("#given the dev push runs that now carry macOS/Windows coverage", () =>
         if (!isRecord(concurrency)) return false
         const cancels = concurrency["cancel-in-progress"]
         const cancelsOnPush = isExpression(cancels) ? evaluate(cancels, { github: dev }) === true : cancels === true
-        const group = (github: Record<string, unknown>) => evaluate(concurrency["group"], { github })
+        // A group is a template with several ${{ }} parts; evaluate each part, keep the literal text between them.
+        const group = (github: Record<string, unknown>) =>
+          String(concurrency["group"]).replace(/\$\{\{([\s\S]+?)\}\}/g, (_part, inner: string) =>
+            String(evaluate(inner, { github })),
+          )
         return cancelsOnPush && group(dev) === group(master)
       })
     expect(cancelling).toEqual([])
