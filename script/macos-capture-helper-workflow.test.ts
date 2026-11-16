@@ -6,7 +6,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { runBlock, sliceWorkflowSection } from "./release-workflow-test-steps"
+import { desktopEngineLegs, runBlock, sliceWorkflowSection } from "./release-workflow-test-steps"
 
 const workflow = readFileSync(new URL("../.github/workflows/publish-platform.yml", import.meta.url), "utf8").replace(
   /\r\n/g,
@@ -23,8 +23,9 @@ describe("embedded macOS capture helper release workflow", () => {
     const helper = sliceWorkflowSection(engine, helperMarker, engineMarker)
     const run = runBlock(engine, helperMarker, engineMarker)
 
-    expect(engine).toMatch(/host: darwin-arm64,[^\n]*rust_target: aarch64-apple-darwin, clang_arch: arm64/)
-    expect(engine).toMatch(/host: darwin-x64,[^\n]*rust_target: x86_64-apple-darwin, clang_arch: x86_64/)
+    const legs = desktopEngineLegs(workflow)
+    expect(legs).toContainEqual(expect.objectContaining({ host: "darwin-arm64", rust_target: "aarch64-apple-darwin", clang_arch: "arm64" }))
+    expect(legs).toContainEqual(expect.objectContaining({ host: "darwin-x64", rust_target: "x86_64-apple-darwin", clang_arch: "x86_64" }))
     expect(helper).toContain("if: startsWith(matrix.host, 'darwin-')")
     expect(helper).toContain("CLANG_ARCH: ${{ matrix.clang_arch }}")
     expect(run).toContain('/usr/bin/clang -arch "$CLANG_ARCH"')
