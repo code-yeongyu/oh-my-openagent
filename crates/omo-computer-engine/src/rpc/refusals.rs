@@ -27,11 +27,28 @@ pub(super) fn refused(refusal: &Refusal) -> Failure {
     if let Err(unknown) = refusal.row() {
         eprintln!("omo-computer-engine: {unknown}");
     }
-    let mut data = json!({ "code": refusal.code.wire(), "hint": null });
-    if let Some(reason) = refusal.reason {
-        data["reason"] = json!(reason.wire());
+    failure(refusal.code.number(), refusal.code.wire(), Some(refusal.wire_data()))
+}
+
+/// R60c: a refusal whose row reads its disposition from the inner stage (a gated drag point)
+/// carries that stage pair's disposition and next call, looked up in the same table.
+fn inner_disposition(refusal: &Refusal, detail: Option<&Value>, data: &mut Value) {
+    let inner = refusal.row().is_ok_and(|row| row.disposition == omo_computer_core::error::DispositionRule::OfInnerCode);
+    let Some(stage) = detail.filter(|_| inner).and_then(|d| d.get("stageCode")).and_then(Value::as_str) else {
+        return;
+    };
+    let reason = detail.and_then(|d| d.get("stageReason")).and_then(Value::as_str);
+    let Ok(row) = omo_computer_core::error::inner_row(stage, reason) else {
+        return;
+    };
+    let disposition = match row.disposition {
+        omo_computer_core::error::DispositionRule::Fixed(d) | omo_computer_core::error::DispositionRule::BySent { nothing: d, .. } => d,
+        _ => return,
+    };
+    data["disposition"] = json!(disposition);
+    if let omo_computer_core::error::NextCall::Call(call) = row.next_call {
+        data["nextCall"] = json!(call);
     }
-    failure(refusal.code.number(), refusal.code.wire(), Some(data))
 }
 
 /// A funnel refusal: the refusal's members plus the `callId` it concerns, for a replay the
@@ -64,6 +81,7 @@ pub(super) fn refused_call(refused: &Refused) -> Failure {
         if let Some(target) = stamps.target {
             data["target"] = json!(target);
         }
+        inner_disposition(&refused.refusal, refused.detail.as_deref(), data);
         if let (Some(Value::Object(detail)), Some(data)) =
             (refused.detail.as_deref(), data.as_object_mut())
         {

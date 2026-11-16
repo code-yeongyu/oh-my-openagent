@@ -49,6 +49,8 @@ pub struct Session {
     pub(crate) trace: crate::trace::Trace,
     /// The session-scoped display-awake hold (design row C22).
     pub(crate) display_awake: crate::intervention::SharedHold,
+    /// The generation of the latest `ax.snapshot` (row 24): a v1 ref `e2` names an element of it.
+    pub(crate) ax_generation: Option<u64>,
     pub(crate) settle: crate::settle::SettleState,
 }
 
@@ -78,8 +80,11 @@ impl Session {
     pub fn open(&mut self, params: SessionOpenParams) -> Result<SessionOpened, Refusal> {
         let request = read_session_open(params);
         let policy = StopPolicy::read(Transport::Local, request.allow_host_relay_only_stop);
+        self.funnel.set_url_policy(&request);
         self.opened = None;
+        crate::route_ladder::open_routes(&request, crate::route_ladder::host_os())?;
         self.guard.open(policy, HostAdditions::default())?;
+        self.guard.apply_table(crate::grant::backend_os(self.backend.as_ref()));
         self.opened = Some(Opened {
             report_mode: request.report_mode,
             tag: random_u64(),
@@ -144,6 +149,7 @@ impl Session {
             Some(ReportMode::Null) | None => CapabilitiesReply::Legacy(Box::new(legacy_capabilities(
                 &capabilities,
                 &self.backend.probe_permissions(),
+                &self.stop_path_status().stop_path,
             ))),
         }
     }
@@ -234,7 +240,7 @@ const fn known_true(state: Tristate) -> bool {
 
 /// The v1 record a null-mode session reads, projected from the object-mode capabilities.
 #[must_use]
-pub fn legacy_capabilities(caps: &Capabilities, probe: &PermissionProbe) -> LegacyCapabilities {
+pub fn legacy_capabilities(caps: &Capabilities, probe: &PermissionProbe, stop_path: &str) -> LegacyCapabilities {
     LegacyCapabilities {
         backend: caps.backend.clone(),
         display_server: None,
@@ -249,8 +255,10 @@ pub fn legacy_capabilities(caps: &Capabilities, probe: &PermissionProbe) -> Lega
         ax_permission: permission(probe.accessibility).to_owned(),
         display_count: caps.display_count,
         focus_guard: caps.background_window_input,
-        stop_path: "none".to_owned(),
-        stop_reason: Some(NO_GLOBAL_LISTENER.to_owned()),
+        // The v1 vocabulary from the session's stop-path state (`none` | `global` |
+        // `host-relay`); the live listener's name is diagnose's alone (plan owner Q6).
+        stop_path: stop_path.to_owned(),
+        stop_reason: (stop_path == "none").then(|| NO_GLOBAL_LISTENER.to_owned()),
         integrity_level: None,
         screen_locked: known_true(caps.session.screen_locked),
         display_asleep: Some(known_true(caps.session.display_asleep)),

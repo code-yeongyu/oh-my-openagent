@@ -1,5 +1,8 @@
 //! The mutate funnel, pre-input marker, audit, refs registry, settle, frames, consent and verbs.
 
+#[cfg(test)]
+mod a_is_64_tests;
+pub mod apps;
 pub mod attribution;
 pub mod audit;
 pub mod batch;
@@ -10,25 +13,35 @@ mod displays;
 pub mod epoch;
 pub mod frames;
 pub mod grant;
+pub mod holds;
 pub mod intervention;
 pub mod lease;
 pub mod liveness;
 pub mod lock;
 pub mod marker;
+pub mod menus;
 pub mod mutate;
 pub mod observe;
 pub mod pause;
+mod pointer;
 pub mod presence;
 pub mod preview;
+pub mod diagnose_wire;
+pub mod recording;
 pub mod refs;
+pub mod route_ladder;
 pub mod reservation;
+pub mod surfaces;
 mod session;
 pub mod session_state;
 pub mod settle;
 #[cfg(test)]
 mod test_process;
 pub mod trace;
+mod clipboard;
+pub(crate) mod value_verbs;
 mod wait_for;
+mod window_frame;
 
 pub use epoch::EpochChanged;
 pub use frames::CapturedFrame;

@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "b1e294f921009a741e7503e5ed45e5056d0025a3c8f82eac712c3fca02a68fd2" as const
+export const SCHEMA_SHA256 = "b126ec05e59159af8e527f277bf1f4d742d5d71eda158822fe4265518c9471c8" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -395,11 +395,14 @@ export type ActionReport = {
 	openedSurfaces?: Surface[]
 	nextCall?: string | null
 	note?: string | null
+	reason?: RefusalReason | null
+	nothingSent?: boolean | null
 	warning?: string | null
 	auditIds?: string[]
 	timings?: Timings | null
 	settle?: ObservationSettle | null
 	evidence: Evidence[]
+	urlPolicy?: UrlPolicyStamp | null
 	observation: UntrustedText
 	paused?: Pause[]
 	session?: SessionState | null
@@ -645,6 +648,8 @@ export type ClipboardContent = {
 	observation: UntrustedText
 }
 
+export type ClipboardReadReply = ClipboardContent | ActionReport
+
 export type ClipboardWriteParams = {
 	text: string
 	format?: PasteFormat | null
@@ -722,6 +727,7 @@ export type Diagnosis = {
 	stopPath: StopPathCapability
 	releaseHelper?: ReleaseHelper | null
 	observation: UntrustedText
+	checks?: ProbeCheck[]
 }
 
 export type DiffFallback = "baseline_incomplete" | "current_incomplete" | "since_expired" | "window_changed" | "menu_root" | "reordered" | "not_shorter" | "query_projection"
@@ -839,7 +845,7 @@ export type Evidence = {
 
 export type EvidenceClass = "receipt" | "observation"
 
-export type EvidenceKind = "barrier_consumed" | "xi2_raw_confirm" | "value_readback" | "focus_readback" | "menu_readback" | "ax_notification" | "settle_frame_diff" | "ax_change"
+export type EvidenceKind = "barrier_consumed" | "xi2_raw_confirm" | "value_readback" | "focus_readback" | "menu_readback" | "ax_notification" | "settle_frame_diff" | "ax_change" | "frame_readback"
 
 export type ExecReply = null | ActionReport
 
@@ -865,8 +871,6 @@ export type Frame = {
 	cursor: CursorMode
 	path?: string | null
 	artifact?: FrameArtifact | null
-	occludersVisible?: boolean | null
-	nextCall?: string | null
 	session: SessionState
 	observation: UntrustedText
 }
@@ -1060,8 +1064,18 @@ export type McpSettings = {
 	tier: Tier
 }
 
+export type MenuItem = {
+	label: string
+	enabled: boolean
+	checked: boolean
+	accelerator?: string | null
+	submenu: boolean
+	path: string[]
+	observation: UntrustedText
+}
+
 export type MenuItems = {
-	items: ElementInfo[]
+	items: MenuItem[]
 	truncated?: boolean | null
 	observation: UntrustedText
 }
@@ -1254,6 +1268,14 @@ export type PressParams = {
 	observeAfter?: ObserveOptions | null
 }
 
+export type ProbeCheck = {
+	name: string
+	state: ProbeState
+	reason?: string | null
+}
+
+export type ProbeState = "ok" | "unavailable" | "unknown"
+
 export type RaiseWindowParams = {
 	windowId: string
 }
@@ -1264,6 +1286,8 @@ export type Rect = {
 	width: number
 	height: number
 }
+
+export type RefusalReason = "secure_focus" | "concealed_clipboard" | "secret_no_clipboard_route"
 
 export type ReleaseHelper = {
 	available: boolean
@@ -1573,6 +1597,8 @@ export type UntrustedText = {
 	untrustedText: true
 }
 
+export type UrlPolicyStamp = "unknown"
+
 export type UserActive = {
 	active: Tristate
 	lastInputAgeMs?: number | null
@@ -1770,7 +1796,7 @@ export type MethodResults = {
 	"ax.focused": AxNode | null
 	"elementAt": ElementInfo | null
 	"waitFor": WaitResult
-	"clipboard.read": ClipboardContent
+	"clipboard.read": ClipboardReadReply
 	"menu.items": MenuItems
 	"surface": Surface
 	"click": ExecReply

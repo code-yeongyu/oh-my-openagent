@@ -4,17 +4,22 @@
 use omo_computer_core::backend::{Backend, WindowFilter};
 
 use super::{Call, Guard};
-use crate::gate::verdicts::{ConsentRefusal, LeaseRefusal};
+use crate::gate::verdicts::{ConsentRefusal, ConsequentialRefusal, LeaseRefusal};
 use crate::gate::{gate, Admitted, GateFacts, GateRefusal, Tables, Tier};
 use crate::resolve::resolve;
 use crate::supervisor::NoHolds;
 
 /// The verdicts of the stages the session owns, handed to the gate so the fixed gate order
 /// still decides which refusal wins.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct StageVerdicts {
     pub consent: Option<ConsentRefusal>,
     pub lease: Option<LeaseRefusal>,
+    /// Row 25: the Consequential stage's `url_policy` verdict.
+    pub consequential: Option<ConsequentialRefusal>,
+    /// Row 25: the call's targets resolved from the app's own identity (`apps.open`, `apps.quit`,
+    /// `openSystemSurface`), so the Target and Scope stages run on the app before any launch.
+    pub targets: Option<Vec<crate::gate::PointTarget>>,
 }
 
 impl Guard {
@@ -44,12 +49,17 @@ impl Guard {
         facts.force = call.force;
         facts.consent = stages.consent;
         facts.lease = stages.lease;
+        facts.consequential = stages.consequential;
         let tables = Tables {
             self_set: &self.self_set,
             protected: self.table,
             allowed_apps: &self.allowed_apps,
         };
+        let targets = stages.targets;
         gate(&facts, &tables, || {
+            if let Some(targets) = targets {
+                return targets;
+            }
             let windows = backend
                 .windows(&WindowFilter::default())
                 .ok()
