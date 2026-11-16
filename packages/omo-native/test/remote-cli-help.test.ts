@@ -31,6 +31,12 @@ function capture() {
     write: (text) => out.push(text),
     error: (line) => err.push(line),
     bootstrap: {} as BootstrapSetup,
+    coldWake: {
+      install: untouched("the cold-wake unit"),
+      uninstall: untouched("the cold-wake unit"),
+      status: untouched("the cold-wake unit"),
+    },
+    linkDevice: untouched("the device link"),
   }
   return { out, err, dependencies }
 }
