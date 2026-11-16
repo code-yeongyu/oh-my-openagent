@@ -109,7 +109,7 @@ impl Session {
             _ => {}
         }
         let Some(ax) = self.backend.ax() else {
-            return (outcome_of(Err(Refusal::new(EngineCode::AxUnsupported, Reason::PerformUnsupported.wire()))), None);
+            return (outcome_of(Err(Refusal::new(EngineCode::AxUnsupported, Reason::PerformUnsupported))), None);
         };
         let sent = match write {
             Write::SetValue { reference, value } => {
