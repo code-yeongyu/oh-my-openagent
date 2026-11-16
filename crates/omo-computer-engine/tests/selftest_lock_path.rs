@@ -28,7 +28,12 @@ fn selftest_prints_the_interaction_lock_path_from_the_runtime_root() {
             .any(|line| line == format!("interaction lock: {}", expected.display())),
         "{text}"
     );
-    let json: Value = serde_json::from_str(selftest(runtime.path(), &["--selftest", "--json"]).trim())
-        .expect("one JSON line");
-    assert_eq!(json["interactionLock"], expected.display().to_string(), "{json}");
+    let json: Value =
+        serde_json::from_str(selftest(runtime.path(), &["--selftest", "--json"]).trim())
+            .expect("one JSON line");
+    assert_eq!(
+        json["interactionLock"],
+        expected.display().to_string(),
+        "{json}"
+    );
 }
