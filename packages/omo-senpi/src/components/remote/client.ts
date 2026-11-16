@@ -1,3 +1,4 @@
+import { lendConnection } from "./connection-of"
 import { existsSync } from "node:fs"
 import { hostname } from "node:os"
 import {
@@ -373,6 +374,14 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
       )
     },
   }
+  // The thread runtime's port rides this client's one connection (connection-of.ts); a failure to open it throws, as a
+  // port connect does.
+  lendConnection(built, async () => {
+    const opened = await connected(undefined)
+    if (opened === "not_installed") throw new Error("The device service is not installed on this device.")
+    if (opened.kind === "error") throw new Error(opened.message)
+    return opened.value
+  })
   return built
 }
 

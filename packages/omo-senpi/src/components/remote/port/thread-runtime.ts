@@ -1,6 +1,7 @@
 import { createServiceAliasRegistry, type ServiceAccess } from "../../thread/remote/alias-registry"
 import type { RemoteSessionsPort, RemoteThreadSurface } from "../../thread/remote/ports"
 import type { RemoteClient } from "../client"
+import { connectionOf } from "../connection-of"
 import {
   remoteClientForCli,
   remoteClientForConnector,
@@ -16,7 +17,9 @@ import { createLazyRemoteSurface } from "./lazy-remote"
 // tools' port over this device's device service is built here, in L2, so no thread file opens a device-service
 // connection itself (guard G1, design v8-core r2).
 
-export const remoteSessionsPort = (version: string): RemoteSessionsPort => createDeviceServiceSessions({ version })
+// The port borrows the client's shared connection (#13768 L3): one connection per engine, closed by the client.
+export const remoteSessionsPort = (version: string, client: RemoteClient): RemoteSessionsPort =>
+  createDeviceServiceSessions({ version, connect: async () => ({ conn: await connectionOf(client), owned: false }) })
 
 // Built through its sender's factory, as every client is (remote/index.ts).
 export function remoteClient(version: string, sender: RemoteSender): RemoteClient {

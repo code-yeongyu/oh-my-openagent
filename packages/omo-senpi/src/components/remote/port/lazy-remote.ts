@@ -28,7 +28,10 @@ export type LazyRemoteOptions = {
  * budget) and needs no change when the client gains a member; `sessions.follow` answers a stream at once and starts the load
  * when called, even if the stream is never read.
  */
-function createLazyRemoteClient(options: LazyRemoteOptions): RemoteClient {
+function createLazyRemoteClient(options: LazyRemoteOptions): {
+  readonly client: RemoteClient
+  readonly loaded: () => Promise<RemoteClient>
+} {
   let client: Promise<RemoteClient> | undefined
   const load = () =>
     (client ??= options.loadRuntime().then(
@@ -85,7 +88,7 @@ function createLazyRemoteClient(options: LazyRemoteOptions): RemoteClient {
         ),
     }
   }
-  return {
+  const lazy = {
     service: group("service"),
     devices: group("devices"),
     sessions: group("sessions"),
@@ -100,14 +103,15 @@ function createLazyRemoteClient(options: LazyRemoteOptions): RemoteClient {
       )
     },
   } as unknown as RemoteClient
+  return { client: lazy, loaded: load }
 }
 
 export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThreadSurface {
-  const client = createLazyRemoteClient(options)
+  const { client, loaded } = createLazyRemoteClient(options)
   let port: Promise<RemoteSessionsPort> | undefined
   const load = () =>
     (port ??= options.loadRuntime().then(
-      ({ remoteSessionsPort }) => remoteSessionsPort(options.version),
+      async ({ remoteSessionsPort }) => remoteSessionsPort(options.version, await loaded()),
       (error: unknown) => {
         port = undefined
         throw error
