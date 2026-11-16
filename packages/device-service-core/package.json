@@ -9,7 +9,8 @@
     "./conformance/fake-owner": "./test/local-api/conformance/fake-owner.ts",
     "./conformance/world": "./test/local-api/conformance/world.ts",
     "./device-service": "./src/device-service.ts",
-    "./local-only": "./src/local-only.ts"
+    "./local-only": "./src/local-only.ts",
+    "./state-dir": "./src/state-dir.ts"
   },
   "scripts": {
     "typecheck": "bun check --no-script --all -p tsconfig.json",
