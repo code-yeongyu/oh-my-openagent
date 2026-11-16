@@ -14,6 +14,9 @@ import {
   ThreadDeliveryMode,
   RelayText,
 } from "./fields"
+import { ThreadCreateParams } from "./create-params"
+
+export { ThreadCreateParams }
 
 const BINDING_PLATFORM = Type.Union(
   [
@@ -42,58 +45,6 @@ const BoundSession = Type.Optional(
       "Thread id or unique name of the session to attach, as returned by thread_list; self or leaving it unset attaches the calling session.",
   }),
 )
-
-export const ThreadCreateParams = Type.Object({
-  thread: Type.Optional(
-    Type.String({
-      minLength: 1,
-      description:
-        "Id or alias of an EXISTING thread to open, on whichever of the account's devices holds it; leave unset to create a new thread. Never combined with device.",
-    }),
-  ),
-  device: Type.Optional(
-    Type.String({
-      minLength: 1,
-      description:
-        "Account device to create the new thread on (from thread_list with all_scope); leave unset to create it on this device. Only for a new thread.",
-    }),
-  ),
-  alias: Type.Optional(
-    Type.String({
-      minLength: 1,
-      maxLength: 64,
-      description:
-        'Account-wide alias for the new thread, usable instead of its id in every thread tool; an alias another thread holds returns alias_taken naming the holder. With no signed-in account it becomes the thread\'s local name instead (unless name is set) and the result carries alias_scope "local".',
-    }),
-  ),
-  name: Type.Optional(
-    Type.String({
-      description:
-        "Display label for the new thread; an existing thread with the same normalized name returns name_conflict, and later renames change only the label while thread_id stays the address.",
-    }),
-  ),
-  cwd: Type.Optional(
-    Type.String({
-      description:
-        "Working directory the new thread runs in; leaving it unset keeps the thread inside the caller's workspace.",
-    }),
-  ),
-  fork_from: Type.Optional(
-    Type.String({
-      description:
-        "Durable id of an existing thread to fork; the new thread starts with that transcript as prior context.",
-    }),
-  ),
-  skills: Type.Optional(
-    Type.Array(Type.String({ minLength: 1, maxLength: 64 }), {
-      minItems: 1,
-      maxItems: 16,
-      description:
-        "Names of installed skills the new thread follows from its first turn, as if each were loaded with /skill. A path or text that is not a skill name refuses the create. The new session applies each name its own skill registry holds and logs any it does not; the result's thread.requested_skills echoes the names passed.",
-    }),
-  ),
-  idempotency_key: IdempotencyKey,
-})
 
 export const ThreadListParams = Type.Object({
   all_scope: Type.Optional(
