@@ -14,9 +14,12 @@ pub struct AxReach {
 /// The reach with the release helper's state `helper_unavailable` (`None`: the helper runs).
 #[must_use]
 pub fn ax_reach(helper_unavailable: Option<ReleaseHelperReason>) -> AxReach {
-    let _ = helper_unavailable;
-    match () {
-        () => AxReach {
+    match helper_unavailable {
+        Some(_) => AxReach {
+            input_modes: vec![InputMode::Ax],
+            background_reach: BackgroundReach::AxOnly,
+        },
+        None => AxReach {
             input_modes: vec![InputMode::Pointer, InputMode::Keyboard, InputMode::Ax],
             background_reach: BackgroundReach::Win32ClassicOnly,
         },

@@ -24,7 +24,11 @@ pub struct UiaReader<S> {
 }
 
 fn node_read(element: &UiaElement, handle: AxHandle) -> NodeRead {
-    let value = element.value.clone();
+    let value = if element.is_password {
+        None
+    } else {
+        element.value.clone()
+    };
     NodeRead {
         handle: Some(handle),
         object: Some(native_object(&element.runtime_id)),
@@ -36,7 +40,7 @@ fn node_read(element: &UiaElement, handle: AxHandle) -> NodeRead {
         native_id: element.automation_id.clone(),
         enabled: Some(element.enabled),
         focused: Some(element.has_focus),
-        secure: false,
+        secure: element.is_password,
         bounds: element.bounds,
         child_count: element.child_count,
         ..NodeRead::default()
@@ -92,7 +96,9 @@ impl<S: UiaSource> UiaReader<S> {
         let hwnd: isize = window
             .parse()
             .map_err(|_| Refusal::bare(EngineCode::WindowNotFound))?;
-        let _ = ELEVATED;
+        if self.source.elevated(hwnd) == Some(true) {
+            return Err(ELEVATED);
+        }
         let root = self.source.root(hwnd).map_err(refused)?;
         self.request = Some(cache_request(&self.source.provider_description(&root)));
         let key = WindowKey {

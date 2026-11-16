@@ -14,6 +14,6 @@ pub fn reidentify(mut found: Vec<UiaElement>) -> Result<UiaElement, Refusal> {
     match found.len() {
         0 => Err(Refusal::bare(EngineCode::StaleRef)),
         1 => found.pop().ok_or_else(|| Refusal::bare(EngineCode::StaleRef)),
-        _ => Ok(found.swap_remove(0)),
+        _ => Err(Refusal::bare(EngineCode::AmbiguousTarget)),
     }
 }
