@@ -254,21 +254,26 @@ export function createCliAccountSource(options: {
       current.accountId === accountId &&
       current.credentialGeneration === generation &&
       sameKeys(current, captured)
+    // #13739: one transiently empty read is read again under the same lock before the capture is retired; a cleared
+    // store (a real sign-out) reads empty twice and still ends sync.
+    const confirmed = async (stored: Credentials | null): Promise<Credentials | null> =>
+      stored ?? (await store.readAuthoritative())
     const isCurrent = async (): Promise<boolean> => {
       if (abort.signal.aborted) return false
-      const current = await session.update(async (stored) => stored)
+      const current = await session.update(confirmed)
       const same = sameCaptured(current)
       if (!same) abort.abort()
       return same && !abort.signal.aborted
     }
     const boundary = async <T>(dispatch: () => T): Promise<T> => {
-      const result = await session.update((current) => {
+      const result = await session.update(async (stored) => {
+        const current = await confirmed(stored)
         if (abort.signal.aborted || !sameCaptured(current)) {
           abort.abort()
           throw new Error("The CLI sync account is no longer current.")
         }
         // Box the return value: release the lock after dispatch itself, not an in-flight request.
-        return Promise.resolve({ value: dispatch() })
+        return { value: dispatch() }
       })
       return result.value
     }
