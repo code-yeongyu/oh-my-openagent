@@ -11,6 +11,12 @@ on:
 permissions:
   contents: read
 
+# One signal per PR: a newer event for the same PR replaces a queued or running older signal. The consumers (CLA
+# Assistant, Review Claims) act on the PR's current state, so only the newest signal carries anything to act on.
+concurrency:
+  group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   signal:
     runs-on: ubuntu-latest
