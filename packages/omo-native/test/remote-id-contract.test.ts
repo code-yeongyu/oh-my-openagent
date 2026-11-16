@@ -108,6 +108,48 @@ describe("#13010 remote CLI session identity", () => {
     }
   })
 
+  test("attach by durable ID resolves on the CLI's own connection through the { conn, owned } dial and keeps it usable (#13761)", async () => {
+    const fake = await owner()
+    const service = await connectDeviceService({ version: "5.1.72", stateDir: fake.stateDir })
+    try {
+      const prepared = await prepareRemoteAttach(
+        {
+          accountShow: async () => SIGNED_IN,
+          stateDir: fake.stateDir,
+          connect: async () => service,
+          now: () => 0,
+          output: () => {},
+          write: () => {},
+          error: () => {},
+        },
+        [DURABLE],
+      )
+      if (typeof prepared === "number") throw new Error(`attach failed with exit ${prepared}`)
+      // The thread port received the CLI's connection through the { conn, owned } dial: resolving the durable ID worked
+      // and the connection still answers. (The port reads owned only in close(), which the attach path never calls.)
+      expect((await service.status()).state).toBe("connected")
+      const socket = prepared.engineArgs[1]
+      if (socket === undefined) throw new Error("attach did not name its endpoint")
+      const endpoint = dirname(socket)
+      // Closing the service schedules the endpoint's asynchronous server.close; wait for that endpoint's removal.
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          watcher.close()
+          reject(new Error("attach endpoint was not removed"))
+        }, 2_000)
+        const watcher = watch(dirname(endpoint), (_event, name) => {
+          if (name !== basename(endpoint) || existsSync(endpoint)) return
+          watcher.close()
+          clearTimeout(timer)
+          resolve()
+        })
+        service.close()
+      })
+    } finally {
+      service.close()
+    }
+  })
+
   test("attach accepts the durable ID and both device-prefixed ID forms", async () => {
     const fake = await owner()
     for (const target of [DURABLE, `${PEER}/${DURABLE}`, `${PEER}/${SESSION_ID}`]) {
