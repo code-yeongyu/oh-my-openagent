@@ -241,3 +241,21 @@ fn daemon_refuses_sibling_host_terminal_self_target() {
     assert!(typed.get("error").is_some(), "{typed}");
     assert_eq!(typed["error"]["data"]["reason"], "self_target", "{typed}");
 }
+
+fn marker_names(runtime: &std::path::Path, call_id: &str) -> bool {
+    std::fs::read_to_string(runtime.join("markers/local/default.json")).is_ok_and(|marker| marker.contains(call_id))
+}
+
+#[test]
+fn marker_precedes_input_in_serve_and_oneshot_modes() {
+    let daemon = Daemon::start(&[]);
+    let mut client = opened(&daemon);
+    client.call(5, "stopPath.start", &json!({"chord": "ctrl+alt+shift+escape"})).expect("armed");
+    client.call(6, "capture", &json!({"target": "101"})).expect("a frame to click in");
+    let clicked = client.call(2, "click", &json!({"target": "101", "x": 10, "y": 10, "callId": "serve-marker"})).expect("answered");
+    assert!(clicked.get("result").is_some(), "{clicked}");
+    assert!(marker_names(daemon.dir.path(), "serve-marker"), "the daemon's click left its pre-input marker");
+
+    // The oneshot leg runs against the daemon (corpus case 09): a standalone oneshot has no frame
+    // across processes. It lands with case 09, after the Q4 ruling in ROW29-DECISIONS.md.
+}
