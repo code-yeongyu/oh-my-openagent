@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdtempSync, realpathSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach } from "vitest"
@@ -26,5 +26,6 @@ export function tempDirs(prefix: string): () => string {
  * long TMPDIR must not decide whether a socket test can bind.
  */
 export function socketDirs(prefix: string): () => string {
-  return freshDirs(process.platform === "win32" ? tmpdir() : "/tmp", prefix)
+  // The real path: macOS's /tmp is a link, and the host API refuses a socket dir under a linked parent.
+  return freshDirs(process.platform === "win32" ? tmpdir() : realpathSync("/tmp"), prefix)
 }

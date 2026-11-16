@@ -164,4 +164,37 @@ describe("the host's local API", () => {
       await server.close()
     }
   })
+
+  it("a socket directory reached through a symlinked parent is refused on both sides (the link could point anywhere)", async () => {
+    // Given a real parent holding the owner-only socket dir, and a symlink to that parent.
+    const real = join(temp(), "real-parent")
+    mkdirSync(join(real, "rt"), { recursive: true, mode: 0o700 })
+    const linked = join(temp(), "linked-parent")
+    symlinkSync(real, linked)
+    const path = join(linked, "rt", "host-api.sock")
+    const server = await serveHostApi(
+      { kind: "socket", path: join(real, "rt", "host-api.sock") },
+      {
+        status: () => ({ consentFingerprint: "x", latch: { suspended: false, stopEpoch: 0 } }),
+        ensure: async () => ({ kind: "refused", code: "RemoteCommandsDisabled" }),
+      },
+    )
+    try {
+      // Then the client refuses the linked address before dialing, and a host refuses to bind through it.
+      await expect(callHostApi({ kind: "socket", path }, "hand.status", {})).rejects.toMatchObject({
+        reason: "host_api_dir_not_owner_only",
+      })
+      await expect(
+        serveHostApi(
+          { kind: "socket", path: join(linked, "rt", "second.sock") },
+          {
+            status: () => ({ consentFingerprint: "x", latch: { suspended: false, stopEpoch: 0 } }),
+            ensure: async () => ({ kind: "refused", code: "RemoteCommandsDisabled" }),
+          },
+        ),
+      ).rejects.toMatchObject({ reason: "host_api_dir_not_owner_only" })
+    } finally {
+      await server.close()
+    }
+  })
 })
