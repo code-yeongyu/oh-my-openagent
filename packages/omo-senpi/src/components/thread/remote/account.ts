@@ -3,6 +3,8 @@ import type { RemoteFailure } from "../../remote/types"
 import type { RemoteDevice } from "./ports"
 
 /** A remote client member that settled with a failure, thrown where the thread callers read the account (a caught read). */
+const LOCAL_ONLY = "local"
+
 export class AccountReadFailure extends Error {
   readonly failure: RemoteFailure
   constructor(failure: RemoteFailure) {
@@ -22,12 +24,14 @@ export type AccountDevices = { readonly here: string | null; readonly devices: r
 export async function accountDevices(client: RemoteClient): Promise<AccountDevices> {
   const listed = await client.devices.list()
   if (listed.kind === "error") throw new AccountReadFailure(listed)
+  // With no device service the self row is the placeholder id `local`; a service whose device list omits this device
+  // still names it, on a self row of kind `local` that carries the account id.
   const self = listed.value.find((row) => row.self === true)
-  const here = self === undefined || self.kind === "local" ? null : self.id
+  const here = self === undefined || self.id === LOCAL_ONLY ? null : self.id
   return {
     here,
     devices: listed.value
-      .filter((row) => row.kind !== "local")
+      .filter((row) => row.id !== LOCAL_ONLY)
       .map((row) => ({ device: row.id, label: row.name, online: row.online })),
   }
 }
