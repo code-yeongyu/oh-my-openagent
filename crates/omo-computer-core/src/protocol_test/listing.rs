@@ -113,11 +113,7 @@ fn capability_spellings_are_single() {
             "root_crop",
             "screencast",
             "screencast_crop",
-            "screenshot_portal",
-            // Row 55 (R34): the Windows routes of d-windows.md:87.
-            "wgc",
-            "printwindow",
-            "bitblt"
+            "screenshot_portal"
         ])
     );
     assert_eq!(

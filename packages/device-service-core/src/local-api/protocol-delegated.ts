@@ -32,6 +32,8 @@ export type SessionLocate = {
   readonly type: "session.locate"
   readonly device: string
   readonly engine_id: string
+  /** omo#13037 A4.3.3: one probe, no wait for the device's next change, a 3 s bound; only to a service that knows it. */
+  readonly single?: true
 }
 export type SessionCandidate = {
   readonly device: string

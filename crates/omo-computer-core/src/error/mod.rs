@@ -37,7 +37,6 @@ mod table;
 pub use code::{ComputerCode, EngineCode, ENGINE_CODE_BASE};
 pub use reason::{LayerFailure, Reason};
 pub use row::{
-    inner_row,
     from_wire, lookup, DispositionRule, ErrorRow, FailureKey, NextCall, NothingSent, Recovery,
     Source, UnknownFailure,
 };

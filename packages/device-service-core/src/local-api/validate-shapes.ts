@@ -55,6 +55,8 @@ const MILLIS_MAX = Number.MAX_SAFE_INTEGER
 
 export const deviceId = (v: unknown, what = "device"): string => text(v, SESSION_DEVICE_MAX_CHARS, what)
 export const sessionId = (v: unknown): string => text(v, SESSION_ID_MAX_CHARS, "session_id")
+// omo#13037: a durable engine session id, the wire's session id bound (as session.locate's engine_id).
+export const durableId = (v: unknown, what = "durable_id"): string => text(v, SESSION_ID_MAX_CHARS, what)
 export const attachId = (v: unknown): number => uint(v, 1, ATTACH_ID_MAX, "attach_id")
 export const millis = (v: unknown, what: string): number => uint(v, 0, MILLIS_MAX, what)
 

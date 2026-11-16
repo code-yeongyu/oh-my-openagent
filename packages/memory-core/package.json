@@ -26,6 +26,9 @@
     "./personas": {
       "import": "./src/personas/manifest.ts"
     },
+    "./hardware-id": {
+      "import": "./src/sync/item/machine-id.ts"
+    },
     "./process-identity": {
       "import": "./src/locks/process-identity.ts"
     },
@@ -56,6 +59,6 @@
   "dependencies": {
     "loro-crdt": "1.16.4",
     "yaml": "2.9.1",
-    "zod": "^4.6.5"
+    "zod": "^4.6.6"
   }
 }

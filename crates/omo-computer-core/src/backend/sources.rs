@@ -2,7 +2,7 @@
 
 use super::refusal::{BackendResult, Refusal};
 use super::types::{AxEvent, EpochChange};
-use crate::error::EngineCode;
+use crate::error::{EngineCode, Reason};
 
 /// A listen-only stop listener that injected input cannot trigger.
 pub trait StopListener: Send {
@@ -33,6 +33,13 @@ pub trait Presence: Send {
     fn hide(&mut self) -> BackendResult<()>;
 }
 
+/// A backend's monotonic clock in milliseconds, and its wait.
+pub trait BackendClock {
+    fn now_ms(&self) -> u64;
+    /// Waits `ms` on this clock (a fake clock just advances).
+    fn wait_ms(&self, ms: u64);
+}
+
 /// The accessibility observer events the settle and `waitFor` consume.
 pub trait AxEventSource: Send {
     /// The next event, or `None` when none is pending.
@@ -42,7 +49,8 @@ pub trait AxEventSource: Send {
     fn next_event(&mut self) -> BackendResult<Option<AxEvent>>;
 }
 
-/// The epoch source of a backend that has none: every read refuses.
+/// The epoch source of a backend that has none: every read refuses with
+/// `Internal{epoch_source_unsupported}`.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct NoEpochSource;
 
@@ -50,12 +58,13 @@ impl EpochSource for NoEpochSource {
     fn next_change(&mut self) -> BackendResult<Option<EpochChange>> {
         Err(Refusal::new(
             EngineCode::Internal,
-            "epoch_source_unsupported",
+            Reason::EpochSourceUnsupported,
         ))
     }
 }
 
-/// The event source of a backend without an accessibility observer: every read refuses.
+/// The event source of a backend without an accessibility observer: every read refuses with
+/// `AxUnsupported{ax_events_unsupported}`.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct NoAxEvents;
 
@@ -63,7 +72,7 @@ impl AxEventSource for NoAxEvents {
     fn next_event(&mut self) -> BackendResult<Option<AxEvent>> {
         Err(Refusal::new(
             EngineCode::AxUnsupported,
-            "ax_events_unsupported",
+            Reason::AxEventsUnsupported,
         ))
     }
 }

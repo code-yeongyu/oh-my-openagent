@@ -83,8 +83,13 @@ impl MarkerStore for FileMarker {
             let _ = fs::remove_file(&temp);
             return Err(error);
         }
-        fs::rename(&temp, &self.path)?;
-        File::open(dir)?.sync_all()
+        let committed = crate::durable::durable_rename(&temp, &self.path, dir);
+        if committed.is_err() {
+            // A refused or failed commit leaves no temp file behind (after a rename that
+            // succeeded, the temp is already gone and this finds nothing).
+            let _ = fs::remove_file(&temp);
+        }
+        committed
     }
 
     fn path(&self) -> Option<&Path> {
@@ -192,6 +197,7 @@ fn owner_ok(file: &File) -> bool {
 fn owner_ok(_file: &File) -> bool {
     true
 }
+
 
 #[cfg(unix)]
 fn euid() -> u32 {

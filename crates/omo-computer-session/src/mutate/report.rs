@@ -4,10 +4,11 @@
 
 use omo_computer_core::backend::Route;
 use omo_computer_core::methods::Method;
+use omo_computer_core::observation::ObservationSettle;
 use omo_computer_core::params::ReportMode;
 use omo_computer_core::report::{
     ActionReport, Delivered, Disposition, Effect, ReportContext, ReportParts, ReportRejection,
-    VerbClass,
+    Timings, VerbClass,
 };
 use omo_computer_core::results::ExecReply;
 use omo_computer_core::untrusted::UntrustedText;
@@ -17,10 +18,12 @@ pub(super) struct ReadBack {
     pub(super) effect: Effect,
 }
 
-/// The settle stage: a typed step that returns at once with `settle` absent; row 19
-/// supplies the policy behind it.
-pub(super) const fn settle() -> Option<omo_computer_core::report::Settle> {
-    None
+/// The settle stage's verdict for the effect rule: a settle that ran watched the window, so it
+/// is never the quiet suspect (that verdict needs the viewport rows of design row C19).
+pub(super) fn settle(
+    settled: Option<&crate::settle::Settled>,
+) -> Option<omo_computer_core::report::Settle> {
+    settled.map(|_| omo_computer_core::report::Settle::NotQuiet)
 }
 
 pub(super) const fn read_back(_settle: Option<omo_computer_core::report::Settle>) -> ReadBack {
@@ -34,11 +37,9 @@ pub(super) struct Sent {
     pub(super) count: u32,
     pub(super) of: u32,
     pub(super) effect: Effect,
+    pub(super) settle: Option<ObservationSettle>,
     pub(super) audit_id: Option<String>,
     pub(super) warning: Option<String>,
-    pub(super) paused: Vec<omo_computer_core::intervention::Pause>,
-    pub(super) session: Option<omo_computer_core::session_state::SessionState>,
-    pub(super) target: Option<omo_computer_core::intervention::TargetLiveness>,
     /// The foreground lease ended under the user since the last report.
     pub(super) user_moved_on: bool,
 }
@@ -71,35 +72,13 @@ pub(super) fn reply(
         note: None,
         warning: sent.warning,
         audit_ids: sent.audit_id.into_iter().collect(),
-        timings: None,
+        timings: sent.settle.as_ref().map(|settle| Timings {
+            settle_ms: Some(settle.waited_ms),
+            ..Timings::default()
+        }),
+        settle: sent.settle,
         evidence: Vec::new(),
         observation: UntrustedText,
-        paused: sent.paused,
-        session: sent.session,
-        target: sent.target,
     };
     ActionReport::new(ReportContext::new(verb, None), parts).map(|report| ExecReply(Some(report)))
-}
-
-/// The reply of an `up` whose hold the ledger already released at the 100 s bound (row 23,
-/// R49): effect `partial`, `delivered{count: 0, of: 1}`, nothing sent.
-///
-/// # Errors
-/// `Internal` if the report breaks a wire rule (a defect of this module).
-pub(crate) fn released_reply(mode: ReportMode, method: Method) -> Result<ExecReply, super::Refused> {
-    let sent = Sent {
-        route: Route::ForegroundHid,
-        count: 0,
-        of: 1,
-        effect: Effect::Partial,
-        audit_id: None,
-        warning: None,
-        paused: Vec::new(),
-        session: None,
-        target: None,
-        user_moved_on: false,
-    };
-    reply(mode, method, sent).map_err(|_| {
-        super::Refused::from(omo_computer_core::backend::Refusal::bare(omo_computer_core::error::EngineCode::Internal))
-    })
 }

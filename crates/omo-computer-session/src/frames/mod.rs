@@ -8,9 +8,6 @@ mod capture;
 mod reply;
 mod session_wire;
 
-pub(crate) use admit::frame_key;
-pub(crate) use session_wire::FrameCheck;
-
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

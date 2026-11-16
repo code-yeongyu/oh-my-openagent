@@ -39,6 +39,9 @@ pub(crate) struct WindowRefs {
     pub(crate) needs_observe: bool,
     /// Generations below the first number expired at once for the reason.
     pub(crate) wiped: Option<(u64, Reason)>,
+    /// The element numbers the latest expiry wiped: the only expired numbers that keep an
+    /// owner, so their tokens answer the expiry's reason (ruling R70bx).
+    pub(crate) wiped_numbers: Vec<u64>,
 }
 
 impl WindowRefs {
@@ -111,7 +114,7 @@ impl RefRegistry {
         let stale = Refusal::bare(EngineCode::StaleRef);
         let parsed = RefToken::parse(token).ok_or(Refusal::bare(EngineCode::InvalidTarget))?;
         if object_mode && matches!(parsed, RefToken::Bare { .. }) {
-            return Err(Refusal::new(EngineCode::InvalidTarget, Reason::RefUnqualified.wire()));
+            return Err(Refusal::new(EngineCode::InvalidTarget, Reason::RefUnqualified));
         }
         let window_id = self.owner.get(&parsed.n()).ok_or_else(|| stale.clone())?.clone();
         let window = self.windows.get_mut(&window_id).ok_or_else(|| stale.clone())?;
@@ -127,13 +130,18 @@ impl RefRegistry {
         };
         let Some(generation) = window.generations.get_mut(&number) else {
             return Err(match window.wiped {
-                Some((below, reason)) if number < below => Refusal::new(EngineCode::StaleRef, reason.wire()),
+                Some((below, reason)) if number < below => Refusal::new(EngineCode::StaleRef, reason),
                 _ => stale,
             });
         };
         let index = generation.position(parsed.n()).ok_or(stale)?;
         self.tick += 1;
         generation.last_used = self.tick;
+        // A hit on a drill also uses the full observation it hangs under: the LRU prune looks
+        // only at full observations, and drops the drill with its parent.
+        if let Some(parent) = generation.parent.and_then(|top| window.generations.get_mut(&top)) {
+            parent.last_used = self.tick;
+        }
         Ok((window_id, number, index))
     }
 }

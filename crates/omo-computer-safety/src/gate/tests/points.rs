@@ -2,6 +2,7 @@
 //! `InvalidTarget{drag_destination}` when any point is refused, naming the point and the
 //! refusing stage's own refusal, before the button goes down.
 
+use omo_computer_core::error::Reason;
 use omo_computer_core::backend::Refusal;
 use omo_computer_core::listing::{Rect, WindowIdentity, WindowInfo};
 use omo_computer_core::params::Point;
@@ -12,7 +13,7 @@ use super::{at, exec, self_set, tables, window, TERMINAL};
 use crate::resolve::{resolve, TargetRef};
 
 fn wire(refusal: &Refusal) -> (&'static str, Option<&'static str>) {
-    (refusal.code.wire(), refusal.reason)
+    (refusal.code.wire(), refusal.reason.map(Reason::wire))
 }
 
 fn drag(points: Vec<PointTarget>) -> Result<(), (Gate, Refusal, Option<Point>, Refusal)> {
