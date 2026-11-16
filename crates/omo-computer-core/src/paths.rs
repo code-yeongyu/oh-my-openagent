@@ -138,10 +138,11 @@ mod os {
     ) -> Result<Roots, RootsUnavailable> {
         let base = absolute(lookup, "LOCALAPPDATA").ok_or(RootsUnavailable::NoLocalAppData)?;
         let state = base.join("OmO").join("ComputerControl");
-        // Windows keeps its sockets and locks in the per-SID named-object namespace; the
-        // file-backed runtime entries (the published endpoint) sit beside the marker.
+        // The Windows lock directory (A-IS-65 L3): `interaction.lock` and the file-backed
+        // runtime entries live in `run` under the STATE root, per user and the same in every
+        // logon session of the user; the daemon's named object stays per SID.
         Ok(Roots {
-            runtime: state.clone(),
+            runtime: state.join("run"),
             state,
         })
     }
@@ -240,5 +241,21 @@ mod tests {
         assert!(relative
             .state
             .ends_with(".local/state/omo/computer-control"));
+    }
+
+    /// A-IS-65 L3: the Windows lock directory is `%LOCALAPPDATA%\OmO\ComputerControl\run`,
+    /// per user and the same in every logon session; the STATE root stays its parent.
+    #[cfg(windows)]
+    #[test]
+    fn windows_runtime_root_is_the_run_directory_under_local_app_data() {
+        let roots = resolve(|name| {
+            (name == "LOCALAPPDATA").then(|| r"C:\Users\u\AppData\Local".to_owned())
+        })
+        .expect("resolves");
+        assert_eq!(
+            roots.state,
+            Path::new(r"C:\Users\u\AppData\Local\OmO\ComputerControl")
+        );
+        assert_eq!(roots.runtime, roots.state.join("run"));
     }
 }

@@ -29,6 +29,8 @@ pub mod reservation;
 mod session;
 pub mod session_state;
 pub mod settle;
+#[cfg(test)]
+mod test_process;
 pub mod trace;
 mod wait_for;
 

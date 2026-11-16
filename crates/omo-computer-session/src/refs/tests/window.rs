@@ -190,3 +190,20 @@ fn repeated_expiries_keep_only_the_latest_expiry_s_owner_entries() {
     let next = |reason| lookup(FailureKey { source: Source::Engine(EngineCode::StaleRef), reason }).map(|row| row.next_call);
     assert_eq!(next(Some(Reason::Epoch)), next(None), "both answers carry the same next call");
 }
+
+/// Review L1 of #13391 (at 68521dfbec): an expiry that wipes nothing (two epoch moves with no
+/// observe in between, e.g. lock then sleep) keeps the previous expiry's owner entries, so the
+/// window's last real tokens still answer `StaleRef{epoch}` with their reason.
+#[test]
+fn an_expiry_that_wipes_nothing_keeps_the_last_tokens_reason() {
+    let mut refs = RefRegistry::default();
+    let minted = refs.mint(&root("w"), &flat_walk(20, 10_000), None);
+    let token = refs.generation("w", minted.generation).expect("minted").token(1);
+    refs.expire("w", Expiry::Epoch);
+    refs.expire("w", Expiry::Epoch);
+    let owned = refs.owner.values().filter(|owner| owner.as_str() == "w").count();
+    assert_eq!(owned, 20, "the empty expiry did not drop the last expiry's owner entries");
+    let mut tree = Tree::default();
+    let answer = refs.resolve(&token, true, &mut tree).map_err(|u| u.refusal);
+    assert_eq!(answer, Err(stale(Reason::Epoch)), "the last real token keeps its reason");
+}

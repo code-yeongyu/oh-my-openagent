@@ -12,6 +12,7 @@ use serde_json::json;
 
 mod binding;
 mod delivered;
+mod lock;
 mod readmit;
 mod refusal;
 
@@ -104,11 +105,7 @@ impl Session {
                 }
             }
         }
-        if let Err((refusal, detail)) = self.funnel.control.commit(self.backend.as_mut(), &plan, epoch) {
-            let out = Refused {
-                detail: detail.map(Box::new),
-                ..refusal.refusal().into()
-            };
+        if let Err(out) = self.funnel.control.commit(self.backend.as_mut(), &plan, epoch) {
             return Err(self.refuse(record, Some("Lease".to_owned()), out));
         }
         let held = Held {
@@ -159,13 +156,7 @@ impl Session {
             }
             Ok(Verdict::Proceed) => {}
         }
-        let lock = match self
-            .funnel
-            .lock
-            .as_ref()
-            .map(crate::lock::InteractionLock::acquire)
-            .transpose()
-        {
+        let lock = match self.interaction_lock() {
             Ok(lock) => lock,
             Err(error) => {
                 self.funnel
@@ -207,7 +198,7 @@ impl Session {
         let (count, of) = (outcome.count, outcome.of);
         if count > 0 {
             if let Some(now) = self.backend.clock().map(BackendClock::now_ms) {
-                self.display_awake.update(|hold| hold.on_exec(now, hold_limits));
+                self.display_awake.update(|hold| hold.tick(now, hold_limits).on_exec(now, hold_limits));
             }
         }
         if let Some((target, frame_id)) = mutation.consume.as_ref().filter(|_| count > 0) {
