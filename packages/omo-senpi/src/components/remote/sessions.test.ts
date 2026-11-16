@@ -420,10 +420,13 @@ describe("durable-id addressing", () => {
 
   test("#given a session its device does not hold #when a member addresses it #then not_found{session} names sessions.list, never an update", async () => {
     const { client } = await opened()
+    // A well-formed listing key the device does not hold: a service with #1350 refuses an id that is no key at all as
+    // invalid_request before any lookup.
+    const nowhere = handleOf(PEER, "bm90LWhlbGQta2V5LTAwMQ")
     for (const settled of [
-      await client.sessions.interrupt(handleOf(PEER, "dur-nowhere")),
-      await client.sessions.setModel(handleOf(PEER, "dur-nowhere"), "anthropic/claude"),
-      await client.sessions.get(handleOf(PEER, "dur-nowhere")),
+      await client.sessions.interrupt(nowhere),
+      await client.sessions.setModel(nowhere, "anthropic/claude"),
+      await client.sessions.get(nowhere),
     ]) {
       const failure = failureOf(settled)
       expect(failure).toMatchObject({ code: "not_found", details: { kind: "session", device: PEER } })
@@ -439,6 +442,7 @@ describe("durable-id addressing", () => {
       sender: { kind: "person", uid: "user-1" },
       timers: fakeClock(),
       deps: { version: "5.1.70" },
+      dial: () => Promise.reject(new Error("the listing alone resolves a listed durable id")),
       member: () => Promise.reject(new Error("the listing alone resolves a listed durable id")),
       sessionsList: client.sessions.list,
       devicesList: client.devices.list,
@@ -464,6 +468,44 @@ describe("#13756 review", () => {
     const session = clientOn(owner.stateDir, fakeClock(), { kind: "session", id: "dur-caller" })
     await valueOf(session.sessions.open({ device: PEER }))
     expect(sent("open_session").map((rpc) => rpc["permissionPreset"])).toEqual(["ask"])
+  })
+
+  test("#given sessions.open with and without a first prompt #when each opens #then its open_session dials its own connection, closed once it settles (dev #13761 parity, M1 of 6473ed9)", async () => {
+    const { owner } = await onWorld()
+    type Dialed = { readonly endpoint: string[]; closed: boolean }
+    const dialed: Dialed[] = []
+    const client = clientOn(owner.stateDir, fakeClock(), undefined, {
+      connect: async (options) => {
+        const svc = await connectDeviceService(options)
+        const entry: Dialed = { endpoint: [], closed: false }
+        dialed.push(entry)
+        return {
+          ...svc,
+          endpointCommand: async (device, rpc, endpointOptions) => {
+            entry.endpoint.push(String(rpc["type"]))
+            return await svc.endpointCommand(device, rpc, endpointOptions)
+          },
+          close: () => {
+            entry.closed = true
+            svc.close()
+          },
+        }
+      },
+    })
+    // Opening on the shared connection attaches the host's delegated engine connection to it, so every streamed delta
+    // would arrive twice there (#12777): the open rides a connection of its own, which the shared one outlives.
+    await valueOf(client.sessions.open({ device: PEER }))
+    expect(dialed).toEqual([
+      { endpoint: [], closed: false },
+      { endpoint: ["open_session"], closed: true },
+    ])
+    const opened = await valueOf(client.sessions.open({ device: PEER, first: { text: "start" } }))
+    expect(opened.receipt).toMatchObject({ lane: "started" })
+    expect(dialed).toEqual([
+      { endpoint: [], closed: false },
+      { endpoint: ["open_session"], closed: true },
+      { endpoint: ["open_session"], closed: true },
+    ])
   })
 
   test("#given a person's uid #when the client builds its sender #then it is the CLI's one identity: that uid and this user's name (L1)", () => {
@@ -529,7 +571,9 @@ describe("an open on this device", () => {
   test("#given a connected service whose device listing omits this device #when devices.list reads #then the self row is not the no-service row", async () => {
     const owner = await startOwner(selfWorld())
     const [self] = await valueOf(clientOn(owner.stateDir, fakeClock()).devices.list())
-    expect(self).toMatchObject({ id: SELF, self: true, kind: "cli" })
+    // This device's own id and name, online with its service; no kind is invented for it (#13402).
+    expect(self).toMatchObject({ id: SELF, self: true, online: true })
+    expect(self?.kind).toBeUndefined()
   })
 
   type Fault = (frame: Record<string, unknown>, socket: Socket) => void

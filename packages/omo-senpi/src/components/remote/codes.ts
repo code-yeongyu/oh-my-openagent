@@ -1,4 +1,4 @@
-import { LocalApiError } from "@oh-my-opencode/device-service-core/device-service"
+import { LocalApiError, type ClientErrorCode, type ErrorCode } from "../../../../device-service-core/src/wire"
 import { THREAD_ERROR_CODES } from "../thread/errors"
 import type { RemoteFailure } from "./types"
 
@@ -33,7 +33,7 @@ export const remoteFailure = (
   extra: Omit<RemoteFailure, "kind" | "code" | "message" | "next_action"> = {},
 ): RemoteFailure => ({ kind: "error", code, message, next_action, ...extra })
 
-type LocalApiCode = LocalApiError["code"]
+type LocalApiCode = ErrorCode | ClientErrorCode
 type Mapped = { readonly code: RemoteCode; readonly details?: Readonly<Record<string, unknown>> }
 
 // How every code the local API (L0) or the device service raises reaches a caller. Typed over the whole vocabulary, so a
@@ -65,6 +65,7 @@ const LOCAL_API_CODES: Readonly<Record<LocalApiCode, Mapped>> = {
   peer_not_found: { code: "not_found", details: { kind: "device" } },
   peer_not_session_client: { code: "not_found", details: { kind: "device" } },
   session_not_found: { code: "not_found", details: { kind: "session" } },
+  session_ambiguous: { code: "ambiguous_target", details: { kind: "session" } },
   not_attached: { code: "not_found", details: { kind: "handle" } },
   // omo#13037 A5.1: an answer to a delivery no hand-off waits on; nothing was applied.
   unknown_delivery: { code: "not_found", details: { kind: "delivery" } },

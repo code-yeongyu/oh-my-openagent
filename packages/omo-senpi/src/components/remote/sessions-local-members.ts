@@ -1,3 +1,4 @@
+import { interruptOver } from "../thread/control/interrupt"
 import type { ThreadSocketConnect } from "../thread/live-surface"
 import type { ThreadHost, ThreadSessionPort } from "../thread/tools/ports"
 import { ok, type Outcome } from "./client"
@@ -89,16 +90,9 @@ export function localSessionMembers(hostOn: HostOn) {
       }),
     interrupt: (target: LocalTarget, thread: ThreadHandle): Promise<Outcome<InterruptResult>> =>
       run(target, "interrupted the turn", async ({ port, routing, durable }) => {
-        const result = await port.interrupt(routing, undefined, durable)
-        const turn = text(result.turnId)
-        return ok({
-          thread_id: thread,
-          ...(turn === undefined ? {} : { turn_id: turn }),
-          interrupted: result.interrupted === true,
-          // This device's host reports no background jobs of the turn.
-          background: { status: "not_supported" },
-          device: target.device,
-        })
+        // The thread tools' one interrupt body: this device's host gets the record thread_interrupt sends.
+        const outcome = await interruptOver((request) => port.interrupt(routing, request, durable), undefined)
+        return ok({ thread_id: thread, ...outcome, device: target.device })
       }),
     setReasoning: (target: LocalTarget, level: string) =>
       run(target, "set the thinking level", async ({ port, routing, durable }) => {
