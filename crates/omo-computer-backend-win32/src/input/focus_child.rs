@@ -17,7 +17,7 @@ pub trait FocusOs {
 /// The refusal when the target thread has no focus window.
 pub const NO_FOCUS_TARGET: Refusal = Refusal::new(
     EngineCode::BackgroundUnavailable,
-    Reason::NoFocusTarget.wire(),
+    Reason::NoFocusTarget,
 );
 
 /// The window a posted key or character goes to for the top-level `window`.

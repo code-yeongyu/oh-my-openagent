@@ -8,7 +8,7 @@ use crate::input::{VK_F, VK_RETURN, VK_TAB, WM_CHAR, WM_SYSKEYDOWN, WM_SYSKEYUP}
 fn refused(chord: Chord) {
     let refusal = posted_press(&chord).expect_err("refused before any post");
     assert_eq!(refusal.code, EngineCode::BackgroundUnavailable);
-    assert_eq!(refusal.reason, Some(Reason::PostedModifierChord.wire()));
+    assert_eq!(refusal.reason, Some(Reason::PostedModifierChord));
 }
 
 #[test]
