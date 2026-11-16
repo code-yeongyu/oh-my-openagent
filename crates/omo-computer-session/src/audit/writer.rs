@@ -18,7 +18,7 @@ use serde_json::json;
 use super::line::{now_ms, AuditEvent};
 use super::handlock::HandLock;
 use super::mark::is_chord_refusal_event;
-use super::scan::{HandScan, Tamper};
+use super::scan::{identity, HandScan, Tamper};
 use super::segment::{anchor_event, chain_link, stamp, truncated, Segment};
 use super::sink::{AuditSink, AUDIT_UNAVAILABLE};
 
@@ -91,6 +91,9 @@ pub struct AuditWriter {
     audit_dir: PathBuf,
     /// This process's reads of the hand (R7-2): whole once, then only what was appended.
     scan: HandScan,
+    /// The file this writer's segment was opened in: after another writer's rotation the segment
+    /// is opened again (audit.meta first) in the new file, so no key starts a file without one.
+    segment_file: Option<(u64, u64)>,
 }
 
 impl AuditWriter {
@@ -147,14 +150,11 @@ impl AuditWriter {
             cap_refusal_written: false,
             audit_dir: audit_dir.to_owned(),
             scan: HandScan::default(),
+            segment_file: None,
         };
         // R7-3: audit.1.jsonl with no audit.jsonl is a rotation in progress, never a fresh hand:
         // the new file's chain starts from the retired file's last line.
-        let max_line = this.limits.max_event + super::scan::LINE_STAMP_BYTES;
-        let retired = this.path.with_file_name(ROTATED_FILE);
-        let last = chain_link(&this.path, max_line).or_else(|| {
-            (!this.path.exists() && retired.exists()).then(|| chain_link(&retired, max_line)).flatten()
-        });
+        let last = this.segment_link();
         this.open_segment(last, false)?;
         Ok(this)
     }
@@ -191,7 +191,9 @@ impl AuditWriter {
             text.push_str(&line.to_string());
             text.push('\n');
         }
-        self.write_held(text.as_bytes())
+        self.write_held(text.as_bytes())?;
+        self.segment_file = identity(&self.path);
+        Ok(())
     }
 
     /// Appends `bytes` to the hand's file; the caller holds the hand's lock.
@@ -206,6 +208,18 @@ impl AuditWriter {
         let mut file = options.open(&self.path)?;
         file.write_all(bytes)?;
         file.sync_data()
+    }
+
+    /// The chain link a new segment of this writer starts from: the current file's last line,
+    /// or, while a rotation is in progress (audit.1.jsonl and no audit.jsonl), the retired file's.
+    fn segment_link(&self) -> Option<String> {
+        let max_line = self.limits.max_event + super::scan::LINE_STAMP_BYTES;
+        let retired = self.path.with_file_name(ROTATED_FILE);
+        chain_link(&self.path, max_line).or_else(|| {
+            (!self.path.exists() && retired.exists())
+                .then(|| chain_link(&retired, max_line))
+                .flatten()
+        })
     }
 
     fn hand_dir(&self) -> io::Result<&Path> {
@@ -283,6 +297,11 @@ impl AuditWriter {
             if let Err(error) = self.rotate() {
                 eprintln!("omo-computer-engine: warn audit not rotated, refused at its hard cap: {error}");
             }
+        }
+        // Another writer rotated since this segment opened: it opens again in the new file.
+        if identity(&self.path) != self.segment_file {
+            let last = self.segment_link();
+            self.open_segment(last, false)?;
         }
         // R7-2: the hard cap never refuses a chord refusal's line: one per segment past it.
         let refusal = is_chord_refusal_event(&event);

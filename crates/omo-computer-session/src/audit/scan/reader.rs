@@ -51,8 +51,7 @@ fn id_of(_path: &Path, _meta: &fs::Metadata) -> Result<FileId, Tamper> {
     Err(Tamper::Unreadable)
 }
 
-/// The identity of the regular file at `path` (tests use it to tell rotations apart).
-#[cfg(test)]
+/// The identity of the regular file at `path` (a writer tells a rotation by it).
 pub(crate) fn identity(path: &Path) -> Option<(u64, u64)> {
     let meta = fs::symlink_metadata(path).ok()?;
     id_of(path, &meta).ok().map(|FileId(a, b)| (a, b))

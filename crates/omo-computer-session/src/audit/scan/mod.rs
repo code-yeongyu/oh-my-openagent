@@ -11,7 +11,6 @@ mod reader;
 use std::path::{Path, PathBuf};
 
 pub use reader::LINE_STAMP_BYTES;
-#[cfg(test)]
 pub(crate) use reader::identity;
 use reader::{read_lines, stat, Seen};
 
