@@ -180,9 +180,10 @@ fn own_method(request: &Value, id: &Value, grant: Grant, shared: &Shared, out: &
         return false;
     }
     if grant != Grant::Authority {
+        // The audit line is written before the refusal leaves: a peer never holds an unaudited refusal.
+        eprintln!("omo-computer-engine: audit: {method} refused hostOnly{{peer_kind:attach_host}}");
         let data = json!({"reason": "hostOnly", "peer_kind": "attach_host"});
         send(out, &error(id, -32_601, "Method not found", data));
-        eprintln!("omo-computer-engine: audit: {method} refused hostOnly{{peer_kind:attach_host}}");
         return true;
     }
     if method == "desktop.shutdown" {
