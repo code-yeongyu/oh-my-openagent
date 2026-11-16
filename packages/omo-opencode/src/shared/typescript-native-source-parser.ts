@@ -12,13 +12,27 @@ const connectionGone = (error: unknown): boolean =>
 export class TypeScriptSourceParser {
   readonly #cwd: string
   #api: API
+  #queue: Promise<unknown> = Promise.resolve()
 
   constructor(cwd: string) {
     this.#cwd = cwd
     this.#api = new API({ cwd })
   }
 
-  async parse(filePaths: readonly string[]): Promise<ReadonlyMap<string, SourceFile>> {
+  // One parse at a time. The TypeScript API starts its process on the first request without guarding concurrent first
+  // requests (two would start two processes), and a restart must never close an API another parse is still using
+  // (#13963 review L1). A parse whose process was killed fails at once, so it does not hold the queue.
+  parse(filePaths: readonly string[]): Promise<ReadonlyMap<string, SourceFile>> {
+    const run = this.#queue.then(async () => await this.#parseOrRestart(filePaths))
+    this.#queue = run.catch(() => undefined)
+    return run
+  }
+
+  async close(): Promise<void> {
+    await this.#api.close()
+  }
+
+  async #parseOrRestart(filePaths: readonly string[]): Promise<ReadonlyMap<string, SourceFile>> {
     try {
       return await this.#parseWith(this.#api, filePaths)
     } catch (error) {
@@ -29,10 +43,6 @@ export class TypeScriptSourceParser {
       this.#api = new API({ cwd: this.#cwd })
       return await this.#parseWith(this.#api, filePaths)
     }
-  }
-
-  async close(): Promise<void> {
-    await this.#api.close()
   }
 
   async #parseWith(api: API, filePaths: readonly string[]): Promise<ReadonlyMap<string, SourceFile>> {
