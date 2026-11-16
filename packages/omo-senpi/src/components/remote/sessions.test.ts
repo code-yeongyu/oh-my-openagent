@@ -1011,6 +1011,8 @@ describe("an open on this device", () => {
     emptyDirs.push(dir)
     const engine = join(dir, "senpi")
     writeFileSync(engine, "#!/bin/sh\nexec sleep 30\n", { mode: 0o755 })
+    // The default host reads the process environment; it is put back after, since a package-local run restores none.
+    const saved = { SENPI_BIN: process.env.SENPI_BIN, OMO_CODING_AGENT_DIR: process.env.OMO_CODING_AGENT_DIR }
     process.env.SENPI_BIN = engine
     // An empty agent dir: no operator socket, no endpoint registered on disk.
     process.env.OMO_CODING_AGENT_DIR = join(dir, "agent")
@@ -1027,6 +1029,9 @@ describe("an open on this device", () => {
       expect(listing.unanswered.map((row) => row.id)).not.toContain(SELF)
     } finally {
       client.close()
+      for (const [name, value] of Object.entries(saved))
+        if (value === undefined) delete process.env[name]
+        else process.env[name] = value
     }
   })
 
@@ -1059,6 +1064,68 @@ describe("an open on this device", () => {
     expect(dialed).toBeGreaterThan(0)
     expect(listing.rows.map((row) => row.device.id)).toContain(PEER)
     expect(listing.rows.filter((row) => row.device.id === SELF)).toEqual([])
+    expect(listing.unanswered.map((row) => row.id)).not.toContain(SELF)
+  })
+
+  test("#given an operator socket that refuses the connect and a registered endpoint that fails another way #when sessions.list reads the whole account #then this device is unanswered, not reported as holding no session", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "omo-remote-mixed-"))
+    emptyDirs.push(dir)
+    const operator = join(dir, "rpc.sock")
+    const shard = join(dir, "i-0123456789abcdef.sock")
+    for (const path of [operator, shard]) writeFileSync(path, "")
+    // The kernel's answer for each socket: nothing listens on the operator's any more; the shard's connection breaks.
+    const failure = (path: string) =>
+      path === operator
+        ? Object.assign(new Error(`connect ECONNREFUSED ${path}`), { code: "ECONNREFUSED" })
+        : Object.assign(new Error(`write EPIPE ${path}`), { code: "EPIPE" })
+    const owner = await startOwner(selfWorld())
+    const client = clientOn(owner.stateDir, fakeClock(), undefined, {
+      localThreadHost: async () =>
+        createLiveThreadSurface(undefined, {
+          socket: operator,
+          env: {},
+          statusAll: async () => undefined,
+          registry: async () => [
+            { socket: shard, dir, identity: "endpoint", endpoint_kind: "rpc_host", registry_version: 2 },
+          ],
+          connect: (path) => {
+            const broken = new Socket()
+            queueMicrotask(() => broken.destroy(failure(path)))
+            return broken
+          },
+        }),
+    })
+    const listing = await valueOf(client.sessions.list())
+    expect(listing.rows.map((row) => row.device.id)).toContain(PEER)
+    expect(listing.rows.filter((row) => row.device.id === SELF)).toEqual([])
+    expect(listing.unanswered.map((row) => row.id)).toContain(SELF)
+  })
+
+  test("#given a one-endpoint host whose socket refuses the connect #when sessions.list reads the whole account #then this device holds no session, not that it missed the round", async () => {
+    // A ThreadHost without listView raises its one endpoint's failure from listSessions.
+    const unused = async (): Promise<never> => {
+      throw new Error("not used by a listing")
+    }
+    const refusing: ThreadHost = {
+      socket: "refused.sock",
+      listSessions: async () => {
+        throw Object.assign(new Error("connect ECONNREFUSED refused.sock"), { code: "ECONNREFUSED" })
+      },
+      openSession: unused,
+      getMessages: unused,
+      getState: unused,
+      prompt: unused,
+      interrupt: unused,
+      setSessionName: unused,
+      setModel: unused,
+      getAvailableModels: unused,
+      setThinkingLevel: unused,
+      getAvailableThinkingLevels: unused,
+    }
+    const owner = await startOwner(selfWorld())
+    const client = clientOn(owner.stateDir, fakeClock(), undefined, { localThreadHost: async () => refusing })
+    const listing = await valueOf(client.sessions.list())
+    expect(listing.rows.map((row) => row.device.id)).toContain(PEER)
     expect(listing.unanswered.map((row) => row.id)).not.toContain(SELF)
   })
 
