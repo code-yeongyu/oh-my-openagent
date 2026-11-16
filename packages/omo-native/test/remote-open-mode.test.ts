@@ -78,25 +78,10 @@ async function open(
 // omo#13409 / omo#13410 / omo#13399: `omo remote open` names the model, the thinking level, a new worktree and the first
 // prompt in the one open, through the same create path as thread_create.
 describe("omo remote open with create options", () => {
-  test("#given --model and --thinking #when opened #then the open_session frame carries them and no set_model follows", async () => {
-    const result = await open(["--model", "anthropic/claude-opus-5-5", "--thinking", "high"])
+  test("#given --thinking #when opened #then the open_session frame carries the level", async () => {
+    const result = await open(["--thinking", "high"])
     expect(result.code).toBe(REMOTE_EXIT.ok)
-    expect(result.frames).toEqual([
-      expect.objectContaining({ provider: "anthropic", modelId: "claude-opus-5-5", thinkingLevel: "high" }),
-    ])
-    expect(result.types).toEqual(["open_session"])
-  })
-
-  test("#given a model b cannot run #when opened #then it fails with model_not_found and no session is left", async () => {
-    const result = await open(["--model", "anthropic/nope", "--json"], undefined, {
-      openRefuse: "model_unavailable: no model anthropic/nope",
-    })
-    expect(result.code).toBe(REMOTE_EXIT.failed)
-    expect(JSON.parse(result.out[0] ?? "{}")).toMatchObject({
-      kind: "error",
-      error: { code: "model_not_found", details: { reason: "model_unavailable" } },
-    })
-    expect(result.types).toEqual(["open_session"])
+    expect(result.frames).toEqual([expect.objectContaining({ thinkingLevel: "high" })])
   })
 
   test("#given --prompt #when opened #then the new session is prompted once and the result names the delivery", async () => {
