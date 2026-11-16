@@ -50,6 +50,21 @@ describe("monitor rpc remote targets (#12719): omo's RpcRemoteSource", () => {
     expect(lines).toEqual([])
   })
 
+  test("#given b's engine names its session by its routing id #when its records reach senpi #then each carries the target label, so senpi keys them with the rows it armed", async () => {
+    const a = account()
+    const { lines, handlers } = capture()
+    const opened = await registered(a.remote).open({ device: "b", session: "dur-on-b" }, {}, handlers)
+    for (const watch of [...a.watchers]) {
+      watch.record({ type: "session_status", sessionId: "rpc-1", status: "running" })
+      watch.record({ type: "agent_settled", sessionId: "rpc-1", turnId: "7" })
+    }
+    opened.stop()
+    expect(lines).toEqual([
+      { type: "session_status", sessionId: "dur-on-b", status: "running" },
+      { type: "agent_settled", sessionId: "dur-on-b", turnId: "7" },
+    ])
+  })
+
   test("#given an engine without senpi's remote-target seam #when the thread component registers #then nothing is registered and nothing throws", () => {
     expect(registerRemoteMonitorTargets({}, account().remote)).toBe(false)
   })
@@ -69,7 +84,7 @@ describe("monitor rpc remote targets (#12719): omo's RpcRemoteSource", () => {
     expect([opened.initial, lines]).toEqual([
       { rows: [{ sessionId: "dur-on-b", status: "idle" }], settledTurns: [], cursor: "" },
       [
-        { type: "agent_start" },
+        { type: "agent_start", sessionId: "dur-on-b" },
         {
           type: "session_status",
           sessionId: "dur-on-b",
