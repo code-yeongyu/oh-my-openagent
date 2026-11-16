@@ -36,3 +36,43 @@ fn secure_field_observe_withholds_tree_and_frame() {
         assert!(!reply.contains(secret), "{secret} reached a private-mode reply: {reply}");
     }
 }
+
+/// R70f(1), R70g(1): a private-mode observation names the user in `nextCall`.
+#[test]
+fn a_private_mode_observation_names_the_user_in_next_call() {
+    let mut session = session(SECURE_FOCUS);
+    let observation = session.observe(serde_json::from_value(json!({"target": "101"})).expect("params")).expect("observe");
+    let reply = serde_json::to_value(&observation).expect("json");
+    assert_eq!(reply["nextCall"], json!("ask the user to fill the field"), "{reply}");
+}
+
+/// Acceptance 79: every Frame, Observation and ActionReport is stamped untrustedText.
+#[test]
+fn every_reply_is_stamped_untrusted() {
+    let mut session = session(FIELDS);
+    let observation = serde_json::to_value(session.observe(serde_json::from_value(json!({"target": "101"})).expect("params")).expect("observe")).expect("json");
+    assert_eq!(observation["observation"], json!({"untrustedText": true}), "{observation}");
+    let frame = serde_json::to_value(session.capture_frame("101", true, None).expect("capture")).expect("json");
+    assert_eq!(frame["observation"], json!({"untrustedText": true}), "{frame}");
+    session.stop_path_start(serde_json::from_value(json!({})).expect("start"));
+    let typed = session.type_text(serde_json::from_value(json!({"target": "101", "text": "abc"})).expect("typeText")).expect("typeText");
+    let report = serde_json::to_value(typed).expect("json");
+    assert_eq!(report["observation"], json!({"untrustedText": true}), "{report}");
+}
+
+/// Row 26: a secret typed into a secure field goes out as keystrokes (never through the
+/// clipboard) and is echoed nowhere in the reply.
+#[test]
+fn secret_typing_never_uses_paste_and_never_echoes_the_value() {
+    let sink = RecordingSink::default();
+    let backend = FakeBackend::with_parts(FakeScenario::from_json(SECURE_FOCUS).expect("scenario"), FakeClock::default(), sink.clone())
+        .with_stop_path(StopPathScript::Live);
+    let mut session = Session::new(Box::new(backend));
+    session.open(serde_json::from_value(json!({"reportMode": "object"})).expect("open")).expect("open");
+    session.stop_path_start(serde_json::from_value(json!({})).expect("start"));
+    let reply = session.type_text(serde_json::from_value(json!({"target": "101", "text": "hunter2"})).expect("typeText"));
+    let text = format!("{reply:?}");
+    assert!(!text.contains("hunter2"), "the secret reached the reply: {text}");
+    let lines = sink.lines();
+    assert!(!lines.iter().any(|line| line.contains("clipboard")), "no paste route: {lines:?}");
+}

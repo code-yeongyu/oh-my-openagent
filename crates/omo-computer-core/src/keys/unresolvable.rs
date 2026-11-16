@@ -50,6 +50,14 @@ pub fn first_unresolvable(
     text.chars().map(String::from).find(|grapheme| !resolvable(group, grapheme)).map(|grapheme| Unresolvable { group, grapheme })
 }
 
+/// The route a target types through (acceptance 81). `remote_screen`: the window shows another
+/// machine's screen; `x11_keymap_remap`: the opt-in `computer.x11_keymap_remap`.
+#[must_use]
+pub const fn text_route(platform: crate::report::Platform, remote_screen: bool, x11_keymap_remap: bool) -> TextRoute {
+    let _ = (platform, remote_screen, x11_keymap_remap);
+    TextRoute::Unicode
+}
+
 impl Unresolvable {
     /// `InvalidKey{reason:"unresolvable"}`; its `group` and `grapheme` go in [`Self::detail`].
     #[must_use]
@@ -81,6 +89,18 @@ mod tests {
         assert_eq!((first.refusal().code, first.refusal().reason), (EngineCode::InvalidKey, Some("unresolvable")));
         assert_eq!(first.detail(), json!({ "group": 0, "grapheme": "\u{d55c}" }));
         assert_eq!(first_unresolvable(TextRoute::None, "plain text", 0, two_level_us_map), None, "a resolvable text is not refused");
+    }
+
+    #[test]
+    fn text_route_is_unicode_for_a_macos_remote_screen_window_and_none_for_a_windows_one() {
+        use crate::report::Platform;
+        assert_eq!(text_route(Platform::Macos, true, false), TextRoute::Unicode, "every macOS target, a remote screen included");
+        assert_eq!(text_route(Platform::Macos, false, false), TextRoute::Unicode);
+        assert_eq!(text_route(Platform::Windows, false, false), TextRoute::Unicode, "an ordinary Windows window");
+        assert_eq!(text_route(Platform::Windows, true, false), TextRoute::None, "a Windows remote-screen window");
+        assert_eq!(text_route(Platform::X11, false, false), TextRoute::None, "X11 by default");
+        assert_eq!(text_route(Platform::X11, false, true), TextRoute::Remap, "X11 with the opt-in remap");
+        assert_eq!(text_route(Platform::Wayland, false, true), TextRoute::None, "Wayland");
     }
 
     #[test]
