@@ -2,7 +2,8 @@ import { existsSync } from "node:fs"
 
 import { type DeviceService, deviceServiceEndpointPath } from "../device-service-core/src/index.ts"
 import { serveRemoteAttach } from "./remote-attach"
-import { type BootstrapSetup, runBootstrapVerb } from "./remote-bootstrap"
+import { type BootstrapSetup, type DeviceLink, runBootstrapVerb, runEnableVerb } from "./remote-bootstrap"
+import { applyColdWake, type ColdWake } from "./remote-cold-wake"
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
 import {
   accountNotice,
@@ -24,6 +25,10 @@ export { REMOTE_EXIT } from "./remote-exit"
 /** `omo remote` verbs; `bootstrap` also needs the pinned install, the stored keys and this omo binary. */
 export interface RemoteVerbDependencies extends RemoteCommandDependencies {
   readonly bootstrap: BootstrapSetup
+  /** The session host unit `bootstrap` and `enable` install, `disable` removes and `status` reads back (omo#13594). */
+  readonly coldWake: ColdWake
+  /** `enable` only: hands the signed-in session's device to a service that holds none (omo#13602). */
+  readonly linkDevice: DeviceLink
 }
 
 export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: readonly string[]): Promise<number> {
@@ -51,11 +56,37 @@ export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: 
     dependencies.error(REMOTE_USAGE)
     return REMOTE_EXIT.usage
   }
+  // `enable` is the one command after `omo login`: the bootstrap (install, connect, register this agent dir), the
+  // switch, the device link and the session host unit. It reaches the network, so it is not a local-only verb.
+  if (parsed.command === "enable") {
+    try {
+      return await runEnableVerb(
+        dependencies,
+        dependencies.bootstrap,
+        dependencies.coldWake,
+        dependencies.linkDevice,
+        parsed.json,
+      )
+    } catch (error) {
+      return reportFailure(dependencies, error)
+    }
+  }
   if (parsed.command === "bootstrap")
-    return (await runBootstrapVerb(dependencies, dependencies.bootstrap, parsed.json)) === "connected"
+    return (await runBootstrapVerb(dependencies, dependencies.bootstrap, dependencies.coldWake, parsed.json)) ===
+      "connected"
       ? REMOTE_EXIT.ok
       : REMOTE_EXIT.unavailable
-  return runLocalRemoteVerb(dependencies, parsed)
+  // The service manager's view of this device's units is read here, outside remote-local's graph (omo#13440), and
+  // handed to `status` as data.
+  const localUnits = parsed.command === "status" ? await dependencies.coldWake.status() : undefined
+  const code = await runLocalRemoteVerb(
+    localUnits === undefined ? dependencies : { ...dependencies, localUnits },
+    parsed,
+  )
+  // After the verb's connection is closed: a changed table restarts the device service, which would cut it.
+  if (code === REMOTE_EXIT.ok && parsed.command === "disable")
+    await applyColdWake(dependencies.coldWake, false, dependencies.error)
+  return code
 }
 
 export type RemoteAttachLaunch = { readonly engineArgs: readonly string[] }
