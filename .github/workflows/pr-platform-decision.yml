@@ -56,6 +56,12 @@ jobs:
           body="$RUNNER_TEMP/pr-body.md"
           # The PR's changed files (the merge-base diff) from the API: no history is checked out.
           gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100" --jq '.[].filename' | tr '\n' '\0' > "$paths"
+          # The API lists at most 3000 files: a longer pull request cannot be judged by its listed paths alone.
+          listed="$(tr -cd '\0' < "$paths" | wc -c)"
+          changed="$(jq -r '.pull_request.changed_files // 0' "$GITHUB_EVENT_PATH")"
+          if [ "$listed" -lt "$changed" ]; then
+            echo "::warning title=ci:full-matrix file list truncated::The API listed $listed of $changed changed files, so a platform path may be missing from the check. To run macOS/Windows here, add a 'Platform-reason: <why>' line to the PR body."
+          fi
           # Read from the event file: a PR body can exceed the per-variable environment limit.
           jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH" > "$body"
           labels="$(jq -c '[.pull_request.labels[].name]' "$GITHUB_EVENT_PATH")"
