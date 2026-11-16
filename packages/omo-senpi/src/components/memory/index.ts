@@ -107,6 +107,8 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
               source: deviceAccount,
               memoryRoot,
               pinDir,
+              env,
+              logger: ctx.logger,
               signal: syncLifetime.signal,
               syncStatus: async () => {
                 const repo =

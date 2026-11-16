@@ -6,7 +6,10 @@ import {
   type DesktopSyncWire,
 } from "./desktopSyncProtocol"
 
-type OperationRequest = { readonly op: "service" | "keyring" | "genesisRun"; readonly data: unknown }
+type OperationRequest = {
+  readonly op: "service" | "keyring" | "genesisRun" | "phraseGenesisRun"
+  readonly data: unknown
+}
 
 export interface DesktopSyncOperationHandle {
   readonly handle: string
