@@ -52,7 +52,7 @@ export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
     name: "thread_read",
     label: "Read session",
     description:
-      "Returns the transcript and latest output of another session, for when the user asks what another session said or produced" +
+      "Returns the transcript and latest output of another session, for when the user asks what another session said or produced; wait_ms first waits, bounded, for a session on another device to finish its turn" +
       ROUTE_TO_TASK,
     exposure: THREAD_TOOL_EXPOSURE,
   },

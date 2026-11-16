@@ -491,7 +491,9 @@ export async function followRemote(
       void probe(settledAlready)
     }
   }
-  const watched = await remote.sessions.watch(row.device, row.session_id, receive)
+  // A gap in the attach ends the follow with its reason, as an ended attach always did: the send's own turn may have
+  // settled unseen, and the CLI answers that typed instead of waiting through a resync.
+  const watched = await remote.sessions.watch(row.device, row.session_id, { record: receive, lost: end })
   if (watched.kind !== "ok") return outcomeFailure(watched, row.device)
   void watched.watch.ended.then(end)
   return { settled, stop: watched.watch.stop, aim }

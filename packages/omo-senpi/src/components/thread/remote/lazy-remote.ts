@@ -38,7 +38,8 @@ export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThrea
     sessionCommand: async (device, sessionId, rpc, options) =>
       await (await load()).sessionCommand(device, sessionId, rpc, options),
     read: async (device, sessionId, tail) => await (await load()).read(device, sessionId, tail),
-    watch: async (device, sessionId, listener) => await (await load()).watch(device, sessionId, listener),
+    watch: async (device, sessionId, handlers, watchOptions) =>
+      await (await load()).watch(device, sessionId, handlers, watchOptions),
     close: async () => {
       const loaded = port
       port = undefined

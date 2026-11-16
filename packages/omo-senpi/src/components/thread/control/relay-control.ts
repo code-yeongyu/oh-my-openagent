@@ -1,3 +1,4 @@
+import type { ThreadWaitOutcome } from "../contracts"
 import type { ThreadTranscriptEntry } from "../reader"
 import { relayAddressEntry } from "../remote/address-book"
 import { rowThreadId } from "../remote/ports"
@@ -30,7 +31,10 @@ const THINKING_LEVEL_UNSUPPORTED =
  * (`sessionCommand`): the same records this device's endpoint takes, so each answer maps to the same result. The
  * caller has already found the device online (`locateControl`); a device that goes away in between refuses typed.
  */
-export function createRelayControl(remote: RemoteThreadSurface, row: RemoteSessionRow): SessionControl {
+export function createRelayControl(
+  remote: RemoteThreadSurface,
+  row: RemoteSessionRow,
+): SessionControl & Required<Pick<SessionControl, "waitSettled">> {
   const { device, session_id: sessionId } = row
   const commandOutcome = async (rpc: JsonObject, options?: { readonly fresh?: boolean }) => {
     const outcome = await remote.sessions.sessionCommand(device, sessionId, { ...rpc, sessionId }, options)
@@ -120,5 +124,63 @@ export function createRelayControl(remote: RemoteThreadSurface, row: RemoteSessi
       const listed = (await command({ type: "get_messages" }))["messages"]
       return Array.isArray(listed) ? (listed as ThreadTranscriptEntry[]) : []
     },
+    waitSettled: (timeoutMs, signal) => waitSettled(remote, row, timeoutMs, signal),
+  }
+}
+
+// The engine statuses a turn is still in progress under; anything else (idle, waiting_input, closed, unloaded) ends a wait.
+const IN_PROGRESS: ReadonlySet<string> = new Set(["running", "compacting", "opening"])
+
+/**
+ * #13417: until the session leaves its running states, on the watch's own events (a baseline `get_state`, then each
+ * status change, and a resync after any relay or service gap), bounded by `timeoutMs` and the caller's abort.
+ */
+async function waitSettled(
+  remote: RemoteThreadSurface,
+  row: RemoteSessionRow,
+  timeoutMs: number,
+  signal: AbortSignal | undefined,
+): Promise<ThreadWaitOutcome> {
+  const started = Date.now()
+  let status = "unknown"
+  let finish!: (outcome: ThreadWaitOutcome["outcome"], status: string) => void
+  const done = new Promise<ThreadWaitOutcome>((resolve) => {
+    let settled = false
+    finish = (outcome, at) => {
+      if (settled) return
+      settled = true
+      resolve({ outcome, status: at, waited_ms: Date.now() - started })
+    }
+  })
+  if (signal?.aborted === true) return { outcome: "cancelled", status, waited_ms: 0 }
+  const observe = (next: string) => {
+    status = next
+    if (!IN_PROGRESS.has(next)) finish("settled", next)
+  }
+  const watched = await remote.sessions.watch(
+    row.device,
+    row.session_id,
+    {
+      record: () => {},
+      status: (change) => observe(change.to),
+      resynced: (resync) => observe(resync.state.status),
+    },
+    { baseline: true },
+  )
+  if (watched.kind !== "ok") throw new ControlRefusal(outcomeFailure(watched, row.device).error)
+  const { watch } = watched
+  const onAbort = () => finish("cancelled", status)
+  signal?.addEventListener("abort", onAbort, { once: true })
+  const timer = setTimeout(() => finish("timeout", status), timeoutMs)
+  void watch.ended.then((end) =>
+    finish(end === "session_closed" ? "settled" : "ended", end === "session_closed" ? "closed" : end),
+  )
+  observe(watch.initial?.status ?? status)
+  try {
+    return await done
+  } finally {
+    clearTimeout(timer)
+    signal?.removeEventListener("abort", onAbort)
+    watch.stop()
   }
 }

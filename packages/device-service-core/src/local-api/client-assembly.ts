@@ -147,6 +147,7 @@ export class EventAssembler {
           attach,
           attach_id: open.position.attach_id,
           records,
+          seqs: [open.position.seq],
         })
       }
       case "entry": {

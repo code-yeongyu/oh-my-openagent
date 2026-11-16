@@ -133,8 +133,21 @@ export type ThreadReadResult =
       readonly source_incomplete?: boolean
       readonly error_note?: string
       readonly device?: string
+      /** Set when the read asked to wait (`wait_ms`): how the wait ended, read before the transcript. */
+      readonly wait?: ThreadWaitOutcome
     }
   | ThreadDataError
+
+/**
+ * A `thread_read` wait (#13417). `settled`: the thread stopped running (`status` is the state it reached).
+ * `timeout`: `wait_ms` passed with the thread still running. `cancelled`: the call was aborted. `ended`: the watch
+ * could not continue (the session closed for good or the access ended; `status` names why).
+ */
+export type ThreadWaitOutcome = {
+  readonly outcome: "settled" | "timeout" | "cancelled" | "ended"
+  readonly status: string
+  readonly waited_ms: number
+}
 
 export type ThreadSendResult =
   | ({

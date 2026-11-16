@@ -55,6 +55,9 @@ export const ThreadListParams = Type.Object({
   ),
 })
 
+/** The longest a `thread_read` waits for its thread to settle (#13417). */
+export const THREAD_READ_WAIT_MAX_MS = 600_000
+
 export const ThreadReadParams = Type.Object({
   thread: ThreadAddress,
   cursor: Type.Optional(
@@ -68,6 +71,13 @@ export const ThreadReadParams = Type.Object({
       minimum: 1,
       maximum: THREAD_READ_MAX_BYTES,
       description: `Byte budget for the returned transcript slice, default ${THREAD_READ_DEFAULT_BYTES} and capped at ${THREAD_READ_MAX_BYTES}; a longer transcript returns truncated with next_cursor.`,
+    }),
+  ),
+  wait_ms: Type.Optional(
+    Type.Integer({
+      minimum: 1,
+      maximum: THREAD_READ_WAIT_MAX_MS,
+      description: `Wait up to this many milliseconds (at most ${THREAD_READ_WAIT_MAX_MS}) for a thread on another device to stop running before reading; the result's wait says settled, timeout, cancelled or ended. A thread on this device answers unsupported: watch it with monitor({ type: "rpc", target: "<thread id>" }).`,
     }),
   ),
   all_scope: AllScope,
