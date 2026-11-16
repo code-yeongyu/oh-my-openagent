@@ -92,6 +92,36 @@ describe("dead-owner lock reclaim", () => {
     expect(provenDeadTakeoverFor(lockPath, contender.nonce)).toBeUndefined()
   })
 
+  test("#given a dead primary owner whose lock vanishes during the hygiene sweep's fenced unlink #when a contender acquires through acquireLock #then it takes the lock without the dead-owner proof", async () => {
+    // #given
+    const lockPath = memoryWriterLockPath(await createLocksDirectory())
+    await writeRecord(lockPath, await deadOwnerRecord("memory-write"))
+    const contender = await createLockRecord("memory-write")
+    const realUnlink = resilientFs.unlink
+    let vanished = false
+    const vanishFirst = spyOn(resilientFs, "unlink").mockImplementation((async (target: string) => {
+      if (target === lockPath && !vanished) {
+        vanished = true
+        await unlink(lockPath)
+      }
+      return realUnlink(target)
+    }) as typeof resilientFs.unlink)
+
+    // #when
+    try {
+      await acquireLock(lockPath, contender)
+    } finally {
+      vanishFirst.mockRestore()
+    }
+
+    // #then
+    // The first lock taken in a directory sweeps it, so the sweeper met the vanished lock, not the contender.
+    expect(vanished).toBe(true)
+    const owner = JSON.parse(await readFile(lockPath, "utf8")) as LockRecord
+    expect(owner.nonce).toBe(contender.nonce)
+    expect(provenDeadTakeoverFor(lockPath, contender.nonce)).toBeUndefined()
+  })
+
   test("#given the fenced unlink of a dead primary fails with an error other than ENOENT #when a contender recovers it #then the error surfaces and the recovery lock is released", async () => {
     // #given
     const lockPath = memoryWriterLockPath(await createLocksDirectory())
