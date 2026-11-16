@@ -116,8 +116,18 @@ pub trait Backend: Send {
             tag,
         };
         match self.post_input(&input, route) {
-            Ok(_) => crate::intervention::TextDelivery { sent: of, of, refusal: None, interrupted: false },
-            Err(refusal) => crate::intervention::TextDelivery { sent: 0, of, refusal: Some(refusal), interrupted: false },
+            Ok(_) => crate::intervention::TextDelivery {
+                sent: of,
+                of,
+                refusal: None,
+                interrupted: false,
+            },
+            Err(refusal) => crate::intervention::TextDelivery {
+                sent: 0,
+                of,
+                refusal: Some(refusal),
+                interrupted: false,
+            },
         }
     }
 

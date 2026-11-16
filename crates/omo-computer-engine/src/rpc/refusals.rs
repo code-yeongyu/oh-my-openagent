@@ -10,9 +10,11 @@ use super::{failure, Failure, INVALID_PARAMS};
 
 pub(super) fn host_failure(error: HostCallError) -> Failure {
     match error {
-        HostCallError::Params(error) => {
-            failure(INVALID_PARAMS, "Invalid params", Some(json!({ "detail": error.to_string() })))
-        }
+        HostCallError::Params(error) => failure(
+            INVALID_PARAMS,
+            "Invalid params",
+            Some(json!({ "detail": error.to_string() })),
+        ),
         HostCallError::Refused(refused) => refused_call(&refused),
     }
 }
@@ -62,7 +64,9 @@ pub(super) fn refused_call(refused: &Refused) -> Failure {
         if let Some(target) = stamps.target {
             data["target"] = json!(target);
         }
-        if let (Some(Value::Object(detail)), Some(data)) = (refused.detail.as_deref(), data.as_object_mut()) {
+        if let (Some(Value::Object(detail)), Some(data)) =
+            (refused.detail.as_deref(), data.as_object_mut())
+        {
             for (key, value) in detail {
                 data.entry(key.clone()).or_insert_with(|| value.clone());
             }
@@ -77,9 +81,12 @@ pub(super) fn refused_call(refused: &Refused) -> Failure {
 /// A ref that did not resolve: the refusal, and on `AmbiguousTarget` the `candidates`.
 pub(super) fn unresolved(unresolved: &Unresolved) -> Failure {
     let mut failure = refused(&unresolved.refusal);
-    if let Some(data) = failure.data.as_mut().filter(|_| !unresolved.candidates.is_empty()) {
+    if let Some(data) = failure
+        .data
+        .as_mut()
+        .filter(|_| !unresolved.candidates.is_empty())
+    {
         data["candidates"] = json!(unresolved.candidates);
     }
     failure
 }
-
