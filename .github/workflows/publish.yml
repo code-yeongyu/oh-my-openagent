@@ -512,6 +512,8 @@ jobs:
           # The committed service-auth bundle inlines packages/omo-native/package.json's version;
           # rebuild it too or script/build-service-auth.test.ts rejects the release commit as stale (#12046).
           bun script/build-service-auth.ts
+          # The committed omo-ai/remote SDK bundle (omo#13413) inlines the same version; same rule.
+          bun script/build-remote-sdk.ts
 
           git config --global user.email "code.yeon.gyu@gmail.com"
           git config --global user.name "YeonGyu-Kim"
