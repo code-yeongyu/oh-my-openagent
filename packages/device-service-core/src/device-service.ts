@@ -39,7 +39,7 @@ function sendToEndpoint(
   // A service before decision 0018's 2026-11-06 amendment refuses the unknown `locate` field with invalid_request
   // before routing anything, so the command id is still unbound and the same command goes again without it; its
   // reply then names no `located` and the caller locates as before.
-  return followDelegatedCommand(client, device, (commandId) => {
+  return followDelegatedCommand(client, device, timers, (commandId) => {
     const send = (asked: boolean): Promise<unknown> =>
       client.endpointCommand(device, endpoint, rpc, commandId, { locate: asked })
     return send(locate).catch((error: unknown) =>
@@ -57,6 +57,7 @@ function sendToEndpoint(
 function followDelegatedCommand(
   client: LocalApiClient,
   device: string,
+  timers: Timers,
   send: (commandId: string) => Promise<unknown>,
 ): Promise<CommandResult> {
   return new Promise<CommandResult>((resolve, reject) => {
@@ -367,7 +368,7 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
     wakeCommand: async (device, durableId, rpc) => {
       if (!carriesWakeMark)
         throw new LocalApiError("unsupported", "this device service does not carry the wake target", { not_sent: true })
-      return await followDelegatedCommand(client, device, (commandId) =>
+      return await followDelegatedCommand(client, device, timers, (commandId) =>
         client.wakeCommand(device, durableId, rpc, commandId).catch((error: unknown) => {
           throw error instanceof LocalApiError && error.command_id === undefined ? markNotSent(error) : error
         }),

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { connectDeviceService, type DeviceService, LocalApiError } from "../src/index.ts"
+import { connectLocalApi } from "../src/local-api/client.ts"
 import { type FakeClock, fakeClock } from "./local-api/conformance/fake-clock.ts"
 import type { FakeOwner } from "./local-api/conformance/fake-owner.ts"
 import { defaultWorld, PEER, SESSION_ID, type World } from "./local-api/conformance/world.ts"
@@ -64,6 +65,29 @@ describe("device service clock seam", () => {
     expect(clock.armed()).toBe(1)
     clock.advance(1)
     expect(await sending).toMatch(/^no final state for endpoint command \S+ within 120000 ms$/)
+  })
+
+  test("a wake command with no final state fails at its 120 s bound on the given timers", async () => {
+    const clock = fakeClock()
+    const { owner } = await startMode("ack-no-final")
+    // The fake owner takes no wake target, so the seam acknowledges the wake and no command state ever follows.
+    const service = await connectDeviceService({
+      version: "5.1.70",
+      stateDir: owner.stateDir,
+      timers: clock,
+      minimums: { wakeMark: "1.4.0", singleLocate: "1.4.0" },
+      connect: async (options) => {
+        const client = await connectLocalApi(options)
+        return { ...client, wakeCommand: async (_device, _durableId, _rpc, commandId) => commandId ?? "" }
+      },
+    })
+    services.push(service)
+    const waking = outcomeOf(service.wakeCommand(PEER, "dur-1", { type: "prompt", message: "hi" }))
+    await service.status()
+    clock.advance(119_999)
+    expect(clock.armed()).toBe(1)
+    clock.advance(1)
+    expect(await waking).toMatch(/^no final state for endpoint command \S+ within 120000 ms$/)
   })
 
   test("a command in flight when its attach ends waits 30 s on the given timers", async () => {
