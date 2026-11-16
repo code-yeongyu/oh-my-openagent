@@ -574,8 +574,8 @@ describe("SCENARIO-OVERRIDES.tsv (R70bj)", () => {
   })
 
   test("a missing table is an error, never an empty table", async () => {
-    await expect(scenarioOverride(join(dir, "frame-invalidation.json"), join(dir, "no-such-overrides.tsv"))).rejects.toThrow(
-      "scenario_overrides_unreadable",
-    )
+    await expect(
+      scenarioOverride(join(dir, "frame-invalidation.json"), join(dir, "no-such-overrides.tsv")),
+    ).rejects.toThrow("scenario_overrides_unreadable")
   })
 })
