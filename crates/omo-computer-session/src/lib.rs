@@ -14,6 +14,7 @@ mod displays;
 pub mod epoch;
 pub mod frames;
 pub mod grant;
+mod held;
 pub mod holds;
 pub mod host_view;
 pub mod intervention;
