@@ -34,7 +34,7 @@ const OFFENDERS: readonly string[] = [
 const allowed = (specifier: string): boolean =>
   specifier.startsWith("node:") ||
   /^\.\/(remote-[\w-]+|thread-[\w-]+\.js)$/.test(specifier) ||
-  /^\.\.\/omo-senpi\/src\/components\/remote\/(index|seams)$/.test(specifier)
+  /^\.\.\/omo-senpi\/src\/components\/remote\/index$/.test(specifier)
 
 function cliFiles(): string[] {
   const remote = readdirSync(NATIVE).filter((name) => /^remote-.*\.ts$/.test(name) && !name.endsWith(".test.ts"))

@@ -1,4 +1,4 @@
-import { handleOf } from "../omo-senpi/src/components/remote/seams"
+import { handleOf } from "../omo-senpi/src/components/remote/index"
 import { type BootstrapSetup, type DeviceLink, runBootstrapVerb, runEnableVerb } from "./remote-bootstrap"
 import { applyColdWake, type ColdWake } from "./remote-cold-wake"
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
