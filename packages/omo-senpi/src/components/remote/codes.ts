@@ -1,4 +1,5 @@
-import { LocalApiError } from "@oh-my-opencode/device-service-core/device-service"
+import { LocalApiError } from "../../../../device-service-core/src/local-api/errors"
+import type { ClientErrorCode, ErrorCode } from "../../../../device-service-core/src/local-api/vocabulary"
 import { THREAD_ERROR_CODES } from "../thread/errors"
 import type { RemoteFailure } from "./types"
 
@@ -33,7 +34,7 @@ export const remoteFailure = (
   extra: Omit<RemoteFailure, "kind" | "code" | "message" | "next_action"> = {},
 ): RemoteFailure => ({ kind: "error", code, message, next_action, ...extra })
 
-type LocalApiCode = LocalApiError["code"]
+type LocalApiCode = ErrorCode | ClientErrorCode
 type Mapped = { readonly code: RemoteCode; readonly details?: Readonly<Record<string, unknown>> }
 
 // How every code the local API (L0) or the device service raises reaches a caller. Typed over the whole vocabulary, so a
