@@ -33,13 +33,15 @@ pub fn dispatch(router: &mut Router, method: Method, params: Value) -> Result<Va
         Method::SessionOpen => {
             let opened = session.open(parse(params)?).map_err(|r| refused(&r))?;
             router.resume_token = Some(opened.resume_token.clone());
-            // The connection that opened the session is the host's relay channel: its open is
-            // the relay's first beat, then `stopPath.heartbeat` keeps it fresh (C14, R56a).
-            // `allowHostRelayOnlyStop` only decides whether input is admitted on that relay.
-            session.stop_path_heartbeat();
             json!(opened)
         }
-        Method::StopPathStart => json!(session.stop_path_start(parse(params)?)),
+        Method::StopPathStart => {
+            let params = parse(params)?;
+            // The host arming its stop path over this connection is the relay's first beat;
+            // `stopPath.heartbeat` keeps it fresh (C14, R56a).
+            session.stop_path_heartbeat();
+            json!(session.stop_path_start(params))
+        }
         Method::StopPathStop => {
             let status = session.stop_path_stop(parse(params)?);
             router.stop_epoch += 1;
