@@ -13,6 +13,8 @@ import type {
   RemoteDevice,
   RemoteSessionRow,
   RemoteThreadSurface,
+  RemoteWatchEnd,
+  RemoteWatchHandlers,
 } from "./remote/ports"
 import type { ThreadTranscriptEntry } from "./reader"
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
@@ -169,7 +171,13 @@ export function createRemoteThreadFixture() {
     // The session's records a prompt makes it write, held until the follower first reads after the answer: the
     // engine's turn records follow its reply out over the wire, and the CLI's read is the first observable hop after
     // its own bookkeeping for that reply.
-    const watchers = new Set<(record: JsonObject) => void>()
+    const watchers = new Set<RemoteWatchHandlers>()
+    const ends = new Set<(end: RemoteWatchEnd) => void>()
+    // Settles when the first watch opens, so a test triggers a status change only once something is watching.
+    let watchStarted: () => void = () => {}
+    const watching = new Promise<void>((resolve) => {
+      watchStarted = resolve
+    })
     let answeredPrompt = false
     let recordsOut = false
     // The client message id the answered prompt named: senpi stamps the prompt's own user message with it.
@@ -178,7 +186,7 @@ export function createRemoteThreadFixture() {
       if (recordsOut) return
       recordsOut = true
       for (const record of options.records ?? [])
-        for (const listener of [...watchers]) listener(stampPromptRecord(record, promptClientMessageId))
+        for (const handlers of [...watchers]) handlers.record(stampPromptRecord(record, promptClientMessageId))
     }
     const hops: number[] = []
     const lookups: Array<{ readonly device: string; readonly durable_id: string }> = []
@@ -423,17 +431,29 @@ export function createRemoteThreadFixture() {
           }
           return outcome
         },
-        watch: async (device, session, listener) => {
+        watch: async (device, session, handlers, watchOptions) => {
           sent.push({ via: "watch", device, session })
           if (options.refuse !== undefined) return { kind: "refused", reason: options.refuse }
-          watchers.add(listener)
+          watchers.add(handlers)
+          let end: (reason: RemoteWatchEnd) => void = () => {}
+          const ended = new Promise<RemoteWatchEnd>((resolve) => {
+            end = resolve
+          })
+          ends.add(end)
+          watchStarted()
+          const initial =
+            watchOptions?.baseline === true
+              ? { initial: { status: engine.streaming ? "running" : "idle", sessionId: session } }
+              : {}
           return {
             kind: "ok",
             watch: {
-              ended: new Promise<string>(() => {}),
+              ended,
               stop: () => {
-                watchers.delete(listener)
+                watchers.delete(handlers)
+                end("stopped")
               },
+              ...initial,
             },
           }
         },
@@ -494,7 +514,23 @@ export function createRemoteThreadFixture() {
       const { lookup: _lookup, canLookup: _canLookup, ...plain } = remote.sessions
       ;(remote as { sessions: typeof plain }).sessions = plain
     }
-    return { remote, sent, hops, aliases, live, registryCalls, lookups, listings, deviceReads }
+    const endWatches = (reason: RemoteWatchEnd) => {
+      for (const end of [...ends]) end(reason)
+    }
+    return {
+      remote,
+      sent,
+      hops,
+      aliases,
+      live,
+      registryCalls,
+      lookups,
+      listings,
+      deviceReads,
+      watchers,
+      watching,
+      endWatches,
+    }
   }
 
   function surface(
