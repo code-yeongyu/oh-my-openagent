@@ -70,7 +70,7 @@ The `operator-darwin` job runs `.github/workflows/operator-darwin-verify.ts` on 
 
 Trade-offs (accepted):
 - No Gatekeeper or OCSP evaluation runs in CI. Notarization is read from Apple's ticket service, as Gatekeeper does for a bare binary.
-- These hosted checks run only on the operator's Mac, so they are self-attested in the operator log: the engine and trust-helper selftests, the omo version and eval smokes, and the keychain helper's designated-requirement check.
+- These hosted checks run only on the operator's Mac, so they are self-attested in the operator log: the engine and trust-helper selftests, the version and eval smokes of the omo binaries, and the keychain helper's designated-requirement check.
 - The verifier and its pins run from the dispatched ref, the same trust level as publish.yml itself.
 
 Running Gatekeeper or OCSP in CI would need a hosted macOS job, which reintroduces the wait this path removes. The operator's local `codesign --verify --strict` and `spctl -a -t install` verdicts are recorded in the operator log, but they are self-attested.
