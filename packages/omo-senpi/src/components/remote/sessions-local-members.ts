@@ -116,9 +116,15 @@ export function localSessionMembers(hostOn: HostOn) {
         return ok({ reasoning: level })
       }),
     get: (target: LocalTarget, thread: ThreadHandle, device: DeviceRow): Promise<Outcome<SessionDetail>> =>
-      run(target, "read", async ({ port, routing }) =>
-        ok(sessionDetail(thread, device, target.row, await port.getState(routing))),
-      ),
+      run(target, "read", async ({ port, routing }) => {
+        const state = await port.getState(routing)
+        // The listing names the session; its engine says whether a turn runs now.
+        const listed: SessionRow | undefined =
+          target.row === undefined
+            ? undefined
+            : { ...target.row, state: state.isStreaming === true ? "running" : "idle" }
+        return ok(sessionDetail(thread, device, listed, state))
+      }),
     read: (
       target: LocalTarget,
       page?: { readonly before?: string; readonly tail?: number },

@@ -813,6 +813,27 @@ describe("an open on this device", () => {
     })
   })
 
+  test("#given a session this device's host holds #when sessions.list reads this device #then the local host's session is listed, the relay's listing aside", async () => {
+    await withContractHost({}, async (host) => {
+      const { client } = await localClient(host)
+      const mine = await valueOf(client.sessions.list({ device: SELF }))
+      expect(mine.rows).toEqual([
+        expect.objectContaining({
+          thread: SELF_SESSION,
+          durable_id: "dur-selected",
+          name: "target",
+          device: expect.objectContaining({ id: SELF, self: true }),
+          project: host.root,
+          source: "live",
+        }),
+      ])
+      // The whole account lists it beside the other devices' rows.
+      const all = await valueOf(client.sessions.list())
+      expect(all.rows.map((row) => String(row.thread))).toContain(String(SELF_SESSION))
+      expect(all.rows.map((row) => row.device.id)).toContain(PEER)
+    })
+  })
+
   test("#given a handle this device's host does not hold #when close addresses it #then not_found{session}", async () => {
     await withContractHost({}, async (host) => {
       const { client } = await localClient(host)
