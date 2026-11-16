@@ -132,6 +132,10 @@ export const S3_OFFENDERS: Readonly<Record<string, Offender>> = {
     uses: [DEVICE_SERVICE_CORE],
     removedBy: "omo#13414 U5 (thread tools onto the module)",
   },
+  "packages/omo-senpi/src/components/thread/remote/attach-pool.ts": {
+    uses: [DEVICE_SERVICE_CORE],
+    removedBy: "omo#13414 U5 (thread tools onto the module)",
+  },
   "packages/omo-senpi/src/components/thread/remote/device-service.ts": {
     uses: [DEVICE_SERVICE_CORE],
     removedBy: "omo#13414 U5 (thread tools onto the module)",
@@ -145,6 +149,10 @@ export const S3_OFFENDERS: Readonly<Record<string, Offender>> = {
     removedBy: "omo#13414 U5 (thread tools onto the module)",
   },
   "packages/omo-senpi/src/components/thread/remote/remote-ops.ts": {
+    uses: [DEVICE_SERVICE_CORE],
+    removedBy: "omo#13414 U5 (thread tools onto the module)",
+  },
+  "packages/omo-senpi/src/components/thread/remote/remote-watch.ts": {
     uses: [DEVICE_SERVICE_CORE],
     removedBy: "omo#13414 U5 (thread tools onto the module)",
   },
