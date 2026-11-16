@@ -160,7 +160,7 @@ const NEXT_ACTION: Partial<Record<ThreadErrorCode, string>> = {
     "Find the binding that holds this thread with `omo thread bindings`, then rebind it with its revision, or unbind it first.",
   binding_mismatch: "Answer through the binding that asked the question; the question stays pending.",
   binding_inactive:
-    "The chat binding is closed: the gateway binds the chat again when its next message arrives, so report through that binding (or bind it by hand with `omo thread bind`).",
+    "The chat binding is closed: the gateway binds the chat again when its next message arrives, so report through that binding.",
   stale_revision: "Read the binding's current revision with `omo thread bindings` and retry with it.",
   stale_token:
     "The question was asked under an earlier binding revision or session runtime; wait for the session to ask again.",
