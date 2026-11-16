@@ -199,6 +199,42 @@ describe("sessions.follow rows", () => {
   })
 })
 
+// One run as the engine streams it: its lease running, its start, its text, its lease done, its settle.
+const turnRecords = (runId: string, text: string, seq: number): JsonObject[] => [
+  { type: "session_lifecycle", lifecycle: { state: "running", seq, runId } },
+  { type: "agent_start", runId },
+  textDelta(text),
+  { type: "session_lifecycle", lifecycle: { state: "done", seq: seq + 1, runId } },
+  { type: "agent_settled" },
+]
+
+describe("sessions.follow rows: anchored at its open (#13753, the U6 waited send)", () => {
+  test("#given turns the attach replays #when follow opens and then a send starts the next turn #then the end is that turn's, twice in a row", async () => {
+    // get_state at each open answers the session as it is then: its last run done.
+    const reply: { lifecycle: JsonObject } = { lifecycle: { state: "done", seq: 5, runId: "run-1" } }
+    const { owner, client } = await on(IDLE, undefined, { reply })
+    const sendAndFollow = async (replayed: readonly JsonObject[], live: readonly JsonObject[]) => {
+      const { events } = await following(client)
+      pushRecords(owner, [...replayed, ...live])
+      return drain(events)
+    }
+    const turn1 = turnRecords("run-1", "pong", 4)
+    const turn2 = turnRecords("run-2", "ping", 6)
+    expect(await sendAndFollow(turn1, turn2)).toEqual([
+      { kind: "waiting", state: "turn_running" },
+      { kind: "text", delta: "ping" },
+      { kind: "end", outcome: { reason: "settled", text: "ping", turn_id: "run-2" } },
+    ])
+    reply.lifecycle = { state: "done", seq: 7, runId: "run-2" }
+    const turn3 = turnRecords("run-3", "third", 8)
+    expect(await sendAndFollow([...turn1, ...turn2], turn3)).toEqual([
+      { kind: "waiting", state: "turn_running" },
+      { kind: "text", delta: "third" },
+      { kind: "end", outcome: { reason: "settled", text: "third", turn_id: "run-3" } },
+    ])
+  })
+})
+
 // A wait opens its attach before a follow started after it on the same connection: the follow's opening state is the
 // signal that the wait is listening, so a push after it reaches both.
 const listening = async (client: RemoteClient): Promise<void> => {
