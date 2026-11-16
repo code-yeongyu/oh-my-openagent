@@ -1,6 +1,6 @@
 import type { AliasRegistry, AliasResult, RemoteSessionsPort, RemoteThreadSurface } from "../../thread/remote/ports"
 import type { RemoteClient } from "../client"
-import type { R, RemoteFailure, RemoteSender } from "../types"
+import type { RemoteFailure, RemoteSender } from "../types"
 
 type Runtime = Pick<typeof import("./thread-runtime"), "remoteSessionsPort" | "remoteClient">
 
@@ -24,8 +24,8 @@ export type LazyRemoteOptions = {
  */
 /**
  * The remote client, loaded with the runtime on its first member call. A failed load is not cached and settles as a typed
- * host_unavailable, since no member throws. The failure is written here, not through codes.ts, because codes.ts brings
- * the device-service code into omo.js.
+ * host_unavailable, since no member throws. Every member forwards by name, so this stays small inside omo.js (its byte
+ * budget) and needs no change when the client gains a member; `follow` answers a stream at once and loads on its first read.
  */
 function createLazyRemoteClient(options: LazyRemoteOptions): RemoteClient {
   let client: Promise<RemoteClient> | undefined
@@ -44,16 +44,23 @@ function createLazyRemoteClient(options: LazyRemoteOptions): RemoteClient {
     next_action: "Reinstall omo, then retry.",
     details: { reason: "client_unavailable" },
   })
-  const call = async <T>(use: (loaded: RemoteClient) => R<T>): R<T> => {
-    let loaded: RemoteClient
-    try {
-      loaded = await load()
-    } catch (error) {
-      return unloaded(error)
+  type Member = (...args: unknown[]) => unknown
+  const forward =
+    (pick: (loaded: RemoteClient) => Member) =>
+    async (...args: unknown[]) => {
+      let loaded: RemoteClient
+      try {
+        loaded = await load()
+      } catch (error) {
+        return unloaded(error)
+      }
+      return await pick(loaded)(...args)
     }
-    return await use(loaded)
-  }
-  // `follow` answers a stream at once, so the load happens on its first read; a stop before then ends it unread.
+  const group = (name: "service" | "devices" | "sessions" | "aliases") =>
+    new Proxy(
+      {},
+      { get: (_, member) => forward((loaded) => (loaded[name] as unknown as Record<PropertyKey, Member>)[member] as Member) },
+    )
   const follow: RemoteClient["sessions"]["follow"] = (thread, opts) => {
     let stopped = false
     let inner: ReturnType<RemoteClient["sessions"]["follow"]> | undefined
@@ -76,42 +83,13 @@ function createLazyRemoteClient(options: LazyRemoteOptions): RemoteClient {
       },
     }
   }
+  const sessions = group("sessions")
   return {
-    service: {
-      info: (opts) => call((loaded) => loaded.service.info(opts)),
-      status: (opts) => call((loaded) => loaded.service.status(opts)),
-      setEnabled: (on, opts) => call((loaded) => loaded.service.setEnabled(on, opts)),
-      control: (opts) => call((loaded) => loaded.service.control(opts)),
-      setControl: (on, opts) => call((loaded) => loaded.service.setControl(on, opts)),
-      bootstrap: (setup, opts) => call((loaded) => loaded.service.bootstrap(setup, opts)),
-      wake: (opts) => call((loaded) => loaded.service.wake(opts)),
-      setWake: (on, opts) => call((loaded) => loaded.service.setWake(on, opts)),
-    },
-    devices: {
-      list: (opts) => call((loaded) => loaded.devices.list(opts)),
-      resolve: (idOrName, opts) => call((loaded) => loaded.devices.resolve(idOrName, opts)),
-    },
-    sessions: {
-      list: (filter, opts) => call((loaded) => loaded.sessions.list(filter, opts)),
-      resolve: (address, scope, opts) => call((loaded) => loaded.sessions.resolve(address, scope, opts)),
-      get: (thread, opts) => call((loaded) => loaded.sessions.get(thread, opts)),
-      open: (request, opts) => call((loaded) => loaded.sessions.open(request, opts)),
-      send: (thread, request, opts) => call((loaded) => loaded.sessions.send(thread, request, opts)),
-      read: (thread, page, opts) => call((loaded) => loaded.sessions.read(thread, page, opts)),
-      follow,
-      wait: (thread, opts) => call((loaded) => loaded.sessions.wait(thread, opts)),
-      interrupt: (thread, opts) => call((loaded) => loaded.sessions.interrupt(thread, opts)),
-      setModel: (thread, model, opts) => call((loaded) => loaded.sessions.setModel(thread, model, opts)),
-      setReasoning: (thread, level, opts) => call((loaded) => loaded.sessions.setReasoning(thread, level, opts)),
-      close: (thread, opts) => call((loaded) => loaded.sessions.close(thread, opts)),
-      archive: (thread, archived, opts) => call((loaded) => loaded.sessions.archive(thread, archived, opts)),
-    },
-    attach: (thread, opts) => call((loaded) => loaded.attach(thread, opts)),
-    aliases: {
-      resolve: (alias, opts) => call((loaded) => loaded.aliases.resolve(alias, opts)),
-      set: (thread, alias, opts) => call((loaded) => loaded.aliases.set(thread, alias, opts)),
-      clear: (thread, opts) => call((loaded) => loaded.aliases.clear(thread, opts)),
-    },
+    service: group("service"),
+    devices: group("devices"),
+    sessions: new Proxy(sessions, { get: (target, member) => (member === "follow" ? follow : Reflect.get(target, member)) }),
+    attach: forward((loaded) => loaded.attach as Member),
+    aliases: group("aliases"),
     close: () => {
       const open = client
       client = undefined
@@ -120,7 +98,7 @@ function createLazyRemoteClient(options: LazyRemoteOptions): RemoteClient {
         () => undefined,
       )
     },
-  }
+  } as unknown as RemoteClient
 }
 
 export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThreadSurface {

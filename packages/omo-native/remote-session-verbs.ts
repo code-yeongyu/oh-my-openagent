@@ -9,6 +9,7 @@ import {
 } from "../omo-senpi/src/components/thread/control/operations"
 import { createRelayControl } from "../omo-senpi/src/components/thread/control/relay-control"
 import { createDeviceServiceSessions } from "../omo-senpi/src/components/remote/port/device-service"
+import { createRemoteClient } from "../omo-senpi/src/components/remote/client"
 import { randomUUID } from "node:crypto"
 import { existsSync } from "node:fs"
 import { userInfo } from "node:os"
@@ -49,6 +50,8 @@ export function gatewayWorkerAnchor(root: string = packageRoot): URL | undefined
 // (K8) starts at its first hop: a person at a terminal is no thread chain.
 const deviceServiceSurface = (service: DeviceService): RemoteThreadSurface => ({
   sessions: createDeviceServiceSessions({ version: service.serviceVersion, connect: async () => service }),
+  // `omo remote` is a person at this device; the account reads go through the one remote client (#13414).
+  client: createRemoteClient({ kind: "person", uid: String(userInfo().uid) }, { version: service.serviceVersion }),
   chain: { stamp: (record) => record },
 })
 

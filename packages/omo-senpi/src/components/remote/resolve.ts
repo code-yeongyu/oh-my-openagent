@@ -4,8 +4,12 @@ import { nextActionFor, remoteFailure } from "./codes"
 import { canonicalizeThreadHandle, handleOf, type CanonicalThread } from "./seams"
 import type { RemoteFailure, Scope, SessionRow } from "./types"
 
-type Match =
+type Match = (
   { readonly kind: "one"; readonly row: SessionRow } | { readonly kind: "many"; readonly rows: readonly SessionRow[] }
+) & {
+  /** A name can gain a second holder or move to another session after any listing; an id or handle cannot. */
+  readonly byName: boolean
+}
 
 // A name match is held to the caller's workspace unless all_scope; an id or `<device>/<session>` names one session
 // account-wide, as on this device (thread/addressing.ts).
@@ -16,10 +20,10 @@ const deviceNamed = (row: SessionRow, device: string): boolean =>
   row.device.id === device || row.device.name.toLowerCase() === device.toLowerCase()
 
 function match(rows: readonly SessionRow[], target: CanonicalThread): Match | undefined {
-  const picked = (found: readonly SessionRow[]): Match | undefined => {
+  const picked = (found: readonly SessionRow[], byName = false): Match | undefined => {
     const [only] = found
     if (only === undefined) return undefined
-    return found.length === 1 ? { kind: "one", row: only } : { kind: "many", rows: found }
+    return found.length === 1 ? { kind: "one", row: only, byName } : { kind: "many", rows: found, byName }
   }
   if (target.target.kind === "device_session") {
     const { device, session } = target.target
@@ -35,7 +39,10 @@ function match(rows: readonly SessionRow[], target: CanonicalThread): Match | un
   const byId = picked(rows.filter((row) => row.durable_id === address || row.thread === address))
   if (byId !== undefined) return byId
   const wanted = normalizeThreadName(address)
-  return picked(rows.filter((row) => inScope(row, target.scope) && normalizeThreadName(row.name) === wanted))
+  return picked(
+    rows.filter((row) => inScope(row, target.scope) && normalizeThreadName(row.name) === wanted),
+    true,
+  )
 }
 
 const ambiguous = (address: string, rows: readonly SessionRow[]): RemoteFailure =>
@@ -50,7 +57,8 @@ const ambiguous = (address: string, rows: readonly SessionRow[]): RemoteFailure 
 
 /**
  * `sessions.resolve` (unit U5 of #13414): one address (durable id, name, `<device>/<session>`) to its row, served from
- * the last listing this client read, so a known session costs no relist (contract L-1). A miss reads the listing once:
+ * the last listing this client read, so a known id or handle costs no relist (contract L-1); a name always reads a fresh
+ * listing, since another session may have taken it since. A miss reads the listing once:
  * filtered to the device when the address names one, else account-wide, and that read becomes the index. Aliases are
  * `aliases.resolve`'s; whether a session is still live is learned from the reply to the command sent to it.
  */
@@ -64,7 +72,7 @@ export function resolveMember(core: ClientCore): RemoteClient["sessions"]["resol
     if (canonical.kind === "error") return canonical
     const target = canonical.value
     const cached = match(index, target)
-    if (cached?.kind === "one") return { kind: "ok", value: cached.row }
+    if (cached?.kind === "one" && !cached.byName) return { kind: "ok", value: cached.row }
     const device = target.target.kind === "device_session" ? target.target.device : undefined
     const listed = await core.sessionsList(device === undefined ? {} : { device }, opts)
     if (listed.kind === "error") return listed

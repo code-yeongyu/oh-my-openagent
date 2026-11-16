@@ -569,7 +569,13 @@ describe("omo remote session verbs", () => {
       read: (device, sessionId, tail) => note("read", port.read(device, sessionId, tail)),
       watch: (device, sessionId, listener) => note("watch", port.watch(device, sessionId, listener)),
     }
-    return { calls, remote: { ...remote, sessions } }
+    // The relay state and the device list are read through the remote client (#13414 U5): the same two account reads.
+    const client = {
+      ...remote.client,
+      service: { ...remote.client.service, status: () => note("status", remote.client.service.status()) },
+      devices: { ...remote.client.devices, list: () => note("devices", remote.client.devices.list()) },
+    }
+    return { calls, remote: { ...remote, sessions, client } }
   }
 
   test("open creates a session on the device in the project and prints <device>/<session>", async () => {

@@ -52,14 +52,15 @@ async function account(rows: readonly ListingRow[]) {
 }
 
 describe("sessions.resolve", () => {
-  test("#given a session on another device #when it is resolved by durable id, by name and by <device>/<durable id> #then each answers its row and the account was listed once", async () => {
+  test("#given a session on another device #when it is resolved by durable id, by name and by <device>/<durable id> #then each answers its row, ids are served from the last listing, and every name reads a fresh one", async () => {
     const { client, listings } = await account([listed(PEER, "rk-1", "dur-1", "Build Bot")])
-    for (const address of ["dur-1", "build  bot", `${PEER}/dur-1`])
+    for (const address of ["dur-1", "build  bot", `${PEER}/dur-1`, "dur-1", "Build Bot"])
       expect(await client.sessions.resolve(address)).toMatchObject({
         kind: "ok",
         value: { thread: `${PEER}/rk-1`, durable_id: "dur-1", device: { id: PEER, name: "Studio" } },
       })
-    expect(listings()).toBe(1)
+    // A name can gain a second holder or move to another session after any listing, so it is never answered from one.
+    expect(listings()).toBe(3)
   })
 
   test("#given two devices each with a session of one name #when the name is resolved #then ambiguous_target names both, and the device's handle picks one", async () => {

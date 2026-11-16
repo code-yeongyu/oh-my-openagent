@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { createRemoteThreadFixture } from "../omo-senpi/src/components/thread/thread-remote-fixture"
+import { createRemoteThreadFixture, fakeRemoteClient } from "../omo-senpi/src/components/thread/thread-remote-fixture"
 import { personSenderProvenance } from "./remote-session-verbs"
 
 const ENV = { OMO_PROVENANCE_WORKSPACE: "Owner workspace", OMO_PROVENANCE_PROJECT: "sender-project" }
@@ -23,7 +23,10 @@ describe("omo remote send sender provenance", () => {
 
   test("#given the device service answers without a device id #when a person sends #then the delivery names why it carries none", async () => {
     const account = remoteFixture.account()
-    const unnamed = { ...account.remote, sessions: { ...account.remote.sessions, thisDevice: async () => null } }
+    const unnamed = {
+      ...account.remote,
+      client: fakeRemoteClient({ state: () => "connected", here: null, devices: () => [] }),
+    }
     try {
       const provenance = await personSenderProvenance(unnamed, process.cwd(), ENV)()
       expect({ device: provenance.device, device_absent: provenance.device_absent }).toEqual({
