@@ -1,7 +1,7 @@
 {
   "description": "The first click, sent with consume:true, is delivered (its three sink lines: move, down, up); the second click on the same frame id answers InvalidCoordinateFrame{consumed} and the sink stays at three lines, so the refusal added no entry.",
   "transport": "stdio",
-  "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/v3-two-displays-one-window-consent.json",
   "env": {
     "OMO_COMPUTER_FAKE_STOP_PATH": "live"
   },

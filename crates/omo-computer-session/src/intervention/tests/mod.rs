@@ -42,7 +42,7 @@ pub(crate) fn object_session(backend: Box<dyn Backend>) -> Session {
 }
 
 pub(crate) fn wire(refused: &Refused) -> (&'static str, Option<&'static str>) {
-    (refused.refusal.code.wire(), refused.refusal.reason)
+    (refused.refusal.code.wire(), refused.refusal.reason.map(omo_computer_core::error::Reason::wire))
 }
 
 pub(crate) fn report(reply: ExecReply) -> omo_computer_core::report::ActionReport {
@@ -73,6 +73,8 @@ impl FramedClick for Session {
     }
 }
 
+mod attribution_send;
 mod display_awake;
+mod listing;
 mod liveness;
 mod typing;

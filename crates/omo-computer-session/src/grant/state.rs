@@ -13,10 +13,11 @@ use serde_json::{json, Value};
 
 use super::{is_global_target, ForegroundGrant, LeaseHook, NoLeaseHook};
 use crate::consent::{AppTarget, BoundIdentity, Consent, Part};
-use crate::lease::{ControlSlot, Holder, SessionToken};
+use crate::lease::{ControlSlot, Holder, SessionToken, SlotRefusal};
+use crate::mutate::{Refused, TRANSACTION_FAILED};
 use crate::presence::PresenceState;
 use crate::preview::Preview;
-use crate::reservation::Reservations;
+use crate::reservation::{AdmitRefusal, Reservations};
 
 /// A millisecond clock every session of the machine reads alike (reservations compare across
 /// sessions); tests install a scripted one.
@@ -42,6 +43,36 @@ pub struct Control {
     pub(crate) lease_hook: Box<dyn LeaseHook>,
     /// Row 23's held-input ledger: holds need the foreground lease, and every lease end releases them.
     pub(crate) holds: crate::holds::SharedLedger,
+    /// A-IS-62 rev 5 (R70an C): the hand reads tampered after a refused chord.
+    pub(crate) chord_tamper: ChordTamper,
+    /// The stop chord armed at stopPath.start (R70av); `None` before the first arm.
+    pub(crate) armed_chord: Option<String>,
+}
+
+/// The tampered mark a refused stop chord leaves on the hand (A-IS-62 rev 5, R70an C, R70as(2)).
+/// It is held by the engine's session state, survives session.close and every re-open, and is
+/// NEVER cleared in-process: a same-uid rewrite of the consent must not clear it, so only row 37's
+/// audited consent_save will (the fingerprint at the refusal is kept for that row).
+#[derive(Debug, Default)]
+pub struct ChordTamper {
+    at: Option<String>,
+}
+
+impl ChordTamper {
+    fn fingerprint(view: Option<&Value>) -> String {
+        crate::audit::sha256_16(&serde_json::to_vec(&view).unwrap_or_default())
+    }
+
+    /// A chord was refused while `view` was the consent in force.
+    pub fn refused(&mut self, view: Option<&Value>) {
+        self.at = Some(Self::fingerprint(view));
+    }
+
+    /// Whether the hand reads tampered: once refused, always, whatever consent is in force.
+    pub fn holds(&mut self, view: Option<&Value>) -> bool {
+        let _ = view;
+        self.at.is_some()
+    }
 }
 
 impl Default for Control {
@@ -63,6 +94,8 @@ impl Default for Control {
             clock: wall_clock(),
             lease_hook: Box::new(NoLeaseHook),
             holds: crate::holds::SharedLedger::default(),
+            chord_tamper: ChordTamper::default(),
+            armed_chord: None,
         }
     }
 }
@@ -79,6 +112,8 @@ pub struct Plan {
     pub windows: Vec<String>,
     /// The app entry has no readable identity: the reason rides the report.
     pub identity_unavailable: bool,
+    /// How the app entry was bound, and the identity observed at use (A-IS-61 Q5 audit members).
+    pub audit_binding: Option<(bool, Option<Vec<u8>>)>,
 }
 
 impl Control {
@@ -104,7 +139,10 @@ impl Control {
             TargetRef::Window(id) => {
                 let app = windows.iter().find(|w| w.id == *id).map(|w| AppTarget {
                     app_key: w.app_key.clone(),
-                    bound: BoundIdentity::new(None, backend.code_identity(w.identity.pid)),
+                    bound: BoundIdentity::new(
+                        backend.executable_path(w.identity.pid),
+                        backend.code_identity(w.identity.pid),
+                    ),
                 });
                 (Some(*id), app)
             }
@@ -113,6 +151,10 @@ impl Control {
             Ok(admission) => {
                 plan.identity_unavailable = app.is_some()
                     && admission.binding == Some(crate::consent::Binding::PathOnly);
+                plan.audit_binding = admission.binding.zip(app.as_ref()).map(|(binding, app)| {
+                    let observed = app.bound.identity.as_ref().and_then(|id| serde_json::to_vec(id).ok());
+                    (binding == crate::consent::Binding::Identity, observed)
+                });
             }
             Err(denial) => {
                 plan.stages.consent = Some(denial.refusal);
@@ -131,11 +173,6 @@ impl Control {
             _ => Vec::new(),
         };
         self.grant.reconcile(stop_epoch);
-        if self.lease_epoch.is_some_and(|epoch| epoch != stop_epoch) {
-            self.presence.end(crate::presence::LeaseEnd::Stop);
-            self.slot.release(&self.token);
-            self.lease_epoch = None;
-        }
         let lease = if plan.foreground {
             self.lease_verdict(backend, (method, target_str))
         } else {
@@ -184,27 +221,36 @@ impl Control {
     /// The gate admitted the call: take the lease (showing presence) and the reservations.
     ///
     /// # Errors
-    /// Another session took the slot or a window between the plan and now.
+    /// Another session took the slot or a window between the plan and now (`InputBusy`); the
+    /// record lock cannot be taken (`TransactionFailed`, review L10); nothing is sent.
     pub(crate) fn commit(
         &mut self,
         backend: &mut dyn Backend,
         plan: &Plan,
         stop_epoch: u64,
-    ) -> Result<(), (LeaseRefusal, Option<Value>)> {
+    ) -> Result<(), Refused> {
+        let lease = |refusal: LeaseRefusal, detail: Option<Value>| Refused {
+            detail: detail.map(Box::new),
+            ..refusal.refusal().into()
+        };
         if plan.foreground && !self.slot.is_mine(&self.token) {
-            self.slot
-                .acquire(&self.token)
-                .map_err(|holder| (LeaseRefusal::InputBusy, Some(holder_detail(&holder))))?;
+            self.slot.acquire(&self.token).map_err(|refused| match refused {
+                SlotRefusal::Held(holder) => lease(LeaseRefusal::InputBusy, Some(holder_detail(&holder))),
+                SlotRefusal::LockUnavailable => TRANSACTION_FAILED.into(),
+            })?;
             if let Err(refusal) = self.presence.begin(backend) {
                 self.slot.release(&self.token);
-                return Err((refusal, None));
+                return Err(lease(refusal, None));
             }
             self.lease_epoch = Some(stop_epoch);
         }
         let now = self.now_ms();
         self.reservations
             .admit(&self.token, &plan.windows, now)
-            .map_err(|busy| (LeaseRefusal::Window, Some(busy.detail())))
+            .map_err(|refused| match refused {
+                AdmitRefusal::Busy(busy) => lease(LeaseRefusal::Window, Some(busy.detail())),
+                AdmitRefusal::LockUnavailable => TRANSACTION_FAILED.into(),
+            })
     }
 
     /// The call's report went out.

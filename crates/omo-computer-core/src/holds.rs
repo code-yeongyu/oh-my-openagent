@@ -106,6 +106,29 @@ impl HoldLedger {
             .collect()
     }
 
+    /// The clock time the oldest held input reaches the bound; `None` with nothing held.
+    #[must_use]
+    pub fn next_deadline(&self) -> Option<u64> {
+        self.entries
+            .iter()
+            .map(|entry| entry.since_ms.saturating_add(MAX_HOLD_MS))
+            .min()
+    }
+
+    /// Takes `which` out of the ledger and answers the inputs that release them, last press
+    /// first, by the same plan as [`Self::release_all`]; every other hold stays held.
+    pub fn release(&mut self, which: &[Held], user_held: &[String]) -> Vec<InputEvent> {
+        let (taken, kept): (Vec<Entry>, Vec<Entry>) = std::mem::take(&mut self.entries)
+            .into_iter()
+            .partition(|entry| which.iter().any(|held| same(&entry.held, held)));
+        self.entries = kept;
+        taken
+            .into_iter()
+            .rev()
+            .flat_map(|entry| release(entry.held, user_held))
+            .collect()
+    }
+
     /// Empties the ledger and answers the inputs that release it, last press first: a key-up
     /// for every key the user does not hold (`user_held`), and for every button a warp to
     /// its origin followed by the button-up. Every exit path takes this same plan.
@@ -165,36 +188,52 @@ mod tests {
         );
     }
 
+    /// The ledger has ONE release plan whatever the exit path; the session's
+    /// `held_key_released_on_each_of_six_session_exit_paths` drives each path.
     #[test]
-    fn every_session_exit_path_releases_every_hold_last_press_first() {
-        for path in ExitPath::SESSION_OWNED {
-            let mut ledger = HoldLedger::default();
-            ledger.press(key("shift"), 0);
-            ledger.press(
-                Held::Button {
+    fn release_all_releases_every_hold_last_press_first() {
+        let mut ledger = HoldLedger::default();
+        ledger.press(key("shift"), 0);
+        ledger.press(
+            Held::Button {
+                button: Button::Left,
+                origin: ORIGIN,
+            },
+            5,
+        );
+        let released = ledger.release_all(&[]);
+        assert_eq!(
+            released,
+            vec![
+                InputEvent::PointerMove(ORIGIN),
+                InputEvent::Button {
                     button: Button::Left,
-                    origin: ORIGIN,
+                    down: false
                 },
-                5,
-            );
-            let released = ledger.release_all(&[]);
-            assert_eq!(
-                released,
-                vec![
-                    InputEvent::PointerMove(ORIGIN),
-                    InputEvent::Button {
-                        button: Button::Left,
-                        down: false
-                    },
-                    InputEvent::Key {
-                        key: "shift".to_owned(),
-                        down: false
-                    },
-                ],
-                "{path:?}"
-            );
-            assert!(ledger.is_empty(), "{path:?}");
-        }
+                InputEvent::Key {
+                    key: "shift".to_owned(),
+                    down: false
+                },
+            ]
+        );
+        assert!(ledger.is_empty());
+    }
+
+    #[test]
+    fn release_takes_only_the_named_holds_and_the_deadline_follows_the_live_ones() {
+        let mut ledger = HoldLedger::default();
+        ledger.press(key("shift"), 0);
+        ledger.press(key("a"), 10);
+        assert_eq!(ledger.next_deadline(), Some(MAX_HOLD_MS));
+        assert_eq!(
+            ledger.release(&[key("shift")], &[]),
+            vec![InputEvent::Key {
+                key: "shift".to_owned(),
+                down: false
+            }]
+        );
+        assert_eq!(ledger.held(), vec![key("a")]);
+        assert_eq!(ledger.next_deadline(), Some(10 + MAX_HOLD_MS));
     }
 
     #[test]

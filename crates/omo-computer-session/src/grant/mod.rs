@@ -18,8 +18,16 @@ mod session_tests;
 mod tests;
 
 pub use lease_hook::{LeaseHook, NoLeaseHook};
-pub use state::{wall_clock, Control, MachineClock, Plan};
+pub use state::{wall_clock, ChordTamper, Control, MachineClock, Plan};
 pub use wire::HostCallError;
+pub(crate) use host::backend_os;
+
+/// A-IS-64 (b): whether `backend`'s declared platform selects the table of the engine's compile
+/// target (a backend declaring none takes that table, item 3).
+#[must_use]
+pub fn declares_compile_target(backend: &dyn omo_computer_core::backend::Backend) -> bool {
+    backend_os(backend) == omo_computer_safety::protected::Os::host()
+}
 
 use omo_computer_core::methods::Method;
 use omo_computer_safety::gate::verdicts::LeaseRefusal;

@@ -82,7 +82,14 @@ impl Incoming for Receiver<io::Result<Vec<u8>>> {
 
 /// # Errors
 /// Reading the input or writing a reply failed.
-pub fn serve(session: &mut Session, mut input: impl Incoming, output: &mut impl Write) -> io::Result<()> {
+pub fn serve(session: &mut Session, input: impl Incoming, output: &mut impl Write) -> io::Result<()> {
+    let served = serve_lines(session, input, output);
+    session.close();
+    served
+}
+
+/// The serve loop; a read or write error ends it, and `serve` still closes the session.
+fn serve_lines(session: &mut Session, mut input: impl Incoming, output: &mut impl Write) -> io::Result<()> {
     loop {
         match input.next(session.hold_wait()) {
             Next::Closed => break,
@@ -99,7 +106,6 @@ pub fn serve(session: &mut Session, mut input: impl Incoming, output: &mut impl 
             }
         }
     }
-    session.close();
     Ok(())
 }
 
@@ -127,5 +133,41 @@ mod tests {
         assert_eq!(replies.len(), 2, "{replies:?}");
         assert_eq!(replies[0]["error"]["code"], rpc::PARSE_ERROR);
         assert_eq!((replies[1]["id"].clone(), replies[1]["result"]["backend"].clone()), (2.into(), "fake".into()));
+    }
+
+    struct BrokenPipe;
+
+    impl Write for BrokenPipe {
+        fn write(&mut self, _: &[u8]) -> io::Result<usize> {
+            Err(io::Error::from(io::ErrorKind::BrokenPipe))
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    /// Review L2 of #13360: a peer that dies mid-reply still gets the ConnectionClose release.
+    #[test]
+    fn a_reply_write_error_still_closes_the_session_and_releases_its_holds() {
+        let sink = omo_computer_backend_fake::RecordingSink::default();
+        let scenario = omo_computer_backend_fake::FakeScenario::from_json(
+            r#"{"windows":[{"id":"101","title":"t","app":"Notes","pid":4242,"x":0,"y":0,"width":800,"height":600,"focused":true,"elevated":null}]}"#,
+        )
+        .expect("scenario");
+        let fake = FakeBackend::with_parts(scenario, omo_computer_backend_fake::FakeClock::default(), sink.clone())
+            .with_stop_path(omo_computer_backend_fake::StopPathScript::Live);
+        let mut session = Session::new(Box::new(fake));
+        session.open(serde_json::from_value(serde_json::json!({"reportMode": "object"})).expect("open")).expect("open");
+        session.stop_path_start(serde_json::from_value(serde_json::json!({})).expect("start"));
+        session.control_grant(serde_json::from_value(serde_json::json!({"reason": "test"})).expect("grant"));
+        session
+            .host_call(omo_computer_core::methods::Method::KeyDown, serde_json::json!({"target": "101", "chord": "shift"}))
+            .expect("served")
+            .expect("key.down");
+        let input = br#"{"jsonrpc":"2.0","id":1,"method":"capabilities","params":{}}"#.to_vec();
+        let served = serve(&mut session, BufRead::split(input.as_slice(), b'\n'), &mut BrokenPipe);
+        assert!(served.is_err(), "the write error ends the loop");
+        let posts: Vec<String> = sink.lines().into_iter().filter(|l| l.starts_with("post_input")).collect();
+        assert!(posts.last().is_some_and(|l| l.ends_with("key \"shift\" down=false")), "{posts:?}");
     }
 }
