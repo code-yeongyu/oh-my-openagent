@@ -113,6 +113,11 @@ describe.skipIf(process.platform === "win32")("omo remote attach: a dialog raise
     ])
   })
 
+  test("#given a dialog that settled before the attach started #when the attach TUI watches #then it is not shown as pending", async () => {
+    const tui = await watcherOf([settled(String(confirm.id), "answered")])
+    expect(dialogs(tui)).toEqual([])
+  })
+
   test("#given a secret input or a grant selection raised elsewhere #when it is mirrored #then the TUI is not shown a dialog only its raiser may answer", async () => {
     const secret = {
       id: "sec-1",
