@@ -1,6 +1,8 @@
 import { writeFileSync } from "node:fs"
 import { join } from "node:path"
 import type { DeviceRef, LocalRequest, Status } from "../../../src/local-api/protocol.ts"
+import { assertNever } from "../../../src/local-api/validate-fields.ts"
+import { deliveryHandler } from "./fake-owner-deliveries.ts"
 import { sessionHandler } from "./fake-owner-sessions.ts"
 import { type Conn, eventOf, ok, type Outcome, type OwnerState, refuse } from "./fake-owner-state.ts"
 
@@ -8,13 +10,7 @@ import { type Conn, eventOf, ok, type Outcome, type OwnerState, refuse } from ".
 export const UNSERVED_REQUEST_TYPES: readonly string[] = [
   "control.remote_commands.get",
   "control.remote_commands.set",
-  "control.session_wake.get",
-  "control.session_wake.set",
-  "deliveries.serve",
-  "delivery.answer",
-  "delivery.drained",
-  "delivery.held",
-  "delivery.pending",
+  "endpoints.list",
   "machine.batch",
   "machine.batch_part",
   "machine.cancel",
@@ -24,7 +20,6 @@ export const UNSERVED_REQUEST_TYPES: readonly string[] = [
   "machine.list",
   "machine.result_of",
   "owner.update_committed",
-  "peer.admitted",
   "session.presenter_open",
   "session.presenter_send",
   "sessions.events.subscribe",
@@ -91,6 +86,19 @@ export const dispatch = (state: OwnerState, conn: Conn, request: LocalRequest): 
       state.reports.push(report)
       return ok()
     }
+    case "control.session_wake.get":
+    case "control.session_wake.set": {
+      if (role !== "desktop" && role !== "omo")
+        return refuse("forbidden", "only the desktop and the CLI read or set the wake switch")
+      if (request.type === "control.session_wake.set")
+        state.sessionWake = {
+          enabled: request.enabled === true,
+          stored: request.enabled,
+          changedAt: new Date(state.now()).toISOString(),
+          overridden: state.sessionWake.overridden,
+        }
+      return ok(state.sessionWake)
+    }
     case "control.attach.get":
     case "control.attach.set":
       if (role !== "desktop" && role !== "omo")
@@ -122,7 +130,13 @@ export const dispatch = (state: OwnerState, conn: Conn, request: LocalRequest): 
         ? refuse("session_not_found", "no session of that device has that engine id")
         : ok({ device: request.device, key, session: `${request.device}.${key}` })
     }
-    // UNSERVED_REQUEST_TYPES.
+    case "deliveries.serve":
+    case "delivery.answer":
+    case "delivery.held":
+    case "delivery.pending":
+    case "delivery.drained":
+    case "peer.admitted":
+      return deliveryHandler(state, conn, request)
     default:
       return refuse("unsupported", `this test owner does not serve ${request.type}`)
   }

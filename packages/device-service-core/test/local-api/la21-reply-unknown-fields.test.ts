@@ -25,6 +25,7 @@ const NEWER = { added_later: { rows: [1, "two"] } }
 const deviceRow = world.devices[0]
 if (deviceRow === undefined) throw new Error("the world lists a device")
 const attachState = { attached: true, changedAt: "2026-11-09T12:00:00.000Z" }
+const wakeState = { enabled: false, stored: null, changedAt: "", overridden: false }
 
 // One answer per request type omo sends; the machine, delivery, presenter, wake and update-commit requests the
 // vendored client added are covered by its upstream suite.
@@ -50,8 +51,16 @@ const answers = {
   "owner.shutdown_for_upgrade": {},
   "session.endpoints": { endpoints: [KEY] },
   "session.locate": { device: PEER, key: KEY, session: `${PEER}.${KEY}` },
+  "control.session_wake.get": wakeState,
+  "control.session_wake.set": wakeState,
   "control.attach.get": attachState,
   "control.attach.set": attachState,
+  "deliveries.serve": { wake: false },
+  "delivery.answer": {},
+  "delivery.held": {},
+  "delivery.pending": {},
+  "delivery.drained": { kept: false },
+  "peer.admitted": { admitted: true },
 } satisfies { readonly [T in RequestType]?: ResponseData[T] }
 const answerRows = Object.entries(answers) as [RequestType, unknown][]
 const response = (data: unknown) => ({ id: "r1", type: "response", ok: true, data })

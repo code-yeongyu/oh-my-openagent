@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@4ed58920002306a95bf92fe99ca448be89d7103f packages/local-api/src/protocol.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@eda08c786872ad5b766b5adba76f9698d4f1cad6 packages/local-api/src/protocol.ts
 import type {
   Capability,
   ClientName,
@@ -131,6 +131,8 @@ export type EndpointsUnregister = { readonly id: string; readonly type: "endpoin
   | { readonly agent_dir: string }
   | EnvironmentEndpoint
 );
+/** #1266: the agent dirs registered with endpoints.register {agent_dir}, the stored list. */
+export type EndpointsList = { readonly id: string; readonly type: "endpoints.list" };
 export type DevicesList = {
   readonly id: string;
   readonly type: "devices.list";
@@ -143,9 +145,9 @@ export type SessionsList = {
   readonly filter?: SessionFilter;
   /**
    * 2: this query's rows may carry `kind`, `parent` and `parent_listed` (#316); 3: those and `durable_id` (#935);
-   * absent, they never do.
+   * 4: those and `model` and `archived` (#1121); 5: those and `settled` and `settled_by`; absent, they never do.
    */
-  readonly rows?: 2 | 3;
+  readonly rows?: 2 | 3 | 4 | 5;
 };
 // #1066: opt in, on this connection, to sessions.listing_changed. Send it only to a service at or above the release
 // that ships it (docs/local-api.md); an older service refuses the request type.
@@ -195,6 +197,7 @@ export type LocalRequest =
   | DeviceInfo
   | EndpointsRegister
   | EndpointsUnregister
+  | EndpointsList
   | DevicesList
   | SessionsList
   | SessionsEventsSubscribe
@@ -232,6 +235,7 @@ export type ResponseData = {
   readonly "device.info": { readonly device: DeviceRef | null };
   readonly "endpoints.register": Empty;
   readonly "endpoints.unregister": Empty;
+  readonly "endpoints.list": { readonly agent_dirs: readonly string[] };
   readonly "devices.list": { readonly devices: readonly DeviceRow[] };
   readonly "sessions.list": { readonly query_id: string };
   readonly "sessions.events.subscribe": Empty;

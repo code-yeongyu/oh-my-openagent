@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@4ed58920002306a95bf92fe99ca448be89d7103f packages/local-api/src/client-open.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@eda08c786872ad5b766b5adba76f9698d4f1cad6 packages/local-api/src/client-open.ts
 import {
   EventAssembler,
   type ListingResult,
@@ -17,6 +17,7 @@ import type {
   LocalEvent,
   RequestType,
   ResponseData,
+  SessionCommand,
   SessionFilter,
   Welcome,
 } from "./protocol.ts";
@@ -54,6 +55,8 @@ export type CommandRouteFor<T extends CommandTarget> = T extends { readonly atta
   : T extends { readonly endpoint: string }
     ? Pick<DelegatedRoute, "delegated" | "locate">
     : { readonly [K in keyof DelegatedRoute]?: never };
+/** omo#13037 A6: the wake mark a command carries on its closing session.command, for any target (docs/local-api.md). */
+export type CommandMark = Pick<SessionCommand, "accepts">;
 export type LocalApiClient = {
   readonly welcome: Welcome;
   readonly request: <T extends RequestType>(
@@ -66,22 +69,25 @@ export type LocalApiClient = {
    * #393: a command to any target: `{attach}`, a device's engine endpoint `{device, endpoint}`, or a session by its id
    * `{session}` or its title `{alias}` (no attach). A one-string tool picks the last two with sessionTargetOf.
    * `route` (decision 0018) opts the command into the delegated channel or asks an open for its located key; it rides
-   * the closing session.command only, never an upload part.
+   * the closing session.command only, never an upload part, as does `mark` (the wake mark, omo#13037 A6).
    */
   readonly commandTo: <T extends CommandTarget>(
     target: T,
     rpc: CommandRpc,
     command_id?: string,
     route?: CommandRouteFor<T>,
+    mark?: CommandMark,
   ) => Promise<string>;
   readonly list: (
     filter?: SessionFilter,
     onRevision?: (revision: ListingRevision) => void,
     /**
-     * `rows: 2` asks for each row's kind and parent link (#316), `rows: 3` for those and its durable_id (#935); a
-     * service before either answers invalid_request.
+     * `rows: 2` asks for each row's kind and parent link (#316), `rows: 3` for those and its durable_id (#935),
+     * `rows: 4` for those and its model and archived flag (#1121; a service at 0.1.37 or older refuses it), `rows: 5`
+     * for those and its settled state (a service at 0.1.38 or older refuses it); a service before either answers
+     * invalid_request.
      */
-    rows?: 2 | 3,
+    rows?: 2 | 3 | 4 | 5,
   ) => Promise<ListingResult>;
   readonly read: (attach: string, options?: ReadOptions) => Promise<ReadPage>;
   readonly oversizedLines: () => number;
@@ -145,7 +151,9 @@ const sendCommand = async (
   rpc: CommandRpc,
   command_id: string | undefined,
   given: DelegatedRoute = {},
+  mark: CommandMark = {},
 ): Promise<string> => {
+  const marked = mark.accepts === undefined ? {} : { accepts: mark.accepts };
   // Only the three route fields reach the wire, and a route endpoint never replaces a device target's endpoint.
   const route: DelegatedRoute = {
     ...(given.delegated === true && ("attach" in target || "endpoint" in target)
@@ -175,6 +183,7 @@ const sendCommand = async (
     type: "session.command",
     ...target,
     ...id,
+    ...marked,
     ...route,
     rpc,
   };
@@ -195,12 +204,14 @@ const sendCommand = async (
     await Promise.all(parts);
     return (
       await connection
-        .request("session.command", { ...target, ...id, ...route, upload_id })
+        .request("session.command", { ...target, ...id, ...marked, ...route, upload_id })
         .catch(timedOut)
     ).command_id;
   }
   return (
-    await connection.request("session.command", { ...target, ...id, ...route, rpc }).catch(timedOut)
+    await connection
+      .request("session.command", { ...target, ...id, ...marked, ...route, rpc })
+      .catch(timedOut)
   ).command_id;
 };
 
@@ -230,8 +241,8 @@ export const openLocalApiClient = async (
       };
     },
     command: (attach, rpc, command_id) => sendCommand(connection, { attach }, rpc, command_id),
-    commandTo: (target, rpc, command_id, route) =>
-      sendCommand(connection, target, rpc, command_id, route),
+    commandTo: (target, rpc, command_id, route, mark) =>
+      sendCommand(connection, target, rpc, command_id, route, mark),
     list: (filter, onRevision, rows) =>
       new Promise<ListingResult>((resolve, reject) => {
         const params = {

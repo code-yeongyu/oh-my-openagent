@@ -1,7 +1,12 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@4ed58920002306a95bf92fe99ca448be89d7103f packages/local-api/src/validate-delegated.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@eda08c786872ad5b766b5adba76f9698d4f1cad6 packages/local-api/src/validate-delegated.ts
 import { SESSION_ID_MAX_CHARS } from "./spec-proto.ts";
 import { LOCAL_BLOB_MAX, LOCAL_CHUNK_MAX, LOCAL_INLINE_MAX, lineBytes } from "./limits.ts";
-import type { EndpointsRegister, EndpointsUnregister } from "./protocol.ts";
+import type {
+  EndpointsList,
+  EndpointsRegister,
+  EndpointsUnregister,
+  ResponseData,
+} from "./protocol.ts";
 import type {
   CommandBlobRef,
   CommandEvent,
@@ -96,7 +101,7 @@ const environmentOf = (v: Fields, required: readonly string[]): Fields => {
   return m["kind"] === "environment" ? m : fail("kind");
 };
 /** endpoints.register: today's `agent_dir`, or decision 0019's `{kind: "environment", socket, key_root}`. */
-export const endpointsRegister = (v: Fields, id: string): EndpointsRegister => {
+const endpointsRegister = (v: Fields, id: string): EndpointsRegister => {
   if (v["kind"] === undefined) return { id, type: "endpoints.register", agent_dir: agentDirOf(v) };
   const m = environmentOf(v, ["kind", "socket", "key_root"]);
   return {
@@ -108,7 +113,7 @@ export const endpointsRegister = (v: Fields, id: string): EndpointsRegister => {
   };
 };
 /** endpoints.unregister: today's `agent_dir`, or decision 0019's `{kind: "environment", socket}`. */
-export const endpointsUnregister = (v: Fields, id: string): EndpointsUnregister => {
+const endpointsUnregister = (v: Fields, id: string): EndpointsUnregister => {
   if (v["kind"] === undefined)
     return { id, type: "endpoints.unregister", agent_dir: agentDirOf(v) };
   const m = environmentOf(v, ["kind", "socket"]);
@@ -119,6 +124,26 @@ export const endpointsUnregister = (v: Fields, id: string): EndpointsUnregister 
     socket: absolutePath(m["socket"], "socket"),
   };
 };
+
+/** #1266 endpoints.list: no fields. */
+const endpointsList = (v: Fields, id: string): EndpointsList => {
+  requestFields(v, []);
+  return { id, type: "endpoints.list" };
+};
+/** #1266 the endpoints.list reply: {agent_dirs}, each an absolute path. */
+export const endpointsListData = (
+  m: Readonly<Record<string, unknown>>,
+): ResponseData["endpoints.list"] => {
+  const dirs = m["agent_dirs"];
+  if (!Array.isArray(dirs)) return fail("agent_dirs");
+  return { agent_dirs: dirs.map((d: unknown) => absolutePath(d, "agent_dirs")) };
+};
+/** The endpoints.* request validators, one table for validate-requests.ts. */
+export const endpointRequests = {
+  "endpoints.register": endpointsRegister,
+  "endpoints.unregister": endpointsUnregister,
+  "endpoints.list": endpointsList,
+} as const;
 
 type DelegatedKind =
   | "session.command_event"

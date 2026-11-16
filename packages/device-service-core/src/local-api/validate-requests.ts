@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@4ed58920002306a95bf92fe99ca448be89d7103f packages/local-api/src/validate-requests.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@eda08c786872ad5b766b5adba76f9698d4f1cad6 packages/local-api/src/validate-requests.ts
 import { toHex } from "./bytes-encoding.ts";
 import { SESSION_PROJECT_MAX_CHARS, SESSION_READ_TAIL_MAX } from "./spec-proto.ts";
 import type {
@@ -29,11 +29,7 @@ import {
   uint,
 } from "./validate-fields.ts";
 import { MACHINE_REQUEST_VALIDATORS } from "./validate-machine.ts";
-import {
-  DELEGATED_REQUEST_VALIDATORS,
-  endpointsRegister,
-  endpointsUnregister,
-} from "./validate-delegated.ts";
+import { DELEGATED_REQUEST_VALIDATORS, endpointRequests } from "./validate-delegated.ts";
 import { attachId, deviceId, deviceRef, sessionId } from "./validate-shapes.ts";
 import { PRESENTER_REQUEST_VALIDATORS } from "./validate-presenter.ts";
 import { DELIVERIES_REQUEST_VALIDATORS } from "./validate-deliveries.ts";
@@ -182,8 +178,7 @@ const VALIDATORS: RequestValidators<RequestType> = {
     bare(v);
     return { id, type: "device.info" };
   },
-  "endpoints.register": endpointsRegister,
-  "endpoints.unregister": endpointsUnregister,
+  ...endpointRequests,
   "devices.list": (v, id) => {
     const { managed } = requestFields(v, [], ["managed"]);
     if (managed !== undefined && managed !== true) return fail("managed");
@@ -195,7 +190,8 @@ const VALIDATORS: RequestValidators<RequestType> = {
   },
   "sessions.list": (v, id) => {
     const { filter, rows } = requestFields(v, [], ["filter", "rows"]);
-    if (rows !== undefined && rows !== 2 && rows !== 3) return fail("rows");
+    if (rows !== undefined && rows !== 2 && rows !== 3 && rows !== 4 && rows !== 5)
+      return fail("rows");
     return {
       id,
       type: "sessions.list",

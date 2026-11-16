@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import { spawn } from "node:child_process"
 import { mkdirSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
-import { deviceServiceEndpointPath } from "../src/device-service.ts"
+import { dirname, join } from "node:path"
+import { deviceServiceEndpointPath, deviceServiceStateDir } from "../src/device-service.ts"
 import type { RegistrantSchedule } from "../src/registrant.ts"
 import type { FakeOwner } from "./local-api/conformance/fake-owner.ts"
 import {
@@ -41,6 +41,28 @@ describe("agent dir registrant: service starts (#12379)", () => {
     ])
     expect(registers(owner)).toBe(2)
   })
+
+  // #13597: a service run with --state-dir elsewhere is found through the env var or the discovery file.
+  test.each(["the env var", "the discovery file"])(
+    "registers on a service in a non-default state dir named by %s",
+    async (via) => {
+      const home = root()
+      const altDir = join(root(), "ds-alt")
+      const owner = await ownerAt(altDir)
+      const env = via === "the env var" ? { OMO_DEVICE_SERVICE_STATE_DIR: altDir } : {}
+      if (via === "the discovery file") {
+        const besideDefault = dirname(deviceServiceStateDir(process.platform, {}, home))
+        mkdirSync(besideDefault, { recursive: true })
+        writeFileSync(join(besideDefault, "device-service.location.json"), JSON.stringify({ v: 1, state_dir: altDir }))
+      }
+      const seen = recorder()
+      const registered = seen.next(registeredFor(SELF), "the register for the adopted device")
+      start({ stateDir: deviceServiceStateDir(process.platform, env, home), onEvent: seen.onEvent })
+
+      await registered
+      expect([...owner.state.endpoints]).toEqual([AGENT_DIR])
+    },
+  )
 
   test("a fresh service on the same state dir (a relayd restart) gets the register again on its new connection", async () => {
     const stateDir = join(root(), "device-service")
