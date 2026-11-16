@@ -54,6 +54,10 @@ export type ContractHost = {
   readonly drain: () => void
   /** Whether the session is still on the host: false once a close or an unload ended it. */
   readonly live: () => boolean
+  /** Settles once a connection attached to the session: a test awaits it before it pushes records. */
+  readonly attached: () => Promise<void>
+  /** Writes these records of the session (`sessionId` "rpc-1") to every connection attached to it, as a live host does. */
+  readonly push: (records: readonly Frame[]) => void
 }
 
 /**
@@ -128,6 +132,8 @@ export async function withContractHost(
   const frames: ContractHost["frames"] = []
   const mutations: Frame[] = []
   const sockets = new Set<Socket>()
+  const attachedClients = new Set<Socket>()
+  const firstAttach = Promise.withResolvers<void>()
   let nextConnection = 0
   let preset = "read-only"
   const durableId = options.durableId ?? "dur-selected"
@@ -227,7 +233,10 @@ export async function withContractHost(
               respond(frame, undefined, "session_identity_mismatch", {})
             } else {
               attached = true
+              attachedClients.add(client)
+              client.once("close", () => attachedClients.delete(client))
               respond(frame, { sessionId: "rpc-1", attached: true })
+              firstAttach.resolve()
             }
             continue
           }
@@ -343,6 +352,16 @@ export async function withContractHost(
             respond(frame, { isStreaming: false })
             continue
           }
+          if (frame.type === "get_snapshot") {
+            respond(frame, {
+              state: { sessionId: "rpc-1", isStreaming: false, pendingDialogs: [] },
+              entries: [],
+              next_before: null,
+              history_truncated: false,
+              markerId: "marker-1",
+            })
+            continue
+          }
           if (frame.type === "get_available_models") {
             respond(frame, { models: [{ provider: "p", id: "m" }] })
             continue
@@ -398,6 +417,11 @@ export async function withContractHost(
         draining = true
       },
       live: () => !ended,
+      attached: () => firstAttach.promise,
+      push: (records) => {
+        for (const client of attachedClients)
+          for (const record of records) client.write(`${JSON.stringify({ ...record, sessionId: "rpc-1" })}\n`)
+      },
     })
   } finally {
     const closed = once(server, "close", { signal: AbortSignal.timeout(2000) })
