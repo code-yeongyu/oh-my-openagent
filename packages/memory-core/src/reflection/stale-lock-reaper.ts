@@ -888,12 +888,16 @@ export async function reclaimDeadOwnerLocks(locksDir: string): Promise<DeadOwner
   const names = (await readdir(locksDir).catch(() => [] as string[])).filter((name) => name.endsWith(".lock")).sort()
   const reclaimed: string[] = []
   const failures = new Map<string, string>()
+  let sweepListingError: string | undefined
   await sweepDeadOwnerLocks(locksDir, {
     onReclaimed: (lockPath) => {
       reclaimed.push(basename(lockPath))
     },
     onFailure: (lockPath, error) => {
-      failures.set(basename(lockPath), error instanceof Error ? error.message : String(error))
+      const message = error instanceof Error ? error.message : String(error)
+      // The sweep reports a directory it could not list under the directory's own path, not a lock name.
+      if (lockPath === locksDir) sweepListingError = message
+      else failures.set(basename(lockPath), message)
     },
   })
   // A lock another process removed while the sweep reached it is neither reclaimed nor kept: it is gone. When
@@ -908,9 +912,11 @@ export async function reclaimDeadOwnerLocks(locksDir: string): Promise<DeadOwner
       name,
       reason:
         failures.get(name) ??
-        (listing.error === undefined
-          ? "owner is alive or not provably dead"
-          : `could not list the locks after the sweep: ${listing.error}`),
+        (sweepListingError !== undefined
+          ? `could not list the locks for the sweep: ${sweepListingError}`
+          : listing.error !== undefined
+            ? `could not list the locks after the sweep: ${listing.error}`
+            : "owner is alive or not provably dead"),
     }))
   return { reclaimed, kept }
 }
