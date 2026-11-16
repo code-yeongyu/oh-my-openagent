@@ -485,7 +485,5 @@ const sessionRow = (row: ListingRow, device: DeviceRow): SessionRow => ({
 })
 
 // The listing's optional durable_id (#12996); a service that predates it lists none.
-const durableIdOf = (row: object): { readonly durable_id?: string } => {
-  const value = Reflect.get(row, "durable_id")
-  return typeof value === "string" && value !== "" ? { durable_id: value } : {}
-}
+const durableIdOf = ({ durable_id }: ListingRow): { readonly durable_id?: string } =>
+  durable_id === undefined || durable_id === "" ? {} : { durable_id }
