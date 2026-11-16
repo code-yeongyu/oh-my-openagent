@@ -1244,10 +1244,7 @@ describe("thread tools over a gateway store a newer omo build migrated", () => {
   )
 
   test.each([
-    [
-      "thread_bind",
-      { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "t1", session: "my-tui", ttl_seconds: null },
-    ],
+    ["thread_outbox_ack", { binding_id: "bnd-1", cursor: 3, provider_message_id: "m-1" }],
     ["thread_report", { kind: "milestone", text: "done step 1" }],
     ["thread_outbox", { binding_id: "bnd-1", after_cursor: 0 }],
   ] as const)(
