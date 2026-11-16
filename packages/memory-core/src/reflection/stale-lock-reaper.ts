@@ -888,17 +888,36 @@ export async function reclaimDeadOwnerLocks(locksDir: string): Promise<DeadOwner
   const names = (await readdir(locksDir).catch(() => [] as string[])).filter((name) => name.endsWith(".lock")).sort()
   const reclaimed: string[] = []
   const failures = new Map<string, string>()
+  let sweepListingError: string | undefined
   await sweepDeadOwnerLocks(locksDir, {
     onReclaimed: (lockPath) => {
       reclaimed.push(basename(lockPath))
     },
     onFailure: (lockPath, error) => {
-      failures.set(basename(lockPath), error instanceof Error ? error.message : String(error))
+      const message = error instanceof Error ? error.message : String(error)
+      // The sweep reports a directory it could not list under the directory's own path, not a lock name.
+      if (lockPath === locksDir) sweepListingError = message
+      else failures.set(basename(lockPath), message)
     },
   })
+  // A lock another process removed while the sweep reached it is neither reclaimed nor kept: it is gone. When
+  // the directory cannot be listed again, every unreclaimed lock stays reported as kept, with that error.
+  const listing = await readdir(locksDir).then(
+    (entries) => ({ remaining: new Set(entries), error: undefined }),
+    (error: unknown) => ({ remaining: undefined, error: error instanceof Error ? error.message : String(error) }),
+  )
   const kept = names
-    .filter((name) => !reclaimed.includes(name))
-    .map((name) => ({ name, reason: failures.get(name) ?? "owner is alive or not provably dead" }))
+    .filter((name) => !reclaimed.includes(name) && (listing.remaining === undefined || listing.remaining.has(name)))
+    .map((name) => ({
+      name,
+      reason:
+        failures.get(name) ??
+        (sweepListingError !== undefined
+          ? `could not list the locks for the sweep: ${sweepListingError}`
+          : listing.error !== undefined
+            ? `could not list the locks after the sweep: ${listing.error}`
+            : "owner is alive or not provably dead"),
+    }))
   return { reclaimed, kept }
 }
 

@@ -118,8 +118,11 @@ export async function recoverStaleOwner(
       await unlink(lockPath)
     } catch (error) {
       // The proven-dead primary vanished between the fence read and this unlink (Windows CI,
-      // #11644): it is already reclaimed. Every other failure still surfaces.
+      // #11644): it is already reclaimed. Every other failure still surfaces. Someone else removed
+      // it, so a live holder may have published and released in the gap: no dead-owner proof is
+      // bound to this contender (#13745 review L1).
       if (errorCode(error) !== "ENOENT") throw error
+      return true
     }
     // Record the reclaimed previous owner so consumers that gate on dead-owner evidence (the
     // stranded-git-lock sweep) can prove reclamation after the lock file itself is republished;

@@ -1,7 +1,8 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
+import * as resilientFs from "../fs/resilient"
 import { withLock } from "../locks/acquire"
 import { runFinalizationLockPath } from "../locks/domains"
 import { createLockRecord } from "../locks/lock-record"
@@ -711,6 +712,77 @@ describe("dead-owner runtime locks (#11976, 4.5)", () => {
     expect(result.kept.map((entry) => entry.name)).toEqual(["notice.lock"])
     expect(existsSync(join(paths.locks, "notice.lock"))).toBe(true)
   })
+
+  test("#given a dead owner's lock that another process removes while the sweep reaches it #when reclaimed #then it is reported neither reclaimed nor kept", async () => {
+    // given
+    const paths = reaperIdentity()
+    mkdirSync(paths.locks, { recursive: true })
+    const dead = await killedChild()
+    const lockPath = join(paths.locks, "finalize-facts-2.lock")
+    writeJson(lockPath, {
+      ...(await createLockRecord("facts-finalize")),
+      pid: dead.pid,
+      process_start: dead.start ?? "unreadable-start",
+    })
+    const realUnlink = resilientFs.unlink
+    let vanished = false
+    const vanishFirst = spyOn(resilientFs, "unlink").mockImplementation((async (target: string) => {
+      if (target === lockPath && !vanished) {
+        vanished = true
+        await realUnlink(lockPath)
+      }
+      return realUnlink(target)
+    }) as typeof resilientFs.unlink)
+
+    // when
+    let result: Awaited<ReturnType<typeof reclaimDeadOwnerLocks>>
+    try {
+      result = await reclaimDeadOwnerLocks(paths.locks)
+    } finally {
+      vanishFirst.mockRestore()
+    }
+
+    // then
+    // The doctor --fix line counts kept locks; one that no longer exists is not kept.
+    expect(vanished).toBe(true)
+    expect(result.reclaimed).toEqual([])
+    expect(result.kept).toEqual([])
+  })
+
+  // reclaimDeadOwnerLocks lists the locks directory three times: its own names, the sweep's listing, the check after.
+  for (const [listing, failingCall, reason] of [
+    ["the sweep's own listing", 2, "could not list the locks for the sweep: EIO: listing failed"],
+    ["the listing after the sweep", 3, "could not list the locks after the sweep: EIO: listing failed"],
+  ] as const) {
+    test(`#given ${listing} fails #when reclaimed #then the unreclaimed lock is reported kept with that error`, async () => {
+      // given
+      const paths = reaperIdentity()
+      mkdirSync(paths.locks, { recursive: true })
+      writeJson(join(paths.locks, "notice.lock"), await createLockRecord("notice"))
+      const realReaddir = resilientFs.readdir
+      let locksListings = 0
+      const failOne = spyOn(resilientFs, "readdir").mockImplementation((async (
+        ...args: Parameters<typeof resilientFs.readdir>
+      ) => {
+        if (args[0] === paths.locks && ++locksListings === failingCall)
+          throw Object.assign(new Error("EIO: listing failed"), { code: "EIO" })
+        return realReaddir(...args)
+      }) as typeof resilientFs.readdir)
+
+      // when
+      let result: Awaited<ReturnType<typeof reclaimDeadOwnerLocks>>
+      try {
+        result = await reclaimDeadOwnerLocks(paths.locks)
+      } finally {
+        failOne.mockRestore()
+      }
+
+      // then
+      expect(locksListings).toBe(3)
+      expect(result.reclaimed).toEqual([])
+      expect(result.kept).toEqual([{ name: "notice.lock", reason }])
+    })
+  }
 })
 
 describe("win32: the reaper with real process liveness and start identities (#11976 Bearmancer report, C16)", () => {
