@@ -150,7 +150,11 @@ export async function attachAddressed(
   const locate = () =>
     Promise.resolve()
       .then(() => connected.locate(device, sessionId))
-      .catch(() => undefined)
+      .catch((error: unknown) => {
+        // A locate that answered "none" is the answer: the address names no session there (not the attach's refusal).
+        if (error instanceof LocalApiError && error.code === "session_not_found") throw error
+        return undefined
+      })
   if (DURABLE_ID.test(sessionId)) {
     // Only a locate that answered "none" means the session is gone; any other failure (b not answering, a lost connection)
     // is the refusal as it came, so a close never reports a running session not_live (review M1 of 6ce7397).
