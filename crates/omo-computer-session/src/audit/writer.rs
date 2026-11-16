@@ -17,6 +17,7 @@ use serde_json::json;
 
 use super::line::{now_ms, AuditEvent};
 use super::handlock::HandLock;
+use super::mark::is_chord_refusal_event;
 use super::segment::{anchor_event, chain_link, stamp, truncated, Segment};
 use super::sink::{AuditSink, AUDIT_UNAVAILABLE};
 
@@ -84,6 +85,8 @@ pub struct AuditWriter {
     limits: AuditLimits,
     authority: Option<Anchor>,
     degraded: bool,
+    /// This segment already used its one chord-refusal line past the hard cap (R7-2).
+    cap_refusal_written: bool,
 }
 
 impl AuditWriter {
@@ -137,6 +140,7 @@ impl AuditWriter {
             limits,
             authority,
             degraded: false,
+            cap_refusal_written: false,
         };
         let last = chain_link(&this.path);
         this.open_segment(last)?;
@@ -157,6 +161,7 @@ impl AuditWriter {
     fn open_segment(&mut self, last: Option<String>) -> io::Result<()> {
         self.segment.seq = 0;
         self.segment.prev = "meta".to_owned();
+        self.cap_refusal_written = false;
         let mut lines = vec![self.segment.meta()];
         if let Some(anchor) = self.authority.clone() {
             let mut line = stamp(&mut self.segment, &anchor_event(&anchor))?;
@@ -237,18 +242,23 @@ impl AuditWriter {
                 eprintln!("omo-computer-engine: warn audit not rotated, refused at its hard cap: {error}");
             }
         }
-        if self.size() >= self.limits.hard_cap {
+        // R7-2: the hard cap never refuses a chord refusal's line: one per segment past it.
+        let refusal = is_chord_refusal_event(&event);
+        let past_cap = self.size() >= self.limits.hard_cap;
+        if past_cap && !(refusal && !self.cap_refusal_written) {
             return Err(io::Error::other("the audit file is at its hard cap"));
         }
         let mut segment = self.segment.clone();
         let mut line = stamp(&mut segment, &event)?.to_string();
-        if line.len() as u64 > self.limits.max_event {
+        // A refusal line is never written as a truncated event (row 21 cuts its chords).
+        if !refusal && line.len() as u64 > self.limits.max_event {
             segment = self.segment.clone();
             line = stamp(&mut segment, &truncated(&event))?.to_string();
         }
         line.push('\n');
         self.write_held(line.as_bytes())?;
         self.segment = segment;
+        self.cap_refusal_written |= past_cap;
         Ok(self.segment.prev.clone())
     }
 }

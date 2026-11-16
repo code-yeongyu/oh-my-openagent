@@ -5,6 +5,7 @@ mod chain;
 pub mod gc;
 mod handlock;
 mod line;
+mod mark;
 mod memory;
 mod redact;
 mod segment;
