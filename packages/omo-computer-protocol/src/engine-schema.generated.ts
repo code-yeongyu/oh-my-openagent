@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "c4746a98fbfc1f0ba8719c86f2a6d3fe490ec0620f6c1782a2ecb1b6f2294b29" as const
+export const SCHEMA_SHA256 = "a1245486c7361d23f7e223d826c7c6142cb97e97abcc8f13b8b8ec82f25fdec3" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -78,6 +78,7 @@ export const METHODS = [
 	{ name: "stopPath.stop", effect: "read", exposure: "public" },
 	{ name: "stopPath.resume", effect: "exec", exposure: "hostOnly(authority)" },
 	{ name: "desktop.shutdown", effect: "exec", exposure: "hostOnly(authority)" },
+	{ name: "hand.register", effect: "exec", exposure: "hostOnly(authority)" },
 	{ name: "$/cancel", effect: "read", exposure: "public" },
 	{ name: "$/test.advanceClock", effect: "exec", exposure: "testOnly" },
 ] as const
@@ -893,6 +894,15 @@ export type HandConsent = {
 	foreground: ForegroundConsent
 	appScope?: string[] | null
 	tampered?: boolean | null
+}
+
+export type HandRegisterParams = {
+	pid: number
+	processStart: number
+}
+
+export type HandRegistered = {
+	capability: string
 }
 
 export type HandSelector = string | {
@@ -1775,6 +1785,7 @@ export type MethodParams = {
 	"stopPath.stop": StopPathStopParams
 	"stopPath.resume": StopPathResumeParams
 	"desktop.shutdown": EmptyParams
+	"hand.register": HandRegisterParams
 	"$/cancel": CancelParams
 	"$/test.advanceClock": AdvanceClockParams
 }
@@ -1847,6 +1858,7 @@ export type MethodResults = {
 	"stopPath.stop": StopPathStatus
 	"stopPath.resume": StopPathStatus
 	"desktop.shutdown": null
+	"hand.register": HandRegistered
 	"$/cancel": null
 	"$/test.advanceClock": null
 }
