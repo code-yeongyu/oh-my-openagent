@@ -87,7 +87,9 @@ pub fn backend(vars: &[(String, String)]) -> Result<Box<dyn Backend>, RouteError
 ///
 /// # Errors
 /// [`RouteError::PlatformMismatch`] when the backend declares another OS.
+#[cfg(any(windows, test))]
 pub fn real<B: Backend + 'static>(backend: B) -> Result<Box<dyn Backend>, RouteError> {
+    launch_gate(Selected::Real, &backend)?;
     Ok(Box::new(backend))
 }
 
