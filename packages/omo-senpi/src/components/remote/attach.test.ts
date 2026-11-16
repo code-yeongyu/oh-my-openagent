@@ -173,6 +173,30 @@ describe("attach rows: pending UI requests (#12750)", () => {
   })
 })
 
+describe("attach rows: events buffer", () => {
+  // The events kept for a reader that has not read yet: 1024. Past it the oldest go and the reader learns so first.
+  const KEPT = 1024
+
+  test("#given an attach nobody reads #when more events than it keeps arrive #then the first read is channel_lost events_overflow, then the newest", async () => {
+    const { owner, handle } = await attached({ sessionId: "engine-1", isStreaming: true, pendingDialogs: [] })
+    const sent = KEPT + 476
+    for (let from = 0; from < sent; from += 100)
+      pushRecords(
+        owner,
+        Array.from({ length: Math.min(100, sent - from) }, (_, i) => ({ type: "message_update", n: from + i })),
+      )
+    // A request on the same connection is answered after every record pushed before it.
+    await handle.read({ tail: 1 })
+    await handle.detach()
+    const events = reader(handle.events)
+    expect(await events.next("the overflow notice")).toEqual({ kind: "channel_lost", reason: "events_overflow" })
+    const kept: unknown[] = []
+    for (let event = await events.next("a kept record"); event !== "done"; event = await events.next("a kept record"))
+      kept.push(event.kind === "record" ? event.record["n"] : event)
+    expect(kept).toEqual(Array.from({ length: KEPT }, (_, i) => sent - KEPT + i))
+  })
+})
+
 describe("attach rows: end", () => {
   test("#given an attach #when the host closes the session #then session_closed and the events end", async () => {
     const { owner, handle } = await attached({ sessionId: "engine-1", isStreaming: false, pendingDialogs: [] })

@@ -18,13 +18,22 @@ import type {
   UiResponse,
 } from "./types"
 
-/** A stream fed by its producer: `push` queues an event, `end` lets the queue drain and finishes; `stop` drops the rest. */
-export function eventStream<E>(onStop?: () => void): {
+/**
+ * A stream fed by its producer: `push` queues an event, `end` lets the queue drain and finishes; `stop` drops the rest.
+ * With `bound`, at most `kept` events wait for the reader: past that the oldest are dropped and the reader's next event
+ * is `overflow`, once per overflow, so a slow or absent reader never grows the queue.
+ */
+export function eventStream<E>(options: {
+  readonly onStop?: () => void
+  readonly bound?: { readonly kept: number; readonly overflow: E }
+}): {
   readonly stream: RemoteStream<E>
   readonly push: (event: E) => void
   readonly end: () => void
 } {
+  const { onStop, bound } = options
   const queue: E[] = []
+  let overflowed = false
   let ended = false
   let stopped = false
   let wake: (() => void) | undefined
@@ -38,6 +47,7 @@ export function eventStream<E>(onStop?: () => void): {
     stopped = true
     ended = true
     queue.length = 0
+    overflowed = false
     notify()
     onStop?.()
   }
@@ -45,6 +55,10 @@ export function eventStream<E>(onStop?: () => void): {
     push: (event) => {
       if (ended) return
       queue.push(event)
+      if (bound !== undefined && queue.length > bound.kept) {
+        queue.shift()
+        overflowed = true
+      }
       notify()
     },
     end: () => {
@@ -56,6 +70,11 @@ export function eventStream<E>(onStop?: () => void): {
       async *[Symbol.asyncIterator]() {
         try {
           for (;;) {
+            if (overflowed && bound !== undefined) {
+              overflowed = false
+              yield bound.overflow
+              continue
+            }
             const next = queue.shift()
             if (next !== undefined) yield next
             else if (ended) return
@@ -201,6 +220,11 @@ export type Attachment = {
   readonly onSnapshot: (listener: (snapshot: SnapshotBody) => void) => () => void
 }
 
+// The events an attach keeps for a reader that has not read them (one that only commands and reads, or a forgotten
+// handle, never reads): past this the oldest go, and the reader learns it missed records and re-reads them with read().
+const EVENTS_KEPT = 1024
+const EVENTS_OVERFLOW: AttachEvent = { kind: "channel_lost", reason: "events_overflow" }
+
 const answerRecord = (requestId: string, response: UiResponse): JsonObject => ({
   type: "extension_ui_response",
   id: requestId,
@@ -212,7 +236,7 @@ function createAttachment(core: ClientCore, attached: RemoteAttach, thread: Thre
   const dialogs = new MirroredDialogs()
   const snapshotListeners = new Set<(snapshot: SnapshotBody) => void>()
   const endpoints: (() => Promise<void>)[] = []
-  const events = eventStream<AttachEvent>()
+  const events = eventStream<AttachEvent>({ bound: { kept: EVENTS_KEPT, overflow: EVENTS_OVERFLOW } })
   let latest: SnapshotBody | undefined
 
   const snapshot = (next: SnapshotBody): void => {

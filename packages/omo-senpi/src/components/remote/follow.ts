@@ -222,7 +222,7 @@ export function streamMembers(core: ClientCore): StreamMembers {
     let watch: SessionWatch | undefined
     let finished = false
     const deadlineMs = opts?.deadlineMs ?? DEADLINES.followTotal
-    const output = eventStream<FollowEvent>(() => finish())
+    const output = eventStream<FollowEvent>({ onStop: () => finish() })
     const finish = (last?: FollowEvent): void => {
       if (finished) return
       finished = true
