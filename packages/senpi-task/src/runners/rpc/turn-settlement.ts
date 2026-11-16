@@ -208,7 +208,9 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
           }
           return
         case "continuation_error":
-          holdRecoveryFailure(event.errorMessage)
+          // Only an announced recovery is ended by a failed continuation; a completed turn's queued
+          // follow-up failing afterwards does not turn that turn into a failure.
+          if (recovery !== undefined) holdRecoveryFailure(event.errorMessage)
           return
         case "agent_idle": {
           // Session-lifetime monitors outlive completed turns; only recovery still belongs to them.

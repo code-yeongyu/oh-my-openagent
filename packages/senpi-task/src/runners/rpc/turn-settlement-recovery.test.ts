@@ -64,6 +64,22 @@ describe("recovery settlement (omo#13785)", () => {
     expect(outcomes).toEqual([{ status: "completed", finalResponse: "done" }])
   })
 
+  test.each([
+    ["no wake source", false],
+    ["a live session-lifetime monitor", true],
+  ])("keeps a completed turn completed when a queued continuation then fails (%s)", (_label, live) => {
+    // given
+    const { settlement, outcomes } = fixture(() => live)
+    settlement.observe(turnEnd(false))
+
+    // when
+    settlement.observe({ type: "continuation_error", errorMessage: CONTINUATION_ERROR })
+    settlement.observe({ type: "agent_idle" })
+
+    // then
+    expect(outcomes).toEqual([{ status: "completed", finalResponse: "done" }])
+  })
+
   test("settles the original retrying error when recovery becomes idle without a retry-end event", () => {
     // given
     const { settlement, outcomes } = fixture()
