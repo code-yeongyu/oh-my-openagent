@@ -1,5 +1,5 @@
 // Architecture contract G2 (design one-remote-module v8-core r2, omo#13414): the `omo remote` and `omo thread` CLI files
-// may import only the remote module's public entry (components/remote/index: the person factory and the types), their own args/render/exit helpers and `node:*`; every
+// may import only the remote module's public entry (components/remote/index: the person factory) and its types module, their own args/render/exit helpers and `node:*`; every
 // other import is an offender listed below with the PR that removes it. The list may only shrink: a new import outside
 // the rule fails, and so does a listed offender that no longer exists (remove its line in the PR that fixes it).
 import { describe, expect, test } from "bun:test"
@@ -49,7 +49,7 @@ const OFFENDERS: readonly string[] = [
 const allowed = (specifier: string): boolean =>
   specifier.startsWith("node:") ||
   /^\.\/(remote-[\w-]+|thread-[\w-]+\.js)$/.test(specifier) ||
-  /^\.\.\/omo-senpi\/src\/components\/remote\/index$/.test(specifier)
+  /^\.\.\/omo-senpi\/src\/components\/remote\/(index|types)$/.test(specifier)
 
 function cliFiles(): string[] {
   const remote = readdirSync(NATIVE).filter((name) => /^remote-.*\.ts$/.test(name) && !name.endsWith(".test.ts"))
