@@ -149,6 +149,8 @@ async function callerHoldsWriterLock(repoDir: string): Promise<boolean> {
 // only when the lock protocol proved the recorded previous owner dead (pid + start identity;
 // provenDeadTakeoverFor keeps that proof across the republish). Unknown ownership keeps the lock
 // and the caller surfaces it through StrandedGitLockError instead of deleting on no evidence.
+// One exception (#13808): an index.lock with no owner record at all is removed by sweepOwnerlessStaleIndexLock
+// only when every check there proves it is debris (age, no holder, no repo user, unchanged across a settle).
 // Both gates must hold, in order: (1) THIS process holds the identity's memory-write lock right
 // now, and (2) the lock protocol proved the previous owner dead when this process took it over,
 // re-verified here so a pid recycled since the takeover cannot pass.

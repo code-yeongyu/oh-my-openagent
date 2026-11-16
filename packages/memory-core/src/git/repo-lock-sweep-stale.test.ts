@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "bun:test"
+import { afterEach, expect, test, spyOn } from "bun:test"
 import { realpathSync } from "node:fs"
 import { appendFile, mkdir, mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -8,6 +8,7 @@ import { git } from "../concurrency/two-process-kit.test-support"
 import { buildIdentityPaths } from "../identity"
 import { acquireLock, createLockRecord, memoryWriterLockPath, releaseLock } from "../locks"
 import type { GitLockScans } from "./lock-scans"
+import * as resilient from "../fs/resilient"
 import { holdGitActivityShared } from "./git-activity-lock"
 import { type KeptGitLockReason, STALE_LOCK_JOURNAL, sweepStrandedGitLockFiles } from "./repo-lock-sweep"
 import { disableFixtureAutoMaintenance } from "./test-repo-config.test-support"
@@ -168,6 +169,27 @@ test("#given a stale ownerless index.lock #when a memory-core git process holds 
     expect(report.kept).toEqual([{ path: fixture.lock, reason: "repo-in-use" }])
   } finally {
     await hold.release()
+    await fixture.release()
+  }
+})
+
+test("#given the removal record cannot be written #when the stale ownerless index.lock is removed #then the sweep still reports it removed", async () => {
+  const fixture = await repoWithStaleLock(70 * 60_000)
+  const realAppend = resilient.appendFile
+  const appends = spyOn(resilient, "appendFile").mockImplementation(async (file, data, options) => {
+    if (String(data).includes('"outcome":"removed"'))
+      throw Object.assign(new Error("no space left"), { code: "ENOSPC" })
+    return realAppend(file, data, options)
+  })
+  try {
+    const report = await sweepStrandedGitLockFiles(fixture.repo, 0, idleScans, {
+      staleAgeMs: 10 * 60_000,
+      staleSettleMs: 0,
+    })
+
+    expect(report.removed).toEqual([fixture.lock])
+  } finally {
+    appends.mockRestore()
     await fixture.release()
   }
 })
