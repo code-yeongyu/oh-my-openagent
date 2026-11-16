@@ -113,4 +113,6 @@ impl Backend for FakeBackend {
 #[cfg(test)]
 mod extent_tests;
 #[cfg(test)]
+mod addressed_tests;
+#[cfg(test)]
 mod tests;
