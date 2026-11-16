@@ -22,7 +22,7 @@ const REPO = resolve(HERE, "..", "..", "..")
 // Where `sp-n.ps1 -Leg build-native` writes sp-n-native.dll (+ .sha256) and every leg reads it: SPN_NATIVE_DIR (the
 // workflow sets it under the runner temp dir), else TEMP. Never inside the checkout. Every helper spawn passes it
 // as -NativeDir, since a runas or SYSTEM child may not inherit the variable.
-export function nativeDir(env: Readonly<Record<string, string | undefined>> = process.env, repo = REPO): string {
+function nativeDir(env: Readonly<Record<string, string | undefined>> = process.env, repo = REPO): string {
   const dir = resolve(env.SPN_NATIVE_DIR || env.TEMP || tmpdir())
   const rel = relative(repo, dir)
   if (rel === "" || (!rel.startsWith("..") && !isAbsolute(rel)))
@@ -31,20 +31,20 @@ export function nativeDir(env: Readonly<Record<string, string | undefined>> = pr
 }
 const nativeArgs = () => ["-NativeDir", nativeDir()]
 const TARGET = join(HERE, "sp-n-target.ps1")
-export const LEDGER = "crates/omo-computer-backend-win32/probes/win32-delivery.tsv"
+const LEDGER = "crates/omo-computer-backend-win32/probes/win32-delivery.tsv"
 const SELF = "crates/omo-computer-backend-win32/probes/probe-sp-n.ts"
 // notes: free text kept across re-measures (for example a design decision that adopted the row), "-" when empty;
 // never read as a verdict.
-export const HEADER = ["id", "question", "condition", "measured", "verdict", "rerun", "host", "build", "notes"] as const
-export const H6 = "H6 Windows 11 VM"
+const HEADER = ["id", "question", "condition", "measured", "verdict", "rerun", "host", "build", "notes"] as const
+const H6 = "H6 Windows 11 VM"
 // sha256 of Microsoft.Web.WebView2 1.0.2903.40 from nuget.org; sp-n-target.ps1 refuses any other package
-export const WEBVIEW2_NUPKG_SHA256 = "ef128016dd1e51c59178c827ed5b8aa3322c57afa8675d930f8109505542ad74"
+const WEBVIEW2_NUPKG_SHA256 = "ef128016dd1e51c59178c827ed5b8aa3322c57afa8675d930f8109505542ad74"
 const HOSTED = "hosted windows-latest"
 const WARM = 5
 const RUNS = 31
 // Every bound a verdict applies, each with its source line in the pinned design. A timing row with no bound here
 // reads NEW-EDGE with its numbers ("first recorded"), never CONTRADICTS: Windows timings are targets until measured.
-export const BOUNDS = {
+const BOUNDS = {
   pollMs: { value: 1, cite: "design/d-windows.md:130 (each hop polls at 1 ms)" },
   hangGuardMs: { value: 5000, cite: "design/d-windows.md:130 (each hop bounded by a 5 s hang guard)" },
   wheelAfterRaise: {
@@ -62,7 +62,7 @@ type Bound = { readonly value: number; readonly cite: string }
 
 // Every count-row property a verdict judges, keyed to its pinned-design line. A property without a citation is not
 // a design claim: it is recorded as data and reads NEW-EDGE. Give it a citation here to make it a verdict.
-export const PROPERTIES: Readonly<Record<string, string | undefined>> = {
+const PROPERTIES: Readonly<Record<string, string | undefined>> = {
   // '## Input', Barrier: what the barrier proves is routed + consumed, not the effect at return
   barrierReceipt: "design/d-windows.md:130 (## Input, Barrier: routed hop + consumed hop)",
   wheelSettled: undefined, // no design line states that a settled foreground target receives the wheel
@@ -71,14 +71,14 @@ export const PROPERTIES: Readonly<Record<string, string | undefined>> = {
   dropMatrixWebView2: "design/d-windows.md:146 (Chromium / CEF / WebView2 background refused)",
   dropMatrixWpf: "design/d-windows.md:147 (WPF pointer and text refused in the background)",
 }
-export function propertyVerdict(property: string, held: boolean, numbers: string): Result {
+function propertyVerdict(property: string, held: boolean, numbers: string): Result {
   const cite = PROPERTIES[property]
   if (cite === undefined) return { measured: `${numbers}; no design claim (${property})`, verdict: "NEW-EDGE" }
   return { measured: `${numbers}; per ${cite}`, verdict: pick(held, "CONFIRMS", "CONTRADICTS") }
 }
 
 // INVALID: a row measured by a probe with a known defect; kept with the reading, superseded by the next run.
-export type Verdict = "CONFIRMS" | "CONTRADICTS" | "NEW-EDGE" | "UNMEASURED" | "INVALID"
+type Verdict = "CONFIRMS" | "CONTRADICTS" | "NEW-EDGE" | "UNMEASURED" | "INVALID"
 // skip: this pass did not re-measure the row, and why (--verify reports it and does not compare it)
 type Result = { readonly measured: string; readonly verdict: Verdict; readonly skip?: string }
 type Json = { readonly [key: string]: unknown }
@@ -148,7 +148,7 @@ const ELEVATED = "medium-integrity process (runas /trustlevel:0x20000) against a
 const chordQ = (what: string) =>
   `does a posted ctrl+a act as the chord in ${what} (negative leg win-posted-ctrl-chord-negative)`
 
-export const SPEC: Readonly<Record<string, Spec>> = {
+const SPEC: Readonly<Record<string, Spec>> = {
   "n-host-admin": {
     question: "is the Windows desktop of host prerequisite H6 reachable with an administrator account",
     condition: "an interactive session of the run's administrator account",
@@ -307,7 +307,7 @@ const at = (j: Json, ...path: string[]): unknown => path.reduce<unknown>((v, k) 
 
 // Every exit goes through runThroughCleanup: fail() throws a ProbeExit, an unexpected error or rejection is caught
 // there (or by onFatal), and the directories this run created are removed on every one of those paths.
-export class ProbeExit extends Error {
+class ProbeExit extends Error {
   constructor(
     readonly code: number,
     line: string,
@@ -319,8 +319,8 @@ function fail(line: string): never {
   throw new ProbeExit(2, line)
 }
 // the directories this run created (never one that existed before it), removed on every exit
-export const EXIT_DIRS = new Set<string>()
-export function cleanDirs(dirs: Set<string>, out: (l: string) => void) {
+const EXIT_DIRS = new Set<string>()
+function cleanDirs(dirs: Set<string>, out: (l: string) => void) {
   for (const d of dirs) {
     try {
       rmSync(d, { recursive: true, force: true })
@@ -330,7 +330,7 @@ export function cleanDirs(dirs: Set<string>, out: (l: string) => void) {
   }
   dirs.clear()
 }
-export async function runThroughCleanup(
+async function runThroughCleanup(
   body: () => Promise<number>,
   dirs: Set<string> = EXIT_DIRS,
   out: (l: string) => void = (l) => console.log(l),
@@ -346,7 +346,7 @@ export async function runThroughCleanup(
   return code
 }
 // uncaught exceptions and unhandled rejections outside the awaited chain
-export function onFatal(
+function onFatal(
   e: unknown,
   dirs: Set<string> = EXIT_DIRS,
   out = (l: string) => console.log(l),
@@ -360,7 +360,7 @@ export function onFatal(
 // The environment of every child: this process's, without PSModulePath (any casing). A Windows PowerShell 5.1
 // child that inherits pwsh 7's PSModulePath cannot load its own modules (hosted run 43133245569: Get-Acl's
 // Microsoft.PowerShell.Security "could not be loaded"); without the variable it uses its own defaults.
-export function childEnv(env: Readonly<Record<string, string | undefined>> = process.env): Record<string, string> {
+function childEnv(env: Readonly<Record<string, string | undefined>> = process.env): Record<string, string> {
   const out: Record<string, string> = {}
   for (const [k, v] of Object.entries(env)) if (v !== undefined && k.toLowerCase() !== "psmodulepath") out[k] = v
   return out
@@ -378,7 +378,7 @@ async function run(cmd: string[], live?: Set<Killable>): Promise<{ code: number;
 }
 
 // One leg's JSON line; a leg that failed reports legError, which is raised here, never read as a result.
-export function legResult(line: string, name: string): Json {
+function legResult(line: string, name: string): Json {
   const j = obj(JSON.parse(line))
   if (typeof j.legError === "string") throw new Error(`leg ${name} failed: ${j.legError}`)
   return j
@@ -413,7 +413,7 @@ async function leg(ctx: Ctx, name: string, arg: Json = {}): Promise<Json> {
 }
 
 // A helper started with -Out writes <out>.started ({ pid }) first; at the deadline it names why nothing came.
-export type HelperWatch = { readonly started: string; readonly alive: (pid: number) => Promise<boolean> }
+type HelperWatch = { readonly started: string; readonly alive: (pid: number) => Promise<boolean> }
 async function helperFate(w: HelperWatch): Promise<string> {
   if (!existsSync(w.started)) return "the helper never started (no start marker)"
   const pid = num(obj(JSON.parse(readFileSync(w.started, "utf8"))).pid)
@@ -427,7 +427,7 @@ const pidAlive = async (pid: number) =>
 
 // The JSON a helper wrote to path, waiting up to ms for it. A file never written, a file still unreadable at the
 // deadline (with its last parse error) and a helper's legError all reject: none of them is read as "no result".
-export async function waitFile(path: string, ms: number, helper?: HelperWatch): Promise<Json> {
+async function waitFile(path: string, ms: number, helper?: HelperWatch): Promise<Json> {
   const end = Date.now() + ms
   let lastError = ""
   while (Date.now() < end) {
@@ -451,7 +451,7 @@ export async function waitFile(path: string, ms: number, helper?: HelperWatch): 
 }
 
 // Every path is quoted: the run's directories may contain spaces.
-export function psCommand(dir: string, name: string, arg: Json, out: string): string {
+function psCommand(dir: string, name: string, arg: Json, out: string): string {
   const argFile = join(dir, `${name}.arg.json`)
   writeFileSync(argFile, JSON.stringify(arg))
   return `powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "${HELPER}" -NativeDir "${nativeDir()}" -Leg ${name} -ArgFile "${argFile}" -Out "${out}"`
@@ -581,14 +581,14 @@ const ms = (s: Json) =>
     : "no samples"
 const count = (runs: unknown, key: string) => arr(runs).filter((r) => r[key] === true).length
 // runs in which SendInput accepted at least one event (sent is the number of events, not a flag)
-export const sentRuns = (runs: unknown) => arr(runs).filter((r) => num(r.sent) > 0).length
+const sentRuns = (runs: unknown) => arr(runs).filter((r) => num(r.sent) > 0).length
 const pick = (cond: boolean, yes: Verdict, no: Verdict): Verdict => (cond ? yes : no)
 const UN = (reason: string): Result => ({ measured: `UNMEASURED: ${reason}`, verdict: "UNMEASURED" })
 
 // A timing row decides only outside a 10 % band around its limit; inside it one run cannot decide, so two
 // back-to-back runs (--measure then --verify) do not flip between CONFIRMS and CONTRADICTS.
-export const TIMING_BAND = 0.1
-export function timingVerdict(p95: number, bound: Bound | undefined, measured: string): Result {
+const TIMING_BAND = 0.1
+function timingVerdict(p95: number, bound: Bound | undefined, measured: string): Result {
   if (!Number.isFinite(p95)) return UN(`no samples; ${measured}`)
   if (!bound) return { measured: `first recorded: p95 ${p95}; ${measured}`, verdict: "NEW-EDGE" }
   const m = `${measured}; bound ${bound.value} ms per ${bound.cite}`
@@ -600,7 +600,7 @@ export function timingVerdict(p95: number, bound: Bound | undefined, measured: s
 // The wheel rows count only when the settled-foreground control delivered every wheel: without that, a 0 could
 // be an oracle that cannot see a wheel.
 type Tally = { readonly delivered: number; readonly runs: number; readonly acquire?: string; readonly notFg?: number }
-export function wheelResults(control: Tally, flush: Tally, delay: Tally): Record<string, Result> {
+function wheelResults(control: Tally, flush: Tally, delay: Tally): Record<string, Result> {
   const c = controlText(control.delivered, control.runs)
   const proven = control.runs > 0 && control.delivered === control.runs
   const why = `the settled-foreground ${c}, so the wheel oracle is not proven`
@@ -650,7 +650,7 @@ type Group = {
 }
 
 // The rows a --measure of this host writes: H6 rows only on H6, second-monitor rows wherever two monitors are seen.
-export const rowsForHost = (host: string, facts: Json): string[] =>
+const rowsForHost = (host: string, facts: Json): string[] =>
   Object.keys(SPEC).filter((id) =>
     SPEC[id]?.multiMonitor ? host === H6 || arr(facts.monitors).length >= 2 : host === H6 || !SPEC[id]?.h6Only,
   )
@@ -680,7 +680,7 @@ const hostFacts: Group = {
 
 // The affinity overlay on the second monitor, judged like n-affinity-wgc-monitor: the no-affinity control must
 // show the overlay, then the flagged overlay must read no magenta. Fewer than two monitors: skipped, with the count.
-export function secondaryResults(
+function secondaryResults(
   monitors: readonly Json[],
   control: Json | undefined,
   ex: Json | undefined,
@@ -776,8 +776,8 @@ const timers: Group = {
 // at the send, or SendInput accepted no event) is left out of the routed / consumed / hang-guard counts and shown as
 // "skipped k/n"; with no exercised run left, both rows are SKIPPED (UNMEASURED with the reason).
 // A validity gate of the probe, not a design bound: a verdict needs more than half of the runs exercised.
-export const MIN_EXERCISED = Math.floor(RUNS / 2) + 1
-export function fgBarrierObs(fg: Json): { readonly proves: Obs; readonly ms: Obs; readonly oracleSeen: boolean } {
+const MIN_EXERCISED = Math.floor(RUNS / 2) + 1
+function fgBarrierObs(fg: Json): { readonly proves: Obs; readonly ms: Obs; readonly oracleSeen: boolean } {
   if (fg.acquired !== true) {
     const s: Obs = { kind: "SKIPPED", reason: "the probe could not take the foreground for the target" }
     return { proves: s, ms: s, oracleSeen: false }
@@ -1005,7 +1005,7 @@ const affinity: Group = {
 }
 
 // The elevated UIA read: CONFIRMS only when the query completed and explicitly found no value.
-export function uiaResult(r: Json): Result {
+function uiaResult(r: Json): Result {
   const measured = `name=${tail(r.uiaName)} descendants=${num(r.uiaDescendants)} value=${tail(r.uiaValue)}`
   if (typeof r.uiaError === "string") return UN(`errored: the UIA read failed: ${r.uiaError}; ${measured}`)
   if (r.uiaQueried !== true) return UN(`the UIA read did not complete; ${measured}`)
@@ -1066,7 +1066,7 @@ const captureIds = (state: CaptureState) => CAPTURE_APIS.map(([k]) => `n-capture
 // active: a frame CONFIRMS. Display off (displayStateDuring read back 0): a frame is a NEW-EDGE, adopted by the
 // design (re-pin item 12: capture proceeds and reports session.displayAsleep:true); a null or black frame CONFIRMS.
 // Disconnected and locked: a null or black frame CONFIRMS, a frame CONTRADICTS.
-export function captureVerdict(state: CaptureState, cls: string, r: Json): Verdict {
+function captureVerdict(state: CaptureState, cls: string, r: Json): Verdict {
   if (state === "active") return pick(cls === "frame", "CONFIRMS", "CONTRADICTS")
   const dark = cls === "null_frame" || cls === "black_frame"
   if (state === "display-off")
@@ -1098,7 +1098,7 @@ function captureResults(state: CaptureState, r: Json | undefined, skip?: string)
 // lock read: WTS_SESSIONSTATE_LOCK at capture time (before and after the captures) and UNLOCK before the lock and
 // after the restore. A failed OpenInputDesktop alone proves nothing. A disconnected verdict needs WTSDisconnected
 // at capture time, read by a helper in the run's own session. Every read error is named, never read as a state.
-export function sessionProblem(
+function sessionProblem(
   state: "disconnected" | "locked",
   r: Json,
   sid: number,
@@ -1126,14 +1126,14 @@ export function sessionProblem(
   return undefined
 }
 
-export const CANNOT_RESTORE =
+const CANNOT_RESTORE =
   "cannot restore session on this host: a locked session cannot be unlocked without credentials; this pass does not lock (run with --allow-irreversible, last, on a host that can unlock)"
 
 // Timing rows ("ms" in the id) across two passes. Unbounded rows stay NEW-EDGE: "first recorded: p95 a / b", plus
 // "; unstable on this host" when the passes differ by more than the band. Bounded rows: the WORSE pass decides
 // (CONFIRMS < inside-the-band UNMEASURED < CONTRADICTS) with both values. Not a timing pair: undefined.
-export const isTimingRow = (id: string) => /(^|-)ms(-|$)/.test(id)
-export const p95Of = (measured: string) => Number(/p95[= ]([\d.]+)/.exec(measured)?.[1])
+const isTimingRow = (id: string) => /(^|-)ms(-|$)/.test(id)
+const p95Of = (measured: string) => Number(/p95[= ]([\d.]+)/.exec(measured)?.[1])
 const timingRank = (r: Result) =>
   r.verdict === "CONFIRMS"
     ? 0
@@ -1142,7 +1142,7 @@ const timingRank = (r: Result) =>
       : r.verdict === "UNMEASURED" && /within \d+ % of the/.test(r.measured)
         ? 1
         : undefined
-export function worstOfPasses(
+function worstOfPasses(
   id: string,
   a: Result,
   b: Result,
@@ -1173,20 +1173,20 @@ export function worstOfPasses(
 
 // Count rows ("-proves-") across two passes: the WORSE pass decides (CONFIRMS < NEW-EDGE < CONTRADICTS; on a tie,
 // the pass with fewer hits), and every count that differs is recorded "k/n vs k2/n".
-export const isCountRow = (id: string) => /-proves-|^n-wheel-/.test(id)
+const isCountRow = (id: string) => /-proves-|^n-wheel-/.test(id)
 // Rows whose "k/n" is one call's return against what that call submitted, judged all-or-nothing (not a hit tally
 // over runs): two passes merge by MERGE_RANK with both texts kept, never by count.
-export const PREDICATE_ROWS: ReadonlySet<string> = new Set(["n-uipi-sendinput"])
+const PREDICATE_ROWS: ReadonlySet<string> = new Set(["n-uipi-sendinput"])
 // A measured row that shows a k/n count yet is neither a count, a timing nor a predicate row: its passes would not
 // merge worst-of, so the self-test refuses it in the committed ledger.
-export const outsideWorstOf = (r: { readonly id: string; readonly verdict: string; readonly measured: string }) =>
+const outsideWorstOf = (r: { readonly id: string; readonly verdict: string; readonly measured: string }) =>
   /^(CONFIRMS|CONTRADICTS)$/.test(r.verdict) &&
   /\d+\/\d+/.test(r.measured) &&
   !isCountRow(r.id) &&
   !isTimingRow(r.id) &&
   !PREDICATE_ROWS.has(r.id)
 // The one merge order: CONTRADICTS > UNMEASURED (a pass that failed to measure) > NEW-EDGE > CONFIRMS.
-export const MERGE_RANK: Readonly<Record<Verdict, number>> = {
+const MERGE_RANK: Readonly<Record<Verdict, number>> = {
   CONFIRMS: 0,
   "NEW-EDGE": 1,
   UNMEASURED: 2,
@@ -1195,7 +1195,7 @@ export const MERGE_RANK: Readonly<Record<Verdict, number>> = {
 }
 const countRank = (v: Verdict) => MERGE_RANK[v]
 const hits = (m: string) => [...m.matchAll(/(\d+)\/(\d+)/g)].reduce((t, x) => t + Number(x[1]), 0)
-export function worstOfCountPasses(
+function worstOfCountPasses(
   id: string,
   a: Result,
   b: Result,
@@ -1218,13 +1218,13 @@ export function worstOfCountPasses(
 
 // Rows gated on a positive control are compared together with it: if the control failed in either pass (the
 // ledger's or this one), the gated rows' combined verdict is UNMEASURED and verify reports SAME, naming both counts.
-export const CONTROL_GATES: Readonly<Record<string, readonly string[]>> = {
+const CONTROL_GATES: Readonly<Record<string, readonly string[]>> = {
   "n-wheel-control-settled": ["n-wheel-after-raise-dwmflush", "n-wheel-after-raise-5ms"],
 }
 // ONE control-text format: the writer (wheelResults) prints controlText, the count merge adds " vs b/n", and
 // parseControl reads exactly that, so a committed ledger row round-trips through its own rerun.
-export const controlText = (d: number, n: number) => `control delivered ${d}/${n}`
-export function parseControl(m: string | undefined): Array<readonly [number, number]> | undefined {
+const controlText = (d: number, n: number) => `control delivered ${d}/${n}`
+function parseControl(m: string | undefined): Array<readonly [number, number]> | undefined {
   const x = /control delivered (\d+)\/(\d+)(?: vs (\d+)\/(\d+))?/.exec(m ?? "")
   if (!x) return undefined
   return x[3]
@@ -1235,7 +1235,7 @@ export function parseControl(m: string | undefined): Array<readonly [number, num
     : [[Number(x[1]), Number(x[2])]]
 }
 const controlOk = (m: string | undefined) => !!parseControl(m)?.every(([d, n]) => n > 0 && d === n)
-export function gatedVerify(ledger: readonly LedgerRow[], results: Record<string, Result>, host: string) {
+function gatedVerify(ledger: readonly LedgerRow[], results: Record<string, Result>, host: string) {
   const out = new Map<string, { readonly kind: "SAME"; readonly text: string }>()
   for (const [ctl, gated] of Object.entries(CONTROL_GATES)) {
     const row = ledger.find((r) => r.id === ctl && r.host === host)
@@ -1260,7 +1260,7 @@ export function gatedVerify(ledger: readonly LedgerRow[], results: Record<string
 // fails only where the MERGED verdict differs from the COMMITTED ledger's, never on pass-to-pass jitter.
 // Two passes of one row: the worse by MERGE_RANK decides and BOTH passes' texts are kept, so a failed pass never
 // hides. Passes with the same verdict merge by count ("a vs b") or p95 ("first recorded: p95 a / b").
-export function mergeTwo(id: string, a: Result, b: Result): Result {
+function mergeTwo(id: string, a: Result, b: Result): Result {
   if (a.verdict === b.verdict && a.measured === b.measured) return b
   if (a.verdict === b.verdict && a.verdict !== "UNMEASURED") {
     const m = worstOfCountPasses(id, a, b)?.result ?? worstOfPasses(id, a, b)?.result
@@ -1269,11 +1269,7 @@ export function mergeTwo(id: string, a: Result, b: Result): Result {
   const [worse, other] = MERGE_RANK[a.verdict] >= MERGE_RANK[b.verdict] ? [a, b] : [b, a]
   return { measured: `${worse.measured} || other pass ${other.verdict}: ${other.measured}`, verdict: worse.verdict }
 }
-export function mergePasses(
-  pass1: readonly LedgerRow[],
-  pass2: Record<string, Result>,
-  host: string,
-): Record<string, Result> {
+function mergePasses(pass1: readonly LedgerRow[], pass2: Record<string, Result>, host: string): Record<string, Result> {
   const out: Record<string, Result> = {}
   const gated = gatedVerify(pass1, pass2, host)
   for (const [id, b] of Object.entries(pass2)) {
@@ -1293,7 +1289,7 @@ export function mergePasses(
   // the merged rows (the uploaded artifact) go through the one verdict function too, so they round-trip
   return Object.fromEntries(Object.entries(out).map(([id, r]) => [id, finalRow(id, r)]))
 }
-export function verifyJob(
+function verifyJob(
   pass1: readonly LedgerRow[],
   pass2: Record<string, Result>,
   committed: readonly LedgerRow[],
@@ -1323,7 +1319,7 @@ export function verifyJob(
 
 // One --verify comparison: rows of other hosts and rows this pass did not re-measure are skipped with the reason;
 // timing rows compare worst-of-passes, so jitter across a bound reads UNSTABLE, never DIFF.
-export function verifyLine(
+function verifyLine(
   row: LedgerRow,
   result: Result | undefined,
   host: string,
@@ -1470,11 +1466,11 @@ const capture: Group = {
 // Every row is decided here from a typed record. Only MEASURED yields CONFIRMS, CONTRADICTS or NEW-EDGE; SKIPPED and
 // ERRORED always yield UNMEASURED with their reason. CONFIRMS / CONTRADICTS need the row's design citation (printed in
 // the row); a row whose design states no claim reads NEW-EDGE. A row id with neither is refused when the table is built.
-export type Outcome = "held" | "broken" | "edge" | "inconclusive"
-export type Obs =
+type Outcome = "held" | "broken" | "edge" | "inconclusive"
+type Obs =
   | { readonly kind: "MEASURED"; readonly data: unknown; readonly reason?: string }
   | { readonly kind: "SKIPPED" | "ERRORED"; readonly data?: unknown; readonly reason: string }
-export type Cite = { readonly design: string } | { readonly noClaim: string }
+type Cite = { readonly design: string } | { readonly noClaim: string }
 const D = (line: number, what: string): Cite => ({ design: `design/d-windows.md:${line} (${what})` })
 const fromProperty = (p: string): Cite => {
   const c = PROPERTIES[p]
@@ -1504,7 +1500,7 @@ const CITE_RULES: ReadonlyArray<readonly [RegExp, Cite]> = [
   ],
   [/^n-capture-/, D(80, "PrintWindow floor and the near-black oracle")],
 ]
-export function buildCites(ids: readonly string[], rules = CITE_RULES): Readonly<Record<string, Cite>> {
+function buildCites(ids: readonly string[], rules = CITE_RULES): Readonly<Record<string, Cite>> {
   const out: Record<string, Cite> = {}
   const missing: string[] = []
   for (const id of ids) {
@@ -1516,7 +1512,7 @@ export function buildCites(ids: readonly string[], rules = CITE_RULES): Readonly
     throw new Error(`ROW_CITES: rows with no design citation and no stated absence: ${missing.join(",")}`)
   return out
 }
-export const ROW_CITES = buildCites(Object.keys(SPEC))
+const ROW_CITES = buildCites(Object.keys(SPEC))
 const isInt = (n: unknown) => typeof n === "number" && Number.isInteger(n) && n >= 0
 function invalidData(d: unknown): string | undefined {
   if (!d || typeof d !== "object") return "no data"
@@ -1531,7 +1527,7 @@ function invalidData(d: unknown): string | undefined {
   }
   return undefined
 }
-export function rowVerdict(id: string, obs: Obs, cites: Readonly<Record<string, Cite>> = ROW_CITES): Result {
+function rowVerdict(id: string, obs: Obs, cites: Readonly<Record<string, Cite>> = ROW_CITES): Result {
   const cite = cites[id]
   if (!cite) throw new Error(`row ${id} has no design citation`)
   const why = (r: unknown) => (typeof r === "string" && r ? r : "no reason given")
@@ -1551,7 +1547,7 @@ export function rowVerdict(id: string, obs: Obs, cites: Readonly<Record<string, 
   }
 }
 // A group's result as a record: the groups judge held/broken/edge; the verdict and its citation come only from here.
-export function toObs(r: Result): Obs {
+function toObs(r: Result): Obs {
   if (r.verdict !== "UNMEASURED")
     return {
       kind: "MEASURED",
@@ -1569,7 +1565,7 @@ export function toObs(r: Result): Obs {
   return { kind: "SKIPPED", reason }
 }
 // INVALID is a ledger-only state (a withdrawn reading); measurement never produces it
-export const finalRow = (id: string, r: Result, cites: Readonly<Record<string, Cite>> = ROW_CITES): Result =>
+const finalRow = (id: string, r: Result, cites: Readonly<Record<string, Cite>> = ROW_CITES): Result =>
   r.verdict === "INVALID" ? r : { ...rowVerdict(id, toObs(r), cites), ...(r.skip ? { skip: r.skip } : {}) }
 
 const GROUPS: readonly Group[] = [
@@ -1587,16 +1583,15 @@ const GROUPS: readonly Group[] = [
 
 // Budget of one probe pass (--measure or --verify): starting the targets, then every group with the time its
 // cleanups may take after a timeout. The self-test checks the hosted workflow's passes fit its job timeout.
-export const SETUP_BUDGET_S = 120
+const SETUP_BUDGET_S = 120
 // ending children (bounded wait for their exit) and removing the run's directories (bounded retries), after the ledger
-export const CLEANUP_BUDGET_S = 30
-export const TOTAL_BUDGET_S =
-  SETUP_BUDGET_S + GROUPS.reduce((s, g) => s + g.budgetS + (g.cleanupS ?? 0), 0) + CLEANUP_BUDGET_S
+const CLEANUP_BUDGET_S = 30
+const TOTAL_BUDGET_S = SETUP_BUDGET_S + GROUPS.reduce((s, g) => s + g.budgetS + (g.cleanupS ?? 0), 0) + CLEANUP_BUDGET_S
 // job steps outside the probe (checkout, bun, precondition, upload: about 30 s observed) and the margin kept free
-export const JOB_OVERHEAD_S = 120
-export const JOB_RESERVE_S = 300
+const JOB_OVERHEAD_S = 120
+const JOB_RESERVE_S = 300
 // share of the job timeout that must stay unused after both passes, overhead and the reserve
-export const JOB_MIN_MARGIN = 0.1
+const JOB_MIN_MARGIN = 0.1
 
 type Budgeted<T> =
   | { readonly timedOut: false; readonly value: T; readonly cleanup: readonly string[] }
@@ -1618,7 +1613,7 @@ async function bounded<T>(p: Promise<T>, s: number): Promise<T | "timeout"> {
 // tasks and target spawns refuse to start), the live helpers and the not-yet-ready targets are killed. In every
 // case the cleanups still registered then run, each bounded by cleanupS, before this returns, so a reconnect or
 // a task drop happens before the caller removes the shared directory or exits.
-export async function withBudget<T>(
+async function withBudget<T>(
   budgetS: number,
   cleanupS: number,
   ctx: Ctx,
@@ -1651,7 +1646,7 @@ export async function withBudget<T>(
 
 // Runs one group within its budget. A group past it writes every row it owns as UNMEASURED "timeout after Ns"
 // (N the seconds it actually ran), followed by its cleanup results: never dropped, never a verdict.
-export async function runGroup(g: Group, ctx: Ctx, cites = ROW_CITES): Promise<Record<string, Result>> {
+async function runGroup(g: Group, ctx: Ctx, cites = ROW_CITES): Promise<Record<string, Result>> {
   const r = await withBudget(g.budgetS, g.cleanupS ?? 0, ctx, (own) =>
     g.run(own).catch((e: Error) => all(g.ids, UN(`errored: leg failed: ${clean(e.message)}`))),
   )
@@ -1666,7 +1661,7 @@ export async function runGroup(g: Group, ctx: Ctx, cites = ROW_CITES): Promise<R
 }
 
 // Starts the targets within SETUP_BUDGET_S; a target not ready by then is killed and its rows say why.
-export async function runSetup(ctx: Ctx, budgetS: number, start: (own: Ctx) => Promise<void>): Promise<boolean> {
+async function runSetup(ctx: Ctx, budgetS: number, start: (own: Ctx) => Promise<void>): Promise<boolean> {
   return !(await withBudget(budgetS, 0, ctx, start)).timedOut
 }
 
@@ -1674,7 +1669,7 @@ export async function runSetup(ctx: Ctx, budgetS: number, start: (own: Ctx) => P
 
 const clean = (s: string) => s.replace(/[\t\r\n]+/g, " ").trim()
 type LedgerRow = Record<(typeof HEADER)[number], string>
-export function readLedger(file: string): LedgerRow[] {
+function readLedger(file: string): LedgerRow[] {
   if (!existsSync(file)) return []
   const lines = readFileSync(file, "utf8").split(/\r?\n/).filter(Boolean)
   if (lines[0] !== HEADER.join("\t")) fail(`LEDGER ${file}: header is not ${HEADER.join(",")}`)
@@ -1685,7 +1680,7 @@ export function readLedger(file: string): LedgerRow[] {
 }
 // The rows a --measure writes: every row of other hosts, and every row of this host it did not re-measure, keep
 // their place; re-measured rows replace theirs in place; new ones are appended.
-export function mergeLedger(before: readonly LedgerRow[], host: string, fresh: ReadonlyMap<string, string>): string[] {
+function mergeLedger(before: readonly LedgerRow[], host: string, fresh: ReadonlyMap<string, string>): string[] {
   const done = new Set<string>()
   const lines = before.map((r) => {
     if (r.host !== host || !fresh.has(r.id)) return HEADER.map((h) => r[h]).join("\t")
@@ -1696,17 +1691,17 @@ export function mergeLedger(before: readonly LedgerRow[], host: string, fresh: R
   return [HEADER.join("\t"), ...lines]
 }
 // A note survives a re-measure, except a probe-defect or SUSPECT note: the re-measure is what supersedes it.
-export const carriedNote = (n: string | undefined) =>
+const carriedNote = (n: string | undefined) =>
   n && n !== "-" && !/^(probe defect|SUSPECT|lock state unproven|NEW-EDGE \(not a design claim\))/.test(n) ? n : "-"
 // The native assembly the helpers used ("precompiled sha256=..." or the run-time Add-Type), one note segment,
 // replaced on every pass; recorded on the rows whose helper runs restricted (the elevated group).
-export function nativeNote(note: string, native: unknown): string {
+function nativeNote(note: string, native: unknown): string {
   if (typeof native !== "string" || !native) return note
   const kept = note.split("; ").filter((s) => s !== "-" && !s.startsWith("native assembly: "))
   return [...kept, `native assembly: ${native}`].join("; ")
 }
-export const rerun = (id: string) => `bun ${SELF} --verify ${LEDGER} --row ${id}`
-export const ledgerLine = (id: string, r: Result, host: string, build: string, notes = "-") => {
+const rerun = (id: string) => `bun ${SELF} --verify ${LEDGER} --row ${id}`
+const ledgerLine = (id: string, r: Result, host: string, build: string, notes = "-") => {
   const spec = SPEC[id] ?? { question: "unknown row", condition: "-" }
   return [id, spec.question, spec.condition, r.measured, r.verdict, rerun(id), host, build, notes].map(clean).join("\t")
 }
@@ -1738,7 +1733,7 @@ function args() {
 
 // Creates the run's shared directory: a fresh name that must not exist yet (a pre-existing directory is refused,
 // never reused), then, on Windows, only SYSTEM and Administrators may access it, owned by Administrators.
-export async function freshDir(path: string, lockDown: (p: string) => Promise<string | undefined>): Promise<string> {
+async function freshDir(path: string, lockDown: (p: string) => Promise<string | undefined>): Promise<string> {
   try {
     mkdirSync(path)
   } catch (e) {
@@ -1754,9 +1749,9 @@ export async function freshDir(path: string, lockDown: (p: string) => Promise<st
 
 // What is wrong with an ACL read of the shared directory, or undefined. A failed read reports its own error.
 const SID = /^S-1-(?:\d+-)*\d+$/
-export const ADMINISTRATORS_SID = "S-1-5-32-544"
-export const SYSTEM_SID = "S-1-5-18"
-export function aclProblem(j: Json): string | undefined {
+const ADMINISTRATORS_SID = "S-1-5-32-544"
+const SYSTEM_SID = "S-1-5-18"
+function aclProblem(j: Json): string | undefined {
   if (typeof j.legError === "string") return `ACL read failed: ${j.legError}`
   if (typeof j.ownerError === "string") return `owner read failed: ${j.ownerError}`
   const owner = str(j.owner)
@@ -1806,7 +1801,7 @@ async function setup(ctx: Ctx, ids: readonly string[]) {
 // Ends every child and waits up to ms for each to EXIT. killTree (taskkill /T /F on Windows) also ends
 // grandchildren, such as WebView2's msedgewebview2 processes that keep files open in the shared directory.
 // Returns the pids still running at the deadline.
-export async function endChildren(
+async function endChildren(
   procs: readonly Killable[],
   ms: number,
   killTree?: (pid: number) => Promise<unknown>,
@@ -1825,7 +1820,7 @@ export async function endChildren(
 
 // Removes a directory, retrying a busy one (EBUSY, EPERM, ENOTEMPTY) with a growing delay: tries attempts spread
 // over about totalMs. A final failure is returned as a warning, never thrown.
-export async function removeDir(
+async function removeDir(
   path: string,
   rm: (p: string) => void = (p) => rmSync(p, { recursive: true, force: true }),
   tries = 10,
@@ -1851,7 +1846,7 @@ export async function removeDir(
 // even when the measurement threw, and only then the cleanup runs. A cleanup failure is a warning line: it never
 // discards the written output and never changes the exit code. Errors are reported in order: the
 // measurement's first, the cleanup's second.
-export async function runThenClean(
+async function runThenClean(
   measure: () => Promise<void>,
   write: (measureError: Error | undefined) => number,
   cleanup: () => Promise<string[]>,
@@ -1912,7 +1907,7 @@ const source = (file: string) => {
 // PowerShell text reduced to its code, one entry per line, for the source scans. Line endings of any kind
 // (CRLF, LF, lone CR) are normalised; <# ... #> blocks, here-strings (@' '@, @" "@) and # comments outside
 // quotes, whole-line or trailing, become blank. Line numbers are kept.
-export function psCode(text: string): string[] {
+function psCode(text: string): string[] {
   const lines = text.replace(/\r\n?/g, "\n").split("\n")
   const out: string[] = []
   let block = false
@@ -1965,7 +1960,7 @@ const WORKFLOW = join(HERE, "..", "..", "..", ".github", "workflows", "computer-
 
 // Lines of PowerShell loops (for / foreach / while / do) whose body holds a return: in a loop, return leaves the
 // whole leg function and skips its Emit.
-export function returnsInLoops(source: string): string[] {
+function returnsInLoops(source: string): string[] {
   // comments, comment blocks and here-strings are blanked by psCode (line numbers hold): a comment may say "return"
   const ps = psCode(source).join("\n")
   const hits: string[] = []
@@ -2195,7 +2190,7 @@ const LOGIC_CHECKS: readonly Check[] = [
       const self = source("probe-sp-n.ts")
       const main = self.slice(self.search(/^async function main\(\): Promise<number> \{$/m))
       const checks = main.indexOf("await logicChecks()")
-      const prep = self.slice(self.search(/^export async function prepare\(/m))
+      const prep = self.slice(self.search(/^async function prepare\(/m))
       // the checks run in main before prepare(), whose first step is the platform check
       return checks >= 0 &&
         checks < main.indexOf("await prepare(") &&
@@ -2628,7 +2623,7 @@ const LOGIC_CHECKS: readonly Check[] = [
           }
         if (bad.length) return bad.slice(0, 6).join("; ") + (bad.length > 6 ? ` (+${bad.length - 6} more)` : "")
         const self = source("probe-sp-n.ts")
-        const main = self.slice(self.search(/^export async function prepare\(/m))
+        const main = self.slice(self.search(/^async function prepare\(/m))
         if (/rmSync\(ctx\.(shared|tmp)/.test(main))
           return "main still removes the run directories with a throwing rmSync"
         return /await runThenClean\(/.test(main) ? undefined : "main does not end the run through runThenClean"
@@ -2707,7 +2702,7 @@ const LOGIC_CHECKS: readonly Check[] = [
       if (!treeFailKilled) return "a child whose tree kill failed was not killed directly"
       if (left.join(",") !== "22") return `children not waited for exit, or a stuck one not reported: ${left.join(",")}`
       const self = source("probe-sp-n.ts")
-      const main = self.slice(self.search(/^export async function prepare\(/m))
+      const main = self.slice(self.search(/^async function prepare\(/m))
       return /endChildren\(/.test(main) && /taskkill\.exe/.test(main)
         ? undefined
         : "main does not wait for the children's trees to exit"
@@ -3252,8 +3247,8 @@ const LOGIC_CHECKS: readonly Check[] = [
       const counted = readLedger(join(HERE, "win32-delivery.tsv")).filter(outsideWorstOf)
       if (counted.length) bad.push(`count rows outside worst-of: ${[...new Set(counted.map((r) => r.id))].join(",")}`)
       const self = source("probe-sp-n.ts")
-      const mp = self.slice(self.indexOf("export function mergePasses("), self.indexOf("export function verifyJob("))
-      const mt = self.slice(self.indexOf("export function mergeTwo("), self.indexOf("export function mergePasses("))
+      const mp = self.slice(self.indexOf("function mergePasses("), self.indexOf("function verifyJob("))
+      const mt = self.slice(self.indexOf("function mergeTwo("), self.indexOf("function mergePasses("))
       if (!(mp.indexOf("gatedVerify(") > 0 && mp.indexOf("mergeTwo(") > mp.indexOf("gatedVerify(")))
         bad.push("mergePasses merges before the control gate")
       if (!(
@@ -3445,7 +3440,7 @@ const LOGIC_CHECKS: readonly Check[] = [
       }
       if (!refused) bad.push("the row table accepted a row with no citation")
       const self = source("probe-sp-n.ts")
-      const at0 = self.indexOf("export async function runGroup(")
+      const at0 = self.indexOf("async function runGroup(")
       if (!/finalRow\(id, x, cites\)/.test(self.slice(at0, self.indexOf("\n}\n", at0))))
         bad.push("runGroup does not pass every row through finalRow")
       if (!/ledgerLine\(id, finalRow\(id, results\[id\] \?\? missing\)/.test(self))
@@ -3694,7 +3689,7 @@ const LOGIC_CHECKS: readonly Check[] = [
         bad.push("a skip mentioning lastError is labelled ERRORED")
       if (toObs(UN("errored: leg failed: x")).kind !== "ERRORED") bad.push("an explicit error is not ERRORED")
       const self = source("probe-sp-n.ts")
-      const to = self.slice(self.indexOf("export function toObs("), self.indexOf("export const finalRow"))
+      const to = self.slice(self.indexOf("function toObs("), self.indexOf("const finalRow"))
       if (/\/i\.test\(reason\)|error\|timeout/.test(to))
         bad.push("toObs still guesses the kind from the reason's words")
       const cite = (id: string) => JSON.stringify(ROW_CITES[id])
@@ -3924,7 +3919,7 @@ async function selfTest(): Promise<number> {
 }
 
 // Everything before the groups run: each early exit (fail or a raw rejection) leaves through runThroughCleanup.
-export type Io = {
+type Io = {
   readonly platform: string
   readonly programData: string
   readonly tmpBase: string
@@ -3932,7 +3927,7 @@ export type Io = {
   readonly lockDown: (ctx: Ctx, p: string) => Promise<string | undefined>
   readonly leg: (ctx: Ctx, name: string) => Promise<Json>
 }
-export async function prepare(opt: ReturnType<typeof args>, io: Io) {
+async function prepare(opt: ReturnType<typeof args>, io: Io) {
   if (io.platform !== "win32")
     fail(
       `PRECONDITION windows-interactive-desktop: SP-N measures a Windows interactive desktop; this host is ${io.platform}`,
