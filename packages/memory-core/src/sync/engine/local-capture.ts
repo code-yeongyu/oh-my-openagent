@@ -142,6 +142,12 @@ async function adoptJournaled(deps: EngineDeps, journal: SyncJournal): Promise<R
 export interface CaptureHolds {
   readonly held: ReadonlyMap<string, string>
   readonly withheld: ReadonlySet<string>
+  /**
+   * Working files of keys this device never knew that the verified batches about to apply carry (#13725): the
+   * device is joining a space that already holds them. They are not captured this cycle and their render is
+   * owed, so the space's state lands in the doc first and the next capture adopts the file insert-only.
+   */
+  readonly joining: ReadonlySet<string>
 }
 
 /**
@@ -161,7 +167,8 @@ export async function capture(
   // Resuming a cycle at merged: every render that landed is the base of any edit made since.
   if (resuming !== null) await adoptLandedRenders(deps, journal, resuming, files)
   const known = await acceptedKeys(deps, journal, "capture", deps.store.keys())
-  const keys = [...new Set([...known, ...files.byKey.keys()])].sort()
+  const joining = await joiningKeys(deps, journal, new Set(known), files.byKey)
+  const keys = [...new Set([...known, ...files.byKey.keys()])].filter((key) => !joining.has(key)).sort()
   const prints = (await journal.state()).held?.prints ?? {}
   const captured: PendingItem[] = []
   const held = new Map<string, string>()
@@ -191,7 +198,7 @@ export async function capture(
   } finally {
     await segment.discard()
   }
-  if (captured.length === 0) return { held, withheld }
+  if (captured.length === 0) return { held, withheld, joining }
   const pending = await journal.pending()
   const queued = new Set(pending.items.map((p) => p.digest))
   const fresh = captured.filter((c) => !queued.has(c.digest))
@@ -206,5 +213,19 @@ export async function capture(
   await deps.store.persist()
   await markImported(journal, new Set(captured.map((c) => c.digest)))
   deps.fault?.("persisted")
-  return { held, withheld }
+  return { held, withheld, joining }
+}
+
+async function joiningKeys(
+  deps: EngineDeps,
+  journal: SyncJournal,
+  known: ReadonlySet<string>,
+  working: ReadonlyMap<string, unknown>,
+): Promise<Set<string>> {
+  const joining = new Set<string>()
+  for (const record of await journal.incoming()) {
+    if (record.stage !== "verified") continue
+    for (const item of record.items) if (!known.has(item.key) && working.has(item.key)) joining.add(item.key)
+  }
+  return joining
 }
