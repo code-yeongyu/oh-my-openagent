@@ -46,6 +46,7 @@ unsafe extern "C" {
         values: *mut CfRef,
     ) -> i32;
     pub fn AXUIElementPerformAction(element: CfRef, action: CfRef) -> i32;
+    pub fn AXUIElementCopyActionNames(element: CfRef, names: *mut CfRef) -> i32;
     pub fn AXUIElementSetAttributeValue(element: CfRef, attribute: CfRef, value: CfRef) -> i32;
     pub fn AXUIElementSetMessagingTimeout(element: CfRef, seconds: f32) -> i32;
     pub fn AXValueGetType(value: CfRef) -> u32;
@@ -70,6 +71,7 @@ unsafe extern "C" {
     pub static kCFTypeArrayCallBacks: c_void;
     pub fn CFRetain(value: CfRef) -> CfRef;
     pub fn CFGetTypeID(value: CfRef) -> usize;
+    pub fn CFHash(value: CfRef) -> usize;
     pub fn CFStringGetTypeID() -> usize;
     pub fn CFBooleanGetTypeID() -> usize;
     pub fn CFNumberGetTypeID() -> usize;

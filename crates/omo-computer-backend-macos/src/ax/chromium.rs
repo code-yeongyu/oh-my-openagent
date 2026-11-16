@@ -1,8 +1,9 @@
 //! Chromium and Electron wake (design: 'Chromium/Electron enhanced UI'). A Chromium-family
 //! window whose tree is empty starts building it when the app's `AXRole` is read; the reader
-//! then waits on the observer feed for the tree, bounded by the observe deadline, with no
-//! sleep. Only an Electron window that stayed empty gets `AXManualAccessibility`. The
-//! attribute that reflows the whole app is never written.
+//! then waits on the observer feed for the tree, at most [`WAKE_STEP_MS`] per step inside the
+//! observe deadline, with no sleep. Only an Electron window that stayed empty gets
+//! `AXManualAccessibility`, and its own fresh step to build the tree. The reader wakes a
+//! window once; the attribute that reflows the whole app is never written.
 
 use omo_computer_core::ax::{Slice, SLICE_MS};
 
@@ -21,6 +22,16 @@ pub const CHROMIUM_BUNDLES: [&str; 8] = [
     "company.thebrowser.Browser",
     "com.electron",
 ];
+
+/// How long one wake step (after the poke, after the write) waits for the tree.
+pub const WAKE_STEP_MS: u64 = 500;
+
+fn step_until(server: &dyn AxServer, deadline_ms: u64) -> u64 {
+    server
+        .now_ms()
+        .saturating_add(WAKE_STEP_MS)
+        .min(deadline_ms)
+}
 
 fn chromium(bundle: Option<&str>) -> bool {
     bundle.is_some_and(|bundle| {
@@ -46,12 +57,14 @@ pub fn wake(
     }
     let app = server.app(owner.pid)?;
     server.poke_role(app);
-    if let Some(woken) = wait_for_children(server, window, deadline_ms) {
+    let until = step_until(server, deadline_ms);
+    if let Some(woken) = wait_for_children(server, window, until) {
         return Some(woken);
     }
     if electron {
         server.set(app, "AXManualAccessibility", AxValue::Bool(true));
-        return wait_for_children(server, window, deadline_ms);
+        let until = step_until(server, deadline_ms);
+        return wait_for_children(server, window, until);
     }
     None
 }

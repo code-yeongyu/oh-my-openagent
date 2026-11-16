@@ -27,9 +27,20 @@ impl<T> Default for ElementTable<T> {
 
 impl<T> ElementTable<T> {
     /// The id of the entry `same` as `value`, else a new id holding `value`.
-    pub fn intern(&mut self, value: T, _hash: u64, _same: impl Fn(&T, &T) -> bool) -> Element {
+    pub fn intern(&mut self, value: T, hash: u64, same: impl Fn(&T, &T) -> bool) -> Element {
+        let found = self.by_hash.get(&hash).and_then(|ids| {
+            ids.iter().copied().find(|id| {
+                self.by_id
+                    .get(id)
+                    .is_some_and(|(_, held)| same(held, &value))
+            })
+        });
+        if let Some(id) = found {
+            return id;
+        }
         self.next += 1;
-        self.by_id.insert(self.next, (0, value));
+        self.by_id.insert(self.next, (hash, value));
+        self.by_hash.entry(hash).or_default().push(self.next);
         self.next
     }
 

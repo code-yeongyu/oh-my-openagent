@@ -94,20 +94,32 @@ fn ax_value<T: Default>(value: CfRef, kind: u32) -> Option<T> {
     unsafe { ffi::AXValueGetValue(value, kind, (&raw mut out).cast()) }.then_some(out)
 }
 
-/// The node behind one read's value array (in [`READ_SET`] order).
-pub fn attributes(values: CfRef) -> Attributes {
-    // SAFETY: `values` is the CFArray the read returned, one entry per name.
+/// The node behind one read's value array (in [`READ_SET`] order); `None` when the array does
+/// not hold one value per name.
+pub fn attributes(values: CfRef) -> Option<Attributes> {
+    // SAFETY: plain type-id reads on the non-null value the read returned.
+    let array = unsafe { ffi::CFGetTypeID(values) == ffi::CFArrayGetTypeID() };
+    if !array {
+        return None;
+    }
+    // SAFETY: `values` is a CFArray (checked above).
+    let count = unsafe { cf::CFArrayGetCount(values) };
+    if usize::try_from(count).unwrap_or(0) < READ_SET.len() {
+        return None;
+    }
+    // SAFETY: `values` is a CFArray with one entry per name (checked above); `i` < its count.
     let at = |i: isize| unsafe { cf::CFArrayGetValueAtIndex(values, i) };
     let point: Option<CgPoint> = ax_value(at(10), ffi::VALUE_CGPOINT);
     let size: Option<CgSize> = ax_value(at(11), ffi::VALUE_CGSIZE);
-    let children =
-        present(at(14)).filter(|c| type_of(*c) == Some(unsafe { ffi::CFArrayGetTypeID() }));
+    let children = present(at(14))
+        // SAFETY: a plain type-id read.
+        .filter(|c| type_of(*c) == Some(unsafe { ffi::CFArrayGetTypeID() }));
     // SAFETY: `children` is a CFArray.
     let child_count = children.map_or(0, |c| unsafe { cf::CFArrayGetCount(c) });
     let role = text(at(0)).unwrap_or_default();
     let value = text(at(4));
     let indeterminate = (role == "AXProgressIndicator").then_some(value.is_none());
-    Attributes {
+    Some(Attributes {
         subrole: text(at(1)),
         title: text(at(2)),
         description: text(at(3)),
@@ -129,7 +141,22 @@ pub fn attributes(values: CfRef) -> Attributes {
         role,
         value,
         indeterminate,
+    })
+}
+
+/// The strings of a CFArray of CFStrings (action names); a non-array reads as none.
+pub fn strings(array: CfRef) -> Vec<String> {
+    // SAFETY: a plain type-id read.
+    let array_type = unsafe { ffi::CFArrayGetTypeID() };
+    if type_of(array) != Some(array_type) {
+        return Vec::new();
     }
+    // SAFETY: `array` is a CFArray (checked above).
+    let count = unsafe { cf::CFArrayGetCount(array) };
+    (0..count)
+        // SAFETY: `i` is in bounds; `cf::string` checks each value is a CFString.
+        .filter_map(|i| cf::string(unsafe { cf::CFArrayGetValueAtIndex(array, i) }))
+        .collect()
 }
 
 /// The CF value an attribute write carries.

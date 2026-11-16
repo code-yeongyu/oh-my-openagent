@@ -62,3 +62,15 @@ pub fn indicator(attributes: &Attributes) -> Option<BusyIndicator> {
         None
     }
 }
+
+/// An unlabelled container: only its actions can still keep the walk from treating it as a
+/// wrapper (the same fields the core `is_wrapper` reads).
+#[must_use]
+pub fn may_be_wrapper(attributes: &Attributes) -> bool {
+    let blank = |field: &Option<String>| field.as_deref().is_none_or(|text| text.trim().is_empty());
+    attributes.child_count > 0
+        && blank(&attributes.title)
+        && blank(&attributes.value)
+        && blank(&attributes.description)
+        && blank(&attributes.identifier)
+}

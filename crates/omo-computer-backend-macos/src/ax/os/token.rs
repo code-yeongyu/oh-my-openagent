@@ -39,7 +39,10 @@ impl RemoteToken for Server {
             )
         };
         let length = usize::try_from(length).ok()?;
-        // SAFETY: the CFData owns `length` bytes at `bytes`.
+        if length == 0 || bytes.is_null() {
+            return Some(Vec::new());
+        }
+        // SAFETY: the CFData owns `length` (> 0) bytes at the non-null `bytes`.
         Some(unsafe { std::slice::from_raw_parts(bytes, length) }.to_vec())
     }
 

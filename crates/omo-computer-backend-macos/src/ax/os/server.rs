@@ -8,19 +8,20 @@ use omo_computer_core::ax::Slice;
 
 use super::ffi;
 use super::observer::{window_of, ObserverThread};
+use super::process_query;
 use super::token::TokenSymbols;
-use super::values::{attributes, read_set, value};
+use super::values::{attributes, read_set, strings, value};
 use crate::ax::seam::{
     Attributes, AxServer, AxStatus, AxValue, Element, Notified, RemoteToken, WindowOwner,
 };
+use crate::ax::table::ElementTable;
 use crate::capture::os::cf::{self, cf_string, CfRef, Owned};
 use crate::capture::os::{listing, process};
 
 /// The live AX server of one session.
 pub struct Server {
     start: Instant,
-    elements: BTreeMap<Element, Owned>,
-    next: Element,
+    elements: ElementTable<Owned>,
     observer: Option<ObserverThread>,
     read_set: Option<Owned>,
     bundles: BTreeMap<String, u32>,
@@ -45,8 +46,7 @@ impl Server {
     pub fn open() -> Self {
         Self {
             start: Instant::now(),
-            elements: BTreeMap::new(),
-            next: 0,
+            elements: ElementTable::default(),
             observer: ObserverThread::start(),
             read_set: read_set(),
             bundles: BTreeMap::new(),
@@ -54,14 +54,17 @@ impl Server {
         }
     }
 
+    /// The id of the element `owned` refers to: the same element keeps one id across reads.
     pub(super) fn insert(&mut self, owned: Owned) -> Element {
-        self.next += 1;
-        self.elements.insert(self.next, owned);
-        self.next
+        // SAFETY: `owned` is a live CF reference.
+        let hash = u64::try_from(unsafe { ffi::CFHash(owned.get()) }).unwrap_or_default();
+        // SAFETY: both are live CF references.
+        self.elements
+            .intern(owned, hash, |a, b| unsafe { cf::CFEqual(a.get(), b.get()) })
     }
 
     pub(super) fn get(&self, element: Element) -> Option<CfRef> {
-        self.elements.get(&element).map(Owned::get)
+        self.elements.get(element).map(Owned::get)
     }
 
     fn copy(&self, element: CfRef, name: &CStr) -> Option<Owned> {
@@ -92,21 +95,6 @@ impl Server {
             .map(|owned| self.insert(owned))
             .collect()
     }
-}
-
-/// Every pid of the machine (`proc_listallpids`).
-fn all_pids() -> Vec<u32> {
-    // SAFETY: a null buffer asks for the count.
-    let count = unsafe { libc::proc_listallpids(std::ptr::null_mut(), 0) };
-    let mut pids = vec![0i32; usize::try_from(count).unwrap_or(0) + 64];
-    let bytes = i32::try_from(pids.len() * std::mem::size_of::<i32>()).unwrap_or(i32::MAX);
-    // SAFETY: `pids` holds `bytes` bytes.
-    let filled = unsafe { libc::proc_listallpids(pids.as_mut_ptr().cast(), bytes) };
-    pids.truncate(usize::try_from(filled).unwrap_or(0));
-    pids.into_iter()
-        .filter_map(|p| u32::try_from(p).ok())
-        .filter(|p| *p > 0)
-        .collect()
 }
 
 #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
@@ -161,14 +149,27 @@ impl AxServer for Server {
             ffi::AXUIElementCopyMultipleAttributeValues(raw, names.get(), 0, &raw mut values)
         };
         match (code, Owned::new(values)) {
-            (ffi::AX_SUCCESS, Some(values)) => Slice::Read(Some(attributes(values.get()))),
+            (ffi::AX_SUCCESS, Some(values)) => Slice::Read(attributes(values.get())),
             (ffi::AX_CANNOT_COMPLETE, _) => Slice::Hung,
             _ => Slice::Read(None),
         }
     }
 
-    fn actions(&mut self, _element: Element, _slice_ms: u64) -> Slice<Vec<String>> {
-        Slice::Read(Vec::new())
+    fn actions(&mut self, element: Element, slice_ms: u64) -> Slice<Vec<String>> {
+        let Some(raw) = self.get(element) else {
+            return Slice::Read(Vec::new());
+        };
+        let mut names: CfRef = std::ptr::null();
+        // SAFETY: a valid element; a success returns a +1 CFArray of CFStrings.
+        let code = unsafe {
+            ffi::AXUIElementSetMessagingTimeout(raw, seconds(slice_ms));
+            ffi::AXUIElementCopyActionNames(raw, &raw mut names)
+        };
+        match (code, Owned::new(names)) {
+            (ffi::AX_SUCCESS, Some(names)) => Slice::Read(strings(names.get())),
+            (ffi::AX_CANNOT_COMPLETE, _) => Slice::Hung,
+            _ => Slice::Read(Vec::new()),
+        }
     }
 
     fn children(
@@ -214,6 +215,10 @@ impl AxServer for Server {
         let wait = Duration::from_millis(until_ms.saturating_sub(self.now_ms()));
         let raw = self.observer.as_ref()?.events.recv_timeout(wait).ok()?;
         let element = self.insert(Owned::new(raw.element.0)?);
+        if raw.notification == "AXUIElementDestroyed" {
+            // The element is gone: release it; a ref to it now reads as gone.
+            drop(self.elements.remove(element));
+        }
         Some(Notified {
             notification: raw.notification,
             pid: raw.pid,
@@ -252,22 +257,13 @@ impl AxServer for Server {
         {
             return Some(pid);
         }
-        let pid = all_pids()
-            .into_iter()
-            .find(|p| process::bundle_id(*p).as_deref() == Some(bundle))?;
+        let pid = process_query::pid_of_bundle(bundle)?;
         self.bundles.insert(bundle.to_owned(), pid);
         Some(pid)
     }
 
     fn is_electron(&mut self, pid: u32) -> bool {
-        process::path(pid).is_some_and(|exe| {
-            exe.ancestors()
-                .find(|p| p.extension().is_some_and(|e| e == "app"))
-                .is_some_and(|app| {
-                    app.join("Contents/Frameworks/Electron Framework.framework")
-                        .exists()
-                })
-        })
+        process_query::is_electron(pid)
     }
 
     fn remote_token(&mut self) -> Option<&mut dyn RemoteToken> {

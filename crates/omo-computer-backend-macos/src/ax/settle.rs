@@ -18,18 +18,22 @@ pub const BUSY_NODE_BUDGET: usize = 256;
 
 impl<S: AxServer> SettleSource for MacAx<S> {
     fn wait_event(&mut self, until_ms: u64) -> BackendResult<Option<AxEvent>> {
-        while let Some(event) = self.server.wait_notification(until_ms) {
-            if Some(event.pid) == self.surface.pid {
-                let now = self.server.now_ms();
-                self.surface.note(&event, now);
-                continue;
-            }
+        let Some(event) = self.server.wait_notification(until_ms) else {
+            return Ok(None);
+        };
+        if Some(event.pid) == self.surface.pid {
+            let now = self.server.now_ms();
+            self.surface.note(&event, now);
+            // A banner event wakes `waitFor({notification})`, which then re-reads the banners.
             return Ok(Some(AxEvent {
-                kind: event.notification,
-                window: event.window.map(|w| w.to_string()).unwrap_or_default(),
+                kind: notifications::NOTIFICATION_EVENT.to_owned(),
+                window: notifications::SURFACE_WINDOW.to_owned(),
             }));
         }
-        Ok(None)
+        Ok(Some(AxEvent {
+            kind: event.notification,
+            window: event.window.map(|w| w.to_string()).unwrap_or_default(),
+        }))
     }
 
     fn busy(&mut self, window: &str) -> BackendResult<Option<BusyIndicator>> {

@@ -9,11 +9,11 @@ use omo_computer_core::ax::{
 use omo_computer_core::backend::{BackendResult, Refusal};
 use omo_computer_core::error::{EngineCode, Reason};
 
-use super::attributes::node;
+use super::attributes::{may_be_wrapper, node};
 use super::chromium;
 use super::handles::{Handles, Retained};
 use super::notifications::Surface;
-use super::seam::{AxServer, Element, WindowOwner};
+use super::seam::{Attributes, AxServer, Element, WindowOwner};
 
 /// Children one children IPC asks for.
 pub const CHILD_BATCH: u32 = 64;
@@ -24,6 +24,8 @@ pub struct MacAx<S> {
     pub(crate) handles: Handles,
     pub(crate) surface: Surface,
     observed: BTreeSet<u32>,
+    /// Windows `(pid, process start, number)` whose empty tree was already woken once.
+    woken: BTreeSet<(u32, u64, u32)>,
 }
 
 impl<S: AxServer> MacAx<S> {
@@ -33,6 +35,7 @@ impl<S: AxServer> MacAx<S> {
             handles: Handles::default(),
             surface: Surface::default(),
             observed: BTreeSet::new(),
+            woken: BTreeSet::new(),
         }
     }
 
@@ -44,11 +47,27 @@ impl<S: AxServer> MacAx<S> {
         &mut self.server
     }
 
-    /// Registers the app's one observer (the eleven notifications) the first time.
+    /// Registers the app's one observer (the eleven notifications) until a registration holds.
     pub(crate) fn ensure_observed(&mut self, pid: u32) {
-        if self.observed.insert(pid) {
-            self.server.observe(pid);
+        if !self.observed.contains(&pid) && self.server.observe(pid) {
+            self.observed.insert(pid);
         }
+    }
+
+    /// The node's actions when only they decide whether the walk may treat it as a wrapper (a
+    /// second IPC, for an unlabelled container only).
+    fn with_actions(
+        &mut self,
+        element: Element,
+        mut attributes: Attributes,
+        slice_ms: u64,
+    ) -> Attributes {
+        if attributes.actions.is_empty() && may_be_wrapper(&attributes) {
+            if let Slice::Read(actions) = self.server.actions(element, slice_ms) {
+                attributes.actions = actions;
+            }
+        }
+        attributes
     }
 
     /// The owner and the `AXWindow` element of window `id`.
@@ -85,6 +104,7 @@ impl<S: AxServer> MacAx<S> {
             Slice::Hung => Slice::Hung,
             Slice::Read(None) => Slice::Read(None),
             Slice::Read(Some(attributes)) => {
+                let attributes = self.with_actions(element, attributes, slice_ms);
                 let handle = self.retain(element, window, owner);
                 Slice::Read(Some(node(handle, attributes)))
             }
@@ -106,11 +126,14 @@ impl<S: AxServer> AxReader for MacAx<S> {
             Slice::Read(None) => return Err(Refusal::bare(EngineCode::WindowNotFound)),
             Slice::Hung => return Err(Refusal::bare(EngineCode::AxFailed)),
         };
-        if attributes.child_count == 0 {
+        if attributes.child_count == 0
+            && self.woken.insert((owner.pid, owner.process_start, number))
+        {
             if let Some(woken) = chromium::wake(&mut self.server, &owner, element, deadline) {
                 attributes = woken;
             }
         }
+        let attributes = self.with_actions(element, attributes, omo_computer_core::ax::SLICE_MS);
         let handle = self.retain(element, number, (owner.pid, owner.process_start));
         Ok(RootRead {
             window: WindowKey {

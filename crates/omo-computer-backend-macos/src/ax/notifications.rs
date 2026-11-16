@@ -14,6 +14,10 @@ use super::reader::{MacAx, CHILD_BATCH};
 use super::seam::{AxServer, Element, Notified};
 
 pub const SURFACE_BUNDLE: &str = "com.apple.notificationcenterui";
+/// The event kind and the window id a surface event carries to the session (the same wire
+/// values as the reference fake backend's notification surface).
+pub const NOTIFICATION_EVENT: &str = "notification_posted";
+pub const SURFACE_WINDOW: &str = "notification-surface";
 /// Elements read per banner at most.
 const BANNER_NODE_BUDGET: usize = 64;
 
@@ -55,6 +59,10 @@ pub fn read<S: AxServer>(ax: &mut MacAx<S>) -> BackendResult<Vec<NotificationFin
     let Slice::Read(windows) = ax.server.children(app, 0, CHILD_BATCH, SLICE_MS) else {
         return Ok(Vec::new());
     };
+    // A banner that left the surface drops its arrival time.
+    ax.surface
+        .arrivals
+        .retain(|banner, _| windows.contains(banner));
     let mut out = Vec::new();
     for window in windows {
         let (texts, description) = texts(&mut ax.server, window);
