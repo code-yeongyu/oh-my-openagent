@@ -213,3 +213,17 @@ fn hello_machine_id_matches_across_stdio_serve_and_oneshot() {
     // --oneshot speaks the v1 `desktop.*` names (corpus case 09).
     assert_eq!(machine_id_over(&["--oneshot"], "desktop.engine.hello", &daemon), served);
 }
+
+#[test]
+fn a_stop_from_one_connection_suspends_every_session() {
+    let daemon = Daemon::start(&[]);
+    let mut idle = opened(&daemon);
+    let mut actor = opened(&daemon);
+    for client in [&mut idle, &mut actor] {
+        let started = client.call(5, "stopPath.start", &json!({"chord": "ctrl+alt+shift+escape"})).expect("armed");
+        assert!(started.get("result").is_some(), "{started}");
+    }
+    actor.call(2, "stopPath.stop", &json!({"source": "test"})).expect("stopped");
+    let status = idle.call(3, "stopPath.status", &json!({})).expect("status");
+    assert_eq!(status["result"]["suspended"], true, "a stop is hand-wide: {status}");
+}
