@@ -15,6 +15,6 @@ terminal	CASCADIA_HOSTING_WINDOW_CLASS	text	foreground	design:OMPW-14
 terminal	ConsoleWindowClass	text	foreground	design:OMPW-14
 terminal	mintty	text	foreground	design:OMPW-14
 classic	Edit	-	-	win32-delivery:n-barrier-posted-proves-notepad
-classic	RichEditD2DPT	-	-	win32-delivery:n-barrier-posted-proves-notepad
+richedit_d2d	RichEditD2DPT	left_click,right_click,middle_click,move,scroll,text,key	foreground	design:OMW-11
 classic	WindowsForms10.EDIT.*	-	-	win32-delivery:n-posted-chord-ctrl-a-classic-edit
 *	*	chord_modifier	foreground	win32-delivery:n-posted-chord-ctrl-a-classic-edit

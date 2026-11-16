@@ -19,6 +19,9 @@ pub enum Family {
     Vcl,
     Terminal,
     Classic,
+    /// The Direct2D rich edit (`RichEditD2DPT`, the Windows 11 Notepad edit): refused until the
+    /// spike measures it (its posted `WM_CHAR` row hit classic `Edit`); owed to row 69.
+    RichEditD2d,
     Unknown,
 }
 
@@ -36,6 +39,7 @@ impl Family {
             "vcl" => Self::Vcl,
             "terminal" => Self::Terminal,
             "classic" => Self::Classic,
+            "richedit_d2d" => Self::RichEditD2d,
             _ => return None,
         })
     }
