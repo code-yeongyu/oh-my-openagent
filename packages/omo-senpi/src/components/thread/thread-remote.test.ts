@@ -26,7 +26,7 @@ describe("thread_set_model on another device", () => {
         "session",
         "b",
         "rk-on-b",
-        { type: "set_model", sessionId: "rk-on-b", provider: "anthropic", modelId: "claude-opus" },
+        { type: "set_model", sessionId: "rk-on-b", provider: "anthropic", modelId: "claude-opus", scope: "session" },
       ],
     ])
   })
@@ -38,6 +38,25 @@ describe("thread_set_model on another device", () => {
     expect(result).toMatchObject({ kind: "error", error: { code: "scope_denied" } })
     expect(a.sent.map((entry) => entry.rpc?.["type"])).toEqual(["get_available_models"])
   })
+})
+
+describe("thread_set_reasoning on another device", () => {
+  test.each([undefined, "session", "turn"] as const)(
+    "#given a thread on b #when thread_set_reasoning runs with scope %s #then set_thinking_level goes to b's session scoped to that session, never to b's remembered level for the model",
+    async (scope) => {
+      const a = account()
+      const { run } = surface(a.remote)
+      const result = await run("thread_set_reasoning", {
+        thread: "dur-on-b",
+        level: "high",
+        ...(scope === undefined ? {} : { scope }),
+      })
+      expect(result).toMatchObject({ kind: "ok", thread_id: "dur-on-b", level: "high", scope: scope ?? "session" })
+      expect(a.sent.map((entry) => [entry.via, entry.device, entry.session, entry.rpc])).toEqual([
+        ["session", "b", "rk-on-b", { type: "set_thinking_level", sessionId: "rk-on-b", level: "high", scope: "turn" }],
+      ])
+    },
+  )
 })
 
 describe("SC-R8: from this device on another (create, list, open, status, prompt, abort, fork)", () => {
@@ -56,19 +75,125 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     expect(a.accountReads).toEqual(["service.status", "devices.list", "devices.list"])
   })
 
-  test("#given a thread on b #when thread_list runs with all_scope #then b's thread is listed with its device, and the default scope lists only this device's threads", async () => {
+  test("#given a thread on b #when thread_list runs with or without all_scope #then both list this device's thread and b's thread with its device (the merged account list)", async () => {
     const a = account()
     const { run } = surface(a.remote)
-    const all = await run("thread_list", { all_scope: true })
-    expect(
-      all.kind === "ok" && "threads" in all && all.threads.map((thread) => [thread.thread_id, thread.device ?? "here"]),
-    ).toEqual([
-      ["dur-local", "here"],
-      ["dur-on-b", "b"],
-    ])
-    const scoped = await run("thread_list", {})
-    expect(scoped.kind === "ok" && "threads" in scoped && scoped.threads.map((thread) => thread.thread_id)).toEqual([
+    for (const args of [{ all_scope: true }, {}]) {
+      const listed = await run("thread_list", args)
+      expect(
+        listed.kind === "ok" &&
+          "threads" in listed &&
+          listed.threads.map((thread) => [thread.thread_id, thread.device ?? "here"]),
+      ).toEqual([
+        ["dur-local", "here"],
+        ["dur-on-b", "b"],
+      ])
+    }
+  })
+
+  test.each([
+    ["plan_required", "relay_requires_paid_plan"],
+    ["connecting", "host_unavailable"],
+    ["signed_out", "absent"],
+    ["disabled", "absent"],
+  ] as const)(
+    "#given the device service reads %s #when a plain thread_list runs #then remote_unavailable is %s (a relay that is not set up is no error)",
+    async (plan, named) => {
+      const expected = named === "absent" ? undefined : named
+      const { run } = surface(account({ plan }).remote)
+      const listed = await run("thread_list", {})
+      expect(listed.kind === "ok" && "threads" in listed && listed.remote_unavailable).toBe(expected ?? undefined)
+    },
+  )
+
+  test("#given the account roster fails #when thread_list runs #then the threads stay merged and remote_unavailable names the missing devices, never a silent drop", async () => {
+    const { run } = surface(account({ devicesFail: true }).remote)
+    const listed = await run("thread_list", {})
+    expect(listed).toMatchObject({ kind: "ok", remote_unavailable: "devices_unavailable" })
+    expect(listed.kind === "ok" && "threads" in listed && listed.threads.map((t) => t.thread_id)).toEqual([
       "dur-local",
+      "dur-on-b",
+    ])
+    expect("devices" in listed).toBe(false)
+  })
+
+  test.each(["throws", "unknown"] as const)(
+    "#given this device's own id read %s #when thread_list runs #then it answers the local threads with remote_unavailable, never a failed call or this device's rows as another device's",
+    async (selfDevice) => {
+      const own = { ...B_ROW, device: "here", session_id: "rk-here-other", durable_id: "dur-here-other" }
+      const { run } = surface(account({ selfDevice, rows: [B_ROW, own] }).remote)
+      for (const args of [{}, { all_scope: true }]) {
+        const listed = await run("thread_list", args)
+        expect(listed).toMatchObject({ kind: "ok", remote_unavailable: "host_unavailable" })
+        expect(listed.kind === "ok" && "threads" in listed && listed.threads.map((t) => t.thread_id)).toEqual([
+          "dur-local",
+        ])
+      }
+    },
+  )
+
+  test("#given an ended thread on b #when thread_list runs #then it is listed resumable, as every other path reports an ended row, never live", async () => {
+    const a = account({ rowState: "ended" })
+    const { run } = surface(a.remote)
+    const listed = await run("thread_list", {})
+    expect(listed.kind === "ok" && "threads" in listed && listed.threads.find((t) => t.device === "b")).toMatchObject({
+      thread_id: "dur-on-b",
+      status: "resumable",
+    })
+  })
+
+  test("#given the account's devices, one of them not answering this listing round and one offline #when thread_list runs #then devices names each with its metadata and listing state, and the unanswered device is incomplete, not silently absent", async () => {
+    const a = account({
+      incomplete: ["c"],
+      rosterWithoutSelf: true,
+      devices: [
+        {
+          device: "c",
+          label: "laptop",
+          online: true,
+          platform: "darwin",
+          kind: "desktop",
+          last_seen_ms: 1_700_000_000_000,
+        },
+        { device: "d", label: "old box", online: false, platform: "linux", kind: "cli", last_seen_ms: null },
+      ],
+    })
+    const { run } = surface(a.remote)
+    const listed = await run("thread_list", {})
+    expect(listed.kind === "ok" && "devices" in listed && listed.devices).toEqual([
+      {
+        device: "here",
+        name: "this mac",
+        platform: process.platform,
+        online: true,
+        last_seen: null,
+        this_device: true,
+        listing: "listed",
+        threads: 1,
+      },
+      { device: "b", name: "studio", online: true, last_seen: null, this_device: false, listing: "listed", threads: 1 },
+      {
+        device: "c",
+        name: "laptop",
+        platform: "darwin",
+        kind: "desktop",
+        online: true,
+        last_seen: "2023-11-14T22:13:20.000Z",
+        this_device: false,
+        listing: "incomplete",
+        threads: 0,
+      },
+      {
+        device: "d",
+        name: "old box",
+        platform: "linux",
+        kind: "cli",
+        online: false,
+        last_seen: null,
+        this_device: false,
+        listing: "offline",
+        threads: 0,
+      },
     ])
   })
 

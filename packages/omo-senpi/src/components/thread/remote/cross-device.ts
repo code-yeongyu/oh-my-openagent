@@ -1,7 +1,15 @@
-import type { ThreadToolResult } from "../contracts"
+import type { ThreadDevice, ThreadToolResult } from "../contracts"
 import { threadToolFailure } from "../errors"
 import { listedThread } from "../control/relay-session-host"
-import { rowThreadId, type AliasRegistry, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
+import {
+  rowThreadId,
+  type AliasRegistry,
+  type RemoteDevice,
+  type RemoteListing,
+  type RemoteSessionRow,
+  type RemoteThreadSurface,
+} from "./ports"
+import { remoteNotSetUp } from "./address-book"
 import type { WorktreeRequest } from "../worktree/thread-worktree"
 import { placeFolder } from "./create-folder"
 import { accountDevices } from "./account"
@@ -151,7 +159,56 @@ export async function renameAlias(
   return signedOut(changed.error) ? { local: "sign_in" } : aliasFailure(changed.error)
 }
 
-/** thread_list with all_scope: this device's threads plus the account's other devices' (each with its device), with aliases. */
+async function accountListing(remote: RemoteThreadSurface): Promise<RemoteListing> {
+  if (remote.sessions.listing !== undefined) return await remote.sessions.listing()
+  return { rows: await remote.sessions.sessions(), incomplete: [] }
+}
+
+// `threads` counts the threads THIS result lists on the device, so it reads the same for every row: this device's are
+// the caller's scoped local threads, another device's are its rows merged into the result.
+function deviceRows(
+  roster: readonly RemoteDevice[],
+  self: { readonly id: string | null; readonly name: string | null },
+  incomplete: readonly string[],
+  threads: readonly { readonly device?: string }[],
+): readonly ThreadDevice[] {
+  const missing = new Set(incomplete)
+  // The account roster leaves this device out (relayd lists only peers), so this device's row is made here.
+  const devices: readonly RemoteDevice[] =
+    self.id === null || roster.some((row) => row.device === self.id)
+      ? roster
+      : [
+          {
+            device: self.id,
+            label: self.name ?? self.id,
+            online: true,
+            platform: process.platform,
+            last_seen_ms: null,
+          },
+          ...roster,
+        ]
+  return devices.map((row) => {
+    const thisDevice = row.device === self.id
+    return {
+      device: row.device,
+      name: row.label,
+      ...(row.platform === undefined ? {} : { platform: row.platform }),
+      ...(row.kind === undefined ? {} : { kind: row.kind }),
+      online: thisDevice || row.online,
+      last_seen:
+        row.last_seen_ms === undefined || row.last_seen_ms === null ? null : new Date(row.last_seen_ms).toISOString(),
+      this_device: thisDevice,
+      listing: thisDevice ? "listed" : !row.online ? "offline" : missing.has(row.device) ? "incomplete" : "listed",
+      threads: threads.filter((thread) => (thread.device ?? self.id) === row.device).length,
+    }
+  })
+}
+
+/**
+ * thread_list: this device's threads (scoped by `all_scope` as before) merged with the account's other devices' threads
+ * (each with its device, any workspace), with aliases, and the account's devices with their listing state. A device
+ * whose rows this listing could not include is named `incomplete` in `devices`, never silently left out.
+ */
 export async function listAcross(
   remote: RemoteThreadSurface | undefined,
   local: ThreadToolResult,
@@ -160,26 +217,42 @@ export async function listAcross(
   if (remote === undefined || local.kind !== "ok" || !("threads" in local)) return local
   const ids = local.threads.map((thread) => thread.thread_id)
   const ready = await remoteReady(remote)
-  if (!allScope) return "kind" in ready ? local : withAliases(remote, local, ids)
-  if ("kind" in ready) return { ...local, remote_unavailable: ready.error.code }
-  const { here } = ready
-  const known = new Set(ids)
-  let listed: readonly RemoteSessionRow[]
-  try {
-    listed = await remote.sessions.sessions()
-  } catch {
-    return withAliases(remote, { ...local, remote_unavailable: "host_unavailable" }, ids)
+  if ("kind" in ready) {
+    const notSetUp = ready.error.code === "host_unavailable" && remoteNotSetUp(ready.error.details?.["state"])
+    return !allScope && notSetUp ? local : { ...local, remote_unavailable: ready.error.code }
   }
-  const others = listed.filter((row) => row.device !== here && !known.has(rowThreadId(row)))
+  const known = new Set(ids)
+  const [here, hereName, listed, roster] = await Promise.all([
+    // This device's id came with the relay state, in the same status round (#13414 U5).
+    Promise.resolve(ready.here),
+    remote.sessions.thisDeviceName?.().catch(() => null) ?? Promise.resolve(null),
+    accountListing(remote).then(
+      (listing) => ({ ok: true as const, listing }),
+      () => ({ ok: false as const }),
+    ),
+    remote.sessions.devices().then(
+      (devices) => ({ ok: true as const, devices }),
+      () => ({ ok: false as const }),
+    ),
+  ])
+  // Without this device's id its own rows cannot be told apart from another device's, so none are merged.
+  if (!listed.ok || here === null) return withAliases(remote, { ...local, remote_unavailable: "host_unavailable" }, ids)
+  const listing = listed.listing
+  const others = listing.rows.filter((row) => row.device !== here && !known.has(rowThreadId(row)))
+  const threads = [
+    ...local.threads,
+    ...others.map((row) => {
+      const { sessionId: _routing, ...thread } = listedThread(row)
+      return thread
+    }),
+  ]
+  // A roster that fails is said, never silently dropped: the threads stay merged and remote_unavailable names it.
   const merged: ThreadToolResult = {
     ...local,
-    threads: [
-      ...local.threads,
-      ...others.map((row) => {
-        const { sessionId: _routing, ...thread } = listedThread(row)
-        return thread
-      }),
-    ],
+    threads,
+    ...(roster.ok
+      ? { devices: deviceRows(roster.devices, { id: here, name: hereName }, listing.incomplete, threads) }
+      : { remote_unavailable: "devices_unavailable" }),
   }
   return withAliases(remote, merged, [...ids, ...others.map(rowThreadId).filter((id) => id !== "")])
 }

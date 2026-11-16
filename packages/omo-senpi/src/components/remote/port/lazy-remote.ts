@@ -115,14 +115,20 @@ export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThrea
   const sessions: RemoteSessionsPort = {
     status: async () => await (await load()).status(),
     thisDevice: async () => await (await load()).thisDevice(),
+    thisDeviceName: async () => (await (await load()).thisDeviceName?.()) ?? null,
     devices: async () => await (await load()).devices(),
-    sessions: async () => await (await load()).sessions(),
+    sessions: async (filter) => await (await load()).sessions(filter),
+    listing: async () => {
+      const loaded = await load()
+      return loaded.listing === undefined ? { rows: await loaded.sessions(), incomplete: [] } : await loaded.listing()
+    },
     endpointCommand: async (device, rpc, options) => await (await load()).endpointCommand(device, rpc, options),
     locate: async (device, engineId, knownKey) => await (await load()).locate(device, engineId, knownKey),
     sessionCommand: async (device, sessionId, rpc, options) =>
       await (await load()).sessionCommand(device, sessionId, rpc, options),
     read: async (device, sessionId, tail) => await (await load()).read(device, sessionId, tail),
-    watch: async (device, sessionId, listener) => await (await load()).watch(device, sessionId, listener),
+    watch: async (device, sessionId, handlers, watchOptions) =>
+      await (await load()).watch(device, sessionId, handlers, watchOptions),
     // A loaded port without the omo#13037 lookup or wake answers as the port contract reads an absent member.
     lookup: async (device, durableId) => (await (await load()).lookup?.(device, durableId)) ?? { kind: "unavailable" },
     canLookup: async () => (await (await load()).canLookup?.()) === true,
