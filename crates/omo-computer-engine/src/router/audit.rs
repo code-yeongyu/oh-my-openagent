@@ -129,6 +129,9 @@ mod tests {
         let chord = json!({"target": "101", "keys": ["shift", "a"]});
         let keyed = notify(spec(Method::KeyChord), &chord, &Ok(Value::Null), true).expect("audited");
         assert_eq!(keyed["params"]["keys"], Value::Null, "{keyed}");
+        let set = notify(spec(Method::AxSetValue), &json!({"ref": "e2", "value": "hunter2"}), &Ok(Value::Null), true).expect("audited");
+        assert_eq!((&set["params"]["textSha256"], &set["params"]["textLength"]), (&Value::Null, &json!(7)), "{set}");
+        assert!(!set.to_string().contains("hunter2"), "no plaintext: {set}");
         let named = notify(spec(Method::KeyChord), &json!({"target": "101", "keys": ["cmd", "q"]}), &Ok(Value::Null), true).expect("audited");
         assert_eq!(named["params"]["keys"], json!(["cmd", "q"]), "{named}");
     }

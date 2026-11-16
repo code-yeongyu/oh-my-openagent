@@ -14,7 +14,9 @@ mod identity;
 use omo_computer_core::backend::Refusal;
 use omo_computer_core::error::{EngineCode, Reason};
 use omo_computer_core::host_paths::{self, HostPaths};
-use serde_json::{json, Value};
+use serde_json::json;
+#[cfg(unix)]
+use serde_json::Value;
 
 #[cfg(unix)]
 pub use files::read_consent;

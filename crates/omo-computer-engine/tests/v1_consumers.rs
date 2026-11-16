@@ -8,6 +8,7 @@ mod case;
 mod compare;
 #[path = "common/host.rs"]
 mod host;
+#[cfg(unix)]
 #[path = "common/latch_tests.rs"]
 mod latch_tests;
 #[path = "common/live.rs"]

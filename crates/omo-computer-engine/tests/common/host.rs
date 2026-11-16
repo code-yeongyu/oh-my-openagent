@@ -4,16 +4,19 @@
 //! `consent.json`. Under the test seam every file sits under `OMO_COMPUTER_RUNTIME_DIR`.
 
 use std::fs;
+#[cfg(unix)]
 use std::io::{BufRead, BufReader, Write};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
+#[cfg(unix)]
 use std::os::unix::net::UnixListener;
 use std::path::Path;
+#[cfg(unix)]
 use std::thread;
 
 use serde_json::{json, Value};
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(all(unix, not(target_os = "linux")))]
 pub const HOST_API: &str = "host-api.sock";
 pub const HOST_LATCH: &str = "computer/host-latch";
 pub const FAKE_IDENTITY: &str = "fake-host-identity";
@@ -35,7 +38,7 @@ fn write_0600(path: &Path, text: &str) {
     fs::set_permissions(path, fs::Permissions::from_mode(0o600)).expect("0600");
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(all(unix, not(target_os = "linux")))]
 fn bind(runtime: &Path) -> UnixListener {
     UnixListener::bind(runtime.join(HOST_API)).expect("the host socket binds")
 }
@@ -78,6 +81,8 @@ pub fn consent(runtime: &Path, computer_use: bool) {
     write_0600(&runtime.join(CONSENT), &file.to_string());
 }
 
+/// The scripted host API listener: a Unix socket (Windows has the named pipe of row 60).
+#[cfg(unix)]
 pub fn serve(runtime: &Path, replies: Vec<Value>) {
     assert!(!replies.is_empty(), "a scripted host needs a reply");
     let listener = bind(runtime);
@@ -126,6 +131,7 @@ pub fn setup(runtime: &Path, block: &Value) {
     if let Some(computer_use) = block["consent"]["computerUse"].as_bool() {
         consent(runtime, computer_use);
     }
+    #[cfg(unix)]
     if let Some(replies) = block["replies"].as_array() {
         serve(runtime, replies.clone());
     }

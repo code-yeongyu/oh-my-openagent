@@ -15,7 +15,7 @@ use omo_computer_core::methods::{Effect, Method};
 use omo_computer_session::Session;
 use serde_json::Value;
 
-pub use dispatch::overtaken;
+pub use dispatch::{overtaken, GENERATION};
 pub use gate::{admit, Peer};
 pub use refusals::refused;
 pub use wire::{notification, reply, WireError, INVALID_PARAMS, INVALID_REQUEST, PARSE_ERROR};

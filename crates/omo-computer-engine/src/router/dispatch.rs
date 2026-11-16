@@ -13,7 +13,8 @@ use super::wire::WireError;
 use super::Router;
 
 /// Restarts bump it; a per-process engine starts at 1.
-const GENERATION: u64 = 1;
+/// The engine generation `engine.hello` reports and the session's markers carry (C2).
+pub const GENERATION: u64 = 1;
 
 fn parse<T: DeserializeOwned>(params: Value) -> Result<T, WireError> {
     serde_json::from_value(params).map_err(|error| WireError::invalid_params(&error))

@@ -117,6 +117,8 @@ fn mcp_tier_flag_refuses_an_unknown_value_with_exit_2() {
     assert_eq!(status.code(), Some(2));
 }
 
+// The own pid chain is read from /proc (Linux); other OSes report the engine pid alone (C12).
+#[cfg(target_os = "linux")]
 #[test]
 fn session_open_without_host_self_set_still_refuses_own_pid_chain() {
     let own = std::process::id();

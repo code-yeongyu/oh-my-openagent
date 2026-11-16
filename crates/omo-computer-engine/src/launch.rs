@@ -52,7 +52,8 @@ pub fn launch(vars: Vec<(String, String)>) -> Result<Launched, String> {
             Session::for_roots_clocked(launched.backend, &roots, move || clock.now_ms())
         }
         _ => Session::for_roots(launched.backend, &roots),
-    };
+    }
+    .with_generation(crate::router::GENERATION);
     Ok(Launched {
         router: Router::new(session, ctx),
         pace: fake && !test_clock,
