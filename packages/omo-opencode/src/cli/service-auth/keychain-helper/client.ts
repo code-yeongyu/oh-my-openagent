@@ -1,6 +1,7 @@
 import { z } from "zod"
 
 import { spawn } from "../../../shared/bun-spawn-shim"
+import { keychainDiagnostic } from "../keychain-diagnostics"
 
 export type HelperVerb = "read" | "approve" | "write" | "stage" | "retire" | "promote" | "remove"
 export type HelperCall = { readonly verb: HelperVerb; readonly account: string; readonly value?: string }
@@ -127,6 +128,14 @@ export async function callHelper(
     }
     const parsed = helperReplySchema.safeParse(json)
     if (!parsed.success) throw new HelperProtocolError(`The keychain helper sent an unexpected ${call.verb} reply.`)
+    keychainDiagnostic("client", {
+      verb: call.verb,
+      ok: parsed.data.ok,
+      error: parsed.data.error,
+      status: parsed.data.status,
+      reason: parsed.data.reason,
+      owned: parsed.data.owned,
+    })
     return parsed.data
   } catch (error) {
     if (handedOver && options.lease !== undefined) {

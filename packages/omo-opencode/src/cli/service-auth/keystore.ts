@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto"
 import { basename } from "node:path"
 import type { z } from "zod"
 import { signInRoute } from "./accounts-gate"
+import { keychainDiagnostic } from "./keychain-diagnostics"
 import { credentialSchema, type Credentials, serviceOrigin, SignInError } from "./protocol"
 import type { HelperLease } from "./keychain-helper/client"
 import {
@@ -279,14 +280,16 @@ export function createSealedStore<T>(
       clearTimeout(timer)
     }
   }
-  const unavailable = (error: unknown) =>
-    isLocked(error)
+  const unavailable = (error: unknown) => {
+    keychainDiagnostic("keystore.unavailable", error)
+    return isLocked(error)
       ? new KeychainLockedError(
           `${platformName} is locked. Unlock it, then try again. Credentials are never saved to a file.`,
         )
       : new CredentialStoreError(
           `Cannot access ${platformName}. Unlock or enable the OS credential store and try again. Credentials are never saved to a file.`,
         )
+  }
   // libsecret answers a locked collection by asking the keyring to show its unlock prompt, so on Linux the
   // Locked property is read over D-Bus BEFORE any secret call and a locked collection is never touched. When the
   // probe cannot answer (no gdbus binary, no Secret Service name on the bus, a bus that did not reply) the store
@@ -351,6 +354,7 @@ export function createSealedStore<T>(
     return value === null ? null : parseStored(value)
   }
   const lockedFailure = (error: unknown): unknown => {
+    keychainDiagnostic("keystore.lockedFailure", error)
     const mapped = asKeystoreError(error, (message) => new KeychainApprovalPendingError(message))
     if (error instanceof HelperOldSlotsFull) return new CredentialStoreError(error.message)
     if (error instanceof HelperItemNotOwned)

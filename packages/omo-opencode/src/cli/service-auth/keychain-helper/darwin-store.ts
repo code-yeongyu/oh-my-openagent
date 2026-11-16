@@ -1,3 +1,4 @@
+import { keychainDiagnostic } from "../keychain-diagnostics"
 import type { HelperCall, HelperLease, HelperReply } from "./client"
 import { type DarwinReadDeps, HelperReadError, readThroughHelper, type ReadResult } from "./darwin-read"
 import { migrate } from "./migration"
@@ -37,11 +38,13 @@ const OLD_SLOTS_FULL_MESSAGE =
 const NOT_OWNED_MESSAGE =
   'The OmO sign-in in the macOS keychain (item "omo-cli") is owned by a different program, and macOS does not let this one remove it. Open Keychain Access, delete the "omo-cli" item for OmO, then try again.'
 
-const failed = (reply: HelperReply, verb: string) =>
-  new HelperReadError(
+const failed = (reply: HelperReply, verb: string) => {
+  keychainDiagnostic("darwin-store.failed", { error: reply.error, status: reply.status, reason: reply.reason })
+  return new HelperReadError(
     reply.error === "locked" ? "locked" : "store",
     `The keychain helper could not ${verb} the sign-in (${reply.error ?? "no answer"}).`,
   )
+}
 
 /**
  * The session-lock view (design 3.3, 3.4, 3.6): every helper mutation is handed the lease; reads never prompt (an

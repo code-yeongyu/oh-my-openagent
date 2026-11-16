@@ -1,3 +1,4 @@
+import { keychainDiagnostic } from "../keychain-diagnostics"
 import type { HelperAccess } from "./access"
 import type { ApprovalAnswer, ApprovalCache } from "./approval-cache"
 import type { HelperReply } from "./client"
@@ -41,6 +42,7 @@ export type DarwinReadDeps = {
 }
 
 function failure(reply: HelperReply): HelperReadError {
+  keychainDiagnostic("darwin-read.failure", { error: reply.error, status: reply.status, reason: reply.reason })
   if (reply.error === "locked") return new HelperReadError("locked", "The keychain is locked.")
   return new HelperReadError("store", `The keychain helper answered ${reply.error ?? "unexpectedly"}.`)
 }
