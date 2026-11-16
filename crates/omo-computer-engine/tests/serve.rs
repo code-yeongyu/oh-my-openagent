@@ -96,13 +96,17 @@ fn same_uid_unregistered_peer_refused_unauthorized() {
 
 #[test]
 fn two_clients_one_daemon_stuck_capture_does_not_block_the_other() {
-    let daemon = Daemon::start(&[]);
+    let mut slow: serde_json::Value = serde_json::from_str(daemon::ONE_WINDOW).expect("scenario");
+    slow["delay_ms"] = json!({"capture": 3000});
+    let daemon = Daemon::start_with(&slow.to_string(), &[]);
     let mut stuck = opened(&daemon);
-    stuck.send_with(2, "capture", &json!({"target": "101", "test": {"stallMs": 3000}}), None);
+    stuck.send_with(2, "capture", &json!({"target": "101"}), None);
     let mut other = opened(&daemon);
     let started = Instant::now();
     let reply = other.call(3, "capabilities", &json!({})).expect("answered");
     assert!(reply.get("result").is_some() && started.elapsed() < Duration::from_secs(1), "{reply}");
+    let captured = stuck.read_reply(2).expect("the stuck capture still answers");
+    assert!(captured.get("result").is_some(), "{captured}");
 }
 
 #[test]
