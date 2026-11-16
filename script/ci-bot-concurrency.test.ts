@@ -34,11 +34,11 @@ const pullRequestEvent = (workflow: string, number: number, event = "pull_reques
   event: { pull_request: { number, head: { ref: `feature/${number}` } } },
 })
 
-const signalCompleted = (workflow: string, branch: string, runId: number) => ({
+const signalCompleted = (workflow: string, branch: string, runId: number, repo = "code-yeongyu/oh-my-openagent") => ({
   workflow,
   event_name: "workflow_run",
   run_id: runId,
-  event: { workflow_run: { head_branch: branch, head_repository: { full_name: "code-yeongyu/oh-my-openagent" } } },
+  event: { workflow_run: { head_branch: branch, head_repository: { full_name: repo } } },
 })
 
 describe("#given PR Automation Signal", () => {
@@ -61,9 +61,11 @@ describe("#given the folded privileged consumer, PR Automation", () => {
     const older = decide(file, signalCompleted(workflow, "feature/7", 1))
     const newer = decide(file, signalCompleted(workflow, "feature/7", 2))
     const other = decide(file, signalCompleted(workflow, "feature/8", 3))
+    const fork = decide(file, signalCompleted(workflow, "feature/7", 4, "contributor/oh-my-openagent"))
     expect(newer.cancels).toBe(true)
     expect(newer.group).toBe(older.group)
     expect(other.group).not.toBe(older.group)
+    expect(fork.group).not.toBe(older.group)
   })
 
   test("#then a dispatched recheck keeps its own group and is never cancelled", () => {
