@@ -4,7 +4,7 @@
 // never armed or a sampler that stalled is a fault that makes the run invalid; it is never read as "none".
 
 import { type SentinelEvent, SIGNALS, type Signal } from "./events.ts"
-import { activatedGapFaults, quietlyFailed } from "./observer-gaps.ts"
+import { observerGapFaults } from "./observer-gaps.ts"
 
 export { parseEvents, type SentinelEvent, SIGNALS, type Signal } from "./events.ts"
 
@@ -91,7 +91,6 @@ export function relativeOrderChanged(before: readonly string[], after: readonly 
 // suppressed), so the self-test can prove that a dead detector makes the run fail.
 export function summarize(events: readonly SentinelEvent[], options: { readonly drop?: Signal } = {}): SentinelSummary {
   const ordered = [...events].sort((a, b) => a.t - b.t)
-  const quiet = quietlyFailed(ordered)
   const start = ordered.find((event) => event.kind === "start")?.t
   const stop = ordered.find((event) => event.kind === "stop")?.t
   const faults: string[] = []
@@ -200,28 +199,13 @@ export function summarize(events: readonly SentinelEvent[], options: { readonly 
         else if (event.axError !== undefined && AX_READ_ERRORS[event.axError] !== "ok")
           faults.push(`dialog: new window ${event.id} of pid ${event.ownerPid} was unreadable (AX ${event.axError})`)
         break
-      // An app that once failed while not regular is judged only by activatedGapFaults, so one gap is one fault.
-      case "observer_failed":
-        if (event.since <= until && event.regular && !targetPids.has(event.pid) && !quiet.has(event.pid))
-          faults.push(
-            `dialog: window observer for pid ${event.pid} did not register after ${event.attempts} attempts (AX ${event.axError})`,
-          )
-        break
-      case "observer_late": {
-        const blind = Math.min(event.t, until) - Math.max(event.since, from)
-        if (blind > 0 && event.regular && !targetPids.has(event.pid) && !quiet.has(event.pid))
-          faults.push(
-            `dialog: window observer for pid ${event.pid} registered only after ${event.attempts} attempts (${blind} ms without one inside the recording)`,
-          )
-        break
-      }
       case "leak":
         if (inWindow(event.t)) mark(event.what === "key" ? "typing" : "pointer", event.t)
         break
     }
   }
 
-  faults.push(...activatedGapFaults(ordered, from, until, targetPids))
+  faults.push(...observerGapFaults(ordered, from, until, targetPids))
   for (const signal of SIGNALS) if (!armed.has(signal)) faults.push(`${signal}: detector never armed`)
   for (const signal of SAMPLED) if (!baseline.has(signal)) faults.push(`${signal}: no baseline read before start`)
   if (!finalRead) faults.push("typing: no final field read after the last keystroke")

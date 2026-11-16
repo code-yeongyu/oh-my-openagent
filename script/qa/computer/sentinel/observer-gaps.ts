@@ -1,42 +1,69 @@
 import type { SentinelEvent } from "./events.ts"
 
-// An app whose window observer failed while it was not a regular app is not judged at that moment. If it activates
-// before the recording stops (before start too: an earlier activation or an earlier segment) it had a user interface,
-// and from its failure until it registered again (observer_late, or never: its registration on activation failed
-// again) a sheet it showed was invisible to every branch of the dialog detector. Only the part of that gap inside the
-// recording is judged, here and only here: summary.ts skips this app's own registration facts.
+// The one judgement of the recorder's window-observer facts. Each fact is a gap of one pid: from `since` until it
+// registered (observer_late) or for good (observer_failed); a sheet in that gap was invisible to every branch of the
+// dialog detector. Facts are read per pid in time order:
+//
+// - A failure while the app was not regular opens a quiet window at its `since`. The app then had no user interface,
+//   so the window is judged only if the app activates before stop (before start too); it is closed by the app's next
+//   registration fact (observer_late, or a regular observer_failed: its registration on activation failed again, so
+//   the gap runs on until stop). Its in-recording part is one fault, whatever facts fall inside it.
+// - Every other fact, before a quiet window opened or after it closed, is judged on its own when the app was regular.
+//
+// So a quiet failure suppresses exactly the facts inside its own window, never a gap before it or after it.
 
-type Failure = { readonly since: number; readonly policy: string }
+type ObserverFact = Extract<SentinelEvent, { readonly kind: "observer_failed" | "observer_late" }>
+type QuietWindow = { readonly since: number; readonly policy: string; activatedAt?: number }
 
-export const quietlyFailed = (events: readonly SentinelEvent[]): ReadonlySet<number> =>
-  new Set(events.flatMap((event) => (event.kind === "observer_failed" && !event.regular ? [event.pid] : [])))
-
-export function activatedGapFaults(
+export function observerGapFaults(
   ordered: readonly SentinelEvent[],
   from: number,
   until: number,
   targetPids: ReadonlySet<number>,
 ): string[] {
-  const failed = new Map<number, Failure>()
-  const activatedAt = new Map<number, number>()
-  const reRegisteredAt = new Map<number, number>()
-  for (const event of ordered) {
-    if (event.kind === "observer_failed" && !event.regular && !targetPids.has(event.pid))
-      failed.set(event.pid, { since: event.since, policy: event.policy })
-    else if (event.kind === "activation" && failed.has(event.pid) && !activatedAt.has(event.pid) && event.t <= until)
-      activatedAt.set(event.pid, event.t)
-    else if (event.kind === "observer_late" && activatedAt.has(event.pid) && !reRegisteredAt.has(event.pid))
-      reRegisteredAt.set(event.pid, event.t)
-  }
   const faults: string[] = []
-  for (const [pid] of activatedAt) {
-    const failure = failed.get(pid)
-    if (failure === undefined) continue
-    const blind = Math.min(reRegisteredAt.get(pid) ?? until, until) - Math.max(failure.since, from)
-    if (blind > 0)
+  const quiet = new Map<number, QuietWindow>()
+  const inRecording = (since: number, end: number): number => Math.min(end, until) - Math.max(since, from)
+  const judgeQuiet = (pid: number, window: QuietWindow, end: number): void => {
+    const blind = inRecording(window.since, end)
+    if (window.activatedAt !== undefined && blind > 0)
       faults.push(
-        `dialog: window observer for pid ${pid} was missing after the app activated (it had failed as ${failure.policy}; ${blind} ms without one inside the recording)`,
+        `dialog: window observer for pid ${pid} was missing after the app activated (it had failed as ${window.policy}; ${blind} ms without one inside the recording)`,
       )
   }
+  const judgeOwn = (fact: ObserverFact): void => {
+    if (!fact.regular) return
+    if (fact.kind === "observer_failed") {
+      if (fact.since <= until)
+        faults.push(
+          `dialog: window observer for pid ${fact.pid} did not register after ${fact.attempts} attempts (AX ${fact.axError})`,
+        )
+      return
+    }
+    const blind = inRecording(fact.since, fact.t)
+    if (blind > 0)
+      faults.push(
+        `dialog: window observer for pid ${fact.pid} registered only after ${fact.attempts} attempts (${blind} ms without one inside the recording)`,
+      )
+  }
+
+  for (const event of ordered) {
+    if (event.kind === "activation") {
+      const window = quiet.get(event.pid)
+      if (window !== undefined && window.activatedAt === undefined && event.t <= until) window.activatedAt = event.t
+      continue
+    }
+    if ((event.kind !== "observer_failed" && event.kind !== "observer_late") || targetPids.has(event.pid)) continue
+    const window = quiet.get(event.pid)
+    if (window === undefined) {
+      if (event.kind === "observer_failed" && !event.regular)
+        quiet.set(event.pid, { since: event.since, policy: event.policy })
+      else judgeOwn(event)
+    } else if (event.kind === "observer_late") {
+      judgeQuiet(event.pid, window, event.t)
+      quiet.delete(event.pid)
+    }
+  }
+  for (const [pid, window] of quiet) judgeQuiet(pid, window, until)
   return faults
 }
