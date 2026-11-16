@@ -45,7 +45,9 @@ fn run(incoming: &Receiver<Call>) {
     let mut bridge = match launch(std::env::vars().collect()) {
         Ok(launched) => {
             let narrowing = crate::stdio::narrowing(&launched, Tier::Exec);
-            Ok(BridgeSession::new(launched.router, narrowing))
+            let mut bridge = BridgeSession::new(launched.router, narrowing);
+            bridge.prepare();
+            Ok(bridge)
         }
         Err(problem) => Err(problem.to_string()),
     };
