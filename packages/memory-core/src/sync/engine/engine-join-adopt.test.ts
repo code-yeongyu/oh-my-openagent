@@ -13,6 +13,10 @@ afterEach(async () => {
   for (const d of devices.splice(0)) await d.dispose()
 })
 
+const crashAt = (point: string) => (at: string) => {
+  if (at === point) throw new Error(`crash injected at ${point}`)
+}
+
 const note = (body: string) => `---\ndescription: seed note\n---\n${body}`
 
 async function commitSeed(device: Device): Promise<void> {
@@ -81,6 +85,33 @@ test(
     await b.clock.untilPending()
     b.clock.advance(8_000)
     await pushed
+    await settle(a, b)
+    expect(await b.read("system/persona.md")).toBe(note(SEED))
+    expect(await a.read("system/persona.md")).toBe(note(SEED))
+  },
+  GIT_TEST_TIMEOUT,
+)
+
+test(
+  "#given a joining rewind that crashed after the store write #when the device restarts and syncs #then the seed lands once on both",
+  async () => {
+    const server = new FakeSyncServer()
+    const a = await makeDevice(server, "a", undefined, { realStore: true })
+    const b = await makeDevice(server, "b", crashAt("rewound-joining"), { realStore: true })
+    devices.push(a, b)
+    await a.write("system/persona.md", note(SEED))
+    await commitSeed(a)
+    await b.write("system/persona.md", note(SEED))
+    await commitSeed(b)
+    server.beforeNextAppend = async () => {
+      server.beforeNextAppend = null
+      await a.engine.runCycle()
+    }
+    const pushed = b.engine.runCycle().catch(() => undefined)
+    await b.clock.untilPending()
+    b.clock.advance(8_000)
+    await pushed
+    await b.restart()
     await settle(a, b)
     expect(await b.read("system/persona.md")).toBe(note(SEED))
     expect(await a.read("system/persona.md")).toBe(note(SEED))

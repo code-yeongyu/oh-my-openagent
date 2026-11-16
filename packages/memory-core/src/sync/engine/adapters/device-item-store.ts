@@ -99,11 +99,21 @@ export function createDeviceItemStore(options: DeviceItemStoreOptions): ItemStor
     },
     peer: () => theDevice().peer,
     keys: () => [...new Set([...docs.keys(), ...baselines.keys()])].sort(),
-    ownHistoryOnly(key) {
+    async firstCapture(key, ops) {
+      const oldest = ops[0]
+      if (oldest === undefined) return "no"
+      const { decodeImportBlobMeta } = await loadLoroRuntime()
+      let start: Map<string, number>
+      try {
+        start = decodeImportBlobMeta(oldest, false).partialStartVersionVector.toJSON()
+      } catch {
+        return "no"
+      }
+      if (![...start.values()].every((counter) => counter === 0)) return "no"
       const doc = docs.get(key)
-      if (doc === undefined) return false
-      const peers = [...doc.oplogVersion().toJSON().keys()]
-      return peers.length > 0 && peers.every((peer) => peer === theDevice().peer)
+      const peers = doc === undefined ? [] : [...doc.oplogVersion().toJSON().keys()]
+      if (peers.length === 0) return "rewound"
+      return peers.every((peer) => peer === theDevice().peer) ? "first" : "no"
     },
     async capture(key, workingText) {
       const doc = await docOf(key)

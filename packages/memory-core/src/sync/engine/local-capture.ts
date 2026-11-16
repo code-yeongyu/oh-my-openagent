@@ -248,15 +248,19 @@ async function rewindJoining(
   for (const key of [...new Set(pending.items.map((item) => item.key))]) {
     if (!incoming.has(key)) continue
     const items = pending.items.filter((item) => item.key === key)
-    if (items.some((item) => carried.has(item.digest)) || !deps.store.ownHistoryOnly(key)) continue
+    if (items.some((item) => carried.has(item.digest))) continue
     const ops: Uint8Array[] = []
     for (const item of items) ops.push(await journal.outbox.readOps(item))
-    if ((await deps.store.rewind(key, ops)) === "kept") continue
+    const first = await deps.store.firstCapture(key, ops)
+    if (first === "no") continue
+    if (first === "first" && (await deps.store.rewind(key, ops)) === "kept") continue
     for (const item of items) rewound.add(item.digest)
     joining.add(key)
   }
   if (rewound.size === 0) return joining
   await deps.store.persist()
+  // A crash here leaves the ops pending with their doc already rewound; the next capture finds them "rewound" and drops them.
+  deps.fault?.("rewound-joining")
   const now = await journal.pending()
   await journal.setPending({ ...now, items: now.items.filter((item) => !rewound.has(item.digest)) })
   return joining

@@ -53,8 +53,8 @@ export class FakeItemStore implements ItemStore {
   }
 
   /** The line-set fake keeps no per-peer history, so it never claims a rewindable first capture. */
-  ownHistoryOnly(): boolean {
-    return false
+  async firstCapture(): Promise<"first" | "rewound" | "no"> {
+    return "no"
   }
 
   keys(): readonly string[] {
