@@ -38,11 +38,11 @@ describe("sampler gap", () => {
     const events = run([
       ...ticks(1_000, 1_200),
       slowTick(1_390, "focus", 120),
-      slowTick(1_795, "pasteboard", 400),
+      slowTick(1_795, "space", 400),
       ...ticks(1_800, 3_000),
     ])
     expect(samplerGapFault(events, 1_000, 3_000)).toBe(
-      "sampler: no tick for 600 ms (20 Hz expected; slowest sampler read in it: pasteboard 400 ms)",
+      "sampler: no tick for 600 ms (20 Hz expected; slowest sampler read in it: space 400 ms)",
     )
   })
 
@@ -59,8 +59,8 @@ describe("sampler gap", () => {
   })
 
   test("a slow_tick fact is a sentinel event; one without its read is not", () => {
-    expect(parseEvents('{"t":5,"kind":"slow_tick","ms":125,"read":"pasteboard","readMs":120}').events).toEqual([
-      slowTick(5, "pasteboard", 120),
+    expect(parseEvents('{"t":5,"kind":"slow_tick","ms":125,"read":"focus","readMs":120}').events).toEqual([
+      slowTick(5, "focus", 120),
     ])
     expect(parseEvents('{"t":5,"kind":"slow_tick","ms":130}').faults).toHaveLength(1)
   })

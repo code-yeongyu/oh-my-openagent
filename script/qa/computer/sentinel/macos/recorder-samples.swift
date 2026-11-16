@@ -20,6 +20,9 @@ final class PasteboardPoller {
 
   func start() { timer.resume() }
 
+  // Waits for a read still running and reads once more, so a change made before `stop` is emitted before it.
+  func drain() { queue.sync { read() } }
+
   private func read() {
     let count = NSPasteboard.general.changeCount
     if count != last {

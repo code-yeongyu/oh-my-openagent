@@ -103,7 +103,7 @@ final class Recorder: NSObject {
       fault("pointer", "listen-only event tap could not be created")
     }
 
-    armed("clipboard", "sample")
+    armed("clipboard", "poller")
 
     let center = NSWorkspace.shared.notificationCenter
     center.addObserver(self, selector: #selector(spaceChanged), name: NSWorkspace.activeSpaceDidChangeNotification, object: nil)
@@ -195,6 +195,7 @@ final class Recorder: NSObject {
   func drainThenStop(deadline: Double) {
     if pendingReads > 0 && uptimeMs() < deadline { return after(0.05) { self.drainThenStop(deadline: deadline) } }
     recording = false
+    pasteboard.drain()
     emit(["kind": "stop", "pendingReads": pendingReads])
     stopping = false
   }
