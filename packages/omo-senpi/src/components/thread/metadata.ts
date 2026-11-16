@@ -68,7 +68,7 @@ export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
     name: "thread_interrupt",
     label: "Interrupt session turn",
     description:
-      "Stops the turn running in another session, for when the user wants to halt a session that is going down the wrong path" +
+      "Stops the turn running in another session, and the background jobs that turn started, for when the user wants to halt a session that is going down the wrong path; the result's background lists what was stopped" +
       ROUTE_TO_TASK,
     exposure: THREAD_TOOL_EXPOSURE,
   },

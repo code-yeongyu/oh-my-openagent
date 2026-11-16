@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { type DeviceService, LocalApiError } from "@oh-my-opencode/device-service-core"
-import { createDeviceServiceSessions } from "./device-service"
+import { createDeviceServiceSessions } from "../../remote/port/device-service"
 
 // omo#13037 A7.2.6: the sender's own device service answers a single-probe locate toward a device that does not list
 // the wake feature with the empty page - the `session_not_found` refusal, sent with no query going out. The lookup
