@@ -77,12 +77,7 @@ pub struct TextDelivery {
     pub interrupted: bool,
 }
 
-/// A backend's monotonic clock in milliseconds, and its wait.
-pub trait BackendClock {
-    fn now_ms(&self) -> u64;
-    /// Waits `ms` on this clock (a fake clock just advances).
-    fn wait_ms(&self, ms: u64);
-}
+pub use crate::backend::BackendClock;
 
 /// What a backend reads for the user-wins-every-race stages.
 pub trait InterventionSource {
@@ -200,6 +195,7 @@ mod tests {
             paused: Vec::new(),
             session: None,
             target: None,
+            settle: None,
         }
     }
 

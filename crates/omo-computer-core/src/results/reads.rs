@@ -98,10 +98,23 @@ pub enum WaitOutcome {
     Timeout,
 }
 
+/// The notification a `waitFor({notification})` matched: its fingerprint only, never the body.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct NotificationMatch {
+    pub app: String,
+    pub title: String,
+    pub body_hash: String,
+    pub arrived_at: u64,
+    pub observation: UntrustedText,
+}
+
 /// `waitFor`: the outcome and the observation it ended on.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct WaitResult {
     pub outcome: WaitOutcome,
     pub observation: Box<Observation>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notification: Option<NotificationMatch>,
 }

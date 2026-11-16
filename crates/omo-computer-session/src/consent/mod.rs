@@ -18,7 +18,7 @@ pub use identity::{Binding, BoundIdentity, IdentityChanged, IDENTITY_UNAVAILABLE
 pub use memory::{Memory, Part};
 pub use scope::bind_scope;
 pub use tier::{covers, Tier};
-pub use view::{AppEntry, Apps, ConsentView, ForegroundPolicy};
+pub use view::{default_stop_hotkey, AppEntry, Apps, ConsentView, ForegroundPolicy, StopChord};
 
 use omo_computer_safety::gate::verdicts::ConsentRefusal;
 use omo_computer_safety::protected::Os;
@@ -143,6 +143,11 @@ impl Consent {
         if self.view.tampered {
             return Err(Denial::bare(ConsentRefusal::Tampered));
         }
+        // A-IS-62 rev 5 (R70an B, interim shape): a view that does not carry stopHotkey leaves the
+        // configured chord unreadable, so every exec is refused, fail-closed.
+        if self.view.stop_hotkey.is_none() {
+            return Err(Denial::bare(ConsentRefusal::Tampered));
+        }
         if !self.view.computer_use {
             return Err(Denial::bare(ConsentRefusal::ConsentOff));
         }
@@ -206,11 +211,15 @@ impl Consent {
         let Some(approved) = approved else {
             return Ok(None);
         };
+        let unbound = approved.bound.is_unbound();
         approved.bound.check(&app.bound).map(Some).map_err(|changed| Denial {
             refusal: ConsentRefusal::IdentityChanged,
             detail: Some(json!({
                 "app": app.app_key,
-                "identity": { "approved": changed.approved, "observed": changed.observed },
+                "identity": {
+                    "approved": if unbound { json!("unbound") } else { json!(changed.approved) },
+                    "observed": changed.observed,
+                },
             })),
         })
     }

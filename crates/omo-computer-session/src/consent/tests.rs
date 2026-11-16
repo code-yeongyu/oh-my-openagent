@@ -20,7 +20,12 @@ fn app(key: &str, cdhash: &str) -> AppTarget {
     }
 }
 
-fn consent(view: serde_json::Value) -> Consent {
+/// A host view in the contract's shape: the member stopHotkey is always carried (R70ao(2)); a test
+/// that does not name it gets null, "absent in the file".
+fn consent(mut view: serde_json::Value) -> Consent {
+    if let Some(map) = view.as_object_mut() {
+        map.entry("stopHotkey").or_insert(serde_json::Value::Null);
+    }
     Consent::new(ConsentView::from_host(view), LOCAL_HAND, Os::Macos)
 }
 
@@ -82,7 +87,9 @@ fn identity_changed_refuses_under_same_app_key() {
         app_key: "com.example.app".to_owned(),
         bound: BoundIdentity::new(None, None),
     };
-    assert_eq!(consent.admit_exec(Some(&unreadable)).map(|a| a.binding), Ok(Some(Binding::PathOnly)));
+    // A-IS-61 (R70ah): an identity-bound entry never falls back to the path; an unreadable
+    // identity refuses (this asserted a path-only admit before the amendment).
+    assert_eq!(refusal(consent.admit_exec(Some(&unreadable))), Some(ConsentRefusal::IdentityChanged));
 }
 
 #[test]
@@ -131,9 +138,68 @@ fn denied_app_seeds_exist_per_os_in_the_scope_stage_keys() {
         }
     }
     let allowed = Consent::new(
-        ConsentView::from_host(json!({ "apps": { "allow": [{ "appKey": "1Password.exe" }] } })),
+        ConsentView::from_host(json!({ "stopHotkey": null, "apps": { "allow": [
+            { "appKey": "1Password.exe", "identity": { "teamId": "TEAM123456", "cdhash": "aa" } }
+        ] } })),
         LOCAL_HAND,
         Os::Windows,
     );
-    assert!(allowed.admit_exec(Some(&app("1Password.exe", "aa"))).is_ok(), "unless explicitly allowed");
+    assert!(allowed.admit_exec(Some(&app("1Password.exe", "aa"))).is_ok(), "unless explicitly allowed, bound at grant");
+    // A-IS-61: an allow entry with neither identity nor path is no grant, so it lifts no seed.
+    let unbound = Consent::new(
+        ConsentView::from_host(json!({ "stopHotkey": null, "apps": { "allow": [{ "appKey": "1Password.exe" }] } })),
+        LOCAL_HAND,
+        Os::Windows,
+    );
+    assert_eq!(refusal(unbound.admit_exec(Some(&app("1Password.exe", "aa")))), Some(ConsentRefusal::IdentityChanged));
+}
+
+/// R70ab (review M3 of #13346): an entry bound to its path alone is satisfied only by a path that
+/// was READ and is equal. Equal: admitted path-only. Different: identity_changed. Unreadable
+/// identity AND path against a stored path: identity_changed, never an admit.
+#[test]
+fn r70ab_a_path_bound_entry_needs_a_read_equal_path() {
+    let consent = consent(json!({ "apps": { "allow": [{ "appKey": "com.example.app", "path": "/usr/bin/app" }] } }));
+    let target = |path: Option<&str>| AppTarget {
+        app_key: "com.example.app".to_owned(),
+        bound: BoundIdentity::new(path.map(str::to_owned), None),
+    };
+    assert_eq!(consent.admit_exec(Some(&target(Some("/usr/bin/app")))).map(|a| a.binding), Ok(Some(Binding::PathOnly)));
+    assert_eq!(refusal(consent.admit_exec(Some(&target(Some("/tmp/app"))))), Some(ConsentRefusal::IdentityChanged));
+    let unread = consent.admit_exec(Some(&target(None))).expect_err("an unreadable path cannot satisfy a stored one");
+    assert_eq!(unread.refusal, ConsentRefusal::IdentityChanged);
+    let observed = &unread.detail.expect("detail")["identity"]["observed"];
+    assert!(observed.get("path").is_none() && observed.get("identity").is_none(), "observed says both were unreadable: {observed}");
+    // A-IS-61 supersedes R70ab's last case: an entry approved without path or identity is no grant.
+    let pathless = self::consent(json!({ "apps": { "allow": [{ "appKey": "com.example.app" }] } }));
+    assert_eq!(refusal(pathless.admit_exec(Some(&target(None)))), Some(ConsentRefusal::IdentityChanged));
+}
+
+/// A-IS-61 (R70ah): admission at use. An identity-bound entry admits only an identity read in full
+/// and equal in every member, never falling back to the path; a path-bound entry admits only a read,
+/// equal path; an entry with neither is no grant and refuses with approved "unbound".
+#[test]
+fn a_is_61_admission_at_use() {
+    let id = |c: &str| Some(CodeIdentity { team_id: Some("T".into()), cdhash: Some(c.into()), signer: None, hash: None });
+    let entry = |path: Option<&str>, ident| BoundIdentity::new(path.map(str::to_owned), ident);
+    let refused = |approved: &BoundIdentity, observed: &BoundIdentity| approved.check(observed).is_err();
+    // The five measured fail-open cases now refuse.
+    assert!(refused(&entry(None, None), &entry(Some("/tmp/evil"), None)), "a1");
+    assert!(refused(&entry(None, None), &entry(Some("/tmp/evil"), id("zz"))), "a2");
+    assert!(refused(&entry(Some("/usr/bin/app"), id("aa")), &entry(Some("/usr/bin/app"), None)), "b1: never falls back to the path");
+    assert!(refused(&entry(None, id("aa")), &entry(Some("/tmp/evil"), None)), "b2");
+    assert!(refused(&entry(None, id("aa")), &entry(None, None)), "b3");
+    // A partial identity is not read.
+    let partial = Some(CodeIdentity { team_id: Some("T".into()), cdhash: None, signer: None, hash: None });
+    assert!(refused(&entry(None, id("aa")), &entry(None, partial)), "partial identity");
+    // What still admits.
+    assert_eq!(entry(None, id("aa")).check(&entry(Some("/x"), id("aa"))).ok(), Some(Binding::Identity));
+    assert_eq!(entry(Some("/usr/bin/app"), None).check(&entry(Some("/usr/bin/app"), id("zz"))).ok(), Some(Binding::PathOnly));
+    // Unbound: approved "unbound", and the engine never binds it.
+    let consent = consent(json!({ "apps": { "allow": [{ "appKey": "com.example.app" }] } }));
+    let target = AppTarget { app_key: "com.example.app".to_owned(), bound: entry(Some("/usr/bin/app"), id("aa")) };
+    let denial = consent.admit_exec(Some(&target)).expect_err("an unbound entry is no grant");
+    assert_eq!(denial.refusal, ConsentRefusal::IdentityChanged);
+    assert_eq!(denial.detail.expect("detail")["identity"]["approved"], json!("unbound"));
+    assert!(consent.admit_exec(Some(&target)).is_err(), "still refused: never bound on first use");
 }
