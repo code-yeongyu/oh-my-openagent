@@ -136,7 +136,8 @@ describe("R57 replay-all classification", () => {
     const outcomes = cases.map((name): Outcome => ({ name, status: "failed" }))
     const { lines } = classify(20, outcomes, ledgers, PLAN)
     for (const [i, name] of cases.entries()) {
-      const owned = lines[i]?.startsWith(`owed ${name} row `) || lines[i]?.startsWith(`FAIL ${name} passed in DEFERRED-LEGS T1 `)
+      const owned =
+        lines[i]?.startsWith(`owed ${name} row `) || lines[i]?.startsWith(`FAIL ${name} passed in DEFERRED-LEGS T1 `)
       expect(owned, lines[i]).toBe(true)
     }
   })
