@@ -4,7 +4,7 @@
 
 ## Shipped skills
 
-The plugin ships 27 skills by default:
+The plugin ships 28 skills by default:
 
 - `ast-grep` — structural code search and rewrites
 - `browser` — drive a real browser from the js eval kernel: signed-in sites, forms, screenshots, web QA
@@ -23,6 +23,7 @@ The plugin ships 27 skills by default:
 - `onboarding` — guide a first-time omo user through setup and the core workflow
 - `programming` — type-strict, modern-stack programming guidance
 - `refactor` — safe refactoring and code quality improvement
+- `remote-machines` — run on, copy to, and talk to the account's other machines
 - `remove-ai-slops` — clean AI-generated code smells
 - `review-work` — multi-angle implementation and PR review
 - `ultimate-browsing` — escalation browsing for blocked or hard-to-reach pages
