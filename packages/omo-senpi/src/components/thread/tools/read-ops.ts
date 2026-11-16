@@ -1,7 +1,7 @@
 import { workspaceEntries } from "../addressing"
-import type { ThreadReadInput, ThreadToolResult } from "../contracts"
+import type { ThreadReadInput, ThreadToolResult, ThreadWaitOutcome } from "../contracts"
 import { locateControl } from "../control/locate"
-import { controlIdentity } from "../control/port"
+import { controlIdentity, controlRefusalOf } from "../control/port"
 import { readTranscript, type ThreadTranscriptEntry } from "../reader"
 import { threadLink } from "../thread-link"
 import {
@@ -64,13 +64,32 @@ export async function readThread(
   current: ThreadHostView,
   value: ThreadReadInput,
   callerId: string,
+  signal?: AbortSignal,
 ): Promise<ThreadToolResult> {
   const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
   if (located.kind === "error") return located.result
   if (located.kind === "not_live") return readDegraded(options, current, located.thread_id, value)
   const { control } = located
+  let wait: ThreadWaitOutcome | undefined
+  if (value.wait_ms !== undefined) {
+    if (control.waitSettled === undefined)
+      return failure(
+        "unsupported",
+        "wait_ms needs a thread on another device.",
+        `Use monitor({ type: "rpc", target: "${control.thread_id}" }).`,
+      )
+    try {
+      wait = await control.waitSettled(value.wait_ms, signal)
+    } catch (error) {
+      const refusal = controlRefusalOf(error)
+      if (refusal === undefined) throw error
+      return { kind: "error", error: refusal }
+    }
+  }
   const result = liveReadResult(control.thread_id, control.title, await control.getMessages(), value)
-  return result.kind === "ok" ? { ...result, ...controlIdentity(control) } : result
+  return result.kind === "ok"
+    ? { ...result, ...controlIdentity(control), ...(wait === undefined ? {} : { wait }) }
+    : result
 }
 
 /** A live session's transcript through the bounded reader; the same window rules on this device and on another one. */
