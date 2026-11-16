@@ -76,6 +76,7 @@ function fixture() {
   const calls: AccountSessionOptions[] = []
   let factoryCalls = 0
   const session: SyncSession = {
+    space: "desktop-account-space",
     transport: account.transport,
     verifier: {
       verifyEntry: async () => ({ ok: true, payload: { items: [] }, batchId: "batch" }),
@@ -127,16 +128,16 @@ describe("desktop account session ports", () => {
 
   test("retirement during runtime loading prevents opening a session", async () => {
     const world = fixture()
-    const started = Promise.withResolvers<void>()
-    const release = Promise.withResolvers<void>()
+    const started = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
     const opening = world.resolve(async () => {
-      started.resolve()
+      started.resolve(undefined)
       await release.promise
       return world.runtime
     })
     await started.promise
     world.lifetime.abort()
-    release.resolve()
+    release.resolve(undefined)
     expect(await opening).toBeNull()
     expect(world.calls).toEqual([])
     expect(world.factoryCalls()).toBe(0)
