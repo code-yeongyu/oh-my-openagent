@@ -51,7 +51,7 @@ impl<S: XServer> X11EpochSource<S> {
     }
 
     fn read(server: &S) -> Result<Layout, Refusal> {
-        let failed = |_| Refusal::new(EngineCode::Internal, "epoch_source_unsupported");
+        let failed = |_| Refusal::new(EngineCode::Internal, Reason::EpochSourceUnsupported);
         let monitors = server.monitors().map_err(failed)?;
         let resources = server.resource_manager().map_err(failed)?;
         Ok(layout_of(&monitors, resources.as_deref()))

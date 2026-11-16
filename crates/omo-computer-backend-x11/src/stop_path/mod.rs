@@ -111,7 +111,7 @@ fn gone() -> Refusal {
 /// slot, which refuses every exec under any policy.
 #[must_use]
 pub fn deaf() -> Refusal {
-    Refusal::new(EngineCode::StopPathUnavailable, Reason::Deaf.wire())
+    Refusal::new(EngineCode::StopPathUnavailable, Reason::Deaf)
 }
 
 /// The armed raw listener.
