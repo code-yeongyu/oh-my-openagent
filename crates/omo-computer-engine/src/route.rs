@@ -7,6 +7,8 @@ use std::path::Path;
 use omo_computer_backend_fake::{FakeBackend, RecordingSink, SeamError};
 use omo_computer_core::backend::Backend;
 use omo_computer_core::env::{check_launch_env, SeamRefusal, FAKE_BACKEND};
+use omo_computer_core::report::Platform;
+use omo_computer_session::grant::declares_compile_target;
 
 pub const BACKEND_SEAM: &str = "OMO_COMPUTER_BACKEND";
 pub const RUNTIME_DIR_SEAM: &str = "OMO_COMPUTER_RUNTIME_DIR";
@@ -21,6 +23,8 @@ pub enum RouteError {
     NoBackend(Option<String>),
     Fake(SeamError),
     Sink(std::io::Error),
+    /// A-IS-64 (b): a non-fake backend that declares another OS than the engine's compile target.
+    PlatformMismatch { declared: Option<Platform> },
 }
 
 impl fmt::Display for RouteError {
@@ -33,6 +37,11 @@ impl fmt::Display for RouteError {
             Self::NoBackend(value) => write!(f, "no backend is registered for {BACKEND_SEAM}={value:?}"),
             Self::Fake(error) => error.fmt(f),
             Self::Sink(error) => write!(f, "fake sink file: {error}"),
+            Self::PlatformMismatch { declared } => write!(
+                f,
+                "the backend declares {declared:?}, the engine is built for {}: no session opens",
+                std::env::consts::OS
+            ),
         }
     }
 }
@@ -59,10 +68,30 @@ pub fn backend(vars: &[(String, String)]) -> Result<Box<dyn Backend>, RouteError
                 None => RecordingSink::default(),
             };
             let fake = FakeBackend::from_seams(lookup, sink).map_err(RouteError::Fake)?;
+            launch_gate(Selected::Fake, &fake)?;
             Ok(Box::new(fake))
         }
         other => Err(RouteError::NoBackend(other)),
     }
+}
+
+/// Which backend the launch environment selected: decided by the route, never by anything the
+/// backend reports about itself (A-IS-64 (b), the LEAD's condition).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Selected {
+    Fake,
+    Real,
+}
+
+/// The launch gate (A-IS-64 (b)): a backend the route SELECTED as real opens no session when its
+/// declared platform maps to another OS than the engine's compile target; the fake is exempt by
+/// its selection, and a real backend declaring no platform takes the compile target's table.
+///
+/// # Errors
+/// [`RouteError::PlatformMismatch`] naming both values.
+pub fn launch_gate(selected: Selected, backend: &dyn Backend) -> Result<(), RouteError> {
+    let _ = (selected, backend);
+    Ok(())
 }
 
 #[cfg(test)]
@@ -85,5 +114,37 @@ mod tests {
             backend(&vars(&[(BACKEND_SEAM, "fake"), ("OMO_COMPUTER_FAKE_STOP_PATH", "loud")])),
             Err(RouteError::Fake(_))
         ));
+    }
+
+    use omo_computer_backend_fake::Persona;
+
+    fn playing(persona: Persona) -> FakeBackend {
+        FakeBackend::from_json("{}").expect("empty scenario").with_persona(persona)
+    }
+
+    /// A-IS-64 test 6: a non-fake backend declaring another OS fails the launch gate, naming both.
+    #[test]
+    fn a_real_backend_declaring_another_os_fails_the_launch_gate() {
+        let other = Persona::ALL
+            .into_iter()
+            .map(playing)
+            .find(|backend| !declares_compile_target(backend))
+            .expect("a persona of another OS");
+        let refused = launch_gate(Selected::Real, &other).expect_err("mismatch");
+        let text = refused.to_string();
+        assert!(matches!(refused, RouteError::PlatformMismatch { declared: Some(_) }), "{text}");
+        assert!(text.contains(std::env::consts::OS), "{text}");
+    }
+
+    /// The LEAD's condition: a backend SELECTED as real is gated whatever it reports about itself,
+    /// and only the route's selection (never a declaration) exempts the fake.
+    #[test]
+    fn a_backend_selected_as_real_is_gated_whatever_it_reports_about_itself() {
+        for persona in Persona::ALL {
+            let backend = playing(persona);
+            let real = launch_gate(Selected::Real, &backend);
+            assert_eq!(real.is_ok(), declares_compile_target(&backend), "{persona:?}");
+            assert!(launch_gate(Selected::Fake, &backend).is_ok(), "{persona:?}");
+        }
     }
 }
