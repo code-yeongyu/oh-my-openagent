@@ -1,4 +1,5 @@
-import { LocalApiError } from "@oh-my-opencode/device-service-core/device-service"
+import { LocalApiError } from "../../../../device-service-core/src/local-api/errors"
+import type { ClientErrorCode, ErrorCode } from "../../../../device-service-core/src/local-api/vocabulary"
 import { THREAD_ERROR_CODES } from "../thread/errors"
 import type { RemoteFailure } from "./types"
 
@@ -33,7 +34,7 @@ export const remoteFailure = (
   extra: Omit<RemoteFailure, "kind" | "code" | "message" | "next_action"> = {},
 ): RemoteFailure => ({ kind: "error", code, message, next_action, ...extra })
 
-type LocalApiCode = LocalApiError["code"]
+type LocalApiCode = ErrorCode | ClientErrorCode
 type Mapped = { readonly code: RemoteCode; readonly details?: Readonly<Record<string, unknown>> }
 
 // How every code the local API (L0) or the device service raises reaches a caller. Typed over the whole vocabulary, so a
@@ -96,7 +97,11 @@ const ENGINE_CODES: Readonly<Record<string, Mapped>> = {
 export const engineCode = (code: string, candidates?: readonly string[]): Mapped =>
   code === "model_unavailable" && candidates !== undefined && candidates.length > 0
     ? { code: "model_ambiguous", details: { candidates } }
-    : (ENGINE_CODES[code] ?? (isRemoteCode(code) ? { code } : { code: "unsupported", details: { engine_code: code } }))
+    : Object.hasOwn(ENGINE_CODES, code)
+      ? ENGINE_CODES[code]!
+      : isRemoteCode(code)
+        ? { code }
+        : { code: "unsupported", details: { engine_code: code } }
 
 // Each next action names an SDK operation, never a CLI verb: the CLI renderer adds the verb (B1, R7).
 const NEXT_ACTION: Partial<Record<RemoteCode, string>> = {
