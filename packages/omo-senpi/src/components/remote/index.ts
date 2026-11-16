@@ -9,4 +9,6 @@ export {
   remoteClientForService,
   remoteClientForSession,
 } from "./factories"
+// Seam 1 (the only thread-address parser) and seam 2 (the only thread-naming helper): surfaces parse and name threads here.
+export { canonicalizeThreadHandle, type CanonicalThread, describeThread, handleOf } from "./seams"
 export type * from "./types"
