@@ -44,11 +44,22 @@ impl OwnSession {
         }
         if method == "session.open" && outcome.is_ok() {
             self.router.session_mut().narrow_consent(self.narrowing);
+            // `stopPath.start` is an authority method the attach host is refused, so the daemon
+            // arms the stop path for it, as the bridge does for its own session.
+            self.on_host("stopPath.start", json!({}));
             if self.start_stopped {
-                let _ = self.router.call(Peer::Host, "stopPath.stop", json!({"source": "peer"}));
+                self.on_host("stopPath.stop", json!({"source": "peer"}));
             }
         }
         (outcome, self.router.take_notifications())
+    }
+
+    /// A stop-path call the daemon makes for this session; a refusal leaves the session's acts
+    /// refused (fail closed) and is logged.
+    fn on_host(&mut self, method: &str, params: Value) {
+        if let Err(error) = self.router.call(Peer::Host, method, params) {
+            eprintln!("omo-computer-engine: attach host session: {method} refused: {}", error.message);
+        }
     }
 }
 

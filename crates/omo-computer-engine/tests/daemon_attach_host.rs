@@ -8,6 +8,7 @@
 #[allow(dead_code)]
 mod peer;
 #[path = "common/daemon.rs"]
+#[allow(dead_code)]
 mod daemon;
 #[path = "common/host.rs"]
 #[allow(dead_code)]

@@ -7,6 +7,7 @@
 #[allow(dead_code)]
 mod peer;
 #[path = "common/daemon.rs"]
+#[allow(dead_code)]
 mod daemon;
 #[path = "common/case.rs"]
 #[allow(dead_code)]
