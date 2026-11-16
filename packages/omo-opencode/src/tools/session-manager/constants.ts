@@ -1,7 +1,7 @@
 import { join } from "node:path"
 import { getClaudeConfigDir } from "../../shared"
 
-export { OPENCODE_STORAGE, MESSAGE_STORAGE, PART_STORAGE, SESSION_STORAGE } from "../../shared"
+export { MESSAGE_STORAGE, PART_STORAGE, SESSION_STORAGE } from "../../shared"
 export const TODO_DIR = join(getClaudeConfigDir(), "todos")
 export const TRANSCRIPT_DIR = join(getClaudeConfigDir(), "transcripts")
 export const SESSION_LIST_DESCRIPTION = `List all OpenCode sessions with optional filtering.
@@ -77,17 +77,3 @@ Duration: 4 days, 5 hours
 Agents Used: build, oracle, librarian
 Has Todos: Yes (12 items, 8 completed)
 Has Transcript: Yes (234 entries)`
-
-export const SESSION_DELETE_DESCRIPTION = `Delete an OpenCode session and all associated data.
-
-Removes session messages, parts, todos, and transcript. This operation cannot be undone.
-
-Arguments:
-- session_id (required): Session ID to delete
-- confirm (required): Must be true to confirm deletion
-
-Example:
-session_delete(session_id="ses_abc123", confirm=true)
-Successfully deleted session ses_abc123`
-
-export const TOOL_NAME_PREFIX = "session_"
