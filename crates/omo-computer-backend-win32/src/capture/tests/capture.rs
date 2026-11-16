@@ -88,7 +88,7 @@ fn near_black_printwindow_frame_is_rejected() {
         .capture(&window_target(), &OPTIONS)
         .expect_err("black frame");
     assert_eq!(refusal.code, EngineCode::CaptureFailed);
-    assert_eq!(refusal.reason, Some(Reason::BlackFrame.wire()));
+    assert_eq!(refusal.reason, Some(Reason::BlackFrame));
 
     // Sixty bright rows of 298: about 80 % near black is a frame (a dark UI is not a failure).
     let mut os = window_os(false);
@@ -106,7 +106,7 @@ fn near_black_printwindow_frame_is_rejected() {
     let refusal = backend
         .capture(&window_target(), &OPTIONS)
         .expect_err("null frame");
-    assert_eq!(refusal.reason, Some(Reason::NullFrame.wire()));
+    assert_eq!(refusal.reason, Some(Reason::NullFrame));
 }
 
 #[test]
@@ -149,7 +149,7 @@ fn per_monitor_v2_scale_in_frame_record() {
         .capture(&window_target(), &OPTIONS)
         .expect_err("session 0");
     assert_eq!(refusal.code, EngineCode::PermissionDenied);
-    assert_eq!(refusal.reason, Some(Reason::NotInteractive.wire()));
+    assert_eq!(refusal.reason, Some(Reason::NotInteractive));
     assert!(!backend
         .os()
         .calls

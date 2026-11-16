@@ -119,7 +119,7 @@ impl Record {
             outcome: GateOutcome::Refused,
             stage,
             code: Some(refusal.code.wire().to_owned()),
-            reason: refusal.reason.map(str::to_owned),
+            reason: refusal.reason.map(|reason| reason.wire().to_owned()),
         };
         self.event.status = match refusal.code.wire() {
             "Suspended" => Status::Suspended,

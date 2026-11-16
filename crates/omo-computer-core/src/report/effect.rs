@@ -103,20 +103,29 @@ impl From<backend::Delivered> for Delivered {
     }
 }
 
-/// Stage timings in microseconds; a stage that did not run is absent.
+/// How long each stage took; a stage that did not run is absent. Each field names its unit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct Timings {
+    /// Microseconds the element reference took to resolve.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ax_resolve: Option<u64>,
+    /// Microseconds the capture took.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub capture: Option<u64>,
+    /// Microseconds the target took to prime.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prime: Option<u64>,
+    /// Microseconds the dispatch of the input took.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dispatch: Option<u64>,
+    /// Microseconds the verification read took.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub verify: Option<u64>,
+    /// Microseconds the focus restore took.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub restore: Option<u64>,
+    /// Milliseconds the post-send settle waited (its `settle.waitedMs`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settle_ms: Option<u64>,
 }

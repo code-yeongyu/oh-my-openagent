@@ -44,6 +44,7 @@ import {
   plantIn,
   ROOT,
   readText,
+  scenarioOverride,
   supersededBy,
   TRANSPORT_ARGS,
 } from "./replay-case"
@@ -133,7 +134,8 @@ async function replay(argv: readonly string[]): Promise<number> {
 
 // A case as its result lines name it: the repository-relative path, else the path given.
 function caseName(casePath: string): string {
-  const rel = relative(ROOT, casePath)
+  // Case names print with forward slashes on every OS, so the output is the same on Windows.
+  const rel = relative(ROOT, casePath).replaceAll("\\", "/")
   return rel.startsWith("..") ? casePath : rel
 }
 
@@ -160,7 +162,8 @@ async function replayCase(opts: Options, casePath: string): Promise<number> {
     OMO_COMPUTER_RUNTIME_DIR: runtime,
     ...Object.fromEntries(Object.entries(spec.env).map(([k, v]) => [k, v.replaceAll(RUNTIME_PLACEHOLDER, runtime)])),
   }
-  if (spec.scenario) env.OMO_COMPUTER_FAKE_SCENARIO = resolve(ROOT, spec.scenario)
+  const scenario = (await scenarioOverride(casePath)) ?? spec.scenario
+  if (scenario) env.OMO_COMPUTER_FAKE_SCENARIO = resolve(ROOT, scenario)
   const spawn = () => {
     const peer = new Peer([opts.engine, ...TRANSPORT_ARGS[spec.transport]], env)
     peers.push(peer)

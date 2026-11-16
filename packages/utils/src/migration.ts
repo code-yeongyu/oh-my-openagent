@@ -6,4 +6,3 @@ export {
   migrateAgentConfigToCategory,
   shouldDeleteAgentConfig,
 } from "./migration/agent-category"
-export { migrateConfigFile } from "./migration/config-migration"

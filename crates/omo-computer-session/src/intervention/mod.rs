@@ -34,6 +34,17 @@ pub fn user_active_in_target(backend: &dyn Backend, pid: u32) -> bool {
             .is_some_and(|last| within_takeover_window(last, clock.now_ms()))
 }
 
+/// R70s(5): a foreign (physical) input in `pid` inside row 19's attribution window before
+/// now holds the send.
+pub fn foreign_input_holds(backend: &dyn Backend, pid: Option<u32>) -> bool {
+    let (Some(pid), Some(clock), Some(reads)) = (pid, backend.clock(), backend.intervention()) else {
+        return false;
+    };
+    reads.last_user_input_ms(pid).is_some_and(|at_ms| {
+        crate::attribution::holds_send(&[crate::attribution::InputSeen { at_ms, own: false }], clock.now_ms())
+    })
+}
+
 /// The mid-send watch of one call: physical input in `pid` after `since_ms`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MidSend {

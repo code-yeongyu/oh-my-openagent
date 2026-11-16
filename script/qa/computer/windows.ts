@@ -5,7 +5,7 @@
 //   bun script/qa/computer/windows.ts --scenario <name> [--engine <omo-computer-engine.exe>] [--json]
 //   bun script/qa/computer/windows.ts --all [--engine <omo-computer-engine.exe>]
 //
-// A scenario is script/qa/computer/windows/<name>.ts exporting `scenario` with its admission:
+// A scenario is script/qa/computer/windows/<name>.ts that registers itself (`register()`) with its admission:
 // `admit:"os"` (the OS stop listener is the stop path), `admit:"host-relay"` (this driver is the
 // host: StopPolicy{allowHostRelayOnly} and a 500 ms heartbeat on its own connection, background
 // only) or `admit:"none"` (no listener and no relay; the scenario sends no input). A scenario that
@@ -18,7 +18,7 @@ import { readdir } from "node:fs/promises"
 import { resolve } from "node:path"
 
 import { openEngine } from "./windows/engine.ts"
-import { ADMISSIONS, type Admission, allRegistered, lastRegistered, type Scenario } from "./windows/scenario.ts"
+import { allRegistered, refusal, type Scenario } from "./windows/scenario.ts"
 import { runAll } from "./windows/set.ts"
 
 const ROOT = resolve(import.meta.dir, "../../..")
@@ -34,14 +34,20 @@ function fail(why: string): never {
   process.exit(2)
 }
 
+/** Imports one scenario file and answers what it registered, refused by the same checks as --all. */
+async function importFile(file: string, helpersAllowed: boolean): Promise<readonly Scenario[]> {
+  const before = allRegistered().length
+  await import(resolve(import.meta.dir, "windows", `${file}.ts`))
+  const added = allRegistered().slice(before)
+  const why = refusal(file, added, { helpersAllowed })
+  if (why !== undefined) fail(why)
+  return added
+}
+
 async function load(name: string): Promise<Scenario> {
   if (!/^[a-z0-9-]+$/.test(name)) fail(`scenario name ${name} is not a file name`)
-  await import(resolve(import.meta.dir, "windows", `${name}.ts`))
-  const scenario = lastRegistered()
-  if (scenario === undefined) fail(`${name} registers no scenario`)
-  if (scenario.name !== name) fail(`${name} registered the scenario ${scenario.name}`)
-  if (!ADMISSIONS.includes(scenario.admit as Admission)) fail(`${name} declares no admission (os, host-relay or none)`)
-  return scenario
+  const [scenario] = await importFile(name, false)
+  return scenario ?? fail(`${name} registers no scenario`)
 }
 
 /** Runs one scenario against a fresh engine: prints its JSON line and receipts, answers PASS. */
@@ -68,7 +74,7 @@ async function runScenario(scenario: Scenario): Promise<boolean> {
 if (process.argv.includes("--all")) {
   const dir = resolve(import.meta.dir, "windows")
   for (const file of (await readdir(dir)).filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts")).sort()) {
-    await import(resolve(dir, file))
+    await importFile(file.slice(0, -".ts".length), true)
   }
   const scenarios = allRegistered()
   const summary = await runAll(

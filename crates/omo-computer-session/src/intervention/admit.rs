@@ -92,7 +92,7 @@ impl Session {
                     "stageCode": drag.inner.code.wire(),
                 });
                 if let (Some(reason), Some(map)) = (drag.inner.reason, data.as_object_mut()) {
-                    map.insert("stageReason".to_owned(), serde_json::json!(reason));
+                    map.insert("stageReason".to_owned(), serde_json::json!(reason.wire()));
                 }
                 Box::new(data)
             });

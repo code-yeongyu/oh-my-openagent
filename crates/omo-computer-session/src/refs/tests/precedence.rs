@@ -118,9 +118,9 @@ fn an_insert_among_shared_ids_is_a_real_diff_not_a_reorder() {
         let second = run_full(&mut refs, &mut tree, json!({"target": "w", "skeleton": false, "since": first.generation}));
         assert_eq!(second.diff_fallback, None, "{case}");
         let diff = second.diff.expect("a diff");
-        let changed: Vec<&str> = diff.lines().filter(|l| l.starts_with("~ ") || l.starts_with("+ ")).collect();
+        let changed: Vec<&str> = diff.lines().filter(|l| l.starts_with("~ ") || l.starts_with('+')).collect();
         assert_eq!(changed.len(), 1, "{case}:\n{diff}");
-        assert!(changed[0].starts_with("+ - listitem \"N\""), "{case}:\n{diff}");
+        assert!(changed[0].starts_with("+(") && changed[0].contains(") - listitem \"N\""), "{case}:\n{diff}");
     }
 }
 
@@ -129,7 +129,7 @@ fn a_bare_never_minted_ref_is_unqualified_on_object_mode() {
     let mut tree = Tree::default().window("w", 1, vec![window(vec![el("button", "Send").obj(3)])]);
     let mut refs = RefRegistry::default();
     snap(&mut tree, &mut refs, "w");
-    let unqualified = Refusal::new(EngineCode::InvalidTarget, Reason::RefUnqualified.wire());
+    let unqualified = Refusal::new(EngineCode::InvalidTarget, Reason::RefUnqualified);
     for token in ["e999", "e1", "e3"] {
         assert_eq!(refs.resolve(token, true, &mut tree).err().map(|u| u.refusal), Some(unqualified.clone()), "{token} on object mode");
     }

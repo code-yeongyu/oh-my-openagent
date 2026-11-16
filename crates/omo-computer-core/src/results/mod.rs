@@ -13,8 +13,8 @@ pub use diagnosis::{
 pub use exec::ExecReply;
 pub use notifications::{AuditLine, EpochChanged, ForegroundConsent, HandConsent, HandStatus};
 pub use reads::{
-    CaptureReply, ClipboardContent, ConcealedReason, DisplayInfo, MenuItems, ObserveReply,
-    PointerPosition, WaitOutcome, WaitResult, WindowsReply,
+    CaptureReply, ClipboardContent, ConcealedReason, DisplayInfo, MenuItems, NotificationMatch,
+    ObserveReply, PointerPosition, WaitOutcome, WaitResult, WindowsReply,
 };
 pub use v1::{
     AxNode, AxSnapshotText, AxTypeTextReply, CapabilitiesReply, CaptureMode, ControlState,

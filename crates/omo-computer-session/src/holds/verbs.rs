@@ -25,8 +25,13 @@ const BAD_KEY: omo_computer_core::backend::Refusal =
     omo_computer_core::backend::Refusal::bare(omo_computer_core::error::EngineCode::InvalidKey);
 
 impl Session {
+    /// The backend's clock, or the session's machine clock when the backend has none (the
+    /// 100 s bound must fire on every backend).
     pub(crate) fn clock_ms(&self) -> u64 {
-        self.backend.clock().map_or(0, omo_computer_core::intervention::BackendClock::now_ms)
+        self.backend.clock().map_or_else(
+            || (self.funnel.control.clock)(),
+            omo_computer_core::intervention::BackendClock::now_ms,
+        )
     }
 
     fn session_tag(&self) -> u64 {
@@ -55,9 +60,10 @@ impl Session {
         }
     }
 
-    /// The units a refused send got out before it stopped.
-    fn sent_before(result: &Result<ExecReply, Refused>) -> usize {
-        result.as_ref().err().and_then(|refused| refused.stamps.delivered).map_or(usize::MAX, |d| usize::try_from(d.count).unwrap_or(usize::MAX))
+    /// The units a call got out: every one on success, the stopped send's count on a refusal
+    /// (0 for a refusal before any send), in either report mode.
+    pub(crate) fn sent_before(result: &Result<ExecReply, Refused>) -> usize {
+        result.as_ref().map_or_else(|refused| usize::try_from(refused.stamps.sent).unwrap_or(usize::MAX), |_| usize::MAX)
     }
 
     fn already_released(&self, method: Method) -> Result<ExecReply, Refused> {
@@ -147,8 +153,9 @@ impl Session {
     pub fn hold_keys(&mut self, params: HoldKeysParams) -> Result<ExecReply, Refused> {
         HoldLedger::admit(params.duration).map_err(|_| hold_duration())?;
         let chord = params.keys.join("+");
+        let before = self.funnel.control.holds.held();
         let down = self.key_down(KeyDownParams { target: params.target.clone(), chord, frame_id: None, force: None, call_id: None, run_generation: None, observe_after: None });
-        self.hold_then_release(params.duration, down)
+        self.hold_then_release(params.duration, &before, down)
     }
 
     /// v1 `holdMouse`: the left button goes down at the point, stays down `duration` ms, and
@@ -158,17 +165,37 @@ impl Session {
     /// `InvalidArguments{hold_duration}` past 100 s, or the funnel's refusal.
     pub fn hold_mouse(&mut self, params: HoldMouseParams) -> Result<ExecReply, Refused> {
         HoldLedger::admit(params.duration).map_err(|_| hold_duration())?;
+        let before = self.funnel.control.holds.held();
         let down = self.mouse_down(MouseDownParams { target: params.target.clone(), button: None, x: Some(params.x), y: Some(params.y), frame_id: None, call_id: None, run_generation: None, observe_after: None });
-        self.hold_then_release(params.duration, down)
+        self.hold_then_release(params.duration, &before, down)
     }
 
-    fn hold_then_release(&mut self, duration_ms: u64, down: Result<ExecReply, Refused>) -> Result<ExecReply, Refused> {
-        if down.is_ok() {
-            if let Some(clock) = self.backend.clock() {
-                clock.wait_ms(duration_ms);
+    /// Holds for `duration_ms`, then releases exactly what this call pressed (the holds not in
+    /// `before`); a stop during the hold ends it at once and answers the stop.
+    fn hold_then_release(&mut self, duration_ms: u64, before: &[Held], down: Result<ExecReply, Refused>) -> Result<ExecReply, Refused> {
+        let pressed: Vec<Held> = self.funnel.control.holds.held().into_iter().filter(|held| !before.contains(held)).collect();
+        let stopped = if down.is_ok() { self.hold_watching_stop(duration_ms) } else { None };
+        self.funnel.control.holds.release(self.backend.as_mut(), &pressed);
+        stopped.map_or(down, |refusal| Err(Refused::from(refusal)))
+    }
+
+    /// Waits `duration_ms` in short ticks, checking the stop latch on each (the pause's
+    /// pattern); on a backend without a clock the wait is real time.
+    fn hold_watching_stop(&mut self, duration_ms: u64) -> Option<omo_computer_core::backend::Refusal> {
+        let mut waited: u64 = 0;
+        loop {
+            if let Some(crate::intervention::Stop::Refused(refusal)) = self.latched() {
+                return Some(refusal);
             }
+            if waited >= duration_ms {
+                return None;
+            }
+            let step = omo_computer_core::intervention::PAUSE_TICK_MS.min(duration_ms - waited);
+            match self.backend.clock() {
+                Some(clock) => clock.wait_ms(step),
+                None => std::thread::sleep(std::time::Duration::from_millis(step)),
+            }
+            waited = waited.saturating_add(step);
         }
-        self.funnel.control.holds.release_all(self.backend.as_mut());
-        down
     }
 }

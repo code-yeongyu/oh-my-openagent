@@ -1,9 +1,12 @@
 import { describe, expect, test } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { dirname, join } from "node:path"
+import { dirname, join, relative } from "node:path"
+
+import { generatedPath as protocolGeneratedPath } from "../packages/omo-computer-protocol/scripts/generate-protocol.ts"
 
 import { parseWriteScope, runGuard } from "./computer-v3-guards.ts"
+import nameMap from "./computer-v3-name-map.json"
 
 // Each guard runs against a temporary git repository that this test owns: one tree that passes and one that
 // violates it. A pass exits 0 with no finding; a violation exits 1 with one line per finding naming the path.
@@ -111,6 +114,54 @@ function expectFindings(
 }
 
 describe("computer-v3-guards --residue", () => {
+  test("residue_reports_an_unreadable_removal_path_as_an_input_error_naming_it", () => {
+    withRepo((repo) => {
+      // given a removal path's parent that is a self-referencing symlink: lstat cannot check what is under it
+      repo.write({ "README.md": "the computer module\n" })
+      symlinkSync("crates", join(repo.root, "crates"))
+      repo.commit("symlink loop")
+
+      // then each removal path under it is reported once as unreadable, by the guard's own classification (the
+      // errno a platform gives a self-loop is not pinned), instead of crashing or calling it absent
+      const result = repo.guard("--residue")
+      expect(result.exitCode).toBe(1)
+      const unreadable = result.findings.filter((line) => /^residue: crates\/\S+ cannot be checked \(\S+\)$/.test(line))
+      expect(unreadable).toHaveLength(nameMap.removal.classA.filter((path) => path.startsWith("crates/")).length)
+    })
+  })
+
+  test("residue_reports_every_unreadable_removal_path_beside_the_other_findings", () => {
+    withRepo((repo) => {
+      // given an unreadable parent over several removal paths, one removal path that still exists, and a file whose
+      // text names the old family
+      repo.write({ "README.md": "the senpi-desktop module\n", "script/qa/desktop/run.ts": "export {}\n" })
+      symlinkSync("crates", join(repo.root, "crates"))
+      repo.commit("several problems")
+
+      // then one run reports all of them: every unreadable path, the remaining path and the text finding
+      const result = repo.guard("--residue")
+      expect(result.exitCode).toBe(1)
+      const underCrates = nameMap.removal.classA.filter((path) => path.startsWith("crates/"))
+      for (const path of underCrates)
+        expect(result.findings.filter((line) => line.startsWith(`residue: ${path} cannot be checked (`))).toHaveLength(
+          1,
+        )
+      expect(result.findings.filter((line) => line === "residue: script/qa/desktop still exists")).toHaveLength(1)
+      expect(result.findings.filter((line) => line.startsWith("residue: README.md:"))).toHaveLength(1)
+    })
+  })
+
+  test("residue_treats_a_removal_path_under_a_file_parent_as_absent_instead_of_crashing", () => {
+    withRepo((repo) => {
+      // given a file where a removal path expects a directory: lstat('crates/<old crate>') fails with ENOTDIR
+      repo.write({ crates: "not a directory\n", "README.md": "the computer module\n" })
+      repo.commit("file at a parent path")
+
+      // then the removal path is absent and the guard reports nothing (it used to throw out of --residue)
+      expectPass(repo.guard("--residue"))
+    })
+  })
+
   test("residue_refuses_an_old_name_outside_the_exclusions_and_a_remaining_class_a_or_b_path", () => {
     withRepo((repo) => {
       // given a tree where the old name survives only in the legacy-name exclusions
@@ -395,6 +446,20 @@ describe("computer-v3-guards --scope <row> <ref> --plan <file>", () => {
     })
   })
 
+  test("scope_accepts_the_protocol_generators_output_path_as_generated", () => {
+    withRepo((repo) => {
+      const scope = scopeRepo(repo)
+
+      // given the path the protocol generator writes, taken from the generator itself
+      const output = relative(join(import.meta.dir, ".."), protocolGeneratedPath)
+      repo.write({ [output]: "export {}\n" })
+      repo.commit("regenerated protocol")
+
+      // then a row that does not own it may still regenerate it
+      expectPass(scope("2"))
+    })
+  })
+
   test("scope_accepts_a_listed_path_owned_by_a_transitive_blocker_and_refuses_an_unlisted_one_or_one_owned_by_a_non_blocker", () => {
     withRepo((repo) => {
       const scope = scopeRepo(repo)
@@ -458,14 +523,16 @@ describe("computer-v3-guards --scope <row> <ref> --plan <file>", () => {
         "crates/senpi-desktop-core/src/lib.rs": "old\n",
         ".github/workflows/desktop-engine.yml": "old\n",
         "script/qa/desktop/a.ts": "old\n",
-        "knip.jsonc": "{}\n",
+        "knip.base.jsonc": "{}\n",
+        "script/knip.workspace.jsonc": "{}\n",
       })
       const scope = scopeRepo(repo)
 
       // given row 80 deleting class A and B paths and editing class C and D files
       repo.remove("crates/senpi-desktop-core", ".github/workflows/desktop-engine.yml", "script/qa/desktop")
       repo.write({
-        "knip.jsonc": "{ }\n",
+        "knip.base.jsonc": "{ }\n",
+        "script/knip.workspace.jsonc": "{ }\n",
         "script/ci-fast-path.mjs": "// re-pointed\n",
         "packages/omo-senpi/scripts/qa/fused-equivalence-golden/linux-x64/E21.json": "{}\n",
         "changes/unreleased/80.md": "removed\n",

@@ -99,7 +99,7 @@ impl Ended {
 impl Session {
     /// A stop is never held (R53): the listener is polled between units, and a set latch ends
     /// the stroke there with the latch's own `Suspended{reason}`.
-    fn latched(&mut self) -> Option<Stop> {
+    pub(crate) fn latched(&mut self) -> Option<Stop> {
         let backend = &mut self.backend;
         self.guard.observe(&mut || backend.stop_listener(), &mut omo_computer_safety::NoHolds);
         self.guard.latch().map(|reason| Stop::Refused(reason.refusal()))
@@ -122,15 +122,21 @@ impl Session {
                 }
             }
             if let InputEvent::Text(text) = event {
-                let mut interrupt =
-                    |backend: &dyn Backend| boundary_stop(backend, watch, window).is_some();
+                // Between scalars as between events (R53): the stop latch first, then the watch.
+                let guard = &mut self.guard;
+                let mut interrupt = |backend: &mut dyn Backend| {
+                    guard.observe(&mut || backend.stop_listener(), &mut omo_computer_safety::NoHolds);
+                    guard.latch().is_some() || boundary_stop(backend, watch, window).is_some()
+                };
                 let delivery = self.backend.post_text(&text, route, tag, &mut interrupt);
                 count = count.saturating_add(delivery.sent);
                 if let Some(refusal) = delivery.refusal {
                     return Outcome { count, of, stop: Some(Stop::Refused(refusal)) };
                 }
                 if delivery.interrupted {
-                    let stop = boundary_stop(self.backend.as_ref(), watch, window)
+                    let stop = self
+                        .latched()
+                        .or_else(|| boundary_stop(self.backend.as_ref(), watch, window))
                         .unwrap_or(Stop::Intervened);
                     return Outcome { count, of, stop: Some(stop) };
                 }

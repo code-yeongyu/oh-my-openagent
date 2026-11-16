@@ -1,0 +1,10 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    ".": {
+      "entry": [
+        "scripts/check-third-party-notices.mjs",
+      ]
+    }
+  }
+}

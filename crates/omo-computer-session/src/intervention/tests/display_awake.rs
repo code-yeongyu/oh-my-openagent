@@ -35,3 +35,20 @@ fn an_exec_after_session_open_acquires_the_display_awake_hold() {
     assert!(session.framed_click(None).is_ok(), "the click delivered");
     assert!(session.display_awake.get().holds_display_awake(), "the exec acquires the hold");
 }
+
+/// Review L1 of #13355: the grace lapses a held hold between execs, so an exec after an idle gap
+/// acquires a fresh hold instead of counting the gap toward the session cap.
+#[test]
+fn an_exec_after_the_grace_lapsed_acquires_a_fresh_hold_not_the_cap() {
+    let (backend, _sink) = fake("");
+    let clock = backend.clock();
+    let mut session = object_session(Box::new(backend));
+    assert!(session.framed_click(None).is_ok(), "the first click delivered");
+    clock.advance(crate::intervention::DEFAULT_DISPLAY_AWAKE_SESSION_CAP_MS);
+    assert!(session.framed_click(None).is_ok(), "the second click delivered");
+    assert!(
+        session.display_awake.get().holds_display_awake(),
+        "the idle gap lapsed the first hold: {:?}",
+        session.display_awake.get()
+    );
+}

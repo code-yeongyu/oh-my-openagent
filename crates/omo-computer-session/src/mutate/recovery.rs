@@ -53,6 +53,8 @@ impl Funnel {
         let refused = |refusal, interrupted| Refused {
             call_id: Some(marker.binding.call_id.clone()),
             interrupted,
+            detail: None,
+            busy: None,
             warning: None,
             ..Refused::from(refusal)
         };
@@ -108,6 +110,8 @@ fn uncertain(call_id: &str) -> Refused {
     Refused {
         call_id: Some(call_id.to_owned()),
         interrupted: Some(Disposition::UNCERTAIN_UNSAFE),
+        detail: None,
+        busy: None,
         warning: None,
         ..Refused::from(RECOVERY_REQUIRED)
     }
