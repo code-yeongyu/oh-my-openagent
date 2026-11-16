@@ -35,7 +35,7 @@ const OLD_SLOTS_FULL_MESSAGE =
   'The macOS keychain holds 8 earlier OmO sign-ins that cannot be removed automatically. Open Keychain Access, delete the items whose account name ends in ".old" or ".old.1" to ".old.7" for OmO, then sign in again.'
 
 const NOT_OWNED_MESSAGE =
-  'The macOS keychain sign-in (item "omo-cli") belongs to another OmO program, for example the OmO desktop app when omo uses its sign-in, and macOS does not let this one remove it. Sign out from that program (the OmO desktop app), or delete the "omo-cli" item in Keychain Access, then try again.'
+  'The OmO sign-in in the macOS keychain (item "omo-cli") belongs to another OmO program, such as the OmO desktop app, and macOS does not let this one remove it. Open Keychain Access, delete the "omo-cli" item for OmO, then try again.'
 
 const failed = (reply: HelperReply, verb: string) =>
   new HelperReadError(
