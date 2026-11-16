@@ -263,11 +263,17 @@ impl InputServer for FakeInputServer {
         self.classes.get(&window).cloned()
     }
 
+    /// A child without its own process belongs to its parent's client, as
+    /// X-Resource reports for a toolkit's widget windows.
     fn client_process(&self, window: Window) -> Result<ClientProcess, String> {
-        self.processes
-            .get(&window)
-            .cloned()
-            .ok_or_else(|| "the X server knows no local process for the window's client".to_owned())
+        let mut current = Some(window);
+        while let Some(id) = current {
+            if let Some(process) = self.processes.get(&id) {
+                return Ok(process.clone());
+            }
+            current = self.parents.get(&id).copied();
+        }
+        Err("the X server knows no local process for the window's client".to_owned())
     }
 
     fn resources(&self) -> Vec<u8> {

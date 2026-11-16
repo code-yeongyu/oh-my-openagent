@@ -111,12 +111,42 @@ fn a_client_with_no_toolkit_known_to_accept_synthetic_input_is_refused() {
 #[test]
 fn xterm_is_refused_until_its_resources_allow_send_events() {
     // Given: an xterm with no allowSendEvents setting.
-    let xterm = || server().process(FIXTURE, &["libXaw.so.7", "libXt.so.6"], &["xterm"]);
+    let xterm = || {
+        FakeInputServer::new(Some(EDITOR))
+            .window(FIXTURE, (2, 40), b"xterm\0XTerm\0")
+            .process(FIXTURE, &["libXaw.so.7", "libXt.so.6"], &["xterm"])
+    };
     // When / Then: refused by default, delivered once the database allows it.
     assert_refused(xterm(), "synthetic_input_dropped");
     let (results, sent) = background_attempts(xterm().resources(b"XTerm*allowSendEvents:\ttrue\n"));
     assert!(results.iter().all(Result::is_ok), "{results:?}");
     assert!(sent > 0);
+}
+
+#[test]
+fn a_window_embedded_from_a_gtk_process_is_refused_inside_an_accepting_shell() {
+    // Given: a Tk shell whose area under the point is a plug window of a GTK process.
+    const PLUG: Window = 0x90_0002;
+    let server = server()
+        .process(FIXTURE, &["libtk8.6.so"], &["wish"])
+        .child(FIXTURE, PLUG)
+        .process(PLUG, &PYTHON_GTK, &["python3", "plug.py"]);
+    let click = PointerEvent::Click {
+        x: 321.0,
+        y: 70.0,
+        button: MouseButton::Left,
+        count: 1,
+        modifiers: Modifiers::default(),
+    };
+    let mut input = X11Input::with_server(server);
+    // When
+    let error = input
+        .pointer(&Target::Window(FIXTURE.to_string()), &click, DeliveryMode::Background)
+        .expect_err("the plug drops synthetic input");
+    // Then
+    assert_eq!(error.code, ErrorCode::BackgroundUnavailable);
+    assert!(error.message.contains("libgtk-3.so.0"), "{}", error.message);
+    assert!(input.server().calls().is_empty(), "no input may be sent");
 }
 
 #[test]
