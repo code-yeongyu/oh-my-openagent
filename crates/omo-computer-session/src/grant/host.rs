@@ -267,6 +267,10 @@ impl Session {
     /// Arms the configured chord (R70av), or a deaf listener when it cannot be read or parsed: the
     /// stop path then reads deaf at once, never live or stale.
     pub(crate) fn arm_configured_chord(&mut self) -> omo_computer_core::results::StopPathStatus {
+        // Review L4: poll the armed listener before it is replaced, so a stop chord or Escape
+        // already queued on its connection latches instead of being dropped with it.
+        let backend = &mut self.backend;
+        self.guard.observe(&mut || backend.stop_listener(), &mut omo_computer_safety::NoHolds);
         if let Some(chord) = self.configured_chord() {
             // R70av: the one chord seam; a chord the backend cannot arm reads deaf at once.
             if self.backend.set_stop_chord(Some(&chord)).is_ok() {
