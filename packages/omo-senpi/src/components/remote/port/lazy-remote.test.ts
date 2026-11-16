@@ -103,3 +103,25 @@ describe("the lazy surface forwards the lookup and wake path (omo#13037) to the 
     expect(await remote.sessions.wake?.("b", "dur-gone", {})).toEqual({ kind: "unavailable" })
   })
 })
+
+describe("the lazy remote client is a plain object to its callers", () => {
+  test("#given the lazy client #when one of its member groups is awaited #then it settles at once (no then is forwarded), and members still reach the loaded client", async () => {
+    const a = account()
+    const remote = createLazyRemoteSurface({
+      version: "0.0.0",
+      sender: { kind: "session", id: "caller" },
+      loadRuntime: async () => ({ remoteSessionsPort: () => a.remote.sessions, remoteClient: () => a.remote.client }),
+    })
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const deadline = new Promise<"hung">((resolve) => {
+      timer = setTimeout(() => resolve("hung"), 2_000)
+    })
+    const settled = await Promise.race([
+      Promise.resolve(remote.client.devices).then(() => "settled" as const),
+      deadline,
+    ])
+    clearTimeout(timer)
+    expect(settled).toBe("settled")
+    expect(await remote.client.devices.list()).toMatchObject({ kind: "ok" })
+  })
+})

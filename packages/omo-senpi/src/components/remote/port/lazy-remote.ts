@@ -47,52 +47,47 @@ function createLazyRemoteClient(options: LazyRemoteOptions): RemoteClient {
   type Member = (...args: unknown[]) => unknown
   const forward =
     (pick: (loaded: RemoteClient) => Member) =>
-    async (...args: unknown[]) => {
-      let loaded: RemoteClient
-      try {
-        loaded = await load()
-      } catch (error) {
-        return unloaded(error)
-      }
-      return await pick(loaded)(...args)
-    }
+    (...args: unknown[]) =>
+      load().then((loaded) => pick(loaded)(...args), unloaded)
+  // A group is not a thenable and has no symbol members, so awaiting or inspecting one never reaches the loader.
   const group = (name: "service" | "devices" | "sessions" | "aliases") =>
     new Proxy(
       {},
       {
         get: (_, member) =>
-          forward((loaded) => (loaded[name] as unknown as Record<PropertyKey, Member>)[member] as Member),
+          typeof member !== "string" || member === "then"
+            ? undefined
+            : member === "follow"
+              ? follow
+              : forward((loaded) => (loaded[name] as unknown as Record<string, Member>)[member] as Member),
       },
     )
   const follow: RemoteClient["sessions"]["follow"] = (thread, opts) => {
-    let stopped = false
-    let inner: ReturnType<RemoteClient["sessions"]["follow"]> | undefined
+    const opened = load().then((loaded) => loaded.sessions.follow(thread, opts))
+    // Read or not, a failed load is answered on the stream, never as an unhandled rejection.
+    opened.catch(() => undefined)
     return {
       [Symbol.asyncIterator]: async function* () {
-        let loaded: RemoteClient
+        let stream: ReturnType<RemoteClient["sessions"]["follow"]>
         try {
-          loaded = await load()
+          stream = await opened
         } catch (error) {
           yield { kind: "failed" as const, failure: unloaded(error) }
           return
         }
-        if (stopped) return
-        inner = loaded.sessions.follow(thread, opts)
-        yield* inner
+        yield* stream
       },
-      stop: () => {
-        stopped = true
-        inner?.stop()
-      },
+      stop: () =>
+        void opened.then(
+          (stream) => stream.stop(),
+          () => undefined,
+        ),
     }
   }
-  const sessions = group("sessions")
   return {
     service: group("service"),
     devices: group("devices"),
-    sessions: new Proxy(sessions, {
-      get: (target, member) => (member === "follow" ? follow : Reflect.get(target, member)),
-    }),
+    sessions: group("sessions"),
     attach: forward((loaded) => loaded.attach as Member),
     aliases: group("aliases"),
     close: () => {

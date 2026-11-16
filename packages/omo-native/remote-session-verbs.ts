@@ -73,6 +73,20 @@ export async function runSession(
   dependencies: RemoteCommandDependencies,
 ): Promise<number> {
   const remote = (dependencies.remote ?? deviceServiceSurface)(service)
+  // The client holds its own device-service connection; a command that left it open would keep the process alive.
+  try {
+    return await runSessionOn(remote, args, json, dependencies)
+  } finally {
+    remote.client.close()
+  }
+}
+
+async function runSessionOn(
+  remote: RemoteThreadSurface,
+  args: SessionArgs,
+  json: boolean,
+  dependencies: RemoteCommandDependencies,
+): Promise<number> {
   const show: Show = (result, label) => {
     if (json) dependencies.output(JSON.stringify(result))
     if (result.kind === "error") {

@@ -578,6 +578,14 @@ describe("omo remote session verbs", () => {
     return { calls, remote: { ...remote, sessions, client } }
   }
 
+  test("#given a session verb #when it returns #then the command has closed its remote client, so no device-service connection outlives it", async () => {
+    const a = fixture.account()
+    let closed = 0
+    const remote = { ...a.remote, client: { ...a.remote.client, close: () => void (closed += 1) } }
+    await run(["interrupt", "b/dur-on-b"], undefined, SIGNED_IN, testBootstrap(), remote)
+    expect(closed).toBe(1)
+  })
+
   test("open creates a session on the device in the project and prints <device>/<session>", async () => {
     const a = fixture.account()
     const { code, out } = await run(
