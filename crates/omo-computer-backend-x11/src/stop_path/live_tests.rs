@@ -73,7 +73,8 @@ fn xi2_listener_arms_live_and_hears_nothing_on_an_idle_server() {
     let display = display();
     let mut listener = armed_listener(&display);
     assert_eq!(listener.poll_stop().ok(), Some(false));
-    let live = Live::for_display(Some(&display));
+    let mut live = Live::for_display(Some(&display));
+    assert_eq!(live.set_chord(Some(DEFAULT_STOP_CHORD)), Ok(()), "the consent view's chord");
     let mut armed = live
         .stop_listener()
         .expect("the backend arms its own listener");
