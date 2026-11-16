@@ -137,6 +137,7 @@ ControlRequired{headless_host}	engine	ControlRequired	headless_host	COMPUTER_CON
 ControlRequired{app_scope}	engine	ControlRequired	app_scope	COMPUTER_CONTROL_REQUIRED	design/d-sdk-skill.md:508	9568e299a9db050b1ecfa4ee06d39bb3a54cf59b01a87434508d903270addaa2	-
 ControlRequired{denied_this_turn}	engine	ControlRequired	denied_this_turn	COMPUTER_CONTROL_REQUIRED	design/d-sdk-skill.md:509	7a30d8207f7597836e5f00c84f6ae0c0dd62bb77680f3575dbf714ddde80f90e	-
 ControlRequired{consent_off}	engine	ControlRequired	consent_off	COMPUTER_CONTROL_REQUIRED	design/d-sdk-skill.md:510	0a58cfd221ca96fb3ac280d320c99ab75adccbd95ce4fe7786cca5af8a198151	-
+ControlRequired{tier_missing}	engine	ControlRequired	tier_missing	COMPUTER_CONTROL_REQUIRED	design/d-arch.md:337	63c8cdfc30f9971fa9e8d9144e9381edd93e9d4f1e70f2f7e372fe125e10ec7a	lead decision 2026-11-16 (row 28 decision 1): a session with no consent view admits computer:read only; its exec refusal is typed
 ControlRequired{user_stopped}	engine	ControlRequired	user_stopped	COMPUTER_CONTROL_REQUIRED	design/d-sdk-skill.md:511	0faa1bb565011304ed3adc80a73be5f0e151fddfd3ea13286c563b7497cfade7	-
 ControlRequired{spawn_inside_session}	engine	ControlRequired	spawn_inside_session	COMPUTER_CONTROL_REQUIRED	design/d-sdk-skill.md:512	a761c798dc86b943db156297a344f819cf79929b5d969780e406354b6f58768b	-
 ControlRequired{attach_inside_session}	engine	ControlRequired	attach_inside_session	COMPUTER_CONTROL_REQUIRED	design/d-sdk-skill.md:512	a761c798dc86b943db156297a344f819cf79929b5d969780e406354b6f58768b	-
