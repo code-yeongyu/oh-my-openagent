@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "61e82ab22e11ca3014190b4c1d976cd40d20657adaed5a82a8861a80cdbf7b0f" as const
+export const SCHEMA_SHA256 = "7f2a0c5ad35cc18e20540fb99fc51f8b459c3d2f01dac9bfdfd9ea8245ac452d" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -395,11 +395,18 @@ export type ActionReport = {
 	openedSurfaces?: Surface[]
 	nextCall?: string | null
 	note?: string | null
+	reason?: RefusalReason | null
+	nothingSent?: boolean | null
 	warning?: string | null
 	auditIds?: string[]
 	timings?: Timings | null
+	settle?: ObservationSettle | null
 	evidence: Evidence[]
+	urlPolicy?: UrlPolicyStamp | null
 	observation: UntrustedText
+	paused?: Pause[]
+	session?: SessionState | null
+	target?: TargetLiveness | null
 }
 
 export type AdvanceClockParams = {
@@ -604,7 +611,7 @@ export type CapturePolicyRow = {
 
 export type CaptureReply = LegacyFrame | Frame
 
-export type CaptureRoute = "composite" | "root_crop" | "screencast" | "screencast_crop" | "screenshot_portal"
+export type CaptureRoute = "composite" | "root_crop" | "screencast" | "screencast_crop" | "screenshot_portal" | "wgc" | "printwindow" | "bitblt"
 
 export type ChainLink = {
 	role: ChainRole
@@ -640,6 +647,8 @@ export type ClipboardContent = {
 	reason?: ConcealedReason | null
 	observation: UntrustedText
 }
+
+export type ClipboardReadReply = ClipboardContent | ActionReport
 
 export type ClipboardWriteParams = {
 	text: string
@@ -718,7 +727,10 @@ export type Diagnosis = {
 	stopPath: StopPathCapability
 	releaseHelper?: ReleaseHelper | null
 	observation: UntrustedText
+	checks?: ProbeCheck[]
 }
+
+export type DiffFallback = "baseline_incomplete" | "current_incomplete" | "since_expired" | "window_changed" | "menu_root" | "reordered" | "not_shorter" | "query_projection"
 
 export type DisplayAwake = {
 	state: DisplayAwakeState
@@ -833,7 +845,7 @@ export type Evidence = {
 
 export type EvidenceClass = "receipt" | "observation"
 
-export type EvidenceKind = "barrier_consumed" | "xi2_raw_confirm" | "value_readback" | "focus_readback" | "menu_readback" | "ax_notification" | "settle_frame_diff" | "ax_change"
+export type EvidenceKind = "barrier_consumed" | "xi2_raw_confirm" | "value_readback" | "focus_readback" | "menu_readback" | "ax_notification" | "settle_frame_diff" | "ax_change" | "frame_readback"
 
 export type ExecReply = null | ActionReport
 
@@ -859,6 +871,7 @@ export type Frame = {
 	cursor: CursorMode
 	path?: string | null
 	artifact?: FrameArtifact | null
+	redaction?: FrameRedaction | null
 	session: SessionState
 	observation: UntrustedText
 }
@@ -869,6 +882,8 @@ export type FrameArtifact = {
 	mime: ImageMime
 	ttlMs: number
 }
+
+export type FrameRedaction = "none"
 
 export type FullLiteral = "full"
 
@@ -1052,8 +1067,18 @@ export type McpSettings = {
 	tier: Tier
 }
 
+export type MenuItem = {
+	label: string
+	enabled: boolean
+	checked: boolean
+	accelerator?: string | null
+	submenu: boolean
+	path: string[]
+	observation: UntrustedText
+}
+
 export type MenuItems = {
-	items: ElementInfo[]
+	items: MenuItem[]
 	truncated?: boolean | null
 	observation: UntrustedText
 }
@@ -1101,6 +1126,14 @@ export type MoveParams = {
 	observeAfter?: ObserveOptions | null
 }
 
+export type NotificationMatch = {
+	app: string
+	title: string
+	bodyHash: string
+	arrivedAt: number
+	observation: UntrustedText
+}
+
 export type NotificationPredicate = {
 	app?: string | null
 	title?: string | null
@@ -1110,6 +1143,8 @@ export type Observation = {
 	frame?: Frame | null
 	tree?: string | null
 	diff?: string | null
+	diffFallback?: DiffFallback | null
+	baseline?: number | null
 	focused?: ElementInfo | null
 	selectedText?: string | null
 	complete: boolean
@@ -1119,6 +1154,7 @@ export type Observation = {
 	session: SessionState
 	observation: UntrustedText
 	secure?: boolean | null
+	nextCall?: string | null
 	settle?: ObservationSettle | null
 	ocr?: Ocr | null
 }
@@ -1128,6 +1164,7 @@ export type ObservationSettle = {
 	indicator?: BusyIndicator | null
 	quietMs: number
 	waitedMs: number
+	regime?: SettleRegime | null
 }
 
 export type ObserveAx = boolean | {
@@ -1198,6 +1235,13 @@ export type PasteParams = {
 	observeAfter?: ObserveOptions | null
 }
 
+export type Pause = {
+	reason: PauseReason
+	ms: number
+}
+
+export type PauseReason = "screen_locked" | "user_active" | "system_suspended"
+
 export type PermissionReport = {
 	state: PermissionState
 	settingsUrl?: string | null
@@ -1228,6 +1272,14 @@ export type PressParams = {
 	observeAfter?: ObserveOptions | null
 }
 
+export type ProbeCheck = {
+	name: string
+	state: ProbeState
+	reason?: string | null
+}
+
+export type ProbeState = "ok" | "unavailable" | "unknown"
+
 export type RaiseWindowParams = {
 	windowId: string
 }
@@ -1238,6 +1290,8 @@ export type Rect = {
 	width: number
 	height: number
 }
+
+export type RefusalReason = "secure_focus" | "concealed_clipboard" | "secret_no_clipboard_route"
 
 export type ReleaseHelper = {
 	available: boolean
@@ -1418,6 +1472,8 @@ export type SettleOptions = {
 
 export type SettleOutcome = "settled" | "pending" | "unsupported" | "timeout"
 
+export type SettleRegime = "changed" | "unchanged" | "navigation"
+
 export type SpawnPath = "open_a" | "disclaim"
 
 export type SshHost = {
@@ -1482,6 +1538,15 @@ export type SurfacePredicate = {
 
 export type SurfaceState = "appeared" | "gone"
 
+export type TargetLiveness = {
+	state: TargetState
+	pid: number
+	exitCode?: number | null
+	signal?: number | null
+}
+
+export type TargetState = "exited" | "unresponsive"
+
 export type TextRange = {
 	start: number
 	end: number
@@ -1498,6 +1563,7 @@ export type Timings = {
 	dispatch?: number | null
 	verify?: number | null
 	restore?: number | null
+	settleMs?: number | null
 }
 
 export type ToolkitClass = "canvas_gl" | "chromium_electron" | "pointer_hw" | "qt_xcb"
@@ -1534,6 +1600,8 @@ export type UnknownLiteral = "unknown"
 export type UntrustedText = {
 	untrustedText: true
 }
+
+export type UrlPolicyStamp = "unknown"
 
 export type UserActive = {
 	active: Tristate
@@ -1572,6 +1640,7 @@ export type WaitPredicate = {
 export type WaitResult = {
 	outcome: WaitOutcome
 	observation: Observation
+	notification?: NotificationMatch | null
 }
 
 export type WindowFrameParams = {
@@ -1731,7 +1800,7 @@ export type MethodResults = {
 	"ax.focused": AxNode | null
 	"elementAt": ElementInfo | null
 	"waitFor": WaitResult
-	"clipboard.read": ClipboardContent
+	"clipboard.read": ClipboardReadReply
 	"menu.items": MenuItems
 	"surface": Surface
 	"click": ExecReply

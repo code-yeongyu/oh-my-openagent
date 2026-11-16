@@ -21,6 +21,8 @@ mod dacl;
 mod dacl_tests;
 #[cfg(windows)]
 mod dir;
+#[cfg(windows)]
+pub use dir::canonical as canonical_sid;
 pub(crate) mod file;
 #[cfg(test)]
 mod process;

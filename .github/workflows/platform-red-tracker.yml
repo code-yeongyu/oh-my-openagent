@@ -5,7 +5,7 @@ name: Platform red tracker
 # pull request, or comments on the open one. publish.yml refuses to cut a release while that issue is open.
 on:
   workflow_run:
-    workflows: [CI, Computer conformance fixtures, Computer engine, Desktop engine, Desktop Windows QA, Engine trust helper, get.omo.dev CI, Git job helper]
+    workflows: [CI, Computer conformance fixtures, Computer engine, Computer Windows QA, Desktop engine, Desktop Windows QA, Engine trust helper, get.omo.dev CI, Git job helper]
     types: [completed]
     branches: [dev]
 
