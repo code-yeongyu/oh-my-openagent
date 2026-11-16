@@ -11,7 +11,7 @@ import type {
   Status,
 } from "../../../../device-service-core/src/local-api/protocol"
 import type { PermissionPreset } from "../thread/contracts/permission-presets"
-import type { AliasRegistry } from "../thread/remote/ports"
+import type { AliasRegistry } from "../thread/remote/alias-port"
 import type { RemoteCode } from "./codes"
 
 // The types of the one remote module (design one-remote-module v8-core r2, section B1 and Appendix B, as confirmed).
