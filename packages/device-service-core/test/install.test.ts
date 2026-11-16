@@ -20,7 +20,7 @@ afterEach(() => {
 
 const HOST = "linux-arm64"
 
-const setup = (minEngine?: string, exitCode = 0) => {
+const setup = (minEngine?: string, exitCode = 0, failure = "install_failed {registration}") => {
   const dir = mkdtempSync(join(tmpdir(), "dsi-"))
   chmodSync(dir, 0o700)
   dirs.push(dir)
@@ -28,7 +28,7 @@ const setup = (minEngine?: string, exitCode = 0) => {
   const runs: (readonly string[])[] = []
   const run: RunCommand = async (argv) => {
     runs.push(argv)
-    return { exitCode, output: exitCode === 0 ? "" : "install_failed {registration}" }
+    return { exitCode, output: exitCode === 0 ? "" : failure }
   }
   const stateDir = join(dir, "device-service")
   const options = {
@@ -65,5 +65,15 @@ describe("installing the device service", () => {
     const outcome = await installDeviceService(options)
     expect(outcome).toMatchObject({ ok: false, state: "service_degraded" })
     expect(outcome.ok ? "" : outcome.action).toContain("install_failed {registration}")
+    expect(outcome.ok ? undefined : outcome.suppressed).toBeUndefined()
+  })
+
+  test("install-service's suppress_failed outcome (no reachable service manager, nothing changed) is marked suppressed", async () => {
+    const { options } = setup(undefined, 1, '{"kind":"install_failed","reason":"suppress_failed"}')
+    expect(await installDeviceService(options)).toMatchObject({
+      ok: false,
+      state: "service_degraded",
+      suppressed: true,
+    })
   })
 })
