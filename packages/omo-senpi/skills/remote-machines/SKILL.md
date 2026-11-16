@@ -118,8 +118,9 @@ if (sent.kind === "error") throw new Error(`${sent.error.code}: ${sent.error.nex
 // Wait up to 5 minutes for its turn to end, then read:
 const read = (await tool.thread_read({ thread, wait_ms: 300_000, all_scope: true })).details.result
 if (read.kind === "error") throw new Error(`${read.error.code}: ${read.error.next_action}`)
-// Close only after a settled wait; timeout (still running), cancelled or ended (status says why) leave it open:
-if (read.wait?.outcome !== "settled") throw new Error(`wait ${read.wait?.outcome}: ${read.wait?.status}; read again later`)
-// read.items is the transcript; close the thread once the answer is in:
+// No read.wait: the thread had no live owner, so the read did not wait and returned its saved transcript.
+// timeout (still running) and cancelled leave the thread open to read again; ended means the session closed for good.
+if (read.wait?.outcome === "timeout" || read.wait?.outcome === "cancelled") throw new Error(`wait ${read.wait.outcome}; read again later`)
+// read.items holds the transcript (all there is when the wait ended or there was no live owner); close the thread once the answer is in:
 await tool.thread_close({ thread, all_scope: true })
 ```
