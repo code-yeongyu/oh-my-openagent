@@ -8,8 +8,8 @@ const packageRoot = join(import.meta.dir, "..")
 
 /**
  * Runs `bun add` with its own install cache under the test's temp root. Bun's default backend hardlinks
- * installed files to its cache, so the engine preparation that rewrites them in place (and the stamp it
- * leaves) would otherwise change the host's shared cache entry and fail later installs on that host (#13819).
+ * installed files to its cache, so the trusted install's engine preparation, which rewrites
+ * dist/modes/rpc/rpc-mode.js in place, would otherwise rewrite the host's shared cache entry too (#13819).
  */
 function bunAddInIsolatedCache(root: string, consumer: string, args: readonly string[]) {
   return Bun.spawnSync(["bun", "add", ...args], {
