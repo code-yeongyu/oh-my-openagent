@@ -23,6 +23,8 @@ const ALLOWED = new Set([
   "packages/omo-senpi/src/components/thread/remote/alias-port.ts",
   "packages/omo-senpi/src/components/thread/remote/ports.ts",
   `${DSC}/src/account-state.ts`,
+  // The local API wire vocabulary outside local-api/ (guard G1 S1): re-exports of the leaf files below, nothing else.
+  `${DSC}/src/wire.ts`,
   `${DSC}/src/local-api/errors.ts`,
   `${DSC}/src/local-api/vocabulary.ts`,
 ])

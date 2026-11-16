@@ -9,7 +9,7 @@ import type {
   JsonObject as WireJsonObject,
   SnapshotBody as WireSnapshotBody,
   Status,
-} from "../../../../device-service-core/src/local-api/protocol"
+} from "../../../../device-service-core/src/wire"
 import type { PermissionPreset } from "../thread/contracts/permission-presets"
 import type { AliasRegistry } from "../thread/remote/alias-port"
 import type { RemoteCode } from "./codes"

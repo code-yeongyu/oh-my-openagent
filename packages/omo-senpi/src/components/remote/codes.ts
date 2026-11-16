@@ -1,5 +1,4 @@
-import { LocalApiError } from "../../../../device-service-core/src/local-api/errors"
-import type { ClientErrorCode, ErrorCode } from "../../../../device-service-core/src/local-api/vocabulary"
+import { LocalApiError, type ClientErrorCode, type ErrorCode } from "../../../../device-service-core/src/wire"
 import { THREAD_ERROR_CODES } from "../thread/errors"
 import type { RemoteFailure } from "./types"
 
