@@ -11,11 +11,17 @@ export type GuardRules = {
   readonly s1: readonly { readonly target: string; readonly allowedImporters: readonly string[] }[]
   readonly s2Origins: readonly GuardedOrigin[]
   readonly s2AllowedImporters: readonly string[]
+  readonly s3: {
+    readonly surface: (file: string) => boolean
+    readonly layers: readonly string[]
+    readonly entry: string
+  }
 }
 
 export type GuardFindings = {
   readonly s1: ReadonlyMap<string, readonly string[]>
   readonly s2: ReadonlyMap<string, readonly string[]>
+  readonly s3: ReadonlyMap<string, readonly string[]>
   readonly nonLiteralImports: ReadonlyMap<string, number>
 }
 
@@ -80,6 +86,7 @@ export function checkImports(facts: readonly FileFacts[], resolve: Resolver, rul
   const exportsOf = guardedExports(facts, resolve, rules.s2Origins)
   const s1 = new Map<string, Set<string>>()
   const s2 = new Map<string, Set<string>>()
+  const s3 = new Map<string, Set<string>>()
   const nonLiteralImports = new Map<string, number>()
   for (const fact of facts) {
     if (fact.nonLiteralImportLines.length > 0) nonLiteralImports.set(fact.file, fact.nonLiteralImportLines.length)
@@ -90,6 +97,8 @@ export function checkImports(facts: readonly FileFacts[], resolve: Resolver, rul
       for (const rule of rules.s1) {
         if (target.startsWith(rule.target) && !under(fact.file, rule.allowedImporters)) add(s1, fact.file, rule.target)
       }
+      if (rules.s3.surface(fact.file) && target !== rules.s3.entry && !rules.s3.surface(target))
+        for (const layer of rules.s3.layers) if (target.startsWith(layer)) add(s3, fact.file, layer)
       if (under(fact.file, rules.s2AllowedImporters)) continue
       const ownNames = new Set(
         rules.s2Origins.filter((origin) => under(fact.file, origin.modules)).flatMap((o) => o.names),
@@ -99,5 +108,10 @@ export function checkImports(facts: readonly FileFacts[], resolve: Resolver, rul
       }
     }
   }
-  return { s1: sorted(s1), s2: sorted(s2), nonLiteralImports: new Map([...nonLiteralImports].toSorted()) }
+  return {
+    s1: sorted(s1),
+    s2: sorted(s2),
+    s3: sorted(s3),
+    nonLiteralImports: new Map([...nonLiteralImports].toSorted()),
+  }
 }
