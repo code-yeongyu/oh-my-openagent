@@ -1,6 +1,7 @@
 //! What every frames test shares: the two-display fixture, opened sessions, the refusal
 //! assertions, the fake's PNG decoded to gray pixels, and a fake shared with the test.
 
+use omo_computer_core::error::Reason;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use omo_computer_backend_fake::{
@@ -88,7 +89,7 @@ pub(super) fn refused(
 ) {
     let before = sink.lines();
     let refusal = click(session, call).expect_err("refused").refusal;
-    assert_eq!((refusal.code.wire(), refusal.reason), (code, Some(reason)));
+    assert_eq!((refusal.code.wire(), refusal.reason.map(Reason::wire)), (code, Some(reason)));
     assert_eq!(sink.lines(), before, "a frame refusal sends nothing");
 }
 

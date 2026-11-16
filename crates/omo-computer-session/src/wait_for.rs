@@ -2,6 +2,7 @@
 //! call's `timeout` (absent: the cap of the regime in force) on the backend's monotonic clock.
 //! No predicate lists windows or polls a tree; the call ends on an observation of its target.
 
+use omo_computer_core::error::Reason;
 use omo_computer_core::backend::{NotificationFingerprint, Refusal, WindowFilter};
 use omo_computer_core::error::EngineCode;
 use omo_computer_core::observation::{Observation, SettleOutcome};
@@ -19,10 +20,10 @@ use crate::settle::{feed, EventMatch, Feed, Settled};
 pub const NOTIFICATION_UNNAMED: Refusal = Refusal::bare(EngineCode::InvalidTarget);
 
 /// A backend without accessibility reads.
-const NO_READER: Refusal = Refusal::new(EngineCode::AxUnsupported, "snapshot_unsupported");
+const NO_READER: Refusal = Refusal::new(EngineCode::AxUnsupported, Reason::SnapshotUnsupported);
 
 /// A null-mode session has no `waitFor`.
-const NO_CAPTURE: Refusal = Refusal::new(EngineCode::CaptureUnavailable, "capture_unsupported");
+const NO_CAPTURE: Refusal = Refusal::new(EngineCode::CaptureUnavailable, Reason::CaptureUnsupported);
 
 const fn settle_outcome(outcome: SettleOutcome) -> WaitOutcome {
     match outcome {

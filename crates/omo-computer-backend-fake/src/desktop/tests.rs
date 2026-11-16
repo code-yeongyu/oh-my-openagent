@@ -1,5 +1,6 @@
 //! The imported scripting fields drive the `Backend` half as their scenarios say.
 
+use omo_computer_core::error::Reason;
 use omo_computer_core::backend::{
     Backend, CaptureOptions, InputEvent, Route, TaggedInput, Target, WindowFilter,
 };
@@ -75,7 +76,7 @@ fn faults_delays_and_presses_run_before_the_call() {
         .expect_err("scripted");
     assert_eq!(
         (refused.code, refused.reason),
-        (EngineCode::CaptureUnavailable, Some("minimized"))
+        (EngineCode::CaptureUnavailable, Some(Reason::Minimized))
     );
     assert_eq!(
         refused.row().map(|row| row.computer),
