@@ -1,5 +1,5 @@
 {
-  "description": "Lossless diff: between two observations of window 101 one title changes. The second observe({since:1}) carries `diff` with exactly one changed node (`~` line), no `removed:` trailer and no `tree`; the refs of unchanged nodes (s2:e3, and s1:e3 of the baseline) still resolve by ref, and the changed node keeps its number. No step sends input. The recorded resumeToken is a synthetic placeholder: the case lists /result/resumeToken as variable, so its value is never compared.",
+  "description": "Lossless diff: between two observations of window 101 one title changes. The second observe({since:1}) carries `diff` with exactly one changed node (`~` line), no `removed:` trailer and no `tree`; the refs of unchanged nodes (s2:e3, and s1:e3 of the baseline) still resolve by ref, and the changed node keeps its number. No step sends input. The recorded resumeToken is the corpus placeholder per-process-random: the case lists /result/resumeToken as variable, so its value is never compared.",
   "transport": "stdio",
   "scenario": "crates/omo-computer-backend-fake/fixtures/v3-ax-diff-one-title-change.json",
   "env": {},
@@ -94,7 +94,7 @@
                   "stale": false
                 }
               },
-              "resumeToken": "00000000000000000000000000000001"
+              "resumeToken": "per-process-random"
             }
           },
           "variable": [
