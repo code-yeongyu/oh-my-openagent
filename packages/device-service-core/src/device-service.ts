@@ -124,6 +124,8 @@ export { SESSION_ROW_STATES } from "./local-api/protocol.ts"
 export type { AttachEnd, CommandResult, RemoteAttach, RemoteAttachEvent } from "./remote-attach.ts"
 
 export { DEVICE_SERVICE_STATE_DIR_ENV, deviceServiceStateDir } from "./state-dir.ts"
+// The clock seam, here too so a local-only caller takes it without the package barrel (which reaches the release fetch).
+export { realTimers, type Timers } from "./timers.ts"
 
 /** The file a running service publishes in its state dir: the socket on POSIX, the port file on Windows. */
 export function deviceServiceEndpointPath(stateDir: string, platform: NodeJS.Platform = process.platform): string {
