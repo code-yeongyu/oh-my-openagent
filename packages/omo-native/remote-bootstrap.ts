@@ -180,9 +180,10 @@ async function enableRemote(
 }
 
 /**
- * The session host unit after login, ordered against a disable as the switch is (#13762 review LOW). A disable records
- * the opt-out before it removes the unit, so an opt-out read before the install skips it, and one read after it removes
- * the unit again: a record made after that read is followed by that disable's own removal, which comes last.
+ * The session host unit after login and at every omo start, ordered against a disable as the switch is (#13762 review
+ * LOW, #13784 review L2). A disable records the opt-out before it removes the unit, so an opt-out read before the
+ * install skips it, and one read after it removes the unit again: a record made after that read is followed by that
+ * disable's own removal, which comes last.
  */
 async function installColdWakeUnlessOptedOut(remote: RemoteSetup, io: BootstrapIo): Promise<void> {
   if (remote.optOut.read()) return
@@ -280,7 +281,9 @@ export async function runBootstrapVerb(
   } finally {
     outcome.service.close()
   }
-  // After the connection is closed: a changed table restarts the device service, which would cut it.
-  await applyColdWake(remote.coldWake, !optedOut && status.state !== "disabled", io.error)
+  // After the connection is closed: a changed table restarts the device service, which would cut it. The install
+  // re-reads the opt-out: a disable since the read above found the unit not installed yet (#13784 review L2).
+  if (!optedOut && status.state !== "disabled") await installColdWakeUnlessOptedOut(remote, io)
+  else await applyColdWake(remote.coldWake, false, io.error)
   return "connected"
 }

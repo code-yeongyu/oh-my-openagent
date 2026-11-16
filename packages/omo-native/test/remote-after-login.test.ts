@@ -99,12 +99,13 @@ describe("the background enable omo login starts", () => {
 
   // #13762 review LOW: the session host unit is ordered against a late disable as the switch is. The disable (record the
   // opt-out, switch the service off, remove the unit) lands after the enable's second opt-out read, before its unit
-  // install or inside it; the hooks run in those steps, so the order is fixed, not timed.
+  // install or inside it; the hooks run in those steps, so the order is fixed, not timed. A disable before the install
+  // means no install call at all (#13784 review L1): an install that is not needed can restart the device service.
   for (const lands of ["before", "during"] as const)
     test(`a disable ${lands} its unit install: the unit ends removed, the switch off, the opt-out kept`, async () => {
       const stateDir = privateDir()
       const { record, optOut } = optOutRecord()
-      const unit = { installed: false }
+      const unit = { installed: false, installs: 0 }
       const disable = () => {
         record.off = true
         const owner = owners[0]
@@ -123,6 +124,7 @@ describe("the background enable omo login starts", () => {
       }
       const coldWake: ColdWake = {
         install: async () => {
+          unit.installs += 1
           if (lands === "during") disable()
           unit.installed = true
           return { kind: "installed", serviceRestarted: false }
@@ -146,13 +148,9 @@ describe("the background enable omo login starts", () => {
         undefined,
         { optOut: disableAfterSecondRead, coldWake },
       )
-      expect([code, unit.installed, owners[0]?.state.status.enabled, record.off, record.clears]).toEqual([
-        REMOTE_EXIT.ok,
-        false,
-        false,
-        true,
-        0,
-      ])
+      expect([code, unit.installed, unit.installs, owners[0]?.state.status.enabled, record.off, record.clears]).toEqual(
+        [REMOTE_EXIT.ok, false, lands === "before" ? 0 : 1, false, true, 0],
+      )
     })
 
   // #13724 review L1: with no opt-out recorded there is nothing to clear; a clear here could only erase one a disable

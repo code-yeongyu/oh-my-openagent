@@ -12,6 +12,7 @@ import {
   runLoginSetup,
 } from "../remote-bootstrap"
 import { disableNotSavedNotice, REMOTE_EXIT } from "../remote-cli"
+import type { ColdWake } from "../remote-cold-wake"
 import { afterServiceAuth } from "../service-auth-command"
 import {
   owners,
@@ -141,6 +142,55 @@ describe("remote sessions on by default", () => {
     const restart = await run(["bootstrap", "--json"], owner.stateDir, SIGNED_IN, testBootstrap(), undefined, remote)
     expect([owner.state.status.enabled, restart.coldWake]).toEqual([true, ["install"]])
   })
+
+  // #13784 review L2: the bootstrap's session host unit is ordered against a late disable as the after-login enable's is.
+  // The disable (record the opt-out, switch the service off, remove the unit) lands after the bootstrap's opt-out read,
+  // before its unit install or inside it; the hooks run in those steps, so the order is fixed, not timed.
+  for (const lands of ["before", "during"] as const)
+    test(`a disable ${lands} the bootstrap's unit install: the unit ends removed, the switch off, the opt-out kept`, async () => {
+      const { owner, record, remote } = await device(true)
+      const unit = { installed: false, installs: 0 }
+      const disable = () => {
+        record.off = true
+        owner.state.status = { ...owner.state.status, enabled: false, state: "disabled" }
+        unit.installed = false
+      }
+      let reads = 0
+      const optOut = {
+        ...remote.optOut,
+        read: () => {
+          const off = remote.optOut.read()
+          reads += 1
+          if (reads === 1 && lands === "before") disable()
+          return off
+        },
+      }
+      const coldWake: ColdWake = {
+        install: async () => {
+          unit.installs += 1
+          if (lands === "during") disable()
+          unit.installed = true
+          return { kind: "installed", serviceRestarted: false }
+        },
+        uninstall: async () => {
+          unit.installed = false
+          return { kind: "removed", serviceRestarted: false }
+        },
+        status: async () => undefined,
+      }
+      const { code } = await run(["bootstrap", "--json"], owner.stateDir, SIGNED_IN, testBootstrap(), undefined, {
+        ...remote,
+        optOut,
+        coldWake,
+      })
+      expect([code, unit.installed, unit.installs, owner.state.status.enabled, record.off]).toEqual([
+        REMOTE_EXIT.ok,
+        false,
+        lands === "before" ? 0 : 1,
+        false,
+        true,
+      ])
+    })
 
   test("a bootstrap never turns on a switch that was turned off without an opt-out (the desktop app's toggle)", async () => {
     const { owner, connect, remote } = await device(true)
