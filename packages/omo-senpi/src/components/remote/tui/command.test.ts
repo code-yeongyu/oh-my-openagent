@@ -210,7 +210,7 @@ describe("/remote", () => {
 
     // then
     expect(notesBeforeReply).toBe(1)
-    expect(ui.notes[0]?.message.startsWith("Sending to dev_mac/s1.")).toBe(true)
+    expect(ui.notes[0]?.type).toBe("info")
     expect(run.options[0]?.deadlineMs).toBe(SEND_DEADLINE_MS)
     expect((await reply).message).toBe("dev_mac/s1:\nlater")
   })
@@ -256,12 +256,59 @@ describe("/remote", () => {
 
     // then
     expect(run.options[0]?.deadlineMs).toBe(COMMAND_DEADLINE_MS)
-    expect(ui.notes).toEqual([
-      {
-        message: `omo remote devices did not answer within ${COMMAND_DEADLINE_MS / 1000} seconds and was stopped.`,
-        type: "error",
-      },
-    ])
+    expect(ui.notes.map((note) => note.type)).toEqual(["error"])
+  })
+
+  it("#given a verb that succeeds with something on stderr #when the answer renders #then the result is shown and the stderr follows as a warning", async () => {
+    // given
+    const unlinked = "This device is not linked to your account. Run omo login to link it."
+    const run = fakeRunner({
+      enable: { code: 0, stdout: `${JSON.stringify({ enabled: true })}\n`, stderr: `${unlinked}\n` },
+    })
+    const ui = fakeUi()
+
+    // when
+    await invoke(run, "enable", ui)
+
+    // then
+    expect(ui.notes.map((note) => note.type)).toEqual(["info", "warning"])
+    expect(ui.notes[1]?.message).toBe(unlinked)
+  })
+
+  it("#given enable stops with a notice and a non-zero exit #when the answer renders #then the CLI's notice is the error, not the exit code", async () => {
+    // given
+    const stopped = { state: "service_degraded", notice: "Could not download the OmO device service." }
+    const run = fakeRunner({ enable: { code: 3, stdout: `${JSON.stringify(stopped)}\n`, stderr: "" } })
+    const ui = fakeUi()
+
+    // when
+    await invoke(run, "enable", ui)
+
+    // then
+    expect(ui.notes).toEqual([{ message: stopped.notice, type: "error" }])
+  })
+
+  it("#given enable, disable and control answers #when they render #then each shows a sentence that differs by state, never the raw JSON", async () => {
+    // given
+    const answers: ReadonlyArray<readonly [string, unknown]> = [
+      ["enable", { enabled: true }],
+      ["disable", { enabled: false }],
+      ["control", { attached: true, changedAt: "" }],
+      ["control", { attached: false, changedAt: "" }],
+    ]
+
+    // when
+    const shown: string[] = []
+    for (const [verb, value] of answers) {
+      const ui = fakeUi()
+      await invoke(fakeRunner({ [verb]: ok(value) }), verb, ui)
+      shown.push(ui.notes[0]?.message ?? "")
+    }
+
+    // then
+    expect(shown.filter((message) => message.trimStart().startsWith("{"))).toEqual([])
+    expect(shown[0]).not.toBe(shown[1])
+    expect(shown[2]).not.toBe(shown[3])
   })
 
   it("#given the CLI exits 0 with a typed error #when the verb runs #then it is shown as a failure, not a result", async () => {

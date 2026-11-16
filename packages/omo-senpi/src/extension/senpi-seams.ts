@@ -28,6 +28,7 @@ export const SENPI_SEAMS = {
   registerMessageRenderer: "function",
   registerReadClassifier: "function",
   registerRemovedToolHint: "function",
+  registerRpcRemoteSource: "function",
   registerTool: "function",
   rpc: "object",
   "rpc.emit": "function",
