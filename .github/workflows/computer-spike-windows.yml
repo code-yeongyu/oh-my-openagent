@@ -1,8 +1,8 @@
 name: Computer spike SP-N (Windows)
 
 # Measures the SP-N ledger rows on a hosted Windows desktop. Runs on
-# workflow_dispatch and on a pull request that carries the ci:full-matrix label
-# (#13811); the first step proves the job has an interactive desktop
+# workflow_dispatch and on a pull request the shared platform decision admits
+# (pr-platform-decision.yml, #13859); the first step proves the job has an interactive desktop
 # (OpenInputDesktop succeeds and the session id is not 0) and the probe exits
 # naming that precondition otherwise. The ledger is uploaded as an artifact;
 # rows are committed to the repository only by the spike's own pull request.
@@ -23,10 +23,17 @@ permissions:
   contents: read
 
 jobs:
+  platform:
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/pr-platform-decision.yml
+
   sp-n:
     name: computer spike SP-N (windows-latest)
-    # Pull requests run Linux only; the ci:full-matrix label, pushes and dispatches run every OS (#13802).
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-matrix')
+    needs: platform
+    # macOS/Windows only when the shared platform decision allows it (pr-platform-decision.yml, #13859).
+    if: needs.platform.outputs.full_matrix == 'true'
     runs-on: windows-latest
     # 2 passes x 895 s + overhead + reserve, 10 % kept free (the self-test checks it)
     timeout-minutes: 45
