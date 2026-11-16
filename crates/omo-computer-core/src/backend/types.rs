@@ -1,8 +1,9 @@
 //! The argument and return types of the backend traits. They are in-process types, never
 //! on the wire.
 
+use crate::capabilities::CaptureRoute;
 use crate::listing::{ElementInfo, Rect, WindowInfo};
-use crate::observation::ImageMime;
+use crate::observation::{CursorMode, ImageMime};
 use crate::params::{Button, ObserveOptions, Point};
 use crate::results::PermissionState;
 
@@ -45,6 +46,39 @@ pub struct FrameBytes {
     pub height: u32,
     pub mime: ImageMime,
     pub bytes: Vec<u8>,
+    /// How the pixels were produced, when the backend reports it.
+    pub route: Option<CaptureRoute>,
+    /// `Some(true)` when windows covering the target may show (a root-crop tier).
+    pub occluders_visible: Option<bool>,
+    /// Whose pointer the pixels carry, when the backend reports it.
+    pub cursor: Option<CursorMode>,
+}
+
+#[cfg(test)]
+mod frame_bytes_tests {
+    use super::*;
+
+    #[test]
+    fn frame_bytes_carry_root_crop_and_cursor_annotations() {
+        let annotated = FrameBytes {
+            width: 1,
+            height: 1,
+            mime: ImageMime::Png,
+            bytes: Vec::new(),
+            route: Some(CaptureRoute::RootCrop),
+            occluders_visible: Some(true),
+            cursor: Some(CursorMode::Engine),
+        };
+        let bare = FrameBytes {
+            route: None,
+            occluders_visible: None,
+            cursor: None,
+            ..annotated.clone()
+        };
+        assert_eq!(annotated.route, Some(CaptureRoute::RootCrop));
+        assert_eq!(annotated.occluders_visible, Some(true));
+        assert_ne!(annotated, bare);
+    }
 }
 
 /// One OS-level input event.
@@ -55,6 +89,11 @@ pub enum InputEvent {
     Key { key: String, down: bool },
     Scroll { dx: f64, dy: f64 },
     Text(String),
+    // --- Row 25: the menu, app and system-surface side effects, through the one sink. ---
+    MenuSelect { path: Vec<String> },
+    AppLaunch { app_key: String, activate: bool },
+    AppQuit { app_key: String, force: bool },
+    OpenSurface { kind: crate::listing::SurfaceKind },
 }
 
 /// An input event carrying the engine's tag, so listeners can tell it from the user's.
@@ -128,4 +167,14 @@ pub struct Semantic(pub String);
 pub struct AxEvent {
     pub kind: String,
     pub window: String,
+}
+
+/// R62: what a backend's own doctor checks add to `diagnose` (row 50's X11 chain and the like):
+/// spawn-chain links after the host's, permission entries by name, and checks that are not
+/// permissions (they never feed `ok`). Reads only; never prompts.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct BackendProbes {
+    pub chain: Vec<crate::results::ChainLink>,
+    pub permissions: std::collections::BTreeMap<String, crate::results::PermissionReport>,
+    pub checks: Vec<crate::results::ProbeCheck>,
 }
