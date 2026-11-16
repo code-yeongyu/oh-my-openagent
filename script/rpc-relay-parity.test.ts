@@ -7,11 +7,11 @@ import {
   checkProblems,
   curatedRows,
   engineMethodClasses,
-  namesRecordType,
   pairTestProblems,
   renderTable,
   TABLE_PATH,
 } from "./rpc-relay-parity.ts"
+import { namesRecordType } from "./rpc-relay-parity-matcher.ts"
 
 const dirs: string[] = []
 afterEach(() => {
@@ -160,6 +160,36 @@ describe("engine RPC local-versus-relay parity table (#13478)", () => {
     expect(namesRecordType('send({ type: "prompt" ', "prompt")).toBe(false)
     // A top-level return is a parse error, yet the recovered AST still holds the send call.
     expect(namesRecordType('send({ type: "prompt" })\nreturn', "prompt")).toBe(false)
+  })
+
+  test("a mapped list may read its parameter through an assertion: (e as Frame).type (#13935 review 3 L1)", () => {
+    expect(namesRecordType('expect(sent.map((e) => (e as Frame).type)).toEqual(["prompt"])', "prompt")).toBe(true)
+  })
+
+  test("a comparison under ! or inside a subject asserted false does not count (#13935 review 3 L2)", () => {
+    expect(namesRecordType('const rest = frames.filter((f) => !(f.type === "prompt"))', "prompt")).toBe(false)
+    expect(namesRecordType('expect(sent.some((e) => e.type === "prompt")).toBe(false)', "prompt")).toBe(false)
+    expect(namesRecordType('expect(sent.some((e) => e.type === "prompt")).toStrictEqual(false)', "prompt")).toBe(false)
+    expect(namesRecordType('expect(sent.some((e) => e.type === "prompt")).toBeFalsy()', "prompt")).toBe(false)
+    expect(namesRecordType('expect(sent.some((e) => e.type === "prompt")).toBeFalse()', "prompt")).toBe(false)
+    expect(namesRecordType('expect(sent.some((e) => e.type === "prompt")).not.toBe(true)', "prompt")).toBe(false)
+    expect(namesRecordType('expect(sent.some((e) => e.type === "prompt")).not.toBeTrue()', "prompt")).toBe(false)
+    expect(namesRecordType('expect(sent.some((e) => e.type === "prompt")).not.toBeTruthy()', "prompt")).toBe(false)
+  })
+
+  test("a comparison asserted true still counts (#13935 review 3 L2)", () => {
+    expect(namesRecordType('expect(sent.some((e) => e.type === "prompt")).toBe(true)', "prompt")).toBe(true)
+    expect(namesRecordType('expect(sent.some((e) => e.type === "prompt")).not.toBe(false)', "prompt")).toBe(true)
+    expect(namesRecordType('expect(sent.some((e) => e.type === "prompt")).toBeTruthy()', "prompt")).toBe(true)
+  })
+
+  test("a destructured map callback and an optional .map call count as a mapped list (#13935 review 3 L3)", () => {
+    expect(namesRecordType('expect(sent.map(({ type }) => type)).toEqual(["prompt"])', "prompt")).toBe(true)
+    expect(namesRecordType('expect(sent.map(({ type: t }) => t)).toEqual(["prompt"])', "prompt")).toBe(true)
+    expect(namesRecordType('expect(sent.map(({ ["type"]: t }) => t)).toEqual(["prompt"])', "prompt")).toBe(true)
+    expect(namesRecordType('expect(sent?.map((e) => e.type)).toEqual(["prompt"])', "prompt")).toBe(true)
+    expect(namesRecordType('expect(sent.map(({ kind }) => kind)).toEqual(["prompt"])', "prompt")).toBe(false)
+    expect(namesRecordType('expect(sent.map(({ type: t }) => other)).toEqual(["prompt"])', "prompt")).toBe(false)
   })
 
   test("a rows file with a misspelled key is refused", () => {
