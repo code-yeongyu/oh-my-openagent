@@ -73,3 +73,63 @@ fn a_world_readable_directory_is_narrowed_to_the_owner() {
         0o700
     );
 }
+
+/// Ruling (LEAD via duty, amendment A-IS-60): a Windows stop marker is committed only on NTFS
+/// or ReFS; any other filesystem, or one whose name cannot be read, refuses with a typed error
+/// that names what was read. The name reader is injected here; the hosted Windows marker test
+/// makes the real call on the runner's volume.
+#[test]
+fn the_marker_filesystem_is_ntfs_or_refs_and_anything_else_refuses_naming_it() {
+    use super::{admit_filesystem, UnsupportedFilesystem};
+    let named = |name: &str| admit_filesystem(Ok(name.to_owned()));
+    assert!(named("NTFS").is_ok(), "NTFS");
+    assert!(named("ReFS").is_ok(), "ReFS");
+    for refused in ["FAT", "FAT32", "exFAT", "NFS", "", "ntfs"] {
+        let error = named(refused).expect_err(refused);
+        let typed = error
+            .get_ref()
+            .and_then(|inner| inner.downcast_ref::<UnsupportedFilesystem>())
+            .unwrap_or_else(|| panic!("{refused:?}: a typed error, got {error:?}"));
+        assert_eq!(typed.name, refused);
+        assert!(
+            error.to_string().contains(&format!("{refused:?}")),
+            "{error}"
+        );
+    }
+    let unreadable =
+        admit_filesystem(Err(std::io::Error::other("volume gone"))).expect_err("unreadable");
+    let typed = unreadable
+        .get_ref()
+        .and_then(|inner| inner.downcast_ref::<UnsupportedFilesystem>())
+        .expect("a typed error");
+    assert!(
+        typed.name.starts_with("unreadable") && typed.name.contains("volume gone"),
+        "{}",
+        typed.name
+    );
+}
+
+/// Review L1 of #13353 (at f8489aad9d): a commit whose rename is refused leaves no temp file
+/// behind; the marker's directory holds only what was there before.
+#[test]
+fn a_refused_rename_leaves_no_temp_file_behind() {
+    let root = tempfile::tempdir().expect("temp dir");
+    let path = root.path().join("state/omo/global-stop");
+    // A non-empty directory where the marker goes: the rename onto it is refused on every OS.
+    fs::create_dir_all(path.join("occupied")).expect("a directory in the marker's place");
+    let mut marker = FileMarker::at(path.clone());
+    assert!(
+        marker.commit().is_err(),
+        "the rename onto a directory is refused"
+    );
+    let left: Vec<String> = fs::read_dir(path.parent().expect("dir"))
+        .expect("list")
+        .flatten()
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .collect();
+    assert_eq!(
+        left,
+        vec!["global-stop".to_owned()],
+        "no temp file remains: {left:?}"
+    );
+}

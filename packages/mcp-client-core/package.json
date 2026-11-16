@@ -36,7 +36,7 @@
     "@oh-my-opencode/claude-code-compat-core": "workspace:*",
     "@oh-my-opencode/utils": "workspace:*",
     "proper-lockfile": "4.1.2",
-    "zod": "^4.6.5"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@types/proper-lockfile": "4.1.4",

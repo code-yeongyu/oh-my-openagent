@@ -5,9 +5,10 @@ import { isClosedDeviceLogin, withClosedDeviceLoginOptions } from "./closed-devi
 import { openSignInBrowser } from "./browser"
 import { deviceName, devicePlatform } from "./device-name"
 import { loginDevice } from "./device-flow"
+import { advertisesMachineIdentity, readMachineDigest } from "./machine-digest"
+import { refuseSecondMachineDevice } from "./machine-device"
 import { createCredentialStore, INTERACTIVE_READ_WAIT } from "./keystore"
 import { BrowserUnavailable, loginLoopback } from "./loopback"
-import { localMachineHash, type MachineDeviceService, prepareMachineSignIn } from "./machine-binding"
 import { type ChooseDevice, type ListedDevice, RequestFailure, serviceOrigin, SignInError } from "./protocol"
 import { resolveMemoryRoot, syncPinDir } from "@oh-my-opencode/memory-core/sync-device-retire"
 
@@ -17,9 +18,9 @@ import { terminalText } from "./terminal-text"
 
 // Probe the service before anything user-visible (a browser tab, a device code) so an
 // unreachable or unhealthy service fails at once instead of after a dead page and a wait.
-async function ensureServiceAvailable(session: Pick<Session, "request">, api: string): Promise<void> {
+async function ensureServiceAvailable(session: Pick<Session, "request">, api: string): Promise<unknown> {
   try {
-    await session.request("/v1/health", { method: "GET" })
+    return await session.request("/v1/health", { method: "GET" })
   } catch (error) {
     if (!(error instanceof SignInError)) throw error
     // No usable HTTP answer (DNS, refused, TLS, timeout, non-JSON body): the client can't tell a
@@ -33,19 +34,31 @@ async function ensureServiceAvailable(session: Pick<Session, "request">, api: st
   }
 }
 
+/**
+ * Login order (#6503): refuse a second device from the stored sign-in and the machine's device service before
+ * `/v1/health`. A logged-out computer is the one that waits on accounts being reachable.
+ */
+export async function beginLogin(
+  session: Pick<Session, "accessSnapshot" | "request">,
+  deviceService: DeviceServiceHandoff | undefined,
+  api: string,
+  newDevice = false,
+): Promise<unknown> {
+  await refuseSecondMachineDevice(session, deviceService, { newDevice })
+  return ensureServiceAvailable(session, api)
+}
+
 type Options = {
   readonly api?: string
   readonly accounts?: string
   readonly device?: boolean
   readonly browser?: boolean
+  /** Register a new device even though the credential store could not be read (#6503: never silently). */
+  readonly newDevice?: boolean
 }
 
 /** What the host adds to the account commands: its device service for an API origin (design D r9 sections 4-5). */
-export type ServiceAuthHooks = {
-  readonly deviceService?: (api: string) => DeviceServiceHandoff
-  /** This machine's device service as a sign-in binds to it (omo-service#1016): one machine, one device. */
-  readonly machineDevice?: () => MachineDeviceService
-}
+export type ServiceAuthHooks = { readonly deviceService?: (api: string) => DeviceServiceHandoff }
 
 export function deviceChoices(devices: readonly ListedDevice[]) {
   return devices.map((device) => ({ value: device.id, label: terminalText(device.name) }))
@@ -111,14 +124,11 @@ async function run(
       console.log(saved ? `Signed in to ${api} as ${terminalText(saved.device.name)}.` : "Not signed in.")
       return
     }
-    await ensureServiceAvailable(session, api)
-    const machineDevice = hooks.machineDevice?.()
-    const machine = async (current: Session) =>
-      prepareMachineSignIn({
-        stored: await current.stored(),
-        local: localMachineHash(process.env),
-        deviceService: machineDevice,
-      })
+    // Local sign-in and the device service first, so an already-signed-in computer is told to log out
+    // even when accounts are unreachable. A logged-out computer then hears a health failure as itself.
+    const health = await beginLogin(session, deviceService, api, options.newDevice === true)
+    const machineDigest = advertisesMachineIdentity(health) ? await readMachineDigest() : undefined
+    const digest = machineDigest === undefined ? {} : { machineDigest }
     const name = deviceName()
     const platform = devicePlatform()
     if (!options.device && options.browser !== false) {
@@ -129,7 +139,7 @@ async function run(
           platform,
           open: openSignInBrowser,
           chooseDevice,
-          machine,
+          ...digest,
         })
         console.log("Signed in to OmO.")
         return
@@ -141,7 +151,7 @@ async function run(
       name,
       platform,
       chooseDevice,
-      machine,
+      ...digest,
       show: (code) => {
         console.log(`Open ${code.verificationUri}`)
         console.log(`User code: ${code.userCode}`)
@@ -227,6 +237,7 @@ export function configureServiceAuthCommands(
     .description("Sign in to OmO using the OS credential store")
     .option("--device", "Use a device code instead of a browser callback")
     .option("--no-browser", "Sign in by device code without opening a browser")
+    .option("--new-device", "Register a new device even if this computer's stored sign-in cannot be read")
     .option("--api <url>", "OmO API origin (or OMO_SERVICE_API_URL)")
     .option("--accounts <url>", "OmO sign-in page origin (or OMO_SERVICE_ACCOUNTS_URL)")
     .action((options: Options) => run("login", options, hooks))

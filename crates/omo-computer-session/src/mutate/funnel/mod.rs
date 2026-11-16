@@ -3,11 +3,17 @@
 
 use std::hash::{BuildHasher, Hasher};
 
-use omo_computer_core::backend::Delivered;
+use omo_computer_core::backend::{Delivered, Refusal};
+use omo_computer_core::error::EngineCode;
+use omo_computer_core::intervention::BackendClock;
 use omo_computer_core::params::ReportMode;
-use omo_computer_core::report::Disposition;
 use omo_computer_core::results::ExecReply;
 use serde_json::json;
+
+mod binding;
+mod delivered;
+mod readmit;
+mod refusal;
 
 use super::record::{target_id, Record};
 use super::recovery::Verdict;
@@ -15,19 +21,18 @@ use super::report::{self, Sent};
 use super::{Mutation, Refused, Stamps, MARKER_UNAVAILABLE, TRANSACTION_FAILED};
 use crate::budget::PermitKind;
 use crate::intervention::{Ended, MidSend, Stop};
-use omo_computer_core::intervention::BackendClock;
 use crate::session_state::sample;
-
-mod refusal;
 use crate::{Session, NOT_OPEN};
 
-/// Row 22's admission outcome and per-call settings, carried into the send stages.
+/// Row 22's admission outcome and per-call settings, and row 21's audit binding, carried into
+/// the send stages.
 struct Held {
     admission: crate::intervention::Admission,
     policy: omo_computer_core::settings::Intervention,
     object: bool,
     hold_limits: crate::intervention::HoldLimits,
     target: Option<String>,
+    binding: Option<(bool, Option<Vec<u8>>)>,
 }
 
 impl Session {
@@ -53,13 +58,11 @@ impl Session {
         let target = target_id(&mutation.call.target);
         let secure = self.funnel.secure.secure(self.backend.as_ref(), target);
         let record = Record::new(&self.funnel, &mutation, &call_id, secure);
-        let epoch = self.guard.supervisor().stop_epoch();
+        self.reconcile_stop();
+        let mut epoch = self.guard.supervisor().stop_epoch();
         let call = (mutation.method, &mutation.call.target, mutation.route);
         let mut plan = self.funnel.control.plan(self.backend.as_mut(), call, epoch);
-        let url = super::url::check(&self.funnel.url_policy, self.backend.as_mut(), &mutation.call.target);
-        plan.stages.consequential = url.refusal;
-        plan.stages.targets = mutation.targets.clone();
-        self.funnel.url_unknown = url.unknown;
+        let url_detail = self.url_stages(&mut plan, &mutation);
         let pausing = object.then_some(ceiling);
         let admission = match self.admit_call(&mutation.call, mutation.route, plan.stages.clone(), pausing) {
             Ok(admission) => admission,
@@ -67,16 +70,41 @@ impl Session {
                 let detail = match blocked.stage.as_str() {
                     "Consent" => plan.consent_detail.clone(),
                     "Lease" => plan.lease_detail.clone(),
-                    "Consequential" => url.detail.clone(),
+                    "Consequential" => url_detail,
                     _ => None,
                 };
                 let mut refused = self.stamp(*blocked.refused, object);
-                refused.detail = detail.map(Box::new);
+                if let Some(detail) = detail {
+                    refused.detail = Some(Box::new(detail));
+                }
                 return Err(self.refuse(record, Some(blocked.stage), refused));
             }
         };
         if let Some(frame) = mutation.frame_refusal {
             return Err(self.refuse(record, Some("Frame".to_owned()), frame.refusal().into()));
+        }
+        let waited_ms = match self.busy_before_send(target) {
+            Ok(waited_ms) => waited_ms,
+            Err(busy) => {
+                let busy = self.stamp(busy, object);
+                return Err(self.refuse(record, Some("Busy".to_owned()), busy));
+            }
+        };
+        // The busy wait let time pass after the gate: a stop, a lock or a lost permission
+        // during it must still refuse, so a wait that took time is admitted again before
+        // anything is taken or sent. A target that was not busy keeps the single gate pass.
+        if waited_ms > 0 {
+            // R70s(1), the fold: a stop during the wait ends the lease through the funnel, the
+            // epoch is read fresh, the plan (consent, lease, reservations) is made again, and the
+            // gate admits the call again on that new plan before anything is taken or sent.
+            match self.readmit(&mutation) {
+                Ok(fresh) => (plan, epoch) = fresh,
+                Err(refused) => {
+                    let (stage, out) = *refused;
+                    let out = self.stamp(out, object);
+                    return Err(self.refuse(record, Some(stage), out));
+                }
+            }
         }
         if let Err((refusal, detail)) = self.funnel.control.commit(self.backend.as_mut(), &plan, epoch) {
             let out = Refused {
@@ -91,6 +119,7 @@ impl Session {
             object,
             hold_limits,
             target: target.map(str::to_owned),
+            binding: plan.audit_binding.clone(),
         };
         let result = self.admitted(mutation, record, (call_id, report_mode, tag), held);
         self.funnel.control.reported(&plan);
@@ -111,8 +140,10 @@ impl Session {
             object,
             hold_limits,
             target,
+            binding,
         } = held;
         let target = target.as_deref();
+        let identity_unavailable = binding::bind_audit(&mut record, binding.as_ref());
         // `&mut Session` serialises a session's calls, so no exec permit free means one leaked:
         // refused with nothing sent, never sent without one.
         let Some(_permit) = self.funnel.permits.try_take(PermitKind::Exec) else {
@@ -148,6 +179,24 @@ impl Session {
                 ));
             }
         };
+        // Time passes between the first gate and here (the busy wait, another holder of the
+        // interaction lock): on every path the gate runs again once the lock is held, and
+        // nothing is SENT before it. (The exec permit and the marker recovery come earlier;
+        // they send nothing.) A refusal drops the lock with nothing sent.
+        // Row 21 on #13391's re-admit (R70bg(2)): the stop is reconciled through the funnel, the
+        // epoch is read fresh and the gate runs on a fresh plan's stages, so a stop or a consent
+        // change while another holder kept the lock refuses here too.
+        if let Err(refused) = self.readmit(&mutation) {
+            let (stage, out) = *refused;
+            drop(lock);
+            let out = self.stamp(out, object);
+            return Err(self.refuse(record, Some(stage), out));
+        }
+        if object && crate::intervention::foreign_input_holds(self.backend.as_ref(), admission.pid) {
+            drop(lock);
+            let out = self.stamp(Refusal::bare(EngineCode::UserIntervened).into(), object);
+            return Err(self.refuse(record, Some("Attribution".to_owned()), out));
+        }
         if let Err(error) = self.funnel.markers.create(&record.marker) {
             self.funnel.warn(format!("marker not written: {error}"));
             return Err(self.refuse(record, Some("Marker".to_owned()), MARKER_UNAVAILABLE.into()));
@@ -155,7 +204,10 @@ impl Session {
         let watch = admission
             .pid
             .and_then(|pid| MidSend::start(self.backend.as_ref(), pid, policy));
-        let outcome = self.send_watched(mutation.events, mutation.route, tag, watch, target);
+        let (outcome, read_back) = match mutation.write.clone() {
+            Some(write) => self.send_write(&write, tag),
+            None => (self.send_watched(mutation.events, mutation.route, tag, watch, target), None),
+        };
         drop(lock);
         let (count, of) = (outcome.count, outcome.of);
         if count > 0 {
@@ -166,7 +218,11 @@ impl Session {
         if let Some((target, frame_id)) = mutation.consume.as_ref().filter(|_| count > 0) {
             self.frames.consume(target, frame_id);
         }
-        let read_back = report::read_back(report::settle());
+        // A null-mode call behaves as today until the cutover: it never waits to settle (R70ci).
+        let settled = (object && outcome.stop.is_none() && count > 0)
+            .then(|| self.settle_after_send(target))
+            .flatten();
+        let settle_read = report::read_back(report::settle(settled.as_ref()));
         let paused = if object { admission.paused } else { Vec::new() };
         let session = object.then(|| sample(self.backend.as_ref()));
         match outcome.stop {
@@ -195,48 +251,34 @@ impl Session {
                         paused,
                         session,
                         target: ended.target,
+                        sent: count,
                     }),
                     warning,
                     ..Refused::from(ended.refusal)
                 })
             }
             None => {
-                record.sent(
-                    count,
-                    of,
-                    Disposition::DELIVERED_UNVERIFIED,
-                    "unverifiable",
-                    None,
-                );
-                let appended = self.funnel.audit().append(record.event.clone());
-                if let Err(error) = &appended {
-                    self.funnel.warn(format!("audit line not written: {error}"));
-                }
                 let sent = Sent {
                     route: mutation.route,
                     count,
                     of,
-                    effect: read_back.effect,
-                    user_moved_on: self.funnel.control.presence.take_ended().is_some(),
+                    // A route that delivered fewer units than were asked reports it (R48c).
+                    effect: if count < of { omo_computer_core::report::Effect::Partial } else { read_back.as_ref().map_or(settle_read.effect, |r| r.effect) },
+                    user_moved_on: false,
                     url_unknown: std::mem::take(&mut self.funnel.url_unknown),
-                    warning: appended.is_err().then(|| "write_failed".to_owned()),
-                    audit_id: appended.ok(),
+                    warning: None,
+                    settle: settled.as_ref().map(crate::settle::Settled::wire),
+                    audit_id: None,
                     paused,
                     session,
                     target: None,
+                    read_back,
                 };
-                let reply =
-                    report::reply(report_mode, mutation.method, sent).unwrap_or_else(|rejection| {
-                        eprintln!("omo-computer-engine: action report rejected: {rejection:?}");
-                        ExecReply(None)
-                    });
-                let receipt = self.funnel.receipt_of(&reply);
-                self.store_receipt(&mut record, receipt);
-                Ok(reply)
+                let reply = (report_mode, mutation.method);
+                Ok(self.reply_delivered(record, reply, sent, identity_unavailable))
             }
         }
     }
-
 }
 
 fn mint_call_id() -> String {

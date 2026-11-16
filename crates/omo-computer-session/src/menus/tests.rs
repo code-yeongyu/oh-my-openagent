@@ -46,6 +46,25 @@ fn menus_imported_scenario_lists_the_fixture_tree() {
     assert!(sink.lines().is_empty(), "a listing sends, raises and focuses nothing: {:?}", sink.lines());
 }
 
+/// Review M1 of #13347: a denied app's menu is never read by `menu.select`. A wrong path and
+/// an existing one answer the same `denied_app`, so the reply cannot reveal which items exist.
+#[test]
+fn menu_select_on_a_denied_app_is_refused_before_its_menu_is_read() {
+    let mut scenario = fixture("menus.json");
+    scenario["consent"] = json!({ "apps": { "deny": ["Code"] } });
+    let sink = RecordingSink::default();
+    let (mut s, _) = session(scenario, json!({}), &sink);
+    for path in [json!(["File", "Sav"]), json!(["File", "Save"])] {
+        let refused = s.menu_select(params(json!({ "target": "101", "path": path }))).expect_err("denied");
+        assert_eq!(
+            (refused.refusal.code.wire(), refused.refusal.reason),
+            ("ControlRequired", Some("denied_app")),
+            "{path}"
+        );
+    }
+    assert!(sent(&sink).is_empty());
+}
+
 #[test]
 fn menu_select_by_exact_label_only() {
     let sink = RecordingSink::default();
@@ -160,6 +179,26 @@ fn url_policy_denied_host_refuses_before_send() {
     assert_eq!(sent(&sink).len(), 3);
 }
 
+/// Review M2 of #13347: the deny list holds for the window a point lands in, not only for a
+/// named window target. A desktop click (no target) at a point inside the denied-host browser
+/// window is refused `url_policy` with nothing sent.
+#[test]
+fn url_policy_holds_for_a_desktop_point_landing_in_a_denied_window() {
+    let (mut s, sink) = bank(json!({ "101": "https://pay.bank.example/x" }), json!(["*.bank.example"]));
+    s.capture(params(json!({ "target": "desktop" }))).expect("capture the desktop");
+    s.control_grant(params(json!({ "reason": "desktop input" })));
+    let refused = s
+        .click(params(json!({ "x": 300, "y": 300 })))
+        .expect_err("the point lands in window 101");
+    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("ControlRequired", Some("url_policy")));
+    assert!(sent(&sink).is_empty(), "{:?}", sent(&sink));
+    let (mut s, sink) = bank(json!({ "101": "https://pay.bank.example/x" }), json!(["*.bank.example"]));
+    s.capture(params(json!({ "target": "desktop" }))).expect("capture the desktop");
+    s.control_grant(params(json!({ "reason": "desktop input" })));
+    assert!(s.click(params(json!({ "x": 10, "y": 10 }))).is_ok(), "a point on no window reads no URL");
+    assert!(!sent(&sink).is_empty());
+}
+
 #[test]
 fn url_policy_unreadable_delivers_stamped_unknown() {
     let (mut s, sink) = bank(json!({ "101": null }), json!(["*.bank.example"]));
@@ -182,6 +221,25 @@ fn apps_scenario(extra_app: Value) -> Value {
     let mut scenario = fixture("v3-apps.json");
     scenario["apps"].as_array_mut().expect("apps").push(extra_app);
     scenario
+}
+
+/// Review L2 of #13347: an app that is not running has no pid, which the gate sees as pid 0.
+/// Opening it is judged by its app key: an ordinary app launches, a protected one is refused,
+/// and pid 0 is never mistaken for the engine's own process.
+#[test]
+fn apps_open_of_a_non_running_app_is_judged_by_its_key_not_pid_0() {
+    let sink = RecordingSink::default();
+    let editor = json!({ "app_key": "com.example.editor", "name": "Editor", "running": false, "source": "launch_services" });
+    let (mut s, _) = session(apps_scenario(editor), json!({}), &sink);
+    s.apps_open(params(json!({ "target": "com.example.editor" }))).expect("a non-running app launches");
+    assert!(sent(&sink).iter().any(|line| line.contains(r#"app_launch "com.example.editor""#)), "{:?}", sent(&sink));
+
+    let sink = RecordingSink::default();
+    let shell = json!({ "app_key": "gnome-shell", "name": "GNOME Shell", "running": false, "source": "launch_services" });
+    let (mut s, _) = session(apps_scenario(shell), json!({}), &sink);
+    let refused = s.apps_open(params(json!({ "target": "gnome-shell" }))).expect_err("protected by key");
+    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("InvalidTarget", Some("protected_surface")));
+    assert!(sent(&sink).is_empty());
 }
 
 #[test]
@@ -207,6 +265,12 @@ fn apps_quit_unprotected_delivered_verified() {
     assert_eq!(report["delivered"], json!({ "count": 1, "of": 1 }));
     assert_eq!(sent(&sink).len(), 1);
     assert!(sent(&sink)[0].ends_with(r#"app_quit "com.example.notes" force=false"#), "{:?}", sent(&sink));
+    assert_eq!(report["effect"], json!("confirmed"), "verified means read back: {report}");
+    assert_eq!(
+        (&report["evidence"][0]["kind"], &report["evidence"][0]["intended"], &report["evidence"][0]["value"]),
+        (&json!("value_readback"), &json!("exited"), &json!("exited")),
+        "R70h: the quit is confirmed only when no window of the app remains"
+    );
 }
 
 #[test]

@@ -10,9 +10,11 @@ use super::{failure, Failure, INVALID_PARAMS};
 
 pub(super) fn host_failure(error: HostCallError) -> Failure {
     match error {
-        HostCallError::Params(error) => {
-            failure(INVALID_PARAMS, "Invalid params", Some(json!({ "detail": error.to_string() })))
-        }
+        HostCallError::Params(error) => failure(
+            INVALID_PARAMS,
+            "Invalid params",
+            Some(json!({ "detail": error.to_string() })),
+        ),
         HostCallError::Refused(refused) => refused_call(&refused),
     }
 }
@@ -26,6 +28,27 @@ pub(super) fn refused(refusal: &Refusal) -> Failure {
         eprintln!("omo-computer-engine: {unknown}");
     }
     failure(refusal.code.number(), refusal.code.wire(), Some(refusal.wire_data()))
+}
+
+/// R60c: a refusal whose row reads its disposition from the inner stage (a gated drag point)
+/// carries that stage pair's disposition and next call, looked up in the same table.
+fn inner_disposition(refusal: &Refusal, detail: Option<&Value>, data: &mut Value) {
+    let inner = refusal.row().is_ok_and(|row| row.disposition == omo_computer_core::error::DispositionRule::OfInnerCode);
+    let Some(stage) = detail.filter(|_| inner).and_then(|d| d.get("stageCode")).and_then(Value::as_str) else {
+        return;
+    };
+    let reason = detail.and_then(|d| d.get("stageReason")).and_then(Value::as_str);
+    let Ok(row) = omo_computer_core::error::inner_row(stage, reason) else {
+        return;
+    };
+    let disposition = match row.disposition {
+        omo_computer_core::error::DispositionRule::Fixed(d) | omo_computer_core::error::DispositionRule::BySent { nothing: d, .. } => d,
+        _ => return,
+    };
+    data["disposition"] = json!(disposition);
+    if let omo_computer_core::error::NextCall::Call(call) = row.next_call {
+        data["nextCall"] = json!(call);
+    }
 }
 
 /// A funnel refusal: the refusal's members plus the `callId` it concerns, for a replay the
@@ -58,7 +81,10 @@ pub(super) fn refused_call(refused: &Refused) -> Failure {
         if let Some(target) = stamps.target {
             data["target"] = json!(target);
         }
-        if let (Some(Value::Object(detail)), Some(data)) = (refused.detail.as_deref(), data.as_object_mut()) {
+        inner_disposition(&refused.refusal, refused.detail.as_deref(), data);
+        if let (Some(Value::Object(detail)), Some(data)) =
+            (refused.detail.as_deref(), data.as_object_mut())
+        {
             for (key, value) in detail {
                 data.entry(key.clone()).or_insert_with(|| value.clone());
             }
@@ -67,15 +93,28 @@ pub(super) fn refused_call(refused: &Refused) -> Failure {
             data["warning"] = json!(warning);
         }
     }
+    busy_data(refused, &mut failure);
     failure
+}
+
+/// `InputBusy{target_busy}`: the busy wait's `indicator`, `waitedMs` and `retryAfterMs`.
+fn busy_data(refused: &Refused, failure: &mut Failure) {
+    if let (Some(busy), Some(data)) = (&refused.busy, failure.data.as_mut()) {
+        data["indicator"] = json!(busy.indicator);
+        data["waitedMs"] = json!(busy.waited_ms);
+        data["retryAfterMs"] = json!(busy.retry_after_ms);
+    }
 }
 
 /// A ref that did not resolve: the refusal, and on `AmbiguousTarget` the `candidates`.
 pub(super) fn unresolved(unresolved: &Unresolved) -> Failure {
     let mut failure = refused(&unresolved.refusal);
-    if let Some(data) = failure.data.as_mut().filter(|_| !unresolved.candidates.is_empty()) {
+    if let Some(data) = failure
+        .data
+        .as_mut()
+        .filter(|_| !unresolved.candidates.is_empty())
+    {
         data["candidates"] = json!(unresolved.candidates);
     }
     failure
 }
-

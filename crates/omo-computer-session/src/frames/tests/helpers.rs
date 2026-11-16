@@ -166,6 +166,19 @@ impl Shared {
 }
 
 impl Backend for Shared {
+    // Row 21 (R70bc): forward the consent view, platform and stop chord to the wrapped fake.
+    fn host_consent(&self) -> Option<serde_json::Value> {
+        self.fake().host_consent()
+    }
+
+    fn platform(&self) -> Option<omo_computer_core::report::Platform> {
+        self.fake().platform()
+    }
+
+    fn set_stop_chord(&mut self, chord: Option<&str>) -> omo_computer_core::backend::BackendResult<()> {
+        self.fake().set_stop_chord(chord)
+    }
+
     fn capabilities(&self) -> Capabilities {
         self.fake().capabilities()
     }

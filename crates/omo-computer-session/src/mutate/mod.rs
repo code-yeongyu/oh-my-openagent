@@ -21,6 +21,7 @@ mod tests;
 
 pub use binding::{Binding, SecureInputProbe, SecureProbe};
 pub use call::Mutation;
+pub(crate) use report::{refused_reply, released_reply};
 pub use memory_markers::MemoryMarkers;
 pub(crate) use route::{key_event, route_for};
 
@@ -61,7 +62,8 @@ pub const TRANSACTION_FAILED: Refusal = Refusal::bare(EngineCode::TransactionFai
 pub const LOCAL_HAND: &str = "local";
 
 /// A refusal and what the funnel adds to it on the wire: the `callId` it concerns, the
-/// stored receipt of a replay, and the disposition of an interrupted earlier send.
+/// stored receipt of a replay, the disposition of an interrupted earlier send, and the busy
+/// wait of an `InputBusy{target_busy}` refusal.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Refused {
     pub refusal: Refusal,
@@ -73,6 +75,8 @@ pub struct Refused {
     pub detail: Option<Box<Value>>,
     /// What row 22 stamps on a refusal, boxed so the error type stays small.
     pub stamps: Box<Stamps>,
+    /// Boxed so the error type stays small (R70cg).
+    pub busy: Option<Box<crate::settle::BusyDetail>>,
     /// `write_failed` when the refusal's own audit line could not be written.
     pub warning: Option<String>,
 }
@@ -88,6 +92,9 @@ pub struct Stamps {
     pub session: Option<SessionState>,
     /// The target that exited or stopped answering.
     pub target: Option<TargetLiveness>,
+    /// In either report mode, the units an interrupted send got out before it stopped; 0 for
+    /// a refusal before any send. Never on the wire: the hold ledger reads it.
+    pub sent: u32,
 }
 
 impl From<Refusal> for Refused {
@@ -99,6 +106,7 @@ impl From<Refusal> for Refused {
             interrupted: None,
             stamps: Box::default(),
             detail: None,
+            busy: None,
             warning: None,
         }
     }
@@ -192,7 +200,7 @@ impl Funnel {
     }
 
     /// The audit sink, opened at first use; a file that cannot be opened refuses every exec.
-    fn audit(&mut self) -> &mut dyn AuditSink {
+    pub(crate) fn audit(&mut self) -> &mut dyn AuditSink {
         let sink = match self.audit.take() {
             Some(sink) => sink,
             None => self.open_audit(),
