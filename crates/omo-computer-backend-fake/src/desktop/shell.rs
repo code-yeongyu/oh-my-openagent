@@ -58,19 +58,6 @@ impl FakeBackend {
         Ok(out)
     }
 
-    /// A second handle on the same scripted state, for a test that changes the scenario under a
-    /// session that owns the first.
-    #[must_use]
-    pub fn handle(&self) -> Self {
-        Self {
-            shared: self.shared.clone(),
-            sink: self.sink.clone(),
-            clock: self.clock.clone(),
-            persona: self.persona,
-            stop_path: self.stop_path,
-        }
-    }
-
     /// Replaces a window's menu tree, as an app that relabels its menu between two reads does.
     pub fn set_menus(&self, window: &str, menus: Vec<FakeMenuNode>) {
         self.lock().scenario.menus.insert(window.to_owned(), menus);
