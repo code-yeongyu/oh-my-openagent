@@ -1,6 +1,7 @@
 import type { AliasError, AliasRegistry, AliasResult } from "../thread/remote/ports"
-import type { ClientCore, Outcome, RemoteClient } from "./client"
+import type { RemoteClient } from "./client"
 import { nextActionFor, type RemoteCode, remoteFailure } from "./codes"
+import type { ClientCore, Outcome } from "./core"
 import { DEADLINES, withinDeadline } from "./deadlines"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
 import type { Opts, RemoteFailure, SessionRow, ThreadHandle } from "./types"

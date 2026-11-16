@@ -1,7 +1,8 @@
 import { outcomeOf } from "../thread/remote/outcome"
 import { eventStream, openAttachment } from "./attach"
-import { type ClientCore, ok, type RemoteClient } from "./client"
+import type { RemoteClient } from "./client"
 import { nextActionFor, remoteFailure } from "./codes"
+import { type ClientCore, ok } from "./core"
 import { DEADLINES } from "./deadlines"
 import { canonicalizeThreadHandle } from "./seams"
 import type {

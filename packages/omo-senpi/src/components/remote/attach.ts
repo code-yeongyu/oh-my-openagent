@@ -1,7 +1,8 @@
 import type { RemoteAttach } from "@oh-my-opencode/device-service-core/device-service"
 import { outcomeOf } from "../thread/remote/outcome"
-import { type ClientCore, ok, type Outcome, type RemoteClient } from "./client"
+import type { RemoteClient } from "./client"
 import { engineCode, nextActionFor, remoteFailure } from "./codes"
+import { type ClientCore, ok, type Outcome } from "./core"
 import { DEADLINES, withinDeadline } from "./deadlines"
 import { canonicalizeThreadHandle } from "./seams"
 import type {

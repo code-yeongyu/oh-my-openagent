@@ -1,4 +1,5 @@
-import { type ClientCore, notYet, type RemoteClient } from "./client"
+import type { RemoteClient } from "./client"
+import { type ClientCore, notYet } from "./core"
 
 /**
  * `sessions.resolve` (unit U5 of #13414): one address (durable id, alias, name, `<device>/<session>`) to its row on the
