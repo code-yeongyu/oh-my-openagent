@@ -4,6 +4,7 @@
 // never armed or a sampler that stalled is a fault that makes the run invalid; it is never read as "none".
 
 import { type SentinelEvent, SIGNALS, type Signal } from "./events.ts"
+import { samplerGapFault } from "./sampler-gap.ts"
 
 export { parseEvents, type SentinelEvent, SIGNALS, type Signal } from "./events.ts"
 
@@ -20,8 +21,6 @@ export type SentinelSummary = {
 
 export type Verdict = "clean" | "disturbed" | "invalid"
 
-// 20 Hz is a 50 ms period; five missed periods in a row means the sampler stalled.
-const MAX_TICK_GAP_MS = 250
 // CGWindowLevel range of modal panels up to (not including) the main menu: alerts and system dialogs live here.
 const MODAL_PANEL_LAYER = 8
 const MAIN_MENU_LAYER = 24
@@ -104,7 +103,6 @@ export function summarize(events: readonly SentinelEvent[], options: { readonly 
   let sent = ""
   let lastTypedAt = Number.NEGATIVE_INFINITY
   let finalRead = false
-  const ticks: number[] = []
 
   for (const event of ordered) {
     switch (event.kind) {
@@ -118,8 +116,6 @@ export function summarize(events: readonly SentinelEvent[], options: { readonly 
         if (event.t <= until) faults.push(`${event.signal}: ${event.detail}`)
         break
       case "tick":
-        if (event.t >= from && event.t <= until) ticks.push(event.t)
-        break
       case "start":
         break
       case "stop":
@@ -177,9 +173,8 @@ export function summarize(events: readonly SentinelEvent[], options: { readonly 
   for (const signal of SAMPLED) if (!baseline.has(signal)) faults.push(`${signal}: no baseline read before start`)
   if (!finalRead) faults.push("typing: no final field read after the last keystroke")
   if (start !== undefined && stop !== undefined) {
-    const stamps = [start, ...ticks, stop]
-    const gap = Math.max(...stamps.slice(1).map((t, index) => t - (stamps[index] ?? t)))
-    if (gap > MAX_TICK_GAP_MS) faults.push(`sampler: no tick for ${gap} ms (20 Hz expected)`)
+    const gap = samplerGapFault(ordered, start, stop)
+    if (gap !== undefined) faults.push(gap)
   }
 
   if (options.drop !== undefined) {
