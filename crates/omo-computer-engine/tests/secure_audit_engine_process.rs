@@ -72,9 +72,15 @@ struct Left {
     /// `<root>/fake-sink-<engine pid>.log`: the one file the engine's fake backend records
     /// its delivered input to (engine `route.rs`, `SINK_FILE_PREFIX` + the process id).
     sink_path: PathBuf,
+    /// Every line the engine wrote to its stdout: replies AND notifications (the v1 `audit`).
+    wire: Vec<String>,
 }
 
 impl Left {
+    fn on_wire(&self, needle: &str) -> usize {
+        self.wire.iter().filter(|line| line.contains(needle)).count()
+    }
+
     /// An engine-state file that MUST exist and be non-empty: a missing one fails the test,
     /// never reads as clean.
     fn state(&self, relative: &str) -> String {
@@ -210,23 +216,32 @@ fn run_engine(case: &Value, scenario: &Path) -> Left {
         }
     });
     let mut typed = Value::Null;
+    let mut wire = Vec::new();
     for step in case["steps"].as_array().expect("steps") {
         writeln!(stdin, "{}", step["send"]).expect("a request line");
         stdin.flush().expect("flushed");
-        let line = replies
-            .recv_timeout(REPLY_TIMEOUT)
-            .expect("a reply within the bound");
+        let reply: Value = loop {
+            let line = replies
+                .recv_timeout(REPLY_TIMEOUT)
+                .expect("a reply within the bound");
+            let message: Value = serde_json::from_str(&line).expect("every line is JSON");
+            wire.push(line);
+            if message.get("id") == step["send"].get("id") {
+                break message;
+            }
+        };
         if step["send"]["method"] == "typeText" {
-            typed = serde_json::from_str(&line).expect("a reply is JSON");
+            typed = reply;
         }
     }
     drop(stdin);
     let status = child.wait().expect("the engine exits");
     reader.join().expect("the reader ends");
+    wire.extend(replies.try_iter());
     assert!(status.success(), "engine exit: {status}");
     let delivered = typed["result"].is_null() && typed.get("error").is_none();
     assert!(delivered, "delivered: {typed}");
-    Left { root, sink_path }
+    Left { root, sink_path, wire }
 }
 
 /// The case's type into a secure context on `scenario`, on every fake persona: length
@@ -251,6 +266,8 @@ fn assert_length_only(case: &Value, scenario: &str) {
         // [digest, secret] x [audit, marker, rest]: all zero.
         let counts = [left.on_disk(&needle), left.on_disk(&secret)];
         assert_eq!(counts, [[0; 3]; 2], "{persona}: {needle}");
+        // Review M1 of #13373: the v1 `audit` notification on stdout is redacted the same way.
+        assert_eq!([left.on_wire(&needle), left.on_wire(&secret)], [0, 0], "{persona}: wire {:?}", left.wire);
         assert!(left.sink().contains(&secret), "{persona}: no delivery");
     }
 }
@@ -282,6 +299,7 @@ fn engine_process_plain_type_keeps_the_digest_the_grep_looks_for() {
         [true, true, false]
     );
     left.assert_no_trace();
+    assert!(left.on_wire(&digest) > 0, "the wire carries the digest of a plain type: {:?}", left.wire);
     assert_eq!(
         left.on_disk(&secret),
         [0; 3],
