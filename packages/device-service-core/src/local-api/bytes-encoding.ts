@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@eda08c786872ad5b766b5adba76f9698d4f1cad6 packages/daemon/src/bytes-encoding.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/daemon/src/bytes-encoding.ts
 // The one byte-encoding helper for code that runs in a browser as well as under Bun (omo-relay-spec decision 0021
 // section 3.4: the Buffer call sites on the browser path move here, bytes unchanged). It uses the standard
 // Uint8Array encoding methods where the runtime has them and a plain implementation where it does not (they are recent

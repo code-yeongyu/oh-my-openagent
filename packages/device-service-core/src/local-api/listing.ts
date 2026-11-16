@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@eda08c786872ad5b766b5adba76f9698d4f1cad6 packages/local-api/src/listing.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/local-api/src/listing.ts
 import { lineBytes } from "./limits.ts";
 import { LocalApiError } from "./errors.ts";
 import type { ListingBegin, ListingEnd, ListingRow, ListingRows } from "./protocol.ts";

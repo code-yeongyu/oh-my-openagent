@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@eda08c786872ad5b766b5adba76f9698d4f1cad6 packages/local-api/src/proof.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/local-api/src/proof.ts
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { fromBase64url, toBase64url } from "./bytes-encoding.ts";
 import { LocalApiError } from "./errors.ts";
