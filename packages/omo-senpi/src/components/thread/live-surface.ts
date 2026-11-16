@@ -30,10 +30,6 @@ import { acceptedControls, LEGACY_TUI_COMMANDS, tuiCommandsFrom } from "./endpoi
 import { answerUiRequest } from "./ui-answer"
 import { fencedCommand } from "./attachment-fence"
 import { closeLadder, SESSION_GONE } from "./control/close-ladder"
-import { createServiceAliasRegistry, type ServiceAccess } from "./remote/alias-registry"
-import { createDeviceServiceSessions } from "./remote/device-service"
-import { createLazyRemoteSurface } from "./remote/lazy-remote"
-import type { RemoteThreadSurface } from "./remote/ports"
 
 export type RpcFrame = {
   readonly success?: boolean
@@ -552,8 +548,7 @@ export function createLiveThreadSurface(
       (await send<{ messages: ThreadTranscriptEntry[] }>("get_messages", { sessionId })).messages,
     getState: (sessionId) => send("get_state", { sessionId }),
     prompt: (sessionId, message, options, durableId) => send("prompt", { sessionId, message, ...options }, durableId),
-    interrupt: (sessionId, turnId, durableId) =>
-      send("interrupt", { sessionId, ...(turnId === undefined ? {} : { turnId }) }, durableId),
+    interrupt: (sessionId, request, durableId) => send("interrupt", { sessionId, ...request }, durableId),
     setSessionName: async (sessionId, name, durableId) => {
       await send("set_session_name", { sessionId, name }, durableId)
     },
@@ -762,24 +757,8 @@ export function createLiveThreadSurface(
   }
 }
 
-export { createDeviceServiceSessions } from "./remote/device-service"
 export { createServiceAliasRegistry } from "./remote/alias-registry"
-
-/**
- * The remote surface the `omo thread` CLI hands its SDK (#12833), from this sidecar's own device-service and alias clients;
- * `loadAccess` is the CLI sign-in (the device-account sidecar's `cliServiceAccess`), loaded only when an alias is used.
- * The caller closes it with `sessions.close` before it exits.
- */
-export function createCliRemoteSurface(options: {
-  readonly version: string
-  readonly loadAccess: () => Promise<ServiceAccess>
-}): RemoteThreadSurface {
-  return createLazyRemoteSurface({
-    version: options.version,
-    loadRuntime: async () => ({ createDeviceServiceSessions }),
-    loadAliasRegistry: async () => createServiceAliasRegistry(await options.loadAccess()),
-  })
-}
+export { createCliRemoteSurface, remoteSessionsPort } from "../remote/port/thread-runtime"
 export { claimCreatedAlias, listAcross, planCreate, renameAlias, withAlias } from "./remote/cross-device"
 export { deviceOnline } from "./remote/remote-ops"
 export { createRemoteMonitorSource } from "./remote/monitor-source"
