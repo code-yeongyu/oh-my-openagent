@@ -80,3 +80,28 @@ fn scroll_steps_bounded_and_counted() {
     let click = capped.session.host_call(Method::Move, json!({"target": "101", "x": 5, "y": 5})).expect("served").expect("move");
     assert_eq!(click["delivered"], json!({"count": 1, "of": 1}), "a single-unit event still counts 1 of 1");
 }
+
+/// #13906: a Wayland hand with no pointer position yet (its last libei position, before the first
+/// motion) answers the typed `Internal{wayland_no_pointer_read}`, whose next call moves the
+/// pointer first; a hand on another platform that cannot read the pointer keeps the bare
+/// `Internal`.
+#[test]
+fn pointer_with_no_position_yet_is_typed_on_wayland() {
+    use omo_computer_backend_fake::{FakeBackend, FakeScenario, Persona};
+    use omo_computer_core::error::{EngineCode, Reason};
+    let session = |persona| {
+        let scenario = FakeScenario::from_json("{}").expect("scenario with no cursor");
+        crate::Session::new(Box::new(FakeBackend::new(scenario).with_persona(persona)))
+    };
+    let refusal = session(Persona::Wayland)
+        .pointer()
+        .expect_err("no position before the first motion");
+    assert_eq!(
+        (refusal.code, refusal.reason),
+        (EngineCode::Internal, Some(Reason::WaylandNoPointerRead))
+    );
+    let refusal = session(Persona::X11)
+        .pointer()
+        .expect_err("this fake hand cannot read the pointer");
+    assert_eq!((refusal.code, refusal.reason), (EngineCode::Internal, None));
+}

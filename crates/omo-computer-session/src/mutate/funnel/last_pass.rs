@@ -37,18 +37,23 @@ impl Session {
             let lock = self.interaction_lock().map_err(|error| {
                 self.funnel
                     .warn(format!("interaction lock not taken: {error}"));
-                Box::new(("Lock".to_owned(), Refused::from(TRANSACTION_FAILED)))
+                let out = Refused::from(TRANSACTION_FAILED).with_paused(admission.paused.clone());
+                Box::new(("Lock".to_owned(), out))
             })?;
             // Row 21 on #13391's re-admit (R70bg(2)): the stop is reconciled through the funnel,
             // the epoch is read fresh and the gate runs on a fresh plan's stages.
+            // Every refusal here carries what the call already waited for (review L3 at
+            // 749dc9d54c): a refusal after a takeover wait reports that wait.
             if let Err(refused) = self.readmit(mutation) {
                 let (stage, out) = *refused;
+                let out = out.with_paused(admission.paused.clone());
                 return Err(Box::new((stage, self.stamp(out, object))));
             }
             // R70s(5): a foreign input inside the attribution window just before the send holds it.
             if object && foreign_input_holds(self.backend.as_ref(), admission.pid) {
-                let out = self.stamp(Refusal::bare(EngineCode::UserIntervened).into(), object);
-                return Err(Box::new(("Attribution".to_owned(), out)));
+                let out = Refused::from(Refusal::bare(EngineCode::UserIntervened))
+                    .with_paused(admission.paused.clone());
+                return Err(Box::new(("Attribution".to_owned(), self.stamp(out, object))));
             }
             let Some(ceiling_ms) = pausing.filter(|_| may_pause) else {
                 return Ok(lock);
@@ -58,9 +63,12 @@ impl Session {
             }
             drop(lock);
             match self.recheck_takeover(admission, ceiling_ms) {
-                // A wait that took no time (a latched stop, a lock with no clock) runs the pass
-                // once more without pausing, so the gate answers it.
-                Ok(waited) => may_pause = waited,
+                // A wait that took no time keeps the takeover check on the next pass (review L4
+                // at 749dc9d54c: the hold that flickered off may be back once the lock is taken
+                // again). A latched stop ends there: the next pass's gate answers `Suspended`.
+                // Only a backend with no clock, which cannot wait at all, runs the next pass
+                // without pausing, so the gate answers its hold (as `admit_call` does).
+                Ok(waited) => may_pause = waited || self.backend.clock().is_some(),
                 Err(out) => return Err(Box::new(("Pause".to_owned(), self.stamp(out, object)))),
             }
         }
