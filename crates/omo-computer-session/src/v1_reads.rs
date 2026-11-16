@@ -3,7 +3,7 @@
 //! the backend's one listing, shaped by the open session's report mode.
 
 use omo_computer_core::backend::{Refusal, Route, WindowFilter};
-use omo_computer_core::error::EngineCode;
+use omo_computer_core::error::{EngineCode, Reason};
 use omo_computer_core::listing::WindowInfo;
 use omo_computer_core::methods::Method;
 use omo_computer_core::params::{RaiseWindowParams, ReportMode, WindowsParams};
@@ -48,7 +48,7 @@ impl Session {
             chord: None,
             force: false,
         };
-        let needs_lease = Refusal::new(EngineCode::ControlRequired, "lease_missing");
+        let needs_lease = Refusal::new(EngineCode::ControlRequired, Reason::LeaseMissing);
         let mutation = Mutation::exec(Method::RaiseWindow, call, Vec::new(), Route::ForegroundHid, &CallAuthority::default())
             .refused_after_gates(needs_lease);
         self.traced(dispatched, &window_id, mutation)
