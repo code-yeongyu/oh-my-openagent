@@ -1,31 +1,51 @@
+import type { AccountShowResult as DeviceAccountShowResult } from "../../../../device-service-core/src/account-state"
 import type {
-  AccountShowResult as DeviceAccountShowResult,
-  CommandResult as DeviceCommandResult,
+  CommandLocated,
   CommandRpc,
+  CommandStateEvent,
   ControlAttachState,
+  ControlSessionWakeState,
+  JsonValue,
   JsonObject as WireJsonObject,
-  ReadPage as WireReadPage,
   SnapshotBody as WireSnapshotBody,
   Status,
-} from "@oh-my-opencode/device-service-core"
+} from "../../../../device-service-core/src/wire"
 import type { PermissionPreset } from "../thread/contracts/permission-presets"
-import type { ExternalAuthor } from "../thread/gateway/types"
+import type { AliasRegistry } from "../thread/remote/alias-port"
 import type { RemoteCode } from "./codes"
 
 // The types of the one remote module (design one-remote-module v8-core r2, section B1 and Appendix B, as confirmed).
+// They reach only leaf files (types-closure.test.ts): the local API's protocol vocabulary, never the device service SDK
+// or the thread gateway, so the published declarations carry no private module graph. A type the layer below declares
+// in a module that imports more is restated here with the same shape; the client assigns the layer's values to it, so
+// the typecheck catches a drift.
 
 // Appendix B names seven types without their source (verdict D-04). Each comes from the layer below, unchanged:
 
-/** The human a connector authenticated: the thread gateway's `ExternalAuthor` (thread/gateway/types.ts). */
-export type Author = ExternalAuthor
+/** The human a connector authenticated: the thread gateway's `ExternalAuthor` (thread/gateway/types.ts), same shape. */
+export type Author = {
+  readonly platform_user_id: string
+  readonly display: string
+  readonly user_id?: string
+}
 /** An attach's first state: the local API's `session.snapshot` body (device-service-core, local-api/protocol-events.ts). */
 export type SnapshotBody = WireSnapshotBody
 /** One engine RPC record, opaque here and classed by the receiving engine: the local API's `CommandRpc` (local-api/protocol.ts). */
 export type EngineRecord = CommandRpc
-/** How an engine record ended, with the engine's reply: the device service's `CommandResult` (device-service-core, remote-attach.ts). */
-export type CommandResult = DeviceCommandResult
-/** One page of a session's history: the local API client's `ReadPage` (local-api/client-assembly.ts). */
-export type ReadPage = WireReadPage
+/** How an engine record ended, with the engine's reply: the device service's `CommandResult` (device-service-core, remote-attach.ts), same shape. */
+export type CommandResult = {
+  readonly outcome: CommandStateEvent
+  readonly response?: JsonObject
+  readonly located?: CommandLocated
+}
+/** One page of a session's history: the local API client's `ReadPage` (local-api/client-assembly.ts), same shape. */
+export type ReadPage = {
+  readonly entries: readonly (
+    | { readonly entry_id: string; readonly entry: JsonValue }
+    | { readonly entry_id: string; readonly too_large: true; readonly bytes: number }
+  )[]
+  readonly next_before: string | null
+}
 /** A JSON object as the local API carries it: its `JsonObject` (local-api/protocol.ts). */
 export type JsonObject = WireJsonObject
 /** `omo account show`'s exit code and stdout: the device service bootstrap's `AccountShowResult` (device-service-core, account-state.ts). */
@@ -286,3 +306,118 @@ export type RemoteSender =
   | { readonly kind: "person"; readonly uid: string }
   | { readonly kind: "cli"; readonly uid: string }
   | { readonly kind: "service" }
+
+/** The clock seam (device-service-core timers.ts `Timers`, same shape): `after` arms `fn` once and returns its cancel. */
+type Timers = {
+  readonly after: (ms: number, fn: () => void) => () => void
+  readonly now: () => number
+}
+/** What the public types need of a proven device-service connection (device-service-core `DeviceService`). */
+type DeviceServiceConnection = {
+  readonly serviceVersion: string
+  readonly closed: Promise<void>
+  readonly close: () => void
+}
+/** What the public types need of a live attach (device-service-core `RemoteAttach`): its device, session and local handle. */
+type RemoteAttachRef = { readonly device: string; readonly sessionId: string; readonly handle: string }
+
+/**
+ * What a remote client is built from. `Connection` and `Attach` are the device service SDK's connection and attach; the
+ * client (client.ts) fixes them to `DeviceService` and `RemoteAttach`, so these types never import the SDK.
+ */
+export type RemoteClientDeps<
+  Connection extends DeviceServiceConnection = DeviceServiceConnection,
+  Attach extends RemoteAttachRef = RemoteAttachRef,
+> = {
+  readonly version: string
+  readonly stateDir?: string
+  /** The clock seam: every deadline of the client and of its connection runs on it (real timers by default). */
+  readonly timers?: Timers
+  /** Runs the device service bootstrap for `service.bootstrap`; the internal bootstrap entry provides it (part 4c-3). */
+  readonly bootstrap?: (setup: BootstrapSetup) => Promise<BootstrapResult>
+  /**
+   * The account's alias registry for `aliases.*`. The caller builds it (it needs the account service access, which the
+   * client must not import); absent, the alias members answer `unsupported{feature:"aliases"}`.
+   */
+  readonly aliasRegistry?: () => Promise<AliasRegistry>
+  /**
+   * Where the gateway store's worker sidecar is (`gateway-store-worker.mjs` beside the plugin's extension bundle). The
+   * compiled binary passes its provisioned runtime's copy; from source the store resolves its own worker.
+   */
+  readonly gatewayWorkerUrl?: URL
+  /**
+   * Serves an attach as a local engine endpoint (`AttachHandle.serveEndpoint`): the caller hands in omo-native's
+   * `serveRemoteAttach`, so the client never imports a net server into `omo remote`'s local-only graph (#13440). Absent,
+   * `serveEndpoint` answers `unsupported{feature:"serve_endpoint"}`.
+   */
+  readonly serveAttach?: (
+    attach: Attach,
+    label: string,
+  ) => Promise<{ readonly socketPath: string; readonly sessionRef: string; readonly close: () => Promise<void> }>
+  /**
+   * The approval mode of the session this client acts for (a session or connector sender): an open may keep or narrow
+   * it, never widen it. Absent, only the narrowest mode passes.
+   */
+  readonly permissionPreset?: () => string | undefined
+  /** Test seam: opens the proven device-service connection (`connectDeviceService` by default). */
+  readonly connect?: (options: {
+    readonly version: string
+    readonly stateDir: string
+    readonly timers: Timers
+  }) => Promise<Connection>
+}
+
+/**
+ * The one remote client (design v8-core r2, B1, with the #13414 W3 rows' shapes). Members of 4a-1 live in client.ts; each
+ * later member lives in its own module (sessions.ts, follow.ts, attach.ts, aliases.ts, resolve.ts) and is built from the
+ * same `ClientCore`, so every member shares the one connection, the sender and the deadlines.
+ */
+export type RemoteClient = {
+  readonly service: {
+    readonly info: (opts?: Opts) => R<ServiceInfo>
+    readonly status: (opts?: Opts) => R<ServiceStatus>
+    readonly setEnabled: (on: boolean, opts?: Opts) => R<{ readonly enabled: boolean }>
+    readonly control: (opts?: Opts) => R<ControlState>
+    readonly setControl: (on: boolean, opts?: Opts) => R<ControlState>
+    readonly bootstrap: (setup: BootstrapSetup, opts?: Opts) => R<BootstrapResult>
+    /** The device's session-wake switch (omo#13037 A7.2.5); `unsupported{feature:"wake"}` below the service that carries it. */
+    readonly wake: (opts?: Opts) => R<ControlSessionWakeState>
+    /** Sets the switch; `null` removes the stored value (the default applies). Person only. */
+    readonly setWake: (on: boolean | null, opts?: Opts) => R<ControlSessionWakeState>
+  }
+  readonly devices: {
+    readonly list: (opts?: Opts) => R<readonly DeviceRow[]>
+    readonly resolve: (idOrName: string, opts?: Opts) => R<DeviceRow>
+  }
+  readonly sessions: {
+    readonly list: (filter?: SessionsListFilter, opts?: Opts) => R<SessionsList>
+    /** One address (durable id, alias, name, `<device>/<session>`) to its row, on the cached listing (no relist per op). */
+    readonly resolve: (address: string, scope?: Scope, opts?: Opts) => R<SessionRow>
+    readonly get: (thread: ThreadHandle, opts?: Opts) => R<SessionDetail>
+    readonly open: (request: OpenRequest, opts?: Opts) => R<OpenResult>
+    readonly send: (thread: ThreadHandle, request: SendRequest, opts?: Opts) => R<SendReceipt>
+    readonly read: (
+      thread: ThreadHandle,
+      page?: { readonly before?: string; readonly tail?: number },
+      opts?: Opts,
+    ) => R<ReadPage>
+    /** Status changes, turn ends and the turn's stream, from now on; survives relay, service and engine restarts. */
+    readonly follow: (thread: ThreadHandle, opts?: Opts) => RemoteStream<FollowEvent>
+    readonly wait: (thread: ThreadHandle, opts?: Opts) => R<WaitResult>
+    readonly interrupt: (thread: ThreadHandle, opts?: Opts) => R<InterruptResult>
+    /** The session's own model ("provider/id"); never a device default. */
+    readonly setModel: (thread: ThreadHandle, model: string, opts?: Opts) => R<{ readonly model: string }>
+    /** The session's own thinking level; never a device default. */
+    readonly setReasoning: (thread: ThreadHandle, level: string, opts?: Opts) => R<{ readonly reasoning: string }>
+    readonly close: (thread: ThreadHandle, opts?: Opts) => R<{ readonly closed: boolean }>
+    readonly archive: (thread: ThreadHandle, archived: boolean, opts?: Opts) => R<{ readonly archived: boolean }>
+  }
+  /** One session's live attach: its snapshot, records, pending UI requests and their answers. */
+  readonly attach: (thread: ThreadHandle, opts?: Opts) => R<AttachHandle>
+  readonly aliases: {
+    readonly resolve: (alias: string, opts?: Opts) => R<ThreadHandle>
+    readonly set: (thread: ThreadHandle, alias: string, opts?: Opts) => R<{ readonly alias: string }>
+    readonly clear: (thread: ThreadHandle, opts?: Opts) => R<{ readonly released: boolean }>
+  }
+  readonly close: () => void
+}
