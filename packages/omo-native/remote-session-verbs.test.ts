@@ -112,7 +112,7 @@ describe("omo remote open connection", () => {
     expect({ code, errors, calls, dialed: dialed.length, sharedClosed: shared.wasClosed() }).toEqual({
       code: REMOTE_EXIT.ok,
       errors: [],
-      calls: ["shared:status", "shared:devices", "dialed:endpoint", "dialed:close", "shared:attach"],
+      calls: ["shared:status", "shared:devices", "dialed:endpoint", "dialed:close"],
       dialed: 1,
       sharedClosed: false,
     })
