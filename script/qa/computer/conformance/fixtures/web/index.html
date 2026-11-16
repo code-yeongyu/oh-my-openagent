@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'unsafe-inline'" />
+    <title>Conformance Document</title>
+    <style>
+      body { font: 13px system-ui, sans-serif; margin: 8px; display: flex; flex-direction: column; gap: 6px; }
+      label { display: flex; gap: 6px; align-items: center; }
+      label > span { width: 80px; }
+      input[type="text"], textarea { flex: 1; }
+      #scroll { height: 40px; border: 1px solid #888; overflow: hidden; }
+      #order { list-style: none; margin: 0; padding: 0; border: 1px solid #888; user-select: none; }
+      #order li { padding: 4px; }
+      #rows { height: 160px; }
+    </style>
+  </head>
+  <body>
+    <button id="press" type="button">Press</button>
+    <label><span>Value</span><input type="text" data-field aria-label="Value" /></label>
+    <label><span>Title</span><input type="text" data-field aria-label="Title" /></label>
+    <label><span>Name</span><input type="text" data-field aria-label="Name" /></label>
+    <label><span>Email</span><input type="text" data-field aria-label="Email" /></label>
+    <label><span>City</span><input type="text" data-field aria-label="City" /></label>
+    <label><input id="archived" type="checkbox" aria-label="Archived" />Archived</label>
+    <label><span>Note</span><textarea data-field aria-label="Note" rows="3"></textarea></label>
+    <label><span>New item</span><input type="text" data-field aria-label="New item" /><button id="add" type="button">Add</button></label>
+    <div id="scroll" role="region" aria-label="Scroll target">Scroll target</div>
+    <ul id="order" role="list" aria-label="Order"></ul>
+    <select id="rows" size="8" aria-label="Rows"></select>
+    <button id="mark-done" type="button">Mark done</button>
+    <dialog id="rename" aria-label="Rename">
+      <label><span>New name</span><input id="new-name" type="text" aria-label="New name" /></label>
+      <button id="rename-button" type="button">Rename</button>
+    </dialog>
+    <script src="page.js"></script>
+  </body>
+</html>
