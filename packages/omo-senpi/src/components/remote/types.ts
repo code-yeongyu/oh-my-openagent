@@ -76,7 +76,8 @@ export type ThreadHandle = string & { readonly __brand: "ThreadHandle" }
 export type DeviceRow = {
   readonly id: string
   readonly name: string
-  readonly kind: string
+  /** Absent on this device's own row when the roster does not list it: the service reports no kind for it (#13402). */
+  readonly kind?: string
   readonly platform: string
   readonly online: boolean
   readonly last_seen_ms: number | null
