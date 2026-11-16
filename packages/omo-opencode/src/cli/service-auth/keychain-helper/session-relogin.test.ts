@@ -174,4 +174,17 @@ describe("#11589 review folds", () => {
     await expect(failure).rejects.toBeInstanceOf(KeychainItemNotOwnedError)
     expect(keychain.items.get(A)?.owner).toBe("other-app")
   })
+
+  test("#given a readable desktop-owned item that refuses deletion (-25244) #when signing out #then the ownership failure leaves the sign-in intact (#13757)", async () => {
+    const keychain = fakeKeychain({ helperReadableOwners: ["runtime"] })
+    keychain.put(A, stored, "runtime", "ours")
+    expect(await keychain.access.call({ verb: "read", account: A })).toMatchObject({
+      owned: true,
+      value: stored,
+    })
+    const { store, session } = await helperSession(keychain)
+    const failure = session.update(async () => store.clear())
+    await expect(failure).rejects.toBeInstanceOf(KeychainItemNotOwnedError)
+    expect(keychain.items.get(A)).toMatchObject({ owner: "runtime", value: stored })
+  })
 })

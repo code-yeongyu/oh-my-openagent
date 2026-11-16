@@ -43,6 +43,7 @@ export function fakeKeychain(
     readonly onApprove?: () => void
     readonly failReadWhenMissing?: boolean
     readonly singleOldSlot?: boolean
+    readonly helperReadableOwners?: readonly Owner[]
   } = {},
 ) {
   const items = new Map<string, Item>()
@@ -98,7 +99,7 @@ export function fakeKeychain(
     switch (request.verb) {
       case "read": {
         if (options.failReadWhenMissing === true && item === undefined) return { error: "locked" }
-        if (item !== undefined && item.owner === "helper")
+        if (item !== undefined && (item.owner === "helper" || options.helperReadableOwners?.includes(item.owner)))
           return {
             owned: true,
             value: item.value,
@@ -162,7 +163,10 @@ export function fakeKeychain(
         return rename(`${name}.staging`, name)
       case "remove": {
         if (item === undefined) return { ok: true, missing: true }
-        if (item.owner !== "helper") return { error: "not-owned" }
+        if (item.owner !== "helper")
+          return options.helperReadableOwners?.includes(item.owner)
+            ? { error: "store", status: -25244 }
+            : { error: "not-owned" }
         items.delete(name)
         return { ok: true }
       }
