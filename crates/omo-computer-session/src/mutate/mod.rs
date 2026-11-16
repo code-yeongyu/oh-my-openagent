@@ -13,6 +13,7 @@ mod poison;
 mod record;
 mod recovery;
 mod report;
+mod route;
 
 #[cfg(test)]
 mod tests;
@@ -20,6 +21,7 @@ mod tests;
 pub use binding::{Binding, SecureInputProbe, SecureProbe};
 pub use call::Mutation;
 pub use memory_markers::MemoryMarkers;
+pub(crate) use route::{key_event, route_for};
 
 use std::path::{Path, PathBuf};
 

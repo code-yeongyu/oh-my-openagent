@@ -2,14 +2,11 @@
 //! the thinnest `click` and `typeText`. Both verbs reach the backend only through the mutate
 //! funnel (`crate::mutate`); consent, receipts and settle policy are added there by later rows.
 
-use std::collections::hash_map::RandomState;
-use std::hash::{BuildHasher, Hasher};
-
-use omo_computer_core::backend::{Backend, InputEvent, PermissionProbe, Refusal, Route};
+use omo_computer_core::backend::{Backend, InputEvent, PermissionProbe, Refusal};
 use omo_computer_core::error::EngineCode;
 use omo_computer_core::capabilities::{Capabilities, InputMode, LegacyCapabilities};
 use omo_computer_core::params::{
-    Button, ClickParams, Delivery, Point, ReportMode, SessionOpenParams, TypeTextParams,
+    Button, ClickParams, ReportMode, SessionOpenParams, TypeTextParams,
 };
 use omo_computer_core::params::{StopPathStartParams, StopPathStopParams};
 use omo_computer_core::paths::Roots;
@@ -22,7 +19,8 @@ use omo_computer_core::session_state::Tristate;
 use omo_computer_safety::{Call, Guard, HostAdditions, NoHolds, StopPolicy, TargetRef, Transport, VerbKind};
 
 use crate::audit::gc::SweepTrigger;
-use crate::mutate::{Funnel, Mutation, Refused};
+use crate::frames::random_u64;
+use crate::mutate::{key_event, route_for, Funnel, Mutation, Refused};
 
 /// `stopReason` while no stop path is armed: `session.open` arms none (`stopPath.start` does).
 pub const NO_GLOBAL_LISTENER: &str = "no-global-listener";
@@ -45,6 +43,9 @@ pub struct Session {
     pub(crate) guard: Guard,
     pub(crate) opened: Option<Opened>,
     pub(crate) funnel: Funnel,
+    pub(crate) refs: crate::refs::RefRegistry,
+    pub(crate) frames: crate::frames::FrameStore,
+    pub(crate) trace: crate::trace::Trace,
 }
 
 impl Session {
@@ -70,6 +71,9 @@ impl Session {
             guard,
             opened: None,
             funnel: Funnel::in_memory(),
+            refs: crate::refs::RefRegistry::default(),
+            frames: crate::frames::FrameStore::default(),
+            trace: crate::trace::Trace::default(),
         }
     }
 
@@ -89,6 +93,7 @@ impl Session {
         let resume_token = format!("{:016x}{:016x}", random_u64(), random_u64());
         self.funnel.set_session_id(resume_token[..16].to_owned());
         self.funnel.sweep(SweepTrigger::Open);
+        self.open_trace(request.trace, &resume_token[..16]);
         Ok(SessionOpened {
             capabilities: self.capabilities(),
             resume_token,
@@ -133,48 +138,59 @@ impl Session {
     pub fn close(&mut self) {
         if self.opened.take().is_some() {
             self.funnel.sweep(SweepTrigger::IdleExit);
+            self.close_trace();
         }
     }
 
+    /// The point is in the coordinate space of the frame the call names (or the target's
+    /// latest); the frame check runs in the funnel, and the point sent is the one the frame
+    /// record maps it to.
+    ///
     /// # Errors
     /// [`NOT_OPEN`], [`POINT_REQUIRED`], or the funnel's refusal.
     pub fn click(&mut self, params: ClickParams) -> Result<ExecReply, Refused> {
+        let dispatched = serde_json::to_value(&params).unwrap_or_default();
         let request = read_click(params);
         let Verb::Click {
             at,
             button,
             count,
             modifiers,
-            consume: _,
+            consume,
         } = request.verb
         else {
             unreachable!("read_click always reads a click");
         };
         let at = at.ok_or(POINT_REQUIRED)?;
+        let (key, point, check) =
+            self.frame_for(request.target.as_deref(), request.frame_id.as_deref(), at, consume);
         let call = Call {
             verb: VerbKind::Pointer,
             target: TargetRef::read(request.target.as_deref()),
-            points: vec![Point { x: at.x, y: at.y }],
+            points: vec![point],
             chord: None,
             force: false,
         };
         let route = route_for(request.target.as_deref(), request.policy.delivery);
         let button = button.unwrap_or(Button::Left);
-        let mut events = vec![InputEvent::PointerMove(Point { x: at.x, y: at.y })];
+        let mut events = vec![InputEvent::PointerMove(point)];
         events.extend(modifiers.iter().map(|key| key_event(key, true)));
         for _ in 0..count.unwrap_or(1) {
             events.push(InputEvent::Button { button, down: true });
             events.push(InputEvent::Button { button, down: false });
         }
         events.extend(modifiers.iter().rev().map(|key| key_event(key, false)));
-        self.mutate(Mutation::exec(Method::Click, call, events, route, &request.authority)
+        let mutation = Mutation::exec(Method::Click, call, events, route, &request.authority)
             .with_frame(request.frame_id.clone())
-            .with_keys(modifiers))
+            .with_frame_check(check.0, check.1)
+            .with_keys(modifiers);
+        self.traced(dispatched, &key, mutation)
     }
 
     /// # Errors
     /// [`NOT_OPEN`] or the funnel's refusal.
     pub fn type_text(&mut self, params: TypeTextParams) -> Result<ExecReply, Refused> {
+        let dispatched = serde_json::to_value(&params).unwrap_or_default();
         let V1Request::TypeText { target, text } = read_type_text(params) else {
             unreachable!("read_type_text always reads a typeText");
         };
@@ -186,30 +202,8 @@ impl Session {
             force: false,
         };
         let route = route_for(Some(target.as_str()), None);
-        self.mutate(Mutation::typed(Method::TypeText, call, route, text))
+        self.traced(dispatched, &target, Mutation::typed(Method::TypeText, call, route, text))
     }
-}
-
-fn key_event(key: &str, down: bool) -> InputEvent {
-    InputEvent::Key {
-        key: key.to_owned(),
-        down,
-    }
-}
-
-/// A call aimed at a window goes to that window in the background unless it asks for the
-/// foreground; a call with no target can only reach the foreground.
-fn route_for(target: Option<&str>, delivery: Option<Delivery>) -> Route {
-    match (target, delivery) {
-        (Some(_), None | Some(Delivery::Background)) => Route::BackgroundWindow,
-        (None, _) | (Some(_), Some(Delivery::Foreground)) => Route::ForegroundHid,
-    }
-}
-
-fn random_u64() -> u64 {
-    let mut hasher = RandomState::new().build_hasher();
-    hasher.write_u32(std::process::id());
-    hasher.finish()
 }
 
 const fn permission(state: PermissionState) -> &'static str {
@@ -289,6 +283,7 @@ mod tests {
         let mut session = session(&sink);
         session.open(params(json!({}))).expect("open");
         start(&mut session);
+        session.capture_frame("1", true, None).expect("a frame of 1");
         let reply = session.click(params(json!({"target": "1", "x": 3, "y": 4})));
         assert_eq!(reply, Ok(ExecReply(None)));
         assert_eq!(sink.len(), 3, "move, down, up: {:?}", sink.lines());

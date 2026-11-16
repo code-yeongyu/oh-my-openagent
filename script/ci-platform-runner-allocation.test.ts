@@ -215,6 +215,7 @@ describe("#given the path-filtered workflows that also run macOS/Windows on dev 
   test.each([
     "computer-engine.yml",
     "computer-fixtures.yml",
+    "computer-windows-qa.yml",
     "desktop-engine.yml",
     "desktop-windows-qa.yml",
     "desktop-linux-qa.yml",
