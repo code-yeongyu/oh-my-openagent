@@ -144,7 +144,13 @@ async function openOn(
     ...(args.worktree === undefined ? {} : { worktree: args.worktree }),
   })
   if (open.kind !== "ok") return show(open, "")
-  const opened = { kind: "ok", thread: open.thread, deduplicated: false } as const
+  // --json keeps naming the model the session opened on, as it did when a set_model followed the open (#13748 review).
+  const opened = {
+    kind: "ok",
+    thread: open.thread,
+    deduplicated: false,
+    ...(args.model === undefined ? {} : { model: { provider: args.model.provider, id: args.model.modelId } }),
+  } as ThreadToolResult & { readonly thread: typeof open.thread }
   if (args.prompt === undefined) return show(opened, "")
   // The first prompt (#13410) goes to the session just opened, by its own id, as `omo remote send --no-wait` sends it.
   const label = `${args.device}/${opened.thread.thread_id}`
