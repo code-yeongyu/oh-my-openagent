@@ -5,11 +5,12 @@
 //! the button at the origin, so the drag drops on its own source.
 
 use omo_computer_core::backend::{InputEvent, Refusal, Route};
-use omo_computer_core::error::EngineCode;
+use omo_computer_core::error::{EngineCode, Reason};
 use omo_computer_core::holds::Held;
 use omo_computer_core::methods::Method;
 use omo_computer_core::params::{Button, DragParams, MoveParams, Point, ScrollParams};
 use omo_computer_core::pointer::ScrollAsk;
+use omo_computer_core::report::Platform;
 use omo_computer_core::requests::{At, CallAuthority};
 use omo_computer_core::results::{ExecReply, PointerPosition};
 use omo_computer_safety::{Call, TargetRef, VerbKind};
@@ -113,9 +114,17 @@ impl Session {
     /// `pointer()`: where the pointer is, read without posting anything.
     ///
     /// # Errors
-    /// `Internal` when the backend cannot read the pointer.
+    /// A Wayland hand with no position yet (its last libei position, before the first motion):
+    /// `Internal{wayland_no_pointer_read}`, whose next call moves the pointer (#13906). Any other
+    /// hand that cannot read the pointer: `Internal`.
     pub fn pointer(&self) -> Result<PointerPosition, Refusal> {
-        self.backend.pointer().map(|p| PointerPosition { x: p.x, y: p.y }).ok_or(Refusal::bare(EngineCode::Internal))
+        let Some(p) = self.backend.pointer() else {
+            return Err(match self.backend.platform() {
+                Some(Platform::Wayland) => Refusal::new(EngineCode::Internal, Reason::WaylandNoPointerRead),
+                _ => Refusal::bare(EngineCode::Internal),
+            });
+        };
+        Ok(PointerPosition { x: p.x, y: p.y })
     }
 }
 
