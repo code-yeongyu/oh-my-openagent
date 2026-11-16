@@ -1,7 +1,9 @@
 # omo thread - the session gateway from scripts and connectors
 
 `omo thread` runs every thread operation the agent tools offer (`thread_list`, `thread_send`,
-`thread_read`, `thread_bind` ... `thread_answer`) without an agent session. It is how a script,
+`thread_read`, `thread_report` ... `thread_answer`) without an agent session, plus the binding
+operations (`bind`, `unbind`, `rebind`, `bindings`) that are not session tools: the always-on
+gateway binds chat threads, and a script can do the same here. It is how a script,
 a cron job or a chat connector talks to running OmO sessions: terminal sessions (`tui`),
 Desktop threads and task children on their hosts (`rpc_host`).
 
@@ -52,7 +54,10 @@ omo thread ack <binding-id> <cursor> [--provider-message-id <id>]
 together with the threads on the account's other devices, each with its `device`. With `--json` it prints the whole
 result as one object: `threads`, `devices` (each device's name, platform, kind, `online`, `last_seen`, `this_device`,
 its thread count and `listing`: `listed`, `incomplete` when it did not answer this listing, or `offline`) and
-`remote_unavailable` when other devices could not be listed.
+`remote_unavailable` when other devices could not be listed, and `aliases_unavailable` when a thread listed without an
+alias may still hold one: `sign_in` or `host_unavailable` when the account's aliases could not be read, `not_asked` when
+the account's other devices cannot be reached from here: this device's device service is not connected, or it answered
+that the account's plan has no relay (a Free plan). Aliases are only read while other devices can be reached.
 
 `omo thread` does not create or resume sessions: session lifecycle belongs to the engine's host
 API, and a connector cannot start a session for a new chat thread through `omo thread` alone. To
