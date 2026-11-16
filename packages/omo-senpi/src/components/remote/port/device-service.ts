@@ -1,4 +1,4 @@
-import { outcomeOf } from "./outcome"
+import { outcomeOf } from "../../thread/remote/outcome"
 import {
   connectDeviceService,
   LocalApiError,
@@ -9,9 +9,15 @@ import {
   type EndpointCommandResult,
   type RemoteAttach,
 } from "@oh-my-opencode/device-service-core/device-service"
-import { CATALOG_RECORD, createAttachPool, type HeldAttach } from "./attach-pool"
-import type { DeviceServiceDial, JsonObject, RemoteCommandOutcome, RemoteListing, RemoteSessionsPort } from "./ports"
-import { openSessionWatch } from "./remote-watch"
+import { CATALOG_RECORD, createAttachPool, type HeldAttach } from "../../thread/remote/attach-pool"
+import type {
+  DeviceServiceDial,
+  JsonObject,
+  RemoteCommandOutcome,
+  RemoteListing,
+  RemoteSessionsPort,
+} from "../../thread/remote/ports"
+import { openSessionWatch } from "../../thread/remote/remote-watch"
 
 export type DeviceServiceSessionsOptions = {
   readonly version: string
