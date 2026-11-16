@@ -4,7 +4,7 @@
 // omo-relay-daemon pins in vendor/relay-spec/PIN.json at the commit PIN.json names. Refresh this file with the vendor.
 
 // packages/relay-proto/src/errors.ts
-export const RELAY_ERROR_CODES = [
+const RELAY_ERROR_CODES = [
   "bad_request",
   "unauthorized",
   "unregistered",
@@ -20,7 +20,7 @@ export const RELAY_ERROR_CODES = [
   // serves it (sent before close 4008).
   "relocating",
 ] as const;
-export type RelayErrorCode = (typeof RELAY_ERROR_CODES)[number];
+type RelayErrorCode = (typeof RELAY_ERROR_CODES)[number];
 
 export class ProtoError extends Error {
   readonly code: RelayErrorCode;

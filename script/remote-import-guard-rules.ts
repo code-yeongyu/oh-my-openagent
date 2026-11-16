@@ -7,7 +7,18 @@ const LOCAL_API = "packages/device-service-core/src/local-api/"
 const BUNSHIN_TS_RELAY = "packages/omo-senpi/vendor/bunshin-ts-relay/"
 const REMOTE = "packages/omo-senpi/src/components/remote/"
 
-// Tests, test helpers and QA fakes are exempt from S1 and S2 (v6 V6).
+// The surfaces of #13414 (thread tools, the omo remote CLI, the TUI's /remote under components/remote/tui) are thin callers
+// of the one remote module: S3 lets them reach the remote layer only through its index, type-only imports included. A
+// surface importing another surface file (the TUI's own files) is not reaching the layer. Scope: S3 sees direct static
+// imports, require() and literal import() only; a route through another module, or bin/lib/thread.js loading built
+// bundles by a non-literal import() (frozen by NON_LITERAL_IMPORT_OFFENDERS), is outside it.
+const isRemoteSurface = (file: string): boolean =>
+  file.startsWith("packages/omo-senpi/src/components/thread/") ||
+  file.startsWith(`${REMOTE}tui/`) ||
+  /^packages\/omo-native\/remote-[^/]+\.ts$/.test(file) ||
+  file === "packages/omo-native/bin/lib/thread.js"
+
+// Tests, test helpers and QA fakes are exempt from S1, S2 and S3 (v6 V6).
 const isTestFile = (file: string): boolean =>
   file.endsWith(".test.ts") || file.split("/").some((segment) => segment === "test" || segment === "testing")
 
@@ -25,7 +36,7 @@ export const REMOTE_IMPORT_RULES: GuardRules = {
     { names: ["connectDeviceService", "connectLocalApi", "openAttach"], modules: [DEVICE_SERVICE_CORE] },
     {
       names: ["createDeviceServiceSessions"],
-      modules: ["packages/omo-senpi/src/components/thread/remote/device-service.ts", REMOTE],
+      modules: [REMOTE],
     },
     { names: ["createRelayTransport"], modules: [BUNSHIN_TS_RELAY] },
   ],
@@ -37,6 +48,7 @@ export const REMOTE_IMPORT_RULES: GuardRules = {
     "packages/omo-native/device-service-handoff.ts",
     "packages/omo-senpi/src/components/memory/device-session/account-runtime.ts",
   ],
+  s3: { surface: isRemoteSurface, layers: [DEVICE_SERVICE_CORE, REMOTE, BUNSHIN_TS_RELAY], entry: `${REMOTE}index.ts` },
 }
 
 type Offender = { readonly uses: readonly string[]; readonly removedBy: string }
@@ -55,23 +67,88 @@ export const S2_OFFENDERS: Readonly<Record<string, Offender>> = {
   "packages/omo-native/remote-cli.ts": { uses: ["createDeviceServiceSessions"], removedBy: "omo PR 4c-2" },
   "packages/omo-native/remote-local.ts": { uses: ["connectDeviceService"], removedBy: "omo PR 4c-1" },
   "packages/omo-native/remote-session-verbs.ts": { uses: ["createDeviceServiceSessions"], removedBy: "omo PR 4c-2" },
-  "packages/omo-senpi/src/components/thread/index.ts": {
-    uses: ["createDeviceServiceSessions"],
-    removedBy: "omo PR 4a-1/4b (the barrel re-exports live-surface.ts)",
-  },
-  "packages/omo-senpi/src/components/thread/live-surface.ts": {
-    uses: ["createDeviceServiceSessions"],
-    removedBy: "omo PR 4a-1/4b",
-  },
-  "packages/omo-senpi/src/components/thread/remote/device-service.ts": {
-    uses: ["connectDeviceService"],
-    removedBy: "omo PR 4a-1/4b (moves into components/remote)",
-  },
   "packages/omo-senpi/src/extension/bunshin-ts-pick-transport.ts": {
     uses: ["createRelayTransport"],
     removedBy: "omo PR 4c-3",
   },
   "packages/omo-senpi/src/extension/bunshin-ts-sdk.ts": { uses: ["createRelayTransport"], removedBy: "omo PR 4c-3" },
+}
+
+// S3 starts at today's surfaces; U5 and U6 move them onto components/remote/index.ts and remove their rows.
+export const S3_OFFENDERS: Readonly<Record<string, Offender>> = {
+  "packages/omo-native/remote-attach-dialogs.ts": {
+    uses: [DEVICE_SERVICE_CORE],
+    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
+  },
+  "packages/omo-native/remote-attach-presentation.ts": {
+    uses: [DEVICE_SERVICE_CORE],
+    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
+  },
+  "packages/omo-native/remote-attach.ts": {
+    uses: [DEVICE_SERVICE_CORE],
+    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
+  },
+  "packages/omo-native/remote-bootstrap.ts": {
+    uses: [DEVICE_SERVICE_CORE],
+    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
+  },
+  "packages/omo-native/remote-cli.ts": {
+    uses: [DEVICE_SERVICE_CORE, REMOTE],
+    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
+  },
+  "packages/omo-native/remote-cold-wake.ts": {
+    uses: [DEVICE_SERVICE_CORE],
+    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
+  },
+  "packages/omo-native/remote-entry.ts": {
+    uses: [DEVICE_SERVICE_CORE],
+    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
+  },
+  "packages/omo-native/remote-local.ts": {
+    uses: [DEVICE_SERVICE_CORE],
+    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
+  },
+  "packages/omo-native/remote-render.ts": {
+    uses: [DEVICE_SERVICE_CORE],
+    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
+  },
+  "packages/omo-native/remote-session-verbs.ts": {
+    uses: [DEVICE_SERVICE_CORE, REMOTE],
+    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
+  },
+  "packages/omo-senpi/src/components/thread/consumer/device-service-port.ts": {
+    uses: [DEVICE_SERVICE_CORE],
+    removedBy: "omo#13414 U5 (thread tools onto the module)",
+  },
+  "packages/omo-senpi/src/components/thread/remote/attach-pool.ts": {
+    uses: [DEVICE_SERVICE_CORE],
+    removedBy: "omo#13414 U5 (thread tools onto the module)",
+  },
+  // Part 4a-1 moved the thread tools' device-service port into the remote module (remote/port/): these two reach it there.
+  "packages/omo-senpi/src/components/thread/live-surface.ts": {
+    uses: [REMOTE],
+    removedBy: "omo#13414 U5 (thread tools onto the module)",
+  },
+  "packages/omo-senpi/src/components/thread/remote/default-remote.ts": {
+    uses: [REMOTE],
+    removedBy: "omo#13414 U5 (thread tools onto the module)",
+  },
+  "packages/omo-senpi/src/components/thread/remote/outcome.ts": {
+    uses: [DEVICE_SERVICE_CORE],
+    removedBy: "omo#13414 U5 (thread tools onto the module)",
+  },
+  "packages/omo-senpi/src/components/thread/remote/ports.ts": {
+    uses: [DEVICE_SERVICE_CORE],
+    removedBy: "omo#13414 U5 (thread tools onto the module)",
+  },
+  "packages/omo-senpi/src/components/thread/remote/remote-ops.ts": {
+    uses: [DEVICE_SERVICE_CORE],
+    removedBy: "omo#13414 U5 (thread tools onto the module)",
+  },
+  "packages/omo-senpi/src/components/thread/remote/remote-watch.ts": {
+    uses: [DEVICE_SERVICE_CORE],
+    removedBy: "omo#13414 U5 (thread tools onto the module)",
+  },
 }
 
 // Non-literal `import()` sites outside tests, frozen at their count per file (v6 section 12): any new one fails.
@@ -123,6 +200,8 @@ export const NON_LITERAL_IMPORT_OFFENDERS: Readonly<Record<string, number>> = {
   "packages/omo-senpi/src/components/onboarding/scan-component.ts": 1,
   "packages/omo-senpi/src/components/side-panel/index.ts": 1,
   "packages/omo-senpi/src/components/thread/gateway/extension-registrations.ts": 1,
+  // A child-process test fixture for hand-browser-placement.test.ts; it imports the engine entry by path like permission-registry.test-fixture.ts.
+  "packages/omo-senpi/src/extension/hand-browser-placement.test-fixture.ts": 1,
   "packages/omo-senpi/src/senpi-test-runtime.ts": 12,
   "packages/omo-senpi/test-support/split-local-session.ts": 1,
   "packages/shared-skills/skills/browser/scripts/omowright.mjs": 1,
