@@ -52,7 +52,8 @@ async function captureClick(ctx: Context, stage: X11Stage, observe: X11Observer)
 		const image = png(frame.data);
 		const geometry = await observe.geometry(stage.target);
 		const before = observe.pastes();
-		const click = outcome(await engine.exec("click", clickParams(stage, frame)));
+		// Foreground: the default (background) is refused for xterm, whose allowSendEvents no client can read.
+		const click = outcome(await engine.exec("click", clickParams(stage, frame, "foreground")));
 		const after = click === "ok" ? await observe.pastesAbove(before.count) : observe.pastes();
 		return result(
 			"x11-capture-click-xterm",
