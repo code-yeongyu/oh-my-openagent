@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test"
 import type { BunshinClient, StandaloneMachine } from "../../vendor/bunshin-ts/index.js"
 
 import { createLazyBunshinClient } from "./bunshin-ts-default-client"
+import { BunshinSessionError } from "./bunshin-ts-errors"
 
 function fakeClient(closed: string[], name: string): BunshinClient {
   return {
@@ -68,7 +69,9 @@ describe("bunshin-ts lazy default client", () => {
       const timeout = setTimeout(() => settle("timeout"), 2_000)
       expect(await outcome).toBe("reported")
       clearTimeout(timeout)
-      expect(reported).toEqual([failure])
+      expect(reported).toHaveLength(1)
+      expect(reported[0]).toBeInstanceOf(BunshinSessionError)
+      expect((reported[0] as BunshinSessionError).cause).toBe(failure)
       expect(unhandled).toEqual([])
     } finally {
       process.off("unhandledRejection", onUnhandled)

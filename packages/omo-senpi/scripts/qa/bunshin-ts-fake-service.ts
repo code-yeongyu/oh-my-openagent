@@ -47,7 +47,9 @@ type Message = Readonly<Record<string, unknown>>
 type Reply =
   | { readonly ok: true; readonly data: Message; readonly after?: () => void }
   | { readonly ok: false; readonly code: string; readonly reason: string }
-type OpRequest = Readonly<{ op_id: string; op: string; args?: Message }>
+export type OpRequest = Readonly<{ op_id: string; op: string; args?: Message; deadline_ms?: number }>
+// The machine.op_result `response` the service relays for one op; the default runs the fixed shell/fs.stat table.
+export type OpExecutor = (device: FakeDevice, op: OpRequest) => Message
 export type SentLine = Readonly<{ conn: number; message: Message }>
 
 const isRecord = (value: unknown): value is Message =>
@@ -73,8 +75,9 @@ const execute = (device: FakeDevice, op: OpRequest): Message => {
   return { state: "refused", error: { code: "op_unknown", message: `${op.op} is not an op this device runs` } }
 }
 
-export async function startFakeDeviceService(options: { devices?: readonly FakeDevice[] } = {}) {
+export async function startFakeDeviceService(options: { devices?: readonly FakeDevice[]; execute?: OpExecutor } = {}) {
   const devices = options.devices ?? FAKE_DEVICES
+  const run = options.execute ?? execute
   const stateDir = mkdtempSync(join(tmpdir(), "omo-bunshin-ts-fake-service-"))
   chmodSync(stateDir, 0o700)
   const token = await writeToken(stateDir, secure)
@@ -122,7 +125,7 @@ export async function startFakeDeviceService(options: { devices?: readonly FakeD
             after: () => {
               for (const op of ops) {
                 for (const state of OP_STATES) event("machine.op_state", { op_id: op.op_id, state })
-                event("machine.op_result", { op_id: op.op_id, response: execute(device, op) })
+                event("machine.op_result", { op_id: op.op_id, response: run(device, op) })
               }
             },
           }
