@@ -142,6 +142,10 @@ const newestLease = (entries: readonly unknown[]): Lease | undefined =>
     undefined,
   )
 
+/** The newest run lease a snapshot holds: its state's `lifecycle`, or its newest `session-lifecycle` entry. */
+const snapshotLease = (snapshot: SnapshotBody): Lease | undefined =>
+  newer(leaseOf(isObject(snapshot.state) ? snapshot.state["lifecycle"] : undefined), newestLease(snapshot.entries))
+
 /** The run lease a record carries: a `session_lifecycle` record, or an appended `session-lifecycle` entry. */
 const recordLease = (record: JsonObject): Lease | undefined =>
   record["type"] === "session_lifecycle"
@@ -165,9 +169,13 @@ class FollowAnchor {
   #seq = -1
   readonly #live = new Set<string>()
   readonly #early: AttachEvent[] = []
-  #run:
-    | { readonly id: string | undefined; verdict: "live" | "history" | "undecided"; readonly held: AttachEvent[] }
-    | undefined
+  /** The newest run lease the snapshot held when follow opened; undefined when it held none. */
+  #openSeq: number | undefined
+  #run: { readonly id: string | undefined; verdict: "live" | "undecided"; readonly held: AttachEvent[] } | undefined
+
+  constructor(atOpen: Lease | undefined) {
+    this.#openSeq = atOpen?.seq
+  }
 
   /** The lease the session held at the open (undefined: none known); answers the events it releases. */
   baseline(lease: Lease | undefined): readonly AttachEvent[] {
@@ -181,7 +189,10 @@ class FollowAnchor {
       if (lease.state === "running") {
         if (lease.runId !== undefined) this.#live.add(lease.runId)
         this.#run = { id: lease.runId, verdict: "live", held: [] }
-      }
+      } else if (lease.runId !== undefined && this.#openSeq !== undefined && lease.seq > this.#openSeq)
+        // A run that started after follow opened (newer than the snapshot's lease) and ended before the baseline read
+        // answered (it failed at once): it is this follow's, though its own leases are not newer than the baseline.
+        this.#live.add(lease.runId)
     }
     return this.#early.splice(0).flatMap((event) => this.#accept(event))
   }
@@ -205,7 +216,6 @@ class FollowAnchor {
       if (lease.seq <= this.#seq) return []
       const run = this.#run
       if (lease.state === "running" && lease.runId !== undefined) this.#live.add(lease.runId)
-      if (run?.verdict === "history" && (lease.runId === undefined || lease.runId === run.id)) return []
       if (run?.verdict === "undecided" && (lease.runId === undefined || lease.runId === run.id)) {
         run.verdict = "live"
         return [...run.held.splice(0), event]
@@ -549,16 +559,16 @@ export function streamMembers(core: ClientCore): StreamMembers {
       }
     }
 
-    const anchor = new FollowAnchor()
+    let anchor: FollowAnchor | undefined
     const release = (events: readonly AttachEvent[]): void => {
       for (const event of events) if (turn !== undefined) deliver(turn.apply(event))
     }
     void watchSession(core, thread, opts?.signal, {
-      event: (event) => release(anchor.accept(event)),
+      event: (event) => release(anchor?.accept(event) ?? []),
       snapshot: (snapshot) => deliver(turn?.resync(snapshot) ?? []),
       fresh: (state) => {
         deliver(turn?.fresh(state) ?? [])
-        release(anchor.baseline(leaseOf(state["lifecycle"])))
+        release(anchor?.baseline(leaseOf(state["lifecycle"])) ?? [])
       },
       ended: () => fail(attachEnded()),
     }).then((opened) => {
@@ -570,12 +580,12 @@ export function streamMembers(core: ClientCore): StreamMembers {
       if (person) for (const request of watch.handle.pending()) output.push({ kind: "frame", request })
       const first = waiting(turn.status)
       if (first !== undefined) output.push(first)
+      const atOpen = snapshotLease(opened.value.initial)
+      const anchored = new FollowAnchor(atOpen)
+      anchor = anchored
       // Without a fresh state the snapshot's lease is the best anchor this follow has.
-      const initial = opened.value.initial
-      const state = isObject(initial.state) ? initial.state : {}
       void watch.baseline().then((unread) => {
-        if (unread !== undefined)
-          release(anchor.baseline(newer(leaseOf(state["lifecycle"]), newestLease(initial.entries))))
+        if (unread !== undefined) release(anchored.baseline(atOpen))
       })
     })
     return output.stream
@@ -611,10 +621,19 @@ export function streamMembers(core: ClientCore): StreamMembers {
         if (turn.status === "waiting_input") return result("settled")
         if (!turn.running && (confirmed || signals.some((signal) => signal.kind === "run_ended"))) result("settled")
       }
+      // The records go through follow's anchor too: a turn the attach replays (its agent_settled above all) never
+      // settles a wait while a newer run is live (#13753 review M1).
+      let anchor: FollowAnchor | undefined
+      const release = (events: readonly AttachEvent[]): void => {
+        for (const event of events) if (turn !== undefined) check(turn.apply(event))
+      }
       void watchSession(core, thread, opts?.signal, {
-        event: (event) => check(turn?.apply(event) ?? []),
+        event: (event) => release(anchor?.accept(event) ?? []),
         snapshot: (snapshot) => check(turn?.resync(snapshot) ?? []),
-        fresh: (state) => check(turn?.fresh(state) ?? []),
+        fresh: (state) => {
+          check(turn?.fresh(state) ?? [])
+          release(anchor?.baseline(leaseOf(state["lifecycle"])) ?? [])
+        },
         ended: () => done(attachEnded()),
       }).then(async (opened) => {
         if (opened.kind === "error") return done(opened)
@@ -622,8 +641,12 @@ export function streamMembers(core: ClientCore): StreamMembers {
         if (settled) return watch.stop()
         turn = new SessionTurn()
         turn.resync(opened.value.initial)
+        const atOpen = snapshotLease(opened.value.initial)
+        const anchored = new FollowAnchor(atOpen)
+        anchor = anchored
         check([])
         const unread = await opened.value.baseline()
+        if (unread !== undefined) release(anchored.baseline(atOpen))
         // Without a fresh state "no run" is unknown (the snapshot's idle can be stale): a run already seen is still
         // waited for, but a wait that would answer settled/idle answers why it cannot tell instead.
         if (unread === undefined) confirmed = true

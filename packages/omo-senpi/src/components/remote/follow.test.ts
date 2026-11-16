@@ -232,6 +232,35 @@ const turnRecords = (runId: string, text: string, seq: number): JsonObject[] => 
 ]
 
 describe("sessions.follow rows: anchored at its open (#13753, the U6 waited send)", () => {
+  test("#given a snapshot that already holds the last turn's lease #when that turn is replayed and a send starts the next #then the end is the next turn's", async () => {
+    const atOpen = { ...IDLE, lifecycle: { state: "done", seq: 5, runId: "run-1" } }
+    const { owner, client } = await on(atOpen, undefined, {
+      reply: { lifecycle: { state: "done", seq: 5, runId: "run-1" } },
+    })
+    const { events } = await following(client)
+    pushRecords(owner, [...turnRecords("run-1", "pong", 4), ...turnRecords("run-2", "ping", 6)])
+    expect(await drain(events)).toEqual([
+      { kind: "waiting", state: "turn_running" },
+      { kind: "text", delta: "ping" },
+      { kind: "end", outcome: { reason: "settled", text: "ping", turn_id: "run-2" } },
+    ])
+  })
+
+  test("#given a run that starts and ends before follow's first get_state answers #when follow reads it #then its end, not a hang (review Probe A)", async () => {
+    // At the open the snapshot holds run-0's lease (seq 3); the baseline already shows run-1 ended (seq 5).
+    const atOpen = { ...IDLE, lifecycle: { state: "done", seq: 3, runId: "run-0" } }
+    const { owner, client } = await on(atOpen, undefined, {
+      reply: { lifecycle: { state: "done", seq: 5, runId: "run-1" } },
+    })
+    const { events } = await following(client)
+    pushRecords(owner, turnRecords("run-1", "failed fast", 4))
+    expect(await drain(events)).toEqual([
+      { kind: "waiting", state: "turn_running" },
+      { kind: "text", delta: "failed fast" },
+      { kind: "end", outcome: { reason: "settled", text: "failed fast", turn_id: "run-1" } },
+    ])
+  })
+
   test("#given a send whose turn already runs when follow's first get_state answers #when the turn ends #then the end is that turn's, not a hang", async () => {
     // U6 opens follow and sends at once: the baseline read can land after the new run started.
     const { owner, client } = await on(IDLE, undefined, {
@@ -348,6 +377,22 @@ describe("sessions.wait rows: a first get_state that tells nothing (#13753 revie
       expect(outcome).toMatchObject({ kind: "error", details: expect.objectContaining({ phase: "baseline" }) })
     },
   )
+})
+
+describe("sessions.wait rows: replayed turns (#13753 review Probe B)", () => {
+  test("#given a run in flight at wait's baseline #when the attach replays the previous turn's end #then wait does not settle until the live run ends", async () => {
+    const { owner, client } = await on(IDLE, undefined, {
+      reply: { lifecycle: { state: "running", seq: 6, runId: "run-2" } },
+    })
+    const settling = client.sessions.wait(THREAD)
+    const settled = settledYet(settling)
+    await listening(client)
+    pushRecords(owner, turnRecords("run-1", "pong", 4))
+    await listening(client)
+    expect(settled()).toBe(false)
+    pushRecords(owner, turnRecords("run-2", "ping", 6).slice(2))
+    expect(await settling).toMatchObject({ kind: "ok", value: { outcome: "settled", status: "idle" } })
+  })
 })
 
 describe("sessions.wait rows", () => {
