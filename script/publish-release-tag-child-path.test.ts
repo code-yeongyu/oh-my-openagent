@@ -6,32 +6,36 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { type CommitName, createGitOrigin, type GitOrigin } from "./fixtures/publish-gate-reuse-origin"
+import {
+  needsOf,
+  PRE_TAG_WRITERS,
+  publishersOf,
+  type Step,
+  upstreamOf,
+  type Workflow,
+} from "./fixtures/publish-workflow-graph"
 
 /**
  * Release contract: a publish run dispatched with prepared_release_sha (the provenance-safe child) owns its
  * release tag. The parent pushes the tag before it dispatches the child, but a child dispatched directly (a
  * branch ref, the ci_basis_receipt waiver) has none, and `gh release create` without --target would let GitHub
  * create the missing tag from the default branch head. Executes the shipped steps against a real git origin
- * with `gh` and `bun` stubbed as bash functions: publish-main tags the prepared SHA before any npm publish or
- * refuses a tag that points elsewhere, and the release step targets the prepared SHA and refuses a foreign tag.
+ * with `gh` and `bun` stubbed as bash functions: the tag-prepared-source job, which every publishing job waits
+ * for, tags the prepared SHA or refuses a tag that points elsewhere, and the release step targets the prepared
+ * SHA and refuses a foreign tag.
  */
 
-const TAG_STEP = { job: "publish-main", name: "Tag prepared release source" } as const
+const TAG_JOB = "tag-prepared-source"
+const TAG_STEP = { job: TAG_JOB, name: "Tag prepared release source" } as const
 const RELEASE_STEP = { job: "release", name: "Create GitHub release" } as const
 const VERSION = "9.9.9"
 const TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
 
-interface Step {
-  readonly name?: string
-  readonly run?: string
-  readonly env?: Record<string, string>
-}
-
 const workflow = Bun.YAML.parse(
   readFileSync(new URL("../.github/workflows/publish.yml", import.meta.url), "utf8").replace(/\r\n/g, "\n"),
-) as { jobs: Record<string, { steps: Step[] }> }
+) as Workflow
 
-function stepsOf(job: string): Step[] {
+function stepsOf(job: string): readonly Step[] {
   return workflow.jobs[job]?.steps ?? []
 }
 
@@ -139,20 +143,37 @@ describe("publish.yml child path release tag", () => {
     }
   })
 
-  test("#given publish-main #then the tag step runs before every npm publish", () => {
-    const steps = stepsOf(TAG_STEP.job)
-    const tagIndex = steps.findIndex((candidate) => candidate.name === TAG_STEP.name)
-    const publishIndexes = steps.flatMap((candidate, index) => (candidate.run?.includes("npm publish") ? [index] : []))
-    expect(tagIndex).toBeGreaterThanOrEqual(0)
-    expect(publishIndexes.length).toBeGreaterThan(0)
-    expect(Math.min(...publishIndexes)).toBeGreaterThan(tagIndex)
+  test("#given every job that publishes #then it waits for the tag job and runs only after it succeeded", () => {
+    const { publishers, unclassified } = publishersOf(workflow)
+    expect(unclassified).toEqual([])
+    expect(publishers).toEqual(expect.arrayContaining(["publish-platform", "publish-main", "release"]))
+    const beforeTag = publishers.filter((name) => name !== TAG_JOB && !upstreamOf(workflow, name).has(TAG_JOB))
+    expect(beforeTag.sort()).toEqual(Object.keys(PRE_TAG_WRITERS).sort())
+    for (const publisher of publishers.filter((name) => !(name in PRE_TAG_WRITERS))) {
+      expect({ publisher, tagJobWaitsForIt: upstreamOf(workflow, TAG_JOB).has(publisher) }).toEqual({
+        publisher,
+        tagJobWaitsForIt: false,
+      })
+    }
+    for (const [name, job] of Object.entries(workflow.jobs).filter(([name]) =>
+      needsOf(workflow, name).includes(TAG_JOB),
+    )) {
+      expect({ name, gate: job.if?.includes(`needs.${TAG_JOB}.result == 'success'`) }).toEqual({ name, gate: true })
+    }
+  })
+
+  test("#given the workflow #then exactly one step tags the prepared source", () => {
+    const tagSteps = Object.entries(workflow.jobs).flatMap(([name, job]) =>
+      (job.steps ?? []).filter((s) => s.name === TAG_STEP.name).map(() => name),
+    )
+    expect(tagSteps).toEqual([TAG_JOB])
   })
 
   test.each([
     ["an omo release", false, `v${VERSION}`],
     ["a LazyCodex-only release", true, `lazycodex-v${VERSION}`],
   ] as const)(
-    "#given %s with no tag on the origin #when publish-main tags #then the tag is pushed at the prepared SHA",
+    "#given %s with no tag on the origin #when the tag job runs #then the tag is pushed at the prepared SHA",
     (_label, lazycodexOnly, tag) => {
       const outcome = runStep({ where: TAG_STEP, prepared: "B", lazycodexOnly })
       expect(outcome.status).toBe(0)
@@ -162,7 +183,7 @@ describe("publish.yml child path release tag", () => {
   )
 
   test(
-    "#given the parent already pushed the tag at the prepared SHA #when publish-main tags #then it accepts it unchanged",
+    "#given the parent already pushed the tag at the prepared SHA #when the tag job runs #then it accepts it unchanged",
     () => {
       const outcome = runStep({ where: TAG_STEP, prepared: "B", originTags: { [`v${VERSION}`]: "B" } })
       expect(outcome.status).toBe(0)
@@ -186,7 +207,7 @@ describe("publish.yml child path release tag", () => {
   )
 
   test.each([
-    ["the tag publish-main pushed", { [`v${VERSION}`]: "B" }],
+    ["the tag the tag job pushed", { [`v${VERSION}`]: "B" }],
     ["no tag yet", {}],
   ] as const)(
     "#given %s #when the release step creates the release #then it targets the prepared SHA",

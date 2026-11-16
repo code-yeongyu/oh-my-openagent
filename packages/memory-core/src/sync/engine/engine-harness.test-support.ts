@@ -258,7 +258,11 @@ export async function makeDevice(
     async retiredJournals() {
       return (await readdir(join(root, ".git"))).filter((n) => n.startsWith("omo-sync.retired-"))
     },
-    dispose: () => rm(base, { recursive: true, force: true }),
+    async dispose() {
+      // A cycle still running (a test that timed out mid-cycle) must settle before its directory goes (#13680).
+      await device.engine.stop()
+      await rm(base, { recursive: true, force: true })
+    },
   }
   return device
 }

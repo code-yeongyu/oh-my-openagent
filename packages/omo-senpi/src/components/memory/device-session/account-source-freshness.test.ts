@@ -264,7 +264,9 @@ describe("authoritative credential reads under the shared lock", () => {
     }, 30_000)
   }
 
-  test("#given a captured CLI account #when one authoritative read is transiently empty #then that read fails closed and the next resolve of the same generation is live", async () => {
+  // #13739 narrows #11812: one transiently empty read is re-read once under the same lock, so a fresh sign-in's first
+  // cycle survives a keyring that briefly reads nothing; two empty reads in a row (the store was cleared) still fail closed.
+  test("#given a captured CLI account #when one authoritative read is transiently empty #then the re-read keeps it current and its first token read succeeds (#13739)", async () => {
     const f = await fixture()
     await f.store.write(credential("device-a"))
     const source = createCliAccountSource({
@@ -277,6 +279,24 @@ describe("authoritative credential reads under the shared lock", () => {
     if (first === null) throw new Error("the fixture account did not resolve")
 
     f.blank(1)
+    expect(await first.accessToken()).toBeString()
+    expect(first.signal.aborted).toBe(false)
+    expect(await first.boundary(() => "dispatched")).toBe("dispatched")
+  }, 30_000)
+
+  test("#given a captured CLI account #when two authoritative reads in a row are empty #then that read fails closed and the next resolve of the same generation is live", async () => {
+    const f = await fixture()
+    await f.store.write(credential("device-a"))
+    const source = createCliAccountSource({
+      api: ORIGIN,
+      store: f.store,
+      home: f.home,
+      fetch: identity("account-a", () => "device-a", []),
+    })
+    const first = await source()
+    if (first === null) throw new Error("the fixture account did not resolve")
+
+    f.blank(2)
     expect(await first.isCurrent()).toBe(false)
     expect(first.signal.aborted).toBe(true)
 
