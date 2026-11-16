@@ -245,8 +245,22 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
       () => ok([localSelfRow()]),
     )
 
+  /**
+   * This device's own sessions, under a bound of their own that ends before the listing's (#13787 review L1): a host that
+   * takes list_sessions and never answers leaves this device unanswered, never the whole listing a timeout.
+   */
+  const localRowsBefore = async (end: number, self: DeviceRow): Promise<readonly SessionRow[] | undefined> => {
+    const ms = Math.max(0, Math.min(DEADLINES.sessionsListLocal, end - timers.now() - 1))
+    const answered = await withinDeadline(timers, undefined, ms, false, async () =>
+      ok(await localSessionRows(deps.localThreadHost ?? defaultLocalThreadHost, self)),
+    )
+    return answered.kind === "ok" ? answered.value : undefined
+  }
+
   const sessionsList = (filter?: SessionsListFilter, opts?: Opts): R<SessionsList> =>
     member(opts, DEADLINES.sessionsList, false, async (svc) => {
+      // The listing's own deadline, whose clock member starts as this body does.
+      const end = timers.now() + (opts?.deadlineMs ?? DEADLINES.sessionsList)
       const [listing, devices] = await Promise.all([
         svc.sessions({
           ...(filter?.device === undefined ? {} : { device: filter.device }),
@@ -267,7 +281,7 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
       const local =
         self === undefined || (filter?.device !== undefined && filter.device !== self.id)
           ? []
-          : await localSessionRows(deps.localThreadHost ?? defaultLocalThreadHost, self)
+          : await localRowsBefore(end, self)
       const known = new Set(listed.flatMap((row) => (row.durable_id === undefined ? [] : [row.durable_id])))
       const rows = [
         ...listed,

@@ -13,9 +13,19 @@ import {
 } from "../../../../device-service-core/test/local-api/conformance/world.ts"
 import { type ContractHost, withContractHost } from "../../../../senpi-task/src/runners/rpc-host/testing/contract-host"
 import { createLiveThreadSurface } from "../thread/live-surface"
+import { DEADLINES } from "./deadlines"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
 import { personIdentity, resolveSessionTarget } from "./sessions"
-import { clientOn, closeClients, failureOf, fakeClock, startModeOwner, startOwner } from "./testing/fake-service"
+import {
+  clientOn,
+  closeClients,
+  failureOf,
+  fakeClock,
+  type FakeClock,
+  startModeOwner,
+  startOwner,
+} from "./testing/fake-service"
+import type { ThreadHost, ThreadHostSession } from "../thread/tools/ports"
 import type { ThreadHandle } from "./types"
 
 // The session members of #13414 unit U1 over the device service's conformance owner: the shared create path
@@ -88,6 +98,15 @@ const valueOf = async <T>(
   const settled = await outcome
   if (settled.kind !== "ok") throw new Error(`expected a value, got ${JSON.stringify(settled)}`)
   return settled.value
+}
+
+/** Awaits `signal`, failing the test with what never came if it has not settled within 5 s. */
+const within = <T>(signal: Promise<T>, what: string): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const breaker = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`waited 5 s for ${what}; it never came`)), 5_000)
+  })
+  return Promise.race([signal, breaker]).finally(() => clearTimeout(timer))
 }
 
 const onWorld = async () => {
@@ -636,9 +655,10 @@ describe("an open on this device", () => {
     world: World = selfWorld(),
     fault?: Fault,
     socketOf: () => string = () => host.socket,
+    clock: FakeClock = fakeClock(),
   ) => {
     const owner = await startOwner(world)
-    const client = clientOn(owner.stateDir, fakeClock(), undefined, {
+    const client = clientOn(owner.stateDir, clock, undefined, {
       localThreadHost: async (connect) =>
         createLiveThreadSurface(undefined, {
           env: { OMO_CODING_AGENT_DIR: host.root, SENPI_RPC_SOCKET: socketOf(), SENPI_RPC_KEY_ROOT: host.root },
@@ -951,6 +971,94 @@ describe("an open on this device", () => {
       expect(all.rows.map((row) => String(row.thread))).toContain(String(SELF_SESSION))
       expect(all.rows.map((row) => row.device.id)).toContain(PEER)
     })
+  })
+
+  test("#given this device's host takes list_sessions and never answers it #when sessions.list reads the whole account #then the other devices' rows come back before the listing's deadline and this device is unanswered (#13787 review L1)", async () => {
+    await withContractHost({ silent: ["list_sessions"] }, async (host) => {
+      const clock = fakeClock()
+      let asked = (): void => {}
+      const listAsked = new Promise<void>((resolve) => {
+        asked = resolve
+      })
+      const { client } = await localClient(
+        host,
+        selfWorld(),
+        (frame) => {
+          if (frame["type"] === "list_sessions") asked()
+        },
+        undefined,
+        clock,
+      )
+      const settling = client.sessions.list()
+      await within(listAsked, "this device's list_sessions")
+      // Fake time short of the listing's own deadline: only a bound inside it can let the listing answer.
+      clock.advance(DEADLINES.sessionsList - 1)
+      const flushed = new Promise<"pending">((resolve) => setImmediate(() => resolve("pending")))
+      expect(await Promise.race([settling.then((outcome) => outcome.kind), flushed])).toBe("ok")
+      const listing = await valueOf(settling)
+      expect(listing.rows.map((row) => row.device.id)).toContain(PEER)
+      expect(listing.rows.filter((row) => row.device.id === SELF)).toEqual([])
+      expect(listing.unanswered).toContainEqual(expect.objectContaining({ id: SELF, self: true }))
+    })
+  })
+
+  test("#given a keyed send on this device still in flight #when more than 256 other keyed sends settle #then its retry joins it instead of sending again, and the oldest settled key is the one forgotten (#13787 review L2)", async () => {
+    // This device's host, controllable: the prompt "held" is answered only when the test releases it.
+    const prompts: string[] = []
+    let release = (): void => {}
+    const released = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let heldAsked = (): void => {}
+    const heldPrompted = new Promise<void>((resolve) => {
+      heldAsked = resolve
+    })
+    const session: ThreadHostSession = {
+      sessionId: "rpc-1",
+      durableSessionId: "dur-selected",
+      cwd: "/w",
+      name: "target",
+    }
+    const unused = async (): Promise<never> => {
+      throw new Error("not used by a send")
+    }
+    const fakeHost: ThreadHost = {
+      socket: "fake.sock",
+      listSessions: async () => [session],
+      openSession: unused,
+      getMessages: unused,
+      getState: async () => ({ isStreaming: false }),
+      prompt: async (_routing, message) => {
+        prompts.push(message)
+        if (message === "held") {
+          heldAsked()
+          await released
+        }
+        return { turnId: String(prompts.length) }
+      },
+      interrupt: unused,
+      setSessionName: unused,
+      setModel: unused,
+      getAvailableModels: unused,
+      setThinkingLevel: unused,
+      getAvailableThinkingLevels: unused,
+    }
+    const owner = await startOwner(selfWorld())
+    const client = clientOn(owner.stateDir, fakeClock(), undefined, { localThreadHost: async () => fakeHost })
+    const held = { text: "held", idempotency_key: "held" }
+    const first = client.sessions.send(SELF_SESSION, held)
+    await within(heldPrompted, "the held prompt")
+    for (let index = 0; index < 256; index++)
+      await valueOf(client.sessions.send(SELF_SESSION, { text: `t-${index}`, idempotency_key: `k-${index}` }))
+    const retry = client.sessions.send(SELF_SESSION, held)
+    release()
+    expect(await valueOf(retry)).toEqual(await valueOf(first))
+    expect(prompts.filter((text) => text === "held")).toHaveLength(1)
+    // The store stays bounded: the oldest settled key was dropped in the in-flight one's place, a newer one replays.
+    await valueOf(client.sessions.send(SELF_SESSION, { text: "t-255", idempotency_key: "k-255" }))
+    expect(prompts.filter((text) => text === "t-255")).toHaveLength(1)
+    await valueOf(client.sessions.send(SELF_SESSION, { text: "t-0", idempotency_key: "k-0" }))
+    expect(prompts.filter((text) => text === "t-0")).toHaveLength(2)
   })
 
   test("#given a handle this device's host does not hold #when close addresses it #then not_found{session}", async () => {

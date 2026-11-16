@@ -201,9 +201,20 @@ const selfDelivery = (device: string): RemoteFailure =>
 const KEYS_KEPT = 256
 
 /**
+ * Every idempotency store's one rule: `entry` is kept under `key` as the newest, and past KEYS_KEPT the oldest settled
+ * entries are forgotten; one still in flight is never dropped, or its repeat would run again.
+ */
+function keepNewest<V extends { readonly settled: boolean }>(held: Map<string, V>, key: string, entry: V): void {
+  held.set(key, entry)
+  for (const [oldest, kept] of held) {
+    if (held.size <= KEYS_KEPT) break
+    if (kept.settled) held.delete(oldest)
+  }
+}
+
+/**
  * The receipts of this client's sends and opens: a repeat under one idempotency key replays the first answer. A send
- * without a key keeps a receipt under a fresh one nobody can retry, so past KEYS_KEPT the oldest settled receipt is
- * forgotten; one still in flight is never dropped, or its repeat would run again.
+ * without a key keeps a receipt under a fresh one nobody can retry, so the store keeps the newest (keepNewest).
  */
 function createReceipts(now: () => number): RelayTransportOptions["store"] {
   type Receipt = { readonly hash: string; settled: boolean; result?: unknown; note?: string }
@@ -215,11 +226,7 @@ function createReceipts(now: () => number): RelayTransportOptions["store"] {
     toolReceiptBegin: async (request): Promise<ToolReceiptBegin> => {
       const known = held.get(keyOf(request))
       if (known === undefined) {
-        held.set(keyOf(request), { hash: request.args_hash, settled: false })
-        for (const [key, receipt] of held) {
-          if (held.size <= KEYS_KEPT) break
-          if (receipt.settled) held.delete(key)
-        }
+        keepNewest(held, keyOf(request), { hash: request.args_hash, settled: false })
         return { kind: "accepted" }
       }
       if (known.hash !== request.args_hash) return { kind: "conflict" }
@@ -253,8 +260,8 @@ function createReceipts(now: () => number): RelayTransportOptions["store"] {
 export function sessionMembers(core: ClientCore): SessionMembers {
   const { sender } = core
   const receipts = createReceipts(() => core.timers.now())
-  // Keyed opens, newest last: a repeat replays (and refreshes) one; past KEYS_KEPT the oldest is forgotten.
-  const opens = new Map<string, { readonly hash: string; readonly result: R<OpenResult> }>()
+  // Keyed opens, newest last: a repeat replays (and refreshes) one; past KEYS_KEPT the oldest settled is forgotten.
+  const opens = new Map<string, { readonly hash: string; readonly result: R<OpenResult>; settled: boolean }>()
   const legs = new WeakMap<
     DeviceService,
     { readonly remote: RemoteThreadSurface; readonly relay: ReturnType<typeof createRelayTransport> }
@@ -331,7 +338,10 @@ export function sessionMembers(core: ClientCore): SessionMembers {
   const local = localSessionMembers(core.deps.localThreadHost ?? defaultLocalThreadHost)
   // A person's sends on this device under an idempotency key, newest last: a repeat replays one, other arguments
   // conflict, and one that ran nothing frees its key (the relay leg's receipts do this for other devices).
-  const localSends = new Map<string, { readonly hash: string; readonly result: Promise<Outcome<SendReceipt>> }>()
+  const localSends = new Map<
+    string,
+    { readonly hash: string; readonly result: Promise<Outcome<SendReceipt>>; settled: boolean }
+  >()
   const localSend = async (
     thread: ThreadHandle,
     target: SessionTarget,
@@ -352,13 +362,10 @@ export function sessionMembers(core: ClientCore): SessionMembers {
             "The idempotency key was already used for another send.",
             nextActionFor("idempotency_conflict"),
           )
-    const result = run()
-    localSends.set(key, { hash, result })
-    for (const oldest of localSends.keys()) {
-      if (localSends.size <= KEYS_KEPT) break
-      localSends.delete(oldest)
-    }
-    const settled = await result
+    const entry = { hash, result: run(), settled: false }
+    keepNewest(localSends, key, entry)
+    const settled = await entry.result
+    entry.settled = true
     if (settled.kind === "error" && settled.uncertain !== true) localSends.delete(key)
     return settled
   }
@@ -553,13 +560,10 @@ export function sessionMembers(core: ClientCore): SessionMembers {
             "The idempotency key was already used for another open.",
             nextActionFor("idempotency_conflict"),
           )
-    const result = openOnce(request, asked, openBudget(request, opts))
-    opens.set(key, { hash, result })
-    for (const oldest of opens.keys()) {
-      if (opens.size <= KEYS_KEPT) break
-      opens.delete(oldest)
-    }
-    const settled = await result
+    const entry = { hash, result: openOnce(request, asked, openBudget(request, opts)), settled: false }
+    keepNewest(opens, key, entry)
+    const settled = await entry.result
+    entry.settled = true
     if (settled.kind === "error" && settled.partial === undefined && settled.uncertain !== true) opens.delete(key)
     return settled
   }
