@@ -31,9 +31,21 @@ fn read_capability() -> io::Result<Capability> {
     Ok(capability)
 }
 
+/// The launcher holds the other end of the capability pipe: when it dies the pipe reads EOF
+/// and the daemon ends with it (no orphan daemon outliving its launcher).
+fn watch_launcher() {
+    std::thread::spawn(|| {
+        let mut rest = Vec::new();
+        let _ = io::Read::read_to_end(&mut io::stdin().lock(), &mut rest);
+        eprintln!("omo-computer-engine: --serve: launcher gone, exiting");
+        std::process::exit(0);
+    });
+}
+
 fn serve(endpoint: &Path, lock: &Path) -> io::Result<()> {
     OpenOptions::new().write(true).create_new(true).open(lock)?;
     let generation = read_capability()?;
+    watch_launcher();
     let runtime = std::env::var_os("OMO_COMPUTER_RUNTIME_DIR")
         .map_or_else(|| endpoint.parent().map(Path::to_path_buf).unwrap_or_default(), PathBuf::from);
     let fake = std::env::var("OMO_COMPUTER_BACKEND").is_ok_and(|backend| backend == "fake");
