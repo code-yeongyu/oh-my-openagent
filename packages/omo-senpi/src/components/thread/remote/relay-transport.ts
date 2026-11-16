@@ -493,21 +493,15 @@ export function createRelayTransport(
       }
       later((revise) => retryHeld(row, record, delivery_id, revise))
     }
-    // An idle receiver reports pendingMessageCount 0 while it holds (held_draft) or already took (already_admitted) the
-    // delivery: the message is still first in line there, so those two kinds answer position 1, never uncertain.
-    // A receiver parked on an approval (an open question its human must answer on that device) reports no queue
-    // position while it holds the message: the delivery is not uncertain, it waits behind that approval (#12886).
+    // Each of these kinds is the engine's own receipt that it holds the delivery, so none of them is uncertain. The
+    // engine's pendingMessageCount does not count an admitted delivery (senpi enqueues it straight into the agent's queue,
+    // outside the user-input count), so a receiver that reports none still holds it, first in line: position 1.
+    // A receiver parked on an approval (an open question its human must answer on that device) waits behind that
+    // approval (#12886); a paused or held one waits on its holds.
     if (kind === "queued" && afterState?.held === true)
       return ok({ kind: "queued", queue_position: pending ?? 1, waiting_on: { kind: "hold", device: row.device } })
     if (kind === "queued" && afterState?.parkedOnApproval === true)
       return ok({ kind: "queued", queue_position: pending ?? 1, waiting_on: { kind: "approval", device: row.device } })
-    if (kind === "queued" && pending === null)
-      return fail(
-        "idempotency_uncertain",
-        `Device ${row.device} accepted the message but did not report where it waits.`,
-        "Read the thread before deciding whether to send again.",
-        { device: row.device, delivery_id },
-      )
     return ok({ kind: "queued", queue_position: pending ?? 1 }, kind === "already_admitted")
   }
 
