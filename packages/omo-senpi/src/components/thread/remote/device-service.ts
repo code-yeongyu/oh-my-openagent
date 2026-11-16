@@ -186,6 +186,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       },
     )).then((dialed) => dialed.conn)
   const pool = createAttachPool(svc, attachAddressed, options.attachIdleMs)
+  const endpoints = new Map<string, string>()
   const sessionCommand: RemoteSessionsPort["sessionCommand"] = async (device, sessionId, rpc, commandOptions) => {
     // Before the command goes out nothing can have run: an attach that fails (session_not_found, as unknown_session; peer_not_found,
     // host_not_answering, a lost connection) or a record that is not JSON is refused with its code, typed.
@@ -196,6 +197,16 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     } catch {
       return { kind: "refused", reason: "invalid_record" }
     }
+    // `direct`: the device's service delivers the record to the session it lists under that key, with no attach here.
+    if (commandOptions?.direct === true)
+      try {
+        return outcomeOf(await (await svc()).sessionCommand(device, sessionId, record))
+      } catch (error) {
+        if (error instanceof NotSentError) return { kind: "refused", reason: sessionReason(error.code) }
+        if (error instanceof LocalApiError && error.command_id === undefined && REFUSED_BEFORE_SENDING.has(error.code))
+          return { kind: "refused", reason: sessionReason(error.code) }
+        return { kind: "uncertain", reason: "reply_lost" }
+      }
     try {
       held = await pool.hold(device, sessionId)
     } catch (error) {
@@ -301,8 +312,20 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         return { kind: "refused", reason: notSentReason(error) }
       }
       const connected = dialed.conn
+      // The device's engine endpoint key, kept from the last command toward it, spares each later one its session.endpoints
+      // round trip. A key the device no longer serves (its host restarted) is refused, and a refused record ran nothing, so
+      // a refusal toward a kept key forgets it and the record goes once more on a fresh lookup.
+      const send = async (endpoint: string | undefined) => {
+        const sent = await connected.endpointCommand(device, record, { ...endpointOptions, endpoint })
+        endpoints.set(device, sent.endpoint)
+        return outcomeOf(sent)
+      }
       try {
-        return outcomeOf(await connected.endpointCommand(device, record, endpointOptions))
+        const kept = endpoints.get(device)
+        const outcome = await send(kept)
+        if (kept === undefined || outcome.kind !== "refused") return outcome
+        endpoints.delete(device)
+        return await send(undefined)
       } catch (error) {
         // The SDK marks a failure before session.command was written (the endpoint lookup timing out or the connection
         // closing during it) not_sent: nothing ran, so it is refused. The same codes after sending stay uncertain.
@@ -415,15 +438,15 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       } catch (error) {
         return { kind: "refused", reason: notSentReason(error) }
       }
-      // A create reply that already names the session's listing key needs no session.locate round trip.
+      // A create reply that already names the session's listing key needs no session.locate round trip, and no attach
+      // either: a located session is attachable at once (CommandResult.located), so the next command attaches it itself.
+      if (knownKey !== undefined) return { kind: "ok", sessionId: knownKey }
       let key: string
-      if (knownKey !== undefined) key = knownKey
-      else
-        try {
-          key = (await connected.locate(device, engineId)).key
-        } catch (error) {
-          return { kind: "refused", reason: error instanceof LocalApiError ? error.code : "locate_failed" }
-        }
+      try {
+        key = (await connected.locate(device, engineId)).key
+      } catch (error) {
+        return { kind: "refused", reason: error instanceof LocalApiError ? error.code : "locate_failed" }
+      }
       // The session exists under `key` from here on; wait (bounded) until the listing names it so the next command's
       // attach finds it, and keep that attach for it.
       const deadline = Date.now() + CREATED_ATTACH_WAIT_MS

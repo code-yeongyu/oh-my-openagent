@@ -180,7 +180,13 @@ export type DeviceService = {
     device: string,
     rpc: CommandRpc,
     options?: EndpointCommandOptions,
-  ) => Promise<CommandResult>
+  ) => Promise<EndpointCommandResult>
+  /**
+   * #393 part B's `session.command {session: "<device>.<key>", rpc}`: one engine record to the session `device` lists
+   * under `key`, delegated by the device's service with no attach on this connection (one round trip, where an attach
+   * then its command takes two). Settles like `endpointCommand`; a refusal before sending is a `NotSentError`.
+   */
+  readonly sessionCommand: (device: string, key: string, rpc: CommandRpc) => Promise<CommandResult>
   readonly close: () => void
   readonly closed: Promise<void>
   /**
@@ -206,7 +212,14 @@ export type DeviceService = {
  * `locate`: an `open_session`/`new_session` asks for its new session on the reply (`CommandResult.located`), sparing the
  * session.locate round trip toward a host that names it (decision 0018 amendment 2026-11-06, relay daemon #698).
  */
-export type EndpointCommandOptions = { readonly locate?: boolean }
+export type EndpointCommandOptions = {
+  readonly locate?: boolean
+  /** The endpoint key an earlier command's result named: sent to as is, so no `session.endpoints` lookup runs. */
+  readonly endpoint?: string
+}
+
+/** `endpoint`: the key the command was sent to, so a caller can send the next one there without a lookup. */
+export type EndpointCommandResult = CommandResult & { readonly endpoint: string }
 
 export type DeviceCredential = {
   readonly device: DeviceRef
@@ -340,15 +353,23 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
     endpointCommand: async (device, rpc, options) => {
       // The endpoint lookup runs before any session.command is written, so whatever fails it (a timeout, a closed
       // connection, a refusal) dispatched nothing: it is marked not_sent, unlike a timeout after sending.
-      let endpoint: string | undefined
-      try {
-        endpoint = (await client.request("session.endpoints", { device })).endpoints[0]
-      } catch (error) {
-        throw markNotSent(error)
+      let endpoint = options?.endpoint
+      if (endpoint === undefined) {
+        try {
+          endpoint = (await client.request("session.endpoints", { device })).endpoints[0]
+        } catch (error) {
+          throw markNotSent(error)
+        }
       }
       if (endpoint === undefined) throw new NotSentError("unsupported", "the device lists no engine endpoint")
-      return await sendToEndpoint(client, device, endpoint, rpc, options?.locate === true, timers)
+      return { ...(await sendToEndpoint(client, device, endpoint, rpc, options?.locate === true, timers)), endpoint }
     },
+    sessionCommand: (device, key, rpc) =>
+      followDelegatedCommand(client, device, timers, (commandId) =>
+        client.commandTo({ session: `${device}.${key}` }, rpc, commandId).catch((error: unknown) => {
+          throw error instanceof LocalApiError && error.command_id === undefined ? markNotSent(error) : error
+        }),
+      ),
     close: () => client.close(),
     closed: client.closed,
     locate: (device, engineId, options) =>
