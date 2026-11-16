@@ -241,11 +241,33 @@ describe("sessions.send and sessions.read", () => {
     const client = clientOn(owner.stateDir, fakeClock())
     const receipt = await valueOf(client.sessions.send(LIVE, { text: "hello", idempotency_key: "k-1" }))
     expect(receipt).toMatchObject({ thread: LIVE, lane: "started", turn_id: "7", device: { id: PEER } })
-    await valueOf(client.sessions.send(LIVE, { text: "hello", idempotency_key: "k-1" }))
-    expect(sent("prompt")).toEqual([expect.objectContaining({ message: "hello", streamingBehavior: "followUp" })])
+    // The replay names the prompt that was sent: the same client message id.
+    expect((await valueOf(client.sessions.send(LIVE, { text: "hello", idempotency_key: "k-1" }))).delivery_id).toBe(
+      receipt.delivery_id,
+    )
+    expect(sent("prompt")).toEqual([
+      expect.objectContaining({
+        message: "hello",
+        streamingBehavior: "followUp",
+        clientMessageId: receipt.delivery_id,
+      }),
+    ])
     expect(failureOf(await client.sessions.send(LIVE, { text: "other", idempotency_key: "k-1" })).code).toBe(
       "idempotency_conflict",
     )
+  })
+
+  test("#given a person's sends #when each is delivered #then its prompt carries a fresh clientMessageId, returned as the receipt's delivery_id", async () => {
+    const { owner, sent } = await onWorld()
+    const client = clientOn(owner.stateDir, fakeClock())
+    const first = await valueOf(client.sessions.send(LIVE, { text: "one" }))
+    const second = await valueOf(client.sessions.send(LIVE, { text: "two" }))
+    expect(typeof first.delivery_id).toBe("string")
+    expect(sent("prompt").map((rpc) => String(rpc["clientMessageId"]))).toEqual([
+      String(first.delivery_id),
+      String(second.delivery_id),
+    ])
+    expect(first.delivery_id).not.toBe(second.delivery_id)
   })
 
   // #13004 (decision 0027 section 3, carried from omo-native remote-session-verbs.test.ts): every delivery names the
@@ -659,7 +681,8 @@ describe("an open on this device", () => {
     await withContractHost({ auth: true }, async (host) => {
       const { owner, client } = await localClient(host)
       expect((await valueOf(client.sessions.open({ device: SELF, workspace: host.root }))).thread).toBe(SELF_SESSION)
-      expect(await valueOf(client.sessions.send(SELF_SESSION, { text: "hello here" }))).toMatchObject({
+      const receipt = await valueOf(client.sessions.send(SELF_SESSION, { text: "hello here" }))
+      expect(receipt).toMatchObject({
         thread: SELF_SESSION,
         device: { id: SELF, self: true },
         lane: "queued",
@@ -685,6 +708,8 @@ describe("an open on this device", () => {
         "unload_session",
       ])
       expect(host.mutations[0]).toMatchObject({ message: "hello here", streamingBehavior: "followUp" })
+      expect(typeof host.mutations[0]?.["clientMessageId"]).toBe("string")
+      expect(host.mutations[0]?.["clientMessageId"]).toBe(receipt.delivery_id)
       expect(owner.state.commands).toEqual([])
     })
   })

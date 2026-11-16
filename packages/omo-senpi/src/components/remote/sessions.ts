@@ -23,6 +23,7 @@ import { nextActionFor, remoteFailure } from "./codes"
 import { DEADLINES } from "./deadlines"
 import { createDeviceServiceSessions } from "./port/device-service"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
+import { clientMessageIdOf } from "./client-message-id"
 import { defaultLocalThreadHost, openOnThisDevice } from "./sessions-local"
 import { localSessionMembers } from "./sessions-local-members"
 import { sessionDetail } from "./session-detail"
@@ -410,7 +411,13 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     return core.member<SendReceipt>(stage(), DEADLINES.drive, true, async (svc) => {
       if (await isThisDevice(svc, target.device))
         return from.sender.kind === "person"
-          ? await local.send(target, thread, device.value, request)
+          ? await local.send(
+              target,
+              thread,
+              device.value,
+              request,
+              clientMessageIdOf(from.caller, request.idempotency_key),
+            )
           : remoteFailure(
               "local_only",
               "A session's message to a session on its own device is delivered by that device's thread tools.",
@@ -420,6 +427,12 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       const row = namedDeviceRow(target.device, target.session)
       const mode = request.mode ?? "auto"
       const expected = request.expected_turn_id === undefined ? undefined : String(request.expected_turn_id)
+      // A person's followUp prompt carries a client message id, the receipt's delivery_id: every record of the turn that
+      // answers it carries it too. The relay's steer record carries none, so a steer names none.
+      const clientMessageId =
+        from.sender.kind === "person" && mode !== "steer"
+          ? clientMessageIdOf(from.caller, request.idempotency_key)
+          : undefined
       const sent = await legOf(svc).relay.deliver({
         sender: from.sender,
         caller_id: from.caller,
@@ -428,6 +441,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
         mode,
         ...(expected === undefined ? {} : { expected_turn_id: expected }),
         idempotency_key: request.idempotency_key ?? randomUUID(),
+        ...(clientMessageId === undefined ? {} : { client_message_id: clientMessageId }),
         args: { thread, text: request.text, mode, expected_turn_id: expected },
       })
       if (sent.kind === "error") return fromThread(sent.error)
@@ -440,7 +454,9 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       const base = {
         thread,
         device: device.value,
-        ...(sent.delivery_id === undefined ? {} : { delivery_id: sent.delivery_id }),
+        ...((sent.delivery_id ?? clientMessageId) === undefined
+          ? {}
+          : { delivery_id: sent.delivery_id ?? clientMessageId }),
       }
       const { delivery } = sent
       switch (delivery.kind) {

@@ -141,8 +141,12 @@ export function localSessionMembers(hostOn: HostOn) {
       thread: ThreadHandle,
       device: DeviceRow,
       request: SendRequest,
+      clientMessageId: string,
     ): Promise<Outcome<SendReceipt>> =>
       run<SendReceipt>(target, "delivered the message", async ({ port, routing, durable }) => {
+        // The prompt's client message id, the receipt's delivery_id (senpi stamps it on the turn that answers it). The
+        // host's port spreads its options onto the prompt record, so the id rides beside streamingBehavior.
+        const stamped = (streamingBehavior: "steer" | "followUp") => ({ streamingBehavior, clientMessageId })
         const state = await port.getState(routing)
         const running = state.isStreaming === true
         const turn = text(Reflect.get(state, "currentTurnId"))
@@ -165,17 +169,24 @@ export function localSessionMembers(hostOn: HostOn) {
                 details: { device: target.device, current_turn_id: turn },
               },
             )
-          await port.prompt(routing, request.text, { streamingBehavior: "steer" }, durable)
-          return ok({ thread, device, lane: "steered", turn_id: turn })
+          await port.prompt(routing, request.text, stamped("steer"), durable)
+          return ok({ thread, device, delivery_id: clientMessageId, lane: "steered", turn_id: turn })
         }
-        const reply = await port.prompt(routing, request.text, { streamingBehavior: "followUp" }, durable)
+        const reply = await port.prompt(routing, request.text, stamped("followUp"), durable)
         const started = text(reply.turnId)
         if (Reflect.get(reply, "disposition") === "started" || (!running && started !== undefined))
-          return ok({ thread, device, lane: "started", ...(started === undefined ? {} : { turn_id: started }) })
+          return ok({
+            thread,
+            device,
+            delivery_id: clientMessageId,
+            lane: "started",
+            ...(started === undefined ? {} : { turn_id: started }),
+          })
         const pending = Reflect.get(await port.getState(routing), "pendingMessageCount")
         return ok({
           thread,
           device,
+          delivery_id: clientMessageId,
           lane: "queued",
           queue_position: typeof pending === "number" && pending >= 1 ? pending : 1,
         })
