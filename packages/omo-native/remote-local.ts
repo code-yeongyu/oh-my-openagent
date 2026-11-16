@@ -242,8 +242,8 @@ function renderFailure(dependencies: RemoteCommandDependencies, failure: RemoteF
     )
     return REMOTE_EXIT.unavailable
   }
-  // The connection itself failed (a stale socket, a refused or timed-out handshake): the service is not running. A
-  // failure inside a member after a good connect keeps its own message below.
+  // The client tags a failure of the connection itself with phase "connect" (the service is not running); a failure
+  // inside a member after a good connect keeps its own message below.
   if (failure.code === "host_unavailable" && details["phase"] === "connect") {
     dependencies.error(NOT_RUNNING)
     return REMOTE_EXIT.unavailable
