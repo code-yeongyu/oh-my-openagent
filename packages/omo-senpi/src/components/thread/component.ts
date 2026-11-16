@@ -658,6 +658,9 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
             ),
           )
         if (options.store === undefined) await store.dispose().catch(() => undefined)
+        // The remote surface this component built is its session's: closing it clears its attach pool's idle detach
+        // timers and ends the device-service connection it opened. A surface the caller passed in stays the caller's.
+        if (options.remote === undefined) await remote.sessions.close?.().catch(() => undefined)
       })
     },
   }

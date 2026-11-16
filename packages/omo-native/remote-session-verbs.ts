@@ -81,6 +81,21 @@ export async function runSession(
   dependencies: RemoteCommandDependencies,
 ): Promise<number> {
   const remote = (dependencies.remote ?? ((service) => deviceServiceSurface(service, dependencies.connect)))(service)
+  try {
+    return await runSessionVerb(remote, args, json, dependencies)
+  } finally {
+    // The verb's port borrows the command's connection; closing it clears its attach pool, so no idle detach timer
+    // outlives the verb.
+    await remote.sessions.close?.()
+  }
+}
+
+async function runSessionVerb(
+  remote: RemoteThreadSurface,
+  args: SessionArgs,
+  json: boolean,
+  dependencies: RemoteCommandDependencies,
+): Promise<number> {
   const show: Show = (result, label) => {
     if (json) dependencies.output(JSON.stringify(result))
     if (result.kind === "error") {

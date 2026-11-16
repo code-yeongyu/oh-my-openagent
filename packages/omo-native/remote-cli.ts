@@ -168,7 +168,14 @@ export async function prepareRemoteAttach(
         chain: { stamp: (record: JsonObject) => record },
       }))
     )(service)
-    const resolved = await resolveSessionTarget(remote, parsedTarget)
+    let resolved: Awaited<ReturnType<typeof resolveSessionTarget>>
+    try {
+      resolved = await resolveSessionTarget(remote, parsedTarget)
+    } finally {
+      // The port only resolves the target on this connection, which the attach keeps; closing it clears its attach
+      // pool, so no idle detach timer outlives the attach TUI.
+      await remote.sessions.close?.()
+    }
     if (resolved.kind === "error") {
       service.close()
       dependencies.error(`omo remote: ${resolved.error.message}`)
