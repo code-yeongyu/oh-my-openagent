@@ -52,11 +52,11 @@ impl Session {
         let record = Record::new(&self.funnel, &mutation, &call_id, secure);
         self.reconcile_stop();
         let mut epoch = self.guard.supervisor().stop_epoch();
-        let call = (mutation.method, &mutation.call.target, mutation.route);
+        let call = (mutation.method, &mutation.call.target, mutation.route.clone());
         let mut plan = self.funnel.control.plan(self.backend.as_mut(), call, epoch);
         let url_detail = self.url_stages(&mut plan, &mutation);
         let pausing = object.then_some(ceiling);
-        let admission = match self.admit_call(&mutation.call, mutation.route, plan.stages.clone(), pausing)
+        let admission = match self.admit_call(&mutation.call, mutation.route.clone(), plan.stages.clone(), pausing)
         {
             Ok(admission) => admission,
             Err(blocked) => {
@@ -219,7 +219,7 @@ impl Session {
             .and_then(|pid| MidSend::start(self.backend.as_ref(), pid, policy));
         let (outcome, read_back) = match mutation.write.clone() {
             Some(write) => self.send_write(&write, tag),
-            None => (self.send_watched(mutation.events, mutation.route, tag, watch, target), None),
+            None => (self.send_watched(mutation.events, mutation.route.clone(), tag, watch, target), None),
         };
         drop(lock);
         let outcome = crate::send_on_enter::TextCut::finish(text_cut, outcome);
@@ -282,7 +282,7 @@ impl Session {
             }
             None => {
                 let sent = Sent {
-                    route: mutation.route,
+                    route: mutation.route.clone(),
                     count,
                     of,
                     // A route that delivered fewer units than were asked reports it (R48c).

@@ -34,15 +34,6 @@ pub(super) fn target_id<'a>(target: &TargetRef<'a>) -> Option<&'a str> {
     }
 }
 
-const fn route_name(route: Route) -> &'static str {
-    match route {
-        Route::Ax => "ax",
-        Route::BackgroundWindow => "background_window",
-        Route::BackgroundPid => "background_pid",
-        Route::ForegroundHid => "foreground_hid",
-    }
-}
-
 impl Record {
     pub(super) fn new(
         funnel: &Funnel,
@@ -74,11 +65,11 @@ impl Record {
             target: target.clone(),
             delivery: match mutation.route {
                 Route::ForegroundHid => DeliveryKind::Foreground,
-                Route::Ax | Route::BackgroundWindow | Route::BackgroundPid => {
+                Route::Ax | Route::BackgroundWindow { .. } | Route::BackgroundPid { .. } => {
                     DeliveryKind::Background
                 }
             },
-            route: Some(route_name(mutation.route).to_owned()),
+            route: Some(mutation.route.wire().to_owned()),
             tier: Tier::Exec,
             frame_id: mutation.frame_id.clone(),
             text: text.clone(),

@@ -135,6 +135,12 @@ impl FakeBackend {
         inputs
     }
 
+    /// The window the last background input was addressed to; `None` after a foreground one.
+    #[must_use]
+    pub fn last_input_window(&self) -> Option<String> {
+        self.lock().last_input_window.clone()
+    }
+
     /// Whether `window`'s process has exited.
     #[must_use]
     pub fn exited(&self, window: &str) -> bool {

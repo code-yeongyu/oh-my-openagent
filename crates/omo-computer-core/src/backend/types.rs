@@ -69,13 +69,28 @@ pub struct TaggedInput {
     pub tag: u64,
 }
 
-/// The delivery route of an input.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// The delivery route of an input. A background route names what it is aimed at, so an
+/// unaddressed background input cannot be built (row 21a, IS-2); the foreground route goes to
+/// whatever holds focus, which the foreground lease guards.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Route {
     Ax,
-    BackgroundWindow,
-    BackgroundPid,
+    BackgroundWindow { window: String },
+    BackgroundPid { pid: u32 },
     ForegroundHid,
+}
+
+impl Route {
+    /// The route's wire name (audit records, reports).
+    #[must_use]
+    pub const fn wire(&self) -> &'static str {
+        match self {
+            Self::Ax => "ax",
+            Self::BackgroundWindow { .. } => "background_window",
+            Self::BackgroundPid { .. } => "background_pid",
+            Self::ForegroundHid => "foreground_hid",
+        }
+    }
 }
 
 /// How many units of an input went out.
