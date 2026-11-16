@@ -215,3 +215,32 @@ fn the_sequence_comparison_survives_the_16_bit_wrap() {
     assert_eq!(repainted_after(u16::MAX, &[u16::MAX, 0]).last(), Some(&DamageWait::Repainted));
     assert_eq!(repainted_after(u16::MAX, &[0]), [DamageWait::Repainted]);
 }
+
+
+/// Review H1 at d6f5b5a626 (live Xvfb): DamageCreate (seq 10) reports the whole window at once,
+/// then the ClearArea (seq 12) paints the background; neither is the client's repaint.
+const CREATE: u16 = 10;
+const CLEAR_AFTER_CREATE: u16 = 12;
+
+#[test]
+fn the_damage_create_report_and_the_server_paint_are_never_the_repaint() {
+    let steps = repainted_after(CLEAR_AFTER_CREATE, &[CREATE, CLEAR_AFTER_CREATE]);
+    assert!(steps.iter().all(|step| *step != DamageWait::Repainted), "{steps:?}");
+    assert_eq!(
+        repainted_after(CLEAR_AFTER_CREATE, &[CREATE, CLEAR_AFTER_CREATE, CLEAR_AFTER_CREATE + 1]).last(),
+        Some(&DamageWait::Repainted),
+        "only a notify after the ClearArea is the client's"
+    );
+}
+
+#[test]
+fn a_background_none_window_waits_past_its_create_report() {
+    // Background None: the server paints nothing, so the create report is the only early notify.
+    assert_ne!(repainted_after(CLEAR_AFTER_CREATE, &[CREATE]), [DamageWait::Repainted]);
+}
+
+#[test]
+fn an_earlier_sequence_stays_earlier_across_the_16_bit_wrap() {
+    assert_ne!(repainted_after(0, &[u16::MAX]), [DamageWait::Repainted], "0xffff is before 0x0000");
+    assert_eq!(repainted_after(0, &[1]), [DamageWait::Repainted]);
+}
