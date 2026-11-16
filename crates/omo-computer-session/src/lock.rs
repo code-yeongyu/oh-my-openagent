@@ -5,6 +5,12 @@
 //! the OS file lock on Windows, on a handle of its own per acquire, released when the guard
 //! drops or the process dies. A failure to create, open or lock the file is an error, and the
 //! funnel refuses with nothing sent (L2); a target with neither arm refuses the same way.
+//!
+//! The funnel's contract (ruling R70cp(1)): a backend's foreground restore completes BEFORE its
+//! send call returns to the funnel, so the guard's drop after the send is a drop after the
+//! restore and the lock is held through activate, act and restore (L1). A backend that
+//! restores later is a defect; the rows that build each OS's restore prove the hold with their
+//! own test (DEFERRED-LEGS, L1).
 
 use std::io;
 use std::path::{Path, PathBuf};
