@@ -1,6 +1,7 @@
 //! AC-98: for every adjacent pair of gates with both conditions set, the earlier gate's code
 //! wins; a read under the lock, the sleep, the inactive session and a composer is admitted.
 
+use omo_computer_core::error::Reason;
 use omo_computer_core::backend::Refusal;
 use omo_computer_core::results::PermissionState;
 use omo_computer_core::session_state::Tristate;
@@ -48,7 +49,7 @@ fn run(gates: &[Gate]) -> (Gate, Refusal) {
 type Wire = (&'static str, Option<&'static str>);
 
 fn wire(refusal: &Refusal) -> Wire {
-    (refusal.code.wire(), refusal.reason)
+    (refusal.code.wire(), refusal.reason.map(Reason::wire))
 }
 
 #[test]

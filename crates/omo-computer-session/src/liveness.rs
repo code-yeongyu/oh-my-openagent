@@ -13,7 +13,7 @@ pub const WINDOW_NOT_FOUND: Refusal = Refusal::bare(EngineCode::WindowNotFound);
 
 /// The refusal of a window that stopped answering.
 pub const APP_UNRESPONSIVE: Refusal =
-    Refusal::new(EngineCode::InputFailed, Reason::AppUnresponsive.wire());
+    Refusal::new(EngineCode::InputFailed, Reason::AppUnresponsive);
 
 /// `window`'s process has exited.
 #[must_use]
