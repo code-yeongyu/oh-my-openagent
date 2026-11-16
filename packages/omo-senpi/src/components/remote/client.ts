@@ -28,6 +28,7 @@ import type {
   ControlState,
   DeviceRow,
   FollowEvent,
+  FollowOpts,
   InterruptResult,
   OpenRequest,
   OpenResult,
@@ -123,9 +124,12 @@ export type RemoteClient = {
       page?: { readonly before?: string; readonly tail?: number },
       opts?: Opts,
     ) => R<ReadPage>
-    /** Status changes, turn ends and the turn's stream, from now on; survives relay, service and engine restarts. */
-    readonly follow: (thread: ThreadHandle, opts?: Opts) => RemoteStream<FollowEvent>
-    readonly wait: (thread: ThreadHandle, opts?: Opts) => R<WaitResult>
+    /**
+     * Status changes, turn ends and the turn's stream, from now on (or, with `opts.from`, the turn that answers that
+     * send); survives relay, service and engine restarts.
+     */
+    readonly follow: (thread: ThreadHandle, opts?: FollowOpts) => RemoteStream<FollowEvent>
+    readonly wait: (thread: ThreadHandle, opts?: FollowOpts) => R<WaitResult>
     readonly interrupt: (thread: ThreadHandle, opts?: Opts) => R<InterruptResult>
     /** The session's own model ("provider/id"); never a device default. */
     readonly setModel: (thread: ThreadHandle, model: string, opts?: Opts) => R<{ readonly model: string }>

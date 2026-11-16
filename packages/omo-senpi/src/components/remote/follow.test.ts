@@ -6,7 +6,7 @@ import { sessionStatusOf } from "./follow"
 import { handleOf } from "./seams"
 import { clientOn, closeClients, fakeClock, startModeOwner, startOwner } from "./testing/fake-service"
 import type { RemoteClient } from "./client"
-import type { FollowEvent, JsonObject, PendingRequest, RemoteSender } from "./types"
+import type { DeviceRow, FollowEvent, JsonObject, PendingRequest, RemoteSender, SendReceipt } from "./types"
 
 // Rows of sessions.follow and sessions.wait (#13414 U2): both run on the attach's events, never a poll of read, over the
 // device service's conformance owner and a fake clock.
@@ -337,6 +337,154 @@ describe("sessions.follow rows: anchored at its open (#13753, the U6 waited send
       { kind: "text", delta: "third" },
       { kind: "end", outcome: { reason: "settled", text: "third", turn_id: "run-3" } },
     ])
+  })
+})
+
+// The records of one engine run as the real engine streams them (live relay trace, #13753): only the records of the
+// turn that answers a prompt carry its clientMessageId; leases, status, agent_start and agent_settled carry none. A
+// queued input is answered inside the same run: its turn_start takes over and the run's agent_end carries the last id.
+const promptRun = (runId: string, seq: number, inputs: readonly (readonly [string, string])[]): JsonObject[] => {
+  const turn = (id: string, text: string): JsonObject[] => [
+    { type: "turn_start", clientMessageId: id },
+    { type: "message_start", clientMessageId: id, message: { role: "user" } },
+    { type: "message_end", clientMessageId: id, message: { role: "user" } },
+    { ...textDelta(text), clientMessageId: id },
+    { type: "turn_end", clientMessageId: id },
+  ]
+  const last = inputs.at(-1)?.[0] ?? ""
+  return [
+    { type: "session_lifecycle", lifecycle: { state: "running", seq, runId } },
+    { type: "agent_start", runId },
+    { type: "session_status", status: "running" },
+    ...inputs.flatMap(([id, text]) => turn(id, text)),
+    { type: "agent_end", messages: [], willRetry: false, clientMessageId: last },
+    { type: "session_status", status: "running" },
+    { type: "agent_settled" },
+    { type: "session_status", status: "idle" },
+    { type: "session_lifecycle", lifecycle: { state: "done", seq: seq + 1, runId } },
+  ]
+}
+
+const DEVICE: DeviceRow = {
+  id: PEER,
+  name: "Studio",
+  kind: "desktop",
+  platform: "darwin",
+  online: true,
+  last_seen_ms: null,
+  caps: { attach: true, machine: false, control: false },
+}
+const receiptOf = (id: string, lane: "started" | "queued", turn?: string): SendReceipt =>
+  lane === "queued"
+    ? { thread: THREAD, device: DEVICE, delivery_id: id, lane, queue_position: 1 }
+    : { thread: THREAD, device: DEVICE, delivery_id: id, lane, ...(turn === undefined ? {} : { turn_id: turn }) }
+
+describe("sessions.follow rows: from one send (#13753, the live relay shapes)", () => {
+  // The attach serves a cached snapshot from the session's open and replays every record since it, then the live ones.
+  const replayed = promptRun("run-1", 1, [["cm-1", "pong"]])
+  // The caller sends without waiting for follow's attach, so its first get_state already shows the send's run.
+  const runningAt = (seq: number, runId: string): JsonObject => ({ lifecycle: { state: "running", seq, runId } })
+  const followFrom = async (from: SendReceipt, pushed: readonly JsonObject[], reply = runningAt(3, "run-2")) => {
+    const { owner, client } = await on(IDLE, undefined, { reply })
+    const events = reader(client.sessions.follow(THREAD, { from }))
+    await listening(client)
+    pushRecords(owner, pushed)
+    return drain(events)
+  }
+
+  test("#given a back-to-back send #when the attach replays the previous turn first #then only this send's turn, ended by its own end", async () => {
+    expect(
+      await followFrom(receiptOf("cm-2", "started", "2"), [...replayed, ...promptRun("run-2", 3, [["cm-2", "ping"]])]),
+    ).toEqual([
+      { kind: "waiting", state: "turn_running" },
+      { kind: "text", delta: "ping" },
+      { kind: "end", outcome: { reason: "settled", text: "ping", turn_id: "2" } },
+    ])
+  })
+
+  test("#given a send queued behind another in the same run #when its turn takes over #then only its text, and its own end", async () => {
+    const run2 = promptRun("run-2", 3, [
+      ["cm-2", "ping"],
+      ["cm-3", "zebra"],
+    ])
+    expect(await followFrom(receiptOf("cm-3", "queued"), [...replayed, ...run2])).toEqual([
+      { kind: "waiting", state: "queued" },
+      { kind: "waiting", state: "turn_running" },
+      { kind: "text", delta: "zebra" },
+      { kind: "end", outcome: { reason: "settled", text: "zebra" } },
+    ])
+  })
+
+  test("#given a send whose run takes a queued input next #when that input's turn starts #then this send's turn has ended", async () => {
+    const run2 = promptRun("run-2", 3, [
+      ["cm-2", "ping"],
+      ["cm-3", "zebra"],
+    ])
+    expect(await followFrom(receiptOf("cm-2", "started", "2"), [...replayed, ...run2])).toEqual([
+      { kind: "waiting", state: "turn_running" },
+      { kind: "text", delta: "ping" },
+      { kind: "end", outcome: { reason: "settled", text: "ping", turn_id: "2" } },
+    ])
+  })
+
+  test("#given a send after an idle gap #when every earlier turn is replayed first #then its own reply only", async () => {
+    const earlier = [
+      ...replayed,
+      ...promptRun("run-2", 3, [
+        ["cm-2", "ping"],
+        ["cm-3", "zebra"],
+      ]),
+    ]
+    expect(
+      await followFrom(
+        receiptOf("cm-4", "started", "3"),
+        [...earlier, ...promptRun("run-3", 5, [["cm-4", "kiwi"]])],
+        runningAt(5, "run-3"),
+      ),
+    ).toEqual([
+      { kind: "waiting", state: "turn_running" },
+      { kind: "text", delta: "kiwi" },
+      { kind: "end", outcome: { reason: "settled", text: "kiwi", turn_id: "3" } },
+    ])
+  })
+
+  test("#given a follow opened after its send's turn already ended #when the replay holds that turn #then its reply and end at once", async () => {
+    const done = { lifecycle: { state: "done", seq: 2, runId: "run-1" } }
+    expect(await followFrom(receiptOf("cm-1", "started", "1"), replayed, done)).toEqual([
+      { kind: "waiting", state: "turn_running" },
+      { kind: "text", delta: "pong" },
+      { kind: "end", outcome: { reason: "settled", text: "pong", turn_id: "1" } },
+    ])
+  })
+})
+
+describe("sessions.follow rows: from one send, replayed with the snapshot at attach", () => {
+  test("#given an attach whose first records already hold the send's whole turn #when follow opens from it #then that turn, not lost before follow is ready", async () => {
+    // The owner sends these right behind the snapshot, as the device service replays them, before follow is wired.
+    const owner = await startOwner(worldWith(IDLE, promptRun("run-1", 1, [["cm-1", "pong"]])))
+    const client = clientOn(owner.stateDir, fakeClock())
+    const events = reader(client.sessions.follow(THREAD, { from: receiptOf("cm-1", "started", "1") }))
+    expect(await drain(events)).toEqual([
+      { kind: "waiting", state: "turn_running" },
+      { kind: "text", delta: "pong" },
+      { kind: "end", outcome: { reason: "settled", text: "pong", turn_id: "1" } },
+    ])
+  })
+})
+
+describe("sessions.wait rows: from one send (#13753)", () => {
+  test("#given a back-to-back send #when the previous turn's end is replayed #then wait settles only on this send's turn", async () => {
+    const { owner, client } = await on(IDLE, undefined, {
+      reply: { lifecycle: { state: "running", seq: 3, runId: "run-2" } },
+    })
+    const settling = client.sessions.wait(THREAD, { from: receiptOf("cm-2", "started", "2") })
+    const settled = settledYet(settling)
+    await listening(client)
+    pushRecords(owner, promptRun("run-1", 1, [["cm-1", "pong"]]))
+    await listening(client)
+    expect(settled()).toBe(false)
+    pushRecords(owner, promptRun("run-2", 3, [["cm-2", "ping"]]))
+    expect(await settling).toMatchObject({ kind: "ok", value: { outcome: "settled", status: "idle" } })
   })
 })
 

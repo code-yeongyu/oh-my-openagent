@@ -8,12 +8,14 @@ import type {
   AttachEvent,
   AttachHandle,
   FollowEvent,
+  FollowOpts,
   FollowOutcome,
   JsonObject,
   Opts,
   PendingRequest,
   R,
   RemoteFailure,
+  SendReceipt,
   SnapshotBody,
   ThreadHandle,
   WaitResult,
@@ -38,6 +40,8 @@ type SessionWatch = {
    * why none was (the read failed, ended uncertain, or the host sent no engine reply).
    */
   readonly baseline: () => Promise<RemoteFailure | undefined>
+  /** Delivers what arrived since the open (the attach's replay first), then everything as it arrives. */
+  readonly start: () => void
   readonly stop: () => void
 }
 
@@ -90,19 +94,37 @@ async function watchSession(
     if (!stopped) handlers.fresh(data)
     return undefined
   }
-  const stopSnapshots = onSnapshot((snapshot) => {
+  // Nothing reaches the handlers before the caller is ready for it (start): the attach replays its records the moment it
+  // opens, and a record dropped there could be the very turn a follow waits for.
+  type Arrival =
+    | { readonly kind: "event"; readonly event: AttachEvent }
+    | { readonly kind: "snapshot"; readonly snapshot: SnapshotBody }
+    | { readonly kind: "ended" }
+  let early: Arrival[] | undefined = []
+  const arrive = (arrival: Arrival): void => {
     if (stopped) return
-    handlers.snapshot(snapshot)
-    void readFresh()
-  })
+    if (early !== undefined) return void early.push(arrival)
+    if (arrival.kind === "event") handlers.event(arrival.event)
+    else if (arrival.kind === "ended") handlers.ended()
+    else {
+      handlers.snapshot(arrival.snapshot)
+      void readFresh()
+    }
+  }
+  const stopSnapshots = onSnapshot((snapshot) => arrive({ kind: "snapshot", snapshot }))
   void (async () => {
-    for await (const event of handle.events) if (!stopped) handlers.event(event)
-    if (!stopped) handlers.ended()
+    for await (const event of handle.events) arrive({ kind: "event", event })
+    arrive({ kind: "ended" })
   })()
   return ok({
     initial: handle.snapshot,
     handle,
     baseline: readFresh,
+    start: () => {
+      const arrived = early ?? []
+      early = undefined
+      for (const arrival of arrived) arrive(arrival)
+    },
     stop: () => {
       stopped = true
       stopSnapshots()
@@ -437,6 +459,11 @@ class SessionTurn {
     }
   }
 
+  /** The followed send's turn began: the session runs it (its agent_start carries no client id). */
+  markRunning(): void {
+    this.#markRunning()
+  }
+
   #markRunning(): void {
     this.running = true
     this.#endPending = false
@@ -484,6 +511,56 @@ export function sessionStatusOf(state: JsonObject, entries: readonly unknown[] =
   return turn.status
 }
 
+/** A record's client message ids: the one it carries, and every input of its turn when it names several. */
+const clientIdsOf = (record: JsonObject): readonly string[] => {
+  const list = record["clientMessages"]
+  const listed = Array.isArray(list)
+    ? list.flatMap((input) => {
+        const id = isObject(input) ? nonEmpty(input["clientMessageId"]) : undefined
+        return id === undefined ? [] : [id]
+      })
+    : []
+  const own = nonEmpty(record["clientMessageId"])
+  return own === undefined ? listed : [own, ...listed]
+}
+
+/**
+ * follow and wait `from` one send (#13753). The engine stamps the prompt's clientMessageId on every record of the turn
+ * that answers it (senpi ClientMessageEvents: turn_start, message_*, tool_execution_*, its message entries, turn_end,
+ * agent_end), live and in any replay; leases, session_status, agent_start and agent_settled carry none (live relay
+ * trace). So the send's turn is exactly the records that carry its id: nothing else is its text or its end, whatever the
+ * attach replays. It ends at an agent_end that carries the id, or when another input's turn takes over (a queued input
+ * is answered inside the same run, whose agent_end then names only the last input).
+ */
+class SendTurn {
+  readonly #id: string
+  #seen = false
+
+  constructor(id: string) {
+    this.#id = id
+  }
+
+  /** What `record` is to this send: one of its turn's records, its turn's end, the next input taking over, or none. */
+  classify(record: JsonObject): "ours" | "end" | "over" | "other" {
+    const ids = clientIdsOf(record)
+    if (ids.includes(this.#id)) {
+      this.#seen = true
+      return record["type"] === "agent_end" ? "end" : "ours"
+    }
+    return this.#seen && ids.length > 0 && record["type"] === "turn_start" ? "over" : "other"
+  }
+
+  get started(): boolean {
+    return this.#seen
+  }
+}
+
+/** A send's turn end, under the receipt's turn id: the identity the send itself reported. */
+const sendOutcome = (turn: SessionTurn, from: SendReceipt): FollowOutcome => {
+  const { turn_id: _runId, ...outcome } = turn.outcome()
+  return { ...outcome, ...(from.turn_id === undefined ? {} : { turn_id: from.turn_id }) }
+}
+
 const WAITING: Readonly<Record<string, Extract<FollowEvent, { readonly kind: "waiting" }>["state"]>> = {
   running: "turn_running",
   idle: "idle",
@@ -510,7 +587,7 @@ const attachEnded = (): RemoteFailure =>
 export function streamMembers(core: ClientCore): StreamMembers {
   const person = core.sender.kind === "person"
 
-  const follow = (thread: ThreadHandle, opts?: Opts) => {
+  const follow = (thread: ThreadHandle, opts?: FollowOpts) => {
     let watch: SessionWatch | undefined
     let finished = false
     const deadlineMs = opts?.deadlineMs ?? DEADLINES.followTotal
@@ -570,14 +647,35 @@ export function streamMembers(core: ClientCore): StreamMembers {
       }
     }
 
+    // From one send: only the records that carry its id (SendTurn); the session's state and leases are not consulted.
+    const from = opts?.from
+    const send = from?.delivery_id === undefined ? undefined : new SendTurn(from.delivery_id)
+    const ofSend = (event: AttachEvent): void => {
+      if (turn === undefined || from === undefined || send === undefined) return
+      if (event.kind !== "record") return deliver(turn.apply(event))
+      const seen = send.started
+      const verdict = send.classify(event.record)
+      if (verdict === "other") return
+      if (verdict === "over") return finish({ kind: "end", outcome: sendOutcome(turn, from) })
+      if (!seen) {
+        turn.markRunning()
+        output.push({ kind: "waiting", state: "turn_running" })
+      }
+      deliver(turn.apply(event))
+      if (verdict === "end" && !finished) finish({ kind: "end", outcome: sendOutcome(turn, from) })
+    }
+
     let anchor: FollowAnchor | undefined
     const release = (events: readonly AttachEvent[]): void => {
       for (const event of events) if (turn !== undefined) deliver(turn.apply(event))
     }
     void watchSession(core, thread, opts?.signal, {
-      event: (event) => release(anchor?.accept(event) ?? []),
-      snapshot: (snapshot) => deliver(turn?.resync(snapshot) ?? []),
+      event: (event) => (send === undefined ? release(anchor?.accept(event) ?? []) : ofSend(event)),
+      snapshot: (snapshot) => {
+        if (send === undefined) deliver(turn?.resync(snapshot) ?? [])
+      },
       fresh: (state) => {
+        if (send !== undefined) return
         deliver(turn?.fresh(state) ?? [])
         release(anchor?.baseline(leaseOf(state["lifecycle"])) ?? [])
       },
@@ -587,6 +685,12 @@ export function streamMembers(core: ClientCore): StreamMembers {
       watch = opened.value
       if (finished) return watch.stop()
       turn = new SessionTurn()
+      if (send !== undefined) {
+        if (person) for (const request of watch.handle.pending()) output.push({ kind: "frame", request })
+        if (from?.lane === "queued" || from?.lane === "queued_offline")
+          output.push({ kind: "waiting", state: "queued" })
+        return watch.start()
+      }
       turn.resync(opened.value.initial)
       if (person) for (const request of watch.handle.pending()) output.push({ kind: "frame", request })
       const first = waiting(turn.status)
@@ -594,6 +698,7 @@ export function streamMembers(core: ClientCore): StreamMembers {
       const atOpen = snapshotLease(opened.value.initial)
       const anchored = new FollowAnchor(atOpen)
       anchor = anchored
+      watch.start()
       // Without a fresh state the snapshot's lease is the best anchor this follow has.
       void watch.baseline().then((unread) => {
         if (unread !== undefined) release(anchored.baseline(atOpen))
@@ -602,7 +707,7 @@ export function streamMembers(core: ClientCore): StreamMembers {
     return output.stream
   }
 
-  const wait = (thread: ThreadHandle, opts?: Opts): R<WaitResult> => {
+  const wait = (thread: ThreadHandle, opts?: FollowOpts): R<WaitResult> => {
     const start = core.timers.now()
     return new Promise((resolve) => {
       let watch: SessionWatch | undefined
@@ -638,10 +743,23 @@ export function streamMembers(core: ClientCore): StreamMembers {
       const release = (events: readonly AttachEvent[]): void => {
         for (const event of events) if (turn !== undefined) check(turn.apply(event))
       }
+      // From one send: settled on its turn's end (idle) or on the next input taking over (running), nothing else.
+      const send = opts?.from?.delivery_id === undefined ? undefined : new SendTurn(opts.from.delivery_id)
+      const ofSend = (event: AttachEvent): void => {
+        if (turn === undefined || send === undefined) return
+        if (event.kind !== "record") return check(turn.apply(event))
+        const verdict = send.classify(event.record)
+        if (verdict === "end") return result("settled", "idle")
+        if (verdict === "over") return result("settled", "running")
+        if (verdict === "ours") turn.markRunning()
+      }
       void watchSession(core, thread, opts?.signal, {
-        event: (event) => release(anchor?.accept(event) ?? []),
-        snapshot: (snapshot) => check(turn?.resync(snapshot) ?? []),
+        event: (event) => (send === undefined ? release(anchor?.accept(event) ?? []) : ofSend(event)),
+        snapshot: (snapshot) => {
+          if (send === undefined) check(turn?.resync(snapshot) ?? [])
+        },
         fresh: (state) => {
+          if (send !== undefined) return
           check(turn?.fresh(state) ?? [])
           release(anchor?.baseline(leaseOf(state["lifecycle"])) ?? [])
         },
@@ -651,11 +769,13 @@ export function streamMembers(core: ClientCore): StreamMembers {
         watch = opened.value
         if (settled) return watch.stop()
         turn = new SessionTurn()
+        if (send !== undefined) return watch.start()
         turn.resync(opened.value.initial)
         const atOpen = snapshotLease(opened.value.initial)
         const anchored = new FollowAnchor(atOpen)
         anchor = anchored
         check([])
+        watch.start()
         const unread = await opened.value.baseline()
         if (unread !== undefined) release(anchored.baseline(atOpen))
         // Without a fresh state "no run" is unknown (the snapshot's idle can be stale): a run already seen is still
