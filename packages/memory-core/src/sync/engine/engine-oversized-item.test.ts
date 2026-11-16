@@ -56,8 +56,8 @@ test(
     await a.write("big.md", note(`${"y".repeat(bound * 2)}\n`))
     const heldAt = a.clock.now()
     await a.engine.runCycle()
+    // A hold is not a failure (#12392): every other file synced, so the status keeps the last sync time.
     const held = {
-      kind: "failing",
       since: heldAt,
       failure: {
         kind: "oversized_item",
@@ -67,11 +67,11 @@ test(
         action: expect.stringContaining("big.md"),
       },
     }
-    expect(await a.engine.status()).toMatchObject({ ...held, attempts: 1 })
+    expect(await a.engine.status()).toMatchObject({ kind: "held", at: heldAt, held: { ...held, attempts: 1 } })
     expect(changes).toBe(1)
     a.clock.advance(10_000)
     await a.engine.runCycle()
-    expect(await a.engine.status()).toMatchObject({ ...held, attempts: 2 })
+    expect(await a.engine.status()).toMatchObject({ kind: "held", at: a.clock.now(), held: { ...held, attempts: 2 } })
     expect(changes).toBe(1)
     await b.engine.runCycle()
     expect(await b.read("small.md")).toBe(note("small\n"))
@@ -128,8 +128,9 @@ test(
     b.verifier.failing.clear()
     await b.engine.runCycle()
     expect(await b.engine.status()).toMatchObject({
-      kind: "failing",
-      failure: { kind: "oversized_item", keys: ["big.md"] },
+      kind: "held",
+      at: b.clock.now(),
+      held: { failure: { kind: "oversized_item", keys: ["big.md"] } },
     })
     expect(await b.read("one.md")).toBe("one\n")
   },

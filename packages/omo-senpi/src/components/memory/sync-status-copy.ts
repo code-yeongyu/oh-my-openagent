@@ -1,4 +1,4 @@
-// The desktop snapshot of a failing or frozen engine (or a pause carrying held files, #12284), and what a person is told about a freeze (rotation
+// The desktop snapshot of a failing, frozen or held engine (or a pause carrying held files, #12284), and what a person is told about a freeze (rotation
 // on revoke, #12280: the engine reports a closed code; the words live here). It ships in the sync
 // sidecar: both statuses exist only while the engine runs, so the eager bundle carries none of it.
 
@@ -9,6 +9,7 @@ import type { MemoryRpcSync } from "./memory-rpc-sync"
 type Frozen = Extract<EngineStatus, { readonly kind: "frozen" }>
 type Failing = Extract<EngineStatus, { readonly kind: "failing" }>
 type Paused = Extract<EngineStatus, { readonly kind: "paused" }>
+type Held = Extract<EngineStatus, { readonly kind: "held" }>
 
 const ACTION: Partial<Record<Frozen["reason"], string>> = {
   waiting_recovery: "Run recovery again on this device.",
@@ -31,10 +32,15 @@ export function freezeFailure(status: Frozen): {
 }
 
 /**
- * The desktop snapshot. Its schema accepts only the current literals, so a freeze, and a held file
- * (#12284), is a failure of the "unknown" kind; a hold keeps its reason, action and keys.
+ * The desktop snapshot. Its schema accepts only the current literals, so a freeze is a failure of the "unknown"
+ * kind. Held files are no failure (#12392): the state stays synced (or never synced) and an additive `held`
+ * names them. A pause that carries held files keeps them as its "unknown" failure for an older desktop too.
  */
-export function failureRpcSync(status: Failing | Frozen | Paused): MemoryRpcSync {
+export function failureRpcSync(status: Failing | Frozen | Paused | Held): MemoryRpcSync {
+  if (status.kind === "held")
+    return status.at === null
+      ? { state: "never_synced", held: rpcHeld(status.held) }
+      : { state: "synced", lastSyncedAtISO: new Date(status.at).toISOString(), held: rpcHeld(status.held) }
   if (status.kind === "frozen") {
     const { reason, action } = freezeFailure(status)
     return {
@@ -43,8 +49,22 @@ export function failureRpcSync(status: Failing | Frozen | Paused): MemoryRpcSync
     }
   }
   if (status.kind === "paused")
-    return status.held === undefined ? { state: "paused" } : { state: "paused", failure: rpcFailure(status.held) }
+    return status.held === undefined
+      ? { state: "paused" }
+      : { state: "paused", failure: rpcFailure(status.held), held: rpcHeld(status.held) }
   return { state: "failing", failure: rpcFailure(status) }
+}
+
+function rpcHeld({ failure, since, attempts }: Held["held"]): NonNullable<MemoryRpcSync["held"]> {
+  return {
+    keys: failure.keys,
+    stuckKeys: failure.stuck,
+    limitBytes: failure.limitBytes,
+    reason: failure.reason,
+    action: failure.action,
+    sinceISO: new Date(since).toISOString(),
+    attempts,
+  }
 }
 
 function rpcFailure({ failure, since, attempts }: Omit<Failing, "kind">): NonNullable<MemoryRpcSync["failure"]> {

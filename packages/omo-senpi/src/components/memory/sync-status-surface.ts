@@ -26,10 +26,16 @@ export const SYNC_RECOVERED_NOTICE = "Memory sync is working again."
 export const SYNC_BLOCKED_NOTICE_PREFIX = "Memory sync is blocked."
 export const SYNC_HELD_NOTICE_PREFIX = "Memory sync is holding back a file."
 
-/** The failure a status asks the person about: a failing cycle, or files held while a refused entry pauses sync. */
-export function shownSyncFailure(status: Awaited<ReturnType<SyncStatusReader>> | undefined): SyncFailure | undefined {
-  if (status?.kind === "failing") return status.failure
-  if (status?.kind === "paused") return status.held?.failure
+/**
+ * What a status asks the person about: a failing cycle (it blocks sync), or files held out of the push (#12392),
+ * on their own or while a refused entry pauses sync (they hold only those files).
+ */
+export function shownSyncFailure(
+  status: Awaited<ReturnType<SyncStatusReader>> | undefined,
+): { readonly failure: SyncFailure; readonly held: boolean } | undefined {
+  if (status?.kind === "failing") return { failure: status.failure, held: false }
+  if (status?.kind === "held") return { failure: status.held.failure, held: true }
+  if (status?.kind === "paused" && status.held !== undefined) return { failure: status.held.failure, held: true }
   return undefined
 }
 
@@ -40,20 +46,21 @@ export function createSyncStatusNotifier(read: SyncStatusReader): SyncStatusNoti
       // A failed read says nothing about sync, so it changes no notice; the next change reads again.
       const status = await read(repo).catch(() => undefined)
       if (status === undefined) return
-      const failure =
+      const shown =
         status?.kind === "frozen"
-          ? (await import("#omo-memory-sync-runtime")).freezeFailure(status)
+          ? { failure: (await import("#omo-memory-sync-runtime")).freezeFailure(status), held: false }
           : shownSyncFailure(status)
       const previous = announced.get(repo)
-      if (failure === undefined) {
+      if (shown === undefined) {
         announced.delete(repo)
         if (previous !== undefined) ui?.notify(SYNC_RECOVERED_NOTICE, "info")
         return
       }
+      const { failure } = shown
       const key = `${failure.kind}\n${failure.action}`
       // Background transitions must not consume a notice the person has never seen.
       if (previous === key || ui === undefined) return
-      const prefix = failure.kind === "oversized_item" ? SYNC_HELD_NOTICE_PREFIX : SYNC_BLOCKED_NOTICE_PREFIX
+      const prefix = shown.held ? SYNC_HELD_NOTICE_PREFIX : SYNC_BLOCKED_NOTICE_PREFIX
       ui.notify(`${prefix} ${failure.reason} ${failure.action}`, "warning")
       announced.set(repo, key)
     },

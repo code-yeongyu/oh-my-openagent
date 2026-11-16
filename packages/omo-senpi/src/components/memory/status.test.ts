@@ -360,7 +360,7 @@ describe("refreshMemoryStatus segments", () => {
     action: "a",
   } as const
   test.each([
-    ["failing on held files", { kind: "failing", since: 0, attempts: 1, failure: heldFailure } as const],
+    ["holding files", { kind: "held", at: 1, held: { since: 0, attempts: 1, failure: heldFailure } } as const],
     [
       "paused at a refused entry while holding files",
       { kind: "paused", seq: 1, code: "signature", held: { since: 0, attempts: 1, failure: heldFailure } } as const,

@@ -25,6 +25,21 @@ export interface MemoryRpcSync {
     readonly stuckKeys?: readonly string[]
     readonly limitBytes?: number
   }
+  /**
+   * Files held out of the push because they are too large (#12284), while everything else syncs (#12392): on a
+   * `synced` (or `never_synced`) state, and on a `paused` one beside its legacy failure. Additive, so a desktop
+   * that does not know it still renders the state.
+   */
+  readonly held?: {
+    readonly keys: readonly string[]
+    /** The held files whose queued change this device cannot send even if made smaller. */
+    readonly stuckKeys: readonly string[]
+    readonly limitBytes: number
+    readonly reason: string
+    readonly action: string
+    readonly sinceISO: string
+    readonly attempts: number
+  }
 }
 
 export async function readMemoryRpcSync(
@@ -44,7 +59,8 @@ export async function readMemoryRpcSync(
         : (await import("#omo-memory-sync-runtime")).failureRpcSync(status)
     case "synced":
       return { state: "synced", lastSyncedAtISO: new Date(status.at).toISOString() }
-    // Both exist only while the engine runs, so their mapping ships with it (sync-status-copy.ts).
+    // These exist only while the engine runs, so their mapping ships with it (sync-status-copy.ts).
+    case "held":
     case "failing":
     case "frozen":
       return (await import("#omo-memory-sync-runtime")).failureRpcSync(status)

@@ -7,7 +7,7 @@
 import { advance, applyVerified } from "./apply"
 import type { EngineDeps } from "./engine-deps"
 import type { SyncFailure } from "./failure"
-import { batchBound, heldShown, recordHeld } from "./held"
+import { batchBound, type HeldShown, heldShown, recordHeld } from "./held"
 import { type EngineState, SyncJournal } from "./journal"
 import { type CaptureHolds, capture } from "./local-capture"
 import { pushCycle } from "./push-cycle"
@@ -24,16 +24,15 @@ export const LOCAL_DEBOUNCE_MS = 2_000
 export type EngineStatus =
   | { readonly kind: "never_synced" }
   | { readonly kind: "synced"; readonly at: number; readonly updatedWhileOffline: number }
-  | { readonly kind: "paused"; readonly seq: number; readonly code: RefusalCode; readonly held?: Failing }
+  | { readonly kind: "paused"; readonly seq: number; readonly code: RefusalCode; readonly held?: HeldShown }
   /** Pushes are frozen by the service until a key rotation lands (sync-design section 7). */
   | { readonly kind: "frozen"; readonly reason: FreezeReason; readonly since: number }
   | { readonly kind: "failing"; readonly failure: SyncFailure; readonly since: number; readonly attempts: number }
-
-export interface Failing {
-  readonly failure: SyncFailure
-  readonly since: number
-  readonly attempts: number
-}
+  /**
+   * Files held out of the push (#12284) while everything else syncs: not a failure (#12392). `at` is the last
+   * successful sync, as in `synced`; null only before any cycle completed.
+   */
+  | { readonly kind: "held"; readonly at: number | null; readonly held: HeldShown }
 
 export interface CycleReport {
   readonly applied: number
@@ -85,7 +84,8 @@ export class SyncEngine {
 
   /**
    * What a UI shows: a shown failure until a cycle succeeds, paused at a refused entry (carrying any
-   * held items along), the items held out of the push while any is, else the last successful sync.
+   * held items along), the items held out of the push (with the last successful sync) while any is, else the
+   * last successful sync.
    */
   async status(): Promise<EngineStatus> {
     // Failing outranks paused on purpose: while no cycle completes nothing moves at all, and a paused refusal shows again after the first good cycle.
@@ -96,7 +96,7 @@ export class SyncEngine {
     // A refused entry is never hidden behind a held item (#12284 review L3); the pause carries the hold along.
     if (s.paused !== null)
       return { kind: "paused", seq: s.paused.seq, code: s.paused.code, ...(held === null ? {} : { held }) }
-    if (held !== null) return { kind: "failing", ...held }
+    if (held !== null) return { kind: "held", at: s.lastSyncedAt, held }
     if (s.lastSyncedAt === null) return { kind: "never_synced" }
     return { kind: "synced", at: s.lastSyncedAt, updatedWhileOffline: s.updatedWhileOffline }
   }
