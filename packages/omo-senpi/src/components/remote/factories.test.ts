@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import type { RemoteClient } from "./client"
-import { remoteClientForCli, remoteClientForConnector, remoteClientForPerson, remoteClientForSession } from "./factories"
+import {
+  remoteClientForCli,
+  remoteClientForConnector,
+  remoteClientForPerson,
+  remoteClientForSession,
+} from "./factories"
 import { closeClients, failureOf, fakeClock, startOwner } from "./testing/fake-service"
 
 // The factories fix who a client acts as and which omo version it hands the device service in its hello; the conformance
@@ -46,13 +51,16 @@ describe("remote client factories", () => {
       remoteClientForCli("501", deps),
     ].map(kept)
 
-    for (const client of built) expect(failureOf(await client.service.setEnabled(false)).code).toBe("sender_not_allowed")
+    for (const client of built)
+      expect(failureOf(await client.service.setEnabled(false)).code).toBe("sender_not_allowed")
     expect(await kept(remoteClientForPerson(deps)).service.status()).toMatchObject({ value: { enabled: true } })
   })
 
   test("#given an explicit version #when the client reaches the service #then the hello carries that version", async () => {
     const owner = await startOwner()
-    const client = kept(remoteClientForSession("dur-1", { version: "9.9.9", stateDir: owner.stateDir, timers: fakeClock() }))
+    const client = kept(
+      remoteClientForSession("dur-1", { version: "9.9.9", stateDir: owner.stateDir, timers: fakeClock() }),
+    )
 
     expect((await client.service.info()).kind).toBe("ok")
     expect([...owner.state.conns].map((conn) => conn.client()?.version)).toEqual(["9.9.9"])
