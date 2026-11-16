@@ -1,13 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  realpathSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { tmpdir } from "node:os"
 import { spawnSync } from "node:child_process"
@@ -59,7 +51,9 @@ describe("omo-senpi local-path runtime dependencies", () => {
       symlinkSync(isolatedPluginRoot, hostPluginPath, "dir")
       expect(realpathSync(hostPluginPath)).toBe(realpathSync(isolatedPluginRoot))
 
-      const importedExtensionUrl = pathToFileURL(join(hostPluginPath, "extensions", "runtime-dependency-probe.mjs")).href
+      const importedExtensionUrl = pathToFileURL(
+        join(hostPluginPath, "extensions", "runtime-dependency-probe.mjs"),
+      ).href
       const result = spawnSync(
         "node",
         ["--input-type=module", "-e", `await import(${JSON.stringify(importedExtensionUrl)})`],

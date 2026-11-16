@@ -1,6 +1,6 @@
-import type { AliasRegistry, AliasResult, RemoteSessionsPort, RemoteThreadSurface } from "./ports"
+import type { AliasRegistry, AliasResult, RemoteSessionsPort, RemoteThreadSurface } from "../../thread/remote/ports"
 
-type Runtime = Pick<typeof import("./device-service"), "createDeviceServiceSessions">
+type Runtime = Pick<typeof import("./thread-runtime"), "remoteSessionsPort">
 
 export type LazyRemoteOptions = {
   readonly version: string
@@ -22,7 +22,7 @@ export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThrea
   let port: Promise<RemoteSessionsPort> | undefined
   const load = () =>
     (port ??= options.loadRuntime().then(
-      ({ createDeviceServiceSessions }) => createDeviceServiceSessions({ version: options.version }),
+      ({ remoteSessionsPort }) => remoteSessionsPort(options.version),
       (error: unknown) => {
         port = undefined
         throw error
@@ -43,7 +43,8 @@ export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThrea
     sessionCommand: async (device, sessionId, rpc, options) =>
       await (await load()).sessionCommand(device, sessionId, rpc, options),
     read: async (device, sessionId, tail) => await (await load()).read(device, sessionId, tail),
-    watch: async (device, sessionId, listener) => await (await load()).watch(device, sessionId, listener),
+    watch: async (device, sessionId, handlers, watchOptions) =>
+      await (await load()).watch(device, sessionId, handlers, watchOptions),
     close: async () => {
       const loaded = port
       port = undefined

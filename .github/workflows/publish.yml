@@ -36,6 +36,16 @@ on:
         description: "Internal: exact prepared source SHA for the provenance-bearing publish run."
         required: false
         type: string
+      ci_basis_receipt:
+        description: "Maintainer-only: id of an exact-head CI basis receipt that waives the hosted ci.yml wait in gate-reuse. Requires prepared_release_sha and ci_basis_head. Leave empty to wait for hosted CI."
+        required: false
+        type: string
+        default: ""
+      ci_basis_head:
+        description: "Maintainer-only: the 40-hex commit the ci_basis_receipt covers; must be prepared_release_sha or an ancestor of it that differs only under .github/workflows/."
+        required: false
+        type: string
+        default: ""
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
@@ -76,8 +86,78 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PREPARED_RELEASE_SHA: ${{ inputs.prepared_release_sha }}
+          CI_BASIS_RECEIPT: ${{ inputs.ci_basis_receipt }}
+          CI_BASIS_HEAD: ${{ inputs.ci_basis_head }}
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
+
+          # Explicit, logged waiver of the hosted CI wait. An empty receipt keeps the default path below.
+          if [ -n "$CI_BASIS_RECEIPT" ]; then
+            LC_ALL=C # ASCII-only character classes for the shape checks; this block always exits.
+            if ! [[ "$CI_BASIS_RECEIPT" =~ ^[[:print:]]{1,128}$ ]]; then
+              echo "::error::ci_basis_receipt refused: it must be 1-128 printable ASCII characters with no newline or control character."
+              exit 1
+            fi
+            if [ -z "$PREPARED_RELEASE_SHA" ]; then
+              echo "::error::ci_basis_receipt refused: prepared_release_sha is empty; the waiver only applies to the prepared-source publish run."
+              exit 1
+            fi
+            if ! [[ "$PREPARED_RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::ci_basis_receipt refused: prepared_release_sha must be a full 40-character lowercase hex commit SHA."
+              exit 1
+            fi
+            if ! [[ "$CI_BASIS_HEAD" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::ci_basis_receipt refused: ci_basis_head must be a full 40-character lowercase hex commit SHA."
+              exit 1
+            fi
+            for login in "$ACTOR" "$TRIGGERING_ACTOR"; do
+              if ! [[ "$login" =~ ^[A-Za-z0-9][A-Za-z0-9-]{0,38}$ ]]; then
+                echo "::error::ci_basis_receipt refused: actor '${login}' is not a GitHub user login and cannot be a maintainer."
+                exit 1
+              fi
+              if ! role="$(gh api "repos/${REPOSITORY}/collaborators/${login}/permission" --jq '.role_name')"; then
+                echo "::error::ci_basis_receipt refused: could not read the repository permission of ${login}."
+                exit 1
+              fi
+              if [ "$role" != "admin" ] && [ "$role" != "maintain" ]; then
+                echo "::error::ci_basis_receipt refused: ${login} has repository role '${role}'; only admin or maintain may waive hosted CI."
+                exit 1
+              fi
+            done
+            # The receipt covers ci_basis_head; the prepared source may add workflow-only commits on top of it.
+            # The fetch depth bounds the ancestry search; an ancestor beyond it is refused, never assumed.
+            if ! git fetch --no-tags --depth=200 origin "$CI_BASIS_HEAD" "$PREPARED_RELEASE_SHA"; then
+              echo "::error::ci_basis_receipt refused: could not fetch ci_basis_head ${CI_BASIS_HEAD} and prepared_release_sha ${PREPARED_RELEASE_SHA}."
+              exit 1
+            fi
+            if ! git merge-base --is-ancestor "$CI_BASIS_HEAD" "$PREPARED_RELEASE_SHA"; then
+              echo "::error::ci_basis_receipt refused: ci_basis_head ${CI_BASIS_HEAD} is not an ancestor of prepared_release_sha ${PREPARED_RELEASE_SHA} within 200 commits."
+              exit 1
+            fi
+            delta="$(git diff --no-renames --name-only "$CI_BASIS_HEAD" "$PREPARED_RELEASE_SHA" --)"
+            outside="$(grep -v '^\.github/workflows/' <<< "$delta" || true)"
+            if [ -n "$outside" ]; then
+              echo "::error::ci_basis_receipt refused: ${CI_BASIS_HEAD}..${PREPARED_RELEASE_SHA} changes files outside .github/workflows/: $(tr '\n' ' ' <<< "$outside")"
+              exit 1
+            fi
+            {
+              echo "- ci_basis_receipt: ${CI_BASIS_RECEIPT}"
+              echo "- ci_basis_head: ${CI_BASIS_HEAD}"
+              echo "- prepared_release_sha: ${PREPARED_RELEASE_SHA}"
+              echo "- actor: ${ACTOR} (triggered by ${TRIGGERING_ACTOR})"
+              echo "- hosted CI wait waived by ci_basis_receipt"
+              echo ""
+              echo "Workflow-only delta (git diff --stat ${CI_BASIS_HEAD}..${PREPARED_RELEASE_SHA}):"
+              echo ""
+              echo '```'
+              git diff --no-renames --stat "${CI_BASIS_HEAD}..${PREPARED_RELEASE_SHA}" --
+              echo '```'
+            } | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
 
           if [ -z "$PREPARED_RELEASE_SHA" ]; then
             echo "Skipping duplicate gates on the release preparation dispatch."
@@ -164,6 +244,7 @@ jobs:
           JOB_SUMMARY_DETAILS: |
             - Skips release validation on the preparation dispatch, which cannot publish.
             - Waits for a successful CI push workflow run on the exact prepared SHA.
+            - A repository admin or maintainer may waive that wait with a ci_basis_receipt whose head differs from the prepared SHA only under .github/workflows/; the waiver and delta are logged.
             - Fails closed when CI fails, is cancelled, times out, or cannot be read.
           JOB_SUMMARY_NEXT: Rerun CI on the prepared SHA or fix its failed workflow before publishing.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
