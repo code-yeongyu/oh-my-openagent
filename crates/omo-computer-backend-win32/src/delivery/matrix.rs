@@ -5,8 +5,10 @@
 //! the ledger; a refusal never needs a measurement to be safe (`delivery/tests/matrix.rs`).
 //!
 //! A class pattern is an exact window class, or a prefix ending in `*` that needs a non-empty
-//! rest, so a lookalike (`ChromeLikeWidgetWin`) is never a member. Family `*` with class `*` is a
-//! per-ROUTE row every family drops (`chord_modifier`).
+//! rest, so a lookalike (`ChromeLikeWidgetWin`) is never a member. Family `unknown` with class `*`
+//! is the catch-all after every named row: a class the spike measured no cell for refuses every
+//! background verb. Family `*` with class `*` is a per-ROUTE row every family drops
+//! (`chord_modifier`).
 
 use std::sync::OnceLock;
 

@@ -11,6 +11,7 @@ use omo_computer_core::params::{Button, Point};
 
 use crate::barrier::{consumed_hop, Barrier};
 use crate::input::chords::posted_press;
+use crate::input::focus_child::NO_FOCUS_TARGET;
 use crate::input::text::background_chars;
 use crate::input::vk::chord_of;
 use crate::input::{Posted, WM_CHAR, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP};
@@ -205,6 +206,10 @@ fn admitted_child(
     at: Point,
     verb: Verb,
 ) -> Result<(isize, ClientPoint), Refusal> {
+    // A window its modal dialog disabled takes no real input, pointer or keys (the key path's rule).
+    if !os.enabled(top) {
+        return Err(NO_FOCUS_TARGET);
+    }
     let (child, client) = os.child_at(top, at).ok_or(NO_POINT)?;
     admit(family_of(&os.class(child).unwrap_or_default()), verb)
         .map_err(|refused| refused.refusal)?;

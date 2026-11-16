@@ -22,6 +22,8 @@ pub enum Family {
     /// The Direct2D rich edit (`RichEditD2DPT`, the Windows 11 Notepad edit): refused until the
     /// spike measures it (its posted `WM_CHAR` row hit classic `Edit`); owed to row 69.
     RichEditD2d,
+    /// A class with no row of its own (the matrix's catch-all `unknown` row): the spike measured no
+    /// cell for it, so every background verb refuses until a measured row names the class.
     Unknown,
 }
 
@@ -40,6 +42,7 @@ impl Family {
             "terminal" => Self::Terminal,
             "classic" => Self::Classic,
             "richedit_d2d" => Self::RichEditD2d,
+            "unknown" => Self::Unknown,
             _ => return None,
         })
     }
@@ -123,7 +126,8 @@ pub fn family_of(class: &str) -> Family {
 ///
 /// # Errors
 /// `BackgroundUnavailable` (`chromium_electron`, `toolkit`, or `posted_modifier_chord` for the
-/// per-route row) with the foreground as the next call, nothing sent.
+/// per-route row) with the foreground as the next call, nothing sent; `Internal{route_table_invalid}`
+/// when the matrix failed to load.
 pub fn admit(family: Family, verb: Verb) -> Result<(), FamilyRefusal> {
     admit_in(rows(), family, verb)
 }
@@ -135,10 +139,7 @@ pub fn admit(family: Family, verb: Verb) -> Result<(), FamilyRefusal> {
 pub fn admit_in(table: Option<&[Row]>, family: Family, verb: Verb) -> Result<(), FamilyRefusal> {
     let Some(table) = table else {
         return Err(FamilyRefusal {
-            refusal: Refusal::new(
-                EngineCode::BackgroundUnavailable,
-                Reason::PostedModifierChord,
-            ),
+            refusal: Refusal::new(EngineCode::Internal, Reason::RouteTableInvalid),
             next: NextDelivery::Foreground,
         });
     };
