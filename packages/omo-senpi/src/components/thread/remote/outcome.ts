@@ -84,6 +84,22 @@ const UNANSWERED: ReadonlySet<string> = new Set([
     .map(([reason]) => reason),
 ])
 
+// Device-service refusals that say THIS device is not attached to the relay: its sign-in lapsed (the service answers
+// sign_in_required at once for any call toward another device, omo-relay-daemon's sign-in gate) or it is signed out here.
+// Nothing reached the other device and no update helps; the remedy is signing in on this device.
+const NOT_SIGNED_IN: ReadonlySet<string> = new Set(["sign_in_required", "signed_out"])
+
+/** The failure for a refusal (a command's or a locate's) that names this device's own missing relay sign-in, if it is one. */
+export function notSignedInFailure(reason: string, device: string): Failure | undefined {
+  if (!NOT_SIGNED_IN.has(reason)) return undefined
+  return fail(
+    "host_unavailable",
+    `This device is not attached to the relay (${reason}), so device ${device} cannot be reached; nothing was sent.`,
+    "Retry when this device is signed in: sign in to omo here, then retry.",
+    { device, reason },
+  )
+}
+
 export function outcomeFailure(
   outcome: Exclude<RemoteCommandOutcome, { readonly kind: "ok" }>,
   device: string,
@@ -95,6 +111,8 @@ export function outcomeFailure(
       "Read the thread before deciding whether to retry.",
       { device, reason: outcome.reason },
     )
+  const notSignedIn = notSignedInFailure(outcome.reason, device)
+  if (notSignedIn !== undefined) return notSignedIn
   if (outcome.reason === "capability_missing")
     return fail(
       "scope_denied",

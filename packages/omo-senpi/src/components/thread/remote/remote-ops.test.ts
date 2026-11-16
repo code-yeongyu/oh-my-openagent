@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { anchorMatches, followRemote } from "./remote-ops"
+import { anchorMatches, followRemote, holderTarget } from "./remote-ops"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 
 // The adapter drops anything delivered before `live = true`, so records reach the listener only after watch()
@@ -715,5 +715,20 @@ describe("#13481 review: a started send prints its own turn, never an earlier id
     expect(await withTimeout(follow.settled, 2000, "the follow never settled")).toBe("settled")
     expect(printed).toEqual(["own answer"])
     follow.stop()
+  })
+})
+
+describe("holderTarget: an alias holder this device cannot locate because its own relay sign-in lapsed", () => {
+  test("#given the locate answers sign_in_required #when the holder is resolved #then host_unavailable names the sign-in, not a re-claim", async () => {
+    const remote = {
+      sessions: {
+        devices: async () => [{ device: "b", label: "b", online: true }],
+        locate: async () => ({ kind: "refused" as const, reason: "sign_in_required" }),
+      },
+    } as unknown as RemoteThreadSurface
+    expect(await holderTarget(remote, { device: "b", session_id: "dur-1" }, "a", [])).toMatchObject({
+      kind: "error",
+      error: { code: "host_unavailable", details: { device: "b", reason: "sign_in_required" } },
+    })
   })
 })

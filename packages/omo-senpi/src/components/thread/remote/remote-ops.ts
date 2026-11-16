@@ -1,6 +1,6 @@
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import type { CommandResult } from "@oh-my-opencode/device-service-core"
-import { outcomeFailure, READ_UNCERTAIN } from "./outcome"
+import { notSignedInFailure, outcomeFailure, READ_UNCERTAIN } from "./outcome"
 import {
   endedRow,
   type AliasError,
@@ -113,6 +113,8 @@ export async function holderTarget(
   // only while this device's service can carry the wake (else today's not_found below).
   if (located.kind === "ok" && (await remote.sessions.canWake?.()) === true)
     return { where: "remote", row: endedRow(holder.device, located.sessionId, holder.session_id) }
+  const notSignedIn = located.kind === "refused" ? notSignedInFailure(located.reason, holder.device) : undefined
+  if (notSignedIn !== undefined) return notSignedIn
   return fail(
     "not_found",
     `The alias names thread ${holder.session_id} on device ${holder.device}, which that device does not list.`,
