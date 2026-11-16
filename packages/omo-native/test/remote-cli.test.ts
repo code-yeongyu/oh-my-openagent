@@ -120,6 +120,26 @@ describe("omo remote", () => {
     ])
   })
 
+  test("devices shows this device's roster row offline while its own service is not connected (#13783)", async () => {
+    const world = defaultWorld()
+    const self = {
+      device: "dev-self",
+      label: "This Mac",
+      kind: "cli",
+      platform: "linux",
+      last_seen_ms: 1,
+      online: true,
+    }
+    const owner = await startFakeOwner({
+      stateDir: privateDir(),
+      world: { ...world, status: { ...world.status, state: "offline" }, devices: [...world.devices, self] },
+    })
+    owners.push(owner)
+    const json = await run(["devices", "--json"], owner.stateDir)
+    const [here] = JSON.parse(json.out.join("")) as Record<string, unknown>[]
+    expect(here).toEqual({ ...self, online: false, this_device: true })
+  })
+
   test("sessions shows attach targets, marks cached rows and names devices that did not answer", async () => {
     const { code, out } = await run(["sessions"])
     expect(code).toBe(REMOTE_EXIT.ok)
