@@ -1,5 +1,7 @@
 import { spawn } from "node:child_process"
 
+import { deviceServiceHost } from "../device-service-core/src/index.ts"
+
 import type { BackgroundRemote } from "./remote-bootstrap"
 import { AFTER_LOGIN_FLAG } from "./remote-verbs"
 
@@ -41,4 +43,16 @@ export function backgroundRemote(
     )
     child.unref()
   }
+}
+
+/**
+ * The background launcher `omo login` hands the install to, or null on a platform the device service does not run on
+ * (omo#14004): there login says so itself instead of promising remote is turning on.
+ */
+export function loginBackground(
+  omoBin: string,
+  platform: NodeJS.Platform = process.platform,
+  arch: string = process.arch,
+): BackgroundRemote | null {
+  return deviceServiceHost(platform, arch) === undefined ? null : backgroundRemote(omoBin)
 }
