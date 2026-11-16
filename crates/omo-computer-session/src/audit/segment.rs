@@ -146,19 +146,3 @@ pub(super) fn chain_link(path: &Path) -> Option<String> {
         None
     })
 }
-
-#[cfg(unix)]
-pub(super) fn lock(file: &File) -> io::Result<()> {
-    use std::os::unix::io::AsRawFd;
-    // SAFETY: the descriptor is open for the call; the lock drops with the file.
-    if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX) } == 0 {
-        Ok(())
-    } else {
-        Err(io::Error::last_os_error())
-    }
-}
-
-#[cfg(not(unix))]
-pub(super) const fn lock(_file: &File) -> io::Result<()> {
-    Ok(())
-}

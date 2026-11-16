@@ -1,6 +1,7 @@
 //! The funnel's tests: a fake backend over a temp RUNTIME/STATE root, as the engine runs it.
 
 mod batch;
+mod lockless;
 mod logged;
 mod marker;
 mod poison;
@@ -9,6 +10,7 @@ mod secure;
 mod standalone;
 mod swallowed;
 
+use omo_computer_core::error::Reason;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -40,7 +42,7 @@ pub(super) fn click(call_id: &str) -> omo_computer_core::params::ClickParams {
 }
 
 pub(super) fn wire(refused: &Refused) -> (&'static str, Option<&'static str>) {
-    (refused.refusal.code.wire(), refused.refusal.reason)
+    (refused.refusal.code.wire(), refused.refusal.reason.map(Reason::wire))
 }
 
 /// One engine's roots in a temp dir, and the sink every backend of the test records into.
@@ -99,7 +101,8 @@ impl Run {
     }
 
     /// Every byte the engine wrote under its roots (audit, markers, artifacts). An entry or
-    /// file that cannot be read fails the walk: a skipped file would read as clean.
+    /// file that cannot be read fails the walk (a skipped file would read as clean), except a
+    /// `.lock` file a live session holds on Windows, which carries no payload.
     pub(super) fn everything_written(&self) -> String {
         let mut text = String::new();
         let mut stack = vec![self.dir.path().to_owned()];
@@ -109,8 +112,19 @@ impl Run {
                 if path.is_dir() {
                     stack.push(path);
                 } else {
-                    let bytes = fs::read(&path)
-                        .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+                    let bytes = match fs::read(&path) {
+                        Ok(bytes) => bytes,
+                        // A `.lock` file a live session holds is byte-range locked on Windows
+                        // (os error 33); lock files carry no payload, so it holds nothing to
+                        // leak. Any other unreadable file still fails the walk.
+                        Err(error)
+                            if error.raw_os_error() == Some(33)
+                                && path.extension().is_some_and(|ext| ext == "lock") =>
+                        {
+                            continue;
+                        }
+                        Err(error) => panic!("{}: {error}", path.display()),
+                    };
                     text.push_str(&String::from_utf8_lossy(&bytes));
                 }
             }
@@ -150,6 +164,19 @@ impl Probe {
 }
 
 impl Backend for Probe {
+    // Row 21 (R70bc): forward the consent view, platform and stop chord to the wrapped fake.
+    fn host_consent(&self) -> Option<serde_json::Value> {
+        self.inner.host_consent()
+    }
+
+    fn platform(&self) -> Option<omo_computer_core::report::Platform> {
+        self.inner.platform()
+    }
+
+    fn set_stop_chord(&mut self, chord: Option<&str>) -> omo_computer_core::backend::BackendResult<()> {
+        self.inner.set_stop_chord(chord)
+    }
+
     fn capabilities(&self) -> Capabilities {
         self.inner.capabilities()
     }

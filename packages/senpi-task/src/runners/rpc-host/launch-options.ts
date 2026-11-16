@@ -23,6 +23,9 @@ export interface DaemonLaunchOptions {
 }
 
 const SESSION_IDLE_EVICTION_ENV = "SENPI_RPC_SESSION_IDLE_EVICTION_MS"
+// `omo daemon run --pinned` (omo#13594) pins the operator host it starts; a task host started from one of its sessions
+// inherits that environment and must still idle out on the spec's own cold-start policy.
+const HOST_COLD_START_ENV = "SENPI_RPC_HOST_COLD_START"
 // Mirrors `runners/rpc/spawn.ts`: a per-child session dir belongs to ONE child and must never
 // become the machine-wide daemon's.
 const CHILD_SESSION_DIR_ENV = "SENPI_CODING_AGENT_SESSION_DIR"
@@ -41,6 +44,7 @@ export function daemonLaunchOptions(input: DaemonLaunchOptionsInput): DaemonLaun
     OMO_SENPI_TASK_DEPTH,
     OMO_SENPI_TASK_ROOT_SESSION_ID,
     CHILD_SESSION_DIR_ENV,
+    HOST_COLD_START_ENV,
     ...MEMBER_PROCESS_ENV_NAMES,
     ...WORKPOOL_PROCESS_ENV_NAMES,
   ]) {

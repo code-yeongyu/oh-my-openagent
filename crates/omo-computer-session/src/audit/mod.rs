@@ -23,5 +23,6 @@ pub use memory::MemoryAudit;
 pub use redact::{keys, text, truncate, KeysRecord};
 pub use sink::{AuditSink, UnavailableAudit, AUDIT_UNAVAILABLE};
 pub use writer::{
-    audit_path, Anchor, AuditLimits, AuditWriter, WriterId, AUDIT_FILE, ROTATED_FILE,
+    audit_path, Anchor, AuditLimits, AuditWriter, WriterId, AUDIT_FILE, AUDIT_LOCK_FILE,
+    ROTATED_FILE,
 };

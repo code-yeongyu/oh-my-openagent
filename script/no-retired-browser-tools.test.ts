@@ -67,8 +67,9 @@ test("ships no retired browser tool instructions", async () => {
 
   // Runtime code that a skill executes (the ultimate-browsing extraction engine and its Playwright
   // templates, the frontend perfection tooling that drives Lighthouse, the frontend detect SDK's renderer) is measured by its own tests;
-  // the omowright rule covers the guidance the model reads, not those programs.
-  const executableSkillCode = /\/(?:engine|scripts)\/.*\.(?:js|mjs|ts|py|json)$|\/references\/perfection\//
+  // the omowright rule covers the guidance the model reads, not those programs. A .jsonc there is that code's config
+  // (e.g. the engine templates' knip.workspace.jsonc naming the runtime's dependencies).
+  const executableSkillCode = /\/(?:engine|scripts)\/.*\.(?:js|mjs|ts|py|json|jsonc)$|\/references\/perfection\//
   const underOmowrightRule = (file: string): boolean =>
     (payloadFiles.has(file) || omowrightGuidanceRoots.some((root) => file.startsWith(`${root}/`))) &&
     !executableSkillCode.test(file)

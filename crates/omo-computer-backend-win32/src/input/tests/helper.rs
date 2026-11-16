@@ -14,7 +14,7 @@ fn release_helper_inside_a_job_refuses_every_held_verb() {
         assert_eq!(refusal.code, EngineCode::StopPathUnavailable);
         assert_eq!(
             refusal.reason,
-            Some(Reason::ReleaseHelperUnavailable.wire())
+            Some(Reason::ReleaseHelperUnavailable)
         );
     }
     assert!(
@@ -47,4 +47,26 @@ fn unproven_helper_refuses_holds_alone_and_a_helper_outside_every_job_admits_all
         assert!(admit(out, verb).is_ok());
     }
     assert!(out.capability().available);
+}
+
+/// Review L2 (#13349): a refused breakaway spawn is the no-breakaway-job case, never "unproven".
+#[test]
+fn a_refused_helper_spawn_is_unavailable_not_unproven() {
+    assert_eq!(
+        HelperState::from_spawn(true, None),
+        HelperState::Unavailable
+    );
+    assert_eq!(
+        HelperState::from_spawn(true, Some(false)),
+        HelperState::Unavailable
+    );
+    assert_eq!(HelperState::from_spawn(false, None), HelperState::Unproven);
+    assert_eq!(
+        HelperState::from_spawn(false, Some(false)),
+        HelperState::Available
+    );
+    assert_eq!(
+        HelperState::from_spawn(false, Some(true)),
+        HelperState::Unavailable
+    );
 }

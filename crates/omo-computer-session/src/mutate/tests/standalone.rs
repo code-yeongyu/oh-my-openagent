@@ -3,6 +3,7 @@
 //! driver runs it, so no case depends on what an earlier run left behind. A case a later row
 //! superseded replays through its newest replacement.
 
+use omo_computer_core::error::Reason;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -98,15 +99,16 @@ fn restore_resets_narrowed_modes_when_the_replay_panics() {
     assert_eq!(mode & 0o777, 0o700, "the narrowed mode is restored");
 }
 
-/// Whether the tests run as root, which ignores a read-only directory mode.
+/// Whether a read-only directory mode is ignored here: root on unix ignores it, and Windows has
+/// no unix modes at all (the plant's 0500 is a no-op there), so both take the plain-file plant.
 #[cfg(unix)]
-fn is_root() -> bool {
+fn read_only_mode_ignored() -> bool {
     crate::marker::euid() == 0
 }
 
 #[cfg(not(unix))]
-const fn is_root() -> bool {
-    false
+const fn read_only_mode_ignored() -> bool {
+    true
 }
 
 /// Plants the case's `runtime.plant` under `root`, directory modes last; answers the
@@ -171,7 +173,7 @@ fn check(outcome: Result<ExecReply, Refused>, expected: &Value, at: &str) {
             let data = &expected["error"]["data"];
             assert_eq!(json!(refused.refusal.code.wire()), data["code"], "{at}");
             assert_eq!(
-                json!(refused.refusal.reason),
+                json!(refused.refusal.reason.map(Reason::wire)),
                 data.get("reason").cloned().unwrap_or(Value::Null),
                 "{at}"
             );
@@ -234,7 +236,7 @@ fn v3_r17_marker_cases_replay_standalone_in_a_fresh_runtime_root() {
             "{name} names no fixed runtime dir"
         );
         let root = tempfile::tempdir().expect("tempdir");
-        let _restore = Restore(plant(root.path(), &case, is_root()));
+        let _restore = Restore(plant(root.path(), &case, read_only_mode_ignored()));
         replay(&replayed, &case, root.path());
         if name == "v3-r17-marker-written-before-input.json" {
             let marker = fs::read_to_string(root.path().join("markers/local/default.json"))

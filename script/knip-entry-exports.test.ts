@@ -140,7 +140,7 @@ describe("knip export-checks every entry", () => {
         const probes = entries.map((file, n) => ({ file, name: `zzKnipProbe_${n}` }))
         for (const probe of probes) appendFileSync(join(copy, probe.file), `\nexport const ${probe.name} = 1;\n`)
 
-        // The exact CI knip.jsonc: per-symbol pre-existing rows cannot hide a new probe name.
+        // The exact CI config (knip.ts): per-symbol pre-existing rows cannot hide a new probe name.
         const { stdout, stderr } = await runKnip(copy, ["--reporter", "json"])
         const unused = unusedExports(copy, stdout, stderr)
         // A config knip cannot load (e.g. a vitest.config.ts whose `vitest/config` import does not resolve in the copy) drops that

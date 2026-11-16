@@ -1,6 +1,7 @@
 //! Every `(code, reason)` pair any gate or stage emits resolves through the one error table
 //! to a row that admits a refusal before send, with a next call.
 
+use omo_computer_core::error::Reason;
 use omo_computer_core::error::{NextCall, NothingSent};
 
 use super::super::verdicts::{
@@ -58,10 +59,10 @@ fn the_stop_path_reasons_read_as_the_contract_spells_them() {
     assert_eq!(
         tokens,
         [
-            Some("deaf"),
-            Some("host_relay_not_allowed"),
-            Some("heartbeat_stale"),
-            Some("no_listener")
+            Some(Reason::Deaf),
+            Some(Reason::HostRelayNotAllowed),
+            Some(Reason::HeartbeatStale),
+            Some(Reason::NoListener)
         ]
     );
 }
