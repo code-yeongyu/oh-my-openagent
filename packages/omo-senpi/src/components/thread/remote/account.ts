@@ -1,5 +1,4 @@
-import type { RemoteClient } from "../../remote/client"
-import type { RemoteFailure } from "../../remote/types"
+import type { RemoteClient, RemoteFailure } from "../../remote"
 import type { RemoteDevice } from "./ports"
 
 const LOCAL_ONLY = "local"
