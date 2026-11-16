@@ -464,6 +464,19 @@ export function fuzzyMatch(entries: readonly ThreadAddressEntry[], query: string
 }
 
 /**
+ * The entries that can still change a `fuzzyMatch` outcome for `query`. An entry scoring below the accept floor minus the
+ * margin can neither lead nor sit within the margin of an accepted leader, so dropping it changes no accepted match and
+ * no ambiguity verdict. Callers use it to bound a large set (an account's ended history) before the candidate cap
+ * applies. An invalid or too-short query keeps nothing: `fuzzyMatch` reports that query on the rest of the set.
+ */
+export function fuzzyContenders(entries: readonly ThreadAddressEntry[], query: string): ThreadAddressEntry[] {
+  const guard = guardInput(query, "fuzzy query")
+  if (!guard.ok || guard.normalized.length < FUZZY_MIN_QUERY_LENGTH) return []
+  const queryGrams = trigrams(guard.normalized)
+  return entries.filter((entry) => scoreEntry(entry, queryGrams).score >= FUZZY_ACCEPT_SCORE - FUZZY_ACCEPT_MARGIN)
+}
+
+/**
  * Reject a thread_create name that collides, after normalization, with an
  * existing thread. There is no auto-suffix anywhere in this family: the
  * collision surfaces as data so the caller picks a new name or reuses the

@@ -142,6 +142,7 @@ describe("Senpi compatibility test script", () => {
       await writeFile(join(pluginRoot, "extensions", "loro_wasm_bg.wasm"), "")
       await writeFile(join(pluginRoot, "extensions", "CaseFolding.txt"), "")
       await writeFile(join(pluginRoot, "extensions", "omo-thread-client.js"), "export {}\n")
+      await writeFile(join(pluginRoot, "extensions", "omo-wake.js"), "export {}\n")
       await writeFile(join(pluginRoot, "extensions", "omo-telemetry-recovery.js"), "export {}\n")
       await writeFile(join(pluginRoot, "extensions", "omo-feedback.js"), "export {}\n")
       await writeFile(join(pluginRoot, "extensions", "omo-desktop-toolkit.js"), "export {}\n")

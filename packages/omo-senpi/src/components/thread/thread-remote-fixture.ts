@@ -32,7 +32,7 @@ export const B_ROW: RemoteSessionRow = {
 }
 
 type Sent = {
-  readonly via: "endpoint" | "session" | "read" | "watch"
+  readonly via: "endpoint" | "session" | "read" | "watch" | "wake"
   readonly device: string
   readonly session?: string
   readonly rpc?: JsonObject
@@ -99,10 +99,34 @@ export function createRemoteThreadFixture() {
       rowState?: string
       live?: readonly string[]
       records?: readonly JsonObject[]
+      /** Entries the session stores once its turn ran (a queued send is stored when the queue drains): served on reads after the turn's records went out. */
+      entriesAfterAnswer?: readonly JsonObject[]
+      /** The turn finishes before its prompt's reply reaches the sender: its records go out at once, before the aim. */
+      recordsBeforeReply?: boolean
       rows?: readonly RemoteSessionRow[]
       registryDown?: "refused" | "throws" | "signed_out"
+      /** Only the claim fails (resolve and aliasesOf still answer): a token that expired between the two calls. */
+      claimDown?: "refused" | "signed_out"
       chainCountLimit?: number
       relayKeys?: ReadonlyMap<string, string>
+      /** omo#13037: sessions a device holds on disk but runs nowhere, by device then durable id, with that device's key. */
+      ended?: Readonly<Record<string, Readonly<Record<string, string>>>>
+      /** omo#13037: devices whose single-probe lookup gets no answer within the bound. */
+      silent?: readonly string[]
+      /** omo#13037: this device's service carries the wake mark and the single probe (both gates open). Off by default, as shipped. */
+      wakeFeature?: boolean
+      /** omo#13037: this device's service makes no single probe (the lookup is never made). */
+      noLookup?: boolean
+      /** omo#13037 review: a sessions port as before the lookup existed (no lookup, no capability read). */
+      withoutLookup?: boolean
+      /** omo#13037 review: the account's device list cannot be read. */
+      devicesFail?: boolean
+      /** omo#13037: this device's service cannot carry the wake target (no wake is sent; today's path). */
+      noWake?: boolean
+      /** omo#13037: the wake path's answer; default the consumer's queued envelope with `waiting_on: {kind: "wake"}`. */
+      wakeOutcome?: RemoteCommandOutcome
+      /** The `get_state` fields a live session reports beyond the engine defaults (`paused`, `holds`). */
+      liveState?: JsonObject
     } = {},
   ) {
     const engine = options.engine ?? ENGINE
@@ -111,13 +135,22 @@ export function createRemoteThreadFixture() {
     // admissions its user's open draft still holds (held_draft, taken by nothing).
     const admitted = new Set<string>()
     let heldDraft = options.heldDraft ?? 0
-    // The session's records a prompt makes it write, delivered to every watch after the prompt is answered.
+    // The session's records a prompt makes it write, held until the follower first reads after the answer: the
+    // engine's turn records follow its reply out over the wire, and the CLI's read is the first observable hop after
+    // its own bookkeeping for that reply.
     const watchers = new Set<(record: JsonObject) => void>()
-    const writeRecords = () =>
-      queueMicrotask(() => {
-        for (const record of options.records ?? []) for (const listener of [...watchers]) listener(record)
-      })
+    let answeredPrompt = false
+    let recordsOut = false
+    const writeRecords = () => {
+      if (recordsOut) return
+      recordsOut = true
+      for (const record of options.records ?? []) for (const listener of [...watchers]) listener(record)
+    }
     const hops: number[] = []
+    const lookups: Array<{ readonly device: string; readonly durable_id: string }> = []
+    const deviceReads = { thisDevice: 0, devices: 0 }
+    // Account listing reads: `all` asks every device (one round across the account), `device` asks one device.
+    const listings = { all: 0, device: 0 }
     const aliases = options.aliases ?? new Map<string, AliasHolder>()
     // The sessions b's engine holds. Its close rules are senpi's (2026.11.5-1): close_session from a connection that never
     // attached is refused unknown_session (senpi#1782); an attached close releases only that hold, so the session ends
@@ -156,7 +189,7 @@ export function createRemoteThreadFixture() {
       }
       if (rpc["type"] === "open_session") {
         const opened = rpc["sessionPath"] === undefined ? "dur-new-on-b" : "dur-on-b"
-        live.add(opened)
+        for (const id of [opened, options.relayKeys?.get(opened) ?? opened]) live.add(id)
         return ok(options.openData ?? { sessionId: "rpc-9", state: { durableSessionId: opened } })
       }
       if (rpc["type"] === "get_state")
@@ -166,6 +199,7 @@ export function createRemoteThreadFixture() {
           ...(engine.currentTurnId === undefined ? {} : { currentTurnId: engine.currentTurnId }),
           ...(engine.pendingQuestions === undefined ? {} : { pendingQuestions: [...engine.pendingQuestions] }),
           ...(engine.pendingDialogs === undefined ? {} : { pendingDialogs: [...engine.pendingDialogs] }),
+          ...options.liveState,
         })
       if (rpc["type"] === "get_messages") return ok({ messages: [...engine.messages] })
       if (rpc["type"] === "interrupt") return ok(engine.interrupt)
@@ -224,9 +258,12 @@ export function createRemoteThreadFixture() {
       { device: "here", label: "this mac", online: true },
       { device: "b", label: "studio", online: options.online ?? true },
     ]
-    for (const row of options.rows ?? [])
-      if (!devices.some((known) => known.device === row.device))
-        devices.push({ device: row.device, label: row.device, online: true })
+    for (const device of [
+      ...(options.rows ?? []).map((row) => row.device),
+      ...Object.keys(options.ended ?? {}),
+      ...(options.silent ?? []),
+    ])
+      if (!devices.some((known) => known.device === device)) devices.push({ device, label: device, online: true })
     const registryCalls: string[] = []
     const down = <T>(): Promise<AliasResult<T>> =>
       options.registryDown === "throws"
@@ -243,6 +280,15 @@ export function createRemoteThreadFixture() {
       claim: async ({ alias, holder }) => {
         registryCalls.push("claim")
         if (options.registryDown !== undefined) return await down()
+        if (options.claimDown !== undefined)
+          return {
+            kind: "error",
+            error: {
+              code: "alias_registry_unavailable",
+              message: "the alias registry refused the claim",
+              details: { reason: options.claimDown === "signed_out" ? "sign_in" : "network" },
+            },
+          }
         if (options.failClaim === true) throw new Error("alias registry failed")
         const held = aliases.get(alias)
         if (held !== undefined && held.session_id !== holder.session_id)
@@ -292,11 +338,21 @@ export function createRemoteThreadFixture() {
     const remote: RemoteThreadSurface = {
       sessions: {
         status: async () => ({ state: options.plan ?? "connected" }),
-        thisDevice: async () => "here",
-        devices: async () => devices,
-        sessions: async () => {
+        thisDevice: async () => {
+          deviceReads.thisDevice += 1
+          return "here"
+        },
+        devices: async () => {
+          deviceReads.devices += 1
+          if (options.devicesFail === true) throw new Error("closed")
+          return devices
+        },
+        sessions: async (filter) => {
+          if (filter?.device === undefined) listings.all += 1
+          else listings.device += 1
           if (options.failSessionsList === true) throw new Error("account list failed")
-          return options.rows ?? [{ ...B_ROW, state: options.rowState ?? B_ROW.state }]
+          const rows = options.rows ?? [{ ...B_ROW, state: options.rowState ?? B_ROW.state }]
+          return filter?.device === undefined ? rows : rows.filter((row) => row.device === filter.device)
         },
         endpointCommand: async (device, rpc) => {
           sent.push({ via: "endpoint", device, rpc })
@@ -312,7 +368,10 @@ export function createRemoteThreadFixture() {
         sessionCommand: async (device, session, rpc) => {
           sent.push({ via: "session", device, session, rpc })
           const outcome = answer(rpc, session)
-          if (rpc["type"] === "prompt" && outcome.kind === "ok") writeRecords()
+          if (rpc["type"] === "prompt" && outcome.kind === "ok") {
+            answeredPrompt = true
+            if (options.recordsBeforeReply === true) writeRecords()
+          }
           return outcome
         },
         watch: async (device, session, listener) => {
@@ -329,14 +388,45 @@ export function createRemoteThreadFixture() {
             },
           }
         },
+        canLookup: async () => options.wakeFeature === true && options.noLookup !== true,
+        lookup: async (device, durableId) => {
+          if (options.noLookup === true || options.wakeFeature !== true) return { kind: "unavailable" }
+          lookups.push({ device, durable_id: durableId })
+          if (options.silent?.includes(device) === true) return { kind: "silent", reason: "host_not_answering" }
+          const key = options.ended?.[device]?.[durableId]
+          return key === undefined ? { kind: "none" } : { kind: "found", key }
+        },
+        canWake: async () => options.wakeFeature === true && options.noWake !== true,
+        wake: async (device, durableId, rpc) => {
+          if (options.noWake === true || options.wakeFeature !== true) return { kind: "unavailable" }
+          sent.push({ via: "wake", device, session: durableId, rpc })
+          return (
+            options.wakeOutcome ?? {
+              kind: "ok",
+              response: {
+                type: "response",
+                success: true,
+                data: {
+                  kind: "queued",
+                  stored_command_id: "stored-1",
+                  deduplicated: false,
+                  waiting_on: { kind: "wake" },
+                },
+              },
+            }
+          )
+        },
         read: async (device, session) => {
           sent.push({ via: "read", device, session })
+          const drained = recordsOut
+          if (answeredPrompt) writeRecords()
           return {
             kind: "ok",
             response: {
               entries: [
                 { role: "user", content: "hi b" },
                 { role: "assistant", content: "hello from b" },
+                ...(drained ? (options.entriesAfterAnswer ?? []) : []),
               ],
             },
           }
@@ -351,7 +441,11 @@ export function createRemoteThreadFixture() {
         },
       },
     }
-    return { remote, sent, hops, aliases, live, registryCalls }
+    if (options.withoutLookup === true) {
+      const { lookup: _lookup, canLookup: _canLookup, ...plain } = remote.sessions
+      ;(remote as { sessions: typeof plain }).sessions = plain
+    }
+    return { remote, sent, hops, aliases, live, registryCalls, lookups, listings, deviceReads }
   }
 
   function surface(
@@ -361,13 +455,19 @@ export function createRemoteThreadFixture() {
       callerChainHop?: () => number
       callerName?: () => string | undefined
       callerReplyTargets?: () => readonly string[]
-      callerReplySenders?: () => readonly { readonly session_id: string; readonly name?: string }[]
+      callerReplySenders?: () => readonly {
+        readonly session_id: string
+        readonly name?: string
+        readonly device?: string
+      }[]
       env?: Readonly<Record<string, string | undefined>>
       sessions?: ThreadHostSession[]
       engine?: Engine
       caller?: string
       diskSessions?: readonly string[]
       closeOutcome?: ThreadCloseOutcome
+      /** Look session files up where senpi writes them, `<agentDir>/sessions`, as the component does. */
+      sessionsDirectory?: boolean
     } = {},
   ) {
     const engine = extra.engine ?? ENGINE
@@ -392,13 +492,23 @@ export function createRemoteThreadFixture() {
     })
     const closed: Array<readonly [string, string | undefined]> = []
     const setSessionName = mock(async (_sessionId: string, _name: string) => {})
+    // How often this device's endpoints were listed (the local enumeration a send can cost).
+    let localListings = 0
+    // How often a session on this device was prompted directly (a delivery never prompts; this counts any leak).
+    let localPrompts = 0
     const host: ThreadHost = {
       socket: "/tmp/thread-remote-test.sock",
-      listSessions: async () => sessions,
+      listSessions: async () => {
+        localListings += 1
+        return sessions
+      },
       openSession,
       getMessages: async () => [...engine.messages],
       getState: async () => ({ isStreaming: false }),
-      prompt: async () => ({ turnId: "turn-local" }),
+      prompt: async () => {
+        localPrompts += 1
+        return { turnId: "turn-local" }
+      },
       interrupt: async () => engine.interrupt,
       setSessionName,
       setModel: async (_s, provider, id) => ({ provider, id }),
@@ -428,11 +538,23 @@ export function createRemoteThreadFixture() {
       source_host: null,
     }))
     const caller = extra.caller ?? "dur-caller"
+    // Every delivery the gateway takes for a session on this device, by target: a local thread_send's real call.
+    const enqueued: string[] = []
+    const countedStore = new Proxy(store, {
+      get: (target, property, receiver) =>
+        property === "enqueue"
+          ? (request: Parameters<GatewayStore["enqueue"]>[0]) => {
+              enqueued.push(request.target_durable_id)
+              return target.enqueue(request)
+            }
+          : Reflect.get(target, property, receiver),
+    })
     const tools = createThreadTools({
       host,
-      store,
+      store: countedStore,
       stateDirectory: join(agentDir, "state"),
       diskSessions: () => disk,
+      ...(extra.sessionsDirectory === true ? { sessionsDirectory: () => join(agentDir, "sessions") } : {}),
       callerSessionId: () => caller,
       callerWorkspaceRoot: () => process.cwd(),
       remote,
@@ -458,7 +580,18 @@ export function createRemoteThreadFixture() {
       if (parse === undefined) throw new Error("thread_send declares no permission parser")
       return parse(args, process.cwd())
     }
-    return { run, permission, openSession, setSessionName, store, closed, agentDir }
+    return {
+      run,
+      permission,
+      openSession,
+      setSessionName,
+      store,
+      closed,
+      agentDir,
+      listings: () => localListings,
+      prompts: () => localPrompts,
+      enqueuedFor: (durableId: string) => enqueued.filter((target) => target === durableId).length,
+    }
   }
 
   return { account, surface, cleanup }
