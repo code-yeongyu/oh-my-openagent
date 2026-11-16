@@ -91,6 +91,7 @@ export function sessionIsIdle(state: {
 
 export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement {
   let held: RunnerOutcome | undefined
+  let retryError: string | undefined
   let confirmation: SettlementTimerHandle | undefined
   let unreadableProbes = 0
   const scheduleConfirmation = input.scheduleConfirmation ?? defaultConfirmationScheduler
@@ -155,16 +156,31 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
     confirmation = undefined
   }
 
+  const holdRecoveryFailure = (message: string): void => {
+    clearConfirmation()
+    held = input.abortedByUser()
+      ? { status: "cancelled" }
+      : { status: "error", failure: { kind: "child-turn-failed", message } }
+    retryError = undefined
+    unreadableProbes = 0
+    rearm()
+  }
+
   return {
     observe: (event) => {
       switch (event.type) {
         case "agent_start":
           clearConfirmation()
           held = undefined
+          retryError = undefined
           return
         case "agent_end": {
-          if (event.willRetry !== false) return
           const outcome = endOutcome(event)
+          if (event.willRetry !== false) {
+            retryError = outcome.status === "error" ? outcome.failure.message : undefined
+            return
+          }
+          retryError = undefined
           // A replaced session runs nothing more for this child: its interrupt is final at once.
           if (outcome.status === "cancelled" || outcome.status === "interrupted") {
             clearConfirmation()
@@ -177,6 +193,14 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
           if (outcome.status === "error") rearm()
           return
         }
+        case "auto_retry_end":
+          if (!event.success) {
+            holdRecoveryFailure(event.finalError ?? retryError ?? "RPC child retry ended without completing")
+          }
+          return
+        case "continuation_error":
+          holdRecoveryFailure(event.errorMessage)
+          return
         case "agent_idle": {
           clearConfirmation()
           const outcome = held
