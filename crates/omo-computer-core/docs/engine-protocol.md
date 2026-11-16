@@ -53,7 +53,7 @@ The one-shot `desktop.stop` calls `stopPath.stop`.
 | `raiseWindow` | exec | public | `RaiseWindowParams` | `ExecReply` |
 | `ax.setValue` | exec | public | `AxSetValueParams` | `ExecReply` |
 | `ax.perform` | exec | public | `AxPerformParams` | `ExecReply` |
-| `ax.focus` | exec | public | `AxRefParams` | `ExecReply` |
+| `ax.focus` | exec | public | `AxFocusParams` | `ExecReply` |
 | `ax.typeText` | exec | public | `AxTypeTextParams` | `AxTypeTextReply` |
 | `ax.selectText` | exec | public | `SelectTextParams` | `ExecReply` |
 | `menu.select` | exec | public | `MenuSelectParams` | `ExecReply` |

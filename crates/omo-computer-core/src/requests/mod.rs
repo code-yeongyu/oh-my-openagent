@@ -24,8 +24,8 @@ pub use host::{
     read_stop_path_start, read_stop_path_stop, HostRequest,
 };
 pub use legacy::{
-    read_ax_perform, read_ax_type_text, read_hold_keys, read_hold_mouse, read_key_chord,
-    read_open_system_surface, read_raise_window, read_type_text, V1Request,
+    read_ax_focus, read_ax_perform, read_ax_type_text, read_hold_keys, read_hold_mouse,
+    read_key_chord, read_open_system_surface, read_raise_window, read_type_text, V1Verb,
 };
 pub use options::{
     read_caps, read_observe_ax, read_observe_options, read_observe_request, read_point, read_rect,
