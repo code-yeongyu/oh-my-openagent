@@ -174,3 +174,14 @@ fn same_uid_unregistered_real_process_is_closed_unread() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("CLOSED-UNREAD"), "a same-uid pid not on the allowlist, even holding the generation capability: {stdout}");
 }
+
+#[test]
+fn launcher_killed_alone_ends_the_daemon_within_2s() {
+    let mut daemon = Daemon::start(&[]);
+    drop(daemon.child.stdin.take());
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while daemon.child.try_wait().expect("wait").is_none() {
+        assert!(Instant::now() < deadline, "the daemon outlived its launcher's pipe");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+}
