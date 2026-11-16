@@ -22,13 +22,21 @@ const firstSession = (world: World): WorldSession => {
   return session
 }
 
-/** The default world with the session's snapshot state and initial records replaced; delegated commands answered. */
-export const worldWith = (state: JsonObject, records: readonly JsonObject[] = []): World => {
+/**
+ * The default world with the session's snapshot state and initial records replaced; delegated commands answered with
+ * `extra.reply` as the engine's reply data (a fresh get_state reads it), and `extra.entries` added to the snapshot.
+ */
+export const worldWith = (
+  state: JsonObject,
+  records: readonly JsonObject[] = [],
+  extra: { readonly reply?: JsonObject; readonly entries?: readonly JsonObject[] } = {},
+): World => {
   const world = defaultWorld()
   const session = firstSession(world)
+  const snapshot = { ...session.snapshot, state, entries: [...session.snapshot.entries, ...(extra.entries ?? [])] }
   return {
     ...world,
-    sessions: [{ ...session, snapshot: { ...session.snapshot, state }, records, delegated: { data: {}, frames: [] } }],
+    sessions: [{ ...session, snapshot, records, delegated: { data: extra.reply ?? {}, frames: [] } }],
   }
 }
 
@@ -42,13 +50,18 @@ export const pushRecords = (owner: FakeOwner, records: readonly JsonObject[], at
   pushToAttach(owner, "session.records", { attach_id: attachId, records: [...records] })
 
 /** A re-attach after a relay gap: a new snapshot of the session with `state`. */
-export const pushSnapshot = (owner: FakeOwner, state: JsonObject, attachId = 2): void => {
+export const pushSnapshot = (
+  owner: FakeOwner,
+  state: JsonObject,
+  attachId = 2,
+  entries: readonly JsonObject[] = [],
+): void => {
   const snapshot = firstSession(owner.state.world).snapshot
   pushToAttach(owner, "session.snapshot", {
     attach_id: attachId,
     cursor: snapshot.cursor,
     state,
-    entries: [...snapshot.entries],
+    entries: [...snapshot.entries, ...entries],
     history_truncated: snapshot.history_truncated,
     oldest_entry_id: snapshot.oldest_entry_id,
   })
