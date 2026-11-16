@@ -158,9 +158,13 @@ const recordLease = (record: JsonObject): Lease | undefined =>
  * follow's anchor (#13753): it follows from the moment it opens. The attach replays turns that already ran (the host
  * streams records it buffered since an older snapshot), so everything the attach replays or the snapshot holds is
  * history, and history never reaches the turn: no text, no tool event, no end. The anchor is the run lease the session
- * held when follow opened (its first fresh get_state): a run counts only once a lease with a newer seq shows it
- * running, or it is the run in flight at the baseline. Until that baseline is known every record waits; a run's
- * records wait until a newer lease decides them, and a run that settles without one was history. An engine whose state
+ * held when follow opened (its first fresh get_state, the baseline). A run is this follow's when:
+ * - a lease newer than the baseline shows it running;
+ * - it is the run in flight at the baseline (a caller may open follow and send without waiting for the open); or
+ * - the baseline shows it ended, under a newer lease than the snapshot's and with another run id than the snapshot's
+ *   (it started after the open and ended before the baseline answered).
+ * Until the baseline is known every record waits; a run's records wait until one of these decides them, and a run that
+ * settles undecided was history. Without a fresh state the snapshot's lease is the baseline; an engine whose state
  * carries no lease is followed as before.
  */
 class FollowAnchor {
@@ -170,11 +174,11 @@ class FollowAnchor {
   readonly #live = new Set<string>()
   readonly #early: AttachEvent[] = []
   /** The newest run lease the snapshot held when follow opened; undefined when it held none. */
-  #openSeq: number | undefined
+  readonly #atOpen: Lease | undefined
   #run: { readonly id: string | undefined; verdict: "live" | "undecided"; readonly held: AttachEvent[] } | undefined
 
   constructor(atOpen: Lease | undefined) {
-    this.#openSeq = atOpen?.seq
+    this.#atOpen = atOpen
   }
 
   /** The lease the session held at the open (undefined: none known); answers the events it releases. */
@@ -189,9 +193,16 @@ class FollowAnchor {
       if (lease.state === "running") {
         if (lease.runId !== undefined) this.#live.add(lease.runId)
         this.#run = { id: lease.runId, verdict: "live", held: [] }
-      } else if (lease.runId !== undefined && this.#openSeq !== undefined && lease.seq > this.#openSeq)
-        // A run that started after follow opened (newer than the snapshot's lease) and ended before the baseline read
-        // answered (it failed at once): it is this follow's, though its own leases are not newer than the baseline.
+      } else if (
+        lease.runId !== undefined &&
+        this.#atOpen !== undefined &&
+        lease.seq > this.#atOpen.seq &&
+        lease.runId !== this.#atOpen.runId
+      )
+        // A run that started after follow opened (another run than the snapshot's, under a newer lease) and ended before
+        // the baseline read answered (it failed at once): it is this follow's, though its own leases are not newer than
+        // the baseline. The seq alone proves nothing: it also advances with no new run, and an idle lease keeps the
+        // previous run's id (senpi rpc.md "Session lifecycle").
         this.#live.add(lease.runId)
     }
     return this.#early.splice(0).flatMap((event) => this.#accept(event))

@@ -232,6 +232,44 @@ const turnRecords = (runId: string, text: string, seq: number): JsonObject[] => 
 ]
 
 describe("sessions.follow rows: anchored at its open (#13753, the U6 waited send)", () => {
+  // senpi's lifecycle seq also advances with no new run, and an idle lease keeps the previous run's id (rpc.md "Session
+  // lifecycle"): a newer lease naming the snapshot's own idle run is not a new run (review M3).
+  test.each([
+    ["waiting_background", "the run's background work finishing"],
+    ["done", "a durable lifecycle write while idle"],
+  ])(
+    "#given a snapshot lease %s for the last run #when %s advances the seq before the baseline #then that run stays history and the end is the next turn's",
+    async (state) => {
+      const atOpen = { ...IDLE, lifecycle: { state, seq: 5, runId: "run-1" } }
+      const { owner, client } = await on(atOpen, undefined, {
+        reply: { lifecycle: { state: "done", seq: 6, runId: "run-1" } },
+      })
+      const { events } = await following(client)
+      pushRecords(owner, [...turnRecords("run-1", "pong", 3), ...turnRecords("run-2", "ping", 7)])
+      expect(await drain(events)).toEqual([
+        { kind: "waiting", state: "turn_running" },
+        { kind: "text", delta: "ping" },
+        { kind: "end", outcome: { reason: "settled", text: "ping", turn_id: "run-2" } },
+      ])
+    },
+  )
+
+  // The baseline read itself ends a run the snapshot showed running (the tracker sees its lease go done), so follow ends
+  // at once, never hangs, whatever the anchor decides about that run's records.
+  test("#given a run running in the snapshot that ends before the baseline answers #when its remainder streams #then follow ends, not a hang", async () => {
+    const atOpen = { ...IDLE, lifecycle: { state: "running", seq: 5, runId: "run-1" } }
+    const { owner, client } = await on(atOpen, undefined, {
+      reply: { lifecycle: { state: "done", seq: 6, runId: "run-1" } },
+    })
+    const { events } = await following(client)
+    pushRecords(owner, [
+      textDelta("late"),
+      { type: "session_lifecycle", lifecycle: { state: "done", seq: 6, runId: "run-1" } },
+      { type: "agent_settled" },
+    ])
+    expect(await drain(events)).toEqual([{ kind: "end", outcome: { reason: "settled" } }])
+  })
+
   test("#given a snapshot that already holds the last turn's lease #when that turn is replayed and a send starts the next #then the end is the next turn's", async () => {
     const atOpen = { ...IDLE, lifecycle: { state: "done", seq: 5, runId: "run-1" } }
     const { owner, client } = await on(atOpen, undefined, {
