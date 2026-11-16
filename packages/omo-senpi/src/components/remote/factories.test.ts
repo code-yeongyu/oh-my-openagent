@@ -5,6 +5,7 @@ import {
   remoteClientForCli,
   remoteClientForConnector,
   remoteClientForPerson,
+  remoteClientForService,
   remoteClientForSession,
 } from "./factories"
 import { closeClients, failureOf, fakeClock, startOwner } from "./testing/fake-service"
@@ -64,5 +65,15 @@ describe("remote client factories", () => {
 
     expect((await client.service.info()).kind).toBe("ok")
     expect([...owner.state.conns].map((conn) => conn.client()?.version)).toEqual(["9.9.9"])
+  })
+})
+
+describe("remoteClientForService", () => {
+  test("#given the device service's own client #when it calls bootstrap and a person-only mutator #then bootstrap is allowed and the mutator is refused", async () => {
+    const client = kept(remoteClientForService({ stateDir: "/nonexistent-rt-13414" }))
+    // No bootstrap runner was handed in, so the call reaches the runner check (allowed sender), not the sender check.
+    const bootstrap = await client.service.bootstrap({})
+    expect(bootstrap).toMatchObject({ kind: "error", code: "unsupported", details: { feature: "bootstrap" } })
+    expect(await client.service.setEnabled(true)).toMatchObject({ kind: "error", code: "sender_not_allowed" })
   })
 })
