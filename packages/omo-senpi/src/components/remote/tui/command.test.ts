@@ -28,6 +28,39 @@ const LISTING = {
   ],
 }
 
+// The one-module CLI (#13414 part 4c) prints the person client's values: DeviceRow {id,name,self,caps}, SessionsList
+// {rows: SessionRow {thread,...}, unanswered: DeviceRow[]}, OpenResult {thread, device} and a flat RemoteFailure.
+const MODULE_SELF = {
+  id: "dev_mac",
+  name: "mengmota-mac",
+  kind: "cli",
+  platform: "darwin",
+  online: true,
+  last_seen_ms: 1,
+  self: true,
+  caps: { attach: true, machine: false, control: true },
+}
+const MODULE_SEOUL = { ...MODULE_SELF, id: "dev_seoul", name: "seoul", platform: "linux", self: undefined }
+const MODULE_NY2 = { ...MODULE_SEOUL, id: "dev_ny2", name: "ny2", online: false }
+const MODULE_LIST = {
+  revision: 2,
+  unanswered: [MODULE_NY2],
+  rows: [
+    {
+      thread: "dev_seoul/s7",
+      name: "s7",
+      title: "nightly",
+      device: MODULE_SEOUL,
+      project: "omo",
+      path: "/w/omo",
+      state: "idle",
+      archived: false,
+      updated_ms: 1,
+      source: "live",
+    },
+  ],
+}
+
 type Script = Readonly<Record<string, OmoRun>>
 
 function fakeRunner(script: Script): OmoRunner & { readonly calls: string[][] } {
@@ -260,6 +293,65 @@ describe("/remote", () => {
     // then
     expect(run.calls.at(-1)).toEqual(["remote", "open", "dev_mac", "--json"])
     expect(ui.notes.map((note) => note.message).join("\n")).toContain("dev_mac/s2")
+  })
+
+  it("#given the one-module CLI #when /remote devices and sessions run #then its rows, this device and the unanswered devices are shown", async () => {
+    // given
+    const run = fakeRunner({ devices: ok([MODULE_SELF, MODULE_SEOUL]), sessions: ok(MODULE_LIST) })
+    const ui = fakeUi()
+
+    // when
+    await invoke(run, "devices", ui)
+    await invoke(run, "sessions", ui)
+
+    // then
+    const [devices, sessions] = ui.notes.map((note) => note.message)
+    expect(devices).toContain("mengmota-mac  dev_mac  online  (this device)")
+    expect(devices).toContain("seoul  dev_seoul  online")
+    expect(sessions).toContain("dev_seoul/s7  idle  nightly")
+    expect(sessions).toContain("No answer from: ny2")
+  })
+
+  it("#given the one-module CLI answers a flat RemoteFailure #when the verb fails #then its message and next action are shown", async () => {
+    // given
+    const failure = { kind: "error", code: "device_offline", message: "ny2 is offline.", next_action: "Wake ny2." }
+    const run = fakeRunner({ interrupt: { code: 3, stdout: `${JSON.stringify(failure)}\n`, stderr: "" } })
+    const ui = fakeUi()
+
+    // when
+    await invoke(run, "interrupt dev_ny2/s1", ui)
+
+    // then
+    expect(ui.notes).toEqual([{ message: "ny2 is offline.\nWake ny2.", type: "error" }])
+  })
+
+  it("#given the one-module CLI #when the person opens and then sends from the picker #then the session's thread handle is used", async () => {
+    // given
+    const run = fakeRunner({
+      devices: ok([MODULE_SELF, MODULE_SEOUL]),
+      sessions: ok(MODULE_LIST),
+      open: ok({ thread: "dev_seoul/s8", device: MODULE_SEOUL }),
+      send: ok({ thread: "dev_seoul/s7", device: MODULE_SEOUL, lane: "queued", queue_position: 2 }),
+    })
+    const pickSeoul = (options: readonly string[]) => options.find((option) => option.startsWith("seoul"))
+    const opening = fakeUi([pickSeoul, (options) => options.find((option) => option.startsWith("Open a new session"))])
+    const sending = fakeUi(
+      [
+        pickSeoul,
+        (options) => options.find((option) => option.includes("dev_seoul/s7")),
+        (options) => options.find((option) => option.startsWith("Send")),
+      ],
+      "go",
+    )
+
+    // when
+    await invoke(run, "", opening)
+    await invoke(run, "", sending)
+
+    // then
+    expect(opening.notes.at(-1)?.message).toBe("Opened dev_seoul/s8.")
+    expect(run.calls.at(-1)).toEqual(["remote", "send", "--json", "dev_seoul/s7", "--", "go"])
+    expect(sending.notes.at(-1)?.message).toBe("Queued on dev_seoul/s7 at position 2.")
   })
 
   it("#given a picked session #when the person interrupts it from the picker #then omo remote interrupt runs on it", async () => {

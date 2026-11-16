@@ -107,8 +107,8 @@ async function send(run: OmoRunner, ui: RemoteCommandUi, target: string, text: s
   show(ui, "send", target, await run(["remote", "send", "--json", target, "--", text]))
 }
 
-type Device = { readonly device: string; readonly label: string; readonly online: boolean }
-type Row = { readonly device: string; readonly session_id: string; readonly title: string; readonly state: string }
+type Device = { readonly id: string; readonly name: string; readonly online: boolean; readonly self: boolean }
+type Row = { readonly target: string; readonly title: string; readonly state: string }
 
 const OPEN_NEW = "Open a new session"
 const ACTIONS = ["Send a message", "Interrupt", "Close", "Attach (new terminal)"] as const
@@ -122,17 +122,16 @@ async function pick(run: OmoRunner, ui: RemoteCommandUi): Promise<void> {
   const deviceOptions = devices.map(deviceLine)
   const device = devices[deviceOptions.indexOf((await ui.select("Which device?", deviceOptions)) ?? "")]
   if (device === undefined) return
-  const sessionsAnswer = await run(["remote", "sessions", "--device", device.device, "--json"])
+  const sessionsAnswer = await run(["remote", "sessions", "--device", device.id, "--json"])
   const rows = succeeded(ui, sessionsAnswer) ? rowsOf(parsed(sessionsAnswer)) : undefined
   if (rows === undefined) return
   const rowOptions = rows.map(rowLine)
-  const choice = await ui.select(`Sessions on ${device.label}`, [`${OPEN_NEW} on ${device.label}`, ...rowOptions])
+  const choice = await ui.select(`Sessions on ${device.name}`, [`${OPEN_NEW} on ${device.name}`, ...rowOptions])
   if (choice === undefined) return
   if (choice.startsWith(OPEN_NEW))
-    return show(ui, "open", device.device, await run(["remote", "open", device.device, "--json"]))
-  const row = rows[rowOptions.indexOf(choice)]
-  if (row === undefined) return
-  const target = `${row.device}/${row.session_id}`
+    return show(ui, "open", device.id, await run(["remote", "open", device.id, "--json"]))
+  const target = rows[rowOptions.indexOf(choice)]?.target
+  if (target === undefined) return
   const action = await ui.select(`${target}: what now?`, [...ACTIONS])
   if (action === "Send a message") {
     const text = await ui.input?.(`Message to ${target}`)
@@ -158,9 +157,11 @@ function parsed(answer: OmoRun): unknown {
   }
 }
 
+// Two CLI generations answer: today's session verbs nest the failure (`{kind:"error", error:{...}}`), the one-module CLI
+// (#13414 part 4c) prints a flat RemoteFailure. The TUI's omo may be either, so both are read.
 function typedFailure(value: unknown): string | undefined {
-  if (!isRecord(value) || value["kind"] !== "error" || !isRecord(value["error"])) return undefined
-  const { message, next_action: next } = value["error"]
+  if (!isRecord(value) || value["kind"] !== "error") return undefined
+  const { message, next_action: next } = isRecord(value["error"]) ? value["error"] : value
   if (typeof message !== "string") return undefined
   return typeof next === "string" && next !== "" ? `${message}\n${next}` : message
 }
@@ -186,22 +187,31 @@ function rendered(verb: string, target: string, value: unknown): readonly string
   if (verb === "sessions") {
     const rows = rowsOf(value) ?? []
     const lines = rows.length === 0 ? ["No sessions."] : rows.map(rowLine)
-    const incomplete = isRecord(value) && Array.isArray(value["incomplete"]) ? value["incomplete"] : []
-    return incomplete.length === 0 ? lines : [...lines, `No answer from: ${incomplete.join(", ")}`]
+    const missing = unansweredOf(value)
+    return missing.length === 0 ? lines : [...lines, `No answer from: ${missing.join(", ")}`]
   }
   if (verb === "status" && isRecord(value)) return statusLines(value)
-  if (!isRecord(value) || value["kind"] !== "ok") return [JSON.stringify(value)]
+  if (!isRecord(value)) return [JSON.stringify(value)]
   return sessionVerbLines(verb, target, value)
 }
 
+function unansweredOf(value: unknown): readonly string[] {
+  if (!isRecord(value)) return []
+  if (Array.isArray(value["unanswered"])) return (devicesOf(value["unanswered"]) ?? []).map((device) => device.name)
+  return Array.isArray(value["incomplete"]) ? value["incomplete"].map(String) : []
+}
+
 function sessionVerbLines(verb: string, target: string, result: Record<string, unknown>): readonly string[] {
+  if (verb === "open" && typeof result["thread"] === "string") return [`Opened ${result["thread"]}.`]
   if (verb === "open" && isRecord(result["thread"])) {
     const { device, thread_id: id } = result["thread"]
     return [`Opened ${typeof device === "string" ? `${device}/` : ""}${String(id)}.`]
   }
   if (verb === "send") {
     const reply = result["reply"]
-    return typeof reply === "string" && reply !== "" ? [`${target}:`, reply] : [`Sent to ${target}.`]
+    if (typeof reply === "string" && reply !== "") return [`${target}:`, reply]
+    const position = result["queue_position"]
+    return typeof position === "number" ? [`Queued on ${target} at position ${position}.`] : [`Sent to ${target}.`]
   }
   if (verb === "interrupt")
     return [result["interrupted"] === true ? `Interrupted ${target}.` : `Nothing was running on ${target}.`]
@@ -222,38 +232,45 @@ function statusLines(status: Record<string, unknown>): readonly string[] {
   return typeof action === "string" && action !== "" ? [...lines, `Action: ${action}`] : lines
 }
 
+const text = (value: unknown): string | undefined => (typeof value === "string" && value !== "" ? value : undefined)
+
+// A device row is today's wire row (`device`, `label`) or the one-module DeviceRow (`id`, `name`, `self`).
+function deviceOf(entry: unknown): Device | undefined {
+  if (!isRecord(entry)) return undefined
+  const id = text(entry["id"]) ?? text(entry["device"])
+  if (id === undefined) return undefined
+  const name = text(entry["name"]) ?? text(entry["label"]) ?? id
+  return { id, name, online: entry["online"] === true, self: entry["self"] === true }
+}
+
 function devicesOf(value: unknown): readonly Device[] | undefined {
   if (!Array.isArray(value)) return undefined
-  return value.flatMap((entry: unknown) =>
-    isRecord(entry) && typeof entry["device"] === "string"
-      ? [
-          {
-            device: entry["device"],
-            label: typeof entry["label"] === "string" && entry["label"] !== "" ? entry["label"] : entry["device"],
-            online: entry["online"] === true,
-          },
-        ]
-      : [],
-  )
+  return value.flatMap((entry: unknown) => {
+    const device = deviceOf(entry)
+    return device === undefined ? [] : [device]
+  })
+}
+
+// A session row is today's listing row (`device` id + `session_id`) or the one-module SessionRow (`thread` handle).
+function rowOf(entry: unknown): Row | undefined {
+  if (!isRecord(entry)) return undefined
+  const device = text(entry["device"])
+  const session = text(entry["session_id"])
+  const target =
+    text(entry["thread"]) ?? (device !== undefined && session !== undefined ? `${device}/${session}` : undefined)
+  if (target === undefined) return undefined
+  return { target, title: text(entry["title"]) ?? text(entry["name"]) ?? "", state: text(entry["state"]) ?? "" }
 }
 
 function rowsOf(value: unknown): readonly Row[] | undefined {
   if (!isRecord(value) || !Array.isArray(value["rows"])) return undefined
-  return value["rows"].flatMap((entry: unknown) =>
-    isRecord(entry) && typeof entry["device"] === "string" && typeof entry["session_id"] === "string"
-      ? [
-          {
-            device: entry["device"],
-            session_id: entry["session_id"],
-            title: typeof entry["title"] === "string" ? entry["title"] : "",
-            state: typeof entry["state"] === "string" ? entry["state"] : "",
-          },
-        ]
-      : [],
-  )
+  return value["rows"].flatMap((entry: unknown) => {
+    const row = rowOf(entry)
+    return row === undefined ? [] : [row]
+  })
 }
 
 const deviceLine = (device: Device): string =>
-  `${device.label}  ${device.device}  ${device.online ? "online" : "offline"}`
+  `${device.name}  ${device.id}  ${device.online ? "online" : "offline"}${device.self ? "  (this device)" : ""}`
 
-const rowLine = (row: Row): string => `${row.device}/${row.session_id}  ${row.state}  ${row.title}`.trimEnd()
+const rowLine = (row: Row): string => `${row.target}  ${row.state}  ${row.title}`.trimEnd()
