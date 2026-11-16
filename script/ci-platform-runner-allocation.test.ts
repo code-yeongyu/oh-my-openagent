@@ -179,6 +179,27 @@ describe("#given the dev push runs that now carry macOS/Windows coverage", () =>
     expect([...(Array.isArray(watched) ? watched : [])].sort()).toEqual(platformOnDev.sort())
   })
 
+  // The tracker files an issue only for a run that concluded `failure`; a cancelled dev run hides its red. The master
+  // mirror pushes the very commit dev just ran, so a group keyed by the SHA would let it cancel the dev run.
+  test("#then no workflow the tracker watches lets another run cancel its dev push run", () => {
+    const tracker = workflow("platform-red-tracker.yml")["on"]
+    const watched = isRecord(tracker) && isRecord(tracker["workflow_run"]) ? tracker["workflow_run"]["workflows"] : []
+    const names = new Set(Array.isArray(watched) ? watched.map(String) : [])
+    const dev = { ...push, sha: "0123abc" }
+    const master = { ...dev, ref: "refs/heads/master" }
+    const cancelling = readdirSync(workflowsDir)
+      .filter((file) => /\.ya?ml$/.test(file) && names.has(String(workflow(file)["name"])))
+      .filter((file) => {
+        const concurrency = workflow(file)["concurrency"]
+        if (!isRecord(concurrency)) return false
+        const cancels = concurrency["cancel-in-progress"]
+        const cancelsOnPush = isExpression(cancels) ? evaluate(cancels, { github: dev }) === true : cancels === true
+        const group = (github: Record<string, unknown>) => evaluate(concurrency["group"], { github })
+        return cancelsOnPush && group(dev) === group(master)
+      })
+    expect(cancelling).toEqual([])
+  })
+
   // GitHub keeps one pending run per concurrency group, so a group that every dev completion enters can drop a
   // red run before its issue exists. Only the writer, gated on a failed macOS/Windows job, may serialize.
   test("#then only the issue writer, gated on a failed macOS/Windows job, enters the tracker's concurrency group", () => {

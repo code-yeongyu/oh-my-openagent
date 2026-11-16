@@ -22,8 +22,10 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: true
+  # One group per ref, and only a pull request cancels: the master mirror pushes the commit dev just ran, and a
+  # cancelled dev run would hide its macOS/Windows red from platform-red-tracker.yml.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   native-linux:
