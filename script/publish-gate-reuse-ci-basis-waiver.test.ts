@@ -96,6 +96,9 @@ function dispatch(input: Dispatch): Outcome {
     timeout: TEST_TIMEOUT_MS - 1_000,
     env: {
       ...fixture.gitEnv,
+      // A UTF-8 locale like the Actions runner's, so the receipt check's own LC_ALL=C is what refuses non-ASCII.
+      LANG: "C.UTF-8",
+      LC_CTYPE: "C.UTF-8",
       GH_CALLS: ghCalls,
       GITHUB_STEP_SUMMARY: summary,
       PREPARED_RELEASE_SHA: input.prepared ?? fixture.sha.B,
