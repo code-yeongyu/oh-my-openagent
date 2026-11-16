@@ -549,9 +549,9 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
   const read: AnyTool = {
     ...metadata("thread_read"),
     parameters: threadToolParamSchemas.thread_read,
-    execute: (id: string, args: ThreadReadInput, _signal, _onUpdate, ectx) =>
+    execute: (id: string, args: ThreadReadInput, signal, _onUpdate, ectx) =>
       execute("thread_read", id, args, ectx, async (current, value, _operationId, callerId) =>
-        readThread(options, current, value, callerId),
+        readThread(options, current, value, callerId, signal),
       ),
   }
   const send: AnyTool = {

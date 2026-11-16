@@ -567,7 +567,7 @@ describe("omo remote session verbs", () => {
       sessionCommand: (device, sessionId, rpc, options) =>
         note(`command:${String(rpc["type"])}`, port.sessionCommand(device, sessionId, rpc, options)),
       read: (device, sessionId, tail) => note("read", port.read(device, sessionId, tail)),
-      watch: (device, sessionId, listener) => note("watch", port.watch(device, sessionId, listener)),
+      watch: (device, sessionId, handlers, options) => note("watch", port.watch(device, sessionId, handlers, options)),
     }
     return { calls, remote: { ...remote, sessions } }
   }
