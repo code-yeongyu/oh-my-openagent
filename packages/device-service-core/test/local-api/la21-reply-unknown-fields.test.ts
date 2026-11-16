@@ -12,6 +12,7 @@ import { exactly } from "../../src/local-api/validate-fields.ts"
 import { validateRequest as validateReleasedRequest } from "../../vendor/omo-5.1.66-decoder/validate.ts"
 import { PEER, defaultWorld } from "./conformance/world.ts"
 import { eventExamples } from "./event-examples.ts"
+import type { OmoSentRequestType } from "./sent-request-types.ts"
 
 // LA21 (omo-relay-daemon#914): what the client READS from the service (welcome, refused, response, event, snapshot
 // blob) ignores a field this version does not define, so a newer service that adds one keeps an installed client
@@ -27,7 +28,8 @@ if (deviceRow === undefined) throw new Error("the world lists a device")
 const attachState = { attached: true, changedAt: "2026-11-09T12:00:00.000Z" }
 const wakeState = { enabled: false, stored: null, changedAt: "", overridden: false }
 
-// One answer per request type omo sends; the machine, delivery, presenter, wake and update-commit requests the
+// One answer per request type omo sends (required: a new send fails typecheck here until it has a row), plus the three
+// the fake owner serves that omo does not send; the machine, delivery, presenter, wake and update-commit requests the
 // vendored client added are covered by its upstream suite.
 const answers = {
   authenticate: {},
@@ -61,7 +63,7 @@ const answers = {
   "delivery.pending": {},
   "delivery.drained": { kept: false },
   "peer.admitted": { admitted: true },
-} satisfies { readonly [T in RequestType]?: ResponseData[T] }
+} satisfies { readonly [T in OmoSentRequestType]: ResponseData[T] } & { readonly [T in RequestType]?: ResponseData[T] }
 const answerRows = Object.entries(answers) as [RequestType, unknown][]
 const response = (data: unknown) => ({ id: "r1", type: "response", ok: true, data })
 const decode = (type: RequestType, data: unknown) => validateResponse(response(data), type)
