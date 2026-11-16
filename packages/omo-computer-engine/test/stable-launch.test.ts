@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
@@ -61,5 +61,25 @@ describe("stable-path launch under the lock", () => {
     expect(attempt).toThrow(expect.objectContaining({ reason: "designated_requirement_mismatch" }))
     expect(spawned).toEqual([])
     expect(readFileSync(join(dir, "omo-computer-engine"), "utf8")).toBe("good engine")
+  })
+
+  it("a stable path that is a symlink to the verified bytes is replaced by a file we wrote before the spawn", () => {
+    // Given the stable path is a symlink (placed by another process of this user) to identical bytes elsewhere.
+    const dir = join(root, "stable")
+    mkdirSync(dir, { recursive: true })
+    const elsewhere = join(root, "elsewhere-engine")
+    writeFileSync(elsewhere, "new engine", { mode: 0o755 })
+    symlinkSync(elsewhere, join(dir, "omo-computer-engine"))
+
+    // When the verified source with those bytes is launched.
+    const launched = launchFromStablePath(
+      { ...source("new engine"), directory: dir, fileName: "omo-computer-engine" },
+      (path) => lstatSync(path).isFile(),
+      () => true,
+    )
+
+    // Then the spawn saw a regular file at the stable path, and the link's target was left alone.
+    expect(launched.value).toBe(true)
+    expect(readFileSync(elsewhere, "utf8")).toBe("new engine")
   })
 })
