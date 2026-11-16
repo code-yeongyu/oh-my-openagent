@@ -326,3 +326,17 @@ fn marker_found_after_engine_restart_refuses_the_act_in_serve_mode() {
     assert_eq!(clicked["error"]["data"]["reason"], "recovery_required", "{clicked}");
     assert_eq!(posted_inputs(daemon.dir.path()), 0, "nothing was sent");
 }
+
+#[test]
+fn screen_lock_pause_refuses_the_act_in_serve_mode() {
+    let mut locked: serde_json::Value = serde_json::from_str(daemon::ONE_WINDOW).expect("scenario");
+    locked["session_timeline"] = json!([{"t_ms": 0, "screen_locked": false}, {"t_ms": 1, "screen_locked": true}, {"t_ms": 5000, "screen_locked": false}]);
+    let daemon = Daemon::start_with(&locked.to_string(), &[("OMO_COMPUTER_FAKE_CLOCK", "1")]);
+    let mut client = opened(&daemon);
+    client.call(5, "stopPath.start", &json!({"chord": "ctrl+alt+shift+escape"})).expect("armed");
+    client.call(6, "capture", &json!({"target": "101"})).expect("a frame to click in");
+    client.call(7, "$/test.advanceClock", &json!({"ms": 10})).expect("the lock is due");
+    let clicked = client.call(2, "click", &json!({"target": "101", "x": 10, "y": 10, "callId": "k-lock"})).expect("answered");
+    assert_eq!(clicked["error"]["data"]["code"], "ScreenLocked", "{clicked}");
+    assert_eq!(posted_inputs(daemon.dir.path()), 0, "nothing was sent while locked");
+}
