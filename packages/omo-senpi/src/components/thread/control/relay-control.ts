@@ -153,7 +153,8 @@ async function waitSettled(
   const started = Date.now()
   let status = "unknown"
   let running = false
-  // A live event is newer than the baseline read: once one arrived, the baseline never overrides it.
+  // A live status (a status change or a resync) is newer than the baseline read: once one arrived, the baseline never
+  // overrides it. A content record says nothing about the status, so it leaves the baseline in place.
   let live = false
   let turn: string | undefined
   let finish!: (outcome: ThreadWaitOutcome["outcome"], status: string, turnId?: string) => void
@@ -186,12 +187,14 @@ async function waitSettled(
     row.session_id,
     {
       record: (record) => {
-        live = true
         const type = record["type"]
-        if (type === "agent_start" || type === "turn_start") runSeen(turnOf(record))
         if (type === "agent_settled") {
           status = record["reason"] === "session_closed" ? "closed" : "idle"
           finish("settled", status, turnOf(record) ?? turn)
+        } else if (type !== "session_status") {
+          // Any other live record is the run's own output (its start may predate the attach, whose replayed history
+          // only positions the watch), so a run is under way.
+          runSeen(turnOf(record))
         }
       },
       status: (change) => {
