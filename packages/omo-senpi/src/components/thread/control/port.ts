@@ -1,8 +1,9 @@
 import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "../errors"
 import type { ThreadTranscriptEntry } from "../reader"
+import type { InterruptOutcome } from "./interrupt"
 import type { ModelChoice } from "../tools/model-match"
 import type { ThreadCloseOutcome } from "../tools/ports"
-import type { ThreadSummary } from "../contracts"
+import type { ThreadSummary, ThreadWaitOutcome } from "../contracts"
 
 /**
  * One live thread's controls, wherever it is held: the session on this device's endpoint, or the session on another
@@ -18,8 +19,8 @@ export type SessionControl = {
   readonly title: string
   /** Names on the target device that a rename must not take. */
   readonly visible: () => Promise<readonly ThreadSummary[]>
-  /** The engine's own `interrupt`: an idle session answers `interrupted: false`. */
-  readonly interrupt: (turnId?: string) => Promise<{ readonly interrupted: boolean; readonly turn_id?: string }>
+  /** `interruptOver` on this leg's transport: an idle session answers `interrupted: false`. */
+  readonly interrupt: (turnId?: string) => Promise<InterruptOutcome>
   /** The one close ladder (`close-ladder.ts`) on the thread's engine. */
   readonly close: () => Promise<ThreadCloseOutcome>
   readonly setName: (name: string) => Promise<void>
@@ -38,6 +39,11 @@ export type SessionControl = {
    */
   readonly setThinkingLevel: (level: string, scope?: "turn") => Promise<void>
   readonly getMessages: () => Promise<readonly ThreadTranscriptEntry[]>
+  /**
+   * Waits, bounded, until the thread stops running, on the leg's own status events (never a polling loop). Absent: the
+   * leg has no such event source here, and a waiting read answers `unsupported`.
+   */
+  readonly waitSettled?: (timeoutMs: number, signal?: AbortSignal) => Promise<ThreadWaitOutcome>
 }
 
 /**

@@ -14,8 +14,26 @@ const isObject = (value: unknown): value is JsonObject =>
 // Dialogs left pending when their settle never arrives (the session ended) stop being remembered past this many.
 const SHOWN_KEPT = 1024
 
+const remember = (known: Set<string>, uiRequestId: string): void => {
+  known.add(uiRequestId)
+  for (const oldest of known) if (known.size > SHOWN_KEPT) known.delete(oldest)
+}
+
+/** Every request id a snapshot's pending lists hold (`state.pendingDialogs`, `state.pendingQuestions`). */
+export const pendingIds = (...lists: readonly unknown[]): Set<string> =>
+  new Set(
+    lists.flatMap((list) =>
+      Array.isArray(list)
+        ? list.flatMap((request) => (isObject(request) && typeof request["id"] === "string" ? [request["id"]] : []))
+        : [],
+    ),
+  )
+
 export class MirroredDialogs {
   readonly #shown = new Set<string>()
+  // Raiser-only dialogs (secret input, grant selection) pending on the session: never shown here, but the raiser's TUI got
+  // them through its own delegated frame, so a snapshot that no longer holds one must still dismiss it there.
+  readonly #raiserOnly = new Set<string>()
 
   /** The record the attach TUI gets for a dialog mirror record; null when the TUI must not see it; undefined for any other record. */
   present(record: JsonObject, sessionId: string): JsonObject | null | undefined {
@@ -23,6 +41,7 @@ export class MirroredDialogs {
     if (typeof uiRequestId !== "string" || uiRequestId === "") return undefined
     if (record["type"] === "ui_request_settled") {
       this.#shown.delete(uiRequestId)
+      this.#raiserOnly.delete(uiRequestId)
       return {
         type: "question_resolved",
         id: uiRequestId,
@@ -32,8 +51,12 @@ export class MirroredDialogs {
     }
     if (record["type"] !== "ui_request_pending") return undefined
     const request = record["request"]
-    if (!isObject(request) || raiserOnly(request)) return null
-    this.#remember(uiRequestId)
+    if (!isObject(request)) return null
+    if (raiserOnly(request)) {
+      remember(this.#raiserOnly, uiRequestId)
+      return null
+    }
+    remember(this.#shown, uiRequestId)
     return { ...request, type: "extension_ui_request", id: uiRequestId, sessionId }
   }
 
@@ -44,29 +67,29 @@ export class MirroredDialogs {
   pending(requests: unknown, sessionId: string): JsonObject[] {
     if (!Array.isArray(requests)) return []
     return requests.flatMap((request) => {
-      if (!isObject(request) || typeof request["id"] !== "string" || request["id"] === "" || raiserOnly(request))
+      if (!isObject(request) || typeof request["id"] !== "string" || request["id"] === "") return []
+      if (raiserOnly(request)) {
+        remember(this.#raiserOnly, request["id"])
         return []
-      this.#remember(request["id"])
+      }
+      remember(this.#shown, request["id"])
       return [{ ...request, type: "extension_ui_request", sessionId }]
     })
   }
 
   /**
-   * After a later snapshot (a re-attach): the resolution of each dialog this TUI was shown that the snapshot no longer
-   * holds. It settled while the attach was away and its settle record was lost with the gap, so the TUI dismisses it.
+   * After a later snapshot (a re-attach): the resolution of each dialog this TUI was shown, or that its raiser holds, that
+   * the snapshot no longer holds. It settled while the attach was away and its settle record was lost with the gap, so
+   * the TUI dismisses it. `still` is every request id the snapshot holds (`pendingIds`), raiser-only ones included.
    */
-  settledAway(pending: readonly JsonObject[], sessionId: string): JsonObject[] {
-    const still = new Set(pending.map((request) => request["id"]))
-    return [...this.#shown].flatMap((uiRequestId) => {
-      if (still.has(uiRequestId)) return []
-      this.#shown.delete(uiRequestId)
-      return [{ type: "question_resolved", id: uiRequestId, outcome: "cancelled", sessionId }]
-    })
-  }
-
-  #remember(uiRequestId: string): void {
-    this.#shown.add(uiRequestId)
-    for (const oldest of this.#shown) if (this.#shown.size > SHOWN_KEPT) this.#shown.delete(oldest)
+  settledAway(still: ReadonlySet<string>, sessionId: string): JsonObject[] {
+    return [this.#shown, this.#raiserOnly].flatMap((known) =>
+      [...known].flatMap((uiRequestId) => {
+        if (still.has(uiRequestId)) return []
+        known.delete(uiRequestId)
+        return [{ type: "question_resolved", id: uiRequestId, outcome: "cancelled", sessionId }]
+      }),
+    )
   }
 
   /** The TUI answers a presented dialog by the id it was shown, its uiRequestId: the answer names it so. Others go as they are. */

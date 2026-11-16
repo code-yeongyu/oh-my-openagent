@@ -88,7 +88,7 @@ test("a cancelled or skipped signal never disappears silently", () => {
   expect(notice.if).toContain("github.event_name == 'workflow_run'")
   expect(notice.if).toContain("github.event.workflow_run.conclusion == 'cancelled'")
   expect(notice.if).toContain("github.event.workflow_run.conclusion == 'skipped'")
-  expect(notice.permissions).toEqual({ actions: "read" })
+  expect(notice.permissions).toEqual({ actions: "read", "pull-requests": "read" })
   expect((notice.steps ?? []).some((step) => step.uses?.startsWith("actions/checkout"))).toBe(false)
   const script = notice.steps.find((step) => step.uses?.startsWith("actions/github-script")).with.script
   expect(script).toContain("listWorkflowRuns")
@@ -134,3 +134,64 @@ test.each([
 function evaluateStep(condition, { github, steps }) {
   return evaluate(String(condition), { github, needs: {}, matrix: {}, steps })
 }
+
+// A push cancels the signal of the head it replaced, so the notice must warn only when the skipped head is still the
+// head of an open PR and no newer signal covers it.
+test.each([
+  ["a superseded head", "new-head", 0],
+  ["a live head with no newer signal", "old-head", 1],
+])("#given %s #then the skipped-signal notice warns only for a live head", async (_name, liveHead, warnings) => {
+  const notice = workflow("pr-automation").jobs["notice-skipped-signal"]
+  const script = notice.steps.find((step) => step.uses?.startsWith("actions/github-script")).with.script
+  const warned = []
+  const github = {
+    rest: {
+      actions: { listWorkflowRuns: async () => ({ data: { workflow_runs: [{ id: 10, run_number: 1 }] } }) },
+      pulls: {
+        list: async (args) => {
+          expect(args).toMatchObject({ owner: "owner", repo: "project", state: "open", head: "owner:feature" })
+          return { data: [{ number: 7, head: { sha: liveHead } }] }
+        },
+      },
+    },
+  }
+  const context = {
+    repo: { owner: "owner", repo: "project" },
+    workflow: "PR Automation",
+    payload: {
+      workflow_run: {
+        id: 10,
+        head_sha: "old-head",
+        head_branch: "feature",
+        head_repository: { owner: { login: "owner" } },
+      },
+    },
+  }
+  const summary = { addHeading: () => summary, addRaw: () => summary, write: async () => {} }
+  const core = { info() {}, warning: (message) => warned.push(message), summary }
+  const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor
+  await new AsyncFunction("github", "context", "core", script)(github, context, core)
+  expect(warned).toHaveLength(warnings)
+})
+
+test("#given a signal from a deleted fork #then the notice warns instead of failing", async () => {
+  const notice = workflow("pr-automation").jobs["notice-skipped-signal"]
+  const script = notice.steps.find((step) => step.uses?.startsWith("actions/github-script")).with.script
+  const warned = []
+  const github = {
+    rest: {
+      actions: { listWorkflowRuns: async () => ({ data: { workflow_runs: [{ id: 10, run_number: 1 }] } }) },
+      pulls: { list: async () => ({ data: [] }) },
+    },
+  }
+  const context = {
+    repo: { owner: "owner", repo: "project" },
+    workflow: "PR Automation",
+    payload: { workflow_run: { id: 10, head_sha: "old-head", head_branch: "feature", head_repository: null } },
+  }
+  const summary = { addHeading: () => summary, addRaw: () => summary, write: async () => {} }
+  const core = { info() {}, warning: (message) => warned.push(message), summary }
+  const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor
+  await new AsyncFunction("github", "context", "core", script)(github, context, core)
+  expect(warned).toHaveLength(1)
+})
