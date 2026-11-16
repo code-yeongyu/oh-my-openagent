@@ -150,3 +150,27 @@ fn desktop_shutdown_is_host_only_and_ends_the_daemon() {
         std::thread::sleep(Duration::from_millis(20));
     }
 }
+
+/// The client side of the real-process test, run only as a re-executed child of it.
+#[test]
+#[ignore = "run by same_uid_unregistered_real_process_is_closed_unread as its child"]
+fn unregistered_client_helper() {
+    let (Ok(socket), Ok(capability)) = (std::env::var("W1E_DIAL"), std::env::var("W1E_CAP")) else { return };
+    let bytes: Vec<u8> = (0..32).map(|i| u8::from_str_radix(&capability[i * 2..i * 2 + 2], 16).expect("hex")).collect();
+    let mut client = daemon::Client::dial(std::path::Path::new(&socket), &bytes, bytes.clone().try_into().expect("32"));
+    client.send_with(1, "session.open", &json!({}), None);
+    println!("{}", if client.closed_silently() { "CLOSED-UNREAD" } else { "ANSWERED" });
+}
+
+#[test]
+fn same_uid_unregistered_real_process_is_closed_unread() {
+    let daemon = Daemon::start(&[]);
+    let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
+        .args(["--exact", "unregistered_client_helper", "--ignored", "--nocapture"])
+        .env("W1E_DIAL", daemon.socket())
+        .env("W1E_CAP", hex(&daemon.capability))
+        .output()
+        .expect("the second process runs");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("CLOSED-UNREAD"), "a same-uid pid not on the allowlist, even holding the generation capability: {stdout}");
+}
