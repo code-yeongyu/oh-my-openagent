@@ -6,6 +6,9 @@ use omo_computer_core::error::{EngineCode, Reason};
 use omo_computer_core::listing::AppSource;
 use omo_computer_core::results::PermissionState;
 
+use std::ffi::OsString;
+use std::os::unix::ffi::OsStringExt;
+
 use super::{gedit, observe};
 use crate::apps::launch::{child_env, LaunchPlan, Launcher};
 use crate::caps::AxPermission;
@@ -23,9 +26,9 @@ impl Launcher for Recording {
     }
 }
 
-fn pairs(env: &[(&str, &str)]) -> Vec<(String, String)> {
+fn pairs(env: &[(&str, &str)]) -> Vec<(OsString, OsString)> {
     env.iter()
-        .map(|(key, value)| ((*key).to_owned(), (*value).to_owned()))
+        .map(|(key, value)| (OsString::from(key), OsString::from(value)))
         .collect()
 }
 
@@ -202,4 +205,17 @@ fn apps_open_child_has_no_activation_token_or_startup_id_env() {
     );
     let leaked = |key: &str| plan.env.iter().any(|(name, _)| name == key);
     assert!(!leaked("XDG_ACTIVATION_TOKEN") && !leaked("DESKTOP_STARTUP_ID"));
+}
+
+#[test]
+fn a_non_unicode_parent_variable_passes_through_untouched() {
+    let raw = OsString::from_vec(vec![b'/', 0xff, b'x']);
+    let parent = vec![
+        (OsString::from("ODD"), raw.clone()),
+        (OsString::from("DESKTOP_STARTUP_ID"), OsString::from("agent")),
+    ];
+
+    let env = child_env(parent);
+
+    assert_eq!(env, vec![(OsString::from("ODD"), raw)]);
 }
