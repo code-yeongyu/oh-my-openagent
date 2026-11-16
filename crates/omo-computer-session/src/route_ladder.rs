@@ -13,7 +13,7 @@ use serde_json::json;
 
 /// The refusal of a table that failed its load test.
 pub const ROUTE_TABLE_INVALID: Refusal =
-    Refusal::new(EngineCode::Internal, Reason::RouteTableInvalid.wire());
+    Refusal::new(EngineCode::Internal, Reason::RouteTableInvalid);
 
 /// The OS family this engine routes for.
 #[must_use]
@@ -70,7 +70,7 @@ mod tests {
         let config = request.config.get_or_insert_with(Default::default);
         config.consent.toolkit_routes = Some([("Blend*".to_owned(), ToolkitClass::CanvasGl)].into());
         let refusal = open_routes(&request, RouteOs::X11).expect_err("a pattern key");
-        assert_eq!((refusal.code, refusal.reason), (EngineCode::Internal, Some("route_table_invalid")));
+        assert_eq!((refusal.code, refusal.reason), (EngineCode::Internal, Some(omo_computer_core::error::Reason::RouteTableInvalid)));
         assert_eq!(refusal.wire_data()["pointer"], json!("/toolkit_routes/Blend*"));
         assert_eq!(refusal.computer_code().map(|c| c.wire()), Ok("COMPUTER_UNAVAILABLE"));
     }

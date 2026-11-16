@@ -40,7 +40,7 @@ fn a_denied_url_keeps_its_detail_and_the_admission_stamp_on_one_call() {
         .expect_err("a denied host");
     assert_eq!(
         (refused.refusal.code.wire(), refused.refusal.reason),
-        ("ControlRequired", Some("url_policy")),
+        ("ControlRequired", Some(omo_computer_core::error::Reason::UrlPolicy)),
         "row 25: the consequential gate refuses"
     );
     assert_eq!(
