@@ -5,6 +5,9 @@
 pub mod bounds;
 pub mod cache;
 pub mod client;
+#[cfg(windows)]
+mod com;
+pub mod control_type;
 pub mod counters;
 pub mod element;
 pub mod identity;
@@ -13,6 +16,8 @@ pub mod reader;
 pub mod reidentify;
 pub mod safety;
 pub mod source;
+#[cfg(windows)]
+pub mod thread;
 
 #[cfg(test)]
 mod tests;
