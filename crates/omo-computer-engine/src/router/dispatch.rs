@@ -35,7 +35,13 @@ pub fn dispatch(router: &mut Router, method: Method, params: Value) -> Result<Va
             router.resume_token = Some(opened.resume_token.clone());
             json!(opened)
         }
-        Method::StopPathStart => json!(session.stop_path_start(parse(params)?)),
+        Method::StopPathStart => {
+            let params = parse(params)?;
+            // The host arming its stop path over this connection is the relay's first beat;
+            // `stopPath.heartbeat` keeps it fresh (C14, R56a).
+            session.stop_path_heartbeat();
+            json!(session.stop_path_start_checked(params).map_err(|r| refused(&r))?)
+        }
         Method::StopPathStop => {
             let status = session.stop_path_stop(parse(params)?);
             router.stop_epoch += 1;

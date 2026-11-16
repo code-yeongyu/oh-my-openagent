@@ -143,3 +143,51 @@ fn a_wrong_resume_token_is_permission_denied() {
     let refused = router.call(Peer::Host, "stopPath.resume", json!({"token": "wrong"})).expect_err("denied");
     assert_eq!(refused.code, EngineCode::PermissionDenied.number());
 }
+
+// Ported from rows 21-26's rpc/tests.rs (R60c), now against the router's refusal wire.
+fn drag_refused(stage: Value) -> Value {
+    let refused = omo_computer_session::Refused {
+        detail: Some(Box::new(stage)),
+        ..Refusal::new(EngineCode::InvalidTarget, omo_computer_core::error::Reason::DragDestination).into()
+    };
+    refused_call(&refused).data.expect("data")
+}
+
+fn own_row(code: EngineCode, reason: Option<&str>) -> Value {
+    let row = omo_computer_core::error::from_wire(code.number(), reason).expect("a row");
+    match row.disposition {
+        omo_computer_core::error::DispositionRule::Fixed(d)
+        | omo_computer_core::error::DispositionRule::BySent { nothing: d, .. } => json!(d),
+        _ => Value::Null,
+    }
+}
+
+#[test]
+fn a_refused_drag_point_takes_its_stage_pairs_own_disposition() {
+    for (code, reason) in [
+        (EngineCode::ControlRequired, Some("denied_app")),
+        (EngineCode::ControlRequired, Some("app_scope")),
+        (EngineCode::ProtectedProcess, Some("self_target")),
+        (EngineCode::InvalidTarget, Some("protected_surface")),
+        (EngineCode::BackgroundUnavailable, Some("target_unknown")),
+        (EngineCode::ScreenLocked, None),
+    ] {
+        let mut stage = json!({"point": {"x": 1.0, "y": 2.0}, "stageCode": code.wire()});
+        if let Some(reason) = reason {
+            stage["stageReason"] = json!(reason);
+        }
+        let data = drag_refused(stage);
+        assert_eq!((&data["code"], &data["reason"]), (&json!("InvalidTarget"), &json!("drag_destination")));
+        assert_eq!(data["disposition"], own_row(code, reason), "{code:?} {reason:?}: {data}");
+    }
+}
+
+#[test]
+fn every_other_refusal_keeps_its_wire_form() {
+    use omo_computer_core::error::Reason;
+    let before = json!({"code": "ControlRequired", "hint": null, "reason": "denied_app"});
+    let plain = refused_call(&Refusal::new(EngineCode::ControlRequired, Reason::DeniedApp).into());
+    assert_eq!(plain.data.expect("data"), before, "no disposition or nextCall is added");
+    let drag_without_stage = drag_refused(json!({"point": {"x": 1.0, "y": 2.0}}));
+    assert!(drag_without_stage.get("disposition").is_none() && drag_without_stage.get("nextCall").is_none());
+}

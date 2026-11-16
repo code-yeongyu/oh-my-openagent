@@ -98,6 +98,11 @@ impl Router {
         self.ctx.test_clock
     }
 
+    #[must_use]
+    pub const fn session(&self) -> &Session {
+        &self.session
+    }
+
     pub fn session_mut(&mut self) -> &mut Session {
         &mut self.session
     }
