@@ -230,7 +230,7 @@
         "$ref": "#/$defs/EmptyParams"
       },
       "result": {
-        "$ref": "#/$defs/ClipboardContent"
+        "$ref": "#/$defs/ClipboardReadReply"
       }
     },
     "menu.items": {
@@ -1163,6 +1163,24 @@
           ],
           "default": null
         },
+        "reason": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RefusalReason"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Row 24 (R60): why an `effect:\"refused\"` report sent nothing."
+        },
+        "nothingSent": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "Row 24 (R60): `true` on a refused report: nothing was sent."
+        },
         "warning": {
           "type": [
             "string",
@@ -1186,6 +1204,18 @@
               "type": "null"
             }
           ],
+          "default": null
+        },
+        "settle": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObservationSettle"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The post-send settle: the regime picked and its outcome.",
           "default": null
         },
         "evidence": {
@@ -2388,6 +2418,17 @@
       ],
       "description": "`clipboard.read`: a concealed clipboard answers `{secure:true, text:null, reason:\"concealed\"}`."
     },
+    "ClipboardReadReply": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ClipboardContent"
+        },
+        {
+          "$ref": "#/$defs/ActionReport"
+        }
+      ],
+      "description": "`clipboard.read`'s reply (R60a(b), repin item 52): the content, or under a secure focus the\nrefused report (`effect:\"refused\"`, `reason:\"secure_focus\"`, `nothingSent:true`), never a\n`ClipboardContent`."
+    },
     "ClipboardWriteParams": {
       "type": "object",
       "additionalProperties": false,
@@ -3409,6 +3450,11 @@
           "type": "string",
           "const": "ax_change",
           "description": "A window-wide accessibility change during the settle window."
+        },
+        {
+          "type": "string",
+          "const": "frame_readback",
+          "description": "Row 24 (R59): a window frame read back after a frame verb; a receipt when every edge is\nwithin 1 px of the frame asked for (design row C8), both recorded raw."
         }
       ],
       "description": "What an evidence entry read."
@@ -3534,6 +3580,17 @@
             }
           ]
         },
+        "redaction": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FrameRedaction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Row 26 (plan owner 2026-11-16): present on a desktop or display frame, always `none`."
+        },
         "session": {
           "$ref": "#/$defs/SessionState"
         },
@@ -3582,6 +3639,13 @@
         "ttlMs"
       ],
       "description": "Present only when the bytes did not ride inline (size above `limits.maxResponseBytes`)."
+    },
+    "FrameRedaction": {
+      "type": "string",
+      "enum": [
+        "none"
+      ],
+      "description": "What a frame's pixels had masked. Frames are declared unredacted (G3): only `none` exists, and\na desktop or display frame says so, so no caller believes a secure field on it was masked (IS-6)."
     },
     "FullLiteral": {
       "type": "string",
@@ -4706,6 +4770,37 @@
         "y"
       ]
     },
+    "NotificationMatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "app": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "bodyHash": {
+          "type": "string"
+        },
+        "arrivedAt": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observation": {
+          "$ref": "#/$defs/UntrustedText"
+        }
+      },
+      "required": [
+        "app",
+        "title",
+        "bodyHash",
+        "arrivedAt",
+        "observation"
+      ],
+      "description": "The notification a `waitFor({notification})` matched: its fingerprint only, never the body."
+    },
     "NotificationPredicate": {
       "type": "object",
       "additionalProperties": false,
@@ -4817,6 +4912,13 @@
             "null"
           ]
         },
+        "nextCall": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Row 26 (R70f(1), R70g(1)): present only when `secure` is true; names the user."
+        },
         "settle": {
           "anyOf": [
             {
@@ -4873,6 +4975,17 @@
           "type": "integer",
           "format": "uint64",
           "minimum": 0
+        },
+        "regime": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SettleRegime"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The regime of `settle_profile` the engine picked."
         }
       },
       "required": [
@@ -5491,6 +5604,15 @@
         "height"
       ],
       "description": "A rectangle in the coordinate space of the reply that carries it."
+    },
+    "RefusalReason": {
+      "type": "string",
+      "enum": [
+        "secure_focus",
+        "concealed_clipboard",
+        "secret_no_clipboard_route"
+      ],
+      "description": "Row 24 (R60): the pinned reasons a report is `effect:\"refused\"` with nothing sent\n(`design/d-sdk-skill.md`:555). A closed enum until the design lane rules its type."
     },
     "ReleaseHelper": {
       "type": "object",
@@ -6486,6 +6608,26 @@
         "timeout"
       ]
     },
+    "SettleRegime": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "changed",
+          "description": "After an input whose settle saw a change."
+        },
+        {
+          "type": "string",
+          "const": "unchanged",
+          "description": "After an input with no detected change."
+        },
+        {
+          "type": "string",
+          "const": "navigation",
+          "description": "After a navigation: a new window, app, Space or desktop, web-area URL or document."
+        }
+      ],
+      "description": "Which settle numbers an input's settle picked, from what it saw."
+    },
     "SpawnPath": {
       "type": "string",
       "enum": [
@@ -6856,7 +6998,8 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the element reference took to resolve."
         },
         "capture": {
           "type": [
@@ -6864,7 +7007,8 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the capture took."
         },
         "prime": {
           "type": [
@@ -6872,7 +7016,8 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the target took to prime."
         },
         "dispatch": {
           "type": [
@@ -6880,7 +7025,8 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the dispatch of the input took."
         },
         "verify": {
           "type": [
@@ -6888,7 +7034,8 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the verification read took."
         },
         "restore": {
           "type": [
@@ -6896,10 +7043,20 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the focus restore took."
+        },
+        "settleMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0,
+          "description": "Milliseconds the post-send settle waited (its `settle.waitedMs`)."
         }
       },
-      "description": "Stage timings in microseconds; a stage that did not run is absent."
+      "description": "How long each stage took; a stage that did not run is absent. Each field names its unit."
     },
     "ToolkitClass": {
       "type": "string",
@@ -7237,6 +7394,16 @@
         },
         "observation": {
           "$ref": "#/$defs/Observation"
+        },
+        "notification": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NotificationMatch"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [

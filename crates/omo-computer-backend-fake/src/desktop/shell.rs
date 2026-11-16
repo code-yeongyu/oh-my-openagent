@@ -9,12 +9,14 @@ use omo_computer_core::surface::ShellReader;
 use omo_computer_core::untrusted::UntrustedText;
 
 use crate::backend::FakeBackend;
-use crate::sink::quoted;
 use crate::scenario::{FakeAxNode, FakeMenuNode};
+use crate::sink::quoted;
 
 impl FakeBackend {
     fn fake_menu_tree(&self, window: &str) -> BackendResult<Vec<MenuNode>> {
-        let menus = self.menus(window).ok_or(Refusal::bare(EngineCode::AxUnsupported))?;
+        let menus = self
+            .menus(window)
+            .ok_or(Refusal::bare(EngineCode::AxUnsupported))?;
         Ok(menus.iter().map(menu_node).collect())
     }
 
@@ -44,25 +46,16 @@ impl FakeBackend {
 
     fn fake_surface_tree(&self, kind: SurfaceKind) -> BackendResult<Vec<ElementInfo>> {
         let window = omo_computer_core::surface::kind_name(kind);
-        let root = self.lock().scenario.surfaces.get(&window).cloned().ok_or(
-            omo_computer_core::surface::SURFACE_UNSUPPORTED,
-        )?;
+        let root = self
+            .lock()
+            .scenario
+            .surfaces
+            .get(&window)
+            .cloned()
+            .ok_or(omo_computer_core::surface::SURFACE_UNSUPPORTED)?;
         let mut out = Vec::new();
         flatten(&root, &window, &mut out);
         Ok(out)
-    }
-
-    /// A second handle on the same scripted state, for a test that changes the scenario under a
-    /// session that owns the first.
-    #[must_use]
-    pub fn handle(&self) -> Self {
-        Self {
-            shared: self.shared.clone(),
-            sink: self.sink.clone(),
-            clock: self.clock.clone(),
-            persona: self.persona,
-            stop_path: self.stop_path,
-        }
     }
 
     /// Replaces a window's menu tree, as an app that relabels its menu between two reads does.
@@ -96,9 +89,15 @@ impl ShellReader for FakeBackend {
 /// The sink line of a row-25 side effect (the menu, app and system-surface events).
 pub(super) fn event_line(event: &InputEvent) -> String {
     match event {
-        InputEvent::MenuSelect { path } => format!("menu_select path={}", quoted(&path.join(" > "))),
-        InputEvent::AppLaunch { app_key, activate } => format!("app_launch {} activate={activate}", quoted(app_key)),
-        InputEvent::AppQuit { app_key, force } => format!("app_quit {} force={force}", quoted(app_key)),
+        InputEvent::MenuSelect { path } => {
+            format!("menu_select path={}", quoted(&path.join(" > ")))
+        }
+        InputEvent::AppLaunch { app_key, activate } => {
+            format!("app_launch {} activate={activate}", quoted(app_key))
+        }
+        InputEvent::AppQuit { app_key, force } => {
+            format!("app_quit {} force={force}", quoted(app_key))
+        }
         InputEvent::OpenSurface { kind } => format!("open_surface {kind:?}").to_lowercase(),
         other => format!("{other:?}"),
     }

@@ -95,14 +95,22 @@ impl Recorder {
 
     /// Stops: flushes the cursor track, finishes any video and writes `recording.stop`.
     ///
+    /// The `recording.stop` line is written exactly once, whatever fails before it, and carries
+    /// status `error` when the cursor flush or the encoder's finish failed.
+    ///
     /// # Errors
-    /// The cursor track could not be flushed or the stop line could not be audited.
+    /// The first failure: the cursor flush, the encoder's finish, or the stop line's audit.
     pub fn stop(mut self, audit: &mut dyn AuditSink) -> io::Result<u64> {
-        self.cursor.flush()?;
-        if let Some(encoder) = self.encoder.as_mut() {
-            let _ = encoder.finish();
+        let flushed = self.cursor.flush();
+        let finished = self.encoder.as_mut().map_or(Ok(()), |encoder| {
+            encoder.finish().map(drop).map_err(|refusal| io::Error::other(format!("encoder finish: {refusal:?}")))
+        });
+        let mut stop = line("recording.stop");
+        if flushed.is_err() || finished.is_err() {
+            stop.status = Status::Error;
         }
-        audit.append(line("recording.stop"))?;
+        let audited = audit.append(stop);
+        flushed.and(finished).and(audited)?;
         Ok(self.rows)
     }
 
@@ -128,11 +136,29 @@ mod tests {
         audit.lines().iter().filter_map(|line| line["action"].as_str().map(str::to_owned)).collect()
     }
 
+    fn stop_status(audit: &MemoryAudit) -> String {
+        let lines = audit.lines();
+        let stop = lines.iter().rev().find(|line| line["action"] == "recording.stop").expect("a stop line");
+        stop["status"].as_str().expect("status").to_owned()
+    }
+
+    #[test]
+    fn a_clean_stop_is_audited_as_success() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let mut audit = MemoryAudit::new("hand", 0);
+        let recorder = Recorder::start(true, dir.path(), None, &mut audit).expect("start").expect("on");
+        recorder.stop(&mut audit).expect("a clean stop");
+        assert_eq!(stop_status(&audit), "success");
+    }
+
     #[test]
     fn recording_is_off_by_default_and_writes_nothing() {
+        // The real default: a session.open carrying no `computer.record` key (review L4).
+        let settings = omo_computer_core::settings::Settings::default();
+        assert_eq!(settings.record, None, "computer.record is absent unless the host sets it");
         let dir = tempfile::tempdir().expect("dir");
         let mut audit = MemoryAudit::new("hand", 0);
-        let recorder = Recorder::start(false, dir.path(), None, &mut audit).expect("start");
+        let recorder = Recorder::start(settings.record.unwrap_or_default(), dir.path(), None, &mut audit).expect("start");
         assert!(recorder.is_none());
         assert!(!dir.path().join(CURSOR_FILE).exists());
         assert!(actions(&audit).is_empty());
@@ -166,5 +192,39 @@ mod tests {
         let recorder = Recorder::start(true, dir.path(), None, &mut audit).expect("start").expect("on");
         assert_eq!(recorder.video(), Video::Inactive { reason: "no_encoder" });
         assert!(recorder.cursor_path().ends_with(CURSOR_FILE), "the cursor track is still written");
+    }
+    struct FailingFinish;
+
+    impl omo_computer_core::recording::RecordingEncoder for FailingFinish {
+        fn push(&mut self, _at_ms: u64, _frame: &omo_computer_core::backend::FrameBytes) -> Result<(), omo_computer_core::backend::Refusal> {
+            Ok(())
+        }
+
+        fn finish(&mut self) -> Result<u64, omo_computer_core::backend::Refusal> {
+            Err(omo_computer_core::backend::Refusal::bare(omo_computer_core::error::EngineCode::Internal))
+        }
+    }
+
+    #[test]
+    fn a_failing_encoder_finish_is_reported_and_stop_is_still_audited_once() {
+        let dir = tempfile::tempdir().expect("dir");
+        let mut audit = MemoryAudit::new("hand", 0);
+        let recorder = Recorder::start(true, dir.path(), Some(Box::new(FailingFinish)), &mut audit).expect("start").expect("on");
+        assert!(recorder.stop(&mut audit).is_err(), "the encoder's failure is returned, never dropped");
+        assert_eq!(actions(&audit), ["recording.start", "recording.stop"], "one audit pair even when finish fails");
+        assert_eq!(stop_status(&audit), "error", "a lost video is never audited as a clean stop (review L7)");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_failing_cursor_flush_is_reported_and_stop_is_still_audited_once() {
+        let dir = tempfile::tempdir().expect("dir");
+        std::os::unix::fs::symlink("/dev/full", dir.path().join(CURSOR_FILE)).expect("symlink");
+        let mut audit = MemoryAudit::new("hand", 0);
+        let mut recorder = Recorder::start(true, dir.path(), None, &mut audit).expect("start").expect("on");
+        recorder.sample(&row(0), false).expect("buffered");
+        assert!(recorder.stop(&mut audit).is_err(), "the flush failure is returned");
+        assert_eq!(actions(&audit), ["recording.start", "recording.stop"], "one audit pair even when the flush fails");
+        assert_eq!(stop_status(&audit), "error", "a lost cursor track is never audited as a clean stop (review L7)");
     }
 }

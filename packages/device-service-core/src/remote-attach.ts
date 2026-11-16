@@ -4,6 +4,7 @@ import { type DelegatedChannel, followDelegatedChannel } from "./delegated-chann
 import type { LocalApiClient } from "./local-api/client.ts"
 import type { ReadPage } from "./local-api/client-assembly.ts"
 import { LocalApiError } from "./local-api/errors.ts"
+import type { WakeAccepts } from "./local-api/protocol-command.ts"
 import type { CommandLocated } from "./local-api/protocol-delegated.ts"
 import type {
   AttachPendingReason,
@@ -56,7 +57,7 @@ export type RemoteAttach = {
    * within ENDED_COMMAND_WAIT_MS: a command that ends its own session (close_session, unload_session) settles with its
    * state after the attach ends.
    */
-  readonly command: (rpc: CommandRpc) => Promise<CommandResult>
+  readonly command: (rpc: CommandRpc, options?: { readonly accepts?: WakeAccepts }) => Promise<CommandResult>
   /** The frames the host's engine writes unasked on the delegated channel (dialog requests, session events). */
   readonly onFrame: (listener: (frame: JsonObject) => void) => () => void
   /** A delegated reply or frame that was lost, or the channel closing, with the reason. */
@@ -209,7 +210,7 @@ export function openAttach(client: LocalApiClient, device: string, sessionId: st
         failure: () => failure,
         onFrame: (listener) => delegated.onFrame(listener),
         onChannelLoss: (listener) => delegated.onLoss(listener),
-        command: (rpc) =>
+        command: (rpc, options) =>
           new Promise<CommandResult>((resolve, reject) => {
             if (ended) return reject(new Error("the attach has ended"))
             // Minted here, before sending, so a state that arrives ahead of the answer is not missed.
@@ -232,7 +233,7 @@ export function openAttach(client: LocalApiClient, device: string, sessionId: st
               resolve(response === undefined ? { outcome: event } : { outcome: event, response })
             })
             commands.add(end)
-            client.command(attach, rpc, commandId, { delegated: true }).catch((error: unknown) => {
+            client.command(attach, rpc, commandId, { delegated: true }, options).catch((error: unknown) => {
               settle()
               reject(error)
             })
