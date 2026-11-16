@@ -14,13 +14,14 @@ mod record;
 mod recovery;
 mod report;
 mod route;
+mod url;
 
 #[cfg(test)]
 mod tests;
 
 pub use binding::{Binding, SecureInputProbe, SecureProbe};
 pub use call::Mutation;
-pub(crate) use report::released_reply;
+pub(crate) use report::{refused_reply, released_reply};
 pub use memory_markers::MemoryMarkers;
 pub(crate) use route::{key_event, route_for};
 
@@ -138,6 +139,11 @@ pub(crate) struct Funnel {
     artifacts: Option<ArtifactStore>,
     secure: Box<dyn SecureProbe>,
     pub(crate) control: crate::grant::Control,
+    // Row 25: the hand's `computer.url_policy` and the last call's unknown-URL stamp.
+    pub(crate) url_policy: omo_computer_core::url_policy::UrlPolicy,
+    pub(crate) url_unknown: bool,
+    /// Row 26: the hand's `computer.send_on_enter` composer table (acceptance 80).
+    pub(crate) send_on_enter: omo_computer_core::settings::ExactKeyTable<omo_computer_core::settings::SendOnEnterRule>,
     #[cfg(test)]
     warned: Vec<String>,
 }
@@ -188,6 +194,9 @@ impl Funnel {
             artifacts,
             secure: Box::new(SecureInputProbe),
             control: crate::grant::Control::default(),
+            url_policy: omo_computer_core::url_policy::UrlPolicy::default(),
+            url_unknown: false,
+            send_on_enter: std::collections::BTreeMap::new(),
             #[cfg(test)]
             warned: Vec::new(),
         }
@@ -226,6 +235,15 @@ impl Funnel {
                 )))
             }
         }
+    }
+
+    /// The Consequential stage's tables from the session's settings (absent is the empty table):
+    /// row 25's `computer.url_policy` and row 26's `computer.send_on_enter`.
+    pub(crate) fn set_url_policy(&mut self, request: &omo_computer_core::requests::SessionOpenRequest) {
+        let consent = request.config.as_ref().map(|config| &config.consent);
+        let hosts = consent.and_then(|consent| consent.url_policy.clone());
+        self.url_policy = omo_computer_core::url_policy::UrlPolicy::new(hosts.unwrap_or_default());
+        self.send_on_enter = consent.and_then(|consent| consent.send_on_enter.clone()).unwrap_or_default();
     }
 
     pub(crate) fn set_session_id(&mut self, id: String) {

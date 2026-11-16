@@ -52,6 +52,7 @@ impl crate::Session {
             trace: crate::trace::Trace::default(),
             settle: crate::settle::SettleState::default(),
             display_awake: crate::intervention::SharedHold::default(),
+            ax_generation: None,
         }))
     }
 }

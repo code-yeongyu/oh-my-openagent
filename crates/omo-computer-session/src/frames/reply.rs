@@ -105,6 +105,7 @@ impl Session {
             ..
         } = frame;
         let (width, height) = (bytes.width, bytes.height);
+        let whole_screen = target == "desktop" || target.starts_with("display:");
         Ok(match mode {
             ReportMode::Null => CaptureReply::Legacy(Box::new(LegacyFrame {
                 mode: if written.is_some() {
@@ -144,6 +145,7 @@ impl Session {
                     mime,
                     ttl_ms: ARTIFACT_TTL_MS,
                 }),
+                redaction: whole_screen.then_some(omo_computer_core::observation::FrameRedaction::None),
                 session: self.backend.capabilities().session,
                 observation: UntrustedText,
             })),
