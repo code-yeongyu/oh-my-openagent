@@ -3,7 +3,8 @@
 
 use std::hash::{BuildHasher, Hasher};
 
-use omo_computer_core::backend::Delivered;
+use omo_computer_core::backend::{Delivered, Refusal};
+use omo_computer_core::error::EngineCode;
 use omo_computer_core::intervention::BackendClock;
 use omo_computer_core::params::ReportMode;
 use omo_computer_core::report::Disposition;
@@ -186,6 +187,11 @@ impl Session {
             drop(lock);
             let out = self.stamp(out, object);
             return Err(self.refuse(record, Some(stage), out));
+        }
+        if object && crate::intervention::foreign_input_holds(self.backend.as_ref(), admission.pid) {
+            drop(lock);
+            let out = self.stamp(Refusal::bare(EngineCode::UserIntervened).into(), object);
+            return Err(self.refuse(record, Some("Attribution".to_owned()), out));
         }
         if let Err(error) = self.funnel.markers.create(&record.marker) {
             self.funnel.warn(format!("marker not written: {error}"));
