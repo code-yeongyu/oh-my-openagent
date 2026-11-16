@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { createSyncRpcCoordinator } from "./sync-rpc-coordinator"
+import { syncErrorFields } from "./sync-rpc-operation"
 import type { SyncRpcOptions, SyncRpcRegistration } from "./sync-rpc-ports"
 
 const empty = z.object({}).strict()
@@ -55,8 +56,13 @@ export function registerSyncRpc(rpc: SyncRpcRegistration, options: SyncRpcOption
               devices: z.array(device).parse(await ports.devices()),
             }))
         }
-      } catch {
-        return { kind: "unavailable", reason: "The sync operation could not complete." }
+      } catch (error) {
+        options.warn?.(`memory sync ${verb} unavailable`, {
+          path: verb,
+          code: "handler_failed",
+          ...syncErrorFields(error),
+        })
+        return { kind: "unavailable", reason: "The sync operation could not complete.", code: "handler_failed" }
       }
     })
   }
