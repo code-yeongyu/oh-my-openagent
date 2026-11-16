@@ -42,6 +42,11 @@ a rename. The shape is the same on every OS (`fixture-report.ts`, schema `omo-co
   `menuSelection`), read live from the window "Conformance Document".
 - `saved`: the task-set oracle fields at the last File > Save of that window, plus `savedDocuments`, the number of
   windows saved.
+- `geometry` (native fixtures only, while the main window is mapped): logical screen rects a pixel driver aims with,
+  read from the toolkit's own layout. `space` is `screen-logical` with the origin at the top-left of the virtual
+  desktop, `scale` the window's scale factor, `window.client` and `window.frame` separate rects, and `widgets` a rect per
+  widget keyed by its accessible name, with its `role` and, where only part of it answers a click, a `hit` rect.
+  Captions are never keyed, so a lookup by name cannot land on the label beside a field.
 
 The app never judges itself. A driver copies the reported field into `oracle.observed`, and `../report.ts` compares it.
 
@@ -76,13 +81,18 @@ the Electron app keeps its profile there. It also points `XDG_DATA_HOME`, `XDG_C
 too. Without it the Electron app makes its own temporary profile and removes it on
 quit.
 
+With `--geometry` (the native fixtures' jobs) the leg `geometry:widget-rects` checks the report's `geometry` at start
+and again after `poke drag`: every widget a driver aims at has a rect of its role, at least 4x4, inside the client
+rect (text fields at least 100 wide), a `hit` inside its rect, and the list items stand in the reported `dragOrder`
+top to bottom, so rects from before the rows were laid out again fail. The leg does not run under a sabotage.
+
 With `--sabotage <target>` the self-test passes only if it turns red on that target's checks and nowhere else. A
 report field as the target makes the app pin that field to its initial value; the target `a11y` makes the page hide its
 controls from assistive technology, so the probe must go red. The hermetic leg does not run under a sabotage.
 
 ```sh
 bun script/qa/computer/conformance/fixtures/self-test.ts --fixture <name> --app-key <key> [--sabotage <target>] \
-  [--a11y <probe command with {pid}>] -- <app command>
+  [--a11y <probe command with {pid}>] [--geometry] -- <app command>
 ```
 
 GUI code runs only on hosted runners or owned guests, never in a person's session.

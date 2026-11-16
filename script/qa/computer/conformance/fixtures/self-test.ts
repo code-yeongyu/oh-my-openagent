@@ -5,6 +5,7 @@ import { parseArgs } from "node:util"
 import { catalogFor, SESSIONS } from "../catalog.ts"
 import { type Action, OS_NAMES, type Oracle } from "../vocabulary.ts"
 import { FixtureProcess } from "./fixture-process.ts"
+import { geometryProblems, withoutGeometry } from "./geometry-check.ts"
 import { fixtureDataEntries, leftoversSince } from "./hermetic-check.ts"
 
 type Field = Oracle["field"]
@@ -69,6 +70,7 @@ function legs(
   sabotage: string,
   appKey: string,
   a11yProbe: string | undefined,
+  withGeometry: boolean,
   baseline: ReadonlySet<string>,
 ): Leg[] {
   const { effect, initial } = catalogOracles()
@@ -126,6 +128,23 @@ function legs(
               }),
           },
         ]
+  const geometry: Leg[] =
+    !withGeometry || sabotage !== ""
+      ? []
+      : [
+          {
+            name: "geometry:widget-rects",
+            fields: [],
+            run: (dir) =>
+              withFixture(command, sabotage, dir, async (fixture) => {
+                const atStart = fixture.report()
+                check(geometryProblems(atStart.geometry, atStart.fields.dragOrder), "at start")
+                await fixture.send("poke drag")
+                const dragged = fixture.report()
+                check(geometryProblems(dragged.geometry, dragged.fields.dragOrder), "after the drag reordered the rows")
+              }),
+          },
+        ]
   const hermetic: Leg[] =
     !webHosted || sabotage !== ""
       ? []
@@ -146,6 +165,7 @@ function legs(
   return [
     ...actionLegs,
     ...a11y,
+    ...geometry,
     windowTitles,
     { name: "document:save", fields: savedFields, run: saveDocument },
     {
@@ -154,7 +174,7 @@ function legs(
       run: async (dir) => {
         const first = await saveDocument(join(dir, "first"))
         const second = await saveDocument(join(dir, "second"))
-        if (first !== second) throw new Error("two identical runs wrote different reports")
+        if (withoutGeometry(first) !== withoutGeometry(second)) throw new Error("two identical runs wrote different reports")
         return second
       },
     },
@@ -170,13 +190,14 @@ async function main(): Promise<number> {
       "app-key": { type: "string" },
       sabotage: { type: "string", default: "" },
       a11y: { type: "string" },
+      geometry: { type: "boolean", default: false },
     },
   })
   const name = values.fixture
   const appKey = values["app-key"]
   if (name === undefined || appKey === undefined || positionals.length === 0) {
     console.error(
-      "usage: self-test.ts --fixture <name> --app-key <key> [--sabotage <field|a11y>] [--a11y <probe command with {pid}>] -- <fixture command...>",
+      "usage: self-test.ts --fixture <name> --app-key <key> [--sabotage <field|a11y>] [--a11y <probe command with {pid}>] [--geometry] -- <fixture command...>",
     )
     return 2
   }
@@ -187,7 +208,7 @@ async function main(): Promise<number> {
   const failed: Leg[] = []
   let passed = 0
   try {
-    for (const leg of legs(positionals, sabotage, appKey, a11yProbe, baseline)) {
+    for (const leg of legs(positionals, sabotage, appKey, a11yProbe, values.geometry, baseline)) {
       const dir = join(root, leg.name.replace(/[^a-zA-Z0-9.-]/g, "_"))
       try {
         for (const sub of ["first", "second"]) mkdirSync(join(dir, sub), { recursive: true })
