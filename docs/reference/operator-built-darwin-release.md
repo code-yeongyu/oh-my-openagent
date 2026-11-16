@@ -77,6 +77,6 @@ Hardening from the #13928 reviews (#13943):
 
 Trade-offs (accepted):
 - No Gatekeeper or OCSP evaluation runs in CI.
-- These hosted checks run only on the operator's Mac, so they are self-attested in the operator log: the engine and trust-helper selftests, and the omo version and eval smokes.
+- These hosted checks run only on the operator's Mac, so they are self-attested in the operator log: the engine and trust-helper selftests, and the version and eval smokes of the omo binaries.
 
 Running Gatekeeper or OCSP in CI would need a hosted macOS job, which reintroduces the wait this path removes. The operator's local `codesign --verify --strict` and `spctl -a -t install` verdicts are recorded in the operator log, but they are self-attested.

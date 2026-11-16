@@ -38,19 +38,25 @@ export function ticketLookup(fetcher: Fetch = fetch): (cdhash: string) => Promis
       return refuse(`could not reach Apple's notarization ticket service for cdhash ${cdhash}`)
     }
     const body = await json(response, "Apple's notarization ticket service")
-    if (!response.ok) refuse(`Apple's notarization ticket service answered HTTP ${response.status} for cdhash ${cdhash}`)
+    if (!response.ok)
+      refuse(`Apple's notarization ticket service answered HTTP ${response.status} for cdhash ${cdhash}`)
     const records = Array.isArray(body.records) ? body.records.map(record) : []
     const answer = records[0]
     if (records.length !== 1 || answer?.recordName !== recordName)
       refuse(`Apple's notarization ticket service did not answer for record ${recordName}`)
     if (answer.serverErrorCode === "NOT_FOUND") return false
-    if (answer.serverErrorCode !== undefined) refuse(`Apple's notarization ticket service answered ${String(answer.serverErrorCode)} for cdhash ${cdhash}`)
+    if (answer.serverErrorCode !== undefined)
+      refuse(`Apple's notarization ticket service answered ${String(answer.serverErrorCode)} for cdhash ${cdhash}`)
     return typeof record(record(answer.fields).signedTicket).value === "string"
   }
 }
 
 /** The repository role_name of a login; null when GitHub answers without one. A network failure is refused. */
-export function roleLookup(repository: string, token: string, fetcher: Fetch = fetch): (login: string) => Promise<string | null> {
+export function roleLookup(
+  repository: string,
+  token: string,
+  fetcher: Fetch = fetch,
+): (login: string) => Promise<string | null> {
   return async (login) => {
     let response: Response
     try {

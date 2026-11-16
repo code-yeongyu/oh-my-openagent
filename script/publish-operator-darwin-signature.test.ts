@@ -163,19 +163,55 @@ describe("operator darwin CMS signer", () => {
 
   describe("with a generated root and Developer ID CA (test-only trust anchors)", () => {
     const root = issue({ subject: [[CN, "Test Root CA"]], serial: 20 })
-    const ca = issue({ subject: [[CN, "Test Developer ID CA"]], issuer: certificateNames(root.certificate).subject, issuerKey: root.key, serial: 21 })
+    const ca = issue({
+      subject: [[CN, "Test Developer ID CA"]],
+      issuer: certificateNames(root.certificate).subject,
+      issuerKey: root.key,
+      serial: 21,
+    })
     const caName = certificateNames(ca.certificate).subject
-    const anchors: TrustAnchors = { root: new X509Certificate(root.certificate), developerIdCa: new X509Certificate(ca.certificate) }
-    const ours = issue({ subject: [[CN, "Developer ID Application: Ours (523JNR86LZ)"], [OU, "523JNR86LZ"]], issuer: caName, issuerKey: ca.key, serial: 22, developerIdApplication: true })
-    const foreign = issue({ subject: [[CN, "Developer ID Application: Attacker (ATTACKER99)"], [OU, "ATTACKER99"]], issuer: caName, issuerKey: ca.key, serial: 23, developerIdApplication: true })
+    const anchors: TrustAnchors = {
+      root: new X509Certificate(root.certificate),
+      developerIdCa: new X509Certificate(ca.certificate),
+    }
+    const ours = issue({
+      subject: [
+        [CN, "Developer ID Application: Ours (523JNR86LZ)"],
+        [OU, "523JNR86LZ"],
+      ],
+      issuer: caName,
+      issuerKey: ca.key,
+      serial: 22,
+      developerIdApplication: true,
+    })
+    const foreign = issue({
+      subject: [
+        [CN, "Developer ID Application: Attacker (ATTACKER99)"],
+        [OU, "ATTACKER99"],
+      ],
+      issuer: caName,
+      issuerKey: ca.key,
+      serial: 23,
+      developerIdApplication: true,
+    })
 
     test("control: our CA-valid leaf signing is accepted with our team", () => {
-      const cms = signedData({ signedOver: realCodeDirectory, key: ours.key, signer: ours.certificate, certificates: [ours.certificate] })
+      const cms = signedData({
+        signedOver: realCodeDirectory,
+        key: ours.key,
+        signer: ours.certificate,
+        certificates: [ours.certificate],
+      })
       expect(verifyDeveloperIdSigner(realCodeDirectory, cms, anchors)).toEqual({ team: "523JNR86LZ" })
     })
 
     test("review NIT-1: a CA-VALID foreign signer with our leaf PREPENDED to the list reads the foreign team", () => {
-      const cms = signedData({ signedOver: realCodeDirectory, key: foreign.key, signer: foreign.certificate, certificates: [ours.certificate, foreign.certificate] })
+      const cms = signedData({
+        signedOver: realCodeDirectory,
+        key: foreign.key,
+        signer: foreign.certificate,
+        certificates: [ours.certificate, foreign.certificate],
+      })
       // The team comes from the certificate that signed, never from the first one in the list; the verifier then
       // refuses any team other than 523JNR86LZ (publish-operator-darwin-verify.test.ts, "signed by team").
       expect(verifyDeveloperIdSigner(realCodeDirectory, cms, anchors)).toEqual({ team: "ATTACKER99" })
@@ -185,6 +221,8 @@ describe("operator darwin CMS signer", () => {
   test("review NIT-2: 200k nested indefinite-length elements are a typed refusal, not a stack overflow", () => {
     const bomb = new Uint8Array(400_000)
     for (let index = 0; index < bomb.length; index += 2) bomb.set([0x30, 0x80], index)
-    expect(refusal(() => verifyDeveloperIdSigner(realCodeDirectory, bomb))).toBe("REFUSED: DER nesting exceeds 32 indefinite-length levels")
+    expect(refusal(() => verifyDeveloperIdSigner(realCodeDirectory, bomb))).toBe(
+      "REFUSED: DER nesting exceeds 32 indefinite-length levels",
+    )
   })
 })
