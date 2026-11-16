@@ -12,6 +12,6 @@ pub fn admit(lease_held: bool) -> Result<(), Refusal> {
     if lease_held {
         Ok(())
     } else {
-        Err(Refusal::new(EngineCode::ControlRequired, Reason::LeaseMissing.wire()))
+        Err(Refusal::new(EngineCode::ControlRequired, Reason::LeaseMissing))
     }
 }

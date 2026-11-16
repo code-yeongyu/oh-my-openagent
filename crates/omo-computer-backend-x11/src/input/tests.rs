@@ -30,7 +30,7 @@ fn map(free: bool) -> GroupMap {
 fn xtest_requires_foreground_lease() {
     assert_eq!(
         admit(false),
-        Err(Refusal::new(EngineCode::ControlRequired, Reason::LeaseMissing.wire()))
+        Err(Refusal::new(EngineCode::ControlRequired, Reason::LeaseMissing))
     );
     assert_eq!(admit(true), Ok(()));
 }
@@ -54,7 +54,7 @@ fn unresolvable_grapheme_is_refused_with_next_call_paste_by_default() {
     assert_eq!(
         plan(&map(true), 0, &format!("a{GA}"), false),
         Err(Unresolvable {
-            refusal: Refusal::new(EngineCode::InvalidKey, Reason::Unresolvable.wire()),
+            refusal: Refusal::new(EngineCode::InvalidKey, Reason::Unresolvable),
             group: 0,
             grapheme: GA.to_string(),
             next_call: "paste",
@@ -81,7 +81,7 @@ fn remap_refused_answers_unresolvable_with_nothing_sent() {
     let refused = plan(&map(false), 0, &format!("x{GA}"), true);
     assert_eq!(
         refused.map_err(|unresolvable| (unresolvable.refusal.reason, unresolvable.grapheme)),
-        Err((Some("unresolvable"), GA.to_string())),
+        Err((Some(Reason::Unresolvable), GA.to_string())),
         "no free keycode: the whole call is refused, the `x` before it included"
     );
 }

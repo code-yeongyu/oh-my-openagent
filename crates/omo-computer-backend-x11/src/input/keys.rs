@@ -83,7 +83,7 @@ pub fn plan(map: &GroupMap, group: usize, text: &str, remap: bool) -> Result<Vec
             steps.extend([Step::Remap { code, keysym }, Step::Key { code, shift: false }, Step::Restore { code }]);
         } else {
             return Err(Unresolvable {
-                refusal: Refusal::new(EngineCode::InvalidKey, Reason::Unresolvable.wire()),
+                refusal: Refusal::new(EngineCode::InvalidKey, Reason::Unresolvable),
                 group,
                 grapheme: ch.to_string(),
                 next_call: "paste",
