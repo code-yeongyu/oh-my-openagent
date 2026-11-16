@@ -226,9 +226,13 @@ describe("#given the path-filtered workflows that also run macOS/Windows on dev 
   // CI's own concurrency is checked with its jobs; every other workflow the tracker watches must be a row here.
   test("#then the table covers every workflow the platform-red tracker watches except CI", () => {
     const tracker = workflow("platform-red-tracker.yml")["on"]
-    const watched = isRecord(tracker) && isRecord(tracker["workflow_run"]) ? tracker["workflow_run"]["workflows"] : []
+    const watched =
+      isRecord(tracker) && isRecord(tracker["workflow_run"]) ? tracker["workflow_run"]["workflows"] : undefined
+    if (!Array.isArray(watched) || watched.length === 0) {
+      throw new Error("platform-red-tracker.yml must list its watched workflows under on.workflow_run.workflows")
+    }
     const rows = devPushWorkflows.map((file) => String(workflow(file)["name"]))
-    const missing = (Array.isArray(watched) ? watched : []).filter((name) => name !== "CI" && !rows.includes(name))
+    const missing = watched.filter((name) => name !== "CI" && !rows.includes(String(name)))
     expect(missing).toEqual([])
   })
 
