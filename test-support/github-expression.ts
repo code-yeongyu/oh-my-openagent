@@ -1,5 +1,7 @@
 // Evaluates the GitHub Actions expression subset our workflows use, so workflow-structure tests can check what
 // GitHub would compute for a given event. String literals are left untouched; everything else becomes JavaScript.
+// One known difference: == and != compare strings case-sensitively here, while GitHub ignores case, so tests must
+// not rely on case-folding.
 function toJavaScript(expression: string): string {
   return expression
     .split(/('(?:[^']|'')*')/)
@@ -51,6 +53,6 @@ export function evaluate(expression: unknown, context: ExpressionContext): unkno
 /** Renders a string that embeds `${{ ... }}` expressions, as GitHub does for concurrency group names. */
 export function interpolate(template: unknown, context: ExpressionContext): string {
   return String(template).replace(/\$\{\{\s*([\s\S]+?)\s*\}\}/g, (_match, body: string) =>
-    String(evaluate(body, context)),
+    String(evaluate(body, context) ?? ""),
   )
 }
