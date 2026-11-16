@@ -116,7 +116,10 @@ impl Session {
         }
         let lock = match self.wait_for_interaction_lock() {
             Ok(lock) => lock,
-            Err((stage, out)) => return Err(self.refuse(record, Some(stage), out)),
+            Err(refused) => {
+                let (stage, out) = *refused;
+                return Err(self.refuse(record, Some(stage), out));
+            }
         };
         // Time passes between the first gate and here (the busy wait, another holder of the
         // interaction lock): on every path the gate runs again once the lock is held, and

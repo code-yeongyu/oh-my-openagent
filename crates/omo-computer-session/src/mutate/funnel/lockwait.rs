@@ -21,14 +21,14 @@ impl Session {
     /// RUNTIME root has none; only the fake acts without it (A-IS-65 L10(b)). Answers the refusal
     /// and its stage: `Lease` at the bound, the stop's own stage when a stop ends the wait, `Lock`
     /// for an unusable lock (A-IS-65 L2).
-    pub(super) fn wait_for_interaction_lock(&mut self) -> Result<Option<LockGuard>, (String, Refused)> {
+    pub(super) fn wait_for_interaction_lock(&mut self) -> Result<Option<LockGuard>, Box<(String, Refused)>> {
         let Some(lock) = self.funnel.lock.clone() else {
             if self.backend.capabilities().backend == FAKE_BACKEND {
                 return Ok(None);
             }
             self.funnel
                 .warn("interaction lock not taken: no runtime root: a real backend acts only under the interaction lock".to_owned());
-            return Err(("Lock".to_owned(), TRANSACTION_FAILED.into()));
+            return Err(Box::new(("Lock".to_owned(), TRANSACTION_FAILED.into())));
         };
         let fallback = MonotonicClock::default();
         let now = |session: &Self| session.backend.clock().map_or_else(|| fallback.now_ms(), |clock| clock.now_ms());
@@ -39,18 +39,18 @@ impl Session {
                 Ok(None) => {}
                 Err(error) => {
                     self.funnel.warn(format!("interaction lock not taken: {error}"));
-                    return Err(("Lock".to_owned(), TRANSACTION_FAILED.into()));
+                    return Err(Box::new(("Lock".to_owned(), TRANSACTION_FAILED.into())));
                 }
             }
             if let Some(refusal) = self.stop_while_waiting() {
-                return Err(("Latch".to_owned(), refusal.into()));
+                return Err(Box::new(("Latch".to_owned(), refusal.into())));
             }
             if let Some(waited_ms) = wait.at_bound(now(self)) {
                 let out = Refused {
                     detail: Some(Box::new(json!({ "waitedMs": waited_ms, "retryAfterMs": WAIT_BUDGET_MS }))),
                     ..INTERACTION_LOCK_BUSY.into()
                 };
-                return Err(("Lease".to_owned(), out));
+                return Err(Box::new(("Lease".to_owned(), out)));
             }
             match self.backend.clock() {
                 Some(clock) => clock.wait_ms(POLL_MS),
