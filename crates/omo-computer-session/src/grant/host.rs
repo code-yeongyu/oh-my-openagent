@@ -275,12 +275,13 @@ impl Session {
             }
         }
         self.funnel.control.armed_chord = Some(String::new());
+        // R70an(B): the binding shape of an unarmable chord - deaf, with its reason, never absent.
         self.guard.start(
             Err(Refusal::new(
                 omo_computer_core::error::EngineCode::StopPathUnavailable,
                 omo_computer_core::error::Reason::Deaf.wire(),
             )),
-            None,
+            Some(omo_computer_core::capabilities::DeafReason::ChordUnarmable),
         )
     }
 
