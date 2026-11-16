@@ -2,6 +2,7 @@
 //! fake's recording sink empty (the sink, not a flag, is the proof), and the serialized
 //! `capabilities().stopPath` carries the engine's own stop-path state over the backend's.
 
+use omo_computer_core::error::Reason;
 use omo_computer_backend_fake::{
     FakeBackend, FakeClock, FakeScenario, RecordingSink, StopPathScript,
 };
@@ -24,7 +25,7 @@ fn params<T: DeserializeOwned>(value: Value) -> T {
 }
 
 fn wire(refusal: Refusal) -> (&'static str, Option<&'static str>) {
-    (refusal.code.wire(), refusal.reason)
+    (refusal.code.wire(), refusal.reason.map(Reason::wire))
 }
 
 /// Each case: the stop script, the window's pid, whether `stopPath.start` and then a
