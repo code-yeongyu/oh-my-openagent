@@ -12,7 +12,7 @@ Every device signed in to this omo account is reachable from a js eval cell thro
 - **Machines** (`bunshin`, an SDK imported in the cell): run a command, start a long job, write or list files, fan one callback out over many machines.
 - **Sessions** (`tool.thread_*`, eval-only tools): list the agent sessions on every device, create one on another device, send it a message, read its transcript, interrupt or close it.
 
-Both ride this device's device service and the relay. Same-account sign-in is the authorization: there is no consent prompt. A device id is the same 32-hex string on both surfaces, so an id from `bunshin.listMachines()` is a valid `device` for `thread_create`.
+Both ride this device's device service and the relay. Same-account sign-in is the authorization: there is no consent prompt, but each device's user can refuse a device in its roster, and ops then fail with `capability_missing`. A device id is the same 32-hex string on both surfaces, so an id from `bunshin.listMachines()` is a valid `device` for `thread_create`.
 
 ## Machines
 
@@ -27,7 +27,7 @@ Read `state` and `unsupported` from the row before calling: an offline or unsupp
 
 | Call | Returns | Use for |
 |------|---------|---------|
-| `m.shell(cmd, { cwd?, env?, timeoutMs? })` | `{ exitCode, stdout, stderr, signal, timedOut, truncated, durationMs }` | One-shot command. A non-zero `exitCode` is a result, not a throw. |
+| `m.shell(cmd, { cwd?, env?, timeoutMs? })` | `{ exitCode, stdout, stderr, signal?, timeout?, startedAtMs?, durationMs? }`; `timeout` is `"deadline"` or `"exit-unconfirmed"` when the command did not finish normally | One-shot command. A non-zero `exitCode` is a result, not a throw. |
 | `m.exec_command({ cmd, workdir?, yield_ms? })` | `{ handleId, output, state, exitCode?, ... }` | Command that may still be running when `yield_ms` passes; poll with `m.wait_for_command`, feed with `m.write_stdin`, stop with `m.kill_terminal`. |
 | `m.spawn(cmd, { cwd? })` | `CommandHandle`: `await h.wait()` -> `{ exitCode, output, durationMs, truncated }`; `h.status()`, `h.output()` (async iterable), `h.write(data)`, `h.kill()` | A job that outlives one call (builds, test runs). |
 | `m.write(path, text \| Uint8Array, { createParentDirs? })` | `{ path, writtenBytes }` | File transfer to the machine. Absolute path inside the device's scope root (its home directory). |
@@ -66,9 +66,12 @@ const r = (await tool.thread_list({ all_scope: true })).details.result
 | direct call | `CapabilityUnavailableError` (`capability unavailable on machine <id>: shell`) | The machine is offline or unsupported; check its row's `state` / `unsupported`. |
 | `getMachine` | `MachineNotFoundError` | Wrong id or alias: call `listMachines()` and use an id it returned. |
 | any machine op | `e.code === "policy_denied"` (`... is outside the scope root`) | The path is outside the device's home. Use a path under the home directory; a path under `/tmp/` is refused. |
+| any machine op | `MachineWireError`, `e.code === "capability_missing"` | The target device's user has refused this device (`omo-device-service control machine <device> deny` on that device). Report it; do not retry. |
+| any machine op | `MachineWireError`, `e.code === "host_detached"` | The target device's service is not attached right now. Report it; retry only after it is back. |
 | any machine op | `e.code === "invoke_deadline"` / `"budget_exceeded"` | Too slow for one call: use `spawn` or `exec_command` instead of `shell`. |
 | first `bunshin` call | `BunshinSessionError`, `e.code === "no_transport"` | This device's device service is not connected to the relay. Tell the user to sign in and turn remote control on; do not retry. |
-| relay | `RelayTransportError`, `e.code` `not_connected` / `closed` / `request_timeout` | The relay link dropped. Retry once; if it repeats, report it. |
+| relay | `RelayTransportError`, `e.code` `not_connected` / `closed` | The relay link dropped and the op was not sent. Retry once; if it repeats, report it. |
+| relay | `RelayTransportError`, `e.code === "request_timeout"` | The op may already have run. Do not send it again: call `bunshin.resultOf(e.requestId)` until its `state` is `terminal` and use that `result`. |
 | thread tools | `device_offline` | That device is offline; nothing was queued. Retry when it is online. |
 | thread tools | `not_found` | Unknown thread or device: call `thread_list({ all_scope: true })` and use an id it returned. |
 | thread tools | `scope_denied` | Add `all_scope: true`; if it is already set, the other device does not allow commands from this one. |
