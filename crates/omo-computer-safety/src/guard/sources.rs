@@ -40,7 +40,8 @@ pub trait ProcessSource: Send {
     fn brain_locks(&self) -> Vec<BrainLock>;
 }
 
-/// The engine's own process, with no ancestry, and the lock files under `runtime_root`.
+/// The engine's own process and its ancestry up to the session leader (where the OS reader
+/// exists), and the lock files under `runtime_root`.
 #[derive(Debug, Clone, Default)]
 pub struct OwnProcess {
     pub runtime_root: Option<PathBuf>,
@@ -48,8 +49,9 @@ pub struct OwnProcess {
 
 impl ProcessSource for OwnProcess {
     fn snapshot(&self) -> ProcessSnapshot {
-        ProcessSnapshot {
-            processes: vec![ProcessInfo {
+        let chain = super::ancestry::own_chain();
+        let processes = if chain.is_empty() {
+            vec![ProcessInfo {
                 pid: std::process::id(),
                 ppid: 0,
                 start: 0,
@@ -57,7 +59,12 @@ impl ProcessSource for OwnProcess {
                 tty: None,
                 host_pid: None,
                 session_leader: true,
-            }],
+            }]
+        } else {
+            chain
+        };
+        ProcessSnapshot {
+            processes,
             tty_owners: Vec::new(),
         }
     }
