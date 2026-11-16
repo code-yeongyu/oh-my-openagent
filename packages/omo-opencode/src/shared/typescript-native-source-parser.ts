@@ -13,6 +13,7 @@ export class TypeScriptSourceParser {
   readonly #cwd: string
   #api: API
   #queue: Promise<unknown> = Promise.resolve()
+  #closed = false
 
   constructor(cwd: string) {
     this.#cwd = cwd
@@ -28,11 +29,19 @@ export class TypeScriptSourceParser {
     return run
   }
 
-  async close(): Promise<void> {
-    await this.#api.close()
+  // Queued behind the parses like them: a close issued while a parse restarts closes the API that parse ends with, and
+  // a parse after close is refused instead of starting a new native process (#13963 review L1).
+  close(): Promise<void> {
+    const run = this.#queue.then(async () => {
+      this.#closed = true
+      await this.#api.close()
+    })
+    this.#queue = run.catch(() => undefined)
+    return run
   }
 
   async #parseOrRestart(filePaths: readonly string[]): Promise<ReadonlyMap<string, SourceFile>> {
+    if (this.#closed) throw new Error("TypeScriptSourceParser is closed")
     try {
       return await this.#parseWith(this.#api, filePaths)
     } catch (error) {
