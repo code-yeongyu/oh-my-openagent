@@ -50,7 +50,7 @@ impl Skylight {
 }
 
 impl SkylightCapture for Skylight {
-    fn capture_window(&mut self, number: u32, _cursor: bool) -> Result<RawFrame, CaptureFault> {
+    fn capture_window(&mut self, number: u32) -> Result<RawFrame, CaptureFault> {
         // SAFETY: the resolved symbols have these signatures; one window id is passed.
         let images = Owned::new(unsafe {
             (self.capture)((self.connection)(), &raw const number, 1, CAPTURE_OPTIONS)

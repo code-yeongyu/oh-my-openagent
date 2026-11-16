@@ -39,11 +39,11 @@ pub trait CaptureOs: Send {
     fn helper(&mut self) -> Result<&mut dyn CaptureHelper, CaptureFault>;
 }
 
-/// The SkyLight hardware window capture, one window's own pixels.
+/// The SkyLight hardware window capture, one window's own pixels, never the pointer.
 pub trait SkylightCapture: Send {
     /// # Errors
     /// A [`CaptureFault`] when the call yields no image.
-    fn capture_window(&mut self, number: u32, cursor: bool) -> Result<RawFrame, CaptureFault>;
+    fn capture_window(&mut self, number: u32) -> Result<RawFrame, CaptureFault>;
 }
 
 /// The capture helper's request/reply channel.

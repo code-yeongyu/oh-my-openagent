@@ -126,7 +126,7 @@ pub struct FakeSkylight {
 }
 
 impl SkylightCapture for FakeSkylight {
-    fn capture_window(&mut self, _number: u32, _cursor: bool) -> Result<RawFrame, CaptureFault> {
+    fn capture_window(&mut self, _number: u32) -> Result<RawFrame, CaptureFault> {
         self.calls += 1;
         Ok(RawFrame {
             width: 4,
