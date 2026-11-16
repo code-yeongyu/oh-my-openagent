@@ -1,12 +1,17 @@
 //! Emulation: one burst per action - `start_emulating` on the device, one frame per event with
 //! strictly increasing microsecond timestamps, `stop_emulating`, flush (d-linux.md 'Emulation').
 
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::io::ErrorKind;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use reis::ei;
 use reis::event::DeviceCapability;
 
 use super::client::{EiSession, LinkError};
+
+/// How long a flush waits for a server that is slow to read before the burst counts as
+/// interrupted.
+const FLUSH_DEADLINE: Duration = Duration::from_secs(5);
 
 /// One libei event.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -63,8 +68,8 @@ impl EiSession {
     /// Sends `events` as one burst per device run.
     ///
     /// # Errors
-    /// [`LinkError::Lost`] when a device is missing or the flush fails; nothing of the burst
-    /// counts as sent then.
+    /// [`LinkError::Lost`] when a device is missing (nothing of the burst left the engine),
+    /// [`LinkError::Interrupted`] when the flush failed part-way (part of it may have landed).
     pub fn emit(
         &mut self,
         events: &[Emit],
@@ -114,10 +119,32 @@ impl EiSession {
             device.device().frame(serial, clock.next());
             device.device().stop_emulating(serial);
         }
-        self.converter
-            .0
-            .connection()
-            .flush()
-            .map_err(|_| LinkError::Lost)
+        self.flush()
+    }
+
+    /// Flushes the burst on this connection. A full socket (the server is slow to read) is
+    /// waited out up to [`FLUSH_DEADLINE`]: what was sent stays sent, so the rest follows on the
+    /// same connection and nothing is ever sent twice.
+    fn flush(&self) -> Result<(), LinkError> {
+        let deadline = Instant::now() + FLUSH_DEADLINE;
+        loop {
+            match self.converter.0.connection().flush() {
+                Ok(()) => return Ok(()),
+                Err(error)
+                    if std::io::Error::from(error).kind() == ErrorKind::WouldBlock
+                        && self.wait_writable(deadline) => {}
+                Err(_) => return Err(LinkError::Interrupted),
+            }
+        }
+    }
+
+    fn wait_writable(&self, deadline: Instant) -> bool {
+        let left = deadline.saturating_duration_since(Instant::now());
+        let millis = i32::try_from(left.as_millis()).unwrap_or(i32::MAX);
+        let mut fds = [rustix::event::PollFd::new(
+            &self.context,
+            rustix::event::PollFlags::OUT,
+        )];
+        millis > 0 && rustix::event::poll(&mut fds, millis).is_ok_and(|ready| ready > 0)
     }
 }

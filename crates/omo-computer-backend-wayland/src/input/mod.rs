@@ -96,24 +96,26 @@ impl Input {
         Ok((session, self.keymap.as_mut().map(|(_, keymap)| keymap)))
     }
 
-    /// Sends `events`; a burst the flush could not deliver is retried once on a reconnected
-    /// session (nothing of it counted as sent before).
+    /// Sends `events`. A burst that failed before anything left the engine (a device gone) is
+    /// retried once on a reconnected session; a flush that failed part-way is never resent,
+    /// since part of it may have landed (review L3 of #13909).
     ///
     /// # Errors
-    /// As [`Input::session`].
+    /// As [`Input::session`], or `Internal{libei_lost}` when the burst could not go out.
     pub fn emit(&mut self, events: &[Emit]) -> Result<(), Refusal> {
         for _ in 0..2 {
             self.session()?;
             let Some(session) = self.session.as_mut() else {
                 break;
             };
-            if session
-                .emit(events, &mut self.clock, &mut self.sequence)
-                .is_ok()
-            {
-                return Ok(());
+            match session.emit(events, &mut self.clock, &mut self.sequence) {
+                Ok(()) => return Ok(()),
+                Err(LinkError::Interrupted) => {
+                    self.session = None;
+                    return Err(libei_lost());
+                }
+                Err(LinkError::Lost | LinkError::Handshake(_)) => self.session = None,
             }
-            self.session = None;
         }
         Err(libei_lost())
     }
