@@ -1,0 +1,83 @@
+{
+  "request": "delivery.pending",
+  "cases": [
+    {
+      "name": "a consumer reports its full list of pairs with rows not yet applied",
+      "outcome": "ok",
+      "world": {
+        "deliveries": {
+          "agent_dirs": ["/agents/a"]
+        }
+      },
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "deliveries.serve",
+            "agent_dir": "/agents/a",
+            "v": 1
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "wake": false
+            }
+          }
+        },
+        {
+          "send": {
+            "id": "2",
+            "type": "delivery.pending",
+            "pairs": [
+              {
+                "sender_device": "dev-peer-1",
+                "session_id": "0193f5c2-7e1a-7c3e-9b1a-2f6c8d4e5a10",
+                "last_command_id": "Q01EV0FLRTAwMDAwMDAwMQ"
+              }
+            ]
+          }
+        },
+        {
+          "expect": {
+            "id": "2",
+            "type": "response",
+            "ok": true,
+            "data": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "a connection that serves no deliveries may not report",
+      "outcome": "refusal",
+      "world": {
+        "deliveries": {
+          "agent_dirs": ["/agents/a"]
+        }
+      },
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "delivery.pending",
+            "pairs": []
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "forbidden"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

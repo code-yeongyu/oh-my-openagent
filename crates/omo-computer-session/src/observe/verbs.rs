@@ -1,6 +1,7 @@
 //! The session's read verbs over the observation model: `observe`, `ax.drill`, `ax.node` and
 //! `ax.children`. Each resolves refs through the registry before it reads anything by ref.
 
+use omo_computer_core::error::Reason;
 use omo_computer_core::ax::NodeRead;
 use omo_computer_core::listing::Rect;
 use omo_computer_core::backend::Refusal;
@@ -14,10 +15,10 @@ use crate::refs::Unresolved;
 use crate::session::{Session, NOT_OPEN};
 
 /// A backend without accessibility reads.
-const NO_READER: Refusal = Refusal::new(EngineCode::AxUnsupported, "snapshot_unsupported");
+const NO_READER: Refusal = Refusal::new(EngineCode::AxUnsupported, Reason::SnapshotUnsupported);
 
 /// A null-mode `observe` is the v1 capture, which this session does not serve yet.
-const NO_CAPTURE: Refusal = Refusal::new(EngineCode::CaptureUnavailable, "capture_unsupported");
+const NO_CAPTURE: Refusal = Refusal::new(EngineCode::CaptureUnavailable, Reason::CaptureUnsupported);
 
 fn ax_node(token: String, read: &NodeRead) -> AxNode {
     let bounds = read.bounds.unwrap_or(Rect { x: 0.0, y: 0.0, width: 0.0, height: 0.0 });

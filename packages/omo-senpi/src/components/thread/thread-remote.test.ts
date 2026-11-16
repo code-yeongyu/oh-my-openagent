@@ -86,21 +86,17 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     ])
   })
 
-  test("#given a thread on b #when thread_create forks it #then the fork is opened on b from that source", async () => {
+  test("#given a thread on b #when thread_create forks it #then the fork is refused unsupported naming b's source, and nothing reaches b (#13031)", async () => {
     const a = account()
     const { run } = surface(a.remote)
     expect(await run("thread_create", { fork_from: "dur-on-b" })).toMatchObject({
-      kind: "ok",
-      thread: { thread_id: "dur-new-on-b", device: "b" },
+      kind: "error",
+      error: { code: "unsupported", details: { reason: "fork_unsupported", source: "dur-on-b", device: "b" } },
     })
-    expect(a.sent[0]).toEqual({
-      via: "endpoint",
-      device: "b",
-      rpc: { type: "open_session", retain_on_disconnect: true, forkFrom: "dur-on-b" },
-    })
+    expect(a.sent).toEqual([])
   })
 
-  test("#given b's engine answers open_session with its real envelope (ids under data) #when thread_create creates and forks on b #then each succeeds with the durable id, falling back to data.sessionId when no durable id is named", async () => {
+  test("#given b's engine answers open_session with its real envelope (ids under data) #when thread_create creates and forks on b #then the create succeeds with the durable id (data.sessionId when none is named) and the fork is refused", async () => {
     const a = account()
     const { run } = surface(a.remote)
     expect(await run("thread_create", { device: "studio" })).toMatchObject({
@@ -108,8 +104,8 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
       thread: { thread_id: "dur-new-on-b", device: "b" },
     })
     expect(await run("thread_create", { fork_from: "dur-on-b" })).toMatchObject({
-      kind: "ok",
-      thread: { thread_id: "dur-new-on-b", device: "b" },
+      kind: "error",
+      error: { code: "unsupported", details: { reason: "fork_unsupported" } },
     })
     const bare = account({ openData: { sessionId: "bmV3LXNlc3Npb24tMDAwMQ" } })
     expect(await surface(bare.remote).run("thread_create", { device: "studio" })).toMatchObject({
@@ -642,7 +638,7 @@ describe("remote == local: the same call answers the same on b as on this device
     })
   })
 
-  test("#given a fork source on this device #when thread_create forks it naming device b, and forks it by its alias #then the first is invalid_arguments with nothing opened, the second forks the resolved id here", async () => {
+  test("#given a fork source on this device #when thread_create forks it naming device b, and forks it by its alias #then the first is invalid_arguments with nothing opened, the second resolves the id here and is refused unsupported", async () => {
     const a = account({ aliases: new Map([["mine", { session_id: "dur-local", device: "here" }]]) })
     const { run, openSession } = surface(a.remote)
     expect(await run("thread_create", { fork_from: "dur-local", device: "studio" })).toMatchObject({
@@ -651,9 +647,9 @@ describe("remote == local: the same call answers the same on b as on this device
     })
     expect(a.sent).toEqual([])
     expect(openSession).not.toHaveBeenCalled()
-    await run("thread_create", { fork_from: "mine" })
-    expect(openSession).toHaveBeenCalledTimes(1)
-    expect((openSession.mock.calls[0] as unknown as [{ forkFrom?: string }])[0].forkFrom).toBe("dur-local")
+    const forked = await run("thread_create", { fork_from: "mine" })
+    expect(openSession).toHaveBeenCalledTimes(0)
+    expect((forked as unknown as { error: { details: { source?: string } } }).error.details.source).toBe("dur-local")
   })
 
   test("#given thread_create opens b's thread and names an alias #when it runs #then the alias is held by that thread", async () => {

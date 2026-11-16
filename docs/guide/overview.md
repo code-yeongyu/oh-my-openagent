@@ -170,8 +170,8 @@ Override specific categories or curated agents in `omo.json`:
   },
 
   "categories": {
-    // Design consultation: Fable 5 max
-    "architect": { "model": "anthropic/claude-fable-5-2", "reasoning": "max" },
+    // Design consultation: Fable 5 xhigh
+    "architect": { "model": "anthropic/claude-fable-5-2", "reasoning": "xhigh" },
 
     // Frontend/UI work: Fable 5 max, then Opus 5 max, then Kimi K3.1 Pro max
     "visual-engineering": { "model": "anthropic/claude-fable-5-2", "reasoning": "max" },
