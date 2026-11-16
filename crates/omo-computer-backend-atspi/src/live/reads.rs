@@ -11,11 +11,12 @@ use atspi::proxy::action::ActionProxy;
 use atspi::proxy::bus::StatusProxy;
 use atspi::proxy::component::ComponentProxy;
 use atspi::proxy::document::DocumentProxy;
+use atspi::proxy::selection::SelectionProxy;
 use atspi::proxy::text::TextProxy;
-use atspi::{CoordType, Interface, ObjectRefOwned, State};
+use atspi::{CoordType, Interface, State};
 use zbus::names::BusName;
-use zbus::proxy::{CacheProperties, Defaults};
 
+use super::proxy::{id_of, libatspi_name, proxy};
 use super::LiveBus;
 use crate::bus::{
     AppRef, Bus, BusEvent, BusResult, Extents, Interfaces, NodeFacts, NodeId, OwnerProcess, States,
@@ -23,35 +24,6 @@ use crate::bus::{
 };
 
 const TEXT_CHARS: i32 = 4_096;
-
-async fn proxy<P>(connection: &zbus::Connection, node: &NodeId) -> zbus::Result<P>
-where
-    P: Defaults + From<zbus::Proxy<'static>>,
-{
-    zbus::proxy::Builder::<P>::new(connection)
-        .destination(node.bus.clone())?
-        .path(node.path.clone())?
-        .cache_properties(CacheProperties::No)
-        .build()
-        .await
-}
-
-/// libatspi's role name (`push button`) where the crate's differs (`button`): the backend
-/// decides on one vocabulary.
-fn libatspi_name(role: &str) -> &str {
-    if role == "button" {
-        "push button"
-    } else {
-        role
-    }
-}
-
-fn id_of(object: &ObjectRefOwned) -> Option<NodeId> {
-    if object.is_null() {
-        return None;
-    }
-    Some(NodeId::new(object.name_as_str()?, object.path_as_str()))
-}
 
 impl Bus for LiveBus {
     fn now_ms(&self) -> u64 {
@@ -184,6 +156,16 @@ impl Bus for LiveBus {
             proxy::<ActionProxy<'static>>(connection, node)
                 .await?
                 .do_action(index)
+                .await
+        })
+    }
+
+    fn clear_selection(&mut self, node: &NodeId, slice: Duration) -> BusResult<bool> {
+        let connection = self.a11y.connection();
+        self.call(slice, async {
+            proxy::<SelectionProxy<'static>>(connection, node)
+                .await?
+                .clear_selection()
                 .await
         })
     }

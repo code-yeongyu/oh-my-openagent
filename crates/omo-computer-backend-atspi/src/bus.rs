@@ -148,6 +148,9 @@ pub trait Bus: Send {
     /// One action's name; names are read per index, never batched.
     fn action_name(&mut self, node: &NodeId, index: i32, slice: Duration) -> BusResult<String>;
     fn do_action(&mut self, node: &NodeId, index: i32, slice: Duration) -> BusResult<bool>;
+    /// The Selection interface's `ClearSelection`: a menu bar or menu closes the submenu its
+    /// selected item opened.
+    fn clear_selection(&mut self, node: &NodeId, slice: Duration) -> BusResult<bool>;
     /// `org.a11y.Status.IsEnabled`.
     fn a11y_enabled(&mut self) -> BusResult<bool>;
     fn set_a11y_enabled(&mut self, enabled: bool) -> BusResult<()>;

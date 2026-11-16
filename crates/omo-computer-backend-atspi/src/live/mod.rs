@@ -5,6 +5,7 @@
 
 mod events;
 mod files;
+mod proxy;
 mod reads;
 
 use std::collections::VecDeque;
