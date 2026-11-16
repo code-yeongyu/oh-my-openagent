@@ -26,10 +26,16 @@ export type LockedDarwinStore = {
 /** RULING-73: every retired slot holds a copy nothing here can remove; the user must delete them once. */
 export class HelperOldSlotsFull extends Error {}
 
+/** Neither the helper nor this process may delete `<A>`: another program owns the item's access list (#13757). */
+export class HelperItemNotOwned extends Error {}
+
 const ALL_OLD_SLOTS = Array.from({ length: OLD_SLOT_COUNT }, (_, slot) => slot)
 
 const OLD_SLOTS_FULL_MESSAGE =
   'The macOS keychain holds 8 earlier OmO sign-ins that cannot be removed automatically. Open Keychain Access, delete the items whose account name ends in ".old" or ".old.1" to ".old.7" for OmO, then sign in again.'
+
+const NOT_OWNED_MESSAGE =
+  'The OmO sign-in in the macOS keychain (item "omo-cli") is owned by a different program, and macOS does not let this one remove it. Open Keychain Access, delete the "omo-cli" item for OmO, then try again.'
 
 const failed = (reply: HelperReply, verb: string) =>
   new HelperReadError(
@@ -106,7 +112,10 @@ export function lockedDarwinStore(deps: DarwinStoreDeps, lease: HelperLease): Lo
     },
     async clear() {
       const removed = await helper({ verb: "remove", account: deps.account })
-      if (removed.error === "not-owned") await deps.ownDelete(deps.account)
+      if (removed.error === "not-owned")
+        await deps.ownDelete(deps.account).catch((error: unknown) => {
+          throw new HelperItemNotOwned(NOT_OWNED_MESSAGE, { cause: error })
+        })
       else if (removed.ok !== true) throw failed(removed, "remove")
       await helper({ verb: "remove", account: `${deps.account}.staging` })
       // The slots a read reports; when that read fails (a staging item another identity owns, a locked keychain), every
