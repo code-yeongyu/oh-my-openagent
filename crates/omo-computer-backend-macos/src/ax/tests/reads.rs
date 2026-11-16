@@ -31,8 +31,10 @@ fn one_ipc_call_per_node() {
 
 #[test]
 fn deadline_3000ms_returns_partial_with_cuts() {
-    let mut fake = FakeAx::default();
-    fake.read_cost_ms = 2;
+    let mut fake = FakeAx {
+        read_cost_ms: 2,
+        ..FakeAx::default()
+    };
     fake.window(7, 70, 1_000, 100);
     fake.tree(100, 5_000, 5);
     let mut ax = reader(fake);
@@ -85,6 +87,7 @@ fn electron_window_that_stays_empty_gets_manual_accessibility_only() {
     for electron in [true, false] {
         let mut fake = FakeAx::default();
         fake.window(7, 70, 1_000, 100);
+        fake.add(100, node("AXWindow"), Vec::new());
         if electron {
             fake.electron.push(70);
         }

@@ -5,12 +5,10 @@ use std::ffi::c_void;
 use crate::capture::os::cf::CfRef;
 
 pub const AX_SUCCESS: i32 = 0;
-pub const AX_FAILURE: i32 = -25200;
 pub const AX_INVALID_ELEMENT: i32 = -25202;
 pub const AX_CANNOT_COMPLETE: i32 = -25204;
 pub const AX_ATTRIBUTE_UNSUPPORTED: i32 = -25205;
 pub const AX_ACTION_UNSUPPORTED: i32 = -25206;
-pub const AX_NO_VALUE: i32 = -25212;
 
 pub const VALUE_CGPOINT: u32 = 1;
 pub const VALUE_CGSIZE: u32 = 2;
@@ -54,7 +52,6 @@ unsafe extern "C" {
     pub fn AXValueGetValue(value: CfRef, kind: u32, out: *mut c_void) -> bool;
     pub fn AXValueCreate(kind: u32, value: *const c_void) -> CfRef;
     pub fn AXValueGetTypeID() -> usize;
-    pub fn AXUIElementGetTypeID() -> usize;
     pub fn AXObserverCreate(pid: i32, callback: ObserverCallback, observer: *mut CfRef) -> i32;
     pub fn AXObserverAddNotification(
         observer: CfRef,
