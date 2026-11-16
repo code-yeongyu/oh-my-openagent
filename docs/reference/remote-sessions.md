@@ -32,7 +32,7 @@ omo remote close <session> [--json]       # end the session on its device
 
 `devices` lists this device first. With `--json` every row carries `this_device`, and this device's row has no
 `kind` unless the account roster lists it. This device reads online only while its device service is connected.
-`sessions --device D` naming a device that is neither this device, in the roster, nor in the listing fails with
+`sessions --device D` naming a device that is not this device and appears in neither the roster nor the listing fails with
 exit 2 and names it.
 
 `open` runs the new session in `MODE` (default: this device's own setting, else full-access), on the
