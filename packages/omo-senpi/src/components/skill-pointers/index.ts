@@ -5,6 +5,13 @@ import { getBuiltinSkillsRoot } from "../telemetry/product-identity"
 import { resolveUlwLoopSessionScope } from "../ulw-loop/session-scope"
 import { BUNSHIN_TS_CELL_HINT } from "../../extension/sdk-root-provisioning"
 import { NOT_AFTER_IDENTIFIER, NOT_BEFORE_PATH, NOT_INTO_IDENTIFIER, stripQuotedRegions } from "./strip-quoted-regions"
+import {
+  companionPointer,
+  ignoreWhenOnlyDiscussed,
+  skillPointer,
+  type SkillCompanion,
+  type SkillPointerTarget,
+} from "./pointer-text"
 
 export const MASS_ULW_CUSTOM_TYPE = "omo-mass-ulw:skill-pointer"
 export const ULW_PLAN_CUSTOM_TYPE = "omo-ulw-plan:skill-pointer"
@@ -16,36 +23,6 @@ export const BUNSHIN_CUSTOM_TYPE = "omo-bunshin:skill-pointer"
 export const SKILL_POINTERS_DISABLED_FLAG = "omo-senpi-skill-pointers-disabled"
 
 const SKILL_COMMAND_PREFIX = "/skill:"
-
-interface SkillPointerTarget {
-  readonly skillName: string
-  readonly customType: string
-  readonly pattern: RegExp
-  readonly expandedBlockPattern: RegExp
-  readonly instruction: string
-  readonly extra?: (sessionScope: string | null) => string
-  readonly companions?: readonly SkillCompanion[]
-  // A binding target enters its mode instead of asking the model whether the user meant it: the
-  // conditional pointer let the model skip mass-ulw entirely (#10810). Binding is POSITIVE: only a
-  // fixed request form matches (`bindingForms`). Every other mention (a statement or a
-  // question about the skill, a relayed report, the plain-word alias `meth`) keeps the conditional
-  // pointer, because forcing a workflow run onto it is the wrong answer.
-  readonly bindingPattern?: RegExp
-  // A target with no packaged skill: the pointer is this text instead of a SKILL.md read.
-  readonly pointer?: string
-}
-
-// A companion is a skill the parent workflow runs on. It has no keyword of its own: it rides on
-// every invocation of its parent, including the paths that dedup the parent's own pointer
-// (a raw `/skill:<parent>` command, an expanded `<skill name="<parent>">` block), and is skipped
-// only when the input already carries the companion itself.
-interface SkillCompanion {
-  readonly skillName: string
-  readonly customType: string
-  readonly expandedBlockPattern: RegExp
-  readonly role: string
-  readonly instruction: string
-}
 
 interface SkillPointerMessage {
   readonly customType: string
@@ -159,10 +136,11 @@ const TARGETS: readonly SkillPointerTarget[] = [
     skillName: "bunshin",
     customType: BUNSHIN_CUSTOM_TYPE,
     // `fleet` alone is an ordinary word (a vehicle fleet, a "fleet dashboard"), so it counts only with a device
-    // sense: owned by the user (`my fleet(s)`, `our fleet(s)`) or naming its machines (`fleet hosts`, `fleet box`, a host name
-    // such as `fleet-node-3`) (#13446).
+    // sense: the user's fleet as the object of the request (`my fleet(s)`, `our fleet(s)` followed by the end, punctuation or a
+    // function word, so not `our fleet management UI` or `our fleet of delivery trucks`) or a fleet machine noun (`fleet hosts`,
+    // `fleet box`, a host name such as `fleet-node-3`; `hosts` before an article is the verb) (#13446, #13467 review L3).
     pattern: skillNamePattern(
-      String.raw`(?:bunshin|(?:my|our)\s+fleets?|fleet[\s-]+(?:machines?|devices?|hosts?|nodes?|box(?:es)?)(?:-[a-z0-9]+)*|machine[\s-]*mesh)`,
+      String.raw`(?:bunshin|(?:my|our)\s+fleets?(?=\s*(?:$|[,.;:!?)]|(?:and|or|now|then|today|please|is|are|up|down|via|with|from|to|on|in|for)\b))|fleet[\s-]+(?:machines?|devices?|hosts?(?!\s+(?:a|an|the)\b)|nodes?|box(?:es)?)(?:-[a-z0-9]+)*|machine[\s-]*mesh)`,
     ),
     expandedBlockPattern: /<skill\s+name="bunshin"/i,
     instruction: "",
@@ -284,18 +262,6 @@ function ulwLoopToolSentence(sessionScope: string | null): string {
   return `${base} This session's state lives under .omo/ulw-loop/${sessionScope}/.`
 }
 
-// A keyword proves a mention, not a request to run the workflow.
-function skillPointer(target: SkillPointerTarget, sessionScope: string | null): string {
-  const skillsRoot = getBuiltinSkillsRoot()
-  const extra = target.extra?.(sessionScope) ?? ""
-  return `<omo-${target.skillName}-pointer>This message mentions ${target.skillName}. If the user of this session is asking to run ${target.skillName}, read the ${target.skillName} skill at ${skillsRoot}${target.skillName}/SKILL.md with the read tool and follow it: ${target.instruction}. ${ignoreWhenOnlyDiscussed(target.skillName)}${extra}</omo-${target.skillName}-pointer>`
-}
-
-// The guard every conditional pointer ends with: a keyword proves a mention, so a mention that is only talk is ignored.
-function ignoreWhenOnlyDiscussed(subject: string): string {
-  return `If ${subject} is only being discussed, quoted, or relayed from another session, ignore this pointer.`
-}
-
 // Reached only for a binding form (see `bindingForms`) in text that survived the quote, relay, negation,
 // identifier, child-session and extension filters, so the block states the mode as settled and names the
 // first reads and the dispatch shape that satisfy it.
@@ -314,14 +280,6 @@ function skillMode(target: SkillPointerTarget, massMode: boolean, sessionScope: 
         ? " mass-ulw mode is active in the same message, so run the research waves as its workflow runs."
         : ""
   return `<${tag}>The user of this session invoked ${target.skillName} in their own words, so this turn runs in ${target.skillName} mode. This is binding: the block is produced only for the skill's slash command or a prompt that opens with a request to run it. Before any other tool call this turn, read ${reads} in full with the read tool, then follow the skill: ${target.instruction}.${dispatch}${extra}</${tag}>`
-}
-
-function companionPointer(parent: SkillPointerTarget, companion: SkillCompanion, binding: boolean): string {
-  const skillsRoot = getBuiltinSkillsRoot()
-  if (binding) {
-    return `<omo-${companion.skillName}-pointer>${parent.skillName} ${companion.role}. Read the ${companion.skillName} skill at ${skillsRoot}${companion.skillName}/SKILL.md with the read tool in the same turn as the ${parent.skillName} skill and ${companion.instruction}.</omo-${companion.skillName}-pointer>`
-  }
-  return `<omo-${companion.skillName}-pointer>${parent.skillName} ${companion.role}. If the user of this session is asking to run ${parent.skillName}, read the ${companion.skillName} skill at ${skillsRoot}${companion.skillName}/SKILL.md with the read tool in the same turn as the ${parent.skillName} skill and ${companion.instruction}. ${ignoreWhenOnlyDiscussed(parent.skillName)}</omo-${companion.skillName}-pointer>`
 }
 
 function skillCommandName(text: string): string | undefined {
