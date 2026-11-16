@@ -178,8 +178,14 @@ fn a_stop_pressed_while_another_holder_keeps_the_lock_refuses_the_waiting_exec()
     // Driven on the fake clock (review M1 of #13767): the exec's wait advances it, and on the
     // first advance after the session's admission polled the listener, the stop is pressed and
     // only then the lock released. No thread, no timing.
+    // The hook acts only when time moved: the fake's own zero-length advances run under its
+    // state lock, where reading the remote would deadlock; the exec's wait moves time unlocked.
     let release = std::sync::Mutex::new(Some(held));
-    clock.on_advance(Box::new(move |_| {
+    let last = std::sync::atomic::AtomicU64::new(clock.now_ms());
+    clock.on_advance(Box::new(move |now| {
+        if last.swap(now, std::sync::atomic::Ordering::SeqCst) == now {
+            return;
+        }
         if remote.stop_polls() > before {
             if let Some(held) = release.lock().expect("hook").take() {
                 remote.press_stop_chord();

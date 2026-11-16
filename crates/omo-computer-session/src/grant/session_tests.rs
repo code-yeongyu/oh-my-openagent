@@ -709,8 +709,13 @@ fn a_stop_while_another_holder_keeps_the_lock_ends_the_lease_and_revokes_the_gra
     let seen = sink.clone();
     // Driven on the fake clock (review M1 of #13767): on the first advance of the exec's wait
     // after the lease is taken (its presence shows), the stop is pressed and the lock released.
+    // Only when time moved: the fake's zero-length advances run under its state lock.
     let release = std::sync::Mutex::new(Some(held));
-    clock.on_advance(Box::new(move |_| {
+    let last = std::sync::atomic::AtomicU64::new(clock.now_ms());
+    clock.on_advance(Box::new(move |now| {
+        if last.swap(now, std::sync::atomic::Ordering::SeqCst) == now {
+            return;
+        }
         if seen.lines().iter().any(|line| line == "presence show") {
             if let Some(held) = release.lock().expect("hook").take() {
                 remote.press_stop_chord();
