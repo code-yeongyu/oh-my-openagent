@@ -35,8 +35,19 @@ function stagePrebuild(bytes: string, checksumOf: string): string {
   return engine
 }
 
-function launchFor(spawned: string[], platform = "linux", runCodesign = () => 0) {
+/** What a release pins in the package for `host`: the digest of the bytes it shipped. */
+const SHIPPED = "#!/bin/sh\necho shipped\n"
+const pinnedRelease = (): Readonly<Record<string, string>> => ({ [releaseAssetName(host) ?? ""]: sha256(SHIPPED) })
+
+function launchFor(
+  spawned: string[],
+  platform = "linux",
+  runCodesign = () => 0,
+  // `null`: the package's own pinned table (no override).
+  pinnedDigests: Readonly<Record<string, string>> | null = pinnedRelease(),
+) {
   return createLaunch({
+    ...(pinnedDigests === null ? {} : { pinnedDigests }),
     locator: {
       platform,
       arch: "x64",
@@ -70,6 +81,34 @@ describe("launch trust", () => {
     expect(spawned).toEqual([])
   })
 
+  it("a tampered checksums file next to a tampered binary is refused against the digest the package pins", async () => {
+    // Given a prebuild replaced together with its checksums file: the pair agrees, the release did not ship it.
+    stagePrebuild("#!/bin/sh\necho tampered\n", "#!/bin/sh\necho tampered\n")
+    const spawned: string[] = []
+
+    // When a host launches it.
+    const attempt = launchFor(spawned)(["--version"], { env: {} })
+
+    // Then the pinned digest refuses it and nothing was spawned.
+    await expect(attempt).rejects.toMatchObject({ reason: "checksum_mismatch", host })
+    expect(spawned).toEqual([])
+  })
+
+  it("a host the package pins no digest for never launches a prebuild, whatever the checksums file beside it says", async () => {
+    // Given a consistent prebuild and checksums file, and nothing pinned for the host.
+    stagePrebuild(SHIPPED, SHIPPED)
+    const spawned: string[] = []
+
+    // When it is launched with an empty pinned table, and with the package's own (no release pinned yet).
+    const unpinned = launchFor(spawned, "linux", () => 0, {})(["--version"], { env: {} })
+    const packaged = launchFor(spawned, "linux", () => 0, null)(["--version"], { env: {} })
+
+    // Then both are refused before any spawn.
+    await expect(unpinned).rejects.toMatchObject({ reason: "no_pinned_digest", host })
+    await expect(packaged).rejects.toMatchObject({ reason: "no_pinned_digest", host })
+    expect(spawned).toEqual([])
+  })
+
   it("a matching checksum launches the stable copy, never the located file", async () => {
     // Given a prebuild whose checksum matches.
     const located = stagePrebuild("#!/bin/sh\necho shipped\n", "#!/bin/sh\necho shipped\n")
@@ -95,6 +134,7 @@ describe("launch trust", () => {
     const spawned: string[] = []
     const codesignCalls: string[][] = []
     const launch = createLaunch({
+      pinnedDigests: { [releaseAssetName(darwinHost) ?? ""]: sha256("macho") },
       locator: {
         platform: "darwin",
         arch: "arm64",
