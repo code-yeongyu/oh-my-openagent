@@ -3,10 +3,10 @@
 mod ax;
 pub(crate) mod cf;
 mod helper_process;
-mod listing;
-mod process;
+pub(crate) mod listing;
+pub(crate) mod process;
 mod skylight;
-mod symbols;
+pub(crate) mod symbols;
 
 use omo_computer_core::backend::Refusal;
 use omo_computer_core::error::{EngineCode, Reason};
