@@ -139,21 +139,18 @@ describe("pruneProvisionedRuntimes", () => {
   })
 
   test("#given idle source-built runtimes beside older releases #when a release or a source build prunes #then no 0.0.0 runtime is removed", () => {
-    // given: no process runs either source build, as between two omob invocations
-    provision("0.0.0-omob.0a1b2c3", "0.0.0-omob.9f8e7d6", "9.2.0", "9.2.1", "9.2.2")
+    // given: omob versions are 0.0.0-omob.<omo7>.<senpi7>; all-digit hashes share every non-numeric
+    // identifier, so only the 0.0.0 rule keeps them apart. No process runs any of them.
+    const sources = ["0.0.0-omob.0a1b2c3.9f8e7d6", "0.0.0-omob.1111111.2222222", "0.0.0-omob.3333333.4444444"]
+    const current = "0.0.0-omob.5555555.6666666"
+    provision(...sources, current, "9.2.0", "9.2.1", "9.2.2")
     // when
     const release = pruneProvisionedRuntimes({ root, current: "9.2.2", platform: "linux", listRunning: () => [] })
-    const source = pruneProvisionedRuntimes({
-      root,
-      current: "0.0.0-omob.9f8e7d6",
-      platform: "linux",
-      listRunning: () => [],
-    })
+    const source = pruneProvisionedRuntimes({ root, current, platform: "linux", listRunning: () => [] })
     // then: the release still retires an older release of its own line
     expect(release).toEqual({ removed: ["9.2.0"], kept: ["9.2.1"], failed: [] })
     expect(source).toEqual({ removed: [], kept: [], failed: [] })
-    for (const version of ["0.0.0-omob.0a1b2c3", "0.0.0-omob.9f8e7d6", "9.2.1", "9.2.2"])
-      expect(present(version)).toBe(true)
+    for (const version of [...sources, current, "9.2.1", "9.2.2"]) expect(present(version)).toBe(true)
   })
 
   test("#given stable, beta and other prerelease runtimes #when each channel prunes #then it removes only older runtimes of its own channel", () => {

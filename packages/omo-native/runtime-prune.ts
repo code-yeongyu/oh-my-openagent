@@ -47,12 +47,9 @@ export function pruneProvisionedRuntimes(options: {
       // Still held (a Windows handle closes late); the next prune retries it.
     }
   }
-  const channel = releaseChannel(options.current)
+  const line = runtimeLine(options.current)
   const older = entries
-    .filter(
-      (name) =>
-        channel !== undefined && releaseChannel(name) === channel && Bun.semver.order(name, options.current) < 0,
-    )
+    .filter((name) => line !== undefined && runtimeLine(name) === line && Bun.semver.order(name, options.current) < 0)
     .sort((left, right) => Bun.semver.order(right, left))
   result.kept.push(...older.slice(0, RETAINED_PREVIOUS_RUNTIMES))
   const candidates = older.slice(RETAINED_PREVIOUS_RUNTIMES)
@@ -114,11 +111,11 @@ export function pruneProvisionedRuntimes(options: {
 }
 
 /**
- * The update channel a release version installs from: "" for stable, the prerelease's non-numeric
- * identifiers for a prerelease (`5.0.0-0.beta.89` -> "-beta"). Undefined for a name that is no release
- * of any channel, including a 0.0.0 core, which only a source build carries.
+ * The release line a runtime directory belongs to, for pruning only: "" for stable, the prerelease's
+ * non-numeric identifiers for a prerelease (`5.0.0-0.beta.89` -> "-beta"). Undefined for a name that is
+ * on no release line, including a 0.0.0 core, which only a source build carries.
  */
-function releaseChannel(version: string): string | undefined {
+function runtimeLine(version: string): string | undefined {
   if (!RELEASE_VERSION.test(version) || /^0\.0\.0(-|$)/.test(version)) return undefined
   const prerelease = version.split("-")[1]
   if (prerelease === undefined) return ""
