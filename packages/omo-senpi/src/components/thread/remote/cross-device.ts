@@ -220,8 +220,8 @@ export async function listAcross(
     const notSetUp =
       unavailable.error.code === "host_unavailable" && remoteNotSetUp(unavailable.error.details?.["state"])
     const listed = !allScope && notSetUp ? local : { ...local, remote_unavailable: unavailable.error.code }
-    // The registry is asked only while the device service is connected (#12833), so a row's missing alias is unknown here,
-    // never "holds none" (#13923).
+    // The registry is asked only while the account's other devices can be reached (#12833): not while the device service is
+    // not connected, nor on a plan without a relay (plan_required). A row's missing alias is then unknown, never "holds none" (#13923).
     return remote.aliases === undefined || ids.length === 0 ? listed : { ...listed, aliases_unavailable: "not_asked" }
   }
   const known = new Set(ids)

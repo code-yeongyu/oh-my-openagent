@@ -67,6 +67,7 @@ describe("an account alias for a session on another device (#13923)", () => {
     ["disabled, all_scope", "disabled", true],
     ["offline, workspace scope", "offline", false],
     ["offline, all_scope", "offline", true],
+    ["plan_required (a Free plan: the service answered), workspace scope", "plan_required", false],
   ] as const)(
     "#given the device service is %s #when thread_list runs #then the registry is not asked and aliases_unavailable says not_asked, so no caller reads an alias as free",
     async (_case, plan, allScope) => {
