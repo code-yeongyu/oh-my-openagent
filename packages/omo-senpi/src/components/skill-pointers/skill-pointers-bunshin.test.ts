@@ -12,6 +12,8 @@ describe("omo-senpi skill-pointers bunshin pointer", () => {
       "run uptime on our fleet",
       "restart the fleet hosts",
       "reboot the fleet box",
+      "check disk on my fleets",
+      "restart fleet-node-3",
       "check the machine mesh",
       "machine-mesh health",
     ] as const
@@ -26,6 +28,7 @@ describe("omo-senpi skill-pointers bunshin pointer", () => {
       // A fleet with no device sense (#13446): the plain word names vehicles, ships or a UI, not this user's machines.
       "Fleet status please",
       "the delivery fleet schedule",
+      "the fleet-dashboard css",
       "bunshins",
       "the mesh network",
       "machine learning",
