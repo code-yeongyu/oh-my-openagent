@@ -1,6 +1,6 @@
 {
   "upstream": "sisyphuslabs/omo-relay-daemon",
-  "upstreamCommit": "eda08c786872ad5b766b5adba76f9698d4f1cad6",
+  "upstreamCommit": "42078b7cbfbc8db06cd626d99ab3b80017e7ae2a",
   "importRewrites": [
     {
       "from": "@sisyphuslabs/relay-spec/proto",

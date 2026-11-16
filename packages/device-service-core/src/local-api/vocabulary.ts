@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@eda08c786872ad5b766b5adba76f9698d4f1cad6 packages/local-api/src/vocabulary.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@42078b7cbfbc8db06cd626d99ab3b80017e7ae2a packages/local-api/src/vocabulary.ts
 // The value lists of the local API v1 vocabulary. Every name and value here is generic: none contains a
 // transport-internal word (docs/local-api.md "Wording"); LA18 scans this file, protocol.ts and the docs.
 export const LOCAL_API_VERSION = 1;

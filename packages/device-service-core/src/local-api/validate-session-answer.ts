@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@eda08c786872ad5b766b5adba76f9698d4f1cad6 packages/local-api/src/validate-session-answer.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@42078b7cbfbc8db06cd626d99ab3b80017e7ae2a packages/local-api/src/validate-session-answer.ts
 import type { IncompleteDevice, SessionCandidate, SessionCommandAnswer } from "./protocol.ts";
 import { formatSessionRef, parseSessionRef } from "./session-ref.ts";
 import { commandId, fail, type Fields, known, oneOf } from "./validate-fields.ts";
