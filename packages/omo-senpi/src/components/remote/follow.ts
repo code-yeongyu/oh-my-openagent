@@ -394,6 +394,8 @@ class SessionTurn {
       case "ui_request_pending": {
         const id = nonEmpty(record["uiRequestId"])
         if (id === undefined) return []
+        // Already raised as this client's own frame: it stays answerable here, as it was raised.
+        if (this.#asked.has(id)) return []
         this.#ask(record["request"], id)
         return this.#update(true)
       }

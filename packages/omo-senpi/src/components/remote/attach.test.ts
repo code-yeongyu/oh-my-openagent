@@ -191,6 +191,24 @@ describe("attach rows: pending UI requests (#12750)", () => {
     await handle.detach()
   })
 
+  test("#given a secret dialog raised on this connection's own channel #when it is answered #then one frame_settled and pending is empty", async () => {
+    const { owner, handle } = await attached({ sessionId: "engine-1", isStreaming: true, pendingDialogs: [] })
+    const events = reader(handle.events)
+    const mirror = {
+      type: "ui_request_pending",
+      uiRequestId: "ui-6",
+      method: "input",
+      request: { ...SECRET, id: "ui-6" },
+    }
+    pushFrame(owner, { ...SECRET, id: "ui-6" })
+    pushRecords(owner, [mirror, { type: "ui_request_settled", uiRequestId: "ui-6", disposition: "answered" }])
+    expect(await events.next("the raiser's frame")).toMatchObject({ kind: "frame", request: { request_id: "ui-6" } })
+    expect(await events.next("the mirror record")).toEqual({ kind: "record", record: mirror })
+    expect(await events.next("the settle")).toEqual({ kind: "frame_settled", request_id: "ui-6", how: "answered" })
+    expect(handle.pending()).toEqual([])
+    await handle.detach()
+  })
+
   test("#given a pending dialog #when answer runs #then extension_ui_response names it by id and uiRequestId", async () => {
     const { owner, handle } = await attached()
     expect(await handle.answer("ui-1", { value: "Yes" })).toEqual({ kind: "ok", value: { answered: true } })

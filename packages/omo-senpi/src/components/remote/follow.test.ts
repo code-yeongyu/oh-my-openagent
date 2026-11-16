@@ -149,6 +149,29 @@ describe("sessions.follow rows", () => {
     expect(await events.next("the state after the answer")).toEqual({ kind: "waiting", state: "turn_running" })
   })
 
+  test("#given a person follower #when a secret input is raised on its own channel and its mirror follows #then it stays answerable, listed in pending", async () => {
+    const { owner, client } = await on(RUNNING)
+    const { events } = await following(client)
+    const request = { type: "extension_ui_request", id: "ui-6", method: "input", title: "API key", secret: true }
+    pushFrame(owner, request)
+    expect(await events.next("the frame")).toMatchObject({ kind: "frame" })
+    expect(await events.next("awaiting_approval")).toMatchObject({ kind: "waiting", state: "awaiting_approval" })
+    // The mirror changes nothing (no event); a second, ordinary dialog shows what this follower may answer now.
+    pushRecords(owner, [
+      { type: "ui_request_pending", uiRequestId: "ui-6", method: "input", request },
+      { type: "ui_request_pending", uiRequestId: "ui-1", method: "confirm", request: DIALOG },
+    ])
+    expect(await events.next("the second frame")).toMatchObject({ kind: "frame", request: { request_id: "ui-1" } })
+    expect(await events.next("the state with both")).toEqual({
+      kind: "waiting",
+      state: "awaiting_approval",
+      pending: [
+        { request_id: "ui-6", kind: "input", title: "API key", secret: true },
+        { request_id: "ui-1", kind: "confirm", title: "Run rm?", message: "rm -rf build" },
+      ],
+    })
+  })
+
   test("#given a person follower #when the turn waits on a secret input raised on another connection #then awaiting_approval, redacted, with no frame", async () => {
     const { owner, client } = await on(RUNNING)
     const { events } = await following(client)
