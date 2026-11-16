@@ -100,27 +100,45 @@ const isTypeMember = (value: unknown): boolean => {
   )
 }
 
-/** `list.map((e) => e.type)`: a list of type members (also with a block body that only returns one). */
+/** The identifier a `type` member is read from: `e` for `e.type`, `e?.type` or `(e as Frame).type`. */
+const memberObjectName = (value: unknown): unknown => {
+  const node = unwrap(value)
+  if (isNode(node) && node.type === "ChainExpression") return memberObjectName(node["expression"])
+  const object = isNode(node) && node.type === "MemberExpression" ? unwrap(node["object"]) : undefined
+  return isNode(object) && object.type === "Identifier" ? object["name"] : undefined
+}
+
+/**
+ * `list.map((e) => e.type)`: the `type` member of the callback's own first parameter, from an expression body or a
+ * block that only returns it (an arrow or a function expression). `list.map((e) => other.type)` and a computed
+ * `list[map](...)` do not count.
+ */
 const isTypeProjection = (value: unknown): boolean => {
   const node = unwrap(value)
   if (!isNode(node) || node.type !== "CallExpression" || !isNode(node["callee"])) return false
   const callee = node["callee"]
   const [fn] = Array.isArray(node["arguments"]) ? node["arguments"] : []
-  if (callee.type !== "MemberExpression" || !isNode(callee["property"]) || callee["property"]["name"] !== "map")
-    return false
+  if (callee.type !== "MemberExpression" || callee["computed"] === true || !isNode(callee["property"])) return false
+  if (callee["property"]["name"] !== "map") return false
   if (!isNode(fn) || (fn.type !== "ArrowFunctionExpression" && fn.type !== "FunctionExpression")) return false
+  const [param] = Array.isArray(fn["params"]) ? fn["params"] : []
+  if (!isNode(param) || param.type !== "Identifier") return false
+  const ownType = (expr: unknown): boolean => isTypeMember(expr) && memberObjectName(expr) === param["name"]
   const body = fn["body"]
-  if (isTypeMember(body)) return true
+  if (ownType(body)) return true
   const statements = isNode(body) && Array.isArray(body["body"]) ? body["body"] : []
   const [only] = statements
-  return statements.length === 1 && isNode(only) && only.type === "ReturnStatement" && isTypeMember(only["argument"])
+  return statements.length === 1 && isNode(only) && only.type === "ReturnStatement" && ownType(only["argument"])
 }
 
 const EXPECT_MATCHERS: ReadonlySet<string> = new Set(["toBe", "toEqual", "toStrictEqual"])
 const ASSERT_METHODS: ReadonlySet<string> = new Set(["equal", "strictEqual"])
 
-/** `expect(<type member>).toBe("m")` (or toEqual/toStrictEqual), `expect(<list>.map((e) => e.type)).toEqual(["m"])`, or
- * `assert.equal(<type member>, "m")` (or strictEqual, either argument order). */
+/**
+ * `expect(<type member>).toBe("m")` (or toEqual/toStrictEqual), `expect(<list>.map((e) => e.type)).toEqual(["m"])`
+ * (or toStrictEqual; never toBe, which cannot pass on a fresh array), or `assert.equal(<type member>, "m")` (or
+ * strictEqual, either argument order).
+ */
 function assertsRecordType(node: AstNode, method: string): boolean {
   const callee = node["callee"]
   const args = Array.isArray(node["arguments"]) ? node["arguments"] : []
@@ -138,7 +156,9 @@ function assertsRecordType(node: AstNode, method: string): boolean {
   const [expected] = args
   if (isTypeMember(actual)) return isLiteral(expected, method)
   const items = isNode(expected) && expected.type === "ArrayExpression" ? expected["elements"] : undefined
-  return isTypeProjection(actual) && Array.isArray(items) && items.some((item) => isLiteral(item, method))
+  return (
+    name !== "toBe" && isTypeProjection(actual) && Array.isArray(items) && items.some((item) => isLiteral(item, method))
+  )
 }
 
 /** Whether one AST node uses `method` as a record type (see namesRecordType). */
@@ -155,7 +175,9 @@ function usesRecordType(node: AstNode, method: string): boolean {
     const cases = node["cases"]
     return Array.isArray(cases) && cases.some((c) => isNode(c) && isLiteral(c["test"], method))
   }
-  if (node.type === "BinaryExpression" && ["===", "==", "!==", "!="].includes(String(node["operator"]))) {
+  // Only equality counts: `x.type !== "m"` (as in `filter((f) => f.type !== "m")`) excludes the method (as `.not.toBe`
+  // does).
+  if (node.type === "BinaryExpression" && ["===", "=="].includes(String(node["operator"]))) {
     const [left, right] = [node["left"], node["right"]]
     return (isTypeMember(left) && isLiteral(right, method)) || (isTypeMember(right) && isLiteral(left, method))
   }
@@ -175,15 +197,18 @@ function someNode(value: unknown, test: (node: AstNode) => boolean): boolean {
 /**
  * Whether `source` (parsed as TypeScript) uses `method` as a record type in code. These count:
  * - the quoted name as the value of a `type` property in an object (`{ type: "m" }`, also `{ ["type"]: "m" }`);
- * - a `type` member (`x.type`, `x["type"]`, optional chains) compared with it (`===`, `==`, `!==`, `!=`), or
- *   switched on with a `case "m":`;
+ * - a `type` member (`x.type`, `x["type"]`, optional chains) compared equal with it (`===`, `==`), or switched on with
+ *   a `case "m":`;
  * - an assertion on a `type` member: `expect(x.type).toBe("m")` (or `toEqual`, `toStrictEqual`),
- *   `expect(list.map((e) => e.type)).toEqual(["m"])`, or `assert.equal(x.type, "m")` (or `strictEqual`).
+ *   `expect(list.map((e) => e.type)).toEqual(["m"])` (or `toStrictEqual`; the callback's own parameter, an expression
+ *   or single-return block body), or `assert.equal(x.type, "m")` (or `strictEqual`, either argument order).
  * The literal may be a quoted string or a template literal with no substitutions. A literal, a `type` member and a
  * switch discriminant may each sit in parentheses or under `as`, `satisfies`, a non-null `!` or a `<T>` assertion.
- * These do not count: a computed key (`{ [type]: "m" }`), an assertion whose subject is not a bare `expect(...)` or
- * whose object is not `assert`, comments, strings (a test title), regex literals, type declarations, other properties
- * such as `$type`, and a source that does not parse.
+ * These do not count: a computed key (`{ [type]: "m" }`), a negative comparison (`!==`, `!=`, such as an exclusion
+ * `filter((f) => f.type !== "m")`), an assertion whose subject is not a bare `expect(...)` or whose object is not
+ * `assert`, a mapped list that projects anything but the callback parameter's `type`, a computed `list[map](...)`,
+ * `.toBe([...])` on a mapped list, comments, strings (a test title), regex literals, type declarations, other
+ * properties such as `$type`, and a source that does not parse.
  */
 export function namesRecordType(source: string, method: string): boolean {
   const parsed = parseSync("pair-test.ts", source)

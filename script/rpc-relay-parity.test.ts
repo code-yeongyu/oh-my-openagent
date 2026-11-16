@@ -111,12 +111,11 @@ describe("engine RPC local-versus-relay parity table (#13478)", () => {
     expect(namesRecordType('if ((frame.type as string) === "prompt") relay()', "prompt")).toBe(true)
   })
 
-  test("toStrictEqual, a mapped type list, a plain template literal, assert.equal and !== count as a pair test (#13935 review L2)", () => {
+  test("toStrictEqual, a mapped type list, a plain template literal and assert.equal count as a pair test (#13935 review L2)", () => {
     expect(namesRecordType('expect(frame.type).toStrictEqual("prompt")', "prompt")).toBe(true)
     expect(namesRecordType('expect(sent.map((e) => e.type)).toEqual(["prompt"])', "prompt")).toBe(true)
     expect(namesRecordType("send({ type: `prompt` })", "prompt")).toBe(true)
     expect(namesRecordType('assert.equal(frame.type, "prompt")', "prompt")).toBe(true)
-    expect(namesRecordType('if (frame.type !== "prompt") skip()', "prompt")).toBe(true)
   })
 
   test("near misses of the review L2 forms do not count as a pair test (#13935 review L2)", () => {
@@ -125,6 +124,42 @@ describe("engine RPC local-versus-relay parity table (#13478)", () => {
     expect(namesRecordType('expect(sent.map((e) => e.type)).toEqual(["other"])', "prompt")).toBe(false)
     expect(namesRecordType('check.equal(frame.type, "prompt")', "prompt")).toBe(false)
     expect(namesRecordType('assert.equal(frame.kind, "prompt")', "prompt")).toBe(false)
+  })
+
+  test("every counted form has its own case: argument order, block body, strictEqual, == and more (#13935 review 2 L1)", () => {
+    expect(namesRecordType('assert.equal("prompt", frame.type)', "prompt")).toBe(true)
+    expect(namesRecordType('assert.strictEqual(frame.type, "prompt")', "prompt")).toBe(true)
+    expect(namesRecordType('expect(sent.map((e) => { return e.type })).toEqual(["prompt"])', "prompt")).toBe(true)
+    expect(namesRecordType('expect(sent.map(function (e) { return e.type })).toEqual(["prompt"])', "prompt")).toBe(true)
+    expect(namesRecordType('expect(sent.map((e) => e?.type)).toStrictEqual(["prompt"])', "prompt")).toBe(true)
+    expect(namesRecordType('if (frame.type == "prompt") relay()', "prompt")).toBe(true)
+    expect(namesRecordType('expect(frame.type).toEqual("prompt")', "prompt")).toBe(true)
+    expect(namesRecordType('send({ "type": "prompt" })', "prompt")).toBe(true)
+    expect(namesRecordType('const record = { ["type"]: "prompt" }', "prompt")).toBe(true)
+    expect(namesRecordType('send({ type: <string>"prompt" })', "prompt")).toBe(true)
+    expect(namesRecordType('switch (frame.type as string) { case "prompt": relay() }', "prompt")).toBe(true)
+  })
+
+  test("a negative comparison excludes the method, so !== and != do not count (#13935 review 2 L2)", () => {
+    expect(namesRecordType('const rest = frames.filter((f) => f.type !== "prompt")', "prompt")).toBe(false)
+    expect(namesRecordType('if (frame.type !== "prompt") skip()', "prompt")).toBe(false)
+    expect(namesRecordType('if (frame.type != "prompt") skip()', "prompt")).toBe(false)
+    expect(namesRecordType('expect(frame.type).not.toBe("prompt")', "prompt")).toBe(false)
+  })
+
+  test("a mapped list counts only for its own parameter, a plain .map and toEqual (#13935 review 2 L3)", () => {
+    expect(namesRecordType('expect(sent.map((e) => other.type)).toEqual(["prompt"])', "prompt")).toBe(false)
+    expect(namesRecordType('expect(sent[map]((e) => e.type)).toEqual(["prompt"])', "prompt")).toBe(false)
+    expect(namesRecordType('expect(sent.map((e) => e.type)).toBe(["prompt"])', "prompt")).toBe(false)
+    expect(namesRecordType('expect(sent.map((e) => { log(e); return e.type })).toEqual(["prompt"])', "prompt")).toBe(
+      false,
+    )
+  })
+
+  test("a source that does not parse does not count, even when it holds a counted shape", () => {
+    expect(namesRecordType('send({ type: "prompt" ', "prompt")).toBe(false)
+    // A top-level return is a parse error, yet the recovered AST still holds the send call.
+    expect(namesRecordType('send({ type: "prompt" })\nreturn', "prompt")).toBe(false)
   })
 
   test("a rows file with a misspelled key is refused", () => {
