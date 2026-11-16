@@ -134,21 +134,21 @@ pub struct FrameRecord {
 /// The engine runs in Session 0 (a service): nothing is captured and the session is named
 /// (`PermissionDenied{session:not_interactive}`, d-windows.md:394 and :477).
 pub const SESSION0: Refusal =
-    Refusal::new(EngineCode::PermissionDenied, Reason::NotInteractive.wire());
+    Refusal::new(EngineCode::PermissionDenied, Reason::NotInteractive);
 
 pub(super) const fn failed(reason: Reason) -> Refusal {
-    Refusal::new(EngineCode::CaptureFailed, reason.wire())
+    Refusal::new(EngineCode::CaptureFailed, reason)
 }
 
 /// An elevated window WGC cannot serve: `PrintWindow` into it returns a null frame
 /// (SP-N #13145@e32a295a17:n-elevated-printwindow, CONTRADICTS), so the floor never runs for it.
 pub const ELEVATED: Refusal = Refusal::new(
     EngineCode::CaptureUnavailable,
-    Reason::ElevatedTarget.wire(),
+    Reason::ElevatedTarget,
 );
 
 pub(super) const fn unavailable(reason: Reason) -> Refusal {
-    Refusal::new(EngineCode::CaptureUnavailable, reason.wire())
+    Refusal::new(EngineCode::CaptureUnavailable, reason)
 }
 
 /// The wire id of a window: its `HWND` in decimal.
@@ -233,7 +233,7 @@ fn crop_record(
     };
     let frame = crop(&frame, &area).ok_or(Refusal::new(
         EngineCode::InvalidTarget,
-        Reason::NoRegion.wire(),
+        Reason::NoRegion,
     ))?;
     Ok(FrameRecord {
         physical: frame.origin,

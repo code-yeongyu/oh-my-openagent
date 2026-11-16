@@ -42,7 +42,7 @@ fn black_frame(os: ScriptedOs, target: &Target) {
         .capture_record(target, &OPTIONS)
         .expect_err("a near-black display frame under the session cause is refused");
     assert_eq!(refusal.code, EngineCode::CaptureFailed);
-    assert_eq!(refusal.reason, Some(Reason::BlackFrame.wire()));
+    assert_eq!(refusal.reason, Some(Reason::BlackFrame));
 }
 
 #[test]
@@ -138,7 +138,7 @@ fn null_window_frame_under_the_session_cause_is_null_frame() {
         .capture_record(&window_target(), &OPTIONS)
         .expect_err("a null window frame is refused");
     assert_eq!(refusal.code, EngineCode::CaptureFailed);
-    assert_eq!(refusal.reason, Some(Reason::NullFrame.wire()));
+    assert_eq!(refusal.reason, Some(Reason::NullFrame));
 }
 
 #[test]
@@ -210,7 +210,7 @@ fn elevated_window_under_the_session_cause_answers_capture_failed() {
                     "an elevated window with no WGC frame under the session cause is refused",
                 );
             assert_eq!(refusal.code, EngineCode::CaptureFailed);
-            assert_eq!(refusal.reason, Some(reason.wire()));
+            assert_eq!(refusal.reason, Some(reason));
             assert!(
                 !backend.os().calls.contains(&"print_window"),
                 "the PrintWindow floor never runs for an elevated window"
@@ -228,7 +228,7 @@ fn elevated_window_without_the_session_cause_answers_elevated_target() {
                 .capture_record(&window_target(), &OPTIONS)
                 .expect_err("an elevated window WGC cannot serve is refused");
             assert_eq!(refusal.code, EngineCode::CaptureUnavailable);
-            assert_eq!(refusal.reason, Some(Reason::ElevatedTarget.wire()));
+            assert_eq!(refusal.reason, Some(Reason::ElevatedTarget));
         }
     }
 }

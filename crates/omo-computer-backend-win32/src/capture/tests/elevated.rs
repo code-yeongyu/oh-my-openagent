@@ -31,7 +31,7 @@ fn elevated_target_never_reaches_printwindow() {
         .capture(&window_target(), &OPTIONS)
         .expect_err("elevated");
     assert_eq!(refusal.code, EngineCode::CaptureUnavailable);
-    assert_eq!(refusal.reason, Some(Reason::ElevatedTarget.wire()));
+    assert_eq!(refusal.reason, Some(Reason::ElevatedTarget));
     assert_eq!(count(backend.os(), "print_window"), 0);
 
     // WGC has no item for it: refused the same way, still no PrintWindow.
@@ -39,7 +39,7 @@ fn elevated_target_never_reaches_printwindow() {
     let refusal = backend
         .capture(&window_target(), &OPTIONS)
         .expect_err("elevated");
-    assert_eq!(refusal.reason, Some(Reason::ElevatedTarget.wire()));
+    assert_eq!(refusal.reason, Some(Reason::ElevatedTarget));
     assert_eq!(count(backend.os(), "print_window"), 0);
 
     // WGC serves it: an ordinary WGC frame.
@@ -63,7 +63,7 @@ fn elevated_blank_wgc_frame_retries_wgc_never_printwindow() {
     let refusal = backend
         .capture(&window_target(), &OPTIONS)
         .expect_err("still blank");
-    assert_eq!(refusal.reason, Some(Reason::ElevatedTarget.wire()));
+    assert_eq!(refusal.reason, Some(Reason::ElevatedTarget));
     assert_eq!(
         count(backend.os(), "wgc_window"),
         2,
