@@ -47,7 +47,7 @@ pub fn acceptance(wm_class: &[u8], client: impl FnOnce() -> Result<ClientProcess
             evidence: "its process runs Chromium --type= helpers".to_owned(),
         };
     }
-    if is_xterm(wm_class, &process.args) {
+    if is_xterm(wm_class, &process) {
         return Acceptance::Drops {
             toolkit: Toolkit::Xterm,
             evidence: "its allowSendEvents setting cannot be read: Xt merges resource files the engine cannot \
@@ -93,14 +93,16 @@ pub fn refusal(window: &str, kind: &str, acceptance: Acceptance) -> Option<Deskt
 }
 
 /// xterm drops sent events unless its `allowSendEvents` resource is on, and
-/// that setting is never fully visible to another client.
-fn is_xterm(wm_class: &[u8], args: &[String]) -> bool {
+/// that setting is never fully visible to another client. An xterm is named
+/// by its `WM_CLASS`, its `argv[0]`, or the binary its `/proc/<pid>/exe`
+/// resolves to (an xterm run through a renamed link with `-name`/`-class`
+/// overridden). When the exe link cannot be read, only the first two count;
+/// a renamed copy of the binary is not recognised.
+fn is_xterm(wm_class: &[u8], process: &ClientProcess) -> bool {
+    let names_xterm = |name: &str| name == "xterm" || name == "uxterm";
     let class_is_xterm = wm_class
         .split(|&byte| byte == 0)
         .any(|part| part.eq_ignore_ascii_case(b"xterm") || part.eq_ignore_ascii_case(b"uxterm"));
-    let program_is_xterm = args
-        .first()
-        .and_then(|program| program.rsplit('/').next())
-        .is_some_and(|name| name == "xterm" || name == "uxterm");
-    class_is_xterm || program_is_xterm
+    let basename = |path: &String| path.rsplit('/').next().is_some_and(names_xterm);
+    class_is_xterm || process.args.first().is_some_and(basename) || process.exe.as_ref().is_some_and(basename)
 }
