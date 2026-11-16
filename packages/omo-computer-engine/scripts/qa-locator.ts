@@ -2,11 +2,13 @@
  * QA driver for row 38: stages a real engine binary the way a release ships it (prebuild +
  * checksums file), then launches it through the `launch` factory.
  *
- *   bun packages/omo-computer-engine/scripts/qa-locator.ts --binary target/debug/omo-computer-engine [--tamper]
+ *   bun packages/omo-computer-engine/scripts/qa-locator.ts --binary target/debug/omo-computer-engine [--tamper | --tamper-pair]
  *
  * Without --tamper it prints the resolved host, the sha256 it verified, the engine's own
  * `--version` line and LOCATOR_OK. With --tamper one byte of the staged copy is flipped after the
- * checksum was recorded: it prints the refusal and exits 1, and no engine process was spawned.
+ * checksum was recorded: it prints the refusal and exits 1, and no engine process was spawned. With
+ * --tamper-pair the checksums file is rewritten to match the flipped copy (binary and file replaced
+ * together): only the digest pinned in the package refuses it, the same way.
  */
 import { spawn } from "node:child_process"
 import { createHash } from "node:crypto"
@@ -27,10 +29,11 @@ const args = process.argv.slice(2)
 const binaryIndex = args.indexOf("--binary")
 const binary = binaryIndex === -1 ? undefined : args[binaryIndex + 1]
 if (binary === undefined) {
-  console.error("usage: qa-locator.ts --binary <engine> [--tamper]")
+  console.error("usage: qa-locator.ts --binary <engine> [--tamper | --tamper-pair]")
   process.exit(2)
 }
 const tamper = args.includes("--tamper")
+const tamperPair = args.includes("--tamper-pair")
 const host = engineHost()
 const asset = releaseAssetName(host)
 if (asset === null) {
@@ -46,11 +49,16 @@ copyFileSync(resolve(binary), staged)
 chmodSync(staged, 0o755)
 const shipped = createHash("sha256").update(readFileSync(staged)).digest("hex")
 writeFileSync(join(prebuilds, ENGINE_CHECKSUMS_ASSET), `${shipped}  ${asset}\n`)
-if (tamper) {
+if (tamper || tamperPair) {
   const bytes = readFileSync(staged)
   const last = bytes.length - 1
   bytes.writeUInt8((bytes.readUInt8(last) ^ 0xff) & 0xff, last)
   writeFileSync(staged, bytes)
+}
+// The pair replaced together: the checksums file now agrees with the tampered binary; only the pin can tell.
+if (tamperPair) {
+  const forged = createHash("sha256").update(readFileSync(staged)).digest("hex")
+  writeFileSync(join(prebuilds, ENGINE_CHECKSUMS_ASSET), `${forged}  ${asset}\n`)
 }
 
 let spawns = 0
@@ -62,6 +70,8 @@ const launch = createLaunch({
     repoRoot: join(root, "repo"),
   },
   stableDir: join(root, "stable"),
+  // What the release pins for the bytes it shipped (scripts/pin-release-digests.ts writes it into a release package).
+  pinnedDigests: { [asset]: shipped },
   spawnEngine: (path, engineArgs) => {
     spawns += 1
     return spawn(path, [...engineArgs], { stdio: ["ignore", "pipe", "pipe"] })

@@ -40,15 +40,32 @@ export function sha256File(path: string): string {
   return createHash("sha256").update(readFileSync(path)).digest("hex")
 }
 
+/**
+ * The digests pinned in the package (src/release-digests.ts): the trust anchor. The checksums file
+ * beside a prebuild lives in the same root as the binary, so it proves integrity, never provenance.
+ */
+export type PinnedDigests = Readonly<Record<string, string>>
+
 export type ChecksumVerdict =
   | { readonly kind: "trusted"; readonly sha256: string }
   | { readonly kind: "refused"; readonly reason: EngineLaunchRefusalReason; readonly detail: string }
 
-/** The engine at `path` is trusted only when its sha256 equals the host's entry in the checksums file. */
-export function verifyChecksum(path: string, host: string, checksumsPath: string): ChecksumVerdict {
+/**
+ * The engine at `path` is trusted only when its sha256 equals the digest the package pins for the
+ * host's asset AND the host's entry in the checksums file beside it (which must agree with the pin).
+ */
+export function verifyChecksum(
+  path: string,
+  host: string,
+  checksumsPath: string,
+  pinned: PinnedDigests,
+): ChecksumVerdict {
   const asset = releaseAssetName(host)
   if (asset === null)
     return { kind: "refused", reason: "no_release_asset", detail: `no engine is published for ${host}` }
+  const anchor = pinned[asset]
+  if (anchor === undefined)
+    return { kind: "refused", reason: "no_pinned_digest", detail: `this package pins no digest for ${asset}` }
   let text: string
   try {
     text = readFileSync(checksumsPath, "utf8")
@@ -67,8 +84,15 @@ export function verifyChecksum(path: string, host: string, checksumsPath: string
   const expected = parsed.digests.get(asset)
   if (expected === undefined)
     return { kind: "refused", reason: "no_checksum_entry", detail: `${checksumsPath} has no line for ${asset}` }
+  if (expected !== anchor) {
+    return {
+      kind: "refused",
+      reason: "checksum_mismatch",
+      detail: `${checksumsPath} says ${asset} is ${expected}, the package pins ${anchor}`,
+    }
+  }
   const actual = sha256File(path)
-  return actual === expected
+  return actual === anchor
     ? { kind: "trusted", sha256: actual }
-    : { kind: "refused", reason: "checksum_mismatch", detail: `${path} is ${actual}, ${asset} is ${expected}` }
+    : { kind: "refused", reason: "checksum_mismatch", detail: `${path} is ${actual}, ${asset} is pinned ${anchor}` }
 }

@@ -4,6 +4,7 @@ import { join } from "node:path"
 import { locateEngine, type LocatorOptions } from "./locator.ts"
 import { EngineLaunchRefused } from "./refusal.ts"
 import { engineFileName } from "./release-assets.ts"
+import { RELEASE_DIGESTS } from "./release-digests.ts"
 import { launchFromStablePath } from "./stable-launch.ts"
 import {
   runSystemCodesign,
@@ -11,6 +12,7 @@ import {
   verifyChecksum,
   verifyDesignatedRequirement,
   type CodesignRunner,
+  type PinnedDigests,
 } from "./trust.ts"
 
 export interface LaunchOptions {
@@ -44,6 +46,8 @@ export interface LaunchFactoryOptions<C> {
   readonly allowDevBuild?: boolean
   readonly runCodesign?: CodesignRunner
   readonly spawnEngine?: SpawnEngine<C>
+  /** The digests a prebuild must match; the package's own pinned table unless a test or the QA driver stages one. */
+  readonly pinnedDigests?: PinnedDigests
 }
 
 const spawnWithPipes: SpawnEngine<ChildProcessWithoutNullStreams> = (path, args, options) =>
@@ -54,7 +58,8 @@ export function createLaunch(
 ): Launch
 export function createLaunch<C>(options: LaunchFactoryOptions<C> & { readonly spawnEngine: SpawnEngine<C> }): Launch<C>
 /**
- * locate -> sha256 against the checksums file beside the prebuild -> designated requirement (macOS)
+ * locate -> sha256 against the digest pinned in the package and the checksums file beside the
+ * prebuild -> designated requirement (macOS)
  * on the staged copy -> spawn from the stable path under the lock. Every refusal is an
  * `EngineLaunchRefused` thrown before any process exists.
  */
@@ -86,7 +91,7 @@ export function createLaunch<C>(options: LaunchFactoryOptions<C>): Launch<C | Ch
     const verdict =
       located.checksumsPath === null
         ? { kind: "trusted" as const, sha256: sha256File(located.path) }
-        : verifyChecksum(located.path, located.host, located.checksumsPath)
+        : verifyChecksum(located.path, located.host, located.checksumsPath, options.pinnedDigests ?? RELEASE_DIGESTS)
     if (verdict.kind === "refused") throw new EngineLaunchRefused(verdict.reason, located.host, verdict.detail)
     const launched = launchFromStablePath(
       {

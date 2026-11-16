@@ -5,6 +5,7 @@ export type EngineLaunchRefusalReason =
   | "no_release_asset"
   | "checksums_unreadable"
   | "no_checksum_entry"
+  | "no_pinned_digest"
   | "checksum_mismatch"
   | "designated_requirement_mismatch"
   | "unverified_dev_build"
