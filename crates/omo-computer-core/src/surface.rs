@@ -39,7 +39,7 @@ pub trait ShellReader {
 
 /// A kind this host does not serve.
 pub const SURFACE_UNSUPPORTED: Refusal =
-    Refusal::new(EngineCode::Internal, Reason::SurfaceUnsupported.wire());
+    Refusal::new(EngineCode::Internal, Reason::SurfaceUnsupported);
 
 /// The kind's wire name (`dock`, `start_menu`, ...).
 #[must_use]

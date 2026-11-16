@@ -4,6 +4,7 @@
 mod frame_readback;
 mod refused;
 mod imported;
+mod receipt_delivery;
 mod receipts;
 mod shape_cases;
 mod shapes;

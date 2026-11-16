@@ -9,7 +9,7 @@ use serde_json::json;
 use crate::mutate::Refused;
 
 fn invalid(reason: Reason, field: &str, limit: &str) -> Refused {
-    let mut refused = Refused::from(Refusal::new(EngineCode::Internal, reason.wire()));
+    let mut refused = Refused::from(Refusal::new(EngineCode::Internal, reason));
     refused.detail = Some(Box::new(json!({
         "field": field,
         "message": format!("/{field}: expected {limit}"),

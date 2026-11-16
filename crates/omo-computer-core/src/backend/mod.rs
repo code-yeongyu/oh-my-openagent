@@ -36,13 +36,19 @@ pub trait Backend: Send {
     /// `Internal{windows_unsupported}` (`COMPUTER_UNAVAILABLE`) by default.
     fn windows(&mut self, filter: &WindowFilter) -> BackendResult<WindowList> {
         let _ = filter;
-        Err(Refusal::new(EngineCode::Internal, "windows_unsupported"))
+        Err(Refusal::new(
+            EngineCode::Internal,
+            Reason::WindowsUnsupported,
+        ))
     }
 
     /// # Errors
     /// `Internal{displays_unsupported}` (`COMPUTER_UNAVAILABLE`) by default.
     fn displays(&mut self) -> BackendResult<Vec<DisplayInfo>> {
-        Err(Refusal::new(EngineCode::Internal, "displays_unsupported"))
+        Err(Refusal::new(
+            EngineCode::Internal,
+            Reason::DisplaysUnsupported,
+        ))
     }
 
     /// # Errors
@@ -51,7 +57,7 @@ pub trait Backend: Send {
         let _ = (target, options);
         Err(Refusal::new(
             EngineCode::CaptureUnavailable,
-            "capture_unsupported",
+            Reason::CaptureUnsupported,
         ))
     }
 
@@ -61,7 +67,7 @@ pub trait Backend: Send {
     /// `Internal{input_unsupported}` (`COMPUTER_UNAVAILABLE`) by default, with nothing sent.
     fn post_input(&mut self, input: &TaggedInput, route: Route) -> BackendResult<Delivered> {
         let _ = (input, route);
-        Err(Refusal::new(EngineCode::Internal, "input_unsupported"))
+        Err(Refusal::new(EngineCode::Internal, Reason::InputUnsupported))
     }
 
     /// A listen-only, injected-immune stop listener.
@@ -69,7 +75,10 @@ pub trait Backend: Send {
     /// # Errors
     /// `StopPathUnavailable{no_listener}` by default.
     fn stop_listener(&mut self) -> BackendResult<Box<dyn StopListener>> {
-        Err(Refusal::new(EngineCode::StopPathUnavailable, "no_listener"))
+        Err(Refusal::new(
+            EngineCode::StopPathUnavailable,
+            Reason::NoListener,
+        ))
     }
 
     /// The tri-state permission read; never prompts. Unknown by default, which is never granted.
@@ -133,13 +142,13 @@ pub trait Backend: Send {
     /// # Errors
     /// `Internal{clipboard}` by default: no clipboard route.
     fn clipboard_read(&mut self) -> BackendResult<crate::clipboard::ClipboardRead> {
-        Err(Refusal::new(EngineCode::Internal, crate::error::Reason::Clipboard.wire()))
+        Err(Refusal::new(EngineCode::Internal, crate::error::Reason::Clipboard))
     }
 
     /// # Errors
     /// `Internal{clipboard}` by default, with nothing written.
     fn clipboard_write(&mut self, _text: &str) -> BackendResult<()> {
-        Err(Refusal::new(EngineCode::Internal, crate::error::Reason::Clipboard.wire()))
+        Err(Refusal::new(EngineCode::Internal, crate::error::Reason::Clipboard))
     }
 
     /// Row 24: asks the window manager for `frame` and answers what it applied, read back.
@@ -147,7 +156,7 @@ pub trait Backend: Send {
     /// # Errors
     /// `InvalidTarget{window_frame_unavailable}` by default, with nothing sent.
     fn set_frame(&mut self, _window: &str, _frame: crate::listing::Rect) -> BackendResult<crate::window_frame::FrameApplied> {
-        Err(Refusal::new(EngineCode::InvalidTarget, crate::error::Reason::WindowFrameUnavailable.wire()))
+        Err(Refusal::new(EngineCode::InvalidTarget, crate::error::Reason::WindowFrameUnavailable))
     }
 
     /// Row 24 (C8): whether the window's position can be set at all, asked BEFORE a frame write so
@@ -162,7 +171,7 @@ pub trait Backend: Send {
     /// # Errors
     /// `InvalidTarget{window_frame_unavailable}` by default, with nothing sent.
     fn set_minimized(&mut self, _window: &str, _minimize: bool) -> BackendResult<()> {
-        Err(Refusal::new(EngineCode::InvalidTarget, crate::error::Reason::WindowFrameUnavailable.wire()))
+        Err(Refusal::new(EngineCode::InvalidTarget, crate::error::Reason::WindowFrameUnavailable))
     }
 
     /// Types `text` as one stroke that `interrupt` may end between Unicode scalars (asked
@@ -241,7 +250,7 @@ pub trait Backend: Send {
         match chord {
             Some(chord) if !chord.eq_ignore_ascii_case(DEFAULT_STOP_CHORD) => Err(Refusal::new(
                 EngineCode::StopPathUnavailable,
-                Reason::Deaf.wire(),
+                Reason::Deaf,
             )),
             _ => Ok(()),
         }
@@ -275,7 +284,7 @@ pub trait AxBackend {
         let _ = request;
         Err(Refusal::new(
             EngineCode::AxUnsupported,
-            "snapshot_unsupported",
+            Reason::SnapshotUnsupported,
         ))
     }
 
@@ -285,7 +294,7 @@ pub trait AxBackend {
         let _ = reference;
         Err(Refusal::new(
             EngineCode::AxUnsupported,
-            "resolve_unsupported",
+            Reason::ResolveUnsupported,
         ))
     }
 
@@ -295,7 +304,7 @@ pub trait AxBackend {
         let _ = (reference, action);
         Err(Refusal::new(
             EngineCode::AxUnsupported,
-            "perform_unsupported",
+            Reason::PerformUnsupported,
         ))
     }
 
@@ -304,7 +313,7 @@ pub trait AxBackend {
     /// # Errors
     /// `AxUnsupported{perform_unsupported}` by default, with nothing sent.
     fn set_value(&mut self, _reference: &Ref, _value: &str) -> BackendResult<Delivered> {
-        Err(Refusal::new(EngineCode::AxUnsupported, crate::error::Reason::PerformUnsupported.wire()))
+        Err(Refusal::new(EngineCode::AxUnsupported, crate::error::Reason::PerformUnsupported))
     }
 
     /// Row 24: reads the element's value back after a write; `Ok(None)` when it has none to
@@ -313,7 +322,7 @@ pub trait AxBackend {
     /// # Errors
     /// `AxUnsupported{resolve_unsupported}` by default.
     fn read_value(&mut self, _reference: &Ref) -> BackendResult<Option<String>> {
-        Err(Refusal::new(EngineCode::AxUnsupported, crate::error::Reason::ResolveUnsupported.wire()))
+        Err(Refusal::new(EngineCode::AxUnsupported, crate::error::Reason::ResolveUnsupported))
     }
 
     /// Row 24: inserts `text` into a native text field at its caret (`ax.typeText` by insertion).
@@ -321,7 +330,7 @@ pub trait AxBackend {
     /// # Errors
     /// `AxUnsupported{perform_unsupported}` by default (the caller then focuses and types keys).
     fn insert_text(&mut self, _reference: &Ref, _text: &str) -> BackendResult<Delivered> {
-        Err(Refusal::new(EngineCode::AxUnsupported, crate::error::Reason::PerformUnsupported.wire()))
+        Err(Refusal::new(EngineCode::AxUnsupported, crate::error::Reason::PerformUnsupported))
     }
 
     /// Row 24: selects `range` (UTF-16 units) inside the element's value (`ax.selectText`).
@@ -329,7 +338,7 @@ pub trait AxBackend {
     /// # Errors
     /// `AxUnsupported{perform_unsupported}` by default, with nothing sent.
     fn select_range(&mut self, _reference: &Ref, _range: crate::text_range::Utf16Range) -> BackendResult<Delivered> {
-        Err(Refusal::new(EngineCode::AxUnsupported, crate::error::Reason::PerformUnsupported.wire()))
+        Err(Refusal::new(EngineCode::AxUnsupported, crate::error::Reason::PerformUnsupported))
     }
 
     /// Row 24: focuses the element (`ax.focus`).
@@ -337,7 +346,7 @@ pub trait AxBackend {
     /// # Errors
     /// `AxUnsupported{perform_unsupported}` by default, with nothing sent.
     fn focus(&mut self, _reference: &Ref) -> BackendResult<Delivered> {
-        Err(Refusal::new(EngineCode::AxUnsupported, crate::error::Reason::PerformUnsupported.wire()))
+        Err(Refusal::new(EngineCode::AxUnsupported, crate::error::Reason::PerformUnsupported))
     }
 
     /// The observer events; by default a source whose every read refuses.
@@ -348,7 +357,7 @@ pub trait AxBackend {
 
 /// The refusal a missing presence surface reads as.
 pub const PRESENCE_UNAVAILABLE: Refusal =
-    Refusal::new(EngineCode::ControlRequired, "no_presence_surface");
+    Refusal::new(EngineCode::ControlRequired, Reason::NoPresenceSurface);
 
 /// The stop chord a backend on the `set_stop_chord` default listens for: the X11, Wayland and
 /// Windows default `computer.stopHotkey` (`design/d-safety.md` '1. The physical stop chord').
@@ -369,12 +378,12 @@ mod stop_chord_tests {
         let mut backend = Defaults;
         assert_eq!(
             backend.set_stop_chord(Some("ctrl+alt+a")),
-            Err(Refusal::new(EngineCode::StopPathUnavailable, Reason::Deaf.wire())),
+            Err(Refusal::new(EngineCode::StopPathUnavailable, Reason::Deaf)),
             "A-IS-62: a chord it cannot arm reads deaf, never a bare or other refusal"
         );
         assert_eq!(
             backend.stop_listener().err(),
-            Some(Refusal::new(EngineCode::StopPathUnavailable, "no_listener")),
+            Some(Refusal::new(EngineCode::StopPathUnavailable, Reason::NoListener)),
             "no listener is armed for the refused chord"
         );
         assert_eq!(backend.set_stop_chord(Some(DEFAULT_STOP_CHORD)), Ok(()));

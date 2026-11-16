@@ -1,6 +1,7 @@
 //! Consent, the foreground lease and window reservations through `Session`, on the fake. The
 //! two-session legs use two INDEPENDENT sessions on one shared RUNTIME root (R23).
 
+use omo_computer_core::error::Reason;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -61,7 +62,7 @@ pub(super) fn params<T: serde::de::DeserializeOwned>(value: Value) -> T {
 }
 
 pub(super) fn reason(result: &Result<impl std::fmt::Debug, Refused>) -> Option<(&'static str, Option<&'static str>)> {
-    result.as_ref().err().map(|r| (r.refusal.code.wire(), r.refusal.reason))
+    result.as_ref().err().map(|r| (r.refusal.code.wire(), r.refusal.reason.map(Reason::wire)))
 }
 
 fn grant(session: &mut Session) {
@@ -140,7 +141,7 @@ fn window_held_by_other_session_is_input_busy() {
     let typed = |s: &mut Session| s.type_text(params(json!({ "target": "1", "text": "hi" })));
     assert!(typed(&mut a).is_ok());
     let busy = typed(&mut b).expect_err("a holds window 1");
-    assert_eq!((busy.refusal.code.wire(), busy.refusal.reason), ("InputBusy", Some("window")));
+    assert_eq!((busy.refusal.code.wire(), busy.refusal.reason), ("InputBusy", Some(Reason::Window)));
     let detail = busy.detail.expect("detail");
     assert_eq!(detail["window"], json!("1"));
     assert_eq!(detail["retryAfterMs"], json!(10_000));
@@ -172,7 +173,7 @@ fn unbound_scope_name_refused_at_open() {
     let backend = FakeBackend::new(scenario(&json!({ "consent": { "scope": ["NoSuchApp"] } })));
     let mut s = Session::new(Box::new(backend));
     let refused = s.open(params(json!({}))).expect_err("no app binds");
-    assert_eq!((refused.code.wire(), refused.reason), ("InvalidTarget", Some("app_unknown")));
+    assert_eq!((refused.code.wire(), refused.reason), ("InvalidTarget", Some(Reason::AppUnknown)));
     let bound = FakeBackend::new(scenario(&json!({ "consent": { "scope": ["notes"] } })));
     let mut s = Session::new(Box::new(bound));
     assert!(s.open(params(json!({}))).is_ok());
@@ -214,7 +215,7 @@ fn path_only_consent_binds_the_observed_executable_path() {
     let refused = s.click(params(json!({ "target": "1", "x": 5, "y": 5 }))).expect_err("another executable");
     assert_eq!(
         (refused.refusal.code.wire(), refused.refusal.reason),
-        ("ControlRequired", Some("identity_changed"))
+        ("ControlRequired", Some(Reason::IdentityChanged))
     );
     assert!(sink.is_empty(), "nothing sent: {:?}", sink.lines());
 
@@ -293,7 +294,7 @@ fn open_session_on(
 fn a_is_62_open_stop_hotkey_must_equal_the_consent_file() {
     let refused = open_with(Some("ctrl+alt+shift+f12"), Some("ctrl+alt+shift+escape")).expect_err("differs");
     // R70aj: the tampered class, encoded as the tampered-file refusal (the file is intact).
-    assert_eq!((refused.code.wire(), refused.reason), ("ControlRequired", Some("tampered")));
+    assert_eq!((refused.code.wire(), refused.reason), ("ControlRequired", Some(Reason::Tampered)));
     let (mut s, refused) = open_session_with(Some("ctrl+alt+shift+f12"), Some("ctrl+alt+shift+escape"));
     assert!(refused.is_err());
     // A-IS-62 rev 5 (R70an C) reverses R70aj: the hand reads tampered at once.
@@ -382,7 +383,7 @@ fn a_is_62_a_refused_chord_leaves_the_hand_tampered() {
     s.stop_path_start(params(json!({})));
     capture(&mut s, "1");
     let refused = s.click(params(json!({ "target": "1", "x": 5, "y": 5 }))).expect_err("exec refused");
-    assert_eq!(refused.refusal.reason, Some("tampered"));
+    assert_eq!(refused.refusal.reason, Some(Reason::Tampered));
     s.close();
     open(&mut s, None).expect("re-open after close");
     assert!(s.funnel.control.consent.view().tampered, "survives close and a re-open of the same consent");
@@ -472,7 +473,7 @@ fn a_is_62_stop_path_start_carried_chord() {
     assert!(none.expect("no chord").global_live);
     let (s, refused) = start(Some("ctrl+alt+shift+escape"));
     let refusal = refused.expect_err("a differing chord");
-    assert_eq!((refusal.code.wire(), refusal.reason), ("ControlRequired", Some("tampered")));
+    assert_eq!((refusal.code.wire(), refusal.reason), ("ControlRequired", Some(Reason::Tampered)));
     let status = s.stop_path_status();
     assert!(status.global_live && status.stop_path == "global", "the configured chord stays armed: {status:?}");
     assert!(s.funnel.control.consent.view().tampered, "the hand reads tampered");
@@ -545,7 +546,7 @@ fn a_is_62_an_unparseable_new_stop_key_reads_deaf_at_once() {
     s.open(params(json!({ "reportMode": "null" }))).expect("re-open");
     capture(&mut s, "1");
     let refused = s.click(params(json!({ "target": "1", "x": 5, "y": 5 }))).expect_err("deaf");
-    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("StopPathUnavailable", Some("deaf")));
+    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("StopPathUnavailable", Some(Reason::Deaf)));
     assert!(!s.stop_path_status().global_live, "never read live or stale");
 }
 
@@ -568,7 +569,7 @@ fn a_is_62_a_chord_the_backend_cannot_arm_reads_deaf() {
     s.open(params(json!({ "reportMode": "null" }))).expect("re-open");
     capture(&mut s, "1");
     let refused = s.click(params(json!({ "target": "1", "x": 5, "y": 5 }))).expect_err("deaf");
-    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("StopPathUnavailable", Some("deaf")));
+    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("StopPathUnavailable", Some(Reason::Deaf)));
 }
 
 fn busy_with_stop(stop: bool) -> Value {
@@ -629,7 +630,7 @@ fn a_chord_longer_than_256_bytes_is_refused_and_cut_only_in_the_audit_line() {
     let long = format!("{configured}{}", " ".repeat(300));
     let (mut s, refused) = open_session_with(Some(configured), Some(&long));
     let refusal = refused.expect_err("longer than 256 bytes differs, even if its first bytes equal the chord");
-    assert_eq!(refusal.reason, Some("tampered"));
+    assert_eq!(refusal.reason, Some(Reason::Tampered));
     let path = crate::audit::AuditSink::path(s.funnel.audit()).map(std::path::Path::to_path_buf).expect("an audit file");
     let audit = std::fs::read_to_string(path).expect("audit");
     let line = audit.lines().find(|l| l.contains("\"stop_hotkey\"")).expect("the refusal line");
@@ -681,7 +682,7 @@ fn the_code_built_default_consent_admits_no_exec_and_arms_no_chord() {
     grant(&mut s);
     capture(&mut s, "1");
     let refused = s.click(params(json!({ "target": "1", "x": 5, "y": 5 }))).expect_err("computer use is off in the file");
-    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("ControlRequired", Some("consent_off")));
+    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("ControlRequired", Some(Reason::ConsentOff)));
     assert!(sink.lines().iter().all(|line| !line.contains("click") && !line.contains("mouse")), "nothing sent: {:?}", sink.lines());
 }
 

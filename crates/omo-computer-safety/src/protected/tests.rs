@@ -1,6 +1,7 @@
 //! The shipped tables, entry by entry on every OS: every protected entry refuses before send
 //! with `force` included; the dangerous chords per OS need `force`, and `force` admits only them.
 
+use omo_computer_core::error::Reason;
 use omo_computer_core::backend::Refusal;
 
 use super::{Chord, Os, ProtectedTable};
@@ -46,7 +47,7 @@ pub(super) fn run(
 }
 
 pub(super) fn wire(refusal: Option<Refusal>) -> Option<(&'static str, Option<&'static str>)> {
-    refusal.map(|r| (r.code.wire(), r.reason))
+    refusal.map(|r| (r.code.wire(), r.reason.map(Reason::wire)))
 }
 
 pub(super) fn self_set(pid: u32, app: &str) -> SelfSet {
