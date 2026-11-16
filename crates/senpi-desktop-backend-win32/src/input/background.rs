@@ -1,8 +1,9 @@
 //! Background delivery: `PostMessageW` straight into the target window's
 //! queue (oh-my-pi `win32/input.rs:184-560`), gated by the toolkit class
 //! matrix so a toolkit that ignores posted input yields
-//! `BackgroundUnavailable` instead of a silent no-op. The foreground and the
-//! cursor are never touched.
+//! `BackgroundUnavailable` instead of a silent no-op, and a chord that holds
+//! a modifier is refused for every class, since posted keys never set the
+//! modifier state. The foreground and the cursor are never touched.
 
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::keys::KeyName;
@@ -15,7 +16,8 @@ use super::keys::key_message;
 use super::messages::{button_messages, WM_CHAR};
 use super::native::{self, Window};
 use crate::delivery::{
-    background_refusal_for, text_input_unsupported, text_units, EventKind, TargetTraits, TextUnit,
+    background_refusal_for, posted_chord_refusal, text_input_unsupported, text_units, EventKind,
+    TargetTraits, TextUnit,
 };
 use crate::integrity::IntegrityRid;
 
@@ -39,15 +41,22 @@ fn deliverable(id: &str, own: IntegrityRid, kind: EventKind) -> CoreResult<Windo
     refusal(id, window, kind).map_or(Ok(window), Err)
 }
 
-/// The window a background key chord of `keys` is posted to: the target's
-/// keyboard focus, after the matrix accepted the target's own class.
-pub(super) fn key_target(id: &str, own: IntegrityRid, keys: &[KeyName]) -> CoreResult<Window> {
+/// The window a background key chord of `keys`, pressed as `vks`, is posted
+/// to: the target's keyboard focus, after the matrix accepted the target's
+/// own class and the chord holds no modifier another key needs.
+pub(super) fn key_target(
+    id: &str,
+    own: IntegrityRid,
+    keys: &[KeyName],
+    vks: &[u16],
+) -> CoreResult<Window> {
     let kind = if keys.len() > 1 || keys.iter().any(|key| key.is_modifier()) {
         EventKind::KeyCombo
     } else {
         EventKind::Keystroke
     };
-    deliverable(id, own, kind).map(Window::keyboard_focus)
+    let window = deliverable(id, own, kind)?;
+    posted_chord_refusal(id, vks).map_or(Ok(window.keyboard_focus()), Err)
 }
 
 pub(super) fn post(window: Window, message: u32, wparam: WPARAM, lparam: LPARAM) -> CoreResult<()> {
