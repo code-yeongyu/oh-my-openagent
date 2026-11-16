@@ -78,7 +78,7 @@ pub(super) fn ends_with(line: &str, tail: &str) -> bool {
 }
 
 pub(super) fn reason(refused: &Refused) -> (&'static str, Option<&'static str>) {
-    (refused.refusal.code.wire(), refused.refusal.reason)
+    (refused.refusal.code.wire(), refused.refusal.reason.map(omo_computer_core::error::Reason::wire))
 }
 
 /// The fake, refusing the `at`-th input post (0-based) the way a stopped or failing route does.
