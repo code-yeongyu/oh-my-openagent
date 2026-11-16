@@ -96,7 +96,11 @@ const ENGINE_CODES: Readonly<Record<string, Mapped>> = {
 export const engineCode = (code: string, candidates?: readonly string[]): Mapped =>
   code === "model_unavailable" && candidates !== undefined && candidates.length > 0
     ? { code: "model_ambiguous", details: { candidates } }
-    : (ENGINE_CODES[code] ?? (isRemoteCode(code) ? { code } : { code: "unsupported", details: { engine_code: code } }))
+    : Object.hasOwn(ENGINE_CODES, code)
+      ? ENGINE_CODES[code]!
+      : isRemoteCode(code)
+        ? { code }
+        : { code: "unsupported", details: { engine_code: code } }
 
 // Each next action names an SDK operation, never a CLI verb: the CLI renderer adds the verb (B1, R7).
 const NEXT_ACTION: Partial<Record<RemoteCode, string>> = {
