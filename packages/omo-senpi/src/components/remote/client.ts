@@ -58,6 +58,11 @@ export type ClientCore = {
   ) => R<T>
   readonly sessionsList: (filter?: SessionsListFilter, opts?: Opts) => R<SessionsList>
   readonly devicesList: (opts?: Opts) => R<readonly DeviceRow[]>
+  /**
+   * The client these members belong to, for the thread bodies a member runs (they read the account through a client):
+   * valid once the client is built, which is before any member can be called.
+   */
+  readonly self: () => RemoteClient
 }
 
 /** The answer of a member whose part has not landed yet. */
@@ -269,9 +274,14 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
       return ok({ revision: listing.revision, rows, unanswered })
     })
 
-  const core: ClientCore = { sender, timers, deps, dial, member, sessionsList, devicesList }
+  let built: RemoteClient | undefined
+  const self = (): RemoteClient => {
+    if (built === undefined) throw new Error("the remote client was used before it was built")
+    return built
+  }
+  const core: ClientCore = { sender, timers, deps, dial, member, sessionsList, devicesList, self }
 
-  return {
+  built = {
     service: {
       info: (opts) =>
         member(opts, DEADLINES.service, false, async (svc) =>
@@ -363,6 +373,7 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
       )
     },
   }
+  return built
 }
 
 // The listing carries one display name per session (its title); archive state has no layer yet (E-archive), so every

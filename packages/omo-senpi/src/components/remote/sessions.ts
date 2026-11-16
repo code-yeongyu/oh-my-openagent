@@ -246,6 +246,8 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     const known = legs.get(svc)
     if (known !== undefined) return known
     const remote: RemoteThreadSurface = {
+      // The thread bodies this member runs read the account through the client they belong to (#13414 U5).
+      client: core.self(),
       sessions: createDeviceServiceSessions({
         version: core.deps.version,
         connect: async () => ({ conn: svc, owned: false }),
