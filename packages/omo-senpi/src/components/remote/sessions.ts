@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto"
 import { userInfo } from "node:os"
 import type { DeviceService } from "@oh-my-opencode/device-service-core/device-service"
 import type { ThreadThinkingLevel, ThreadToolResult } from "../thread/contracts"
+import { isPermissionPreset, presetWithin } from "../thread/contracts/permission-presets"
 import { answered, closeThread, setModelOn, setThinkingLevelOn } from "../thread/control/operations"
 import { ControlRefusal, type SessionControl } from "../thread/control/port"
 import { createRelayControl } from "../thread/control/relay-control"
@@ -23,7 +24,6 @@ import { nextActionFor, remoteFailure } from "./codes"
 import { DEADLINES } from "./deadlines"
 import { createDeviceServiceSessions } from "./port/device-service"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
-import { PERMISSION_PRESETS } from "./types"
 import type {
   DeviceRow,
   SessionRow,
@@ -32,7 +32,6 @@ import type {
   OpenRequest,
   OpenResult,
   Opts,
-  PermissionPreset,
   R,
   RemoteFailure,
   SendReceipt,
@@ -89,21 +88,6 @@ const splitModel = (model: string): { readonly provider: string; readonly modelI
     )
   return { provider: model.slice(0, slash), modelId: model.slice(slash + 1) }
 }
-
-// #13748: thread/contracts/permission-presets.ts `isPermissionPreset` and `presetWithin` replace these (the same senpi
-// preset rules).
-const AT_MOST: Readonly<Record<PermissionPreset, readonly PermissionPreset[]>> = {
-  "full-access": PERMISSION_PRESETS,
-  workspace: ["workspace", "accept-edits", "read-only", "ask"],
-  "accept-edits": ["accept-edits", "read-only", "ask"],
-  "read-only": ["read-only", "ask"],
-  auto: ["auto", "ask"],
-  ask: ["ask"],
-}
-const isPermissionPreset = (value: string): value is PermissionPreset =>
-  PERMISSION_PRESETS.some((preset) => preset === value)
-const presetWithin = (requested: PermissionPreset, creator: PermissionPreset | undefined): boolean =>
-  creator === undefined ? requested === "ask" : AT_MOST[creator].includes(requested)
 
 // #13748: SessionOpenRequest takes these itself; dev's relay host already puts them on the open_session frame.
 type LaunchProfile = { readonly provider?: string; readonly modelId?: string; readonly thinkingLevel?: string }
@@ -260,7 +244,10 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     const known = legs.get(svc)
     if (known !== undefined) return known
     const remote: RemoteThreadSurface = {
-      sessions: createDeviceServiceSessions({ version: core.deps.version, connect: async () => svc }),
+      sessions: createDeviceServiceSessions({
+        version: core.deps.version,
+        connect: async () => ({ conn: svc, owned: false }),
+      }),
       chain: { stamp: (record) => record },
     }
     const relay = createRelayTransport({

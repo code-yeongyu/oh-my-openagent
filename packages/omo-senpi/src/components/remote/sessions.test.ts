@@ -373,10 +373,13 @@ describe("durable-id addressing", () => {
 
   test("#given a session its device does not hold #when a member addresses it #then not_found{session} names sessions.list, never an update", async () => {
     const { client } = await opened()
+    // A well-formed listing key the device does not hold: a service with #1350 refuses an id that is no key at all as
+    // invalid_request before any lookup.
+    const nowhere = handleOf(PEER, "bm90LWhlbGQta2V5LTAwMQ")
     for (const settled of [
-      await client.sessions.interrupt(handleOf(PEER, "dur-nowhere")),
-      await client.sessions.setModel(handleOf(PEER, "dur-nowhere"), "anthropic/claude"),
-      await client.sessions.get(handleOf(PEER, "dur-nowhere")),
+      await client.sessions.interrupt(nowhere),
+      await client.sessions.setModel(nowhere, "anthropic/claude"),
+      await client.sessions.get(nowhere),
     ]) {
       const failure = failureOf(settled)
       expect(failure).toMatchObject({ code: "not_found", details: { kind: "session", device: PEER } })
