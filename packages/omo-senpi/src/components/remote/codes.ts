@@ -84,19 +84,21 @@ const LOCAL_API_CODES: Readonly<Record<LocalApiCode, Mapped>> = {
 
 // The engine's own failure codes that are renamed on the way up (B1 mappings, R-05 restored). Every other engine code
 // keeps its name when it is already a remote code.
-const ENGINE_CODES: Readonly<Record<string, Mapped>> = {
-  model_unavailable: { code: "model_not_found" },
-  invalid_level: { code: "thinking_level_unsupported" },
-  worktree_failed: { code: "unsupported", details: { feature: "worktree" } },
-  not_running: { code: "not_resumable" },
-  handle_lost: { code: "not_found", details: { kind: "handle" } },
-}
+// A Map, not an object literal: a wire code naming an Object prototype member must never resolve to that member.
+const ENGINE_CODES: ReadonlyMap<string, Mapped> = new Map<string, Mapped>([
+  ["model_unavailable", { code: "model_not_found" }],
+  ["invalid_level", { code: "thinking_level_unsupported" }],
+  ["worktree_failed", { code: "unsupported", details: { feature: "worktree" } }],
+  ["not_running", { code: "not_resumable" }],
+  ["handle_lost", { code: "not_found", details: { kind: "handle" } }],
+])
 
 /** `model_unavailable` becomes `model_ambiguous` when the host names candidates (B1). */
 export const engineCode = (code: string, candidates?: readonly string[]): Mapped =>
   code === "model_unavailable" && candidates !== undefined && candidates.length > 0
     ? { code: "model_ambiguous", details: { candidates } }
-    : (ENGINE_CODES[code] ?? (isRemoteCode(code) ? { code } : { code: "unsupported", details: { engine_code: code } }))
+    : (ENGINE_CODES.get(code) ??
+      (isRemoteCode(code) ? { code } : { code: "unsupported", details: { engine_code: code } }))
 
 // Each next action names an SDK operation, never a CLI verb: the CLI renderer adds the verb (B1, R7).
 const NEXT_ACTION: Partial<Record<RemoteCode, string>> = {
