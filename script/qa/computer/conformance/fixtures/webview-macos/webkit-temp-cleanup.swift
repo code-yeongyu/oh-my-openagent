@@ -1,10 +1,17 @@
 import Darwin
 import Foundation
 
-/// WebKit's networking service keeps this app's folders in the per-user Darwin temp directory
+/// The responsibility lookup libSystem exports without a public header: the pid macOS holds responsible for `pid`,
+/// which for the XPC services WebKit launches is the app that asked for them.
+@_silgen_name("responsibility_get_pid_responsible_for_pid")
+private func responsiblePid(_ pid: pid_t) -> pid_t
+
+/// WebKit's helper services keep this app's folders in the per-user Darwin temp directory
 /// ("com.apple.WebKit.Networking+Conformance Fixture..."), which no environment variable moves. At quit, after the web
-/// views are torn down, the fixture waits for every networking process that still holds a file in those folders to
-/// exit (a process-exit event, bounded), then removes them. Anything left is a typed failure, never a skip.
+/// views are torn down, the fixture waits for every WebKit helper (Networking, WebContent, GPU) that macOS counts as
+/// this app's, and for any other WebKit process still holding a file in those folders, to exit (a process-exit event,
+/// bounded); only then does it remove the folders, so no live helper of this app can recreate one after the removal.
+/// Anything left is a typed failure, never a skip.
 enum WebKitTempCleanup {
     enum Outcome {
         case clean
@@ -13,11 +20,12 @@ enum WebKitTempCleanup {
 
     static func run(bound: TimeInterval) -> Outcome {
         let deadline = DispatchTime.now() + bound
+        let seen = ownFolders()
+        for helper in helpers(holding: seen) where !waitForExit(helper, until: deadline) {
+            return .failed("WebKit helper \(helper) still runs; this app's folders: \(seen.joined(separator: ", "))")
+        }
         let folders = ownFolders()
         if folders.isEmpty { return .clean }
-        for holder in holders(of: folders) where !waitForExit(holder, until: deadline) {
-            return .failed("networking process \(holder) still holds \(folders.joined(separator: ", "))")
-        }
         for folder in folders { try? FileManager.default.removeItem(atPath: folder) }
         let left = ownFolders()
         return left.isEmpty ? .clean : .failed("could not remove \(left.joined(separator: ", "))")
@@ -37,18 +45,24 @@ enum WebKitTempCleanup {
         return String(cString: resolved)
     }
 
-    private static func holders(of folders: [String]) -> [pid_t] {
+    /// A WebKit helper is this app's when macOS names this process as responsible for it (the XPC services WebKit
+    /// launches for this app); one that holds a file in this app's folders is waited for whoever is responsible.
+    private static func helpers(holding folders: [String]) -> [pid_t] {
         let capacity = proc_listallpids(nil, 0)
         guard capacity > 0 else { return [] }
         var pids = [pid_t](repeating: 0, count: Int(capacity) * 2)
         let listed = proc_listallpids(&pids, Int32(pids.count * MemoryLayout<pid_t>.size))
-        return pids.prefix(Int(max(listed, 0))).filter { $0 > 0 && isNetworking($0) && holdsAny($0, folders) }
+        let own = getpid()
+        return pids.prefix(Int(max(listed, 0))).filter { pid in
+            pid > 0 && pid != own && isWebKitHelper(pid)
+                && (responsiblePid(pid) == own || holdsAny(pid, folders))
+        }
     }
 
-    private static func isNetworking(_ pid: pid_t) -> Bool {
+    private static func isWebKitHelper(_ pid: pid_t) -> Bool {
         var buffer = [CChar](repeating: 0, count: 4 * Int(MAXPATHLEN))
         guard proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 else { return false }
-        return String(cString: buffer).contains("com.apple.WebKit.Networking")
+        return String(cString: buffer).contains("/com.apple.WebKit.")
     }
 
     private static func holdsAny(_ pid: pid_t, _ folders: [String]) -> Bool {
