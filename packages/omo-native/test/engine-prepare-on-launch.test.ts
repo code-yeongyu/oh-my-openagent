@@ -1,5 +1,16 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  existsSync,
+  linkSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { ENGINE_PREPARED_STAMP, ensureEnginePrepared } from "../bin/lib/engine-prepare.js"
@@ -71,6 +82,21 @@ describe("launcher engine preparation (#8713)", () => {
       expect(readStamp(root)).toBe(OMO_VERSION)
       expect(readFileSync(cachedRpc, "utf8")).toBe(pristineRpc)
       expect(readFileSync(cachedStamp, "utf8")).toBe("5.0.0-0.beta.85\n")
+    })
+  })
+
+  describe("#given an executable engine file and a restrictive umask", () => {
+    test.skipIf(process.platform === "win32")("#then the prepared file keeps its exact permission bits", () => {
+      const root = createEngine()
+      chmodSync(join(root, RPC_MODE), 0o755)
+      const previous = process.umask(0o077)
+      try {
+        prepareOnce(root)
+      } finally {
+        process.umask(previous)
+      }
+      expect(readRpc(root)).toContain("invalid_stream_event")
+      expect(statSync(join(root, RPC_MODE)).mode & 0o777).toBe(0o755)
     })
   })
 
