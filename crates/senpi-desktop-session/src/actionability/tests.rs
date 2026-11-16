@@ -3,6 +3,8 @@
 
 #[path = "lock_tests.rs"]
 mod lock_tests;
+#[path = "occlusion_tests.rs"]
+mod occlusion_tests;
 
 use std::time::{Duration, Instant};
 
