@@ -56,6 +56,32 @@ describe("the background enable omo login starts", () => {
     expect([owners[0]?.state.status.enabled, record.off, record.clears]).toEqual([false, true, 0])
   })
 
+  // #13724 review L1: with no opt-out recorded there is nothing to clear; a clear here could only erase one a disable
+  // recorded after the re-read.
+  test("no opt-out recorded: it switches remote on and never clears the opt-out record", async () => {
+    const stateDir = privateDir()
+    const { record, optOut } = optOutRecord()
+    const { code, out, coldWake } = await run(
+      ["enable", AFTER_LOGIN_FLAG, "--json"],
+      stateDir,
+      SIGNED_IN,
+      testBootstrap({
+        install: async () => {
+          owners.push(await startFakeOwner({ stateDir, world: defaultWorld() }))
+          return { ok: true }
+        },
+      }),
+      undefined,
+      { optOut },
+    )
+    expect([code, out.map((line) => JSON.parse(line)), coldWake]).toEqual([
+      REMOTE_EXIT.ok,
+      [{ enabled: true }],
+      ["install"],
+    ])
+    expect([owners[0]?.state.status.enabled, record.off, record.clears]).toEqual([true, false, 0])
+  })
+
   test("a user-typed enable is the user turning remote on: it switches on and clears the opt-out", async () => {
     const stateDir = privateDir()
     const { record, optOut } = optOutRecord()
