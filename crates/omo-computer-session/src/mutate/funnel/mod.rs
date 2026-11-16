@@ -205,7 +205,8 @@ impl Session {
         if let Some((target, frame_id)) = mutation.consume.as_ref().filter(|_| count > 0) {
             self.frames.consume(target, frame_id);
         }
-        let settled = (outcome.stop.is_none() && count > 0)
+        // A null-mode call behaves as today until the cutover: it never waits to settle (R70ci).
+        let settled = (object && outcome.stop.is_none() && count > 0)
             .then(|| self.settle_after_send(target))
             .flatten();
         let read_back = report::read_back(report::settle(settled.as_ref()));
