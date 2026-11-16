@@ -12,11 +12,13 @@ use crate::Session;
 /// The engine's narrowing of the opened consent view.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ConsentNarrowing {
-    /// The hand's file allows computer use (absent file: `false`, d-remote.md:207).
+    /// The hand's file allows computer use. With no file this stays `true` and the run is held at
+    /// `computer:read` by `exec_tier` instead (lead decision 1 of row 28: exec refuses `tier_missing`).
     pub computer_use: bool,
     /// The requested tier is `exec`; `false` keeps the run at `computer:read`.
     pub exec_tier: bool,
-    /// The file is present but not trustworthy, or a live host's fingerprint differs.
+    /// The file is present but not trustworthy. Comparing a live host's `consentFingerprint` with
+    /// the host's fingerprint sidecar is owed to row 37, which writes the sidecar (DEFERRED-LEGS).
     pub tampered: bool,
 }
 
