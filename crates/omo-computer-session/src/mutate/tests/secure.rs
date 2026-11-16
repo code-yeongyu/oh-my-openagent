@@ -87,3 +87,19 @@ fn secure_field_type_audit_keeps_length_only_and_no_digest() {
         );
     }
 }
+
+/// Review L1 of #13373 at 4d3d6227f5: a funnel pass refused before it takes the secure decision
+/// leaves no decision behind, so a multi-pass call never hands the wire audit an earlier
+/// pass's answer.
+#[test]
+fn a_pass_refused_before_the_secure_decision_leaves_none() {
+    let run = Run::new();
+    let backend = Box::new(run.fake_of(SECURE_SCENARIO, Persona::Macos));
+    let session = Session::for_roots(backend, &run.roots());
+    let mut session = super::open(session.with_secure_probe(Box::new(|_: Option<&str>| false)));
+    let click = serde_json::json!({"target": "101", "x": 10, "y": 10});
+    session.click(params::<ClickParams>(click.clone())).expect("clicked");
+    session.close();
+    session.click(params::<ClickParams>(click)).expect_err("a closed session refuses");
+    assert_eq!(session.take_call_secure(), None, "the refused pass left an earlier decision");
+}

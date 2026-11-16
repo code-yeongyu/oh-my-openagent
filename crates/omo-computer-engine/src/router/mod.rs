@@ -62,6 +62,7 @@ impl Router {
     /// The v1 rejection, the host latch, or the session's refusal, as the wire carries it.
     pub fn call(&mut self, peer: Peer, method: &str, params: Value) -> Result<Value, WireError> {
         let spec = gate::admit(peer, method, self.ctx.test_clock)?;
+        // Clear any decision a call outside the router left, so this call reads only its own.
         self.session.take_call_secure();
         let outcome = self
             .admit_latched(spec.method, spec.effect)

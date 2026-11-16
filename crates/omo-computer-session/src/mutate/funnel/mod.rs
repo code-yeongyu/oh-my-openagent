@@ -34,6 +34,8 @@ impl Session {
     /// The gate's, the marker's or the backend's refusal; nothing is sent on any refusal
     /// produced before the send.
     pub(crate) fn mutate(&mut self, mutation: Mutation<'_>) -> Result<ExecReply, Refused> {
+        // A pass that stops before deciding must not leave an earlier pass's secure answer.
+        self.funnel.call_secure = None;
         let (report_mode, tag, policy, ceiling) = {
             let opened = self.opened.as_ref().ok_or(NOT_OPEN)?;
             (
