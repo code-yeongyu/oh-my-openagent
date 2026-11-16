@@ -39,7 +39,7 @@ function runWriter(name: string, listAnswers: readonly string[]): string[] {
       'echo "$*" >> "$FAKE_DIR/calls"',
       'case "$1 $2" in',
       '  "api repos/"*) echo "#13811" ;;',
-      '  "issue list") head -n 1 "$FAKE_DIR/answers"; sed -i 1d "$FAKE_DIR/answers" ;;',
+      '  "issue list") head -n 1 "$FAKE_DIR/answers"; tail -n +2 "$FAKE_DIR/answers" > "$FAKE_DIR/rest"; mv "$FAKE_DIR/rest" "$FAKE_DIR/answers" ;;',
       '  "issue create") echo "https://github.com/owner/project/issues/42" ;;',
       "esac",
       "",
