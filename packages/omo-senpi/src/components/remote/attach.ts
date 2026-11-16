@@ -309,11 +309,19 @@ function createAttachment(core: ClientCore, attached: RemoteAttach, thread: Thre
     command,
     read: (page) =>
       withinDeadline(core.timers, undefined, DEADLINES.observeRead, false, async () => ok(await attached.read(page))),
-    serveEndpoint: () =>
-      withinDeadline(core.timers, undefined, DEADLINES.serveEndpoint, false, async () => {
-        // Loaded only here, so nothing of an attach loads node:net (the endpoint's net server) until a caller serves one.
-        const { serveRemoteAttach } = await import("../../../../omo-native/remote-attach")
-        const endpoint = await serveRemoteAttach(attached, { label: thread })
+    // The endpoint server is the caller's (RemoteClientDeps.serveAttach): it is a net server, and `omo remote`'s
+    // local-only graph reaches no network but the local API transport (#13440).
+    serveEndpoint: async () => {
+      const serve = core.deps.serveAttach
+      if (serve === undefined)
+        return remoteFailure(
+          "unsupported",
+          "This client was built without an attach endpoint server.",
+          "Call attach on a client built with serveAttach.",
+          { details: { feature: "serve_endpoint" } },
+        )
+      return withinDeadline(core.timers, undefined, DEADLINES.serveEndpoint, false, async () => {
+        const endpoint = await serve(attached, thread)
         endpoints.push(endpoint.close)
         // An attach that ended while the endpoint was being made closes it at once.
         if (ended) {
@@ -325,7 +333,8 @@ function createAttachment(core: ClientCore, attached: RemoteAttach, thread: Thre
           )
         }
         return ok({ socketPath: endpoint.socketPath, sessionRef: endpoint.sessionRef })
-      }),
+      })
+    },
     pending: () => dialogs.current(),
     answer: async (requestId, response) => {
       const sent = await command(answerRecord(requestId, response))

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { PEER } from "../../../../device-service-core/test/local-api/conformance/world.ts"
 import { pushDetached, pushFrame, pushRecords, pushSnapshot, reader, THREAD, worldWith } from "./attach.test-support"
 import { DEADLINES } from "./deadlines"
+import { sessionStatusOf } from "./follow"
 import { handleOf } from "./seams"
 import { clientOn, closeClients, fakeClock, startOwner } from "./testing/fake-service"
 import type { RemoteClient } from "./client"
@@ -254,5 +255,24 @@ describe("sessions.wait rows", () => {
     await listening(client)
     pushDetached(owner, "session_closed")
     expect(await settling).toMatchObject({ kind: "ok", value: { outcome: "ended", status: "closed" } })
+  })
+})
+
+describe("sessionStatusOf: the rule sessions.get reads an engine state by (#13753)", () => {
+  test.each([
+    ["an idle state with no run lease", IDLE, [], "idle"],
+    ["isStreaming false while the run lease still runs", IDLE, [lease("running", 4)], "running"],
+    [
+      "isStreaming false while get_state's lifecycle runs",
+      { ...IDLE, lifecycle: { state: "running", seq: 4 } },
+      [],
+      "running",
+    ],
+    ["a run lease that moved off running", IDLE, [lease("running", 4), lease("done", 5)], "idle"],
+    ["a run lease waiting on a person", IDLE, [lease("waiting_human", 5)], "waiting_input"],
+    ["a pending dialog", { ...RUNNING, pendingDialogs: [DIALOG] }, [], "waiting_input"],
+    ["isStreaming true", RUNNING, [], "running"],
+  ] as const)("#given %s #then %s", (_name, state, entries, status) => {
+    expect(sessionStatusOf(state, entries)).toBe(status)
   })
 })

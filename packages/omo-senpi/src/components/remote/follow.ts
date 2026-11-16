@@ -165,10 +165,6 @@ class SessionTurn {
   aborted = false
   #leaseSeq = -1
 
-  constructor(initial: SnapshotBody) {
-    this.resync(initial)
-  }
-
   /** What an attach event changes, in order; `closed` once the session left its engine. */
   apply(event: AttachEvent): readonly Signal[] | "closed" {
     switch (event.kind) {
@@ -287,6 +283,19 @@ class SessionTurn {
   }
 }
 
+/**
+ * One engine state as `sessions.get` reports it, by the rule follow and wait apply (#13753): `running` when the state
+ * shows a run in flight (`isStreaming`, or a run lease, `state.lifecycle` or the newest `session-lifecycle` entry among
+ * `entries`, still running); `waiting_input` when it asks a person; `compacting`; else `idle`. A stale `isStreaming:
+ * false` cannot hide a run the lease still holds. Read it from a fresh `get_state` (pass a snapshot's entries too when
+ * there is one), never from a held reply.
+ */
+export function sessionStatusOf(state: JsonObject, entries: readonly unknown[] = []): string {
+  const turn = new SessionTurn()
+  turn.fresh(state, entries)
+  return turn.status
+}
+
 const WAITING: Readonly<Record<string, Extract<FollowEvent, { readonly kind: "waiting" }>["state"]>> = {
   running: "turn_running",
   idle: "idle",
@@ -378,7 +387,8 @@ export function streamMembers(core: ClientCore): StreamMembers {
       if (opened.kind === "error") return fail(opened)
       watch = opened.value
       if (finished) return watch.stop()
-      turn = new SessionTurn(opened.value.initial)
+      turn = new SessionTurn()
+      turn.resync(opened.value.initial)
       if (person) for (const request of watch.handle.pending()) output.push({ kind: "frame", request })
       const first = waiting(turn.status)
       if (first !== undefined) output.push(first)
@@ -426,7 +436,8 @@ export function streamMembers(core: ClientCore): StreamMembers {
         if (opened.kind === "error") return done(opened)
         watch = opened.value
         if (settled) return watch.stop()
-        turn = new SessionTurn(opened.value.initial)
+        turn = new SessionTurn()
+        turn.resync(opened.value.initial)
         check([])
         await opened.value.baseline()
         confirmed = true
