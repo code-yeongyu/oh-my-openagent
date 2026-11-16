@@ -1,4 +1,7 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, onTestFinished, test } from "bun:test"
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 import { backgroundRemote, type DetachedSpawn } from "../remote-background-enable"
 import { AFTER_LOGIN_FLAG } from "../remote-verbs"
@@ -36,6 +39,24 @@ describe("omo login's background remote verb", () => {
     )
     expect(spawned.map((s) => [s.command, ...s.args])).toEqual([
       ["/usr/bin/bun", "/lib/omo-ai/bin/omo.js", "remote", "bootstrap"],
+    ])
+  })
+
+  test("an npm launcher started from a compiled omo runs under a JS runtime on PATH, never the compiled omo", () => {
+    // A compiled omo login inside an npm-launched session inherits OMO_BIN=.../bin/omo.js (#13724 review L2).
+    const bin = mkdtempSync(join(tmpdir(), "omo-runtime-"))
+    onTestFinished(() => rmSync(bin, { recursive: true, force: true }))
+    const node = join(bin, process.platform === "win32" ? "node.exe" : "node")
+    writeFileSync(node, "")
+    chmodSync(node, 0o755)
+    const spawned: Spawned[] = []
+    backgroundRemote("/lib/omo-ai/bin/omo.js", {
+      spawn: recordingSpawn(spawned),
+      execPath: "/opt/omo/omo",
+      env: { PATH: bin },
+    })("enable")
+    expect(spawned.map((s) => [s.command, ...s.args])).toEqual([
+      [node, "/lib/omo-ai/bin/omo.js", "remote", "enable", AFTER_LOGIN_FLAG],
     ])
   })
 })
