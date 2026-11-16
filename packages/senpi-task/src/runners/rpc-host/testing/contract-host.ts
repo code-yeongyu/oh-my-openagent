@@ -38,6 +38,18 @@ export type ContractHostOptions = {
   readonly unwritten?: boolean
   /** unload_session answers `{outcome: "refused", reason}` with this reason, as data, whatever else is set. */
   readonly unloadRefusal?: string
+  /**
+   * The session's history (entries with an `id`): get_entries pages it backward as the engine does (`{before, tail}`,
+   * answering `next_before`; an unknown `before` is refused), and get_snapshot answers its newest entries.
+   */
+  readonly history?: readonly Frame[]
+  /** Refuse an unpaged get_entries over this many entries `response_too_large` (the engine's 48 MiB answer cap). */
+  readonly unpagedCap?: number
+  /**
+   * Records of the session written ahead of get_snapshot's answer, then the engine's `snapshot_marker`: the snapshot
+   * already holds them, as the engine takes it before it writes the marker and the answer (get-snapshot.js).
+   */
+  readonly beforeSnapshot?: readonly Frame[]
 }
 export type ContractHost = {
   readonly socket: string
@@ -352,10 +364,32 @@ export async function withContractHost(
             respond(frame, { isStreaming: false })
             continue
           }
+          if (frame.type === "get_entries" && options.history !== undefined) {
+            const all = options.history
+            const before =
+              typeof frame.before === "string" ? all.findIndex((entry) => entry.id === frame.before) : all.length
+            if (before < 0) {
+              respond(frame, undefined, `Entry not found: ${String(frame.before)}`)
+              continue
+            }
+            const tail = typeof frame.tail === "number" ? frame.tail : undefined
+            if (tail === undefined && options.unpagedCap !== undefined && before > options.unpagedCap) {
+              respond(frame, undefined, "response_too_large")
+              continue
+            }
+            const page = all.slice(tail === undefined ? 0 : Math.max(0, before - tail), before)
+            const older = before - page.length > 0
+            respond(frame, { entries: page, hasMore: older, ...(older ? { next_before: page[0]?.id } : {}) })
+            continue
+          }
           if (frame.type === "get_snapshot") {
+            for (const record of options.beforeSnapshot ?? [])
+              client.write(`${JSON.stringify({ ...record, sessionId: "rpc-1" })}\n`)
+            if (options.beforeSnapshot !== undefined)
+              client.write(`${JSON.stringify({ type: "snapshot_marker", markerId: "marker-1", sessionId: "rpc-1" })}\n`)
             respond(frame, {
               state: { sessionId: "rpc-1", isStreaming: false, pendingDialogs: [] },
-              entries: [],
+              entries: (options.history ?? []).slice(-20),
               next_before: null,
               history_truncated: false,
               markerId: "marker-1",

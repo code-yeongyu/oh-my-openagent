@@ -175,6 +175,12 @@ export function createLocalAttach(
     const onLine = (line: JsonObject): void => {
       if (finished || routing === undefined || line["sessionId"] !== routing) return
       const type = line["type"]
+      // The engine takes its snapshot, then writes this marker, then the answer (get-snapshot.js): the records held
+      // before it are already in the snapshot, so only the ones after it stream as new.
+      if (type === "snapshot_marker") {
+        if (!snapshotted) early.length = 0
+        return
+      }
       if (type === "session_closed") return finish("session_closed")
       if (type === "session_released") return finish("peer_detached")
       if (type === "extension_ui_request") {
@@ -219,7 +225,7 @@ export function createLocalAttach(
       connection.close()
       throw error
     })
-    // The records that arrived before the snapshot answered follow it, in order.
+    // The records written after the snapshot's marker (all of them on an engine without get_snapshot) follow it, in order.
     deliver({ kind: "snapshot", snapshot })
     snapshotted = true
     records(early.splice(0))
@@ -235,19 +241,22 @@ export function createLocalAttach(
         if (!finished) listeners.add(listener)
         return () => listeners.delete(listener)
       },
+      // The engine pages the history itself (`{before, tail}`, newest first; an unknown `before` is refused), so a page
+      // never carries the whole history.
       read: async (page = {}) => {
-        const all = dataOf(await connection.request({ type: "get_entries", sessionId: session() }), "get_entries")[
-          "entries"
-        ]
-        const entries = (Array.isArray(all) ? all : []).filter(isObject)
-        const before =
-          page.before === undefined ? entries.length : entries.findIndex((entry) => entry["id"] === page.before)
-        const kept = entries.slice(0, before < 0 ? entries.length : before)
-        const tail = kept.slice(-(page.tail ?? READ_TAIL))
-        const older = kept.length > tail.length ? text(tail[0]?.["id"]) : undefined
+        const data = dataOf(
+          await connection.request({
+            type: "get_entries",
+            sessionId: session(),
+            tail: page.tail ?? READ_TAIL,
+            ...(page.before === undefined ? {} : { before: page.before }),
+          }),
+          "get_entries",
+        )
+        const entries = (Array.isArray(data["entries"]) ? data["entries"] : []).filter(isObject)
         return {
-          entries: tail.map((entry) => ({ entry_id: text(entry["id"]) ?? "", entry })),
-          next_before: older ?? null,
+          entries: entries.map((entry) => ({ entry_id: text(entry["id"]) ?? "", entry })),
+          next_before: text(data["next_before"]) ?? null,
         }
       },
       command: async (rpc): Promise<CommandResult> => {

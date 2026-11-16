@@ -119,6 +119,46 @@ describe("a session on this device (local watch)", () => {
     })
   })
 
+  test("#given a history larger than one unpaged answer #when attach reads it a page at a time #then each page comes from the engine's own paging and an unknown before is refused", async () => {
+    const owner = await startOwner(selfWorld())
+    const history = Array.from({ length: 6 }, (_, index) => ({ type: "message", id: `e${index + 1}` }))
+    await withContractHost({ history, unpagedCap: 3 }, async (host) => {
+      const client = clientOn(owner.stateDir, fakeClock(), undefined, {
+        localAttach: createLocalAttach({ socket: host.socket, keyRoot: host.root }),
+      })
+      const opened = await client.attach(THREAD)
+      if (opened.kind !== "ok") throw new Error(`expected an attach, got ${JSON.stringify(opened)}`)
+      const page = async (request: { readonly before?: string; readonly tail: number }) => {
+        const read = await opened.value.read(request)
+        if (read.kind !== "ok") throw new Error(`expected a page, got ${JSON.stringify(read)}`)
+        return { ids: read.value.entries.map((entry) => entry.entry_id), next_before: read.value.next_before }
+      }
+      expect(await page({ tail: 2 })).toEqual({ ids: ["e5", "e6"], next_before: "e5" })
+      expect(await page({ before: "e5", tail: 2 })).toEqual({ ids: ["e3", "e4"], next_before: "e3" })
+      expect(await page({ before: "e2", tail: 2 })).toEqual({ ids: ["e1"], next_before: null })
+      expect((await opened.value.read({ before: "no-such-entry", tail: 2 })).kind).toBe("error")
+      await opened.value.detach()
+    })
+  })
+
+  test("#given a record the engine wrote before its snapshot answer #when attach opens #then the snapshot holds it and only records after the snapshot stream as new", async () => {
+    const owner = await startOwner(selfWorld())
+    await withContractHost({ beforeSnapshot: [{ type: "agent_start", runId: "covered" }] }, async (host) => {
+      const client = clientOn(owner.stateDir, fakeClock(), undefined, {
+        localAttach: createLocalAttach({ socket: host.socket, keyRoot: host.root }),
+      })
+      const opened = await client.attach(THREAD)
+      if (opened.kind !== "ok") throw new Error(`expected an attach, got ${JSON.stringify(opened)}`)
+      const events = reader(opened.value.events)
+      host.push([{ type: "agent_start", runId: "after" }])
+      expect(await events.next("the first record after the snapshot")).toEqual({
+        kind: "record",
+        record: { type: "agent_start", runId: "after", sessionId: "rpc-1" },
+      })
+      await opened.value.detach()
+    })
+  })
+
   test("#given a client built without a local attach #when it follows a self session #then unsupported{local_attach}, not the relay's peer_not_found", async () => {
     const owner = await startOwner(selfWorld())
     const client = clientOn(owner.stateDir, fakeClock())
