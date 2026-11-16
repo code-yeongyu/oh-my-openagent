@@ -281,3 +281,29 @@ fn idle_exit_only_without_open_session() {
     client.call(4, "$/test.advanceClock", &json!({"ms": 301_000})).expect("advanced");
     assert!(!alive_after(&mut daemon, Duration::from_secs(3)), "300 s idle with no open session ends the daemon");
 }
+
+fn posted_inputs(runtime: &std::path::Path) -> usize {
+    std::fs::read_dir(runtime)
+        .expect("the runtime dir is readable")
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_name().to_string_lossy().starts_with("fake-sink-"))
+        .map(|entry| std::fs::read_to_string(entry.path()).unwrap_or_default())
+        .map(|sink| sink.lines().filter(|line| line.starts_with("post_input")).count())
+        .sum()
+}
+
+#[test]
+fn marker_persist_fails_input_not_sent_in_serve_mode() {
+    use std::os::unix::fs::PermissionsExt;
+    let daemon = Daemon::start(&[]);
+    let markers = daemon.dir.path().join("markers");
+    std::fs::create_dir_all(&markers).expect("markers dir");
+    std::fs::set_permissions(&markers, std::fs::Permissions::from_mode(0o500)).expect("read-only");
+    let mut client = opened(&daemon);
+    client.call(5, "stopPath.start", &json!({"chord": "ctrl+alt+shift+escape"})).expect("armed");
+    client.call(6, "capture", &json!({"target": "101"})).expect("a frame to click in");
+    let clicked = client.call(2, "click", &json!({"target": "101", "x": 10, "y": 10, "callId": "k-unavailable"})).expect("answered");
+    std::fs::set_permissions(&markers, std::fs::Permissions::from_mode(0o700)).expect("restore");
+    assert_eq!(clicked["error"]["data"]["reason"], "marker_unavailable", "{clicked}");
+    assert_eq!(posted_inputs(daemon.dir.path()), 0, "nothing was sent");
+}
