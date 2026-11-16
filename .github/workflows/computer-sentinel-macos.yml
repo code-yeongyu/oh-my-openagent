@@ -22,6 +22,8 @@ concurrency:
 jobs:
   sentinel-selftest:
     name: computer sentinel self-test (${{ matrix.os }})
+    # Pull requests run Linux only; the ci:full-matrix label and dispatches run macOS (#13802).
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-matrix')
     strategy:
       fail-fast: false
       matrix:
