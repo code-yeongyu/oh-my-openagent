@@ -109,10 +109,17 @@ fn paired_coordinates_decoder_and_schema_agree_on_every_case() {
             }
         };
         let present = |member: &str| params.get(member).is_some();
-        let typed = ["x", "y"].iter().all(|m| params.get(*m).is_none_or(|v| allows(m, v)));
-        let paired = def["dependentRequired"]
-            .as_object()
-            .is_none_or(|deps| deps.iter().all(|(k, needs)| !present(k) || needs.as_array().is_some_and(|n| n.iter().filter_map(Value::as_str).all(present))));
+        let typed = ["x", "y"]
+            .iter()
+            .all(|m| params.get(*m).is_none_or(|v| allows(m, v)));
+        let paired = def["dependentRequired"].as_object().is_none_or(|deps| {
+            deps.iter().all(|(k, needs)| {
+                !present(k)
+                    || needs
+                        .as_array()
+                        .is_some_and(|n| n.iter().filter_map(Value::as_str).all(present))
+            })
+        });
         typed && paired
     };
     let cases: [(&str, Value, bool); 5] = [
@@ -125,14 +132,21 @@ fn paired_coordinates_decoder_and_schema_agree_on_every_case() {
     for name in ["ClickParams", "MouseDownParams"] {
         for (case, coordinates, expected) in &cases {
             let mut params = json!({"target": "101"});
-            params.as_object_mut().expect("object").extend(coordinates.as_object().expect("object").clone());
+            params
+                .as_object_mut()
+                .expect("object")
+                .extend(coordinates.as_object().expect("object").clone());
             let decoded = if name == "ClickParams" {
                 serde_json::from_value::<crate::params::ClickParams>(params.clone()).is_ok()
             } else {
                 serde_json::from_value::<crate::params::MouseDownParams>(params.clone()).is_ok()
             };
             assert_eq!(decoded, *expected, "{name} decoder, {case}");
-            assert_eq!(schema_accepts(name, &params), *expected, "{name} schema, {case}");
+            assert_eq!(
+                schema_accepts(name, &params),
+                *expected,
+                "{name} schema, {case}"
+            );
         }
     }
 }
