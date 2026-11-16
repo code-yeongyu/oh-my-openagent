@@ -137,4 +137,16 @@ impl Backend for RefuseAt {
     fn clock(&self) -> Option<&dyn omo_computer_core::intervention::BackendClock> {
         Backend::clock(&self.inner)
     }
+
+    fn host_consent(&self) -> Option<serde_json::Value> {
+        self.inner.host_consent()
+    }
+
+    fn platform(&self) -> Option<omo_computer_core::report::Platform> {
+        self.inner.platform()
+    }
+
+    fn set_stop_chord(&mut self, chord: Option<&str>) -> BackendResult<()> {
+        self.inner.set_stop_chord(chord)
+    }
 }
