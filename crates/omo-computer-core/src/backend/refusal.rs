@@ -132,7 +132,7 @@ mod tests {
 
     #[test]
     fn data_members_join_the_wire_object_and_never_replace_its_own() {
-        let refusal = Refusal::new(EngineCode::Internal, "route_table_invalid")
+        let refusal = Refusal::new(EngineCode::Internal, crate::error::Reason::RouteTableInvalid)
             .with_data(json!({ "pointer": "/routes/1/class", "reason": "spoofed", "code": "spoofed" }));
         assert_eq!(
             refusal.wire_data(),
