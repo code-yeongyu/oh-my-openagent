@@ -80,6 +80,7 @@ impl Session {
         let policy = StopPolicy::read(Transport::Local, request.allow_host_relay_only_stop);
         self.opened = None;
         self.guard.open(policy, HostAdditions::default())?;
+        self.guard.apply_table(crate::grant::backend_os(self.backend.as_ref()));
         self.opened = Some(Opened {
             report_mode: request.report_mode,
             tag: random_u64(),

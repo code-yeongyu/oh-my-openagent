@@ -59,7 +59,7 @@ pub fn backend(vars: &[(String, String)]) -> Result<Box<dyn Backend>, RouteError
             .map(|(_, value)| value.clone())
     };
     match lookup(BACKEND_SEAM) {
-        Some(value) if value == FAKE_BACKEND => {
+        Some(value) if selection(&value) == Selected::Fake => {
             let sink = match lookup(RUNTIME_DIR_SEAM) {
                 Some(dir) => RecordingSink::with_file(
                     &Path::new(&dir).join(format!("{SINK_FILE_PREFIX}{}.log", std::process::id())),
@@ -83,6 +83,17 @@ pub enum Selected {
     Real,
 }
 
+/// The selection a `OMO_COMPUTER_BACKEND` value makes: `fake` is the fake, any other value names a
+/// real backend (registered by the OS rows; until then the route answers `NoBackend`).
+#[must_use]
+pub fn selection(value: &str) -> Selected {
+    if value == FAKE_BACKEND {
+        Selected::Fake
+    } else {
+        Selected::Real
+    }
+}
+
 /// The launch gate (A-IS-64 (b)): a backend the route SELECTED as real opens no session when its
 /// declared platform maps to another OS than the engine's compile target; the fake is exempt by
 /// its selection, and a real backend declaring no platform takes the compile target's table.
@@ -90,8 +101,12 @@ pub enum Selected {
 /// # Errors
 /// [`RouteError::PlatformMismatch`] naming both values.
 pub fn launch_gate(selected: Selected, backend: &dyn Backend) -> Result<(), RouteError> {
-    let _ = (selected, backend);
-    Ok(())
+    match selected {
+        Selected::Real if !declares_compile_target(backend) => Err(RouteError::PlatformMismatch {
+            declared: backend.platform(),
+        }),
+        Selected::Real | Selected::Fake => Ok(()),
+    }
 }
 
 #[cfg(test)]
