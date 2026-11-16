@@ -6,6 +6,20 @@ import { join, sep } from "node:path"
 
 const packageRoot = join(import.meta.dir, "..")
 
+/**
+ * Runs `bun add` with its own install cache under the test's temp root. Bun's default backend hardlinks
+ * installed files to its cache, so the engine preparation that rewrites them in place (and the stamp it
+ * leaves) would otherwise change the host's shared cache entry and fail later installs on that host (#13819).
+ */
+function bunAddInIsolatedCache(root: string, consumer: string, args: readonly string[]) {
+  return Bun.spawnSync(["bun", "add", ...args], {
+    cwd: consumer,
+    env: { ...process.env, BUN_INSTALL_CACHE_DIR: join(root, "bun-install-cache") },
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+}
+
 describe("omo-ai packed install", () => {
   test("ships the Senpi patch installer and installs a Senpi that surfaces pre-replay results natively", () => {
     const root = mkdtempSync(join(tmpdir(), "omo-ai-packed-install-"))
@@ -30,11 +44,7 @@ describe("omo-ai packed install", () => {
       const consumer = join(root, "consumer")
       Bun.spawnSync(["mkdir", "-p", consumer], { stdout: "ignore", stderr: "ignore" })
       writeFileSync(join(consumer, "package.json"), JSON.stringify({ name: "omo-ai-consumer", private: true }))
-      const install = Bun.spawnSync(["bun", "add", "--trust", join(root, tarball!)], {
-        cwd: consumer,
-        stdout: "pipe",
-        stderr: "pipe",
-      })
+      const install = bunAddInIsolatedCache(root, consumer, ["--trust", join(root, tarball!)])
       expect(install.exitCode).toBe(0)
       const installedPackageRoot = join(consumer, "node_modules", "omo-ai")
 
@@ -81,11 +91,12 @@ describe("omo-ai packed install", () => {
       const home = join(root, "home")
       Bun.spawnSync(["mkdir", "-p", consumer, home], { stdout: "ignore", stderr: "ignore" })
       writeFileSync(join(consumer, "package.json"), JSON.stringify({ name: "omo-ai-consumer", private: true }))
-      const install = Bun.spawnSync(["bun", "add", "--ignore-scripts", "--backend", "copyfile", join(root, tarball!)], {
-        cwd: consumer,
-        stdout: "pipe",
-        stderr: "pipe",
-      })
+      const install = bunAddInIsolatedCache(root, consumer, [
+        "--ignore-scripts",
+        "--backend",
+        "copyfile",
+        join(root, tarball!),
+      ])
       expect(install.exitCode).toBe(0)
       const installedPackageRoot = join(consumer, "node_modules", "omo-ai")
       const consumerRequire = createRequire(join(installedPackageRoot, "package.json"))
