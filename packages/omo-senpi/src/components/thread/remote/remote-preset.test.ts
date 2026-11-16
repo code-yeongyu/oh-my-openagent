@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { createDefaultRemoteSurface } from "./default-remote"
-import { createLazyRemoteSurface } from "./lazy-remote"
+import { createLazyRemoteSurface } from "../../remote/port/lazy-remote"
 
 // The session's permission preset reaches `open_session` only through these factories (component -> default-remote ->
 // lazy-remote -> `remote.permissionPreset`, read by remote-ops on create and fork). Dropping the pass-through anywhere
