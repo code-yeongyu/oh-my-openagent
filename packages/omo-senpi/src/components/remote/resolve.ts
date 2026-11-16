@@ -1,7 +1,7 @@
 import { normalizeThreadName } from "../thread/addressing"
 import { type ClientCore, type RemoteClient } from "./client"
 import { nextActionFor, remoteFailure } from "./codes"
-import { canonicalizeThreadHandle, type CanonicalThread } from "./seams"
+import { canonicalizeThreadHandle, handleOf, type CanonicalThread } from "./seams"
 import type { RemoteFailure, Scope, SessionRow } from "./types"
 
 type Match = { readonly kind: "one"; readonly row: SessionRow } | { readonly kind: "many"; readonly rows: readonly SessionRow[] }
@@ -25,7 +25,8 @@ function match(rows: readonly SessionRow[], target: CanonicalThread): Match | un
     return picked(
       rows.filter(
         (row) =>
-          row.thread === target.handle || (deviceNamed(row, device) && (row.durable_id === session || row.thread === `${row.device.id}/${session}`)),
+          row.thread === target.handle ||
+          (deviceNamed(row, device) && (row.durable_id === session || row.thread === handleOf(row.device.id, session))),
       ),
     )
   }
