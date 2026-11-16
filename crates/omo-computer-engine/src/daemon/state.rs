@@ -38,6 +38,7 @@ pub struct Shared {
     subscribers: Mutex<Vec<(usize, UnixStream)>>,
     injectors: Mutex<Vec<(usize, Sender<Vec<u8>>)>>,
     stopped: AtomicBool,
+    pub idle: super::idle::Idle,
 }
 
 impl Shared {
@@ -52,6 +53,7 @@ impl Shared {
             subscribers: Mutex::new(Vec::new()),
             injectors: Mutex::new(Vec::new()),
             stopped: AtomicBool::new(false),
+            idle: super::idle::Idle::new(fake && std::env::var_os("OMO_COMPUTER_FAKE_CLOCK").is_some()),
         })
     }
 
