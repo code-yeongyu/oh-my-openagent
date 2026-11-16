@@ -1,0 +1,17 @@
+{
+  // SP-W probe typecheck, run by `probe-sp-w.ts --self-test` (part of `bun run test:computer`). The repository's root
+  // tsconfig covers packages/omo-opencode/src only, so the probe files need their own.
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "lib": ["ESNext"],
+    "types": ["bun-types"]
+  },
+  "include": ["../probe-sp-w.ts", "./**/*.ts"]
+}
