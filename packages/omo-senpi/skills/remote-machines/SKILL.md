@@ -53,7 +53,7 @@ const r = (await tool.thread_list({ all_scope: true })).details.result
 |------|---------|
 | `tool.thread_create({ device, cwd?, name?, alias?, skills? })` | New session on another device. Address it afterwards by the `thread_id` that `thread_list({ all_scope: true })` reports for it (match the `name` you gave and the `device`). |
 | `tool.thread_send({ thread, message, delivery?: "auto"\|"steer"\|"follow_up", all_scope: true })` | Give it work. `auto` steers a running turn or starts a new one. |
-| `tool.thread_read({ thread, max_bytes?, cursor?, all_scope: true })` | Read its transcript; continue a truncated read with `next_cursor`. |
+| `tool.thread_read({ thread, max_bytes?, cursor?, wait_ms?, all_scope: true })` | Read its transcript; continue a truncated read with `next_cursor`. With `wait_ms` (1 to 600000) it first waits for the thread's turn to end; `result.wait` says how the wait ended: `outcome` `settled` (a turn ended, `turn_id`, or the thread is idle), `timeout` (still running after `wait_ms`), `cancelled` or `ended` (`status` names why), with `waited_ms`. |
 | `tool.thread_interrupt({ thread, all_scope: true })` | Stop its running turn. |
 | `tool.thread_close({ thread, all_scope: true })` | End it when the work is done. |
 
@@ -115,8 +115,9 @@ const thread = listed.kind === "ok" ? listed.threads.find((t) => t.name === name
 if (thread === undefined) throw new Error(`thread ${name} is not listed on device ${device}`)
 const sent = (await tool.thread_send({ thread, message: "Report free disk space on / and stop.", all_scope: true })).details.result
 if (sent.kind === "error") throw new Error(`${sent.error.code}: ${sent.error.next_action}`)
-// Later, when its turn has finished:
-const read = (await tool.thread_read({ thread, all_scope: true })).details.result
+// Wait up to 5 minutes for its turn to end, then read:
+const read = (await tool.thread_read({ thread, wait_ms: 300_000, all_scope: true })).details.result
+if (read.kind === "ok" && read.wait?.outcome === "timeout") throw new Error("still running; read again later")
 // read.items is the transcript; close the thread once the answer is in:
 await tool.thread_close({ thread, all_scope: true })
 ```
