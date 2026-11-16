@@ -438,16 +438,13 @@ export function createLiveThreadSurface(
     return known
   }
 
-  const degraded = (
+  const degraded = async (
     endpoint: KnownEndpoint,
     error: unknown,
     reason: "live_unresponsive" | "dead" | null,
-  ): EndpointListing => {
-    const known = new Set([
-      ...endpoint.paths,
-      ...endpoint.claimDirs.flatMap((dir) => claimedSessionPaths(dir)),
-      ...(lastListed.get(endpoint.socket) ?? []),
-    ])
+  ): Promise<EndpointListing> => {
+    const claimed = await Promise.all(endpoint.claimDirs.map((dir) => claimedSessionPaths(dir)))
+    const known = new Set([...endpoint.paths, ...claimed.flat(), ...(lastListed.get(endpoint.socket) ?? [])])
     const disk = [...known].flatMap((path) => {
       const session = readDiskSession(path, endpoint.socket)
       return session === null ? [] : [session]

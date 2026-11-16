@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { readdirSync, readFileSync, realpathSync } from "node:fs"
+import { realpathSync } from "node:fs"
 import { readdir, readFile } from "node:fs/promises"
 import { basename, dirname, join } from "node:path"
 
@@ -136,25 +136,28 @@ async function identify(dir: string): Promise<RegistryEndpoint> {
  * `<16hex>.json` per claim, `sessionPath` naming the file). A host that died holding sessions leaves these behind, so
  * they are the record of its threads in a process that never listed it alive. Unreadable claims are skipped.
  */
-export function claimedSessionPaths(dir: string): readonly string[] {
+export async function claimedSessionPaths(dir: string): Promise<readonly string[]> {
   let names: string[]
   try {
-    names = readdirSync(join(dir, "reservations"))
+    names = await readdir(join(dir, "reservations"))
   } catch {
     return []
   }
-  return names
-    .filter((name) => name.endsWith(".json"))
-    .sort()
-    .flatMap((name) => {
-      try {
-        const claim: unknown = JSON.parse(readFileSync(join(dir, "reservations", name), "utf8"))
-        const path = typeof claim === "object" && claim !== null ? Reflect.get(claim, "sessionPath") : undefined
-        return typeof path === "string" && path !== "" ? [path] : []
-      } catch {
-        return []
-      }
-    })
+  const claims = await Promise.all(
+    names
+      .filter((name) => name.endsWith(".json"))
+      .sort()
+      .map(async (name) => {
+        try {
+          const claim: unknown = JSON.parse(await readFile(join(dir, "reservations", name), "utf8"))
+          const path = typeof claim === "object" && claim !== null ? Reflect.get(claim, "sessionPath") : undefined
+          return typeof path === "string" && path !== "" ? [path] : []
+        } catch {
+          return []
+        }
+      }),
+  )
+  return claims.flat()
 }
 
 /** Every endpoint directory under `agentDir`, sorted by directory name; `[]` before layout 2. */
