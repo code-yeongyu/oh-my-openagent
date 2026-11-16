@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { backgroundRemote, type DetachedSpawn } from "../remote-background-enable"
+import { AFTER_LOGIN_FLAG } from "../remote-verbs"
 
 // omo#13722: the background remote verb must never keep omo login alive: a detached child with no pipes back, hidden
 // on Windows, unref'd. An npm launcher (.js) runs under this runtime; a compiled omo runs directly.
@@ -21,7 +22,7 @@ describe("omo login's background remote verb", () => {
     expect(spawned).toEqual([
       {
         command: "/opt/omo/omo",
-        args: ["remote", "enable"],
+        args: ["remote", "enable", AFTER_LOGIN_FLAG],
         options: { detached: true, stdio: "ignore", windowsHide: true, env: process.env },
         unrefs: 1,
       },

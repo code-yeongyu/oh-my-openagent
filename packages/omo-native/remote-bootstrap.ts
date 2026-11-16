@@ -2,6 +2,7 @@ import { isAbsolute, resolve } from "node:path"
 
 import {
   type BootstrapDependencies,
+  type BootstrapOutcome,
   bootstrapDeviceService,
   DEVICE_SERVICE_VERSION,
   deviceServiceHost,
@@ -103,17 +104,33 @@ export type RemoteSetup = {
  * `omo remote enable`: the bootstrap (install the pinned service when none runs, connect, register the refresher and
  * this agent dir), then the switch on, the device link and the always-on session host unit, and it clears a recorded
  * opt-out (omo#13594, omo#13602). Every step is idempotent, so running it again changes nothing already in place.
+ * `afterLogin`: started by `omo login`, not typed by the user; an opt-out recorded by then keeps remote off instead.
  */
 export async function runEnableVerb(
   io: BootstrapIo,
   setup: BootstrapSetup,
   remote: RemoteSetup,
   json: boolean,
+  afterLogin = false,
 ): Promise<number> {
-  const enabled = await enableRemote(io, setup, remote, json, (on) =>
+  const enabled = await enableRemote(io, setup, remote, json, afterLogin, (on) =>
     io.output(json ? JSON.stringify({ enabled: on }) : `Remote sessions are ${on ? "on" : "off"} for this device.`),
   )
   return enabled === "stopped" ? REMOTE_EXIT.unavailable : REMOTE_EXIT.ok
+}
+
+/** An opt-out on a connected service, as the bootstrap enforces it: the switch off if it is on, the unit removed. */
+async function keepRemoteOff(
+  outcome: Extract<BootstrapOutcome, { kind: "connected" }>,
+  remote: RemoteSetup,
+  io: BootstrapIo,
+): Promise<void> {
+  try {
+    if (outcome.status.enabled) await outcome.service.setEnabled(false)
+  } finally {
+    outcome.service.close()
+  }
+  await applyColdWake(remote.coldWake, false, io.error)
 }
 
 async function enableRemote(
@@ -121,11 +138,19 @@ async function enableRemote(
   setup: BootstrapSetup,
   remote: RemoteSetup,
   json: boolean,
+  afterLogin: boolean,
   report: (enabled: boolean) => void,
   quietSuppressed = false,
 ): Promise<boolean | "stopped"> {
   const outcome = await bootstrap(io, setup, json, quietSuppressed)
   if (outcome.kind === "stopped") return "stopped"
+  // Re-read after the install, which can take minutes (#13724 review M1): a `omo remote disable` typed meanwhile found
+  // no service to switch off, so this enable, which login started, enforces it and leaves the record in place.
+  if (afterLogin && remote.optOut.read()) {
+    await keepRemoteOff(outcome, remote, io)
+    report(false)
+    return false
+  }
   let enabled: boolean
   try {
     enabled = await outcome.service.setEnabled(true)
@@ -140,8 +165,9 @@ async function enableRemote(
 }
 
 /**
- * Starts `omo remote <verb>` in its own detached process, which outlives `omo login` (omo#13722): enable turns remote
- * on; bootstrap enforces a recorded opt-out (the switch off, the unit removed) on the service it installs.
+ * Starts `omo remote <verb>` in its own detached process, which outlives `omo login` (omo#13722): enable (with
+ * --after-login) turns remote on unless an opt-out was recorded by the end of its install; bootstrap enforces a recorded
+ * opt-out (the switch off, the unit removed) on the service it installs.
  */
 export type BackgroundRemote = (verb: "enable" | "bootstrap") => void
 
@@ -185,18 +211,11 @@ export async function runLoginSetup(
     // A device with no current service (none, or an older one) gets it from a background omo remote bootstrap, which
     // turns the switch off and removes the unit on the service it installs, as login did inline before (#13724 M1).
     const outcome = await bootstrap(io, handOff("bootstrap"), false, true)
-    if (outcome.kind === "connected") {
-      try {
-        if (outcome.status.enabled) await outcome.service.setEnabled(false)
-      } finally {
-        outcome.service.close()
-      }
-      await applyColdWake(remote.coldWake, false, io.error)
-    }
+    if (outcome.kind === "connected") await keepRemoteOff(outcome, remote, io)
     io.output(REMOTE_KEPT_OFF_AFTER_SIGN_IN)
     return "kept_off"
   }
-  const enabled = await enableRemote(io, handOff("enable"), remote, false, () => {}, true)
+  const enabled = await enableRemote(io, handOff("enable"), remote, false, true, () => {}, true)
   if (handedOff) {
     io.output(REMOTE_TURNING_ON_AFTER_SIGN_IN)
     return "background"
