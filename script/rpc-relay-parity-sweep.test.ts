@@ -179,6 +179,17 @@ describe("compareAnswers", () => {
     })
   })
 
+  test("a local reply cancelled by an extension is not served, so a relay refusal is differs (navigate/edit)", () => {
+    const cancelled: Answer = { kind: "reply", reply: { success: true, data: { outcome: "cancelled" } } }
+    expect(describeAnswer(cancelled)).toBe("reply ok (outcome cancelled)")
+    expect(
+      compareAnswers(cancelled, { kind: "refused", code: "unsupported", message: "unsupported" }, new Map()),
+    ).toEqual({
+      kind: "differs",
+      detail: "reply ok (outcome cancelled) locally, refused unsupported through the relay",
+    })
+  })
+
   test("a local reply with the engine's success outcomes is served, so a relay refusal stays missing", () => {
     // The engine's success outcomes: unload_session answers "unloaded"; navigate/edit answer "navigated", "edited", "unchanged".
     for (const outcome of ["unloaded", "navigated", "edited", "unchanged"]) {

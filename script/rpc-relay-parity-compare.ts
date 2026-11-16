@@ -86,14 +86,18 @@ function firstDifference(left: Json, right: Json, path = "$"): string | undefine
 }
 
 /**
- * A successful reply can still report that it did not act: unload_session answers `{ outcome: "refused", detail }`.
- * Only "refused" means that; the engine's other outcomes ("unloaded", "navigated", "edited", "unchanged") are successes.
+ * The outcomes with which a successful reply reports that it did NOT act, from the engine's typed results:
+ * `RpcUnloadAnswer` (rpc-effect-answer-types: "unloaded" | "refused") and `NavigateTreeResult`, `EditAssistantMessageResult`
+ * and `EditUserMessageResult` (rpc-result-types: "navigated" | "edited" | "unchanged" | "cancelled"). The types are not
+ * exported by @code-yeongyu/senpi, so the set is listed here; every other outcome is a success.
  */
+const NOT_APPLIED_OUTCOMES: ReadonlySet<string> = new Set(["refused", "cancelled"])
+
 const unappliedOutcome = (reply: JsonObject): { readonly outcome: string; readonly detail?: string } | undefined => {
   const data = reply["data"]
   if (!isObject(data)) return undefined
   const outcome = data["outcome"]
-  if (outcome !== "refused") return undefined
+  if (typeof outcome !== "string" || !NOT_APPLIED_OUTCOMES.has(outcome)) return undefined
   const detail = data["detail"] ?? data["reason"]
   return typeof detail === "string" ? { outcome, detail } : { outcome }
 }
