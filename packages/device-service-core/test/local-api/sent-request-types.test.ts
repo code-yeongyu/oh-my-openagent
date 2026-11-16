@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { OMO_SENT_REQUEST_TYPES, scanSentRequestTypes } from "./sent-request-types.ts"
 
@@ -12,7 +14,23 @@ describe("the request types omo sends through this package's client", () => {
     expect(scanSentRequestTypes().unscanned).toEqual(["local-api/client-open.ts: type"])
   })
 
-  test("the package entry exposes no raw local-api client, so no other package sends past the scan", async () => {
+  test("a send the scan cannot read, bare or through a member, is reported rather than skipped", () => {
+    const dir = mkdtempSync(join(tmpdir(), "sent-request-scan-"))
+    try {
+      writeFileSync(join(dir, "bare.ts"), 'const sent = request(kind, {})\nconst named = request("status.get", {})\n')
+      writeFileSync(join(dir, "member.ts"), "const sent = client.request(type, {})\n")
+      expect(scanSentRequestTypes(dir)).toEqual({
+        sent: ["status.get"],
+        unscanned: ["bare.ts: kind", "member.ts: type"],
+      })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  // A tripwire on the entry's export names only: that no other package reaches the client is enforced by guard G1
+  // (script/remote-import-guard-rules.ts S1: local-api/** is importable only inside device-service-core).
+  test("the package entry exports nothing named like a raw local-api client", async () => {
     // A non-literal specifier keeps knip's export check on the entry; a namespace import would mark every export used.
     const entry: Record<string, unknown> = await import(join(import.meta.dir, "..", "..", "src", "index.ts"))
     expect(Object.keys(entry).filter((name) => /localapi|request/i.test(name))).toEqual(["LocalApiError"])
