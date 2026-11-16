@@ -21,7 +21,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # Pull requests run Linux only; the ci:full-matrix label, pushes and dispatches run every OS (#13802).
+        os: ${{ fromJSON(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'ci:full-matrix') && '["ubuntu-latest"]' || '["ubuntu-latest", "macos-latest", "windows-latest"]') }}
     runs-on: ${{ matrix.os == 'ubuntu-latest' && 'ubuntu-26.04' || matrix.os }}
     timeout-minutes: 10
     steps:
