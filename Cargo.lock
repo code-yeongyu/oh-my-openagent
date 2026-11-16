@@ -2004,6 +2004,7 @@ dependencies = [
  "image",
  "omo-computer-core",
  "omo-computer-safety",
+ "omo-computer-session",
  "serde_json",
  "windows 0.62.2",
 ]
