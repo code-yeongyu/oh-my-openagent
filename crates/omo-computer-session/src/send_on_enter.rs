@@ -245,7 +245,7 @@ mod tests {
     fn send_on_enter_shift_return_on_the_windows_fake_background_is_refused_and_foreground_delivers() {
         let mut scenario: Value = serde_json::from_str(SCENARIO).expect("scenario json");
         scenario["persona"] = json!("win32");
-        scenario["fail_next"] = json!([{ "method": "post_input", "code": "BackgroundUnavailable", "reason": "posted_modifier_chord" }]);
+        scenario["fail_next"] = json!([{ "method": "key", "code": "BackgroundUnavailable", "reason": "posted_modifier_chord" }]);
         let sink = RecordingSink::default();
         let fake = FakeBackend::with_parts(FakeScenario::from_value(&scenario).expect("scenario"), FakeClock::default(), sink.clone())
             .with_stop_path(StopPathScript::Live);
