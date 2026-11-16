@@ -106,21 +106,31 @@ async function runAccountShow(dependencies: AccountShowDependencies, flags: read
   }
 }
 
-/** `omo account show` run in this process with no arguments, for the remote verbs' first step: exit code and stdout. */
-export async function readAccountInProcess(): Promise<AccountShowResult> {
-  const api = serviceOrigin(process.env.OMO_SERVICE_API_URL ?? "https://api.omo.dev")
+/** The account service origin this process signs in against: OMO_SERVICE_API_URL, else the production API. */
+export const accountServiceApi = (): string => serviceOrigin(process.env.OMO_SERVICE_API_URL ?? "https://api.omo.dev")
+
+/**
+ * `omo account show` run in this process with no arguments, for the remote verbs' first step: exit code and stdout.
+ * The store's own lines (the recovery hint for an invalid stored sign-in, a locked keychain) go to `error`, never into
+ * the stdout the caller parses (#13638). `openStore` replaces the OS credential store in tests.
+ */
+export async function readAccountInProcess(
+  error: (line: string) => void,
+  openStore: (api: string) => CredentialStore = (api) => createCredentialStore(api, { wait: SESSION_READ_WAIT }),
+): Promise<AccountShowResult> {
+  const api = accountServiceApi()
   const lines: string[] = []
   let store: CredentialStore | undefined
   const exitCode = await runAccountShow(
     {
       api,
       get store() {
-        store ??= createCredentialStore(api, { wait: SESSION_READ_WAIT })
+        store ??= openStore(api)
         return store
       },
       pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())),
       output: (line) => lines.push(line),
-      error: () => {},
+      error,
     },
     [],
   )

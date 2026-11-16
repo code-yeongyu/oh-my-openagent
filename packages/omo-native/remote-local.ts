@@ -17,9 +17,10 @@ import type { SessionFilter } from "../device-service-core/src/local-api/protoco
 import type { SessionRowState } from "../device-service-core/src/local-api/vocabulary.ts"
 import type { RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
 import { readAccountInProcess } from "./account-show"
+import type { LocalStatus } from "./remote-cold-wake"
 import packageJson from "./package.json" with { type: "json" }
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
-import { controlLines, deviceLines, sessionLines, statusLines, wakeLines } from "./remote-render"
+import { controlLines, deviceLines, localRows, sessionLines, statusLines, wakeLines } from "./remote-render"
 import { isSessionVerb, parseSession, type SessionArgs } from "./remote-session-args"
 import { runSession } from "./remote-session-verbs"
 
@@ -47,20 +48,23 @@ export interface RemoteCommandDependencies {
    * module paths sit inside the executable and resolve to nothing on disk.
    */
   readonly packageRoot?: string
+  /** `status` only: this device's units as its service manager reports them, read by remote-cli (omo#13594). */
+  readonly localUnits?: LocalStatus
 }
 
 /** This device's real account read, local API and stdio: every dependency the local verbs need. */
 export function localRemoteDependencies(packageRoot?: string): RemoteCommandDependencies {
   const stateDir = deviceServiceStateDir()
+  const error = (line: string) => process.stderr.write(`${line}\n`)
   return {
-    accountShow: readAccountInProcess,
+    accountShow: () => readAccountInProcess(error),
     stateDir,
     ...(packageRoot === undefined ? {} : { packageRoot }),
     connect: () => connectDeviceService({ version: packageJson.version, stateDir }),
     now: () => Date.now(),
     output: (line) => process.stdout.write(`${line}\n`),
     write: (text) => process.stdout.write(text),
-    error: (line) => process.stderr.write(`${line}\n`),
+    error,
   }
 }
 
@@ -132,7 +136,10 @@ async function runOn(service: DeviceService, parsed: Parsed, dependencies: Remot
   switch (parsed.command) {
     case "status": {
       const status = await service.status()
-      return print(status, () => statusLines(status, service.serviceVersion))
+      const local = dependencies.localUnits
+      return print(local === undefined ? status : { ...status, local }, () =>
+        statusLines(status, service.serviceVersion, local === undefined ? [] : localRows(local)),
+      )
     }
     case "devices": {
       const devices = await service.devices()
@@ -143,9 +150,8 @@ async function runOn(service: DeviceService, parsed: Parsed, dependencies: Remot
       const labels = new Map(devices.map((device) => [device.device, device.label]))
       return print(result, () => sessionLines(result, labels, dependencies.now()))
     }
-    case "enable":
     case "disable": {
-      const enabled = await service.setEnabled(parsed.command === "enable")
+      const enabled = await service.setEnabled(false)
       return print({ enabled }, () => [`Remote sessions are ${enabled ? "on" : "off"} for this device.`])
     }
     case "control": {
