@@ -14,6 +14,9 @@ describe("omo-senpi skill-pointers bunshin pointer", () => {
       "reboot the fleet box",
       "check disk on my fleets",
       "restart fleet-node-3",
+      "deploy to our fleet and verify",
+      "is my fleet up?",
+      "run it on my fleet, then report",
       "check the machine mesh",
       "machine-mesh health",
     ] as const
@@ -29,6 +32,14 @@ describe("omo-senpi skill-pointers bunshin pointer", () => {
       "Fleet status please",
       "the delivery fleet schedule",
       "the fleet-dashboard css",
+      // The owner form names this user's machines only as the object of the request, not as a modifier or a
+      // vehicle fleet (#13467 review L3): "our fleet management UI", "our fleet of delivery trucks".
+      "update our fleet management UI",
+      "our fleet of delivery trucks",
+      "my fleets of ships",
+      "our fleet's fuel costs",
+      "our fleet size grew last year",
+      "the fleet hosts a regatta",
       "bunshins",
       "the mesh network",
       "machine learning",
