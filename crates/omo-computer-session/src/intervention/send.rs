@@ -38,7 +38,11 @@ pub fn units(events: &[InputEvent]) -> u32 {
             InputEvent::PointerMove(_)
             | InputEvent::Button { .. }
             | InputEvent::Key { .. }
-            | InputEvent::Scroll { .. } => 1,
+            | InputEvent::Scroll { .. }
+            | InputEvent::MenuSelect { .. }
+            | InputEvent::AppLaunch { .. }
+            | InputEvent::AppQuit { .. }
+            | InputEvent::OpenSurface { .. } => 1,
         })
         .fold(0, u32::saturating_add)
 }
