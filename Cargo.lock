@@ -1984,8 +1984,12 @@ dependencies = [
 name = "omo-computer-backend-macos"
 version = "0.0.0"
 dependencies = [
+ "image",
+ "libc",
  "omo-computer-core",
  "omo-computer-safety",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
