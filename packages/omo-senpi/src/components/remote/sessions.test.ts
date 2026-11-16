@@ -991,10 +991,16 @@ describe("an open on this device", () => {
       )
       const settling = client.sessions.list()
       await within(listAsked, "this device's list_sessions")
-      // Fake time short of the listing's own deadline: only a bound inside it can let the listing answer.
-      clock.advance(DEADLINES.sessionsList - 1)
-      const flushed = new Promise<"pending">((resolve) => setImmediate(() => resolve("pending")))
-      expect(await Promise.race([settling.then((outcome) => outcome.kind), flushed])).toBe("ok")
+      const pending = () => new Promise<"pending">((resolve) => setImmediate(() => resolve("pending")))
+      // Just short of this device's own bound the listing still waits; at the bound it answers, well inside the
+      // listing's own deadline (#13787 review L3: the clamp alone would only fire at sessionsList - 1).
+      // The bound is the same 10 s the thread tools give one endpoint's list (a default contract), so it is pinned here.
+      const localListBoundMs = 10_000
+      expect(localListBoundMs).toBeLessThan(DEADLINES.sessionsList)
+      clock.advance(localListBoundMs - 1)
+      expect(await Promise.race([settling.then((outcome) => outcome.kind), pending()])).toBe("pending")
+      clock.advance(1)
+      expect(await Promise.race([settling.then((outcome) => outcome.kind), pending()])).toBe("ok")
       const listing = await valueOf(settling)
       expect(listing.rows.map((row) => row.device.id)).toContain(PEER)
       expect(listing.rows.filter((row) => row.device.id === SELF)).toEqual([])
