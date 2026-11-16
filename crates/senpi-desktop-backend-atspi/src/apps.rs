@@ -17,6 +17,8 @@ const MIN_WINDOW_EDGE: i32 = 16;
 const MAX_FOCUS_DEPTH: u8 = 40;
 /// Depth guard for the walk from an element up to its frame.
 const MAX_OWNER_DEPTH: u8 = 64;
+/// Depth guard for the hit-test descent from a frame to its deepest element.
+const MAX_HIT_DEPTH: u8 = 64;
 
 /// Every top-level frame of every registered application, in registry order.
 pub(crate) fn windows<B: AtSpiBus>(bus: &mut B) -> CoreResult<Vec<DesktopWindow>> {
@@ -139,6 +141,10 @@ fn screen_coordinate(value: f64) -> i32 {
 }
 
 /// The deepest element under a global point, searched frame by frame.
+///
+/// `GetAccessibleAtPoint` answers with the direct child of the object asked
+/// (a GTK frame answers with its root filler), so the search asks again of
+/// each answer until one has no child under the point.
 pub(crate) fn element_at<B: AtSpiBus>(bus: &mut B, x: f64, y: f64) -> CoreResult<Option<B::Node>> {
     let point = ScreenPoint {
         x: screen_coordinate(x),
@@ -152,10 +158,29 @@ pub(crate) fn element_at<B: AtSpiBus>(bus: &mut B, x: f64, y: f64) -> CoreResult
             let found = bus
                 .accessible_at_point(&frame, point)
                 .map_err(DesktopError::ax_failed)?;
-            return Ok((!bus.is_null(&found)).then_some(found));
+            if bus.is_null(&found) {
+                return Ok(None);
+            }
+            return Ok(Some(deepest_at(bus, found, point)));
         }
     }
     Ok(None)
+}
+
+/// Descends from `node` through the child under `point` at each level. An
+/// object without a Component interface (a failed round trip), a null answer,
+/// or an answer naming the object itself ends the descent at the last object.
+fn deepest_at<B: AtSpiBus>(bus: &mut B, mut node: B::Node, point: ScreenPoint) -> B::Node {
+    for _ in 0..MAX_HIT_DEPTH {
+        let Ok(child) = bus.accessible_at_point(&node, point) else {
+            break;
+        };
+        if bus.is_null(&child) || bus.object_id(&child) == bus.object_id(&node) {
+            break;
+        }
+        node = child;
+    }
+    node
 }
 
 /// The first element in depth-first order whose state holds `Focused`.
