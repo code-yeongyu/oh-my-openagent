@@ -134,8 +134,8 @@ export async function prepareRemoteAttach(
     return reportFailure(dependencies, error)
   }
   try {
-    // A bare durable id is found in the account listing; `<device>/<session>` attaches by the id as typed, located when
-    // that device's listing does not name it yet (omo#13707).
+    // A bare durable id is found in the account listing; for `<device>/<session>`, attachAddressed locates a durable id on
+    // that device and attaches on its key, and attaches a listing key directly (omo#13707).
     const remote = (
       dependencies.remote ??
       ((connected: DeviceService) => ({
@@ -150,7 +150,7 @@ export async function prepareRemoteAttach(
       dependencies.error(resolved.error.next_action)
       return REMOTE_EXIT.failed
     }
-    const attach = await attachAddressed(service, resolved.row.device, resolved.row.session_id)
+    const { attached: attach } = await attachAddressed(service, resolved.row.device, resolved.row.session_id)
     await attach.snapshot
     const endpoint = await serveRemoteAttach(attach, { label: target ?? parsedTarget.session })
     void service.closed.then(() => endpoint.close())

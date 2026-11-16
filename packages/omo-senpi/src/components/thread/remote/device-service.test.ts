@@ -392,6 +392,51 @@ describe("device-service adapter: a session created on another device is address
     expect(attached).toEqual(["older-engine-id", KEY])
   })
 
+  // Relay proof at 6ce7397 (NY2 -> seoul): `omo remote model <device>/<durable id>` attached on the located key but sent
+  // the record with sessionId = the durable id, which the receiving endpoint refused `malformed`.
+  test("#given a command addressed by a durable id #when it runs on the located key #then the record it sends names that key", async () => {
+    const records: Record<string, unknown>[] = []
+    const service = {
+      ...fakeService([], []),
+      locate: async (device: string) => ({ device, key: KEY, session: `${device}.${KEY}` }),
+      attach: async () =>
+        ({
+          command: async (rpc: Record<string, unknown>) => {
+            records.push(rpc)
+            return state(
+              { state: "engine_applied" },
+              { type: "response", command: rpc["type"], success: true, data: {} },
+            )
+          },
+          read: async () => ({ entries: [], next_before: null }),
+          detached: new Promise(() => {}),
+          ...quietStream,
+        }) as unknown as RemoteAttach,
+    } as unknown as DeviceService
+    const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: async () => service })
+    await port.sessionCommand("b", ENGINE_ID, { type: "set_model", sessionId: ENGINE_ID, provider: "p", modelId: "m" })
+    expect(records.map((record) => record["sessionId"])).toEqual([KEY])
+  })
+
+  // Review M1 at 6ce7397: a locate that could not answer (b not reachable) is not proof the session is gone, or a close
+  // would report a running session not_live.
+  test("#given locate for a durable id fails with a transport code #when a command addresses it #then that code is the refusal, never unknown_session", async () => {
+    const service = {
+      ...fakeService([], []),
+      locate: async () => {
+        throw new LocalApiError("host_not_answering", "b did not answer")
+      },
+      attach: async () => {
+        throw new Error("a durable id must never reach attach")
+      },
+    } as unknown as DeviceService
+    const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: async () => service })
+    expect(await port.sessionCommand("b", ENGINE_ID, { type: "get_state" })).toEqual({
+      kind: "refused",
+      reason: "host_not_answering",
+    })
+  })
+
   test("#given an id b holds under no name #when a command addresses it #then it is refused unknown_session after one locate", async () => {
     const located: string[] = []
     const service = {

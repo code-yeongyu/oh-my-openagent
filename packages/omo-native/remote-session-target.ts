@@ -4,10 +4,10 @@ import type { RemoteSessionRow, RemoteThreadSurface } from "../omo-senpi/src/com
 import type { RemoteSessionTarget } from "./remote-session-args"
 
 /**
- * The session a remote verb names (omo#13707, folded from #13666). `<device>/<session>` is addressed on that device as
- * typed: the device-service port attaches by the durable id or the listing key alike, locating a durable id the listing
- * does not name yet (`attachAddressed`), so no extra round trip runs before the verb. A bare durable id has no device, so
- * the account listing names the one device that holds it.
+ * The session a remote verb names (omo#13707, folded from #13666). `<device>/<session>` is passed to that device as
+ * typed: the device-service port (`attachAddressed`) locates a durable id on that device and attaches on the key it names
+ * (a durable id never reaches session.attach), and attaches a listing key directly, so no extra round trip runs here. A
+ * bare durable id has no device, so the account listing names the one device that holds it.
  */
 export async function resolveSessionTarget(
   remote: RemoteThreadSurface,
