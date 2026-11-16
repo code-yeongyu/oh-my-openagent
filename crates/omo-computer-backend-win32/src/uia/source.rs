@@ -29,7 +29,8 @@ pub trait UiaSource {
     ) -> Slice<Vec<UiaElement>>;
     /// A fresh read of `element`; `None` when it is gone.
     fn refresh(&mut self, element: &UiaElement, slice_ms: u64) -> Slice<Option<UiaElement>>;
-    /// Every element under `hwnd` (0: any window) whose `RuntimeId` equals `runtime_id`.
+    /// Every element in top-level window `hwnd` whose `RuntimeId` equals `runtime_id`; 0 searches
+    /// the window the element was last seen in, and nothing when that is unknown (never the desktop).
     fn find_runtime_id(&mut self, hwnd: isize, runtime_id: &[i32]) -> Vec<UiaElement>;
     /// The element with keyboard focus (`GetFocusedElement`), if any.
     fn focused(&self) -> Option<UiaElement>;

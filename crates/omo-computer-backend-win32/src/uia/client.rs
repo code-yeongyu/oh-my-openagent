@@ -66,10 +66,13 @@ impl<S: UiaSource> UiaHost<S> {
         }
     }
 
-    /// The value the element with `runtime_id` reads back after a write; never a password's.
-    pub fn value_readback(&mut self, _window: &str, runtime_id: &[i32]) -> Option<String> {
+    /// The value the element with `runtime_id` reads back after a write into `window` (a decimal
+    /// `HWND`, the target's top-level window); never a password's. A window that names nothing
+    /// gets no search: the read-back never walks the desktop.
+    pub fn value_readback(&mut self, window: &str, runtime_id: &[i32]) -> Option<String> {
+        let window = window.parse::<isize>().ok().filter(|hwnd| *hwnd != 0)?;
         let reader = self.reader().ok()?;
-        let element = reidentify(reader.source_mut().find_runtime_id(0, runtime_id)).ok()?;
+        let element = reidentify(reader.source_mut().find_runtime_id(window, runtime_id)).ok()?;
         if element.is_password {
             None
         } else {

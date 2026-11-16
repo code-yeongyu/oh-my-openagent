@@ -103,7 +103,12 @@ fn live_runtime_id_search_finds_an_element_from_an_earlier_walk() {
         .expect("kept")
         .runtime_id;
     let source = reader.source_mut();
+    // Review L1 of #13837 at 44cdbb2103: hwnd 0 searches the window the text box was last seen
+    // in, and once a new walk dropped that memory it searches nothing, never the desktop.
+    let remembered = source.find_runtime_id(0, &runtime_id);
+    assert_eq!(remembered.len(), 1, "0 names the window the element was last seen in");
     source.root(fixture.hwnd).expect("a new walk starts");
+    assert!(source.find_runtime_id(0, &runtime_id).is_empty(), "no remembered window: no search");
     let again = source.find_runtime_id(fixture.hwnd, &runtime_id);
     assert_eq!(again.len(), 1, "exactly the one text box");
     assert_eq!(again[0].value.as_deref(), Some("hello"), "read now, not from the cache");
