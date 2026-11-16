@@ -41,14 +41,21 @@ Every member takes an optional last argument `{ signal?: AbortSignal, deadlineMs
 |---|---|
 | `service.info()`, `service.status()` | this device's service version and state |
 | `service.setEnabled(on)`, `service.control()`, `service.setControl(on)` | the service switch and the attach setting |
+| `service.wake()`, `service.setWake(on \| null)` | the device's session-wake switch (`null` restores the default) |
+| `service.bootstrap(setup)` | installs and connects the device service; a client built without the bootstrap runner answers `unsupported` |
 | `devices.list()` | every device on the account, this one marked `self: true`; `online` is a property of the device |
 | `devices.resolve(idOrName)` | one device, by id or by the name the list shows |
 | `sessions.list(filter?)` | ONE list across every device (`all_scope: true`), each row naming its device; `unanswered` names devices that missed the round |
+| `sessions.resolve(address, scope?)` | one address (durable id, alias, name or `<device>/<session>`) to its row |
 | `sessions.get(thread)` | one session's detail |
 | `sessions.open({ device, workspace?, worktree?, model?, reasoning?, preset?, name?, first? })` | create a session on any device, through the same create path as `thread_create` and `omo remote open` |
 | `sessions.send(thread, { text, mode? })`, `sessions.read(thread, { tail? })` | send input, read the transcript |
 | `sessions.follow(thread)` | watch: an async stream of status changes and the turn's end; `stop()` ends it |
+| `sessions.wait(thread)` | waits for the current turn to end and answers how it ended |
 | `sessions.interrupt(thread)`, `sessions.close(thread)`, `sessions.archive(thread, archived)` | session control |
+| `sessions.setModel(thread, "provider/id")`, `sessions.setReasoning(thread, level)` | the session's own model and thinking level, never a device default |
+| `attach(thread)` | one session's live attach: snapshot, records, pending UI requests and their answers |
+| `aliases.resolve(alias)`, `aliases.set(thread, alias)`, `aliases.clear(thread)` | account-wide thread aliases |
 | `close()` | closes the client's one connection |
 
 Threads are named `<device>/<session>`, as `sessions.list` returns them. A thread handle is typed: take it from a list
