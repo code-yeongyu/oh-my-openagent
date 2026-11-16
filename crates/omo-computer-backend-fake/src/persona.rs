@@ -16,7 +16,11 @@ pub enum Persona {
 impl Persona {
     pub const ALL: [Self; 4] = [Self::Macos, Self::X11, Self::Wayland, Self::Win32];
 
-    /// The persona of the host the tests run on, so each CI leg plays its own OS.
+    /// The persona of a scenario that names none, on every host (A-IS-64 item 2): x11, the value
+    /// every Linux run already had, so the corpus behaves the same wherever it is replayed.
+    pub const DEFAULT: Self = Self::X11;
+
+    /// The persona of the host the tests run on; tests only (A-IS-64: no caller outside tests).
     #[must_use]
     pub const fn host() -> Self {
         if cfg!(target_os = "macos") {
