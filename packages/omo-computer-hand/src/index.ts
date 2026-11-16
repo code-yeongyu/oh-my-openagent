@@ -20,3 +20,6 @@ export { createHandEnsure, type EnsureCaller, type EnsureReply } from "./ensure.
 export { createAttachOnlyHost } from "./attach-only.ts"
 export { callHostApi, serveHostApi } from "./host-api.ts"
 export { classifyOrigin, handResume, type OriginFacts } from "./resume.ts"
+export { AuthorityAudit } from "./audit-chain.ts"
+export { ConsentBridge } from "./consent-bridge.ts"
+export { ConsentPrompts, type PromptRequest } from "./consent-prompts.ts"

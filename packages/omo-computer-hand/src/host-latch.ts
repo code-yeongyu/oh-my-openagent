@@ -78,13 +78,20 @@ export function effectiveLatch(read: LatchRead): HostLatch {
 }
 
 /** Written like the pre-input marker: exclusive temp file, fsync, rename, directory fsync; 0600 in a 0700 dir. */
-export function writeHostLatch(path: string, latch: HostLatch): void {
+export function writeHostLatch(path: string, latch: HostLatch, lineHash?: string): void {
   const dir = dirname(path)
   mkdirSync(dir, { recursive: true, mode: 0o700 })
   const temp = join(dir, `.host-latch-${randomUUID()}`)
   const fd = openSync(temp, "wx", 0o600)
   try {
-    writeSync(fd, JSON.stringify({ suspended: latch.suspended, stopEpoch: latch.stopEpoch }))
+    writeSync(
+      fd,
+      JSON.stringify({
+        suspended: latch.suspended,
+        stopEpoch: latch.stopEpoch,
+        ...(lineHash === undefined ? {} : { lineHash }),
+      }),
+    )
     fsyncSync(fd)
   } finally {
     closeSync(fd)
