@@ -30,4 +30,6 @@ fn ta6_the_route_names_the_window_the_call_aims_at() {
     assert_eq!(route_for(Some("202"), Some(Delivery::Foreground)), Ok(Route::ForegroundHid));
     assert_eq!(route_for(None, None), Ok(Route::ForegroundHid));
     assert!(route_for(None, Some(Delivery::Background)).is_err(), "no window, no background route");
+    assert_eq!(route_for(Some("desktop"), None), Ok(Route::ForegroundHid), "the desktop is not a window");
+    assert!(route_for(Some("desktop"), Some(Delivery::Background)).is_err(), "nor a background target");
 }
