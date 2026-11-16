@@ -5,7 +5,7 @@ import type {
   StatusState,
   UnitState,
 } from "../device-service-core/src/index.ts"
-import type { DeviceRow, SessionsList } from "../omo-senpi/src/components/remote/types"
+import type { DeviceRow, SessionsList } from "../omo-senpi/src/components/remote/index"
 import type { ThreadDelivery, ThreadToolResult } from "../omo-senpi/src/components/thread/contracts"
 import type { LocalStatus } from "./remote-cold-wake"
 
