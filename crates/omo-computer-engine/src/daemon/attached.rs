@@ -1,5 +1,5 @@
 //! The attach-host connections (`hand.register`-ed peers: the `--oneshot --attach` consumers of
-//! corpus case 09) share ONE bridge session the daemon opens itself (null mode, no session flags,
+//! corpus case 09) share ONE bridge session, issuer `remote`, the daemon opens itself (null mode, no session flags,
 //! the bridge's own stop path), so a oneshot per request sees one session across processes. The
 //! bridge session lives on one thread; connections reach it over a channel.
 
@@ -10,10 +10,14 @@ use std::sync::{Mutex, PoisonError};
 
 use serde_json::{json, Value};
 
+use omo_computer_session::mutate::Binding;
+
 use crate::bridge::BridgeSession;
 use crate::launch::launch;
 use crate::mcp::tier::Tier;
 use crate::router::{reply, WireError};
+
+const REMOTE_ISSUER: &str = "remote";
 
 type Call = (String, Value, Sender<Result<Value, WireError>>);
 
@@ -45,7 +49,11 @@ fn run(incoming: &Receiver<Call>) {
     let mut bridge = match launch(std::env::vars().collect()) {
         Ok(launched) => {
             let narrowing = crate::stdio::narrowing(&launched, Tier::Exec);
-            let mut bridge = BridgeSession::new(launched.router, narrowing);
+            let mut router = launched.router;
+            // An attach-only peer is never the spawning host: its calls run as issuer `remote`,
+            // so its audit lines, markers and lease never read `local` (d-remote.md:207, Q5).
+            router.session_mut().rebind(Binding { issuer: REMOTE_ISSUER.to_owned(), scope: "default".to_owned() });
+            let mut bridge = BridgeSession::new(router, narrowing);
             bridge.prepare();
             Ok(bridge)
         }
