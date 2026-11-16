@@ -10,6 +10,7 @@ import type {
   SnapshotBody as WireSnapshotBody,
   Status,
 } from "../../../../device-service-core/src/local-api/protocol"
+import type { PermissionPreset } from "../thread/contracts/permission-presets"
 import type { AliasRegistry } from "../thread/remote/ports"
 import type { RemoteCode } from "./codes"
 
@@ -229,9 +230,11 @@ export type SessionsList = {
 
 // What the members of part 4a-2 take and answer (#13414 W3: the rows' confirmed shapes, recorded in remote-tools SEAMS.md).
 
-/** senpi's approval modes (permission-system/types.ts), as `open_session` takes them (`permissionPreset`): the one list. */
-export const PERMISSION_PRESETS = ["full-access", "workspace", "accept-edits", "auto", "read-only", "ask"] as const
-export type PermissionPreset = (typeof PERMISSION_PRESETS)[number]
+/**
+ * senpi's approval modes (permission-system/types.ts), as `open_session` takes them (`permissionPreset`): the one list
+ * is the thread contracts' PERMISSION_PRESETS (thread_create narrows by it); its type is re-exported here.
+ */
+export type { PermissionPreset }
 
 /**
  * One new session, opened through the shared create path (thread SessionHost.open): `workspace` is its cwd, `model` is
