@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { readFileSync } from "node:fs"
 import type { RemoteClient } from "./client"
 import {
   remoteClientForCli,
@@ -23,29 +22,26 @@ const kept = (client: RemoteClient): RemoteClient => {
   return client
 }
 
-const packageVersion = (): string => {
-  const version: unknown = Reflect.get(
-    JSON.parse(readFileSync(new URL("../../../package.json", import.meta.url), "utf8")),
-    "version",
-  )
-  if (typeof version !== "string") throw new Error("omo-senpi's package.json names a version")
-  return version
-}
-
 describe("remote client factories", () => {
-  test("#given a person client built without a version #when it reaches the service #then its hello carries the omo-senpi package version and it may change the service", async () => {
+  test("#given a person client #when it reaches the service #then its hello carries the caller's version and it may change the service", async () => {
     const owner = await startOwner()
-    const client = kept(remoteClientForPerson({ stateDir: owner.stateDir, timers: fakeClock() }))
+    const client = kept(remoteClientForPerson({ version: "5.1.74", stateDir: owner.stateDir, timers: fakeClock() }))
 
     const enabled = await client.service.setEnabled(false)
 
     expect(enabled).toEqual({ kind: "ok", value: { enabled: false } })
-    expect([...owner.state.conns].map((conn) => conn.client())).toEqual([{ name: "omo", version: packageVersion() }])
+    expect([...owner.state.conns].map((conn) => conn.client())).toEqual([{ name: "omo", version: "5.1.74" }])
+  })
+
+  test("#given no version #then a factory does not compile (the module reads no default, so it pulls no product config)", () => {
+    // @ts-expect-error the version is required: a default would drag the telemetry config graph into every caller
+    const build = () => remoteClientForPerson({ stateDir: "/nonexistent-rt-13414" })
+    expect(typeof build).toBe("function")
   })
 
   test("#given session, connector and cli clients #when each calls a person-only member #then each answers sender_not_allowed", async () => {
     const owner = await startOwner()
-    const deps = { stateDir: owner.stateDir, timers: fakeClock() }
+    const deps = { version: "5.1.74", stateDir: owner.stateDir, timers: fakeClock() }
     const built = [
       remoteClientForSession("dur-1", deps),
       remoteClientForConnector("binding-1", deps),
@@ -70,7 +66,7 @@ describe("remote client factories", () => {
 
 describe("remoteClientForService", () => {
   test("#given the device service's own client #when it calls bootstrap and a person-only mutator #then bootstrap is allowed and the mutator is refused", async () => {
-    const client = kept(remoteClientForService({ stateDir: "/nonexistent-rt-13414" }))
+    const client = kept(remoteClientForService({ version: "5.1.74", stateDir: "/nonexistent-rt-13414" }))
     // No bootstrap runner was handed in, so the call reaches the runner check (allowed sender), not the sender check.
     const bootstrap = await client.service.bootstrap({})
     expect(bootstrap).toMatchObject({ kind: "error", code: "unsupported", details: { feature: "bootstrap" } })
