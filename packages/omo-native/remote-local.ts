@@ -37,13 +37,17 @@ import { runSession } from "./remote-session-verbs"
 // download) and `attach` (the engine) and delegates the rest here; nothing in this module reaches the network.
 
 /**
- * The account's devices with this one first: relayd's roster lists only the peers (#13402). This device's own row is
- * made from the service's status: it is online only while the service is connected, and its kind is not invented
- * (the service reports none for this device).
+ * The account's devices with this one first. relayd's roster usually leaves this device out (#13402); then its row is
+ * made from the service's status, with no invented kind. A roster row for this device is kept with its kind and moved
+ * first. Either way this device reads online only while its own service is connected: the service's state wins over
+ * the roster's presence.
  */
 function withThisDevice(roster: readonly DeviceRow[], status: Status): readonly ListedDevice[] {
   const self = status.device
-  const rows = roster.map((row) => ({ ...row, this_device: row.device === self?.id }))
+  const online = status.state === "connected"
+  const rows = roster.map((row) =>
+    row.device === self?.id ? { ...row, online, this_device: true } : { ...row, this_device: false },
+  )
   if (self === null) return rows
   const peers = rows.filter((row) => !row.this_device)
   // A roster that already lists this device keeps that row, moved first.
@@ -53,7 +57,7 @@ function withThisDevice(roster: readonly DeviceRow[], status: Status): readonly 
     label: self.name,
     platform: process.platform,
     last_seen_ms: null,
-    online: status.state === "connected",
+    online,
     this_device: true,
   }
   return [here, ...peers]

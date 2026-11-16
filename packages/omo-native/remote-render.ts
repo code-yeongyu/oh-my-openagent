@@ -95,7 +95,7 @@ export function localRows(local: LocalStatus): (readonly [string, string])[] {
   ]
 }
 
-/** A device row as `omo remote devices` lists it: this device's own row carries no kind (the service reports none). */
+/** A device row as `omo remote devices` lists it: a row made for this device from the service's status has no kind. */
 export type ListedDevice = Omit<DeviceRow, "kind"> & { readonly kind?: string; readonly this_device: boolean }
 
 export function deviceLines(devices: readonly ListedDevice[], now: number): string[] {
