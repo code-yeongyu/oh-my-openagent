@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@42078b7cbfbc8db06cd626d99ab3b80017e7ae2a packages/local-api/src/protocol-presenter.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@04288f856dcd224a87108cb46d62d0343ce77136 packages/local-api/src/protocol-presenter.ts
 import type { Empty, EventOf } from "./protocol.ts";
 
 // Decision 0020 on the local API v1: the remote presenter tunnel. A client that owns a delegated channel toward a

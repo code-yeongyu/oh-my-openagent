@@ -1,6 +1,6 @@
 {
   "upstream": "sisyphuslabs/omo-relay-daemon",
-  "upstreamCommit": "42078b7cbfbc8db06cd626d99ab3b80017e7ae2a",
+  "upstreamCommit": "04288f856dcd224a87108cb46d62d0343ce77136",
   "importRewrites": [
     {
       "from": "@sisyphuslabs/relay-spec/proto",
@@ -71,8 +71,8 @@
     },
     {
       "upstreamPath": "packages/local-api/src/dacl.ts",
-      "sha256": "a38bfe1588db514782883f7d81d93d7c578dc741f54a3dc0d5d23b77ccfe9a8b",
-      "gitBlobSha1": "372ea6a5f9487d6cbb046dbb3022e9d700e8c1e7",
+      "sha256": "b1ca42c5d67389fe01d74c2de1d2b2f528c3701d81b09867ee7e243a66fd2b0e",
+      "gitBlobSha1": "3451ae02763fa05e01f88c1f7c9f52ff2e53f8dc",
       "importRewrite": false
     },
     {
@@ -233,8 +233,8 @@
     },
     {
       "upstreamPath": "packages/local-api/src/validate-requests.ts",
-      "sha256": "37da69fdf8184435d8a13326bd212c40985621e42afe8f3c089badfa5810ccfc",
-      "gitBlobSha1": "954aab431f9fa2e91899b74ff8b689663a308dfb",
+      "sha256": "6b702a924f6cda7bf319384fcaa9ec8b45629b5b3786ef7df2102a88f617a82b",
+      "gitBlobSha1": "6c0d57c20fea00b9790abaa28248115153da6233",
       "importRewrite": true
     },
     {

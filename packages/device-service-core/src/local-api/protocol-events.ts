@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@42078b7cbfbc8db06cd626d99ab3b80017e7ae2a packages/local-api/src/protocol-events.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@04288f856dcd224a87108cb46d62d0343ce77136 packages/local-api/src/protocol-events.ts
 import type { EventOf, JsonObject, JsonValue, Status } from "./protocol.ts";
 import type { MachineEvent } from "./protocol-machine.ts";
 import type { DelegatedEvent } from "./protocol-delegated.ts";

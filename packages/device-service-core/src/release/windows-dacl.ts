@@ -1,3 +1,5 @@
+import { spawn } from "node:child_process"
+
 import { LocalApiError } from "../local-api/errors.ts"
 import type { SecureFile } from "../local-api/access.ts"
 import { APPLY_DACL_SCRIPT, type DaclDescription, describeDacl, exactDaclVerdict } from "../local-api/dacl.ts"
@@ -20,16 +22,20 @@ export type PowerShellRunner = (
 
 const runPowerShell: PowerShellRunner = async (script, env) => {
   const encoded = Buffer.from(script, "utf16le").toString("base64")
-  const proc = Bun.spawn(
-    ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encoded],
-    { env: { ...process.env, ...env }, stdin: "ignore", stdout: "pipe", stderr: "pipe" },
+  const proc = spawn(
+    "powershell.exe",
+    ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encoded],
+    { env: { ...process.env, ...env }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true },
   )
-  const [out, err, code] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ])
-  return { code, out, err }
+  const chunks: Buffer[] = []
+  const errChunks: Buffer[] = []
+  proc.stdout.on("data", (chunk: Buffer) => chunks.push(chunk))
+  proc.stderr.on("data", (chunk: Buffer) => errChunks.push(chunk))
+  const code = await new Promise<number>((resolve, reject) => {
+    proc.once("error", reject)
+    proc.once("close", (exitCode) => resolve(exitCode ?? -1))
+  })
+  return { code, out: Buffer.concat(chunks).toString("utf8"), err: Buffer.concat(errChunks).toString("utf8") }
 }
 
 const firstErrorLine = (err: string | undefined): string => {
