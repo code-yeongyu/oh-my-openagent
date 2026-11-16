@@ -9,7 +9,10 @@ export const ALLOWED_EXTENSIONS = [".md"]
 
 export const ALLOWED_PATH_PREFIX = ".omo"
 
-export const BLOCKED_TOOLS = ["Write", "Edit", "write", "edit"]
+export const BLOCKED_TOOLS = ["Write", "Edit", "write", "edit", "MultiEdit", "multiedit"]
+
+/** opencode swaps edit/write for apply_patch on gpt-* models; its paths live in the patch body (omo#11367). */
+export const PATCH_TOOLS = ["apply_patch"]
 
 /**
  * XML-tag wrapper used to mark the planning-context boundary in prompts

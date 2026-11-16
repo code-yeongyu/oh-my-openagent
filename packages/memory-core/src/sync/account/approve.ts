@@ -14,7 +14,14 @@ import { openAccountChain } from "./account-chain.ts"
 import type { AccountHttp } from "./http.ts"
 import { type CeremonyClock, POLL_MS, principalOf } from "./join.ts"
 import { approvalCode, approvalCommitment, newPairingNonce } from "./pairing.ts"
-import type { PairingHttp } from "./pairing-http.ts"
+import type { PairingHttp, PendingApproval } from "./pairing-http.ts"
+import {
+  checkSyncOperation,
+  admitSyncOperation,
+  waitSyncOperation,
+  type SyncOperationOptions,
+} from "../operation-authority.ts"
+import { accountOperation, pairingOperation } from "./operation-ports.ts"
 
 export type ApproveOutcome =
   | { readonly kind: "approved"; readonly seq: number }
@@ -22,46 +29,80 @@ export type ApproveOutcome =
   | { readonly kind: "declined" }
   | { readonly kind: "refused"; readonly reason: string }
 
-export async function approveDevice(input: {
-  readonly account: string
-  readonly keyring: DeviceKeyring
-  readonly pinDir: string
-  readonly chain: AccountHttp
-  readonly pairing: PairingHttp
-  readonly clock: CeremonyClock
-  readonly pendingId: string
-  readonly confirmCode: (code: string) => Promise<boolean>
-}): Promise<ApproveOutcome> {
-  const { account, keyring, chain, pairing, clock } = input
+export async function approveDevice(
+  input: {
+    readonly account: string
+    readonly keyring: DeviceKeyring
+    readonly pinDir: string
+    readonly chain: AccountHttp
+    readonly pairing: PairingHttp
+    readonly clock: CeremonyClock
+    readonly pendingId: string
+    readonly confirmCode: (code: string) => Promise<boolean>
+    readonly onAnswered?: (pending: PendingApproval) => void
+  } & SyncOperationOptions,
+): Promise<ApproveOutcome> {
+  const { account, keyring, clock } = input
+  const operation = input
+  const chain = accountOperation(input.chain, operation)
+  const pairing = pairingOperation(input.pairing, operation)
   const pin = await loadTrustAnchor(input.pinDir, account)
   if (!pin.ok) return { kind: "refused", reason: "this device has not joined the account's memory" }
   const self = principalOf(keyring)
   const nonce = newPairingNonce()
   const answered = await pairing.answerPending(input.pendingId, self, nonce)
+  checkSyncOperation(operation)
+  admitSyncOperation(operation, () => input.onAnswered?.(answered))
   let row = answered
   while (row.reveal === null) {
     if (clock.now() >= answered.expires_at) return { kind: "expired" }
-    await clock.sleep(POLL_MS)
+    await waitSyncOperation(operation, clock.sleep(POLL_MS))
     const next = await pairing.readPending(input.pendingId)
     if (next === null) return { kind: "expired" }
     row = next
   }
   const joining = row.reveal
-  if ((await approvalCommitment(account, { principal: joining.principal, nonce: joining.joining_nonce })) !== answered.commitment) {
+  if (
+    (await approvalCommitment(account, { principal: joining.principal, nonce: joining.joining_nonce })) !==
+    answered.commitment
+  ) {
     return { kind: "refused", reason: "the joining device revealed keys its commitment did not name" }
   }
-  if (!(await input.confirmCode(await approvalCode(account, [{ principal: self, nonce }, { principal: joining.principal, nonce: joining.joining_nonce }])))) {
+  const code = await approvalCode(account, [
+    { principal: self, nonce },
+    { principal: joining.principal, nonce: joining.joining_nonce },
+  ])
+  const confirmed = await waitSyncOperation(
+    operation,
+    admitSyncOperation(operation, () => input.confirmCode(code)),
+  )
+  checkSyncOperation(operation)
+  if (!confirmed) {
     return { kind: "declined" }
   }
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    const verified = await openAccountChain({ account, anchor: pin.anchor, keyring, http: chain, rejections: createRejectionCounter() })
+    const verified = await openAccountChain({
+      account,
+      anchor: pin.anchor,
+      keyring,
+      http: chain,
+      rejections: createRejectionCounter(),
+    })
     const state = verified.state()
     const authority = state.authority
-    if (authority === null || state.head === null || !verified.isMember()) return { kind: "refused", reason: "this device is not a member of the account's memory" }
+    if (authority === null || state.head === null || !verified.isMember())
+      return { kind: "refused", reason: "this device is not a member of the account's memory" }
     const wrap = committedWrap(state, authority.epoch, `device:${self.id}`)
-    const material = wrap === null ? null : await ownMaterial(keyring, account, wrap, expectedHistory(authority, authority.epoch))
+    const material =
+      wrap === null ? null : await ownMaterial(keyring, account, wrap, expectedHistory(authority, authority.epoch))
     if (material === null) return { kind: "refused", reason: "this device cannot open the current epoch key" }
-    const wraps = [await sealWrap({ account, epoch: authority.epoch, id: `device:${joining.principal.id}` }, joining.principal.sealing_public_key, material)]
+    const wraps = [
+      await sealWrap(
+        { account, epoch: authority.epoch, id: `device:${joining.principal.id}` },
+        joining.principal.sealing_public_key,
+        material,
+      ),
+    ]
     const digest = await wrapSetDigest(wraps)
     if (!digest.ok) return { kind: "refused", reason: "the approval wraps do not digest" }
     const body = {
@@ -72,10 +113,11 @@ export async function approveDevice(input: {
       wraps_digest: digest.digest,
       pairing: { commitment: answered.commitment, joining_nonce: joining.joining_nonce, approver_nonce: nonce },
     }
-    const appended = await chain.appendKeys(await signedAppend(keyring, state.head, body, wraps))
+    const appended = await chain.appendKeys(await signedAppend(keyring, state.head, body, wraps, operation))
+    checkSyncOperation(operation)
     if (appended.ok) return { kind: "approved", seq: appended.seq }
-    if (appended.reason !== "stale_base") return { kind: "refused", reason: `the service refused the approval (${appended.reason})` }
+    if (appended.reason !== "stale_base")
+      return { kind: "refused", reason: `the service refused the approval (${appended.reason})` }
   }
   return { kind: "refused", reason: "the account kept changing while approving; try again" }
 }
-

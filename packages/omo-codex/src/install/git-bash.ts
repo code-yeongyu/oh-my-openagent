@@ -13,10 +13,12 @@ export type { GitBashResolverInput, GitBashSource } from "@oh-my-opencode/utils/
 export const resolveGitBash = (input: GitBashResolverInput): GitBashResolution =>
   toCodexResolution(resolveSharedGitBash(input))
 
-export const resolveGitBashForCurrentProcess = (input: {
-  readonly platform?: string
-  readonly env?: { readonly [key: string]: string | undefined }
-} = {}): GitBashResolution => {
+export const resolveGitBashForCurrentProcess = (
+  input: {
+    readonly platform?: string
+    readonly env?: { readonly [key: string]: string | undefined }
+  } = {},
+): GitBashResolution => {
   return toCodexResolution(resolveSharedGitBashForCurrentProcess(input))
 }
 
@@ -25,7 +27,8 @@ export async function prepareGitBashForInstall(input: {
   readonly env: { readonly [key: string]: string | undefined }
   readonly resolveGitBash?: () => GitBashResolution
 }): Promise<GitBashResolution> {
-  const resolve = input.resolveGitBash ?? (() => resolveGitBashForCurrentProcess({ platform: input.platform, env: input.env }))
+  const resolve =
+    input.resolveGitBash ?? (() => resolveGitBashForCurrentProcess({ platform: input.platform, env: input.env }))
   const initialResolution = resolve()
   return initialResolution
 }

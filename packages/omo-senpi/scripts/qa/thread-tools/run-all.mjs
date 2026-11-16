@@ -6,14 +6,15 @@
  *
  * Two suites:
  * - `gateway` (todo 16): real pty OmO TUIs, shard hosts and the `omo` CLI on the RELEASED engine
- *   (`lib/gateway.mjs`; `THREAD_QA_SENPI_VERSION`, default 2026.9.29-5). Needs only bun, node and the
- *   network for the first kit install.
+ *   (`lib/gateway.mjs`). `THREAD_QA_SENPI_VERSION` is REQUIRED for this suite and for `all`: the engine
+ *   under test. Unset or empty, run-all exits 2 before running anything and names the engine omo pins.
+ *   Needs only bun, node and the network for the first kit install.
  * - `legacy` (task 13/14): the thread components driven from source against a senpi SOURCE checkout
  *   (`THREAD_QA_SENPI_ROOT`) and a desktop checkout (`THREAD_QA_DESKTOP_ROOT`), via `lib/harness.mjs`.
  *   A legacy scenario whose checkouts are unset, absent, not installed or not built is reported
  *   `SKIP` with the missing path, never silently dropped.
  *
- * Usage: bun packages/omo-senpi/scripts/qa/thread-tools/run-all.mjs [--suite gateway|legacy|all]
+ * Usage: THREAD_QA_SENPI_VERSION=<engine> bun packages/omo-senpi/scripts/qa/thread-tools/run-all.mjs [--suite gateway|legacy|all]
  *        [--out-dir <dir>] [--with-mutant] [--keep-kit]
  *   --with-mutant  also run `loop-guard.mjs --mutant` (cycle check disabled) and require it to FAIL
  *   --keep-kit     keep the released-engine kit dir (default: removed after the gateway suite)
@@ -25,13 +26,15 @@ import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { withTelemetryOptOut } from "../telemetry-opt-out-env.mjs"
+import { requireEngineVersion } from "./lib/engine-version.mjs"
+import { QA_TMP_ROOT } from "./lib/qa-tmp.mjs"
 
 const here = dirname(fileURLToPath(import.meta.url))
 const omoRoot = resolve(here, "..", "..", "..", "..", "..")
 // The legacy checkouts have no portable default location; the legacy suite is SKIPPED until both are set.
 const senpiRoot = process.env.THREAD_QA_SENPI_ROOT
 const desktopRoot = process.env.THREAD_QA_DESKTOP_ROOT
-const kitDir = process.env.THREAD_QA_KIT_DIR ?? "/tmp/qa-thread-tools-kit"
+const kitDir = process.env.THREAD_QA_KIT_DIR ?? join(QA_TMP_ROOT, "qa-thread-tools-kit")
 
 const gateway = [
   ["tui-to-tui", "tui-to-tui.mjs"],
@@ -49,6 +52,7 @@ const gateway = [
   ["binding-author", "binding-author.mjs"],
   ["report-origin", "report-origin.mjs"],
   ["report-origin-steer", "report-origin-steer.mjs"],
+  ["report-origin-auto-steer", "report-origin-auto-steer.mjs"],
 ]
 
 const legacy = [
@@ -71,6 +75,7 @@ if (!SUITES.includes(suite)) {
   process.stderr.write(`run-all: unknown --suite ${JSON.stringify(suite)}; expected one of ${SUITES.join(", ")}\n`)
   process.exit(2)
 }
+if (suite === "gateway" || suite === "all") requireEngineVersion()
 const outDir = option("--out-dir")
 if (outDir !== undefined) mkdirSync(outDir, { recursive: true })
 
@@ -88,14 +93,20 @@ function legacyMissing() {
   const needed = [
     [join(senpiRoot, "packages", "coding-agent", "scripts", "qa-shared", "lib", "env.mjs"), "senpi source checkout"],
     [join(senpiRoot, "node_modules"), "senpi checkout not installed: bun install"],
-    ...["ai", "agent", "tui"].map((pkg) => [join(senpiRoot, "packages", pkg, "dist", "index.js"), "senpi checkout not built: bun run build"]),
+    ...["ai", "agent", "tui"].map((pkg) => [
+      join(senpiRoot, "packages", pkg, "dist", "index.js"),
+      "senpi checkout not built: bun run build",
+    ]),
     [desktopRoot, "desktop checkout"],
     [join(omoRoot, "node_modules"), "omo checkout not installed: bun install"],
   ]
   const missing = needed.filter(([path]) => !existsSync(path)).map(([path, why]) => `${path} (${why})`)
   // Checked on disk rather than through `require.resolve`: bun resolves a missing package from its
   // global install cache, so resolution succeeds even for a checkout that was never installed.
-  const desktopEffect = [join(desktopRoot, "node_modules", "effect"), join(desktopRoot, "apps", "server", "node_modules", "effect")]
+  const desktopEffect = [
+    join(desktopRoot, "node_modules", "effect"),
+    join(desktopRoot, "apps", "server", "node_modules", "effect"),
+  ]
   if (existsSync(desktopRoot) && !desktopEffect.some((path) => existsSync(join(path, "package.json")))) {
     missing.push(`${join(desktopRoot, "node_modules")} (desktop checkout not installed: bun install)`)
   }
@@ -118,7 +129,13 @@ function runOne(name, file, extraArgs = [], reportDir = outDir) {
     }
   }
   const count = (pattern) => (text.match(pattern) ?? []).length
-  const result = { name, code: child.exitCode, skipped: count(/^SKIP /gm), defects: count(/^DEFECT /gm), receipt: /PASS \S+\/cleanup-no-leftovers/.test(text) }
+  const result = {
+    name,
+    code: child.exitCode,
+    skipped: count(/^SKIP /gm),
+    defects: count(/^DEFECT /gm),
+    receipt: /PASS \S+\/cleanup-no-leftovers/.test(text),
+  }
   results.push(result)
   process.stdout.write(`----- ${name} exit=${result.code} skipped=${result.skipped} defects=${result.defects} -----\n`)
   return result
@@ -139,7 +156,10 @@ if (suite === "gateway" || suite === "all") {
     const crashed = /^FAIL loop-guard\/scenario-completed /m.test(text)
     mutant.code = mutant.code !== 0 && cycleFailed && !crashed ? 0 : 1
     mutant.expectedFailure = true
-    if (mutant.code !== 0) process.stdout.write(`FAIL loop-guard-mutant did not fail the cycle check: exit=${mutant.code} cycle_check_failed=${cycleFailed} scenario_crashed=${crashed}\n`)
+    if (mutant.code !== 0)
+      process.stdout.write(
+        `FAIL loop-guard-mutant did not fail the cycle check: exit=${mutant.code} cycle_check_failed=${cycleFailed} scenario_crashed=${crashed}\n`,
+      )
     if (outDir === undefined) rmSync(mutantDir, { recursive: true, force: true })
   }
   if (!process.argv.includes("--keep-kit")) rmSync(kitDir, { recursive: true, force: true })
@@ -159,10 +179,14 @@ if (suite === "legacy" || suite === "all") {
 process.stdout.write("\n===== summary =====\n")
 for (const result of results) {
   const status = result.skippedScenario ? "SKIP" : result.code === 0 ? "PASS" : "FAIL"
-  process.stdout.write(`${status} ${result.name} exit=${result.code} skipped=${result.skipped} defects=${result.defects}${result.expectedFailure ? " (mutant: failing is the pass)" : ""}\n`)
+  process.stdout.write(
+    `${status} ${result.name} exit=${result.code} skipped=${result.skipped} defects=${result.defects}${result.expectedFailure ? " (mutant: failing is the pass)" : ""}\n`,
+  )
 }
 const failed = results.filter((result) => result.code !== 0)
 const skippedScenarios = results.filter((result) => result.skippedScenario).length
 const defects = results.reduce((sum, result) => sum + result.defects, 0)
-process.stdout.write(`${failed.length === 0 ? "PASS" : "FAIL"} run-all failed_scenarios=${failed.length} skipped_scenarios=${skippedScenarios} skipped_checks=${results.reduce((sum, result) => sum + result.skipped, 0)} product_defects=${defects}\n`)
+process.stdout.write(
+  `${failed.length === 0 ? "PASS" : "FAIL"} run-all failed_scenarios=${failed.length} skipped_scenarios=${skippedScenarios} skipped_checks=${results.reduce((sum, result) => sum + result.skipped, 0)} product_defects=${defects}\n`,
+)
 process.exit(failed.length === 0 ? 0 : 1)

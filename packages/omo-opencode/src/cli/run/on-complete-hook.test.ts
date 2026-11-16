@@ -61,13 +61,16 @@ describe("executeOnCompleteHook", () => {
     const { deps, spawnCalls } = createHookDeps(undefined, "linux", { SHELL: "/bin/bash" })
 
     // when
-    await executeOnCompleteHook({
-      command: "echo test",
-      sessionId: "session-123",
-      exitCode: 0,
-      durationMs: 5000,
-      messageCount: 10,
-    }, deps)
+    await executeOnCompleteHook(
+      {
+        command: "echo test",
+        sessionId: "session-123",
+        exitCode: 0,
+        durationMs: 5000,
+        messageCount: 10,
+      },
+      deps,
+    )
 
     // then
     expect(spawnCalls).toHaveLength(1)
@@ -89,13 +92,16 @@ describe("executeOnCompleteHook", () => {
     })
 
     // when
-    await executeOnCompleteHook({
-      command: "Write-Host done",
-      sessionId: "session-123",
-      exitCode: 0,
-      durationMs: 5000,
-      messageCount: 10,
-    }, deps)
+    await executeOnCompleteHook(
+      {
+        command: "Write-Host done",
+        sessionId: "session-123",
+        exitCode: 0,
+        durationMs: 5000,
+        messageCount: 10,
+      },
+      deps,
+    )
 
     // then
     const [args] = spawnCalls[0]
@@ -109,13 +115,16 @@ describe("executeOnCompleteHook", () => {
     })
 
     // when
-    await executeOnCompleteHook({
-      command: "Write-Host done",
-      sessionId: "session-123",
-      exitCode: 0,
-      durationMs: 5000,
-      messageCount: 10,
-    }, deps)
+    await executeOnCompleteHook(
+      {
+        command: "Write-Host done",
+        sessionId: "session-123",
+        exitCode: 0,
+        durationMs: 5000,
+        messageCount: 10,
+      },
+      deps,
+    )
 
     // then
     const [args] = spawnCalls[0]
@@ -129,13 +138,16 @@ describe("executeOnCompleteHook", () => {
     })
 
     // when
-    await executeOnCompleteHook({
-      command: "echo done",
-      sessionId: "session-123",
-      exitCode: 0,
-      durationMs: 5000,
-      messageCount: 10,
-    }, deps)
+    await executeOnCompleteHook(
+      {
+        command: "echo done",
+        sessionId: "session-123",
+        exitCode: 0,
+        durationMs: 5000,
+        messageCount: 10,
+      },
+      deps,
+    )
 
     // then
     const [args] = spawnCalls[0]
@@ -147,13 +159,16 @@ describe("executeOnCompleteHook", () => {
     const { deps, spawnCalls } = createHookDeps()
 
     // when
-    await executeOnCompleteHook({
-      command: "echo test",
-      sessionId: "session-123",
-      exitCode: 1,
-      durationMs: 12345,
-      messageCount: 42,
-    }, deps)
+    await executeOnCompleteHook(
+      {
+        command: "echo test",
+        sessionId: "session-123",
+        exitCode: 1,
+        durationMs: 12345,
+        messageCount: 42,
+      },
+      deps,
+    )
 
     // then
     const [, options] = spawnCalls[0]
@@ -171,13 +186,16 @@ describe("executeOnCompleteHook", () => {
     const { deps, spawnCalls } = createHookDeps()
 
     // when
-    await executeOnCompleteHook({
-      command: "",
-      sessionId: "session-123",
-      exitCode: 0,
-      durationMs: 5000,
-      messageCount: 10,
-    }, deps)
+    await executeOnCompleteHook(
+      {
+        command: "",
+        sessionId: "session-123",
+        exitCode: 0,
+        durationMs: 5000,
+        messageCount: 10,
+      },
+      deps,
+    )
 
     // then
     expect(spawnCalls).toHaveLength(0)
@@ -188,13 +206,16 @@ describe("executeOnCompleteHook", () => {
     const { deps, spawnCalls } = createHookDeps()
 
     // when
-    await executeOnCompleteHook({
-      command: "   ",
-      sessionId: "session-123",
-      exitCode: 0,
-      durationMs: 5000,
-      messageCount: 10,
-    }, deps)
+    await executeOnCompleteHook(
+      {
+        command: "   ",
+        sessionId: "session-123",
+        exitCode: 0,
+        durationMs: 5000,
+        messageCount: 10,
+      },
+      deps,
+    )
 
     // then
     expect(spawnCalls).toHaveLength(0)
@@ -205,18 +226,19 @@ describe("executeOnCompleteHook", () => {
     const { deps } = createHookDeps(() => createProc(1))
 
     // when
-    await executeOnCompleteHook({
-      command: "false",
-      sessionId: "session-123",
-      exitCode: 0,
-      durationMs: 5000,
-      messageCount: 10,
-    }, deps)
+    await executeOnCompleteHook(
+      {
+        command: "false",
+        sessionId: "session-123",
+        exitCode: 0,
+        durationMs: 5000,
+        messageCount: 10,
+      },
+      deps,
+    )
 
     // then
-    const warningCall = logCalls.find(
-      (call) => call[0] === "On-complete hook exited with non-zero code"
-    )
+    const warningCall = logCalls.find((call) => call[0] === "On-complete hook exited with non-zero code")
     expect(warningCall).toBeDefined()
   })
 
@@ -228,18 +250,19 @@ describe("executeOnCompleteHook", () => {
     })
 
     // when
-    await executeOnCompleteHook({
-      command: "nonexistent-command",
-      sessionId: "session-123",
-      exitCode: 0,
-      durationMs: 5000,
-      messageCount: 10,
-    }, deps)
+    await executeOnCompleteHook(
+      {
+        command: "nonexistent-command",
+        sessionId: "session-123",
+        exitCode: 0,
+        durationMs: 5000,
+        messageCount: 10,
+      },
+      deps,
+    )
 
     // then
-    const errorCall = logCalls.find(
-      (call) => call[0] === "Failed to execute on-complete hook"
-    )
+    const errorCall = logCalls.find((call) => call[0] === "Failed to execute on-complete hook")
     expect(errorCall).toBeDefined()
   })
 
@@ -248,21 +271,20 @@ describe("executeOnCompleteHook", () => {
     const { deps } = createHookDeps(() => createProc(0, { stdout: "hook output\n", stderr: "hook warning\n" }))
 
     // when
-    await executeOnCompleteHook({
-      command: "echo test",
-      sessionId: "session-123",
-      exitCode: 0,
-      durationMs: 5000,
-      messageCount: 10,
-    }, deps)
+    await executeOnCompleteHook(
+      {
+        command: "echo test",
+        sessionId: "session-123",
+        exitCode: 0,
+        durationMs: 5000,
+        messageCount: 10,
+      },
+      deps,
+    )
 
     // then
-    const stdoutCall = logCalls.find(
-      (call) => call[0] === "On-complete hook stdout"
-    )
-    const stderrCall = logCalls.find(
-      (call) => call[0] === "On-complete hook stderr"
-    )
+    const stdoutCall = logCalls.find((call) => call[0] === "On-complete hook stdout")
+    const stderrCall = logCalls.find((call) => call[0] === "On-complete hook stderr")
 
     expect(stdoutCall?.[1]).toEqual({ command: "echo test", stdout: "hook output" })
     expect(stderrCall?.[1]).toEqual({ command: "echo test", stderr: "hook warning" })

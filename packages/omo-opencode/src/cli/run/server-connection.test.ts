@@ -1,15 +1,22 @@
 import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
-import { createServerConnectionWithDeps, type ServerConnectionDeps, type ServerConnectionOptions } from "./server-connection"
+import { existsSync, statSync } from "node:fs"
+import { dirname } from "node:path"
+import { buildPaneAuthEnvironmentArgs } from "../../../../tmux-core/src/tmux-utils/pane-command"
+import {
+  createServerConnectionWithDeps,
+  type ServerConnectionDeps,
+  type ServerConnectionOptions,
+} from "./server-connection"
 
 const originalConsole = globalThis.console
-type TestClient = { session: Record<string, unknown>, baseUrl?: string }
+type TestClient = { session: Record<string, unknown>; baseUrl?: string }
 
 const mockServerClose = mock(() => {})
 const mockCreateOpencode = mock(() =>
   Promise.resolve({
     client: { session: {} },
     server: { url: "http://127.0.0.1:4096", close: mockServerClose },
-  })
+  }),
 )
 const mockCreateOpencodeClient = mock((options?: { baseUrl?: string }) => ({
   session: {},
@@ -51,6 +58,144 @@ describe("createServerConnection", () => {
 
   afterEach(() => {
     globalThis.console = originalConsole
+  })
+
+  describe("#given no OPENCODE_SERVER_PASSWORD (omo#11367)", () => {
+    const savedPassword = process.env.OPENCODE_SERVER_PASSWORD
+
+    beforeEach(() => {
+      delete process.env.OPENCODE_SERVER_PASSWORD
+    })
+
+    afterEach(() => {
+      if (savedPassword === undefined) delete process.env.OPENCODE_SERVER_PASSWORD
+      else process.env.OPENCODE_SERVER_PASSWORD = savedPassword
+    })
+
+    it("#when omo run starts its own server #then the server is started with a generated password the client also uses", async () => {
+      // given
+      let passwordAtSpawn: string | undefined
+      mockCreateOpencode.mockImplementationOnce(() => {
+        passwordAtSpawn = process.env.OPENCODE_SERVER_PASSWORD
+        return Promise.resolve({
+          client: { session: {} },
+          server: { url: "http://127.0.0.1:4096", close: mockServerClose },
+        })
+      })
+      let passwordAtInject: string | undefined
+      mockInjectServerAuthIntoClient.mockImplementationOnce(() => {
+        passwordAtInject = process.env.OPENCODE_SERVER_PASSWORD
+      })
+
+      // when
+      const result = await createServerConnection({ signal: new AbortController().signal })
+
+      // then
+      expect(passwordAtSpawn?.length ?? 0).toBeGreaterThanOrEqual(32)
+      expect(passwordAtInject === passwordAtSpawn).toBe(true)
+      const passwordFile = buildPaneAuthEnvironmentArgs()
+        .find((arg) => arg.startsWith("OPENCODE_SERVER_PASSWORD_FILE="))
+        ?.slice("OPENCODE_SERVER_PASSWORD_FILE=".length)
+      expect(passwordFile !== undefined).toBe(true)
+      if (!passwordFile) throw new Error("missing private password file")
+      if (process.platform !== "win32") {
+        expect(statSync(passwordFile).mode & 0o777).toBe(0o600)
+        expect(statSync(dirname(passwordFile)).mode & 0o777).toBe(0o700)
+      }
+      result.cleanup()
+      expect(existsSync(passwordFile)).toBe(false)
+      expect(existsSync(dirname(passwordFile))).toBe(false)
+      expect(process.env.OPENCODE_SERVER_PASSWORD_FILE).toBeUndefined()
+    })
+
+    it("#when injecting auth into the client throws #then the server is closed and no generated password is left behind", async () => {
+      // given
+      let passwordFile: string | undefined
+      mockInjectServerAuthIntoClient.mockImplementationOnce(() => {
+        passwordFile = buildPaneAuthEnvironmentArgs()
+          .find((arg) => arg.startsWith("OPENCODE_SERVER_PASSWORD_FILE="))
+          ?.slice("OPENCODE_SERVER_PASSWORD_FILE=".length)
+        throw new Error("incompatible client")
+      })
+      mockServerClose.mockImplementationOnce(() => {
+        throw new Error("close also failed")
+      })
+
+      // when
+      const attempt = createServerConnection({ signal: new AbortController().signal })
+
+      // then
+      await expect(attempt).rejects.toThrow("incompatible client")
+      expect(mockServerClose).toHaveBeenCalledTimes(1)
+      expect(process.env.OPENCODE_SERVER_PASSWORD).toBeUndefined()
+      expect(passwordFile !== undefined).toBe(true)
+      if (!passwordFile) throw new Error("missing pending password file")
+      expect(existsSync(dirname(passwordFile))).toBe(false)
+    })
+
+    it("#when closing the server throws during cleanup #then the generated password is still restored and the close error is rethrown", async () => {
+      // given
+      const result = await createServerConnection({ signal: new AbortController().signal })
+      const passwordFile = buildPaneAuthEnvironmentArgs()
+        .find((arg) => arg.startsWith("OPENCODE_SERVER_PASSWORD_FILE="))
+        ?.slice("OPENCODE_SERVER_PASSWORD_FILE=".length)
+      expect(process.env.OPENCODE_SERVER_PASSWORD).toBeDefined()
+      mockServerClose.mockImplementationOnce(() => {
+        throw new Error("close failed")
+      })
+
+      // when
+      const cleanup = () => result.cleanup()
+
+      // then
+      expect(cleanup).toThrow("close failed")
+      expect(process.env.OPENCODE_SERVER_PASSWORD).toBeUndefined()
+      expect(passwordFile !== undefined).toBe(true)
+      if (!passwordFile) throw new Error("missing pending password file")
+      expect(existsSync(dirname(passwordFile))).toBe(false)
+    })
+
+    it("#when the own server fails to start and omo attaches instead #then no generated password is left behind", async () => {
+      // given
+      mockIsPortAvailable
+        .mockImplementationOnce(() => Promise.resolve(true))
+        .mockImplementationOnce(() => Promise.resolve(false))
+      mockCreateOpencode.mockImplementationOnce(() => Promise.reject(new Error("Failed to start server on port 4100")))
+
+      // when
+      const result = await createServerConnection({ port: 4100, signal: new AbortController().signal })
+
+      // then
+      expect(mockCreateOpencodeClient).toHaveBeenCalledWith({ baseUrl: "http://127.0.0.1:4100" })
+      expect(process.env.OPENCODE_SERVER_PASSWORD).toBeUndefined()
+      result.cleanup()
+    })
+  })
+
+  it("#given a user-set OPENCODE_SERVER_PASSWORD #when omo run starts its own server #then that password is kept (omo#11367)", async () => {
+    // given
+    const savedPassword = process.env.OPENCODE_SERVER_PASSWORD
+    process.env.OPENCODE_SERVER_PASSWORD = "user-chosen"
+    let passwordAtSpawn: string | undefined
+    mockCreateOpencode.mockImplementationOnce(() => {
+      passwordAtSpawn = process.env.OPENCODE_SERVER_PASSWORD
+      return Promise.resolve({
+        client: { session: {} },
+        server: { url: "http://127.0.0.1:4096", close: mockServerClose },
+      })
+    })
+
+    try {
+      // when
+      const result = await createServerConnection({ signal: new AbortController().signal })
+
+      // then
+      expect(passwordAtSpawn).toBe("user-chosen")
+      result.cleanup()
+    } finally {
+      if (savedPassword === undefined) delete process.env.OPENCODE_SERVER_PASSWORD
+      else process.env.OPENCODE_SERVER_PASSWORD = savedPassword
+    }
   })
 
   it("attach mode injects auth only for loopback URLs", async () => {
@@ -194,12 +339,10 @@ describe("createServerConnection", () => {
       .mockResolvedValueOnce({ port: 4096, wasAutoSelected: false })
       .mockResolvedValueOnce({ port: 4097, wasAutoSelected: true })
 
-    mockCreateOpencode
-      .mockRejectedValueOnce(new Error("Failed to start server on port 4096"))
-      .mockResolvedValueOnce({
-        client: { session: {} },
-        server: { url: "http://127.0.0.1:4097", close: mockServerClose },
-      })
+    mockCreateOpencode.mockRejectedValueOnce(new Error("Failed to start server on port 4096")).mockResolvedValueOnce({
+      client: { session: {} },
+      server: { url: "http://127.0.0.1:4097", close: mockServerClose },
+    })
 
     // when
     const result = await createServerConnection({ signal })
@@ -216,9 +359,7 @@ describe("createServerConnection", () => {
   it("auto mode attaches to default server when port range is exhausted", async () => {
     // given
     const signal = new AbortController().signal
-    mockGetAvailableServerPort.mockRejectedValueOnce(
-      new Error("No available port found in range 4097-4116"),
-    )
+    mockGetAvailableServerPort.mockRejectedValueOnce(new Error("No available port found in range 4097-4116"))
     mockIsPortAvailable.mockResolvedValueOnce(false)
 
     // when

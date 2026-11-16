@@ -1,9 +1,4 @@
-export type {
-  AvailableAgent,
-  AvailableTool,
-  AvailableSkill,
-  AvailableCategory,
-} from "./dynamic-agent-prompt-types"
+export type { AvailableAgent, AvailableTool, AvailableSkill, AvailableCategory } from "./dynamic-agent-prompt-types"
 
 export { categorizeTools } from "./dynamic-agent-tool-categorization"
 
@@ -15,7 +10,6 @@ export {
   buildLibrarianSection,
   buildDelegationTable,
   buildOracleSection,
-  buildFrontendGuidanceSection,
   buildNonClaudePlannerSection,
   buildParallelDelegationSection,
 } from "./dynamic-agent-core-sections"

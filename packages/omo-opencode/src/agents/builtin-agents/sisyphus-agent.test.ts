@@ -1,9 +1,9 @@
 /// <reference types="bun-types" />
 
-import { describe, expect, test } from "bun:test";
-import { maybeCreateSisyphusConfig } from "./sisyphus-agent";
-import type { AgentOverrides } from "../types";
-import type { CategoryConfig } from "../../config/schema";
+import { describe, expect, test } from "bun:test"
+import { maybeCreateSisyphusConfig } from "./sisyphus-agent"
+import type { AgentOverrides } from "../types"
+import type { CategoryConfig } from "../../config/schema"
 
 describe("maybeCreateSisyphusConfig", () => {
   describe("#given GPT model with user override allowing apply_patch", () => {
@@ -16,8 +16,8 @@ describe("maybeCreateSisyphusConfig", () => {
             apply_patch: "allow",
           } as Record<string, "allow">,
         },
-      };
-      const mergedCategories: Record<string, CategoryConfig> = {};
+      }
+      const mergedCategories: Record<string, CategoryConfig> = {}
 
       // when
       const config = maybeCreateSisyphusConfig({
@@ -31,14 +31,14 @@ describe("maybeCreateSisyphusConfig", () => {
         availableCategories: [],
         mergedCategories,
         useTaskSystem: false,
-      });
+      })
 
       // then
-      expect(config).toBeDefined();
-      expect(config?.model).toBe("openai/gpt-5.4");
-      expect(config?.permission).toHaveProperty("apply_patch", "allow");
-    });
-  });
+      expect(config).toBeDefined()
+      expect(config?.model).toBe("openai/gpt-5.4")
+      expect(config?.permission).toHaveProperty("apply_patch", "allow")
+    })
+  })
 
   describe("#given non-GPT model with user override", () => {
     test("#when config is created #then apply_patch is not forced to deny", () => {
@@ -50,8 +50,8 @@ describe("maybeCreateSisyphusConfig", () => {
             apply_patch: "allow",
           } as Record<string, "allow">,
         },
-      };
-      const mergedCategories: Record<string, CategoryConfig> = {};
+      }
+      const mergedCategories: Record<string, CategoryConfig> = {}
 
       // when
       const config = maybeCreateSisyphusConfig({
@@ -65,15 +65,15 @@ describe("maybeCreateSisyphusConfig", () => {
         availableCategories: [],
         mergedCategories,
         useTaskSystem: false,
-      });
+      })
 
       // then
-      expect(config).toBeDefined();
-      expect(config?.model).toBe("anthropic/claude-opus-4-7");
+      expect(config).toBeDefined()
+      expect(config?.model).toBe("anthropic/claude-opus-4-7")
       // Claude models should allow the user override
-      expect(config?.permission).toHaveProperty("apply_patch", "allow");
-    });
-  });
+      expect(config?.permission).toHaveProperty("apply_patch", "allow")
+    })
+  })
 
   describe("#given Opus 4.7 model with user override allowing grep and glob", () => {
     test("#when config is created #then grep and glob are still denied", () => {
@@ -86,8 +86,8 @@ describe("maybeCreateSisyphusConfig", () => {
             glob: "allow",
           } as Record<string, "allow">,
         },
-      };
-      const mergedCategories: Record<string, CategoryConfig> = {};
+      }
+      const mergedCategories: Record<string, CategoryConfig> = {}
 
       // when
       const config = maybeCreateSisyphusConfig({
@@ -101,13 +101,13 @@ describe("maybeCreateSisyphusConfig", () => {
         availableCategories: [],
         mergedCategories,
         useTaskSystem: false,
-      });
+      })
 
       // then
-      expect(config?.permission).toHaveProperty("grep", "deny");
-      expect(config?.permission).toHaveProperty("glob", "deny");
-    });
-  });
+      expect(config?.permission).toHaveProperty("grep", "deny")
+      expect(config?.permission).toHaveProperty("glob", "deny")
+    })
+  })
 
   describe("#given dotted Opus 4.7 model with user override allowing grep and glob", () => {
     test("#when config is created #then grep and glob are still denied", () => {
@@ -120,8 +120,8 @@ describe("maybeCreateSisyphusConfig", () => {
             glob: "allow",
           } as Record<string, "allow">,
         },
-      };
-      const mergedCategories: Record<string, CategoryConfig> = {};
+      }
+      const mergedCategories: Record<string, CategoryConfig> = {}
 
       // when
       const config = maybeCreateSisyphusConfig({
@@ -135,13 +135,13 @@ describe("maybeCreateSisyphusConfig", () => {
         availableCategories: [],
         mergedCategories,
         useTaskSystem: false,
-      });
+      })
 
       // then
-      expect(config?.permission).toHaveProperty("grep", "deny");
-      expect(config?.permission).toHaveProperty("glob", "deny");
-    });
-  });
+      expect(config?.permission).toHaveProperty("grep", "deny")
+      expect(config?.permission).toHaveProperty("glob", "deny")
+    })
+  })
 
   describe("#given GPT 5.5 model with user override allowing grep and glob", () => {
     test("#when config is created #then grep and glob are still denied", () => {
@@ -154,8 +154,8 @@ describe("maybeCreateSisyphusConfig", () => {
             glob: "allow",
           } as Record<string, "allow">,
         },
-      };
-      const mergedCategories: Record<string, CategoryConfig> = {};
+      }
+      const mergedCategories: Record<string, CategoryConfig> = {}
 
       // when
       const config = maybeCreateSisyphusConfig({
@@ -169,13 +169,13 @@ describe("maybeCreateSisyphusConfig", () => {
         availableCategories: [],
         mergedCategories,
         useTaskSystem: false,
-      });
+      })
 
       // then
-      expect(config?.permission).toHaveProperty("grep", "deny");
-      expect(config?.permission).toHaveProperty("glob", "deny");
-    });
-  });
+      expect(config?.permission).toHaveProperty("grep", "deny")
+      expect(config?.permission).toHaveProperty("glob", "deny")
+    })
+  })
 
   describe("#given frontier default model with category override to non-frontier model", () => {
     test("#when config is created #then stale grep and glob denies are cleared", () => {
@@ -184,12 +184,12 @@ describe("maybeCreateSisyphusConfig", () => {
         sisyphus: {
           category: "non-frontier",
         },
-      };
+      }
       const mergedCategories: Record<string, CategoryConfig> = {
         "non-frontier": {
           model: "openai/gpt-5.4",
         },
-      };
+      }
 
       // when
       const config = maybeCreateSisyphusConfig({
@@ -203,14 +203,14 @@ describe("maybeCreateSisyphusConfig", () => {
         availableCategories: [],
         mergedCategories,
         useTaskSystem: false,
-      });
+      })
 
       // then
-      expect(config?.model).toBe("openai/gpt-5.4");
-      expect(config?.permission).not.toHaveProperty("grep");
-      expect(config?.permission).not.toHaveProperty("glob");
-    });
-  });
+      expect(config?.model).toBe("openai/gpt-5.4")
+      expect(config?.permission).not.toHaveProperty("grep")
+      expect(config?.permission).not.toHaveProperty("glob")
+    })
+  })
 
   describe("#given non-frontier model with user override denying grep and glob", () => {
     test("#when config is created #then explicit user denies are preserved", () => {
@@ -223,8 +223,8 @@ describe("maybeCreateSisyphusConfig", () => {
             glob: "deny",
           } as Record<string, "deny">,
         },
-      };
-      const mergedCategories: Record<string, CategoryConfig> = {};
+      }
+      const mergedCategories: Record<string, CategoryConfig> = {}
 
       // when
       const config = maybeCreateSisyphusConfig({
@@ -238,13 +238,13 @@ describe("maybeCreateSisyphusConfig", () => {
         availableCategories: [],
         mergedCategories,
         useTaskSystem: false,
-      });
+      })
 
       // then
-      expect(config?.permission).toHaveProperty("grep", "deny");
-      expect(config?.permission).toHaveProperty("glob", "deny");
-    });
-  });
+      expect(config?.permission).toHaveProperty("grep", "deny")
+      expect(config?.permission).toHaveProperty("glob", "deny")
+    })
+  })
 
   describe("#given non-frontier model with legacy user tools denying grep and glob", () => {
     test("#when config is created #then explicit legacy denies are preserved", () => {
@@ -255,11 +255,11 @@ describe("maybeCreateSisyphusConfig", () => {
           grep: false,
           glob: false,
         },
-      };
+      }
       const agentOverrides: AgentOverrides = {
         sisyphus: legacyOverride,
-      };
-      const mergedCategories: Record<string, CategoryConfig> = {};
+      }
+      const mergedCategories: Record<string, CategoryConfig> = {}
 
       // when
       const config = maybeCreateSisyphusConfig({
@@ -273,13 +273,13 @@ describe("maybeCreateSisyphusConfig", () => {
         availableCategories: [],
         mergedCategories,
         useTaskSystem: false,
-      });
+      })
 
       // then
-      expect(config?.permission).toHaveProperty("grep", "deny");
-      expect(config?.permission).toHaveProperty("glob", "deny");
-    });
-  });
+      expect(config?.permission).toHaveProperty("grep", "deny")
+      expect(config?.permission).toHaveProperty("glob", "deny")
+    })
+  })
 
   describe("#given generic GPT model with user override allowing apply_patch", () => {
     test("#when config is created #then user override is respected", () => {
@@ -291,8 +291,8 @@ describe("maybeCreateSisyphusConfig", () => {
             apply_patch: "allow",
           } as Record<string, "allow">,
         },
-      };
-      const mergedCategories: Record<string, CategoryConfig> = {};
+      }
+      const mergedCategories: Record<string, CategoryConfig> = {}
 
       // when
       const config = maybeCreateSisyphusConfig({
@@ -306,12 +306,12 @@ describe("maybeCreateSisyphusConfig", () => {
         availableCategories: [],
         mergedCategories,
         useTaskSystem: false,
-      });
+      })
 
       // then
-      expect(config).toBeDefined();
-      expect(config?.model).toBe("openai/gpt-4o");
-      expect(config?.permission).toHaveProperty("apply_patch", "allow");
-    });
-  });
-});
+      expect(config).toBeDefined()
+      expect(config?.model).toBe("openai/gpt-4o")
+      expect(config?.permission).toHaveProperty("apply_patch", "allow")
+    })
+  })
+})

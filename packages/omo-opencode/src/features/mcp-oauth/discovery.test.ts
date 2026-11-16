@@ -28,11 +28,12 @@ describe("discoverOAuthServerMetadata", () => {
       if (url === asUrl) {
         return new Response(
           JSON.stringify({
+            issuer: authServer,
             authorization_endpoint: "https://auth.example.com/authorize",
             token_endpoint: "https://auth.example.com/token",
             registration_endpoint: "https://auth.example.com/register",
           }),
-          { status: 200 }
+          { status: 200 },
         )
       }
       return new Response("not found", { status: 404 })
@@ -43,6 +44,7 @@ describe("discoverOAuthServerMetadata", () => {
     return discoverOAuthServerMetadata(resource).then((result) => {
       // then
       expect(result).toEqual({
+        issuer: authServer,
         authorizationEndpoint: "https://auth.example.com/authorize",
         tokenEndpoint: "https://auth.example.com/token",
         registrationEndpoint: "https://auth.example.com/register",
@@ -67,10 +69,11 @@ describe("discoverOAuthServerMetadata", () => {
       if (url === asUrl) {
         return new Response(
           JSON.stringify({
+            issuer: resource,
             authorization_endpoint: "https://mcp.example.com/authorize",
             token_endpoint: "https://mcp.example.com/token",
           }),
-          { status: 200 }
+          { status: 200 },
         )
       }
       return new Response("not found", { status: 404 })
@@ -81,6 +84,7 @@ describe("discoverOAuthServerMetadata", () => {
     return discoverOAuthServerMetadata(resource).then((result) => {
       // then
       expect(result).toEqual({
+        issuer: resource,
         authorizationEndpoint: "https://mcp.example.com/authorize",
         tokenEndpoint: "https://mcp.example.com/token",
         registrationEndpoint: undefined,
@@ -109,11 +113,12 @@ describe("discoverOAuthServerMetadata", () => {
       if (url === rootAsUrl) {
         return new Response(
           JSON.stringify({
+            issuer: new URL(resource).origin,
             authorization_endpoint: "https://mcp.example.com/oauth/authorize",
             token_endpoint: "https://mcp.example.com/oauth/token",
             registration_endpoint: "https://mcp.example.com/oauth/register",
           }),
-          { status: 200 }
+          { status: 200 },
         )
       }
       return new Response("not found", { status: 404 })
@@ -124,6 +129,7 @@ describe("discoverOAuthServerMetadata", () => {
     return discoverOAuthServerMetadata(resource).then((result) => {
       // then
       expect(result).toEqual({
+        issuer: new URL(resource).origin,
         authorizationEndpoint: "https://mcp.example.com/oauth/authorize",
         tokenEndpoint: "https://mcp.example.com/oauth/token",
         registrationEndpoint: "https://mcp.example.com/oauth/register",
@@ -186,9 +192,12 @@ describe("discoverOAuthServerMetadata", () => {
         return new Response(JSON.stringify({ authorization_servers: [authServer] }), { status: 200 })
       }
       if (url === asUrl) {
-        return new Response(JSON.stringify({ authorization_endpoint: "https://auth.example.com/authorize" }), {
-          status: 200,
-        })
+        return new Response(
+          JSON.stringify({ issuer: authServer, authorization_endpoint: "https://auth.example.com/authorize" }),
+          {
+            status: 200,
+          },
+        )
       }
       return new Response("not found", { status: 404 })
     }
@@ -217,10 +226,11 @@ describe("discoverOAuthServerMetadata", () => {
       if (url === asUrl) {
         return new Response(
           JSON.stringify({
+            issuer: authServer,
             authorization_endpoint: "https://auth.example.com/authorize",
             token_endpoint: "https://auth.example.com/token",
           }),
-          { status: 200 }
+          { status: 200 },
         )
       }
       return new Response("not found", { status: 404 })

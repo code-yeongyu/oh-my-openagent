@@ -4,7 +4,6 @@ import { describe, expect, test } from "bun:test"
 
 import { corePackagePaths as corePackages } from "./core-package-paths"
 
-
 type ForbiddenSourcePattern = {
   readonly pattern: RegExp
   readonly allowPackagePaths?: readonly string[]
@@ -20,7 +19,14 @@ const forbiddenSourcePatterns: readonly ForbiddenSourcePattern[] = [
   { pattern: /plugin\/components/ },
   {
     pattern: /\b(?:SessionStart|UserPromptSubmit|PreToolUse|PostToolUse|PostCompact|Stop|SubagentStop)\b/,
-    allowPackagePaths: ["packages/claude-code-compat-core"],
+    // The device-service Windows DACL code (the vendored local API's reader and omo's exact-DACL writer) runs PowerShell with
+    // $ErrorActionPreference = 'Stop'; it names no hook.
+    allowPackagePaths: [
+      "packages/claude-code-compat-core",
+      "packages/device-service-core/src/local-api",
+      "packages/device-service-core/src/release/windows-dacl.ts",
+      "packages/device-service-core/test/local-api",
+    ],
   },
   { pattern: /\bsession\.prompt(?:Async)?\s*\(/ },
 ] as const
@@ -65,9 +71,10 @@ describe("shared core extraction guardrails", () => {
       const source = await readFile(file, "utf8")
       const relativeFilePath = toPosixPath(relative(process.cwd(), file))
       for (const forbidden of forbiddenSourcePatterns) {
-        const allowedByPackage = forbidden.allowPackagePaths?.some((packagePath) =>
-          relativeFilePath.startsWith(`${packagePath}/`),
-        ) ?? false
+        const allowedByPackage =
+          forbidden.allowPackagePaths?.some(
+            (packagePath) => relativeFilePath === packagePath || relativeFilePath.startsWith(`${packagePath}/`),
+          ) ?? false
         if (!allowedByPackage && forbidden.pattern.test(source)) {
           offenders.push(`${relativeFilePath} matches ${forbidden.pattern}`)
         }
@@ -94,5 +101,4 @@ describe("shared core extraction guardrails", () => {
     // then
     expect(offenders).toEqual([])
   })
-
 })

@@ -1,22 +1,32 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, realpathSync } from "node:fs"
 import { lstat, readFile, readdir, realpath, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
-import { MEMORY_ROOT_ENV_VAR, buildIdentityPaths, resolveMemoryIdentity, type ProjectScopeFs } from "@oh-my-opencode/memory-core"
+import {
+  MEMORY_ROOT_ENV_VAR,
+  buildIdentityPaths,
+  resolveMemoryIdentity,
+  type ProjectScopeFs,
+} from "@oh-my-opencode/memory-core"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
 import { isGrantedProjectMemoryRead } from "./project-memory-grants"
-import { PROJECT_MEMORY_NUDGE_MAX_NOTES, createProjectMemoryScope, type ProjectMemorySwitches } from "./project-memory-nudge"
+import {
+  PROJECT_MEMORY_NUDGE_MAX_NOTES,
+  createProjectMemoryScope,
+  type ProjectMemorySwitches,
+} from "./project-memory-nudge"
 import { createSharedRecallCorpusCache } from "./recall-wiring"
 import { rmSyncEfaultTolerant } from "./teardown.test-support"
 
 const roots: string[] = []
 
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0))
+    rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 function git(cwd: string, ...args: string[]): void {
@@ -49,7 +59,11 @@ interface World {
   readonly switchReads: () => number
 }
 
-function world(childNotes: Record<string, string> = { "reference/deploy.md": "how the child deploys" }, fs?: ProjectScopeFs): World {
+function world(
+  childNotes: Record<string, string> = { "reference/deploy.md": "how the child deploys" },
+  fs?: ProjectScopeFs,
+  corpusCache = createSharedRecallCorpusCache(undefined),
+): World {
   const root = realpathSync.native(mkdtempSync(join(tmpdir(), "project-memory-nudge-")))
   roots.push(root)
   const workspace = join(root, "workspace")
@@ -76,7 +90,7 @@ function world(childNotes: Record<string, string> = { "reference/deploy.md": "ho
       return switches.current
     },
     fallbackCwd: () => workspace,
-    corpusCache: createSharedRecallCorpusCache(undefined),
+    corpusCache,
     env,
     ...(fs === undefined ? {} : { fs }),
   }).register(pi)
@@ -85,10 +99,12 @@ function world(childNotes: Record<string, string> = { "reference/deploy.md": "ho
 
 function countingFs(): { readonly fs: ProjectScopeFs; readonly calls: () => number } {
   let calls = 0
-  const counted = <A extends unknown[], R>(call: (...args: A) => Promise<R>) => (...args: A): Promise<R> => {
-    calls += 1
-    return call(...args)
-  }
+  const counted =
+    <A extends unknown[], R>(call: (...args: A) => Promise<R>) =>
+    (...args: A): Promise<R> => {
+      calls += 1
+      return call(...args)
+    }
   return {
     fs: {
       realpath: counted((path: string) => realpath(path)),
@@ -103,11 +119,54 @@ function countingFs(): { readonly fs: ProjectScopeFs; readonly calls: () => numb
 
 const ctx = (w: World) => ({ cwd: w.workspace, sessionManager: { getSessionId: () => "session-1" } })
 
+function holdCorpusReads(cache: ReturnType<typeof createSharedRecallCorpusCache>, failFirst = false) {
+  const firstEntered = Promise.withResolvers<void>()
+  const nextEntered = Promise.withResolvers<void>()
+  const thirdEntered = Promise.withResolvers<void>()
+  const firstRelease = Promise.withResolvers<void>()
+  const nextRelease = Promise.withResolvers<void>()
+  const load = cache.load.bind(cache)
+  let calls = 0
+  const spy = spyOn(cache, "load").mockImplementation(async (repo) => {
+    const first = ++calls === 1
+    if (calls === 3) thirdEntered.resolve()
+    const entered = first ? firstEntered : nextEntered
+    entered.resolve()
+    await (first ? firstRelease : nextRelease).promise
+    if (first && failFirst) throw new Error("project notes temporarily unavailable")
+    return await load(repo)
+  })
+  return {
+    spy,
+    firstEntered: firstEntered.promise,
+    nextEntered: nextEntered.promise,
+    thirdEntered: thirdEntered.promise,
+    releaseFirst: () => firstRelease.resolve(),
+    releaseNext: () => nextRelease.resolve(),
+    release: () => {
+      firstRelease.resolve()
+      nextRelease.resolve()
+    },
+  }
+}
+
 async function readResult(w: World, path: string, toolName = "read"): Promise<string> {
   const original = [{ type: "text", text: "file body" }]
-  const results = await w.pi.dispatch("tool_result", { type: "tool_result", toolName, input: { path }, content: original }, ctx(w))
-  const changed = results.find((result): result is { content: { text?: string }[] } => typeof result === "object" && result !== null && "content" in result)
-  return changed === undefined ? "" : changed.content.slice(original.length).map((block) => block.text ?? "").join("\n")
+  const results = await w.pi.dispatch(
+    "tool_result",
+    { type: "tool_result", toolName, input: { path }, content: original },
+    ctx(w),
+  )
+  const changed = results.find(
+    (result): result is { content: { text?: string }[] } =>
+      typeof result === "object" && result !== null && "content" in result,
+  )
+  return changed === undefined
+    ? ""
+    : changed.content
+        .slice(original.length)
+        .map((block) => block.text ?? "")
+        .join("\n")
 }
 
 describe("project memory nudge (#10044)", () => {
@@ -116,14 +175,34 @@ describe("project memory nudge (#10044)", () => {
     const trace = join(dirname(w.workspace), "git-trace.jsonl")
 
     const result = Bun.spawnSync(
-      ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-q", "-m", "trace maintenance"],
+      [
+        "git",
+        "-c",
+        "user.name=t",
+        "-c",
+        "user.email=t@t",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "--allow-empty",
+        "-q",
+        "-m",
+        "trace maintenance",
+      ],
       { cwd: w.childRepo, env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_TRACE2_EVENT: trace } },
     )
 
     expect(result.exitCode).toBe(0)
-    const events = readFileSync(trace, "utf8").trim().split("\n").map((line) => JSON.parse(line) as { event: string; argv?: string[] })
+    const events = readFileSync(trace, "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as { event: string; argv?: string[] })
     expect(events.some((event) => event.event === "exit")).toBe(true)
-    expect(events.filter((event) => event.event === "child_start" && event.argv?.some((arg) => arg === "maintenance" || arg === "gc"))).toEqual([])
+    expect(
+      events.filter(
+        (event) => event.event === "child_start" && event.argv?.some((arg) => arg === "maintenance" || arg === "gc"),
+      ),
+    ).toEqual([])
   })
 
   test("#given a child project with memory #when the session first reads a file there #then one nudge lists its notes with a call to consult them", async () => {
@@ -154,9 +233,100 @@ describe("project memory nudge (#10044)", () => {
     expect(second).toContain(w.other)
   })
 
+  test("#given a project corpus read is pending #when another tool result touches it #then only the reserved read appends a nudge", async () => {
+    const cache = createSharedRecallCorpusCache(undefined)
+    const w = world(undefined, undefined, cache)
+    const held = holdCorpusReads(cache)
+    const first = readResult(w, join(w.child, "a.ts"))
+    await held.firstEntered
+    const second = readResult(w, join(w.child, "b.ts"), "edit")
+    try {
+      await Promise.race([second, held.nextEntered])
+      held.release()
+      const nudges = await Promise.all([first, second])
+      expect(nudges[0]).toContain("reference/deploy.md")
+      expect(nudges[1]).toBe("")
+      expect(held.spy).toHaveBeenCalledTimes(1)
+    } finally {
+      held.release()
+      await Promise.allSettled([first, second])
+      held.spy.mockRestore()
+    }
+  })
+
+  test("#given a project corpus read fails #when another touch retries #then the failed reservation does not suppress its nudge", async () => {
+    const cache = createSharedRecallCorpusCache(undefined)
+    const w = world(undefined, undefined, cache)
+    const held = holdCorpusReads(cache, true)
+    const first = readResult(w, join(w.child, "a.ts"))
+    try {
+      await held.firstEntered
+      held.release()
+      expect(await first).toBe("")
+      expect(await readResult(w, join(w.child, "b.ts"))).toContain("reference/deploy.md")
+      expect(held.spy).toHaveBeenCalledTimes(2)
+    } finally {
+      held.release()
+      await first
+      held.spy.mockRestore()
+    }
+  })
+
+  test.each([{ failFirst: false }, { failFirst: true }])(
+    "#given a corpus read crosses compaction (fails=$failFirst) #when a new reservation starts #then the old completion neither nudges nor removes it",
+    async ({ failFirst }) => {
+      const cache = createSharedRecallCorpusCache(undefined)
+      const w = world(undefined, undefined, cache)
+      const held = holdCorpusReads(cache, failFirst)
+      const first = readResult(w, join(w.child, "a.ts"))
+      await held.firstEntered
+      await w.pi.dispatch("session_compact", { type: "session_compact", accepted: true }, ctx(w))
+      const second = readResult(w, join(w.child, "b.ts"))
+      try {
+        await held.nextEntered
+        held.releaseFirst()
+        expect(await first).toBe("")
+        const third = readResult(w, join(w.child, "c.ts"))
+        const thirdResult = await Promise.race([third, held.thirdEntered.then(() => undefined)])
+        held.releaseNext()
+        await third
+        expect(thirdResult).toBe("")
+        expect(held.spy).toHaveBeenCalledTimes(2)
+        expect(await second).toContain("reference/deploy.md")
+      } finally {
+        held.release()
+        await Promise.allSettled([first, second])
+        held.spy.mockRestore()
+      }
+    },
+  )
+
+  test("#given a project corpus read is pending #when its session shuts down #then completion leaves the tool result unchanged", async () => {
+    const cache = createSharedRecallCorpusCache(undefined)
+    const w = world(undefined, undefined, cache)
+    const held = holdCorpusReads(cache)
+    const first = readResult(w, join(w.child, "a.ts"))
+    try {
+      await held.firstEntered
+      await w.pi.dispatch("session_shutdown", { type: "session_shutdown" }, ctx(w))
+      held.release()
+      expect(await first).toBe("")
+      expect(isGrantedProjectMemoryRead(w.own, join(w.childRepo, "reference", "deploy.md"))).toBe(false)
+    } finally {
+      held.release()
+      await first
+      held.spy.mockRestore()
+    }
+  })
+
   test("#given more notes than the cap #when nudged #then the list stops at the cap with a count of the rest", async () => {
     // given
-    const notes = Object.fromEntries(Array.from({ length: PROJECT_MEMORY_NUDGE_MAX_NOTES + 4 }, (_, i) => [`n/${String(i).padStart(2, "0")}.md`, `note ${i}`]))
+    const notes = Object.fromEntries(
+      Array.from({ length: PROJECT_MEMORY_NUDGE_MAX_NOTES + 4 }, (_, i) => [
+        `n/${String(i).padStart(2, "0")}.md`,
+        `note ${i}`,
+      ]),
+    )
     const w = world(notes)
 
     // when
@@ -265,7 +435,11 @@ describe("project memory nudge (#10044)", () => {
     const w = world()
 
     // when
-    const results = await w.pi.dispatch("tool_result", { type: "tool_result", toolName: "read", isError: true, input: { path: join(w.child, "x.ts") }, content: [] }, ctx(w))
+    const results = await w.pi.dispatch(
+      "tool_result",
+      { type: "tool_result", toolName: "read", isError: true, input: { path: join(w.child, "x.ts") }, content: [] },
+      ctx(w),
+    )
 
     // then
     expect(results.every((result) => result === undefined)).toBe(true)

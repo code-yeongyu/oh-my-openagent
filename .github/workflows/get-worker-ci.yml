@@ -27,6 +27,12 @@ env:
   OMO_INSTALL_QA: "1"
 
 jobs:
+  platform:
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/pr-platform-decision.yml
+
   worker:
     runs-on: ubuntu-26.04
     defaults:
@@ -36,7 +42,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.3"
+          bun-version: "1.4.4"
       - run: bun install --frozen-lockfile
       - name: Type check
         run: bun run type-check
@@ -69,14 +75,15 @@ jobs:
 
   # Runs the installer from this checkout against the live get.omo.dev, the way users run it.
   install-unix:
-    needs: worker
+    needs: [worker, platform]
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { os: ubuntu-latest, name: linux-glibc }
-          - { os: ubuntu-24.04-arm, name: linux-arm64 }
-          - { os: macos-latest, name: macos-arm64 }
+        # macOS/Windows only when the shared platform decision allows it (pr-platform-decision.yml, #13859).
+        include: >-
+          ${{ fromJSON(needs.platform.outputs.full_matrix != 'true' && '[{"os": "ubuntu-latest", "name": "linux-glibc"},
+          {"os": "ubuntu-24.04-arm", "name": "linux-arm64"}]' || '[{"os": "ubuntu-latest", "name": "linux-glibc"},
+          {"os": "ubuntu-24.04-arm", "name": "linux-arm64"}, {"os": "macos-latest", "name": "macos-arm64"}]') }}
     runs-on: ${{ matrix.os == 'ubuntu-latest' && 'ubuntu-26.04' || matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -144,7 +151,9 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   install-windows:
-    needs: worker
+    needs: [worker, platform]
+    # macOS/Windows only when the shared platform decision allows it (pr-platform-decision.yml, #13859).
+    if: needs.platform.outputs.full_matrix == 'true'
     runs-on: windows-latest
     strategy:
       fail-fast: false

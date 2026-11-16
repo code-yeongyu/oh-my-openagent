@@ -4,9 +4,27 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
 import { artifactsMatch } from "./build-artifact.mjs"
-import { buildExtension, COMPUTER_PRELUDE_ASSET_NAME, extensionBuildPaths, GATEWAY_STORE_WORKER_NAME, memorySyncAssetSources, resolveOutputs, THREAD_SDK_RELATIVE_PATH } from "./build-extension-core.mjs"
+import {
+  buildExtension,
+  COMPUTER_PRELUDE_ASSET_NAME,
+  COMPUTER_RUN_WASM_NAME,
+  COMPUTER_RUN_WORKER_NAME,
+  computerRunWasmSourcePath,
+  extensionBuildPaths,
+  GATEWAY_STORE_WORKER_NAME,
+  memorySyncAssetSources,
+  resolveOutputs,
+  THREAD_SDK_RELATIVE_PATH,
+} from "./build-extension-core.mjs"
 import { findStaleRuntimePersona } from "./persona-artifacts.mjs"
 
+/**
+ * Compares the current outputs against an independent reproduction of the build. By default the
+ * reproduction is built into a fresh temp root and removed afterwards (the CLI `--check` path).
+ * `options.expectedRoot` names an already-built reproduction root (laid out like a build into an
+ * empty directory) so callers that check many output trees against the same sources build it once;
+ * that root is read only and left in place.
+ */
 export async function checkExtensionCurrent(options = {}) {
   const {
     output,
@@ -17,9 +35,8 @@ export async function checkExtensionCurrent(options = {}) {
     sidePanelRuntimeOutput,
     onboardingScanRuntimeOutput,
     toolkitSdkOutput,
+    bunshinTsOutput,
     rollbackRuntimeOutput,
-    doriLayerOutput,
-    doriReplayOutput,
     computerUseOutput,
     memoryDoctorOutput,
     memoryMemfsOutput,
@@ -28,24 +45,26 @@ export async function checkExtensionCurrent(options = {}) {
     memoryCommandsOutput,
     sessionHistoryOutput,
     recallStoreOutput,
-    doriMigrationOutput,
+    deviceServiceOutput,
     telemetryPosthogOutput,
+    telemetryOtlpOutput,
     memorySyncOutput,
     threadClientOutput,
+    wakeOutput,
     telemetryRecoveryOutput,
     feedbackOutput,
+    desktopToolkitOutput,
     claimReceiptOutput,
     gatewayStoreWorkerOutput,
     threadSdkOutput,
   } = resolveOutputs(options)
   const currentToolkitSdk = await readBuiltEntry(toolkitSdkOutput)
   if (currentToolkitSdk === undefined) return { ok: false, reason: "missing-output", output: toolkitSdkOutput }
+  const currentBunshinTs = await readBuiltEntry(bunshinTsOutput)
+  if (currentBunshinTs === undefined) return { ok: false, reason: "missing-output", output: bunshinTsOutput }
   const currentRollbackRuntime = await readBuiltEntry(rollbackRuntimeOutput)
-  if (currentRollbackRuntime === undefined) return { ok: false, reason: "missing-output", output: rollbackRuntimeOutput }
-  const currentDoriLayer = await readBuiltEntry(doriLayerOutput)
-  if (currentDoriLayer === undefined) return { ok: false, reason: "missing-output", output: doriLayerOutput }
-  const currentDoriReplay = await readBuiltEntry(doriReplayOutput)
-  if (currentDoriReplay === undefined) return { ok: false, reason: "missing-output", output: doriReplayOutput }
+  if (currentRollbackRuntime === undefined)
+    return { ok: false, reason: "missing-output", output: rollbackRuntimeOutput }
   const currentMain = await readBuiltEntry(output)
   if (currentMain === undefined) return { ok: false, reason: "missing-output", output }
   const currentTask = await readBuiltEntry(taskOutput)
@@ -57,9 +76,11 @@ export async function checkExtensionCurrent(options = {}) {
   const currentAdvisorRuntime = await readBuiltEntry(advisorRuntimeOutput)
   if (currentAdvisorRuntime === undefined) return { ok: false, reason: "missing-output", output: advisorRuntimeOutput }
   const currentSidePanelRuntime = await readBuiltEntry(sidePanelRuntimeOutput)
-  if (currentSidePanelRuntime === undefined) return { ok: false, reason: "missing-output", output: sidePanelRuntimeOutput }
+  if (currentSidePanelRuntime === undefined)
+    return { ok: false, reason: "missing-output", output: sidePanelRuntimeOutput }
   const currentOnboardingScanRuntime = await readBuiltEntry(onboardingScanRuntimeOutput)
-  if (currentOnboardingScanRuntime === undefined) return { ok: false, reason: "missing-output", output: onboardingScanRuntimeOutput }
+  if (currentOnboardingScanRuntime === undefined)
+    return { ok: false, reason: "missing-output", output: onboardingScanRuntimeOutput }
   const currentMemoryDoctor = await readBuiltEntry(memoryDoctorOutput)
   const currentMemoryMemfs = await readBuiltEntry(memoryMemfsOutput)
   const currentMemoryPalace = await readBuiltEntry(memoryPalaceOutput)
@@ -67,10 +88,12 @@ export async function checkExtensionCurrent(options = {}) {
   const currentMemoryCommands = await readBuiltEntry(memoryCommandsOutput)
   const currentSessionHistory = await readBuiltEntry(sessionHistoryOutput)
   const currentRecallStore = await readBuiltEntry(recallStoreOutput)
-  const currentDoriMigration = await readBuiltEntry(doriMigrationOutput)
+  const currentDeviceService = await readBuiltEntry(deviceServiceOutput)
   const currentTelemetryPosthog = await readBuiltEntry(telemetryPosthogOutput)
+  const currentTelemetryOtlp = await readBuiltEntry(telemetryOtlpOutput)
   const currentThreadClient = await readBuiltEntry(threadClientOutput)
   const currentFeedback = await readBuiltEntry(feedbackOutput)
+  const currentDesktopToolkit = await readBuiltEntry(desktopToolkitOutput)
   const currentClaimReceipt = await readBuiltEntry(claimReceiptOutput)
   const currentMemorySync = await readBuiltEntry(memorySyncOutput)
   if (currentMemorySync === undefined) return { ok: false, reason: "missing-output", output: memorySyncOutput }
@@ -80,7 +103,8 @@ export async function checkExtensionCurrent(options = {}) {
     const assetOutput = join(dirname(memorySyncOutput), name)
     const current = await readFile(assetOutput).catch(() => undefined)
     if (current === undefined) return { ok: false, reason: "missing-output", output: assetOutput }
-    if (sha256(current) !== sha256(await readFile(source))) return { ok: false, reason: "stale-output", output: assetOutput }
+    if (sha256(current) !== sha256(await readFile(source)))
+      return { ok: false, reason: "stale-output", output: assetOutput }
   }
   if (currentMemoryDoctor === undefined) return { ok: false, reason: "missing-output", output: memoryDoctorOutput }
   if (currentMemoryMemfs === undefined) return { ok: false, reason: "missing-output", output: memoryMemfsOutput }
@@ -89,21 +113,40 @@ export async function checkExtensionCurrent(options = {}) {
   if (currentMemoryCommands === undefined) return { ok: false, reason: "missing-output", output: memoryCommandsOutput }
   if (currentSessionHistory === undefined) return { ok: false, reason: "missing-output", output: sessionHistoryOutput }
   if (currentRecallStore === undefined) return { ok: false, reason: "missing-output", output: recallStoreOutput }
-  if (currentDoriMigration === undefined) return { ok: false, reason: "missing-output", output: doriMigrationOutput }
-  if (currentTelemetryPosthog === undefined) return { ok: false, reason: "missing-output", output: telemetryPosthogOutput }
+  if (currentDeviceService === undefined) return { ok: false, reason: "missing-output", output: deviceServiceOutput }
+  if (currentTelemetryPosthog === undefined)
+    return { ok: false, reason: "missing-output", output: telemetryPosthogOutput }
+  if (currentTelemetryOtlp === undefined) return { ok: false, reason: "missing-output", output: telemetryOtlpOutput }
   if (currentThreadClient === undefined) return { ok: false, reason: "missing-output", output: threadClientOutput }
+  const currentWake = await readBuiltEntry(wakeOutput)
+  if (currentWake === undefined) return { ok: false, reason: "missing-output", output: wakeOutput }
   const currentTelemetryRecovery = await readBuiltEntry(telemetryRecoveryOutput)
-  if (currentTelemetryRecovery === undefined) return { ok: false, reason: "missing-output", output: telemetryRecoveryOutput }
+  if (currentTelemetryRecovery === undefined)
+    return { ok: false, reason: "missing-output", output: telemetryRecoveryOutput }
   if (currentFeedback === undefined) return { ok: false, reason: "missing-output", output: feedbackOutput }
+  if (currentDesktopToolkit === undefined) return { ok: false, reason: "missing-output", output: desktopToolkitOutput }
   if (currentClaimReceipt === undefined) return { ok: false, reason: "missing-output", output: claimReceiptOutput }
   const currentComputerUse = await readBuiltEntry(computerUseOutput)
   if (currentComputerUse === undefined) return { ok: false, reason: "missing-output", output: computerUseOutput }
+  const computerRunWorkerOutput = join(dirname(computerUseOutput), COMPUTER_RUN_WORKER_NAME)
+  const currentComputerRunWorker = await readBuiltEntry(computerRunWorkerOutput)
+  if (currentComputerRunWorker === undefined)
+    return { ok: false, reason: "missing-output", output: computerRunWorkerOutput }
+  const computerRunWasmOutput = join(dirname(computerUseOutput), COMPUTER_RUN_WASM_NAME)
+  const currentComputerRunWasm = await readFile(computerRunWasmOutput).catch(() => undefined)
+  if (currentComputerRunWasm === undefined)
+    return { ok: false, reason: "missing-output", output: computerRunWasmOutput }
+  if (sha256(currentComputerRunWasm) !== sha256(await readFile(computerRunWasmSourcePath()))) {
+    return { ok: false, reason: "stale-output", output: computerRunWasmOutput }
+  }
   const currentGatewayStoreWorker = await readBuiltEntry(gatewayStoreWorkerOutput)
-  if (currentGatewayStoreWorker === undefined) return { ok: false, reason: "missing-output", output: gatewayStoreWorkerOutput }
+  if (currentGatewayStoreWorker === undefined)
+    return { ok: false, reason: "missing-output", output: gatewayStoreWorkerOutput }
   const currentThreadSdk = await readBuiltEntry(threadSdkOutput)
   if (currentThreadSdk === undefined) return { ok: false, reason: "missing-output", output: threadSdkOutput }
 
-  const tempRoot = await mkdtemp(join(tmpdir(), "omo-senpi-build-check-"))
+  const ownsReproduction = options.expectedRoot === undefined
+  const tempRoot = ownsReproduction ? await mkdtemp(join(tmpdir(), "omo-senpi-build-check-")) : options.expectedRoot
   const expected = {
     outputPath: join(tempRoot, "omo.js"),
     taskOutputPath: join(tempRoot, "omo-task.js"),
@@ -113,9 +156,8 @@ export async function checkExtensionCurrent(options = {}) {
     sidePanelRuntimeOutputPath: join(tempRoot, "omo-side-panel.js"),
     onboardingScanRuntimeOutputPath: join(tempRoot, "omo-onboarding-scan.js"),
     toolkitSdkOutputPath: join(tempRoot, "runtime", "agent-toolkit-sdk", "sdk.js"),
+    bunshinTsOutputPath: join(tempRoot, "runtime", "bunshin-ts", "sdk.js"),
     rollbackRuntimeOutputPath: join(tempRoot, "runtime", "rollback-migrate.js"),
-    doriLayerOutputPath: join(tempRoot, "runtime", "dori", "layer2.js"),
-    doriReplayOutputPath: join(tempRoot, "runtime", "dori", "replay.js"),
     memoryDoctorOutputPath: join(tempRoot, "omo-memory-doctor.js"),
     memoryMemfsOutputPath: join(tempRoot, "omo-memory-memfs.js"),
     memoryPalaceOutputPath: join(tempRoot, "omo-memory-palace.js"),
@@ -123,24 +165,26 @@ export async function checkExtensionCurrent(options = {}) {
     memoryCommandsOutputPath: join(tempRoot, "omo-memory-commands.js"),
     sessionHistoryOutputPath: join(tempRoot, "omo-session-history.js"),
     recallStoreOutputPath: join(tempRoot, "omo-recall-store.js"),
-    doriMigrationOutputPath: join(tempRoot, "omo-dori-migration.js"),
+    deviceServiceOutputPath: join(tempRoot, "omo-device-service.js"),
     telemetryPosthogOutputPath: join(tempRoot, "omo-telemetry-posthog.js"),
+    telemetryOtlpOutputPath: join(tempRoot, "omo-telemetry-otlp.js"),
     memorySyncOutputPath: join(tempRoot, "omo-memory-sync.js"),
     threadClientOutputPath: join(tempRoot, "omo-thread-client.js"),
+    wakeOutputPath: join(tempRoot, "omo-wake.js"),
     telemetryRecoveryOutputPath: join(tempRoot, "omo-telemetry-recovery.js"),
     feedbackOutputPath: join(tempRoot, "omo-feedback.js"),
+    desktopToolkitOutputPath: join(tempRoot, "omo-desktop-toolkit.js"),
     claimReceiptOutputPath: join(tempRoot, "omo-claim-receipt.js"),
     computerUseOutputPath: join(tempRoot, "omo-computer-use.js"),
     gatewayStoreWorkerOutputPath: join(tempRoot, GATEWAY_STORE_WORKER_NAME),
     threadSdkOutputPath: join(tempRoot, THREAD_SDK_RELATIVE_PATH),
   }
   try {
-    await buildExtension(expected)
+    if (ownsReproduction) await buildExtension(expected)
     for (const [current, built, outputFile] of [
       [currentRollbackRuntime, expected.rollbackRuntimeOutputPath, rollbackRuntimeOutput],
-      [currentDoriLayer, expected.doriLayerOutputPath, doriLayerOutput],
-      [currentDoriReplay, expected.doriReplayOutputPath, doriReplayOutput],
       [currentToolkitSdk, expected.toolkitSdkOutputPath, toolkitSdkOutput],
+      [currentBunshinTs, expected.bunshinTsOutputPath, bunshinTsOutput],
       [currentMain, expected.outputPath, output],
       [currentTask, expected.taskOutputPath, taskOutput],
       [currentMember, expected.memberOutputPath, memberOutput],
@@ -155,14 +199,22 @@ export async function checkExtensionCurrent(options = {}) {
       [currentMemoryCommands, expected.memoryCommandsOutputPath, memoryCommandsOutput],
       [currentSessionHistory, expected.sessionHistoryOutputPath, sessionHistoryOutput],
       [currentRecallStore, expected.recallStoreOutputPath, recallStoreOutput],
-      [currentDoriMigration, expected.doriMigrationOutputPath, doriMigrationOutput],
+      [currentDeviceService, expected.deviceServiceOutputPath, deviceServiceOutput],
       [currentTelemetryPosthog, expected.telemetryPosthogOutputPath, telemetryPosthogOutput],
+      [currentTelemetryOtlp, expected.telemetryOtlpOutputPath, telemetryOtlpOutput],
       [currentMemorySync, expected.memorySyncOutputPath, memorySyncOutput],
       [currentThreadClient, expected.threadClientOutputPath, threadClientOutput],
+      [currentWake, expected.wakeOutputPath, wakeOutput],
       [currentTelemetryRecovery, expected.telemetryRecoveryOutputPath, telemetryRecoveryOutput],
       [currentFeedback, expected.feedbackOutputPath, feedbackOutput],
+      [currentDesktopToolkit, expected.desktopToolkitOutputPath, desktopToolkitOutput],
       [currentClaimReceipt, expected.claimReceiptOutputPath, claimReceiptOutput],
       [currentComputerUse, expected.computerUseOutputPath, computerUseOutput],
+      [
+        currentComputerRunWorker,
+        join(dirname(expected.computerUseOutputPath), COMPUTER_RUN_WORKER_NAME),
+        computerRunWorkerOutput,
+      ],
       [currentGatewayStoreWorker, expected.gatewayStoreWorkerOutputPath, gatewayStoreWorkerOutput],
       [currentThreadSdk, expected.threadSdkOutputPath, threadSdkOutput],
     ]) {
@@ -173,13 +225,26 @@ export async function checkExtensionCurrent(options = {}) {
     const stalePersona = await findStaleRuntimePersona(tempRoot, dirname(output), extensionBuildPaths.repoRoot)
     if (stalePersona !== undefined) return { ok: false, reason: "stale-output", output: stalePersona }
     const expectedPrelude = await readFile(join(tempRoot, COMPUTER_PRELUDE_ASSET_NAME), "utf8")
-    const currentPrelude = await readFile(join(dirname(output), COMPUTER_PRELUDE_ASSET_NAME), "utf8").catch(() => undefined)
+    const currentPrelude = await readFile(join(dirname(output), COMPUTER_PRELUDE_ASSET_NAME), "utf8").catch(
+      () => undefined,
+    )
     if (currentPrelude !== expectedPrelude) {
       return { ok: false, reason: "stale-output", output: join(dirname(output), COMPUTER_PRELUDE_ASSET_NAME) }
     }
-    return { ok: true, output, taskOutput, memberOutput, advisorRuntimeOutput, sidePanelRuntimeOutput, computerUseOutput, gatewayStoreWorkerOutput, threadSdkOutput }
+    return {
+      ok: true,
+      output,
+      taskOutput,
+      memberOutput,
+      advisorRuntimeOutput,
+      sidePanelRuntimeOutput,
+      computerUseOutput,
+      gatewayStoreWorkerOutput,
+      threadSdkOutput,
+      wakeOutput,
+    }
   } finally {
-    await rm(tempRoot, { recursive: true, force: true })
+    if (ownsReproduction) await rm(tempRoot, { recursive: true, force: true })
   }
 }
 

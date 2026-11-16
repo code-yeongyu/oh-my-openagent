@@ -7,14 +7,16 @@ import { OmoGitMasterSettingsLayerSchema, OmoGitMasterSettingsSchema } from "./g
 import { OmoHarnessIdSchema, type OmoHarnessId } from "./harness"
 import { OmoMemorySettingsLayerSchema, OmoMemorySettingsSchema } from "./memory"
 import { OmoModelCatalogLayerSchema, OmoModelCatalogSchema } from "./model-catalog"
+import { OmoModelPadSchema } from "./model-pad"
 import { OmoModelProfilesLayerSchema, OmoModelProfilesSchema } from "./model-profile"
 import { OmoSidePanelSettingsLayerSchema, OmoSidePanelSettingsSchema } from "./side-panel"
 import { OmoTaskSettingsLayerSchema, OmoTaskSettingsSchema } from "./task"
 import { OmoTeamsConfigLayerSchema, OmoTeamsConfigSchema } from "./team"
 import { OmoTelemetrySettingsLayerSchema, OmoTelemetrySettingsSchema } from "./telemetry"
+import { OmoDeviceServiceSettingsLayerSchema, OmoDeviceServiceSettingsSchema } from "./device-service"
 import { OmoFormatOnMutationLayerSchema, OmoFormatOnMutationSchema } from "./format-on-mutation"
-import { OmoDoriSectionSchema } from "./dori"
 import { OmoProvenanceSettingsSchema } from "./provenance"
+import { OmoSessionWakeSettingsSchema } from "./session-wake"
 
 export type { OmoHarnessId }
 export { OmoHarnessIdSchema }
@@ -34,105 +36,121 @@ export const OmoDisabledSkillsSchema = z.array(z.string())
  */
 export const OmoExcludedModelsSchema = z.array(z.string())
 
-export const OmoTypedHarnessConfigSchema = z.object({
-  provenance: OmoProvenanceSettingsSchema.optional(),
-  formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
-  dori: OmoDoriSectionSchema.optional(),
-  categories: OmoCategoriesConfigSchema.optional(),
-  agents: OmoAgentsConfigSchema.optional(),
-  git_master: OmoGitMasterSettingsLayerSchema.optional(),
-  task: OmoTaskSettingsLayerSchema.optional(),
-  teams: OmoTeamsConfigLayerSchema.optional(),
-  models: OmoModelCatalogLayerSchema.optional(),
-  model_profiles: OmoModelProfilesLayerSchema.optional(),
-  model_profile: z.string().optional(),
-  memory: OmoMemorySettingsLayerSchema.optional(),
-  telemetry: OmoTelemetrySettingsLayerSchema.optional(),
-  side_panel: OmoSidePanelSettingsLayerSchema.optional(),
-  computer: OmoComputerSettingsLayerSchema.optional(),
-  disabled_skills: OmoDisabledSkillsSchema.optional(),
-  exclude_models: OmoExcludedModelsSchema.optional(),
-}).strict()
+export const OmoTypedHarnessConfigSchema = z
+  .object({
+    provenance: OmoProvenanceSettingsSchema.optional(),
+    session_wake: OmoSessionWakeSettingsSchema.optional(),
+    formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
+    categories: OmoCategoriesConfigSchema.optional(),
+    agents: OmoAgentsConfigSchema.optional(),
+    git_master: OmoGitMasterSettingsLayerSchema.optional(),
+    task: OmoTaskSettingsLayerSchema.optional(),
+    teams: OmoTeamsConfigLayerSchema.optional(),
+    models: OmoModelCatalogLayerSchema.optional(),
+    model_profiles: OmoModelProfilesLayerSchema.optional(),
+    model_profile: z.string().optional(),
+    model_pad: OmoModelPadSchema.optional(),
+    memory: OmoMemorySettingsLayerSchema.optional(),
+    telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+    device_service: OmoDeviceServiceSettingsLayerSchema.optional(),
+    side_panel: OmoSidePanelSettingsLayerSchema.optional(),
+    computer: OmoComputerSettingsLayerSchema.optional(),
+    disabled_skills: OmoDisabledSkillsSchema.optional(),
+    exclude_models: OmoExcludedModelsSchema.optional(),
+  })
+  .strict()
 
-export const OmoConfigProfileSchema = z.object({
-  provenance: OmoProvenanceSettingsSchema.optional(),
-  formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
-  dori: OmoDoriSectionSchema.optional(),
-  categories: OmoCategoriesConfigSchema.optional(),
-  agents: OmoAgentsConfigSchema.optional(),
-  git_master: OmoGitMasterSettingsLayerSchema.optional(),
-  task: OmoTaskSettingsLayerSchema.optional(),
-  teams: OmoTeamsConfigLayerSchema.optional(),
-  models: OmoModelCatalogLayerSchema.optional(),
-  model_profiles: OmoModelProfilesLayerSchema.optional(),
-  model_profile: z.string().optional(),
-  memory: OmoMemorySettingsLayerSchema.optional(),
-  telemetry: OmoTelemetrySettingsLayerSchema.optional(),
-  side_panel: OmoSidePanelSettingsLayerSchema.optional(),
-  computer: OmoComputerSettingsLayerSchema.optional(),
-  disabled_skills: OmoDisabledSkillsSchema.optional(),
-  exclude_models: OmoExcludedModelsSchema.optional(),
-  "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
-  "[native]": OmoTypedHarnessConfigSchema.optional(),
-  "[senpi]": OmoTypedHarnessConfigSchema.optional(),
-  "[codex]": OmoTypedHarnessConfigSchema.optional(),
-}).strict()
+export const OmoConfigProfileSchema = z
+  .object({
+    provenance: OmoProvenanceSettingsSchema.optional(),
+    session_wake: OmoSessionWakeSettingsSchema.optional(),
+    formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
+    categories: OmoCategoriesConfigSchema.optional(),
+    agents: OmoAgentsConfigSchema.optional(),
+    git_master: OmoGitMasterSettingsLayerSchema.optional(),
+    task: OmoTaskSettingsLayerSchema.optional(),
+    teams: OmoTeamsConfigLayerSchema.optional(),
+    models: OmoModelCatalogLayerSchema.optional(),
+    model_profiles: OmoModelProfilesLayerSchema.optional(),
+    model_profile: z.string().optional(),
+    model_pad: OmoModelPadSchema.optional(),
+    memory: OmoMemorySettingsLayerSchema.optional(),
+    telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+    device_service: OmoDeviceServiceSettingsLayerSchema.optional(),
+    side_panel: OmoSidePanelSettingsLayerSchema.optional(),
+    computer: OmoComputerSettingsLayerSchema.optional(),
+    disabled_skills: OmoDisabledSkillsSchema.optional(),
+    exclude_models: OmoExcludedModelsSchema.optional(),
+    "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
+    "[native]": OmoTypedHarnessConfigSchema.optional(),
+    "[senpi]": OmoTypedHarnessConfigSchema.optional(),
+    "[codex]": OmoTypedHarnessConfigSchema.optional(),
+  })
+  .strict()
 
-export const OmoConfigSchema = z.object({
-  provenance: OmoProvenanceSettingsSchema.optional(),
-  formatOnMutation: OmoFormatOnMutationSchema.optional(),
-  dori: OmoDoriSectionSchema.optional(),
-  $schema: z.string().optional(),
-  categories: OmoCategoriesConfigSchema.optional(),
-  agents: OmoAgentsConfigSchema.optional(),
-  git_master: OmoGitMasterSettingsSchema.optional(),
-  task: OmoTaskSettingsSchema.optional(),
-  teams: OmoTeamsConfigSchema.optional(),
-  models: OmoModelCatalogSchema.optional(),
-  model_profiles: OmoModelProfilesSchema.optional(),
-  model_profile: z.string().optional(),
-  memory: OmoMemorySettingsSchema.optional(),
-  telemetry: OmoTelemetrySettingsSchema.optional(),
-  side_panel: OmoSidePanelSettingsSchema.optional(),
-  computer: OmoComputerSettingsSchema.optional(),
-  disabled_skills: OmoDisabledSkillsSchema.optional(),
-  exclude_models: OmoExcludedModelsSchema.optional(),
-  "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
-  "[native]": OmoTypedHarnessConfigSchema.optional(),
-  "[senpi]": OmoTypedHarnessConfigSchema.optional(),
-  "[codex]": OmoTypedHarnessConfigSchema.optional(),
-  profiles: z.record(z.string(), OmoConfigProfileSchema).default({}),
-  _migrations: z.array(z.string()).optional(),
-  legacy_migrations: z.record(z.string(), z.unknown()).optional(),
-}).strict()
+export const OmoConfigSchema = z
+  .object({
+    provenance: OmoProvenanceSettingsSchema.optional(),
+    session_wake: OmoSessionWakeSettingsSchema.optional(),
+    formatOnMutation: OmoFormatOnMutationSchema.optional(),
+    $schema: z.string().optional(),
+    categories: OmoCategoriesConfigSchema.optional(),
+    agents: OmoAgentsConfigSchema.optional(),
+    git_master: OmoGitMasterSettingsSchema.optional(),
+    task: OmoTaskSettingsSchema.optional(),
+    teams: OmoTeamsConfigSchema.optional(),
+    models: OmoModelCatalogSchema.optional(),
+    model_profiles: OmoModelProfilesSchema.optional(),
+    model_profile: z.string().optional(),
+    model_pad: OmoModelPadSchema.optional(),
+    memory: OmoMemorySettingsSchema.optional(),
+    telemetry: OmoTelemetrySettingsSchema.optional(),
+    device_service: OmoDeviceServiceSettingsSchema.optional(),
+    side_panel: OmoSidePanelSettingsSchema.optional(),
+    computer: OmoComputerSettingsSchema.optional(),
+    disabled_skills: OmoDisabledSkillsSchema.optional(),
+    exclude_models: OmoExcludedModelsSchema.optional(),
+    "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
+    "[native]": OmoTypedHarnessConfigSchema.optional(),
+    "[senpi]": OmoTypedHarnessConfigSchema.optional(),
+    "[codex]": OmoTypedHarnessConfigSchema.optional(),
+    profiles: z.record(z.string(), OmoConfigProfileSchema).default({}),
+    _migrations: z.array(z.string()).optional(),
+    legacy_migrations: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict()
 
-export const OmoConfigLayerSchema = z.object({
-  provenance: OmoProvenanceSettingsSchema.optional(),
-  formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
-  dori: OmoDoriSectionSchema.optional(),
-  $schema: z.string().optional(),
-  categories: OmoCategoriesConfigSchema.optional(),
-  agents: OmoAgentsConfigSchema.optional(),
-  git_master: OmoGitMasterSettingsLayerSchema.optional(),
-  task: OmoTaskSettingsLayerSchema.optional(),
-  teams: OmoTeamsConfigLayerSchema.optional(),
-  models: OmoModelCatalogLayerSchema.optional(),
-  model_profiles: OmoModelProfilesLayerSchema.optional(),
-  model_profile: z.string().optional(),
-  memory: OmoMemorySettingsLayerSchema.optional(),
-  telemetry: OmoTelemetrySettingsLayerSchema.optional(),
-  side_panel: OmoSidePanelSettingsLayerSchema.optional(),
-  computer: OmoComputerSettingsLayerSchema.optional(),
-  disabled_skills: OmoDisabledSkillsSchema.optional(),
-  exclude_models: OmoExcludedModelsSchema.optional(),
-  "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
-  "[native]": OmoTypedHarnessConfigSchema.optional(),
-  "[senpi]": OmoTypedHarnessConfigSchema.optional(),
-  "[codex]": OmoTypedHarnessConfigSchema.optional(),
-  profiles: z.record(z.string(), OmoConfigProfileSchema).optional(),
-  _migrations: z.array(z.string()).optional(),
-  legacy_migrations: z.record(z.string(), z.unknown()).optional(),
-}).strict()
+export const OmoConfigLayerSchema = z
+  .object({
+    provenance: OmoProvenanceSettingsSchema.optional(),
+    session_wake: OmoSessionWakeSettingsSchema.optional(),
+    formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
+    $schema: z.string().optional(),
+    categories: OmoCategoriesConfigSchema.optional(),
+    agents: OmoAgentsConfigSchema.optional(),
+    git_master: OmoGitMasterSettingsLayerSchema.optional(),
+    task: OmoTaskSettingsLayerSchema.optional(),
+    teams: OmoTeamsConfigLayerSchema.optional(),
+    models: OmoModelCatalogLayerSchema.optional(),
+    model_profiles: OmoModelProfilesLayerSchema.optional(),
+    model_profile: z.string().optional(),
+    model_pad: OmoModelPadSchema.optional(),
+    memory: OmoMemorySettingsLayerSchema.optional(),
+    telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+    device_service: OmoDeviceServiceSettingsLayerSchema.optional(),
+    side_panel: OmoSidePanelSettingsLayerSchema.optional(),
+    computer: OmoComputerSettingsLayerSchema.optional(),
+    disabled_skills: OmoDisabledSkillsSchema.optional(),
+    exclude_models: OmoExcludedModelsSchema.optional(),
+    "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
+    "[native]": OmoTypedHarnessConfigSchema.optional(),
+    "[senpi]": OmoTypedHarnessConfigSchema.optional(),
+    "[codex]": OmoTypedHarnessConfigSchema.optional(),
+    profiles: z.record(z.string(), OmoConfigProfileSchema).optional(),
+    _migrations: z.array(z.string()).optional(),
+    legacy_migrations: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict()
 
 type OmoParsedConfig = z.infer<typeof OmoConfigSchema>
 

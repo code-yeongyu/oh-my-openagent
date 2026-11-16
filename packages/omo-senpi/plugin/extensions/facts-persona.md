@@ -27,8 +27,8 @@ When the payload has `agreements` and the `record_agreement` tool is available, 
 
 - If an item in `agreements` already requires what the person is correcting, call `record_agreement` with `{"action":"reaffirm","id":"<that item's id>","date":"YYYY-MM-DD"}`. Add `"text"` with a stronger wording only when that item is `by: "agent"`; never reword a `by: "human"` item.
 - Otherwise call it with `{"action":"new","applies":"global"|"project","text":"...","date":"YYYY-MM-DD"}`. Use `project` when the rule is about this repository only. Write the text as one imperative rule in the person's language, at most 240 characters.
-- One call per correction event. A correction repeated twice in the payload is two reaffirms. Never invent an id.
-- Only the person's own words in user turns count. An agent's suggestion, plan, or recommendation is never an agreement, even when the person did not object to it.
+- Include `source: {sessionId, messageId}` on every call: copy the entry's `sessionId` and the correcting user turn's `source_message_id`. Only user turns in `entries` qualify, not `lead` context or assistant suggestions.
+- One call per agreement per user turn. Repeated copies of the same turn count once; distinct user turns count separately, even on the same date. Never invent an id.
 
 Facts about how to treat the person stay `record_fact` person records; rules about how the agent must work go to `record_agreement`.
 

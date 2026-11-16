@@ -1,30 +1,387 @@
+## 2026-11-16 - /remote renders enable, disable and control (#13796)
+
+`components/remote/tui/command.ts`: `sessionVerbLines` renders `{enabled}` (enable, disable) and the control state `{attached}` as sentences; anything else still falls back to its JSON. `show` adds the CLI's stderr as a warning after a successful result; `succeeded` shows a failed answer's `notice` (enable exits 3 with `{state, notice}` on stdout, omo-native `remote-bootstrap.ts`) before stderr and the exit code. Tests assert note type, count and the deadline handed to the runner instead of pinning notice wording.
+
+## 2026-11-14 - `thread_interrupt` stops the interrupted turn's background jobs
+
+- `src/components/thread/control/interrupt.ts` (new): `interruptOver`, the one interrupt body of both legs. It sends the engine's `interrupt` record with `background: "stop"` and reads the reply into `{ interrupted, turn_id, background }`; a reply with no `background` (an engine before senpi's `interrupt { background }`) reads as `not_supported`.
+- `src/components/thread/control/local-control.ts` and `control/relay-control.ts`: `interrupt` is `interruptOver` over this device's endpoint (`port.interrupt`) and over the device service (`sessionCommand`) respectively; neither builds its own record or parses its own reply any more.
+- `src/components/thread/tools/ports.ts`, `live-surface.ts`, `lazy-live-surface.ts`: the endpoint port's `interrupt` takes the request fields and answers the engine's reply data.
+- `src/components/thread/contracts/results.ts`, `control/operations.ts`, `control/port.ts`: the `thread_interrupt` result carries the typed `background` (`ThreadInterruptBackground`).
+- Why: measured on a remote thread, the interrupted turn's auto-detached `sleep 60` kept running, its completion woke the thread about 60 s later and the thread replied anyway.
+
+## 2026-11-16 - bunshin-ts SDK: typed fanout-run errors and resultOf naming (#13813, follow-up to #13744)
+
+`typedClient` returns the fanout run behind a proxy that types the run's own failure (`fanout on the fleet`) and every per-target error the runner made, such as a `FanoutTimeoutError` (`fanout on <device>`), while an error the callback threw passes as thrown; the machines in its outcomes and result are typed too. `FanoutOptionsError` and `FanoutDuplicateTargetError` map to `invalid_arguments`, `FanoutTimeoutError` to `timeout`. Only device-addressed calls (`getMachine`, `listTools`, `getPolicy`, `setPolicy`) use their first argument as the device; `resultOf` reports the fleet and puts its argument in `details.request_id`. New test: `bunshin-ts-fanout-errors.test.ts` (unknown target awaited and iterated, duplicate target, invalid options, per-target timeout, a callback's own error, `resultOf`); `bunshin-ts-sdk.test.ts` checks that the relay transport's new surface is exposed and typed through the SDK entry.
+
+## 2026-11-11 - Remote open_session rides the endpoint dialer, and borrowed connections stay open (#13761, adopting #13075)
+
+`endpointCommand` in `device-service.ts` sends an `open_session` through `dialEndpoint` (a fresh owned connection per call by default) and closes it in `finally` only when owned; every other record rides the long-lived connection; a borrowed connection (the CLI's shared one, `owned: false`) is left open for its owner. The attach that follows still rides the long-lived connection, which then carries one copy per delta. `device-service.test.ts` pins the split: the open leaves a borrowed connection open for the model set that follows. `device-service-watch.test.ts` pins the duplicate: one copy with the per-call dialer, two without it.
+
+## 2026-11-16 - thread_create carries the launch profile and the first prompt (#13748)
+
+`contracts/create-params.ts`: `model` (exact provider/id), `reasoning`, `permission_preset`, `prompt`, `delivery`, all for a new thread only (`control/create-launch.ts` refuses them with `thread`, a `delivery` without `prompt`, a model that is not provider/id, and a `permission_preset` wider than the creator's, before anything opens). The model and level ride on the `open_session` frame as senpi's launch profile (`provider`, `modelId`, `thinkingLevel`) on both legs (`SessionOpenRequest`, `ThreadHost.openSession`), so senpi's `model_unavailable` refusal (open-session-model.ts) creates nothing; `control/open-reply.ts` `modelRefusal` maps it to `model_not_found` with `details.reason: "model_unavailable"` on the relay leg and from the local host's thrown text (worktree discarded first). `contracts/permission-presets.ts` holds senpi's preset list and `presetWithin`, the allows-no-more order (full-access > workspace > accept-edits > read-only > ask; auto only between full-access and ask; an unknown creator may ask only for ask). `tools.ts` `firstPrompt` delivers `prompt` through `deliverThrough` to the created thread itself (device + durable id, never a name lookup, #13001) under `<create key>:prompt`; a replayed create answers its stored result, so it is sent once per key. The result's `prompt` is the delivery or `{ error }`; the thread stays created. Test: `control/thread-create-options.test.ts`. `remote/device-service.ts` `attachAddressed`: a durable id (a UUID) is located first and never sent to `session.attach` (a device service refuses it `invalid_request` since relay-daemon#1350, and crashed on it before); any other address is attached as typed and located once when the attach refuses it (`session_not_found` or `invalid_request`), so every verb accepts the id `open` printed (omo#13707); the port and `omo remote attach` share it. `remote/address-book.ts` `createdDeviceRow` addresses a just-created remote session by its open reply's relay key. Tests: `remote/device-service.test.ts`.
+
+## 2026-11-16 - bunshin-ts SDK: typed device operation failures (#13744, fixes #13406)
+
+`bunshin-ts-errors.ts` holds `BunshinSessionError` (moved from `bunshin-ts-pick-transport.ts`, still exported under the same name) with the thread tools' failure shape plus `uncertain` and `details`, and `deviceOperationError`, which classifies a rejection by its wire code (relay op-result codes 1:1, hub and relay transport codes by recovery class) or by the vendored error class name. `bunshin-ts-typed-machine.ts` wraps the lazy client and every machine it hands out (fanout callbacks, `withToken` / `withTask` / `tool()` results included); `createLazyBunshinClient` classifies a connect failure as `host_unavailable`. New test: `bunshin-ts-device-errors.test.ts` (operation x bad argument / offline / denied / transport lost, every relay code, the fs.read decode error, connect, `no_transport`).
+
+## 2026-11-16 - Remote wake and wait (#13743)
+
+`remote/remote-watch.ts` (watch v2, from the closed #12725): `RemoteSessionsPort.watch(device, session, handlers, options)` follows a session across attach ends, device-service restarts and engine restarts (re-attach with 1 s to 30 s backoff, resync from a fresh `get_state`, re-locate by durable id), deduplicates by stream seq and turn id, and bounds its queue at 256 records. `remote/attach-pool.ts` refcounts the one attach per session and detaches it 600 s after its last holder. `remote/monitor-source.ts` serves senpi's `RpcRemoteSource` seam, registered by `remote/lazy-ops.ts` `registerRemoteMonitorTargets`. `control/relay-control.ts` `waitSettled` backs `thread_read` `wait_ms` and settles only on an observed turn end (or 3 s of no run at all); a thread on this device answers `unsupported`. `followRemote` (`omo remote send`) still ends on a gap with its reason. `device-service-core` carries optional per-record `seqs` on `session.records`.
+
+## 2026-11-16 - /remote in the TUI (#13412)
+
+`components/remote/tui/` registers `/remote` (component `remote`, after `device-service`). Each action runs one `$OMO_BIN remote <verb> --json` process through `run-omo.ts`, the only spawn helper, imported only by `command.ts` (design v8-core r2 B5, guard G4b), and renders the typed answer: a `{kind:"error"}` result shows its message and `next_action`, an exit without JSON shows the CLI's stderr. `send` puts the text after `--`. With no absolute `OMO_BIN` the command says so and spawns nothing. **Must not break:** no device-service client or local-API connection enters the engine bundle from this component.
+
+## 2026-11-13 - A replaced desktop account ends, and a begin that crosses a retirement owns nothing (#13327 review follow-up)
+
+- **An account that is no longer current ends.** `desktopSyncAccount.ts` `isCurrent()` ends the account (aborts its signal) when it answers false: main's describe or durable record moved on without a `retired` event. Its `retired` listener leaves the channel, and the resolver's `onEnded` ends sessions on it once; before, it stayed on the channel with a live signal until the next `retired` or the channel's end.
+- **Session Workers.** `workerPort.ts` counts main's `retired` events; an `operationBegin` whose reply arrives after a retirement it was sent before is refused to the Worker and its handle is never owned, so the host never forwards that dead handle to main.
+- The rollover test now asserts a refused describe reads signed out (`null`) on both threads exactly; on the main thread that is #13329's refusal mapping, which this follow-up merges.
+- **Must not break:** an account the account source has replaced must not keep listening on the channel; a handle begun for a retired account must never be owned.
+
+## 2026-11-14 - thread tools: one answer on this device and on another one
+
+`control/locate.ts` resolves a control tool's address against the send address book (`sendAddressBook`: the session files an address names are looked up when no endpoint lists it), so the control tools and `thread_send` find the same threads; `tools/read-ops.ts` reads any not-running thread that has a session file here, not only one whose endpoint died. `control/session-host.ts` `openedThread` is the one create summary both session hosts answer. `control/local-session-host.ts` `workspaceNote` adds the out-of-workspace note to a thread this device opened.
+
+## 2026-11-14 - thread_create: device, folder and worktree (#13393, #13408, #13400)
+
+`thread_create` on another device returns the durable id (`control/relay-session-host.ts` reads the engine's `state.sessionId`). Placement is split: `remote/plan-create.ts` (device and session) and `remote/create-folder.ts` (relative `cwd`, worktree preconditions). `worktree/` holds the worktree creation (`thread-worktree.ts`, typed reasons in `failures.ts`), the `omo.thread.worktree` extension request another device's thread_create sends (`worktree-rpc.ts`, registered with the initial skills in `create-receivers.ts`), and its client over the relay (`remote-worktree.ts`: a short-lived session in the repository folder, the request, the close ladder). `ThreadCreateParams` moved to `contracts/create-params.ts`.
+
+## 2026-11-13 - A desktop refusal on the main-thread channel reads as signed out (#13325 follow-up)
+
+- `desktop-sync/channel.ts` rejects a `{ok: false, reason: "refused"}` reply with `DesktopSyncRefused` (desktopSyncProtocol.ts), the class a session Worker's port already used. It used to reject with `DesktopSyncUnavailable`, so on the main thread `selected-account-source.ts` rethrew a signed-out desktop's refusal instead of reading it as signed out (null), and the sync runner saw an error.
+- Unchanged: a broken channel (disconnect, malformed or foreign frame, unknown reply id, more than 64 in flight, closed lifetime) still rejects with `DesktopSyncUnavailable`.
+- **Must not break:** a refusal must not close the channel; the account source maps only `DesktopSyncRefused` to signed out.
+
+## 2026-11-13 - An account rollover on the desktop's private channel no longer ends memory sync (#13325)
+
+- **`retired` ends the account, not the channel.** `desktop-sync/channel.ts` hands a `retired` event to its listeners and keeps the channel open; a closed stream (and a malformed or foreign frame) is still the only permanent end.
+- **The account owns the end.** `openDesktopSyncAccount` gives each account its own signal: the channel's signal plus main's next `retired` event, listened for before the descriptor request so an account whose describe raced its retirement ends too. Its boundary, operations, subscription and `isCurrent` use that signal, so the resolver's `onEnded` ends open sync sessions on the old account exactly once, and the selected account source's next resolve opens main's next account (or reads signed out while main refuses).
+- **Session Workers.** `workerPort.ts` forwards `retired` to every Worker port (other events stay scoped to the port's own handles) and forgets the port's handles, which died with the account.
+- **Mixed versions.** A desktop that still closes the stream on retirement leaves the engine as before (unavailable until restart). A desktop that keeps the stream and sends `retired` gets the new account on the next resolve; an engine before this change reads that `retired` as the end of the channel, as before.
+- **Must not break:** do not close the channel on `retired`; do not let an account outlive the channel.
+
+## 2026-11-12 - A fuzzy handoff resolves exact names first and ranks ended remote rows with every other candidate (#13141, follows #13066)
+
+`tools/internals.ts` `resolveAcross`: for `match: "fuzzy"` the exact ladder (`resolveTarget`: id, alias, name) runs first over local entries plus every account row, ended ones included, and its hit is the answer unless it is the caller. Otherwise `fuzzyMatch` ranks one set: local entries, the account's live rows and the ended rows `fuzzyContenders` (`addressing.ts`) keeps, those scoring at least the accept floor minus the margin (0.64), the only ones that can lead or block a leader. The 500-candidate cap applies to that set. Review fix at 54e5b128ab: ended rows were compared only when local plus live answered `not_found`, so a live row at or above 0.72 beat an ended row that matched better or exactly ("release planner" went to the live "release planner notes", while exact reached the ended "release planner"). Tests (`remote/route-parity.test.ts`): "600 ended remote rows + unique local" (non-contending ended rows stay out of the cap), "live remote exact title beats a local near-match", "only an ended remote row matches" (fuzzy and exact reach it through the same relay calls), "an ended row named exactly as the query and a live near-match" (RED at 54e5b128ab: sent to dur-on-b; fuzzy and exact relay calls now `toStrictEqual`), unequal scores in both directions (RED at 54e5b128ab for the better ended row), "a live and an ended row match equally" now `ambiguous_target` with no send (54e5b128ab sent to the live row; the exact path refuses two rows sharing a name), and exact/fuzzy parity on a local exact name with a remote near-match.
+
+## 2026-11-12 - A claim that asks for a sign-in after the create names the thread locally (#13179, follows #13112)
+
+`remote/cross-device.ts` `claimCreatedAlias` (the claim half of `withAlias`, exported through `live-surface.ts` and `remote/lazy-ops.ts`) answers `{ local: "sign_in" }` when the post-create claim answers `alias_registry_unavailable` with reason `sign_in`; `withAlias` keeps its old behaviour for an opened thread. `tools.ts` `thread_create` then names the created thread by the trimmed alias through `nameCreatedThread` (the create's `checkNameConflict` against the device's other threads, then the located control's `setName`), unless `name` was given; a refused name keeps the thread as created and adds `local_name_unavailable` with the refusing code (`contracts/results.ts` `ThreadLocalAliasNote`). `renameAlias` answers `{ local: "sign_in" }` when the claim or rename itself asks for a sign-in. The no-account create path trims the alias it uses as the name, as `thread_rename` does. Tests: `thread-local-alias-claim.test.ts` (fixture `claimDown`), the padded-alias cases, and an alias-only `thread_rename` on a relay target with no alias registry in `thread-local-alias.test.ts`.
+
+## 2026-11-11 - An alias no account can hold becomes the thread's local name (#13112, fixes #13104)
+
+`remote/cross-device.ts` `planCreate` no longer ends `thread_create` when the alias registry answers `alias_registry_unavailable` with reason `sign_in`, the remote surface has no alias registry, or there is no remote surface. A new thread is still placed, and the plan carries `localAlias` with the reason. `tools.ts` names the thread by the alias unless `name` is given, runs the normal `name_conflict` check, skips the claim, and adds `alias_scope: "local"` and `alias_unavailable: "sign_in" | "no_registry" | "no_remote"` (`contracts/results.ts` `ThreadLocalAliasNote`). `renameAlias` answers `{ local }` without changing anything, and `thread_rename` then makes the alias the name. Opening an existing thread with an alias, and every other registry failure, are unchanged. The desktop's own sign-in path for account-wide aliases is #13105.
+
+## 2026-11-10 - The reply allowance lasts for the work a delivery started (#13042, part of #12996)
+
+`component.ts` `noteInput`: a custom message that is no delivery (an engine-started turn) keeps `replyTo`, `replySenders`, `chainHop` and `cause`; after a final answer, a user-role message or any delivery clears them (the new delivery re-adds its own sender; nothing of the earlier group survives), and an engine-started message after the answer clears `consumed` whether or not the settle ran first; `agent_settled` no longer clears them; it still clears `consumed` (a report without `binding_id` after the run must name its thread, as before) and sets `local = false`, `answered = true`. The same-account bound is not enforceable here: a delivery's details carry sender, remote_origin and chain_count, no account fact; it rests on the engine's admission letting no cross-account agent delivery through (not verified in this change). Tests: `peer-reply.test.ts` decision table gains after_settle (kept), the engine-started turn (kept) and the person's message (ends), per leg; a new case per leg for another sender's delivery starting new work (after the answer, only that sender is approved; the earlier group's other agent is not) versus joining running work; `report-origin.test.ts` proves a report without `binding_id` must name its thread in an engine-started turn before the settle too; `component.test.ts` K8 hop case now reads hop 3, 3, 1 across settle, engine turn, person's message.
+
+The delivery text a receiver gets (`gateway/constants.ts` `GATEWAY_PEER_REPLY_SENTENCE`) now names the call it can make - `tool.thread_send({ thread: <sender_session>, message })` inside an eval cell - since the thread family is eval-only, like bash (#12903); the render test pins the eval form.
+
+## 2026-11-10 - omo remote send on the one delivery pipeline (#13038, part of #13016)
+
+## 2026-11-10 - A local send names the approval its receiver waits on (#13035, part of #13008)
+- A delivery queued while the receiving session waits on a question records the wait (gateway schema v11, `deliveries.wait_kind`), and `thread_send` reports it as `waiting_on` on both transports. `DeliveryWait.device` is optional.
+
+## 2026-11-10 - thread: every delivery names its sender device (#13004)
+
+- **One reader for this device.** `remote/this-device.ts`:
+  - `thisDeviceId(remote)` reads `remote.sessions.thisDevice()` once and keeps it per remote surface.
+  - `stampThisDevice(provenance, remote)` adds `device`, or `device_absent` (`no_device_service` | `device_service_unavailable` | `no_device_id`) when the id cannot be read.
+  - Every path that creates a delivery uses it: `tools/gateway-services.ts` `senderProvenance` (local and relay transports), the component's store, the SDK's store and `omo remote send` (`omo-native/remote-session-verbs.ts` `personSenderProvenance`). Decision 0027 section 3 requires every delivery to name its sender device, with the local transport stamping this device.
+- **No origin test.** `component.ts` drops `fromOtherDevice`, which read `details.remote_origin`. Every consumed delivery is `run.cause`.
+- **Unknown cause.** `gateway/store-ops.ts` `placeCausally` treats a cause no row here holds as a new root with the hop kept, instead of refusing it as `unknown_cause`. A cause row naming another target is still refused.
+- **#12860 pin relaxed.** A send to a published id now makes exactly one `thisDevice` read, and still no alias or listing call.
+- **Must not break:**
+  - Do not add a second reader of this device.
+  - Do not let a failed device read fail a send.
+  - Do not reintroduce a rule that asks whether a delivery came from another device.
+- **Follow-up:** carrying the causal root across devices as data is #13032.
+
+## 2026-11-10 - A send to another device answers with its delivery facts (#13033, part of #13008)
+- `thread_send` and `thread_handoff` to a session on another device return `delivery_id` and `effective_mode` from the relay result, and `endpoint: null`. The hand-off receipt names the thread by the relay result's `thread_id`.
+
+## 2026-11-10 - One resolver across devices, reply by stated name, and one send result on both legs (#13000 with #13006, part of #12996)
+
+
+
+### One send result on both legs, and a route-parity table (#13006)
+
+`tools.ts` `deliverThrough` builds one result for both transports: `delivery`, `deduplicated`, `delivery_id` and `effective_mode` on each; `message_seq` and `endpoint` only for a gateway row on this device, `device` only for another device (the remote handoff receipt carries the same facts; `contracts/results.ts` makes the handoff's `message_seq` optional, which the remote branch never had). Tests: `peer-reply.test.ts` runs the reply-allowance table once per leg (a consumed delivery with and without `remote_origin`) and asserts the two legs equal; `route-parity.test.ts` runs the send-path table (id and name, reply by id and by stated name, `reply_target_mismatch`, `ambiguous_target`, idempotent replay, result keys) against a thread on this device and one on device b; `thread-remote-fixture.ts` `surface()` exposes `permission(args)`, what `thread_send` asks the engine before it runs.
+
+## 2026-11-09 - Thread tools are eval-only (#12907, closes #12903)
+
+`thread/metadata.ts` declares `THREAD_TOOL_EXPOSURE = "eval"` for all eighteen `thread_*` tools (`THREAD_TOOL_METADATA`, formerly `THREAD_TOOL_SEARCH_METADATA`), and `tools/internals.ts` `metadata(name)` returns only name, label, description and exposure. Senpi treats an `"eval"` definition like `bash`: it is withheld from the active tool list while an eval tool is registered, reachable from a cell through the registry with a redirect hint on a direct call, and a direct tool when no eval tool exists. Senpi's tool_search catalog indexes only `"search"` exposure, so the search-only fields (`searchText`, `searchKeywords`, `group`, `allowLazyActivation`) and the BM25 discovery tests are gone; `discovery.test.ts` became `metadata.test.ts` with an eval-exposure check. The family guideline is unchanged. `scripts/qa/thread-tools/plugin-surface.mjs` proves the exposure on a real rpc host with the built extension (direct `thread_list` and `generate_image` refused with the eval hint, js and py cells list threads, `generate_image` reached from a cell); the `lib/gateway.mjs` scenarios disable codemode in their scratch settings because they drive the gateway through the fake model's direct `QA:CALL thread_*` calls. The `plugin/extensions` and `plugin/runtime` bundles are regenerated.
+
+## 2026-11-09 - The once-per-process transient memory sweep re-arms after 24 h (#12899)
+
+`memory/transient-sweep-once.ts` keeps a claim map (memory root -> claim time) under `Symbol.for("omo.memory.transient-sweep.claims")` instead of a set. A claim older than `TRANSIENT_RUN_MAX_AGE_MS` (24 h) re-arms, so the first open after it schedules one more deferred `sweepTransientMemoryRuns`; opens before it start nothing. `cancel()` releases a claim only if it is still its own. `index.ts` passes the component's `now` seam through. `transient-sweep-once.test.ts` checks that a claim re-arms at the 24 h bound and not before it.
+
+## 2026-11-09 - The transient memory sweep runs once per process, off the open path (#12896)
+
+`memory/transient-sweep-once.ts` `scheduleTransientSweepOnce` claims each memory root once per process (a `globalThis` latch under `Symbol.for("omo.memory.transient-sweep.claims")`) and starts `sweepTransientMemoryRuns` on an unref'd 1 s timer, so it no longer runs inside `register()` on every session open. Once started, the sweep is still tracked by the session's in-flight work, so the shutdown drain waits on it. `session_shutdown` releases a claim whose sweep has not started yet. `transient-run-lifecycle.test.ts` counts sweeps across five opens (exactly one, none during an open) and checks that a released claim is swept by the next open.
+
+## 2026-11-10 - Queued behind an approval on another device (#12975, part of #12886)
+
+`remote/relay-transport.ts` reads open `pendingQuestions` from the receiver's `get_state` as parked-on-approval and answers a queued admission with `waiting_on` instead of `idempotency_uncertain`; `gateway/types.ts` / `contracts/results.ts` add the optional `waiting_on` to the queued delivery shape. Test: `remote/relay-transport.test.ts`.
+
+## 2026-11-09 - The default delivery mode steers the running turn (#12921, part of #12879)
+
+`thread/gateway/decision.ts`: the `auto` row of the 15-cell table admits a `mid_turn` target as `steer` with `expected_turn_id` = the target's own `turnEpoch` (`expect: steered`); a `mid_turn` target whose engine reports no epoch still queues (`followUp`), and idle, waiting-question, compacting and offline cells are unchanged. The local drain reads the phase and epoch from its own runtime, as before. `remote/relay-transport.ts` `send` probes `get_state` once for `auto` as it already did for `steer` and decides through the same table; the record then carries `deliverAs: "steer"` and `expectedTurnId` for a running turn. When the engine answers `turn_conflict` to an `auto` steer (the probed turn ended before the record arrived) the same `deliveryId` is re-sent as `followUp` and the reply is read as usual (started when idle, queued behind a turn that began since). A default-mode steer the receiver holds behind its user's open draft (`held_draft`) is re-sent as `followUp` too, and the sender's answer names that lane, so the draft's release can never turn it into a `turn_conflict` the sender does not see; a held re-send that still ends `turn_conflict` is logged as `relay_delivery_failed`. `contracts/params.ts` describes a binding's `inbound_mode: auto` accordingly. Tests: `gateway/decision.test.ts` (table + the two new mid-turn auto cells), `gateway/engine.test.ts` (the local 15 cells), `thread-remote-send.test.ts` (auto steers b's running turn through one `get_state`; the probe-to-record race falls back), and the drain/reconciliation suites updated for the lane the default now takes.
+
+## 2026-11-09 - omo remote send over the transport port, one outcome mapping (#12911, part of #12879)
+
+`thread/remote/outcome.ts` holds the one mapping from a device service `CommandResult` to a `RemoteCommandOutcome` (`outcomeOf`, moved from `device-service.ts`) and from a non-ok outcome to a `ThreadToolFailure` (`outcomeFailure` and `READ_UNCERTAIN`, moved from `remote-ops.ts`); `relay-transport.ts`, `remote-controls.ts`, `remote-ops.ts`, `live-surface.ts`, `lazy-ops.ts` and omo-native's `remote-attach.ts` (the attach TUI's `command` passthrough) read it from there. `GatewaySender` gains `{ kind: "person", uid, user }` (`gateway/types.ts`; `envelope.ts` `senderFacts` keys its receipt as `person:<uid>`). `relay-transport.ts` delivers a person sender as the engine's own `prompt` record (`followUp`, or `steer` after one `get_state` against `expected_turn_id`) behind the same `deviceOnline` preflight, recorded through the same `once` receipt as a peer delivery under a key minted per invocation (a person's retry is a new send, nothing dedupes it); a person steer confirms the running turn by its numeric `currentTurnId`, as the peer path does (an engine reporting a non-numeric turn id is told the turn cannot be confirmed); `local-transport.ts` refuses a person sender (`unsupported`: a person reaches a session on this device through its TUI). `omo-native/remote-session-verbs.ts` `send` builds `createRelayTransport` over this device's gateway store and delivers through it instead of `promptRemote`.
+
+## 2026-11-09 - One create/open/fork body over a SessionHost port; the creator's approval mode on both devices (#12891, part of #12879)
+
+`thread/control/session-host.ts` is the port `thread_create` opens sessions through: `open({ cwd?, sessionPath?, forkFrom?, name?, initialSkills?, permissionPreset? })` and `visible()`, the target device's threads a new name must not collide with. `control/local-session-host.ts` is this device's operator endpoint (`ThreadHost.openSession`, which now takes `permissionPreset` and puts it on the `open_session` frame); `control/relay-session-host.ts` is another device's engine endpoint through the device service (the former `openRemote` body: `endpointCommand open_session`, `locate` for a create or fork, `set_session_name`), answering `summary()` of the engine's reply state keyed by the listing id plus `device`. `remote/cross-device.ts` `planCreate` is placement only: it keeps every device / alias / fork refusal, names the host that opens, and answers an already-live thread as `deduplicated` on both legs (a live session in the view here; a listing row that is not `ended` there). `tools.ts` `thread_create` is one body: the skills shape check, placement, the name conflict over `host.visible()`, one `host.open` with the creator's `permissionPreset` on a create or fork (never on an open of an existing session), then `recordThreadCreator` and `withAlias`, on both legs. Deleted: `openRemote` and `RemoteOpen` (`remote/remote-ops.ts`), `openLocal` (`tools.ts`), `remote/remote-open-mode.test.ts` (its cases run on both legs in `control/session-host.test.ts`); `omo remote open` opens through the relay host.
+
+## 2026-11-09 - One tool body per control tool over a SessionControl port (#12890, part of #12879)
+
+`thread/control/port.ts` defines the `SessionControl` port (interrupt, close, setName, getAvailableModels, setModel, getAvailableThinkingLevels, setThinkingLevel, getMessages); `control/local-control.ts` implements it over the endpoint that listed the session and `control/relay-control.ts` over the other device's `sessionCommand` records. `control/locate.ts` `locateControl` is the only place a control tool reads the device. `control/close-ladder.ts` is the one close ladder on both legs (unload with force, then an attached close and one `get_state` probe for a session with no file yet; a draining host is `host_unavailable`, any other unload refusal is typed `unsupported` naming the reason, on this device as on another). `control/operations.ts` holds the one body per tool, run by `tools.ts` and by `omo remote model|interrupt|close`. `thread_set_reasoning` gains its cross-device leg. Deleted: `remote/remote-controls.ts`, `interruptRemote`/`closeRemote`/`readRemote` from `remote/remote-ops.ts`, their `lazy-ops.ts` wrappers and the per-tool `if remote` branches in `tools.ts`. `thread_interrupt` and `thread_set_reasoning` results name `device` for a thread on another device, as the other control results already did.
+
+## 2026-11-09 - A send to another device is the same delivery as a send on this device (#12889, part of #12879)
+
+`thread/remote/relay-transport.ts` is now a real transport: one `admit_external_message` on the target device's session (senpi#6240), carrying `gateway/provenance.ts` `renderDeliveryText` over the same envelope a same-device delivery gets (`gateway/envelope.ts` `senderFacts`, moved out of `engine.ts`; `decideDelivery` for a steer after one `get_state`), `displayText` = the provenance line + body, `sender: { kind: "agent", session_id, name? }`, `deliverAs`, `expectedTurnId`, `chainCount`. The engine's reply maps to the send contract (`started` / `steered` / `queued` with the engine's own pending count / `already_admitted` = deduplicated / `turn_conflict`); `held_draft` is retried under the same delivery id for about half an hour; an engine without the record answers typed `unsupported` naming the device, never a downgrade to a `prompt`. The `thread_send:remote` tool receipt keeps the retry promise. `remote/peer-text.ts`, `RemoteSender` and the peer half of `promptRemote` are deleted (`omo remote send` keeps a person's `prompt`). Chain continuity on both legs (K8, #12865): `component.ts` reads the engine-stamped `chain_count` of a consumed `session_control_delivery` that carries `remote_origin` (no local row, so no `cause`), `tools/ports.ts` `callerChainHop`, `OutboundDelivery.inbound_hop`, `store-ops.ts` `placeCausally` `hop = max(cause.hop, inbound_hop) + 1`. `sdk.ts` `send` resolves across the account through the same pipeline; a `cli` sender to another device is refused `unsupported` (`sender_not_allowed`) before any record (#12857).
+
+## 2026-11-09 - One delivery pipeline with a transport port (#12887, part of #12879)
+
+`thread/gateway/transport.ts` defines the port: a resolved `DeliveryTarget` (`local` = a session this device holds, `remote` = an account listing row) and one `OutboundDelivery` shape every send becomes, carried by a `DeliveryTransport`. `gateway/local-transport.ts` wraps the gateway engine (row + receipt + inbox marker + wake); `remote/relay-transport.ts` wraps the existing remote prompt send (its `thread_send:remote` tool receipt and the caller's chain facts moved there from `tools.ts`); `gateway/pipeline.ts` routes by the target's kind and is composed once in `tools/gateway-services.ts`. `tools.ts` `deliver` resolves the address (`locate`) and hands one `OutboundDelivery` to the pipeline; `deliverThrough` shapes the result exactly as before, and `remoteOnce` / `remotePeer` are gone. Pure refactor: no result field, refusal code, receipt key or wire record changes. The remote leg becoming a real delivery (`admit_external_message`) is #12882.
+
+## 2026-11-09 - A cross-device peer send names no device in the receiver's text (#12878, fixes #12877)
+
+`thread/remote/peer-text.ts` `peerText` renders exactly the local delivery text (`gateway/provenance.ts` `renderDeliveryText`) with the sender's own provenance and no `device` field; `remote-ops.ts` `promptRemote` no longer asks the device service for this device only to stamp it. Replies resolve the `sender_session` id through the account session list (`cross-device.ts` `crossTarget`, exact id first). `thread-remote-send.test.ts` asserts the remote From line equals the local one and the header carries no `device`.
+
+## 2026-11-08 - A send to another device carries the sender's gateway provenance (#12858, part of #12852)
+
+`thread/remote/remote-ops.ts` `promptRemote` takes a `RemoteSender`: `{ kind: "peer" } & RemotePeer` from the thread tools (`tools.ts` `remotePeer`: caller durable id, caller name, `resolveProvenance` through `tools/gateway-services.ts` `senderProvenance`, the engine's own closure, a fresh delivery id, the cause's `root_id` and hop + 1), or `{ kind: "person", hop: 1 }` from `omo remote send` (`omo-native/remote-session-verbs.ts`), whose text is sent as before. A peer prompt's `message` is `gateway/provenance.ts` `renderDeliveryText` over the delivery the send makes, with the sender's device (`device.info`) as the new optional `Provenance.device` (`From ... / device "<id>"`, header `device=`), and the record sets `expandPromptTemplates: false`. `renderDeliveryText` takes `RenderedDelivery` (the fields it reads, plus any of a stored row). Still open in #12852: the receiver writes the text as `role: "user"` and fires `input` hooks on it until senpi#6233 gives RPC an `admit_external_message` record.
+
+## 2026-11-07 - A remote command on a closed session answers unknown_session (#12755, part of #12320)
+
+`thread/remote/device-service.ts` `sessionReason` maps the device service's `session_not_found` to the engine's `unknown_session` for every session-scoped refusal of the port: a failed attach for `sessionCommand` or `read`, and a command or read-only record refused before sending. Every other code is unchanged, and the attach retry inside `locate` still keys on the raw `session_not_found`. `device-service.test.ts` runs one prompt for a closed session through the local surface (contract host) and through the remote port and asserts both answer the same code; the remote fixture refuses a no-longer-live session with `unknown_session`, as the port does.
+
+## 2026-11-05 - Ancestor enumeration is denied only when a foreign identity exists (#12301)
+
+`guard.ts` used to deny every recursive tool rooted at an ancestor of a memory area. It now lists every area in the call's denied set (lexical and canonical forms, including a transient run's own `transient-runs/<token>/agents`) through `guard-foreign-roots.ts`. Each physical area is listed once by its canonical form, so the verdict does not depend on whether a symlinked home or a case-variant path reached it. Regular files (`.DS_Store`, `desktop.ini`) are skipped because an identity root is a directory; any other entry counts as the caller's own only if it is, or contains, one of the own roots, compared lexically and never resolved, so a dangling link or a link aliasing the own root counts as foreign. A missing area is empty, and any other listing error denies. Because the host checks only the walk's root, an allowed ancestor walk is recorded by `toolCallId`; its `tool_result` re-lists the areas and replaces the whole result with the deny when a foreign root appeared or an area can no longer be listed. The hard filesystem policy still has no ancestor rule, so this soft guard alone covers ancestor enumeration until the host prunes per directory.
+
+## 2026-11-04 - Config-watch creation targets stop at the project root (#12397)
+
+`resolveOmoConfigWatchTargetResolution` bounds the ancestor list used for creation targets with `creationAncestors()`: it stops after the first ancestor holding `.git`, and before any ancestor that contains the user config directory's parent or is the filesystem root. The walk for existing `.omo` config targets is unchanged. Measured on macOS: a session's CPU during 12 s of HOME writes went from 1.69-1.78 s to 0.03-0.04 s.
+
+## 2026-11-02 - Import guard for the shared launch classification module (#11997)
+
+`desktop-sync/launchClassification.test.ts` bundles `launchClassification.ts` on its own and requires the module to be
+its only input, with no imports. The rule that the module stays free of sidecar and private-fds imports used to be a
+comment only; omo.js's registration half imports the module before any sidecar loads, so a later import would have
+pulled that code into omo.js. Test only.
+
+## 2026-11-01 - Shared launch classification for the compiled desktop-sync test (#11997)
+
+`launchCarriedPrivateTable` moved from `device-session/account-runtime-loader.ts` (module-private) to the sidecar-free
+`desktop-sync/launchClassification.ts`; the loader and `desktop-sync/channel-compiled.fixture.ts` both import it, so the
+compiled test can no longer pass on a stale copy of the classification. The fixture header now describes the loader
+wiring it uses. Must not break: the module stays free of sidecar and private-fds imports, because omo.js's
+registration half imports it.
+
+## 2026-10-31 - Desktop memory sync attaches on Windows over senpi's pipe pair (#11997)
+
+`components/memory/desktop-sync/channel.ts` no longer refuses win32. It attaches to the stream senpi's
+`takeInheritedPrivateChannel("memory-sync")` hands over on every platform; on win32 senpi builds that stream
+from two one-way pipes (engine fd 5 read, fd 6 write) and clears their inherit flag before adoption, so the
+receiver opens no descriptor, clears no flag and spawns nothing itself. A declared channel that senpi did not
+adopt (no stream) is `unavailable: private_channel_unavailable` on every platform, never the CLI source.
+Must not break: the receiver stays platform-neutral; Windows handle work belongs to senpi. `channel-compiled.test.ts`
+runs in the Windows Senpi compatibility job and skips the win32 pair case only while the bundled senpi predates
+the pair gate (senpi#5125).
+
+## 2026-11-05 - An applied onboarding scan stays retained for understanding (#12509)
+
+`omo.onboarding.apply` used to delete the scan from the process-wide store before applying it, so `omo.onboarding.understand` on the same `scanId`, which the desktop sends right after About you's apply, answered `unavailable`. Apply now marks the held scan `applied` (checked and set before its first `await`, so racing applies still produce one success) and leaves it retained with its in-memory digests until the ten-minute TTL or the eight-scan eviction removes it; a failed or expired scan is still dropped at apply. A second apply answers `unavailable` as before. The understand refusal no longer lists "was applied" among its causes.
+
+## 2026-11-04 - A timed-out bwrap probe is not cached (#12378)
+
+`probeBwrapUsability` used to memoize every verdict for the process lifetime, including a smoke test that hit its 3000 ms timeout. Under `auto` every later reflection child then ran unsandboxed, and under `required` every later reflection was refused. Only definitive verdicts are memoized now (exited 0, exited nonzero such as the user-namespace denial, or spawn failure). A timeout is returned to its caller and the next spawn's probe runs the smoke again. Concurrent callers still share one in-flight smoke.
+
+Because a timed-out spawn now runs unsandboxed under `auto` while the next one re-probes, the deferred (async) probe path reports per spawn: the transform's `wasSandboxed` and `warning` describe the latest spawn instead of the build-time guess, and `identity-runtime` logs `memory reflection sandbox degraded` when the state changes to a new degradation reason (and `memory reflection sandbox restored` when it recovers), never once per spawn. `required` still fails closed. A test also pins that a spawn-error verdict stays cached (the smoke never runs again).
+
+## 2026-11-04 - The next turn releases a run Stop whose Resume was missed (#12343)
+
+When the run-pause bridge misses the Resume of a user Stop, the pause ledger stays `applied` with admission closed while the engine holds no Stop, and no later hold-change event can arrive. `EngineRunPauseBridge.releaseStale()` resumes the recorded Stop through the normal Resume path when the engine's live ledger is at or past it and holds no user Stop, and every real `before_agent_start` starts it in the background. It acts only on a Stop left `applied` with no Resume already in flight, so the ordinary Stop-then-message path keeps its own Resume, and the turn never waits on child resume turns; a failure is logged.
+
+## 2026-11-03 - Run-paused task children resume and never stay paused forever (#12268)
+
+A user Stop pauses the background children of that run. The run's Resume now reaches them: the bridge resumes the recorded Stop whenever the resumed event's seq is at or above it, because the Stop's own `run_fence` holds raise the engine seq. A participant the released Resume could not restore is retried on a bounded schedule; one still lost after that has its paused run ended as `error` with `failure_kind: session_unavailable`, its lane slot freed and its parent notified. A paused child a live foreign host owns is never ended. The widget renders a paused child as paused with no clock, and `/task-kill` lists paused children.
+
+## 2026-10-28 - Memory shutdown waits for in-flight memory work (#11671)
+
+`MemoryBlockCache.settled()` and `RecallCorpusCache.settled()` now cover every call from its first repository read (HEAD, the persisted-store load, the compile or corpus load) through a shared `InFlightReads` tracker, and the prompt prebuild runs its HEAD read through `MemoryBlockCache.track()`. The memory component registers its hooks through `trackMemoryHooks()`, which tracks every hook's promise (`session_shutdown` itself excepted) and every memory tool execute in one component-wide tracker (on quit the host runs the drain before it aborts a running tool); the bind-time reconcile, the registration-time transient sweep, the sync-status refresh, pressure dream requests and idle dream fires run through it too, and the shutdown drain awaits it in a `memory-work-settle` step that runs last, after the drain's own steps (`wiring-shutdown.ts`), so work that stalls cannot starve the facts enqueue, the skills-usage flush or the shutdown evaluators. To keep `omo.js` inside its byte budget, the dream conversation selection (`dream-selector.ts`) moves out of the entry bundle into the memory commands sidecar (`extensions/omo-memory-commands.js`), which a dream fire loads through the shared commands loader only when it selects conversations.
+
+## 2026-11-02 - Finished team members leave the task widget (#12160)
+
+The below-editor task widget now shows only running or parked work. A team member that completes its turn leaves the widget even while its handle stays resident, instead of lingering as a `process completed` row until the team shuts down. `/tasks` still lists it, `task_send` still revives it, and its row returns while it runs again. Task lifecycle, residency and messaging are unchanged.
+
+## 2026-10-31 - Isolate memory-hook startup from supervisor imports (#11957)
+
+Load supervisor-only dependencies after selecting supervisor mode, and load child bootstrap code only for its mode. Keep the existing checker, entry point, process ownership and deadlines. An import-boundary regression and real Senpi hook proof cover valid writes, duplicate-key rejection and provenance rejection.
+
+## 2026-10-31 - Reduce trusted command-fixture setup cost (#11954)
+
+Install the real memory hooks after the fixture's initial seed commit rather than before it. Keep normal hook installation and validation for commands under test, with a real-git regression proving later invalid writes remain rejected. This is only the fixture part of #10696; actual hook-startup latency is tracked separately in #11953.
+
+## 2026-10-30 - Ordered post-turn memory journal delivery (#11935)
+
+Separate required read-only journal delivery from the two-second maintenance observer. Combine live and durable answer IDs, and run full snapshot builds outside the journal publication queue. Publish journal updates immediately, rebase late full results on newer journal accounting, and use an explicitly unknown non-journal state before the first full snapshot. Transcript read failures retain durable counters.
+
+## 2026-10-30 - Allocate model distribution turns at spawn (#11905)
+
+The task child planner owns independent category and agent cursors and passes them only into spawn-time resolution, leaving inspection and session continuations unchanged.
+
+## 2026-10-30 - Deterministic stale-lock recovery fixture (#11604)
+
+Derive the fixture's hard and grace deadlines from one clock sample, matching
+the production ledger contract. Exercise recovery with an advancing clock and
+verify that in-flight diagnostic contention and errors stay before the mark.
+
+## 2026-10-28 - Job widget author on the quick category and task widget sources
+
+The task component reads senpi's job-widget exports off the loaded `@code-yeongyu/senpi` module (`job-widget-host.ts`, feature-detected: `setJobWidgetAuthorResolver`, `registerJobWidgetSource` + `TextTap`) and wires nothing on a senpi without them. `job-widget-author.ts` installs one process-wide author route that resolves `quick` through `resolveCategory` against the asking session's model registry, using the omo.json of the session whose cwd matches; an unknown cwd or an unresolvable `quick` answers `undefined`, so senpi falls back to the session model. Each registering session holds the route until its `session_shutdown`; the last release withdraws it. `job-widget-sources.ts` registers a `task` job for each running background task (`notify_on_terminal`) of the current session: id = task id, brief `task` = the spawn prompt (capped at 4 KiB) and `intent` = the description, one `tools` TextTap fed `\n» <tool> <first argument>\n<result text>\n` per finished child tool call (the last 64 KiB of each result), `notify()` per call, `settle()` on a terminal status, and `dispose()` on record removal, a session change, a revived run, or `session_shutdown`. A child `bash` call with `run_in_background: true` sets the job's `watch` hint through `update()` to `background command: <command>` (secret shapes redacted with omo's mirror of senpi's `sensitive-output` patterns plus flag, `sk-`, AKIA and JWT shapes, then cut to 300 characters); the newest background command wins and a finished one leaves the hint in place. Without one, senpi's request policy authors no task widget.
+
+## 2026-10-29 - Preserve feedback refusal sections (#11830)
+
+Validate the service's secret-detection section id against the feedback section list and carry it through the existing submit result. Missing or malformed detail keeps the existing refusal shape.
+
+## 2026-10-29 - Wire the task host generation view into the task engine (#11783)
+
+The task engine passes the lifecycle a read-only view of the endpoint's generations and handover-parked entries, and the steering destruction port carries the lifecycle's host-session cancel, so a cancel can tell a child still running on a draining generation from one that ended.
+
+## 2026-10-30 - Darwin `/home` account homes count as real profiles (#11878)
+
+`telemetry/omo-native-session.ts` `isInsideTempDir` now also compares a trigger-path HOME's own lexical parent with the users dirs, so `/home/<name>` (which resolves to `/System/Volumes/Data/home/<name>`) is a real profile. `automount-trap.test-support.ts` exempts the `os.tmpdir()` subtree, so the trap only fires on real `/home` and `/net` resolution. `install-identity.test.ts` adds a table test for HOME under `/home`, `/Users` and the resolved `/System/Volumes/Data/home` path.
+
+## 2026-10-28 - Load the memory name-listing renderer lazily (#11559)
+
+memory-core imports its `<external_projection>` renderer through `#memory-external-projection`, which maps to its own source everywhere except the plugin manifest, where it maps to `extensions/omo-recall-store.js`. `DEFAULT_EXTERNAL_PROJECTION_LIMITS` stays in the entry. Refs #11557.
+
+## 2026-10-28 - Never resolve a macOS automount trigger on the host loop (#11546)
+
+`@oh-my-opencode/utils/path-containment` gains `isDarwinAutomountTriggerPath(path, { platform, homeDir })`. It is true only on darwin, for `/home`, `/net` and anything below them, and never for the user's own home subtree. It is decided from the string alone, before any syscall. `telemetry/omo-native-session.ts` `isInsideTempDir` compares trigger candidates (and a HOME whose parent is one) lexically. The predicate also matches the firmlinked `/System/Volumes/Data/home|net` spellings, case-insensitively. The class sweep applies the same rule to format-on-mutation, `skill_loaded` (`omo-native-tools.ts`), the memory read classifier, the memory guard and policy guard roots, kibitzer `resolveWorkspacePath`, project memory read grants and sandbox `canonicalPath`. `automount-trap.test-support.ts` forces darwin and traps every resolving fs entry, so each site's table test fails if it ever resolves a trigger.
+
+## 2026-10-26 - Feedback identity follows native telemetry consent
+
+Use the shared native enablement decision before collecting install and session hashes. Keep the existing feedback-specific opt-out and configuration checks, and leave ordinary report sections available when hashes are suppressed. Refs #10937, item 1; the tracking issue's other follow-ups remain open.
+
+## 2026-10-29 - Desktop private sync channel receiver (#11750)
+
+`components/memory/desktop-sync/channel.ts` adds `attachDesktopSyncChannel(stream)`, the memory component's receiver for the desktop's private sync duplex (claimed through `takeInheritedPrivateChannel("memory-sync")`). It bootstraps once (the reply names the child capability every later request carries), writes each request synchronously before returning its promise, keeps at most 64 requests in flight, settles each reply once, and retires the channel on disconnect, a malformed or foreign frame, another child's event or `retired`, rejecting every waiter with one fixed, body-free error. A bootstrap main never answers is unavailable after 10 s (a contract bound) and a late reply is discarded. A missing stream or a refused or invalid bootstrap is `private_channel_unavailable`, never a CLI account fallback; Windows is `platform_not_supported`. `framing.ts` (LF JSON, canonical `$omoSyncBytes` base64url, 92 MiB frame bound) and `protocol.ts` (strict zod schemas matching the desktop wire contract) are local, so the plugin does not import the unpublished desktop package. Registration in `memory/index.ts` belongs to the account-source change.
+
+## 2026-10-28 - getBuiltinSkillsRoot honours OMO_BUNDLED_SKILLS_DIR (#11631)
+
+`getBuiltinSkillsRoot()` resolves a valid `OMO_BUNDLED_SKILLS_DIR` through `resolveBundledSkillsOverride`, the resolver the bundled-skills loader uses, so `skill-pointers`, `onboarding`, `init-deep-advisor` and the `skill_loaded` telemetry root name the tree skills actually load from; the returned root still ends in a path separator. The resolver moved unchanged to the leaf module `bundled-skills/override.ts` (node builtins only), re-exported from `bundled-skills/index.ts`, so the telemetry helper and the advisor bundle do not pull the component's config loading. An invalid value is still reported once per process and falls back to the plugin-relative root; `onboarding` and the telemetry component pass their component logger so that one report reaches the component log whichever registers first. Telemetry still exports only the allowlisted skill name, never the directory.
+
+## 2026-10-28 - Distinguish runner argv from nested command pairs
+
+Do not credit a test merely mentioned in an echo argument inside an eval cell. Preserve real command kinds, offsets and supported test receipts. Refs #10802, runner-argv blocker only; the other tracking and replay follow-ups remain open.
+
+## 2026-10-27 - Preserve ordinary thread attachment refusal identity
+
+Keep the host's two session identity refusal codes on ordinary mutation errors. Preserve the existing authentication, draining and typed release/UI reply paths. Refs #10944 item 5 only; the tracking issue's other follow-ups remain open.
+
+## 2026-10-27 - Recover failed facts parking without a restart
+
+Keep migration retryable when a hot-to-parked move fails after the failure ledger is durable. Preserve the original error, ledger, bytes and healthy queued work; restore the existing cache after successful movement. Refs #11091, post-ledger movement only; batching, orphan cleanup and claim revalidation remain open.
+
+## 2026-10-27 - OTLP projection and startup privacy follow-ups (#11431)
+
+Project the actual client field names against the pinned collector types, derive
+summary cost from USD, and purge the previous run's OTLP spool when startup is
+opted out. Cleanup uses the existing recovery sidecar, not the exporter. Reject
+unlisted events and unsupported platforms before importing OTLP, retry failed
+startup after the same 60-second backoff as PostHog, dispose late transports, and
+keep PostHog acknowledgement timing independent of OTLP lifecycle bounds.
+
+## 2026-10-27 - OTLP model ids fall back to custom (#11428)
+
+`pinned-model-ids.ts` holds the pin's model enum (omo-telemetry 13c6e61b, 44 values) and `pinnedModelId`.
+The projection applies it to the 15 keys that share that enum and to the ranked `omo.m*_model` keys
+(`none` kept). The turn span applies it to its three model attributes. The list lives in its own module, so
+the turn span in the main bundle does not pull in the projection tables. Update the list together with the pin.
+
+## 2026-10-26 - model-profile outcomes leave the conversation (#11365)
+
+`components/model-profile/index.ts` records every outcome with `pi.appendEntry(<type>, { content, details }, { startupBookkeeping: true })` instead of `pi.sendMessage`. senpi's `convertToLlm` turns every custom message into user text in the next provider request (its context-exclusion predicate is false for every type), so the notice reached the model, and one sent while the first prompt streamed was delivered as a steer. The three custom types and their `details` are unchanged; only the entry kind moved from `custom_message` to `custom`. An outcome that leaves the profile unapplied also goes to `ctx.ui.notify`: `warning` for a chosen profile that no available model serves, an unknown profile name or a stored login that failed, `info` when the unset default falls back to the session's own model. `notice.ts` names the next step per host (rpc: Provider authentication settings or the composer; headless: `/login` or `--model`). A clean apply is recorded and logged only.
+
+Must not break: no profile outcome may go through `pi.sendMessage`; `index.test.ts` runs senpi's own `convertToLlm` over the component's conversation output for every outcome kind. Live proof: `scripts/qa/model-profile-e2e.mjs` checks `notice_not_in_conversation` and `notice_not_in_request` (the mock provider records whether the request it received carried a profile notice).
+
+## 2026-10-26 - Align project-memory grants with raw file reads (#11339)
+
+Suffix-classified external file tools no longer receive a grant for a different file when a symlink is followed by `..`. Built-in resolved reads remain supported, and the missing-note exception is limited to ENOENT with plain missing segments: a missing path such as `missing/../note.md`, `a/./b` or `a//b` is not granted. Real filesystem tests cover grants, the soft guard, temporary HOME detection, and native case aliases. A missing remainder under a file is refused on every platform (Windows reports ENOENT there, not ENOTDIR), and the temporary-HOME check judges HOME the way the install id is written (lexically resolved), so a HOME like `<tmp>/link/../home` that writes inside the temp root counts as temporary, and a lexical HOME that does not exist yet counts as temporary too (telemetry stays off).
+
+## 2026-10-26 - Admit sessions before host reconciliation (#11335)
+
+The task event bridge restores local pause and transition state, attaches RPC and workpools, then lets the existing durable recovery chain finish asynchronously. Its abort signal fences the recovery tail on a newer start, switch or shutdown. The lifecycle carries its own disposal and shutdown generation through host probes, admission and revival; stale probe completions cannot claim newer ownership, and late respawn handles use fenced suspension. Endpoint groups reconcile independently while the shared admission lease still enforces per-session capacity. Deterministic regressions cover blocked probes, disposal, shutdown, newer same-process claims, independent hosts and late handles.
+
+## 2026-10-27 - The local launcher sends the OmO logo (#11445)
+
+`install/local-launcher.ts` imports the same `OMO_BRAND_LOGO` from omo-native, so a sibling-store install brands the sign-in result page like the published launcher; `plugin/scripts/install.mjs` and `bundle-inputs.json` are regenerated.
+
+## 2026-10-25 - Close research fidelity gate findings (#11310)
+
+Source-backed facts fail verification when their own snapshot metadata or body cannot be checked, with the cause in the message, while facts on healthy sources keep their checks. Grouped derived values verify exactly as fill writes them. Conversion originals remain bound to their operand rows under one bracket grammar: a conversion shown without its original, with a non-numeric or nested bracket, with a dash separator, or with a second original (a bare figure in the operand's dimension right after it) is a mismatch, while another filled fact, prose with a figure, or a range after it is not, and a correct original passes in any bracket style or fullwidth form in HTML and Markdown. The V, A, and D claim prefixes preserve their marks through fill and Markdown projection. Packaged research skills use the shared runtime and the corrected format guidance.
+
+## 2026-10-26 - Optional lazy OTLP dual-send (#11413)
+
+An optional second telemetry transport, inactive by default and consent-gated; it
+never blocks the existing sink.
+
+## 2026-10-26 - Cover restored Stop admission through the real manager (#11401)
+
+The restart regression reconstructs pause custody over a shared state directory, releases the restored Stop, injects a child restore failure, and verifies that real manager admission changes from held to started. It then verifies a successful child retry using the durable acknowledgement without a live hold observer.
+
+A native-session regression also quits, disposes and reopens the same persisted JSONL, sends a real person prompt through AgentSession, and verifies the actual manager admits a new task. The native engine's input release is the person-reachable action; `/resume` remains the session picker.
+
+## 2026-10-26 - Recovery guidance distinguishes prose from commands (#11390)
+
+Missing-runtime notices describe an incomplete installation without spelling a retired CLI command. A host missing the computer-use API now names the registered `omo update` command. The command audit allowlist stays unchanged; owner tests pin the update command emitted by `/computer` and the npm/Bun reinstall commands passed through `OMO_REINSTALL_COMMAND`.
+
+## 2026-10-25 - Optional shared bundled skills directory (#11332)
+
+Every bundled skill consumer (resources discovery, the task skill loader, and
+the bare skill commands) uses one resolver for `OMO_BUNDLED_SKILLS_DIR`. The
+override replaces only `plugin/skills`; `plugin/skills-conditional` remains
+relative to the plugin. Absent or empty is unchanged. An invalid
+`OMO_BUNDLED_SKILLS_DIR` (relative, missing, not a directory, unreadable) now
+logs ONE error naming the variable and falls back to the plugin-relative
+bundled skills, plus one session notice; the report is once per
+process across both extension bundles. An explicit `skillsDir`
+option wins over a valid override.
+
+## 2026-10-25 - Report hosted child availability as parent status (#11317)
+
+Deliver debounced unresponsive, close-pending, and recovered-running status through stable per-child coordinator keys without sending false terminal completions. Use the parent streaming batch window for status delivery.
+
+## 2026-10-25 - memory sync defers a pass while the keychain waits for approval (#11264)
+
+`device-session/account-source.ts` turns the credential store's `KeychainApprovalPendingError` (a session read past its 5 s deadline in `service-auth/keystore.ts`) into `SyncSessionDeferredError` (`sync-session-deferred.ts`, matched by its code because the account sidecar carries its own copy of the class), and `signedOut()` answers false while the keychain waits, so a pending keychain never reads as signed out. `sync-runner.ts` logs the store's message, leaves the repo idle (status `null`, so the `memory` tool's status read returns at once), and launches the pass again after `deferredRetryMs` (15 s initially, doubling to a 5-minute cap, with one warning per escalation) while the same sessions still hold the repo.
+
+Settled answers are never cached. A write or clear invalidates the pending-read entry, and an old read settling afterward cannot restore it. Native writes retain their existing unbounded behavior; safe write deadlines need the single credential-owner design tracked in #11262.
+
+Must not break: a retry joins the process's one parked keychain read instead of starting another, so it adds no prompt; a pass that resolves the session normally schedules no retry.
+
+## 2026-10-25 - Supervisor slot event waits (#11288)
+
+The slot harness observes TCP starts, filesystem transitions and supervisor exits against one deadline with time reserved for cleanup. Filesystem waits retain the macOS event-loss re-check. Regressions exercise a real supervisor exiting before TCP start and simulated Windows admission rename contention exhausting the existing retry budget. The simulation establishes a possible failure path, not the cause of the historical Windows CI failures.
+
+## 2026-10-25 - Remove automatic engine crash telemetry
+
+The session-start component no longer reads, claims or sends earlier process crash records. Retire the legacy crash capture entry point and its reviewed writer site. Recording-transport coverage requires zero crash events while normal session telemetry continues. Preserve operational crash files and user-initiated reports. No replacement signal or local bundle regeneration is included.
+
 ## 2026-10-20 - git-master adds the sisyphus-dev-ai co-author trailer by default (#10713)
 
 `components/git-master/directive.ts` builds the attribution directive whenever `git_master.include_co_authored_by` (default `true` again, no longer a no-op) or `commit_footer` is on. Its commit example is `git -c trailer.ifexists=addIfDifferent commit -m ... --trailer "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"`, under the `git_env_prefix` from #10613, so git keeps one copy when the message already carries the trailer. A squash joins messages without `--trailer`, so the directive asks for one `--amend` rewrite afterwards. `skill-content.ts` runs the shared template rewrite with `include_co_authored_by: false`, because the directive carries attribution, and both channels (the `read` hook and `task-skill-loader.ts`) append the directive only when the text does not already contain `<commit_attribution>`. `scripts/qa/git-master-attribution-e2e.mjs` now expects the trailer exactly once by default, and adds an `include_co_authored_by: false` run that expects none.
-
-## 2026-10-18 - A committed layer-2 effect survives a lost response; off means not callable (#10458 review T1/T2)
-
-The replay identity no longer lives in a journal file next to the store: `gateway/schema.ts` v10 (after dev's v8 provenance trigger and the v9 thread-creation tables) adds `toolkit_replay_receipts`, and the receipt is committed INSIDE the op's own transaction (op, canonical-arguments sha256, result, the turn's time). A call whose response was lost after commit - the store worker answered, the caller never heard - returns the recorded result on retry; the effect runs once. The old sidecar file, its pending state and its claim deletion on dispatch failure are gone: nothing outside the transaction can judge whether an ambiguous failure ran the effect.
-
-With the `dori` section off, the dori extension's declared layer-2 tools are no longer built at all, so a stale registration cannot dispatch an effectful op without replay protection; the old behaviour (tools listed, dispatching bare) was the review's T2. On, and only on, those tools' schemas also accept the optional `omo_toolkit_replay` context argument, and `help()` hides it.
-
-Also: the divergence refusal carries a machine-readable tail (`replay_differs=op,args recorded_op=... attempted_op=...`) that the engine converts to the structured stop, so the kernel error keeps `key`, `differs`, and both ops; and a store at v6 upgrading to v9 drops nothing (the mixed-case migration fixture rewinds the new table too).
-
-## 2026-10-17 - The dori toolkit replay identity covers arguments, expiry and program order (#10316 review)
-
-A layer-2 call's replay identity is again the agreed one: op plus canonical arguments plus turn and call index. The journal stores a sha256 of the arguments (sorted-key JSON) beside the op, and the same key with other arguments now stops as `toolkit_replay_divergence` naming what differed, instead of returning another call's result. A turn older than the seven-day window stops as `toolkit_replay_expired` before any claim, so a pruned key can no longer let an old turn run again.
-
-Call indexes follow program order: the SDK reads the calling eval cell from the stack (the kernel evaluates each cell under its tool call id) and numbers its calls synchronously per cell, so concurrent `Promise.all` calls replay with the same indexes. The engine accepts that cell only as a tool call on the caller's own branch and files the call under the turn the cell started in, so a cell that outlives its turn stays in it; any other cell is refused as `toolkit_replay_turn_unknown`. Layer-2 tools accept the context parameter only while the toolkit is on, and `help()` hides it.
-
-Both dori layers now ship as their own sidecars, `runtime/dori/layer2.js` and `runtime/dori/replay.js`, loaded by URL only while the gate is on; the shipped SDK runs with its sidecar deleted while off. Nested function names such as `send.call` are reachable.
-
-## 2026-10-17 - The agent toolkit gets the layer-2 namespace seam a dori host fills (#10316)
-
-With an enabled `dori` section in `omo.json`, the agent toolkit SDK gains eleven namespaces (`route`, `reply`, `room`, `send`, `thread`, `describe`, `file`, `rules`, `iam`, `call`, `work`); without one, the properties do not exist and no layer module is imported. omo ships no namespace behavior: each function calls the session tool a separately installed dori host declares through a store extension named `dori` (`ext_dori_<ns>_<fn>`), so the caller is stamped by the engine as for every session-callable op, and `help()` lists the registered functions with signatures rendered from their JSON Schemas.
-
-Every such call is journaled by the engine under a replay key, `JSON.stringify(["turn", turnId, callIndex])` (inbound deliveries use `["inbound", dedupeKey]`); dori-link derives its envelope ids from the same string, and `replay-key.test.ts` pins the vectors. The turn is the calling session plus the newest assistant entry on its branch. Replaying a turn returns each recorded result without dispatching again; a different op at a recorded index stops with `ToolkitReplayStopError` (`toolkit_replay_divergence`), and a call an earlier run started but never recorded stops as `toolkit_replay_pending` instead of being sent twice. Keys are kept seven days.
-
-Tests: the key vectors, the journal (replay, divergence, per-turn indices, released claims, pending, retention, missing turn), the session-tool wiring against a real gateway store (one dispatch on replay, divergence, off means no journal, other extensions untouched), the kernel namespaces and `help()`, and an import-graph walk proving the SDK and the thread component load no layer module statically. `scripts/qa/dori-toolkit-replay-qa.mjs` drives the same contract through real eval kernels, one process per phase.
 
 ## 2026-10-19 - desktop-toolkit component: the session's channel to toolkits the app hosts for its thread
 
@@ -189,7 +546,7 @@ The computer-use engine probe's timeout phase names where the handshake stopped.
 
 ## 2026-10-10 - Bindings take whatsapp as a native platform name
 
-The omo-gateway WhatsApp channel binds its chats through the session-gateway store, but the binding contract refused the platform: `bindings.ts` `BINDING_PLATFORMS`, the `thread_bind` tool schema (`contracts/params.ts`), and the store's `bindings.platform` CHECK all stopped at `custom`. The first admitted WhatsApp message would have been refused by core's thread store.
+A WhatsApp connector binds its chats through the session-gateway store, but the binding contract refused the platform: `bindings.ts` `BINDING_PLATFORMS`, the `thread_bind` tool schema (`contracts/params.ts`), and the store's `bindings.platform` CHECK all stopped at `custom`. The first admitted WhatsApp message would have been refused by core's thread store.
 
 `whatsapp` is now a binding platform in all three spellings. Because SQLite cannot widen a CHECK in place, schema v7 rebuilds the `bindings` table with the widened list, carrying every column over verbatim and recreating `bindings_one_active_thread` and `bindings_session` before the old table drops. The rebuild runs with foreign keys off so an extension table referencing `bindings` is neither cascade-deleted nor able to block the migration, and the AUTOINCREMENT high-water mark is carried over so a deleted newest row's key is never reused. Before the version bump commits, `migrate()` runs `PRAGMA foreign_key_check` from TypeScript and throws (rolling back to v6) if the step introduced a violation referencing `bindings`; the `foreign_keys` pragma is restored to its prior value afterwards. A store migrated from v6 keeps its live bindings and accepts a `whatsapp` bind (`store-v7-whatsapp.test.ts`); the tool schema takes the native name and the store keeps it (`bindings.test.ts`).
 
@@ -401,10 +758,6 @@ Tests (`store-idle-retire.test.ts`; the last one in `component.test.ts`):
 
 The `ulw-plan` skill's delegation-router row listed a `git` category that no edition ships (`SKILL.md`), and its reference copy (`references/full-workflow.md`) also still listed `deep`, which was split into `deep-low` and `deep-high`. A plan that followed either name sent `task(category: ...)` to a category the user's session does not have. Both rows now list exactly the built-in categories.
 
-## 2026-10-04 - The committed gateway rules sidecar is no longer an ignored path
-
-`packages/omo-senpi/.gitignore` ignores `/plugin/extensions/*` and re-admits each committed bundle with a `!` line. The `gateway_rules` store-extension sidecar (`gateway-rules-extension.mjs`, from #9540) was committed without its `!` line, so `script/tracked-ignored-paths-audit.test.ts` failed on `dev` and on the v5.1.17 release-state PR. A local `git add` of a fresh regen would also silently skip that file. Added the negation next to its sibling `gateway-store-worker.mjs`.
-
 ## 2026-10-04 - A runtime advisory no longer makes a failed reflection child look like a provider outage (#9553)
 
 On Windows every failed memory reflection child was recorded as "refused by its provider", and automatic reflection parked for hours. `worker/model-miss.ts` `providerFailureDetail` took the first stderr line as the provider's answer. On a Bun host on win32 that line is Bun's `child reaper unavailable under Bun on win32: ...` advisory, printed once per terminated worker thread before anything the child says. The shared retryable-error classifier matches the bare word `unavailable`, so any failure became `provider_unavailable`, the real cause was hidden, and every candidate in the chain was marked as refused.
@@ -419,14 +772,6 @@ Tests (`model-miss.test.ts`, the exact advisory text):
 - a provider sentence then a stack `Error:` line: the provider's sentence decides.
 
 **Known limit:** an advisory with neither a runtime marker nor a log-level prefix, and nothing after it, is still taken as the detail. There is no better line to report then.
-
-## 2026-10-04 - Gateway operating-rules injection into lead and bound sessions (#9190)
-
-- New `components/gateway`: the scope lead and every session with an active binding get the scope's compiled behavioral rules as one `<operating-rules version="<rules sha>">` block in the system prompt through `before_agent_start`, rendered beside the memory block. The component lazily connects only when the `gateway.scopes` config is non-empty and the store database exists; every other session's prompt passes through byte-identical. Rules are computed by the gateway package; omo owns only the `gateway_rules` store extension (a `gateway_rules_blocks` table plus the `rulesCommitted`/`blockForSession` ops) and the exactly-once `rules_changed` fanout per session and version. `plugin/scripts/build-extension-core.mjs` emits the ops module as `extensions/gateway-rules-extension.mjs` beside `omo.js`, covered by the build freshness check.
-
-## 2026-10-04 - Escape untrusted gateway rule text and add `sessionsWithRules`
-
-- Behavioral rule lines, scope and version render with `&`, `<` and `>` escaped, so a rule carrying the end sentinel or the closing tag can neither break the byte-identical turn guarantee nor close the block early; the `rules_changed` delivery text escapes scope and version the same way. New `sessionsWithRules({scope})` op lists a scope's `gateway_rules_blocks` rows ordered by session id so the gateway can clear sessions whose binding ended while the connector was down.
 
 ## 2026-10-04 - Live QA: a task child's fallback after a tool call, and the user's settings untouched (#9512)
 

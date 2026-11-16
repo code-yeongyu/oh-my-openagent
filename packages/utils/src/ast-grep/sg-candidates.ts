@@ -63,7 +63,8 @@ function skillBinCandidates(options: {
 }
 
 function homebrewCandidates(platform: NodeJS.Platform): readonly SgCandidate[] {
-  const prefixes = platform === "darwin" || platform === "linux" || platform === "win32" ? HOMEBREW_PREFIXES[platform] : []
+  const prefixes =
+    platform === "darwin" || platform === "linux" || platform === "win32" ? HOMEBREW_PREFIXES[platform] : []
   const names = [astGrepBinaryName(platform), sgBinaryName(platform)]
   return prefixes.flatMap((prefix) => names.map((name) => candidate("homebrew", join(prefix, name))))
 }

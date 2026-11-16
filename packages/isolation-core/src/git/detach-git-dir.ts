@@ -44,7 +44,8 @@ async function assertContainedMetadata(gitDir: string): Promise<void> {
     if (!(await exists(area))) continue
     const info = await lstat(area)
     if (info.isSymbolicLink()) {
-      if (!inside(await canonical(area))) throw new IsolationUnavailableError(`git metadata ${name} escapes the repository copy: ${gitDir}`)
+      if (!inside(await canonical(area)))
+        throw new IsolationUnavailableError(`git metadata ${name} escapes the repository copy: ${gitDir}`)
       continue
     }
     if (!info.isDirectory()) continue
@@ -52,7 +53,8 @@ async function assertContainedMetadata(gitDir: string): Promise<void> {
       for (const child of await readdir(dir, { withFileTypes: true })) {
         const path = join(dir, child.name)
         if (child.isSymbolicLink()) {
-          if (!inside(await canonical(path))) throw new IsolationUnavailableError(`git metadata under ${name} escapes the repository copy: ${gitDir}`)
+          if (!inside(await canonical(path)))
+            throw new IsolationUnavailableError(`git metadata under ${name} escapes the repository copy: ${gitDir}`)
         } else if (child.isDirectory()) await walk(path)
       }
     }
@@ -70,7 +72,10 @@ async function sanitizeStandaloneGitDir(entry: string): Promise<void> {
   await assertContainedMetadata(entry)
 }
 
-export async function detachGitDir(worktreeRoot: string, sourceCommonDir: string): Promise<"no-git" | "independent" | "detached"> {
+export async function detachGitDir(
+  worktreeRoot: string,
+  sourceCommonDir: string,
+): Promise<"no-git" | "independent" | "detached"> {
   const entry = join(worktreeRoot, ".git")
   if (!(await exists(entry))) return "no-git"
   const meta = await lstat(entry)
@@ -87,7 +92,7 @@ export async function detachGitDir(worktreeRoot: string, sourceCommonDir: string
   if (await exists(join(admin, "gitdir"))) {
     const backPointer = (await readFile(join(admin, "gitdir"), "utf8")).trim()
     const target = resolve(admin, backPointer)
-    if (await exists(target)) ownAdmin = await canonical(target) === await canonical(entry)
+    if (await exists(target)) ownAdmin = (await canonical(target)) === (await canonical(entry))
   }
   const privateDir = join(worktreeRoot, ".git-private")
   await mkdir(privateDir)
@@ -97,7 +102,14 @@ export async function detachGitDir(worktreeRoot: string, sourceCommonDir: string
     await writeFile(join(privateDir, "HEAD"), await readFile(join(admin, "HEAD")))
     await writeFile(join(privateDir, "config"), "[core]\n\trepositoryformatversion = 0\n")
     if (await exists(join(common, "config"))) {
-      const config = await git(common, ["config", "--file", join(common, "config"), "--null", "--list", "--no-includes"])
+      const config = await git(common, [
+        "config",
+        "--file",
+        join(common, "config"),
+        "--null",
+        "--list",
+        "--no-includes",
+      ])
       for (const record of config.toString().split("\0").filter(Boolean)) {
         const split = record.indexOf("\n")
         const key = split < 0 ? record : record.slice(0, split)
@@ -107,12 +119,19 @@ export async function detachGitDir(worktreeRoot: string, sourceCommonDir: string
         }
       }
     }
-    for (const name of await readdir(join(common, "refs"))) await copyOptional(join(common, "refs", name), join(privateDir, "refs", name))
+    for (const name of await readdir(join(common, "refs")))
+      await copyOptional(join(common, "refs", name), join(privateDir, "refs", name))
     await copyOptional(join(common, "packed-refs"), join(privateDir, "packed-refs"))
-    for (const name of ["index", "info/sparse-checkout", "shallow", ...(await readdir(admin)).filter(name => name.startsWith("sharedindex."))]) {
+    for (const name of [
+      "index",
+      "info/sparse-checkout",
+      "shallow",
+      ...(await readdir(admin)).filter((name) => name.startsWith("sharedindex.")),
+    ]) {
       await copyOptional(join(admin, name), join(privateDir, name))
     }
-    if (!(await exists(join(privateDir, "shallow")))) await copyOptional(join(common, "shallow"), join(privateDir, "shallow"))
+    if (!(await exists(join(privateDir, "shallow"))))
+      await copyOptional(join(common, "shallow"), join(privateDir, "shallow"))
     await writeFile(join(privateDir, "objects/info/alternates"), `${join(common, "objects")}\n`)
     await removeLocks(privateDir)
     await rm(entry)
@@ -125,7 +144,7 @@ export async function detachGitDir(worktreeRoot: string, sourceCommonDir: string
     // A matching back-pointer alone is not proof of ownership: the registration
     // must also live under the source common directory's worktrees area.
     const worktreesRoot = join(common, "worktrees")
-    if (await canonical(admin) === worktreesRoot || (await canonical(admin)).startsWith(worktreesRoot + sep)) {
+    if ((await canonical(admin)) === worktreesRoot || (await canonical(admin)).startsWith(worktreesRoot + sep)) {
       await rm(admin, { recursive: true })
       await git(common, ["--git-dir", common, "worktree", "prune"])
     }
@@ -146,7 +165,8 @@ export async function scanNestedGitDirs(merged: string): Promise<NestedGitResult
       const entry = join(dir, ".git")
       if (await exists(entry)) {
         const meta = await lstat(entry)
-        if (meta.isSymbolicLink()) throw new IsolationUnavailableError(`submodule ${relative(merged, dir)} shares the source gitdir`)
+        if (meta.isSymbolicLink())
+          throw new IsolationUnavailableError(`submodule ${relative(merged, dir)} shares the source gitdir`)
         if (meta.isDirectory()) await sanitizeStandaloneGitDir(entry)
         if (meta.isFile()) {
           const target = await gitdir(entry)
@@ -167,7 +187,8 @@ export async function scanNestedGitDirs(merged: string): Promise<NestedGitResult
     // the link itself), so the walk cannot cycle, and stopping early would leave
     // deeper external Git-directory pointers unchecked.
     for (const entry of await readdir(dir, { withFileTypes: true })) {
-      if (entry.isDirectory() && entry.name !== ".git" && entry.name !== "node_modules") await walk(join(dir, entry.name), depth + 1)
+      if (entry.isDirectory() && entry.name !== ".git" && entry.name !== "node_modules")
+        await walk(join(dir, entry.name), depth + 1)
     }
   }
   await walk(merged, 0)

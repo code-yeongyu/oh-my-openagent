@@ -120,7 +120,7 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
         .string()
         .optional()
         .describe(
-          "CDP endpoint URL to connect Playwright to an existing browser (e.g. http://localhost:9222). Creates a separate MCP instance per unique URL."
+          "CDP endpoint URL to connect Playwright to an existing browser (e.g. http://localhost:9222). Creates a separate MCP instance per unique URL.",
         ),
     },
     async execute(args: SkillMcpArgs, toolContext: ToolContext) {
@@ -158,12 +158,17 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
       const parsedArgs = parseSkillMcpArguments(args.arguments)
 
       let output: string
-      const cdpOptions = args.cdp_url ? { cdpUrl: args.cdp_url } : undefined
+      const cdpOptions = args.cdp_url
+        ? { cdpUrl: args.cdp_url, signal: toolContext.abort }
+        : { signal: toolContext.abort }
 
       switch (operation.type) {
         case "tool": {
           const result = await manager.callTool(info, context, operation.name, parsedArgs, cdpOptions)
-          output = JSON.stringify(result, null, 2)
+          if (result.isError === true) {
+            throw new Error(`MCP tool "${operation.name}" failed: ${JSON.stringify(result, null, 2)}`)
+          }
+          output = JSON.stringify(result.structuredContent !== undefined ? result : result.content, null, 2)
           break
         }
         case "resource": {

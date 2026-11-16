@@ -26,7 +26,9 @@ describe("TaskManager revive concurrency slot", () => {
       const next = await h.manager.start({ prompt: "next", parent_session_id: "parent", depth: 1 })
       expect(next).toMatchObject({ kind: "started", status: "running" })
       if (next.kind === "started") await h.manager.cancelTask(next.task_id)
-    } finally { await h.dispose() }
+    } finally {
+      await h.dispose()
+    }
   })
 
   test("#given single concurrency #when a revived task completes #then it releases its slot and a queued task starts", async () => {
@@ -35,13 +37,18 @@ describe("TaskManager revive concurrency slot", () => {
     const events = new EventEmitter()
     const project = tempProject()
     const backing = createTaskRecordStore({ project_dir: project })
-    const observed = { ...backing, transition: (...args: Parameters<typeof backing.transition>) => {
-      const result = backing.transition(...args)
-      if (result.applied && result.record.status === "running") events.emit(`running:${result.record.task_id}`)
-      return result
-    } }
+    const observed = {
+      ...backing,
+      transition: (...args: Parameters<typeof backing.transition>) => {
+        const result = backing.transition(...args)
+        if (result.applied && result.record.status === "running") events.emit(`running:${result.record.task_id}`)
+        return result
+      },
+    }
     const { manager, store } = makeManager({
-      inProcess, project, store: observed,
+      inProcess,
+      project,
+      store: observed,
       config: settings({ default_concurrency: 1, max_depth: 1 }),
     })
     const a = await manager.start(baseSpec({ name: "a" }))

@@ -28,7 +28,15 @@ import {
 } from "./runtime-loader"
 import { resolveOmoComputerSettings } from "./settings"
 import { watchFullAccess } from "./full-access"
-import { initialComputerState, skillStatusLine, toolActivatedNames, wireComputerControlEvents } from "./registration-support"
+import {
+  computerFailureText,
+  initialComputerState,
+  skillStatusLine,
+  toolActivatedNames,
+  hostLifecycleSource,
+  type ComputerLifecycleSource,
+  wireComputerControlEvents,
+} from "./registration-support"
 import { createComputerUseTelemetry } from "./telemetry"
 import { wireComputerPermissionEvents } from "./permission-events"
 
@@ -36,7 +44,14 @@ type ComputerExecute = ComputerUseRuntime["computerTool"]["execute"]
 type ComputerActionsExecute = ComputerUseRuntime["computerActionsTool"]["execute"]
 
 export const COMPUTER_USE_COMPONENT_NAME = "computer-use"
-export const COMPUTER_UNAVAILABLE = "Computer use is unavailable in this session."
+export type ComputerUnavailableReason = "unsupported_host" | "host_api_missing" | "disabled" | "invalid_settings"
+
+export const COMPUTER_UNAVAILABLE_MESSAGE = {
+  unsupported_host: "Computer use isn't supported on this system.",
+  host_api_missing: "This omo release can't run computer use. Run `omo update`, then start a new session.",
+  disabled: "Computer use is off. Set computer.enabled in omo.json, then start a new session.",
+  invalid_settings: "Computer use is off: its settings in omo.json are invalid. Fix them, then start a new session.",
+} as const satisfies Record<ComputerUnavailableReason, string>
 
 interface CommandContext extends ComputerHostContext {
   readonly hasUI: boolean
@@ -53,6 +68,8 @@ export interface ComputerUseComponentOptions {
   readonly telemetryObservers?: ComputerUseTelemetryObservers
   /** Imports the implementation entry; the default is `#omo-computer-use-runtime`, on first use only. */
   readonly loadRuntime?: () => Promise<ComputerUseRuntimeModule>
+  /** Run end and close of the session holding the grant; a hand of a split session passes its scope's source. */
+  readonly lifecycle?: (pi: SenpiExtensionAPI) => ComputerLifecycleSource
 }
 
 function hostApi(pi: SenpiExtensionAPI): ComputerHostApi | undefined {
@@ -101,25 +118,26 @@ export function createComputerUseComponent(options: ComputerUseComponentOptions 
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
       const reportPermission = wireComputerPermissionEvents(pi, options.env ?? process.env, ctx.logger)
       const api = hostApi(pi)
-      const available = (() => {
-        if (!isSupportedHost(platform)) return undefined
+      const availability = ((): { host: ComputerHostApi; settings: ComputerSettings } | ComputerUnavailableReason => {
+        if (!isSupportedHost(platform)) return "unsupported_host"
         if (api === undefined) {
           ctx.logger.warn("computer-use skipped: host lacks getActiveTools/setActiveTools/executeTool", {
             component: COMPUTER_USE_COMPONENT_NAME,
           })
-          return undefined
+          return "host_api_missing"
         }
         try {
           const settings = loadSettings(pi.cwd ?? process.cwd(), platform)
-          return settings.enabled ? { host: api, settings } : undefined
+          return settings.enabled ? { host: api, settings } : "disabled"
         } catch (error) {
           ctx.logger.warn("computer-use skipped: invalid computer settings", {
             component: COMPUTER_USE_COMPONENT_NAME,
             error: error instanceof Error ? error.message : String(error),
           })
-          return undefined
+          return "invalid_settings"
         }
       })()
+      const available = typeof availability === "string" ? undefined : availability
 
       const state = initialComputerState()
       const runtime =
@@ -133,10 +151,11 @@ export function createComputerUseComponent(options: ComputerUseComponentOptions 
               onPermissionRequired: reportPermission,
               fullAccess: watchFullAccess(pi),
               onEngineError: (code) => {
-                if (state.telemetryContext !== undefined) telemetry.engineError(state.telemetryContext, code, state.backend)
+                if (state.telemetryContext !== undefined)
+                  telemetry.engineError(state.telemetryContext, code, state.backend)
               },
             })
-      wireComputerControlEvents(pi, runtime)
+      wireComputerControlEvents((options.lifecycle ?? hostLifecycleSource)(pi), runtime)
 
       pi.registerCommand("computer", {
         description: "Computer use (experimental): on, off, status, stop, or resume (stop and resume are user-only)",
@@ -147,10 +166,11 @@ export function createComputerUseComponent(options: ComputerUseComponentOptions 
             label: name,
           })),
         handler: async (args: string, commandCtx: CommandContext) => {
-          if (available === undefined || runtime === undefined) {
-            commandCtx.ui.notify(COMPUTER_UNAVAILABLE, "warning")
+          if (typeof availability === "string") {
+            commandCtx.ui.notify(COMPUTER_UNAVAILABLE_MESSAGE[availability], "warning")
             return
           }
+          if (available === undefined || runtime === undefined) return
           const command = args.trim().toLowerCase() || "status"
           state.telemetryContext = commandCtx
           try {
@@ -183,13 +203,15 @@ export function createComputerUseComponent(options: ComputerUseComponentOptions 
             }
             const prelude = available.host.getActiveTools().includes(COMPUTER_TOOL_NAME) ? "active" : "inactive"
             const source = describeEngineSource(available.settings.enginePath, options.env ?? process.env, { platform })
-            const permissions = handle.running ? "" : `\n${await describeEnginePermissions(available.settings.enginePath, options.env ?? process.env, { platform })}`
+            const permissions = handle.running
+              ? ""
+              : `\n${await describeEnginePermissions(available.settings.enginePath, options.env ?? process.env, { platform })}`
             const status = `${text}\nengine: ${service.engineState}${service.engineState === "not started" ? ` (${source})` : ""}\nprelude: ${prelude}${skillStatusLine(state.skill)}\nengine source: ${source}${permissions}`
             commandCtx.ui.notify(status, "info")
             if (commandCtx.hasUI === false) process.stderr.write(`${status}\n`)
           } catch (error) {
             if (!(error instanceof Error)) throw error
-            commandCtx.ui.notify(`/computer ${args.trim()}: ${error.message}`, "error")
+            commandCtx.ui.notify(`/computer ${args.trim()}: ${computerFailureText(error)}`, "error")
           }
         },
       })
@@ -257,11 +279,6 @@ export function createComputerUseComponent(options: ComputerUseComponentOptions 
       })
       pi.on("message_end", (payload, eventCtx) => {
         telemetry.permissionTierDenied(payload, state.telemetryContext ?? eventCtx, state.backend)
-      })
-      pi.on("session_shutdown", async () => {
-        // A runtime that never loaded has no engine session to end.
-        const started = runtime.started()
-        if (started !== undefined) await (await started).handle.close()
       })
     },
   }

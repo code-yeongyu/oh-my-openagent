@@ -1,8 +1,13 @@
 import { log } from "@oh-my-opencode/utils"
 
-import { markRecordLostForReconciliation, transitionTaskRecord, type TaskRecord, type TaskTransitionAudit } from "../state"
+import {
+  markRecordLostForReconciliation,
+  transitionTaskRecord,
+  type TaskRecord,
+  type TaskTransitionAudit,
+} from "../state"
 import { withDroppedSteeringNotice } from "../state/queued-steering"
-import { nowIso, type LifecycleContext } from "./context"
+import { nowIso, reconciliationActive, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
 import type { ReconcileDeferredReason, ReconcileOutcome } from "./types"
 
@@ -26,6 +31,12 @@ export async function terminateOldRpc(context: LifecycleContext, record: TaskRec
   context.signaller.signal(pid, "SIGTERM")
   context.store.appendEvent(record.task_id, { type: "reconcile_terminated", payload: { pid, signal: "SIGTERM" } })
   await context.hostRetry.wait(context.orphanKillDelayMs)
+  const fresh = context.store.load(record.task_id)
+  if (
+    !reconciliationActive(context) ||
+    (context.reconcileActive !== undefined && (fresh === null || !holdsClaim(context, fresh, record)))
+  )
+    return false
   if (context.signaller.isAlive(pid)) {
     context.signaller.signal(pid, "SIGKILL")
     context.store.appendEvent(record.task_id, { type: "reconcile_terminated", payload: { pid, signal: "SIGKILL" } })
@@ -53,10 +64,17 @@ export function rollbackOrDeferred(
 export function holdsClaim(context: LifecycleContext, fresh: TaskRecord, claim: TaskRecord | undefined): boolean {
   if (fresh.host_pid !== context.hostPid || fresh.residency_state !== "resident") return false
   if (claim === undefined) return true
-  return fresh.notification.run_epoch === claim.notification.run_epoch && fresh.residency_claim === claim.residency_claim
+  return (
+    fresh.notification.run_epoch === claim.notification.run_epoch && fresh.residency_claim === claim.residency_claim
+  )
 }
 
-function rollbackClaim(context: LifecycleContext, taskId: string, residency: SuspendedResidency, claim: TaskRecord | undefined): boolean {
+function rollbackClaim(
+  context: LifecycleContext,
+  taskId: string,
+  residency: SuspendedResidency,
+  claim: TaskRecord | undefined,
+): boolean {
   try {
     context.store.mutate(taskId, (fresh) => {
       if (!holdsClaim(context, fresh, claim)) return fresh

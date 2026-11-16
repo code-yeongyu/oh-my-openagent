@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test"
+import { NAME_NOTE } from "./external-projection-names"
 import { renderExternalProjection, renderExternalProjectionStats } from "./index"
 
 const at = (entries: Record<string, number>): ReadonlyMap<string, number> => new Map(Object.entries(entries))
@@ -14,16 +15,16 @@ describe("renderExternalProjection limits", () => {
     const text = renderExternalProjection(paths, { times, limits: { maxEntriesPerDirectory: 2, maxBytes: 0 } })
 
     // then
-    expect(text.split("\n")).toContain("dir/: c3.md, c2.md (+1 more; read $MEMORY_DIR/dir/ to list)")
+    expect(text.split("\n")).toContain("dir/: c3, c2 (+1 more; read $MEMORY_DIR/dir/ to list)")
   })
 
-  it("#given both limits disabled #when rendered #then the bytes equal the unbounded renderer's", () => {
+  it("#given both limits disabled #when rendered #then it equals the render with no input, every name in name order", () => {
     // given
     const paths = [
       "ARCHIVE.md", "reference/zeta.md", "reference/Alpha.md", "reference/project/b.md", "reference/project/a.md",
       "people/한글/card.md", "notes/n.md", "reference/AKIAABCDEFGHIJKLMNOP.md",
     ]
-    const unbounded = "<external_projection>\n$MEMORY_DIR/: ARCHIVE.md\nnotes/: n.md\npeople/한글/: card.md\nreference/: ***.md, Alpha.md, zeta.md\nreference/project/: a.md, b.md\n</external_projection>"
+    const unbounded = `<external_projection>\n${NAME_NOTE}\n$MEMORY_DIR/: ARCHIVE\nnotes/: n\npeople/한글/: card\nreference/: ***, Alpha, zeta\nreference/project/: a, b\n</external_projection>`
 
     // when
     const disabled = renderExternalProjection(paths, {
@@ -38,7 +39,7 @@ describe("renderExternalProjection limits", () => {
 
   it("#given a byte budget below the full render #when rendered #then the largest directory shrinks first and every directory line stays", () => {
     // given
-    const big = Array.from({ length: 8 }, (_, index) => `big/entry-${index}.md`)
+    const big = Array.from({ length: 8 }, (_, index) => `big/entry-with-a-long-enough-name-${index}.md`)
     const paths = [...big, "small/s1.md", "small/s2.md"]
     const times = at(Object.fromEntries(paths.map((path, index) => [path, index])))
     const full = renderExternalProjection(paths, { times, limits: { maxEntriesPerDirectory: 0, maxBytes: 0 } })
@@ -51,8 +52,8 @@ describe("renderExternalProjection limits", () => {
     // then
     expect(bytes(first)).toBeLessThanOrEqual(limits.maxBytes)
     expect(first).toBe(second)
-    expect(first.split("\n")).toContain("small/: s2.md, s1.md")
-    expect(first).toMatch(/^big\/: (?:entry-\d\.md, )*entry-\d\.md \(\+\d+ more; read \$MEMORY_DIR\/big\/ to list\)$/m)
+    expect(first.split("\n")).toContain("small/: s2, s1")
+    expect(first).toMatch(/^big\/: (?:entry-with-a-long-enough-name-\d, )*entry-with-a-long-enough-name-\d \(\+\d+ more; read \$MEMORY_DIR\/big\/ to list\)$/m)
   })
 
   it("#given a budget too small for the full render #when fitted #then only the wider directory gives up names", () => {
@@ -67,8 +68,8 @@ describe("renderExternalProjection limits", () => {
 
     // then
     expect(bytes(text)).toBeLessThanOrEqual(bytes(full) - 60)
-    expect(text.split("\n")).toContain("aa/: x2.md, x1.md")
-    expect(text).toMatch(/^zz\/: entry-29\.md, .* \(\+\d+ more; read \$MEMORY_DIR\/zz\/ to list\)$/m)
+    expect(text.split("\n")).toContain("aa/: x2, x1")
+    expect(text).toMatch(/^zz\/: entry-29, .* \(\+\d+ more; read \$MEMORY_DIR\/zz\/ to list\)$/m)
   })
 
   it("#given a budget one byte below the next larger listing #when fitted #then shrinking stops at the first listing that fits, line breaks counted", () => {
@@ -111,8 +112,9 @@ describe("renderExternalProjection limits", () => {
     ]
     const smallest = [
       "<external_projection>",
+      NAME_NOTE,
       "$MEMORY_DIR/",
-      "A/: a.md, b.md, c.md, d.md, e.md, f.md",
+      "A/: a, b, c, d, e, f",
       "B/: (+2 more; read $MEMORY_DIR/B/ to list)",
       "</external_projection>",
     ].join("\n")
@@ -147,7 +149,7 @@ describe("renderExternalProjection limits", () => {
     const text = renderExternalProjection(paths, { times: at({}), limits: { maxEntriesPerDirectory: 1, maxBytes: 0 } })
 
     // then
-    expect(text).toContain("reference/***/: a.md (+1 more; read $MEMORY_DIR/reference/ to list)")
+    expect(text).toContain("reference/***/: a (+1 more; read $MEMORY_DIR/reference/ to list)")
   })
 
   it("#given long names and a budget below the floor #when rendered #then the floor render is returned and the overflow is reported", () => {
@@ -163,6 +165,7 @@ describe("renderExternalProjection limits", () => {
     // then
     expect(text).toBe([
       "<external_projection>",
+      NAME_NOTE,
       "$MEMORY_DIR/: (+1 more; read $MEMORY_DIR/ to list)",
       "a/: (+8 more; read $MEMORY_DIR/a/ to list)",
       "b/: (+1 more; read $MEMORY_DIR/b/ to list)",
@@ -194,7 +197,7 @@ describe("renderExternalProjection limits", () => {
     const text = renderExternalProjection(paths, { times, limits: { maxEntriesPerDirectory: 10, maxBytes: 0 } })
 
     // then
-    expect(text.split("\n")).toContain("d/: new.md, a.md, b.md, untimed.md")
+    expect(text.split("\n")).toContain("d/: new, a, b, untimed")
   })
 
   it("#given a render within both limits #when counted #then nothing is omitted and the bytes are exact", () => {

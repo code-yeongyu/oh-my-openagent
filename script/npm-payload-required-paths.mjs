@@ -7,7 +7,11 @@ import { canonicalUltraworkDirectiveRelativePath } from "../packages/omo-codex/p
 // shipped that path while oh-my-openagent@5.0.0-beta.43 did not, so the second payload died at
 // `npm run sync:skills` with ENOENT while passing this verifier.
 export function requiredCodexInstallPaths() {
-  return [canonicalUltraworkDirectiveRelativePath.split(sep).join("/")]
+  return [
+    canonicalUltraworkDirectiveRelativePath.split(sep).join("/"),
+    "packages/lsp-core/package.json",
+    "packages/lsp-core/src/index.ts",
+  ]
 }
 
 export function findMissingPayloadPaths(packedPaths, requiredPaths) {

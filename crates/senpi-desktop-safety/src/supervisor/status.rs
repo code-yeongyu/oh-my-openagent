@@ -1,7 +1,5 @@
 //! The supervisor's status snapshot, the one view gating and reporting read.
 
-use std::sync::atomic::Ordering;
-
 use super::{ActiveStopPath, StopPathId, StopPolicy, Supervisor, SupervisorStatus};
 
 impl Supervisor {
@@ -27,7 +25,7 @@ impl Supervisor {
         };
         let (suspended, stopped_by) = {
             let stopped_by = self.stopped_by.lock();
-            (self.suspended.load(Ordering::SeqCst), *stopped_by)
+            (self.is_suspended(), *stopped_by)
         };
         SupervisorStatus {
             suspended,

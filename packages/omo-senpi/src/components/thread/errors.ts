@@ -6,6 +6,7 @@ export const THREAD_ERROR_CODES = [
   "invalid_arguments",
   "caller_context_missing",
   "not_found",
+  "reply_target_mismatch",
   "ambiguous_target",
   "scope_denied",
   "name_conflict",
@@ -41,6 +42,9 @@ export const THREAD_ERROR_CODES = [
   "stale_token",
   "already_answered",
   "answer_in_progress",
+  "device_offline",
+  "relay_requires_paid_plan",
+  "alias_taken",
 ] as const
 
 export type ThreadErrorCode = (typeof THREAD_ERROR_CODES)[number]

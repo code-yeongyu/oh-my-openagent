@@ -5,33 +5,40 @@ import type { LoadedSkill } from "../../../features/opencode-skill-loader/types"
 import { createMockSkill, createSkillTool, mockContext } from "./test-support"
 
 describe("skill tool - nativeSkills integration", () => {
-  it("includes native skills in the description even when skills are pre-seeded", async () => {
+  it("keeps pre-seeded skills listed and leaves skills from core's own list to core, still loadable", async () => {
     const tool = createSkillTool({
       skills: [createMockSkill("seeded-skill")],
       includeSkillsInDescription: true,
       nativeSkills: {
         all() {
-          return [{
-            name: "native-visible-skill",
-            description: "Native skill exposed from config",
-            location: "/external/skills/native-visible-skill/SKILL.md",
-            content: "Native visible skill body",
-          }]
+          return [
+            {
+              name: "native-visible-skill",
+              description: "Native skill exposed from config",
+              location: "/external/skills/native-visible-skill/SKILL.md",
+              content: "Native visible skill body",
+            },
+          ]
         },
-        get() { return undefined },
-        dirs() { return [] },
+        get() {
+          return undefined
+        },
+        dirs() {
+          return []
+        },
       },
     })
 
     expect(tool.description).toContain("seeded-skill")
-    expect(tool.description).toContain("native-visible-skill")
-    await tool.execute({ name: "native-visible-skill" }, mockContext)
+    expect(tool.description).not.toContain("native-visible-skill")
+    const result = await tool.execute({ name: "native-visible-skill" }, mockContext)
 
+    expect(result).toContain("Native visible skill body")
     expect(tool.description).toContain("seeded-skill")
-    expect(tool.description).toContain("native-visible-skill")
+    expect(tool.description).not.toContain("native-visible-skill")
   })
 
-  it("keeps OpenCode-injected native skills in the description after the shared/ prefix cutover", () => {
+  it("omits OpenCode-injected native skills from available_items because core already lists them", () => {
     const tool = createSkillTool({
       skills: [],
       includeSkillsInDescription: true,
@@ -52,15 +59,21 @@ describe("skill tool - nativeSkills integration", () => {
             },
           ]
         },
-        get() { return undefined },
-        dirs() { return [] },
+        get() {
+          return undefined
+        },
+        dirs() {
+          return []
+        },
       },
     })
 
     const description = tool.description
 
-    expect(description).toContain("<name>/customize-opencode</name>")
-    expect(description).toContain("Customize OpenCode")
+    expect(description).not.toContain("<name>/customize-opencode</name>")
+    expect(description).not.toContain("<name>/opencode/customize-opencode</name>")
+    expect(description).not.toContain("Customize OpenCode")
+    expect(description).not.toContain("Qualified OpenCode customize entry")
   })
 
   it("merges native skills exposed by PluginInput.skills.all()", async () => {
@@ -68,15 +81,21 @@ describe("skill tool - nativeSkills integration", () => {
       skills: [],
       nativeSkills: {
         async all() {
-          return [{
-            name: "external-plugin-skill",
-            description: "Skill from config.skills.paths",
-            location: "/external/skills/external-plugin-skill/SKILL.md",
-            content: "External plugin skill body",
-          }]
+          return [
+            {
+              name: "external-plugin-skill",
+              description: "Skill from config.skills.paths",
+              location: "/external/skills/external-plugin-skill/SKILL.md",
+              content: "External plugin skill body",
+            },
+          ]
         },
-        async get() { return undefined },
-        async dirs() { return [] },
+        async get() {
+          return undefined
+        },
+        async dirs() {
+          return []
+        },
       },
     })
 
@@ -94,15 +113,21 @@ describe("skill tool - nativeSkills integration", () => {
       includeSkillsInDescription: true,
       nativeSkills: {
         all() {
-          return [{
-            name: "blocked-native-skill",
-            description: "Blocked native skill from config.skills.paths",
-            location: "/external/skills/blocked-native-skill/SKILL.md",
-            content: "BYPASS_CONFIRMED",
-          }]
+          return [
+            {
+              name: "blocked-native-skill",
+              description: "Blocked native skill from config.skills.paths",
+              location: "/external/skills/blocked-native-skill/SKILL.md",
+              content: "BYPASS_CONFIRMED",
+            },
+          ]
         },
-        get() { return undefined },
-        dirs() { return [] },
+        get() {
+          return undefined
+        },
+        dirs() {
+          return []
+        },
       },
     })
 

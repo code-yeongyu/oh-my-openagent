@@ -3,7 +3,10 @@ use std::sync::{mpsc, Arc};
 use parking_lot::Mutex;
 use senpi_desktop_core::backend::{DeliveryMode, Modifiers, MouseButton, PointerEvent};
 use senpi_desktop_core::keys::KeyName;
+use senpi_desktop_core::protocol_results::AxInputMethod;
 use senpi_desktop_core::types::{DesktopPoint, FrontWindow, Target};
+
+use crate::scripting::{EpochReason, FakeFocusRead, FakeHit, FakeIdentityRead, FocusRecordKind, FocusRecordOutcome};
 
 /// A pointer event as the fake received it (global logical coordinates).
 #[derive(Debug, Clone, PartialEq)]
@@ -128,10 +131,46 @@ pub enum SinkOp {
     AxFocus {
         node: u64,
     },
+    AxTypeText {
+        node: u64,
+        text: String,
+        method: AxInputMethod,
+        mode: DeliveryMode,
+    },
     MenuSelect {
         window: String,
         path: Vec<String>,
         delivery: DeliveryMode,
+    },
+    IdentityRead {
+        window: String,
+        identity: Option<FakeIdentityRead>,
+    },
+    IdentityChanged {
+        window: String,
+        old_pid: Option<u32>,
+        new_pid: u32,
+        process_start: u64,
+    },
+    FocusRead(FakeFocusRead),
+    FocusRecord {
+        kind: FocusRecordKind,
+        window: String,
+        outcome: FocusRecordOutcome,
+    },
+    HitRead {
+        at: DesktopPoint,
+        hit: Option<FakeHit>,
+    },
+    FrontmostRead {
+        pid: Option<u32>,
+    },
+    EpochBumped {
+        epoch: u64,
+        reason: EpochReason,
+    },
+    DisplaysChanged {
+        count: usize,
     },
 }
 

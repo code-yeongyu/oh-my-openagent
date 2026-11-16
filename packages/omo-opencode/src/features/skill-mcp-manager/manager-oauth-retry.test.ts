@@ -39,11 +39,11 @@ function createContext(): SkillMcpServerContext {
 describe("SkillMcpManager post-request OAuth retry", () => {
   it("retries the operation after a 401 refresh succeeds", async () => {
     // given
-    const refresh = mock(async () => ({ accessToken: "refreshed-token" } satisfies OAuthTokenData))
+    const refresh = mock(async () => ({ accessToken: "refreshed-token" }) satisfies OAuthTokenData)
     const manager = new SkillMcpManager({
       createOAuthProvider: () => ({
         tokens: () => ({ accessToken: "stale-token", refreshToken: "refresh-token" }),
-        login: mock(async () => ({ accessToken: "login-token" } satisfies OAuthTokenData)),
+        login: mock(async () => ({ accessToken: "login-token" }) satisfies OAuthTokenData),
         refresh,
       }),
     })
@@ -60,18 +60,18 @@ describe("SkillMcpManager post-request OAuth retry", () => {
     const result = await manager.callTool(createInfo(), createContext(), "test-tool", {})
 
     // then
-    expect(result).toEqual([{ type: "text", text: "success" }])
+    expect(result).toEqual({ content: [{ type: "text", text: "success" }] })
     expect(refresh).toHaveBeenCalledTimes(1)
     expect(callTool).toHaveBeenCalledTimes(2)
   })
 
   it("retries the operation after a 403 refresh succeeds without step-up scope", async () => {
     // given
-    const refresh = mock(async () => ({ accessToken: "refreshed-token" } satisfies OAuthTokenData))
+    const refresh = mock(async () => ({ accessToken: "refreshed-token" }) satisfies OAuthTokenData)
     const manager = new SkillMcpManager({
       createOAuthProvider: () => ({
         tokens: () => ({ accessToken: "stale-token", refreshToken: "refresh-token" }),
-        login: mock(async () => ({ accessToken: "login-token" } satisfies OAuthTokenData)),
+        login: mock(async () => ({ accessToken: "login-token" }) satisfies OAuthTokenData),
         refresh,
       }),
     })
@@ -88,7 +88,7 @@ describe("SkillMcpManager post-request OAuth retry", () => {
     const result = await manager.callTool(createInfo(), createContext(), "test-tool", {})
 
     // then
-    expect(result).toEqual([{ type: "text", text: "success" }])
+    expect(result).toEqual({ content: [{ type: "text", text: "success" }] })
     expect(refresh).toHaveBeenCalledTimes(1)
     expect(callTool).toHaveBeenCalledTimes(2)
   })
@@ -101,7 +101,7 @@ describe("SkillMcpManager post-request OAuth retry", () => {
     const manager = new SkillMcpManager({
       createOAuthProvider: () => ({
         tokens: () => ({ accessToken: "stale-token", refreshToken: "refresh-token" }),
-        login: mock(async () => ({ accessToken: "login-token" } satisfies OAuthTokenData)),
+        login: mock(async () => ({ accessToken: "login-token" }) satisfies OAuthTokenData),
         refresh,
       }),
     })
@@ -118,11 +118,11 @@ describe("SkillMcpManager post-request OAuth retry", () => {
 
   it("only attempts one refresh when the retried operation returns 401 again", async () => {
     // given
-    const refresh = mock(async () => ({ accessToken: "refreshed-token" } satisfies OAuthTokenData))
+    const refresh = mock(async () => ({ accessToken: "refreshed-token" }) satisfies OAuthTokenData)
     const manager = new SkillMcpManager({
       createOAuthProvider: () => ({
         tokens: () => ({ accessToken: "stale-token", refreshToken: "refresh-token" }),
-        login: mock(async () => ({ accessToken: "login-token" } satisfies OAuthTokenData)),
+        login: mock(async () => ({ accessToken: "login-token" }) satisfies OAuthTokenData),
         refresh,
       }),
     })

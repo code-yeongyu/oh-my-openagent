@@ -49,7 +49,11 @@ Always required, never null: `fact_id`, `kind`, `raw` (string), `quote` (string)
 | `locator` | object | object | object or null | object or null | object or null |
 | `snapshot_sha256` | sha256 | sha256 | sha256 or null | sha256 or null | sha256 or null |
 | `rationale` | string or null | string or null | string or null | non-empty | string or null |
-| `exact` | from `value` | null | written by derive (rational or null) | rational or null | written by derive (rational or null) |
+| `exact` | from `value` | null | reduced rational | rational or null | reduced rational |
+| `context` | quote context or null (legacy) | quote context or null (legacy) | written by derive (object or null) | null | written by derive (object or null) |
+| `operation` | null | null | sum/diff/growth/share/ratio/expr | null | `convert` |
+| `precision` | null | null | `{ places, sigfigs }` | null | `{ places, sigfigs }` |
+| `compatibility` | null | null | checked or unchecked (expr) | null | checked or unchecked (expr) |
 <!-- kind-rules:end -->
 
 - `exact` is `{ num: integer string, den: positive integer string }` or null. A measured row's
@@ -57,9 +61,27 @@ Always required, never null: `fact_id`, `kind`, `raw` (string), `quote` (string)
   it when the caller leaves it null. Derived and converted rows get it from
   derive (plan todo 9): a converted value's rational comes from the original and the factor,
   not from the rounded `value`, so `addRow` never computes it from `value`.
-- `locator` is `{ artifact, char_start <= char_end, page?, line?, table?, row_label?,
-  col_label? }`.
+- `locator` is `{ artifact, char_start <= char_end, unit?, page?, line?, table?, row_label?,
+  col_label? }`: `char_start/char_end` are a half-open byte range of `artifact` (raw.bin, or
+  text.txt for a declared or converted extraction) in its own encoding; new rows write
+  `unit: "bytes"`. No unit marks a legacy text locator.
+- Source `snapshot_sha256` binds the pinned body exactly (raw.bin; text.txt for converted-only). Source `context` is `{prefix, suffix}`, each
+  at most 32 Unicode characters copied around the value span, or the whole quote for Q rows.
 - All other fields are nullable with the types in `fact-ledger-schema.mjs`.
+
+Exact rational integer strings are canonical: no leading zeros, negative zero, negative denominator,
+or common factors. Unit aliases normalize at input, with numeric scaling for basis-point factors
+in composites. Derived rows store canonical units, compared exactly, including symbols' case; a source
+row's registered alias is canonicalized when the ledger is read (`unit-rules.md` dimension 31).
+
+A ledger written before `context`, `precision`, and `compatibility` existed still loads: source rows
+read those columns as null, and older derived or converted rows load but are never used as operands.
+
+Derived and converted rows require a matching operation, its closed context, distinct existing operands,
+formula, derived_from, precision, and compatibility. Source rows cannot carry derivation fields.
+Precision records nonnegative decimal places and positive significant figures, independently of display
+text. Recomputation verifies redundant audit fields and recursively verifies each shared dependency once.
+New work may consume only active transitive dependencies; historical verification ignores current eligibility.
 
 ## Labels
 

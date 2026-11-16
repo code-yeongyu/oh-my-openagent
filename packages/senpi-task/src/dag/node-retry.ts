@@ -38,6 +38,13 @@ export type DagRetryOptions = {
  */
 export function reenterDagRun(options: DagSchedulerOptions): DagRunReentry {
   const current = readRecord(options.store, options.initialRecord.runId) ?? options.initialRecord
+  if (current.pause?.reason === "user_stop") {
+    throw new DagNodeControlError({
+      code: "run_paused_by_user",
+      message: "only the user's Resume may restart this run",
+      runId: current.runId,
+    })
+  }
   const record = withRevivalCapacity(options, current, () => resumeIfSettled(options, current))
   return startReentry(options, record)
 }
@@ -104,6 +111,13 @@ export function retryDagNodes(
   if (retryOptions?.prompt !== undefined) {
     for (const target of targets) current = amendRetryPrompt(options, record, target, retryOptions.prompt)
   }
+  if (record.status === "paused" && record.pause?.reason === "user_stop") {
+    const journal = controlJournal(options, current)
+    journal.append({ type: "dag.node.retry-staged", nodeIds: targets })
+    const staged = journal.snapshot()
+    const scheduler = createDagScheduler({ ...options, initialRecord: staged })
+    return { record: staged, scheduler, run: Promise.resolve(staged) }
+  }
   // The node mutations and the resume share one cap check, so a refused retry leaves every node as it was.
   const resumed = withRevivalCapacity(options, current, () => {
     const journal = controlJournal(options, current)
@@ -122,21 +136,25 @@ export function resetDagNodes(
 ): void {
   for (const nodeId of targets) {
     const node = nodeById(journal.snapshot(), nodeId)
-    journal.append(dagNodeRetriedEvent({
-      nodeId,
-      ...(node.taskId === undefined ? {} : { priorTaskId: node.taskId }),
-      execAttempt: (node.execAttempt ?? 0) + 1,
-      promptChanged,
-      ...(automatic === undefined ? {} : { automatic }),
-    }))
+    journal.append(
+      dagNodeRetriedEvent({
+        nodeId,
+        ...(node.taskId === undefined ? {} : { priorTaskId: node.taskId }),
+        execAttempt: (node.execAttempt ?? 0) + 1,
+        promptChanged,
+        ...(automatic === undefined ? {} : { automatic }),
+      }),
+    )
   }
   for (const node of skippedDependentsOf(journal.snapshot(), targets)) {
-    journal.append(dagNodeTransitionedEvent({
-      nodeId: node.id,
-      from: "skipped",
-      to: "blocked",
-      reason: { kind: "retried" },
-    }))
+    journal.append(
+      dagNodeTransitionedEvent({
+        nodeId: node.id,
+        from: "skipped",
+        to: "blocked",
+        reason: { kind: "retried" },
+      }),
+    )
   }
 }
 
@@ -171,7 +189,12 @@ function assertRetryable(record: DagRunRecordV1, runId: DagRunId, targets: reado
   for (const nodeId of targets) {
     const node = record.nodes.find((entry) => entry.id === nodeId)
     if (node === undefined) {
-      throw new DagNodeControlError({ code: "node_not_found", message: `unknown dag node "${nodeId}"`, runId, nodeIds: [nodeId] })
+      throw new DagNodeControlError({
+        code: "node_not_found",
+        message: `unknown dag node "${nodeId}"`,
+        runId,
+        nodeIds: [nodeId],
+      })
     }
     if (node.state === "completed") {
       throw new DagNodeControlError({

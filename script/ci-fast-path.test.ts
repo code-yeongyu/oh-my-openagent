@@ -62,11 +62,7 @@ function classify(
   const generatedReleasePush = parsed["generatedReleasePush"]
   const webOnly = parsed["webOnly"]
   const runHeavy = parsed["runHeavy"]
-  if (
-    typeof generatedReleasePush !== "boolean" ||
-    typeof webOnly !== "boolean" ||
-    typeof runHeavy !== "boolean"
-  ) {
+  if (typeof generatedReleasePush !== "boolean" || typeof webOnly !== "boolean" || typeof runHeavy !== "boolean") {
     throw new Error("classifier output must contain boolean CI mode fields")
   }
   return { generatedReleasePush, webOnly, runHeavy }
@@ -162,8 +158,15 @@ describe("CI fast-path workflow wiring", () => {
     const jobs = workflowJobs(ciWorkflowPath)
     const contexts: string[] = []
     for (const id of [
-      "test", "typecheck", "build", "codex-compatibility", "senpi-compatibility",
-      "macos-test-1-status", "macos-test-2-status", "macos-codex-status", "macos-senpi-status",
+      "test",
+      "typecheck",
+      "build",
+      "codex-compatibility",
+      "senpi-compatibility",
+      "macos-test-1-status",
+      "macos-test-2-status",
+      "macos-codex-status",
+      "macos-senpi-status",
     ]) {
       const job = jobs[id]
       if (!isRecord(job)) throw new Error(`CI must define ${id}`)
@@ -196,14 +199,20 @@ describe("CI fast-path workflow wiring", () => {
     expect(gate["permissions"]).toEqual({ contents: "read", "pull-requests": "read" })
     contexts.push(String(gate["name"]))
     for (const required of [
-      "test (windows-latest, 1/2)", "test (windows-latest, 2/2)",
-      "test (ubuntu-latest, 1/2)", "test (ubuntu-latest, 2/2)",
-      "test (macos-latest, 1/2)", "test (macos-latest, 2/2)",
-      "typecheck", "build",
+      "test (windows-latest, 1/2)",
+      "test (windows-latest, 2/2)",
+      "test (ubuntu-latest, 1/2)",
+      "test (ubuntu-latest, 2/2)",
+      "test (macos-latest, 1/2)",
+      "test (macos-latest, 2/2)",
+      "typecheck",
+      "build",
       "codex-compatibility (ubuntu-latest, full)",
       "codex-compatibility (macos-latest, platform)",
       "codex-compatibility (windows-latest, platform)",
-      "senpi-compatibility (ubuntu-latest)", "senpi-compatibility (macos-latest)", "Review claim gate",
+      "senpi-compatibility (ubuntu-latest)",
+      "senpi-compatibility (macos-latest)",
+      "Review claim gate",
     ]) {
       expect(contexts).toContain(required)
     }
@@ -230,14 +239,28 @@ describe("CI fast-path workflow wiring", () => {
   })
 
   test("keeps schema generation on master and skips duplicate draft generation", () => {
+    const triggers = parseWorkflow(ciWorkflowPath)["on"]
+    if (!isRecord(triggers) || !isRecord(triggers["push"])) throw new Error("CI must define push triggers")
+    expect(triggers["push"]["branches"]).toEqual(["master", "dev"])
+
     const jobs = workflowJobs(ciWorkflowPath)
     const schema = jobs["auto-commit-schema"]
     const draft = jobs["draft-release"]
     if (!isRecord(schema) || !isRecord(draft)) throw new Error("CI write jobs must exist")
+    expect(schema["needs"]).toContain("lint-ratchet")
+    expect(draft["needs"]).toContain("lint-ratchet")
 
     expect(String(schema["if"])).toContain("refs/heads/master")
     expect(String(schema["if"])).not.toContain("run_heavy")
     expect(String(draft["if"])).toContain("needs.ci-mode.outputs.run_heavy == 'true'")
+  })
+
+  test("retains the typecheck ratchet during the required-check transition", () => {
+    const typecheck = workflowJobs(ciWorkflowPath)["typecheck"]
+    if (!isRecord(typecheck) || !Array.isArray(typecheck["steps"])) throw new Error("typecheck must define steps")
+    const ratchet = typecheck["steps"].filter(isRecord).find((step) => step["run"] === "bun run lint:ratchet")
+    expect(ratchet).toBeDefined()
+    expect(ratchet?.["if"]).toBe("needs.ci-mode.outputs.run_heavy == 'true'")
   })
 
   test("keeps the Web CI path contract aligned with classifier inputs", () => {
@@ -247,10 +270,6 @@ describe("CI fast-path workflow wiring", () => {
     const pullRequest = triggers["pull_request"]
     if (!isRecord(pullRequest)) throw new Error("Web CI must define pull_request")
 
-    expect(pullRequest["paths"]).toEqual([
-      "packages/web/**",
-      "docs/**",
-      ".github/workflows/web-ci.yml",
-    ])
+    expect(pullRequest["paths"]).toEqual(["packages/web/**", "docs/**", ".github/workflows/web-ci.yml"])
   })
 })

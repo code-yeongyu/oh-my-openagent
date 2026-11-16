@@ -1,4 +1,5 @@
 import type { TaskManager } from "../manager/types"
+import type { ResumeCredential } from "../pause/admission-barrier"
 import type { DagExecutionModeSources } from "./execution-mode"
 import { createDagJournal, subscribeDagJournal, type DagJournalListener } from "./journal"
 import { skipDuplicateTerminalTransition, type DagMaterializeSkills, type DagRunRecordV1 } from "./manager"
@@ -6,7 +7,13 @@ import { retryDagNodes, type DagRetryOptions, type DagRunReentry } from "./node-
 import { sendToDagNode, type DagNodeSendResult } from "./node-send"
 import type { DagFileStore } from "./store"
 import type { DagNodeError, DagNodeId, DagRunId } from "./types"
-import { deferredSignal, repeatableSignal, TERMINAL_NODE_STATES, type PendingTerminalResult, type SchedulerContext } from "./scheduler-context"
+import {
+  deferredSignal,
+  repeatableSignal,
+  TERMINAL_NODE_STATES,
+  type PendingTerminalResult,
+  type SchedulerContext,
+} from "./scheduler-context"
 import { applyDagSchedulerEvent } from "./scheduler-projection"
 import { cancelRun, whenAdmissionIdle } from "./scheduler-cancellation"
 import { runFrontier } from "./scheduler-frontier"
@@ -20,6 +27,7 @@ export type { DagRetryOptions, DagRunReentry } from "./node-retry"
 export type { DagNodeSendResult } from "./node-send"
 
 export type DagSchedulerOptions = {
+  readonly resumeCredential?: ResumeCredential
   readonly store: DagFileStore
   readonly taskManager: TaskManager
   readonly initialRecord: DagRunRecordV1
@@ -72,11 +80,7 @@ export type DagScheduler = {
    * NEW scheduler. Safe to call on a settled instance: it reads the durable record, not this
    * instance's spent state machine.
    */
-  readonly retryNode: (
-    runId: DagRunId,
-    nodeIds?: readonly DagNodeId[],
-    options?: DagRetryOptions,
-  ) => DagRunReentry
+  readonly retryNode: (runId: DagRunId, nodeIds?: readonly DagNodeId[], options?: DagRetryOptions) => DagRunReentry
   /** Steers a running child, revives a finished resident one, or refuses with node_not_continuable. */
   readonly sendToNode: (runId: DagRunId, nodeId: DagNodeId, message: string) => Promise<DagNodeSendResult>
 }
@@ -106,12 +110,8 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
     store: options.store,
     runId: options.initialRecord.runId,
     initialCheckpoint: options.initialRecord,
-    applyEvent: (record, event) => applyDagSchedulerEvent(
-      record,
-      event,
-      pendingErrors,
-      { store: options.store, pendingTerminalResults, now },
-    ),
+    applyEvent: (record, event) =>
+      applyDagSchedulerEvent(record, event, pendingErrors, { store: options.store, pendingTerminalResults, now }),
     ...(options.subscriberRing === undefined ? {} : { subscriberRing: options.subscriberRing }),
     now,
     skipDuplicate: skipDuplicateTerminalTransition,
@@ -123,6 +123,7 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
     definitionNodes: new Map(options.initialRecord.definition.nodes.map((node) => [node.id, node])),
     ...(options.executionMode === undefined ? {} : { executionMode: options.executionMode }),
     ...(options.ancestry === undefined ? {} : { ancestry: options.ancestry }),
+    ...(options.resumeCredential === undefined ? {} : { resumeCredential: options.resumeCredential }),
     ...(options.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: options.nodeSpawnPolicy }),
     now,
     pendingErrors,
@@ -170,7 +171,7 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
 
   let running: Promise<DagRunRecordV1> | undefined
   const scheduler: DagScheduler = {
-    run: () => running ??= runFrontier(context),
+    run: () => (running ??= runFrontier(context)),
     cancel: (runId, reason) => cancelRun(context, runId, reason),
     suspend: async () => {
       context.suspended = true
@@ -189,17 +190,19 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
     subscribe: journal.subscribe,
     whenIdle: journal.whenIdle,
     retryNode: (runId, nodeIds, retryOptions) => retryDagNodes(options, runId, nodeIds, retryOptions),
-    sendToNode: (runId, nodeId, message) => sendToDagNode(
-      options,
-      runId,
-      nodeId,
-      message,
-      // Refresh, not snapshot: a control-journal commit may still be a microtask away from the
-      // subscription callback, and routing a revive off a stale status was half of dag_923ad20e.
-      (revivedNodeId, taskId) => context.journal.refresh().status === "running"
-        ? watchRevivedInScheduler(context, revivedNodeId, taskId)
-        : undefined,
-    ),
+    sendToNode: (runId, nodeId, message) =>
+      sendToDagNode(
+        options,
+        runId,
+        nodeId,
+        message,
+        // Refresh, not snapshot: a control-journal commit may still be a microtask away from the
+        // subscription callback, and routing a revive off a stale status was half of dag_923ad20e.
+        (revivedNodeId, taskId) =>
+          context.journal.refresh().status === "running"
+            ? watchRevivedInScheduler(context, revivedNodeId, taskId)
+            : undefined,
+      ),
   }
   for (const observer of schedulerObservers.get(options.taskManager) ?? []) observer(scheduler)
   return scheduler

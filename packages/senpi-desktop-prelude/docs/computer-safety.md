@@ -6,6 +6,7 @@
 - Confirm exact target, scope, and values at point of risk.
 - Provider safety checks MUST receive explicit interactive approval; fail closed otherwise.
 - A `Suspended` or `StopPathUnavailable` error means the user stopped or cannot stop you: halt computer input and report; NEVER retry around it or try to resume it yourself.
+- A `UserIntervened` error means the user is using the app you were driving: the user always wins. Read that window again after they pause; NEVER repeat the action or type around them.
 </critical>
 
 Consequential actions include sending/publishing, purchases/transfers, deletion, account/security changes, permission grants, disclosure of private data, accepting legal terms, and irreversible changes.

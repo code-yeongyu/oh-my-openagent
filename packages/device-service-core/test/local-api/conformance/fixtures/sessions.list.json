@@ -1,0 +1,220 @@
+{
+  "request": "sessions.list",
+  "cases": [
+    {
+      "name": "a round opens, publishes the cached revision, then the live one, then ends done",
+      "outcome": "ok",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "sessions.list"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "query_id": "<capture:q>"
+            }
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "sessions.round",
+            "query_id": "<ref:q>",
+            "state": "open",
+            "devices": {
+              "dev-peer-1": "pending",
+              "dev-peer-2": "pending"
+            }
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "sessions.listing_begin",
+            "query_id": "<ref:q>",
+            "revision": 1
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "sessions.listing_rows",
+            "query_id": "<ref:q>",
+            "revision": 1,
+            "rows": [
+              {
+                "device": "dev-peer-2",
+                "source": "cache"
+              }
+            ]
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "sessions.listing_end",
+            "query_id": "<ref:q>",
+            "revision": 1,
+            "incomplete": ["dev-peer-1"]
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "sessions.listing_begin",
+            "query_id": "<ref:q>",
+            "revision": 2
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "sessions.listing_rows",
+            "query_id": "<ref:q>",
+            "revision": 2,
+            "rows": [
+              {
+                "source": "cache"
+              },
+              {
+                "device": "dev-peer-1",
+                "source": "live"
+              }
+            ]
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "sessions.listing_end",
+            "query_id": "<ref:q>",
+            "revision": 2,
+            "incomplete": []
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "sessions.round",
+            "query_id": "<ref:q>",
+            "state": "done",
+            "devices": {
+              "dev-peer-1": "answered",
+              "dev-peer-2": "undelivered"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a device filter narrows each revision for this subscriber only",
+      "outcome": "ok",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "sessions.list",
+            "filter": {
+              "device": "dev-peer-1"
+            }
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "query_id": "<capture:q>"
+            }
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "sessions.round",
+            "state": "open"
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "sessions.listing_begin",
+            "revision": 1
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "sessions.listing_end",
+            "revision": 1
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "sessions.listing_begin",
+            "revision": 2
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "sessions.listing_rows",
+            "revision": 2,
+            "rows": [
+              {
+                "device": "dev-peer-1"
+              }
+            ]
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "sessions.listing_end",
+            "revision": 2
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "sessions.round",
+            "state": "done"
+          }
+        }
+      ]
+    },
+    {
+      "name": "an unknown filter key is refused",
+      "outcome": "refusal",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "sessions.list",
+            "filter": {
+              "owner": "me"
+            }
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "invalid_request"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

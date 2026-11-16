@@ -6,12 +6,7 @@ import { resolveActualInstallPath } from "./install-path-resolver"
 import { createLoadedPlugin } from "./loaded-plugin"
 import { loadPluginManifest } from "./plugin-manifest"
 import { isPluginEnabled, loadClaudeSettings } from "./plugin-settings"
-import type {
-  LoadedPlugin,
-  PluginLoadError,
-  PluginLoaderOptions,
-  PluginLoadResult,
-} from "./types"
+import type { LoadedPlugin, PluginLoadError, PluginLoaderOptions, PluginLoadResult } from "./types"
 
 export function discoverInstalledPlugins(options?: PluginLoaderOptions): PluginLoadResult {
   const pluginsBaseDir = options?.pluginsHomeOverride ?? getPluginsBaseDir()

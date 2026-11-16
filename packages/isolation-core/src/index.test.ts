@@ -3,9 +3,14 @@ import * as isolationCore from "./index"
 
 test("public surface exposes the whole isolation lifecycle from the package root", () => {
   for (const name of [
-    "ensureIsolation", "cleanupIsolation", "retainIsolation",
-    "sweepStaleIsolations", "readOwnerLiveness", "writeOwnerMarker",
-    "chooseBaseDir", "resolveCandidates",
+    "ensureIsolation",
+    "cleanupIsolation",
+    "retainIsolation",
+    "sweepStaleIsolations",
+    "readOwnerLiveness",
+    "writeOwnerMarker",
+    "chooseBaseDir",
+    "resolveCandidates",
   ] as const) {
     expect(typeof isolationCore[name]).toBe("function")
   }

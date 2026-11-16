@@ -33,11 +33,7 @@ describe("bundled model capabilities snapshot", () => {
   test("keeps GPT-4.1 OpenAI variants marked as supporting tool calls", () => {
     // given
     const bundledSnapshot = getBundledModelCapabilitiesSnapshot(bundledModelCapabilitiesSnapshotJson)
-    const modelIDs = [
-      "openai/gpt-4.1",
-      "openai/gpt-4.1-mini",
-      "openai/gpt-4.1-nano",
-    ]
+    const modelIDs = ["openai/gpt-4.1", "openai/gpt-4.1-mini", "openai/gpt-4.1-nano"]
 
     // when
     const results = modelIDs.map((modelID) =>
@@ -69,5 +65,23 @@ describe("bundled model capabilities snapshot", () => {
 
     // then
     expect(results).toEqual([1_050_000, 1_050_000])
+  })
+})
+
+test("registers Claude Fable 5.2 with its launch limits and modalities", () => {
+  // given
+  const snapshot = getBundledModelCapabilitiesSnapshot({ generatedAt: "", sourceUrl: "", models: {} })
+
+  // when
+  const entry = snapshot.models["claude-fable-5-2"]
+
+  // then
+  expect(entry).toMatchObject({
+    family: "claude-fable",
+    reasoning: true,
+    temperature: false,
+    toolCall: true,
+    modalities: { input: ["text", "image", "pdf"], output: ["text"] },
+    limit: { context: 1_000_000, output: 128_000 },
   })
 })

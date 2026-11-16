@@ -1,13 +1,24 @@
+import { join } from "node:path"
+
 import { loadPiTui } from "@oh-my-opencode/senpi-task"
+
+import { defaultCommentCheckerCacheDir } from "../components/comment-checker/resolver"
 
 import { createDagSdkRootProvisioning } from "./dag-sdk-root-provisioning"
 import { isOmoSenpiDisabledByEnv } from "./disable-env"
-import { AGENT_TOOLKIT_SDK_ROOT_ENV, createSdkRootProvisioning } from "./sdk-root-provisioning"
+import { AGENT_TOOLKIT_SDK_ROOT_ENV, BUNSHIN_TS_SDK_ROOT_ENV, createSdkRootProvisioning } from "./sdk-root-provisioning"
 import { IdleInjectionCoordinator } from "./idle-injection-coordinator"
+import { deliverItems } from "./deliver-items"
 import { publishWakeQueueBaselineOnSessionStart, publishWakeQueueChildWork } from "./wake-queue-source"
-import { createFirstPaintScheduler, createStartupDeferral, type StartupWorkScheduler } from "./startup-deferral"
+import {
+  createFirstPaintScheduler,
+  createStartupDeferral,
+  type ExtensionPlacement,
+  type StartupWorkScheduler,
+} from "./startup-deferral"
 import { installToolCaptureRegistry } from "./tool-capture-registry"
 import { createPrewarmDiagnostics } from "./prewarm-diagnostics"
+import { absentSenpiSeamsNotice, installRemoteWakeRefusal } from "./senpi-seams"
 import type { ComponentContext, ComponentLogger, OmoSenpiComponent, SenpiExtensionAPI } from "./types"
 import { releaseHerdrAgentHint } from "./herdr-agent-hint"
 
@@ -16,6 +27,11 @@ export interface ComposeOmoSenpiExtensionOptions {
   /** Test seam for the startup deferral; production uses its next-tick scheduler. */
   scheduleStartupWork?: StartupWorkScheduler
   env?: NodeJS.ProcessEnv
+  /**
+   * Where this generation runs. senpi does not report its side to an extension yet, so production composes as
+   * "fused" (today); the hand reads it once the host exposes the side of a split session.
+   */
+  placement?: () => ExtensionPlacement
 }
 
 const REQUIRED_CAPABILITIES = [
@@ -73,18 +89,32 @@ export function composeOmoSenpiExtension(
 ): (pi: unknown) => Promise<void> {
   const logger = options.logger ?? defaultLogger
   const provisionDagSdkRoot = createDagSdkRootProvisioning({ logger })
-  const provisionAgentToolkitSdkRoot = createSdkRootProvisioning({
-    envKey: AGENT_TOOLKIT_SDK_ROOT_ENV,
-    packagedRelativeDir: "../runtime/agent-toolkit-sdk",
-    sourceTreeRelativeDir: "../../plugin/runtime/agent-toolkit-sdk",
-    logger,
-  })
+  const runtimeSdkRoot = (envKey: string, dir: string, label?: string) =>
+    createSdkRootProvisioning({
+      envKey,
+      packagedRelativeDir: `../runtime/${dir}`,
+      sourceTreeRelativeDir: `../../plugin/runtime/${dir}`,
+      logger,
+      label,
+    })
+  const provisionAgentToolkitSdkRoot = runtimeSdkRoot(AGENT_TOOLKIT_SDK_ROOT_ENV, "agent-toolkit-sdk")
+  const provisionBunshinTsSdkRoot = runtimeSdkRoot(BUNSHIN_TS_SDK_ROOT_ENV, "bunshin-ts", "bunshin-ts")
 
   return async (pi: unknown): Promise<void> => {
     releaseHerdrAgentHint()
+    // Shell children inherit process.env: a bundled skill's Python must not write __pycache__ into a signed app (#11373),
+    // so bytecode goes to <user cache>/omo-senpi/pycache unless the user set either variable, even to an empty string.
+    if (process.env.PYTHONDONTWRITEBYTECODE === undefined) {
+      process.env.PYTHONPYCACHEPREFIX ??= join(
+        defaultCommentCheckerCacheDir(process.platform, process.env, "omo-senpi"),
+        "..",
+        "pycache",
+      )
+    }
     // Publish the dag eval sdk directory so JavaScript cells can import it from OMO_DAG_SDK_ROOT.
     provisionDagSdkRoot()
     provisionAgentToolkitSdkRoot()
+    provisionBunshinTsSdkRoot()
 
     const missing = getMissingCapabilities(pi)
     if (missing.length > 0 || !isSenpiExtensionAPI(pi)) {
@@ -114,6 +144,10 @@ export function composeOmoSenpiExtension(
       return
     }
 
+    const absentSeams = absentSenpiSeamsNotice(pi)
+    if (absentSeams !== undefined) logger.warn(absentSeams)
+    installRemoteWakeRefusal(pi)
+
     // Install the capture registry and idle coordinator BEFORE the component loop so every component
     // (lsp registers earlier than task) has its tools captured and shares one injection arbiter.
     const captureRegistry = installToolCaptureRegistry(pi)
@@ -127,7 +161,7 @@ export function composeOmoSenpiExtension(
     const publishChildWork = publishWakeQueueChildWork(pi, logger)
     const idleCoordinator = new IdleInjectionCoordinator(
       (message, options) =>
-        pi.sendMessage(message, { triggerTurn: true, deliverAs: options.deliverAs }),
+        deliverItems((native, delivery) => pi.sendMessage(native, delivery), { ...options, message }),
       {
         scheduleFlush: (flush) => {
           const timer = setTimeout(flush, IDLE_FLUSH_BATCH_WINDOW_MS)
@@ -153,7 +187,9 @@ export function composeOmoSenpiExtension(
       try {
         idleCoordinator.retire()
       } catch (error) {
-        logger.warn("omo-senpi idle injection receipt failed on shutdown", { error: error instanceof Error ? error.message : String(error) })
+        logger.warn("omo-senpi idle injection receipt failed on shutdown", {
+          error: error instanceof Error ? error.message : String(error),
+        })
       }
     })
 
@@ -166,7 +202,12 @@ export function composeOmoSenpiExtension(
     // as the idle coordinator: a session that ends before the gate opens must not start a
     // half-session's worth of work on a dead API.
     const startupDeferral = createStartupDeferral({
-      schedule: options.scheduleStartupWork ?? createFirstPaintScheduler({ on: (event, handler, registrationOptions) => pi.on(event, handler, registrationOptions) }),
+      schedule:
+        options.scheduleStartupWork ??
+        createFirstPaintScheduler({
+          on: (event, handler, registrationOptions) => pi.on(event, handler, registrationOptions),
+          placement: options.placement?.() ?? "fused",
+        }),
       onError: (label, error) => logger.warn("omo-senpi deferred startup work failed", { label, error }),
     })
     pi.on("session_shutdown", () => startupDeferral.retire())

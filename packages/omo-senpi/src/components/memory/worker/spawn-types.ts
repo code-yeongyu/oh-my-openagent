@@ -30,6 +30,8 @@ export interface ReflectionSpawnArgs {
   readonly runId?: string
   readonly attempt: number
   readonly hardDeadlineAt: number
+  readonly memoryRoot?: string
+  readonly maxConcurrentRuns?: number
   readonly category: string
   readonly conversationIds: readonly string[]
   readonly model: string
@@ -51,9 +53,7 @@ export interface ReflectionSpawnArgs {
   readonly paths: ReflectionSpawnPaths
 }
 
-export type ReflectionSandbox = (
-  spawnArgs: ReflectionSpawnArgs,
-) => ReflectionSpawnArgs | Promise<ReflectionSpawnArgs>
+export type ReflectionSandbox = (spawnArgs: ReflectionSpawnArgs) => ReflectionSpawnArgs | Promise<ReflectionSpawnArgs>
 
 export interface ReflectionChildResult {
   readonly code: number | null
@@ -76,6 +76,8 @@ export interface PrepareReflectionSpawnInput {
   readonly loadExtensions?: boolean
   readonly attempt?: number
   readonly hardDeadlineAt?: number
+  readonly memoryRoot?: string
+  readonly maxConcurrentRuns?: number
   readonly nextAttempt?: RunAttempt
   readonly env: NodeJS.ProcessEnv
   readonly mergePolicy: "auto" | "integration"

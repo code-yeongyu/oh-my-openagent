@@ -90,7 +90,8 @@ export type ThreadTranscriptReadOk = {
   readonly skipped_lines: number
 }
 
-export type ThreadTranscriptReadResult = ThreadTranscriptReadOk | { readonly kind: "error"; readonly error: ThreadToolFailure }
+export type ThreadTranscriptReadResult =
+  ThreadTranscriptReadOk | { readonly kind: "error"; readonly error: ThreadToolFailure }
 
 const READ_CHUNK_BYTES = 65536
 const CURSOR_VERSION = "t1"

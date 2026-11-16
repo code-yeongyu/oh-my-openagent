@@ -1,4 +1,6 @@
 import { createOpencode as createOpencodeSdk, createOpencodeClient as createOpencodeClientSdk } from "@opencode-ai/sdk"
+import { randomBytes } from "node:crypto"
+import { createPaneAuthDirectory } from "@oh-my-opencode/tmux-core"
 import pc from "picocolors"
 import type { ServerConnection } from "./types"
 import { injectServerAuthIntoClient } from "../../shared/opencode-server-auth"
@@ -22,14 +24,15 @@ type OpencodeServer<TClient> = {
 }
 
 export type ServerConnectionDeps<TClient> = {
-  createOpencode: (options: { signal: AbortSignal, port: number, hostname: string }) => Promise<OpencodeServer<TClient>>
+  createOpencode: (options: { signal: AbortSignal; port: number; hostname: string }) => Promise<OpencodeServer<TClient>>
   createOpencodeClient: (options: { baseUrl: string }) => TClient
   injectServerAuthIntoClient: (client: TClient) => void
   isPortAvailable: (port: number, hostname?: string) => Promise<boolean>
-  getAvailableServerPort: (preferredPort?: number, hostname?: string) => Promise<{ port: number, wasAutoSelected: boolean }>
-  withWorkingOpencodePath: (
-    startServer: () => Promise<OpencodeServer<TClient>>,
-  ) => Promise<OpencodeServer<TClient>>
+  getAvailableServerPort: (
+    preferredPort?: number,
+    hostname?: string,
+  ) => Promise<{ port: number; wasAutoSelected: boolean }>
+  withWorkingOpencodePath: (startServer: () => Promise<OpencodeServer<TClient>>) => Promise<OpencodeServer<TClient>>
 }
 
 const defaultDeps: ServerConnectionDeps<ServerConnection["client"]> = {
@@ -70,23 +73,80 @@ function isPortRangeExhausted(error: unknown): boolean {
 }
 
 async function startServer<TClient>(
-  options: { signal: AbortSignal, port: number },
+  options: { signal: AbortSignal; port: number },
   deps: ServerConnectionDeps<TClient>,
-): Promise<{ client: TClient, cleanup: () => void }> {
+): Promise<{ client: TClient; cleanup: () => void }> {
   const { signal, port } = options
-  const { client, server } = await deps.withWorkingOpencodePath(() =>
-    deps.createOpencode({ signal, port, hostname: "127.0.0.1" }),
-  )
+  // Without a password the spawned server accepts any local caller, including a web page on another
+  // localhost port or a DNS-rebound name (its origin check allows both). A per-run random password,
+  // inherited by the spawned server through process.env, closes that (omo#11367). A user-set value
+  // is never replaced.
+  const previousPassword = process.env.OPENCODE_SERVER_PASSWORD
+  const generated = previousPassword === undefined || previousPassword === ""
+  if (generated) {
+    process.env.OPENCODE_SERVER_PASSWORD = randomBytes(32).toString("base64url")
+  }
+  const restorePassword = (): void => {
+    if (!generated) return
+    if (previousPassword === undefined) delete process.env.OPENCODE_SERVER_PASSWORD
+    else process.env.OPENCODE_SERVER_PASSWORD = previousPassword
+  }
 
-  deps.injectServerAuthIntoClient(client)
+  let started: OpencodeServer<TClient>
+  let cleanupAuthDirectory: (() => void) | undefined
+  try {
+    cleanupAuthDirectory = createPaneAuthDirectory()
+    started = await deps.withWorkingOpencodePath(() => deps.createOpencode({ signal, port, hostname: "127.0.0.1" }))
+  } catch (error) {
+    try {
+      cleanupAuthDirectory?.()
+    } catch {
+      // Preserve the startup error even if removing the channel also fails.
+    } finally {
+      restorePassword()
+    }
+    throw error
+  }
+  const { client, server } = started
+  const releaseServer = (): void => {
+    let failed = false
+    try {
+      server.close()
+    } catch (error) {
+      failed = true
+      throw error
+    } finally {
+      try {
+        cleanupAuthDirectory?.()
+      } catch (error) {
+        if (!failed) throw error
+      } finally {
+        restorePassword()
+      }
+    }
+  }
+
+  try {
+    deps.injectServerAuthIntoClient(client)
+  } catch (error) {
+    try {
+      releaseServer()
+    } catch {
+      // The injection failure is the error the caller needs; release already ran every step.
+    }
+    throw error
+  }
   console.log(pc.dim("Server listening at"), pc.cyan(server.url))
-  return { client, cleanup: () => server.close() }
+  return {
+    client,
+    cleanup: releaseServer,
+  }
 }
 
 export async function createServerConnectionWithDeps<TClient>(
   options: ServerConnectionOptions,
   deps: ServerConnectionDeps<TClient>,
-): Promise<{ client: TClient, cleanup: () => void }> {
+): Promise<{ client: TClient; cleanup: () => void }> {
   const { port, attach, signal } = options
 
   if (attach !== undefined) {
@@ -148,7 +208,10 @@ export async function createServerConnectionWithDeps<TClient>(
       throw error
     }
 
-    console.log(pc.dim("Port range exhausted, attaching to existing server on"), pc.cyan(DEFAULT_SERVER_PORT.toString()))
+    console.log(
+      pc.dim("Port range exhausted, attaching to existing server on"),
+      pc.cyan(DEFAULT_SERVER_PORT.toString()),
+    )
     const client = deps.createOpencodeClient({ baseUrl: `http://127.0.0.1:${DEFAULT_SERVER_PORT}` })
     deps.injectServerAuthIntoClient(client)
     return { client, cleanup: () => {} }

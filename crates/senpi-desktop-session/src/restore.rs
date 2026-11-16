@@ -90,12 +90,22 @@ impl Guard {
         Ok(guard)
     }
 
+    /// Whether [`Self::begin`] captures focus or cursor state for `action`
+    /// delivered this way, so that its restore moves focus again.
+    pub(crate) const fn captures(action: MutatingAction, delivery: DeliveryMode) -> bool {
+        !matches!(
+            (Self::kind(action), delivery),
+            (GuardKind::Untouched, _) | (GuardKind::Delivery, DeliveryMode::Background)
+        )
+    }
+
     const fn kind(action: MutatingAction) -> GuardKind {
         match action {
             MutatingAction::RaiseWindow | MutatingAction::AxFocus => GuardKind::Untouched,
             MutatingAction::TypeText | MutatingAction::KeyChord | MutatingAction::HoldKeys
             | MutatingAction::HoldMouse
-            | MutatingAction::MenuSelect => GuardKind::Keys,
+            | MutatingAction::MenuSelect
+            | MutatingAction::AxTypeText => GuardKind::Keys,
             MutatingAction::Click
             | MutatingAction::MoveMouse
             | MutatingAction::Drag

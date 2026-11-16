@@ -19,7 +19,7 @@ R7_HINT = (
     "💡 R7 API-first 권장: WAF가 HTML 경로를 차단 중. "
     "Playwright MCP 사용 → browser_navigate → browser_network_requests "
     "→ `/api/`·`/graphql`·`\\.json` 필터로 내부 엔드포인트 탐지 → "
-    "해당 URL을 `python3 -m engine <API_URL>`로 재호출. 대부분 API 레이어는 "
+    "해당 URL을 `python3 -B -m engine <API_URL>`로 재호출. 대부분 API 레이어는 "
     "WAF 방어가 얕아 curl_cffi만으로 수집됨."
 )
 

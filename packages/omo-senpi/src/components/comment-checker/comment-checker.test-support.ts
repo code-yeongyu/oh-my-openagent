@@ -90,12 +90,14 @@ export function isToolResultPatch(value: unknown): value is ToolResultPatch {
   return typeof value === "object" && value !== null
 }
 
-export async function registerWithFakeRunner(options: {
-  resolveBinary?: () => string | null
-  downloadBinary?: () => Promise<string | null>
-  result?: CheckResult
-  logger?: ComponentLogger
-} = {}): Promise<{
+export async function registerWithFakeRunner(
+  options: {
+    resolveBinary?: () => string | null
+    downloadBinary?: () => Promise<string | null>
+    result?: CheckResult
+    logger?: ComponentLogger
+  } = {},
+): Promise<{
   pi: FakeExtensionAPI
   calls: RunCommentCheckerInput[]
   logger: ComponentLogger

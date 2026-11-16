@@ -1,0 +1,64 @@
+{
+  "request": "device.adopt",
+  "cases": [
+    {
+      "name": "PKCS#8 keys of the right algorithms are adopted",
+      "outcome": "ok",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "device.adopt",
+            "device": {
+              "id": "dev-self",
+              "name": "This Mac"
+            },
+            "signing_private_key": "<signing_key>",
+            "sealing_private_key": "<sealing_key>"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "device": {
+                "id": "dev-self",
+                "name": "This Mac"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a sealing key in the signing slot is refused",
+      "outcome": "refusal",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "device.adopt",
+            "device": {
+              "id": "dev-self",
+              "name": "This Mac"
+            },
+            "signing_private_key": "<sealing_key>",
+            "sealing_private_key": "<sealing_key>"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "invalid_request"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

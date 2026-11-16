@@ -97,6 +97,7 @@ impl FakeBackend {
         let index = match_index(&items, &leaf[0])?;
         require_command(&items[index])?;
         check_stop()?;
+        self.press_check(crate::method::FakeMethod::MenuSelect)?;
         self.record(SinkOp::MenuSelect {
             window: window.id.clone(),
             path: items[index].path.clone(),

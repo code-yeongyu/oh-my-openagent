@@ -1,6 +1,6 @@
 import type { PathLike } from "node:fs"
 
-import { fsErrorCode } from "./retry"
+import { fsErrorCode, retryOnEintr } from "./retry"
 
 // Windows refuses a rename onto a file another handle holds open (a reader, the search indexer,
 // an antivirus scan) with EPERM, EBUSY or EACCES, and the hold usually clears within milliseconds.
@@ -14,16 +14,23 @@ export type RenameContentionDeps = {
   readonly platform: NodeJS.Platform
   readonly delaysMs?: readonly number[]
   readonly sleep?: (ms: number) => Promise<void>
+  readonly admit?: (begin: () => Promise<void>) => Promise<void>
 }
 
 const sleepFor = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
-export async function renameWithContentionRetry(from: PathLike, to: PathLike, deps: RenameContentionDeps): Promise<void> {
+export async function renameWithContentionRetry(
+  from: PathLike,
+  to: PathLike,
+  deps: RenameContentionDeps,
+): Promise<void> {
   const delays = deps.platform === "win32" ? (deps.delaysMs ?? CONTENTION_DELAYS_MS) : []
   const sleep = deps.sleep ?? sleepFor
   for (let attempt = 0; ; attempt += 1) {
     try {
-      await deps.rename(from, to)
+      await retryOnEintr(() =>
+        deps.admit === undefined ? deps.rename(from, to) : deps.admit(() => deps.rename(from, to)),
+      )
       return
     } catch (error) {
       const delay = delays[attempt]

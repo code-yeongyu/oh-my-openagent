@@ -1,13 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import { posix } from "node:path"
 
-import {
-  runMigrations,
-  type MigrationBatchRunResult,
-  type MigrationFileSystem,
-} from "@oh-my-opencode/omo-config-core"
+import { runMigrations, type MigrationBatchRunResult, type MigrationFileSystem } from "@oh-my-opencode/omo-config-core"
 import { createLegacyConfigMigrationPlans } from "@oh-my-opencode/omo-opencode/config-migration"
-import { doriSectionRename } from "@oh-my-opencode/omo-opencode/config-migration/dori-section-rename"
 import { parse } from "jsonc-parser"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
@@ -16,13 +11,9 @@ import type { SenpiOmoConfigResult } from "../config-resolution"
 import {
   createConfigStartupComponent,
   notificationMessages,
-  prepareDoriSectionRename,
   runSenpiStartupMigration,
   type SenpiStartupMigrationResult,
 } from "./index"
-import { DORI_MIGRATION_RUNTIME_ARTIFACT, NO_DORI_SECTION_RENAME } from "./dori-migration-loader"
-
-const skipDoriSectionRename = async () => ({ rename: NO_DORI_SECTION_RENAME })
 
 function fileError(code: string, message: string): Error {
   return Object.assign(new Error(message), { code })
@@ -37,10 +28,19 @@ function memoryFileSystem() {
     readonly realpathSync: (path: string) => string
   } = {
     files,
-    copyFileSync(source, destination) { files.set(key(destination), this.readFileSync(source, "utf-8")) },
-    existsSync(path) { return files.has(key(path)) || directories.has(key(path)) },
-    lstatSync() { return { isSymbolicLink: () => false } },
-    mkdirSync(path) { directories.add(key(path)); return undefined },
+    copyFileSync(source, destination) {
+      files.set(key(destination), this.readFileSync(source, "utf-8"))
+    },
+    existsSync(path) {
+      return files.has(key(path)) || directories.has(key(path))
+    },
+    lstatSync() {
+      return { isSymbolicLink: () => false }
+    },
+    mkdirSync(path) {
+      directories.add(key(path))
+      return undefined
+    },
     readFileSync(path) {
       const content = files.get(key(path))
       if (content === undefined) throw fileError("ENOENT", `Missing ${path}`)
@@ -78,7 +78,9 @@ function memoryFileSystem() {
       if (files.has(key(path))) throw fileError("EEXIST", `Exists ${path}`)
       files.set(key(path), content)
     },
-    writeFileSync(path, content) { files.set(key(path), content) },
+    writeFileSync(path, content) {
+      files.set(key(path), content)
+    },
     realpathSync(path) {
       if (!this.existsSync(path)) throw fileError("ENOENT", `Missing ${path}`)
       return key(path)
@@ -103,7 +105,6 @@ function migrationOptions(fileSystem: ReturnType<typeof memoryFileSystem>) {
     clock: { now: () => 1_000 },
     cwd: "/home/alice/project",
     discoveryFileSystem: fileSystem,
-    doriSectionRename,
     env: { HOME: "/home/alice" },
     environment: { HOME: "/home/alice", XDG_CONFIG_HOME: "/home/alice/.config" },
     fileSystem,
@@ -119,7 +120,10 @@ describe("runSenpiStartupMigration", () => {
   test("#given both legacy source groups without an OpenCode boot #when Senpi starts #then the core migration engine migrates both into the unified config", () => {
     // given
     const fileSystem = memoryFileSystem()
-    fileSystem.files.set("/home/alice/.config/opencode/oh-my-openagent.jsonc", '{"agents":{"finder":{"model":"provider/finder"}}}')
+    fileSystem.files.set(
+      "/home/alice/.config/opencode/oh-my-openagent.jsonc",
+      '{"agents":{"finder":{"model":"provider/finder"}}}',
+    )
     fileSystem.files.set("/home/alice/.omo/config.jsonc", '{"[opencode]":{"disabled_hooks":["startup-toast"]}}')
 
     // when
@@ -128,7 +132,6 @@ describe("runSenpiStartupMigration", () => {
     // then
     expect(result.error).toBeUndefined()
     expect(result.results.map((entry) => entry.status)).toEqual([
-      "skipped",
       "migrated",
       "migrated",
       "migrated",
@@ -150,35 +153,40 @@ describe("runSenpiStartupMigration", () => {
   test("#given OpenCode and Senpi race on the first legacy migration #when Senpi holds the injected core lock #then exactly one caller migrates", () => {
     // given
     const fileSystem = memoryFileSystem()
-    fileSystem.files.set("/home/alice/.config/opencode/oh-my-openagent.jsonc", '{"agents":{"finder":{"model":"provider/finder"}}}')
+    fileSystem.files.set(
+      "/home/alice/.config/opencode/oh-my-openagent.jsonc",
+      '{"agents":{"finder":{"model":"provider/finder"}}}',
+    )
     const options = migrationOptions(fileSystem)
     let opencodeResult: MigrationBatchRunResult | undefined
     let raced = false
 
     // when
-    const senpiResult = withProcessPlatform("win32", () => runSenpiStartupMigration({
-      ...options,
-      onBoundary: (boundary) => {
-        if (boundary !== "journal-written" || raced) return
-        raced = true
-        opencodeResult = runMigrations({
-          clock: options.clock,
-          discover: () => createLegacyConfigMigrationPlans({
-            doriSectionRename,
-            cwd: options.cwd,
-            environment: options.environment,
+    const senpiResult = withProcessPlatform("win32", () =>
+      runSenpiStartupMigration({
+        ...options,
+        onBoundary: (boundary) => {
+          if (boundary !== "journal-written" || raced) return
+          raced = true
+          opencodeResult = runMigrations({
+            clock: options.clock,
+            discover: () =>
+              createLegacyConfigMigrationPlans({
+                cwd: options.cwd,
+                environment: options.environment,
+                fileSystem,
+                homeDir: options.homeDir,
+                pathOperations: posix,
+                platform: options.platform,
+              }),
+            env: options.env,
             fileSystem,
-            homeDir: options.homeDir,
-            pathOperations: posix,
-            platform: options.platform,
-          }),
-          env: options.env,
-          fileSystem,
-          isProcessAlive: options.isProcessAlive,
-          pid: 42,
-        })
-      },
-    }))
+            isProcessAlive: options.isProcessAlive,
+            pid: 42,
+          })
+        },
+      }),
+    )
 
     // then
     if (opencodeResult === undefined) throw new Error("Expected OpenCode race result")
@@ -195,7 +203,11 @@ describe("runSenpiStartupMigration", () => {
 function context(logs: string[]): ComponentContext {
   return {
     config: { getFlag: () => undefined },
-    logger: { error() {}, info: (message) => logs.push(`info:${message}`), warn: (message) => logs.push(`warn:${message}`) },
+    logger: {
+      error() {},
+      info: (message) => logs.push(`info:${message}`),
+      warn: (message) => logs.push(`warn:${message}`),
+    },
   }
 }
 
@@ -217,7 +229,6 @@ describe("createConfigStartupComponent", () => {
     }
     await createConfigStartupComponent({
       loadConfig: () => config,
-      prepareDoriSectionRename: skipDoriSectionRename,
       resolveCwd: () => "/project",
       runMigration: () => migration,
     }).register(pi, context(logs))
@@ -249,7 +260,6 @@ describe("createConfigStartupComponent", () => {
     const logs: string[] = []
     await createConfigStartupComponent({
       loadConfig: () => ({ config: {}, diagnostics: [], layers: [], sources: [] }),
-      prepareDoriSectionRename: skipDoriSectionRename,
       resolveCwd: () => "/project",
       runMigration: () => migration,
     }).register(pi, context(logs))
@@ -286,7 +296,6 @@ describe("createConfigStartupComponent", () => {
     }
     await createConfigStartupComponent({
       loadConfig: () => config,
-      prepareDoriSectionRename: skipDoriSectionRename,
       resolveCwd: () => "/project",
       runMigration: () => ({ journalResumed: false, migratedFrom: [], results: [] }),
     }).register(pi, context(logs))
@@ -311,7 +320,6 @@ describe("createConfigStartupComponent", () => {
     }
     await createConfigStartupComponent({
       loadConfig: () => config,
-      prepareDoriSectionRename: skipDoriSectionRename,
       resolveCwd: () => "/project",
       runMigration: () => ({ journalResumed: false, migratedFrom: [], results: [] }),
     }).register(pi, context(logs))
@@ -366,17 +374,24 @@ describe("notificationMessages", () => {
     const notices = notificationMessages(quietMigration, config)
 
     // then
-    expect(notices).toEqual([{
-      message: "OmO Native: Devin does not serve devin/swe-2-low (categories.quick.model), devin/swe-2-high-lite (categories.deep-low.models[1]), devin/swe-2 (categories.writing.fallback_models[0]); SWE-2 runs as devin/swe-2-medium, devin/swe-2-high or devin/swe-2-max",
-      type: "warning",
-    }])
+    expect(notices).toEqual([
+      {
+        message:
+          "OmO Native: Devin does not serve devin/swe-2-low (categories.quick.model), devin/swe-2-high-lite (categories.deep-low.models[1]), devin/swe-2 (categories.writing.fallback_models[0]); SWE-2 runs as devin/swe-2-medium, devin/swe-2-high or devin/swe-2-max",
+        type: "warning",
+      },
+    ])
   })
 
   test("#given categories named after a builtin and a configured agent #when notices are built #then one warning names each ignored category key and its agents key", () => {
     // given
     const config: SenpiOmoConfigResult = {
       config: {
-        categories: { "plan-consultant": { model: "omo-mock/mock-1" }, scout: { model: "omo-mock/mock-2" }, quick: { model: "omo-mock/mock-3" } },
+        categories: {
+          "plan-consultant": { model: "omo-mock/mock-1" },
+          scout: { model: "omo-mock/mock-2" },
+          quick: { model: "omo-mock/mock-3" },
+        },
         agents: { scout: { description: "Project scout" } },
       },
       diagnostics: [],
@@ -388,10 +403,13 @@ describe("notificationMessages", () => {
     const notices = notificationMessages(quietMigration, config)
 
     // then
-    expect(notices).toEqual([{
-      message: 'OmO Native: categories."plan-consultant" is not read for subagent_type "plan-consultant" spawns (categories only route task(category: ...)), so that agent runs its default model chain. Move the chain to the agent: "agents": { "plan-consultant": { "models": ["omo-mock/mock-1"] } }. If you also use task(category: "plan-consultant") on purpose, the key keeps working there; giving the agent its own models silences this warning; categories."scout" is not read for subagent_type "scout" spawns (categories only route task(category: ...)), so that agent runs its default model chain. Move the chain to the agent: "agents": { "scout": { "models": ["omo-mock/mock-2"] } }. If you also use task(category: "scout") on purpose, the key keeps working there; giving the agent its own models silences this warning',
-      type: "warning",
-    }])
+    expect(notices).toEqual([
+      {
+        message:
+          'OmO Native: categories."plan-consultant" is not read for subagent_type "plan-consultant" spawns (categories only route task(category: ...)), so that agent runs its default model chain. Move the chain to the agent: "agents": { "plan-consultant": { "models": ["omo-mock/mock-1"] } }. If you also use task(category: "plan-consultant") on purpose, the key keeps working there; giving the agent its own models silences this warning; categories."scout" is not read for subagent_type "scout" spawns (categories only route task(category: ...)), so that agent runs its default model chain. Move the chain to the agent: "agents": { "scout": { "models": ["omo-mock/mock-2"] } }. If you also use task(category: "scout") on purpose, the key keeps working there; giving the agent its own models silences this warning',
+        type: "warning",
+      },
+    ])
   })
 
   test("#given a category named after an agent that already sets its own models #when notices are built #then no category-shadow warning is produced", () => {
@@ -446,129 +464,5 @@ describe("notificationMessages", () => {
 
     // then
     expect(notices).toEqual([])
-  })
-})
-
-describe("gateway -> dori rename sidecar", () => {
-  function preparationOptions(fileSystem: ReturnType<typeof memoryFileSystem>) {
-    const { doriSectionRename: _rename, ...rest } = migrationOptions(fileSystem)
-    return rest
-  }
-
-  test("#given no config declares a gateway key #when startup prepares the rename #then its sidecar is never imported and the plan is skipped", async () => {
-    // given
-    const fileSystem = memoryFileSystem()
-    fileSystem.files.set("/home/alice/.omo/omo.jsonc", '{"agents":{"finder":{"model":"provider/finder"}}}')
-    let imports = 0
-    const load = async () => { imports += 1; return doriSectionRename }
-
-    // when
-    const prepared = await prepareDoriSectionRename(preparationOptions(fileSystem), load)
-    const result = runSenpiStartupMigration({ ...preparationOptions(fileSystem), doriSectionRename: prepared.rename })
-
-    // then
-    expect(imports).toBe(0)
-    expect(prepared).toEqual({ rename: NO_DORI_SECTION_RENAME })
-    expect(result.error).toBeUndefined()
-    expect(parse(fileSystem.files.get("/home/alice/.omo/omo.jsonc") ?? "")).toMatchObject({ agents: { finder: { model: "provider/finder" } } })
-  })
-
-  test("#given a config still declares gateway #when startup prepares the rename #then it imports the sidecar, the section becomes dori and the next start imports nothing", async () => {
-    // given
-    const fileSystem = memoryFileSystem()
-    fileSystem.files.set("/home/alice/.omo/omo.jsonc", '{"gateway":{"scopes":["slack"]}}')
-    let imports = 0
-    const load = async () => { imports += 1; return doriSectionRename }
-
-    // when
-    const prepared = await prepareDoriSectionRename(preparationOptions(fileSystem), load)
-    const result = runSenpiStartupMigration({ ...preparationOptions(fileSystem), doriSectionRename: prepared.rename })
-
-    // then
-    expect(imports).toBe(1)
-    expect(prepared.rename).toBe(doriSectionRename)
-    expect(result.error).toBeUndefined()
-    const migrated = parse(fileSystem.files.get("/home/alice/.omo/omo.jsonc") ?? "") as Record<string, unknown>
-    expect(migrated["dori"]).toEqual({ scopes: ["slack"] })
-    expect(migrated).not.toHaveProperty("gateway")
-    expect(await prepareDoriSectionRename(preparationOptions(fileSystem), async () => { throw new Error("must not load") })).toEqual({ rename: NO_DORI_SECTION_RENAME })
-  })
-
-  test.each([
-    ["pretty-printed", '{\n  "gateway": {\n    "scopes": ["slack"]\n  }\n}\n'],
-    ["minified", '{"gateway":{"scopes":["slack"]}}'],
-    ["JSONC with comments, one between key and colon", '// legacy\n{\n  /* section */ "gateway" /* c */ : { "scopes": ["slack"], }, // trailing\n}\n'],
-    ["a unicode-escaped key", '{"gate\\u0077ay":{"scopes":["slack"]}}'],
-    ["a harness block", '{"[senpi]":{"gateway":{"scopes":["slack"]}}}'],
-    ["a profile", '{"profiles":{"work":{"gateway":{"scopes":["slack"]}}}}'],
-  ])("#given a gateway section written as %s #when startup prepares and migrates #then the sidecar loads and no gateway key survives", async (_form, text) => {
-    // given
-    const fileSystem = memoryFileSystem()
-    fileSystem.files.set("/home/alice/.omo/omo.jsonc", text)
-    let imports = 0
-    const load = async () => { imports += 1; return doriSectionRename }
-
-    // when
-    const prepared = await prepareDoriSectionRename(preparationOptions(fileSystem), load)
-    const result = runSenpiStartupMigration({ ...preparationOptions(fileSystem), doriSectionRename: prepared.rename })
-
-    // then
-    expect(imports).toBe(1)
-    expect(result.error).toBeUndefined()
-    const migrated = JSON.stringify(parse(fileSystem.files.get("/home/alice/.omo/omo.jsonc") ?? ""))
-    expect(migrated).toContain('"dori":{"scopes":["slack"]}')
-    expect(migrated).not.toContain('"gateway"')
-  })
-
-  test("#given a config whose only escapes are in string values #when startup prepares the rename #then the sidecar is not imported", async () => {
-    // given
-    const fileSystem = memoryFileSystem()
-    fileSystem.files.set("/home/alice/.omo/omo.jsonc", '{"agents":{"finder":{"prompt":"\\uac00\\ub098 \\u2014 \\u00e9"}}}')
-    let imports = 0
-
-    // when
-    const prepared = await prepareDoriSectionRename(preparationOptions(fileSystem), async () => { imports += 1; return doriSectionRename })
-
-    // then
-    expect(imports).toBe(0)
-    expect(prepared).toEqual({ rename: NO_DORI_SECTION_RENAME })
-  })
-
-  test("#given a config file that exists but cannot be read #when startup prepares the rename #then it loads the sidecar rather than skip", async () => {
-    // given
-    const fileSystem = memoryFileSystem()
-    fileSystem.files.set("/home/alice/.omo/omo.jsonc", "{}")
-    const unreadable = { ...fileSystem, readFileSync: () => { throw fileError("EACCES", "permission denied") } }
-    let imports = 0
-
-    // when
-    await prepareDoriSectionRename({ ...preparationOptions(fileSystem), fileSystem: unreadable }, async () => { imports += 1; return doriSectionRename })
-
-    // then
-    expect(imports).toBe(1)
-  })
-
-  test("#given the sidecar is missing from the payload #when a gateway config starts #then the warning names the artifact and the remedy", async () => {
-    // given
-    const fileSystem = memoryFileSystem()
-    fileSystem.files.set("/home/alice/.omo/omo.jsonc", '{"gateway":{"scopes":["slack"]}}')
-    const load = () => Promise.reject(new Error("Cannot find module '#omo-dori-migration-runtime'"))
-    const pi = new FakeExtensionAPI()
-    const logs: string[] = []
-
-    // when
-    await createConfigStartupComponent({
-      loadConfig: () => ({ config: {}, diagnostics: [], layers: [], sources: [] }),
-      prepareDoriSectionRename: (options) => prepareDoriSectionRename({ ...preparationOptions(fileSystem), ...options }, load),
-      resolveCwd: () => "/home/alice/project",
-      runMigration: (options) => runSenpiStartupMigration({ ...preparationOptions(fileSystem), ...options }),
-    }).register(pi, context(logs))
-    await pi.dispatch("session_start", {})
-
-    // then
-    expect(logs).toHaveLength(1)
-    expect(logs[0]).toContain(DORI_MIGRATION_RUNTIME_ARTIFACT)
-    expect(logs[0]).toContain("reinstall omo")
-    expect(parse(fileSystem.files.get("/home/alice/.omo/omo.jsonc") ?? "")).toMatchObject({ gateway: { scopes: ["slack"] } })
   })
 })

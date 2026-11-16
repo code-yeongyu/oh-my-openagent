@@ -37,7 +37,10 @@ describe("codex-cache security boundaries", () => {
     const pluginRoot = join(root, "plugin")
     const binDir = join(root, "bin")
     await mkdir(join(pluginRoot, "dist"), { recursive: true })
-    await writeFile(join(pluginRoot, "package.json"), JSON.stringify({ name: "@scope/omo", bin: { "../escaped": "dist/cli.js" } }))
+    await writeFile(
+      join(pluginRoot, "package.json"),
+      JSON.stringify({ name: "@scope/omo", bin: { "../escaped": "dist/cli.js" } }),
+    )
     await writeFile(join(pluginRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")
 
     // when
@@ -55,7 +58,10 @@ describe("codex-cache security boundaries", () => {
     const binDir = join(root, "bin")
     await mkdir(pluginRoot, { recursive: true })
     await writeFile(join(root, "outside.js"), "#!/usr/bin/env node\n")
-    await writeFile(join(pluginRoot, "package.json"), JSON.stringify({ name: "@scope/omo", bin: { "omo-escape": "../outside.js" } }))
+    await writeFile(
+      join(pluginRoot, "package.json"),
+      JSON.stringify({ name: "@scope/omo", bin: { "omo-escape": "../outside.js" } }),
+    )
 
     // when
     const linked = linkCachedPluginBins({ binDir, pluginRoot, platform: "linux" })
@@ -73,7 +79,11 @@ describe("codex-cache security boundaries", () => {
     await symlink(join(root, "missing-marketplace"), join(cacheParent, "debug"))
 
     // when
-    const pruned = pruneMarketplaceCache({ codexHome: join(root, "codex-home"), marketplaceName: "debug", keepPluginNames: [] })
+    const pruned = pruneMarketplaceCache({
+      codexHome: join(root, "codex-home"),
+      marketplaceName: "debug",
+      keepPluginNames: [],
+    })
 
     // then
     await expect(pruned).resolves.toBeUndefined()
@@ -87,7 +97,11 @@ describe("codex-cache security boundaries", () => {
     await symlink(join(root, "missing-marketplace"), join(cacheParent, "debug"))
 
     // when
-    const pruned = pruneMarketplacePluginCaches({ codexHome: join(root, "codex-home"), marketplaceName: "debug", pluginNames: ["omo"] })
+    const pruned = pruneMarketplacePluginCaches({
+      codexHome: join(root, "codex-home"),
+      marketplaceName: "debug",
+      pluginNames: ["omo"],
+    })
 
     // then
     await expect(pruned).resolves.toBeUndefined()

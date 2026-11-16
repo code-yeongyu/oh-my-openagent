@@ -62,7 +62,13 @@ export interface LaunchScope {
 const launchScope = new AsyncLocalStorage<LaunchScope>()
 
 export function withLaunchScope<T>(scope: LaunchScope, launch: () => T): T {
-  return launchScope.run({ conversationIds: [...scope.conversationIds], ...(scope.snapshot === undefined ? {} : { snapshot: Object.freeze({ ...scope.snapshot }) }) }, launch)
+  return launchScope.run(
+    {
+      conversationIds: [...scope.conversationIds],
+      ...(scope.snapshot === undefined ? {} : { snapshot: Object.freeze({ ...scope.snapshot }) }),
+    },
+    launch,
+  )
 }
 
 export function currentLaunchScope(): LaunchScope | undefined {
@@ -70,7 +76,11 @@ export function currentLaunchScope(): LaunchScope | undefined {
 }
 
 /** Facts for a launch from the current ctx, restricted to what the run's own conversations may see. */
-export function factsForScope(scope: LaunchScope, currentSessionId: string | undefined, live: LaunchFacts): LaunchFacts {
+export function factsForScope(
+  scope: LaunchScope,
+  currentSessionId: string | undefined,
+  live: LaunchFacts,
+): LaunchFacts {
   if (scope.snapshot !== undefined) return scope.snapshot
   if (currentSessionId !== undefined && scope.conversationIds.includes(currentSessionId)) return live
   return { ...NO_LAUNCH_FACTS, modelRegistry: live.modelRegistry }

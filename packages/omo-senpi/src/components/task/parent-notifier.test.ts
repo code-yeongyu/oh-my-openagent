@@ -5,7 +5,10 @@ import type { SenpiExtensionAPI } from "../../extension/types"
 import { createParentNotifier } from "./parent-notifier"
 
 type SentMessage = { readonly message: Record<string, unknown>; readonly options: Record<string, unknown> | undefined }
-type SentUserMessage = { readonly content: string | readonly Record<string, unknown>[]; readonly options: { deliverAs?: "steer" | "followUp" } | undefined }
+type SentUserMessage = {
+  readonly content: string | readonly Record<string, unknown>[]
+  readonly options: { deliverAs?: "steer" | "followUp" } | undefined
+}
 
 function fakePi(): SenpiExtensionAPI & { readonly sent: SentMessage[]; readonly userSent: SentUserMessage[] } {
   const sent: SentMessage[] = []
@@ -28,15 +31,28 @@ function fakePi(): SenpiExtensionAPI & { readonly sent: SentMessage[]; readonly 
   }
 }
 
-type Delivered = { content: string; deliverAs: "steer" | "followUp" }
+type Delivered = { content: string; deliverAs: "steer" | "followUp"; runRefs: readonly unknown[] }
 
 // A manually-driven flush scheduler stands in for the production batch-window timer so the tests
 // control exactly when the deferred flush runs (everything enqueued before it batches together).
-function coordinatorWithManualFlush(delivered: Delivered[]): { coordinator: IdleInjectionCoordinator; runFlush: () => void } {
+function coordinatorWithManualFlush(delivered: Delivered[]): {
+  coordinator: IdleInjectionCoordinator
+  runFlush: () => void
+} {
   let pending: (() => void) | undefined
   const coordinator = new IdleInjectionCoordinator(
-    (message, options) => delivered.push({ content: message.content, deliverAs: options.deliverAs }),
-    { scheduleFlush: (flush) => { pending = flush } },
+    (_message, options) => {
+      delivered.push({
+        content: options.items.map((item) => item.content).join("\n\n"),
+        deliverAs: options.deliverAs,
+        runRefs: options.items.map((item) => item.runRef),
+      })
+    },
+    {
+      scheduleFlush: (flush) => {
+        pending = flush
+      },
+    },
   )
   return {
     coordinator,
@@ -87,6 +103,7 @@ describe("createParentNotifier batched injection delivery", () => {
       {
         key: "task-completion:st_1",
         source: "task-completion",
+        runRef: { kind: "task", id: "st_1" },
         customType: "senpi-task.completion",
         content: "st_1 completed",
         display: false,
@@ -101,9 +118,14 @@ describe("createParentNotifier batched injection delivery", () => {
     const delivered: Delivered[] = []
     const failures: Array<{ taskIds: readonly string[]; error: unknown }> = []
     const { coordinator } = coordinatorWithManualFlush(delivered)
-    const notifier = createParentNotifier(fakePi(), coordinator, () => true, (taskIds, error) => {
-      failures.push({ taskIds, error })
-    })
+    const notifier = createParentNotifier(
+      fakePi(),
+      coordinator,
+      () => true,
+      (taskIds, error) => {
+        failures.push({ taskIds, error })
+      },
+    )
     notifier.enqueue(completionMessage("st_1"))
 
     // when the session shuts down (/reload) before the batch window closes
@@ -154,7 +176,7 @@ describe("createParentNotifier batched injection delivery", () => {
     expect(pi.userSent).toHaveLength(0)
   })
 
-  test("#given two near-simultaneous completions #when the batch window closes #then BOTH arrive in ONE steer injection", () => {
+  test("#given completions from different runs #when the batch window closes #then one admission carries each completion with its own reference", () => {
     // given
     const delivered: Delivered[] = []
     const { coordinator, runFlush } = coordinatorWithManualFlush(delivered)
@@ -166,11 +188,14 @@ describe("createParentNotifier batched injection delivery", () => {
     notifier.enqueue(completionMessage("st_2"))
     runFlush()
 
-    // then the parent receives exactly ONE steer carrying both notifications
+    // then one admission carries both, each item tagged with its own run
     expect(delivered).toHaveLength(1)
     expect(delivered[0]?.deliverAs).toBe("steer")
-    expect(delivered[0]?.content).toContain("st_1 completed")
-    expect(delivered[0]?.content).toContain("st_2 completed")
+    expect(delivered[0]?.content).toMatch(/st_1 completed[\s\S]*st_2 completed/)
+    expect(delivered[0]?.runRefs).toEqual([
+      { kind: "task", id: "st_1" },
+      { kind: "task", id: "st_2" },
+    ])
   })
 
   test("#given a re-enqueue of the same completion #when the batch window closes #then the key dedupes to one entry", () => {
@@ -191,10 +216,14 @@ describe("createParentNotifier batched injection delivery", () => {
 
   test("#given an IDLE parent #when two completions land in the same tick #then one microtask steer carries both", async () => {
     // given: no manual scheduler - the idle path flushes itself on the next microtask
-  const delivered: Delivered[] = []
-  const coordinator = new IdleInjectionCoordinator(
-    (message, options) => delivered.push({ content: message.content, deliverAs: options.deliverAs }),
-    )
+    const delivered: Delivered[] = []
+    const coordinator = new IdleInjectionCoordinator((_message, options) => {
+      delivered.push({
+        content: options.items.map((item) => item.content).join("\n\n"),
+        deliverAs: options.deliverAs,
+        runRefs: options.items.map((item) => item.runRef),
+      })
+    })
     const notifier = createParentNotifier(fakePi(), coordinator, () => false)
 
     // when both completions land in the same tick
@@ -206,8 +235,7 @@ describe("createParentNotifier batched injection delivery", () => {
     // then delivery is immediate (no exit race in print mode) and still batched into ONE steer
     expect(delivered).toHaveLength(1)
     expect(delivered[0]?.deliverAs).toBe("steer")
-    expect(delivered[0]?.content).toContain("st_1 completed")
-    expect(delivered[0]?.content).toContain("st_2 completed")
+    expect(delivered[0]?.content).toMatch(/st_1 completed[\s\S]*st_2 completed/)
   })
 
   test("#given no coordinator is wired #when a completion enqueues #then it falls back to a direct steer on the renderer channel", () => {

@@ -44,11 +44,16 @@ async function runRetry(
   const filter: FactsFailureFilter = conversationId === undefined ? {} : { conversationId }
   const removed = await store.clearForRetry(filter)
   // ONE attempt: the extractor owns its own re-entrancy latch, so the command never loops.
+  // Production reconcile only launches the extractor and does not wait for its outcome
+  // (see wiring-static.ts), so the report must not claim anything about the outcome:
+  // it says the retry started and leaves the result to the next /facts read.
   await deps.factsSink?.reconcile()
   const names = conversationsIn(matching)
+  const unparked = matching.filter((record) => record.state === "parked").length
+  const unparkedNote = unparked === 0 ? "" : `; ${unparked} parked ${unparked === 1 ? "batch" : "batches"} unparked`
   return respond(
     ctx,
-    `cleared ${removed} record${removed === 1 ? "" : "s"} for ${names.join(", ")}; one launch attempt was triggered`,
+    `cleared ${removed} record${removed === 1 ? "" : "s"} for ${names.join(", ")}; one retry attempt was started${unparkedNote}; run /facts again to check whether any batch parked again`,
   )
 }
 

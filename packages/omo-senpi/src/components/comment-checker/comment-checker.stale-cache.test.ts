@@ -20,7 +20,10 @@ async function serveRelease(): Promise<{ url: string; requests: () => number }> 
   const stage = createTempCwd()
   writeFileSync(join(stage, "comment-checker"), FRESH_BINARY, { mode: 0o755 })
   const archive = join(createTempCwd(), "release.tar.gz")
-  const result = Bun.spawnSync(["tar", "-czf", archive, "-C", stage, "comment-checker"], { stdout: "pipe", stderr: "pipe" })
+  const result = Bun.spawnSync(["tar", "-czf", archive, "-C", stage, "comment-checker"], {
+    stdout: "pipe",
+    stderr: "pipe",
+  })
   if (result.exitCode !== 0) throw new Error(`tar failed: ${new TextDecoder().decode(result.stderr)}`)
   const bytes = await Bun.file(archive).bytes()
   let requests = 0
@@ -55,7 +58,10 @@ function resolveFromCacheOnly(cacheDir: string): string | null {
 }
 
 describe("omo-senpi comment-checker shared cache is pinned to the release (#8850)", () => {
-  for (const [label, marker] of [["no version marker", undefined], ["an older version marker", "0.6.1"]] as const) {
+  for (const [label, marker] of [
+    ["no version marker", undefined],
+    ["an older version marker", "0.6.1"],
+  ] as const) {
     it(`#given a cached checker with ${label} #when resolving #then the cache is not trusted`, () => {
       // given
       const cacheDir = cacheWithBinary(marker)
@@ -85,7 +91,9 @@ describe("omo-senpi comment-checker shared cache is pinned to the release (#8850
       expect(binaryPath).toBe(join(cacheDir, "comment-checker"))
       expect(requests()).toBe(1)
       expect(readFileSync(join(cacheDir, "comment-checker"), "utf-8")).toBe(FRESH_BINARY)
-      expect(readFileSync(join(cacheDir, COMMENT_CHECKER_VERSION_MARKER), "utf-8").trim()).toBe(COMMENT_CHECKER_RELEASE_VERSION)
+      expect(readFileSync(join(cacheDir, COMMENT_CHECKER_VERSION_MARKER), "utf-8").trim()).toBe(
+        COMMENT_CHECKER_RELEASE_VERSION,
+      )
       expect(resolveFromCacheOnly(cacheDir)).toBe(join(cacheDir, "comment-checker"))
     })
   }

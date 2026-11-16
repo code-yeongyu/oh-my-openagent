@@ -13,8 +13,7 @@ import { LATEST_MODEL_BY_FAMILY } from "@oh-my-opencode/model-core/latest-models
  * user still resolves the model instead of reading "unavailable" while the model
  * sits right there in the registry. Provider spellings are copied from those
  * chains: senpi-only `kimi-coding` plus the leftover OpenCode `kimi-for-coding`
- * alias those chains keep, and the engine GLM ids `zai` / `zai-coding-cn` (not
- * OpenCode's `zai-coding-plan`; #8824).
+ * alias those chains keep.
  *
  * The table is additive data: an `omo.json` `model_profiles.<name>` entry replaces
  * the builtin of the same name WHOLESALE (see `resolve.ts`), so a later change
@@ -66,8 +65,6 @@ export const RETIRED_MODEL_PROFILE_IDS: ReadonlySet<string> = new Set(["recommen
 
 const CLAUDE_PROVIDERS = ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"] as const
 const KIMI_PROVIDERS = ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"] as const
-// Engine Z.AI ids. `omo setup` imports OpenCode's `zai-coding-plan` key as `zai` (#8799).
-const GLM_PROVIDERS = ["zai", "zai-coding-cn", "opencode-go"] as const
 const GPT_PROVIDERS = ["chatgpt-subscription", "openai", "github-copilot", "opencode"] as const
 // GPT-6.1 Sol and its Fast tier are served only on the two OpenAI lanes (not Copilot or OpenCode Zen),
 // so their rungs list just those; Obsessive · Normal heads with GPT-6 Astra on every GPT provider and
@@ -86,10 +83,12 @@ export const BUILTIN_MODEL_PROFILES: Readonly<Record<string, BuiltinModelProfile
     tier: "normal",
     displayName: "Daily · Normal",
     description: "Gets any task done without fuss.",
+    // Matches senpi's shipped Opus 5.5 fallback chain (senpi#6699), so the start walk and a
+    // mid-session fallback land on the same models: Fable 5.2 medium, then Kimi K3.1 Pro max (#13547).
     models: [
       { providers: [...CLAUDE_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.claudeOpus, variant: "medium" },
+      { providers: [...CLAUDE_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.claudeFable, variant: "medium" },
       { providers: [...KIMI_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.kimi, variant: "max" },
-      { providers: [...GLM_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.glm, variant: "max" },
     ],
   },
   "daily-heavy": {
@@ -97,7 +96,11 @@ export const BUILTIN_MODEL_PROFILES: Readonly<Record<string, BuiltinModelProfile
     tier: "heavy",
     displayName: "Daily · Heavy",
     description: "Gets any task done, after thinking it over from more sides.",
-    models: [{ providers: [...CLAUDE_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.claudeFable, variant: "xhigh" }],
+    models: [
+      // Owner's order (Slack C0C54MMK806 ts 1794722854.910489): Fable 5.2 runs at high; the Fable 5.1 rung keeps xhigh.
+      { providers: [...CLAUDE_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.claudeFable, variant: "high" },
+      { providers: [...CLAUDE_PROVIDERS], model: "claude-fable-5-1", variant: "xhigh" },
+    ],
   },
   "geeky-normal": {
     family: "geeky",

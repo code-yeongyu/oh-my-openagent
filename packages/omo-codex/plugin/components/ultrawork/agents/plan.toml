@@ -59,8 +59,8 @@ Write ONE plan to `.omo/plans/<slug>.md` (create the directory if absent). No "P
 
 ## Execution strategy
 ### Parallel execution waves
-> Target 5-8 tasks per wave. <3 per wave (except final) = under-splitting.
-> Extract shared dependencies as Wave-1 tasks to maximize parallelism.
+> Size each wave to the tasks that are independent of each other.
+> Extract shared dependencies as Wave-1 tasks so later waves can run in parallel.
 
 Wave 1 (no dependencies):
 - Task 1: <desc>

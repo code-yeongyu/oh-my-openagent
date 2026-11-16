@@ -129,7 +129,7 @@ describe("plugin load telemetry send path", () => {
       shutdown: async () => undefined,
     }))
     const client = posthogModule.createPluginPostHog()
-    client.trackActive("distinct-plugin", "plugin_loaded")
+    client.trackActive("plugin_loaded")
 
     // when
     const flushed = client.flush()
@@ -157,7 +157,7 @@ describe("plugin load telemetry send path", () => {
     const client = posthogModule.createPluginPostHog()
 
     // when
-    client.trackActive("distinct-plugin", "plugin_loaded")
+    client.trackActive("plugin_loaded")
     await client.flush()
     await client.shutdown()
 

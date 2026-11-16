@@ -20,7 +20,7 @@ describe("gated category listing", () => {
       const entry = entryFor("architect", {})
 
       // then
-      expect(entry?.description).toContain("(requires claude-fable-5-1)")
+      expect(entry?.description).toContain("(requires claude-fable-5-2 or claude-fable-5-1)")
     })
 
     test("#when the categories are listed #then ultrabrain carries its required model annotation", () => {
@@ -37,7 +37,9 @@ describe("gated category listing", () => {
       const high = entryFor("deep-high", {})
 
       // then
-      expect(low?.description).toContain("(requires gpt-6.1-sol or gpt-6.1-sol-fast or gpt-5.6-sol-fast or gpt-5.6-sol)")
+      expect(low?.description).toContain(
+        "(requires gpt-6.1-sol or gpt-6.1-sol-fast or gpt-5.6-sol-fast or gpt-5.6-sol)",
+      )
       expect(low?.description).toContain(requiredAnnotation("deep-low"))
       expect(low?.description).not.toContain("gpt-6-sol")
       expect(high?.description).toContain("(requires gpt-6-astra)")

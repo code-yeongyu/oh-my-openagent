@@ -1,7 +1,16 @@
 import type { TaskRecord, TaskStatus } from "../state"
 import type { OwnedStartResult } from "./owner"
 import { dagNodeTaskAttachedEvent } from "./events"
-import { deferredSignal, errorMessage, failNode, nodeById, transition, type SchedulerContext, type AttachedTask, type AttachedTaskSettlement } from "./scheduler-context"
+import {
+  deferredSignal,
+  errorMessage,
+  failNode,
+  nodeById,
+  transition,
+  type SchedulerContext,
+  type AttachedTask,
+  type AttachedTaskSettlement,
+} from "./scheduler-context"
 import type { DagNodeId, DagNodeErrorCode } from "./types"
 
 export function attachStarted(
@@ -116,7 +125,7 @@ export async function settleOne(context: SchedulerContext, residencyReleased?: P
 }
 
 function foldTaskOutcome(context: SchedulerContext, nodeId: DagNodeId, task: TaskRecord): void {
-  if (task.status === "pending" || task.status === "running") {
+  if (task.status === "pending" || task.status === "running" || task.status === "paused") {
     throw new Error(`TaskManager.waitFor returned nonterminal task ${task.task_id}`)
   }
   context.pendingTerminalResults.set(nodeId, { record: task })
@@ -129,7 +138,10 @@ function foldTaskOutcome(context: SchedulerContext, nodeId: DagNodeId, task: Tas
   context.infrastructureRetries.retry(nodeId, task)
 }
 
-function taskFailure(status: Exclude<TaskStatus, "completed" | "pending" | "running">, message?: string): {
+function taskFailure(
+  status: Exclude<TaskStatus, "completed" | "pending" | "running" | "paused">,
+  message?: string,
+): {
   readonly code: DagNodeErrorCode
   readonly message: string
 } {

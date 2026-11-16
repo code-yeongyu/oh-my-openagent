@@ -1,9 +1,32 @@
-export type IdleInjectionSource = "task-completion" | "workpool-aggregate" | "team-message" | "team-liveness" | "boulder-continuation" | "ulw-continuation" | "dag-run" | "kibitzer"
+import { randomUUID } from "node:crypto"
+import type { RunRef } from "../../../senpi-task/src/pause/ports"
+import {
+  admissionBatches,
+  failItems,
+  settleItemReceipts,
+  withSuperseded,
+  type AdmissionItem,
+  type ItemReceipt,
+  type QueuedInjection,
+} from "./idle-injection-items"
+import { NO_RECEIPT_ERRORS, type ReceiptErrors } from "./idle-injection-receipts"
+
+export type IdleInjectionSource =
+  | "task-status"
+  | "task-completion"
+  | "workpool-aggregate"
+  | "team-message"
+  | "team-liveness"
+  | "boulder-continuation"
+  | "ulw-continuation"
+  | "dag-run"
+  | "kibitzer"
 
 export interface IdleInjection {
-  // Dedupe/order key. Task completions key on their task id; the ulw continuation keys on its source
-  // so repeated continuation enqueues on one idle edge collapse to a single injection.
+  // Cancellation/order key; every enqueue retains its independent custody identity.
   readonly key: string
+  readonly itemId?: string
+  readonly runRef?: RunRef
   readonly source: IdleInjectionSource
   readonly customType?: string
   readonly content: string
@@ -14,6 +37,7 @@ export interface IdleInjection {
   /** Preserve this segment's boundary for model-specific context transforms. */
   readonly contextScoped?: boolean
   readonly onFlushed?: () => void
+  readonly onHeld?: (receipt: ItemReceipt) => void
   readonly onDeliveryFailed?: (error: unknown) => void
 }
 
@@ -21,12 +45,16 @@ export interface IdleInjectionMessage extends Record<string, unknown> {
   readonly customType: "omo-senpi:wake"
   readonly content: string
   readonly display: false
-  readonly details: ReadonlyArray<{ readonly customType: string; readonly details: unknown; readonly contentRange?: readonly [number, number] }>
+  readonly details: ReadonlyArray<{
+    readonly customType: string
+    readonly details: unknown
+    readonly contentRange?: readonly [number, number]
+  }>
 }
 
 export type IdleInjectionDelivery = (
   message: IdleInjectionMessage,
-  options: { deliverAs: "steer" | "followUp" },
+  options: { deliverAs: "steer" | "followUp"; readonly items: readonly AdmissionItem[] },
 ) => unknown
 
 // Defers a single flush to the next idle tick. Injectable so unit tests drive it deterministically;
@@ -38,29 +66,6 @@ export type IdleInjectionDelivery = (
 // that still fires has nothing left to deliver.
 export type FlushScheduler = (flush: () => void) => (() => void) | void
 
-type ReceiptErrors = { readonly threw: boolean; readonly first: unknown; readonly rest: readonly unknown[] }
-
-const NO_RECEIPT_ERRORS: ReceiptErrors = { threw: false, first: undefined, rest: [] }
-
-// Runs one receipt per producer, each in its own try, and returns every error: one producer's throwing receipt
-// must never cost a later producer its receipt, or that producer's completion is never recorded or redelivered.
-// `threw` is set in the catch block, never from the caught value, so a thrown undefined, null, 0 or '' still counts.
-function runReceipts(injections: readonly IdleInjection[], receipt: (injection: IdleInjection) => void): ReceiptErrors {
-  let threw = false
-  let first: unknown
-  const rest: unknown[] = []
-  for (const injection of injections) {
-    try {
-      receipt(injection)
-    } catch (error) {
-      if (threw) rest.push(error)
-      else first = error
-      threw = true
-    }
-  }
-  return { threw, first, rest }
-}
-
 export interface IdleInjectionCoordinatorOptions {
   readonly scheduleFlush?: FlushScheduler
   /** Called with each new count of child results queued or still in delivery (#10782). */
@@ -71,7 +76,12 @@ export interface IdleInjectionCoordinatorOptions {
 
 // Sources that carry a child's result to its parent: until they are delivered, the parent still owes
 // that work, so the engine must not read it as done. Continuations and nudges are the parent's own.
-const CHILD_WORK_SOURCES: ReadonlySet<IdleInjectionSource> = new Set(["task-completion", "workpool-aggregate", "team-message", "dag-run"])
+const CHILD_WORK_SOURCES: ReadonlySet<IdleInjectionSource> = new Set([
+  "task-completion",
+  "workpool-aggregate",
+  "team-message",
+  "dag-run",
+])
 
 /**
  * Handed to `onDeliveryFailed` for every injection still queued when the coordinator retires, and
@@ -90,6 +100,7 @@ export class IdleInjectionRetiredError extends Error {
 // Deterministic order: task completions are announced first and DAG run summaries last, so a mixed
 // flush leads with the most immediate child completion context.
 const SOURCE_RANK: Readonly<Record<IdleInjectionSource, number>> = {
+  "task-status": 0,
   "task-completion": 0,
   "workpool-aggregate": 0,
   "team-message": 1,
@@ -117,7 +128,7 @@ const SOURCE_RANK: Readonly<Record<IdleInjectionSource, number>> = {
  */
 export class IdleInjectionCoordinator {
   readonly #deliver: IdleInjectionDelivery
-  readonly #pending = new Map<string, IdleInjection>()
+  readonly #pending = new Map<string, QueuedInjection>()
   readonly #scheduleFlush: FlushScheduler
   #flushScheduled = false
   #soonScheduled = false
@@ -151,7 +162,17 @@ export class IdleInjectionCoordinator {
    */
   enqueue(injection: IdleInjection): boolean {
     if (this.#retired) return false
-    this.#pending.set(injection.key, injection)
+    const itemId = injection.itemId ?? randomUUID()
+    const prior = this.#pending.get(injection.key)
+    const superseded = prior === undefined ? [] : withSuperseded(prior)
+    this.#pending.set(injection.key, {
+      ...injection,
+      itemId,
+      superseded,
+      get content() {
+        return injection.content
+      },
+    })
     this.#reportChildWork()
     return true
   }
@@ -162,11 +183,12 @@ export class IdleInjectionCoordinator {
   scheduleFlush(): void {
     if (this.#retired || this.#flushScheduled) return
     this.#flushScheduled = true
-    this.#cancelScheduledFlush = this.#scheduleFlush(() => {
-      this.#flushScheduled = false
-      this.#cancelScheduledFlush = undefined
-      this.#flush("steer")
-    }) ?? undefined
+    this.#cancelScheduledFlush =
+      this.#scheduleFlush(() => {
+        this.#flushScheduled = false
+        this.#cancelScheduledFlush = undefined
+        this.#flush("steer")
+      }) ?? undefined
   }
 
   // Immediate coalesced flush for an IDLE parent. A microtask is soon enough to land the steer before
@@ -216,7 +238,7 @@ export class IdleInjectionCoordinator {
     const dropped = [...this.#pending.values()]
     this.#pending.clear()
     this.#reportChildWork()
-    const errors = runReceipts(dropped, (injection) => injection.onDeliveryFailed?.(new IdleInjectionRetiredError()))
+    const errors = failItems(dropped, new IdleInjectionRetiredError())
     this.#reportReceiptErrors(errors.rest)
     if (errors.threw) throw errors.first
   }
@@ -228,7 +250,10 @@ export class IdleInjectionCoordinator {
       try {
         this.#onReceiptError?.(error)
       } catch (reporterError) {
-        console.error("[omo-senpi] onReceiptError threw while reporting a receipt error", { receiptError: error, reporterError })
+        console.error("[omo-senpi] onReceiptError threw while reporting a receipt error", {
+          receiptError: error,
+          reporterError,
+        })
       }
     }
   }
@@ -249,74 +274,57 @@ export class IdleInjectionCoordinator {
       (left, right) => SOURCE_RANK[left.source] - SOURCE_RANK[right.source],
     )
     const collapsed = ordered.length
-    const children = ordered.filter((injection) => CHILD_WORK_SOURCES.has(injection.source)).length
-    const settleChildren = () => {
-      this.#childrenInDelivery -= children
-      this.#reportChildWork()
-    }
+    this.#pending.clear()
+    for (const batch of admissionBatches(ordered)) this.#deliverBatch(batch, deliverAs)
+    return collapsed
+  }
+
+  #deliverBatch(batch: ReturnType<typeof admissionBatches>[number], deliverAs: "steer" | "followUp"): void {
+    const children = batch.injections.filter((injection) => CHILD_WORK_SOURCES.has(injection.source)).length
     // Every producer gets its receipt even when an earlier one throws, and the count settles after all of them.
-    // It happens once per flush: a thenable that calls back and then throws, or calls both callbacks, must not
+    // It happens once per batch: a thenable that calls back and then throws, or calls both callbacks, must not
     // hand out a second set of receipts or settle the count twice.
     let settled = false
-    const receiptsThenSettle = (receipt: (injection: IdleInjection) => void): ReceiptErrors => {
+    const receiptsThenSettle = (receipts: () => ReceiptErrors): ReceiptErrors => {
       if (settled) return NO_RECEIPT_ERRORS
       settled = true
       try {
-        return runReceipts(ordered, receipt)
+        return receipts()
       } finally {
-        settleChildren()
+        this.#childrenInDelivery -= children
+        this.#reportChildWork()
       }
     }
-    this.#pending.clear()
     this.#childrenInDelivery += children
     let delivery: unknown
     try {
-      const contents = ordered.map((injection) => injection.content)
-      let offset = 0
-      const details = ordered.flatMap((injection, index) => {
-        const start = offset
-        const end = start + (contents[index]?.length ?? 0)
-        offset = end + 2
-        return injection.customType === undefined ? [] : [{
-          customType: injection.customType, details: injection.details,
-          ...(injection.contextScoped === true ? { contentRange: [start, end] as const } : {}),
-        }]
-      })
-      delivery = this.#deliver(
-        {
-          customType: "omo-senpi:wake",
-          content: contents.join("\n\n"),
-          display: false,
-          details,
-        },
-        { deliverAs },
-      )
+      delivery = this.#deliver(batch.message, { deliverAs, items: batch.items })
     } catch (error) {
       // Receipts first: the count is a report, and nothing about reporting may cost a producer its receipt.
       // The delivery error is the one the caller needs, so a receipt that throws does not replace it.
-      this.#reportAllReceiptErrors(receiptsThenSettle((injection) => injection.onDeliveryFailed?.(error)))
+      this.#reportAllReceiptErrors(receiptsThenSettle(() => failItems(batch.injections, error)))
       throw error
     }
     if (!isPromiseLike(delivery)) {
-      const errors = receiptsThenSettle((injection) => injection.onFlushed?.())
+      const errors = receiptsThenSettle(() => settleItemReceipts(batch.injections, delivery))
       this.#reportReceiptErrors(errors.rest)
       if (errors.threw) throw errors.first
-    } else {
-      // Nothing awaits this chain, so every receipt error here goes to onReceiptError instead of becoming an
-      // unhandled rejection.
-      try {
-        void delivery.then(
-          () => this.#reportAllReceiptErrors(receiptsThenSettle((injection) => injection.onFlushed?.())),
-          (error: unknown) => this.#reportAllReceiptErrors(receiptsThenSettle((injection) => injection.onDeliveryFailed?.(error))),
-        )
-      } catch (error) {
-        // A thenable whose then() throws never settles: treat it as a failed delivery so receipts and the count
-        // still settle.
-        this.#reportAllReceiptErrors(receiptsThenSettle((injection) => injection.onDeliveryFailed?.(error)))
-        throw error
-      }
+      return
     }
-    return collapsed
+    // Nothing awaits this chain, so every receipt error here goes to onReceiptError instead of becoming an
+    // unhandled rejection.
+    try {
+      void delivery.then(
+        (result) =>
+          this.#reportAllReceiptErrors(receiptsThenSettle(() => settleItemReceipts(batch.injections, result))),
+        (error: unknown) => this.#reportAllReceiptErrors(receiptsThenSettle(() => failItems(batch.injections, error))),
+      )
+    } catch (error) {
+      // A thenable whose then() throws never settles: treat it as a failed delivery so receipts and the count
+      // still settle.
+      this.#reportAllReceiptErrors(receiptsThenSettle(() => failItems(batch.injections, error)))
+      throw error
+    }
   }
 }
 

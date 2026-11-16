@@ -12,6 +12,7 @@ export const KNOWN_PROFILES = "daily-heavy, daily-normal, geeky-heavy, geeky-nor
 // The refresh token the fixture OAuth lane in model-profile-e2e-mock-provider.ts refuses to
 // exchange (kept literal on both sides: the mock runs inside the senpi process, this file in node).
 export const REJECTED_REFRESH_TOKEN = "rejected-refresh"
+export const FLAKY_REFRESH_TOKEN = "flaky-refresh"
 
 export const SCENARIOS = {
   "geeky-normal-api-sol": {
@@ -46,6 +47,18 @@ export const SCENARIOS = {
     registerProviders: ["anthropic"],
     expect: { model: "claude-fable-5-1", provider: "anthropic", notice: APPLIED_TYPE, thinking: "xhigh" },
   },
+  "daily-heavy-fable52": {
+    omoConfig: { model_profile: "daily-heavy" },
+    mockModels: ["mock-1", "claude-fable-5-1", "claude-fable-5-2"],
+    registerProviders: ["anthropic", "opencode"],
+    expect: { model: "claude-fable-5-2", provider: "anthropic", notice: APPLIED_TYPE, thinking: "high" },
+  },
+  "daily-heavy-fable52-gateway-unavailable": {
+    omoConfig: { model_profile: "daily-heavy" },
+    mockModels: ["mock-1", "anthropic/claude-fable-5-2"],
+    registerProviders: ["opengateway"],
+    expect: { model: "mock-1", notice: UNAVAILABLE_TYPE },
+  },
   "geeky-normal-sol": {
     omoConfig: { model_profile: "geeky-normal" },
     mockModels: ["mock-1", "gpt-5.6-sol", "gpt-6.1-sol"],
@@ -69,18 +82,19 @@ export const SCENARIOS = {
   },
   "daily-normal-kimi": {
     omoConfig: { model_profile: "daily-normal" },
-    mockModels: ["mock-1", "kimi-k3"],
+    mockModels: ["mock-1", "kimi-k3.1-pro"],
     cliModel: undefined,
     registerProviders: ["kimi-coding"],
-    expect: { model: "kimi-k3", provider: "kimi-coding", notice: APPLIED_TYPE, thinking: "max" },
+    expect: { model: "kimi-k3.1-pro", provider: "kimi-coding", notice: APPLIED_TYPE, thinking: "max" },
   },
-  "daily-normal-glm": {
+  "daily-normal-fable52": {
     omoConfig: { model_profile: "daily-normal" },
-    mockModels: ["mock-1", "glm-5.3"],
+    mockModels: ["mock-1", "claude-fable-5-2"],
     cliModel: undefined,
-    registerProviders: ["zai"],
-    expect: { model: "glm-5.3", provider: "zai", notice: APPLIED_TYPE, thinking: "max" },
+    registerProviders: ["anthropic"],
+    expect: { model: "claude-fable-5-2", provider: "anthropic", notice: APPLIED_TYPE, thinking: "medium" },
   },
+
   "geeky-normal-astra": {
     omoConfig: { model_profile: "geeky-normal" },
     mockModels: ["mock-1", "gpt-5.6-sol", "gpt-6.1-sol", "gpt-6.1-sol-fast", "gpt-6-astra"],
@@ -96,32 +110,32 @@ export const SCENARIOS = {
   },
   unset: {
     omoConfig: {},
-    mockModels: ["mock-1", "kimi-k3"],
+    mockModels: ["mock-1", "kimi-k3.1-pro"],
     cliModel: undefined,
     registerProviders: ["kimi-coding"],
-    expect: { model: "kimi-k3", provider: "kimi-coding", notice: APPLIED_TYPE, thinking: "max" },
+    expect: { model: "kimi-k3.1-pro", provider: "kimi-coding", notice: APPLIED_TYPE, thinking: "max" },
   },
   "unset-skips-gateway": {
     omoConfig: {},
-    mockModels: ["mock-1", "anthropic/claude-opus-5-5", "kimi-k3"],
+    mockModels: ["mock-1", "anthropic/claude-opus-5-5", "kimi-k3.1-pro"],
     cliModel: undefined,
     registerProviders: ["opengateway", "kimi-coding"],
-    expect: { model: "kimi-k3", provider: "kimi-coding", notice: APPLIED_TYPE, thinking: "max" },
+    expect: { model: "kimi-k3.1-pro", provider: "kimi-coding", notice: APPLIED_TYPE, thinking: "max" },
   },
-  // Unset starts on Daily · Normal (#10029): with GLM connected beside GPT, its GLM rung wins.
+  // Unset starts on Daily · Normal (#10029): with Kimi connected beside GPT, its Kimi rung wins.
   "unset-gpt-6-1-sol": {
     omoConfig: {},
-    mockModels: ["mock-1", "gpt-6-sol", "gpt-6.1-sol", "glm-5.3"],
+    mockModels: ["mock-1", "gpt-6-sol", "gpt-6.1-sol", "kimi-k3.1-pro"],
     cliModel: undefined,
-    registerProviders: ["chatgpt-subscription", "zai"],
-    expect: { model: "glm-5.3", provider: "zai", notice: APPLIED_TYPE, thinking: "max" },
+    registerProviders: ["chatgpt-subscription", "kimi-coding"],
+    expect: { model: "kimi-k3.1-pro", provider: "kimi-coding", notice: APPLIED_TYPE, thinking: "max" },
   },
   "unset-copilot-gpt-6-sol": {
     omoConfig: {},
-    mockModels: ["mock-1", "gpt-6-sol", "glm-5.3"],
+    mockModels: ["mock-1", "gpt-6-sol", "kimi-k3.1-pro"],
     cliModel: undefined,
-    registerProviders: ["github-copilot", "zai"],
-    expect: { model: "glm-5.3", provider: "zai", notice: APPLIED_TYPE, thinking: "max" },
+    registerProviders: ["github-copilot", "kimi-coding"],
+    expect: { model: "kimi-k3.1-pro", provider: "kimi-coding", notice: APPLIED_TYPE, thinking: "max" },
   },
   // No Daily lane resolves on a ChatGPT-only setup: the first lane that does, Obsessive · Normal, applies.
   "unset-chatgpt-only-geeky-normal": {
@@ -131,14 +145,14 @@ export const SCENARIOS = {
     registerProviders: ["chatgpt-subscription"],
     expect: { model: "gpt-6.1-sol", provider: "chatgpt-subscription", notice: APPLIED_TYPE, thinking: "medium" },
   },
-  // The retired "recommended" id (#10029) starts the unset default: Daily · Normal's glm-5.3 here,
+  // The retired "recommended" id (#10029) starts the unset default: Daily · Normal's kimi-k3.1-pro here,
   // never the old ladder's gpt-6.1-sol and never the unknown-profile notice.
   "retired-recommended": {
     omoConfig: { model_profile: "recommended" },
-    mockModels: ["mock-1", "gpt-6-sol", "gpt-6.1-sol", "glm-5.3"],
+    mockModels: ["mock-1", "gpt-6-sol", "gpt-6.1-sol", "kimi-k3.1-pro"],
     cliModel: undefined,
-    registerProviders: ["chatgpt-subscription", "zai"],
-    expect: { model: "glm-5.3", provider: "zai", notice: APPLIED_TYPE, thinking: "max" },
+    registerProviders: ["chatgpt-subscription", "kimi-coding"],
+    expect: { model: "kimi-k3.1-pro", provider: "kimi-coding", notice: APPLIED_TYPE, thinking: "max" },
   },
   "empty-registry": {
     omoConfig: { model_profile: "daily-normal" },
@@ -225,10 +239,30 @@ export const SCENARIOS = {
   // The exact chain the desktop Settings editor saved after removing Daily · Normal's Claude
   // candidates: Opus is served (Claude connected) but must not run, and the lane keeps its name.
   "custom-daily-normal-desktop-chain": {
-    omoConfig: { model_profile: "daily-normal", model_profiles: { "daily-normal": { models: [{"model":"kimi-coding/kimi-k3","reasoning":"max"},{"model":"kimi-for-coding/kimi-k3","reasoning":"max"},{"model":"moonshotai/kimi-k3","reasoning":"max"},{"model":"opencode-go/kimi-k3","reasoning":"max"},{"model":"zai-coding-plan/glm-5.3","reasoning":"max"},{"model":"opencode-go/glm-5.3","reasoning":"max"}] } } },
+    omoConfig: {
+      model_profile: "daily-normal",
+      model_profiles: {
+        "daily-normal": {
+          models: [
+            { model: "kimi-coding/kimi-k3", reasoning: "max" },
+            { model: "kimi-for-coding/kimi-k3", reasoning: "max" },
+            { model: "moonshotai/kimi-k3", reasoning: "max" },
+            { model: "opencode-go/kimi-k3", reasoning: "max" },
+            { model: "zai-coding-plan/glm-5.3", reasoning: "max" },
+            { model: "opencode-go/glm-5.3", reasoning: "max" },
+          ],
+        },
+      },
+    },
     mockModels: ["mock-1", "claude-opus-5-5", "kimi-k3"],
     registerProviders: ["anthropic-subscription", "kimi-coding"],
-    expect: { model: "kimi-k3", provider: "kimi-coding", notice: APPLIED_TYPE, thinking: "max", label: "(Daily · Normal)" },
+    expect: {
+      model: "kimi-k3",
+      provider: "kimi-coding",
+      notice: APPLIED_TYPE,
+      thinking: "max",
+      label: "(Daily · Normal)",
+    },
   },
   "cli-model-wins": {
     omoConfig: { model_profile: "daily-normal" },
@@ -238,40 +272,61 @@ export const SCENARIOS = {
     expect: { model: "mock-1", notice: null, thinking: "low" },
   },
   // senpi's recommended-models builtin switches only away from an implicit start that is off its
-  // ladder, so no listed provider may serve its engine provider default (chatgpt-subscription's is
-  // gpt-6.1-sol, opencode-go's kimi-k3): the session starts first-available on mock-1, the builtin
-  // switches to its gpt-6-astra rung, and Daily · Normal then wins with glm-5.3 (#9238).
+  // ladder, so no listed provider may serve its engine provider default (anthropic's is
+  // claude-opus-5-5): the session starts first-available on mock-1, the builtin switches to its
+  // claude-fable-5-2 xhigh rung, and Daily · Normal then wins with claude-fable-5-2 medium (#9238, #13547).
   "lane-beats-recommended-models": {
     omoConfig: { model_profile: "daily-normal" },
-    mockModels: ["mock-1", "glm-5.3", "gpt-6-astra"],
+    mockModels: ["mock-1", "claude-fable-5-2"],
     cliModel: undefined,
     recommendedModels: undefined,
-    registerProviders: ["chatgpt-subscription", "opencode-go"],
+    registerProviders: ["anthropic"],
     expect: {
-      model: "glm-5.3",
-      provider: "opencode-go",
+      model: "claude-fable-5-2",
+      provider: "anthropic",
       notice: APPLIED_TYPE,
-      thinking: "max",
+      thinking: "medium",
       initialModel: "mock-1",
-      recommendedSwitch: "chatgpt-subscription/gpt-6-astra",
+      recommendedSwitch: "anthropic/claude-fable-5-2",
     },
   },
+
   // A stored Claude login whose refresh token the (offline) fixture exchange rejects, the way a
   // revoked subscription login is: the default must not pin it, and the turn must run on the next
   // connected rung. `oauthProviders` gives the fixture lane an OAuth block; `authJson` is the
   // sandbox's stored credential, expired so the engine has to refresh it.
   "unset-rejected-login-falls-back": {
     omoConfig: {},
-    mockModels: ["mock-1", "claude-opus-5-5", "glm-5.3"],
-    registerProviders: ["anthropic", "zai"],
+    mockModels: ["mock-1", "claude-opus-5-5", "kimi-k3.1-pro"],
+    registerProviders: ["anthropic", "kimi-coding"],
     oauthProviders: ["anthropic"],
     authJson: { anthropic: { type: "oauth", access: "stale-access", refresh: REJECTED_REFRESH_TOKEN, expires: 0 } },
     expect: {
-      model: "glm-5.3",
-      provider: "zai",
+      model: "kimi-k3.1-pro",
+      provider: "kimi-coding",
       notice: APPLIED_TYPE,
       thinking: "max",
       authFailed: [{ provider: "anthropic", model: "claude-opus-5-5", reason: "refresh" }],
+    },
+  },
+  // A ChatGPT subscription login whose refresh fails transiently at session start (the fixture
+  // answers ECONNREFUSED to every exchange until the first turn starts) beside an OpenAI API lane serving the same model (#11432): the
+  // subscription keeps the rung, and the first turn's own refresh succeeds on it. Before the fix the
+  // session moved to openai/gpt-6-astra for its lifetime.
+  "geeky-normal-transient-refresh-keeps-subscription": {
+    omoConfig: { model_profile: "geeky-normal" },
+    mockModels: ["mock-1", "gpt-6-astra"],
+    registerProviders: ["chatgpt-subscription", "openai"],
+    oauthProviders: ["chatgpt-subscription"],
+    authJson: {
+      "chatgpt-subscription": { type: "oauth", access: "stale-access", refresh: FLAKY_REFRESH_TOKEN, expires: 0 },
+    },
+    expect: {
+      model: "gpt-6-astra",
+      provider: "chatgpt-subscription",
+      notice: APPLIED_TYPE,
+      thinking: "medium",
+      authFailedAbsent: true,
     },
   },
   // A credential pool whose flat (default) account is rejected but whose sibling account is valid:
@@ -279,8 +334,8 @@ export const SCENARIOS = {
   // rejection reads as a credential-scoped failure to senpi's pool classifier, like a revoked key).
   "unset-pooled-login-sibling-account": {
     omoConfig: {},
-    mockModels: ["mock-1", "claude-opus-5-5", "glm-5.3"],
-    registerProviders: ["anthropic", "zai"],
+    mockModels: ["mock-1", "claude-opus-5-5", "kimi-k3.1-pro"],
+    registerProviders: ["anthropic", "kimi-coding"],
     oauthProviders: ["anthropic"],
     authJson: {
       anthropic: {
@@ -294,6 +349,12 @@ export const SCENARIOS = {
         ],
       },
     },
-    expect: { model: "claude-opus-5-5", provider: "anthropic", notice: APPLIED_TYPE, thinking: "medium", authFailedAbsent: true },
+    expect: {
+      model: "claude-opus-5-5",
+      provider: "anthropic",
+      notice: APPLIED_TYPE,
+      thinking: "medium",
+      authFailedAbsent: true,
+    },
   },
 }

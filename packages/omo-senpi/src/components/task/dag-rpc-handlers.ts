@@ -10,14 +10,7 @@ const LIST_MAX_LIMIT = 256
 const HISTORY_DEFAULT_LIMIT = 256
 const HISTORY_MAX_LIMIT = 1000
 
-const RUN_STATUSES = new Set([
-  "pending",
-  "running",
-  "paused",
-  "completed",
-  "failed",
-  "cancelled",
-])
+const RUN_STATUSES = new Set(["pending", "running", "paused", "completed", "failed", "cancelled"])
 
 const EVENT_LANES = new Set(["activity", "boundary"])
 
@@ -152,9 +145,8 @@ export function registerDagRpcHandlers(pi: SenpiExtensionAPI, deps: DagRpcHandle
       const highWaterSeq = snapshot.lastSeq
       const page = deps.manager.history({
         ...historyQuery(input.value, sessionId),
-        throughSeq: input.value.throughSeq === undefined
-          ? highWaterSeq
-          : Math.min(input.value.throughSeq, highWaterSeq),
+        throughSeq:
+          input.value.throughSeq === undefined ? highWaterSeq : Math.min(input.value.throughSeq, highWaterSeq),
       })
       return {
         schemaVersion: 1,
@@ -167,10 +159,7 @@ export function registerDagRpcHandlers(pi: SenpiExtensionAPI, deps: DagRpcHandle
   })
 }
 
-function historyQuery(
-  params: HistoryParams,
-  parentSessionId: string,
-): DagRpcHistoryQuery {
+function historyQuery(params: HistoryParams, parentSessionId: string): DagRpcHistoryQuery {
   return {
     runId: params.runId,
     parentSessionId,
@@ -255,9 +244,7 @@ function parseHistory(value: unknown): ParseResult<HistoryParams> {
   }
   const types = parseTypes(value.types)
   if ("error" in types) return types
-  const throughSeq = value.throughSeq === undefined
-    ? { value: undefined }
-    : parseSeq(value.throughSeq, "throughSeq", 0)
+  const throughSeq = value.throughSeq === undefined ? { value: undefined } : parseSeq(value.throughSeq, "throughSeq", 0)
   if ("error" in throughSeq) return throughSeq
   return {
     value: {

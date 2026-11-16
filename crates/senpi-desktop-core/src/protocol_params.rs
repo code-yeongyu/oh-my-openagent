@@ -95,6 +95,9 @@ pub struct KeyChordParams {
     pub target: String,
     pub keys: Vec<String>,
     pub opts: Option<PointerOptions>,
+    /// Sends a chord the engine treats as dangerous (`cmd+q`, `alt+f4`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub force: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -190,6 +193,18 @@ pub struct AxSetValueParams {
 pub struct AxClickParams {
     #[serde(rename = "ref")]
     pub ref_: String,
+    pub opts: Option<PointerOptions>,
+}
+
+/// `ax.typeText`: types `text` into the element `ref` names. Only
+/// `opts.deliveryMode` is read: an omitted delivery is background (no focus
+/// change for the user); `foreground` raises the element's window under the
+/// control grant, like `ax.click`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct AxTypeTextParams {
+    #[serde(rename = "ref")]
+    pub ref_: String,
+    pub text: String,
     pub opts: Option<PointerOptions>,
 }
 

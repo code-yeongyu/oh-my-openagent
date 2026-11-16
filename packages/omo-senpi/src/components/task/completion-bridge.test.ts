@@ -14,9 +14,12 @@ import {
   type ManagedRunner,
   type ParentNotifierMessage,
   type TaskManager,
+  type TaskRecordStore,
 } from "@oh-my-opencode/senpi-task"
 
+import { seedRecord } from "../../../../senpi-task/src/lifecycle/__fixtures__/lifecycle-fakes"
 import { createCompletionObservingStore } from "./completion-bridge"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const projects: string[] = []
 
@@ -28,27 +31,31 @@ function tempProject(): string {
 
 function pendingRunner(): ManagedRunner {
   return {
-    start: (spec): Promise<ManagedChildHandle> => Promise.resolve({
-      task_id: spec.taskId,
-      sessionId: `session-${spec.taskId}`,
-      pid: undefined,
-      steer: () => Promise.resolve(),
-      followUp: () => Promise.resolve(),
-      abort: () => Promise.resolve(),
-      subscribe: () => () => {},
-      waitForOutcome: () => new Promise(() => {}),
-      lastAssistantText: () => undefined,
-      dispose: () => Promise.resolve(),
-    }),
+    start: (spec): Promise<ManagedChildHandle> =>
+      Promise.resolve({
+        task_id: spec.taskId,
+        sessionId: `session-${spec.taskId}`,
+        pid: undefined,
+        steer: () => Promise.resolve(),
+        followUp: () => Promise.resolve(),
+        abort: () => Promise.resolve(),
+        subscribe: () => () => {},
+        waitForOutcome: () => new Promise(() => {}),
+        lastAssistantText: () => undefined,
+        dispose: () => Promise.resolve(),
+      }),
   }
 }
 
-function createHarness(options: {
-  currentSessionId?: string | null
-  runner?: ManagedRunner
-  onMessage?: (message: ParentNotifierMessage) => void
-} = {}): {
-  readonly manager: TaskManager
+function createHarness(
+  options: {
+    currentSessionId?: string | null
+    runner?: ManagedRunner
+    onMessage?: (message: ParentNotifierMessage) => void
+  } = {},
+): {
+  readonly manager: ReturnType<typeof createTaskManager>
+  readonly store: TaskRecordStore
   readonly messages: ParentNotifierMessage[]
   readonly complete: (taskId: string) => void
   readonly lose: (taskId: string) => void
@@ -58,17 +65,29 @@ function createHarness(options: {
   const backing = createTaskRecordStore({ project_dir: tempProject() })
   const messages: ParentNotifierMessage[] = []
   const completion = createCompletionNotifier({
-    notifier: { enqueue: (message) => { messages.push(message); options.onMessage?.(message) } },
+    notifier: {
+      enqueue: (message) => {
+        messages.push(message)
+        options.onMessage?.(message)
+      },
+    },
     store: backing,
   })
   let managerRef: TaskManager | undefined
   let notifyCalls = 0
   const store = createCompletionObservingStore(backing, {
     // Counts the bridge's own calls, so "once" is the bridge's guarantee, not the notifier's dedupe.
-    notifier: { ...completion, notifyTerminal: (input) => { notifyCalls += 1; return completion.notifyTerminal(input) } },
+    notifier: {
+      ...completion,
+      notifyTerminal: (input) => {
+        notifyCalls += 1
+        return completion.notifyTerminal(input)
+      },
+    },
     parentState: () => ({ kind: "idle" }),
     wasBackground: (taskId) => managerRef?.wasBackground(taskId) ?? false,
-    currentSessionId: () => (options.currentSessionId === null ? undefined : (options.currentSessionId ?? "parent-session")),
+    currentSessionId: () =>
+      options.currentSessionId === null ? undefined : (options.currentSessionId ?? "parent-session"),
   })
   const runner = options.runner ?? pendingRunner()
   const manager = createTaskManager({
@@ -81,6 +100,7 @@ function createHarness(options: {
   managerRef = manager
   return {
     manager,
+    store,
     messages,
     notifyCalls: () => notifyCalls,
     notifiedEpoch: (taskId) => backing.load(taskId)?.notification.notified_epoch,
@@ -92,10 +112,14 @@ function createHarness(options: {
       })
     },
     lose: (taskId) => {
-      store.mutate(taskId, (record) => markRecordLostForReconciliation(record, {
-        timestamp: "2026-07-28T00:00:01.000Z",
-        error_message: "revival deferred: model_unavailable; exhausted 3 retry attempts",
-      }).record)
+      store.mutate(
+        taskId,
+        (record) =>
+          markRecordLostForReconciliation(record, {
+            timestamp: "2026-07-28T00:00:01.000Z",
+            error_message: "revival deferred: model_unavailable; exhausted 3 retry attempts",
+          }).record,
+      )
     },
   }
 }
@@ -203,9 +227,14 @@ describe("completion bridge live background promotion", () => {
     // given
     const release = Promise.withResolvers<void>()
     const refusing: ManagedRunner = {
-      start: () => release.promise.then(() => {
-        throw new RunnerError({ kind: "host_unavailable", reason: "host_busy", message: "the task host is not answering" })
-      }),
+      start: () =>
+        release.promise.then(() => {
+          throw new RunnerError({
+            kind: "host_unavailable",
+            reason: "host_busy",
+            message: "the task host is not answering",
+          })
+        }),
     }
     const arrived = Promise.withResolvers<ParentNotifierMessage>()
     const harness = createHarness({ runner: refusing, onMessage: arrived.resolve })
@@ -223,7 +252,12 @@ describe("completion bridge live background promotion", () => {
     release.resolve()
     const message = await Promise.race([
       arrived.promise,
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("waited 2s for the start-failure notification, it never came")), 2_000)),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error("waited out the test budget for the start-failure notification, it never came")),
+          remainingTestTime(),
+        ),
+      ),
     ])
 
     // then
@@ -231,5 +265,36 @@ describe("completion bridge live background promotion", () => {
     expect(message.details[0]?.status).toBe("error")
     expect(harness.notifyCalls()).toBe(1)
     expect(harness.messages).toHaveLength(1)
+  })
+
+  it("#given a paused child its run's Resume could not restore #when the manager ends that run #then the parent is told once that it failed", async () => {
+    // given
+    const arrived = Promise.withResolvers<ParentNotifierMessage>()
+    const harness = createHarness({ onMessage: arrived.resolve })
+    const paused = seedRecord(harness.store, {
+      task_id: "st_0e1d0003",
+      status: "paused",
+      parent_session_id: "parent-session",
+      run_epoch: 0,
+      notify_on_terminal: true,
+    })
+
+    // when
+    const ended = harness.manager.endLostPausedTask(paused.task_id, "paused child restore failed (respawn_failed)")
+    const message = await Promise.race([
+      arrived.promise,
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error("waited out the test budget for the ended-run notification, it never came")),
+          remainingTestTime(),
+        ),
+      ),
+    ])
+
+    // then
+    expect(ended).toBe(true)
+    expect(message.details[0]?.task_id).toBe(paused.task_id)
+    expect(message.details[0]?.status).toBe("error")
+    expect(harness.notifyCalls()).toBe(1)
   })
 })

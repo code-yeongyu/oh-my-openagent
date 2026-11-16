@@ -1,0 +1,88 @@
+{
+  "request": "owner.shutdown_for_upgrade",
+  "cases": [
+    {
+      "name": "an installer stops the owner, which closes the connection",
+      "outcome": "ok",
+      "client": {
+        "name": "installer",
+        "version": "2.0.0"
+      },
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "owner.shutdown_for_upgrade",
+            "target_version": "1.5.0"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": true,
+            "data": {}
+          }
+        },
+        {
+          "expect_closed": true
+        }
+      ]
+    },
+    {
+      "name": "a desktop client is refused forbidden",
+      "outcome": "refusal",
+      "client": {
+        "name": "desktop",
+        "version": "2.0.0",
+        "data_home": "/home/user/.config/omo"
+      },
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "owner.shutdown_for_upgrade",
+            "target_version": "1.5.0"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "forbidden"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a target version that is not semver is refused",
+      "outcome": "refusal",
+      "client": {
+        "name": "installer",
+        "version": "2.0.0"
+      },
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "owner.shutdown_for_upgrade",
+            "target_version": "next"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "invalid_request"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "request": "device.info",
+  "cases": [
+    {
+      "name": "answers the adopted device",
+      "outcome": "ok",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "device.info"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "device": {
+                "id": "dev-self",
+                "name": "This Mac"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "refused before the client proof",
+      "outcome": "refusal",
+      "handshake": "welcome_only",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "device.info"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "unauthenticated"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

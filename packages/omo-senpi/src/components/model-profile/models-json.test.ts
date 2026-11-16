@@ -30,6 +30,20 @@ describe("readModelsJson", () => {
     expect(readModelsJson(dir)).toBe(first)
   })
 
+  it("#given a caller tries to write into the returned parse #when read again #then the cached value is unchanged", () => {
+    const dir = agentDir()
+    writeFileSync(join(dir, "models.json"), `{ "providers": { "proxy": { "models": [{ "id": "a" }] } } }`)
+    const first = readModelsJson(dir) as { providers: { proxy: { models: { id: string }[] } } }
+
+    expect(() => {
+      first.providers.proxy.models.push({ id: "b" })
+    }).toThrow()
+    expect(() => {
+      first.providers = { proxy: { models: [] } }
+    }).toThrow()
+    expect(readModelsJson(dir)).toEqual({ providers: { proxy: { models: [{ id: "a" }] } } })
+  })
+
   it("#given models.json is edited or removed after a read #when read again #then the new content is returned", () => {
     const dir = agentDir()
     const path = join(dir, "models.json")

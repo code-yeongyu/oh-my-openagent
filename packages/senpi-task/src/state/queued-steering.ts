@@ -16,14 +16,20 @@ export function withParkedSteeringNotice(message: string, count: number): string
 /** A terminal turn's later queued continuation owes its own terminal result when its target ends. */
 export function endDroppedSteering(record: TaskRecord, timestamp: string, count: number): TaskRecord {
   const error_message = withDroppedSteeringNotice(
-    record.status === "completed" ? "The task finished; its continuation is no longer available."
-      : record.error_message ?? "Task target is no longer available.",
+    record.status === "completed"
+      ? "The task finished; its continuation is no longer available."
+      : (record.error_message ?? "Task target is no longer available."),
     count,
   )
   if (record.status === "completed" || record.status === "error" || record.status === "interrupted") {
     return {
-      ...record, status: "error", killed: true, failure_kind: "suspended_unresumable",
-      error_message, updated_at: timestamp, terminal_at: timestamp,
+      ...record,
+      status: "error",
+      killed: true,
+      failure_kind: "suspended_unresumable",
+      error_message,
+      updated_at: timestamp,
+      terminal_at: timestamp,
       notify_on_terminal: true,
       notification: { ...record.notification, run_epoch: record.notification.run_epoch + 1 },
     }

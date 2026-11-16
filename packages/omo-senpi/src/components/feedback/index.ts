@@ -1,10 +1,16 @@
 import { join } from "node:path"
+import type { CredentialStore } from "@oh-my-opencode/omo-opencode/service-auth"
 
 import type { OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { createOmoNativeProductConfig } from "../telemetry/product-identity"
 import type { FeedbackDraft, FeedbackKind, UploadRedactor } from "./draft"
-import { feedbackRuntimeLoadFailure, loadFeedbackRuntime, type FeedbackRuntimeLoader, type FeedbackRuntimeModule } from "./runtime-loader"
+import {
+  feedbackRuntimeLoadFailure,
+  loadFeedbackRuntime,
+  type FeedbackRuntimeLoader,
+  type FeedbackRuntimeModule,
+} from "./runtime-loader"
 import type { FeedbackCommandUi, FeedbackCore, FeedbackSessionLike } from "./runtime"
 import type { ReportTransport, SubmitResult } from "./submit"
 
@@ -21,6 +27,7 @@ export interface FeedbackComponentOptions {
   readonly channel?: string
   readonly now?: () => Date
   readonly loadRuntime?: FeedbackRuntimeLoader
+  readonly credentialStore?: CredentialStore
 }
 
 type SessionLike = FeedbackSessionLike
@@ -42,17 +49,16 @@ const sessionIdOf = (ctx: SessionLike | undefined): string | undefined => {
   }
 }
 
-export const FEEDBACK_UNAVAILABLE = "Feedback needs an OmO runtime that can remove secrets before upload. Update OmO and try again."
+export const FEEDBACK_UNAVAILABLE =
+  "Feedback needs an OmO runtime that can remove secrets before upload. Update OmO and try again."
 
 export function createFeedbackComponent(options: FeedbackComponentOptions = {}): OmoSenpiComponent {
   return {
     name: "feedback",
-    register(pi) {
+    register(pi, { logger }) {
       const env = options.env ?? process.env
-      const now = options.now ?? (() => new Date())
       const omoVersion = options.omoVersion ?? createOmoNativeProductConfig().packageVersion
       const senpiVersion = options.senpiVersion ?? pi.hostVersion ?? "unknown"
-      const channel = options.channel ?? (omoVersion.includes("-") ? "beta" : "latest")
       const liveSessions = new Map<string, SessionLike>()
       let latestSessionId: string | undefined
       pi.on("session_start", (_payload, ctx) => {
@@ -91,10 +97,11 @@ export function createFeedbackComponent(options: FeedbackComponentOptions = {}):
         const runtime = await runtimeOf()
         core ??= runtime.createFeedbackCore({
           env,
-          now,
+          now: options.now,
           omoVersion,
           senpiVersion,
-          channel,
+          channel: options.channel,
+          logger,
           stateDir: () => options.stateDir ?? join(resolveAgentHome({ env }), "omo-senpi"),
           apiOrigin: () => env.OMO_SERVICE_API_URL ?? DEFAULT_API_ORIGIN,
           transport: options.transport ?? ((url, init) => fetch(url, init)),
@@ -102,7 +109,10 @@ export function createFeedbackComponent(options: FeedbackComponentOptions = {}):
         return core
       }
 
-      const prepare = async (session: SessionLike | undefined, input: unknown): Promise<FeedbackDraft | { kind: "unavailable"; reason: string }> => {
+      const prepare = async (
+        session: SessionLike | undefined,
+        input: unknown,
+      ): Promise<FeedbackDraft | { kind: "unavailable"; reason: string }> => {
         const redact = hostRedactor(pi)
         if (redact === undefined) return { kind: "unavailable", reason: FEEDBACK_UNAVAILABLE }
         return (await coreOf()).prepare(session, input, redact)
@@ -136,6 +146,8 @@ export function createFeedbackComponent(options: FeedbackComponentOptions = {}):
           kind,
           args,
           ui,
+          env,
+          credentialStore: options.credentialStore,
           prepare: async () => (await coreOf()).prepare(ctx as SessionLike, {}, redact),
           submit,
         })
@@ -154,4 +166,3 @@ export function createFeedbackComponent(options: FeedbackComponentOptions = {}):
     },
   }
 }
-

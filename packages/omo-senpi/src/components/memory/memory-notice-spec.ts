@@ -69,7 +69,7 @@ export function memoryPendingLine(args: MemoryNoticeArgs): string {
   if (args.command === "rename") {
     const from = optional(args.old_path)
     const to = optional(args.new_path)
-    return joinFields(["◌ Moving", from !== undefined && to !== undefined ? `${from} → ${to}` : from ?? to])
+    return joinFields(["◌ Moving", from !== undefined && to !== undefined ? `${from} → ${to}` : (from ?? to)])
   }
   return joinFields(["◌ Remembering", optional(args.file_path)])
 }
@@ -85,15 +85,16 @@ function titleLine(notice: MemoryWriteNotice, args: MemoryNoticeArgs): string {
 /** English ordinals: 1st/2nd/3rd/4th, with the 11-13 exception. */
 export function ordinal(value: number): string {
   const teens = value % 100
-  const suffix = teens >= 11 && teens <= 13
-    ? "th"
-    : value % 10 === 1
-      ? "st"
-      : value % 10 === 2
-        ? "nd"
-        : value % 10 === 3
-          ? "rd"
-          : "th"
+  const suffix =
+    teens >= 11 && teens <= 13
+      ? "th"
+      : value % 10 === 1
+        ? "st"
+        : value % 10 === 2
+          ? "nd"
+          : value % 10 === 3
+            ? "rd"
+            : "th"
   return `${value}${suffix}`
 }
 
@@ -148,7 +149,8 @@ function friendlyFailure(raw: string): string {
 
 /** Description refusals; `memory_apply_patch` puts the file path before them, so they are not anchored. */
 function descriptionFailure(message: string): string | undefined {
-  if (message.includes("'description' contains tool-call scaffolding")) return "The memory call arrived garbled, so nothing was saved."
+  if (message.includes("'description' contains tool-call scaffolding"))
+    return "The memory call arrived garbled, so nothing was saved."
   const tooLong = /'description' exceeds (\d+) characters \((\d+)\)/u.exec(message)
   if (tooLong?.[1] !== undefined && tooLong[2] !== undefined) {
     return `The description was ${Number(tooLong[2]).toLocaleString("en-US")} characters; the limit is ${Number(tooLong[1]).toLocaleString("en-US")}.`

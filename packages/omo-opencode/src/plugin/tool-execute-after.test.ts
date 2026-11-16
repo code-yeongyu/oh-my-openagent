@@ -32,7 +32,7 @@ describe("createToolExecuteAfterHandler", () => {
 
     await handler(
       { tool: "hashline_edit", sessionID: "ses_test", callID: "call_test" },
-      { title: "result", output: "original output", metadata: {} }
+      { title: "result", output: "original output", metadata: {} },
     )
 
     expect(callOrder).toEqual(["truncator", "claude"])
@@ -54,10 +54,7 @@ describe("createToolExecuteAfterHandler", () => {
     const output = { title: "result", output: "original output", metadata: { truncated: true } }
 
     // when
-    await handler(
-      { tool: "hashline_edit", sessionID: "ses_parent", callId: " call_legacy " },
-      output
-    )
+    await handler({ tool: "hashline_edit", sessionID: "ses_parent", callId: " call_legacy " }, output)
 
     // then
     expect(output.title).toBe("stored title")
@@ -83,10 +80,7 @@ describe("createToolExecuteAfterHandler", () => {
     }
 
     // when
-    await handler(
-      { tool: "hashline_edit", sessionID: "ses_parent", callID: "call_native" },
-      output
-    )
+    await handler({ tool: "hashline_edit", sessionID: "ses_parent", callID: "call_native" }, output)
 
     // then
     expect(output.title).toBe("stored title")
@@ -112,10 +106,7 @@ describe("createToolExecuteAfterHandler", () => {
     }
 
     // when
-    await handler(
-      { tool: "task", sessionID: "ses_parent", callID: "call_model" },
-      output
-    )
+    await handler({ tool: "task", sessionID: "ses_parent", callID: "call_model" }, output)
 
     // then
     expect(output.title).toBe("stored title")
@@ -138,10 +129,7 @@ describe("createToolExecuteAfterHandler", () => {
     const output = { title: "result", output: "read output", metadata: {} }
 
     // when
-    await handler(
-      { tool: "read", sessionID: "ses_parent", callID: "call_read" },
-      output
-    )
+    await handler({ tool: "read", sessionID: "ses_parent", callID: "call_read" }, output)
 
     // then
     expect(output).toEqual({ title: "result", output: "read output", metadata: {} })

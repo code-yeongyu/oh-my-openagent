@@ -204,8 +204,7 @@ gh release view "v${NEW_VERSION}" --json tagName,url --jq '{tag: .tagName, url: 
 
 **Release notes are written BEFORE the release, not after.**
 
-The release body is extracted from the `CHANGELOG.md` section for this version. Author the user-facing
-notes under `## [Unreleased]` and land them before dispatching `/publish`; release-state preparation
+The release body is extracted from the `CHANGELOG.md` section for this version. Add the user-facing notes as `changes/unreleased/<pr-number>.md` fragments (one per PR, named for the PR) and land them before dispatching `/publish`; release-state preparation
 stamps that heading into `## [<version>] - <UTC date>` and commits it with the release state, so the
 published commit already carries its own notes.
 
@@ -219,13 +218,13 @@ bun run script/print-release-notes.ts "${NEW_VERSION}" /tmp/contributors.md
 <agent-instruction>
 After running the preview, present the output to the user and say:
 
-> **This is the exact body the release will publish:** the notes you authored under `[Unreleased]`,
+> **This is the exact body the release will publish:** the assembled fragments,
 > then contributor thank-yous for non-team contributors, then the install footer.
 >
 > Both steps are fail-closed: an absent, empty, or duplicated section aborts the release instead of
 > publishing blank notes, and re-stamping a version that already has a section is refused.
 >
-> If the `[Unreleased]` section is empty, STOP and write the notes first — the release cannot proceed.
+> If `changes/unreleased/` holds no fragments, STOP and write them first — the release cannot proceed.
 
 **APPROVAL GATE (single, binary):** The user's initial publish request with a named bump type IS the only approval this workflow requires. Do NOT wait for a separate acknowledgement here. Present the preview, then IMMEDIATELY proceed to Step 6. The only exception: if the user explicitly said "let me review the changelog before you continue" (or equivalent), stop and wait. Otherwise continue without ending the turn.
 </agent-instruction>
@@ -372,25 +371,25 @@ After the release notes are finalized, post them to the Discord channel. This st
 <hard-gate>
 The workflow is not complete until this step has either:
 1. Sent a Discord message successfully and recorded the message ID, or
-2. Failed after `agent-discordbot auth status` plus one send retry, with the Jobdori bot-token failure reported to the user.
+2. Failed after `agent-discordbot auth status` plus one send retry, with the release bot-token failure reported to the user.
 
 Never skip this step because the release summary was awaiting approval. If the user already confirmed the publish, continue through Discord before stopping.
 </hard-gate>
 
 <agent-discord-instruction>
-1. Use the Jobdori bot token through `agent-discordbot` for release announcements. This is the required release path; do not use the personal `agent-discord` token unless the bot path is unavailable and the user explicitly approves the fallback. Pin the bot id so release messages go out as the Jobdori bot even if the local `agent-discordbot` current bot changes.
+1. Use the release bot token through `agent-discordbot` for release announcements. This is the required release path; do not use the personal `agent-discord` token unless the bot path is unavailable and the user explicitly approves the fallback. Pin the bot id so release messages go out as the release bot even if the local `agent-discordbot` current bot changes.
 ```bash
-JOBDORI_BOT_ID=1486173823354146917
-agent-discordbot auth status --bot "$JOBDORI_BOT_ID"
+RELEASE_BOT_ID=1486173823354146917
+agent-discordbot auth status --bot "$RELEASE_BOT_ID"
 ```
 
 2. **Read recent messages** in the channel to match the existing announcement style:
 ```bash
-JOBDORI_BOT_ID=1486173823354146917
-agent-discordbot message list 1454708427392680067 --bot "$JOBDORI_BOT_ID" --limit 5
+RELEASE_BOT_ID=1486173823354146917
+agent-discordbot message list 1454708427392680067 --bot "$RELEASE_BOT_ID" --limit 5
 ```
 
-3. If `agent-discordbot` is unavailable or unauthorized, stop and report that the Jobdori token path failed. Only then may a human decide whether to use `agent-discord`.
+3. If `agent-discordbot` is unavailable or unauthorized, stop and report that the release bot token path failed. Only then may a human decide whether to use `agent-discord`.
 
 4. Post the release announcement to channel `1454708427392680067` matching the style of previous announcements. The message should follow this structure:
 ```
@@ -413,9 +412,9 @@ Plus {summary of remaining changes}.
 ```
 
 ```bash
-JOBDORI_BOT_ID=1486173823354146917
+RELEASE_BOT_ID=1486173823354146917
 RELEASE_URL=$(gh release view "v${NEW_VERSION}" --json url --jq '.url')
-agent-discordbot message send 1454708427392680067 "{your message following the style above}" --bot "$JOBDORI_BOT_ID"
+agent-discordbot message send 1454708427392680067 "{your message following the style above}" --bot "$RELEASE_BOT_ID"
 ```
 
 If the message fails to send, warn the user and continue — do NOT block the publish workflow on Discord errors.

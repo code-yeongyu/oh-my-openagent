@@ -1,4 +1,5 @@
 import * as p from "@clack/prompts"
+import { TELEMETRY_INSTALL_DISCLOSURE_LINES } from "@oh-my-opencode/telemetry-core/install-disclosure"
 import color from "picocolors"
 import { PLUGIN_NAME } from "../shared"
 import type { InstallArgs } from "./types"
@@ -30,7 +31,9 @@ import * as astGrepInstall from "./install-ast-grep-sg"
 
 export async function runTuiInstaller(args: InstallArgs, version: string): Promise<number> {
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
-    console.error("Error: Interactive installer requires a TTY. Use --non-interactive or set environment variables directly.")
+    console.error(
+      "Error: Interactive installer requires a TTY. Use --non-interactive or set environment variables directly.",
+    )
     return 1
   }
 
@@ -116,10 +119,14 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
         p.log.info("Refreshed the OpenCode plugin cache; the next OpenCode start loads the installed version.")
       }
       if (deferred.length > 0) {
-        p.log.info("OpenCode is running from its plugin cache; it refreshes when the last OpenCode window closes. Restart OpenCode to load the installed version.")
+        p.log.info(
+          "OpenCode is running from its plugin cache; it refreshes when the last OpenCode window closes. Restart OpenCode to load the installed version.",
+        )
       }
       for (const { dir, message } of failed) {
-        p.log.warn(`Could not refresh the OpenCode plugin cache at ${dir} (${message}). Close OpenCode and delete that directory, or OpenCode keeps loading the previous version.`)
+        p.log.warn(
+          `Could not refresh the OpenCode plugin cache at ${dir} (${message}). Close OpenCode and delete that directory, or OpenCode keeps loading the previous version.`,
+        )
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -218,8 +225,7 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
   if (config.hasOpenCode) {
     p.log.message(`Run ${color.cyan("opencode")} to start!`)
   }
-  p.log.info("Anonymous telemetry is enabled by default. Disable it with OMO_SEND_ANONYMOUS_TELEMETRY=0 or OMO_DISABLE_POSTHOG=1.")
-  p.log.info("Docs: docs/legal/privacy-policy.md and docs/legal/terms-of-service.md")
+  p.log.info(TELEMETRY_INSTALL_DISCLOSURE_LINES.join("\n"))
 
   p.note(
     `Include ${color.cyan("ultrawork")} (or ${color.cyan("ulw")}) in your prompt.\n` +

@@ -15,6 +15,7 @@ export type TelemetryDiagnosticEvent =
   | "telemetry_event_property_rejected"
   | "telemetry_event_rejected"
   | "telemetry_events_dropped_by_consent"
+  | "telemetry_legacy_rollups_removed"
   | "telemetry_otlp_partial_success"
   | "telemetry_otlp_send_failed"
   | "telemetry_posthog_import_failed"
@@ -55,7 +56,6 @@ export type TelemetryProductConfig = {
   readonly defaultApiKey: string
   readonly defaultHost: string
   readonly eventName: string
-  readonly machineIdPrefix: string
   readonly packageName: string
   readonly packageVersion: string
   readonly platform: string
@@ -129,10 +129,7 @@ export type TelemetryTransport = {
   readonly traces?: TurnTracing
 }
 
-export type TelemetryTransportFactory = (
-  apiKey: string,
-  options: TelemetryTransportOptions,
-) => TelemetryTransport
+export type TelemetryTransportFactory = (apiKey: string, options: TelemetryTransportOptions) => TelemetryTransport
 
 export type TelemetryClient = {
   readonly enabled: boolean

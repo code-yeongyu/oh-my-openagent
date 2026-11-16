@@ -28,7 +28,12 @@ export interface WakeTransitions {
   settle(turn: Turn, outcome: RunnerOutcome): Promise<void>
 }
 
-export function createWakeTransitions(core: SidecarCore, turns: TurnLifecycle, admission: SidecarAdmission, recovery: SidecarRecovery): WakeTransitions {
+export function createWakeTransitions(
+  core: SidecarCore,
+  turns: TurnLifecycle,
+  admission: SidecarAdmission,
+  recovery: SidecarRecovery,
+): WakeTransitions {
   /**
    * The deadline fired while the child was still starting or reviving. The transition holding the
    * per-session mutex is the very I/O this bounds, so the abort cannot queue behind it: the turn is
@@ -65,13 +70,21 @@ export function createWakeTransitions(core: SidecarCore, turns: TurnLifecycle, a
     core.activeTurn = turn
     core.state = "turn_running"
     turns.armDeadline(turn)
-    turn.settled = current.handle.waitForIdle().then(
-      (outcome) => core.serialized(() => settle(turn, outcome)),
-      (error: unknown) => core.serialized(() => settle(turn, {
-        status: "error",
-        failure: { kind: "child-turn-failed", message: describe(error), cause: error },
-      })),
-    ).catch((error: unknown) => core.warn("omo-senpi kibitzer sidecar settlement failed", { wake: turn.wake, error: describe(error) }))
+    turn.settled = current.handle
+      .waitForIdle()
+      .then(
+        (outcome) => core.serialized(() => settle(turn, outcome)),
+        (error: unknown) =>
+          core.serialized(() =>
+            settle(turn, {
+              status: "error",
+              failure: { kind: "child-turn-failed", message: describe(error), cause: error },
+            }),
+          ),
+      )
+      .catch((error: unknown) =>
+        core.warn("omo-senpi kibitzer sidecar settlement failed", { wake: turn.wake, error: describe(error) }),
+      )
   }
 
   async function seed(fresh: readonly RecallCandidate[], maxItems: number): Promise<KibitzerOfferResult> {
@@ -81,12 +94,14 @@ export function createWakeTransitions(core: SidecarCore, turns: TurnLifecycle, a
     // next batch instead of being drained unread once the child exists.
     const payload = merge([...core.carry, payloadOf(core.stream.drain(), fresh)])
     core.carry = []
-    const wakeText = core.pendingReseed === undefined
-      ? renderKibitzerSeedPrompt(envelopeInput(core, payload, maxItems, true))
-      : renderKibitzerWakePrompt(envelopeInput(core, payload, maxItems, false))
-    const prompt = core.pendingReseed === undefined
-      ? wakeText
-      : `${renderKibitzerReseedPrompt({ ...core.pendingReseed, maxItems, toolBudget: core.toolBudget })}${wakeText}`
+    const wakeText =
+      core.pendingReseed === undefined
+        ? renderKibitzerSeedPrompt(envelopeInput(core, payload, maxItems, true))
+        : renderKibitzerWakePrompt(envelopeInput(core, payload, maxItems, false))
+    const prompt =
+      core.pendingReseed === undefined
+        ? wakeText
+        : `${renderKibitzerReseedPrompt({ ...core.pendingReseed, maxItems, toolBudget: core.toolBudget })}${wakeText}`
     const generation = core.generations + 1
     const turn = turns.newTurn(generation, maxItems, payload.candidates.length)
     turn.lease = admitted.lease
@@ -102,7 +117,13 @@ export function createWakeTransitions(core: SidecarCore, turns: TurnLifecycle, a
     })
     let handle: ChildHandle
     try {
-      handle = await core.options.startChild({ sessionId: core.sessionId, generation, prompt, tools: tools.tools, maxItems })
+      handle = await core.options.startChild({
+        sessionId: core.sessionId,
+        generation,
+        prompt,
+        tools: tools.tools,
+        maxItems,
+      })
     } catch (error) {
       if (turn.abort === "deadline") return abandoned(payload)
       // No child read the envelope and nothing was offered: its events and candidates ride the retry.
@@ -125,13 +146,24 @@ export function createWakeTransitions(core: SidecarCore, turns: TurnLifecycle, a
     core.generations = generation
     core.pendingReseed = undefined
     turns.offerPaths(fresh, turn.wake)
-    const created: Child = { handle, generation, tools, unsubscribe: handle.subscribe(turns.observe), usageTokens: undefined, charsSent: 0 }
+    const created: Child = {
+      handle,
+      generation,
+      tools,
+      unsubscribe: handle.subscribe(turns.observe),
+      usageTokens: undefined,
+      charsSent: 0,
+    }
     core.child = created
     beginTurn(created, turn, { text: prompt, payload, steered: false, consumed: true })
     return { action: "seeded", wake: turn.wake }
   }
 
-  async function followUp(current: Child, fresh: readonly RecallCandidate[], maxItems: number): Promise<KibitzerOfferResult> {
+  async function followUp(
+    current: Child,
+    fresh: readonly RecallCandidate[],
+    maxItems: number,
+  ): Promise<KibitzerOfferResult> {
     const admitted = await admission.admit()
     if (admitted.status !== "acquired") return admission.refused(admitted, current.generation, maxItems, fresh.length)
     const payload = merge([...core.carry, payloadOf(core.stream.drain(), fresh)])
@@ -169,7 +201,12 @@ export function createWakeTransitions(core: SidecarCore, turns: TurnLifecycle, a
     return { action: "followed_up", wake: turn.wake }
   }
 
-  async function steer(current: Child, turn: Turn, fresh: readonly RecallCandidate[], maxItems: number): Promise<KibitzerOfferResult> {
+  async function steer(
+    current: Child,
+    turn: Turn,
+    fresh: readonly RecallCandidate[],
+    maxItems: number,
+  ): Promise<KibitzerOfferResult> {
     const payload = payloadOf(core.stream.drain(), fresh)
     const text = renderKibitzerWakePrompt(envelopeInput(core, payload, maxItems, false))
     turns.offerPaths(fresh, turn.wake)
@@ -207,17 +244,28 @@ export function createWakeTransitions(core: SidecarCore, turns: TurnLifecycle, a
       core.cooldown.charge()
     }
     // A dead child judged nothing it was sent; a live one may have missed steers that landed late.
-    const unread = end.status === "failed" ? turn.envelopes : turn.envelopes.filter((envelope) => envelope.steered && !envelope.consumed)
+    const unread =
+      end.status === "failed"
+        ? turn.envelopes
+        : turn.envelopes.filter((envelope) => envelope.steered && !envelope.consumed)
     core.carry.push(...unread.map((envelope) => envelope.payload))
     if (end.status === "failed") {
-      for (const path of turn.envelopes.flatMap((envelope) => envelope.payload.candidates.map((candidate) => candidate.path))) {
+      for (const path of turn.envelopes.flatMap((envelope) =>
+        envelope.payload.candidates.map((candidate) => candidate.path),
+      )) {
         if (core.delivered.has(path)) continue
         core.offered.delete(path)
         core.offeredAtWake.delete(path)
       }
     }
     core.activeTurn = undefined
-    turns.report(turn, end, nudges, current, outcome.status === "cancelled" || outcome.status === "interrupted" ? undefined : outcome.model)
+    turns.report(
+      turn,
+      end,
+      nudges,
+      current,
+      outcome.status === "cancelled" || outcome.status === "interrupted" ? undefined : outcome.model,
+    )
     switch (end.status) {
       case "cancelled":
         recovery.disposeChild()

@@ -38,9 +38,7 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
       client: input.client,
       sessionID: input.sessionID,
       source: "background-agent-parent-wake",
-      ...(input.emptyAssistantTurnRetry
-        ? { dedupeKey: createEmptyAssistantTurnRetryDedupeKey(input.latestWake) }
-        : {}),
+      ...(input.emptyAssistantTurnRetry ? { dedupeKey: createEmptyAssistantTurnRetryDedupeKey(input.latestWake) } : {}),
       settleMs: 0,
       queueBehavior: "defer",
       checkStatus: input.forceNoReply !== true && input.skipPromptGateStatusCheck !== true,
@@ -65,7 +63,10 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
         dispatchedWake.dispatchedAt = dispatchStartedAt
         if (await input.hasRecordedPromptAfterDispatch(dispatchedWake)) {
           markRetainedNoReplyAdmission(input, dispatchStartedAt)
-          input.trackDispatchedWake(createTrackedDispatchedWake(input.latestWake, input.forceNoReply), dispatchStartedAt)
+          input.trackDispatchedWake(
+            createTrackedDispatchedWake(input.latestWake, input.forceNoReply),
+            dispatchStartedAt,
+          )
           log("[background-agent] Treated failed parent wake prompt as accepted after observing session history:", {
             sessionID: input.sessionID,
             error: promptResult.error,

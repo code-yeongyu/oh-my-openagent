@@ -54,9 +54,7 @@ function parseModel(value: unknown): StoredMessageWithTime["model"] {
   const modelID = typeof value.modelID === "string" ? value.modelID : undefined
   const variant = typeof value.variant === "string" ? value.variant : undefined
 
-  return providerID || modelID || variant
-    ? { providerID, modelID, ...(variant ? { variant } : {}) }
-    : undefined
+  return providerID || modelID || variant ? { providerID, modelID, ...(variant ? { variant } : {}) } : undefined
 }
 
 function parseCreatedAt(value: unknown): number | undefined {
@@ -122,8 +120,9 @@ export function findNearestMessageWithFields(messageDir: string): StoredMessage 
   }
 
   try {
-    const messages = getMessageEntries(messageDir, Number.NEGATIVE_INFINITY)
-      .sort((left, right) => right.createdAt - left.createdAt || right.fileName.localeCompare(left.fileName))
+    const messages = getMessageEntries(messageDir, Number.NEGATIVE_INFINITY).sort(
+      (left, right) => right.createdAt - left.createdAt || right.fileName.localeCompare(left.fileName),
+    )
 
     for (const entry of messages) {
       if (!isUsableMessageEntry(entry)) {
@@ -160,8 +159,9 @@ export function findFirstMessageWithAgent(messageDir: string): string | null {
   }
 
   try {
-    const messages = getMessageEntries(messageDir, Number.POSITIVE_INFINITY)
-      .sort((left, right) => left.createdAt - right.createdAt || left.fileName.localeCompare(right.fileName))
+    const messages = getMessageEntries(messageDir, Number.POSITIVE_INFINITY).sort(
+      (left, right) => left.createdAt - right.createdAt || left.fileName.localeCompare(right.fileName),
+    )
 
     for (const entry of messages) {
       if (!isUsableMessageEntry(entry)) {

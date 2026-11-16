@@ -48,12 +48,7 @@ describe("ParentWakeNotifier — assistant text history deferral", () => {
         userMessageInProgressWindowMs: 2_000,
       },
     )
-    notifier.queuePendingParentWake(
-      "parent-stale-text",
-      "task complete",
-      { agent: "sisyphus" },
-      true,
-    )
+    notifier.queuePendingParentWake("parent-stale-text", "task complete", { agent: "sisyphus" }, true)
     const pendingWake = notifier.getPendingParentWakes().get("parent-stale-text")
     expect(pendingWake).toBeDefined()
     if (!pendingWake) {
@@ -114,12 +109,7 @@ describe("ParentWakeNotifier — assistant text history deferral", () => {
         userMessageInProgressWindowMs: 2_000,
       },
     )
-    notifier.queuePendingParentWake(
-      "parent-fresh-text",
-      "task complete",
-      { agent: "sisyphus" },
-      true,
-    )
+    notifier.queuePendingParentWake("parent-fresh-text", "task complete", { agent: "sisyphus" }, true)
     const pendingWake = notifier.getPendingParentWakes().get("parent-fresh-text")
     expect(pendingWake).toBeDefined()
     if (!pendingWake) {
@@ -182,12 +172,7 @@ describe("ParentWakeNotifier — assistant text history deferral", () => {
         userMessageInProgressWindowMs: 2_000,
       },
     )
-    notifier.queuePendingParentWake(
-      "parent-fresh-text-flush",
-      "task complete",
-      { agent: "sisyphus" },
-      true,
-    )
+    notifier.queuePendingParentWake("parent-fresh-text-flush", "task complete", { agent: "sisyphus" }, true)
     const pendingWake = notifier.getPendingParentWakes().get("parent-fresh-text-flush")
     expect(pendingWake).toBeDefined()
     if (!pendingWake) {

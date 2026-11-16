@@ -1,0 +1,31 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/device-service-core": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "test/local-api/event-examples.ts",
+        "test/local-api/sent-request-types.ts",
+        "test/local-api/support.ts",
+        "test/local-api/support-windows.ts",
+        "test/local-api/conformance/*.ts",
+        "test/registrant-support.ts",
+        "test/release-fixture.ts",
+        "test/strict-ed25519/native-control.ts",
+      ],
+    }
+  },
+  "preExistingExports": {
+    "packages/device-service-core/test/local-api/conformance/fake-owner.ts": ["errorReply"],
+    "packages/device-service-core/test/local-api/conformance/raw-peer.ts": ["NEXT_TIMEOUT_MS"],
+    "packages/device-service-core/test/local-api/conformance/runner.ts": ["FIXTURE_DIR"],
+    "packages/device-service-core/test/local-api/support.ts": ["WAIT_MS", "listenRaw"]
+  }
+}

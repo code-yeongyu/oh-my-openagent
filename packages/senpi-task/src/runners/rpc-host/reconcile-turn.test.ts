@@ -9,32 +9,62 @@ import { runTaskOutput } from "../../tools/output/output"
 import type { RunnerOutcome } from "../in-process/child-handle"
 import { isHostSessionHandle } from "../rpc-host"
 import { childSpec, hostRunnerHarness } from "../rpc-host.test-support"
-import { HOST_RESPAWN_CONTINUATION, reconcileHostTurn, type InputEffectStatus, type ReconciledTurnNotice } from "./reconcile-turn"
+import {
+  HOST_RESPAWN_CONTINUATION,
+  reconcileHostTurn,
+  type InputEffectStatus,
+  type ReconciledTurnNotice,
+} from "./reconcile-turn"
 import { reattachContinuationPrompt } from "./reattach"
 
 const harness = hostRunnerHarness()
-afterEach(async () => { await harness.release(); cleanupProjects() })
+afterEach(async () => {
+  await harness.release()
+  cleanupProjects()
+})
 
-function scenario(options: {
-  readonly streaming?: boolean
-  readonly receipt?: InputEffectStatus
-  readonly aborted?: boolean
-  readonly deadline?: boolean
-  readonly error?: boolean
-} = {}) {
+function scenario(
+  options: {
+    readonly streaming?: boolean
+    readonly receipt?: InputEffectStatus
+    readonly aborted?: boolean
+    readonly deadline?: boolean
+    readonly error?: boolean
+  } = {},
+) {
   const path = join(tempProject(), "session.jsonl")
-  writeFileSync(path, [
-    { type: "message", id: "user-1", message: { role: "user", content: "work" } },
-    { type: "message", id: "answer-1", message: { role: "assistant", stopReason: options.error ? "error" : options.aborted ? "aborted" : "stop", errorMessage: "fixture_stream_error", content: [{ type: "text", text: "ANSWER" }] } },
-    ...(options.deadline ? [{ type: "agent_end", aborted: true, abortSource: "system", deadline: { kind: "inactivity" } }] : []),
-  ].map((row) => JSON.stringify(row)).join("\n"))
+  writeFileSync(
+    path,
+    [
+      { type: "message", id: "user-1", message: { role: "user", content: "work" } },
+      {
+        type: "message",
+        id: "answer-1",
+        message: {
+          role: "assistant",
+          stopReason: options.error ? "error" : options.aborted ? "aborted" : "stop",
+          errorMessage: "fixture_stream_error",
+          content: [{ type: "text", text: "ANSWER" }],
+        },
+      },
+      ...(options.deadline
+        ? [{ type: "agent_end", aborted: true, abortSource: "system", deadline: { kind: "inactivity" } }]
+        : []),
+    ]
+      .map((row) => JSON.stringify(row))
+      .join("\n"),
+  )
   const outcomes: RunnerOutcome[] = []
   const notices: ReconciledTurnNotice[] = []
   const port = {
     getState: async () => ({ sessionId: "session", isStreaming: options.streaming === true }),
     ...(options.receipt === undefined ? {} : { lastInputEffect: options.receipt }),
-    settle: (outcome: RunnerOutcome) => { outcomes.push(outcome) },
-    notify: (notice: ReconciledTurnNotice) => { notices.push(notice) },
+    settle: (outcome: RunnerOutcome) => {
+      outcomes.push(outcome)
+    },
+    notify: (notice: ReconciledTurnNotice) => {
+      notices.push(notice)
+    },
   }
   return { path, port, outcomes, notices }
 }
@@ -43,16 +73,22 @@ describe("host turn reconciliation authority", () => {
   for (const prompt of [reattachContinuationPrompt(), HOST_RESPAWN_CONTINUATION]) {
     test(`idle unanswered ${prompt === HOST_RESPAWN_CONTINUATION ? "respawn" : "reattach"} continuation interrupts instead of empty success, even with an applied receipt`, async () => {
       const f = scenario({ receipt: { state: "applied" } })
-      appendFileSync(f.path, `\n${JSON.stringify({
-        type: "message", message: { role: "user", content: [{ type: "text", text: prompt }] },
-      })}\n`)
+      appendFileSync(
+        f.path,
+        `\n${JSON.stringify({
+          type: "message",
+          message: { role: "user", content: [{ type: "text", text: prompt }] },
+        })}\n`,
+      )
       expect(await reconcileHostTurn(f.port, {}, f.path)).toBe("interrupted")
       expect(f.outcomes).toEqual([{ status: "cancelled" }])
-      expect(f.notices).toEqual([{
-        kind: "interrupted",
-        reason: expect.any(String),
-        action: expect.stringContaining("task_send"),
-      }])
+      expect(f.notices).toEqual([
+        {
+          kind: "interrupted",
+          reason: expect.any(String),
+          action: expect.stringContaining("task_send"),
+        },
+      ])
     })
   }
 
@@ -70,10 +106,17 @@ describe("host turn reconciliation authority", () => {
       },
     })
     const project = tempProject()
-    const initial = createTaskRecord({
-      parent_session_id: "parent", root_session_id: "parent", depth: 1,
-      execution_mode: "process", model: "anthropic/claude-sonnet-4-5", notify_on_terminal: false,
-    }, 0)
+    const initial = createTaskRecord(
+      {
+        parent_session_id: "parent",
+        root_session_id: "parent",
+        depth: 1,
+        execution_mode: "process",
+        model: "anthropic/claude-sonnet-4-5",
+        notify_on_terminal: false,
+      },
+      0,
+    )
     const handle = await runner.start(childSpec({ state_dir: project, task_id: initial.task_id }))
     if (!isHostSessionHandle(handle)) throw new Error("expected host session")
     const { manager, store } = makeManager({ project })
@@ -105,9 +148,10 @@ describe("host turn reconciliation authority", () => {
       expect(stopped?.error_message).toContain("task_send")
       const output = await runTaskOutput({ manager, stateDir: store.stateDir }, { task_id: record.task_id }, "parent")
       const rendered = output.content[0]
-      if (rendered?.type !== "text" || stopped?.error_message === undefined) throw new Error("missing interruption output")
+      if (rendered?.type !== "text" || stopped?.error_message === undefined)
+        throw new Error("missing interruption output")
       expect(rendered.text).toContain(stopped.error_message)
-      expect(host.commands.filter(command => command.type === "prompt")).toHaveLength(2)
+      expect(host.commands.filter((command) => command.type === "prompt")).toHaveLength(2)
     } finally {
       for (const gate of reopen) gate.resolve()
       await handle.dispose()
@@ -124,7 +168,10 @@ describe("host turn reconciliation authority", () => {
   test("idle completed tail adopts once by entry identity", async () => {
     const f = scenario()
     expect(await reconcileHostTurn(f.port, {}, f.path)).toBe("adopted")
-    const record = { final_response: "ANSWER", host_session: { socket: "", routing_id: "", session_path: f.path, instance_id: "", adopted_entry_id: "answer-1" } }
+    const record = {
+      final_response: "ANSWER",
+      host_session: { socket: "", routing_id: "", session_path: f.path, instance_id: "", adopted_entry_id: "answer-1" },
+    }
     expect(await reconcileHostTurn(f.port, record, f.path)).toBe("adopted")
     expect(f.outcomes).toEqual([{ status: "completed", finalResponse: "ANSWER" }])
     expect(f.notices).toEqual([{ kind: "adopted", entryId: "answer-1" }])
@@ -159,8 +206,13 @@ describe("host turn reconciliation authority", () => {
 
   test("an adoption marker without a persisted terminal still settles the recovered handle", async () => {
     const f = scenario()
-    appendFileSync(f.path, `\n${JSON.stringify({ type: "custom", customType: "rpc_client_message_admission", data: { state: "completed" } })}\n`)
-    const record = { host_session: { socket: "", routing_id: "", session_path: f.path, instance_id: "", adopted_entry_id: "answer-1" } }
+    appendFileSync(
+      f.path,
+      `\n${JSON.stringify({ type: "custom", customType: "rpc_client_message_admission", data: { state: "completed" } })}\n`,
+    )
+    const record = {
+      host_session: { socket: "", routing_id: "", session_path: f.path, instance_id: "", adopted_entry_id: "answer-1" },
+    }
     expect(await reconcileHostTurn(f.port, record, f.path)).toBe("adopted")
     expect(f.notices).toEqual([])
     expect(f.outcomes).toEqual([{ status: "completed", finalResponse: "ANSWER" }])
@@ -178,9 +230,15 @@ describe("host turn reconciliation authority", () => {
     const originalOpen = fsPromises.open
     let reads = 0
     const opened = spyOn(fsPromises, "open").mockImplementation((...args: Parameters<typeof fsPromises.open>) => {
-      if (args[0] === f.path && ++reads === 2) appendFileSync(f.path, `\n${JSON.stringify({
-        type: "message", id: "answer-2", message: { role: "assistant", stopReason: "stop", content: [{ type: "text", text: "LATER ANSWER" }] },
-      })}\n`)
+      if (args[0] === f.path && ++reads === 2)
+        appendFileSync(
+          f.path,
+          `\n${JSON.stringify({
+            type: "message",
+            id: "answer-2",
+            message: { role: "assistant", stopReason: "stop", content: [{ type: "text", text: "LATER ANSWER" }] },
+          })}\n`,
+        )
       return originalOpen(...args)
     })
     try {
@@ -191,16 +249,21 @@ describe("host turn reconciliation authority", () => {
       opened.mockRestore()
     }
   })
-  for (const receipt of [undefined, { state: "done", outcome: { kind: "deadline", deadline: { kind: "inactivity" } } } satisfies InputEffectStatus]) {
+  for (const receipt of [
+    undefined,
+    { state: "done", outcome: { kind: "deadline", deadline: { kind: "inactivity" } } } satisfies InputEffectStatus,
+  ]) {
     test(`deadline ${receipt === undefined ? "transcript" : "receipt"} stops without adopting partial text`, async () => {
       const f = scenario({ receipt, aborted: true, deadline: true })
       expect(await reconcileHostTurn(f.port, {}, f.path)).toBe("stopped_deadline")
       expect(f.outcomes).toEqual([{ status: "cancelled" }])
-      expect(f.notices).toEqual([{
-        kind: "interrupted",
-        reason: expect.any(String),
-        deadline: { kind: "inactivity" },
-      }])
+      expect(f.notices).toEqual([
+        {
+          kind: "interrupted",
+          reason: expect.any(String),
+          deadline: { kind: "inactivity" },
+        },
+      ])
     })
   }
 })

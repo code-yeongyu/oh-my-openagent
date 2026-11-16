@@ -20,6 +20,8 @@ import type { ConsentScope } from "./session-summary-storage"
 export function startOptOutPurge(input: {
   readonly stateDir: string
   readonly isScopeConsented: (scope: ConsentScope) => boolean
+  /** True when this process's own persisted setting is off: unreadable summary files are deleted too. */
+  readonly persistedOptOut?: boolean
   readonly load: LoadSummaryRecovery
   readonly isPidAlive?: (pid: number) => boolean
   readonly diagnostics?: (input: TelemetryDiagnosticInput) => void
@@ -33,12 +35,13 @@ export function startOptOutPurge(input: {
     })
   }
   try {
-    purgeUnconsentedQueue(input.stateDir, input.isScopeConsented)
+    purgeUnconsentedQueue(input.stateDir, input.isScopeConsented, { dropUnreadable: input.persistedOptOut === true })
   } catch (error) {
     report(error)
   }
   if (!hasLivenessLeftovers(input.stateDir)) return Promise.resolve()
-  return input.load()
+  return input
+    .load()
     .then((sidecar) => {
       sidecar.purgeOptedOutStorage({
         stateDir: input.stateDir,

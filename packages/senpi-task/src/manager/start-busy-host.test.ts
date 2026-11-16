@@ -8,7 +8,15 @@ import { FakeRegistry, readEvents } from "../lifecycle/__fixtures__/lifecycle-fa
 import { createTaskLifecycle } from "../lifecycle"
 import { hostLifecycleDeps } from "../lifecycle/__fixtures__/host-session-fakes"
 import { isRevivalCandidate } from "../lifecycle/revival-selection"
-import { FakeRunner, baseSpec, cleanupProjects, makeManager, settings } from "./__fixtures__/manager-fakes"
+import {
+  FakeRunner,
+  baseSpec,
+  cleanupProjects,
+  launchSettled,
+  makeManager,
+  settings,
+} from "./__fixtures__/manager-fakes"
+import { resetTestDeadline, useTestTimeout } from "../../../../test-support/test-deadline"
 
 afterEach(cleanupProjects)
 
@@ -56,11 +64,12 @@ class SessionOwningRegistry extends FakeRegistry {
 
 const oneLane = () => settings({ default_concurrency: 1, global_concurrency: 0 })
 
-const hostBusy = () => new RunnerError({
-  kind: "host_unavailable",
-  reason: "host_busy",
-  message: "the task host accepts connections but its event loop is not answering",
-})
+const hostBusy = () =>
+  new RunnerError({
+    kind: "host_unavailable",
+    reason: "host_busy",
+    message: "the task host accepts connections but its event loop is not answering",
+  })
 
 describe("task start against a busy host (#10042)", () => {
   for (const runInBackground of [true, false]) {
@@ -162,7 +171,9 @@ describe("task start against a busy host (#10042)", () => {
     const whenLaunched = h.manager.whenLaunched?.bind(h.manager)
     if (whenLaunched === undefined) throw new Error("the manager exposes no whenLaunched")
     let launched = false
-    const settled = whenLaunched(started.task_id).then(() => { launched = true })
+    const settled = whenLaunched(started.task_id).then(() => {
+      launched = true
+    })
 
     // when
     held.release.resolve(undefined)
@@ -172,6 +183,100 @@ describe("task start against a busy host (#10042)", () => {
     expect(launched).toBe(true)
     expect(h.manager.getResidentHandle(started.task_id)).toBeDefined()
   })
+
+  for (const elapsedMs of [2_500, 11_000]) {
+    test(`#given a gated cold launch #when its guard clock advances ${elapsedMs}ms within the test budget #then the child completes`, async () => {
+      // given - the runner gate is the launch seam; no real machine or socket timing is needed.
+      useTestTimeout(15_000)
+      const held = new BusyHostRunner()
+      const h = makeManager({ inProcess: held })
+      const started = await bounded(h.manager.start(baseSpec({ run_in_background: true })))
+      if (started.kind !== "started") throw new Error("fixture did not start")
+      expect(started.starting).toBe(true)
+      const clock = spyOn(performance, "now").mockReturnValue(0)
+      resetTestDeadline()
+      const timers: Array<{ fire: () => void; delay: number }> = []
+      const schedule = spyOn(globalThis, "setTimeout").mockImplementation(
+        Object.assign((fire: () => void, delay?: number) => {
+          timers.push({ fire: () => fire(), delay: delay ?? 0 })
+          return 0 as unknown as ReturnType<typeof setTimeout>
+        }, setTimeout),
+      )
+      const settled = launchSettled(h.manager, started, 15_000)
+      schedule.mockRestore()
+      const observed = settled.then(
+        (value) => ({ value }),
+        (error: unknown) => ({ error }),
+      )
+      try {
+        // when - advance only the fixture's guard clock, with the real launch still gated.
+        clock.mockReturnValue(elapsedMs)
+        expect(timers).toHaveLength(1)
+        expect(timers[0]?.delay).toBeGreaterThan(elapsedMs)
+        for (const timer of timers) if (timer.delay <= elapsedMs) timer.fire()
+        held.release.resolve(undefined)
+        expect(await observed).toEqual({ value: "running" })
+
+        // then - settlement means a tracked resident, not just a start report.
+        expect(h.manager.getResidentHandle(started.task_id)).toBeDefined()
+        const handle = held.handles.get(started.task_id)
+        if (handle === undefined) throw new Error("admitted child has no handle")
+        const completed = h.manager.waitFor(started.task_id)
+        handle.settle({ status: "completed", finalResponse: "COLD DONE" })
+        expect((await bounded(completed)).final_response).toBe("COLD DONE")
+      } finally {
+        clock.mockRestore()
+        resetTestDeadline()
+        held.release.resolve(undefined)
+        await h.manager.whenLaunched?.(started.task_id)
+        await observed
+      }
+    }, 15_000)
+  }
+
+  test("#given a launch that never settles #when its fixture deadline expires #then it fails within the bound naming the task and budget", async () => {
+    useTestTimeout(15_000)
+    // given
+    const held = new BusyHostRunner()
+    const h = makeManager({ inProcess: held })
+    const started = await bounded(h.manager.start(baseSpec({ run_in_background: true })))
+    if (started.kind !== "started") throw new Error("fixture did not start")
+
+    const timers: Array<() => void> = []
+    const delays: number[] = []
+    const clock = spyOn(performance, "now").mockReturnValue(performance.now() + 14_000)
+    const schedule = spyOn(globalThis, "setTimeout").mockImplementation(
+      Object.assign((fire: () => void, delay?: number) => {
+        timers.push(() => fire())
+        delays.push(delay ?? 0)
+        return 0 as unknown as ReturnType<typeof setTimeout>
+      }, setTimeout),
+    )
+    const settled = launchSettled(h.manager, started, 15_000)
+    schedule.mockRestore()
+    clock.mockRestore()
+    const failed = settled.then(
+      () => undefined,
+      (error: unknown) => error,
+    )
+    // when / then - fire the circuit breaker without waiting on wall-clock scheduling.
+    try {
+      expect(timers).toHaveLength(1)
+      expect(delays).toEqual([0])
+      timers[0]?.()
+      const failure = await failed
+      expect(failure).toBeInstanceOf(Error)
+      if (!(failure instanceof Error)) throw new Error("the deadline did not report an Error")
+      expect(failure.message).toContain("whenLaunched")
+      expect(failure.message).toContain(started.task_id)
+      expect(failure.message).toContain("15000 ms test budget")
+      expect(h.manager.getResidentHandle(started.task_id)).toBeUndefined()
+    } finally {
+      held.release.resolve(undefined)
+      await h.manager.whenLaunched?.(started.task_id)
+      await failed
+    }
+  }, 15_000)
 
   test("#given a start still waiting on the host #when the parent steers it #then the message is queued and delivered once the child is admitted", async () => {
     // given
@@ -189,7 +294,9 @@ describe("task start against a busy host (#10042)", () => {
     })
 
     // when
-    const sent = await bounded(h.manager.sendToTask({ idOrName: started.task_id, message: "steer while starting", deliverAs: "steer" }))
+    const sent = await bounded(
+      h.manager.sendToTask({ idOrName: started.task_id, message: "steer while starting", deliverAs: "steer" }),
+    )
     expect(sent.kind).toBe("queued")
     held.release.resolve(undefined)
     await bounded(delivered.promise)
@@ -224,7 +331,9 @@ describe("task start against a busy host (#10042)", () => {
     await bounded(runner.heldStart.promise)
 
     // when
-    const sent = await bounded(h.manager.sendToTask({ idOrName: second.task_id, message: "steer while starting", deliverAs: "steer" }))
+    const sent = await bounded(
+      h.manager.sendToTask({ idOrName: second.task_id, message: "steer while starting", deliverAs: "steer" }),
+    )
     expect(sent.kind).toBe("queued")
     runner.release.resolve()
     await bounded(delivered.promise)
@@ -295,7 +404,12 @@ describe("task start against a busy host (#10042)", () => {
       hostPid: 999_999_993,
       respawn: async (record, resumeSessionPath) => {
         respawned.push(`${record.task_id}:${resumeSessionPath ?? "fresh"}`)
-        return { ok: false, disposition: "retryable", code: "model_unavailable", reason: "fixture stops after the relaunch attempt" }
+        return {
+          ok: false,
+          disposition: "retryable",
+          code: "model_unavailable",
+          reason: "fixture stops after the relaunch attempt",
+        }
       },
     })
     const lifecycle = createTaskLifecycle({

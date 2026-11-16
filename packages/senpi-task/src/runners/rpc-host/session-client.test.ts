@@ -26,7 +26,11 @@ describe("HostSessionClient.open", () => {
       engineVersion: "2026.9.18+1758000000.abc1234",
     })
     expect(client.sessionId).toBe("routing-1")
-    expect(host.commands.map((command) => command.type)).toEqual(["get_protocol_info", "open_session"])
+    // The probe is its own connection. Since senpi 2026.10.25-1 the engine client authenticates every new
+    // connection with a first get_protocol_info frame on macOS and Linux (senpi#3815; Windows endpoints use no
+    // per-launch key), so there the session connection sends one too.
+    const authFrame = process.platform === "win32" ? [] : ["get_protocol_info"]
+    expect(host.commands.map((command) => command.type)).toEqual(["get_protocol_info", ...authFrame, "open_session"])
     expect(host.sessions()).toEqual([
       {
         routingId: "routing-1",
@@ -130,9 +134,10 @@ describe("HostSessionClient transport", () => {
     const opened = await client.open(childOpenInput("/tmp/sessions/g.jsonl"))
 
     // when
-    await client.close()
+    const answered = await client.close()
 
     // then
+    expect(answered).toBe(true)
     const closes = host.commands.filter((command) => command.type === "close_session")
     expect(closes).toHaveLength(1)
     expect(closes[0]?.payload).toMatchObject({ sessionId: opened.sessionId })
@@ -153,6 +158,8 @@ describe("HostSessionClient transport", () => {
     // then
     expect(gone).toMatchObject({ code: "rpc_transport_gone" })
     expect(client.sessionId).toBeUndefined()
+    // A released port answers nothing: a cancel must never read this close as the host ending the session.
+    expect(await client.close()).toBe(false)
   })
 
   test("#given a command in flight #when the daemon dies under it #then the command rejects and transportGone resolves", async () => {

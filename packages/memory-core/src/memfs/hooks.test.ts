@@ -6,6 +6,7 @@ import type { ClaimReceipt } from "../provenance"
 import { stampReceipt } from "../tools/claim-frontmatter"
 import { renderMemoryFile } from "./frontmatter"
 import { installHooks, resolveHooksDir } from "./hooks"
+import { stagedEntries, treeBlob } from "./memory-hook-git"
 import { COMMIT_MSG_HOOK_SCRIPT } from "./hooks-commit-msg"
 import { POST_COMMIT_HOOK_SCRIPT, PRE_COMMIT_HOOK_SCRIPT } from "./hooks-scripts"
 import { commit, createRepo, removeTempDirs, run, tempDir, writeFiles } from "./hooks.test-support"
@@ -28,7 +29,33 @@ async function seedServerFile(dir: string, relativePath: string, content: string
 
 afterEach(removeTempDirs)
 
-setDefaultTimeout(process.platform === "win32" ? 30000 : 5000)
+if (process.platform === "win32") setDefaultTimeout(30000)
+
+describe("memory hook Git pathspec environment", () => {
+  for (const variable of ["GIT_GLOB_PATHSPECS", "GIT_ICASE_PATHSPECS"] as const) {
+    it(`#given inherited ${variable} #when reading staged memory #then literal Git commands still succeed`, async () => {
+      const dir = await createRepo()
+      await seedServerFile(dir, "reference/z.md", VALID)
+      const expectedBlob = treeBlob(dir, "HEAD", "reference/z.md")
+      expect(expectedBlob).toBeDefined()
+      await writeFiles(dir, { "reference/z.md": `${VALID}updated\n` })
+      expect((await run(["git", "add", "-A"], dir)).code).toBe(0)
+      const expectedEntries = stagedEntries(dir)
+      expect(expectedEntries.map((entry) => entry.path)).toEqual(["reference/z.md"])
+      const saved = process.env[variable]
+      try {
+        process.env[variable] = "1"
+        expect(stagedEntries(dir)).toEqual(expectedEntries)
+        expect(treeBlob(dir, "HEAD", "reference/z.md")).toBe(expectedBlob)
+        expect((await run(["git", "commit", "-m", "memory write"], dir)).code).toBe(0)
+        expect(process.env[variable]).toBe("1")
+      } finally {
+        if (saved === undefined) delete process.env[variable]
+        else process.env[variable] = saved
+      }
+    })
+  }
+})
 
 describe("installHooks", () => {
   it("#given a repository #when hooks are installed twice #then both hooks stay executable and identical", async () => {
@@ -59,7 +86,11 @@ describe("installHooks", () => {
     const bashOnly = [/<<</, /echo -e/, /(^|[\s=(])\$'/, /disown/, /env bash/]
 
     // when
-    await writeFiles(dir, { "pre-commit": PRE_COMMIT_HOOK_SCRIPT, "commit-msg": COMMIT_MSG_HOOK_SCRIPT, "post-commit": POST_COMMIT_HOOK_SCRIPT })
+    await writeFiles(dir, {
+      "pre-commit": PRE_COMMIT_HOOK_SCRIPT,
+      "commit-msg": COMMIT_MSG_HOOK_SCRIPT,
+      "post-commit": POST_COMMIT_HOOK_SCRIPT,
+    })
 
     // then
     for (const script of [PRE_COMMIT_HOOK_SCRIPT, COMMIT_MSG_HOOK_SCRIPT, POST_COMMIT_HOOK_SCRIPT]) {
@@ -100,10 +131,13 @@ describe("pre-commit hook", () => {
     const result = await commit(dir, {
       "system/persona.md": VALID,
       "reference/notes.md": "---\ndescription: Notes\nlimit: 5000\n---\n\nnotes\n",
+      "system/outage.md": "---\ndescription: Outage\nexpires: 2026-10-27T06:33Z\n---\n\noutage\n",
+      "system/freeze.md": '---\ndescription: Freeze\nexpires: "2026-10-28"\n---\n\nfreeze\n',
       "memory/system/legacy.md": "---\ndescription: Legacy layout\n---\n\nlegacy\n",
       "skills/deploy/SKILL.md": "---\nname: deploy\ndescription: Use when deploying\nunknown_key: fine\n---\n\nsteps\n",
-      "skills/quoted/SKILL.md": "---\ndescription: \"Use when shipping: verify, merge\"\nversion: 0.2.0\n---\n\nsteps\n",
-      "people/sarah/card.md": "---\ndescription: Sarah - cofounder\nkind: person\naliases: [\"Sarah\"]\n---\n\nIDENTITY: cofounder\n",
+      "skills/quoted/SKILL.md": '---\ndescription: "Use when shipping: verify, merge"\nversion: 0.2.0\n---\n\nsteps\n',
+      "people/sarah/card.md":
+        '---\ndescription: Sarah - cofounder\nkind: person\naliases: ["Sarah"]\n---\n\nIDENTITY: cofounder\n',
       "README.md": "no frontmatter here\n",
     })
 
@@ -115,13 +149,18 @@ describe("pre-commit hook", () => {
   it("#given a note stamped with a claim receipt by the memory tool #when it is committed #then the hook accepts the provenance header (#10488)", async () => {
     // given: exactly what the memory tool writes for a user receipt and for a downgraded claim
     const dir = await createRepo()
-    const stamp = (claim: ClaimReceipt): string => renderMemoryFile(stampReceipt(undefined, { description: "Cleanup" }, "body\n", claim), "body\n")
+    const stamp = (claim: ClaimReceipt): string =>
+      renderMemoryFile(stampReceipt(undefined, { description: "Cleanup" }, "body\n", claim), "body\n")
 
     // when
-    const result = await commit(dir, {
-      "reference/approved.md": stamp({ source: "user", userQuote: "Yes delete it.", approves: "0123456789abcdef" }),
-      "reference/suggested.md": stamp({ source: "agent", downgraded: true }),
-    }, "memory write\n\nOmo-Writer: memory-tool")
+    const result = await commit(
+      dir,
+      {
+        "reference/approved.md": stamp({ source: "user", userQuote: "Yes delete it.", approves: "0123456789abcdef" }),
+        "reference/suggested.md": stamp({ source: "agent", downgraded: true }),
+      },
+      "memory write\n\nOmo-Writer: memory-tool",
+    )
 
     // then
     expect(result.stdout + result.stderr).not.toContain("unknown frontmatter key")

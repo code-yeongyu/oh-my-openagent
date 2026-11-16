@@ -1,7 +1,7 @@
 import { log } from "@oh-my-opencode/utils"
 
 import type { TaskRecord } from "../state"
-import type { LifecycleContext } from "./context"
+import { reconciliationActive, type LifecycleContext } from "./context"
 import { hostSessionResumePath, isHostSessionRecord, type HostSessionRecord } from "./host-session"
 import { parkedReason, reachRecordedHost, type HostParkedReason, type RecordedHostVerdict } from "./host-endpoint-reach"
 import { markSuspensionReason, parkHostSessionRecord } from "./host-session-record"
@@ -10,6 +10,7 @@ import { claimResidencySlot } from "./residency"
 import { retryDeferredScopedChild } from "./deferred-revival"
 import { SCOPED_RETRY_REASONS } from "./deferred-revival-reasons"
 import type { ReconcileOutcome } from "./types"
+import { holdsClaim, rollbackOrDeferred } from "./revive-rollback"
 
 /**
  * Reviving a child that lives on the shared daemon. A host session has no pid, so nothing here can
@@ -18,8 +19,7 @@ import type { ReconcileOutcome } from "./types"
  */
 
 export type HostSessionParkOutcome =
-  | { readonly kind: "revived" }
-  | { readonly kind: "suspended"; readonly reason: HostParkedReason }
+  { readonly kind: "revived" } | { readonly kind: "suspended"; readonly reason: HostParkedReason }
 
 export type HostSessionParkOptions = {
   /** Test seam: observe (and drive) the daemon between the bounded reconcile's attempts. */
@@ -37,6 +37,10 @@ export async function reconcileHostSessionOrphan(
   record: HostSessionRecord,
 ): Promise<ReconcileOutcome> {
   const verdict = await reachRecordedHost(context, record.host_session)
+  const fresh = context.store.load(record.task_id)
+  if (!reconciliationActive(context) || fresh === null || !holdsClaim(context, fresh, record)) {
+    return rollbackOrDeferred(context, record.task_id, "rpc_detached", "foreign_live_owner", record)
+  }
   if (verdict !== "alive") {
     const reason = parkedReason(verdict)
     parkHostSessionRecord(context, record.task_id)
@@ -120,15 +124,21 @@ export function retryDeferredHostSessions(
   for (const outcome of outcomes) {
     if (outcome.kind !== "deferred") continue
     const record = context.store.load(outcome.task_id)
-    const scoped = parentSessionId !== undefined && record?.parent_session_id === parentSessionId
-      && SCOPED_RETRY_REASONS.has(outcome.reason ?? "")
+    const scoped =
+      parentSessionId !== undefined &&
+      record?.parent_session_id === parentSessionId &&
+      SCOPED_RETRY_REASONS.has(outcome.reason ?? "")
     const host = DEFERRED_REASONS.has(outcome.reason ?? "") && isHostSessionRecord(record)
     if ((!scoped && !host) || active.has(outcome.task_id)) continue
     active.add(outcome.task_id)
-    void (scoped && parentSessionId !== undefined && outcome.reason !== undefined
-      ? retryDeferredScopedChild(context, outcome.task_id, parentSessionId, outcome.reason)
-      : retryDeferredHostSession(context, outcome.task_id))
-      .catch((error: unknown) => log("senpi-task deferred host session retry failed", { taskId: outcome.task_id, error: String(error) }))
+    void (
+      scoped && parentSessionId !== undefined && outcome.reason !== undefined
+        ? retryDeferredScopedChild(context, outcome.task_id, parentSessionId, outcome.reason)
+        : retryDeferredHostSession(context, outcome.task_id)
+    )
+      .catch((error: unknown) =>
+        log("senpi-task deferred host session retry failed", { taskId: outcome.task_id, error: String(error) }),
+      )
       .finally(() => active.delete(outcome.task_id))
   }
 }
@@ -137,7 +147,13 @@ async function retryDeferredHostSession(context: LifecycleContext, taskId: strin
   for (const backoffMs of context.hostRetry.deferredRetryBackoffMs) {
     await context.hostRetry.wait(backoffMs)
     const fresh = context.store.load(taskId)
-    if (!isHostSessionRecord(fresh) || fresh.status !== "running" || fresh.residency_state !== "rpc_detached" || fresh.killed === true) return
+    if (
+      !isHostSessionRecord(fresh) ||
+      fresh.status !== "running" ||
+      fresh.residency_state !== "rpc_detached" ||
+      fresh.killed === true
+    )
+      return
     context.hostSessionProbe.refresh(fresh.host_session.socket)
     if (await reviveParkedHostSession(context, taskId)) return
   }

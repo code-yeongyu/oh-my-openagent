@@ -1,0 +1,78 @@
+name: Linux trust containers
+
+# The Linux side of the engine CA importer (omo#10762, design 9.4): per distribution container, the
+# compiled engine's `trust ensure` selects the os-release bundle, a synthetic root installed with the
+# distribution tool is accepted, and on openSUSE a root only in /var/lib/ca-certificates/openssl stays
+# rejected. Certificates are generated per run; no host trust store is read or modified.
+on:
+  pull_request:
+    branches: [master, dev]
+    paths:
+      - "packages/omo-native/*trust*.ts"
+      - "packages/omo-native/openssl-*.ts"
+      - "packages/omo-native/compile-entry.ts"
+      - "packages/omo-native/test/linux-trust-containers.test.ts"
+      - "packages/omo-native/test/fixtures/linux-trust-containers/**"
+      - "packages/omo-native/test/trust-certificate-fixtures.ts"
+      - ".github/workflows/linux-trust-containers.yml"
+  push:
+    branches: [master, dev]
+    paths:
+      - "packages/omo-native/*trust*.ts"
+      - "packages/omo-native/openssl-*.ts"
+      - "packages/omo-native/compile-entry.ts"
+      - "packages/omo-native/test/linux-trust-containers.test.ts"
+      - "packages/omo-native/test/fixtures/linux-trust-containers/**"
+      - "packages/omo-native/test/trust-certificate-fixtures.ts"
+      - ".github/workflows/linux-trust-containers.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  linux-trust:
+    name: linux trust (${{ matrix.distro }})
+    strategy:
+      fail-fast: false
+      matrix:
+        distro: [debian, fedora, alpine, opensuse-leap, opensuse-tumbleweed]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Install JavaScript dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      # The test skips without docker; failing here keeps a missing daemon from reading as a pass.
+      - name: Require docker
+        run: docker version
+
+      - name: Compiled engine in the ${{ matrix.distro }} container
+        env:
+          OMO_LINUX_TRUST_CONTAINERS: ${{ matrix.distro }}
+        run: bun test --timeout 900000 packages/omo-native/test/linux-trust-containers.test.ts
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Linux trust containers (${{ matrix.distro }})
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Compiles the omo entry with an embedded runtime manifest and runs `omo trust ensure --json` inside the distribution container under strace.
+            - Asserts the one system bundle opened is the os-release selection, and TLS to a loopback server accepts a synthetic root installed with the distribution tool.
+            - openSUSE: a root only in /var/lib/ca-certificates/openssl, which OpenSSL itself verifies, stays rejected.
+          JOB_SUMMARY_NEXT: Read the failing assertion; a container exit prints the protocol lines and the tail of the container's stderr.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

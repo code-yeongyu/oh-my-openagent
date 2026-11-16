@@ -1,7 +1,7 @@
 //! Cursor primitives and the lock-screen probe.
 
 use core_graphics::display::CGDisplay;
-use core_graphics::event::{CGEvent, CGEventFlags, CGEventTapLocation, CGEventType, CGMouseButton};
+use core_graphics::event::{CGEventFlags, CGEventTapLocation, CGEventType, CGMouseButton};
 use core_graphics::event_source::CGEventSource;
 use core_graphics::geometry::CGPoint;
 use objc2_core_foundation::CFBoolean;
@@ -11,8 +11,7 @@ use senpi_desktop_core::types::DesktopPoint;
 
 /// The current global cursor position, read from a fresh `CGEventCreate`.
 pub(crate) fn position(source: &CGEventSource) -> CoreResult<Option<DesktopPoint>> {
-    let event = CGEvent::new(source.clone())
-        .map_err(|()| DesktopError::input_failed("failed to create a Quartz probe event"))?;
+    let event = crate::input::probe_event(source)?;
     let location = event.location();
     Ok(Some(DesktopPoint {
         x: location.x,
@@ -32,13 +31,7 @@ pub(crate) fn warp(source: &CGEventSource, point: DesktopPoint) -> CoreResult<()
         .map_err(|error| DesktopError::input_failed(format!("cursor warp failed ({error:?})")))?;
     CGDisplay::associate_mouse_and_mouse_cursor_position(true)
         .map_err(|error| DesktopError::input_failed(format!("cursor re-association failed ({error:?})")))?;
-    let event = CGEvent::new_mouse_event(
-        source.clone(),
-        CGEventType::MouseMoved,
-        target,
-        CGMouseButton::Left,
-    )
-    .map_err(|()| DesktopError::input_failed("failed to create a Quartz pointer event"))?;
+    let event = crate::input::mouse_event(source, CGEventType::MouseMoved, target, CGMouseButton::Left)?;
     event.set_flags(CGEventFlags::CGEventFlagNull);
     event.post(CGEventTapLocation::HID);
     Ok(())

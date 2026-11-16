@@ -9,11 +9,7 @@ import { CODEX_COMPONENT_NOTICE_REQUIREMENTS } from "./third-party-notice-requir
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..")
 const WINDOWS_CMD_SHIM_COMMANDS = new Set(["npm", "npx"])
 
-const ROOT_BUNDLED_COMPONENTS = [
-  "pi-lsp-client",
-  "pi-rules",
-  "pi-comment-checker",
-]
+const ROOT_BUNDLED_COMPONENTS = ["pi-lsp-client", "pi-rules", "pi-comment-checker"]
 
 const CODEX_AGGREGATE_COMPONENTS = [
   "@code-yeongyu/comment-checker",
@@ -45,10 +41,7 @@ const CODEX_AGGREGATE_COMPONENTS = [
   "posthog-node",
 ]
 
-const ROOT_SHIP_REQUIRED_PATHS = [
-  "THIRD-PARTY-NOTICES.md",
-  "packages/omo-codex/THIRD-PARTY-NOTICES.md",
-]
+const ROOT_SHIP_REQUIRED_PATHS = ["THIRD-PARTY-NOTICES.md", "packages/omo-codex/THIRD-PARTY-NOTICES.md"]
 
 const scopes = {
   root: {
@@ -116,7 +109,9 @@ function checkCodexComponentNotices() {
     }
     for (const term of requirement.forbiddenTerms ?? []) {
       if (noticeText.includes(term)) {
-        failures.push(`${requirement.path}/NOTICE must be self-contained and not reference missing payload path: ${term}`)
+        failures.push(
+          `${requirement.path}/NOTICE must be self-contained and not reference missing payload path: ${term}`,
+        )
       }
     }
   }
@@ -200,7 +195,9 @@ function runShipCheck() {
     return
   }
 
-  console.log(`ship verification passed: ${requiredPackPaths.length} notice/license files present in root npm pack payload`)
+  console.log(
+    `ship verification passed: ${requiredPackPaths.length} notice/license files present in root npm pack payload`,
+  )
 }
 
 function readRootDryRunPackFiles() {

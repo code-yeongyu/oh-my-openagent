@@ -14,6 +14,13 @@ declare const process: {
 // `REJECTED_REFRESH_TOKEN` is refused by the (offline) exchange the way a revoked login is, any other
 // token renews. No network, no real identity endpoint.
 export const REJECTED_REFRESH_TOKEN = "rejected-refresh"
+// Every exchange of `FLAKY_REFRESH_TOKEN` fails at the transport (ECONNREFUSED, which senpi
+// classifies as a transient refresh failure) until the first turn starts (`agent_start`), the way a
+// token-endpoint outage that covers the whole session start ends before the first turn. Keying it to
+// the turn, not to a count of exchanges, keeps every session-start refresh (the model-profile probe
+// included, whatever senpi refreshes before it) on the failing side.
+export const FLAKY_REFRESH_TOKEN = "flaky-refresh"
+let firstTurnStarted = false
 
 type FixtureOAuthCredentials = { refresh: string; access: string; expires: number; [key: string]: unknown }
 
@@ -26,6 +33,9 @@ function fixtureOAuth(providerId: string) {
     async refreshToken(credentials: FixtureOAuthCredentials): Promise<FixtureOAuthCredentials> {
       if (credentials.refresh === REJECTED_REFRESH_TOKEN) {
         throw new Error(`Token exchange rejected for ${providerId}: 401 unauthorized; body={"error":"invalid_grant"}`)
+      }
+      if (credentials.refresh === FLAKY_REFRESH_TOKEN && !firstTurnStarted) {
+        throw Object.assign(new Error(`connect to the ${providerId} token endpoint failed`), { code: "ECONNREFUSED" })
       }
       return { ...credentials, access: `${providerId}-renewed-access`, expires: Date.now() + 60 * 60 * 1000 }
     },
@@ -96,6 +106,16 @@ function lastConfigurationUpdateEffort(context: unknown): string | null {
   return typeof effort === "string" ? effort : null
 }
 
+// Every model-profile notice starts with this prefix; the request a provider receives must carry none.
+function carriesProfileNotice(context: unknown): boolean {
+  if (typeof context !== "object" || context === null) return false
+  const messages = Reflect.get(context, "messages")
+  if (!Array.isArray(messages)) return false
+  return messages.some((message) =>
+    /OmO Native: model[ _]profile/.test(JSON.stringify(Reflect.get(Object(message), "content") ?? "")),
+  )
+}
+
 function appendCapture(record: Record<string, unknown>): void {
   appendFileSync(join(process.cwd(), CAPTURES_FILE), `${JSON.stringify(record)}\n`)
 }
@@ -104,17 +124,14 @@ function wrapStreamSimple(providerId: string, original: StreamSimple): StreamSim
   return (model, context, options) => {
     appendCapture({
       provider: providerId,
-      model: typeof model === "object" && model !== null ? Reflect.get(model, "id") ?? null : null,
-      thinking:
-        readThinking(options) ??
-        readThinking(context) ??
-        readThinking(model) ??
-        null,
+      model: typeof model === "object" && model !== null ? (Reflect.get(model, "id") ?? null) : null,
+      thinking: readThinking(options) ?? readThinking(context) ?? readThinking(model) ?? null,
       configurationUpdateEffort: lastConfigurationUpdateEffort(context),
+      profileNoticeInRequest: carriesProfileNotice(context),
       thinkingSelection:
-        typeof options === "object" && options !== null ? Reflect.get(options, "thinkingSelection") ?? null : null,
+        typeof options === "object" && options !== null ? (Reflect.get(options, "thinkingSelection") ?? null) : null,
       modelThinkingLevelMap:
-        typeof model === "object" && model !== null ? Reflect.get(model, "thinkingLevelMap") ?? null : null,
+        typeof model === "object" && model !== null ? (Reflect.get(model, "thinkingLevelMap") ?? null) : null,
       optionKeys: typeof options === "object" && options !== null ? Object.keys(options) : [],
       contextKeys: typeof context === "object" && context !== null ? Object.keys(context) : [],
     })
@@ -123,6 +140,9 @@ function wrapStreamSimple(providerId: string, original: StreamSimple): StreamSim
 }
 
 export default function registerModelProfileMockProvider(pi: TaskE2EExtensionAPI): void {
+  pi.on?.("agent_start", () => {
+    firstTurnStarted = true
+  })
   const registerProvider: TaskE2EExtensionAPI["registerProvider"] = (id, provider) => {
     const wrapped: MockProvider = {
       ...provider,

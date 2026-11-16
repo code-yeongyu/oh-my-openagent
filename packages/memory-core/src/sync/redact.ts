@@ -36,14 +36,38 @@ export interface SecretMatch {
  */
 const SECRET_VALUE_TAIL = "[^\\s\"'<>,}\\])]"
 
+const VALUE_END = "(?![^\\s\"'<>,}\\])])"
+
+/**
+ * An assignment whose value only REFERS to a secret (an environment lookup, a shell variable, a template
+ * slot, an already-masked `[FILTERED]`, the `Bearer` scheme word, a literal such as null or example) holds no
+ * credential, so describing credentials in notes and scripts is not a hit. Each reference must be the WHOLE
+ * value: `process.env.X||hunter2`, `{{x}}secret` and `nullable-9fQ2...` keep the literal after the reference
+ * and still match. `memfs/hooks-scripts.ts` mirrors this list as its ERE exclusion.
+ */
+const REFERENCE_TOKEN = [
+  "process\\.env\\.[A-Za-z_][A-Za-z0-9_]*",
+  "os\\.environ(?:\\.get\\(|\\[)?",
+  "env\\.[A-Za-z_][A-Za-z0-9_]*",
+  // Balanced or bare, never half: `${FOO}secret` and `[FILTERED]secret` keep the literal and must match.
+  "\\$\\{[A-Za-z_][A-Za-z0-9_]*\\}",
+  "\\$[A-Za-z_][A-Za-z0-9_]*",
+  "\\{\\{[^}\\n]*\\}\\}",
+  "\\[(?:redacted|filtered)\\]",
+  "(?:redacted|filtered)",
+  "(?:bearer|changeme|placeholder|example|none|null|undefined|true|false)",
+].join("|")
+
+const REFERENCE_VALUE = `(?!(?:${REFERENCE_TOKEN})${VALUE_END})`
+
 export const SECRET_PATTERN_SOURCES: ReadonlyArray<readonly [SecretPatternClass, string, string]> = [
   ["aws_access_key", "\\bAKIA[0-9A-Z]{16}\\b", ""],
   [
     "credential_assignment",
-    `\\b(?:bearer|token|api[_-]?key|secret|password|passwd|pwd)\\s*[=:]\\s*${SECRET_VALUE_TAIL}{1,256}`,
+    `\\b(?:bearer|token|api[_-]?key|secret|password|passwd|pwd)\\s*[=:]\\s*${REFERENCE_VALUE}${SECRET_VALUE_TAIL}{1,256}`,
     "i",
   ],
-  ["authorization_header", `\\bAuthorization\\s*:\\s*Bearer\\s+${SECRET_VALUE_TAIL}{1,256}`, "i"],
+  ["authorization_header", `\\bAuthorization\\s*:\\s*Bearer\\s+${REFERENCE_VALUE}${SECRET_VALUE_TAIL}{1,256}`, "i"],
   ["openai_key", "\\bsk-(?:proj-)?[-_A-Za-z0-9]+\\b", ""],
   ["vendor_token", "\\b(?:ghp|github_pat|glpat|xox[baprs])[-_][-_A-Za-z0-9]+\\b", ""],
 ]
@@ -53,7 +77,7 @@ export const SECRET_PATTERN_SOURCES: ReadonlyArray<readonly [SecretPatternClass,
  * which the unsplit class cannot match. Applied only where no plain match
  * covers the span, so a normal assignment is never double-reported.
  */
-const SPLIT_CREDENTIAL_ASSIGNMENT_SOURCE = `(?:a\\s*u\\s*t\\s*h\\s*o\\s*r\\s*i\\s*z\\s*a\\s*t\\s*i\\s*o\\s*n|p\\s*a\\s*s\\s*s\\s*w\\s*(?:o\\s*r\\s*)?d|s\\s*e\\s*c\\s*r\\s*e\\s*t|t\\s*o\\s*k\\s*e\\s*n|a\\s*p\\s*i\\s*[_-]?\\s*k\\s*e\\s*y)\\s*[:=]\\s*${SECRET_VALUE_TAIL}{6,256}`
+const SPLIT_CREDENTIAL_ASSIGNMENT_SOURCE = `(?:a\\s*u\\s*t\\s*h\\s*o\\s*r\\s*i\\s*z\\s*a\\s*t\\s*i\\s*o\\s*n|p\\s*a\\s*s\\s*s\\s*w\\s*(?:o\\s*r\\s*)?d|s\\s*e\\s*c\\s*r\\s*e\\s*t|t\\s*o\\s*k\\s*e\\s*n|a\\s*p\\s*i\\s*[_-]?\\s*k\\s*e\\s*y)\\s*[:=]\\s*${REFERENCE_VALUE}${SECRET_VALUE_TAIL}{6,256}`
 
 const FORMAT_CHARACTER = /\p{Cf}/u
 
@@ -72,7 +96,7 @@ function normalizeForSecretScan(text: string, formatCharacters: FormatCharacterH
   const map: number[] = []
   const seams = new Set<number>()
   let dropped = false
-  for (let index = 0; index < text.length; ) {
+  for (let index = 0; index < text.length;) {
     // Walk by code point: a format character above U+FFFF (the tag block) is two UTF-16 units, and
     // neither lone surrogate matches \p{Cf}, so a per-unit walk would keep it in the shadow.
     const code = text.codePointAt(index) ?? 0
@@ -225,13 +249,19 @@ export function scanSecretLikeMaterial(value: string): SecretMatch[] {
     if (span !== undefined) matches.push({ class: "pem_block", ...span })
     pemOffset = block.end
   }
-  for (const [patternClass, source, flags] of SECRET_PATTERN_SOURCES) matches.push(...patternMatches(joined, patternClass, source, flags))
+  for (const [patternClass, source, flags] of SECRET_PATTERN_SOURCES)
+    matches.push(...patternMatches(joined, patternClass, source, flags))
   // A format character between a word character and a secret hides the secret's leading or trailing
   // \b once dropped; the separated shadow keeps that boundary. A separated match is kept unless a joined
   // match already covers all of it: one that only overlaps (a token read through the next key) would
   // otherwise leave the rest of the secret unmasked. The split pass follows the same rule. Masking merges
   // the overlapping spans.
-  keepUncovered(matches, SECRET_PATTERN_SOURCES.flatMap(([patternClass, source, flags]) => patternMatches(separated, patternClass, source, flags)))
+  keepUncovered(
+    matches,
+    SECRET_PATTERN_SOURCES.flatMap(([patternClass, source, flags]) =>
+      patternMatches(separated, patternClass, source, flags),
+    ),
+  )
   keepUncovered(matches, seamMatches(joined))
   keepUncovered(matches, patternMatches(joined, "split_credential_assignment", SPLIT_CREDENTIAL_ASSIGNMENT_SOURCE, "i"))
   return matches.sort((a, b) => a.start - b.start || a.end - b.end)
@@ -309,13 +339,14 @@ export function redactUrl(value: string): string {
   if (!value) return ""
   const withUrlCredentials = value.includes("://")
     ? value.replace(URL_USERINFO, (_match, scheme: string, _user: string, password?: string) =>
-      password === undefined ? `${scheme}${MASK}@` : `${scheme}${MASK}:${MASK}@`,
-    )
+        password === undefined ? `${scheme}${MASK}@` : `${scheme}${MASK}:${MASK}@`,
+      )
     : value
   const withScpCredentials = withUrlCredentials.includes("@")
-    ? withUrlCredentials.replace(SCP_USERINFO, (_match, prefix: string, _user: string, host: string) =>
-      `${prefix}${MASK}@${host}:`,
-    )
+    ? withUrlCredentials.replace(
+        SCP_USERINFO,
+        (_match, prefix: string, _user: string, host: string) => `${prefix}${MASK}@${host}:`,
+      )
     : withUrlCredentials
   return redactSecretLikeMaterial(withScpCredentials)
 }

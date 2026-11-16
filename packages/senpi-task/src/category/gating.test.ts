@@ -38,13 +38,16 @@ describe("category activation gating", () => {
       // then
       expect(result.kind).toBe("model_unavailable")
       if (result.kind !== "model_unavailable") throw new Error("Expected model_unavailable")
-      expect(result.attemptedModel).toBe("anthropic/claude-fable-5-1")
+      expect(result.attemptedModel).toBe("anthropic/claude-fable-5-2")
       expect(result.availableCategories).not.toContain("architect")
     })
 
-    test("#when the registry offers claude-fable-5-1 #then architect resolves at max", () => {
+    test("#when the registry offers claude-fable-5-1 #then architect resolves at xhigh", () => {
       // given
-      const models = registry([...MODELS_THE_PRE_GATING_CHAINS_WOULD_HAVE_ACCEPTED, model("anthropic", "claude-fable-5-1")])
+      const models = registry([
+        ...MODELS_THE_PRE_GATING_CHAINS_WOULD_HAVE_ACCEPTED,
+        model("anthropic", "claude-fable-5-1"),
+      ])
 
       // when
       const result = resolveCategory("architect", {}, models)
@@ -54,7 +57,7 @@ describe("category activation gating", () => {
       if (result.kind !== "resolved") throw new Error("Expected resolved")
       expect(result.spec.provider).toBe("anthropic")
       expect(result.spec.modelId).toBe("claude-fable-5-1")
-      expect(result.spec.variant).toBe("max")
+      expect(result.spec.variant).toBe("xhigh")
       expect(result.availableCategories).toContain("architect")
     })
 
@@ -70,7 +73,7 @@ describe("category activation gating", () => {
       if (result.kind !== "resolved") throw new Error("Expected resolved")
       expect(result.spec.provider).toBe("github-copilot")
       expect(result.spec.modelId).toBe("claude-fable-5.1")
-      expect(result.spec.variant).toBe("max")
+      expect(result.spec.variant).toBe("xhigh")
       expect(result.availableCategories).toContain("architect")
     })
 
@@ -91,11 +94,7 @@ describe("category activation gating", () => {
       const models = registry([model("kimi-coding", "k3")])
 
       // when
-      const result = resolveCategory(
-        "architect",
-        { categories: { architect: { model: "kimi-coding/k3" } } },
-        models,
-      )
+      const result = resolveCategory("architect", { categories: { architect: { model: "kimi-coding/k3" } } }, models)
 
       // then
       expect(result.kind).toBe("resolved")
@@ -253,7 +252,7 @@ describe("category activation gating", () => {
   describe("#given a retargeted fallback fixture", () => {
     test("#when visual-engineering resolves on a kimi-only registry #then it is a REAL chain fallback, not a primary hit", () => {
       // given
-      const models = registry([model("kimi-coding", "k3")])
+      const models = registry([model("kimi-coding", "k3.1-pro")])
 
       // when
       const result = resolveCategory("visual-engineering", {}, models)
@@ -267,7 +266,7 @@ describe("category activation gating", () => {
 
     test("#when artistry resolves on a fable-only registry #then it is a PRIMARY hit, which is why it cannot prove fallback", () => {
       // given
-      const models = registry([model("anthropic", "claude-fable-5-1")])
+      const models = registry([model("anthropic", "claude-fable-5-2")])
 
       // when
       const result = resolveCategory("artistry", {}, models)

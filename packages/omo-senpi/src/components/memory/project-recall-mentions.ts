@@ -9,14 +9,20 @@ interface SourceAliases {
 
 export interface ProjectSourceMentions {
   /** Qualified `@project/` paths of the project notes whose file path the transcript already names. */
-  excludedPaths(sessionId: string, entries: readonly unknown[], projectDocuments: readonly RecallDocument[]): Set<string>
+  excludedPaths(
+    sessionId: string,
+    entries: readonly unknown[],
+    projectDocuments: readonly RecallDocument[],
+  ): Set<string>
 }
 
 // The model reads a project note at its file path (the project nudge and the recall notice both show
 // that path), never at its `@project/<identity>/<path>` key, so a note it already read is found in the
 // transcript by the file path. The alias list is kept per document array, which stays the same object
 // while the touched projects and their revisions do, so the mention index keeps its per-entry cache.
-export function createProjectSourceMentions(sourceFor: (sessionId: string, path: string) => string | undefined): ProjectSourceMentions {
+export function createProjectSourceMentions(
+  sourceFor: (sessionId: string, path: string) => string | undefined,
+): ProjectSourceMentions {
   const index = createTranscriptMentionIndex()
   const aliases = new WeakMap<readonly RecallDocument[], SourceAliases>()
 

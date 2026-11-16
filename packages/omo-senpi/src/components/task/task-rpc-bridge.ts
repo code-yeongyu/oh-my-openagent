@@ -60,6 +60,7 @@ export interface TaskRpcBridge {
   sync(): void
   resend(): void
   detach(): void
+  forgetOutputReads(sessionId: string): void
   dispose(): void
 }
 
@@ -90,10 +91,7 @@ export function wireTaskRpcBridge(
     const live = all.filter(isLive).slice(-MAX_TASK_SNAPSHOTS)
     const terminalSlots = MAX_TASK_SNAPSHOTS - live.length
     return {
-      records: [
-        ...live,
-        ...(terminalSlots === 0 ? [] : all.filter((record) => !isLive(record)).slice(-terminalSlots)),
-      ],
+      records: [...live, ...(terminalSlots === 0 ? [] : all.filter((record) => !isLive(record)).slice(-terminalSlots))],
       truncatedTasks,
     }
   }
@@ -191,7 +189,12 @@ export function wireTaskRpcBridge(
     emit(snapshotData(sessionId, selection))
   }
 
-  registerTaskHandlers(pi, engine, () => (disposed ? undefined : activeSessionId), snapshotData)
+  const forgetOutputReads = registerTaskHandlers(
+    pi,
+    engine,
+    () => (disposed ? undefined : activeSessionId),
+    snapshotData,
+  )
 
   return {
     attach() {
@@ -208,6 +211,7 @@ export function wireTaskRpcBridge(
       sync()
     },
     detach,
+    forgetOutputReads,
     dispose() {
       if (disposed) return
       disposed = true
@@ -225,15 +229,23 @@ function registerTaskHandlers(
     readonly tasks: readonly unknown[]
     readonly truncated_tasks?: number
   },
-): void {
+): (sessionId: string) => void {
   const handle = pi.rpc?.handle
-  if (handle === undefined) return
+  const statusReads = new Map<string, string>()
+  const forgetSession = (sessionId: string): void => {
+    for (const key of statusReads.keys()) {
+      const parsed: unknown = JSON.parse(key)
+      if (Array.isArray(parsed) && parsed[0] === sessionId) statusReads.delete(key)
+    }
+  }
+  if (handle === undefined) return forgetSession
   handle("omo.task.list", async (data) => {
     const sessionId = currentSessionId()
     if (sessionId === undefined) return unavailable()
     const input = parseTaskList(data)
     if ("error" in input) return invalidArguments(input.error)
-    if (input.value.parent_session_id !== sessionId) return { kind: "not_found", reason: "No such parent session on this connection." } as const
+    if (input.value.parent_session_id !== sessionId)
+      return { kind: "not_found", reason: "No such parent session on this connection." } as const
     return snapshot(sessionId)
   })
   handle("omo.task.send", async (data) => {
@@ -259,10 +271,12 @@ function registerTaskHandlers(
     if (sessionId === undefined) return unavailable()
     const input = parseTaskOutput(data)
     if ("error" in input) return invalidArguments(input.error)
-    return boundedTaskOutput((
-      await runTaskOutput({ manager: engine.manager, stateDir: engine.stateDir }, input.value, sessionId)
-    ).details)
+    return boundedTaskOutput(
+      (await runTaskOutput({ manager: engine.manager, stateDir: engine.stateDir }, input.value, sessionId, statusReads))
+        .details,
+    )
   })
+  return forgetSession
 }
 
 function isLive(record: TaskRecord): boolean {

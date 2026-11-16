@@ -1,16 +1,16 @@
 //! `HotkeyListener`: the owner side of the kill-switch thread, the
 //! stop-commit worker, and the state they share.
 
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::thread::{self, Thread};
 use std::time::Duration;
 
 use parking_lot::{Condvar, Mutex};
-use senpi_desktop_safety::{Chord, StopPathError, StopPathId, StopPathListener, StopSource, Supervisor};
+use senpi_desktop_safety::{Chord, StopPathError, StopPathId, StopPathListener, Supervisor};
 
 use super::chord::Hotkey;
 use super::hotkey::{self, Run};
+use super::pending::PendingStop;
 
 const THREAD_NAME: &str = "senpi-desktop-killswitch";
 const WORKER_NAME: &str = "senpi-desktop-stop-commit";
@@ -46,7 +46,7 @@ pub(super) struct Shared {
     pub(super) control: Mutex<Control>,
     pub(super) changed: Condvar,
     /// A physical chord refused input; the worker still has to commit it.
-    stop_pending: AtomicBool,
+    stop_pending: PendingStop,
     worker: OnceLock<Thread>,
 }
 
@@ -80,8 +80,7 @@ impl Shared {
     /// wakes the worker, which commits the stop off the listener thread so
     /// the keyboard hook never waits on a held-input release.
     pub(super) fn request_stop(&self) {
-        self.supervisor.suspend_input();
-        self.stop_pending.store(true, Ordering::SeqCst);
+        self.stop_pending.request(&self.supervisor);
         if let Some(worker) = self.worker.get() {
             worker.unpark();
         }
@@ -89,7 +88,9 @@ impl Shared {
 
     /// The hook ignored an injected trigger; the lock is held for one add.
     pub(super) fn injected_ignored(&self) {
-        self.update(|control| control.injected_ignored = control.injected_ignored.saturating_add(1));
+        self.update(|control| {
+            control.injected_ignored = control.injected_ignored.saturating_add(1)
+        });
     }
 
     /// Asks the thread to re-register; `force` also re-registers a live one.
@@ -105,8 +106,9 @@ impl Shared {
     /// Parks until a restart (`true`) or shutdown (`false`) request.
     fn wait_restart(&self) -> bool {
         let mut control = self.control.lock();
-        self.changed
-            .wait_while(&mut control, |control| !control.restart && !control.shutdown);
+        self.changed.wait_while(&mut control, |control| {
+            !control.restart && !control.shutdown
+        });
         control.restart = false;
         !control.shutdown
     }
@@ -134,8 +136,7 @@ impl Shared {
 /// Commits each requested stop, then counts it.
 fn run_worker(shared: &Shared) {
     loop {
-        if shared.stop_pending.swap(false, Ordering::SeqCst) {
-            shared.supervisor.trigger_stop(StopSource::Hotkey);
+        if shared.stop_pending.complete(&shared.supervisor) {
             shared.update(|control| control.stops = control.stops.saturating_add(1));
             continue;
         }
@@ -170,7 +171,7 @@ impl Shared {
             hotkey: Mutex::new(hotkey),
             control: Mutex::new(Control::default()),
             changed: Condvar::new(),
-            stop_pending: AtomicBool::new(false),
+            stop_pending: PendingStop::default(),
             worker: OnceLock::new(),
         })
     }

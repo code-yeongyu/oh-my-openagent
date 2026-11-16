@@ -1,0 +1,57 @@
+{
+  "request": "status.subscribe",
+  "cases": [
+    {
+      "name": "answers, then replays the current status",
+      "outcome": "ok",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "status.subscribe"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": true,
+            "data": {}
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "status.changed",
+            "status": {
+              "state": "connected"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "an extra field is refused",
+      "outcome": "refusal",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "status.subscribe",
+            "filter": "all"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "invalid_request"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

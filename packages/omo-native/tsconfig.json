@@ -15,5 +15,5 @@
     "lib": ["ESNext"],
     "types": ["bun-types"]
   },
-  "include": ["*.ts", "test/**/*", "bin/**/*"]
+  "include": ["*.ts", "test/**/*", "bin/**/*", "keychain-helper/**/*.ts"]
 }

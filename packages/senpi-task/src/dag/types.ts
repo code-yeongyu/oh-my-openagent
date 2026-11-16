@@ -12,29 +12,28 @@ export type DagNodeId = string & { readonly __brand: "DagNodeId" }
 // reintroduce the write/read primitive by bypassing the checked accessors. The store also adds a
 // containment check after the join, so the rule does not rest on this deny-list alone.
 export function isSafeDagPathSegment(value: string): boolean {
-  return value.length > 0
-    && value !== "."
-    && value !== ".."
-    && !value.includes("/")
-    && !value.includes("\\")
-    && !value.includes("\0")
-    && !value.includes(":")
+  return (
+    value.length > 0 &&
+    value !== "." &&
+    value !== ".." &&
+    !value.includes("/") &&
+    !value.includes("\\") &&
+    !value.includes("\0") &&
+    !value.includes(":")
+  )
 }
 
-export const DAG_RUN_STATUSES = [
-  "pending",
-  "running",
-  "paused",
-  "completed",
-  "failed",
-  "cancelled",
-] as const
+export const DAG_RUN_STATUSES = ["pending", "running", "paused", "completed", "failed", "cancelled"] as const
 
 export type DagRunStatus = (typeof DAG_RUN_STATUSES)[number]
 
 // A run in one of these statuses holds no scheduler or lease and does not count against the session's
 // active-run cap; it waits for retention. `send` may still revive a child of a failed run.
-export const TERMINAL_DAG_RUN_STATUSES: ReadonlySet<string> = new Set<DagRunStatus>(["completed", "failed", "cancelled"])
+export const TERMINAL_DAG_RUN_STATUSES: ReadonlySet<string> = new Set<DagRunStatus>([
+  "completed",
+  "failed",
+  "cancelled",
+])
 
 /** True for a persisted status string naming a terminal run; unknown or missing statuses are not terminal. */
 export function isTerminalDagRunStatus(status: string | undefined): boolean {
@@ -46,6 +45,7 @@ export const DAG_NODE_STATES = [
   "blocked",
   "scheduled",
   "running",
+  "paused",
   "completed",
   "failed",
   "cancelled",
@@ -126,6 +126,7 @@ export const DAG_NODE_ERROR_CODES = [
   "task_cancelled",
   "resume_task_missing",
   "resume_task_orphaned",
+  "lost_while_paused",
   "journal_corrupt",
 ] as const
 
@@ -219,6 +220,7 @@ export type DagBottleneck = {
 }
 
 export type DagNodeCounts = {
+  readonly paused?: number
   readonly total: number
   readonly pending: number
   readonly blocked: number
@@ -231,6 +233,7 @@ export type DagNodeCounts = {
 }
 
 export type DagRunSnapshot = {
+  readonly pause?: { readonly reason: "user_stop"; readonly pauseSeq: number }
   readonly schemaVersion: 1
   readonly runId: DagRunId
   readonly runKey: string
@@ -272,4 +275,10 @@ export type AmendRecord = {
 }
 
 export { DAG_NODE_TRANSITION_REASONS, DAG_RUN_EVENT_TYPES, DAG_ACTIVITY_CHANNEL } from "./event-types"
-export type { DagNodeTransitionReason, DagRunEventPayload, DagRunEventEnvelope, DagRunEvent, DagActivityEvent } from "./event-types"
+export type {
+  DagNodeTransitionReason,
+  DagRunEventPayload,
+  DagRunEventEnvelope,
+  DagRunEvent,
+  DagActivityEvent,
+} from "./event-types"

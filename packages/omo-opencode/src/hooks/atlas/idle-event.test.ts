@@ -6,11 +6,9 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { createBoulderState, readBoulderState, writeBoulderState } from "../../features/boulder-state"
 import { _resetForTesting, registerAgentName } from "../../features/claude-code-session-state"
-import {
-  releaseAllPromptAsyncReservationsForTesting,
-  releasePromptAsyncReservation,
-} from "../shared/prompt-async-gate"
+import { releaseAllPromptAsyncReservationsForTesting, releasePromptAsyncReservation } from "../shared/prompt-async-gate"
 import { handleCompletedBoulderIdle } from "./idle-completion-nudge"
+import { scheduleRetryWithTimer } from "./idle-continuation"
 import { handleAtlasSessionIdle } from "./idle-event"
 import type { SessionState } from "./types"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
@@ -87,19 +85,21 @@ describe("handleAtlasSessionIdle completion nudge", () => {
         }>
       }
     }> = []
-    const promptAsyncMock = mock(async (request: {
-      body?: {
-        noReply?: boolean
-        parts?: Array<{
-          text?: string
-          synthetic?: boolean
-          metadata?: Record<string, unknown>
-        }>
-      }
-    }) => {
-      promptRequests.push(request)
-      return { data: {} }
-    })
+    const promptAsyncMock = mock(
+      async (request: {
+        body?: {
+          noReply?: boolean
+          parts?: Array<{
+            text?: string
+            synthetic?: boolean
+            metadata?: Record<string, unknown>
+          }>
+        }
+      }) => {
+        promptRequests.push(request)
+        return { data: {} }
+      },
+    )
 
     const ctx = unsafeTestValue<PluginInput>({
       directory: testDirectory,
@@ -235,7 +235,7 @@ describe("handleAtlasSessionIdle completion nudge", () => {
         },
       },
     })
-    const retryTimer = setTimeout(() => {}, 60_000)
+    const retryTimer = scheduleRetryWithTimer(async () => {}, 60_000)
     const sessionStateById = new Map<string, SessionState>([
       [SESSION_ID, { promptFailureCount: 0, pendingRetryTimer: retryTimer }],
     ])
@@ -470,7 +470,9 @@ describe("handleAtlasSessionIdle completion nudge", () => {
       getState,
       options: {
         directory: testDirectory,
-        backgroundManager: unsafeTestValue<NonNullable<Parameters<typeof handleAtlasSessionIdle>[0]["options"]>["backgroundManager"]>({
+        backgroundManager: unsafeTestValue<
+          NonNullable<Parameters<typeof handleAtlasSessionIdle>[0]["options"]>["backgroundManager"]
+        >({
           getTasksByParentSession: () => [{ status: "pending" }],
         }),
       },
@@ -481,7 +483,7 @@ describe("handleAtlasSessionIdle completion nudge", () => {
     expect(promptAsyncMock).not.toHaveBeenCalled()
     expect(sessionState.pendingRetryTimer).toBeDefined()
     if (sessionState.pendingRetryTimer) {
-      clearTimeout(sessionState.pendingRetryTimer)
+      sessionState.pendingRetryTimer.cancel()
       sessionState.pendingRetryTimer = undefined
     }
   })

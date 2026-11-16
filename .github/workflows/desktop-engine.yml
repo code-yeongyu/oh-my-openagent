@@ -39,17 +39,26 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  platform:
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/pr-platform-decision.yml
+
   native-contract:
     name: desktop native contract (${{ matrix.os }})
+    needs: platform
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { os: macos-14, rust_target: aarch64-apple-darwin }
-          - { os: ubuntu-22.04, rust_target: x86_64-unknown-linux-gnu }
-          - { os: ubuntu-22.04-arm, rust_target: aarch64-unknown-linux-gnu }
-          - { os: windows-latest, rust_target: x86_64-pc-windows-msvc }
-          - { os: windows-11-arm, rust_target: aarch64-pc-windows-msvc }
+        # macOS/Windows only when the shared platform decision allows it (pr-platform-decision.yml, #13859).
+        include: >-
+          ${{ fromJSON(needs.platform.outputs.full_matrix != 'true' && '[{"os": "ubuntu-22.04", "rust_target": "x86_64-unknown-linux-gnu"},
+          {"os": "ubuntu-22.04-arm", "rust_target": "aarch64-unknown-linux-gnu"}]' || '[{"os": "macos-14", "rust_target": "aarch64-apple-darwin"},
+          {"os": "ubuntu-22.04", "rust_target": "x86_64-unknown-linux-gnu"},
+          {"os": "ubuntu-22.04-arm", "rust_target": "aarch64-unknown-linux-gnu"},
+          {"os": "windows-latest", "rust_target": "x86_64-pc-windows-msvc"},
+          {"os": "windows-11-arm", "rust_target": "aarch64-pc-windows-msvc"}]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
@@ -57,7 +66,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.3"
+          bun-version: "1.4.4"
 
       - uses: actions/setup-python@v7
         if: runner.os == 'Windows'
@@ -107,6 +116,16 @@ jobs:
           OMO_DESKTOP_PRELUDE_PYTHON_DIAGNOSTICS: ${{ runner.os == 'Windows' && '1' || '0' }}
         run: bun run test:desktop
 
+      # omo#10762 design 9.3: the engine trust helper against real Security.framework objects, through the
+      # production decoder and selectEngineTrust. It reads the runner's stores for the contract only.
+      - name: Engine trust helper (macOS)
+        if: runner.os == 'macOS'
+        env:
+          OMO_ENGINE_TRUST_HELPER_TARGET_DIR: ${{ github.workspace }}/target/debug
+        run: |
+          cargo build -p omo-engine-trust-helper --bins --examples --locked
+          bun test packages/omo-native/test/macos-trust-helper.macos.test.ts
+
       # The runner is disposable, so the live clipboard round-trip may overwrite its clipboard.
       - name: System clipboard round-trip
         if: runner.os != 'Linux'
@@ -129,6 +148,7 @@ jobs:
             dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24" cargo test -p senpi-desktop-backend-atspi --locked --lib -- --ignored --exact "live_tests::$test"
           done
           dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24" cargo test -p senpi-desktop-backend-atspi --locked --lib -- --ignored --exact --nocapture menus_live_tests::menu_listing_and_select_against_a_real_gtk_menu_bar
+          dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24" cargo test -p senpi-desktop-backend-atspi --locked --lib -- --ignored --exact --nocapture hit_live_tests::element_at_names_the_deepest_element_of_a_real_gtk_window
           env -u AT_SPI_BUS_ADDRESS DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent/senpi-no-bus cargo test -p senpi-desktop-backend-atspi --locked --lib -- --ignored --exact live_tests::no_bus_reports_bus_unreachable
 
       - name: Write job summary

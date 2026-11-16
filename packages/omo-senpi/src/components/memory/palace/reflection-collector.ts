@@ -1,10 +1,7 @@
 import { readFile, readdir, stat } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
-import type {
-  MemoryIdentityPaths,
-  ReflectionTranscriptState,
-} from "@oh-my-opencode/memory-core"
+import type { MemoryIdentityPaths, ReflectionTranscriptState } from "@oh-my-opencode/memory-core"
 
 export interface PalaceReflectionOutcome {
   readonly runId: string
@@ -42,7 +39,9 @@ async function readLatestCursor(
     const statePath = join(transcriptsDir, entry.name, "state.json")
     const parsed = await readJson(statePath)
     if (!isReflectionState(parsed)) continue
-    const modifiedAt = await stat(statePath).then((info) => info.mtimeMs).catch(() => 0)
+    const modifiedAt = await stat(statePath)
+      .then((info) => info.mtimeMs)
+      .catch(() => 0)
     if (latest === undefined || modifiedAt > latest.modifiedAt) {
       latest = { conversationId: entry.name, state: parsed, modifiedAt }
     }
@@ -51,10 +50,7 @@ async function readLatestCursor(
   return { conversationId: latest.conversationId, state: latest.state }
 }
 
-async function readOutcomes(
-  completionsDir: string,
-  limit: number,
-): Promise<readonly PalaceReflectionOutcome[]> {
+async function readOutcomes(completionsDir: string, limit: number): Promise<readonly PalaceReflectionOutcome[]> {
   const files = await readdir(completionsDir).catch(() => [])
   const outcomes: PalaceReflectionOutcome[] = []
   for (const file of files) {
@@ -66,9 +62,7 @@ async function readOutcomes(
     const finishedAt = typeof parsed.finishedAt === "string" ? parsed.finishedAt : ""
     outcomes.push({ runId, outcome, finishedAt })
   }
-  return outcomes
-    .sort((left, right) => right.finishedAt.localeCompare(left.finishedAt))
-    .slice(0, Math.max(0, limit))
+  return outcomes.sort((left, right) => right.finishedAt.localeCompare(left.finishedAt)).slice(0, Math.max(0, limit))
 }
 
 async function readJson(path: string): Promise<unknown> {

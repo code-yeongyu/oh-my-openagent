@@ -1,0 +1,49 @@
+{
+  "request": "endpoints.register",
+  "cases": [
+    {
+      "name": "an absolute agent dir registers",
+      "outcome": "ok",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "endpoints.register",
+            "agent_dir": "/home/user/.omo/agent"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": true,
+            "data": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "a relative agent dir is refused",
+      "outcome": "refusal",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "endpoints.register",
+            "agent_dir": ".omo/agent"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "invalid_request"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

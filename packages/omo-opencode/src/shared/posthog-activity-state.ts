@@ -13,7 +13,7 @@ type PostHogActivityCaptureState = {
   captureDaily: boolean
 }
 
-function getPostHogActivityStateDir(): string {
+export function getPostHogActivityStateDir(): string {
   return resolveTelemetryStateDir(createOpencodeTelemetryProductConfig())
 }
 

@@ -21,6 +21,9 @@ thiserror.workspace = true
 tokio = { workspace = true, features = ["time"] }
 ulid.workspace = true
 
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
 [target.'cfg(target_os = "macos")'.dependencies]
 senpi-desktop-backend-macos = { path = "../senpi-desktop-backend-macos" }
 
@@ -30,6 +33,7 @@ senpi-desktop-backend-x11 = { path = "../senpi-desktop-backend-x11" }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 senpi-desktop-backend-win32 = { path = "../senpi-desktop-backend-win32" }
+windows-sys = { workspace = true, features = ["Win32_Security_Authorization"] }
 
 [dev-dependencies]
 senpi-desktop-safety = { path = "../senpi-desktop-safety", features = ["test-support"] }

@@ -49,7 +49,7 @@ Understand the current memory landscape before changing anything. Start with the
 Read `$AUDIT_PATH` and repair findings before consolidation:
 - `link_dangling`: point at the file now holding the content, or remove a link whose target is gone for good; report which.
 - `content_duplicate`: merge into the more specific home and leave a one-line pointer in the other.
-- `path_orphan`: use `git mv` into the home its content belongs to.
+- `path_orphan`: use `git mv` into the home its content belongs to. If the file has no frontmatter (the finding says so), add a one-line `description:` frontmatter in the same commit as the move; a bare move of such a file is refused by completion validation and would be dropped. If you cannot write an honest description, leave the file where it is.
 - `frontmatter_invalid`: leave to the writer owning the file unless only the description is missing.
 
 Never touch `system/boundaries.md` or `system/agreements.md`, and never delete evidence. Report unresolved findings with reasons.
@@ -64,8 +64,9 @@ This is the dream's core duty: make memory smaller, better placed, and less redu
 - An external file the agent keeps fetching turn after turn is hot: promote it to `system/` (trimmed to what's needed every turn, verbose detail stays external). Use the ledger as primary evidence: a file with high `count` and recent `lastUsedAt` is a strong promote candidate.
 - A `system/` file nothing recent has needed is stale: demote it to `reference/` so it stops costing context on every turn. A `system/` file that never appears in the ledger and has no recent transcript references is a strong demote candidate.
 - Demotion is reversible: it MOVES the file to `reference/` with a `[[path]]` cross-reference at the former point of use. It never deletes content.
+- A `system/` file whose frontmatter `expires` instant has passed is already out of context (the compiler skips it): demote it to `reference/` with its dates, and move any durable line inside it to the right `system/` file first. A temporary section inside a durable `system/` file has no machine expiry: split it into its own file with `expires: <ISO 8601>` (a UTC date or an instant with `Z` or an offset), or demote it when its stated end has passed.
 
-**Fact archiving**: entries in `notes/facts/` older than 6 months get summarized into `ARCHIVE.md`, the single non-system root archive file. Compress them into concise dated summary entries, append those to `ARCHIVE.md`, and remove the summarized originals. Keep anything younger, and keep anything old that's still clearly load-bearing. Delete (don't archive) content the user asked to forget, sensitive or wrong content, and junk with no future-reference value.
+**Fact archiving**: entries in `notes/facts/` older than 6 months get summarized into `ARCHIVE.md`, the single non-system root archive file. Compress them into concise dated summary entries, append those to `ARCHIVE.md` with each entry naming the file it came from (for example `- 2026-03 (notes/facts/2026-03.md): ...`), and remove the summarized originals. Links to an archived file are pointed at `ARCHIVE.md` only when its entry names the file; links to anything you delete instead become plain text. Keep anything younger, and keep anything old that's still clearly load-bearing. Delete (don't archive) content the user asked to forget, sensitive or wrong content, and junk with no future-reference value.
 
 ### System Token Budget Contract
 

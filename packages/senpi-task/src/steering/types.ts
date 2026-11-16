@@ -1,12 +1,20 @@
 import type { ManagedChildHandle } from "../manager/child-handle"
 import type { ColdRevivalFailureCode, DetachedRevivalResult, DetachedRevivalRollbackResult } from "../lifecycle/port"
+import type { HostSessionCancelPort } from "../lifecycle/host-session"
 import type { TeardownStepDeadline } from "../lifecycle/teardown-budget"
 import type { HostSessionIdentity, TaskRecord, TaskRunStats, TaskStatus } from "../state"
 import type { TaskRecordStore } from "../store"
 
 // `reconcile_lost`: a child whose handle cleanup rejected is recorded on its terminal record and ended
 // through the lifecycle's orphan path (pid signal or daemon session close).
-export type DestructionCause = "cancel" | "cancel_without_abort" | "fallback_handoff" | "revive_failure" | "reconcile_lost" | "recovery_detach" | "redispatch"
+export type DestructionCause =
+  | "cancel"
+  | "cancel_without_abort"
+  | "fallback_handoff"
+  | "revive_failure"
+  | "reconcile_lost"
+  | "recovery_detach"
+  | "redispatch"
 
 // Structural port implemented by lifecycle (todo 12). Steering delegates ALL child destruction here
 // and NEVER calls dispose()/terminate()/SIGTERM itself (the dispose single-writer rule). Idempotent.
@@ -14,13 +22,14 @@ export type DestructionPort = {
   destroyResidentTask(taskId: string, cause: DestructionCause): Promise<void>
   // Releases a finished child still resident here; false when there is none (omo#9785).
   parkTerminalResident?(taskId: string): Promise<boolean>
+  // Ends a daemon-hosted child this process holds no handle for, and re-drives it; absent, such a cancel
+  // stays pending on its record (omo#11765).
+  hostSessionCancel?: HostSessionCancelPort
 }
 
 // The seam steering consumes from the manager. The manager owns concurrency + live handles + the
 // record store; steering reads through this port so it never forks that state.
-export type ReviveReservation =
-  | { readonly ok: false }
-  | { readonly ok: true; commit(): void; release(): void }
+export type ReviveReservation = { readonly ok: false } | { readonly ok: true; commit(): void; release(): void }
 
 export type SteeringPort = {
   readonly store: TaskRecordStore
@@ -30,6 +39,8 @@ export type SteeringPort = {
   // True while the task's launch is still being admitted by its host (#10042): no live handle yet, and
   // the launch drains whatever is queued once the child starts.
   isLaunching?(taskId: string): boolean
+  // The child's run admission is stopped: the send is held in the child (no turn). Undefined: send normally.
+  sendWhileRunHeld?(record: TaskRecord, message: string): Promise<SendOutcome> | undefined
   liveHandle(taskId: string): ManagedChildHandle | undefined
   dequeuePending(taskId: string): boolean
   reserveForRevive(taskId: string): ReviveReservation
@@ -73,10 +84,23 @@ export type SendInput = {
 export const DEFAULT_SEND_DELIVERY: SendDelivery = "followUp"
 
 export type SendOutcome =
+  | { readonly kind: "unresponsive"; readonly task_id: string; readonly retryable: true; readonly reason: string }
   | { readonly kind: "uncertain"; readonly task_id: string; readonly effect_id: string; readonly reason: string }
-  | { readonly kind: "failed"; readonly task_id: string; readonly effect_id: string; readonly reason: string; readonly detail: string; readonly action: string }
+  | {
+      readonly kind: "failed"
+      readonly task_id: string
+      readonly effect_id: string
+      readonly reason: string
+      readonly detail: string
+      readonly action: string
+    }
   | { readonly kind: ColdRevivalFailureCode; readonly task_id: string; readonly reason: string }
-  | { readonly kind: "steered"; readonly task_id: string; readonly status: TaskStatus; readonly delivered: SendDelivery }
+  | {
+      readonly kind: "steered"
+      readonly task_id: string
+      readonly status: TaskStatus
+      readonly delivered: SendDelivery
+    }
   | { readonly kind: "revived"; readonly task_id: string; readonly run_epoch: number }
   | {
       readonly kind: "delivery_uncertain"
@@ -87,13 +111,20 @@ export type SendOutcome =
     }
   | { readonly kind: "capacity_deferred"; readonly task_id: string; readonly reason: string }
   | { readonly kind: "queued"; readonly task_id: string; readonly queue_position: number }
+  // The child's run is stopped: the message is held in the child and delivered when the run resumes.
+  | { readonly kind: "held"; readonly task_id: string; readonly pause_seq: number; readonly entry_id: string }
   | { readonly kind: "not_continuable"; readonly task_id: string; readonly reason: string; readonly suggestion: string }
   /** The caller named an earlier run (`expectedRunEpoch`) and the task has moved on; nothing was delivered. */
   | { readonly kind: "stale"; readonly task_id: string; readonly run_epoch: number; readonly reason: string }
   // One-shot agents (see agents/interaction-policy.ts) refuse task_send in EVERY state; message is
   // the registry's sendDenialReminder, surfaced to the caller verbatim.
   | { readonly kind: "one_shot_agent"; readonly task_id: string; readonly agent: string; readonly message: string }
-  | { readonly kind: "scope_denied"; readonly task_id: string; readonly owning_session_id: string; readonly reason: string }
+  | {
+      readonly kind: "scope_denied"
+      readonly task_id: string
+      readonly owning_session_id: string
+      readonly reason: string
+    }
   | { readonly kind: "not_found"; readonly reason: string; readonly suggestion: string }
 
 export type InterruptOutcome =
@@ -109,15 +140,37 @@ export type CancelOptions = {
 }
 
 export type CancelOutcome =
-  | { readonly kind: "cancelled"; readonly task_id: string; readonly previous_status: TaskStatus; readonly undelivered_messages?: number }
+  | {
+      readonly kind: "cancelled"
+      readonly task_id: string
+      readonly previous_status: TaskStatus
+      readonly undelivered_messages?: number
+    }
   // The child is unreachable right now: the cancel runs on its host before anything else once it is
   // reachable (or the child ends when its connection does not come back), and only then is it cancelled.
-  | { readonly kind: "cancel_pending"; readonly task_id: string; readonly previous_status: TaskStatus; readonly reason: string; readonly undelivered_messages?: number }
+  | {
+      readonly kind: "cancel_pending"
+      readonly task_id: string
+      readonly previous_status: TaskStatus
+      readonly reason: string
+      readonly undelivered_messages?: number
+    }
   | { readonly kind: "noop"; readonly task_id: string; readonly status: TaskStatus; readonly reason: string }
   // The task had already finished; cancel released the child it still kept resident (omo#9785).
-  | { readonly kind: "released"; readonly task_id: string; readonly status: TaskStatus; readonly undelivered_messages?: number }
+  | {
+      readonly kind: "released"
+      readonly task_id: string
+      readonly status: TaskStatus
+      readonly undelivered_messages?: number
+    }
   /** The caller named an earlier run (`expectedRunEpoch`) and the task has moved on; nothing was cancelled. */
-  | { readonly kind: "stale"; readonly task_id: string; readonly status: TaskStatus; readonly run_epoch: number; readonly reason: string }
+  | {
+      readonly kind: "stale"
+      readonly task_id: string
+      readonly status: TaskStatus
+      readonly run_epoch: number
+      readonly reason: string
+    }
   | { readonly kind: "not_found"; readonly reason: string }
 
 // senpi#3266: the result of re-dispatching a flagged "resumed, waiting for input" task onto a
@@ -127,7 +180,12 @@ export type RedispatchOutcome =
   | { readonly kind: "invalid_state"; readonly task_id: string; readonly reason: string }
   | { readonly kind: "respawn_failed"; readonly task_id: string; readonly reason: string }
   | { readonly kind: "capacity_deferred"; readonly task_id: string; readonly reason: string }
-  | { readonly kind: "scope_denied"; readonly task_id: string; readonly owning_session_id: string; readonly reason: string }
+  | {
+      readonly kind: "scope_denied"
+      readonly task_id: string
+      readonly owning_session_id: string
+      readonly reason: string
+    }
   | { readonly kind: "not_found"; readonly reason: string }
 
 export type SteeringEngine = {

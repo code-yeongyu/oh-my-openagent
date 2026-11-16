@@ -45,7 +45,11 @@ const server = http.createServer(async (req, res) => {
   callCount++
   const raw = await readBody(req)
   let body
-  try { body = JSON.parse(raw) } catch { body = {} }
+  try {
+    body = JSON.parse(raw)
+  } catch {
+    body = {}
+  }
 
   const inputStr = JSON.stringify(body.input ?? body.messages ?? body)
   const branch = selectBranch(inputStr)
@@ -70,22 +74,28 @@ const server = http.createServer(async (req, res) => {
 
   if (branch === "parent-tool-call") {
     latches.parentToolCallIssued = true
-    sendSse(res, toolCallEvents(callCount, "task", `call_agent_${callCount}`, {
-      description: "split probe child",
-      prompt: "SPLIT_CHILD_TASK: reply exactly DONE",
-      subagent_type: "explore",
-      run_in_background: true,
-      load_skills: [],
-    }))
+    sendSse(
+      res,
+      toolCallEvents(callCount, "task", `call_agent_${callCount}`, {
+        description: "split probe child",
+        prompt: "SPLIT_CHILD_TASK: reply exactly DONE",
+        subagent_type: "explore",
+        run_in_background: true,
+        load_skills: [],
+      }),
+    )
     return
   }
 
   if (branch === "parent-hold") {
     latches.parentHoldIssued = true
-    sendSse(res, toolCallEvents(callCount, "bash", `call_bash_${callCount}`, {
-      command: "i=0; while [ $i -lt 8 ]; do i=$((i+1)); sleep 1; done",
-      description: "hold turn",
-    }))
+    sendSse(
+      res,
+      toolCallEvents(callCount, "bash", `call_bash_${callCount}`, {
+        command: "i=0; while [ $i -lt 8 ]; do i=$((i+1)); sleep 1; done",
+        description: "hold turn",
+      }),
+    )
     return
   }
 
@@ -97,7 +107,9 @@ const server = http.createServer(async (req, res) => {
 })
 
 function logFinalCounts() {
-  const summary = Object.entries(branchCounts).map(([k, v]) => `${k}=${v}`).join(" ")
+  const summary = Object.entries(branchCounts)
+    .map(([k, v]) => `${k}=${v}`)
+    .join(" ")
   const line = `[${new Date().toISOString()}] FINAL_COUNTS ${summary}\n`
   appendLog(logFile, line)
   process.stdout.write(line)
@@ -113,5 +125,11 @@ server.listen(requestedPort, "127.0.0.1", () => {
   process.stdout.write(`fake-openai listening on ${port}\n`)
 })
 
-process.on("SIGTERM", () => { logFinalCounts(); server.close(() => process.exit(0)) })
-process.on("SIGINT", () => { logFinalCounts(); server.close(() => process.exit(0)) })
+process.on("SIGTERM", () => {
+  logFinalCounts()
+  server.close(() => process.exit(0))
+})
+process.on("SIGINT", () => {
+  logFinalCounts()
+  server.close(() => process.exit(0))
+})

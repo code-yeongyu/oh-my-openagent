@@ -24,9 +24,7 @@ function createPluginInput(promptCalls: PromptCall[]): PluginInput {
   const directory = "/tmp/opencode-overload-continuation-test"
   const client = createOpencodeClient({ directory })
   Reflect.set(client.session, "todo", async () => ({
-    data: [
-      { id: "1", content: "Keep working", status: "pending", priority: "high" },
-    ],
+    data: [{ id: "1", content: "Keep working", status: "pending", priority: "high" }],
   }))
   Reflect.set(client.session, "messages", async () => ({ data: [] }))
   Reflect.set(client.session, "promptAsync", async (input: PromptInput) => {

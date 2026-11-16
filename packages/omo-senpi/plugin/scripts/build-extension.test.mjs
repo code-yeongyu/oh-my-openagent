@@ -3,6 +3,7 @@ import { appendFile, cp, mkdir, mkdtemp, readdir, readFile, rm, utimes, writeFil
 import { tmpdir } from "node:os"
 import { dirname, join, parse } from "node:path"
 import { fileURLToPath } from "node:url"
+import bundleBudget from "../../bundle-budget.json" with { type: "json" }
 
 import { PERSONA_ASSET_FILES } from "@oh-my-opencode/memory-core/personas"
 
@@ -14,15 +15,21 @@ import {
   resolveBunExecutable,
   toPortableBuildPath,
 } from "./build-extension.mjs"
-import { runBoundedStage, systemTar } from "./bounded-stage.test-support.mjs"
-import { createBuildFixture } from "./build-extension.test-support.mjs"
+import { COMPUTER_RUN_WASM_NAME } from "./build-extension-core.mjs"
+import { npmPackStage, runBoundedStage, systemTar } from "./bounded-stage.test-support.mjs"
+import { createBuildFixture, outputPathsIn } from "./build-extension.test-support.mjs"
+import {
+  SENPI_ASTRA_ULTRAWORK_DIRECTIVE,
+  SENPI_ULTRAWORK_DIRECTIVE,
+} from "../../src/components/ultrawork/generated-directive.ts"
 import { runtimePersonaSources } from "./persona-artifacts.mjs"
+import { removeTestRootBestEffort } from "../../../../test-support/held-test-root.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const pluginRoot = join(scriptDir, "..")
 const repoRoot = join(scriptDir, "..", "..", "..", "..")
 const fixture = createBuildFixture()
-const { sharedOutputs, mutableOutputs } = fixture
+const { sharedOutputs, mutableOutputs, reproductionRoot } = fixture
 
 // A focused run builds the six artifacts twice in ~14s, while the package suite shares CPU and disk
 // with other build/staging files. Keep the test bounded, but give the real two-build workload enough
@@ -40,21 +47,46 @@ afterAll(fixture.cleanupFile)
 describe("checkExtensionCurrent", () => {
   test("#given the eval SDK build #when inputs and exports are inspected #then the standalone entry has no dependencies", async () => {
     const outputs = await sharedOutputs()
-    expect(outputs.toolkitSdkInputs.some(input => input.endsWith("src/extension/agent-toolkit-sdk.ts"))).toBe(true)
-    expect(outputs.toolkitSdkInputs.filter(input => input.includes("node_modules/"))).toEqual([])
+    expect(outputs.toolkitSdkInputs.some((input) => input.endsWith("src/extension/agent-toolkit-sdk.ts"))).toBe(true)
+    expect(outputs.toolkitSdkInputs.filter((input) => input.includes("node_modules/"))).toEqual([])
     const sdk = await import(outputs.toolkitSdkOutputPath)
-    expect(Object.keys(sdk).sort()).toEqual(["SDK_VERSION", "ULW_LOOP_MANIFEST", "ULW_LOOP_OPERATIONS", "agentToolkit", "createAgentToolkit", "toolkitContextFromEnv"].sort())
+    expect(Object.keys(sdk).sort()).toEqual(
+      [
+        "SDK_VERSION",
+        "ULW_LOOP_MANIFEST",
+        "ULW_LOOP_OPERATIONS",
+        "agentToolkit",
+        "createAgentToolkit",
+        "toolkitContextFromEnv",
+      ].sort(),
+    )
   })
 
   test("#given a missing SDK artifact #when freshness is checked #then it reports that output", async () => {
     const outputs = await mutableOutputs()
     await rm(outputs.toolkitSdkOutputPath)
-    expect(await checkExtensionCurrent(outputs)).toMatchObject({ ok: false, reason: "missing-output", output: outputs.toolkitSdkOutputPath })
+    expect(await checkExtensionCurrent(outputs)).toMatchObject({
+      ok: false,
+      reason: "missing-output",
+      output: outputs.toolkitSdkOutputPath,
+    })
+  })
+
+  test("#given a missing OTLP sidecar #when freshness is checked #then it reports that output", async () => {
+    const outputs = await mutableOutputs()
+    await rm(outputs.telemetryOtlpOutputPath)
+    expect(await checkExtensionCurrent(outputs)).toMatchObject({
+      ok: false,
+      reason: "missing-output",
+      output: outputs.telemetryOtlpOutputPath,
+    })
   })
 
   test("#given the rollback migration runtime #when built #then its store entry and migration event are present", async () => {
     const outputs = await sharedOutputs()
-    expect(outputs.rollbackRuntimeInputs.some(input => input.endsWith("src/extension/rollback-migrate-runtime.ts"))).toBe(true)
+    expect(
+      outputs.rollbackRuntimeInputs.some((input) => input.endsWith("src/extension/rollback-migrate-runtime.ts")),
+    ).toBe(true)
     expect(await readFile(outputs.rollbackRuntimeOutputPath, "utf8")).toContain("host_session_migrated")
   })
 
@@ -81,6 +113,7 @@ describe("checkExtensionCurrent", () => {
       outputPath: outputs.outputPath,
       memberOutputPath: outputs.memberOutputPath,
       supervisorOutputPath: outputs.supervisorOutputPath,
+      expectedRoot: await reproductionRoot(),
     })
     // Compare the whole result so a failure names the stale artifact instead of printing "false".
     expect(check).toMatchObject({ ok: true })
@@ -90,12 +123,21 @@ describe("checkExtensionCurrent", () => {
     // given / when
     const outputs = await sharedOutputs()
     const personas = [
-      ["reflection-persona.md", join(repoRoot, "packages", "memory-core", "src", "reflection", "assets", "reflection-persona.md")],
-      ["dream-persona.md", join(repoRoot, "packages", "memory-core", "src", "reflection", "assets", "dream-persona.md")],
+      [
+        "reflection-persona.md",
+        join(repoRoot, "packages", "memory-core", "src", "reflection", "assets", "reflection-persona.md"),
+      ],
+      [
+        "dream-persona.md",
+        join(repoRoot, "packages", "memory-core", "src", "reflection", "assets", "dream-persona.md"),
+      ],
       ["facts-persona.md", join(repoRoot, "packages", "memory-core", "src", "facts", "assets", "facts-persona.md")],
       // The kibitzer gate loads its persona from beside the BUNDLE, so an unstaged asset makes
       // every live gate launch fail with ENOENT while every source-reading unit test still passes.
-      ["kibitzer-persona.md", join(repoRoot, "packages", "memory-core", "src", "recall", "assets", "kibitzer-persona.md")],
+      [
+        "kibitzer-persona.md",
+        join(repoRoot, "packages", "memory-core", "src", "recall", "assets", "kibitzer-persona.md"),
+      ],
     ]
 
     // then
@@ -113,10 +155,12 @@ describe("checkExtensionCurrent", () => {
   })
 
   test("#given platform-specific source paths #when normalized #then build markers use portable separators", () => {
-    expect(toPortableBuildPath("packages\\omo-senpi\\src\\extension\\index.ts"))
-      .toBe("packages/omo-senpi/src/extension/index.ts")
-    expect(toPortableBuildPath("packages/omo-senpi/src/extension/index.ts"))
-      .toBe("packages/omo-senpi/src/extension/index.ts")
+    expect(toPortableBuildPath("packages\\omo-senpi\\src\\extension\\index.ts")).toBe(
+      "packages/omo-senpi/src/extension/index.ts",
+    )
+    expect(toPortableBuildPath("packages/omo-senpi/src/extension/index.ts")).toBe(
+      "packages/omo-senpi/src/extension/index.ts",
+    )
   })
 
   test("#given current generated outputs with old mtimes #when checked #then freshness passes", async () => {
@@ -130,7 +174,7 @@ describe("checkExtensionCurrent", () => {
     ])
 
     // when
-    const result = await checkExtensionCurrent(outputs)
+    const result = await checkExtensionCurrent({ ...outputs, expectedRoot: await reproductionRoot() })
 
     // then
     expect(result).toMatchObject({ ok: true })
@@ -154,7 +198,7 @@ describe("checkExtensionCurrent", () => {
     await appendFile(outputs.supervisorOutputPath, "\nchanged\n")
 
     // when
-    const result = await checkExtensionCurrent(outputs)
+    const result = await checkExtensionCurrent({ ...outputs, expectedRoot: await reproductionRoot() })
 
     // then
     expect(result).toMatchObject({ ok: false, reason: "stale-output", output: outputs.supervisorOutputPath })
@@ -168,7 +212,7 @@ describe("checkExtensionCurrent", () => {
     await utimes(outputs.outputPath, future, future)
 
     // when
-    const result = await checkExtensionCurrent(outputs)
+    const result = await checkExtensionCurrent({ ...outputs, expectedRoot: await reproductionRoot() })
 
     // then
     expect(result).toMatchObject({ ok: false, reason: "stale-output", output: outputs.outputPath })
@@ -183,7 +227,7 @@ describe("checkExtensionCurrent", () => {
     await writeFile(outputs.outputPath, `${prefix}:${"0".repeat(43)}:${bodyDigest}\n${artifact.slice(newline + 1)}`)
 
     // when
-    const result = await checkExtensionCurrent(outputs)
+    const result = await checkExtensionCurrent({ ...outputs, expectedRoot: await reproductionRoot() })
 
     // then
     expect(result).toMatchObject({ ok: false, reason: "stale-output", output: outputs.outputPath })
@@ -206,15 +250,38 @@ describe("checkExtensionCurrent", () => {
     expect(advisorRuntime).not.toMatch(/^[\t ]+$/m)
   })
 
+  // Generated payload confinement (#9913): the shared directive parts are dropped from every bundle
+  // that imports the ultrawork module without using the directives. The probe is a line both
+  // directives share, read from the generated module rather than pinned here.
+  test("#given the split extension build #when bundles are inspected #then only the main entry carries the ultrawork directive text", async () => {
+    // given
+    const outputs = await sharedOutputs()
+    const sharedLine = SENPI_ULTRAWORK_DIRECTIVE.split("\n")
+      .filter((line) => /^[A-Za-z0-9 ,.:;()-]+$/.test(line) && SENPI_ASTRA_ULTRAWORK_DIRECTIVE.includes(line))
+      .sort((left, right) => right.length - left.length)[0]
+
+    // when
+    const carriers = []
+    for (const [name, path] of Object.entries(outputPathsIn(outputs.root))) {
+      if ((await readFile(path, "utf8")).includes(sharedLine)) carriers.push(name)
+    }
+
+    // then
+    expect(sharedLine.length).toBeGreaterThan(40)
+    expect(carriers).toEqual(["outputPath"])
+  })
+
   test("#given the split extension build #when metafile inputs are inspected #then task sources live only in the lazy sidecar", async () => {
     // given / when
     const { mainInputs, taskInputs } = await sharedOutputs()
 
     // then
-    expect(mainInputs.some((input) => input.endsWith("packages/senpi-task/src/runners/in-process/curated-readonly-bash.ts")))
-      .toBe(false)
-    expect(taskInputs.some((input) => input.endsWith("packages/senpi-task/src/runners/in-process/curated-readonly-bash.ts")))
-      .toBe(true)
+    expect(
+      mainInputs.some((input) => input.endsWith("packages/senpi-task/src/runners/in-process/curated-readonly-bash.ts")),
+    ).toBe(false)
+    expect(
+      taskInputs.some((input) => input.endsWith("packages/senpi-task/src/runners/in-process/curated-readonly-bash.ts")),
+    ).toBe(true)
   })
 
   test("#given the split extension build #when metafile inputs are inspected #then the computer-use implementation lives only in its lazy entry", async () => {
@@ -243,8 +310,14 @@ describe("checkExtensionCurrent", () => {
       "packages/omo-senpi/src/components/memory/commands/doctor-checks.ts",
       "packages/omo-senpi/src/components/memory/commands/doctor-reservation.ts",
     ]) {
-      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
-      expect(memoryDoctorInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
+      expect(
+        mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(false)
+      expect(
+        memoryDoctorInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(true)
     }
   })
 
@@ -254,8 +327,14 @@ describe("checkExtensionCurrent", () => {
       "packages/omo-senpi/src/components/memory/commands/memfs-runtime.ts",
       "packages/omo-senpi/src/components/memory/commands/memfs-extra.ts",
     ]) {
-      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
-      expect(memoryMemfsInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
+      expect(
+        mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(false)
+      expect(
+        memoryMemfsInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(true)
     }
   })
 
@@ -268,24 +347,83 @@ describe("checkExtensionCurrent", () => {
       "packages/omo-senpi/src/components/feedback/draft.ts",
       "packages/omo-senpi/src/components/feedback/submit.ts",
     ]) {
-      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
-      expect(feedbackInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
+      expect(
+        mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(false)
+      expect(
+        feedbackInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(true)
     }
-    expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith("packages/omo-senpi/src/components/feedback/index.ts"))).toBe(true)
+    expect(
+      mainInputs.some((input) =>
+        toPortableBuildPath(input).endsWith("packages/omo-senpi/src/components/feedback/index.ts"),
+      ),
+    ).toBe(true)
+  })
+
+  test("#given offered desktop toolkits #when bundle inputs are inspected #then the runtime is lazy and carries no third-party dependencies", async () => {
+    const { mainInputs, desktopToolkitInputs } = await sharedOutputs()
+    for (const suffix of ["/desktop-toolkit/runtime.ts", "/desktop-toolkit/thread-tools.ts"]) {
+      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(false)
+      expect(desktopToolkitInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(true)
+    }
+    expect(desktopToolkitInputs.filter((input) => toPortableBuildPath(input).includes("node_modules/"))).toEqual([])
   })
 
   test("#given lazy thread registration #when bundle inputs are inspected #then live RPC implementation is confined to its sidecar", async () => {
     const { mainInputs, threadClientInputs } = await sharedOutputs()
     const suffix = "/components/thread/live-surface.ts"
-    expect(mainInputs.some(input => toPortableBuildPath(input).endsWith(suffix))).toBe(false)
-    expect(threadClientInputs.some(input => toPortableBuildPath(input).endsWith(suffix))).toBe(true)
+    expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(false)
+    expect(threadClientInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(true)
+  })
+
+  test("#given the lazy session wake #when bundle inputs are inspected #then the carrier, the consumer and the device-service client are confined to their sidecar", async () => {
+    const { mainInputs, wakeInputs } = await sharedOutputs()
+    for (const suffix of [
+      "/components/thread/wake/wake-runtime.ts",
+      "/components/thread/wake/runtime.ts",
+      "/components/thread/wake/carrier.ts",
+      "/components/thread/wake/carrier-connection.ts",
+      "/components/thread/wake/consumer-start.ts",
+      "/components/thread/consumer/consumer.ts",
+      "/components/thread/consumer/device-service-port.ts",
+      "/components/thread/gateway/same-device-wake.ts",
+    ]) {
+      expect(
+        mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(false)
+      expect(
+        wakeInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(true)
+    }
+  })
+
+  test("#given thread_create's folder and worktree code #when bundle inputs are inspected #then it lives only in the thread client sidecar", async () => {
+    const { mainInputs, threadClientInputs } = await sharedOutputs()
+    for (const suffix of [
+      "/components/thread/control/local-open.ts",
+      "/components/thread/worktree/thread-worktree.ts",
+      "/components/thread/worktree/discard-worktree.ts",
+      "/components/thread/worktree/failures.ts",
+      "/components/thread/worktree/worktree-rpc.ts",
+      "/components/thread/worktree/remote-worktree.ts",
+      "/components/thread/remote/create-folder.ts",
+      "/components/thread/remote/plan-create.ts",
+    ]) {
+      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(false)
+      expect(threadClientInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(true)
+    }
   })
 
   test("#given lazy session-summary recovery #when bundle inputs are inspected #then the recovery sweep is confined to its sidecar", async () => {
     const { mainInputs, telemetryRecoveryInputs } = await sharedOutputs()
     const suffix = "/components/telemetry/session-summary-recovery.ts"
-    expect(mainInputs.some(input => toPortableBuildPath(input).endsWith(suffix))).toBe(false)
-    expect(telemetryRecoveryInputs.some(input => toPortableBuildPath(input).endsWith(suffix))).toBe(true)
+    expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(false)
+    expect(telemetryRecoveryInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(true)
   })
 
   test("#given the split extension build #when palace inputs are inspected #then the /palace and /people runtime loads only from the lazy entry", async () => {
@@ -297,8 +435,14 @@ describe("checkExtensionCurrent", () => {
       "packages/omo-senpi/src/components/memory/palace/styles.ts",
       "packages/omo-senpi/src/components/memory/commands/people-runtime.ts",
     ]) {
-      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
-      expect(memoryPalaceInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
+      expect(
+        mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(false)
+      expect(
+        memoryPalaceInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(true)
     }
   })
 
@@ -309,7 +453,10 @@ describe("checkExtensionCurrent", () => {
       "packages/omo-senpi/src/components/memory/palace/command.ts",
       "packages/omo-senpi/src/components/memory/commands/people.ts",
     ]) {
-      expect(memoryPalaceInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
+      expect(
+        memoryPalaceInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(false)
     }
     expect(await readFile(memoryPalaceOutputPath, "utf8")).not.toContain("#omo-memory-palace-runtime")
   })
@@ -326,15 +473,32 @@ describe("checkExtensionCurrent", () => {
       "packages/omo-senpi/src/components/memory/commands/memory-unlock.ts",
       "packages/omo-senpi/src/components/memory/commands/search.ts",
       "packages/omo-senpi/src/components/memory/commands/facts.ts",
+      // A dream fire loads its conversation selection from this sidecar (keeps omo.js inside its byte budget).
+      "packages/omo-senpi/src/components/memory/dream-selector.ts",
+      // The maintenance pass loads runtime retention and the host sweep from this sidecar when one is due (keeps omo.js inside its byte budget).
+      "packages/omo-senpi/src/components/memory/memory-retention-pass.ts",
+      // A finalized dream or reflection run loads the archive link repair (#12642) from this sidecar (keeps omo.js inside its byte budget).
+      "packages/memory-core/src/reflection/completion-links.ts",
+      "packages/memory-core/src/reflection/link-removals.ts",
+      "packages/memory-core/src/reflection/link-rewrite.ts",
     ]) {
-      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
-      expect(memoryCommandsInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
+      expect(
+        mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(false)
+      expect(
+        memoryCommandsInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(true)
     }
     for (const suffix of [
       "packages/omo-senpi/src/components/memory/commands/metadata.ts",
       "packages/omo-senpi/src/components/memory/commands/runtime-loader.ts",
     ]) {
-      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
+      expect(
+        mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(true)
     }
   })
 
@@ -344,7 +508,10 @@ describe("checkExtensionCurrent", () => {
       "packages/omo-senpi/src/components/memory/commands/runtime-loader.ts",
       "packages/omo-senpi/src/components/memory/commands/register.ts",
     ]) {
-      expect(memoryCommandsInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
+      expect(
+        memoryCommandsInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(false)
     }
     expect(await readFile(memoryCommandsOutputPath, "utf8")).not.toContain("#omo-memory-commands-runtime")
   })
@@ -356,9 +523,39 @@ describe("checkExtensionCurrent", () => {
       "packages/omo-opencode/src/cli/service-auth/keystore.ts",
       "packages/omo-opencode/src/cli/service-auth/session.ts",
     ]) {
-      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
-      expect(deviceAccountInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
+      expect(
+        mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(false)
+      expect(
+        deviceAccountInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(true)
     }
+  })
+
+  test("#given the split extension build #when device-service inputs are inspected #then the start-up bootstrap runtime loads only from its lazy entry", async () => {
+    const { mainInputs, deviceServiceInputs, deviceServiceOutputPath, outputPath } = await sharedOutputs()
+    for (const suffix of [
+      "packages/omo-senpi/src/components/device-service/runtime.ts",
+      "packages/omo-senpi/src/components/device-service/runner.ts",
+    ]) {
+      expect(
+        mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(false)
+      expect(
+        deviceServiceInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(true)
+    }
+    expect(
+      mainInputs.some((input) =>
+        toPortableBuildPath(input).endsWith("packages/omo-senpi/src/components/device-service/index.ts"),
+      ),
+    ).toBe(true)
+    expect(await readFile(outputPath, "utf8")).toContain('import("#omo-device-service-runtime")')
+    expect(await readFile(deviceServiceOutputPath, "utf8")).not.toContain("#omo-device-service-runtime")
   })
 
   test("#given the split extension build #when onboarding inputs are inspected #then the session-history scan loads only from its lazy entry", async () => {
@@ -370,15 +567,24 @@ describe("checkExtensionCurrent", () => {
       "packages/omo-senpi/src/components/onboarding/session-history/transcript-parser.ts",
       "packages/omo-senpi/src/components/onboarding/session-history/digest-store.ts",
     ]) {
-      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
-      expect(sessionHistoryInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
+      expect(
+        mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(false)
+      expect(
+        sessionHistoryInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(true)
     }
     for (const suffix of [
       "packages/omo-senpi/src/components/onboarding/session-history-runtime-loader.ts",
       "packages/omo-senpi/src/components/onboarding/session-history-rpc.ts",
       "packages/omo-senpi/src/components/onboarding/session-history-tool.ts",
     ]) {
-      expect(sessionHistoryInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
+      expect(
+        sessionHistoryInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(false)
     }
     expect(await readFile(sessionHistoryOutputPath, "utf8")).not.toContain("#omo-session-history-runtime")
   })
@@ -390,20 +596,54 @@ describe("checkExtensionCurrent", () => {
       "packages/memory-core/src/recall/bm25-store.ts",
       "packages/memory-core/src/recall/bm25-persist-gate.ts",
     ]) {
-      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
-      expect(recallStoreInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
+      expect(
+        mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(false)
+      expect(
+        recallStoreInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(true)
     }
     // The store seeds and reads the ranking's own index, which it is handed; a bundled copy would be a second index.
-    expect(recallStoreInputs.some((input) => toPortableBuildPath(input).endsWith("packages/memory-core/src/recall/bm25-index.ts"))).toBe(false)
+    expect(
+      recallStoreInputs.some((input) =>
+        toPortableBuildPath(input).endsWith("packages/memory-core/src/recall/bm25-index.ts"),
+      ),
+    ).toBe(false)
     expect(await readFile(recallStoreOutputPath, "utf8")).not.toContain("#omo-recall-store-runtime")
   })
 
   test("#given the split extension build #when telemetry inputs are inspected #then PostHog lives only in its lazy sidecar", async () => {
     const { mainInputs, telemetryPosthogInputs, telemetryPosthogOutputPath } = await sharedOutputs()
-    expect(mainInputs.some(input => /node_modules\/posthog-(?:node|core)\//.test(toPortableBuildPath(input)))).toBe(false)
-    expect(telemetryPosthogInputs.some(input => /node_modules\/posthog-node\//.test(toPortableBuildPath(input)))).toBe(true)
-    expect(mainInputs.some(input => toPortableBuildPath(input).endsWith("/telemetry/posthog-runtime.ts"))).toBe(false)
+    expect(mainInputs.some((input) => /node_modules\/posthog-(?:node|core)\//.test(toPortableBuildPath(input)))).toBe(
+      false,
+    )
+    expect(
+      telemetryPosthogInputs.some((input) => /node_modules\/posthog-node\//.test(toPortableBuildPath(input))),
+    ).toBe(true)
+    expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith("/telemetry/posthog-runtime.ts"))).toBe(false)
     expect(await readFile(telemetryPosthogOutputPath, "utf8")).not.toContain("#omo-telemetry-posthog-runtime")
+  })
+
+  test("#given the split telemetry build #when inputs and bytes are inspected #then OTLP and its SDKs stay outside the small main entry", async () => {
+    const { mainInputs, telemetryOtlpInputs, telemetryOtlpOutputPath, outputPath } = await sharedOutputs()
+    for (const pattern of [
+      /node_modules\/(?:@opentelemetry|@bufbuild)\//,
+      /telemetry-core\/src\/otlp-entry\.ts$/,
+      /telemetry\/otlp-(?:runtime|projection)\.ts$/,
+    ]) {
+      expect(mainInputs.some((input) => pattern.test(toPortableBuildPath(input)))).toBe(false)
+      expect(telemetryOtlpInputs.some((input) => pattern.test(toPortableBuildPath(input)))).toBe(true)
+    }
+    const main = await readFile(outputPath, "utf8")
+    expect(main).toContain('import("#omo-telemetry-otlp-runtime")')
+    // Measured, not estimated (#11431 review): origin/dev 1,422,748 B; #11431 head 0b551794 1,423,520 B (1 B under the
+    // old 1_419_425 + 4_096 cap); this branch 1,423,766 B after the persisted-opt-out spool purge (node 24, bun 1.4.4,
+    // linux x64). Base reset to the measurement with the standing 4,096 B headroom; bundle-size.test.ts's 1,425,000 B
+    // budget stays the binding package ceiling.
+    expect(Buffer.byteLength(main)).toBeLessThanOrEqual(bundleBudget.omoJsBytes)
+    expect(await readFile(telemetryOtlpOutputPath, "utf8")).not.toContain("#omo-telemetry-otlp-runtime")
   })
 
   test("#given the split extension build #when sync inputs are inspected #then the Loro engine and its wasm live only in the sync sidecar", async () => {
@@ -412,8 +652,14 @@ describe("checkExtensionCurrent", () => {
       "packages/memory-core/src/crdt/loro-runtime.ts",
       "packages/memory-core/src/sync/engine/index.ts",
     ]) {
-      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
-      expect(memorySyncInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
+      expect(
+        mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(false)
+      expect(
+        memorySyncInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(true)
     }
     const wasm = await readFile(join(dirname(memorySyncOutputPath), MEMORY_SYNC_WASM_NAME))
     const source = await readFile(loroWasmSourcePath())
@@ -423,63 +669,72 @@ describe("checkExtensionCurrent", () => {
   })
 
   test("#given the sync sidecar build #when its output dir is listed #then every emitted asset is a declared sidecar asset", async () => {
-    const { memorySyncOutputPath } = await sharedOutputs()
+    const { memorySyncOutputPath, computerUseOutputPath } = await sharedOutputs()
+    // The computer.run QuickJS wasm is the computer-use sidecar's asset, emitted into the same dir.
+    expect(await readFile(computerUseOutputPath, "utf8")).toContain(COMPUTER_RUN_WASM_NAME)
     const syncText = await readFile(memorySyncOutputPath, "utf8")
     const referenced = MEMORY_SYNC_ASSET_NAMES.filter((name) => syncText.includes(name))
     expect(referenced).toEqual([...MEMORY_SYNC_ASSET_NAMES])
     const emitted = (await readdir(dirname(memorySyncOutputPath), { withFileTypes: true }))
       .filter((entry) => entry.isFile() && !/\.(?:m?js|json|md)$/.test(entry.name))
       .map((entry) => entry.name)
-    expect(emitted.sort()).toEqual([...MEMORY_SYNC_ASSET_NAMES].sort())
+    expect(emitted.sort()).toEqual([...MEMORY_SYNC_ASSET_NAMES, COMPUTER_RUN_WASM_NAME].sort())
   })
 
-  test("#given the sync sidecar packed with npm pack #when the installed package imports #omo-memory-sync-runtime under Node #then Loro initializes from the packed wasm", async () => {
-    const { memorySyncOutputPath } = await sharedOutputs()
-    const work = await mkdtemp(join(tmpdir(), "omo-sync-sidecar-pack-"))
-    try {
-      const pkg = join(work, "pkg")
-      await mkdir(join(pkg, "extensions"), { recursive: true })
-      await cp(join(pluginRoot, "package.json"), join(pkg, "package.json"))
-      await cp(memorySyncOutputPath, join(pkg, "extensions", "omo-memory-sync.js"))
-      for (const asset of MEMORY_SYNC_ASSET_NAMES) await cp(join(dirname(memorySyncOutputPath), asset), join(pkg, "extensions", asset))
-      const packed = await runBoundedStage("npm pack", "npm", ["pack", "--silent", "--pack-destination", work], { cwd: pkg, shell: process.platform === "win32" }, PACKED_STAGE_CAPS.pack)
-      expect(packed.status, packed.stderr).toBe(0)
-      const tarball = join(work, packed.stdout.trim().split("\n").at(-1))
-      const installed = join(work, "installed")
-      await mkdir(installed)
-      const untar = await runBoundedStage("tar", systemTar(), ["-xzf", tarball, "-C", installed], {}, PACKED_STAGE_CAPS.untar)
-      expect(untar.status, untar.stderr).toBe(0)
-      const root = join(installed, "package")
-      const listed = await readdir(join(root, "extensions"))
-      for (const asset of MEMORY_SYNC_ASSET_NAMES) expect(listed).toContain(asset)
-      const probe = join(root, "sync-probe.mjs")
-      await writeFile(probe, [
-        'const sidecar = await import("#omo-memory-sync-runtime")',
-        'if (typeof sidecar.openDeviceSync !== "function") throw new Error("openDeviceSync missing")',
-        "await sidecar.checkSyncRuntime()",
-        'console.log("sync-sidecar-ok")',
-      ].join("\n"))
-      const run = await runBoundedStage("node probe", "node", [probe], { cwd: parse(process.cwd()).root }, PACKED_STAGE_CAPS.probe)
-      expect(run.stdout, run.stderr).toContain("sync-sidecar-ok")
-      expect(run.status, run.stderr).toBe(0)
-    } finally {
-      await rm(work, { recursive: true, force: true })
-    }
-  }, PACKED_TEST_TIMEOUT_MS)
-
-  test("#given the split extension build #when config-startup inputs are inspected #then the gateway -> dori rename loads only from its lazy entry", async () => {
-    const { mainInputs, doriMigrationInputs, doriMigrationOutputPath } = await sharedOutputs()
-    for (const suffix of [
-      "packages/omo-senpi/src/components/config-startup/dori-migration-runtime.ts",
-      "packages/omo-opencode/src/config-migration/dori-section-rename.ts",
-      "packages/omo-config-core/src/schema/legacy-dori-section.ts",
-    ]) {
-      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
-      expect(doriMigrationInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
-    }
-    expect(doriMigrationInputs.some((input) => toPortableBuildPath(input).endsWith("packages/omo-senpi/src/components/config-startup/dori-migration-loader.ts"))).toBe(false)
-    expect(await readFile(doriMigrationOutputPath, "utf8")).not.toContain("#omo-dori-migration-runtime")
-  })
+  test(
+    "#given the sync sidecar packed with npm pack #when the installed package imports #omo-memory-sync-runtime under Node #then Loro initializes from the packed wasm",
+    async () => {
+      const { memorySyncOutputPath } = await sharedOutputs()
+      const work = await mkdtemp(join(tmpdir(), "omo-sync-sidecar-pack-"))
+      try {
+        const pkg = join(work, "pkg")
+        await mkdir(join(pkg, "extensions"), { recursive: true })
+        await cp(join(pluginRoot, "package.json"), join(pkg, "package.json"))
+        await cp(memorySyncOutputPath, join(pkg, "extensions", "omo-memory-sync.js"))
+        for (const asset of MEMORY_SYNC_ASSET_NAMES)
+          await cp(join(dirname(memorySyncOutputPath), asset), join(pkg, "extensions", asset))
+        const pack = npmPackStage(pkg, work)
+        const packed = await runBoundedStage("npm pack", pack.command, pack.args, pack.options, PACKED_STAGE_CAPS.pack)
+        expect(packed.status, packed.stderr).toBe(0)
+        const tarball = join(work, packed.stdout.trim().split("\n").at(-1))
+        const installed = join(work, "installed")
+        await mkdir(installed)
+        const untar = await runBoundedStage(
+          "tar",
+          systemTar(),
+          ["-xzf", tarball, "-C", installed],
+          {},
+          PACKED_STAGE_CAPS.untar,
+        )
+        expect(untar.status, untar.stderr).toBe(0)
+        const root = join(installed, "package")
+        const listed = await readdir(join(root, "extensions"))
+        for (const asset of MEMORY_SYNC_ASSET_NAMES) expect(listed).toContain(asset)
+        const probe = join(root, "sync-probe.mjs")
+        await writeFile(
+          probe,
+          [
+            'const sidecar = await import("#omo-memory-sync-runtime")',
+            'if (typeof sidecar.openDeviceSync !== "function") throw new Error("openDeviceSync missing")',
+            "await sidecar.checkSyncRuntime()",
+            'console.log("sync-sidecar-ok")',
+          ].join("\n"),
+        )
+        const run = await runBoundedStage(
+          "node probe",
+          "node",
+          [probe],
+          { cwd: parse(process.cwd()).root },
+          PACKED_STAGE_CAPS.probe,
+        )
+        expect(run.stdout, run.stderr).toContain("sync-sidecar-ok")
+        expect(run.status, run.stderr).toBe(0)
+      } finally {
+        removeTestRootBestEffort(work)
+      }
+    },
+    PACKED_TEST_TIMEOUT_MS,
+  )
 
   test("#given a packaged task import map #when generated artifacts are inspected #then the main bundle resolves its task sidecar", async () => {
     const outputs = await sharedOutputs()
@@ -493,16 +748,22 @@ describe("checkExtensionCurrent", () => {
     expect(main).toContain('import("#omo-memory-memfs-runtime")')
     expect(main).toContain('import("#omo-memory-palace-runtime")')
     expect(main).toContain('import("#omo-memory-commands-runtime")')
+    expect(main).toContain('import("#memory-completion-links")')
     expect(main).toContain('import("#omo-device-account-runtime")')
     expect(main).toContain('import("#omo-session-history-runtime")')
     expect(main).toContain('import("#omo-recall-store-runtime")')
-    expect(main).toContain('import("#omo-dori-migration-runtime")')
+    expect(main).toContain('import("#memory-external-projection")')
+    // The <external_projection> renderer (its legend is the marker) ships in the recall-store sidecar, not the entry.
+    expect(main).not.toContain("stand for similar names")
     expect(main).toContain('import("#omo-telemetry-posthog-runtime")')
+    expect(main).toContain('import("#omo-telemetry-otlp-runtime")')
     expect(main).toContain('import("#omo-thread-client-runtime")')
+    expect(main).toContain('import("#omo-wake-runtime")')
     expect(main).toContain('import("#omo-telemetry-recovery-runtime")')
     expect(posthog).toContain('import("#telemetry-immediate-send")')
     expect(main).toContain('import("#omo-memory-sync-runtime")')
     expect(main).toContain('import("#omo-feedback-runtime")')
+    expect(main).toContain('import("#omo-desktop-toolkit-runtime")')
     expect(main).toContain('import("#omo-claim-receipt-runtime")')
     expect(task).toMatch(/^\/\/ omo:[A-Za-z0-9_-]{43}:[A-Za-z0-9_-]{43}/)
     expect(main).not.toContain('import("#omo-agent-toolkit-runtime")')
@@ -514,18 +775,24 @@ describe("checkExtensionCurrent", () => {
       "#omo-memory-memfs-runtime": "./extensions/omo-memory-memfs.js",
       "#omo-memory-palace-runtime": "./extensions/omo-memory-palace.js",
       "#omo-memory-commands-runtime": "./extensions/omo-memory-commands.js",
+      "#memory-completion-links": "./extensions/omo-memory-commands.js",
       "#omo-device-account-runtime": "./extensions/omo-device-account.js",
       "#omo-session-history-runtime": "./extensions/omo-session-history.js",
       "#omo-recall-store-runtime": "./extensions/omo-recall-store.js",
-      "#omo-dori-migration-runtime": "./extensions/omo-dori-migration.js",
+      "#memory-external-projection": "./extensions/omo-recall-store.js",
+      "#omo-device-service-runtime": "./extensions/omo-device-service.js",
       "#omo-telemetry-posthog-runtime": "./extensions/omo-telemetry-posthog.js",
+      "#omo-telemetry-otlp-runtime": "./extensions/omo-telemetry-otlp.js",
       "#omo-memory-sync-runtime": "./extensions/omo-memory-sync.js",
       "#omo-feedback-runtime": "./extensions/omo-feedback.js",
+      "#omo-desktop-toolkit-runtime": "./extensions/omo-desktop-toolkit.js",
       "#omo-claim-receipt-runtime": "./extensions/omo-claim-receipt.js",
       "#omo-thread-client-runtime": "./extensions/omo-thread-client.js",
+      "#omo-wake-runtime": "./extensions/omo-wake.js",
       "#omo-telemetry-recovery-runtime": "./extensions/omo-telemetry-recovery.js",
       "#telemetry-immediate-send": "./extensions/omo-telemetry-recovery.js",
       "#omo-agent-toolkit-sdk": "./runtime/agent-toolkit-sdk/sdk.js",
+      "#bunshin-ts": "./runtime/bunshin-ts/sdk.js",
     })
   })
 })

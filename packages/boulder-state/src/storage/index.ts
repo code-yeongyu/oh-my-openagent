@@ -1,5 +1,13 @@
 export { getBoulderFilePath, resolveBoulderPlanPath, resolveBoulderPlanPathForWork } from "./path"
 export { findPrometheusPlans, getPlanName, getPlanProgress } from "./plan-progress"
+export {
+  formatMomusReviewArtifact,
+  getPlanReviewsDir,
+  hashPlanContent,
+  isContainedPlanPath,
+  writeMomusReviewArtifact,
+} from "./review-artifacts"
+export type { MomusReviewArtifactInput, MomusReviewVerdict } from "./review-artifacts"
 export { normalizeSessionId } from "./shared"
 export {
   getActiveWorks,
@@ -20,4 +28,12 @@ export {
   STALE_WORK_THRESHOLD_ENV_KEY,
 } from "./stale-work"
 export { endTaskTimer, startTaskTimer, upsertTaskSessionState, upsertTaskSessionStateForWork } from "./task"
-export { addBoulderWork, clearBoulderState, completeBoulder, createBoulderState, generateWorkId, selectActiveWork, writeBoulderState } from "./write-state"
+export {
+  addBoulderWork,
+  clearBoulderState,
+  completeBoulder,
+  createBoulderState,
+  generateWorkId,
+  selectActiveWork,
+  writeBoulderState,
+} from "./write-state"

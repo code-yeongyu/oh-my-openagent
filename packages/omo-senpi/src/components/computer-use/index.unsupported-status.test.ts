@@ -10,20 +10,32 @@ import { createComputerUseRuntime } from "./runtime"
 import { describeEnginePermissions } from "./permission-status"
 
 class Host extends FakeExtensionAPI {
-  getActiveTools() { return ["read"] }
+  getActiveTools() {
+    return ["read"]
+  }
   setActiveTools() {}
-  async executeTool() { return { content: [] } }
+  async executeTool() {
+    return { content: [] }
+  }
 }
 
-test.each([["linux", "riscv64"], ["win32", "ia32"]])("status preserves %s-%s absence after failed first use without acquisition", async (platform, arch) => {
+test.each([
+  ["linux", "riscv64"],
+  ["win32", "ia32"],
+])("status preserves %s-%s absence after failed first use without acquisition", async (platform, arch) => {
   const root = mkdtempSync(join(tmpdir(), "cu-unsupported-"))
   const pi = new Host()
   const locator = { platform, arch, execDir: root, repoRoot: root, packageDir: root, runtimeDir: "" }
   let starts = 0
   const messages: string[] = []
-  const fetch = spyOn(globalThis, "fetch").mockImplementation(Object.assign(() => {
-    throw new Error("status must not download")
-  }, { preconnect: globalThis.fetch.preconnect }))
+  const fetch = spyOn(globalThis, "fetch").mockImplementation(
+    Object.assign(
+      () => {
+        throw new Error("status must not download")
+      },
+      { preconnect: globalThis.fetch.preconnect },
+    ),
+  )
   try {
     createComputerUseComponent({
       platform,
@@ -44,7 +56,9 @@ test.each([["linux", "riscv64"], ["win32", "ia32"]])("status preserves %s-%s abs
     const registration = pi.commands.find((item) => item.name === "computer")
     if (!registration) throw new Error("computer command missing")
     const ctx = {
-      cwd: root, model: undefined, hasUI: true,
+      cwd: root,
+      model: undefined,
+      hasUI: true,
       sessionManager: { getSessionId: () => "unsupported", getSessionDir: () => root },
       ui: { notify: (text: string) => messages.push(text) },
     }
@@ -53,7 +67,9 @@ test.each([["linux", "riscv64"], ["win32", "ia32"]])("status preserves %s-%s abs
     expect(starts).toBe(0)
     await handler("on", ctx)
     expect(starts).toBe(1)
-    expect(messages.at(-1)).toContain("native-unavailable")
+    expect(messages.at(-1)).toBe(
+      "/computer on: Computer use is unavailable: no usable desktop engine was found for this host. Run /computer status to see the engine path and what is wrong with it.",
+    )
     await handler("status", ctx)
     expect(messages.at(-1)).toContain(`No senpi-desktop-engine is built for ${platform}-${arch}`)
     expect(messages.at(-1)).toContain("engine: native-unavailable")

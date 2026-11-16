@@ -27,20 +27,8 @@ export type LegacyConfigMigrationPlan = {
   readonly transform: MigrationTransform
 }
 
-export const DORI_SECTION_RENAME_MIGRATION_ID = "2026-10-dori-section-rename"
-
-/**
- * The one-shot legacy `gateway` -> `dori` section rename. The caller supplies it, so a host can load it lazily
- * and only when a config still carries the old section (the Senpi entry bundle does; see `dori-section-rename.ts`).
- */
-export type DoriSectionRename = {
-  readonly shouldRun: (target: Readonly<Record<string, unknown>>) => boolean
-  readonly transform: (document: unknown) => ConfigMigrationTransformResult
-}
-
 export type CreateLegacyConfigMigrationPlansOptions = ConfigMigrationDiscoveryOptions & {
   readonly backupTimestamp?: string
-  readonly doriSectionRename: DoriSectionRename
 }
 
 type OpenCodePlanInput = {
@@ -67,15 +55,17 @@ function descriptors(
 ): readonly MigrationSourceDescriptor[] {
   const homeDir = canonicalPath(options.homeDir, options)
   const pathOperations = hostPathOperations(options)
-  const userBackupRoot = pathOperations.join(
-    homeDir,
-    ".omo",
-    `migration-backup-${timestamp}-opencode-config`,
-  )
+  const userBackupRoot = pathOperations.join(homeDir, ".omo", `migration-backup-${timestamp}-opencode-config`)
   return sources.map((source) => ({
-    backupPath: source.projectRoot === undefined
-      ? pathOperations.join(userBackupRoot, safeRelativePath(source.path, homeDir, options))
-      : pathOperations.join(source.projectRoot, ".omo", `migration-backup-${timestamp}`, pathOperations.basename(source.path)),
+    backupPath:
+      source.projectRoot === undefined
+        ? pathOperations.join(userBackupRoot, safeRelativePath(source.path, homeDir, options))
+        : pathOperations.join(
+            source.projectRoot,
+            ".omo",
+            `migration-backup-${timestamp}`,
+            pathOperations.basename(source.path),
+          ),
     path: source.path,
   }))
 }
@@ -84,13 +74,16 @@ function openCodeInspection(
   input: OpenCodePlanInput,
   loaded: Parameters<MigrationTransform>[0],
 ): ConfigMigrationTransformResult {
-  return input.scopes.reduce<ConfigMigrationTransformResult>((result, scope) => {
-    const next = transformOpenCodeSources({ discovered: input.sources, scope, sources: loaded })
-    return {
-      diagnostics: [...result.diagnostics, ...next.diagnostics],
-      document: mergeRecords(result.document, next.document),
-    }
-  }, { diagnostics: [], document: {} })
+  return input.scopes.reduce<ConfigMigrationTransformResult>(
+    (result, scope) => {
+      const next = transformOpenCodeSources({ discovered: input.sources, scope, sources: loaded })
+      return {
+        diagnostics: [...result.diagnostics, ...next.diagnostics],
+        document: mergeRecords(result.document, next.document),
+      }
+    },
+    { diagnostics: [], document: {} },
+  )
 }
 
 function openCodePlan(
@@ -187,20 +180,6 @@ function subscriptionProviderRenamePlan(targetPath: string): LegacyConfigMigrati
   }
 }
 
-function doriSectionRenamePlan(targetPath: string, rename: DoriSectionRename): LegacyConfigMigrationPlan {
-  const inspect = (sources: Parameters<MigrationTransform>[0]): ConfigMigrationTransformResult =>
-    rename.transform(sources[0]?.value)
-  return {
-    id: DORI_SECTION_RENAME_MIGRATION_ID,
-    inspect,
-    mode: "replace-target",
-    shouldRun: rename.shouldRun,
-    sources: [],
-    targetPath,
-    transform: inspect,
-  }
-}
-
 function existingOmoConfigPath(directory: string, options: ConfigMigrationDiscoveryOptions): string | undefined {
   const fileSystem = discoveryFileSystem(options)
   for (const fileName of ["omo.jsonc", "omo.json"] as const) {
@@ -225,9 +204,10 @@ export function createLegacyConfigMigrationPlans(
     sources.push(source)
     projectSources.set(source.projectRoot, sources)
   }
-  const userInput: OpenCodePlanInput | undefined = userSources.length === 0
-    ? undefined
-    : { scopes: [{ kind: "user" }], sources: userSources, targetPath: userTargetPath }
+  const userInput: OpenCodePlanInput | undefined =
+    userSources.length === 0
+      ? undefined
+      : { scopes: [{ kind: "user" }], sources: userSources, targetPath: userTargetPath }
   const projectInputs: OpenCodePlanInput[] = []
   for (const [projectRoot, sources] of projectSources) {
     projectInputs.push({
@@ -236,23 +216,23 @@ export function createLegacyConfigMigrationPlans(
       targetPath: pathOperations.join(projectRoot, ".omo", "omo.jsonc"),
     })
   }
-  const openCodeInputs: OpenCodePlanInput[] = [
-    ...(userInput === undefined ? [] : [userInput]),
-    ...projectInputs,
-  ]
+  const openCodeInputs: OpenCodePlanInput[] = [...(userInput === undefined ? [] : [userInput]), ...projectInputs]
   const plans = mergeOpenCodeInputs(openCodeInputs, options).map((input) => openCodePlan(input, options, timestamp))
-  const legacyPlans = configJsoncGroup.id !== CONFIG_JSONC_MIGRATION_ID || configJsoncGroup.sources.length === 0
-    ? plans
-    : [
-      ...plans,
-      {
-        id: CONFIG_JSONC_MIGRATION_ID,
-        inspect: (loaded: Parameters<MigrationTransform>[0]) => transformConfigJsoncSources({ discovered: configJsoncGroup.sources, sources: loaded }),
-        sources: descriptors(configJsoncGroup.sources, options, timestamp),
-        targetPath: userTargetPath,
-        transform: (loaded: Parameters<MigrationTransform>[0]) => transformConfigJsoncSources({ discovered: configJsoncGroup.sources, sources: loaded }),
-      },
-    ]
+  const legacyPlans =
+    configJsoncGroup.id !== CONFIG_JSONC_MIGRATION_ID || configJsoncGroup.sources.length === 0
+      ? plans
+      : [
+          ...plans,
+          {
+            id: CONFIG_JSONC_MIGRATION_ID,
+            inspect: (loaded: Parameters<MigrationTransform>[0]) =>
+              transformConfigJsoncSources({ discovered: configJsoncGroup.sources, sources: loaded }),
+            sources: descriptors(configJsoncGroup.sources, options, timestamp),
+            targetPath: userTargetPath,
+            transform: (loaded: Parameters<MigrationTransform>[0]) =>
+              transformConfigJsoncSources({ discovered: configJsoncGroup.sources, sources: loaded }),
+          },
+        ]
 
   const reasoningTargets = new Map<string, string>()
   const addReasoningTarget = (targetPath: string | undefined): void => {
@@ -267,7 +247,6 @@ export function createLegacyConfigMigrationPlans(
 
   const inPlaceTargets = [...reasoningTargets.values()]
   return [
-    ...inPlaceTargets.map((targetPath) => doriSectionRenamePlan(targetPath, options.doriSectionRename)),
     ...legacyPlans,
     ...inPlaceTargets.map(reasoningPlan),
     ...inPlaceTargets.map(categoryDeepSplitPlan),

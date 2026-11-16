@@ -21,7 +21,8 @@ export {
   hasTelemetryApiKey,
   getTelemetryHost,
   getDefaultTelemetryOsProvider,
-  getTelemetryDistinctId,
+  TELEMETRY_INSTALL_ID_FILE_NAME,
+  getTelemetryInstallDistinctId,
   resolveTelemetryStateDir,
   getTelemetryActivityStateFilePath,
   getDailyActiveCaptureState,
@@ -36,10 +37,6 @@ export type CreateEventTelemetryClientInput = WithTransport<DefaultEventInput>
 export type RecordDailyActiveInput = WithTransport<DefaultDailyInput>
 export type CreateTelemetryClientInput = WithTransport<Parameters<typeof import("./index").createTelemetryClient>[0]>
 
-export declare function createTelemetryClient(
-  input: CreateTelemetryClientInput,
-): TelemetryClient
-export declare function createEventTelemetryClient(
-  input: CreateEventTelemetryClientInput,
-): EventTelemetryClient
+export declare function createTelemetryClient(input: CreateTelemetryClientInput): TelemetryClient
+export declare function createEventTelemetryClient(input: CreateEventTelemetryClientInput): EventTelemetryClient
 export declare function recordDailyActive(input: RecordDailyActiveInput): Promise<void>

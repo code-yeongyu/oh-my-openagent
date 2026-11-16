@@ -1,0 +1,126 @@
+/* omo.dev home: doriterm.com's landing system (doriterm docs/design/landing/DESIGN-LANDING.md) with OmO's teal
+   accent. The palette itself lives in app/styles/design-system.css; this file adds the landing's type, space and motion. */
+/* Type, space, radius and motion: the whole home page, plus the shared nav and footer on every other page (scoped so
+   the docs site keeps its own spacing scale). */
+:root.home,
+.nav,
+.footer,
+.skip {
+  --font-sans: var(--font-timeless), "Pretendard Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-term: var(--font-jetbrains), ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --text-display: clamp(2.75rem, 1.4rem + 5.6vw, 6rem);
+  --text-h2: clamp(2rem, 1.3rem + 2.8vw, 3.5rem);
+  --text-h3: 1.25rem;
+  --text-lede: clamp(1.0625rem, 1rem + 0.35vw, 1.25rem);
+  --text-body: 1rem;
+  --text-sm: 0.875rem;
+  --text-xs: 0.75rem;
+  --tracking-display: -0.04em;
+  --tracking-h2: -0.03em;
+  --weight-display: 560;
+
+  /* space (4 px base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --space-9: 96px;
+  --space-10: 144px;
+  --page-max: 1200px;
+  --gutter: clamp(20px, 4vw, 40px);
+
+  /* radius */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-pill: 999px;
+
+  /* motion */
+  --dur-press: 120ms;
+  --dur-ui: 220ms;
+  --dur-enter: 900ms;
+  --dur-draw: 1200ms;
+  --dur-loop: 3.2s;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-reverb: cubic-bezier(0.1, 1, 0.1, 1);
+  --ease-exit: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --ease-linear: linear;
+  --reveal-shift: 16px;
+}
+
+/* Night */
+:root,
+:root[data-theme="dark"] {
+  --bg: #0f0e0d;
+  --bg-raised: #141311;
+  --surface: #191816;
+  --surface-2: #211f1c;
+  --ink: #eeeeef;
+  --ink-soft: #a8a49b;
+  --ink-faint: #6e6a62;
+  --accent-wash: rgb(127 205 214 / 0.12);
+  --wait: #e2b86b;
+  --ok: #8fcf9a;
+  --primary-ink: #0f0e0d;
+  --dot: rgb(238 238 239 / 0.16);
+  --shadow-frame: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 24px 80px -24px rgb(0 0 0 / 0.7);
+  --term-bg: #121210;
+  --term-fg: #d8d4cb;
+  --term-dim: #8c877d;
+}
+
+/* Day */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #fbfaf7;
+    --bg-raised: #f6f5f1;
+    --surface: #ffffff;
+    --surface-2: #f0efea;
+    --ink: #1b1b1e;
+    --ink-soft: #5c5850;
+    --ink-faint: #9a958b;
+    --accent-wash: rgb(11 110 122 / 0.09);
+    --wait: #8a5a00;
+    --ok: #2f7a3e;
+    --primary-ink: #fbfaf7;
+    --dot: rgb(20 19 17 / 0.14);
+    --shadow-frame: 0 1px 0 rgb(255 255 255 / 0.8) inset, 0 24px 60px -28px rgb(40 32 20 / 0.28);
+    --term-bg: #fbfaf7;
+    --term-fg: #2a2723;
+    --term-dim: #6f6a61;
+  }
+}
+
+:root[data-theme="light"] {
+  --bg: #fbfaf7;
+  --bg-raised: #f6f5f1;
+  --surface: #ffffff;
+  --surface-2: #f0efea;
+  --ink: #1b1b1e;
+  --ink-soft: #5c5850;
+  --ink-faint: #9a958b;
+  --accent-wash: rgb(11 110 122 / 0.09);
+  --wait: #8a5a00;
+  --ok: #2f7a3e;
+  --primary-ink: #fbfaf7;
+  --dot: rgb(20 19 17 / 0.14);
+  --shadow-frame: 0 1px 0 rgb(255 255 255 / 0.8) inset, 0 24px 60px -28px rgb(40 32 20 / 0.28);
+  --term-bg: #fbfaf7;
+  --term-fg: #2a2723;
+  --term-dim: #6f6a61;
+}
+
+/* A pinned theme also pins the scheme the browser draws its own controls, scrollbars and autofill in. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}

@@ -3,7 +3,7 @@ import type { JSX, ReactNode } from "react"
 import { cn } from "@/lib/utils"
 
 export interface LedgerRowProps {
-  /** Index cell, Numeral style in `--text-faint` ("01", "A", "v2"). */
+  /** Index cell, Numeral style in `--text-lo` ("01", "A", "v2"). */
   readonly index: ReactNode
   /** Heading level for the explanation title. */
   readonly title: ReactNode
@@ -46,7 +46,7 @@ export function LedgerRow({
     >
       <div
         aria-hidden="true"
-        className="text-text-faint ease-standard group-focus-within:text-accent group-data-[active=true]:text-accent font-medium tracking-[-0.03em] tabular-nums transition-colors duration-[var(--dur-micro)] lg:text-[clamp(2rem,1.4rem+2vw,2.75rem)] lg:leading-none"
+        className="text-text-lo ease-standard group-focus-within:text-accent group-data-[active=true]:text-accent font-medium tracking-[-0.03em] tabular-nums transition-colors duration-[var(--dur-micro)] lg:text-[clamp(2rem,1.4rem+2vw,2.75rem)] lg:leading-none"
       >
         {index}
       </div>

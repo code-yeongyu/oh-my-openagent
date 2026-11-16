@@ -13,7 +13,10 @@ function shellDeps(shellType: ShellType) {
 
 const unixShell = shellDeps("unix")
 
-async function prefixedGitCommand(hook: ReturnType<typeof createNonInteractiveEnvHook>, command = "git status"): Promise<string> {
+async function prefixedGitCommand(
+  hook: ReturnType<typeof createNonInteractiveEnvHook>,
+  command = "git status",
+): Promise<string> {
   const output: { args: Record<string, unknown>; message?: string } = { args: { command } }
   await hook["tool.execute.before"]({ tool: "bash", sessionID: "test", callID: "1" }, output)
   return output.args.command as string
@@ -29,10 +32,7 @@ describe("non-interactive-env hook", () => {
         args: { command: "git commit -m 'test'" },
       }
 
-      await hook["tool.execute.before"](
-        { tool: "bash", sessionID: "test", callID: "1" },
-        output
-      )
+      await hook["tool.execute.before"]({ tool: "bash", sessionID: "test", callID: "1" }, output)
 
       const cmd = output.args.command as string
       expect(cmd).toStartWith("export ")
@@ -48,10 +48,7 @@ describe("non-interactive-env hook", () => {
         args: { command: "git add file && git rebase --continue" },
       }
 
-      await hook["tool.execute.before"](
-        { tool: "bash", sessionID: "test", callID: "1" },
-        output
-      )
+      await hook["tool.execute.before"]({ tool: "bash", sessionID: "test", callID: "1" }, output)
 
       const cmd = output.args.command as string
       expect(cmd).toStartWith("export ")
@@ -64,10 +61,7 @@ describe("non-interactive-env hook", () => {
         args: { command: "ls -la" },
       }
 
-      await hook["tool.execute.before"](
-        { tool: "bash", sessionID: "test", callID: "1" },
-        output
-      )
+      await hook["tool.execute.before"]({ tool: "bash", sessionID: "test", callID: "1" }, output)
 
       expect(output.args.command).toBe("ls -la")
     })
@@ -78,10 +72,7 @@ describe("non-interactive-env hook", () => {
         args: { command: "git status" },
       }
 
-      await hook["tool.execute.before"](
-        { tool: "Read", sessionID: "test", callID: "1" },
-        output
-      )
+      await hook["tool.execute.before"]({ tool: "Read", sessionID: "test", callID: "1" }, output)
 
       expect(output.args.command).toBe("git status")
     })
@@ -92,38 +83,29 @@ describe("non-interactive-env hook", () => {
         args: {},
       }
 
-      await hook["tool.execute.before"](
-        { tool: "bash", sessionID: "test", callID: "1" },
-        output
-      )
+      await hook["tool.execute.before"]({ tool: "bash", sessionID: "test", callID: "1" }, output)
 
       expect(output.args.command).toBeUndefined()
     })
 
     test("#given git command already has prefix #when hook executes again #then does not duplicate prefix", async () => {
       const hook = createNonInteractiveEnvHook(mockCtx, unixShell)
-      
+
       // First call: transforms the command
       const output1: { args: Record<string, unknown>; message?: string } = {
         args: { command: "git commit -m 'test'" },
       }
-      await hook["tool.execute.before"](
-        { tool: "bash", sessionID: "test", callID: "1" },
-        output1
-      )
-      
+      await hook["tool.execute.before"]({ tool: "bash", sessionID: "test", callID: "1" }, output1)
+
       const firstResult = output1.args.command as string
       expect(firstResult).toStartWith("export ")
-      
+
       // Second call: takes the already-prefixed command
       const output2: { args: Record<string, unknown>; message?: string } = {
         args: { command: firstResult },
       }
-      await hook["tool.execute.before"](
-        { tool: "bash", sessionID: "test", callID: "2" },
-        output2
-      )
-      
+      await hook["tool.execute.before"]({ tool: "bash", sessionID: "test", callID: "2" }, output2)
+
       // Should be exactly the same (no double prefix)
       expect(output2.args.command).toBe(firstResult)
     })
@@ -136,10 +118,7 @@ describe("non-interactive-env hook", () => {
         args: { command: "git status" },
       }
 
-      await hook["tool.execute.before"](
-        { tool: "bash", sessionID: "test", callID: "1" },
-        output
-      )
+      await hook["tool.execute.before"]({ tool: "bash", sessionID: "test", callID: "1" }, output)
 
       const cmd = output.args.command as string
       expect(cmd).toContain("VISUAL=''")
@@ -151,10 +130,7 @@ describe("non-interactive-env hook", () => {
         args: { command: "git log" },
       }
 
-      await hook["tool.execute.before"](
-        { tool: "bash", sessionID: "test", callID: "1" },
-        output
-      )
+      await hook["tool.execute.before"]({ tool: "bash", sessionID: "test", callID: "1" }, output)
 
       const cmd = output.args.command as string
       for (const key of Object.keys(NON_INTERACTIVE_ENV)) {
@@ -170,10 +146,7 @@ describe("non-interactive-env hook", () => {
         args: { command: "vim file.txt" },
       }
 
-      await hook["tool.execute.before"](
-        { tool: "bash", sessionID: "test", callID: "1" },
-        output
-      )
+      await hook["tool.execute.before"]({ tool: "bash", sessionID: "test", callID: "1" }, output)
 
       expect(output.message).toContain("vim")
       expect(output.message).toContain("interactive")
@@ -185,10 +158,7 @@ describe("non-interactive-env hook", () => {
         args: { command: "ls -la" },
       }
 
-      await hook["tool.execute.before"](
-        { tool: "bash", sessionID: "test", callID: "1" },
-        output
-      )
+      await hook["tool.execute.before"]({ tool: "bash", sessionID: "test", callID: "1" }, output)
 
       expect(output.message).toBeUndefined()
     })

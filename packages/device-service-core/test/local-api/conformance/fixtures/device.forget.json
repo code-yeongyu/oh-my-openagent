@@ -1,0 +1,65 @@
+{
+  "request": "device.forget",
+  "cases": [
+    {
+      "name": "forgetting answers and the status turns signed_out",
+      "outcome": "ok",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "device.forget"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": true,
+            "data": {}
+          }
+        },
+        {
+          "send": {
+            "id": "2",
+            "type": "status.get"
+          }
+        },
+        {
+          "expect": {
+            "id": "2",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "state": "signed_out",
+              "device": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "an extra field is refused",
+      "outcome": "refusal",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "device.forget",
+            "device": "dev-self"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "invalid_request"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

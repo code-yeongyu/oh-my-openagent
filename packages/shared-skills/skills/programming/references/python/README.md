@@ -41,7 +41,7 @@ These are deliberate project choices. Violations are always wrong, not "style pr
 11. **No Any, no object** — both are banned as type annotations. `object` erases all structural information (zero callable attributes, zero narrowing). Use `Protocol` (structural typing), `TypeVar` (generic pass-through), explicit union (known variants), or `TypedDict` (dict shapes).
 12. **No cast** — `cast()` is banned. Redesign the types.
 13. **No type: ignore** — fix the type error. The checker is right; you are wrong.
-14. **No broad except** — `except Exception` and `except BaseException` are banned. Catch the **specific** exception you expect. A broad catch swallows bugs you need to see — `KeyError`, `AttributeError`, `TypeError` all vanish silently. If you genuinely need a catch-all at a top-level boundary (CLI entry, HTTP handler), use `# noqa: BROAD_EXCEPT_OK` and log + re-raise.
+14. **No broad except** — `except Exception` and `except BaseException` are banned. Catch the **specific** exception you expect. A broad catch swallows bugs you need to see — `KeyError`, `AttributeError`, `TypeError` all vanish silently. If you genuinely need a catch-all at a top-level boundary (CLI entry, HTTP handler), put `# noqa: BROAD_EXCEPT_OK` on the `except` line and log + re-raise.
 
 ### Typing and safety
 
@@ -147,19 +147,19 @@ except Exception:
 # GOOD — catch what you expect
 try:
     result = api.fetch(url)
-except httpx.HTTPStatusError as e:
+except httpx2.HTTPStatusError as e:
     logger.error("API %d: %s", e.response.status_code, e.request.url)
     return None
-except httpx.ConnectError:
+except httpx2.ConnectError:
     raise ServiceUnavailableError(service="api") from None
 
-# GOOD — top-level boundary (only place broad catch is acceptable)
-def main() -> int:  # noqa: BROAD_EXCEPT_OK
+# GOOD — top-level boundary (CLI entry or HTTP handler: the only places a broad catch is acceptable)
+def main() -> int:
     try:
         return run()
-    except Exception:
+    except Exception:  # noqa: BROAD_EXCEPT_OK
         logger.exception("unhandled error")
-        return 1
+        raise
 ```
 
 ### Async
@@ -221,9 +221,9 @@ Canonical defaults (override only if `pyproject.toml` explicitly picks something
 Scaffold a new project with all strict defaults pre-configured:
 
 ```bash
-uv run ../../scripts/python/new-project.py myproject
-uv run ../../scripts/python/new-project.py myproject --path ./workspace
-uv run ../../scripts/python/new-project.py myproject --lib   # publishable library
+bun run ../../scripts/python/new-project.ts myproject
+bun run ../../scripts/python/new-project.ts myproject --path ./workspace
+bun run ../../scripts/python/new-project.ts myproject --lib   # publishable library
 ```
 
 Creates via `uv init`, then injects basedpyright `typeCheckingMode = "all"` + ruff `select = ["ALL"]` + pytest strict. Cross-platform (macOS, Linux, Windows).
@@ -234,7 +234,7 @@ For manual setup: `uv init --app myproject`, then load `pyproject-strict.md`.
 
 Every `.py` script — even throwaway — MUST use PEP 723 inline metadata with the `# ─── How to run ───` comment block. No venv, no `requirements.txt`. The script IS the environment spec. A script without the usage comment block is incomplete.
 
-Scaffold with: `uv run ../../scripts/python/new-script.py <name> --deps "httpx2[http2,brotli,zstd]"` (writes to temp dir by default, `--output` for specific path).
+Scaffold with: `bun run ../../scripts/python/new-script.ts <name> --deps "httpx2[http2,brotli,zstd]"` (writes to temp dir by default, `--output` for specific path).
 
 Load `one-liners.md` for full patterns, examples, and anti-patterns.
 
@@ -307,7 +307,7 @@ Tests still follow the iron list — frozen dataclasses, typed errors, exhaustiv
 
 ## Existing codebases
 
-When editing an existing file that doesn't follow these rules: **write new code in strict style, don't refactor existing code in the same change.** Mixing feature work with style migration makes reviews harder and bugs likelier.
+When editing an existing file that doesn't follow these rules: **write new code in strict style, don't refactor existing code in the same change.** The one exception is the 250 pure-LOC ceiling: if your edit adds lines to a file already over it, split the unit you are touching into its own file first (see [`../code-smells.md`](../code-smells.md) Smell 1); everything else waits for a separate change. Mixing feature work with style migration makes reviews harder and bugs likelier.
 
 ## Activation
 

@@ -1,11 +1,22 @@
 import { describe, expect, test } from "bun:test"
 
-import { classifyRunProcess, isLauncherDead } from "./run-liveness"
+import { classifyRunProcess, isLauncherDead, waitUntil } from "./run-liveness"
 
 const alive = () => "alive" as const
 const dead = () => "dead" as const
 
 describe("run process liveness across start-identity schemes", () => {
+  test("#given a run deadline minutes away #when its observer cancels #then the timer wait rejects immediately", async () => {
+    const controller = new AbortController()
+    const reason = new Error("observer deadline")
+    const pending = waitUntil(Date.now() + 60_000, Date.now, controller.signal).then(
+      () => undefined,
+      (error: unknown) => error,
+    )
+    controller.abort(reason)
+    expect(await pending).toBe(reason)
+  })
+
   test("#given a live pid recorded with ps-lstart and read back as proc-start-epoch #when classified #then the mismatch is not pid reuse and the process is alive", async () => {
     // given
     const recorded = "ps-lstart:Tue Sep 15 14:59:03 2026"
@@ -56,6 +67,17 @@ describe("run process liveness across start-identity schemes", () => {
 
     // then
     expect(verdict).toBe("dead")
+  })
+
+  test("#given a dead pid recorded with no start #when classified by reconciliation #then it stays unknown, so queued and deadline waits are unchanged (C20 control)", async () => {
+    // when
+    const verdict = await classifyRunProcess(424242, undefined, {
+      getPidLiveness: dead,
+      getProcessStartIdentity: async () => null,
+    })
+
+    // then
+    expect(verdict).toBe("unknown")
   })
 
   test("#given scheme-less legacy identities that differ #when classified #then raw inequality still means pid reuse", async () => {

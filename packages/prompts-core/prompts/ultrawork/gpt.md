@@ -185,6 +185,7 @@ Trigger if user said "엄밀"/"strictly"/"rigorously"/"properly review", or task
 - After each result, ask whether the user's core request can now be answered with useful evidence in hand. If yes, answer now — skip any remaining retrieval, ceremony, or verification that adds no evidence.
 - The STOP GOAL: every scenario PASSES with its real-surface artifact captured and the tests of record green; full suite green and `lsp_diagnostics` clean on changed files; QA teardown receipts recorded; no scope creep; and (if triggered) the reviewer gate approved unconditionally. Above ALL of that, the decisive test — outranking every other consideration — is: is the user's problem ACTUALLY SOLVED in observable behavior? If no, you are NOT done, whatever the checklist says. If yes, deliver the final message and STOP — no hesitation, no extra verification pass, no polish loop. Work past the stop goal is scope creep, not diligence.
 - After 2 identical failed attempts at one step, surface what was tried and ask the user before another retry.
+- A permission denial or a refusal by the user is not a blocker to work around: it is final for what that call was meant to do. Never reach that result with another tool, command, path or host; ask the user.
 - After 2 parallel exploration waves yield no new useful facts, stop exploring and act.
 
 **Deliver exactly what was asked. No more, no less.**

@@ -2,7 +2,7 @@
 
 Codex plugin component that emits a single anonymous daily-active event (`omo_codex_daily_active`) to PostHog whenever a Codex session starts.
 
-The event is sent **at most once per UTC day per machine**. It uses a SHA256-hashed installation identifier derived from `omo-codex:${hostname}` and never sends the raw hostname. PostHog person profiles are explicitly disabled.
+The event is sent **at most once per UTC day per machine**. Its distinct id is `sha256` of a random install id created on the first send and stored as `install-id` in the telemetry state directory; nothing about the machine or user is used to build it. PostHog person profiles are explicitly disabled.
 
 ## Hook Wiring
 
@@ -33,7 +33,7 @@ The aggregate `plugin/hooks/hooks.json` mounts this hook alongside `rules` and `
 A single PostHog `capture` call with:
 
 - `event: "omo_codex_daily_active"`
-- `distinctId: sha256("omo-codex:" + hostname)`
+- `distinctId: sha256(install id)`
 - `properties`:
   - `platform`, `product_name`, `package_name`, `package_version`
   - `runtime` (`"node"`), `runtime_version`

@@ -124,7 +124,8 @@ function findAncestorDirectories(
 }
 
 export function findProjectOpencodeCommandDirs(startDirectory: string, stopDirectory?: string): string[] {
-  const detectedStopDirectory = stopDirectory ?? detectWorktreePath(startDirectory) ?? findGitMarkerAncestor(startDirectory)
+  const detectedStopDirectory =
+    stopDirectory ?? detectWorktreePath(startDirectory) ?? findGitMarkerAncestor(startDirectory)
 
   return findAncestorDirectories(
     startDirectory,

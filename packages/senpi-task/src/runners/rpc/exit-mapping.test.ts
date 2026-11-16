@@ -3,14 +3,21 @@ import { describe, expect, test } from "bun:test"
 import { classifyChildExit, mapExitOutcomeToError, tailStderr } from "./exit-mapping"
 
 /** Lines a killed Windows child really wrote to stderr in #9471: the Bun reaper advisory, then memory teardown diagnostics. */
-const REAPER_ADVISORY = "child reaper unavailable under Bun on win32: children orphaned by a terminated worker thread stay as zombies until this host exits"
+const REAPER_ADVISORY =
+  "child reaper unavailable under Bun on win32: children orphaned by a terminated worker thread stay as zombies until this host exits"
 const MEMORY_RENAME_EPERM = `${REAPER_ADVISORY}\nmemory shutdown drain step failed {\n  step: "shutdown-evaluator",\n  reason: "quit",\n  error: "Error: EPERM: operation not permitted, rename 'state.json.tmp-1' -> 'state.json'",\n}\n`
 const MEMORY_DRAIN_BUDGET = `${REAPER_ADVISORY}\nmemory shutdown drain hit its budget {\n  step: "facts-enqueue",\n  reason: "quit",\n  remainingMs: 0,\n  completedSteps: [ "journal-flush" ],\n}\n`
 
 describe("classifyChildExit", () => {
   test("#given a spawn error #when classifying #then it is a spawn_error outcome", () => {
     // when
-    const outcome = classifyChildExit({ code: null, signal: null, error: new Error("ENOENT"), pid: undefined, stderr: "" })
+    const outcome = classifyChildExit({
+      code: null,
+      signal: null,
+      error: new Error("ENOENT"),
+      pid: undefined,
+      stderr: "",
+    })
 
     // then
     expect(outcome.kind).toBe("spawn_error")
@@ -36,8 +43,20 @@ describe("classifyChildExit", () => {
 
   test("#given a child the runner terminated #when it exits with code 1 and memory teardown lines on stderr #then it is killed", () => {
     // when
-    const renameFailure = classifyChildExit({ code: 1, signal: null, pid: 8076, stderr: MEMORY_RENAME_EPERM, terminatedByRunner: true })
-    const drainBudget = classifyChildExit({ code: 1, signal: null, pid: 5532, stderr: MEMORY_DRAIN_BUDGET, terminatedByRunner: true })
+    const renameFailure = classifyChildExit({
+      code: 1,
+      signal: null,
+      pid: 8076,
+      stderr: MEMORY_RENAME_EPERM,
+      terminatedByRunner: true,
+    })
+    const drainBudget = classifyChildExit({
+      code: 1,
+      signal: null,
+      pid: 5532,
+      stderr: MEMORY_DRAIN_BUDGET,
+      terminatedByRunner: true,
+    })
 
     // then
     expect(renameFailure.kind).toBe("killed")
@@ -47,7 +66,9 @@ describe("classifyChildExit", () => {
 
   test("#given a child the runner terminated that exited cleanly on the signal #when classifying #then it is still killed", () => {
     // when / then
-    expect(classifyChildExit({ code: 0, signal: null, pid: 2, stderr: "", terminatedByRunner: true }).kind).toBe("killed")
+    expect(classifyChildExit({ code: 0, signal: null, pid: 2, stderr: "", terminatedByRunner: true }).kind).toBe(
+      "killed",
+    )
   })
 
   test("#given a child that exits on its own and writes 'killed' #when classifying #then it is crashed, not killed", () => {
@@ -76,7 +97,10 @@ describe("classifyChildExit", () => {
 
   test("#given a spawn error on a child the runner was terminating #when classifying #then the spawn error wins", () => {
     // when / then
-    expect(classifyChildExit({ code: null, signal: null, error: new Error("EPERM"), stderr: "", terminatedByRunner: true }).kind).toBe("spawn_error")
+    expect(
+      classifyChildExit({ code: null, signal: null, error: new Error("EPERM"), stderr: "", terminatedByRunner: true })
+        .kind,
+    ).toBe("spawn_error")
   })
 
   test("#given a nonzero exit code #when classifying #then it is crashed and stderr tail is capped at 4KB", () => {
@@ -120,7 +144,13 @@ describe("mapExitOutcomeToError", () => {
 
   test("#given a child the runner terminated #when mapping #then killed:true and the message says the runner stopped it", () => {
     // given
-    const outcome = classifyChildExit({ code: 1, signal: null, pid: 6664, stderr: MEMORY_DRAIN_BUDGET, terminatedByRunner: true })
+    const outcome = classifyChildExit({
+      code: 1,
+      signal: null,
+      pid: 6664,
+      stderr: MEMORY_DRAIN_BUDGET,
+      terminatedByRunner: true,
+    })
 
     // when
     const mapped = mapExitOutcomeToError(outcome, { alreadyTerminal: false })
@@ -161,14 +191,24 @@ describe("mapExitOutcomeToError", () => {
 
   test("#given a daemon session that ended with a reason and no exit code #when mapping #then the host's reason is the whole message", () => {
     // given: a session exit carries no pid, code or signal; the host's reason rides the stderr tail
-    const outcome = { kind: "crashed" as const, facts: { pid: undefined, code: null, signal: null, stderrTail: "transport lost: the connection to the task host dropped and the child did not resume" } }
+    const outcome = {
+      kind: "crashed" as const,
+      facts: {
+        pid: undefined,
+        code: null,
+        signal: null,
+        stderrTail: "transport lost: the connection to the task host dropped and the child did not resume",
+      },
+    }
 
     // when
     const mapped = mapExitOutcomeToError(outcome, { alreadyTerminal: false })
 
     // then
     expect(mapped?.killed).toBe(false)
-    expect(mapped?.error_message).toBe("transport lost: the connection to the task host dropped and the child did not resume")
+    expect(mapped?.error_message).toBe(
+      "transport lost: the connection to the task host dropped and the child did not resume",
+    )
   })
 
   test("#given an exit AFTER a terminal state #when mapping #then it is resident teardown with no status change", () => {
@@ -179,4 +219,3 @@ describe("mapExitOutcomeToError", () => {
     expect(mapExitOutcomeToError(outcome, { alreadyTerminal: true })).toBeNull()
   })
 })
-

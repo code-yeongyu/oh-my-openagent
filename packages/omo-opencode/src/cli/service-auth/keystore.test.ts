@@ -1,20 +1,50 @@
 import { describe, expect, test } from "bun:test"
 import { randomUUID } from "node:crypto"
-import { createCredentialStore } from "./keystore"
+import { createCredentialStore, InvalidCredentialState } from "./keystore"
 import { grant, memorySecrets, privateKeys } from "./test-support"
 
 describe("OS credential storage", () => {
-  test.each(["darwin", "linux", "win32"] as const)("delegates %s storage exclusively to the in-process secret API", async platform => {
-    const memory = memorySecrets()
-    const store = createCredentialStore("https://api.omo.dev", memory.api, platform, async () => "unlocked")
-    const record = { ...grant, ...privateKeys }
-    await store.write(record)
-    expect(await store.read()).toMatchObject(record)
-    expect(memory.values.size).toBe(1)
-    expect(JSON.parse(memory.writes[0] ?? "")).toMatchObject(record)
-    await store.clear()
-    expect(await store.read()).toBeNull()
-  })
+  test.each(["read", "readAuthoritative"] as const)(
+    "%s reports corrupt credentials with the account-forget recovery error",
+    async (read) => {
+      const store = createCredentialStore("https://api.omo.dev", {
+        platform: "darwin",
+        secrets: {
+          get: async () => "{",
+          set: async () => {
+            throw new Error("unexpected write")
+          },
+          delete: async () => {
+            throw new Error("unexpected delete")
+          },
+        },
+      })
+      const error = await store[read]().catch((error) => error)
+      expect(error).toBeInstanceOf(InvalidCredentialState)
+      expect(error.message).toBe(
+        "The OmO sign-in saved on this computer can't be read. Run omo account forget to remove it, then sign in again from the OmO desktop app on this computer, or with omo login in a terminal.",
+      )
+    },
+  )
+
+  test.each(["darwin", "linux", "win32"] as const)(
+    "delegates %s storage exclusively to the in-process secret API",
+    async (platform) => {
+      const memory = memorySecrets()
+      const store = createCredentialStore("https://api.omo.dev", {
+        secrets: memory.api,
+        platform,
+        lockProbe: async () => "unlocked",
+      })
+      const record = { ...grant, ...privateKeys }
+      await store.write(record)
+      expect(await store.read()).toMatchObject(record)
+      expect(memory.values.size).toBe(1)
+      expect(JSON.parse(memory.writes[0] ?? "")).toMatchObject(record)
+      await store.clear()
+      expect(await store.read()).toBeNull()
+    },
+  )
 
   test("isolates origins and canonicalizes trailing slash", async () => {
     const memory = memorySecrets()
@@ -25,12 +55,25 @@ describe("OS credential storage", () => {
 
   test("unavailable store fails without exposing native error contents", async () => {
     const store = createCredentialStore("https://api.omo.dev", {
-      get: async () => { throw new Error(grant.refreshToken) },
-      set: async () => { throw new Error(grant.refreshToken) },
-      delete: async () => { throw new Error(grant.refreshToken) },
-    }, "linux", async () => "unlocked")
+      secrets: {
+        get: async () => {
+          throw new Error(grant.refreshToken)
+        },
+        set: async () => {
+          throw new Error(grant.refreshToken)
+        },
+        delete: async () => {
+          throw new Error(grant.refreshToken)
+        },
+      },
+      platform: "linux",
+      lockProbe: async () => "unlocked",
+    })
     for (const action of [() => store.read(), () => store.write({ ...grant, ...privateKeys }), () => store.clear()]) {
-      try { await action(); throw new Error("unexpected success") } catch (error) {
+      try {
+        await action()
+        throw new Error("unexpected success")
+      } catch (error) {
         expect(String(error)).toContain("Secret Service")
         expect(String(error)).not.toContain(grant.refreshToken)
       }
@@ -38,7 +81,7 @@ describe("OS credential storage", () => {
   })
 
   test("unsupported runtimes fail closed with no file fallback", () => {
-    expect(() => createCredentialStore("https://api.omo.dev", null, "linux")).toThrow("Bun")
+    expect(() => createCredentialStore("https://api.omo.dev", { secrets: null, platform: "linux" })).toThrow("Bun")
   })
 
   test.skipIf(process.env.OMO_TEST_REAL_KEYSTORE !== "1")("opt-in real OS keystore smoke", async () => {

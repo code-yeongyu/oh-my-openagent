@@ -1,4 +1,4 @@
-import { type ChildProcess, type SpawnOptions, spawnSync } from "node:child_process";
+import type { ChildProcess, SpawnOptions } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -11,6 +11,7 @@ import {
 	resolveDaemonNodeExecutable,
 	spawnDaemonProcess,
 } from "../src/ensure-daemon.js";
+import { runBunChild } from "./bun-child.js";
 import { daemonTestPaths } from "./daemon-path-fixture.js";
 
 const PATHS = daemonTestPaths("/tmp/ensure-test", "9.9.9");
@@ -223,9 +224,9 @@ describe("ensureDaemonRunning", () => {
 			if (uncaughtError) throw uncaughtError;
 		`;
 
-		const child = spawnSync("bun", ["--eval", script], { encoding: "utf8" });
+		const child = await runBunChild(["--eval", script], { label: "aborted ping probe" });
 
-		expect(child.status, child.stderr).toBe(0);
+		expect(child.code, child.stderr).toBe(0);
 	});
 });
 

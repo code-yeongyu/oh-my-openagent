@@ -71,12 +71,15 @@ function capture(
   emitted.add(key)
 
   const events = readTaskEvents(options.stateDir, record.task_id)
-  options.captureEvent("delegation_completed", projectDelegationCompleted({
-    edge,
-    sessionHash: options.hashSessionId(record.parent_session_id),
-    startReason: startReasonOf(record, events, priorStatus),
-    steerCounts: countSteers(events, record.notification.run_epoch),
-  }))
+  options.captureEvent(
+    "delegation_completed",
+    projectDelegationCompleted({
+      edge,
+      sessionHash: options.hashSessionId(record.parent_session_id),
+      startReason: startReasonOf(record, events, priorStatus),
+      steerCounts: countSteers(events, record.notification.run_epoch),
+    }),
+  )
   if (record.task_seq !== undefined) priorStatus.set(record.task_seq, record.status)
 }
 
@@ -108,6 +111,7 @@ function startReasonOf(
       return "revive_after_lost"
     case "pending":
     case "running":
+    case "paused":
     case undefined:
       // The prior terminal happened in a process that is gone (or before this subscription): the
       // epoch proves a resume, but its prior outcome is not knowable here and is never guessed.

@@ -1,0 +1,68 @@
+{
+  "request": "service.set_enabled",
+  "cases": [
+    {
+      "name": "turning off answers enabled false and the status turns disabled",
+      "outcome": "ok",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "service.set_enabled",
+            "enabled": false
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "enabled": false
+            }
+          }
+        },
+        {
+          "send": {
+            "id": "2",
+            "type": "status.get"
+          }
+        },
+        {
+          "expect": {
+            "id": "2",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "state": "disabled",
+              "enabled": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a string instead of a boolean is refused",
+      "outcome": "refusal",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "service.set_enabled",
+            "enabled": "false"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "invalid_request"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

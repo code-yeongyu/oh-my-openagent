@@ -19,16 +19,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * `caution` is an optional one-line warning renderers show prominently; on an entry that replaces
  * a builtin it carries over from that builtin when unset, like `display_name`.
  */
-const OmoModelProfileInputSchema = z.object({
-  display_name: z.string().optional(),
-  caution: z.string().optional(),
-  family: z.enum(["daily", "geeky"]).optional(),
-  tier: z.enum(["normal", "heavy"]).optional(),
-  models: z.array(z.union([z.string(), OmoFallbackModelObjectSchema])).optional(),
-}).strict()
+const OmoModelProfileInputSchema = z
+  .object({
+    display_name: z.string().optional(),
+    caution: z.string().optional(),
+    family: z.enum(["daily", "geeky"]).optional(),
+    tier: z.enum(["normal", "heavy"]).optional(),
+    models: z.array(z.union([z.string(), OmoFallbackModelObjectSchema])).optional(),
+  })
+  .strict()
 
 export const OmoModelProfileSchema = z.preprocess(
-  (value) => isRecord(value) ? normalizeLegacyModelFields(value) : value,
+  (value) => (isRecord(value) ? normalizeLegacyModelFields(value) : value),
   OmoModelProfileInputSchema,
 )
 
@@ -36,7 +38,7 @@ export const OmoModelProfilesSchema = z.record(z.string(), OmoModelProfileSchema
 
 const OmoModelProfileLayerInputSchema = OmoModelProfileInputSchema.partial()
 export const OmoModelProfileLayerSchema = z.preprocess(
-  (value) => isRecord(value) ? normalizeLegacyModelFields(value) : value,
+  (value) => (isRecord(value) ? normalizeLegacyModelFields(value) : value),
   OmoModelProfileLayerInputSchema,
 )
 export const OmoModelProfilesLayerSchema = z.record(z.string(), OmoModelProfileLayerSchema)

@@ -238,6 +238,7 @@ fn drag(
     for &(x, y) in &path[1..] {
         thread::sleep(Duration::from_millis(16));
         overlay.target(x, y);
+        held.button_moved(&route, button, local_point(window, x, y));
         post_mouse(
             source, pid, wid, window, dragged, cg_button, x, y, 3, 1, number, group, flags,
         )?;

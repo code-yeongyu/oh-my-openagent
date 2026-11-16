@@ -5,9 +5,18 @@
 // verify what they read through the client chain before using it.
 
 import type { KeyringEntry } from "../crypto/entry.ts"
-import type { AppendResult, ChainRow, KeyringAppendRequest, RecoveryTransport, RecoveryWrapRow, TransportRefusal } from "../recovery/ports.ts"
+import { admitSyncOperation, syncOperationSignal, type SyncOperationOptions } from "../operation-authority.ts"
+import { syncHeaders } from "../contract-version.ts"
+import type {
+  AppendResult,
+  ChainRow,
+  KeyringAppendRequest,
+  RecoveryTransport,
+  RecoveryWrapRow,
+  TransportRefusal,
+} from "../recovery/ports.ts"
 
-export interface AccountHttpOptions {
+export interface AccountHttpOptions extends SyncOperationOptions {
   readonly baseUrl: string
   /** The device's bearer token, read per request so a refresh takes effect. */
   readonly token: () => string | Promise<string>
@@ -18,11 +27,13 @@ export interface AccountState {
   readonly head: { readonly seq: number; readonly link: string; readonly keyring_link: string }
   readonly currentEpoch: number
   readonly rotationPending: boolean
+  /** omo-service `accepts_phrase_keys` (#1070): true only while the service accepts new phrase keys; absent reads false. */
+  readonly acceptsPhraseKeys: boolean
 }
 
 export interface AccountHttp extends RecoveryTransport {
-  listEntriesAfter(after: number): Promise<ReadonlyArray<ChainRow> | null>
-  state(): Promise<AccountState | null>
+  listEntriesAfter(after: number, operation?: SyncOperationOptions): Promise<ReadonlyArray<ChainRow> | null>
+  state(operation?: SyncOperationOptions): Promise<AccountState | null>
 }
 
 export class AccountHttpError extends Error {
@@ -35,9 +46,15 @@ export class AccountHttpError extends Error {
   }
 }
 
-const REFUSALS: ReadonlySet<string> = new Set<TransportRefusal>(["stale_base", "rate_limited", "not_found"])
+const REFUSALS: ReadonlySet<string> = new Set<TransportRefusal>([
+  "stale_base",
+  "rate_limited",
+  "not_found",
+  "phrase_keys_not_accepted",
+])
 
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value)
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
 
 const listOf = (value: unknown, key: string): ReadonlyArray<unknown> | null => {
   if (!isRecord(value)) return null
@@ -47,10 +64,23 @@ const listOf = (value: unknown, key: string): ReadonlyArray<unknown> | null => {
 
 export function createAccountHttp(options: AccountHttpOptions): AccountHttp {
   const doFetch = options.fetch ?? fetch
-  const send = async (method: string, path: string, body?: unknown): Promise<Response> => {
-    const headers: Record<string, string> = { authorization: `Bearer ${await options.token()}` }
+  const send = async (
+    method: string,
+    path: string,
+    body: unknown,
+    operation: SyncOperationOptions = options,
+  ): Promise<Response> => {
+    const headers: Record<string, string> = { ...syncHeaders(), authorization: `Bearer ${await options.token()}` }
     if (body !== undefined) headers["content-type"] = "application/json"
-    return doFetch(`${options.baseUrl}${path}`, { method, headers, ...(body === undefined ? {} : { body: JSON.stringify(body) }) })
+    const signal = syncOperationSignal(operation)
+    return admitSyncOperation(operation, () =>
+      doFetch(`${options.baseUrl}${path}`, {
+        method,
+        headers,
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        ...(signal === undefined ? {} : { signal }),
+      }),
+    )
   }
   const codeOf = async (response: Response): Promise<string> =>
     response.json().then(
@@ -60,42 +90,65 @@ export function createAccountHttp(options: AccountHttpOptions): AccountHttp {
       },
       () => "unknown",
     )
-  const read = async (path: string): Promise<unknown> => {
-    const response = await send("GET", path)
-    if (!response.ok) throw new AccountHttpError(response.status >= 500 ? "unavailable" : await codeOf(response), response.status)
+  const read = async (path: string, operation?: SyncOperationOptions): Promise<unknown> => {
+    const response = await send("GET", path, undefined, operation)
+    if (!response.ok)
+      throw new AccountHttpError(response.status >= 500 ? "unavailable" : await codeOf(response), response.status)
     return response.json()
   }
-  const append = async (path: string, method: "PUT" | "POST", request: KeyringAppendRequest): Promise<AppendResult> => {
-    const response = await send(method, path, request)
+  const append = async (
+    path: string,
+    method: "PUT" | "POST",
+    request: KeyringAppendRequest,
+    operation?: SyncOperationOptions,
+  ): Promise<AppendResult> => {
+    const response = await send(method, path, request, operation)
     if (response.ok) {
       const body: unknown = await response.json()
       const seq = isRecord(body) ? body["seq"] : undefined
-      if (typeof seq !== "number" || !Number.isSafeInteger(seq)) throw new AccountHttpError("malformed_reply", response.status)
+      if (typeof seq !== "number" || !Number.isSafeInteger(seq))
+        throw new AccountHttpError("malformed_reply", response.status)
       return { ok: true, seq }
     }
     if (response.status >= 500) throw new AccountHttpError("unavailable", response.status)
     const code = await codeOf(response)
     return { ok: false, reason: REFUSALS.has(code) ? (code as TransportRefusal) : "refused" }
   }
-  const entriesAfter = async (after: number): Promise<ReadonlyArray<ChainRow> | null> =>
-    listOf(await read(`/v1/sync/entries?after=${after}`), "entries") as ReadonlyArray<ChainRow> | null
+  const entriesAfter = async (
+    after: number,
+    operation?: SyncOperationOptions,
+  ): Promise<ReadonlyArray<ChainRow> | null> =>
+    listOf(await read(`/v1/sync/entries?after=${after}`, operation), "entries") as ReadonlyArray<ChainRow> | null
   return {
     listEntriesAfter: entriesAfter,
-    listEntries: () => entriesAfter(0),
-    listKeys: async () => listOf(await read("/v1/sync/keys"), "entries") as ReadonlyArray<KeyringEntry> | null,
-    listRecoveryWraps: async () => listOf(await read("/v1/sync/recovery-wraps"), "wraps") as ReadonlyArray<RecoveryWrapRow> | null,
-    appendKeys: (request) => append("/v1/sync/keys", "PUT", request),
-    recoveryJoin: (request) => append("/v1/sync/recovery/join", "POST", request),
-    async state() {
-      const body = await read("/v1/sync/state")
+    listEntries: (operation) => entriesAfter(0, operation),
+    listKeys: async (operation) =>
+      listOf(await read("/v1/sync/keys", operation), "entries") as ReadonlyArray<KeyringEntry> | null,
+    listRecoveryWraps: async (operation) =>
+      listOf(await read("/v1/sync/recovery-wraps", operation), "wraps") as ReadonlyArray<RecoveryWrapRow> | null,
+    appendKeys: (request, operation) => append("/v1/sync/keys", "PUT", request, operation),
+    recoveryJoin: (request, operation) => append("/v1/sync/recovery/join", "POST", request, operation),
+    async state(operation) {
+      const body = await read("/v1/sync/state", operation)
       if (!isRecord(body) || !isRecord(body["head"])) return null
       const head = body["head"]
       const seq = head["seq"]
       const link = head["link"]
       const keyringLink = head["keyring_link"]
       const epoch = body["current_epoch"]
-      if (typeof seq !== "number" || typeof link !== "string" || typeof keyringLink !== "string" || typeof epoch !== "number") return null
-      return { head: { seq, link, keyring_link: keyringLink }, currentEpoch: epoch, rotationPending: body["rotation_pending"] === true }
+      if (
+        typeof seq !== "number" ||
+        typeof link !== "string" ||
+        typeof keyringLink !== "string" ||
+        typeof epoch !== "number"
+      )
+        return null
+      return {
+        head: { seq, link, keyring_link: keyringLink },
+        currentEpoch: epoch,
+        rotationPending: body["rotation_pending"] === true,
+        acceptsPhraseKeys: body["accepts_phrase_keys"] === true,
+      }
     },
   }
 }

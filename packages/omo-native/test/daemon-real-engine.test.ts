@@ -1,16 +1,8 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { createHash } from "node:crypto"
-import {
-  lstatSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs"
+import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { join, relative, resolve } from "node:path"
-import { spawnSync } from "node:child_process"
+import { type ChildProcess, spawn, spawnSync } from "node:child_process"
 
 import { daemonDirectoryName } from "@code-yeongyu/senpi"
 import { runStatus as runProductionStatus } from "../bin/lib/daemon-operations.js"
@@ -22,13 +14,17 @@ const LAUNCHER = join(PACKAGE_ROOT, "bin", "omo.js")
 const LAUNCH_SPEC = resolve(PACKAGE_ROOT, "..", "omo-senpi", "plugin", "daemon-launch-spec.json")
 const roots: string[] = []
 const ownedPids = new Set<number>()
+const runningChildren = new Set<ChildProcess>()
 // Headroom over any single status spawn, so the observing reads land inside the idle window on a loaded runner.
 const OBSERVED_IDLE_EXIT_MS = 8_000
 const REQUIRED_REACHABLE_READS = 2
 
-setDefaultTimeout(30_000)
+const TEST_BUDGET_MS = 30_000
+setDefaultTimeout(TEST_BUDGET_MS)
 
 afterEach(() => {
+  for (const child of runningChildren) child.kill("SIGKILL")
+  runningChildren.clear()
   for (const pid of ownedPids) killOwned(pid)
   ownedPids.clear()
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
@@ -53,25 +49,54 @@ function sandbox() {
   return { agentDir, socket, env }
 }
 
-function run(command: string, args: readonly string[], env: NodeJS.ProcessEnv) {
-  const result = spawnSync(command, [...args], { encoding: "utf8", env, timeout: 15_000 })
-  if (result.error !== undefined) throw result.error
-  return { exitCode: result.status ?? 1, stdout: result.stdout ?? "", stderr: result.stderr ?? "" }
+// A cold `node` start on a loaded host can take longer than any fixed per-spawn budget (#9679), so each child runs
+// until it closes; the only bound is the test's own budget, which names the command it was waiting on.
+function run(command: string, args: readonly string[], env: NodeJS.ProcessEnv, deadlineMs = TEST_BUDGET_MS) {
+  return new Promise<{ exitCode: number; stdout: string; stderr: string }>((resolvePromise, reject) => {
+    const child = spawn(command, [...args], { env, stdio: ["ignore", "pipe", "pipe"] })
+    runningChildren.add(child)
+    let stdout = ""
+    let stderr = ""
+    child.stdout.setEncoding("utf8").on("data", (chunk: string) => {
+      stdout += chunk
+    })
+    child.stderr.setEncoding("utf8").on("data", (chunk: string) => {
+      stderr += chunk
+    })
+    const deadline = setTimeout(() => {
+      child.kill("SIGKILL")
+      reject(new Error(`${command} ${args.join(" ")} did not exit within the ${deadlineMs} ms test budget`))
+    }, deadlineMs)
+    child.on("error", (error) => {
+      clearTimeout(deadline)
+      runningChildren.delete(child)
+      reject(error)
+    })
+    child.on("close", (code) => {
+      clearTimeout(deadline)
+      runningChildren.delete(child)
+      resolvePromise({ exitCode: code ?? 1, stdout, stderr })
+    })
+  })
 }
 
-function ensureShard(socket: string, env: NodeJS.ProcessEnv) {
-  const result = run("node", [
-    resolveSenpi().cliPath,
-    "host",
-    "ensure",
-    "--json",
-    "--socket",
-    socket,
-    "--launch-spec",
-    LAUNCH_SPEC,
-    "--policy",
-    "upgrade",
-  ], env)
+async function ensureShard(socket: string, env: NodeJS.ProcessEnv) {
+  const result = await run(
+    "node",
+    [
+      resolveSenpi().cliPath,
+      "host",
+      "ensure",
+      "--json",
+      "--socket",
+      socket,
+      "--launch-spec",
+      LAUNCH_SPEC,
+      "--policy",
+      "upgrade",
+    ],
+    env,
+  )
   expect(result.exitCode).toBe(0)
   const payload = JSON.parse(result.stdout) as { pid: number }
   ownedPids.add(payload.pid)
@@ -82,8 +107,8 @@ function runStatus(env: NodeJS.ProcessEnv) {
   return run("node", [LAUNCHER, "daemon", "status", "--json"], env)
 }
 
-function statusSawReachableShard(env: NodeJS.ProcessEnv): boolean {
-  const payload = JSON.parse(runStatus(env).stdout) as { endpoints: readonly { reachable: boolean }[] }
+async function statusSawReachableShard(env: NodeJS.ProcessEnv): Promise<boolean> {
+  const payload = JSON.parse((await runStatus(env)).stdout) as { endpoints: readonly { reachable: boolean }[] }
   return payload.endpoints.some((endpoint) => endpoint.reachable)
 }
 
@@ -174,7 +199,7 @@ if (process.platform !== "win32") {
   describe("omo daemon real-engine read-only and observe contracts", () => {
     test("#given an uncleanly killed shard #when status json runs #then every daemon and shard state byte stays identical", async () => {
       const { agentDir, socket, env } = sandbox()
-      const supervisorPid = ensureShard(socket, env)
+      const supervisorPid = await ensureShard(socket, env)
       killShardUncleanly(supervisorPid)
       const endpointDir = join(agentDir, "rpc-host-daemon", daemonDirectoryName(socket))
       const pointer = join(endpointDir, "host.pid")
@@ -189,8 +214,8 @@ if (process.platform !== "win32") {
         expect(readFileSync(join(generations, generation, "settings.json"), "utf8")).toContain("idleExitMs")
       }
 
-      await assertReadOnlyState(agentDir, () => {
-        const status = runStatus(env)
+      await assertReadOnlyState(agentDir, async () => {
+        const status = await runStatus(env)
         expect(status.exitCode).toBe(3)
         const payload = JSON.parse(status.stdout) as { endpoints: readonly { reachable: boolean }[] }
         expect(payload.endpoints.some((endpoint) => endpoint.reachable === false)).toBe(true)
@@ -201,59 +226,74 @@ if (process.platform !== "win32") {
       const { agentDir } = sandbox()
       mkdirSync(join(agentDir, "rpc-host-daemon"), { recursive: true })
 
-      await expect(assertReadOnlyState(agentDir, () => {
-        runProductionStatus({
-          engine: {
-            run: () => ({ exitCode: 3, stdout: JSON.stringify({ endpoints: [] }), stderr: "" }),
-          },
-          agentDir,
-          env: {},
-          json: true,
-          stdout: { write() {} },
-          stderr: { write() {} },
-          _test: {
-            afterRead: () => {
-              writeFileSync(join(agentDir, "rpc-host-daemon", "status-was-here"), "mutant\n")
+      await expect(
+        assertReadOnlyState(agentDir, () => {
+          runProductionStatus({
+            engine: {
+              run: () => ({ exitCode: 3, stdout: JSON.stringify({ endpoints: [] }), stderr: "" }),
             },
-          },
-        })
-      })).rejects.toThrow("daemon status changed state")
+            agentDir,
+            env: {},
+            json: true,
+            stdout: { write() {} },
+            stderr: { write() {} },
+            _test: {
+              afterRead: () => {
+                writeFileSync(join(agentDir, "rpc-host-daemon", "status-was-here"), "mutant\n")
+              },
+            },
+          })
+        }),
+      ).rejects.toThrow("daemon status changed state")
     })
 
-    test("#given a short idle shard #when status reads keep arriving #then observing reads do not keep it alive", () => {
-      const { socket, env } = sandbox()
-      const supervisorPid = ensureShard(socket, {
-        ...env,
-        SENPI_RPC_HOST_IDLE_EXIT_MS: String(OBSERVED_IDLE_EXIT_MS),
-      })
+    test(
+      "#given a short idle shard #when status reads keep arriving #then observing reads do not keep it alive",
+      async () => {
+        const { socket, env } = sandbox()
+        const supervisorPid = await ensureShard(socket, {
+          ...env,
+          SENPI_RPC_HOST_IDLE_EXIT_MS: String(OBSERVED_IDLE_EXIT_MS),
+        })
 
-      let reachableReads = 0
-      while (reachableReads < REQUIRED_REACHABLE_READS) {
-        if (!pidAlive(supervisorPid)) {
-          throw new Error(`shard exited after ${reachableReads} of ${REQUIRED_REACHABLE_READS} status reads that saw it reachable`)
+        let reachableReads = 0
+        while (reachableReads < REQUIRED_REACHABLE_READS) {
+          if (!pidAlive(supervisorPid)) {
+            throw new Error(
+              `shard exited after ${reachableReads} of ${REQUIRED_REACHABLE_READS} status reads that saw it reachable`,
+            )
+          }
+          if (await statusSawReachableShard(env)) reachableReads += 1
         }
-        if (statusSawReachableShard(env)) reachableReads += 1
-      }
 
-      // The supervisor is detached by `host ensure`, so there is no exit event to await: it is watched by pid.
-      // The backoff between reads only limits spawn load on a busy runner; it is not a timing assertion, and the
-      // reads keep arriving well inside the idle window.
-      const exitDeadline = Date.now() + OBSERVED_IDLE_EXIT_MS * 3
-      let readsAwaitingExit = 0
-      let backoffMs = 100
-      while (pidAlive(supervisorPid)) {
-        if (Date.now() > exitDeadline) {
-          throw new Error(`shard pid ${supervisorPid} still alive after ${readsAwaitingExit} more status reads; observing reads must not reset its idle timer`)
+        // The supervisor is detached by `host ensure`, so there is no exit event to await: it is watched by pid.
+        // The backoff between reads only limits spawn load on a busy runner; it is not a timing assertion, and the
+        // reads keep arriving well inside the idle window.
+        const exitDeadline = Date.now() + OBSERVED_IDLE_EXIT_MS * 3
+        let readsAwaitingExit = 0
+        let backoffMs = 100
+        while (pidAlive(supervisorPid)) {
+          if (Date.now() > exitDeadline) {
+            throw new Error(
+              `shard pid ${supervisorPid} still alive after ${readsAwaitingExit} more status reads; observing reads must not reset its idle timer`,
+            )
+          }
+          await runStatus(env)
+          readsAwaitingExit += 1
+          Atomics.wait(
+            new Int32Array(new SharedArrayBuffer(4)),
+            0,
+            0,
+            Math.min(backoffMs, Math.max(0, exitDeadline - Date.now())),
+          )
+          backoffMs = Math.min(backoffMs * 2, 500)
         }
-        runStatus(env)
-        readsAwaitingExit += 1
-        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, Math.min(backoffMs, Math.max(0, exitDeadline - Date.now())))
-        backoffMs = Math.min(backoffMs * 2, 500)
-      }
 
-      expect(reachableReads).toBe(REQUIRED_REACHABLE_READS)
-      ownedPids.delete(supervisorPid)
-    }, OBSERVED_IDLE_EXIT_MS * 6)
+        expect(reachableReads).toBe(REQUIRED_REACHABLE_READS)
+        ownedPids.delete(supervisorPid)
+      },
+      OBSERVED_IDLE_EXIT_MS * 6,
+    )
   })
 }
 

@@ -15,12 +15,19 @@ test("copyTree does not descend into its own destination when it lives inside th
   const destination = join(lower, ".omo-wt", "handle", "m")
   await mkdir(join(lower, ".omo-wt", "handle"), { recursive: true })
   try {
-    await copyTree(lower, destination, async (_src, dst, size) => {
-      if (size > 0) await writeFile(dst, "cloned")
-    }, () => {})
+    await copyTree(
+      lower,
+      destination,
+      async (_src, dst, size) => {
+        if (size > 0) await writeFile(dst, "cloned")
+      },
+      () => {},
+    )
     expect(await readFile(join(destination, "nested", "file"), "utf8")).toBe("cloned")
     // The walk must not chase its own output: the destination subtree the
     // source already contains stays un-copied below the new tree.
     await expect(access(join(destination, ".omo-wt", "handle", "m"))).rejects.toThrow()
-  } finally { await rm(root, { recursive: true, force: true }) }
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
 })

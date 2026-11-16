@@ -175,10 +175,7 @@ describe("runSummarizeRetryStrategy", () => {
       truncateAttempt: 2,
     })
     autoCompactState.emptyContentAttemptBySession.set(sessionID, 3)
-    autoCompactState.retryTimerBySession.set(
-      sessionID,
-      unsafeTestValue<ReturnType<typeof setTimeout>>(1),
-    )
+    autoCompactState.retryTimerBySession.set(sessionID, unsafeTestValue<ReturnType<typeof setTimeout>>(1))
 
     //#when
     await runSummarizeRetryStrategy({

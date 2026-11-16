@@ -2,10 +2,7 @@ import { createHash } from "node:crypto"
 import { readFile, stat } from "@oh-my-opencode/memory-core/fs"
 import { resolve } from "node:path"
 
-import {
-  TranscriptJournal,
-  projectTranscriptEntries,
-} from "@oh-my-opencode/memory-core"
+import { TranscriptJournal, projectTranscriptEntries } from "@oh-my-opencode/memory-core"
 
 import { projectSessionEntries } from "../journal-wiring"
 
@@ -77,9 +74,9 @@ export async function stageDreamTranscript(
   const existingMessageIds = new Set((await journal.readEntries()).map((entry) => entry.source_message_id))
   const fresh = entries.filter((entry) => !existingMessageIds.has(entry.source_message_id))
   const stagedMessageIds = unique(fresh.map((entry) => entry.source_message_id))
-  const skippedMessageIds = unique(entries
-    .filter((entry) => existingMessageIds.has(entry.source_message_id))
-    .map((entry) => entry.source_message_id))
+  const skippedMessageIds = unique(
+    entries.filter((entry) => existingMessageIds.has(entry.source_message_id)).map((entry) => entry.source_message_id),
+  )
   await journal.append(fresh)
   return { conversationId, stagedMessageIds, skippedMessageIds }
 }

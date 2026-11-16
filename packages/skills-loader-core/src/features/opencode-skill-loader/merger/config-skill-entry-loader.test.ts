@@ -25,24 +25,10 @@ describe("configEntryToLoadedSkill", () => {
     mkdirSync(configDir, { recursive: true })
     writeFileSync(
       allowedSkillPath,
-      [
-        "---",
-        "description: Allowed skill",
-        "---",
-        "Use ./allowed.txt for context.",
-      ].join("\n"),
-      "utf8"
+      ["---", "description: Allowed skill", "---", "Use ./allowed.txt for context."].join("\n"),
+      "utf8",
     )
-    writeFileSync(
-      outsideSkillPath,
-      [
-        "---",
-        "description: Secret skill",
-        "---",
-        "Do not leak this.",
-      ].join("\n"),
-      "utf8"
-    )
+    writeFileSync(outsideSkillPath, ["---", "description: Secret skill", "---", "Do not leak this."].join("\n"), "utf8")
     symlinkSync(outsideSkillPath, linkedSecretSkillPath)
   })
 

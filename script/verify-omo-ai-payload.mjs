@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process"
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, readFileSync, statSync } from "node:fs"
 import { dirname, posix, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -18,6 +18,9 @@ const REQUIRED_ARTIFACTS = [
   "plugin/extensions/omo.js",
   // The session gateway's SQLite store runs as a worker thread started from this sidecar beside omo.js.
   "plugin/extensions/gateway-store-worker.mjs",
+  // Both inline the macOS sign-in store, which finds the keychain helper two levels up (#11262).
+  "plugin/extensions/omo-device-account.js",
+  "plugin/extensions/omo-feedback.js",
   // Credential-gated skill: not under plugin/skills (never eager-loaded) but the bundled x-search
   // component resolves ../skills-conditional/x-search/SKILL.md, so the payload must ship it.
   "plugin/skills-conditional/x-search/SKILL.md",
@@ -25,6 +28,8 @@ const REQUIRED_ARTIFACTS = [
   "plugin/runtime/ast-grep-mcp/cli.js",
   "plugin/runtime/dag/sdk.js",
   "plugin/runtime/agent-toolkit-sdk/sdk.js",
+  // Eval cells import the fleet SDK from OMO_BUNSHIN_TS_SDK_ROOT; the installer requires it too.
+  "plugin/runtime/bunshin-ts/sdk.js",
   // omo thread and omo daemon adopt import it (bin/lib/thread.js).
   "plugin/runtime/thread-sdk/sdk.js",
   // omo doctor / omo setup classify task-category coverage through it (bin/lib/category-coverage.js).
@@ -35,6 +40,12 @@ const REQUIRED_ARTIFACTS = [
   // loader with it (bin/lib/daemon-config.js).
   "plugin/runtime/task-config/index.js",
 ]
+
+// The signed keychain helper (#11262) exists only in the release lane, which builds it on macOS
+// (publish.yml passes --release); PR CI packs omo-ai on Linux without it. npm pack lists paths
+// only, so its execute bit is read from the file system.
+const RELEASE_EXECUTABLE_ARTIFACTS = ["bin/darwin/omo-keychain"]
+const releaseMode = process.argv.slice(2).includes("--release")
 
 // A bundle that reads `join(dirname(fileURLToPath(import.meta.url)), "<file>")` needs <file> packed
 // next to it; minified bundles keep this shape with renamed helpers, so the helper names are not matched.
@@ -95,6 +106,14 @@ for (const artifact of REQUIRED_ARTIFACTS) {
   }
 }
 
+for (const artifact of releaseMode ? RELEASE_EXECUTABLE_ARTIFACTS : []) {
+  if (!pathSet.has(artifact)) {
+    errors.push(`missing artifact: ${artifact}`)
+  } else if ((statSync(resolve(pkgDir, artifact)).mode & 0o100) === 0) {
+    errors.push(`not executable (u+x): ${artifact}`)
+  }
+}
+
 for (const path of paths.filter((p) => BUNDLE_PATH_RE.test(p))) {
   const source = readFileSync(resolve(pkgDir, path), "utf8")
   for (const asset of new Set(Array.from(source.matchAll(SIBLING_ASSET_READ_RE), (match) => match[1]))) {
@@ -107,9 +126,7 @@ for (const path of paths.filter((p) => BUNDLE_PATH_RE.test(p))) {
 
 const skillCount = paths.filter((p) => SKILL_PATH_RE.test(p)).length
 if (skillCount < MIN_SKILL_COUNT) {
-  errors.push(
-    `missing: expected >= ${MIN_SKILL_COUNT} skill files (plugin/skills/*/SKILL.md), found ${skillCount}`,
-  )
+  errors.push(`missing: expected >= ${MIN_SKILL_COUNT} skill files (plugin/skills/*/SKILL.md), found ${skillCount}`)
 }
 
 if (paths.length > 0) {
@@ -129,9 +146,7 @@ if (paths.length > 0) {
   }
 
   if (unpackedSize >= MAX_UNPACKED_SIZE) {
-    errors.push(
-      `unpacked size ${unpackedSize} bytes exceeds limit ${MAX_UNPACKED_SIZE} bytes (30 MB)`,
-    )
+    errors.push(`unpacked size ${unpackedSize} bytes exceeds limit ${MAX_UNPACKED_SIZE} bytes (30 MB)`)
   }
 }
 
@@ -143,6 +158,4 @@ if (errors.length > 0) {
   process.exit(1)
 }
 
-console.log(
-  `omo-ai payload verification OK (${paths.length} packed paths, 0 offenders, ${unpackedSize} bytes)`,
-)
+console.log(`omo-ai payload verification OK (${paths.length} packed paths, 0 offenders, ${unpackedSize} bytes)`)

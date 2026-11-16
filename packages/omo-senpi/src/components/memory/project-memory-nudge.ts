@@ -43,7 +43,7 @@ export interface ProjectMemoryNudgeOptions {
 interface SessionScope {
   readonly key: string
   readonly resolver: ProjectIdentityResolver
-  readonly nudged: Set<string>
+  readonly nudged: Map<string, symbol>
   readonly touched: ProjectIdentity[]
   readonly touchedPaths: Map<string, string>
   corpora?: { readonly key: string; readonly list: readonly ProjectRecallCorpus[] }
@@ -70,7 +70,9 @@ export function createProjectMemoryScope(options: ProjectMemoryNudgeOptions): Pr
   }
 
   function sessionCwd(eventCtx: unknown): string {
-    return isRecord(eventCtx) && typeof eventCtx.cwd === "string" && eventCtx.cwd.length > 0 ? eventCtx.cwd : options.fallbackCwd()
+    return isRecord(eventCtx) && typeof eventCtx.cwd === "string" && eventCtx.cwd.length > 0
+      ? eventCtx.cwd
+      : options.fallbackCwd()
   }
 
   function scopeFor(sessionId: string, cwd: string, context: MemoryIdentityContext): SessionScope {
@@ -87,7 +89,7 @@ export function createProjectMemoryScope(options: ProjectMemoryNudgeOptions): Pr
         ...(options.env === undefined ? {} : { env: options.env }),
         ...(options.fs === undefined ? {} : { fs: options.fs }),
       }),
-      nudged: new Set(),
+      nudged: new Map(),
       touched: [],
       touchedPaths: new Map(),
     }
@@ -109,13 +111,23 @@ export function createProjectMemoryScope(options: ProjectMemoryNudgeOptions): Pr
     const scope = sessions.get(sessionId)
     if (scope === undefined || !switchesFor(sessionId).recall) return []
     const projects = scope.touched.slice(0, PROJECT_MEMORY_RECALL_MAX_PROJECTS)
-    const list = await Promise.all(projects.map(async (project) => {
-      const corpus = await corpusOf(project)
-      const touchedPath = scope.touchedPaths.get(project.identity.id)
-      return { identityId: project.identity.id, revision: corpus.revision, documents: corpus.documents, ...(touchedPath === undefined ? {} : { touchedPath }) }
-    }))
-    const key = projects.map((project, index) => `${project.identity.id}@${list[index]?.revision}:${list[index]?.touchedPath ?? ""}`).join("\0")
-    if (scope.corpora?.key !== key) scope.corpora = { key, list: list.map(({ revision: _revision, ...corpus }) => corpus) }
+    const list = await Promise.all(
+      projects.map(async (project) => {
+        const corpus = await corpusOf(project)
+        const touchedPath = scope.touchedPaths.get(project.identity.id)
+        return {
+          identityId: project.identity.id,
+          revision: corpus.revision,
+          documents: corpus.documents,
+          ...(touchedPath === undefined ? {} : { touchedPath }),
+        }
+      }),
+    )
+    const key = projects
+      .map((project, index) => `${project.identity.id}@${list[index]?.revision}:${list[index]?.touchedPath ?? ""}`)
+      .join("\0")
+    if (scope.corpora?.key !== key)
+      scope.corpora = { key, list: list.map(({ revision: _revision, ...corpus }) => corpus) }
     return scope.corpora.list
   }
 
@@ -142,33 +154,42 @@ export function createProjectMemoryScope(options: ProjectMemoryNudgeOptions): Pr
 
     const cwd = sessionCwd(eventCtx)
     const scope = scopeFor(sessionId, cwd, context)
-    const project = await scope.resolver.forPath(touchedPath)
+    const resolver = scope.resolver
+    const project = await resolver.forPath(touchedPath)
     if (project === undefined || project.identity.id === context.identity) return undefined
+    const projectId = project.identity.id
     const live = () => sessions.get(sessionId) === scope
-    await grantProjectMemoryRead(context, project.identity.paths.repo, { realPath: scope.resolver.realPath, stillLive: live })
+    await grantProjectMemoryRead(context, project.identity.paths.repo, { realPath: resolver.realPath, stillLive: live })
     if (!live()) return undefined
-    const index = scope.touched.findIndex((entry) => entry.identity.id === project.identity.id)
-    if (index >= 0) scope.touched.splice(index, 1)
-    scope.touched.unshift(project)
-    const within = await projectRelativePath(scope.resolver, project.projectDir, resolve(cwd, touchedPath))
-    if (within !== undefined) scope.touchedPaths.set(project.identity.id, within)
+    const touched = scope.touched
+    const index = touched.findIndex((entry) => entry.identity.id === projectId)
+    if (index >= 0) touched.splice(index, 1)
+    touched.unshift(project)
+    const within = await projectRelativePath(resolver, project.projectDir, resolve(cwd, touchedPath))
+    if (within !== undefined) scope.touchedPaths.set(projectId, within)
 
-    if (!switches.nudge || scope.nudged.has(project.identity.id)) return undefined
+    const nudged = scope.nudged
+    if (!switches.nudge || nudged.has(projectId)) return undefined
+    // Reserve before I/O; the token distinguishes this read from one started after compaction.
+    const reservation = Symbol()
+    nudged.set(projectId, reservation)
     let notes: readonly RecallDocument[]
     try {
       notes = await notesOf(project)
     } catch (error) {
+      if (nudged.get(projectId) === reservation) nudged.delete(projectId)
       // Advice only: a project repo that cannot be read leaves the tool result untouched and is retried on the next touch.
-      options.logger?.warn("omo-senpi project memory nudge skipped", {
+      options.logger?.warn("project memory nudge skipped", {
         project: project.projectDir,
         error: error instanceof Error ? error.message : String(error),
       })
       return undefined
     }
-    scope.nudged.add(project.identity.id)
-    if (notes.length === 0) return undefined
+    if (!live() || nudged.get(projectId) !== reservation || notes.length === 0) return undefined
     const content = isRecord(payload) && Array.isArray(payload.content) ? payload.content : []
-    return { content: [...content, { type: "text", text: formatProjectMemoryNudge(project, notes), audience: "model" }] }
+    return {
+      content: [...content, { type: "text", text: formatProjectMemoryNudge(project, notes), audience: "model" }],
+    }
   }
 
   function register(pi: SenpiExtensionAPI): void {
@@ -213,7 +234,11 @@ export function formatProjectMemoryNudge(project: ProjectIdentity, notes: readon
 
 // The touched file named from its project's root, so a note about that file can match it. A path
 // mapped onto a main checkout (git mode) does not sit under it lexically and keeps no relative form.
-async function projectRelativePath(resolver: ProjectIdentityResolver, projectDir: string, filePath: string): Promise<string | undefined> {
+async function projectRelativePath(
+  resolver: ProjectIdentityResolver,
+  projectDir: string,
+  filePath: string,
+): Promise<string | undefined> {
   const realDir = await resolver.realPath(dirname(filePath))
   // A file whose directory vanished after the tool ran has no position to rank by.
   if (realDir === undefined) return undefined
@@ -234,10 +259,16 @@ function touchedPathOf(payload: unknown): string | undefined {
   return undefined
 }
 
-const mergedCorpora = new WeakMap<readonly RecallDocument[], WeakMap<readonly RecallDocument[], readonly RecallDocument[]>>()
+const mergedCorpora = new WeakMap<
+  readonly RecallDocument[],
+  WeakMap<readonly RecallDocument[], readonly RecallDocument[]>
+>()
 
 /** The session's own notes plus its touched projects', as one stable array per pair of inputs (the recall memos are keyed on it). */
-export function withProjectDocuments(own: readonly RecallDocument[], projects: readonly RecallDocument[]): readonly RecallDocument[] {
+export function withProjectDocuments(
+  own: readonly RecallDocument[],
+  projects: readonly RecallDocument[],
+): readonly RecallDocument[] {
   if (projects.length === 0) return own
   let byProjects = mergedCorpora.get(own)
   if (byProjects === undefined) {

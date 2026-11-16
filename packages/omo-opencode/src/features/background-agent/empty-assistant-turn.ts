@@ -31,19 +31,17 @@ function allTokenCountsIndicateNoProgress(tokens: unknown): boolean {
     getTokenCount(tokens, "output"),
     getTokenCount(tokens, "reasoning"),
   ]
-  const cacheCounts = [
-    getCacheTokenCount(tokens, "write"),
-    getCacheTokenCount(tokens, "read"),
-  ]
+  const cacheCounts = [getCacheTokenCount(tokens, "write"), getCacheTokenCount(tokens, "read")]
   const cachePresent = cacheCounts.some((count) => count !== undefined)
-  return coreCounts.every((count) => count === 0)
-    && (!cachePresent || cacheCounts.every((count) => count === 0))
+  return coreCounts.every((count) => count === 0) && (!cachePresent || cacheCounts.every((count) => count === 0))
 }
 
 export function isEmptyNoProgressAssistantTurnInfo(info: unknown): info is AssistantTurnInfo {
   const infoRecord = isRecord(info) ? info : undefined
-  return !!infoRecord
-    && infoRecord.role === "assistant"
-    && infoRecord.finish === "unknown"
-    && allTokenCountsIndicateNoProgress(infoRecord.tokens)
+  return (
+    !!infoRecord &&
+    infoRecord.role === "assistant" &&
+    infoRecord.finish === "unknown" &&
+    allTokenCountsIndicateNoProgress(infoRecord.tokens)
+  )
 }

@@ -12,11 +12,6 @@
 > | :-----| :----- |
 
 
-> [!NOTE]
->
-> [![Sisyphus Labs - Lerne Dori kennen. Keine Demo. Abonniert einfach alles.](./.github/assets/sisyphuslabs.png?v=4)](https://sisyphuslabs.ai)
-> > **OmO wird von Jobdori betreut, dem oben gezeigten KI-Assistenten. Lerne deinen eigenen Jobdori kennen: Dori. <br />Trag dich [hier](https://sisyphuslabs.ai) auf die Warteliste ein.**
-
 > [!TIP]
 > Sei dabei!
 >

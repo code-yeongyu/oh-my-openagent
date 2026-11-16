@@ -67,7 +67,14 @@ describe("panelFactsFrom", () => {
     const ctx = {
       sessionManager: {
         getSessionId: () => "session-1",
-        getUsageTotals: () => ({ input: 100, output: 20, cacheRead: 5, cacheWrite: 1, cost: 0.5, latestCacheHitRate: 90 }),
+        getUsageTotals: () => ({
+          input: 100,
+          output: 20,
+          cacheRead: 5,
+          cacheWrite: 1,
+          cost: 0.5,
+          latestCacheHitRate: 90,
+        }),
       },
     }
 

@@ -1,0 +1,55 @@
+{
+  "request": "status.get",
+  "cases": [
+    {
+      "name": "answers the current status",
+      "outcome": "ok",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "status.get"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "state": "connected",
+              "enabled": true,
+              "origin_configured": true,
+              "device": {
+                "id": "dev-self"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "refused before the client proof",
+      "outcome": "refusal",
+      "handshake": "welcome_only",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "status.get"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "unauthenticated"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

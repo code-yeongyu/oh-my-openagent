@@ -37,10 +37,19 @@ function persistFailedRung(store: TaskRecordStore, taskId: string): string {
   const directory = resolveChildSessionDir(join(store.stateDir, "children", taskId), taskId)
   mkdirSync(directory, { recursive: true })
   const path = join(directory, "failed-rung.jsonl")
-  writeFileSync(path, [
-    JSON.stringify({ type: "message", message: { role: "user", content: [{ type: "text", text: "do the original task" }] } }),
-    JSON.stringify({ type: "message", message: { role: "assistant", content: [], stopReason: "error", errorMessage: "500 overloaded" } }),
-  ].join("\n"))
+  writeFileSync(
+    path,
+    [
+      JSON.stringify({
+        type: "message",
+        message: { role: "user", content: [{ type: "text", text: "do the original task" }] },
+      }),
+      JSON.stringify({
+        type: "message",
+        message: { role: "assistant", content: [], stopReason: "error", errorMessage: "500 overloaded" },
+      }),
+    ].join("\n"),
+  )
   return path
 }
 
@@ -66,7 +75,10 @@ function seedHandoff(store: TaskRecordStore, taskId: string, handoffEpoch = 1): 
 
 function sweeperOverDaemon(store: TaskRecordStore) {
   const channel = stubChannel(undefined)
-  const runner = harness.runnerWithout({ createClient: () => channel, ensureDaemon: async () => ensuredDaemon(channel.socketPath) })
+  const runner = harness.runnerWithout({
+    createClient: () => channel,
+    ensureDaemon: async () => ensuredDaemon(channel.socketPath),
+  })
   const manager = createTaskManager({
     store,
     config: managerSettings(),
@@ -103,7 +115,9 @@ describe("reconcile of a runtime-fallback handoff whose owner died", () => {
 
       try {
         // when
-        const result = await sweeper.lifecycle.reconcileOnSessionStart(sweep === "another session" ? "other-session" : PARENT)
+        const result = await sweeper.lifecycle.reconcileOnSessionStart(
+          sweep === "another session" ? "other-session" : PARENT,
+        )
 
         // then
         expect(result.outcomes).toContainEqual({ task_id: taskId, kind: "resumed", reason: "respawned and reattached" })
@@ -125,7 +139,12 @@ describe("reconcile of a runtime-fallback handoff whose owner died", () => {
       store,
       hostPid: SWEEPER,
       isAlive: (pid) => pid === SWEEPER,
-      respawn: async () => ({ ok: false, disposition: "retryable", code: "respawn_failed", reason: "rpc respawn failed" }),
+      respawn: async () => ({
+        ok: false,
+        disposition: "retryable",
+        code: "respawn_failed",
+        reason: "rpc respawn failed",
+      }),
     })
     const lifecycle = createTaskLifecycle(ports.deps)
 

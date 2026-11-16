@@ -17,6 +17,7 @@ import type { DelegatedModelConfig } from "./types"
 import { applyCategoryParams } from "./delegated-model-config"
 import { applyFallbackEntrySettings } from "./fallback-entry-settings"
 import { lowerReasoningForModel } from "../../shared/agent-variant"
+import { distributeTaskModels } from "./models-distribution"
 
 function getConfiguredModel(entry: string | { model: string } | undefined): string | undefined {
   return typeof entry === "string" ? entry : entry?.model
@@ -47,7 +48,7 @@ export interface CategoryResolutionResult {
   modelInfo: ModelFallbackInfo | undefined
   actualModel: string | undefined
   isUnstableAgent: boolean
-  fallbackChain?: FallbackEntry[]  // For runtime retry on model errors
+  fallbackChain?: FallbackEntry[] // For runtime retry on model errors
   error?: string
 }
 
@@ -68,22 +69,35 @@ export async function resolveCategoryExecution(
   args: DelegateTaskArgs,
   executorCtx: ExecutorContext,
   inheritedModel: string | undefined,
-  systemDefaultModel: string | undefined
+  systemDefaultModel: string | undefined,
 ): Promise<CategoryResolutionResult> {
-  const { client, userCategories, sisyphusJuniorModel } = executorCtx
+  const { client, sisyphusJuniorModel } = executorCtx
+  let userCategories = executorCtx.userCategories
 
   // A retired builtin name resolves to its replacement so third-party skills and AGENTS.md text
   // spawning the old category keep working; a user category of that name still wins over the alias.
   const enabledCategories = mergeCategories(userCategories)
   const requestedCategoryName = args.category!
-  const categoryName = enabledCategories[requestedCategoryName] !== undefined
-    ? requestedCategoryName
-    : canonicalCategoryName(requestedCategoryName)
+  const categoryName =
+    enabledCategories[requestedCategoryName] !== undefined
+      ? requestedCategoryName
+      : canonicalCategoryName(requestedCategoryName)
   const categoryExists = enabledCategories[categoryName] !== undefined
 
   if (!categoryExists) {
     const allCategoryNames = Object.keys(enabledCategories).join(", ")
     return categoryResolutionError(`Unknown category: "${categoryName}". Available: ${allCategoryNames}`)
+  }
+
+  const configuredCategory = userCategories?.[categoryName]
+  if (configuredCategory?.models_distribution === "round_robin" && configuredCategory.models?.length) {
+    userCategories = {
+      ...userCategories,
+      [categoryName]: {
+        ...configuredCategory,
+        models: [...distributeTaskModels(`category:${categoryName}`, configuredCategory.models, "round_robin")],
+      },
+    }
   }
 
   const availableModels = await getAvailableModelsForDelegateTask(client)
@@ -104,7 +118,9 @@ export async function resolveCategoryExecution(
 
     if (configuredModels && availableModels.size > 0) {
       const configuredChain = configuredModels.map((entry) => getConfiguredModel(entry)).join(" -> ")
-      return categoryResolutionError(`Configured model chain is unavailable for category "${categoryName}": ${configuredChain}`)
+      return categoryResolutionError(
+        `Configured model chain is unavailable for category "${categoryName}": ${configuredChain}`,
+      )
     }
 
     if (categoryExists && requiredModel) {
@@ -147,9 +163,7 @@ Available categories: ${allCategoryNames}`)
   let matchedFallback = false
 
   const overrideModel = sisyphusJuniorModel
-  const explicitCategoryModel = hasCanonicalModels
-    ? configuredPrimaryModel
-    : userCategories?.[args.category!]?.model
+  const explicitCategoryModel = hasCanonicalModels ? configuredPrimaryModel : userCategories?.[args.category!]?.model
 
   if (!requirement) {
     // Precedence: explicit category model > sisyphus-junior default > category resolved model
@@ -157,9 +171,10 @@ Available categories: ${allCategoryNames}`)
     // per-category overrides via `categories[category].model`.
     actualModel = explicitCategoryModel ?? overrideModel ?? categoryResolvedModel
     if (actualModel) {
-      modelInfo = explicitCategoryModel || overrideModel
-        ? { model: actualModel, type: "user-defined", source: "override" }
-        : { model: actualModel, type: "system-default", source: "system-default" }
+      modelInfo =
+        explicitCategoryModel || overrideModel
+          ? { model: actualModel, type: "user-defined", source: "override" }
+          : { model: actualModel, type: "system-default", source: "system-default" }
       const parsedModel = parseModelString(actualModel)
       const variantToUse = userCategories?.[args.category!]?.variant ?? resolved.config.variant
       categoryModel = parsedModel
@@ -203,22 +218,20 @@ Available categories: ${allCategoryNames}`)
       actualModel = resolvedModel
 
       if (!parseModelString(actualModel)) {
-        return categoryResolutionError(`Invalid model format "${actualModel}". Expected "provider/model" format (e.g., "anthropic/claude-sonnet-4-6").`)
+        return categoryResolutionError(
+          `Invalid model format "${actualModel}". Expected "provider/model" format (e.g., "anthropic/claude-sonnet-4-6").`,
+        )
       }
 
       const type: "user-defined" | "inherited" | "category-default" | "system-default" =
-        (explicitCategoryModel || overrideModel)
+        explicitCategoryModel || overrideModel
           ? "user-defined"
-          : (systemDefaultModel && actualModel === systemDefaultModel)
-              ? "system-default"
-              : "category-default"
+          : systemDefaultModel && actualModel === systemDefaultModel
+            ? "system-default"
+            : "category-default"
 
       const source: "override" | "category-default" | "system-default" =
-        type === "user-defined"
-          ? "override"
-          : type === "system-default"
-              ? "system-default"
-              : "category-default"
+        type === "user-defined" ? "override" : type === "system-default" ? "system-default" : "category-default"
 
       modelInfo = { model: actualModel, type, source }
 
@@ -255,15 +268,12 @@ Available categories: ${categoryNames.join(", ")}`)
   }
 
   const resolvedModel = actualModel?.toLowerCase()
-  const isUnstableAgent = resolved.config.is_unstable_agent ?? (resolvedModel ? resolvedModel.includes("gemini") || resolvedModel.includes("minimax") : false)
+  const isUnstableAgent =
+    resolved.config.is_unstable_agent ??
+    (resolvedModel ? resolvedModel.includes("gemini") || resolvedModel.includes("minimax") : false)
 
-  const defaultProviderID = categoryModel?.providerID
-    ?? parseModelString(actualModel ?? "")?.providerID
-    ?? "opencode"
-  const configuredFallbackChain = buildFallbackChainFromModels(
-    normalizedConfiguredFallbackModels,
-    defaultProviderID,
-  )
+  const defaultProviderID = categoryModel?.providerID ?? parseModelString(actualModel ?? "")?.providerID ?? "opencode"
+  const configuredFallbackChain = buildFallbackChainFromModels(normalizedConfiguredFallbackModels, defaultProviderID)
   const canonicalModelChain = hasCanonicalModels
     ? buildFallbackChainFromModels(resolved.config.models, defaultProviderID)
     : undefined
@@ -272,16 +282,14 @@ Available categories: ${categoryNames.join(", ")}`)
   // Legacy fallback-only settings are promoted only when resolution selected a fallback.
   const effectiveEntry = categoryModel
     ? hasCanonicalModels
-      ? (canonicalModelChain
-          ? findMostSpecificFallbackEntry(categoryModel.providerID, categoryModel.modelID, canonicalModelChain)
-          : undefined)
+      ? canonicalModelChain
+        ? findMostSpecificFallbackEntry(categoryModel.providerID, categoryModel.modelID, canonicalModelChain)
+        : undefined
       : matchedFallback
-        ? (
-            fallbackEntry
-            ?? (configuredFallbackChain
-              ? findMostSpecificFallbackEntry(categoryModel.providerID, categoryModel.modelID, configuredFallbackChain)
-              : undefined)
-          )
+        ? (fallbackEntry ??
+          (configuredFallbackChain
+            ? findMostSpecificFallbackEntry(categoryModel.providerID, categoryModel.modelID, configuredFallbackChain)
+            : undefined))
         : undefined
     : undefined
 
@@ -313,6 +321,8 @@ Available categories: ${categoryNames.join(", ")}`)
     actualModel,
     isUnstableAgent,
     // Don't use hardcoded fallback chain when resolution was skipped (cold cache)
-    fallbackChain: configuredFallbackChain ?? ((isModelResolutionSkipped || explicitCategoryModel || overrideModel) ? undefined : requirement?.fallbackChain),
+    fallbackChain:
+      configuredFallbackChain ??
+      (isModelResolutionSkipped || explicitCategoryModel || overrideModel ? undefined : requirement?.fallbackChain),
   }
 }

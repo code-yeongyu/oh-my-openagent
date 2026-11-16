@@ -1,0 +1,54 @@
+{
+  "request": "authenticate",
+  "cases": [
+    {
+      "name": "a correct client_proof is accepted",
+      "outcome": "ok",
+      "handshake": "welcome_only",
+      "steps": [
+        {
+          "send": {
+            "id": "a",
+            "type": "authenticate",
+            "client_proof": "<client_proof>"
+          }
+        },
+        {
+          "expect": {
+            "id": "a",
+            "type": "response",
+            "ok": true,
+            "data": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "a wrong client_proof is refused and the connection closes",
+      "outcome": "refusal",
+      "handshake": "welcome_only",
+      "steps": [
+        {
+          "send": {
+            "id": "a",
+            "type": "authenticate",
+            "client_proof": "<wrong_proof>"
+          }
+        },
+        {
+          "expect": {
+            "id": "a",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "client_proof_invalid"
+            }
+          }
+        },
+        {
+          "expect_closed": true
+        }
+      ]
+    }
+  ]
+}
