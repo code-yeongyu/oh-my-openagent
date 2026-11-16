@@ -71,4 +71,21 @@ describe("placeBuiltSenpi", () => {
       rmSync(root, { recursive: true, force: true })
     }
   })
+
+  test("#given a workspace resolution linked to an engine outside the clone #when the built engine is placed #then it refuses naming the path and the outside engine survives", () => {
+    const root = mkdtempSync(join(tmpdir(), "omob-senpi-swap-outside-"))
+    try {
+      const { omoDir, built } = isolatedLinkerClone(root)
+      const outside = join(root, "outside-cache", "senpi")
+      writeEngine(outside, "outside")
+      const escaping = join(omoDir, "packages", "omo-senpi", "node_modules", "@code-yeongyu", "senpi")
+      rmSync(escaping)
+      link(outside, escaping)
+      expect(() => placeBuiltSenpi(omoDir, built)).toThrow(escaping)
+      expect(JSON.parse(readFileSync(join(outside, "package.json"), "utf8")).version).toBe("outside")
+      expect(realpathSync(escaping)).toBe(realpathSync(outside))
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
 })

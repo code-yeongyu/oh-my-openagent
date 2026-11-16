@@ -9,7 +9,7 @@
 // coordinated host start timed out in supervisor_bootstrap.
 
 import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, realpathSync, rmSync, symlinkSync } from "node:fs"
-import { dirname, join } from "node:path"
+import { dirname, isAbsolute, join, relative, sep } from "node:path"
 
 const SENPI_SCOPE = "@code-yeongyu"
 const SENPI_NAME = "senpi"
@@ -59,11 +59,18 @@ function resolvedOrUndefined(path: string): string | undefined {
  */
 export function placeBuiltSenpi(omoDir: string, builtSenpiRoot: string): string {
   const target = senpiLinkUnder(join(omoDir, "node_modules"))
+  const cloneRoot = realpathSync(omoDir)
   const others = new Set<string>()
   for (const path of senpiResolutionPaths(omoDir)) {
     if (path === target) continue
     const resolved = resolvedOrUndefined(path)
-    if (resolved !== undefined) others.add(resolved)
+    if (resolved === undefined) continue
+    // The swap deletes and re-links each resolved directory; one that a symlink backend or a `link:` dependency
+    // placed outside the clone is not ours to remove.
+    const fromClone = relative(cloneRoot, resolved)
+    if (fromClone === "" || fromClone === ".." || fromClone.startsWith(`..${sep}`) || isAbsolute(fromClone))
+      throw new Error(`senpi resolution ${path} points outside the clone at ${resolved}; refusing to replace it`)
+    others.add(resolved)
   }
   rmSync(target, { recursive: true, force: true })
   mkdirSync(dirname(target), { recursive: true })
