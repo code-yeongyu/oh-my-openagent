@@ -26,6 +26,9 @@ pub fn status(suspended: bool, stop_epoch: u64) -> Value {
 fn write_0600(path: &Path, text: &str) {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).expect("the parent dir");
+        // The authority host creates its `computer/` dir owner-only (row 37; R70k D-1).
+        #[cfg(unix)]
+        fs::set_permissions(parent, fs::Permissions::from_mode(0o700)).expect("0700");
     }
     fs::write(path, text).expect("the file is written");
     #[cfg(unix)]

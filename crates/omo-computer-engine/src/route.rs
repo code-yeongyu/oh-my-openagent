@@ -4,7 +4,7 @@
 use std::fmt;
 use std::path::Path;
 
-use omo_computer_backend_fake::{FakeBackend, RecordingSink, SeamError};
+use omo_computer_backend_fake::{FakeBackend, FakeClock, RecordingSink, SeamError};
 use omo_computer_core::backend::Backend;
 use omo_computer_core::env::{check_launch_env, SeamRefusal, FAKE_BACKEND};
 
@@ -37,11 +37,17 @@ impl fmt::Display for RouteError {
     }
 }
 
+/// The backend the launch environment selects, and the fake's clock when it is the fake.
+pub struct Launched {
+    pub backend: Box<dyn Backend>,
+    pub fake_clock: Option<FakeClock>,
+}
+
 /// The backend the launch environment selects.
 ///
 /// # Errors
 /// A seam is refused, no backend is registered for the value, or the fake cannot be built.
-pub fn backend(vars: &[(String, String)]) -> Result<Box<dyn Backend>, RouteError> {
+pub fn launch(vars: &[(String, String)]) -> Result<Launched, RouteError> {
     check_launch_env(vars.iter().map(|(name, value)| (name.as_str(), value.as_str())))
         .map_err(RouteError::Seam)?;
     let lookup = |name: &str| {
@@ -59,7 +65,8 @@ pub fn backend(vars: &[(String, String)]) -> Result<Box<dyn Backend>, RouteError
                 None => RecordingSink::default(),
             };
             let fake = FakeBackend::from_seams(lookup, sink).map_err(RouteError::Fake)?;
-            Ok(Box::new(fake))
+            let fake_clock = Some(fake.clock());
+            Ok(Launched { backend: Box::new(fake), fake_clock })
         }
         other => Err(RouteError::NoBackend(other)),
     }
@@ -75,14 +82,14 @@ mod tests {
 
     #[test]
     fn fake_is_selected_and_other_values_refuse() {
-        assert!(backend(&vars(&[(BACKEND_SEAM, "fake")])).is_ok());
-        assert!(matches!(backend(&vars(&[])), Err(RouteError::NoBackend(None))));
+        assert!(launch(&vars(&[(BACKEND_SEAM, "fake")])).is_ok_and(|l| l.fake_clock.is_some()));
+        assert!(matches!(launch(&vars(&[])), Err(RouteError::NoBackend(None))));
         assert!(matches!(
-            backend(&vars(&[("OMO_COMPUTER_FAKE_STOP_PATH", "live")])),
+            launch(&vars(&[("OMO_COMPUTER_FAKE_STOP_PATH", "live")])),
             Err(RouteError::Seam(_))
         ));
         assert!(matches!(
-            backend(&vars(&[(BACKEND_SEAM, "fake"), ("OMO_COMPUTER_FAKE_STOP_PATH", "loud")])),
+            launch(&vars(&[(BACKEND_SEAM, "fake"), ("OMO_COMPUTER_FAKE_STOP_PATH", "loud")])),
             Err(RouteError::Fake(_))
         ));
     }

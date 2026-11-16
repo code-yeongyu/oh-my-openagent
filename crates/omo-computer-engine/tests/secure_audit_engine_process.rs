@@ -177,6 +177,11 @@ fn as_persona(scenario: &str, persona: &str, dir: &Path) -> PathBuf {
 /// checks the typeText was delivered.
 fn run_engine(case: &Value, scenario: &Path) -> Left {
     let root = tempfile::tempdir().expect("runtime root");
+    // Owner-only like every runtime root the resolver creates: row 28's host-latch read
+    // validates the dir's mode (R70k D-1) and reads a permissive one as latch SET.
+    #[cfg(unix)]
+    std::fs::set_permissions(root.path(), <std::fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o700))
+        .expect("0700");
     let mut command = Command::new(engine());
     command
         .arg("--stdio")

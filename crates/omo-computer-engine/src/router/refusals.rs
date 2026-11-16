@@ -1,18 +1,17 @@
 //! How a refusal reaches the wire: the closed code's number and name, `data.code`/`data.reason`,
-//! and a funnel refusal's call members, stamps and detail (moved from rpc.rs, R65: no change).
+//! and a funnel refusal's call members, stamps and detail (moved from rpc/refusals.rs into the
+//! router, row 28: no change).
 
 use omo_computer_core::backend::Refusal;
 use omo_computer_session::grant::HostCallError;
 use omo_computer_session::{Refused, Unresolved};
 use serde_json::{json, Value};
 
-use super::{failure, Failure, INVALID_PARAMS};
+use super::wire::WireError;
 
-pub(super) fn host_failure(error: HostCallError) -> Failure {
+pub fn host_failure(error: HostCallError) -> WireError {
     match error {
-        HostCallError::Params(error) => {
-            failure(INVALID_PARAMS, "Invalid params", Some(json!({ "detail": error.to_string() })))
-        }
+        HostCallError::Params(error) => WireError::invalid_params(&error),
         HostCallError::Refused(refused) => refused_call(&refused),
     }
 }
@@ -21,7 +20,7 @@ pub(super) fn host_failure(error: HostCallError) -> Failure {
 /// it, and `data.reason` when the refusal carries one. Every refusal resolves to its row of
 /// the one error table (a bare refusal to its code's bare row); a pair with no row is a
 /// backend defect, reported on stderr, and still answered with the refusal's own code.
-pub(super) fn refused(refusal: &Refusal) -> Failure {
+pub fn refused(refusal: &Refusal) -> WireError {
     if let Err(unknown) = refusal.row() {
         eprintln!("omo-computer-engine: {unknown}");
     }
@@ -29,7 +28,7 @@ pub(super) fn refused(refusal: &Refusal) -> Failure {
     if let Some(reason) = refusal.reason {
         data["reason"] = json!(reason);
     }
-    failure(refusal.code.number(), refusal.code.wire(), Some(data))
+    WireError::new(refusal.code.number(), refusal.code.wire(), Some(data))
 }
 
 /// R60c: a refusal whose row reads its disposition from the inner stage (a gated drag point)
@@ -58,7 +57,7 @@ fn inner_disposition(refusal: &Refusal, detail: Option<&Value>, data: &mut Value
 /// whose send was interrupted its `disposition` (`delivery_uncertain/unsafe`): without it
 /// the code's own row would read `not_delivered/safe` and invite a resend; `warning:"write_failed"`
 /// when the refusal's own audit line could not be written.
-pub(super) fn refused_call(refused: &Refused) -> Failure {
+pub fn refused_call(refused: &Refused) -> WireError {
     let mut failure = self::refused(&refused.refusal);
     if let Some(data) = failure.data.as_mut() {
         if let Some(call_id) = &refused.call_id {
@@ -97,7 +96,7 @@ pub(super) fn refused_call(refused: &Refused) -> Failure {
 }
 
 /// A ref that did not resolve: the refusal, and on `AmbiguousTarget` the `candidates`.
-pub(super) fn unresolved(unresolved: &Unresolved) -> Failure {
+pub fn unresolved(unresolved: &Unresolved) -> WireError {
     let mut failure = refused(&unresolved.refusal);
     if let Some(data) = failure.data.as_mut().filter(|_| !unresolved.candidates.is_empty()) {
         data["candidates"] = json!(unresolved.candidates);

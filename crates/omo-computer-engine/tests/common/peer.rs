@@ -14,6 +14,18 @@ use serde_json::Value;
 pub const MESSAGE_TIMEOUT: Duration = Duration::from_secs(10);
 const EXIT_TIMEOUT: Duration = Duration::from_secs(5);
 
+/// A runtime dir as the engine's resolver creates it: owner-only (0700). The host-latch read
+/// validates the dir's mode (R70k D-1), so a default 0755 temp dir would read as latch SET.
+pub fn runtime_dir() -> tempfile::TempDir {
+    let dir = tempfile::tempdir().expect("a runtime dir");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700)).expect("0700");
+    }
+    dir
+}
+
 pub fn engine() -> &'static str {
     env!("CARGO_BIN_EXE_omo-computer-engine")
 }

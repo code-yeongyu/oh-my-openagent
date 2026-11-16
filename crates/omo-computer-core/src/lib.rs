@@ -12,6 +12,7 @@ pub mod error;
 pub mod frame;
 pub mod hello;
 pub mod holds;
+pub mod host_paths;
 pub mod intervention;
 pub mod keys;
 pub mod listing;

@@ -122,7 +122,8 @@ fn session_open_without_host_self_set_still_refuses_own_pid_chain() {
     let own = std::process::id();
     let scenario = scenario_with(
         &json!({"windows": [{"id": "301", "title": "the MCP client", "app": "Terminal", "pid": own,
-        "x": 0, "y": 0, "width": 400, "height": 300, "focused": true, "elevated": null}]}),
+        "x": 0, "y": 0, "width": 400, "height": 300, "focused": true, "elevated": null}],
+        "ax": {}}),
     );
     let mut live = mcp("exec", &scenario, Some(true));
     let typed = tool(
@@ -132,8 +133,9 @@ fn session_open_without_host_self_set_still_refuses_own_pid_chain() {
         &json!({"target": "301", "text": "rm -rf ~"}),
     );
     assert_eq!(typed["result"]["isError"], json!(true), "{typed}");
+    // The self target rides an existing code as `data.reason` (d-arch.md 'Wire protocol').
     assert!(
-        typed.to_string().contains("SelfTarget"),
+        typed.to_string().contains(r#"\"reason\":\"self_target\""#),
         "refused as the engine's own pid chain: {typed}"
     );
     assert!(

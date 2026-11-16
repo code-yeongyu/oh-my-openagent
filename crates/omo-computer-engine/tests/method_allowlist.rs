@@ -133,7 +133,7 @@ fn the_method_tables_public_rows_equal_the_snapshot() {
 
 #[test]
 fn the_mcp_catalog_is_exactly_the_public_methods() {
-    let runtime = tempfile::tempdir().expect("a runtime dir");
+    let runtime = peer::runtime_dir();
     let mut mcp = Peer::spawn(&["--mcp"], &env(runtime.path()), &repo());
     mcp.send(&json!({"jsonrpc": "2.0", "id": 0, "method": "initialize",
         "params": {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "allowlist", "version": "0"}}}));
@@ -170,7 +170,7 @@ fn oneshot_refuses_host_only_method() {
         "the lift is host-only"
     );
     for (id, method) in (1_i64..).zip(&host_only) {
-        let runtime = tempfile::tempdir().expect("a runtime dir");
+        let runtime = peer::runtime_dir();
         let mut oneshot = Peer::spawn(&["--oneshot"], &env(runtime.path()), &repo());
         oneshot.send(&json!({"jsonrpc": "2.0", "id": id, "method": format!("desktop.{method}"), "params": {}}));
         let reply: Value = oneshot
