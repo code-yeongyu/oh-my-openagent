@@ -4,8 +4,37 @@
 import AppKit
 import ApplicationServices
 
+// The pasteboard change count is read on its own queue, off the sampler's main thread: a read waits on the pasteboard
+// server, which can take hundreds of ms while another process writes the pasteboard, and must not stall the sampler.
+// The count only grows, so a slow read delays a change but cannot hide one.
+final class PasteboardPoller {
+  private let queue = DispatchQueue(label: "dev.omo.qa.sentinel.pasteboard")
+  private let timer: DispatchSourceTimer
+  private var last: Int?
+
+  init() {
+    timer = DispatchSource.makeTimerSource(queue: queue)
+    timer.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(5))
+    timer.setEventHandler { [unowned self] in self.read() }
+  }
+
+  func start() { timer.resume() }
+
+  private func read() {
+    let count = NSPasteboard.general.changeCount
+    if count != last {
+      last = count
+      emit(["kind": "clipboard", "changeCount": count])
+    }
+  }
+}
+
+// A sample slower than this reports its slowest read, so a stalled sampler names what held it.
+private let slowTickMs = 100.0
+
 extension Recorder {
   func startSampler() {
+    pasteboard.start()
     let timer = Timer(timeInterval: 0.05, repeats: true) { [weak self] _ in self?.sample() }
     RunLoop.main.add(timer, forMode: .common)
     sample()
@@ -40,13 +69,22 @@ extension Recorder {
   }
 
   func sample() {
-    emit(["kind": "tick"])
+    let began = uptimeMs()
+    emit(["kind": "tick", "t": began])
+    var mark = began
+    var slowest = (read: "none", ms: 0.0)
+    func timed(_ read: String) {
+      let now = uptimeMs()
+      if now - mark > slowest.ms { slowest = (read, now - mark) }
+      mark = now
+    }
 
     if let focus = focusIdentity(of: userPid) {
       if focus != Recorder.busy, changed("focus", focus) { send("key_focus", ["kind": "focus", "via": "sample", "value": focus]) }
     } else {
       fault("key_focus", "focused element read failed")
     }
+    timed("focus")
 
     if let windows = listWindows() {
       let order = windows.filter { $0.layer == 0 }.map(\.id)
@@ -61,6 +99,7 @@ extension Recorder {
     } else {
       fault("window_raised", "window list read failed")
     }
+    timed("window list")
 
     if field != nil {
       if let text = fieldText() {
@@ -69,6 +108,7 @@ extension Recorder {
         fault("typing", "field read failed")
       }
     }
+    timed("typist field")
 
     if let point = pointerLocation() {
       if changed("pointer", "\(point.x),\(point.y)") {
@@ -77,18 +117,23 @@ extension Recorder {
     } else {
       fault("pointer", "cursor position read failed")
     }
-
-    let count = NSPasteboard.general.changeCount
-    if changed("clipboard", String(count)) { send("clipboard", ["kind": "clipboard", "changeCount": count]) }
+    timed("pointer")
 
     if let space = activeSpaceId() {
       if changed("space", String(space)) { send("space", ["kind": "space", "via": "sample", "value": String(space)]) }
     }
+    timed("space")
 
     if let front = NSWorkspace.shared.frontmostApplication?.processIdentifier {
       if changed("front", String(front)) { send("activation", ["kind": "activation", "via": "sample", "pid": Int(front)]) }
     } else {
       fault("activation", "frontmost application unreadable")
+    }
+    timed("frontmost app")
+
+    let total = uptimeMs() - began
+    if total > slowTickMs {
+      emit(["kind": "slow_tick", "ms": total.rounded(), "read": slowest.read, "readMs": slowest.ms.rounded()])
     }
   }
 
