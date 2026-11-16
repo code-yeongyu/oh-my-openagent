@@ -87,6 +87,8 @@ jobs:
 
   native-windows:
     name: fixture native-windows (windows-latest)
+    # Pull requests run Linux only; the ci:full-matrix label and dispatches run every OS (#13802).
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-matrix')
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -238,6 +240,8 @@ jobs:
 
   electron-windows:
     name: fixture electron (windows-latest)
+    # Pull requests run Linux only; the ci:full-matrix label and dispatches run every OS (#13802).
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-matrix')
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -388,6 +392,8 @@ jobs:
 
   native-macos:
     name: fixture native-macos (macos-15)
+    # Pull requests run Linux only; the ci:full-matrix label and dispatches run every OS (#13802).
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-matrix')
     runs-on: macos-15
     timeout-minutes: 20
     steps:
@@ -431,6 +437,8 @@ jobs:
 
   electron-macos:
     name: fixture electron (macos-15)
+    # Pull requests run Linux only; the ci:full-matrix label and dispatches run every OS (#13802).
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-matrix')
     runs-on: macos-15
     timeout-minutes: 20
     steps:
@@ -528,6 +536,8 @@ jobs:
 
   webview-macos:
     name: fixture webview (macos-15)
+    # Pull requests run Linux only; the ci:full-matrix label and dispatches run every OS (#13802).
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-matrix')
     runs-on: macos-15
     timeout-minutes: 20
     steps:
@@ -598,6 +608,8 @@ jobs:
 
   webview-windows:
     name: fixture webview (windows-latest)
+    # Pull requests run Linux only; the ci:full-matrix label and dispatches run every OS (#13802).
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-matrix')
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
