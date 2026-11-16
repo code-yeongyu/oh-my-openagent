@@ -54,6 +54,14 @@ function resolvedOrUndefined(path: string): string | undefined {
 }
 
 /**
+ * Whether a path relative to the clone root names something the swap must not delete: the clone root itself, its
+ * parent or anything above it, or (Windows, another drive) an absolute path `relative` could not express.
+ */
+export function leavesClone(fromClone: string): boolean {
+  return fromClone === "" || fromClone === ".." || fromClone.startsWith(`..${sep}`) || isAbsolute(fromClone)
+}
+
+/**
  * Copies the built engine to the root resolution and turns every other directory a resolution points at into a
  * link to it, so the bundler (which follows links to real paths) sees one module per engine file. Returns the root.
  */
@@ -67,8 +75,7 @@ export function placeBuiltSenpi(omoDir: string, builtSenpiRoot: string): string 
     if (resolved === undefined) continue
     // The swap deletes and re-links each resolved directory; one that a symlink backend or a `link:` dependency
     // placed outside the clone is not ours to remove.
-    const fromClone = relative(cloneRoot, resolved)
-    if (fromClone === "" || fromClone === ".." || fromClone.startsWith(`..${sep}`) || isAbsolute(fromClone))
+    if (leavesClone(relative(cloneRoot, resolved)))
       throw new Error(`senpi resolution ${path} points outside the clone at ${resolved}; refusing to replace it`)
     others.add(resolved)
   }
