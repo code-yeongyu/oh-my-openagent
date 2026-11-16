@@ -9,6 +9,7 @@ import {
 } from "../omo-senpi/src/components/thread/control/operations"
 import { createRelayControl } from "../omo-senpi/src/components/thread/control/relay-control"
 import { createDeviceServiceSessions } from "../omo-senpi/src/components/remote/port/device-service"
+import { createRemoteClient } from "../omo-senpi/src/components/remote/client"
 import { randomUUID } from "node:crypto"
 import { existsSync } from "node:fs"
 import { userInfo } from "node:os"
@@ -60,6 +61,8 @@ const deviceServiceSurface = (service: DeviceService, dial: () => Promise<Device
     connect: async () => ({ conn: service, owned: false }),
     dialEndpoint: async () => ({ conn: await dial(), owned: true }),
   }),
+  // `omo remote` is a person at this device; the account reads go through the one remote client (#13414).
+  client: createRemoteClient({ kind: "person", uid: String(userInfo().uid) }, { version: service.serviceVersion }),
   chain: { stamp: (record) => record },
 })
 
@@ -81,6 +84,20 @@ export async function runSession(
   dependencies: RemoteCommandDependencies,
 ): Promise<number> {
   const remote = (dependencies.remote ?? ((service) => deviceServiceSurface(service, dependencies.connect)))(service)
+  // The client holds its own device-service connection; a command that left it open would keep the process alive.
+  try {
+    return await runSessionOn(remote, args, json, dependencies)
+  } finally {
+    remote.client.close()
+  }
+}
+
+async function runSessionOn(
+  remote: RemoteThreadSurface,
+  args: SessionArgs,
+  json: boolean,
+  dependencies: RemoteCommandDependencies,
+): Promise<number> {
   const show: Show = (result, label) => {
     if (json) dependencies.output(JSON.stringify(result))
     if (result.kind === "error") {

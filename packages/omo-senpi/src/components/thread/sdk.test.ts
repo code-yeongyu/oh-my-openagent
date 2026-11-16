@@ -7,7 +7,7 @@ import type { GatewayEndpointRef, ReleaseSessionRequest } from "./gateway/adapte
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import type { RemoteThreadSurface } from "./remote/ports"
 import { createThreadSdk, type ThreadSdk } from "./sdk"
-import { createRemoteThreadFixture } from "./thread-remote-fixture"
+import { createRemoteThreadFixture, fakeRemoteClient } from "./thread-remote-fixture"
 import type { ThreadHost, ThreadHostSession } from "./tools"
 import type { ThreadHostViewRequest } from "./tools/ports"
 import { startFakeEngineHost } from "./wake/testing/fake-engine-host"
@@ -143,13 +143,13 @@ function countingRemote(remote: RemoteThreadSurface): {
   readonly calls: string[]
 } {
   const calls: string[] = []
-  const counted = <T extends object>(port: T): T =>
+  const counted = <T extends object>(port: T, prefix = ""): T =>
     new Proxy(port, {
       get: (target, key, receiver) => {
         const value: unknown = Reflect.get(target, key, receiver)
         if (typeof value !== "function") return value
         return (...args: unknown[]) => {
-          calls.push(String(key))
+          calls.push(`${prefix}${String(key)}`)
           return Reflect.apply(value, target, args)
         }
       },
@@ -158,6 +158,12 @@ function countingRemote(remote: RemoteThreadSurface): {
     remote: {
       ...remote,
       sessions: counted(remote.sessions),
+      client: {
+        ...remote.client,
+        service: counted(remote.client.service, "client.service."),
+        devices: counted(remote.client.devices, "client.devices."),
+        sessions: counted(remote.client.sessions, "client.sessions."),
+      },
       ...(remote.aliases === undefined ? {} : { aliases: counted(remote.aliases) }),
     },
     calls,
@@ -282,7 +288,7 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
     ])
   })
 
-  test("#given a published thread id and the account surface set #when omo thread send names that id #then it is delivered with no host listing, no alias call and no listing, and its one device-service call is the thisDevice read that stamps its sender device (#12860, #13004)", async () => {
+  test("#given a published thread id and the account surface set #when omo thread send names that id #then it is delivered with no host listing, no alias call and no listing, and its one device-service call is the device read that stamps its sender device (#12860, #13004)", async () => {
     const account = remoteFixture.account({
       aliases: new Map([["lane-here", { session_id: "dur-host", device: "here" }]]),
     })
@@ -297,22 +303,22 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
     expect((await store.list({ target_durable_id: "dur-host" })).map((row) => row.sender)).toEqual(["cli:501"])
     expect(views).toEqual([])
     // Decision 0027 section 3: every delivery names its sender device, read once and kept for the process.
-    expect(counting.calls).toEqual(["thisDevice"])
+    expect(counting.calls).toEqual(["client.devices.list"])
     expect((await store.list({ target_durable_id: "dur-host" }))[0]?.envelope.provenance?.device).toBe("here")
     expect(await sdk.send({ thread: "dur-host", text: "again" })).toMatchObject({ kind: "ok" })
-    expect(counting.calls).toEqual(["thisDevice"])
+    expect(counting.calls).toEqual(["client.devices.list"])
   })
 
   test("#given the device service cannot answer #when omo thread send names a thread here #then the send still goes and its row names why it carries no sender device (#13004)", async () => {
     const account = remoteFixture.account()
     const down = {
       ...account.remote,
-      sessions: {
-        ...account.remote.sessions,
-        thisDevice: async () => {
-          throw new Error("device service down")
-        },
-      },
+      client: fakeRemoteClient({
+        state: () => "connected",
+        here: "here",
+        devices: () => [],
+        fail: { kind: "error", code: "host_unavailable", message: "device service down", next_action: "Retry." },
+      }),
     }
     const { sdk, store } = fixture({ remote: down })
     await store.registerIncarnation({
