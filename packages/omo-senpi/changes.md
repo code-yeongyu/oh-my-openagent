@@ -1,3 +1,15 @@
+## 2026-11-16 - /remote renders enable, disable and control (#13796)
+
+`components/remote/tui/command.ts`: `sessionVerbLines` renders `{enabled}` (enable, disable) and the control state `{attached}` as sentences; anything else still falls back to its JSON. `show` adds the CLI's stderr as a warning after a successful result; `succeeded` shows a failed answer's `notice` (enable exits 3 with `{state, notice}` on stdout, omo-native `remote-bootstrap.ts`) before stderr and the exit code. Tests assert note type, count and the deadline handed to the runner instead of pinning notice wording.
+
+## 2026-11-14 - `thread_interrupt` stops the interrupted turn's background jobs
+
+- `src/components/thread/control/interrupt.ts` (new): `interruptOver`, the one interrupt body of both legs. It sends the engine's `interrupt` record with `background: "stop"` and reads the reply into `{ interrupted, turn_id, background }`; a reply with no `background` (an engine before senpi's `interrupt { background }`) reads as `not_supported`.
+- `src/components/thread/control/local-control.ts` and `control/relay-control.ts`: `interrupt` is `interruptOver` over this device's endpoint (`port.interrupt`) and over the device service (`sessionCommand`) respectively; neither builds its own record or parses its own reply any more.
+- `src/components/thread/tools/ports.ts`, `live-surface.ts`, `lazy-live-surface.ts`: the endpoint port's `interrupt` takes the request fields and answers the engine's reply data.
+- `src/components/thread/contracts/results.ts`, `control/operations.ts`, `control/port.ts`: the `thread_interrupt` result carries the typed `background` (`ThreadInterruptBackground`).
+- Why: measured on a remote thread, the interrupted turn's auto-detached `sleep 60` kept running, its completion woke the thread about 60 s later and the thread replied anyway.
+
 ## 2026-11-14 - thread tools: one answer on this device and on another one
 
 `control/locate.ts` resolves a control tool's address against the send address book (`sendAddressBook`: the session files an address names are looked up when no endpoint lists it), so the control tools and `thread_send` find the same threads; `tools/read-ops.ts` reads any not-running thread that has a session file here, not only one whose endpoint died. `control/session-host.ts` `openedThread` is the one create summary both session hosts answer. `control/local-session-host.ts` `workspaceNote` adds the out-of-workspace note to a thread this device opened.
