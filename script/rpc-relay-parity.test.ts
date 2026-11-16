@@ -76,6 +76,17 @@ describe("engine RPC local-versus-relay parity table (#13478)", () => {
     ])
   })
 
+  test("regex literals, ternaries, type declarations and template expressions are read as code (#13826 review L1-L3)", () => {
+    expect(namesRecordType(`/'/.test(x)\ntest('type: "prompt" relays', () => {})`, "prompt")).toBe(false)
+    expect(namesRecordType(`const q = /["']/g\nsend({ type: "prompt" })`, "prompt")).toBe(true)
+    expect(namesRecordType('const u = /https?:\\/\\//\nsend({ type: "prompt" })', "prompt")).toBe(true)
+    expect(namesRecordType('const k = flag ? "type" : "prompt"', "prompt")).toBe(false)
+    expect(namesRecordType('expect(s).toMatch(/type: "prompt"/)', "prompt")).toBe(false)
+    expect(namesRecordType('type Frame = { type: "prompt" }', "prompt")).toBe(false)
+    expect(namesRecordType('const t = `${send({ type: "prompt" })}`', "prompt")).toBe(true)
+    expect(namesRecordType('if (frame?.type === "prompt") relay()', "prompt")).toBe(true)
+  })
+
   test("a rows file with a misspelled key is refused", () => {
     expect(() => curatedRows(rowsFile({ prompt: { relaay: "differs" } }))).toThrow('unknown key "relaay"')
   })
