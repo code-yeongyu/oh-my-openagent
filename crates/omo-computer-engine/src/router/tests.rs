@@ -45,13 +45,13 @@ fn an_interrupted_call_carries_its_disposition_on_the_wire() {
         call_id: Some("k-1".to_owned()),
         interrupted: Some(omo_computer_core::report::Disposition::UNCERTAIN_UNSAFE),
         warning: Some("write_failed".to_owned()),
-        ..Refusal::new(EngineCode::TransactionFailed, "recovery_required").into()
+        ..Refusal::new(EngineCode::TransactionFailed, omo_computer_core::error::Reason::RecoveryRequired).into()
     };
     let data = refused_call(&interrupted).data.expect("data");
     assert_eq!(data["warning"], json!("write_failed"), "an unwritten audit line is surfaced");
     assert_eq!(data["callId"], json!("k-1"));
     assert_eq!(data["disposition"], json!({ "delivery": "delivery_uncertain", "retry": "unsafe" }));
-    let plain = refused_call(&Refusal::new(EngineCode::TransactionFailed, "marker_unavailable").into());
+    let plain = refused_call(&Refusal::new(EngineCode::TransactionFailed, omo_computer_core::error::Reason::MarkerUnavailable).into());
     assert!(plain.data.expect("data").get("disposition").is_none(), "a refusal before any send carries none");
 }
 
@@ -100,7 +100,7 @@ fn object_mode_refusals_carry_delivered_paused_and_session() {
 
 #[test]
 fn a_reasoned_refusal_carries_its_reason() {
-    let refusal = Refusal::new(EngineCode::InvalidTarget, "drag_destination");
+    let refusal = Refusal::new(EngineCode::InvalidTarget, omo_computer_core::error::Reason::DragDestination);
     assert!(refusal.computer_code().is_ok(), "the pair has a table row");
     let wire = refused(&refusal);
     assert_eq!(wire.code, EngineCode::InvalidTarget.number());

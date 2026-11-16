@@ -12,7 +12,7 @@ mod files;
 mod identity;
 
 use omo_computer_core::backend::Refusal;
-use omo_computer_core::error::EngineCode;
+use omo_computer_core::error::{EngineCode, Reason};
 use omo_computer_core::host_paths::{self, HostPaths};
 use serde_json::{json, Value};
 
@@ -59,7 +59,7 @@ impl HostLatch {
     /// `Suspended{reason:"host_latch"}` with `nothingSent:true`, the session's own row.
     #[must_use]
     pub fn refusal() -> WireError {
-        let mut error = crate::router::refused(&Refusal::new(EngineCode::Suspended, "host_latch"));
+        let mut error = crate::router::refused(&Refusal::new(EngineCode::Suspended, Reason::HostLatch));
         if let Some(data) = error.data.as_mut() {
             data["nothingSent"] = json!(true);
         }
