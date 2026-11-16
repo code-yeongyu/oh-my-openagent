@@ -43,9 +43,12 @@ async function openSession(
     device,
     sessionId,
     {
+      // The remote engine names its session by its own routing id (`rpc-1`); senpi keys a watch's lines and rows by
+      // the target it armed, so every record carries that label, or its status would read `unknown -> ...` and the
+      // next resync would report the engine's id as gone.
       record: (record) => {
         if (record["type"] === "session_status") sawStatusRecord = true
-        handlers.record(record)
+        handlers.record({ ...record, sessionId: label })
       },
       // A relay before #12719 forwards no session_status record; the watch reads the status off the run's lifecycle, and
       // senpi gets the record it would have had.
