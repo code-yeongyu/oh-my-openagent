@@ -307,3 +307,22 @@ fn marker_persist_fails_input_not_sent_in_serve_mode() {
     assert_eq!(clicked["error"]["data"]["reason"], "marker_unavailable", "{clicked}");
     assert_eq!(posted_inputs(daemon.dir.path()), 0, "nothing was sent");
 }
+
+#[test]
+fn marker_found_after_engine_restart_refuses_the_act_in_serve_mode() {
+    use std::os::unix::fs::PermissionsExt;
+    let daemon = Daemon::start(&[]);
+    let local = daemon.dir.path().join("markers/local");
+    std::fs::create_dir_all(&local).expect("markers dir");
+    std::fs::set_permissions(daemon.dir.path().join("markers"), std::fs::Permissions::from_mode(0o700)).expect("0700");
+    std::fs::set_permissions(&local, std::fs::Permissions::from_mode(0o700)).expect("0700");
+    let left = local.join("default.json");
+    std::fs::write(&left, "a marker the previous engine left mid-call").expect("left marker");
+    std::fs::set_permissions(&left, std::fs::Permissions::from_mode(0o600)).expect("0600");
+    let mut client = opened(&daemon);
+    client.call(5, "stopPath.start", &json!({"chord": "ctrl+alt+shift+escape"})).expect("armed");
+    client.call(6, "capture", &json!({"target": "101"})).expect("a frame to click in");
+    let clicked = client.call(2, "click", &json!({"target": "101", "x": 10, "y": 10, "callId": "k-after-restart"})).expect("answered");
+    assert_eq!(clicked["error"]["data"]["reason"], "recovery_required", "{clicked}");
+    assert_eq!(posted_inputs(daemon.dir.path()), 0, "nothing was sent");
+}
