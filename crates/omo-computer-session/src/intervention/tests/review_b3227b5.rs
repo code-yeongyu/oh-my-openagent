@@ -5,9 +5,9 @@
 
 use super::*;
 
-const BUSY_UNTIL_300: &str = r#""busy_timeline":[{"t_ms":0,"window":"101","busy":true,"indicator":"spinner"},{"t_ms":300,"window":"101","busy":false}]"#;
+pub(super) const BUSY_UNTIL_300: &str = r#""busy_timeline":[{"t_ms":0,"window":"101","busy":true,"indicator":"spinner"},{"t_ms":300,"window":"101","busy":false}]"#;
 
-fn key_inputs(times: impl IntoIterator<Item = u64>) -> String {
+pub(super) fn key_inputs(times: impl IntoIterator<Item = u64>) -> String {
     let inputs: Vec<String> = times
         .into_iter()
         .map(|t| format!(r#"{{"t_ms":{t},"pid":4242,"kind":"key"}}"#))
@@ -15,13 +15,28 @@ fn key_inputs(times: impl IntoIterator<Item = u64>) -> String {
     format!(r#""user_input_timeline":[{}]"#, inputs.join(","))
 }
 
-/// The fake, its target no longer frontmost once the clock reaches `away_at_ms`, and the stop
-/// chord pressed once it reaches `stop_at_ms` (the fake fires `stop_timeline` presses only from
-/// its settle reads, never from a pause's clock wait).
-struct Scripted {
-    inner: FakeBackend,
-    away_at_ms: Option<u64>,
-    stop_at_ms: Option<u64>,
+/// The fake, its target no longer frontmost once the clock reaches `away_at_ms` or on the one
+/// frontmost read `away_read` names (`(from_ms, n)`: the n-th read at or after `from_ms`, from 1),
+/// and the stop chord pressed once the clock reaches `stop_at_ms` (the fake fires `stop_timeline`
+/// presses only from its settle reads, never from a pause's clock wait).
+pub(super) struct Scripted {
+    pub(super) inner: FakeBackend,
+    pub(super) away_at_ms: Option<u64>,
+    pub(super) away_read: Option<(u64, usize)>,
+    pub(super) stop_at_ms: Option<u64>,
+    pub(super) reads: std::sync::atomic::AtomicUsize,
+}
+
+impl Scripted {
+    pub(super) fn new(inner: FakeBackend) -> Self {
+        Self {
+            inner,
+            away_at_ms: None,
+            away_read: None,
+            stop_at_ms: None,
+            reads: std::sync::atomic::AtomicUsize::new(0),
+        }
+    }
 }
 
 /// The fake's stop listener, with one press heard once the clock reaches `at_ms`.
@@ -100,10 +115,12 @@ impl Backend for Scripted {
 
 impl InterventionSource for Scripted {
     fn frontmost_pid(&self) -> Option<u32> {
-        if self
-            .away_at_ms
-            .is_some_and(|away_at_ms| self.inner.clock().now_ms() >= away_at_ms)
-        {
+        let now_ms = self.inner.clock().now_ms();
+        let flicker = self.away_read.is_some_and(|(from_ms, n)| {
+            now_ms >= from_ms
+                && self.reads.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1 == n
+        });
+        if flicker || self.away_at_ms.is_some_and(|away_at_ms| now_ms >= away_at_ms) {
             return Some(9_999);
         }
         self.inner.intervention()?.frontmost_pid()
@@ -125,9 +142,8 @@ impl InterventionSource for Scripted {
 fn h1_a_stop_during_the_takeover_recheck_refuses_with_nothing_sent() {
     let (inner, sink) = fake(&format!(r#",{BUSY_UNTIL_300},{}"#, key_inputs([100])));
     let backend = Scripted {
-        inner,
-        away_at_ms: None,
         stop_at_ms: Some(600),
+        ..Scripted::new(inner)
     };
     let refused = object_session(Box::new(backend))
         .framed_click(None)
@@ -149,9 +165,8 @@ fn m1_a_foreign_input_just_before_the_recheck_ends_holds_the_send() {
         key_inputs([100].into_iter().chain((1_000..=2_000).step_by(10)))
     ));
     let backend = Scripted {
-        inner,
         away_at_ms: Some(1_300),
-        stop_at_ms: None,
+        ..Scripted::new(inner)
     };
     let refused = object_session(Box::new(backend))
         .framed_click(None)
