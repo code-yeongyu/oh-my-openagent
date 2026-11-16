@@ -6,7 +6,7 @@
 
 closed_names! {
     /// Every `data.reason` any stage, gate, backend default or layer emits.
-    Reason [151] {
+    Reason [152] {
         NotInteractive = "not_interactive",
         PromptPending = "prompt_pending",
         Revoked = "revoked",
@@ -73,6 +73,8 @@ closed_names! {
         NoPresenceSurface = "no_presence_surface",
         WaylandNoEscape = "wayland_no_escape",
         WaylandNoPointerRead = "wayland_no_pointer_read",
+        // Row 51: the libei connection is lost and no bounded reconnect brought it back.
+        LibeiLost = "libei_lost",
         SurfaceUnsupported = "surface_unsupported",
         NoNotificationSurface = "no_notification_surface",
         WaylandActivationToken = "wayland_activation_token",

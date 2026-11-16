@@ -7,7 +7,28 @@ license.workspace = true
 [lib]
 crate-type = ["rlib"]
 
+[features]
+# The scriptable fake EIS server and fake portal, for the crate's tests and the Linux QA driver
+# (`cargo build -p omo-computer-backend-wayland --example omo-fake-eis --features fake`).
+fake = []
+
 [dependencies]
 omo-computer-core = { path = "../omo-computer-core" }
 omo-computer-safety = { path = "../omo-computer-safety" }
 omo-computer-backend-atspi = { path = "../omo-computer-backend-atspi" }
+serde_json.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+ashpd.workspace = true
+libloading.workspace = true
+reis.workspace = true
+rustix = { version = "=0.38.44", features = ["event", "fs"] }
+tokio = { workspace = true, features = ["rt"] }
+xkbcommon-dl = "=0.4.2"
+
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+tempfile.workspace = true
+
+[[example]]
+name = "omo-fake-eis"
+required-features = ["fake"]

@@ -2001,9 +2001,17 @@ dependencies = [
 name = "omo-computer-backend-wayland"
 version = "0.0.0"
 dependencies = [
+ "ashpd",
+ "libloading",
  "omo-computer-backend-atspi",
  "omo-computer-core",
  "omo-computer-safety",
+ "reis",
+ "rustix 0.38.44",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "xkbcommon-dl",
 ]
 
 [[package]]
@@ -3840,6 +3848,19 @@ checksum = "a7a974f48060a14e95705c01f24ad9c3345022f4d97441b8a36beb7ed5c4a02d"
 dependencies = [
  "libc",
  "memmap2",
+ "xkeysym",
+]
+
+[[package]]
+name = "xkbcommon-dl"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d039de8032a9a8856a6be89cea3e5d12fdd82306ab7c94d74e6deab2460651c5"
+dependencies = [
+ "bitflags",
+ "dlib",
+ "log",
+ "once_cell",
  "xkeysym",
 ]
 

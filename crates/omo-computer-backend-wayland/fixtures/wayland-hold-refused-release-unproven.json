@@ -1,0 +1,58 @@
+{
+  "name": "wayland-hold-refused-release-unproven",
+  "about": "A compositor whose SP-W release-on-close row has not run (weston has no row): holds are refused typed before any libei frame; every non-hold verb is kept.",
+  "compositor": "weston",
+  "capabilities": {
+    "releaseHelper": {
+      "available": false,
+      "reason": "wayland_release_unproven"
+    }
+  },
+  "steps": [
+    {
+      "verb": "key.down",
+      "kind": "hold",
+      "keys": [
+        [
+          "shift",
+          true
+        ]
+      ],
+      "expect": {
+        "refused": {
+          "code": "StopPathUnavailable",
+          "reason": "release_helper_unavailable"
+        },
+        "libeiFrames": 0
+      }
+    },
+    {
+      "verb": "mouse.down",
+      "kind": "hold",
+      "expect": {
+        "refused": {
+          "code": "StopPathUnavailable",
+          "reason": "release_helper_unavailable"
+        },
+        "libeiFrames": 0
+      }
+    },
+    {
+      "verb": "press",
+      "kind": "holding_input",
+      "keys": [
+        [
+          "a",
+          true
+        ],
+        [
+          "a",
+          false
+        ]
+      ],
+      "expect": {
+        "delivered": true
+      }
+    }
+  ]
+}
