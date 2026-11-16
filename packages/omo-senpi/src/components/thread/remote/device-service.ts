@@ -9,7 +9,7 @@ import {
   type RemoteAttach,
 } from "@oh-my-opencode/device-service-core/device-service"
 import { CATALOG_RECORD, createAttachPool, type HeldAttach } from "./attach-pool"
-import type { DeviceServiceDial, JsonObject, RemoteSessionsPort } from "./ports"
+import type { DeviceServiceDial, JsonObject, RemoteCommandOutcome, RemoteListing, RemoteSessionsPort } from "./ports"
 import { openSessionWatch } from "./remote-watch"
 
 export type DeviceServiceSessionsOptions = {
@@ -124,6 +124,46 @@ function durableIdOf(row: object): { readonly durable_id?: string } {
 // not rest on the service honouring it. A device past the cap counts as silent.
 const LOOKUP_CAP_MS = 3_500
 
+/**
+ * Attaches to a session another device holds, by the address a caller typed. A thread is addressed by its durable id
+ * (decision 0027 D2), which the device's listing may not name yet for a session it opened a moment ago: an attach refused
+ * session_not_found locates the id once and attaches on the key the device names (omo#13748, omo#13707; measured over
+ * the relay as `omo remote open` then `omo remote model <device>/<id>` answering no session). A durable id (a UUID) is
+ * never sent to session.attach: the device service refuses it invalid_request (relay-daemon#1350; before that the
+ * attach crashed the service), so it is located first and attached on the key the device names. Any other address is
+ * attached as typed and located once when the attach refuses it (session_not_found, or invalid_request from a service
+ * with #1350). A locate that cannot answer leaves the attach's own refusal as the answer. The thread tools' port and
+ * `omo remote attach` both use it.
+ */
+export async function attachAddressed(
+  connected: DeviceService,
+  device: string,
+  sessionId: string,
+): Promise<{ readonly attached: RemoteAttach; readonly key: string }> {
+  const on = async (key: string) => ({ attached: await connected.attach(device, key), key })
+  const locate = () =>
+    Promise.resolve()
+      .then(() => connected.locate(device, sessionId))
+      .catch(() => undefined)
+  if (DURABLE_ID.test(sessionId)) {
+    // Only a locate that answered "none" means the session is gone; any other failure (b not answering, a lost connection)
+    // is the refusal as it came, so a close never reports a running session not_live (review M1 of 6ce7397).
+    return await on((await connected.locate(device, sessionId)).key)
+  }
+  try {
+    return await on(sessionId)
+  } catch (error) {
+    if (!(error instanceof LocalApiError && (error.code === "session_not_found" || error.code === "invalid_request")))
+      throw error
+    const located = await locate()
+    if (located === undefined || located.key === sessionId) throw error
+    return await on(located.key)
+  }
+}
+
+// The shape of an omo durable session id (a UUID, v7 in practice); a device's listing key is never one.
+const DURABLE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export function createDeviceServiceSessions(options: DeviceServiceSessionsOptions): RemoteSessionsPort {
   let service: Promise<{ readonly conn: DeviceService; readonly owned: boolean }> | undefined
   const connect =
@@ -145,7 +185,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         throw error
       },
     )).then((dialed) => dialed.conn)
-  const pool = createAttachPool(svc, options.attachIdleMs)
+  const pool = createAttachPool(svc, attachAddressed, options.attachIdleMs)
   const sessionCommand: RemoteSessionsPort["sessionCommand"] = async (device, sessionId, rpc, commandOptions) => {
     // Before the command goes out nothing can have run: an attach that fails (session_not_found, as unknown_session; peer_not_found,
     // host_not_answering, a lost connection) or a record that is not JSON is refused with its code, typed.
@@ -161,6 +201,10 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     } catch (error) {
       return { kind: "refused", reason: sessionReason(notSentReason(error)) }
     }
+    // A record naming the session by the address the caller typed names it by the key the device attached it on: the
+    // receiving endpoint refuses a record whose sessionId is not its attached session (`malformed`, relay proof 6ce7397).
+    if (held.session.key !== sessionId && rpc["sessionId"] === sessionId)
+      record = wireRecord({ ...rpc, sessionId: held.session.key })
     try {
       const { attached, catalog } = held.session
       const readOnly = READ_ONLY_RECORDS.has(String(rpc["type"]))
@@ -193,24 +237,49 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       held.release()
     }
   }
+  const listing = async (filter?: { readonly device?: string }): Promise<RemoteListing> => {
+    const listed = await (await svc()).sessions(filter?.device === undefined ? undefined : { device: filter.device })
+    return {
+      rows: listed.rows.map((row) => ({
+        device: row.device,
+        session_id: row.session_id,
+        ...durableIdOf(row),
+        title: row.title,
+        project: row.project,
+        path: row.path,
+        state: row.state,
+        updated_ms: row.updated_ms,
+      })),
+      incomplete: listed.incomplete,
+    }
+  }
+  // thread_list asks for this device's id and name in parallel: overlapping asks share one device.info read.
+  let info: ReturnType<DeviceService["thisDevice"]> | undefined
+  const deviceInfo = (): ReturnType<DeviceService["thisDevice"]> => {
+    if (info !== undefined) return info
+    const asked = svc().then((connected) => connected.thisDevice())
+    info = asked
+    const clear = () => {
+      if (info === asked) info = undefined
+    }
+    asked.then(clear, clear)
+    return asked
+  }
   return {
     status: async () => ({ state: (await (await svc()).status()).state }),
-    thisDevice: async () => (await (await svc()).thisDevice())?.id ?? null,
+    thisDevice: async () => (await deviceInfo())?.id ?? null,
+    thisDeviceName: async () => (await deviceInfo())?.name ?? null,
     devices: async () =>
-      (await (await svc()).devices()).map((row) => ({ device: row.device, label: row.label, online: row.online })),
-    sessions: async (filter) =>
-      (await (await svc()).sessions(filter?.device === undefined ? undefined : { device: filter.device })).rows.map(
-        (row) => ({
-          device: row.device,
-          session_id: row.session_id,
-          ...durableIdOf(row),
-          title: row.title,
-          project: row.project,
-          path: row.path,
-          state: row.state,
-          updated_ms: row.updated_ms,
-        }),
-      ),
+      (await (await svc()).devices()).map((row) => ({
+        device: row.device,
+        label: row.label,
+        online: row.online,
+        platform: row.platform,
+        kind: row.kind,
+        last_seen_ms: row.last_seen_ms,
+      })),
+    sessions: async (filter) => (await listing(filter)).rows,
+    listing: () => listing(),
     // create / open / fork on another device: relay daemon #393's attach-less `session.command {device, endpoint, rpc}`.
     // The endpoint lookup and every refusal answered before sending ran nothing; anything after sending may have.
     // An open_session goes on the endpoint dialer (a fresh owned connection per call by default), closed once it

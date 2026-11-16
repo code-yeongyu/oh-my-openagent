@@ -28,7 +28,18 @@ function createCatalogHold(attached: RemoteAttach) {
   }
 }
 
-export type PooledSession = { readonly attached: RemoteAttach; readonly catalog: ReturnType<typeof createCatalogHold> }
+/** `key`: the address the device attached the session on (a located key when the caller named a durable id). */
+export type PooledSession = {
+  readonly attached: RemoteAttach
+  readonly key: string
+  readonly catalog: ReturnType<typeof createCatalogHold>
+}
+
+export type AttachAddressed = (
+  connected: DeviceService,
+  device: string,
+  sessionId: string,
+) => Promise<{ readonly attached: RemoteAttach; readonly key: string }>
 
 export type HeldAttach = { readonly session: PooledSession; readonly release: () => void }
 
@@ -43,20 +54,24 @@ type Entry = { readonly opened: Promise<PooledSession>; holders: number; idle?: 
  * count reaches 0 the attach is detached after `idleMs`, unless a new holder comes first; one that ends on its own is
  * dropped, so the next holder attaches again.
  */
-export function createAttachPool(svc: () => Promise<DeviceService>, idleMs: number = ATTACH_IDLE_MS) {
+export function createAttachPool(
+  svc: () => Promise<DeviceService>,
+  attach: AttachAddressed,
+  idleMs: number = ATTACH_IDLE_MS,
+) {
   const entries = new Map<string, Entry>()
   const hold = async (device: string, sessionId: string): Promise<HeldAttach> => {
     const key = `${device}\u0000${sessionId}`
     let entry = entries.get(key)
     if (entry === undefined) {
       const opened = svc()
-        .then((connected) => connected.attach(device, sessionId))
+        .then((connected) => attach(connected, device, sessionId))
         .then(
-          (attached) => {
+          ({ attached, key: attachedOn }) => {
             void attached.detached.then(() => {
               if (entries.get(key)?.opened === opened) entries.delete(key)
             })
-            return { attached, catalog: createCatalogHold(attached) }
+            return { attached, key: attachedOn, catalog: createCatalogHold(attached) }
           },
           (error: unknown) => {
             if (entries.get(key)?.opened === opened) entries.delete(key)

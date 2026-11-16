@@ -20,6 +20,7 @@ import { createModelProfileComponent } from "../components/model-profile"
 import { createNativeBadgeComponent } from "../components/native-badge"
 import { createOnboardingComponent, createOnboardingScanComponent } from "../components/onboarding"
 import { createQuestionGatesComponent } from "../components/question-gates"
+import { createRemoteTuiComponent } from "../components/remote/tui"
 import { createSkillCommandsComponent } from "../components/skill-commands"
 import { createSidePanelComponent } from "../components/side-panel"
 import { createSkillPointersComponent } from "../components/skill-pointers"
@@ -66,6 +67,7 @@ export function createOmoSenpiComponents(taskComponent: OmoSenpiComponent): OmoS
     createComputerUseComponent(),
     createFeedbackComponent(),
     createDeviceServiceComponent(),
+    createRemoteTuiComponent(),
     createBrowserBridgeComponent(),
     createDesktopToolkitComponent(),
     createClaudeCodeComponent(),

@@ -13,6 +13,7 @@ import {
   ThreadAddress,
   ThreadDeliveryMode,
   RelayText,
+  thinkingLevel,
 } from "./fields"
 import { ThreadCreateParams } from "./create-params"
 
@@ -50,7 +51,7 @@ export const ThreadListParams = Type.Object({
   all_scope: Type.Optional(
     Type.Boolean({
       description:
-        "List threads from every workspace on this machine; the default scope returns only the caller's workspace.",
+        "List this machine's threads from every workspace; the default returns only the caller's workspace here. The account's other devices' threads are always listed.",
     }),
   ),
 })
@@ -170,20 +171,8 @@ export const ThreadSetModelParams = Type.Object({
 
 export const ThreadSetReasoningParams = Type.Object({
   thread: ThreadAddress,
-  level: Type.Union(
-    [
-      Type.Literal("off"),
-      Type.Literal("minimal"),
-      Type.Literal("low"),
-      Type.Literal("medium"),
-      Type.Literal("high"),
-      Type.Literal("xhigh"),
-      Type.Literal("max"),
-    ],
-    {
-      description:
-        "Thinking level to apply; a level the thread's active model cannot run returns thinking_level_unsupported with the supported list and leaves the thread unchanged.",
-    },
+  level: thinkingLevel(
+    "Thinking level to apply; a level the thread's active model cannot run returns thinking_level_unsupported with the supported list and leaves the thread unchanged.",
   ),
   scope: Type.Optional(
     Type.Union([Type.Literal("session"), Type.Literal("turn")], {

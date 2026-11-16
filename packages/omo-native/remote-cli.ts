@@ -16,9 +16,10 @@ import {
 } from "./remote-local"
 import { isHelpFlag, REMOTE_USAGE, verbUsage } from "./remote-usage"
 import { VERBS } from "./remote-verbs"
-import { parseTarget } from "./remote-session-args"
+import { parseTarget, type RemoteSessionTarget } from "./remote-session-args"
 import { resolveSessionTarget } from "./remote-session-target"
-import { createDeviceServiceSessions } from "../omo-senpi/src/components/thread/remote/device-service"
+import { attachAddressed, createDeviceServiceSessions } from "../omo-senpi/src/components/thread/remote/device-service"
+import type { JsonObject } from "../omo-senpi/src/components/thread/remote/ports"
 
 export type { RemoteCommandDependencies } from "./remote-local"
 // `omo remote`: the sessions on this account's other devices, through this device's service. A thin CLI over the
@@ -107,10 +108,10 @@ export async function prepareRemoteAttach(
     return REMOTE_EXIT.ok
   }
   const [target, ...extra] = args
-  let parsedTarget: ReturnType<typeof parseTarget>
+  let parsedTarget: RemoteSessionTarget
   try {
-    parsedTarget = parseTarget("attach", target)
     if (extra.length > 0) throw new UsageError("unexpected arguments")
+    parsedTarget = parseTarget("attach", target)
   } catch (error) {
     if (!(error instanceof UsageError)) throw error
     dependencies.error("usage: omo remote attach <device>/<session>   (the SESSION column of omo remote sessions)")
@@ -133,14 +134,16 @@ export async function prepareRemoteAttach(
     return reportFailure(dependencies, error)
   }
   try {
+    // A bare durable id is found in the account listing; for `<device>/<session>`, attachAddressed locates a durable id on
+    // that device and attaches on its key, and attaches a listing key directly (omo#13707).
     const remote = (
       dependencies.remote ??
-      ((connected) => ({
+      ((connected: DeviceService) => ({
         sessions: createDeviceServiceSessions({
           version: connected.serviceVersion,
           connect: async () => ({ conn: connected, owned: false }),
         }),
-        chain: { stamp: (record) => record },
+        chain: { stamp: (record: JsonObject) => record },
       }))
     )(service)
     const resolved = await resolveSessionTarget(remote, parsedTarget)
@@ -150,7 +153,7 @@ export async function prepareRemoteAttach(
       dependencies.error(resolved.error.next_action)
       return REMOTE_EXIT.failed
     }
-    const attach = await service.attach(resolved.row.device, resolved.row.session_id)
+    const { attached: attach } = await attachAddressed(service, resolved.row.device, resolved.row.session_id)
     await attach.snapshot
     const endpoint = await serveRemoteAttach(attach, { label: target ?? parsedTarget.session })
     void service.closed.then(() => endpoint.close())

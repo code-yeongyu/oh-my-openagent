@@ -125,6 +125,12 @@ export function createRemoteThreadFixture() {
       /** The turn finishes before its prompt's reply reaches the sender: its records go out at once, before the aim. */
       recordsBeforeReply?: boolean
       rows?: readonly RemoteSessionRow[]
+      /** Devices the account listing names as not answering this round. */
+      incomplete?: readonly string[]
+      /** Extra devices the account lists beyond this one and b. */
+      devices?: readonly RemoteDevice[]
+      /** The roster as relayd answers it: without this device (its row then comes from thisDeviceName). */
+      rosterWithoutSelf?: boolean
       registryDown?: "refused" | "throws" | "signed_out"
       /** Only the claim fails (resolve and aliasesOf still answer): a token that expired between the two calls. */
       claimDown?: "refused" | "signed_out"
@@ -142,12 +148,18 @@ export function createRemoteThreadFixture() {
       withoutLookup?: boolean
       /** omo#13037 review: the account's device list cannot be read. */
       devicesFail?: boolean
+      /** This device's own id read (device.info): it fails, or the service answers without an id. */
+      selfDevice?: "throws" | "unknown"
       /** omo#13037: this device's service cannot carry the wake target (no wake is sent; today's path). */
       noWake?: boolean
       /** omo#13037: the wake path's answer; default the consumer's queued envelope with `waiting_on: {kind: "wake"}`. */
       wakeOutcome?: RemoteCommandOutcome
       /** The `get_state` fields a live session reports beyond the engine defaults (`paused`, `holds`). */
       liveState?: JsonObject
+      /** b's engine refuses every open_session with this error text (senpi names an unresolvable model `model_unavailable: ...`). */
+      openRefuse?: string
+      /** b knows a session it just opened only by its relay key (relayKeys), not by its durable id: a listing that has not caught up yet. */
+      relayKeyOnly?: boolean
     } = {},
   ) {
     const engine = options.engine ?? ENGINE
@@ -217,9 +229,12 @@ export function createRemoteThreadFixture() {
         live.delete(attachedTo)
         return ok({ outcome: "unloaded", sessionPath: B_ROW.path })
       }
+      if (rpc["type"] === "open_session" && options.openRefuse !== undefined)
+        return { kind: "refused", reason: options.openRefuse }
       if (rpc["type"] === "open_session") {
         const opened = rpc["sessionPath"] === undefined ? "dur-new-on-b" : "dur-on-b"
-        for (const id of [opened, options.relayKeys?.get(opened) ?? opened]) live.add(id)
+        const key = options.relayKeys?.get(opened) ?? opened
+        for (const id of options.relayKeyOnly === true ? [key] : [opened, key]) live.add(id)
         return ok(options.openData ?? { sessionId: "rpc-9", state: { durableSessionId: opened } })
       }
       if (rpc["type"] === "get_state")
@@ -285,8 +300,9 @@ export function createRemoteThreadFixture() {
       return ok({})
     }
     const devices: RemoteDevice[] = [
-      { device: "here", label: "this mac", online: true },
+      ...(options.rosterWithoutSelf === true ? [] : [{ device: "here", label: "this mac", online: true }]),
       { device: "b", label: "studio", online: options.online ?? true },
+      ...(options.devices ?? []),
     ]
     for (const device of [
       ...(options.rows ?? []).map((row) => row.device),
@@ -370,8 +386,10 @@ export function createRemoteThreadFixture() {
         status: async () => ({ state: options.plan ?? "connected" }),
         thisDevice: async () => {
           deviceReads.thisDevice += 1
-          return "here"
+          if (options.selfDevice === "throws") throw new Error("device.info failed")
+          return options.selfDevice === "unknown" ? null : "here"
         },
+        thisDeviceName: async () => "this mac",
         devices: async () => {
           deviceReads.devices += 1
           if (options.devicesFail === true) throw new Error("closed")
@@ -383,6 +401,14 @@ export function createRemoteThreadFixture() {
           if (options.failSessionsList === true) throw new Error("account list failed")
           const rows = options.rows ?? [{ ...B_ROW, state: options.rowState ?? B_ROW.state }]
           return filter?.device === undefined ? rows : rows.filter((row) => row.device === filter.device)
+        },
+        listing: async () => {
+          listings.all += 1
+          if (options.failSessionsList === true) throw new Error("account list failed")
+          return {
+            rows: options.rows ?? [{ ...B_ROW, state: options.rowState ?? B_ROW.state }],
+            incomplete: options.incomplete ?? [],
+          }
         },
         endpointCommand: async (device, rpc) => {
           sent.push({ via: "endpoint", device, rpc })
@@ -527,6 +553,8 @@ export function createRemoteThreadFixture() {
       closeOutcome?: ThreadCloseOutcome
       /** Look session files up where senpi writes them, `<agentDir>/sessions`, as the component does. */
       sessionsDirectory?: boolean
+      /** This device's engine refuses every open_session with this error text, as its host client throws it. */
+      openThrows?: string
     } = {},
   ) {
     const engine = extra.engine ?? ENGINE
@@ -539,6 +567,7 @@ export function createRemoteThreadFixture() {
     }
     const sessions = extra.sessions ?? [local]
     const openSession = mock(async (_request: Parameters<ThreadHost["openSession"]>[0]) => {
+      if (extra.openThrows !== undefined) throw new Error(extra.openThrows)
       const created: ThreadHostSession = {
         sessionId: "route-created",
         durableSessionId: "dur-created-here",
