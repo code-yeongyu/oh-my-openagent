@@ -79,5 +79,5 @@ fn no_overlay_server_is_no_presence_surface() {
     let mut overlay = Overlay::new(None);
     assert!(!overlay.available());
     let refused = overlay.show().expect_err("no surface");
-    assert_eq!(refused.reason, Some("no_presence_surface"));
+    assert_eq!(refused.reason, Some(Reason::NoPresenceSurface));
 }

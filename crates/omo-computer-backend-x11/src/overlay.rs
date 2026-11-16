@@ -78,7 +78,7 @@ struct State {
 pub struct Overlay(Arc<Mutex<State>>);
 
 fn unavailable(_error: String) -> Refusal {
-    Refusal::new(EngineCode::ControlRequired, "no_presence_surface")
+    Refusal::new(EngineCode::ControlRequired, Reason::NoPresenceSurface)
 }
 
 impl Overlay {
