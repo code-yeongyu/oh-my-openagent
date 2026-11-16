@@ -1,4 +1,4 @@
-import { createLazyRemoteSurface } from "./lazy-remote"
+import { createLazyRemoteSurface } from "../../remote/port/lazy-remote"
 import type { RemoteThreadSurface } from "./ports"
 
 /**

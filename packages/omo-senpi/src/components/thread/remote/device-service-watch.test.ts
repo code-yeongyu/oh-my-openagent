@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { DeviceService, RemoteAttach } from "@oh-my-opencode/device-service-core"
-import { createDeviceServiceSessions } from "./device-service"
+import { createDeviceServiceSessions } from "../../remote/port/device-service"
 import type { JsonObject } from "./ports"
 
 type AttachEvent = Parameters<Parameters<RemoteAttach["onEvent"]>[0]>[0]
