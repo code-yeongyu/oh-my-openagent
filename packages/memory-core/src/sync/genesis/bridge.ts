@@ -24,10 +24,22 @@ export type GenesisBridgeResult =
   | { readonly ok: true; readonly prepared: GenesisPrepared }
   | { readonly ok: false; readonly reason: GenesisBridgeRefusal }
 
+/** A recovery-phrase genesis: no RP id, user name or roaming; the surface shows its own account label. */
+export type PhraseGenesisBridgeRequest = {
+  readonly account: string
+  readonly firstDevice: Principal
+}
+
 export interface GenesisBridge {
   readonly prfSupported: boolean
+  /** True only where a protected phrase surface exists (descriptor `phraseGenesis: "supported"`, or the CLI tty). */
+  readonly phraseSupported?: boolean
   createGenesis(
     request: GenesisBridgeRequest,
+    options: { readonly operation: SyncOperationAuthority },
+  ): Promise<GenesisBridgeResult>
+  createPhraseGenesis?(
+    request: PhraseGenesisBridgeRequest,
     options: { readonly operation: SyncOperationAuthority },
   ): Promise<GenesisBridgeResult>
 }

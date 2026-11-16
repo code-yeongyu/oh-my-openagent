@@ -44,7 +44,7 @@ export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
     name: "thread_list",
     label: "List sessions",
     description:
-      "Shows every addressable session with its id, name, and status, for when the user needs a valid target address before acting on a session" +
+      "Shows every addressable session on this device and the account's other devices with its id, name, status and device, plus the account's devices, for when the user needs a valid target address before acting on a session" +
       ROUTE_TO_TASK,
     exposure: THREAD_TOOL_EXPOSURE,
   },
