@@ -32,9 +32,13 @@ class DocumentWindow(Gtk.Window):
         self.done_row = 0
         self.saved_once = False
         self.menu_items = {}
+        self.menu_tops = {}
+        self.buttons = {}
         self.text = TextFields(fixture.changed)
         self.connect("key-press-event", self.on_key)
         self.connect("delete-event", self.on_delete)
+        self.connect("configure-event", lambda _window, _event: self.fixture.changed() or False)
+        self.connect("map-event", lambda _window, _event: self.fixture.changed() or False)
 
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.add(outer)
@@ -63,6 +67,7 @@ class DocumentWindow(Gtk.Window):
         button = named(Gtk.Button(label=label), label)
         button.connect("clicked", lambda _button: handler())
         box.pack_start(button, False, False, 0)
+        self.buttons[label] = button
         return button
 
     def add_field(self, box, label):
@@ -125,6 +130,7 @@ class DocumentWindow(Gtk.Window):
                 self.menu_items[f"{title}/{label}"] = item
             top.set_submenu(submenu)
             bar.append(top)
+            self.menu_tops[title] = top
         return bar
 
     def document_state(self):

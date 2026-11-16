@@ -30,6 +30,7 @@ import gi
 gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from document_window import APP, DocumentWindow  # noqa: E402
+from geometry import geometry  # noqa: E402
 from gi.repository import Gdk, GLib, Gtk  # noqa: E402
 from poke import poke  # noqa: E402
 
@@ -59,7 +60,7 @@ class Fixture:
 
     def snapshot(self):
         main = self.windows[0]
-        return {
+        report = {
             "schema": SCHEMA,
             "app": APP,
             "toolkit": "native",
@@ -75,6 +76,10 @@ class Fixture:
             },
             "saved": dict(main.saved, savedDocuments=sum(1 for window in self.windows if window.saved_once)),
         }
+        shape = geometry(main)
+        if shape is not None:
+            report["geometry"] = shape
+        return report
 
     def write(self):
         report = self.snapshot()
