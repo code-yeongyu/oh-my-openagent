@@ -403,6 +403,15 @@
               "auditIds": [
                 "a223a4a0d7fefa59"
               ],
+              "timings": {
+                "settleMs": 500
+              },
+              "settle": {
+                "outcome": "settled",
+                "quietMs": 500,
+                "waitedMs": 500,
+                "regime": "unchanged"
+              },
               "evidence": [],
               "observation": {
                 "untrustedText": true
