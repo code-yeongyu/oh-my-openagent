@@ -516,10 +516,14 @@ export function sessionMembers(core: ClientCore): SessionMembers {
         if (device.kind === "error") return device
         // This device opens on its own operator endpoint, never through the relay to itself (#13787).
         if (device.value.self === true) {
-          const host = await (core.deps.localThreadHost ?? defaultLocalThreadHost)()
-          const local = await openOnThisDevice(svc, host, device.value.id, asked)
-          if (local.kind === "error") return modelUnavailable(fromThread(local.error), request.model)
-          return ok({ device: device.value, key: local.key, warnings: local.warnings })
+          const local = await openOnThisDevice(
+            svc,
+            core.deps.localThreadHost ?? defaultLocalThreadHost,
+            device.value.id,
+            asked,
+          )
+          if (local.kind === "ok") return ok({ device: device.value, key: local.key, warnings: local.warnings })
+          return "error" in local ? fromThread(local.error) : local
         }
         const outcome = await createRelaySessionHost(legOf(svc).remote, device.value.id).open(asked)
         if (outcome.kind === "error") return modelUnavailable(fromThread(outcome.error), request.model)
@@ -529,8 +533,8 @@ export function sessionMembers(core: ClientCore): SessionMembers {
           warnings: (outcome.thread.warnings ?? []).map((warning) => warning.message),
         })
       },
-      // No device service on this device (the connection says so, not a row): thread_create's local host needs a
-      // running engine's extension context, which a client does not have, so the open is local only.
+      // No device service on this device (the connection says so, not a row): the operator endpoint could open a session,
+      // but no handle would address it, since every session member reaches a session through the service.
       () =>
         remoteFailure(
           "local_only",

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { connectDeviceService } from "@oh-my-opencode/device-service-core/device-service"
 import { mkdtempSync, rmSync } from "node:fs"
+import type { Socket } from "node:net"
 import { tmpdir, userInfo } from "node:os"
 import { join } from "node:path"
 import type { JsonObject, ListingRow } from "../../../../device-service-core/src/local-api/protocol.ts"
@@ -10,7 +11,7 @@ import {
   SESSION_ID,
   type World,
 } from "../../../../device-service-core/test/local-api/conformance/world.ts"
-import { withContractHost } from "../../../../senpi-task/src/runners/rpc-host/testing/contract-host"
+import { type ContractHost, withContractHost } from "../../../../senpi-task/src/runners/rpc-host/testing/contract-host"
 import { createLiveThreadSurface } from "../thread/live-surface"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
 import { personIdentity, resolveSessionTarget } from "./sessions"
@@ -512,24 +513,112 @@ describe("an open on this device", () => {
     expect(self).toMatchObject({ id: SELF, self: true, kind: "cli" })
   })
 
+  type Fault = (frame: Record<string, unknown>, socket: Socket) => void
+  // This device's operator endpoint (the contract host), over the socket the open watches, with a fault injected after a
+  // frame of a given type is written.
+  const localClient = async (host: ContractHost, world: World = selfWorld(), fault?: Fault) => {
+    const owner = await startOwner(world)
+    const client = clientOn(owner.stateDir, fakeClock(), undefined, {
+      localThreadHost: async (connect) =>
+        createLiveThreadSurface(undefined, {
+          env: { OMO_CODING_AGENT_DIR: host.root, SENPI_RPC_SOCKET: host.socket, SENPI_RPC_KEY_ROOT: host.root },
+          statusAll: async () => undefined,
+          registry: async () => [],
+          connect: (path) => {
+            const socket = connect(path)
+            if (fault === undefined) return socket
+            socket.write = new Proxy(socket.write, {
+              apply: (write, self, args: unknown[]) => {
+                const written = Reflect.apply(write, self, args)
+                const [chunk] = args
+                if (typeof chunk === "string")
+                  for (const line of chunk.split("\n").filter((text) => text.startsWith("{")))
+                    fault(JSON.parse(line) as Record<string, unknown>, socket)
+                return written
+              },
+            })
+            return socket
+          },
+        }),
+    })
+    return { owner, client }
+  }
+  const opensOn = (host: ContractHost) => host.frames.filter(({ frame }) => frame["type"] === "open_session")
+
   test("#given a connected service #when sessions.open names this device #then it opens on this device's own host, never through the relay to itself", async () => {
     await withContractHost({}, async (host) => {
-      const owner = await startOwner(selfWorld())
-      const client = clientOn(owner.stateDir, fakeClock(), undefined, {
-        localThreadHost: async () =>
-          createLiveThreadSurface(undefined, {
-            env: { OMO_CODING_AGENT_DIR: host.root, SENPI_RPC_SOCKET: host.socket, SENPI_RPC_KEY_ROOT: host.root },
-            statusAll: async () => undefined,
-            registry: async () => [],
-          }),
-      })
+      const { owner, client } = await localClient(host)
       const opened = await valueOf(client.sessions.open({ device: SELF, workspace: host.root, preset: "read-only" }))
       expect(opened.thread).toBe(handleOf(SELF, NEW_KEY))
       expect(opened.device).toMatchObject({ id: SELF, self: true })
       expect(owner.state.commands.filter((rpc) => rpc["type"] === "open_session")).toEqual([])
-      expect(host.frames.filter(({ frame }) => frame["type"] === "open_session")).toEqual([
+      expect(opensOn(host)).toEqual([
         expect.objectContaining({ frame: expect.objectContaining({ cwd: host.root, permissionPreset: "read-only" }) }),
       ])
+    })
+  })
+
+  test("#given the open's connection drops after the open_session frame was written #when sessions.open runs #then it is uncertain and the same key does not open twice (#13787 M1)", async () => {
+    await withContractHost({}, async (host) => {
+      const { client } = await localClient(host, selfWorld(), (frame, socket) => {
+        if (frame["type"] === "open_session") socket.destroy()
+      })
+      const request = { device: SELF, workspace: host.root, idempotency_key: "local-1" }
+      const failure = failureOf(await client.sessions.open(request))
+      expect(failure).toMatchObject({ code: "unconfirmed", uncertain: true, details: { phase: "open" } })
+      expect(failure.next_action).toContain("sessions.list")
+      expect(failureOf(await client.sessions.open(request))).toEqual(failure)
+      expect(opensOn(host).length).toBeLessThanOrEqual(1)
+    })
+  })
+
+  test("#given an open answered but its read-back failed #when sessions.open runs #then it is uncertain: a session may exist (#13787 M1)", async () => {
+    await withContractHost({}, async (host) => {
+      const { client } = await localClient(host, selfWorld(), (frame, socket) => {
+        if (frame["type"] === "list_sessions") socket.destroy()
+      })
+      expect(failureOf(await client.sessions.open({ device: SELF, workspace: host.root }))).toMatchObject({
+        code: "unconfirmed",
+        uncertain: true,
+        details: { phase: "read_back" },
+      })
+      expect(opensOn(host)).toHaveLength(1)
+    })
+  })
+
+  test("#given this device's engine refuses the open #when sessions.open runs #then the refusal maps as on the relay leg (#13787 M1)", async () => {
+    await withContractHost({}, async (host) => {
+      const refusal = "open_failed: model_unavailable: anthropic/nope is not available"
+      const { client } = await localClient(host, selfWorld(), (frame, socket) => {
+        if (frame["type"] !== "open_session") return
+        const reply = { id: frame["id"], type: "response", command: "open_session", success: false, error: refusal }
+        socket.emit("data", Buffer.from(`${JSON.stringify(reply)}\n`))
+      })
+      const failure = failureOf(
+        await client.sessions.open({ device: SELF, workspace: host.root, model: "anthropic/nope" }),
+      )
+      expect(failure).toMatchObject({ code: "model_not_found", details: { device: SELF, reason: refusal } })
+      expect(failure.uncertain).toBeUndefined()
+    })
+  })
+
+  test("#given no operator endpoint answers on this device #when sessions.open runs #then host_unavailable, certain, and the key stays free (#13787 L1)", async () => {
+    await withContractHost({}, async (host) => {
+      const { client } = await localClient({ ...host, socket: join(host.root, "absent.sock") })
+      const request = { device: SELF, workspace: host.root, idempotency_key: "local-2" }
+      const failure = failureOf(await client.sessions.open(request))
+      expect(failure).toMatchObject({ code: "host_unavailable", details: { device: SELF } })
+      expect(failure.uncertain).toBeUndefined()
+      expect(opensOn(host)).toEqual([])
+    })
+  })
+
+  test("#given this device's service cannot name the new session's listing key #when sessions.open runs #then its durable id answers, with a warning (#13787 L1)", async () => {
+    await withContractHost({}, async (host) => {
+      const { client } = await localClient(host, { ...selfWorld(), located: { [PEER]: { [ENGINE_ID]: NEW_KEY } } })
+      const opened = await valueOf(client.sessions.open({ device: SELF, workspace: host.root }))
+      expect(opened.thread).toBe(handleOf(SELF, "dur-selected"))
+      expect(opened.warnings).toEqual([expect.stringContaining("did not name the listing key")])
     })
   })
 })
