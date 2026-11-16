@@ -10,15 +10,26 @@ use omo_computer_core::capabilities::CompositorName;
 use super::support::{key, send, Rig, US};
 use crate::fake::Mode;
 
-fn child_fds() -> Vec<RawFd> {
+/// The sockets a freshly spawned child holds, as `socket:[inode]`: identities, not fd numbers,
+/// so a parallel test's inheritable descriptor that reuses the number is never taken for ours.
+fn child_sockets() -> Vec<String> {
     let out = Command::new("/bin/sh")
-        .args(["-c", "ls /proc/self/fd"])
+        .args(["-c", "for fd in /proc/self/fd/*; do readlink \"$fd\"; done"])
         .output()
         .expect("child runs");
     String::from_utf8_lossy(&out.stdout)
-        .split_whitespace()
-        .filter_map(|fd| fd.parse().ok())
+        .lines()
+        .filter(|link| link.starts_with("socket:"))
+        .map(str::to_owned)
         .collect()
+}
+
+/// The engine's EIS socket as the kernel names it.
+fn socket_identity(raw: RawFd) -> String {
+    std::fs::read_link(format!("/proc/self/fd/{raw}"))
+        .expect("the engine's fd is open")
+        .to_string_lossy()
+        .into_owned()
 }
 
 #[test]
@@ -28,10 +39,10 @@ fn engine_never_passes_its_eis_fd_to_a_child() {
     assert!(socket.connect_input().is_ok());
     let fd = socket.eis_fd().expect("connected on the socket route");
     assert!(fd.cloexec, "socket route: close-on-exec");
+    let ours = socket_identity(fd.raw);
     assert!(
-        !child_fds().contains(&fd.raw),
-        "a child does not inherit fd {}",
-        fd.raw
+        !child_sockets().contains(&ours),
+        "a child does not inherit the EIS socket {ours}"
     );
 
     // The portal hands the fd over D-Bus; this fake hands it WITHOUT close-on-exec.
@@ -45,10 +56,10 @@ fn engine_never_passes_its_eis_fd_to_a_child() {
         fd.cloexec,
         "portal route: the engine sets close-on-exec itself"
     );
+    let ours = socket_identity(fd.raw);
     assert!(
-        !child_fds().contains(&fd.raw),
-        "a child does not inherit fd {}",
-        fd.raw
+        !child_sockets().contains(&ours),
+        "a child does not inherit the EIS socket {ours}"
     );
     assert_eq!(
         rig.eis.log().connections,
