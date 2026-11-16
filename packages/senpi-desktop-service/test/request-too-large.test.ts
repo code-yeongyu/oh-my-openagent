@@ -1,15 +1,32 @@
 import { spawn } from "node:child_process"
+import { existsSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { locateDesktopEngine } from "@oh-my-opencode/senpi-desktop-engine"
+import { getDesktopEngineFileName, locateDesktopEngine } from "@oh-my-opencode/senpi-desktop-engine"
 import { describe, expect, it } from "vitest"
 import { DesktopEngineRpcError, RpcClient } from "../src/service/rpc-client"
 import { rejectionOf } from "./harness"
 
-const scenario = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../../../crates/senpi-desktop-backend-fake/fixtures/two-displays-one-window.json",
-)
+const here = path.dirname(fileURLToPath(import.meta.url))
+const scenario = path.resolve(here, "../../../crates/senpi-desktop-backend-fake/fixtures/two-displays-one-window.json")
+const repoRoot = path.resolve(here, "../../..")
+
+/**
+ * The engine built from this checkout, or why there is none. Under CI the Desktop package tests step stages this
+ * tree's engine in OMO_PACKAGE_DIR, which the locator reads first, and a fresh runner has no other engine installed.
+ * Elsewhere the locator also accepts an installed runtime's older engine (#13625), so only the repository's own
+ * release build counts.
+ */
+function engineUnderTest(): { readonly path: string } | { readonly skip: string } {
+  if (process.env.CI === "true") {
+    const location = locateDesktopEngine()
+    return location.path === null ? { skip: location.diagnostic.message } : { path: location.path }
+  }
+  const devBuild = path.join(repoRoot, "target", "release", getDesktopEngineFileName())
+  return existsSync(devBuild)
+    ? { path: devBuild }
+    : { skip: `no release build of this checkout at ${devBuild}; run cargo build --release -p senpi-desktop-engine` }
+}
 
 /** Over the engine's 1 MiB request line cap (connection.rs MAX_REQUEST_BYTES). */
 const OVER_CAP = 2 * 1024 * 1024
@@ -17,14 +34,14 @@ const OVER_CAP = 2 * 1024 * 1024
 const hooks = { onNotification: () => undefined, onExit: () => undefined }
 
 describe("an oversized request", { timeout: 30_000 }, () => {
-  it("is refused request_too_large under its own id by the real engine, which stays usable", async () => {
-    // Given
-    const location = locateDesktopEngine()
-    if (location.path === null) {
-      expect(location.diagnostic.code).toBe("native-unavailable")
+  it("is refused request_too_large under its own id by the real engine, which stays usable", async (context) => {
+    // Given: this checkout's engine; an installed runtime's older one would test an engine without the cap
+    const engine = engineUnderTest()
+    if ("skip" in engine) {
+      context.skip(engine.skip)
       return
     }
-    const child = spawn(location.path, ["--stdio"], {
+    const child = spawn(engine.path, ["--stdio"], {
       stdio: "pipe",
       env: { ...process.env, SENPI_DESKTOP_BACKEND: `fake:${scenario}` },
     })
