@@ -37,7 +37,7 @@ export interface StaleIndexLockPolicy {
   readonly staleSettleMs: number
 }
 
-export const STALE_INDEX_LOCK_POLICY: StaleIndexLockPolicy = { staleAgeMs: 10 * 60_000, staleSettleMs: 60_000 }
+const STALE_INDEX_LOCK_POLICY: StaleIndexLockPolicy = { staleAgeMs: 10 * 60_000, staleSettleMs: 60_000 }
 
 export interface KeptGitLock {
   readonly path: string
