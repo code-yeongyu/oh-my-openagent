@@ -171,14 +171,20 @@ fn rogue_serve_starts_suspended_when_the_live_hosts_latch_is_set() {
         "--lock",
         lock.to_str().expect("utf-8"),
     ];
-    let daemon = Peer::spawn(&args, &env, &repo());
+    let mut daemon = Peer::spawn(&args, &env, &repo());
+    let capability = [7u8; 32];
+    let capability_hex: String = capability.iter().map(|b| format!("{b:02x}")).collect();
+    daemon.send_line(&capability_hex);
     let mut stream = dial(&endpoint);
+    stream.write_all(&capability).expect("the capability preamble");
     let mut lines = BufReader::new(stream.try_clone().expect("a reader")).lines();
     let mut failures = Vec::new();
     for step in &case.steps {
         let super::case::Step::Send { send, expect, .. } = step else {
             continue;
         };
+        let mut send = send.clone();
+        send["capability"] = json!(capability_hex);
         writeln!(stream, "{send}").expect("the daemon reads");
         for expectation in expect {
             let message: Value = lines
