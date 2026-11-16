@@ -6,8 +6,8 @@
 //!   around `SendInput`; pointer input first waits for the compositor to
 //!   present the raised window ([`compositor`]).
 //! - `Target::Window` + background: `PostMessageW` when the toolkit class
-//!   matrix accepts the event, else `BackgroundUnavailable` - never a silent
-//!   fallback to the foreground.
+//!   matrix accepts the event and a key chord holds no modifier, else
+//!   `BackgroundUnavailable` - never a silent fallback to the foreground.
 //!
 //! Every window-targeted input first refuses an elevated window (UIPI).
 
@@ -109,7 +109,7 @@ impl Win32Input {
                 })
             }
             (Target::Window(id), DeliveryMode::Background) => {
-                let window = background::key_target(id, self.integrity, keys)?;
+                let window = background::key_target(id, self.integrity, keys, &vks)?;
                 self.holding(Via::Post(window), &vks, |_| Ok(()))
             }
         }

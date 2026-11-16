@@ -29,8 +29,17 @@ env:
   VDD_SHA256: b7a36f341f2a0ce43cc2afe7894d30dd8fef7b6f60ef9491aab2ef77663a42fd
 
 jobs:
+  platform:
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/pr-platform-decision.yml
+
   host:
     name: computer live windows-full (host)
+    needs: platform
+    # macOS/Windows only when the shared platform decision allows it (pr-platform-decision.yml, #13859).
+    if: needs.platform.outputs.full_matrix == 'true'
     runs-on: windows-latest
     timeout-minutes: 30
     outputs:
@@ -99,6 +108,9 @@ jobs:
 
   session:
     name: computer live windows-full (session)
+    needs: platform
+    # macOS/Windows only when the shared platform decision allows it (pr-platform-decision.yml, #13859).
+    if: needs.platform.outputs.full_matrix == 'true'
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -152,7 +164,8 @@ jobs:
   ledger:
     name: computer live windows-full (ledger and plan)
     needs: [host, session]
-    if: always()
+    # No facts exist when the label gate skipped both Windows legs.
+    if: always() && needs.host.result != 'skipped'
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
