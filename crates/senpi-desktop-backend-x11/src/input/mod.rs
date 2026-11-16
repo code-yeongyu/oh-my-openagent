@@ -40,6 +40,8 @@ mod settle_tests;
 mod table_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod xterm_resources_tests;
 
 use senpi_desktop_core::backend::{DeliveryMode, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
