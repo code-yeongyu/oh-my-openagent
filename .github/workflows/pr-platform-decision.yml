@@ -59,6 +59,7 @@ jobs:
           # The API lists a capped number of files; the classifier owns the cap and says when it honored the label above it.
           listed="$(tr -cd '\0' < "$paths" | wc -c)"
           changed="$(jq -r '.pull_request.changed_files // 0' "$GITHUB_EVENT_PATH")"
+          # Read from the event file: a PR body can exceed the per-variable environment limit.
           jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH" > "$body"
           labels="$(jq -c '[.pull_request.labels[].name]' "$GITHUB_EVENT_PATH")"
           mode="$(node script/ci-fast-path.mjs --event pull_request --message "" --diff-available true --changed-files "$changed" \
