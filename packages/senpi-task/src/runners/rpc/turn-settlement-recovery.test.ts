@@ -44,9 +44,7 @@ describe("recovery settlement (omo#13785)", () => {
     expect(scheduler.pending()).toBe(1)
     scheduler.runNext()
     await flushSettlement()
-    expect(outcomes).toEqual([
-      { status: "error", failure: { kind: "child-turn-failed", message: COMPACTION_ERROR } },
-    ])
+    expect(outcomes).toEqual([{ status: "error", failure: { kind: "child-turn-failed", message: COMPACTION_ERROR } }])
   })
 
   test("reports a continuation rejection without relying on a second agent_end", () => {
@@ -59,9 +57,7 @@ describe("recovery settlement (omo#13785)", () => {
     settlement.observe({ type: "agent_idle" })
 
     // then
-    expect(outcomes).toEqual([
-      { status: "error", failure: { kind: "child-turn-failed", message: CONTINUATION_ERROR } },
-    ])
+    expect(outcomes).toEqual([{ status: "error", failure: { kind: "child-turn-failed", message: CONTINUATION_ERROR } }])
   })
 
   test("does not fail a retry that starts another run", async () => {
