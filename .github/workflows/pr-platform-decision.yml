@@ -1,0 +1,78 @@
+name: PR platform decision
+
+# The one ci:full-matrix decision for every pull-request workflow that can run macOS/Windows (#13859). A pull request
+# gets them only when script/ci-fast-path.mjs honors the label (a platform path in the diff, or a body line
+# 'Platform-reason: <why>') or its head is a release source-state branch; every other event gets the full matrix.
+on:
+  workflow_call:
+    inputs:
+      fail-on-refusal:
+        description: Fail when the ci:full-matrix label is refused (the label workflow's gate)
+        required: false
+        type: boolean
+        default: false
+    outputs:
+      full_matrix:
+        description: "'true' when this run may schedule macOS/Windows jobs"
+        value: ${{ jobs.decide.outputs.full_matrix }}
+
+permissions:
+  contents: read
+
+jobs:
+  decide:
+    name: Platform decision
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    outputs:
+      full_matrix: ${{ steps.decide.outputs.full_matrix }}
+    steps:
+      - uses: actions/checkout@v7
+        if: github.event_name == 'pull_request'
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Decide whether this run may use macOS/Windows
+        id: decide
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_REF: ${{ github.head_ref }}
+          FAIL_ON_REFUSAL: ${{ inputs.fail-on-refusal }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
+            echo "full_matrix=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          paths="$RUNNER_TEMP/paths"
+          body="$RUNNER_TEMP/pr-body.md"
+          git diff --name-only -z "$(git merge-base "$BASE_SHA" HEAD)" HEAD > "$paths"
+          # Read from the event file: a PR body can exceed the per-variable environment limit.
+          jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH" > "$body"
+          labels="$(jq -c '[.pull_request.labels[].name]' "$GITHUB_EVENT_PATH")"
+          mode="$(node script/ci-fast-path.mjs --event pull_request --message "" --diff-available true \
+            --merge-parents 2 --head-ref "$HEAD_REF" --labels "$labels" --body-file "$body" < "$paths")"
+          jq . <<< "$mode"
+          jq -r '"full_matrix=\(.fullMatrix)"' <<< "$mode" >> "$GITHUB_OUTPUT"
+          if jq -e '.labelRefused' <<< "$mode" > /dev/null; then
+            message="No changed path is platform-specific and the PR body has no reason line, so macOS/Windows stay off. Add a line 'Platform-reason: <why this change needs macOS/Windows on the pull request>' to the PR body and re-apply the label, or remove the label."
+            if [ "$FAIL_ON_REFUSAL" = "true" ]; then
+              echo "::error title=ci:full-matrix refused::$message"
+              exit 1
+            fi
+            echo "::warning title=ci:full-matrix refused::$message"
+          fi
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: PR platform decision
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - May use macOS/Windows: `${{ steps.decide.outputs.full_matrix || 'unknown' }}`.
+            - A pull request gets them only for a platform path in the diff, a `Platform-reason: <why>` body line with `ci:full-matrix`, or a release source-state head.
+          JOB_SUMMARY_NEXT: Add the Platform-reason line to the PR body and re-apply the label, or remove the label.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

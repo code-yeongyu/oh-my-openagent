@@ -158,7 +158,7 @@ export function classifyCiMode({
     runHeavy: eventName === "merge_group" || !(generatedReleasePush || webOnly),
     fullMatrix,
     runtimeTouching,
-    labelRefused: labelled && !labelHonored,
+    labelRefused: labelled && !fullMatrix,
   }
 }
 

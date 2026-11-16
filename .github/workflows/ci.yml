@@ -79,7 +79,6 @@ jobs:
           HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message || '' }}
           HEAD_REF: ${{ github.head_ref || '' }}
           PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) || '[]' }}
-          PR_BODY: ${{ github.event.pull_request.body || '' }}
         run: |
           set -euo pipefail
 
@@ -95,7 +94,8 @@ jobs:
 
           MERGE_PARENTS="$(git show -s --format=%P "$GITHUB_SHA" | wc -w)"
           BODY_FILE="$RUNNER_TEMP/pr-body.md"
-          printf '%s' "${PR_BODY:-}" > "$BODY_FILE"
+          # Read from the event file: a PR body can exceed the per-variable environment limit.
+          jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH" > "$BODY_FILE"
 
           MODE_JSON="$(node script/ci-fast-path.mjs \
             --event "$GITHUB_EVENT_NAME" \

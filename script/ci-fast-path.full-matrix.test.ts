@@ -290,9 +290,10 @@ describe("full-matrix classification", () => {
       expect(mode.labelRefused).toBe(false)
     })
 
-    test("#then a release source-state pull request keeps the full matrix whatever the label decides", () => {
+    test("#then a release source-state pull request keeps the full matrix and its label is not reported refused", () => {
       const mode = classify({ ...labelled, headRef: "release/v5.2.0-source-state", changedPaths: ["package.json"] })
       expect(mode.fullMatrix).toBe(true)
+      expect(mode.labelRefused).toBe(false)
     })
 
     // run-full-ci was a second name for the label; one opt-in label is the contract (#13802).
