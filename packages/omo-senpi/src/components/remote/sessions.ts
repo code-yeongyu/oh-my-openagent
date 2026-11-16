@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto"
+import { userInfo } from "node:os"
 import type { DeviceService } from "@oh-my-opencode/device-service-core/device-service"
 import type { ThreadThinkingLevel, ThreadToolResult } from "../thread/contracts"
 import { answered, closeThread, setModelOn, setThinkingLevelOn } from "../thread/control/operations"
@@ -22,6 +23,7 @@ import { nextActionFor, remoteFailure } from "./codes"
 import { DEADLINES } from "./deadlines"
 import { createDeviceServiceSessions } from "./port/device-service"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
+import { PERMISSION_PRESETS } from "./types"
 import type {
   DeviceRow,
   SessionRow,
@@ -45,6 +47,8 @@ type SessionMembers = Pick<
 >
 
 type Target = { readonly device: string; readonly session: string }
+/** The options of one stage of a call, under what is left of the call's one deadline (capped at `capMs`). */
+type Stage = (capMs?: number) => Opts
 
 const isObject = (value: unknown): value is JsonObject =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -89,14 +93,15 @@ const splitModel = (model: string): { readonly provider: string; readonly modelI
 // #13748: thread/contracts/permission-presets.ts `isPermissionPreset` and `presetWithin` replace these (the same senpi
 // preset rules).
 const AT_MOST: Readonly<Record<PermissionPreset, readonly PermissionPreset[]>> = {
-  "full-access": ["full-access", "workspace", "accept-edits", "auto", "read-only", "ask"],
+  "full-access": PERMISSION_PRESETS,
   workspace: ["workspace", "accept-edits", "read-only", "ask"],
   "accept-edits": ["accept-edits", "read-only", "ask"],
   "read-only": ["read-only", "ask"],
   auto: ["auto", "ask"],
   ask: ["ask"],
 }
-const isPermissionPreset = (value: string): value is PermissionPreset => Object.hasOwn(AT_MOST, value)
+const isPermissionPreset = (value: string): value is PermissionPreset =>
+  PERMISSION_PRESETS.some((preset) => preset === value)
 const presetWithin = (requested: PermissionPreset, creator: PermissionPreset | undefined): boolean =>
   creator === undefined ? requested === "ask" : AT_MOST[creator].includes(requested)
 
@@ -187,6 +192,18 @@ export async function resolveSessionTarget(
   return ok({ device, session })
 }
 
+/**
+ * A person's one identity on a send, as `omo remote send` builds it: the client's fixed uid (this process's own when
+ * it is not numeric) and this user's name; the receipt principal is that uid.
+ */
+export function personIdentity(uid: string): { readonly sender: GatewaySender; readonly caller: string } {
+  const numeric = /^\d+$/.test(uid) ? Number(uid) : (process.getuid?.() ?? 0)
+  return { sender: { kind: "person", uid: numeric, user: userInfo().username }, caller: `person:${uid}` }
+}
+
+/** How many keyed opens a client remembers for replay. */
+const OPENS_KEPT = 256
+
 /** The receipts of this client's sends and opens: a repeat under one idempotency key replays the first answer. */
 function createReceipts(now: () => number): RelayTransportOptions["store"] {
   type Receipt = { readonly hash: string; settled: boolean; result?: unknown; note?: string }
@@ -232,6 +249,7 @@ function createReceipts(now: () => number): RelayTransportOptions["store"] {
 export function sessionMembers(core: ClientCore): SessionMembers {
   const { sender } = core
   const receipts = createReceipts(() => core.timers.now())
+  // Keyed opens, newest last: a repeat replays (and refreshes) one; past OPENS_KEPT the oldest is forgotten.
   const opens = new Map<string, { readonly hash: string; readonly result: R<OpenResult> }>()
   const legs = new WeakMap<
     DeviceService,
@@ -255,6 +273,24 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     return leg
   }
 
+  /**
+   * One deadline for a whole call (#13756 L3): its clock starts once, and each stage (the listing, the device row, the
+   * member) runs under what is left of it, a stage's own table default capping its share.
+   */
+  const budget = (opts: Opts | undefined, totalMs: number): Stage => {
+    const end = core.timers.now() + (opts?.deadlineMs ?? totalMs)
+    return (capMs) => {
+      const left = Math.max(1, end - core.timers.now())
+      return {
+        ...(opts?.signal === undefined ? {} : { signal: opts.signal }),
+        deadlineMs: capMs === undefined ? left : Math.min(capMs, left),
+      }
+    }
+  }
+  // An open with a first prompt spends the create's and one send's default.
+  const openBudget = (request: OpenRequest, opts: Opts | undefined): Stage =>
+    budget(opts, DEADLINES.openEndpoint + (request.first === undefined ? 0 : DEADLINES.drive))
+
   const deviceRow = async (id: string, opts: Opts | undefined): Promise<Outcome<DeviceRow>> => {
     const listed = await core.devicesList(opts)
     if (listed.kind === "error") return listed
@@ -270,9 +306,11 @@ export function sessionMembers(core: ClientCore): SessionMembers {
   const controlOf = (svc: DeviceService, { device, session }: Target): SessionControl =>
     createRelayControl(legOf(svc).remote, namedDeviceRow(device, session))
 
-  const resolve = async (thread: ThreadHandle, opts: Opts | undefined): Promise<Outcome<SessionTarget>> => {
+  const resolve = async (thread: ThreadHandle, stage: Stage): Promise<Outcome<SessionTarget>> => {
     const named = targetOf(thread)
-    return "kind" in named ? named : await resolveSessionTarget(core, named.device, named.session, opts)
+    return "kind" in named
+      ? named
+      : await resolveSessionTarget(core, named.device, named.session, stage(DEADLINES.sessionsList))
   }
 
   const controlled = async <T>(
@@ -281,10 +319,11 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     body: (control: SessionControl, target: Target, svc: DeviceService) => Promise<ThreadToolResult>,
     value: (result: ThreadToolResult) => T,
   ): R<T> => {
-    const resolved = await resolve(thread, opts)
+    const stage = budget(opts, DEADLINES.drive)
+    const resolved = await resolve(thread, stage)
     if (resolved.kind === "error") return resolved
     const target = resolved.value
-    return core.member(opts, DEADLINES.drive, true, async (svc) => {
+    return core.member(stage(), DEADLINES.drive, true, async (svc) => {
       const result = await answered(() => body(controlOf(svc, target), target, svc))
       return result.kind === "error" ? fromThread(result.error) : ok(value(result))
     })
@@ -294,10 +333,8 @@ export function sessionMembers(core: ClientCore): SessionMembers {
   const gatewaySender = (): { readonly sender: GatewaySender; readonly caller: string } | RemoteFailure => {
     switch (sender.kind) {
       case "person":
-      case "cli": {
-        const uid = process.getuid?.() ?? 0
-        return { sender: { kind: "person", uid, user: sender.uid }, caller: `person:${uid}` }
-      }
+      case "cli":
+        return personIdentity(sender.uid)
       case "session":
         return { sender: { kind: "session", durable_id: sender.id }, caller: sender.id }
       case "connector":
@@ -317,9 +354,10 @@ export function sessionMembers(core: ClientCore): SessionMembers {
   }
 
   const send = async (thread: ThreadHandle, request: SendRequest, opts?: Opts): R<SendReceipt> => {
-    const resolved = await resolve(thread, opts)
+    const stage = budget(opts, DEADLINES.drive)
+    const resolved = await resolve(thread, stage)
     if (resolved.kind === "error") return resolved
-    return await deliverTo(thread, resolved.value, request, opts)
+    return await deliverTo(thread, resolved.value, request, stage)
   }
 
   /** One send to the session the device lists under `target` (already resolved); `thread` is the caller's handle. */
@@ -327,7 +365,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     thread: ThreadHandle,
     target: Target,
     request: SendRequest,
-    opts: Opts | undefined,
+    stage: Stage,
   ): R<SendReceipt> => {
     if (request.author !== undefined && sender.kind !== "connector")
       return remoteFailure(
@@ -346,9 +384,9 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       )
     const from = gatewaySender()
     if ("kind" in from) return from
-    const device = await deviceRow(target.device, opts)
+    const device = await deviceRow(target.device, stage(DEADLINES.devices))
     if (device.kind === "error") return device
-    return core.member<SendReceipt>(opts, DEADLINES.drive, true, async (svc) => {
+    return core.member<SendReceipt>(stage(), DEADLINES.drive, true, async (svc) => {
       const row = namedDeviceRow(target.device, target.session)
       const mode = request.mode ?? "auto"
       const expected = request.expected_turn_id === undefined ? undefined : String(request.expected_turn_id)
@@ -407,9 +445,9 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     if ("kind" in translated) return translated
     let asked = translated
     const preset = request.preset
-    // A person opens in any mode (absent, the engine's own default). Any other caller acts for a session and may keep
-    // or narrow that session's mode; absent, it keeps it. A mode this client is not told passes only `ask`.
-    if (sender.kind !== "person") {
+    // A person (at a terminal or not) opens in the mode it names (absent, the engine's own default). A caller that acts
+    // for a session may keep or narrow that session's mode; absent, it keeps it. A mode it is not told passes only `ask`.
+    if (sender.kind === "session" || sender.kind === "connector") {
       const told = core.deps.permissionPreset?.()
       const own = told !== undefined && isPermissionPreset(told) ? told : undefined
       if (preset !== undefined && !presetWithin(preset, own))
@@ -422,11 +460,15 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       if (preset === undefined && own !== undefined) asked = { ...asked, permissionPreset: own }
     }
     const key = request.idempotency_key
-    if (key === undefined) return await openOnce(request, asked, opts)
+    if (key === undefined) return await openOnce(request, asked, openBudget(request, opts))
     // A repeat under the key replays the first open (in flight or settled); one with other arguments conflicts. An
     // open that created nothing frees the key for a retry.
     const hash = hashArgs(request)
     const known = opens.get(key)
+    if (known !== undefined) {
+      opens.delete(key)
+      opens.set(key, known)
+    }
     if (known !== undefined)
       return known.hash === hash
         ? await known.result
@@ -435,8 +477,12 @@ export function sessionMembers(core: ClientCore): SessionMembers {
             "The idempotency key was already used for another open.",
             nextActionFor("idempotency_conflict"),
           )
-    const result = openOnce(request, asked, opts)
+    const result = openOnce(request, asked, openBudget(request, opts))
     opens.set(key, { hash, result })
+    for (const oldest of opens.keys()) {
+      if (opens.size <= OPENS_KEPT) break
+      opens.delete(oldest)
+    }
     const settled = await result
     if (settled.kind === "error" && settled.partial === undefined && settled.uncertain !== true) opens.delete(key)
     return settled
@@ -445,9 +491,9 @@ export function sessionMembers(core: ClientCore): SessionMembers {
   const openOnce = async (
     request: OpenRequest,
     asked: SessionOpenRequest & LaunchProfile,
-    opts?: Opts,
+    stage: Stage,
   ): R<OpenResult> => {
-    const device = await deviceRow(request.device, opts)
+    const device = await deviceRow(request.device, stage(DEADLINES.devices))
     // This device with no device service: thread_create's local host needs a running engine's extension context, which
     // a client does not have, so the open is local only.
     if (device.kind === "ok" && device.value.self === true && device.value.kind === "local")
@@ -457,7 +503,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
         "Call service.bootstrap to install the device service, then call sessions.open again.",
       )
     if (device.kind === "error") return device
-    const made = await core.member(opts, DEADLINES.openEndpoint, true, async (svc) => {
+    const made = await core.member(stage(DEADLINES.openEndpoint), DEADLINES.openEndpoint, true, async (svc) => {
       const outcome = await createRelaySessionHost(legOf(svc).remote, device.value.id).open(asked)
       if (outcome.kind === "error") return modelUnavailable(fromThread(outcome.error), request.model)
       return ok({
@@ -482,7 +528,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
         ...request.first,
         ...(request.idempotency_key === undefined ? {} : { idempotency_key: request.idempotency_key }),
       },
-      opts,
+      stage,
     )
     // The session exists either way: a first prompt that failed names it, so a retry does not open another one.
     if (first.kind === "error") return { ...first, partial: result }
@@ -500,13 +546,14 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     open,
     send,
     get: async (thread, opts) => {
-      const resolved = await resolve(thread, opts)
+      const stage = budget(opts, DEADLINES.observeRead)
+      const resolved = await resolve(thread, stage)
       if (resolved.kind === "error") return resolved
       const target = resolved.value
       const { row } = target
       // Not listed (yet): there is no row to report it with.
       if (row === undefined) return unknownSession(target.device, target.session)
-      return core.member(opts, DEADLINES.observeRead, false, async (svc) => {
+      return core.member(stage(), DEADLINES.observeRead, false, async (svc) => {
         const state = await engineState(svc, target)
         if (state.kind === "error") return state
         const data = state.value
@@ -533,10 +580,11 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       })
     },
     read: async (thread, page, opts) => {
-      const resolved = await resolve(thread, opts)
+      const stage = budget(opts, DEADLINES.observeRead)
+      const resolved = await resolve(thread, stage)
       if (resolved.kind === "error") return resolved
       const target = resolved.value
-      return core.member(opts, DEADLINES.observeRead, false, async (svc) => {
+      return core.member(stage(), DEADLINES.observeRead, false, async (svc) => {
         const attached = await svc.attach(target.device, target.session)
         try {
           return ok(
@@ -552,10 +600,11 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     },
     // The engine's interrupt record itself (relay-control's body drops the background report InterruptResult carries).
     interrupt: async (thread, opts) => {
-      const resolved = await resolve(thread, opts)
+      const stage = budget(opts, DEADLINES.drive)
+      const resolved = await resolve(thread, stage)
       if (resolved.kind === "error") return resolved
       const target = resolved.value
-      return core.member(opts, DEADLINES.drive, true, async (svc) => {
+      return core.member(stage(), DEADLINES.drive, true, async (svc) => {
         const { device, session } = target
         const outcome = await legOf(svc).remote.sessions.sessionCommand(device, session, {
           type: "interrupt",
@@ -615,10 +664,11 @@ export function sessionMembers(core: ClientCore): SessionMembers {
         () => ({ reasoning: level }),
       ),
     close: async (thread, opts) => {
-      const resolved = await resolve(thread, opts)
+      const stage = budget(opts, DEADLINES.close)
+      const resolved = await resolve(thread, stage)
       if (resolved.kind === "error") return resolved
       const target = resolved.value
-      return core.member(opts, DEADLINES.close, true, async (svc) => {
+      return core.member(stage(), DEADLINES.close, true, async (svc) => {
         const result = await answered(() => closeThread(controlOf(svc, target)))
         if (result.kind === "error") return fromThread(result.error)
         return ok({ closed: "closed" in result && result.closed === true })
