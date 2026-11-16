@@ -11,6 +11,8 @@
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
         "vitest.config.ts",
+        // the row 37 QA driver (cu-v3 plan: packages/omo-computer-hand/scripts/qa-hand.ts) and its scenario files
+        "scripts/qa-hand.ts",
       ],
     }
   },
