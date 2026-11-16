@@ -1,6 +1,6 @@
 // The vendored local-API client imports these from `@sisyphuslabs/relay-spec/proto` (rewritten to this file, PIN.json
 // importRewrites). The whole relay-proto package (cbor-x and thousands of lines) is not needed for them, so each is
-// ported here verbatim from sisyphuslabs/omo-relay-spec@8ce4ec71bcb00ca9a0513db5a3aaffadeeec97dc, the commit
+// ported here verbatim from sisyphuslabs/omo-relay-spec@139d0f83a6a4127b1afae3bc8d5e25c2eb9a0ca3, the commit
 // omo-relay-daemon pins in vendor/relay-spec/PIN.json at the commit PIN.json names. Refresh this file with the vendor.
 
 // packages/relay-proto/src/errors.ts
@@ -35,11 +35,13 @@ export class ProtoError extends Error {
 // packages/relay-proto/src/session-blob.ts
 export const SESSION_BLOB_MAX = 16_777_216;
 
-// packages/relay-proto/src/session-inner.ts
+// packages/relay-proto/src/session-list-bounds.ts
 export const SESSION_KIND_MAX_CHARS = 32;
+export const SESSION_ID_MAX_CHARS = 128;
+
+// packages/relay-proto/src/session-inner.ts
 export const SESSION_DEVICE_MAX_CHARS = 64;
 export const SESSION_PROJECT_MAX_CHARS = 256;
-export const SESSION_ID_MAX_CHARS = 128;
 
 // packages/relay-proto/src/session-read.ts
 export const SESSION_READ_TAIL_MAX = 200;
@@ -48,6 +50,16 @@ export const SESSION_READ_TAIL_MAX = 200;
 export const SESSION_SUMMARY_TITLE_MAX_CHARS = 256;
 export const SESSION_SUMMARY_PROJECT_MAX_CHARS = 128;
 export const SESSION_SUMMARY_PATH_MAX_CHARS = 1024;
+
+// packages/relay-proto/src/session-list-rows.ts
+export const SESSION_MODEL_PROVIDER_MAX_CHARS = 64;
+export const SESSION_MODEL_ID_MAX_CHARS = 128;
+
+// packages/relay-proto/src/session-list-settled.ts
+/** An inactivity settle names at most this many days (100 years). */
+export const SESSION_SETTLED_DAYS_MAX = 36_500;
+/** An agent's thread title is bounded like a summary title (SESSION_SUMMARY_TITLE_MAX_CHARS), and may be empty. */
+export const SESSION_SETTLED_THREAD_TITLE_MAX_CHARS = 256;
 
 // packages/relay-proto/src/session-codec.ts
 const SESSION_KEY_CHARS = 22;

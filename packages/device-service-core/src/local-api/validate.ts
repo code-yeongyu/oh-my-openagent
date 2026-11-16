@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@4ed58920002306a95bf92fe99ca448be89d7103f packages/local-api/src/validate.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@eda08c786872ad5b766b5adba76f9698d4f1cad6 packages/local-api/src/validate.ts
 import { LocalApiError } from "./errors.ts";
 import type {
   Empty,
@@ -35,7 +35,7 @@ import {
 import { MACHINE_DATA } from "./validate-machine.ts";
 import { DELIVERIES_DATA } from "./validate-deliveries.ts";
 import { commandAnswerOf, refOf } from "./validate-session-answer.ts";
-import { endpointsData } from "./validate-delegated.ts";
+import { endpointsData, endpointsListData } from "./validate-delegated.ts";
 import { isRequestType, REQUEST_TYPES, validateRequestFields } from "./validate-requests.ts";
 import {
   deviceRef,
@@ -200,6 +200,7 @@ const DATA: { readonly [T in RequestType]: (v: unknown) => ResponseData[T] } = {
   }),
   "endpoints.register": empty,
   "endpoints.unregister": empty,
+  "endpoints.list": (v) => endpointsListData(known(v, ["agent_dirs"], [], "data")),
   "session.presenter_open": empty,
   "session.presenter_send": empty,
   "devices.list": (v) => {

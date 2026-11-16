@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@4ed58920002306a95bf92fe99ca448be89d7103f packages/local-api/src/validate-fields.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@eda08c786872ad5b766b5adba76f9698d4f1cad6 packages/local-api/src/validate-fields.ts
 import { posix, win32 } from "node:path";
 import { fromBase64, toBase64 } from "./bytes-encoding.ts";
 import type { JsonObject, JsonValue } from "./protocol.ts";

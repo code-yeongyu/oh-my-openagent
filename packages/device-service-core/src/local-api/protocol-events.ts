@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@4ed58920002306a95bf92fe99ca448be89d7103f packages/local-api/src/protocol-events.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@eda08c786872ad5b766b5adba76f9698d4f1cad6 packages/local-api/src/protocol-events.ts
 import type { EventOf, JsonObject, JsonValue, Status } from "./protocol.ts";
 import type { MachineEvent } from "./protocol-machine.ts";
 import type { DelegatedEvent } from "./protocol-delegated.ts";
@@ -44,7 +44,26 @@ export type ListingRow = {
    * characters, as `session.locate`'s `engine_id`). Absent when the host does not report it.
    */
   readonly durable_id?: string;
+  /**
+   * Only on rows of a `sessions.list` with `rows: 4` (#1121): the model the session runs as its engine names it
+   * (`provider` 1-64 and `id` 1-128 characters), absent when the host does not report one; and `archived: true` when
+   * the engine archived the session (absent: not archived).
+   */
+  readonly model?: { readonly provider: string; readonly id: string };
+  readonly archived?: true;
+  /**
+   * Only on rows of a `sessions.list` with `rows: 5`: whether the engine settled the session, on every row from a host
+   * that reports it (absent: the host does not); and, only beside `settled: true`, what settled it when the engine says.
+   */
+  readonly settled?: boolean;
+  readonly settled_by?: ListingSettledBy;
 };
+/** What settled a session, as its engine names it (the keys keep the engine's camelCase). */
+export type ListingSettledBy =
+  | { readonly kind: "user" }
+  | { readonly kind: "agent"; readonly threadId?: string; readonly threadTitle?: string }
+  | { readonly kind: "pr-merged" | "pr-closed"; readonly pullRequestNumber?: number }
+  | { readonly kind: "inactivity"; readonly days: number };
 export type StatusChanged = EventOf<"status.changed", { readonly status: Status }>;
 export type SessionsRound = EventOf<
   "sessions.round",

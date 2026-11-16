@@ -1,8 +1,13 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@4ed58920002306a95bf92fe99ca448be89d7103f packages/local-api/src/validate-machine.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@eda08c786872ad5b766b5adba76f9698d4f1cad6 packages/local-api/src/validate-machine.ts
 import { methodOf, ProtoError, SESSION_BLOB_MAX } from "./spec-proto.ts";
-import { LOCAL_CHUNK_MAX, LOCAL_INLINE_MAX, lineBytes } from "./limits.ts";
+import {
+  LOCAL_CHUNK_MAX,
+  LOCAL_INLINE_MAX,
+  lineBytes,
+  MACHINE_UPLOAD_LIMIT,
+  MACHINE_UPLOAD_PARTS_MAX,
+} from "./limits.ts";
 import type { MachineOp, MachineResponseData, MachineRow } from "./protocol-machine.ts";
-import { LOCAL_UPLOAD_PARTS_MAX } from "./upload.ts";
 import { requestFields, type RequestValidators } from "./validate-command.ts";
 import {
   base64Bytes,
@@ -129,7 +134,7 @@ export const MACHINE_REQUEST_VALIDATORS: RequestValidators<MachineType> = {
   },
   "machine.batch_part": (v, id) => {
     const m = requestFields(v, ["upload_id", "index", "count", "b"]);
-    const count = uint(m["count"], 1, LOCAL_UPLOAD_PARTS_MAX, "count");
+    const count = uint(m["count"], 1, MACHINE_UPLOAD_PARTS_MAX, `count: ${MACHINE_UPLOAD_LIMIT}`);
     base64Bytes(m["b"], LOCAL_CHUNK_MAX, "b");
     return {
       id,
@@ -217,7 +222,7 @@ export const MACHINE_DATA: { readonly [T in MachineType]: (v: unknown) => Machin
       received: uint(
         fields(v, ["received"])["received"],
         0,
-        LOCAL_UPLOAD_PARTS_MAX - 1,
+        MACHINE_UPLOAD_PARTS_MAX - 1,
         "received",
       ),
     }),

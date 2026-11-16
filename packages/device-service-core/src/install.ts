@@ -13,7 +13,7 @@ export type InstallOutcome =
 
 const INSTALL_TIMEOUT_MS = 120_000
 
-const runCommand: RunCommand = ([command, ...args]) =>
+export const runCommand: RunCommand = ([command, ...args]) =>
   new Promise((resolve) => {
     if (command === undefined) return resolve({ exitCode: 1, output: "no command" })
     const child = spawn(command, args, {

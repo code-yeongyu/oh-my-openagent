@@ -3,19 +3,27 @@ import { join, relative } from "node:path"
 import type { RequestType } from "../../src/local-api/protocol.ts"
 import { isRequestType } from "../../src/local-api/validate.ts"
 
-// The request types omo sends through this package's local-api client: the SDK (device-service.ts), remote-attach.ts and
-// the vendored client's own sends (client-open.ts). The package entry exposes no raw request, so no other package sends
+// The request types omo sends through this package's local-api client: the SDK (device-service.ts), remote-attach.ts,
+// the delivery consumer (delivery-consumer.ts) and the vendored client's own sends (client-open.ts). The package entry exposes no raw request, so no other package sends
 // through this client. sent-request-types.test.ts holds this list equal to a scan of src/, and LA21 keeps one reply row
 // per entry, so a new send fails a test here and then typecheck in LA21 until it has a row.
 export const OMO_SENT_REQUEST_TYPES = [
   "authenticate",
   "control.attach.get",
   "control.attach.set",
+  "control.session_wake.get",
+  "control.session_wake.set",
+  "deliveries.serve",
+  "delivery.answer",
+  "delivery.drained",
+  "delivery.held",
+  "delivery.pending",
   "device.adopt",
   "device.forget",
   "device.info",
   "devices.list",
   "endpoints.register",
+  "peer.admitted",
   "refresher.register",
   "service.set_enabled",
   "session.attach",

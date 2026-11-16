@@ -1,6 +1,6 @@
 {
   "upstream": "sisyphuslabs/omo-relay-daemon",
-  "upstreamCommit": "4ed58920002306a95bf92fe99ca448be89d7103f",
+  "upstreamCommit": "eda08c786872ad5b766b5adba76f9698d4f1cad6",
   "importRewrites": [
     {
       "from": "@sisyphuslabs/relay-spec/proto",
@@ -12,13 +12,19 @@
     }
   ],
   "ported": {
-    "spec-proto.ts": "sisyphuslabs/omo-relay-spec@8ce4ec71bcb00ca9a0513db5a3aaffadeeec97dc packages/relay-proto/src (vendor/relay-spec/PIN.json at the commit above)"
+    "spec-proto.ts": "sisyphuslabs/omo-relay-spec@139d0f83a6a4127b1afae3bc8d5e25c2eb9a0ca3 packages/relay-proto/src (vendor/relay-spec/PIN.json at the commit above)"
   },
   "files": [
     {
       "upstreamPath": "packages/local-api/src/access.ts",
       "sha256": "c7164f485ca8688f66192f452120484fd55b4174307e7c08ca5f9081226df05c",
       "gitBlobSha1": "65dc77a54f148b1aee989abb8b4e87ca52dca7b3",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/daemon/src/bytes-encoding.ts",
+      "sha256": "e572f4feeb7b779483c188955b87ded4af2da7e757dd7ec3a9eb9132289dbdd1",
+      "gitBlobSha1": "243f0cdd5593ad38d4710b21ed9689ab4dd6e122",
       "importRewrite": false
     },
     {
@@ -47,14 +53,14 @@
     },
     {
       "upstreamPath": "packages/local-api/src/client-open.ts",
-      "sha256": "5f571ecdd09501e3d73d47f3041795a777a2fbe2f7865438f564e22537874144",
-      "gitBlobSha1": "90d18d96932e65a462f59ddb8a42ec55df0c3c9b",
+      "sha256": "8d4411754d8ef5218820c82c5fa8adf5054127c5b8b6068d2c8b3d1739e01211",
+      "gitBlobSha1": "dcdfacaab9c3a86134a7e7e41170a4e997d3185c",
       "importRewrite": false
     },
     {
       "upstreamPath": "packages/local-api/src/client.ts",
-      "sha256": "71b2a03ae58f5df225309c4812cb5ea734a975e9a4b53a245d5e276de5433e0f",
-      "gitBlobSha1": "6000d0404f428580a05e71fb27b2b509e3384f8e",
+      "sha256": "e566fca5234adf658955fd178f7b16e7fbb77dabc819d7313903203519ab8ddb",
+      "gitBlobSha1": "d10096992bc4c1284d098e0c99cae3d9340f42c0",
       "importRewrite": false
     },
     {
@@ -83,8 +89,8 @@
     },
     {
       "upstreamPath": "packages/local-api/src/limits.ts",
-      "sha256": "f9fb83511eda907633b7f3718e2bacebbf4eacebc52b6fd2cb82793c99a4fc8b",
-      "gitBlobSha1": "ffc75b326875c3058454b646c3d79822529a8e62",
+      "sha256": "4e100635d86c22debf15d98fde25d70fb85b79de19719d7f4402c4d28c3867a1",
+      "gitBlobSha1": "89d386bc2de908cdb6b75a9a7cf4ac3decbd899c",
       "importRewrite": true
     },
     {
@@ -125,8 +131,8 @@
     },
     {
       "upstreamPath": "packages/local-api/src/protocol-events.ts",
-      "sha256": "dd2319a17da64ac74557488caafce2902c688b5f131dc9eac585b88f80870785",
-      "gitBlobSha1": "51136f2c653ad38b92f03271c6c55246f52f6c34",
+      "sha256": "685c8f23cb3e2a9870bffc751bd7fc6b15bba2f789ee7a32804b1c2da100f471",
+      "gitBlobSha1": "dff9b94415f36aefc8ef32b963e4390bf9801d42",
       "importRewrite": false
     },
     {
@@ -149,8 +155,8 @@
     },
     {
       "upstreamPath": "packages/local-api/src/protocol.ts",
-      "sha256": "7e0838bbb24670310d53e8ce77744765d6ed72a8e7a3451bc6adf71b818e6b96",
-      "gitBlobSha1": "9d818bf28100c0e1a0fa4b24911ba42287857efa",
+      "sha256": "17f877eaffcf30b087a2bc4626fcf34f7cfa9a225f66ac0a60992d36e8a66a4a",
+      "gitBlobSha1": "94e742b899aafe40db5977d9cc8e0aa147afd367",
       "importRewrite": false
     },
     {
@@ -167,8 +173,8 @@
     },
     {
       "upstreamPath": "packages/local-api/src/upload.ts",
-      "sha256": "52ec02ae26d269ba2b49609e1a07655557d2ec9811a911fc5bc6fad04f5d1858",
-      "gitBlobSha1": "68675ff5c37307bea88b1751b75083ebbb9c147d",
+      "sha256": "646e94a6fe868569ca68b001712b1cc5cf16f3b615a4b58187241510a4c56fe6",
+      "gitBlobSha1": "1110aec602fec4f9994b3df79ffefb11ac198e2a",
       "importRewrite": true
     },
     {
@@ -179,8 +185,8 @@
     },
     {
       "upstreamPath": "packages/local-api/src/validate-delegated.ts",
-      "sha256": "a0076056bec22438cc7de8a123c1382bf6713ffb81235e9257377f14d265f40a",
-      "gitBlobSha1": "1bc564445c453a080d4ed5276eee4bb8729c0207",
+      "sha256": "44e5a9f5b9cfdb72632838d8943e687bdb508fd140e214718ae77481fd42feb5",
+      "gitBlobSha1": "24ca33343803cff6a88e1e2c3b76df66450b2472",
       "importRewrite": true
     },
     {
@@ -203,8 +209,8 @@
     },
     {
       "upstreamPath": "packages/local-api/src/validate-listing-row.ts",
-      "sha256": "3c75a9137cfa093ad8a9b55d0b24c1af274c9fa70a8ee0b7de8c7b97b7e7bed1",
-      "gitBlobSha1": "d144baba808a476d6ff60520fb1e65392cfaafda",
+      "sha256": "db65760a241e2ad4a71030c4eeddd8e89c06981aa2b25c19a102bb272ddccc06",
+      "gitBlobSha1": "8edbb88c61ca76542214526a31fc485c587d9088",
       "importRewrite": true
     },
     {
@@ -215,8 +221,8 @@
     },
     {
       "upstreamPath": "packages/local-api/src/validate-machine.ts",
-      "sha256": "edcfc357af3bea0bdd88f5bcc5cb0cf76891d7b319641e0ef6bfb6fd37484fb1",
-      "gitBlobSha1": "96616390ad96b7e4f925af3c89960de392763d9a",
+      "sha256": "74bad85c85c33f870faf99ada0b4ac75f3212080eaaf18d7b2335b28b0c32dda",
+      "gitBlobSha1": "d4d4a01f015479dcf84cc212d760e1859ce55292",
       "importRewrite": true
     },
     {
@@ -227,8 +233,8 @@
     },
     {
       "upstreamPath": "packages/local-api/src/validate-requests.ts",
-      "sha256": "22f884888e397e09753ffc6802db816e770add4459df5a01d519c562c88ba394",
-      "gitBlobSha1": "f20db71946b36a7c5ce7f9c14306bd9bc2b7123b",
+      "sha256": "37da69fdf8184435d8a13326bd212c40985621e42afe8f3c089badfa5810ccfc",
+      "gitBlobSha1": "954aab431f9fa2e91899b74ff8b689663a308dfb",
       "importRewrite": true
     },
     {
@@ -269,20 +275,14 @@
     },
     {
       "upstreamPath": "packages/local-api/src/validate.ts",
-      "sha256": "e9499955ead4f2e244866ee1571da41c053238410e79cc676b33e53ae6be7ff8",
-      "gitBlobSha1": "87cbe448326b9e492f977ac8e0961498a2352c06",
+      "sha256": "eccf7e4a740dc8f5fb1c580db759c2df5145f53183bb07e548d0e7dec485cec8",
+      "gitBlobSha1": "5bbcfa9f14363218d7adba6ec580e9403e71cd6e",
       "importRewrite": false
     },
     {
       "upstreamPath": "packages/local-api/src/vocabulary.ts",
-      "sha256": "9f47ef69624f87aba9e2168b39552ab8325416c75c9c867cfdafabd170addc4a",
-      "gitBlobSha1": "e6e551549ac9e184ede587d868cd7d1c561c901e",
-      "importRewrite": false
-    },
-    {
-      "upstreamPath": "packages/daemon/src/bytes-encoding.ts",
-      "sha256": "e572f4feeb7b779483c188955b87ded4af2da7e757dd7ec3a9eb9132289dbdd1",
-      "gitBlobSha1": "243f0cdd5593ad38d4710b21ed9689ab4dd6e122",
+      "sha256": "7b8d0828d59cf24b47cb777d2b6a95b30ac08541ab714dc1657820f820b44374",
+      "gitBlobSha1": "040f36dffb054b533610f97d52eaf0b44978e9a6",
       "importRewrite": false
     }
   ]

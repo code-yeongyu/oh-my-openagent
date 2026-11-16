@@ -2,6 +2,7 @@ import { createHash } from "node:crypto"
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { posixSecureFile, type SecureFile } from "../local-api/access.ts"
+import { refuseIfLocalOnly } from "../local-only.ts"
 import { currentUserSid } from "../local-api/dacl.ts"
 import { windowsSecureFile } from "./windows-dacl.ts"
 import {
@@ -138,6 +139,7 @@ const install = async (
  * then latest.json against the pinned version and the bundled engine.
  */
 export const acquireDeviceService = async (options: AcquireOptions): Promise<AcquireResult> => {
+  refuseIfLocalOnly("device-service-core/release/acquire.ts acquireDeviceService")
   const keys = releaseKeySetBytes(options.releaseKeys ?? DEVICE_SERVICE_RELEASE_KEYS)
   if (keys === undefined)
     return refuse(

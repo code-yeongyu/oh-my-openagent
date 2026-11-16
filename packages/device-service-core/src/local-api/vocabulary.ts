@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@4ed58920002306a95bf92fe99ca448be89d7103f packages/local-api/src/vocabulary.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@eda08c786872ad5b766b5adba76f9698d4f1cad6 packages/local-api/src/vocabulary.ts
 // The value lists of the local API v1 vocabulary. Every name and value here is generic: none contains a
 // transport-internal word (docs/local-api.md "Wording"); LA18 scans this file, protocol.ts and the docs.
 export const LOCAL_API_VERSION = 1;
@@ -66,6 +66,15 @@ export type ListingSource = (typeof LISTING_SOURCES)[number];
 export const SESSION_ROW_STATES = ["running", "idle", "ended"] as const;
 export type SessionRowState = (typeof SESSION_ROW_STATES)[number];
 export const FILTER_KEYS = ["device", "project", "state"] as const;
+// Rows 5: what settled a listed session (the shared session-list contract's settled_by kinds; a drift test pins them).
+// A row naming a kind outside this list keeps `settled` and drops the reason.
+export const LISTING_SETTLED_BY_KINDS = [
+  "user",
+  "agent",
+  "pr-merged",
+  "pr-closed",
+  "inactivity",
+] as const;
 
 export const BLOB_OF = ["state", "record", "entry"] as const;
 export type BlobOf = (typeof BLOB_OF)[number];
@@ -165,6 +174,11 @@ export const COMMAND_REFUSAL_REASONS = [
   "epoch_step_exceeded",
   // Decision 0018 section 5 (amended 2026-11-04): a delegated command whose route the host does not list.
   "route_unlisted",
+  // R3 C1 (spec#297): an empty hand_link poll over its sender's rate; only a hosted brain's hand_link meets it.
+  "rate_limited",
+  // #1120, local only: a host reason this list lacks; the host's own reason travels as receipt.raw_reason. Gated by
+  // client version (event-gate.ts): an older client gets engine_capability_missing.
+  "unknown_reason",
 ] as const;
 export type CommandUncertainReason = (typeof COMMAND_UNCERTAIN_REASONS)[number];
 export type CommandRefusalReason = (typeof COMMAND_REFUSAL_REASONS)[number];

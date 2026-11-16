@@ -52,7 +52,7 @@ export const S1_OFFENDERS: Readonly<Record<string, Offender>> = {
 }
 
 export const S2_OFFENDERS: Readonly<Record<string, Offender>> = {
-  "packages/omo-native/remote-entry.ts": { uses: ["connectDeviceService"], removedBy: "omo PR 4c-1" },
+  "packages/omo-native/remote-local.ts": { uses: ["connectDeviceService"], removedBy: "omo PR 4c-1" },
   "packages/omo-native/remote-session-verbs.ts": { uses: ["createDeviceServiceSessions"], removedBy: "omo PR 4c-2" },
   "packages/omo-senpi/src/components/thread/index.ts": {
     uses: ["createDeviceServiceSessions"],
