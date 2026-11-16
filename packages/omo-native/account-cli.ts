@@ -28,26 +28,14 @@ import {
 import { retireSyncPinOnDiscard } from "../omo-opencode/src/cli/service-auth/sync-pin-retire"
 import { retireSyncDevice } from "../memory-core/src/sync/device-retire"
 import { RecoveryExhausted, RecoveryPending } from "../omo-opencode/src/cli/service-auth/owned-refresh"
+import { ACCOUNT_EXIT, accountStoreFailure, showAccount } from "./account-show"
 import { cliDeviceServiceHandoff } from "./device-service-handoff"
+
+export { ACCOUNT_EXIT }
 
 // `omo account` lets the desktop share this machine's one OS-keychain credential with `omo login`
 // (one sync device per machine). It is a machine interface: one JSON line on stdout, secrets only on
-// stdin and stdout, and the exit code carries the outcome.
-// Exit 9 reports native storage failures/timeouts as {"error":"store-unavailable"} without another read.
-// Exit 10 is exit 4 after an explicit `omo logout` (its marker, #11434): 4 alone may be a store that read empty.
-export const ACCOUNT_EXIT = {
-  ok: 0,
-  failed: 1,
-  invalid: 2,
-  conflict: 3,
-  signedOut: 4,
-  ended: 5,
-  uncertain: 6,
-  keychainLocked: 7,
-  keychainUnavailable: 8,
-  storeUnavailable: 9,
-  loggedOut: 10,
-} as const
+// stdin and stdout, and the exit code carries the outcome (codes in account-show.ts).
 
 export interface AccountCommandDependencies {
   readonly api: string
@@ -167,34 +155,11 @@ async function token(dependencies: AccountCommandDependencies): Promise<number> 
   }
 }
 
-// A trust pin is written only after the device verified its membership, so a pin means this device
-// joined memory sync for that account.
-async function syncStateOf(pinDir: string, account: string): Promise<"joined" | "not_joined" | "corrupt_pin"> {
-  const pin = await loadTrustAnchor(pinDir, account)
-  if (pin.ok) return "joined"
-  return pin.reason === "corrupt_pin" ? "corrupt_pin" : "not_joined"
-}
-
 async function runVerb(dependencies: AccountCommandDependencies, args: readonly string[]): Promise<number> {
   const [verb, ...flags] = args
   switch (verb) {
-    case "show": {
-      const current = await dependencies.store.read()
-      const accountAt = flags.indexOf("--account")
-      const account = accountAt === -1 ? undefined : flags[accountAt + 1]
-      if (accountAt !== -1 && (account === undefined || account === "")) {
-        dependencies.error("omo account show: --account needs an account id")
-        return ACCOUNT_EXIT.invalid
-      }
-      const sync = account === undefined ? {} : { sync: await syncStateOf(dependencies.pinDir(), account) }
-      const marker = current === null ? await sessionOf(dependencies).signedOutMarker() : null
-      return reply(
-        dependencies,
-        current === null
-          ? { signedIn: false, ...(marker === null ? {} : { signedOut: marker }), ...sync }
-          : { signedIn: true, device: deviceOf(current), refreshState: current.refreshState ?? "ok", ...sync },
-      )
-    }
+    case "show":
+      return showAccount(dependencies, flags)
     case "adopt":
       return adopt(dependencies, flags.includes("--replace"))
     case "token":
@@ -264,22 +229,7 @@ export async function runAccountVerb(
   try {
     return await runVerb(dependencies, args)
   } catch (error) {
-    if (error instanceof KeychainLockedError) {
-      dependencies.error(error.message)
-      return reply(dependencies, { keychain: "locked" }, ACCOUNT_EXIT.keychainLocked)
-    }
-    if (error instanceof SecretServiceUnavailableError) {
-      dependencies.error(error.message)
-      return reply(dependencies, { keychain: "unavailable" }, ACCOUNT_EXIT.keychainUnavailable)
-    }
-    if (error instanceof CredentialStoreError) {
-      dependencies.error(error.message)
-      return reply(dependencies, { error: "store-unavailable" }, ACCOUNT_EXIT.storeUnavailable)
-    }
-    dependencies.error(
-      error instanceof SignInError || error instanceof Error ? error.message : "omo account: the operation failed",
-    )
-    return ACCOUNT_EXIT.failed
+    return accountStoreFailure(dependencies, error)
   }
 }
 

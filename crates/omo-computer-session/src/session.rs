@@ -84,6 +84,7 @@ impl Session {
         self.opened = None;
         crate::route_ladder::open_routes(&request, crate::route_ladder::host_os())?;
         self.guard.open(policy, HostAdditions::default())?;
+        self.guard.apply_table(crate::grant::backend_os(self.backend.as_ref()));
         self.opened = Some(Opened {
             report_mode: request.report_mode,
             tag: random_u64(),

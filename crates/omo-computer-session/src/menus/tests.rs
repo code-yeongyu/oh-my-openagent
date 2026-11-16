@@ -51,7 +51,7 @@ fn menus_imported_scenario_lists_the_fixture_tree() {
 #[test]
 fn menu_select_on_a_denied_app_is_refused_before_its_menu_is_read() {
     let mut scenario = fixture("menus.json");
-    scenario["consent"] = json!({ "apps": { "deny": ["Code"] } });
+    scenario["consent"] = json!({ "stopHotkey": null, "apps": { "deny": ["Code"] } });
     let sink = RecordingSink::default();
     let (mut s, _) = session(scenario, json!({}), &sink);
     for path in [json!(["File", "Sav"]), json!(["File", "Save"])] {
@@ -95,7 +95,7 @@ fn menu_relabelled_between_listing_and_select_is_not_activated() {
 #[test]
 fn menu_items_on_a_denied_app_is_refused() {
     let mut scenario = fixture("menus.json");
-    scenario["consent"] = json!({ "apps": { "deny": ["Code"] } });
+    scenario["consent"] = json!({ "stopHotkey": null, "apps": { "deny": ["Code"] } });
     let sink = RecordingSink::default();
     let (mut s, _) = session(scenario, json!({}), &sink);
     let refused = s.menu_items(params(json!({ "target": "101" }))).expect_err("denied");
@@ -119,7 +119,7 @@ fn apps_list_records_carry_identity() {
 #[test]
 fn apps_open_of_a_denied_app_launches_nothing() {
     let mut scenario = fixture("v3-apps.json");
-    scenario["consent"] = json!({ "apps": { "deny": ["com.example.mail"] } });
+    scenario["consent"] = json!({ "stopHotkey": null, "apps": { "deny": ["com.example.mail"] } });
     let sink = RecordingSink::default();
     let (mut s, _) = session(scenario, json!({}), &sink);
     let refused = s.apps_open(params(json!({ "target": "Mail" }))).expect_err("denied");
