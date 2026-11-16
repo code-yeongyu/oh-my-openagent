@@ -21,6 +21,7 @@ import { streamMembers } from "./follow"
 import { resolveMember } from "./resolve"
 import { handleOf } from "./seams"
 import { sessionMembers } from "./sessions"
+import { thisDeviceRow } from "./this-device-row"
 import type {
   AttachHandle,
   BootstrapResult,
@@ -49,6 +50,7 @@ import type {
   ThreadHandle,
   WaitResult,
 } from "./types"
+import { unknownDevice } from "./unknown-device"
 
 export type RemoteClientDeps = {
   readonly version: string
@@ -320,17 +322,11 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
   }
 
   const listDevices = async (svc: DeviceService): Promise<readonly DeviceRow[]> => {
-    const [rows, self] = await Promise.all([svc.devices(), svc.thisDevice()])
-    const control = svc.capabilities.includes("control")
+    const [rows, self, status] = await Promise.all([svc.devices(), svc.thisDevice(), svc.status()])
     const listed = rows.map(deviceRow)
     if (self === null) return [localSelfRow(), ...listed]
     const own = listed.find((row) => row.id === self.id)
-    const selfRow: DeviceRow = {
-      ...(own ?? { ...localSelfRow(), id: self.id, name: self.name, last_seen_ms: timers.now() }),
-      self: true,
-      online: true,
-      caps: { attach: true, machine: false, control },
-    }
+    const selfRow = thisDeviceRow(self, own, status, timers.now(), svc.capabilities.includes("control"))
     return [selfRow, ...listed.filter((row) => row.id !== self.id)]
   }
 
@@ -354,6 +350,8 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
         listDevices(svc),
       ])
       const byId = new Map(devices.map((row) => [row.id, row]))
+      const unknown = unknownDevice(filter?.device, byId, listing)
+      if (unknown !== undefined) return unknown
       const deviceOf = (id: string): DeviceRow => byId.get(id) ?? unlistedDevice(id)
       const wanted = filter?.name?.toLowerCase()
       const rows = listing.rows
