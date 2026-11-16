@@ -96,7 +96,11 @@ fn a_refused_select_closes_every_menu_its_walk_opened() {
 
     assert_eq!(near_miss.code(), EngineCode::StaleRef);
     assert_eq!(handle.performed(), vec![(file, 0)], "only File was pressed");
-    assert_eq!(handle.open_menus(), Vec::<NodeId>::new(), "File is closed again");
+    assert_eq!(
+        handle.open_menus(),
+        Vec::<NodeId>::new(),
+        "File is closed again"
+    );
     assert_eq!(handle.cleared(), vec![bar]);
 }
 
@@ -111,6 +115,10 @@ fn a_press_refused_below_an_opened_menu_closes_it() {
 
     assert_eq!(refused.code(), EngineCode::AxUnsupported);
     assert_eq!(handle.performed(), vec![(file, 0)]);
-    assert_eq!(handle.open_menus(), Vec::<NodeId>::new(), "File is closed again");
+    assert_eq!(
+        handle.open_menus(),
+        Vec::<NodeId>::new(),
+        "File is closed again"
+    );
     assert_eq!(handle.cleared(), vec![bar]);
 }
