@@ -11,7 +11,9 @@ use super::wire::{notification, WireError, INVALID_REQUEST, PARSE_ERROR};
 const TEXT_MEMBERS: &[&str] = &["text", "value"];
 
 /// The notification for one call, `None` for a call v1 never audited.
-pub fn notify(spec: MethodSpec, params: &Value, outcome: &Result<Value, WireError>) -> Option<Value> {
+/// `secure`: the target is under the session's secure predicate, so the text keeps its length
+/// only and a single printable key loses its name (the session audit's own redaction rule).
+pub fn notify(spec: MethodSpec, params: &Value, outcome: &Result<Value, WireError>, secure: bool) -> Option<Value> {
     if spec.effect != Effect::Exec || is_unaudited(spec.method) || never_reached(outcome) {
         return None;
     }
@@ -38,13 +40,27 @@ pub fn notify(spec: MethodSpec, params: &Value, outcome: &Result<Value, WireErro
         "durationMs": 0,
         "focusRestored": Value::Null,
         "textLength": text.map_or(Value::Null, |t| json!(t.chars().count())),
-        "textSha256": text.map_or(Value::Null, |t| json!(sha256_16(t.as_bytes()))),
-        "keys": params.get("keys").cloned().unwrap_or(Value::Null),
+        "textSha256": text.filter(|_| !secure).map_or(Value::Null, |t| json!(sha256_16(t.as_bytes()))),
+        "keys": keys_on_wire(params.get("keys"), secure),
     });
     if let (Some(text), false) = (text, control) {
         audit["textDelivered"] = json!(delivered(text, error));
     }
     Some(notification("audit", audit))
+}
+
+/// A chord's names, except under the secure predicate one printable key (alone or with Shift)
+/// would spell the typed character, so it is left out.
+fn keys_on_wire(keys: Option<&Value>, secure: bool) -> Value {
+    let Some(keys) = keys else { return Value::Null };
+    let printable: Vec<&str> = keys
+        .as_array()
+        .map(|list| list.iter().filter_map(Value::as_str).filter(|key| !key.eq_ignore_ascii_case("shift")).collect())
+        .unwrap_or_default();
+    if secure && matches!(printable.as_slice(), [key] if key.chars().count() == 1) {
+        return Value::Null;
+    }
+    keys.clone()
 }
 
 fn is_unaudited(method: Method) -> bool {
@@ -97,37 +113,51 @@ mod tests {
     #[test]
     fn a_typed_text_is_digested_never_echoed() {
         let params = json!({"target": "101", "text": "hello"});
-        let audit = notify(spec(Method::TypeText), &params, &Ok(Value::Null)).expect("audited");
+        let audit = notify(spec(Method::TypeText), &params, &Ok(Value::Null), false).expect("audited");
         assert_eq!(audit["params"]["textSha256"], json!("2cf24dba5fb0a30e"));
         assert_eq!((audit["params"]["textLength"].clone(), audit["params"]["textDelivered"].clone()), (json!(5), json!(5)));
         assert!(!audit.to_string().contains("hello"), "{audit}");
     }
 
     #[test]
+    fn a_secure_target_keeps_the_length_and_drops_the_digest_and_the_single_key() {
+        let typed = json!({"target": "101", "text": "hunter2"});
+        let plain = notify(spec(Method::TypeText), &typed, &Ok(Value::Null), false).expect("audited");
+        let secure = notify(spec(Method::TypeText), &typed, &Ok(Value::Null), true).expect("audited");
+        assert!(plain["params"]["textSha256"].is_string(), "{plain}");
+        assert_eq!((&secure["params"]["textSha256"], &secure["params"]["textLength"]), (&Value::Null, &json!(7)), "{secure}");
+        let chord = json!({"target": "101", "keys": ["shift", "a"]});
+        let keyed = notify(spec(Method::KeyChord), &chord, &Ok(Value::Null), true).expect("audited");
+        assert_eq!(keyed["params"]["keys"], Value::Null, "{keyed}");
+        let named = notify(spec(Method::KeyChord), &json!({"target": "101", "keys": ["cmd", "q"]}), &Ok(Value::Null), true).expect("audited");
+        assert_eq!(named["params"]["keys"], json!(["cmd", "q"]), "{named}");
+    }
+
+    #[test]
     fn raise_window_audits_its_window_id_as_the_target() {
         let refused = Err(WireError::bare(omo_computer_core::error::EngineCode::StopPathUnavailable));
-        let audit = notify(spec(Method::RaiseWindow), &json!({"windowId": "101"}), &refused).expect("audited");
+        let audit = notify(spec(Method::RaiseWindow), &json!({"windowId": "101"}), &refused, false).expect("audited");
         assert_eq!(audit["params"]["target"], "101", "{audit}");
     }
 
     #[test]
     fn a_call_that_never_reached_a_session_is_not_audited() {
         let bad = Err(WireError::invalid_params(&serde_json::from_str::<u8>("x").expect_err("bad")));
-        assert!(notify(spec(Method::Click), &json!({}), &bad).is_none());
+        assert!(notify(spec(Method::Click), &json!({}), &bad, false).is_none());
         let closed = Err(WireError::bare(omo_computer_core::error::EngineCode::Closed));
-        assert!(notify(spec(Method::Click), &json!({}), &closed).is_none());
+        assert!(notify(spec(Method::Click), &json!({}), &closed, false).is_none());
     }
 
     #[test]
     fn reads_and_the_stop_verbs_are_not_audited() {
-        assert!(notify(spec(Method::Capture), &json!({}), &Ok(Value::Null)).is_none());
-        assert!(notify(spec(Method::StopPathStart), &json!({}), &Ok(Value::Null)).is_none());
+        assert!(notify(spec(Method::Capture), &json!({}), &Ok(Value::Null), false).is_none());
+        assert!(notify(spec(Method::StopPathStart), &json!({}), &Ok(Value::Null), false).is_none());
     }
 
     #[test]
     fn a_refused_call_carries_its_code() {
         let refused = WireError::bare(omo_computer_core::error::EngineCode::Suspended);
-        let audit = notify(spec(Method::Click), &json!({"target": "desktop"}), &Err(refused)).expect("audited");
+        let audit = notify(spec(Method::Click), &json!({"target": "desktop"}), &Err(refused), false).expect("audited");
         assert_eq!(audit["params"]["code"], json!("Suspended"));
         assert_eq!(audit["params"]["delivery"], json!("background"));
     }

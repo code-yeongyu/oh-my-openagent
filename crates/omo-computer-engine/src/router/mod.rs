@@ -65,7 +65,8 @@ impl Router {
         let outcome = self
             .admit_latched(spec.method, spec.effect)
             .and_then(|()| dispatch::dispatch(self, spec.method, params.clone()));
-        if let Some(audit) = audit::notify(spec, &params, &outcome) {
+        let secure = self.session.is_secure_target(params.get("target").and_then(Value::as_str));
+        if let Some(audit) = audit::notify(spec, &params, &outcome, secure) {
             self.notifications.push(audit);
         }
         if matches!(spec.method, Method::StopPathStart | Method::StopPathStop) {

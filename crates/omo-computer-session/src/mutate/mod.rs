@@ -278,6 +278,12 @@ impl Session {
         self
     }
 
+    /// Whether text sent to `target` falls under the secure predicate the audit redacts by.
+    #[must_use]
+    pub fn is_secure_target(&self, target: Option<&str>) -> bool {
+        self.funnel.secure.secure(self.backend.as_ref(), target)
+    }
+
     pub(crate) fn funnel_issuer(&self) -> String {
         self.funnel.binding.issuer.clone()
     }
