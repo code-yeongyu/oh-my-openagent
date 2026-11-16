@@ -19,19 +19,25 @@ omo remote enable | disable [--json]   # set this device up and turn remote sess
 omo remote control [on|off]      # whether your other devices may view and command this device's sessions
 omo remote wake [on|off|default] # whether a message from your other devices may start a session here that is not running
 omo remote bootstrap [--json]    # set up the device service for your sign-in (every omo start runs it)
-omo remote attach <device>/<session>   # open a session on another device in the terminal UI, to watch and type
+omo remote attach <session>      # open a session in the terminal UI, to watch and type
 omo remote open <device> [--project P] [--model M] [--permission-preset MODE] [--json]
                                  # start a session on another device; prints <device>/<session>
-omo remote send <device>/<session> <text> [--steer|--follow-up] [--no-wait] [--json]
+omo remote send <session> <text> [--steer|--follow-up] [--no-wait] [--json]
                                  # send a message and print the answer as it arrives
-omo remote model <device>/<session> <provider/id> [--json]   # switch the session's model
-omo remote interrupt <device>/<session> [--json]   # stop the session's running turn
-omo remote close <device>/<session> [--json]       # end the session on its device
+omo remote model <session> <provider/id> [--json]   # switch the session's model
+omo remote interrupt <session> [--json]   # stop the session's running turn
+omo remote close <session> [--json]       # end the session on its device
 ```
 
 `open` runs the new session in `MODE` (default: this device's own setting, else full-access). `send`
 with `--steer` goes into the running turn, and `--no-wait` returns once the session took the message
 instead of printing the answer.
+
+The canonical session identity is the durable `thread.thread_id` returned by `open --json`. Pass it directly to
+`send`, `model`, `interrupt`, `close` or `attach`; the CLI discovers its device from the account listing. All five
+also accept `<device>/<session>`, using either the durable ID or the listing key in the `SESSION` column.
+An explicit device avoids the account-wide listing. Opening with `--model` uses the new session's already
+resolved listing key, so setting the model does not wait for that listing to catch up.
 
 Exit codes: `0` done, `1` the operation failed, `2` usage error, `3` unavailable (signed out, the
 device service is not set up or not running, or it lacks the feature). `omo remote bootstrap` exits `3`
