@@ -105,6 +105,28 @@ describe("engine RPC local-versus-relay parity table (#13478)", () => {
     expect(namesRecordType('check(frame.type).toBe("prompt")', "prompt")).toBe(false)
   })
 
+  test("'satisfies', a non-null type member and an asserted type member count as a pair test (#13935 review L1)", () => {
+    expect(namesRecordType('send({ type: "prompt" satisfies string })', "prompt")).toBe(true)
+    expect(namesRecordType('if (frame.type! === "prompt") relay()', "prompt")).toBe(true)
+    expect(namesRecordType('if ((frame.type as string) === "prompt") relay()', "prompt")).toBe(true)
+  })
+
+  test("toStrictEqual, a mapped type list, a plain template literal, assert.equal and !== count as a pair test (#13935 review L2)", () => {
+    expect(namesRecordType('expect(frame.type).toStrictEqual("prompt")', "prompt")).toBe(true)
+    expect(namesRecordType('expect(sent.map((e) => e.type)).toEqual(["prompt"])', "prompt")).toBe(true)
+    expect(namesRecordType("send({ type: `prompt` })", "prompt")).toBe(true)
+    expect(namesRecordType('assert.equal(frame.type, "prompt")', "prompt")).toBe(true)
+    expect(namesRecordType('if (frame.type !== "prompt") skip()', "prompt")).toBe(true)
+  })
+
+  test("near misses of the review L2 forms do not count as a pair test (#13935 review L2)", () => {
+    expect(namesRecordType("send({ type: `${kind}` })", "prompt")).toBe(false)
+    expect(namesRecordType('expect(sent.map((e) => e.kind)).toEqual(["prompt"])', "prompt")).toBe(false)
+    expect(namesRecordType('expect(sent.map((e) => e.type)).toEqual(["other"])', "prompt")).toBe(false)
+    expect(namesRecordType('check.equal(frame.type, "prompt")', "prompt")).toBe(false)
+    expect(namesRecordType('assert.equal(frame.kind, "prompt")', "prompt")).toBe(false)
+  })
+
   test("a rows file with a misspelled key is refused", () => {
     expect(() => curatedRows(rowsFile({ prompt: { relaay: "differs" } }))).toThrow('unknown key "relaay"')
   })

@@ -72,9 +72,19 @@ const WRAPPERS: ReadonlySet<string> = new Set([
 /** `node` with type assertions and parentheses removed (`("m" as const)` is the literal `"m"`). */
 const unwrap = (node: unknown): unknown => (isNode(node) && WRAPPERS.has(node.type) ? unwrap(node["expression"]) : node)
 
+/** The string `value` as a literal: a quoted string or a template literal with no substitutions (`` `m` ``). */
 const isLiteral = (node: unknown, value: string): boolean => {
   const bare = unwrap(node)
-  return isNode(bare) && bare.type === "Literal" && bare["value"] === value
+  if (!isNode(bare)) return false
+  if (bare.type === "Literal") return bare["value"] === value
+  const [quasi] = Array.isArray(bare["quasis"]) ? bare["quasis"] : []
+  const cooked = isNode(quasi) ? Reflect.get(Object(quasi["value"]), "cooked") : undefined
+  return (
+    bare.type === "TemplateLiteral" &&
+    Array.isArray(bare["expressions"]) &&
+    bare["expressions"].length === 0 &&
+    cooked === value
+  )
 }
 
 /** `x.type`, `x["type"]` or their optional-chain forms (not `x.$type`, not `x.typeName`). */
@@ -88,6 +98,47 @@ const isTypeMember = (value: unknown): boolean => {
       ? isLiteral(node["property"], "type")
       : isNode(node["property"]) && node["property"]["name"] === "type")
   )
+}
+
+/** `list.map((e) => e.type)`: a list of type members (also with a block body that only returns one). */
+const isTypeProjection = (value: unknown): boolean => {
+  const node = unwrap(value)
+  if (!isNode(node) || node.type !== "CallExpression" || !isNode(node["callee"])) return false
+  const callee = node["callee"]
+  const [fn] = Array.isArray(node["arguments"]) ? node["arguments"] : []
+  if (callee.type !== "MemberExpression" || !isNode(callee["property"]) || callee["property"]["name"] !== "map")
+    return false
+  if (!isNode(fn) || (fn.type !== "ArrowFunctionExpression" && fn.type !== "FunctionExpression")) return false
+  const body = fn["body"]
+  if (isTypeMember(body)) return true
+  const statements = isNode(body) && Array.isArray(body["body"]) ? body["body"] : []
+  const [only] = statements
+  return statements.length === 1 && isNode(only) && only.type === "ReturnStatement" && isTypeMember(only["argument"])
+}
+
+const EXPECT_MATCHERS: ReadonlySet<string> = new Set(["toBe", "toEqual", "toStrictEqual"])
+const ASSERT_METHODS: ReadonlySet<string> = new Set(["equal", "strictEqual"])
+
+/** `expect(<type member>).toBe("m")` (or toEqual/toStrictEqual), `expect(<list>.map((e) => e.type)).toEqual(["m"])`, or
+ * `assert.equal(<type member>, "m")` (or strictEqual, either argument order). */
+function assertsRecordType(node: AstNode, method: string): boolean {
+  const callee = node["callee"]
+  const args = Array.isArray(node["arguments"]) ? node["arguments"] : []
+  if (!isNode(callee) || callee.type !== "MemberExpression" || !isNode(callee["property"])) return false
+  const name = String(callee["property"]["name"])
+  const subject = callee["object"]
+  if (isNode(subject) && subject.type === "Identifier" && subject["name"] === "assert" && ASSERT_METHODS.has(name)) {
+    const [a, b] = args
+    return (isTypeMember(a) && isLiteral(b, method)) || (isTypeMember(b) && isLiteral(a, method))
+  }
+  if (!EXPECT_MATCHERS.has(name) || !isNode(subject) || subject.type !== "CallExpression") return false
+  const expectCallee = subject["callee"]
+  if (!isNode(expectCallee) || expectCallee["name"] !== "expect" || !Array.isArray(subject["arguments"])) return false
+  const [actual] = subject["arguments"]
+  const [expected] = args
+  if (isTypeMember(actual)) return isLiteral(expected, method)
+  const items = isNode(expected) && expected.type === "ArrayExpression" ? expected["elements"] : undefined
+  return isTypeProjection(actual) && Array.isArray(items) && items.some((item) => isLiteral(item, method))
 }
 
 /** Whether one AST node uses `method` as a record type (see namesRecordType). */
@@ -104,27 +155,11 @@ function usesRecordType(node: AstNode, method: string): boolean {
     const cases = node["cases"]
     return Array.isArray(cases) && cases.some((c) => isNode(c) && isLiteral(c["test"], method))
   }
-  if (node.type === "BinaryExpression" && ["===", "=="].includes(String(node["operator"]))) {
+  if (node.type === "BinaryExpression" && ["===", "==", "!==", "!="].includes(String(node["operator"]))) {
     const [left, right] = [node["left"], node["right"]]
     return (isTypeMember(left) && isLiteral(right, method)) || (isTypeMember(right) && isLiteral(left, method))
   }
-  if (node.type === "CallExpression" && isNode(node["callee"]) && node["callee"].type === "MemberExpression") {
-    const callee = node["callee"]
-    const matcher = isNode(callee["property"]) ? callee["property"]["name"] : undefined
-    const subject = callee["object"]
-    const args = node["arguments"]
-    return (
-      (matcher === "toBe" || matcher === "toEqual") &&
-      Array.isArray(args) &&
-      isLiteral(args[0], method) &&
-      isNode(subject) &&
-      subject.type === "CallExpression" &&
-      isNode(subject["callee"]) &&
-      subject["callee"]["name"] === "expect" &&
-      Array.isArray(subject["arguments"]) &&
-      isTypeMember(subject["arguments"][0])
-    )
-  }
+  if (node.type === "CallExpression") return assertsRecordType(node, method)
   return false
 }
 
@@ -138,11 +173,17 @@ function someNode(value: unknown, test: (node: AstNode) => boolean): boolean {
 }
 
 /**
- * Whether `source` (parsed as TypeScript) uses `method` as a record type in code: the quoted name as the value of a `type`
- * property in an object (`{ type: "m" }`), compared with a `type` member (`x.type === "m"`, `x["type"] === "m"`), a case of a
- * `switch` on one, or asserted on one (`expect(x.type).toBe("m")`); `as const`, `satisfies` and parentheses around the literal
- * are allowed. A computed key (`{ [type]: "m" }`) and an assertion whose subject is not `expect(...)` do not count. Comments, strings (a test title), regex literals, type declarations,
- * other properties such as `$type`, and a source that does not parse do not count.
+ * Whether `source` (parsed as TypeScript) uses `method` as a record type in code. These count:
+ * - the quoted name as the value of a `type` property in an object (`{ type: "m" }`, also `{ ["type"]: "m" }`);
+ * - a `type` member (`x.type`, `x["type"]`, optional chains) compared with it (`===`, `==`, `!==`, `!=`), or
+ *   switched on with a `case "m":`;
+ * - an assertion on a `type` member: `expect(x.type).toBe("m")` (or `toEqual`, `toStrictEqual`),
+ *   `expect(list.map((e) => e.type)).toEqual(["m"])`, or `assert.equal(x.type, "m")` (or `strictEqual`).
+ * The literal may be a quoted string or a template literal with no substitutions. A literal, a `type` member and a
+ * switch discriminant may each sit in parentheses or under `as`, `satisfies`, a non-null `!` or a `<T>` assertion.
+ * These do not count: a computed key (`{ [type]: "m" }`), an assertion whose subject is not a bare `expect(...)` or
+ * whose object is not `assert`, comments, strings (a test title), regex literals, type declarations, other properties
+ * such as `$type`, and a source that does not parse.
  */
 export function namesRecordType(source: string, method: string): boolean {
   const parsed = parseSync("pair-test.ts", source)
