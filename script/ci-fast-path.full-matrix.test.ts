@@ -271,6 +271,12 @@ describe("full-matrix classification", () => {
       expect(mode.fullMatrix).toBe(false)
     })
 
+    test("#then a diff that cannot be fully listed honors the label (fails toward the full matrix)", () => {
+      const mode = classify({ ...labelled, changedPaths: ["packages/utils/src/index.ts"], diffAvailable: false })
+      expect(mode.fullMatrix).toBe(true)
+      expect(mode.labelRefused).toBe(false)
+    })
+
     test("#then it runs the full matrix when the diff touches a platform path", () => {
       const mode = classify({
         ...labelled,

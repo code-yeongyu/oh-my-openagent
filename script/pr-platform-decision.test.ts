@@ -22,7 +22,12 @@ function decideScript(): string {
   return step.run
 }
 
-function decide(name: string, listed: readonly string[], changedFiles: number) {
+function decide(
+  name: string,
+  listed: readonly string[],
+  changedFiles: number,
+  labels: readonly string[] = ["ci:full-matrix"],
+) {
   const dir = join(root, name)
   const bin = join(dir, "bin")
   mkdirSync(bin, { recursive: true })
@@ -30,7 +35,12 @@ function decide(name: string, listed: readonly string[], changedFiles: number) {
   writeFileSync(
     join(dir, "event.json"),
     JSON.stringify({
-      pull_request: { number: 7, changed_files: changedFiles, body: "", labels: [{ name: "ci:full-matrix" }] },
+      pull_request: {
+        number: 7,
+        changed_files: changedFiles,
+        body: "",
+        labels: labels.map((label) => ({ name: label })),
+      },
     }),
   )
   writeFileSync(join(bin, "gh"), '#!/bin/bash\ncat "$FAKE_DIR/files"\n')
@@ -63,9 +73,16 @@ test("#given a complete file list with a platform path #then the label is honore
   expect(result.stdout).not.toContain("truncated")
 })
 
-test("#given more changed files than the API listed #then the refusal says the list is truncated", () => {
+// A capped list may hide a platform path, so a labelled pull request fails toward the full matrix (the lead's ruling).
+test("#given the label and more changed files than the API listed #then the label is honored and the cap is named", () => {
   const result = decide("truncated", ["packages/utils/src/a.ts"], 3500)
   expect(result.status).toBe(0)
-  expect(result.output).toContain("full_matrix=false")
+  expect(result.output).toContain("full_matrix=true")
   expect(result.stdout).toContain("::warning title=ci:full-matrix file list truncated::")
+})
+
+test("#given no label and a truncated list #then the pull request stays on Linux", () => {
+  const result = decide("truncated-unlabelled", ["packages/utils/src/a.ts"], 3500, [])
+  expect(result.status).toBe(0)
+  expect(result.output).toContain("full_matrix=false")
 })

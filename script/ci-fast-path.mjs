@@ -148,7 +148,9 @@ export function classifyCiMode({
   const webOnly = diffAvailable && changedPaths.length > 0 && changedPaths.every(isWebPath)
   const runtimeTouching = !diffAvailable || changedPaths.some(isRuntimePath)
   const labelled = classificationEvent === "pull_request" && labels.includes(fullMatrixLabel)
-  const labelHonored = labelled && (changedPaths.some(isPlatformSensitivePath) || platformReasonLine.test(body))
+  // A diff that cannot be fully listed may hide a platform path, so the label is honored (fails toward the full matrix).
+  const labelHonored =
+    labelled && (!diffAvailable || changedPaths.some(isPlatformSensitivePath) || platformReasonLine.test(body))
   const fullMatrix =
     eventName === "merge_group" || classificationEvent === "push" || releaseStateHeadRef.test(headRef) || labelHonored
 
