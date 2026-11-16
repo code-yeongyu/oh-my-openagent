@@ -30,10 +30,13 @@ omo remote interrupt <session> [--json]   # stop the session's running turn
 omo remote close <session> [--json]       # end the session on its device
 ```
 
-`devices` lists this device first. With `--json`, each row has `id`, `name`, `platform`, `online`,
-`last_seen_ms` and `self`, and `kind` when the account roster reports one. Exactly one row, this device's, has
-`self: true`; it reads online only while this device's own device service is connected. `sessions --device D`
-for a device that is neither this device nor on the account fails with exit 2 and names it.
+`devices` lists this device first. With `--json`, every row has `id`, `name`, `platform`, `online`,
+`last_seen_ms` and `caps` (`attach`, `machine`, `control`), and `kind` when one is reported (this device's row has
+none when the account roster does not list it). Only this device's row has `self: true`; the other rows have no
+`self` key. When the device service reports this device, its row reads online only while that service is
+connected; with no device service, or one that does not report this device, the row is a local one (`id: "local"`,
+`kind: "local"`) that reads online. While the device service answers, `sessions --device D` for a device that is
+neither this device nor on the account fails with exit 2 and names it.
 
 `open` runs the new session in `MODE` (default: this device's own setting, else full-access), on the
 model and thinking level given (default: that device's own); a model that device cannot run opens
