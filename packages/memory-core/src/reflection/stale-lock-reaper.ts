@@ -896,8 +896,10 @@ export async function reclaimDeadOwnerLocks(locksDir: string): Promise<DeadOwner
       failures.set(basename(lockPath), error instanceof Error ? error.message : String(error))
     },
   })
+  // A lock another process removed while the sweep reached it is neither reclaimed nor kept: it is gone.
+  const remaining = new Set(await readdir(locksDir).catch(() => [] as string[]))
   const kept = names
-    .filter((name) => !reclaimed.includes(name))
+    .filter((name) => !reclaimed.includes(name) && remaining.has(name))
     .map((name) => ({ name, reason: failures.get(name) ?? "owner is alive or not provably dead" }))
   return { reclaimed, kept }
 }
