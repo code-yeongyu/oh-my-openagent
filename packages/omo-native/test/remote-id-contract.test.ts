@@ -66,13 +66,16 @@ async function owner(duplicate = false) {
 }
 
 describe("#13010 remote CLI session identity", () => {
+  // #13409: the model rides on the one open_session (the engine's launch profile), so no later model step can miss the
+  // session whose durable id differs from its attach key.
   test("open --model succeeds when its durable ID differs from its attach key", async () => {
     const fake = await owner()
     const result = await run(["open", PEER, "--model", "test/model", "--json"], fake.stateDir)
     expect({ code: result.code, json: JSON.parse(result.out.join("")) }).toMatchObject({
       code: REMOTE_EXIT.ok,
-      json: { kind: "ok", thread: { thread_id: DURABLE }, model: MODEL },
+      json: { kind: "ok", thread: { thread_id: DURABLE, sessionId: SESSION_ID } },
     })
+    expect(JSON.stringify(fake.state.commands)).not.toContain("set_model")
   })
 
   test.each([

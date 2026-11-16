@@ -91,25 +91,43 @@ impl DisplayAwakeHold {
 
 /// The ONE owner of the session's hold (R45): the `Session` field and the lease hook hold
 /// clones of this handle, so the exec path that acquires and the hook that releases never
-/// keep two copies that drift.
+/// keep two copies that drift. It also keeps the limits the last exec held it under, so the
+/// lease hook ticks the hold before it reads it (review L4 of #13355).
 #[derive(Debug, Clone)]
-pub struct SharedHold(Arc<Mutex<DisplayAwakeHold>>);
+pub struct SharedHold(Arc<Mutex<(DisplayAwakeHold, Option<HoldLimits>)>>);
 
 impl Default for SharedHold {
     fn default() -> Self {
-        Self(Arc::new(Mutex::new(DisplayAwakeHold::Idle)))
+        Self(Arc::new(Mutex::new((DisplayAwakeHold::Idle, None))))
     }
 }
 
 impl SharedHold {
     #[must_use]
     pub fn get(&self) -> DisplayAwakeHold {
-        *self.0.lock().unwrap_or_else(PoisonError::into_inner)
+        self.0.lock().unwrap_or_else(PoisonError::into_inner).0
     }
 
     pub fn update(&self, step: impl FnOnce(DisplayAwakeHold) -> DisplayAwakeHold) {
-        let mut hold = self.0.lock().unwrap_or_else(PoisonError::into_inner);
-        *hold = step(*hold);
+        let mut state = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        state.0 = step(state.0);
+    }
+
+    /// An exec at `now_ms` under `limits`: the hold is ticked, then acquired or extended.
+    pub fn exec(&self, now_ms: u64, limits: HoldLimits) {
+        let mut state = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        *state = (
+            state.0.tick(now_ms, limits).on_exec(now_ms, limits),
+            Some(limits),
+        );
+    }
+
+    /// The hold as the clock reads it at `now_ms` (a hold past its grace or cap is ticked first).
+    pub fn tick(&self, now_ms: u64) {
+        let mut state = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        if let Some(limits) = state.1 {
+            state.0 = state.0.tick(now_ms, limits);
+        }
     }
 }
 
