@@ -4,6 +4,7 @@ mod clearing;
 mod gc;
 mod lock;
 mod redaction;
+mod rotation;
 mod scan_fixture;
 mod segment;
 mod tamper_files;
