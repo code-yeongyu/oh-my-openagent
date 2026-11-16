@@ -309,3 +309,22 @@ fn engine_process_plain_type_keeps_the_digest_the_grep_looks_for() {
     );
     assert!(left.sink().contains(&secret), "no delivery");
 }
+
+/// Review M1 (fix round) of #13373: the secure field's window exits right after the type. The
+/// session decided "secure" before the send; the wire audit must use that decision, not a
+/// fresh read after the call, so neither the digest nor the secret reaches stdout.
+#[test]
+fn a_secure_window_that_exits_after_the_type_leaves_no_digest_on_the_wire() {
+    let case = case();
+    let secret = secret(&case);
+    let needle = sha256_16(&secret);
+    let dir = tempfile::tempdir().expect("scenario dir");
+    let base = repo().join(case["scenario"].as_str().expect("scenario"));
+    let mut scenario: Value = serde_json::from_str(&fs::read_to_string(&base).expect("scenario file")).expect("JSON");
+    scenario["target_exit"] = json!([{"after_call": "type_text", "nth": 1, "window": "101"}]);
+    let path = dir.path().join("secure-exits.json");
+    fs::write(&path, scenario.to_string()).expect("scenario written");
+    let left = run_engine(&case, &path);
+    assert_eq!(left.typed_line()["text"], json!({ "length": secret.chars().count() }), "the disk audit is length-only");
+    assert_eq!([left.on_wire(&needle), left.on_wire(&secret)], [0, 0], "wire {:?}", left.wire);
+}
