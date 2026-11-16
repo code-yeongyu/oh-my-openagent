@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
+import { createConnection } from "node:net"
 import { dirname } from "node:path"
 import { PEER, SESSION_ID } from "../../../../device-service-core/test/local-api/conformance/world.ts"
 import { pushDetached, pushFrame, pushRecords, pushSnapshot, reader, THREAD, worldWith } from "./attach.test-support"
-import { serveRemoteAttach } from "../../../../omo-native/remote-attach"
+import { pipeAddress, serveRemoteAttach } from "../../../../omo-native/remote-attach"
 import type { RemoteClientDeps } from "./client"
 import { nextActionFor } from "./codes"
 import { DEADLINES } from "./deadlines"
@@ -57,6 +58,21 @@ const attached = async (
 
 // The endpoint server a caller outside `omo remote`'s local-only graph injects (#13440): omo-native's own.
 const SERVING: Partial<RemoteClientDeps> = { serveAttach: (attach, label) => serveRemoteAttach(attach, { label }) }
+
+// Where a client reaches a served endpoint: the socket at `socketPath`, or on Windows the named pipe derived from that
+// path and the secret beside it (no file is ever made at `socketPath` there), as the attach TUI connects.
+const transportAddress = (socketPath: string): string =>
+  process.platform === "win32" ? pipeAddress(socketPath, readFileSync(`${socketPath}.secret`)) : socketPath
+
+const accepts = (address: string): Promise<boolean> =>
+  new Promise((resolve) => {
+    const socket = createConnection(address)
+    socket.once("connect", () => {
+      socket.destroy()
+      resolve(true)
+    })
+    socket.once("error", () => resolve(false))
+  })
 
 const ids = (handle: AttachHandle): string[] => handle.pending().map((request) => request.request_id)
 
@@ -301,10 +317,12 @@ describe("attach rows: end", () => {
     const { handle } = await attached(STATE, [], SERVING)
     const served = await handle.serveEndpoint()
     if (served.kind !== "ok") throw new Error(`expected an endpoint, got ${JSON.stringify(served)}`)
-    expect(existsSync(served.value.socketPath)).toBe(true)
+    const address = transportAddress(served.value.socketPath)
+    expect(await accepts(address)).toBe(true)
     expect(served.value.sessionRef).toBe(SESSION_ID)
     await handle.detach()
-    expect(existsSync(served.value.socketPath)).toBe(false)
+    expect(await accepts(address)).toBe(false)
+    expect(existsSync(dirname(served.value.socketPath))).toBe(false)
   })
 
   test("#given a client built without serveAttach #when serveEndpoint runs #then it answers unsupported{serve_endpoint} as data", async () => {
