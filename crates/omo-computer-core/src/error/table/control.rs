@@ -13,6 +13,7 @@ pub(super) static ROWS: &[ErrorRow] = &[
     e!(ControlRequired, AppScope => ControlRequired, NDAU, Yes, ASK, "win.setFrame(frame)"),
     e!(ControlRequired, DeniedThisTurn => ControlRequired, NDAU, Yes, ASK, none),
     e!(ControlRequired, ConsentOff => ControlRequired, NDAU, Yes, ASK, "computer.hands()"),
+    e!(ControlRequired, TierMissing => ControlRequired, NDAU, Yes, ASK, "computer.hands()"),
     e!(ControlRequired, UserStopped => ControlRequired, NDAU, Yes, ASK, "another app or stop"),
     e!(ControlRequired, SpawnInsideSession => ControlRequired, NDAU, Yes, ASK, none),
     e!(ControlRequired, AttachInsideSession => ControlRequired, NDAU, Yes, ASK, none),

@@ -6,7 +6,7 @@
 
 closed_names! {
     /// Every `data.reason` any stage, gate, backend default or layer emits.
-    Reason [144] {
+    Reason [151] {
         NotInteractive = "not_interactive",
         PromptPending = "prompt_pending",
         Revoked = "revoked",
@@ -81,6 +81,11 @@ closed_names! {
         LaunchNeedsUser = "launch_needs_user",
         AuditUnavailable = "audit_unavailable",
         RequestTooLarge = "request_too_large",
+        HoldDuration = "hold_duration",
+        ScrollSteps = "scroll_steps",
+        TextAbsent = "text_absent",
+        SpanOutOfRange = "span_out_of_range",
+        SpanInverted = "span_inverted",
         Deaf = "deaf",
         HostRelayNotAllowed = "host_relay_not_allowed",
         HeartbeatStale = "heartbeat_stale",
@@ -107,6 +112,7 @@ closed_names! {
         AppScope = "app_scope",
         DeniedThisTurn = "denied_this_turn",
         ConsentOff = "consent_off",
+        TierMissing = "tier_missing",
         UserStopped = "user_stopped",
         SpawnInsideSession = "spawn_inside_session",
         AttachInsideSession = "attach_inside_session",
@@ -151,6 +157,8 @@ closed_names! {
         ConcealedClipboard = "concealed_clipboard",
         SecretNoClipboardRoute = "secret_no_clipboard_route",
         Unmeasured = "unmeasured",
+        // Row 27: the toolkit route table failed its load test (R28: the existing Unavailable code).
+        RouteTableInvalid = "route_table_invalid",
     }
 }
 
