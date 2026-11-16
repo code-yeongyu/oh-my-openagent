@@ -228,6 +228,9 @@ function succeeded(ui: RemoteCommandUi, verb: string, target: string, answer: Om
 function show(ui: RemoteCommandUi, verb: string, target: string, answer: OmoRun): void {
   if (!succeeded(ui, verb, target, answer)) return
   ui.notify(rendered(verb, target, parsed(answer)).join("\n"), "info")
+  // A verb that succeeds can still say something on stderr (enable: device not linked, a session-host notice).
+  const stderr = answer.stderr.trim()
+  if (stderr !== "") ui.notify(stderr, "warning")
 }
 
 function rendered(verb: string, target: string, value: unknown): readonly string[] {

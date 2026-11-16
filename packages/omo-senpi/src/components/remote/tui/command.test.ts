@@ -259,6 +259,22 @@ describe("/remote", () => {
     expect(ui.notes.map((note) => note.type)).toEqual(["error"])
   })
 
+  it("#given a verb that succeeds with something on stderr #when the answer renders #then the result is shown and the stderr follows as a warning", async () => {
+    // given
+    const unlinked = "This device is not linked to your account. Run omo login to link it."
+    const run = fakeRunner({
+      enable: { code: 0, stdout: `${JSON.stringify({ enabled: true })}\n`, stderr: `${unlinked}\n` },
+    })
+    const ui = fakeUi()
+
+    // when
+    await invoke(run, "enable", ui)
+
+    // then
+    expect(ui.notes.map((note) => note.type)).toEqual(["info", "warning"])
+    expect(ui.notes[1]?.message).toBe(unlinked)
+  })
+
   it("#given enable stops with a notice and a non-zero exit #when the answer renders #then the CLI's notice is the error, not the exit code", async () => {
     // given
     const stopped = { state: "service_degraded", notice: "Could not download the OmO device service." }
