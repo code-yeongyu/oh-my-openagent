@@ -12,6 +12,8 @@
         "bin/senpi-patch.mjs",
         // the omo-ai/remote SDK entry: script/build-remote-sdk.ts bundles it by path into bin/lib/remote-sdk.generated.js
         "remote-sdk.ts",
+        // omo#13413's two-device acceptance script, run by path against a live pair
+        "test/remote-sdk-two-device.ts",
         // the engine entry the npm launcher spawns by path for a launch that claims memory sync at boot (launcher.js)
         "bin/lib/engine-boot.js",
         // the manual GUI-session QA runner for the keychain helper: a person runs it by path in a dedicated QA login session
