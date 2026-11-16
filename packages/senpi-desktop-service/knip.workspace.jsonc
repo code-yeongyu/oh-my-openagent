@@ -16,6 +16,8 @@
         "test/fake-engine.mjs",
         "test/global-input-harness.ts",
         "test/harness.ts",
+        // the package's ./testing export, imported by other packages' tests
+        "test/testing.ts",
         "vitest.config.ts",
       ],
     }

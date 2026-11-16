@@ -28,6 +28,7 @@
 | Configuration field reference | [docs/reference/configuration.md](reference/configuration.md) |
 | Harness-neutral `omo.json` config reference | [docs/reference/omo-json.md](reference/omo-json.md) |
 | Native `computer` tool contract | [docs/reference/computer.md](reference/computer.md) |
+| Computer-use eval (7 tasks, 3 arms) and latency bench baselines | [docs/reference/computer-use-eval.md](reference/computer-use-eval.md) |
 | Feature-by-feature reference | [docs/reference/features.md](reference/features.md) |
 | CLI command reference | [docs/reference/cli.md](reference/cli.md) |
 | Engine hosts per session, `omo daemon`, migration and rollback | [docs/reference/omo-daemon.md](reference/omo-daemon.md) |
@@ -75,7 +76,7 @@ docs/
 
 ## CONVENTIONS
 
-- **CI matrix label:** adding `run-full-ci` or `ci:full-matrix` launches a separate run with optional `full-matrix / ...` checks that do not gate merge. Keep the label and push a commit or reopen the PR to run the full matrix in the required checks.
+- **CI matrix label:** pull requests run Linux only; adding `ci:full-matrix` (the one opt-in label; honored only for a platform-path diff or a PR body line `Platform-reason: <why>`) launches a separate run with optional `full-matrix / ...` checks that do not gate merge. Keep the label and push a commit or reopen the PR to run the full matrix in the required checks.
 - **User-facing language only in `guide/` and `reference/`.** No `OmO` internal jargon without explanation.
 - **Path links** use the `file://` scheme so OpenCode renders them in TUI. Use absolute paths.
 - **No HTML.** Markdown only. No `<details>` / `<summary>` (causes rendering issues in some terminals).

@@ -1,0 +1,64 @@
+{
+  "v": 4,
+  "os": "windows",
+  "protectedSurfaces": [
+    "consent.exe",
+    "logonui.exe",
+    "winlogon.exe",
+    "lsass.exe",
+    "LockApp.exe",
+    "secure-desktop",
+    "SecurityHealth*",
+    "SystemSettings.exe:privacy"
+  ],
+  "readOnlySurfaces": [],
+  "systemSurfaces": [
+    "Shell_TrayWnd",
+    "Shell_SecondaryTrayWnd",
+    "Progman",
+    "WorkerW",
+    "StartMenuExperienceHost.exe",
+    "ShellExperienceHost.exe"
+  ],
+  "processes": [
+    "explorer.exe",
+    "csrss.exe",
+    "lsaiso.exe",
+    "winlogon.exe",
+    "dwm.exe",
+    "StartMenuExperienceHost.exe",
+    "ShellExperienceHost.exe",
+    "omo-computer-*"
+  ],
+  "deniedApps": [
+    "1Password.exe",
+    "Bitwarden.exe",
+    "KeePassXC.exe",
+    "KeePass.exe",
+    "Dashlane.exe",
+    "LastPass.exe",
+    "NordPass.exe",
+    "Proton Pass.exe",
+    "control.exe:Microsoft.CredentialManager",
+    "rundll32.exe:keymgr.dll",
+    "Agilebits.1Password_*",
+    "8bitSolutionsLLC.bitwardendesktop_*"
+  ],
+  "dangerousChords": [
+    "alt+f4",
+    "win+l",
+    "win+d",
+    "alt+tab",
+    "win+r",
+    "win+x",
+    "win+e",
+    "ctrl+shift+esc"
+  ],
+  "chordsMatchSupersets": true,
+  "secureLabelRegex": "\\b(passw(or)?d|passcode|pin|otp|cvv|cvc|csc|ssn|card number)\\b",
+  "secureInputSources": [
+    "UIA:IsPassword",
+    "UIA:PasswordText",
+    "label:secureLabelRegex"
+  ]
+}

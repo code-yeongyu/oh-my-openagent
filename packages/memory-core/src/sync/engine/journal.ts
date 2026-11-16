@@ -101,6 +101,11 @@ export interface EngineState {
   readonly updatedWhileOffline: number
   /** The device peer this journal was created under. */
   readonly peer: string | null
+  /**
+   * The memory space (hex id) this journal's cursor, outbox and item docs belong to; null in a journal
+   * an older build wrote. The account feed carries every space, so a cursor is only valid in its own.
+   */
+  readonly space: string | null
 }
 
 const EMPTY_STATE: EngineState = {
@@ -115,6 +120,7 @@ const EMPTY_STATE: EngineState = {
   lastSyncedAt: null,
   updatedWhileOffline: 0,
   peer: null,
+  space: null,
 }
 
 export class SyncJournal {
@@ -140,7 +146,10 @@ export class SyncJournal {
     return next
   }
 
-  /** Moves the whole journal aside (another device's, carried by a copied repo); a fresh one starts empty. */
+  /**
+   * Moves the whole journal aside (another device's, carried by a copied repo, or another space's, after
+   * the repository moved to a new space); a fresh one starts empty.
+   */
   async retire(): Promise<void> {
     try {
       await rename(this.dir, `${this.dir}.retired-${Date.now()}-${randomBytes(4).toString("hex")}`)

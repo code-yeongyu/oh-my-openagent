@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { CommandResult, DeviceService, RemoteAttach } from "@oh-my-opencode/device-service-core"
-import { createDeviceServiceSessions } from "./device-service"
+import { createDeviceServiceSessions } from "../../remote/port/device-service"
 
 // omo#13037 A6 addendum 3: the wake mark follows the service this connection reached. A reconnect to an older service
 // (its welcome below the gate) stops the mark at once; nothing is remembered from the connection before.
@@ -46,7 +46,7 @@ describe("omo#13037: the wake gate is read per connection", () => {
         const fake = services[next]
         next += 1
         if (fake === undefined) throw new Error("no more connections")
-        return fake.service
+        return { conn: fake.service, owned: true }
       },
     })
     const admit = { type: "admit_external_message", sessionId: "s", deliveryId: "d", text: "t" }
