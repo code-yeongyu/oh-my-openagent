@@ -98,6 +98,7 @@
     "packages/device-service-core/src/remote-attach.ts",
     "packages/device-service-core/src/state-dir.ts",
     "packages/device-service-core/src/strict-ed25519/strict-ed25519.ts",
+    "packages/device-service-core/src/timers.ts",
     "packages/device-service-core/tsconfig.json",
     "packages/isolation-core/bunfig.toml",
     "packages/isolation-core/package.json",
