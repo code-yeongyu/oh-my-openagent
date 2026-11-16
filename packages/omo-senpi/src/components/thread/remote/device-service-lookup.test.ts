@@ -27,7 +27,11 @@ function portFor(lookup: "timeout" | "closed" | "answers") {
   const port = createDeviceServiceSessions({
     version: "0.0.0-test",
     connect: () =>
-      connectDeviceService({ version: "0.0.0-test", stateDir: "/nonexistent", connect: async () => fake as never }),
+      connectDeviceService({
+        version: "0.0.0-test",
+        stateDir: "/nonexistent",
+        connect: async () => fake as never,
+      }).then((conn) => ({ conn, owned: true })),
   })
   return { port, calls }
 }

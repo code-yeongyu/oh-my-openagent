@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import * as entry from "../../src/index.ts"
 import { OMO_SENT_REQUEST_TYPES, scanSentRequestTypes } from "./sent-request-types.ts"
 
 // Protocol coverage contract: LA21's reply rows and the fake owner's served set must follow what omo actually sends.
@@ -59,7 +58,9 @@ describe("the request types omo sends through this package's client", () => {
 
   // A tripwire on the entry's export names only: that no other package reaches the client is enforced by guard G1
   // (script/remote-import-guard-rules.ts S1: local-api/** is importable only inside device-service-core).
-  test("the package entry exports nothing named like a raw local-api client", () => {
+  test("the package entry exports nothing named like a raw local-api client", async () => {
+    // A non-literal specifier keeps knip's export check on the entry; a namespace import would mark every export used.
+    const entry: Record<string, unknown> = await import(join(import.meta.dir, "..", "..", "src", "index.ts"))
     expect(Object.keys(entry).filter((name) => /localapi|request/i.test(name))).toEqual(["LocalApiError"])
   })
 })

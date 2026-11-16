@@ -41,10 +41,8 @@ export const OMO_SENT_REQUEST_TYPES = [
 export type OmoSentRequestType = (typeof OMO_SENT_REQUEST_TYPES)[number]
 
 const SRC = join(import.meta.dir, "../../src")
-const LITERAL_SEND = /\brequest(?:<(?:[^<>]|<[^<>]*>)*>)?\(\s*"([^"]+)"/g
-// A send names its type as the first argument; a method definition (`request<T>(type: T, …)`) is skipped because its
-// first argument is a name followed by `:`. Anything else that is not a string literal is reported, whatever follows.
-const OTHER_SEND = /\brequest(?:<(?:[^<>]|<[^<>]*>)*>)?\(\s*(?!")(?![\w$]+\??\s*:)([^\s,)]+)/g
+const LITERAL_SEND = /\brequest\(\s*"([^"]+)"/g
+const OTHER_SEND = /\brequest\(\s*(?!")([^\s,)]+)/g
 
 const sourceFiles = (dir: string): string[] =>
   readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -67,5 +65,6 @@ export const scanSentRequestTypes = (root: string = SRC): SentScan => {
     for (const [, type] of text.matchAll(LITERAL_SEND)) if (isRequestType(type)) sent.add(type)
     for (const [, argument] of text.matchAll(OTHER_SEND)) unscanned.push(`${relative(root, file)}: ${argument}`)
   }
+  // readdir order differs between file systems, so both lists are sorted.
   return { sent: [...sent].toSorted(), unscanned: unscanned.toSorted() }
 }

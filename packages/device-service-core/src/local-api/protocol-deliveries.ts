@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@04288f856dcd224a87108cb46d62d0343ce77136 packages/local-api/src/protocol-deliveries.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/local-api/src/protocol-deliveries.ts
 import type { Empty, EventOf, JsonObject } from "./protocol.ts";
 
 // omo#13037 on the local API v1: delivery consumers. An omo engine process that holds the long-lived connection
