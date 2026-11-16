@@ -43,10 +43,11 @@ pub fn bundle_id(pid: u32) -> Option<String> {
         .ancestors()
         .filter(|p| p.extension().is_some_and(|e| e == "app"))
         .last()?;
-    identifier(app)
+    bundle_identifier(app)
 }
 
-fn identifier(app: &Path) -> Option<String> {
+/// `CFBundleIdentifier` of the bundle at `app`.
+pub fn bundle_identifier(app: &Path) -> Option<String> {
     let bytes = app.as_os_str().as_encoded_bytes();
     let length = isize::try_from(bytes.len()).ok()?;
     // SAFETY: `bytes` is a path of `length` bytes; the default allocator.

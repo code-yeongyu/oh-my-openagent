@@ -54,9 +54,8 @@ impl CaptureOs for Os {
         ax::facts(window)
     }
 
-    /// The Space read belongs to row 45 (`spaces.rs`); until then every window reads `None`.
-    fn space_of(&mut self, _number: u32) -> Option<String> {
-        None
+    fn space_of(&mut self, number: u32) -> Option<String> {
+        crate::spaces::space_of(number)
     }
 
     fn displays(&mut self) -> Result<Vec<DisplayRecord>, Refusal> {
