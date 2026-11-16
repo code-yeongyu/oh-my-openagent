@@ -76,6 +76,9 @@ impl Session {
         if let Some(frame) = mutation.frame_refusal {
             return Err(self.refuse(record, Some("Frame".to_owned()), frame.refusal().into()));
         }
+        if let Some(refusal) = mutation.after_gates {
+            return Err(self.refuse(record, Some("Lease".to_owned()), refusal.into()));
+        }
         let waited_ms = match self.busy_before_send(target) {
             Ok(waited_ms) => waited_ms,
             Err(busy) => {

@@ -28,6 +28,8 @@ pub struct Mutation<'a> {
     /// Row 24: a write that is not input events (an AX write, the clipboard, a window frame),
     /// sent instead of `events`; its value is read back after the send.
     pub write: Option<crate::value_verbs::Write>,
+    /// A verb no row builds yet: every gate runs, then this refuses, nothing sent.
+    pub after_gates: Option<omo_computer_core::backend::Refusal>,
 }
 
 impl<'a> Mutation<'a> {
@@ -54,6 +56,7 @@ impl<'a> Mutation<'a> {
             frame_refusal: None,
             consume: None,
             write: None,
+            after_gates: None,
         }
     }
 
@@ -74,6 +77,7 @@ impl<'a> Mutation<'a> {
             frame_refusal: None,
             consume: None,
             write: None,
+            after_gates: None,
         }
     }
 
@@ -82,6 +86,12 @@ impl<'a> Mutation<'a> {
     pub fn with_write(mut self, write: crate::value_verbs::Write) -> Self {
         self.events = Vec::new();
         self.write = Some(write);
+        self
+    }
+
+    #[must_use]
+    pub fn refused_after_gates(mut self, refusal: omo_computer_core::backend::Refusal) -> Self {
+        self.after_gates = Some(refusal);
         self
     }
 

@@ -1,12 +1,17 @@
-//! The v1 `windows` read the imported corpus calls and no earlier row serves (plan row 28: "a v1
+//! The v1 `windows` read and `raiseWindow` the imported corpus calls and no earlier row serves (plan row 28: "a v1
 //! name that no earlier row serves gets its thin adapter in this row, never a second code path"):
 //! the backend's one listing, shaped by the open session's report mode.
 
-use omo_computer_core::backend::{Refusal, WindowFilter};
+use omo_computer_core::backend::{Refusal, Route, WindowFilter};
+use omo_computer_core::error::EngineCode;
 use omo_computer_core::listing::WindowInfo;
-use omo_computer_core::params::{ReportMode, WindowsParams};
-use omo_computer_core::results::{LegacyWindow, WindowsReply};
+use omo_computer_core::methods::Method;
+use omo_computer_core::params::{RaiseWindowParams, ReportMode, WindowsParams};
+use omo_computer_core::requests::CallAuthority;
+use omo_computer_core::results::{ExecReply, LegacyWindow, WindowsReply};
+use omo_computer_safety::{Call, TargetRef, VerbKind};
 
+use crate::mutate::{Mutation, Refused};
 use crate::Session;
 
 impl Session {
@@ -25,6 +30,28 @@ impl Session {
             Some(ReportMode::Object) => WindowsReply::Object(list),
             Some(ReportMode::Null) | None => WindowsReply::Legacy(list.iter().map(legacy).collect()),
         })
+    }
+
+    /// `raiseWindow{windowId}`: a foreground act no row builds yet (lead decision 3, row 28). It
+    /// runs every gate (stop path, consent, lease) and audits like any exec, then refuses
+    /// `ControlRequired{lease_missing}` with its next call; nothing is sent. Row 21 owes the verb.
+    ///
+    /// # Errors
+    /// The first gate's refusal, else `ControlRequired{lease_missing}`.
+    pub fn raise_window(&mut self, params: RaiseWindowParams) -> Result<ExecReply, Refused> {
+        let dispatched = serde_json::to_value(&params).unwrap_or_default();
+        let RaiseWindowParams { window_id } = params;
+        let call = Call {
+            verb: VerbKind::Keyboard,
+            target: TargetRef::read(Some(window_id.as_str())),
+            points: Vec::new(),
+            chord: None,
+            force: false,
+        };
+        let needs_lease = Refusal::new(EngineCode::ControlRequired, "lease_missing");
+        let mutation = Mutation::exec(Method::RaiseWindow, call, Vec::new(), Route::ForegroundHid, &CallAuthority::default())
+            .refused_after_gates(needs_lease);
+        self.traced(dispatched, &window_id, mutation)
     }
 }
 
