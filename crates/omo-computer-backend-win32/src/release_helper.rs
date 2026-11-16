@@ -35,7 +35,7 @@ pub enum VerbKind {
 /// The refusal of a verb that needs the release helper.
 pub const RELEASE_HELPER_UNAVAILABLE: Refusal = Refusal::new(
     EngineCode::StopPathUnavailable,
-    Reason::ReleaseHelperUnavailable.wire(),
+    Reason::ReleaseHelperUnavailable,
 );
 
 impl HelperState {

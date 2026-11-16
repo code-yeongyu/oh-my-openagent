@@ -49,6 +49,6 @@ fn posted_target_is_the_focused_child_never_the_frame() {
     ] {
         let refusal = focus_child(&os, FRAME).expect_err("no focus target");
         assert_eq!(refusal.code, EngineCode::BackgroundUnavailable);
-        assert_eq!(refusal.reason, Some(Reason::NoFocusTarget.wire()));
+        assert_eq!(refusal.reason, Some(Reason::NoFocusTarget));
     }
 }

@@ -14,7 +14,7 @@ fn release_helper_inside_a_job_refuses_every_held_verb() {
         assert_eq!(refusal.code, EngineCode::StopPathUnavailable);
         assert_eq!(
             refusal.reason,
-            Some(Reason::ReleaseHelperUnavailable.wire())
+            Some(Reason::ReleaseHelperUnavailable)
         );
     }
     assert!(

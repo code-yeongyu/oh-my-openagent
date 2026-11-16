@@ -46,7 +46,7 @@ pub struct Chord {
 /// The refusal of a chord the posted route cannot carry; nothing is posted.
 pub const POSTED_MODIFIER_CHORD: Refusal = Refusal::new(
     EngineCode::BackgroundUnavailable,
-    Reason::PostedModifierChord.wire(),
+    Reason::PostedModifierChord,
 );
 
 /// The messages that post `chord` to a background window.
