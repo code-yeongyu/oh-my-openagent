@@ -36,6 +36,13 @@ describe("operator darwin Mach-O signature layout", () => {
     expect(slice?.cms).toEqual(new Uint8Array([0x30, 0x00]))
   })
 
+  test("#13964 LOW-2: reads the cpu subtype without its capability bits, so arm64e is told apart from arm64", () => {
+    const subtype = (cpu: readonly [number, number]) => readSignatures(machoSigned({ code, cpu }).file)[0]?.cpuSubtype
+    expect(subtype([0x0100000c, 0])).toBe(0)
+    expect(subtype([0x0100000c, 0x80000002])).toBe(2)
+    expect(subtype([0x01000007, 3])).toBe(3)
+  })
+
   test("an ad-hoc slice (empty CMS blob) carries no CMS for the signer check to accept", () => {
     expect(readSignatures(machoSigned({ code }).file)[0]?.cms).toBeNull()
   })

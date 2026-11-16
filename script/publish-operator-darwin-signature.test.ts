@@ -218,6 +218,37 @@ describe("operator darwin CMS signer", () => {
     })
   })
 
+  test("#13964 LOW-1: a signing certificate OpenSSL cannot parse is a typed refusal, not a thrown OpenSSL error", () => {
+    // Same issuer and serial as the real leaf, so it is selected as the signer; its public-key BIT STRING tag is
+    // corrupted, which makes X509Certificate throw (measured: OPENSSL NO_START_LINE).
+    const broken = realLeaf.slice()
+    const rsa = Buffer.from(broken).indexOf(
+      Buffer.from([0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01]),
+    )
+    broken[rsa + 13] = 0x04
+    const foreign = issue({ subject: [[CN, "Attacker"]], serial: 12 })
+    const cms = signedData({ signedOver: realCodeDirectory, key: foreign.key, signer: broken, certificates: [broken] })
+    expect(refusal(() => verifyDeveloperIdSigner(realCodeDirectory, cms))).toBe(
+      "REFUSED: the signing certificate is not a valid X.509 certificate",
+    )
+  })
+
+  test("#13964 L7: 32 nested indefinite-length levels are parsed, even with an element inside; 33 are refused", () => {
+    const nested = (levels: number, inner: number[] = []) =>
+      Uint8Array.from([
+        ...Array.from({ length: levels }, () => [0x30, 0x80]).flat(),
+        ...inner,
+        ...new Array(levels * 2).fill(0),
+      ])
+    expect(refusal(() => verifyDeveloperIdSigner(realCodeDirectory, nested(32)))).not.toContain("DER nesting exceeds")
+    expect(refusal(() => verifyDeveloperIdSigner(realCodeDirectory, nested(32, [0x05, 0x00])))).not.toContain(
+      "DER nesting exceeds",
+    )
+    expect(refusal(() => verifyDeveloperIdSigner(realCodeDirectory, nested(33)))).toBe(
+      "REFUSED: DER nesting exceeds 32 indefinite-length levels",
+    )
+  })
+
   test("review NIT-2: 200k nested indefinite-length elements are a typed refusal, not a stack overflow", () => {
     const bomb = new Uint8Array(400_000)
     for (let index = 0; index < bomb.length; index += 2) bomb.set([0x30, 0x80], index)
