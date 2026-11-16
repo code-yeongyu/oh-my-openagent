@@ -505,7 +505,7 @@ describe("omo remote attach", () => {
     expect(socket).toMatch(/[\\/]t-[0-9a-f]{16}\.sock$/)
   })
 
-  test.each([[[]], [["no-slash"]], [["/session"]], [["device/"]], [[`${PEER}/${SESSION_ID}`, "extra"]]])(
+  test.each([[[]], [["/session"]], [["device/"]], [[`${PEER}/${SESSION_ID}`, "extra"]]])(
     "refuses the target %p as usage",
     async (target) => {
       const { prepared, err } = await attach(target)
@@ -669,7 +669,7 @@ describe("omo remote session verbs", () => {
       sessionCommand: (device, sessionId, rpc, options) =>
         note(`command:${String(rpc["type"])}`, port.sessionCommand(device, sessionId, rpc, options)),
       read: (device, sessionId, tail) => note("read", port.read(device, sessionId, tail)),
-      watch: (device, sessionId, listener) => note("watch", port.watch(device, sessionId, listener)),
+      watch: (device, sessionId, handlers, options) => note("watch", port.watch(device, sessionId, handlers, options)),
     }
     return { calls, remote: { ...remote, sessions } }
   }
@@ -687,7 +687,8 @@ describe("omo remote session verbs", () => {
     expect(types(a.sent, "open_session").map((entry) => entry.rpc?.["cwd"])).toEqual(["/work/b"])
   })
 
-  test("open --model sets the new session's model, and --json prints the typed result with it", async () => {
+  // #13409: the model is the open's launch profile, never a set_model after it.
+  test("open --model opens the session on that model in the one open_session, and --json prints the typed result", async () => {
     const a = fixture.account()
     const { code, out } = await run(
       ["open", "b", "--model", "openai/gpt-6", "--json"],
@@ -697,14 +698,11 @@ describe("omo remote session verbs", () => {
       a.remote,
     )
     expect(code).toBe(REMOTE_EXIT.ok)
-    expect(JSON.parse(out.join(""))).toMatchObject({
-      kind: "ok",
-      thread: { thread_id: "dur-new-on-b", device: "b" },
-      model: { provider: "openai", id: "gpt-6" },
-    })
-    expect(types(a.sent, "set_model").map((entry) => [entry.session, entry.rpc?.["modelId"]])).toEqual([
-      ["dur-new-on-b", "gpt-6"],
+    expect(JSON.parse(out.join(""))).toMatchObject({ kind: "ok", thread: { thread_id: "dur-new-on-b", device: "b" } })
+    expect(types(a.sent, "open_session").map((entry) => [entry.rpc?.["provider"], entry.rpc?.["modelId"]])).toEqual([
+      ["openai", "gpt-6"],
     ])
+    expect(types(a.sent, "set_model")).toEqual([])
   })
 
   test("send streams the answer's text deltas in order and returns once the turn settles", async () => {
@@ -737,29 +735,31 @@ describe("omo remote session verbs", () => {
     )
   })
 
-  test("open --model that the new session cannot use names the session it opened, which is still open, in human and --json output", async () => {
+  // #13409: b's engine refuses an open whose model it cannot run (senpi model_unavailable), so no session is left behind.
+  test("open --model that b cannot run opens nothing and fails with model_not_found, in human and --json output", async () => {
+    const refusal = "model_unavailable: no model nope/none"
+    const humanAccount = fixture.account({ openRefuse: refusal })
     const human = await run(
       ["open", "b", "--model", "nope/none"],
       undefined,
       SIGNED_IN,
       testBootstrap(),
-      fixture.account().remote,
+      humanAccount.remote,
     )
-    expect([human.code, human.out]).toEqual([REMOTE_EXIT.failed, ["b/dur-new-on-b"]])
-    expect(human.err[0]).toStartWith("omo remote: opened b/dur-new-on-b, but its model was not set: ")
-    expect(human.err[1]).toEndWith("The session is still open; end it with omo remote close b/dur-new-on-b.")
+    expect([human.code, human.out]).toEqual([REMOTE_EXIT.failed, []])
+    expect(human.err[0]).toStartWith("omo remote: No thread was created: device b cannot run nope/none")
+    expect(types(humanAccount.sent, "set_model")).toEqual([])
     const json = await run(
       ["open", "b", "--model", "nope/none", "--json"],
       undefined,
       SIGNED_IN,
       testBootstrap(),
-      fixture.account().remote,
+      fixture.account({ openRefuse: refusal }).remote,
     )
     expect(json.code).toBe(REMOTE_EXIT.failed)
     expect(JSON.parse(json.out.join(""))).toMatchObject({
       kind: "error",
-      error: { code: "model_not_found" },
-      thread: { thread_id: "dur-new-on-b", device: "b" },
+      error: { code: "model_not_found", details: { reason: "model_unavailable", model: "nope/none", device: "b" } },
     })
   })
 
@@ -856,7 +856,8 @@ describe("omo remote session verbs", () => {
 
   test("a waiting send whose started turn was interrupted and finished before the send caught up fails with a typed line (probe)", async () => {
     const a = fixture.account({
-      records: [{ type: "agent_settled" }],
+      // The run's own prompt precedes its settle, so the settle is this send's turn and not an earlier run's.
+      records: [{ type: "message_end", message: { role: "user", content: "hi" } }, { type: "agent_settled" }],
       recordsBeforeReply: true,
       entriesAfterAnswer: [
         { role: "user", content: "hi" },
@@ -989,7 +990,7 @@ describe("omo remote session verbs", () => {
 
   test.each([
     [
-      ["send", "no-slash", "hi"],
+      ["send", "/session", "hi"],
       "omo remote send: name the session as <device>/<session> (the SESSION column of omo remote sessions)",
     ],
     [["send", "b/dur-on-b"], "omo remote send: the message text is required"],

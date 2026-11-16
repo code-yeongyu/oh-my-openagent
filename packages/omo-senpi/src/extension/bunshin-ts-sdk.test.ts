@@ -35,4 +35,12 @@ describe("bunshin-ts eval SDK entry", () => {
     )
     expect(refused).toBeInstanceOf(BunshinSessionError)
   })
+
+  it("#given the re-vendored relay transport #when created through the SDK entry #then its artifact surface and retryUnreachableMs are exposed and typed", () => {
+    const transport = createRelayTransport({ stateDir: "/nonexistent", retryUnreachableMs: 1_000 })
+    const upload: (bytes: Uint8Array) => Promise<{ readonly url: string }> = transport.uploadArtifact
+    const fetchArtifact: typeof fetch = transport.fetchArtifact
+    expect(typeof upload).toBe("function")
+    expect(typeof fetchArtifact).toBe("function")
+  })
 })
