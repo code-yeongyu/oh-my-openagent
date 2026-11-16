@@ -125,9 +125,18 @@ impl FakeInputServer {
             ClientProcess {
                 libraries: owned(libraries),
                 args: owned(args),
+                exe: None,
                 chromium_helpers: false,
             },
         );
+        self
+    }
+
+    /// `window`'s client process runs the binary at `exe`.
+    pub fn with_exe(mut self, window: Window, exe: &str) -> Self {
+        if let Some(process) = self.processes.get_mut(&window) {
+            process.exe = Some(exe.to_owned());
+        }
         self
     }
 

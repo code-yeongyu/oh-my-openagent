@@ -126,6 +126,21 @@ fn xterm_is_refused_even_when_the_resources_the_engine_can_read_allow_send_event
 }
 
 #[test]
+fn an_xterm_binary_under_another_name_and_class_is_refused() {
+    // Given: xterm run through a renamed link with -name/-class overridden; only its exe link names xterm.
+    let server = FakeInputServer::new(Some(EDITOR))
+        .window(FIXTURE, (2, 40), b"myterm\0MyTerm\0")
+        .process(
+            FIXTURE,
+            &["libXaw.so.7", "libXt.so.6"],
+            &["/usr/local/bin/myterm", "-name", "myterm", "-class", "MyTerm"],
+        )
+        .with_exe(FIXTURE, "/usr/bin/xterm");
+    // When / Then
+    assert_refused(server, "synthetic_input_dropped");
+}
+
+#[test]
 fn a_window_embedded_from_a_gtk_process_is_refused_inside_an_accepting_shell() {
     // Given: a Tk shell whose area under the point is a plug window of a GTK process.
     const PLUG: Window = 0x90_0002;

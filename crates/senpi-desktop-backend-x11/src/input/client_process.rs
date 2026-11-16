@@ -13,6 +13,9 @@ pub struct ClientProcess {
     pub libraries: Vec<String>,
     /// `argv` as `/proc/<pid>/cmdline` lists it.
     pub args: Vec<String>,
+    /// What `/proc/<pid>/exe` resolves to, e.g. `/usr/bin/xterm`; `None` when
+    /// the link cannot be read.
+    pub exe: Option<String>,
     /// Whether a child runs with Chromium's `--type=` helper argument
     /// (Chromium and Electron link their toolkit statically).
     pub chromium_helpers: bool,
@@ -42,9 +45,13 @@ impl ClientProcess {
             read_args(&proc_root.join(child).join("cmdline"))
                 .is_some_and(|args| args.iter().any(|arg| arg.starts_with("--type=")))
         });
+        let exe = fs::read_link(dir.join("exe"))
+            .ok()
+            .map(|path| path.to_string_lossy().trim_end_matches(" (deleted)").to_owned());
         Ok(Self {
             libraries,
             args,
+            exe,
             chromium_helpers,
         })
     }

@@ -55,6 +55,7 @@ fn a_process_lists_its_mapped_libraries_once_and_its_arguments() {
     // Then
     assert_eq!(process.libraries, ["libX11.so.6.4.0", "libgtk-3.so.0.2409.32"]);
     assert_eq!(process.args, ["python3", "fixture.py", "--report", "/tmp/r.json"]);
+    assert_eq!(process.exe, None, "the fake /proc has no exe link");
     assert!(!process.chromium_helpers);
 }
 
@@ -69,6 +70,18 @@ fn a_child_with_a_type_argument_marks_a_chromium_helper_tree() {
     let process = ClientProcess::read(root.path(), 50).expect("readable process");
     // Then
     assert!(process.chromium_helpers);
+}
+
+#[test]
+fn the_exe_link_names_the_binary_even_after_it_was_replaced_on_disk() {
+    // Given: pid 60 runs a binary that a package upgrade has since replaced.
+    let root = ProcRoot::new("exe");
+    root.process(60, GTK_MAPS, b"/usr/local/bin/myterm\0", "");
+    std::os::unix::fs::symlink("/usr/bin/xterm (deleted)", root.path().join("60").join("exe")).expect("exe link");
+    // When
+    let process = ClientProcess::read(root.path(), 60).expect("readable process");
+    // Then
+    assert_eq!(process.exe.as_deref(), Some("/usr/bin/xterm"));
 }
 
 #[test]
