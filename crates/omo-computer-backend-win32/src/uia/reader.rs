@@ -14,7 +14,7 @@ use super::source::UiaSource;
 
 /// `AxUnsupported{elevated_target}`: an elevated target is not read, before any walk.
 pub const ELEVATED: Refusal =
-    Refusal::new(EngineCode::AxUnsupported, Reason::ElevatedTarget.wire());
+    Refusal::new(EngineCode::AxUnsupported, Reason::ElevatedTarget);
 
 /// The reader over one UI Automation client.
 pub struct UiaReader<S> {

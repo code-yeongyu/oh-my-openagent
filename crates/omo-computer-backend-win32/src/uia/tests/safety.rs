@@ -30,7 +30,7 @@ fn self_activating_hosts_refuse_off_the_foreground_and_admit_on_it() {
         let refusal =
             ensure_pattern_safe(host, false).expect_err("refused before any pattern call");
         assert_eq!(refusal.code, EngineCode::BackgroundUnavailable);
-        assert_eq!(refusal.reason, Some(Reason::ProviderSelfActivates.wire()));
+        assert_eq!(refusal.reason, Some(Reason::ProviderSelfActivates));
         assert!(
             ensure_pattern_safe(host, true).is_ok(),
             "{host:?} on the foreground"

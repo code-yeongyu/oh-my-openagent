@@ -46,7 +46,7 @@ pub fn host_of(class: &str, _exe: &str) -> Host {
 /// The refusal of a pattern call that would bring its provider to the foreground.
 pub const PROVIDER_SELF_ACTIVATES: Refusal = Refusal::new(
     EngineCode::BackgroundUnavailable,
-    Reason::ProviderSelfActivates.wire(),
+    Reason::ProviderSelfActivates,
 );
 
 /// Admits a UIA pattern call on `host`.

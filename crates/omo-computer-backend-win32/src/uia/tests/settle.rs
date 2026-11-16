@@ -29,7 +29,7 @@ fn loading_reports_unsupported() {
     let mut settle = settle(FakeUia::winforms());
     let refused = settle.busy("4660").expect_err("no probe-ledger row defines a Windows loading predicate (A4)");
     assert_eq!(refused.code, EngineCode::Internal);
-    assert_eq!(refused.reason, Some(Reason::SurfaceUnsupported.wire()));
+    assert_eq!(refused.reason, Some(Reason::SurfaceUnsupported));
 }
 
 #[test]
@@ -48,5 +48,5 @@ fn uia_toast_fingerprint_and_unavailable_without_the_shell() {
     assert_eq!(listed[0].body_hash.len(), 16);
     assert_eq!(listed[0].arrived_at_ms, 900);
     let refused = settle(FakeUia::winforms()).notifications().expect_err("no ShellExperienceHost");
-    assert_eq!(refused.reason, Some(Reason::NoNotificationSurface.wire()));
+    assert_eq!(refused.reason, Some(Reason::NoNotificationSurface));
 }

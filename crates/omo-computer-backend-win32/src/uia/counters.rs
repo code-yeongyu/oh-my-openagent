@@ -18,7 +18,7 @@ use super::source::UiaSource;
 
 /// `Internal{surface_unsupported}`: no loading predicate on Windows yet (A4).
 pub const LOADING_UNSUPPORTED: Refusal =
-    Refusal::new(EngineCode::Internal, Reason::SurfaceUnsupported.wire());
+    Refusal::new(EngineCode::Internal, Reason::SurfaceUnsupported);
 
 /// What one UIA handler saw.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
