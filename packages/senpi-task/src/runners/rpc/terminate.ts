@@ -96,7 +96,7 @@ async function terminateWindowsProcessTree(child: ChildProcess, pid: number): Pr
   // event is a runtime courtesy, not a guarantee: Bun on Windows can leave it undelivered when the
   // stdio pipes outlive the process, and the unbounded wait held a cleanup hook for 46.8 s until its
   // bound (hosted run 44169815547, job 134346049552). The POSIX path already races post-kill liveness
-  // against an observation window; Windows now matches — bounded observation, never an open-ended wait.
+  // against an observation window; Windows now matches: bounded observation, never an open-ended wait.
   await waitForExitOrDelay(exited, PROCESS_EXIT_OBSERVATION_TIMEOUT_MS)
 }
 
